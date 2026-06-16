@@ -1221,11 +1221,12 @@ public:
      complex expression or any lexing failure falls back to the char parser. */
   fn evaluate_arithmetic_cached(const WordSegment &segment) throws -> i64;
 
-  /* The same value as evaluate_arithmetic, but it lexes the clause once into the
-     caller-owned token store and re-evaluates from it. The C-style for loop owns
-     a token store per clause, so its condition and step do not re-scan their
-     bytes on every iteration. A complex clause or a lexing failure falls back to
-     the char parser, and a clause holding a substitution skips the cache. */
+  /* The same value as evaluate_arithmetic, but it lexes the clause once into
+     the caller-owned token store and re-evaluates from it. The C-style for loop
+     owns a token store per clause, so its condition and step do not re-scan
+     their bytes on every iteration. A complex clause or a lexing failure falls
+     back to the char parser, and a clause holding a substitution skips the
+     cache. */
   fn evaluate_arithmetic_cached_clause(StringView expression,
                                        ArrayList<arith_token> &tokens,
                                        bool &is_tokenized,

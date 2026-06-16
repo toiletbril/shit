@@ -107,19 +107,20 @@ public:
 
   /* The optimizer-state dump, also set by --show-optimizer-state. It prints a
      located line for every node the stage eliminated and a final state summary,
-     so an operator sees exactly which source the optimizer removed. The one flag
-     drives both this and the trace, so a folded node prints once. */
+     so an operator sees exactly which source the optimizer removed. The one
+     flag drives both this and the trace, so a folded node prints once. */
   bool should_print_optimizer_state{false};
 
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
-  /* The message states the problem, and the suggestion, when present, renders as
-     a trailing note line under the caret rather than appended to the message, so
-     the advice reads on its own. */
+  /* The message states the problem, and the suggestion, when present, renders
+     as a trailing note line under the caret rather than appended to the
+     message, so the advice reads on its own. */
   fn warn(SourceLocation location, StringView message,
           StringView suggestion = {}) throws -> void;
-  /* The message states the problem, and the suggestion, when present, renders as
-     a trailing note line, the way warn does, so the advice reads on its own. */
+  /* The message states the problem, and the suggestion, when present, renders
+     as a trailing note line, the way warn does, so the advice reads on its own.
+   */
   fn fail(SourceLocation location, StringView message,
           StringView suggestion = {}) throws -> void;
   /* Prints one optimizer trace line to standard error when the trace is on, so
@@ -127,9 +128,10 @@ public:
   fn trace_optimizer_line(StringView message) const throws -> void;
   /* Prints one located optimizer-state line to standard error when the state
      dump is on, the message followed by the source caret at the given location,
-     so the -Z dump names where each eliminated node lives. A no-op otherwise. */
-  fn trace_eliminated_node(SourceLocation location, StringView message) const
-      throws -> void;
+     so the -Z dump names where each eliminated node lives. A no-op otherwise.
+   */
+  fn trace_eliminated_node(SourceLocation location,
+                           StringView message) const throws -> void;
 };
 
 /* Walk the tree and report. Returns true when execution may proceed, false when
@@ -857,9 +859,9 @@ protected:
   /* The condition and step clauses are immutable text re-evaluated every
      iteration, so each clause lexes its tokens once into its own store and the
      evaluator re-runs from them rather than re-scanning the bytes. A simple
-     clause such as m <= hi runs the token fast path, while a complex clause such
-     as the m += p step falls back to the char parser, decided once when the
-     tokens are filled. */
+     clause such as m <= hi runs the token fast path, while a complex clause
+     such as the m += p step falls back to the char parser, decided once when
+     the tokens are filled. */
   mutable ArrayList<arith_token> m_condition_tokens{heap_allocator()};
   mutable ArrayList<arith_token> m_step_tokens{heap_allocator()};
   mutable bool m_condition_tokenized{false};

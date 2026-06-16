@@ -1424,10 +1424,10 @@ hot fn Parser::parse_for() throws -> Command *
                       (name_text[i] >= '0' && name_text[i] <= '9');
   }
   if (!is_name_plain) {
-    ErrorWithLocation error{
-        name_token->source_location(),
-        StringView{"Bad for loop variable, '"} + name_token->raw_string() +
-            "' is not a plain name"};
+    ErrorWithLocation error{name_token->source_location(),
+                            StringView{"Bad for loop variable, '"} +
+                                name_token->raw_string() +
+                                "' is not a plain name"};
     error.set_note("drop the '$' and any quotes");
     throw error;
   }

@@ -28,9 +28,9 @@ static BumpArena HIGHLIGHT_ARENA{};
    highlighter and a TAB completion do not re-read the same directory through a
    readdir on every stroke. A large directory such as /usr/bin costs one readdir
    on the first stroke and a stat on every later one, where the stat detects an
-   outside change to the directory and forces a re-read. The cache is keyed by the
-   directory path the caller passed, so two spellings of the same directory take
-   two slots, an accepted cost for a four-slot ring. */
+   outside change to the directory and forces a re-read. The cache is keyed by
+   the directory path the caller passed, so two spellings of the same directory
+   take two slots, an accepted cost for a four-slot ring. */
 struct directory_listing_cache_entry
 {
   String directory_path{};
@@ -94,8 +94,7 @@ static fn read_directory_cached(const Path &directory) throws
   /* The least-recently-used slot is the last one, so the whole ring shifts down
      by one and the fresh listing lands at the front. */
   for (usize back = DIRECTORY_LISTING_CACHE_SLOT_COUNT - 1; back > 0; back--)
-    DIRECTORY_LISTING_CACHE[back] =
-        steal(DIRECTORY_LISTING_CACHE[back - 1]);
+    DIRECTORY_LISTING_CACHE[back] = steal(DIRECTORY_LISTING_CACHE[back - 1]);
 
   directory_listing_cache_entry fresh{};
   fresh.directory_path = String{path_view};
@@ -2620,9 +2619,9 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
       (token.is_empty() || token[0] != '-'))
   {
     /* unset -f removes a function, so its operand completes against the defined
-       function names. The plain and -v forms remove a variable, so they complete
-       the shell and environment names the way a $-prefixed reference would. The
-       flag is read from the words typed before this operand. */
+       function names. The plain and -v forms remove a variable, so they
+       complete the shell and environment names the way a $-prefixed reference
+       would. The flag is read from the words typed before this operand. */
     let unsets_function = false;
     let const prefix = line.substring_of_length(0, token_start);
     usize scan_position = 0;

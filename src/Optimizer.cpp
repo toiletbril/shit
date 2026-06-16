@@ -218,9 +218,8 @@ inline constexpr StaticStringMap<bool>::entry ENVIRONMENT_NEUTRAL_ENTRIES[] = {
 };
 
 inline constexpr StaticStringMap<bool> ENVIRONMENT_NEUTRAL_NAMES{
-    ENVIRONMENT_NEUTRAL_ENTRIES,
-    sizeof(ENVIRONMENT_NEUTRAL_ENTRIES) /
-        sizeof(ENVIRONMENT_NEUTRAL_ENTRIES[0])};
+    ENVIRONMENT_NEUTRAL_ENTRIES, sizeof(ENVIRONMENT_NEUTRAL_ENTRIES) /
+                                     sizeof(ENVIRONMENT_NEUTRAL_ENTRIES[0])};
 
 } /* namespace */
 
@@ -422,8 +421,8 @@ pure fn trim_arithmetic_whitespace(StringView text) wontthrow -> StringView
   while (end_position > start_position &&
          (text[end_position - 1] == ' ' || text[end_position - 1] == '\t'))
     end_position--;
-  return text.substring(start_position).substring_of_length(0, end_position -
-                                                                   start_position);
+  return text.substring(start_position)
+      .substring_of_length(0, end_position - start_position);
 }
 
 /* The constant result of an algebraic identity on a single binary operator, the
@@ -460,7 +459,8 @@ fn try_algebraic_simplify(StringView expression,
       break;
     }
     /* A leading sign on the whole expression is a unary minus, not the binary
-       operator this matcher splits on, so the scan starts past position zero. */
+       operator this matcher splits on, so the scan starts past position zero.
+     */
     if (i > 0 && (byte == '*' || byte == '-')) {
       operator_position = i;
       operator_count++;
@@ -472,8 +472,8 @@ fn try_algebraic_simplify(StringView expression,
   const char op = expr[operator_position];
   let const lhs = trim_arithmetic_whitespace(
       expr.substring_of_length(0, operator_position));
-  let const rhs = trim_arithmetic_whitespace(expr.substring(operator_position +
-                                                            1));
+  let const rhs =
+      trim_arithmetic_whitespace(expr.substring(operator_position + 1));
   if (lhs.length == 0 || rhs.length == 0) return None;
 
   /* Each operand must read as a plain name or a plain integer, no increment, no
@@ -833,8 +833,8 @@ fn rule_eliminate_compound_body(const Expression *node,
 /* RULE empty for-loop elimination. A for with an explicit in clause and no
    words never iterates, so the whole loop is a no-op whatever the body holds.
    The mark is honored at the top of ForLoop::evaluate_impl. */
-fn rule_eliminate_empty_for(const Expression *node, AnalysisContext &actx) throws
-    -> bool
+fn rule_eliminate_empty_for(const Expression *node,
+                            AnalysisContext &actx) throws -> bool
 {
   const expressions::ForLoop *loop = node->as_for_loop();
   if (loop == nullptr) return false;
@@ -907,8 +907,9 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
     actx.optimizer_eliminated_compounds++;
     if (actx.should_trace_optimizer)
       actx.trace_optimizer_line(String{"eliminated c-style for loop"});
-    actx.trace_eliminated_node(node->source_location(),
-                               "Eliminated c-style for whose condition is zero");
+    actx.trace_eliminated_node(
+        node->source_location(),
+        "Eliminated c-style for whose condition is zero");
   }
   return true;
 }

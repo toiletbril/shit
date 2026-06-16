@@ -352,8 +352,7 @@ public:
     if (pos == source.length) return 0;
     let const result = parse_comma();
     skip_spaces();
-    if (pos != source.length)
-    {
+    if (pos != source.length) {
       /* The leftover text after a complete expression usually means an operator
          is missing, so the cause rides a trailing note rather than the message.
        */
@@ -1069,10 +1068,9 @@ fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
       segment.arith_simple);
 }
 
-fn EvalContext::evaluate_arithmetic_cached_clause(StringView expression,
-                                                  ArrayList<arith_token> &tokens,
-                                                  bool &is_tokenized,
-                                                  bool &is_simple) throws -> i64
+fn EvalContext::evaluate_arithmetic_cached_clause(
+    StringView expression, ArrayList<arith_token> &tokens, bool &is_tokenized,
+    bool &is_simple) throws -> i64
 {
   /* A parameter or command substitution inside the arithmetic needs the full
      expansion path, so only a substitution-free expression, the hot loop case

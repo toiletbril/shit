@@ -232,8 +232,8 @@ get_context_pointing_to(StringView source, usize byte_position,
   const usize line_number_digit_count = number_string_length(line_number + 1);
   const usize line_number_padding_length =
       sub_sat(LINE_NUMBER_FIELD_WIDTH, line_number_digit_count);
-  const usize gutter_width =
-      line_number_padding_length + line_number_digit_count + BAR_SEPARATOR_WIDTH;
+  const usize gutter_width = line_number_padding_length +
+                             line_number_digit_count + BAR_SEPARATOR_WIDTH;
 
   let msg = String{};
   for (usize i = 0; i < line_number_padding_length; i++) {
@@ -283,8 +283,9 @@ get_context_pointing_to(StringView source, usize byte_position,
                                        : byte_count);
 
   /* The underline gutter mirrors the context gutter so the two bars line up.
-     The bar sits one column before its two trailing spaces, so the spaces run up
-     to the bar, the bar prints, then the two trailing spaces close the gutter.
+     The bar sits one column before its two trailing spaces, so the spaces run
+     up to the bar, the bar prints, then the two trailing spaces close the
+     gutter.
    */
   msg += '\n';
   for (usize i = 0; i + 3 < gutter_width; i++)

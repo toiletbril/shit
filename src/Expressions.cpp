@@ -4697,12 +4697,10 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      shellcheck SC2005, run the command on its own. */
   if (!command_is_shadowed) {
     if (command_literal == "egrep")
-      actx.warn(m_args[0]->source_location(),
-                "The egrep command is deprecated",
+      actx.warn(m_args[0]->source_location(), "The egrep command is deprecated",
                 "use grep -E for the extended regular expression match");
     else if (command_literal == "fgrep")
-      actx.warn(m_args[0]->source_location(),
-                "The fgrep command is deprecated",
+      actx.warn(m_args[0]->source_location(), "The fgrep command is deprecated",
                 "use grep -F for the fixed string match");
     else if (command_literal == "expr")
       actx.warn(m_args[0]->source_location(),
@@ -4814,8 +4812,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      so command -v is the portable lookup. This is shellcheck SC2230. A function
      or alias named which is the user's own, so the lint is off for it. */
   if (command_literal == "which" && !command_is_shadowed) {
-    actx.warn(m_args[0]->source_location(),
-              "The which command is non-standard",
+    actx.warn(m_args[0]->source_location(), "The which command is non-standard",
               "use command -v for a portable lookup");
   }
 
@@ -5155,8 +5152,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (view == "==" && i >= 2 &&
           !is_test_binary_operator_word(previous_literal.view()))
       {
-        actx.warn(m_args[i]->source_location(),
-                  "== is undefined in POSIX test", "use = for string equality");
+        actx.warn(m_args[i]->source_location(), "== is undefined in POSIX test",
+                  "use = for string equality");
       }
       let const previous_is_bang = previous_literal.view() == "!";
       if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
