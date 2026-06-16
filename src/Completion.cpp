@@ -101,10 +101,10 @@ static fn read_directory_cached(const Path &directory) throws
   let listing = Path::read_directory_typed(directory);
   if (!listing.has_value()) return nullptr;
 
-  /* The directory flag is resolved here, once per read, from the dirent type the
-     read already knew. Only a symlink, whose target type the read cannot know,
-     and a type the filesystem left unknown fall back to a stat, so a directory of
-     plain files and subdirectories costs no stat at all. */
+  /* The directory flag is resolved here, once per read, from the dirent type
+     the read already knew. Only a symlink, whose target type the read cannot
+     know, and a type the filesystem left unknown fall back to a stat, so a
+     directory of plain files and subdirectories costs no stat at all. */
   let resolved_entries = ArrayList<cached_directory_entry>{};
   resolved_entries.reserve(listing->count());
   for (let &child : *listing) {
@@ -599,8 +599,8 @@ static fn complete_filesystem(StringView token,
     let candidate = String{parts.directory_part};
     candidate += name;
 
-    /* The directory flag was resolved when the listing was cached, so a trailing
-       slash needs no stat here. */
+    /* The directory flag was resolved when the listing was cached, so a
+       trailing slash needs no stat here. */
     if (entry.is_directory) candidate += '/';
 
     candidates.push(steal(candidate));
@@ -3065,12 +3065,13 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
                                       descriptions);
     if (from_stage.has_value()) {
       candidates = steal(*from_stage);
-    } else if (for_listing || !split_path_token(token).basename_part.is_empty()) {
-      /* A token ending in a slash has an empty basename, so the ghost would list
-         a whole directory on each keystroke to suggest nothing, since the entries
-         share no common prefix to extend. The listing runs for the ghost only
-         once a basename is typed, while an explicit tab still lists the directory
-         because the user asked for the menu. */
+    } else if (for_listing || !split_path_token(token).basename_part.is_empty())
+    {
+      /* A token ending in a slash has an empty basename, so the ghost would
+         list a whole directory on each keystroke to suggest nothing, since the
+         entries share no common prefix to extend. The listing runs for the
+         ghost only once a basename is typed, while an explicit tab still lists
+         the directory because the user asked for the menu. */
       candidates = complete_filesystem(token, base_directory);
     }
   }
@@ -3395,8 +3396,9 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
 }
 
 /* True when the character after a word finishes it, a space, a tab, a newline,
-   or a list operator, so no further keystroke can grow the word. A finished word
-   that does not fully resolve is a dead end rather than a prefix still typed. */
+   or a list operator, so no further keystroke can grow the word. A finished
+   word that does not fully resolve is a dead end rather than a prefix still
+   typed. */
 static fn word_is_terminated_by_separator(StringView line, usize word_end,
                                           usize line_length) wontthrow -> bool
 {
@@ -3481,10 +3483,10 @@ static fn color_path_argument(usize word_start, StringView word,
 
   let const partial =
       word.substring_of_length(existing_end, segment_end - existing_end);
-  /* A tail still being typed that prefixes a real entry could still complete, so
-     it is normal cyan against the bright cyan of the part that exists. Once the
-     word is finished, or when nothing begins with the tail, the path does not
-     fully resolve and the tail is a dead end, so it reads red. */
+  /* A tail still being typed that prefixes a real entry could still complete,
+     so it is normal cyan against the bright cyan of the part that exists. Once
+     the word is finished, or when nothing begins with the tail, the path does
+     not fully resolve and the tail is a dead end, so it reads red. */
   let const tail_could_complete =
       !word_is_terminated &&
       path_partial_prefixes_entry(word, existing_end, partial, has_tilde);
