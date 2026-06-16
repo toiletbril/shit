@@ -31,12 +31,22 @@ static BumpArena HIGHLIGHT_ARENA{};
    outside change to the directory and forces a re-read. The cache is keyed by
    the directory path the caller passed, so two spellings of the same directory
    take two slots, an accepted cost for a four-slot ring. */
+/* One listed child, its name and whether it is a directory. The directory flag
+   is resolved once when the listing is read, from the dirent type the read
+   already knew, so the per-keystroke completion never stats an entry to learn
+   whether to append a trailing slash. */
+struct cached_directory_entry
+{
+  String name{};
+  bool is_directory{false};
+};
+
 struct directory_listing_cache_entry
 {
   String directory_path{};
   i64 modification_time{0};
   bool is_valid{false};
-  ArrayList<String> entries{};
+  ArrayList<cached_directory_entry> entries{};
 };
 
 static constexpr usize DIRECTORY_LISTING_CACHE_SLOT_COUNT = 4;
@@ -51,7 +61,7 @@ static directory_listing_cache_entry
    sees from a bare read_directory. The returned pointer stays valid until the
    next call, which the per-keystroke callers consume before they call again. */
 static fn read_directory_cached(const Path &directory) throws
-    -> const ArrayList<String> *
+    -> const ArrayList<cached_directory_entry> *
 {
   let const path_view = directory.text().view();
 
@@ -88,8 +98,32 @@ static fn read_directory_cached(const Path &directory) throws
     break;
   }
 
-  let listing = Path::read_directory(directory);
+  let listing = Path::read_directory_typed(directory);
   if (!listing.has_value()) return nullptr;
+
+  /* The directory flag is resolved here, once per read, from the dirent type the
+     read already knew. Only a symlink, whose target type the read cannot know,
+     and a type the filesystem left unknown fall back to a stat, so a directory of
+     plain files and subdirectories costs no stat at all. */
+  let resolved_entries = ArrayList<cached_directory_entry>{};
+  resolved_entries.reserve(listing->count());
+  for (let &child : *listing) {
+    let is_directory = false;
+    switch (child.kind) {
+    case Path::entry_kind::Directory: is_directory = true; break;
+    case Path::entry_kind::Regular:
+    case Path::entry_kind::Other: is_directory = false; break;
+    default: {
+      let full = directory.clone();
+      full.push_component(child.name.view());
+      is_directory = full.is_directory();
+      break;
+    }
+    }
+
+    resolved_entries.push(
+        cached_directory_entry{steal(child.name), is_directory});
+  }
 
   /* The least-recently-used slot is the last one, so the whole ring shifts down
      by one and the fresh listing lands at the front. */
@@ -100,7 +134,7 @@ static fn read_directory_cached(const Path &directory) throws
   fresh.directory_path = String{path_view};
   fresh.modification_time = has_status ? status.modification_time : 0;
   fresh.is_valid = has_status;
-  fresh.entries = steal(*listing);
+  fresh.entries = steal(resolved_entries);
   DIRECTORY_LISTING_CACHE[0] = steal(fresh);
 
   LOG(All, "directory listing cache miss for '%.*s', read %zu entries",
@@ -551,25 +585,23 @@ static fn complete_filesystem(StringView token,
   if (entries == nullptr) return candidates;
 
   for (let const &entry : *entries) {
-    if (!entry.view().starts_with(parts.basename_part)) continue;
+    let const name = entry.name.view();
+    if (!name.starts_with(parts.basename_part)) continue;
 
     /* A name beginning with a dot stays hidden unless the user typed a leading
        dot, the way ls and the shell hide dotfiles. */
-    if (entry.length() > 0 && entry.view()[0] == '.' &&
+    if (name.length > 0 && name[0] == '.' &&
         (parts.basename_part.is_empty() || parts.basename_part[0] != '.'))
     {
       continue;
     }
 
     let candidate = String{parts.directory_part};
-    candidate += entry.view();
+    candidate += name;
 
-    /* Path::read_directory hands back names only, so the trailing slash needs a
-       stat per entry. Threading the dirent d_type through read_directory would
-       change its signature and the Windows path, so the stat stays. */
-    let full = listing_directory.clone();
-    full.push_component(entry.view());
-    if (full.is_directory()) candidate += '/';
+    /* The directory flag was resolved when the listing was cached, so a trailing
+       slash needs no stat here. */
+    if (entry.is_directory) candidate += '/';
 
     candidates.push(steal(candidate));
   }
@@ -3031,10 +3063,16 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     if (!from_stage.has_value() && !is_posix_completion)
       from_stage = complete_from_spec(line, token, cursor, for_listing, context,
                                       descriptions);
-    if (from_stage.has_value())
+    if (from_stage.has_value()) {
       candidates = steal(*from_stage);
-    else
+    } else if (for_listing || !split_path_token(token).basename_part.is_empty()) {
+      /* A token ending in a slash has an empty basename, so the ghost would list
+         a whole directory on each keystroke to suggest nothing, since the entries
+         share no common prefix to extend. The listing runs for the ghost only
+         once a basename is typed, while an explicit tab still lists the directory
+         because the user asked for the menu. */
       candidates = complete_filesystem(token, base_directory);
+    }
   }
 
   /* A token that matched nothing skips the sort and the prefix scan, the common
@@ -3347,8 +3385,8 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
   if (entries == nullptr) return false;
 
   for (let const &entry : *entries)
-    if (entry.count() >= partial.length &&
-        entry.view().substring_of_length(0, partial.length) == partial)
+    if (entry.name.count() >= partial.length &&
+        entry.name.view().substring_of_length(0, partial.length) == partial)
     {
       return true;
     }
