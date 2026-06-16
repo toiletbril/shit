@@ -15,7 +15,7 @@ shit: 2:6: warning: An unquoted command substitution splits its output.
      2 |  echo $(echo $(echo deep))
        |       ^~~~~~~~~~~~~~~~~~~~ here.
 note: Quote it to keep one argument.
-shit: 2:6: warning: A useless echo inside the command substitution.
+shit: 2:6: warning: A command substitution wraps a useless echo.
      2 |  echo $(echo $(echo deep))
        |       ^~~~~~~~~~~~~~~~~~~~ here.
 note: The text can be used directly without the subshell.

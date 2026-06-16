@@ -17,7 +17,7 @@ shit: 2:8: warning: An unquoted command substitution splits its output.
      2 |  echo a $(echo b) c
        |         ^~~~~~~~~ here.
 note: Quote it to keep one argument.
-shit: 2:8: warning: A useless echo inside the command substitution.
+shit: 2:8: warning: A command substitution wraps a useless echo.
      2 |  echo a $(echo b) c
        |         ^~~~~~~~~ here.
 note: The text can be used directly without the subshell.

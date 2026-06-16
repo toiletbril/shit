@@ -49,7 +49,7 @@ shit: 2:6: warning: An echo of a command substitution prints what the command al
      2 |  f(){ echo "$(echo hi)"; }
        |       ^~~~ here.
 note: Run the command on its own instead.
-shit: 2:11: warning: A useless echo inside the command substitution.
+shit: 2:11: warning: A command substitution wraps a useless echo.
      2 |  f(){ echo "$(echo hi)"; }
        |            ^~~~~~~~~~~~ here.
 note: The text can be used directly without the subshell.

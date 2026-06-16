@@ -4611,7 +4611,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
             segment.is_split_eligible())
         {
           actx.warn(m_args[i]->source_location(),
-                    "Unquoted variable in a test",
+                    "A test reads an unquoted variable",
                     "quote it to avoid an empty or split argument");
           break;
         }
@@ -4914,7 +4914,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         let const literal = word.to_literal_string();
         if (SYSTEM_DIRECTORIES.find(literal.view()).has_value())
           actx.warn(m_args[i]->source_location(),
-                    "A rm -r aimed at the system directory '" + literal.view() +
+                    "A rm -r targets the system directory '" + literal.view() +
                         "'",
                     "double-check the path before running this");
       }
@@ -5044,7 +5044,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         }
       if (!body_runs_more_than_echo)
         actx.warn(m_args[i]->source_location(),
-                  "A useless echo inside the command substitution",
+                  "A command substitution wraps a useless echo",
                   "the text can be used directly without the subshell");
     }
   }

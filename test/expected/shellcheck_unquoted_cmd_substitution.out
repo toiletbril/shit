@@ -32,7 +32,7 @@ shit: 2:6: warning: An unquoted command substitution splits its output.
      2 |  echo $(echo hi)
        |       ^~~~~~~~~~ here.
 note: Quote it to keep one argument.
-shit: 2:6: warning: A useless echo inside the command substitution.
+shit: 2:6: warning: A command substitution wraps a useless echo.
      2 |  echo $(echo hi)
        |       ^~~~~~~~~~ here.
 note: The text can be used directly without the subshell.
@@ -44,7 +44,7 @@ shit: 4:1: warning: An echo of a command substitution prints what the command al
      4 |  echo "$(echo hi)"
        |  ^~~~ here.
 note: Run the command on its own instead.
-shit: 4:6: warning: A useless echo inside the command substitution.
+shit: 4:6: warning: A command substitution wraps a useless echo.
      4 |  echo "$(echo hi)"
        |       ^~~~~~~~~~~~ here.
 note: The text can be used directly without the subshell.

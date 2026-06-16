@@ -75,7 +75,7 @@ shit: 4:17: warning: The command reads and truncates 'data' at once, the truncat
      4 |    sort < data > data
        |                  ^~~~ here.
 note: Write to a temporary and move it over.
-shit: 5:8: warning: A useless echo inside the command substitution.
+shit: 5:8: warning: A command substitution wraps a useless echo.
      5 |    echo "wrapped $(echo inner)"
        |         ^~~~~~~~~~~~~~~~~~~~~~~ here.
 note: The text can be used directly without the subshell.

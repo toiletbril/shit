@@ -191,7 +191,7 @@ shit: 12:3: warning: Counting grep output with wc -l runs an extra process.
     12 |    grep needle file | wc -l
        |    ^~~~ here.
 note: Use grep -c to count the matching lines directly.
-shit: 14:5: warning: Unquoted variable in a test.
+shit: 14:5: warning: A test reads an unquoted variable.
     14 |    [ $? -eq 0 ] && echo ok
        |      ^~ here.
 note: Quote it to avoid an empty or split argument.
