@@ -34,10 +34,6 @@ inline const StringView BOLD_YELLOW = "\x1b[1;33m";
 inline const StringView CYAN = "\x1b[36m";
 inline const StringView BOLD_MAGENTA = "\x1b[1;35m";
 inline const StringView BOLD_CYAN = "\x1b[1;36m";
-/* Swaps the foreground and the background, so a dead-end completion segment
-   reads as a solid block that the eye cannot miss against the rest of the
-   line. */
-inline const StringView INVERSE = "\x1b[7m";
 } /* namespace ansi */
 
 /* Whether color may be written to a stream, decided fresh so a redirected

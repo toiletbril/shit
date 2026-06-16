@@ -24,13 +24,6 @@ namespace completion {
    line editor has drained them into its own buffer. */
 static BumpArena HIGHLIGHT_ARENA{};
 
-/* The dead-end completion color, the inverse attribute folded onto red into one
-   SGR escape so a highlight span, which carries a single sequence, opens both at
-   once. A failed segment then reads as a solid red block rather than red text
-   alone. The constant lives here because a span's sgr points at stable storage,
-   so a concatenation of two color constants would dangle. */
-static const StringView DEAD_END_COLOR = "\x1b[7;31m";
-
 /* A small most-recently-used cache of directory listings, so the per-keystroke
    highlighter and a TAB completion do not re-read the same directory through a
    readdir on every stroke. A large directory such as /usr/bin costs one readdir
@@ -3413,12 +3406,12 @@ static fn color_path_argument(usize word_start, StringView word,
   let const tail_color =
       path_partial_prefixes_entry(word, existing_end, partial, has_tilde)
           ? colors::ansi::CYAN
-          : DEAD_END_COLOR;
+          : colors::ansi::RED;
   spans.push(highlight_span{word_start + existing_end, word_start + segment_end,
                             tail_color});
   if (segment_end < word.length)
     spans.push(highlight_span{word_start + segment_end,
-                              word_start + word.length, DEAD_END_COLOR});
+                              word_start + word.length, colors::ansi::RED});
 
   return true;
 }
