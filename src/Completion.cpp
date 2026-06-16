@@ -3356,14 +3356,29 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
   return false;
 }
 
+/* True when the character after a word finishes it, a space, a tab, a newline,
+   or a list operator, so no further keystroke can grow the word. A finished word
+   that does not fully resolve is a dead end rather than a prefix still typed. */
+static fn word_is_terminated_by_separator(StringView line, usize word_end,
+                                          usize line_length) wontthrow -> bool
+{
+  if (word_end >= line_length) return false;
+
+  let const next_byte = line[word_end];
+  return next_byte == ' ' || next_byte == '\t' || next_byte == '\n' ||
+         next_byte == ';' || next_byte == '|' || next_byte == '&';
+}
+
 /* Color a path-like argument by segment. The resolved on-disk prefix is cyan.
-   The first segment past it is yellow when it prefixes a real entry of its
-   directory, so it could still complete, and red when nothing begins with it. A
-   deeper segment after an unresolved one cannot exist, so it is red. A word
-   that is not path-like, a plain name with no slash that does not resolve, is
-   left in the default color so an ordinary argument such as a subcommand is not
-   painted. Returns whether the word was treated as a path. */
+   The first segment past it is cyan while it prefixes a real entry of its
+   directory and the word is still being typed, so it could still complete, and
+   red once the word is finished or nothing begins with it. A deeper segment
+   after an unresolved one cannot exist, so it is red. A word that is not
+   path-like, a plain name with no slash that does not resolve, is left in the
+   default color so an ordinary argument such as a subcommand is not painted.
+   Returns whether the word was treated as a path. */
 static fn color_path_argument(usize word_start, StringView word,
+                              bool word_is_terminated,
                               ArrayList<highlight_span> &spans) throws -> bool
 {
   if (word.is_empty() || word[0] == '-') return false;
@@ -3428,13 +3443,15 @@ static fn color_path_argument(usize word_start, StringView word,
 
   let const partial =
       word.substring_of_length(existing_end, segment_end - existing_end);
-  /* A tail that prefixes a real entry could still complete, so it is normal
-     cyan against the bright cyan of the part that exists, and red when nothing
-     begins with it. */
+  /* A tail still being typed that prefixes a real entry could still complete, so
+     it is normal cyan against the bright cyan of the part that exists. Once the
+     word is finished, or when nothing begins with the tail, the path does not
+     fully resolve and the tail is a dead end, so it reads red. */
+  let const tail_could_complete =
+      !word_is_terminated &&
+      path_partial_prefixes_entry(word, existing_end, partial, has_tilde);
   let const tail_color =
-      path_partial_prefixes_entry(word, existing_end, partial, has_tilde)
-          ? colors::ansi::CYAN
-          : colors::ansi::RED;
+      tail_could_complete ? colors::ansi::CYAN : colors::ansi::RED;
   spans.push(highlight_span{word_start + existing_end, word_start + segment_end,
                             tail_color});
   if (segment_end < word.length)
@@ -3881,19 +3898,15 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
          or red. A plain command name is bright blue when it resolves, blue
          while it still prefixes some command name so it could complete, and red
          once it prefixes nothing. */
+      /* A command word the user has finished, with whitespace or with a list
+         operator such as ';', '|', or '&', can no longer grow into a real
+         command, so it must resolve fully or read as a dead end. A still-typed
+         word may still complete and keeps its prefix color. */
+      let const is_word_terminated =
+          word_is_terminated_by_separator(line, word_end, end);
       if (word.find_character('/').has_value()) {
-        color_path_argument(word_start, word, spans);
+        color_path_argument(word_start, word, is_word_terminated, spans);
       } else {
-        /* A command word the user has finished, with whitespace or with a list
-           operator such as ';', '|', or '&', can no longer grow into a real
-           command. It must resolve fully or read as a dead end, where a
-           still-typed trailing word that only prefixes some command name stays
-           blue since it could still complete. */
-        let const is_word_terminated =
-            word_end < end &&
-            (line[word_end] == ' ' || line[word_end] == '\t' ||
-             line[word_end] == '\n' || line[word_end] == ';' ||
-             line[word_end] == '|' || line[word_end] == '&');
         let command_color = colors::ansi::RED;
         if (first_word_resolves(word, context)) {
           command_color = colors::ansi::BRIGHT_BLUE;
@@ -3914,10 +3927,13 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
        subtle gray, and a plain argument that looks like a path colors per
        segment, the on-disk prefix cyan, the rest yellow or red. */
     if (!command_position && plain && !is_assignment) {
-      if (!word.is_empty() && word[0] == '-')
+      if (!word.is_empty() && word[0] == '-') {
         do_push(word_start, word_end, colors::ansi::GRAY);
-      else
-        color_path_argument(word_start, word, spans);
+      } else {
+        let const is_word_terminated =
+            word_is_terminated_by_separator(line, word_end, end);
+        color_path_argument(word_start, word, is_word_terminated, spans);
+      }
     }
     for (let const &inner : word_spans)
       do_push(inner.start, inner.end, inner.sgr);
