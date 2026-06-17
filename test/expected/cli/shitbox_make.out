@@ -6,7 +6,22 @@ finished
 echo hello from make
 hello from make
 --- missing target ---
-shit: 1:1: error: make: no rule to make target 'nope'.
+shit: 1:1: error: There is no rule to make the target 'nope'.
      1 |  shitbox make nope
        |  ^~~~~~~~~~~~~~~~~ here.
+rc=1
+--- advanced features ---
+second recipe line ran after a forking command
+make=[shitbox make -j4]
+src=[a.c b.c]
+obj=[a.o b.o]
+flags=[one  two]
+tag=[debug]
+--- ignored flags -B and -k ---
+built
+rc=0
+--- failing recipe aborts ---
+shit: 1:1: error: The recipe for the target 'broken' failed with status 1.
+     1 |  shitbox make broken
+       |  ^~~~~~~~~~~~~~~~~~~ here.
 rc=1
