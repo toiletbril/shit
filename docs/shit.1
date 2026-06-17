@@ -18,8 +18,7 @@ standard input is a terminal and no script is given, runs a script file named on
 the command line, or runs a command string given with
 .BR \-c .
 Before a script runs, the default mood walks the parsed tree to fold constants,
-prune dead branches, and report shellcheck-style diagnostics, so a malformed
-construct is caught up front rather than half-run.
+prune dead branches, and report shellcheck-style diagnostics.
 .SH MOODS
 The shell runs under one of three moods that set how strict it is. The default
 .B shit
@@ -174,12 +173,8 @@ Compiled in only in a debug build.
 Append the debug log to FILE instead of standard error.
 .SH RESCUE
 When a flag in SHIT_FLAGS or in the argument list fails to parse and standard
-input is a terminal, the shell enters rescue rather than exiting, so a removed
-flag left in a config never locks the user out of a new pane. Rescue prints the
-error, prints
-.BR "shit: Entering rescue." ,
-resets to default flags, skips the rc chain, and drops to an interactive prompt.
-A non-interactive run keeps the usage exit.
+input is a terminal, the shell enters rescue rather than exiting. A
+non-interactive run keeps the usage exit.
 .SH ENVIRONMENT
 .TP
 .B SHIT_FLAGS
@@ -230,35 +225,6 @@ the default shit mood a bare utility name also falls back to the bundled utility
 when PATH holds no binary of that name, so a missing system coreutil is filled
 in, while a PATH binary still takes precedence.
 .PP
-The utilities are
-.BR ls ", " ln ", " rm ", " mkdir ", " rmdir ", " cp ", " mv ", " cat ", "
-.BR tee ", " touch ", " basename ", " dirname ", " realpath ", " du ", " head ", "
-.BR tail ", " wc ", " seq ", " tr ", " grep ", " sort ", " uniq ", " sleep ", "
-.BR env ", " yes ", " pkill ", " killall ", " ps ", " find ", " make ", "
-.BR which ", " whoami ", and " unlink .
-Each takes a small set of flags. The bundled make reads a Makefile, expands its
-variables, and runs each recipe through the shell. It handles single-level
-pattern rules such as
-.B "%.o: %.c"
-with the automatic variables $@, $<, and $^, and has no chained implicit rules
-and no parallelism.
-.PP
-A few utilities follow their coreutils counterparts closely.
-.B ls
-lays the names out in columns sized to the terminal, falls back to one name per
-line when the output is not a terminal, and prints the mode, owner, group, size,
-and time under
-.BR \-l .
-.B sleep
-accepts a unit suffix on each duration, s for seconds, m for minutes, h for
-hours, and d for days, the word inf for an unbounded pause, and more than one
-duration to sum.
-.B "ps aux"
-prints the owner, the process id, and the full command line of every process.
-.B find
-walks each path and prints every entry, with
-.BR \-name ", " \-type ", " \-maxdepth ", and " \-mindepth
-to filter the walk.
 .SH SHIT BUILTINS
 These builtins are unique to shit and have no counterpart in bash or dash.
 .TP

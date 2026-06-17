@@ -20,40 +20,34 @@ itself, a strict superset of Bash, with the analysis and optimization stages
 enabled.
 
 Before a single command runs, **shit** walks the whole parsed tree to optimize
-and analyze it. If a command that cannot resolve, a malformed glob/redirection,
-which a normal shell will half-assedly run and leave you with a mess, gets
-caught up front and the run stops. The same stage carries most of shellcheck
-built in as warnings. Every error or warning at stage is called a diagnostic.
+and analyze it. Default mood prohibits non-deterministic globs, substituions,
+variables or anything else that will make the shell behave unexpectedly. Every
+error or warning at that stage is called a diagnostic.
 
 `--mood`, short `-M`, selects the mood, one of `shit`, `bash`, or `sh`. The
-default is `shit`. If the binary is named or symlinked to `sh`, `dash`, or
-`bash`, it picks the matching mood and disables diagnostics. `set --mood`
-changes the mood at runtime. `-W` keeps the diagnostics but turns every error
-into a warning and lets the run continue to stay compatible.
+default is `shit`. Binary symlinked as `sh`, `dash`, or `bash` will pick the
+matching mood and disable diagnostics. `set --mood` changes the mood at
+runtime. `-W` keeps the diagnostics but turns every error into a warning.
 
-`-I` is mimicry. With it on, a script whose shebang names `sh`, `dash`, `bash`
-runs inside **shit** in the matching mood rather than launching the real shell
-for more speed.
+`-I` is mimicry. **shit** will detect `sh`, `dash`, `bash` shebangs and run the
+script inside itself in the matching mood rather than launching the real shell
+to keep speed and diagnostics.
 
-`--init-moods`, short `-L`, lists which startup files to load, one flavor per
-name, comma separated or by repeating the flag, and defaults to the value of
-`--mood`. The `shit` flavor reads `/etc/shitrc` and `~/.shitrc`, the `bash`
-flavor reads the bash rc and its completion, and the `sh` flavor reads the file
-named by `ENV`. So `--init-moods=shit,bash` runs a strict shit prompt that still
-loads the whole bash setup. `set --init-moods` reloads the listed flavors into a
-live session. The startup files always source lenient, so an unset variable or
-an unmatched glob in a profile never aborts the login.
+`--init-moods`/`-L` accepts a comma-separated list of moods to steal and use
+init files from. It defaults to the value of `--mood`.
 
-`SHIT_FLAGS` sets your defaults once. Put the recommended `-W -I
---init-moods=shit,bash` in it and every **shit** starts that way, while a flag
-on the command line still wins.
+The `shit` mood reads `/etc/shitrc` and `~/.shitrc`, the `bash` flavor reads
+the bash rc and its completion, and `sh` reads the file named by `ENV`. So
+`--init-moods=shit,bash` runs a strict shit prompt that still loads the whole
+bash setup. `set --init-moods` reloads the listed flavors into a live session.
+The startup files from non-default mood always turn all errors to warnings.
 
-A broken flag left in `SHIT_FLAGS`, such as one removed across an upgrade, would
-otherwise kill every new terminal and lock you out. When standard input is a
-terminal **shit** prints the error, prints `shit: Entering rescue.`, drops the
-broken config, skips the rc chain, and gives you a default prompt to fix the
-config from. A non-interactive run still exits with the usage status the way
-`dash` does.
+`SHIT_FLAGS` environment variable may be used to specify flags. The recommended
+is `-W -I --init-moods=shit,bash`. Flag on the command line still wins.
+
+When encountering broken flags or arguments in `SHIT_FLAGS`, or supplied when
+launched the binary, **shit** acting as a login shell will skip the rc chain,
+and give you a rescue session to fix the config from.
 
 ## Additional bull**shit**
 
@@ -73,11 +67,7 @@ every builtin from `bash` and POSIX standard, with the addition of:
 - and more
 
 It also bundles a busybox-style set of coreutilities behind the `shitbox`
-builtin, so a machine with only a compiler can run a configure and a make under
-shit. The set covers `ls`, `cp`, `mv`, `find`, `grep`, `ps`, `make`, and more.
-`ls` lays its output in terminal-sized columns and follows coreutils under `-l`,
-`sleep` reads the GNU duration suffixes, and `find` walks a tree with `-name`,
-`-type`, `-maxdepth`, and `-mindepth`.
+builtin.
 
 # Development
 
@@ -134,6 +124,6 @@ Is is exceptional?
 - [x] `bash`-compatible.
 - [x] Most of shellcheck built-in as warnings.
 - [x] Own bells and whistles.
-- [ ] Arbitrary precision numeric expressions.
 - [x] Cross-platform replacement for most common Unix programs which Windows
       does not have.
+- [ ] Arbitrary precision numeric expressions.

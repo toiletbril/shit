@@ -34,10 +34,6 @@ OBJ_DIR := o/$(TARGET)/$(MODE)
 OBJECTS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 DEPS := $(OBJECTS:.o=.d)
 
-# Linker target file. MODE=rel keeps the canonical name, every other mode adds a
-# -MODE suffix so a debug, coverage, or profiling binary never overwrites the
-# release one. A mode switch then needs no relink-time cleanup, since the two
-# artifacts coexist.
 MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
 ifeq ($(MODE), cosmo)
 OUT := ../shit$(MODE_SUFFIX).com
@@ -219,9 +215,6 @@ else
 $(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cov", "cosmo", "cosmo_dbg")
 endif
 
-# The command-substitution drain runs on a pthread, so every POSIX build links
-# libpthread. Native Windows clang has no libpthread and uses the Win32 thread
-# API instead, so the flag stays off there.
 ifneq ($(TARGET), Windows_NT)
 CXXFLAGS += \
 	-pthread
