@@ -113,12 +113,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  /* bash resolves a relative operand against the logical PWD by default, the -L
-     mode, so a move lexically joins the operand onto PWD rather than appending it
-     to the physical getcwd. A cd .. out of a symlinked directory then returns to
-     the directory that holds the symlink instead of the physical parent. The
-     logical path is taken only when it names a directory, and the physical
-     resolution through getcwd stays as the fallback the way bash retries. */
+  /* A relative operand joins onto the logical PWD when that names a directory,
+     the bash -L default, so cd .. out of a symlinked directory returns to the
+     symlink's parent. The physical getcwd resolution stays as the fallback. */
   if (target.is_absolute()) {
     target = target.normalized();
   } else {

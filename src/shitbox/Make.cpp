@@ -200,7 +200,7 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
    nothing contributes no words. */
 static fn make_wildcard(StringView patterns) throws -> String
 {
-  String result{};
+  let result = String{};
   for (const String &pattern : split_words(patterns)) {
     glob_t glob_result{};
     if (glob(pattern.c_str(), 0, nullptr, &glob_result) == 0) {
@@ -225,7 +225,9 @@ static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
     -> Maybe<String>
 {
   let const colon = name.find_character(':');
-  if (!colon.has_value() || *colon == 0) return None;
+  if (!colon.has_value() || *colon == 0) {
+    return None;
+  }
 
   let const variable_name = name.substring_of_length(0, *colon);
   if (variable_name.find_character(' ').has_value() ||
@@ -242,7 +244,7 @@ static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
       expand(cxt, mk, rest.substring_of_length(0, *equals), depth + 1);
   let const replacement = expand(cxt, mk, rest.substring(*equals + 1), depth + 1);
 
-  String value{};
+  let value = String{};
   if (const String *stored = mk.find_variable(variable_name); stored != nullptr)
     value = expand(cxt, mk, stored->view(), depth + 1);
   else if (Maybe<String> from_env =
@@ -251,7 +253,7 @@ static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
     value = steal(*from_env);
 
   let const has_percent = pattern.view().find_character('%').has_value();
-  String out{};
+  let out = String{};
   for (const String &word : split_words(value.view())) {
     if (!out.is_empty()) out += ' ';
     if (has_percent) {
@@ -318,7 +320,7 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
                     expand(cxt, mk, name.substring(6), depth + 1) + "'"};
       } else if (name.length > 8 &&
                  name.substring_of_length(0, 8) == "warning ") {
-        /* $(warning text) is informational only, so it expands to nothing. */
+        /* $(warning text) is informational only. */
       } else if (Maybe<String> subst =
                      try_substitution_reference(cxt, mk, name, depth);
                  subst.has_value()) {
@@ -437,7 +439,7 @@ static fn join_continuations(StringView source) throws -> ArrayList<String>
     let raw = physical[i];
     if (!raw.is_empty() && raw[raw.length - 1] == '\n')
       raw = raw.substring_of_length(0, raw.length - 1);
-    String line{raw};
+    let line = String{raw};
 
     while (ends_with_continuation(line.view()) && i + 1 < physical.count()) {
       line = String{line.view().substring_of_length(0, line.view().length - 1)};
@@ -534,9 +536,9 @@ static fn evaluate_conditional(EvalContext &cxt, const makefile &mk,
    only when every open conditional is in its active branch. */
 struct conditional_state
 {
-  bool branch_active;
-  bool any_branch_taken;
-  bool parent_active;
+  bool is_branch_active;
+  bool was_any_branch_taken;
+  bool is_parent_active;
 };
 
 static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
@@ -547,7 +549,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
 
   let const do_is_active = [&]() -> bool {
     for (const conditional_state &state : conditionals)
-      if (!state.branch_active) return false;
+      if (!state.is_branch_active) return false;
     return true;
   };
 
@@ -580,12 +582,12 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
     if (directive == "ifeq" || directive == "ifneq" || directive == "ifdef" ||
         directive == "ifndef")
     {
-      let const parent_active = do_is_active();
+      let const is_parent_active = do_is_active();
       let const is_taken =
-          parent_active && evaluate_conditional(
+          is_parent_active && evaluate_conditional(
                                cxt, mk, directive,
                                trimmed.substring(directive.length));
-      conditionals.push(conditional_state{is_taken, is_taken, parent_active});
+      conditionals.push(conditional_state{is_taken, is_taken, is_parent_active});
       current = nullptr;
       continue;
     }
@@ -598,14 +600,14 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
             else_directive == "ifdef" || else_directive == "ifndef")
         {
           let const is_taken =
-              top.parent_active && !top.any_branch_taken &&
+              top.is_parent_active && !top.was_any_branch_taken &&
               evaluate_conditional(cxt, mk, else_directive,
                                    rest.substring(else_directive.length));
-          top.branch_active = is_taken;
-          if (is_taken) top.any_branch_taken = true;
+          top.is_branch_active = is_taken;
+          if (is_taken) top.was_any_branch_taken = true;
         } else {
-          top.branch_active = top.parent_active && !top.any_branch_taken;
-          top.any_branch_taken = true;
+          top.is_branch_active = top.is_parent_active && !top.was_any_branch_taken;
+          top.was_any_branch_taken = true;
         }
       }
       current = nullptr;
@@ -798,7 +800,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
        replacing the make process when the recipe is a single external command,
        which would otherwise abandon the remaining recipe lines and targets. The
        newlines guard the closing paren against a trailing comment in the line. */
-    String subshell_command{"(\n"};
+    let subshell_command = String{"(\n"};
     subshell_command += command.view();
     subshell_command += "\n)";
     let const status =

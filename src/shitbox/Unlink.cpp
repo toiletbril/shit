@@ -40,8 +40,11 @@ fn Unlink::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
+  /* unlink removes the link itself, so a symlink to a directory is fine and only
+     a real directory is refused, the way unlink(2) and GNU unlink behave. */
   let const &target = operands[0];
-  if (Path{target.view()}.is_directory()) {
+  let const target_path = Path{target.view()};
+  if (target_path.is_directory() && !target_path.is_symbolic_link()) {
     report_soft_shitbox_error(ec, cxt,
                               "unlink: cannot unlink '" + target +
                                   "': it is a directory");

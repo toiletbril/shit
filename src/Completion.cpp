@@ -2147,10 +2147,13 @@ static fn parse_makefile_targets_directly(StringView text) throws
     let const raw = text.substring_of_length(i, end - i);
     i = end + 1;
 
-    if (raw.is_empty() || raw[0] == '\t' || raw[0] == '#' || raw[0] == '.')
+    if (raw.is_empty() || raw[0] == '\t' || raw[0] == '#' || raw[0] == '.') {
       continue;
+    }
     let const colon = raw.find_character(':');
-    if (!colon.has_value() || *colon == 0) continue;
+    if (!colon.has_value() || *colon == 0) {
+      continue;
+    }
     if (let const equals = raw.find_character('='); equals.has_value() &&
         *equals < *colon)
     {
