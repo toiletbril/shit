@@ -1188,9 +1188,8 @@ fn EvalContext::print_source_backtrace(
          file must match too, since two sources can share a byte offset and a
          length while pointing at unrelated text. */
       let const &call_file = frame.call_site.filename;
-      let const &error_file = error_location.has_value()
-                                  ? error_location->filename
-                                  : call_file;
+      let const &error_file =
+          error_location.has_value() ? error_location->filename : call_file;
       let const same_file =
           call_file.has_value() == error_file.has_value() &&
           (!call_file.has_value() || *call_file == *error_file);

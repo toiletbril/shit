@@ -929,8 +929,8 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
 
   /* The parser expands variables and runs the := and conditional assignments,
      so a $(VAR) target name resolves to its real text the way make reads it. A
-     pattern rule lives in its own list, so mk.rules holds only explicit targets.
-     A dot-special such as .PHONY and an empty name are excluded. */
+     pattern rule lives in its own list, so mk.rules holds only explicit
+     targets. A dot-special such as .PHONY and an empty name are excluded. */
   let const mk = parse_makefile(cxt, source->view());
   for (const make_rule &rule : mk.rules) {
     let const name = rule.target.view();

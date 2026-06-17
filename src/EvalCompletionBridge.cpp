@@ -91,8 +91,8 @@ fn EvalContext::run_completion_function(StringView function_name,
   set_shell_variable("COMP_LINE", line);
   set_shell_variable("COMP_POINT", utils::int_to_text(static_cast<i64>(point)));
   /* bash-completion reassembles the words against COMP_WORDBREAKS, so it is set
-     for the function run when a non-bash session left it unset. Without this the
-     function reads it unset and the run warns under the strict default. */
+     for the function run when a non-bash session left it unset. Without this
+     the function reads it unset and the run warns under the strict default. */
   if (!get_variable_value("COMP_WORDBREAKS").has_value())
     set_shell_variable("COMP_WORDBREAKS", StringView{" \t\n\"'><=;|&(:"});
 

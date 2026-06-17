@@ -2393,9 +2393,8 @@ static fn complete_from_build_tools(StringView line, StringView token,
       invocation += " -f ";
       invocation += makefile_name->view();
       invocation += " -pRrq : 2>/dev/null";
-      let database_targets =
-          parse_make_database_targets(capture(invocation).view(),
-                                      make_directory);
+      let database_targets = parse_make_database_targets(
+          capture(invocation).view(), make_directory);
       if (!database_targets.is_empty()) return database_targets;
       /* An empty dump means no GNU make answered, so the bundled make parser
          reads the Makefile and resolves its variables the way make would. The
