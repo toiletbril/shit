@@ -81,10 +81,6 @@ FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods", Compat,
      "ENV file, with the login profiles added under -l. Defaults to the value "
      "of --mood.");
 FLAG(
-    INIT_AS_BASH, Bool, '\0', "init-as-bash", Compat,
-    "Deprecated alias for --init-moods=bash. The SHIT_INIT_AS_BASH environment "
-    "variable enables it when set.");
-FLAG(
     MIMICRY, Bool, 'I', "mimicry", Compat,
     "Mimic the shell a script's shebang names, for speed. A program whose "
     "shebang is a shell shit can emulate runs in-process in the matching mode. "
@@ -375,8 +371,8 @@ static fn run_script_contents(const String &script_contents,
        both skip the stage, since neither dash nor bash runs a shellcheck pass.
        -W forces it back on as warnings and --no-diagnostics always skips it.
        The decision and the skip read the live context rather than the static
-       helpers, so init-as-bash and a runtime set -o no-diagnostics both flip the
-       stage for the session. --show-optimizer-state forces the prepass on
+       helpers, so a mood switch and a runtime set -o no-diagnostics both flip
+       the stage for the session. --show-optimizer-state forces the prepass on
        whatever the mood, since its whole purpose is to trace it. */
     let const run_analysis =
         precompiled_ast == nullptr &&
@@ -583,7 +579,7 @@ static fn source_posix_login_files(EvalContext &context,
 
 /* Source the bash login files in bash login order, /etc/profile then the first
    existing of ~/.bash_profile, ~/.bash_login, ~/.profile. A login shell in bash
-   mode and an init-as-bash login shell both read this set. */
+   mode reads this set. */
 static fn source_bash_login_files(EvalContext &context,
                                   BumpArena &ast_arena) throws -> void
 {
@@ -989,27 +985,8 @@ fn main(int argc, char **argv) -> int
     }
   }
 
-  /* init-as-bash is the deprecated alias that adds the bash startup files. The
-     SHIT_INIT_AS_BASH environment variable enables it when set and not empty.
-   */
-  bool should_init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
-  if (!should_init_as_bash) {
-    if (shit::Maybe<shit::String> env =
-            shit::os::get_environment_variable("SHIT_INIT_AS_BASH");
-        env.has_value() && !env->is_empty())
-      should_init_as_bash = true;
-  }
-
   /* With no explicit --init-moods the session mood's files source. */
   if (init_moods.is_empty()) init_moods.push(session_mood);
-
-  /* The bash alias appends bash when the list does not already carry it. */
-  if (should_init_as_bash) {
-    bool has_bash = false;
-    for (let listed : init_moods)
-      if (listed == shit::mimic_mood::Bash) has_bash = true;
-    if (!has_bash) init_moods.push(shit::mimic_mood::Bash);
-  }
 
   /* A privileged shell skips every startup config file, so a profile or rc that
      a less-privileged user controls cannot run with the raised privileges. The
@@ -1389,7 +1366,6 @@ fn main(int argc, char **argv) -> int
           shit::show_message(
               session_mood == shit::mimic_mood::Posix  ? "POSIX me harder!"
               : session_mood == shit::mimic_mood::Bash ? "Bash me harder!"
-              : should_init_as_bash                    ? "Bash me harder?"
                                                        : "Welcome :3");
         } else {
           /* This branch is reached only after a prior exit_raw_mode() call. */

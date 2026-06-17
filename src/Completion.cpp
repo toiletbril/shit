@@ -861,33 +861,33 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);
   } else {
-    /* The argument cascade is the mood's own. The builtin flag tables answer
-       first in the default and bash moods. The default mood then asks the man
-       sources, the help sources, the build tools, the specs, then files. The
-       bash mood is specs then files. The POSIX mood goes straight to files. */
+    /* The argument cascade runs in the bash and the default moods, the POSIX
+       mood goes straight to files. The builtin flag tables answer first, then
+       the registered specs, then the man sources, then the build tools, and the
+       --help fork is the last resort. */
     Maybe<ArrayList<String>> from_stage = None;
-    if (!is_posix_completion)
+    if (!is_posix_completion) {
       from_stage =
           complete_from_builtin_flags(line, token, token_start, context);
-    if (!from_stage.has_value() && context.mood() == mimic_mood::Default) {
-      from_stage = complete_from_man_subcommands(line, token, token_start,
-                                                 for_listing, context);
       if (!from_stage.has_value())
-        from_stage = complete_from_help_subcommands(
-            line, token, token_start, for_listing, context, descriptions);
+        from_stage = complete_from_spec(line, token, cursor, for_listing,
+                                        context, descriptions);
+      if (!from_stage.has_value())
+        from_stage = complete_from_man_subcommands(line, token, token_start,
+                                                   for_listing, context);
       if (!from_stage.has_value())
         from_stage = complete_from_manpage(line, token, for_listing, context,
                                            descriptions);
       if (!from_stage.has_value())
-        from_stage =
-            complete_from_help(line, token, for_listing, context, descriptions);
-      if (!from_stage.has_value())
         from_stage = complete_from_build_tools(line, token, token_start,
                                                for_listing, context);
+      if (!from_stage.has_value())
+        from_stage = complete_from_help_subcommands(
+            line, token, token_start, for_listing, context, descriptions);
+      if (!from_stage.has_value())
+        from_stage =
+            complete_from_help(line, token, for_listing, context, descriptions);
     }
-    if (!from_stage.has_value() && !is_posix_completion)
-      from_stage = complete_from_spec(line, token, cursor, for_listing, context,
-                                      descriptions);
     if (from_stage.has_value()) {
       candidates = steal(*from_stage);
     } else if (for_listing || !split_path_token(token).basename_part.is_empty())

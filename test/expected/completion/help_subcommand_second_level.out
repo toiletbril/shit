@@ -1,0 +1,11 @@
+== base subcommands:
+debug
+set
+up
+== second-level options from 'tailscale set --help':
+--hostname
+--shields-up
+== second-level sub-subcommands from 'tailscale debug --help':
+derp-map
+prefs
+== an unknown second word does not fork:

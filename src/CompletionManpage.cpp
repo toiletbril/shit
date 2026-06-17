@@ -847,21 +847,24 @@ static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
    no alias shadows it, and stdin is the null device. The capture is bounded by
    the timeout, and any failure caches the empty string so it never forks
    twice. */
-static fn help_text_for(StringView command) throws -> String
+static fn help_text_for(StringView command, StringView subcommand = {}) throws
+    -> String
 {
   let text = String{};
   /* The allowlist entry carries the help argument, so ffmpeg forks --help full
      rather than the summary-only --help. A command not on the list never
-     forks. */
+     forks. The allowlist and the trust gate read the base command, a known
+     subcommand of an allowlisted command is forked too. */
   let help_argument = HELP_ALLOWLIST.find(command);
   let const paths = utils::search_program_path(command);
   if (help_argument.has_value() && !paths.is_empty() &&
       command_directory_is_trusted(paths[0].text().view()))
   {
-    /* argv is the absolute path then the help argument split on spaces, so
-       ffmpeg runs as the three words path, --help, full. */
+    /* argv is the absolute path, then the subcommand when one is given, then the
+       help argument split on spaces, so git runs as path, commit, --help. */
     let argv = ArrayList<String>{};
     argv.push(String{paths[0].text().view()});
+    if (!subcommand.is_empty()) argv.push(String{subcommand});
     let const argument_view = StringView{*help_argument};
     usize i = 0;
     while (i < argument_view.length) {
@@ -929,24 +932,40 @@ static fn parse_help_option_entries(StringView text) throws
 static fn parse_help_subcommands(StringView text) throws
     -> ArrayList<help_entry>;
 
+/* The cache key for a fork, the bare command at the top level and the compound
+   "command subcommand" at the second level, the way the man path keys
+   command-subcommand. */
+static fn help_cache_key(StringView command, StringView subcommand) throws
+    -> String
+{
+  if (subcommand.is_empty()) return String{command};
+  let key = String{command};
+  key += " ";
+  key += subcommand;
+  return key;
+}
+
 /* Forks the command's --help once, parses both options and subcommands out of
    the one capture, and frees the raw text. HELP_PARSED gates the fork so a
-   second tab reads the parsed caches. */
-static fn ensure_help_parsed(StringView command) throws -> void
+   second tab reads the parsed caches. A subcommand forks "command subcommand
+   --help" under the compound key. */
+static fn ensure_help_parsed(StringView command, StringView subcommand = {})
+    throws -> void
 {
-  if (HELP_PARSED.find(command) != nullptr) return;
-  let const text = help_text_for(command);
-  HELP_OPTION_CACHE.set(command, parse_help_option_entries(text.view()));
-  HELP_SUBCOMMAND_CACHE.set(command, parse_help_subcommands(text.view()));
-  HELP_PARSED.set(command, true);
+  let const key = help_cache_key(command, subcommand);
+  if (HELP_PARSED.find(key.view()) != nullptr) return;
+  let const text = help_text_for(command, subcommand);
+  HELP_OPTION_CACHE.set(key.view(), parse_help_option_entries(text.view()));
+  HELP_SUBCOMMAND_CACHE.set(key.view(), parse_help_subcommands(text.view()));
+  HELP_PARSED.set(key.view(), true);
 }
 
 /* The options a command's --help text lists, parsed once and cached. */
-static fn help_options_for(StringView command) throws
+static fn help_options_for(StringView command, StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
 {
-  ensure_help_parsed(command);
-  return *HELP_OPTION_CACHE.find(command);
+  ensure_help_parsed(command, subcommand);
+  return *HELP_OPTION_CACHE.find(help_cache_key(command, subcommand).view());
 }
 
 /* Whether a name reads as a subcommand rather than a description fragment,
@@ -1082,11 +1101,22 @@ static fn parse_help_subcommands(StringView text) throws
 }
 
 /* The subcommands a command's --help text lists, parsed once and cached. */
-static fn help_subcommands_for(StringView command) throws
-    -> const ArrayList<help_entry> &
+static fn help_subcommands_for(StringView command, StringView subcommand = {})
+    throws -> const ArrayList<help_entry> &
 {
-  ensure_help_parsed(command);
-  return *HELP_SUBCOMMAND_CACHE.find(command);
+  ensure_help_parsed(command, subcommand);
+  return *HELP_SUBCOMMAND_CACHE.find(help_cache_key(command, subcommand).view());
+}
+
+/* Whether a word names a subcommand the base command's --help lists, so a
+   second-level fork is reserved for a parsed subcommand rather than an arbitrary
+   word. */
+static fn is_known_help_subcommand(StringView command, StringView word) throws
+    -> bool
+{
+  for (let const &entry : help_subcommands_for(command))
+    if (entry.name.view() == word) return true;
+  return false;
 }
 
 /* Completes an option token from the command's --help text, the fallback after
@@ -1107,7 +1137,17 @@ fn complete_from_help(StringView line, StringView token,
   /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved_name = resolve_completion_alias(surface_command, context);
-  let const &options = help_options_for(resolved_name.view());
+
+  /* A settled second word that names a parsed subcommand forks "command
+     subcommand --help" for its own options, so git commit -<tab> reads the
+     commit options rather than the top-level ones. */
+  let subcommand = StringView{};
+  if (let const second = second_word_of(line);
+      second.has_value() &&
+      is_known_help_subcommand(resolved_name.view(), *second))
+    subcommand = *second;
+
+  let const &options = help_options_for(resolved_name.view(), subcommand);
   if (options.is_empty()) return None;
 
   let matches = matches_from_help_entries(options, token, descriptions);
@@ -1127,7 +1167,6 @@ fn complete_from_help_subcommands(StringView line, StringView token,
   if (!for_listing) return None;
   if (!token.is_empty() && token[0] == '-') return None;
   if (token.find_character('/').has_value()) return None;
-  if (!is_first_argument_token(line, token_start)) return None;
   let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
       surface_command.find_character('/').has_value())
@@ -1137,15 +1176,28 @@ fn complete_from_help_subcommands(StringView line, StringView token,
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved_name = resolve_completion_alias(surface_command, context);
 
-  /* A command the man index already lists subcommands for never forks --help to
-     relist them, the man stage is authoritative. The fork is reserved for a
-     tool like cargo with no man pages. */
-  if (is_man_subcommand_index_built) {
-    let const man_subcommands = MAN_SUBCOMMAND_INDEX.find(resolved_name.view());
-    if (man_subcommands != nullptr && !man_subcommands->is_empty()) return None;
+  let subcommand = StringView{};
+  if (is_first_argument_token(line, token_start)) {
+    /* The first-argument token lists the base subcommands. A command the man
+       index already lists never forks --help to relist them, the man stage is
+       authoritative, the fork is reserved for a tool like cargo with no man
+       pages. */
+    if (is_man_subcommand_index_built) {
+      let const man_subcommands = MAN_SUBCOMMAND_INDEX.find(resolved_name.view());
+      if (man_subcommands != nullptr && !man_subcommands->is_empty()) return None;
+    }
+  } else if (let const second = second_word_of(line);
+             second.has_value() &&
+             is_known_help_subcommand(resolved_name.view(), *second)) {
+    /* A settled second word that names a parsed subcommand forks "command
+       subcommand --help" for its sub-subcommands, so git remote <tab> lists the
+       remote subcommands. */
+    subcommand = *second;
+  } else {
+    return None;
   }
 
-  let const &subcommands = help_subcommands_for(resolved_name.view());
+  let const &subcommands = help_subcommands_for(resolved_name.view(), subcommand);
   if (subcommands.is_empty()) return None;
 
   let matches = matches_from_help_entries(subcommands, token, descriptions);
