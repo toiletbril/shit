@@ -1177,11 +1177,20 @@ pure fn EvalContext::current_origin() const wontthrow -> const String &
   return m_current_origin;
 }
 
-fn EvalContext::print_source_backtrace() const throws -> void
+fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location)
+    const throws -> void
 {
   for (usize i = m_source_frames.count(); i > 0; i--) {
     let const &frame = m_source_frames[i - 1];
     if (frame.parent_source != nullptr) {
+      /* A frame whose call site is exactly where the error already pointed
+         repeats that caret, so it is dropped to leave a single one there. */
+      if (error_location.has_value() &&
+          frame.call_site.position == error_location->position &&
+          frame.call_site.length == error_location->length)
+      {
+        continue;
+      }
       /* A frame is context under the primary error, not an error of its own, so
          it prints with the Trace severity rather than Error. */
       let const sourced_here = TraceWithLocation{frame.call_site};

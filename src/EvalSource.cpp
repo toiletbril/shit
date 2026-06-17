@@ -155,7 +155,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       std::rethrow_exception(error);
     } catch (const ErrorWithLocation &located_error) {
       show_message(located_error.to_string(contents->view()));
-      print_source_backtrace();
+      print_source_backtrace(located_error.location());
     } catch (const Error &caught_error) {
       show_message(caught_error.to_string());
       print_source_backtrace();
@@ -396,11 +396,11 @@ fn EvalContext::run_source(StringView source, StringView origin,
   } catch (const ErrorWithLocationAndDetails &detailed_error) {
     show_message(detailed_error.to_string(source));
     show_message(detailed_error.details_to_string(source));
-    print_source_backtrace();
+    print_source_backtrace(detailed_error.location());
     return 1;
   } catch (const ErrorWithLocation &located_error) {
     show_message(located_error.to_string(source));
-    print_source_backtrace();
+    print_source_backtrace(located_error.location());
     return 1;
   } catch (const Error &caught_error) {
     show_message(caught_error.to_string());

@@ -416,10 +416,10 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
     } catch (const ErrorWithLocationAndDetails &e) {
       show_message(e.to_string(source.view()));
       show_message(e.details_to_string(source.view()));
-      print_source_backtrace();
+      print_source_backtrace(e.location());
     } catch (const ErrorWithLocation &e) {
       show_message(e.to_string(source.view()));
-      print_source_backtrace();
+      print_source_backtrace(e.location());
     } catch (const Error &e) {
       show_message(e.to_string());
       print_source_backtrace();
@@ -527,10 +527,10 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
     } catch (const ErrorWithLocationAndDetails &e) {
       show_message(e.to_string(source.view()));
       show_message(e.details_to_string(source.view()));
-      print_source_backtrace();
+      print_source_backtrace(e.location());
     } catch (const ErrorWithLocation &e) {
       show_message(e.to_string(source.view()));
-      print_source_backtrace();
+      print_source_backtrace(e.location());
     } catch (const Error &e) {
       show_message(e.to_string());
       print_source_backtrace();

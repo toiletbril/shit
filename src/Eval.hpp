@@ -837,8 +837,10 @@ public:
   pure fn current_origin() const wontthrow -> const String &;
   /* Print the source backtrace, every dot or eval call site from the innermost
      out, as context under a diagnostic. It prints nothing at the top level
-     where no source is on the stack. */
-  fn print_source_backtrace() const throws -> void;
+     where no source is on the stack. A frame at error_location is dropped, since
+     the error already printed a caret there and a second one repeats it. */
+  fn print_source_backtrace(Maybe<SourceLocation> error_location = None)
+      const throws -> void;
 
   /* The byte offset in the current source of the command being evaluated, the
      position $LINENO reports the line of. A SimpleCommand and an assignment set
