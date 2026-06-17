@@ -586,6 +586,10 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   sigemptyset(&default_signals);
   sigaddset(&default_signals, SIGINT);
   sigaddset(&default_signals, SIGCHLD);
+  /* posix_spawn keeps the parent disposition for a signal absent from the default
+     set. SIGPIPE is added so an external pipe producer dies on a closed reader
+     rather than inheriting the shell's ignore. */
+  sigaddset(&default_signals, SIGPIPE);
   posix_spawnattr_setsigdefault(&attr, &default_signals);
 
   short spawn_flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
@@ -691,9 +695,21 @@ fn capture_program_output(const ArrayList<String> &argv,
     raw_args.push(const_cast<char *>(argument.c_str()));
   raw_args.push(nullptr);
 
+  /* The shell ignores SIGPIPE. The spawn restores the default in the child, so a
+     child that keeps writing after the read end closes on the timeout dies on
+     SIGPIPE rather than seeing EPIPE. */
+  posix_spawnattr_t attr;
+  posix_spawnattr_init(&attr);
+  sigset_t default_signals;
+  sigemptyset(&default_signals);
+  sigaddset(&default_signals, SIGPIPE);
+  posix_spawnattr_setsigdefault(&attr, &default_signals);
+  posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGDEF);
+
   pid_t child_pid = 0;
   const int spawn_result = posix_spawn(&child_pid, raw_args[0], &file_actions,
-                                       nullptr, raw_args.begin(), environ);
+                                       &attr, raw_args.begin(), environ);
+  posix_spawnattr_destroy(&attr);
   posix_spawn_file_actions_destroy(&file_actions);
   close(write_end);
   close(devnull_fd);
@@ -1271,6 +1287,12 @@ fn reset_signal_handlers() throws -> void
   sa.sa_handler = SIG_DFL;
   check_syscall(sigaction(SIGCHLD, &sa, nullptr));
 
+  /* A forked command or pipeline producer must die on a broken pipe rather than
+     see its write fail with EPIPE, so it exits with the SIGPIPE status the way
+     bash and the coreutils do. The shell itself ignores SIGPIPE, so the default
+     disposition is restored here in the child before it runs the command. */
+  check_syscall(sigaction(SIGPIPE, &sa, nullptr));
+
   /* A forked compound-pipeline child inherits the flag value at fork. A stale
      one would make the evaluator throw Interrupted before the child runs, so it
      is cleared here alongside the handler reset. */
@@ -1306,6 +1328,14 @@ fn set_default_signal_handlers() throws -> void
   struct sigaction si = {};
   si.sa_handler = handle_interrupt;
   check_syscall(sigaction(SIGINT, &si, nullptr));
+
+  /* The shell ignores SIGPIPE so a write to a reader that closed returns EPIPE
+     for the shell to handle rather than killing the shell. A forked child
+     restores the default disposition in reset_signal_handlers, so a pipeline
+     producer still dies on the signal. */
+  struct sigaction sp = {};
+  sp.sa_handler = SIG_IGN;
+  check_syscall(sigaction(SIGPIPE, &sp, nullptr));
 }
 
 static fn handle_trapped_signal(int signal_number) wontthrow -> void
@@ -1548,6 +1578,10 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
   if (child_pid == -1) return false;
 
   if (child_pid == 0) {
+    /* The shell ignores SIGPIPE and execve keeps an ignored disposition. The
+       default is restored here before the exec, so the measured program dies on a
+       broken pipe rather than inheriting the ignore. */
+    signal(SIGPIPE, SIG_DFL);
     if (suppress_output) {
       const int null_fd = open("/dev/null", O_WRONLY);
       if (null_fd != -1) {
