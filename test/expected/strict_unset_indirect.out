@@ -43,6 +43,7 @@
 shit: 3:7: error: Unable to expand 'missing_target' because the parameter is not set.
      3 |  (echo "${!ref}")
        |        ^~~~~~~~~ here.
+note: Replace it with ${missing_target-} if empty expansion is desired.
 target-form=2
 shit: 5:6: error: Unable to expand 'nope' because the parameter is not set.
      5 |  echo "${!nope}"

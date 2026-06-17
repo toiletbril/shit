@@ -24,3 +24,4 @@ shit: 2:14: warning: The assignment prefix does not affect this command, 'foo' i
 shit: 2:14: error: Unable to expand 'foo' because the parameter is not set.
      2 |  foo=bar echo "$foo"
        |               ^~~~~~ here.
+note: Replace it with ${foo-} if empty expansion is desired.

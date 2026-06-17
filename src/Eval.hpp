@@ -811,8 +811,8 @@ public:
      location inside that command, the unset-variable caret on the reference
      itself. */
   cold fn show_runtime_warning(StringView message) wontthrow -> void;
-  cold fn show_runtime_warning_at(SourceLocation location,
-                                  StringView message) wontthrow -> void;
+  cold fn show_runtime_warning_at(SourceLocation location, StringView message,
+                                  StringView note = {}) wontthrow -> void;
   /* The location of the $name or ${name spelling inside the command being
      evaluated, found by scanning the command's source span, since word
      segments carry no positions of their own. The statement location is the
@@ -1783,7 +1783,8 @@ fn find_substring_length_separator(StringView body) wontthrow -> usize;
 
 /* Throw an error carrying the script-fatal mark, the abort the set -u read
    and the ${name:?} report perform even in the bash mood. */
-[[noreturn]] fn throw_script_fatal(String message) throws -> void;
+[[noreturn]] fn throw_script_fatal(String message, StringView note = {}) throws
+    -> void;
 
 /* Source the startup files for each mood in the list, in order, the way the
    --init-moods flag and the set --init-moods builtin both ask. A shit flavor

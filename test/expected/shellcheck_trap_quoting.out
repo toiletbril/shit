@@ -37,3 +37,4 @@ note: Single-quote it so it expands as the signal arrives.
 shit: 5:6: error: Unable to expand 'unset_at_set_time' because the parameter is not set.
      5 |  trap "echo $unset_at_set_time" EXIT
        |       ^~~~~~~~~~~~~~~~~~~~~~~~~ here.
+note: Replace it with ${unset_at_set_time-} if empty expansion is desired.

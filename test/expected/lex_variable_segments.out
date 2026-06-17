@@ -49,3 +49,4 @@
 shit: 2:3: error: Unable to expand 'foo' because the parameter is not set.
      2 |  : $foo ${bar}
        |    ^~~~ here.
+note: Replace it with ${foo-} if empty expansion is desired.

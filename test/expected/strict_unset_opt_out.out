@@ -49,5 +49,6 @@
 shit: 5:7: error: Unable to expand 'nope' because the parameter is not set.
      5 |  (echo "$nope")
        |        ^~~~~~~ here.
+note: Replace it with ${nope-} if empty expansion is desired.
 code=2
 [Code 0]

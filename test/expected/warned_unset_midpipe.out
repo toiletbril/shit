@@ -29,9 +29,10 @@
 [Word
   Unquoted "continued"
 ]
-shit: 3:13: warning: The variable 'never_piped' is not set, it expands to empty, replace it with ${never_piped-} if empty expansion is desired.
+shit: 3:13: warning: The variable 'never_piped' is not set, it expands to empty.
      3 |  echo "value=$never_piped" | cat
        |              ^~~~~~~~~~~~ here.
+note: Replace it with ${never_piped-} if empty expansion is desired.
 value=
 continued
 [Code 0]

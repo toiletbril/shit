@@ -29,3 +29,4 @@
 shit: 3:13: error: Unable to expand 'y' because the parameter is not set.
      3 |  printf '%s' "${x-$y}"
        |              ^~~~~~~~~ here.
+note: Replace it with ${y-} if empty expansion is desired.

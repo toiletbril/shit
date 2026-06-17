@@ -93,3 +93,4 @@ note: Test with -z instead.
 shit: 3:8: error: Unable to expand 'x' because the parameter is not set.
      3 |  [ ! -z "$x" ]
        |         ^~~~ here.
+note: Replace it with ${x-} if empty expansion is desired.

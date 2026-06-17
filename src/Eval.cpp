@@ -324,10 +324,12 @@ fn EvalContext::append_indexed_array(StringView name,
    unlike the command-level errors the bash mood continues past, so their
    throws carry the script-fatal mark. Shared with the parameter expansion in
    EvalParamExpansion.cpp. */
-[[noreturn]] fn throw_script_fatal(String message) throws -> void
+[[noreturn]] fn throw_script_fatal(String message, StringView note) throws
+    -> void
 {
   let error = Error{message.view()};
   error.set_script_fatal();
+  if (!note.is_empty()) error.set_note(note);
   throw error;
 }
 
@@ -337,8 +339,8 @@ cold fn EvalContext::show_runtime_warning(StringView message) wontthrow -> void
 }
 
 cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
-                                             StringView message) wontthrow
-    -> void
+                                             StringView message,
+                                             StringView note) wontthrow -> void
 {
   if (diagnostics_disabled()) return;
   /* A windowed resolution rebases the absolute position onto the function's
@@ -360,11 +362,14 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     if (resolved_source.text == nullptr ||
         location.position > resolved_source.text->count())
     {
-      show_message(Warning{message}.to_string());
+      let fallback = Warning{message};
+      if (!note.is_empty()) fallback.set_note(note);
+      show_message(fallback.to_string());
       return;
     }
     let warning = WarningWithLocation{location, message};
     warning.set_line_offset(line_offset);
+    if (!note.is_empty()) warning.set_note(note);
     show_message(warning.to_string(resolved_source.text->view()));
     /* A warning from a sourced file names the chain that reached it, the user
        typed no source command for an rc chain. The typed line has no frames. */
@@ -462,19 +467,21 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
 
   /* -W downgrades the mood-seeded fatality to a warning, an explicit set -u
      keeps the abort. A lenient run without -W expands the name to empty. */
+  let const empty_expansion_note =
+      "replace it with ${" + String{name} + "-} if empty expansion is desired";
+
   if (m_runtime.error_unset &&
       (m_runtime.error_unset_explicit || !m_runtime.are_warnings_enabled))
   {
     throw_script_fatal("Unable to expand '" + String{name} +
-                       "' because the parameter is not set");
+                           "' because the parameter is not set",
+                       empty_expansion_note.view());
   }
   if (m_runtime.error_unset || m_runtime.are_warnings_enabled) {
     show_runtime_warning_at(locate_variable_reference(name),
                             "The variable '" + String{name} +
-                                "' is not set, it expands to empty, replace "
-                                "it with ${" +
-                                String{name} +
-                                "-} if empty expansion is desired");
+                                "' is not set, it expands to empty",
+                            empty_expansion_note.view());
   }
 }
 
@@ -1819,15 +1826,17 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
       kind = ResolvedCommand::from_builtin(Builtin::Kind::Shitbox);
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
-      /* A close builtin or PATH program is offered as a did-you-mean hint, so a
+      /* A close builtin or PATH program is offered as a did-you-mean note, so a
          typo such as gti points at git. */
-      String message = "Program '" + program + "' wasn't found";
+      let error = CommandNotFound{location, "Program '" + program +
+                                                "' wasn't found"};
       if (Maybe<String> suggestion =
               utils::suggest_command(program.view(), ArrayList<String>{}))
       {
-        message += ", did you mean '" + *suggestion + "'?";
+        let const hint = "did you mean '" + *suggestion + "'?";
+        error.set_note(hint.view());
       }
-      throw CommandNotFound{location, steal(message)};
+      throw error;
     }
   } else {
     LOG(Debug, "resolved '%s' to a builtin", program.c_str());

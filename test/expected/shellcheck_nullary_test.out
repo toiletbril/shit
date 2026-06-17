@@ -31,3 +31,4 @@ note: Write it with -n to read clearer.
 shit: 2:3: error: Unable to expand 'x' because the parameter is not set.
      2 |  [ "$x" ]
        |    ^~~~ here.
+note: Replace it with ${x-} if empty expansion is desired.

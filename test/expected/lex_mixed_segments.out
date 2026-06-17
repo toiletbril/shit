@@ -33,3 +33,4 @@ note: Quote it to keep one argument.
 shit: 2:3: error: Unable to expand 'x' because the parameter is not set.
      2 |  : pre"dq"'sq'$x${y}post
        |    ^~~~~~~~~~~~~~~~~~~~~ here.
+note: Replace it with ${x-} if empty expansion is desired.
