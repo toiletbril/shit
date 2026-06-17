@@ -1184,8 +1184,17 @@ fn EvalContext::print_source_backtrace(
     let const &frame = m_source_frames[i - 1];
     if (frame.parent_source != nullptr) {
       /* A frame whose call site is exactly where the error already pointed
-         repeats that caret, so it is dropped to leave a single one there. */
-      if (error_location.has_value() &&
+         repeats that caret, so it is dropped to leave a single one there. The
+         file must match too, since two sources can share a byte offset and a
+         length while pointing at unrelated text. */
+      let const &call_file = frame.call_site.filename;
+      let const &error_file = error_location.has_value()
+                                  ? error_location->filename
+                                  : call_file;
+      let const same_file =
+          call_file.has_value() == error_file.has_value() &&
+          (!call_file.has_value() || *call_file == *error_file);
+      if (error_location.has_value() && same_file &&
           frame.call_site.position == error_location->position &&
           frame.call_site.length == error_location->length)
       {

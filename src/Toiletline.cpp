@@ -92,7 +92,7 @@ fn tl_arena_realloc(void *pointer, usize length) -> void *
 
 #define TL_NO_SUSPEND
 #define TL_ASSERT           ASSERT
-#define TL_HISTORY_MAX_SIZE 1024 * 4
+#define TL_HISTORY_MAX_SIZE (1024 * 4)
 
 #define TOILETLINE_IMPLEMENTATION
 /* A release build makes TL_ASSERT a no-op, which leaves a few of the vendored
@@ -174,8 +174,14 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     const usize byte_cursor =
         byte_offset_of_codepoint(buffer, byte_length, cursor);
 
+    /* A completion run can raise a diagnostic, such as a bash-completion
+       function tripping a warning, while the editor sits on the prompt line. It
+       is armed to break onto its own line first, then disarmed whether or not
+       it printed, so a later command's message is unaffected. */
+    shit::arm_message_leading_newline(true);
     shit::completion::completion_result result = shit::completion::complete(
         line, byte_cursor, *COMPLETION_CONTEXT, base, for_listing != 0);
+    shit::arm_message_leading_newline(false);
 
     if (result.candidates.is_empty()) return 0;
 
@@ -222,9 +228,13 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 
     return 1;
   } catch (shit::ErrorBase &error) {
+    /* A throw skips the disarm above, so it runs here too, since the flag is
+       process-wide and would otherwise push the next command's message down. */
+    shit::arm_message_leading_newline(false);
     LOG(Debug, "completion swallowed an error: %s", error.message().c_str());
     return 0;
   } catch (...) {
+    shit::arm_message_leading_newline(false);
     LOG(Debug, "completion swallowed an unknown throw");
     return 0;
   }

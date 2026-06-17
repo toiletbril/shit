@@ -2085,11 +2085,31 @@ static fn settled_option_value(StringView line, StringView option) throws
   return None;
 }
 
+/* A name that carries a slash, repeats a makefile name, or names a path that
+   exists in the make directory is a build artifact rather than a target, so it
+   is dropped from completion. GNUmakefile, config.status, and the src directory
+   fall out this way while all and install remain. */
+static fn make_target_is_artifact(StringView name, const Path &directory) throws
+    -> bool
+{
+  if (name.find_character('/').has_value()) return true;
+  if (name == StringView{"GNUmakefile"} || name == StringView{"Makefile"} ||
+      name == StringView{"makefile"})
+  {
+    return true;
+  }
+
+  let candidate = directory.clone();
+  candidate.push_component(name);
+  return candidate.exists();
+}
+
 /* The targets of a GNU make database dump, the lines between "# Files" and
    "# Finished Make data base" that open a rule. A comment, a dot rule, a
-   recipe line, and the rule a "# Not a target" comment disowns are all
-   skipped, the same reading fish's make completion applies. */
-static fn parse_make_database_targets(StringView database) throws
+   recipe line, the rule a "# Not a target" comment disowns, and an artifact
+   target are all skipped, the same reading fish's make completion applies. */
+static fn parse_make_database_targets(StringView database,
+                                      const Path &directory) throws
     -> ArrayList<String>
 {
   let targets = ArrayList<String>{};
@@ -2124,58 +2144,9 @@ static fn parse_make_database_targets(StringView database) throws
     if (text[0] == '.' || text[0] == '\t') continue;
     let const colon = text.find_character(':');
     if (!colon.has_value() || *colon == 0) continue;
-    targets.push(String{text.substring_of_length(0, *colon)});
-  }
-  return targets;
-}
-
-/* The explicit-rule targets read straight from a Makefile's text, the fallback
-   when the make database dump is empty because no GNU make is on the PATH and
-   the bundled make has no database mode. A recipe line, a comment, a dot rule,
-   a pattern rule, and a macro assignment are skipped, so a plain target rule
-   contributes its names. */
-static fn parse_makefile_targets_directly(StringView text) throws
-    -> ArrayList<String>
-{
-  let targets = ArrayList<String>{};
-  let seen = HashSet{heap_allocator()};
-  usize i = 0;
-  while (i < text.length) {
-    usize end = i;
-    while (end < text.length && text[end] != '\n')
-      end++;
-    let const raw = text.substring_of_length(i, end - i);
-    i = end + 1;
-
-    if (raw.is_empty() || raw[0] == '\t' || raw[0] == '#' || raw[0] == '.') {
-      continue;
-    }
-    let const colon = raw.find_character(':');
-    if (!colon.has_value() || *colon == 0) {
-      continue;
-    }
-    if (let const equals = raw.find_character('=');
-        equals.has_value() && *equals < *colon)
-    {
-      continue;
-    }
-
-    let const names = raw.substring_of_length(0, *colon);
-    usize word = 0;
-    while (word < names.length) {
-      while (word < names.length && (names[word] == ' ' || names[word] == '\t'))
-        word++;
-      let const start = word;
-      while (word < names.length && names[word] != ' ' && names[word] != '\t')
-        word++;
-      if (word == start) continue;
-      let const name = names.substring_of_length(start, word - start);
-      if (name.find_character('%').has_value() ||
-          name.find_character('$').has_value() || seen.contains(name))
-        continue;
-      seen.add(name);
-      targets.push(String{name});
-    }
+    let const name = text.substring_of_length(0, *colon);
+    if (make_target_is_artifact(name, directory)) continue;
+    targets.push(String{name});
   }
   return targets;
 }
@@ -2415,6 +2386,7 @@ static fn complete_from_build_tools(StringView line, StringView token,
        between the probe and now, completes to nothing rather than running
        make against a missing file. */
     if (!makefile_path.exists()) return None;
+    let const make_directory = Path{directory.view()};
     targets = cached_targets_for(makefile_path, [&]() throws {
       let invocation = String{"make -C "};
       invocation += directory.view();
@@ -2422,14 +2394,25 @@ static fn complete_from_build_tools(StringView line, StringView token,
       invocation += makefile_name->view();
       invocation += " -pRrq : 2>/dev/null";
       let database_targets =
-          parse_make_database_targets(capture(invocation).view());
+          parse_make_database_targets(capture(invocation).view(),
+                                      make_directory);
       if (!database_targets.is_empty()) return database_targets;
-      /* An empty dump means no GNU make answered, so the Makefile is scanned
-         directly for its explicit targets. */
-      if (let const text = utils::read_entire_file(makefile_path.text().view());
-          text.has_value())
-        return parse_makefile_targets_directly(text->view());
-      return database_targets;
+      /* An empty dump means no GNU make answered, so the bundled make parser
+         reads the Makefile and resolves its variables the way make would. The
+         artifact filter drops a name that names a path on disk, and the seen
+         set drops a second rule for the same target so a name lists once. */
+      let const intrinsic_targets =
+          shitbox::collect_makefile_targets(context, makefile_path);
+      let filtered = ArrayList<String>{};
+      let seen = HashSet{heap_allocator()};
+      for (const String &name : intrinsic_targets) {
+        if (make_target_is_artifact(name.view(), make_directory) ||
+            seen.contains(name.view()))
+          continue;
+        seen.add(name.view());
+        filtered.push(name.clone());
+      }
+      return filtered;
     });
   } else if (command == "ninja") {
     let const directory =

@@ -652,8 +652,22 @@ fn print_error(StringView text) throws -> void
 
 fn flush() throws -> void { std::fflush(stdout); }
 
+/* Set while the editor sits mid-line and a diagnostic must break to its own
+   line first. The first show_message consumes it, so only the leading message
+   of a completion run is pushed down, not every message after it. */
+static thread_local bool MESSAGE_LEADING_NEWLINE_ARMED = false;
+
+fn arm_message_leading_newline(bool armed) wontthrow -> void
+{
+  MESSAGE_LEADING_NEWLINE_ARMED = armed;
+}
+
 cold fn show_message(StringView err) throws -> void
 {
+  if (MESSAGE_LEADING_NEWLINE_ARMED) {
+    print_error("\n");
+    MESSAGE_LEADING_NEWLINE_ARMED = false;
+  }
   print_error("shit: ");
   print_error(err);
   print_error("\n");

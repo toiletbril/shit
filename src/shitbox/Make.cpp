@@ -920,6 +920,26 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
+fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
+    -> ArrayList<String>
+{
+  let targets = ArrayList<String>{};
+  let const source = utils::read_entire_file(makefile.text().view());
+  if (!source.has_value()) return targets;
+
+  /* The parser expands variables and runs the := and conditional assignments,
+     so a $(VAR) target name resolves to its real text the way make reads it. A
+     pattern rule lives in its own list, so mk.rules holds only explicit targets.
+     A dot-special such as .PHONY and an empty name are excluded. */
+  let const mk = parse_makefile(cxt, source->view());
+  for (const make_rule &rule : mk.rules) {
+    let const name = rule.target.view();
+    if (name.is_empty() || name[0] == '.') continue;
+    targets.push(rule.target.clone());
+  }
+  return targets;
+}
+
 } /* namespace shitbox */
 
 } /* namespace shit */

@@ -143,6 +143,13 @@ fn find_util(StringView name) throws -> Maybe<Utility::Kind>;
    completion to offer them alongside the builtins. */
 fn util_names() throws -> const ArrayList<String> &;
 
+/* The explicit non-pattern targets of a Makefile, read through the bundled make
+   parser so $(VAR) target names and the := and conditional assignments resolve
+   the way make would. Completion calls this when no GNU make answered the
+   database dump. A pattern target and a dot-special are excluded. */
+fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
+    -> ArrayList<String>;
+
 /* Whether the bare utility names resolve as commands, set by the
    --enable-shitbox flag at startup and the set -o shitbox option at run time.
    The command resolver reads this without an EvalContext in scope, so the state

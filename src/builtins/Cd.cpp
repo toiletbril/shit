@@ -133,6 +133,15 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       target = steal(logical_target);
     } else {
       target = target.to_absolute().normalized();
+      /* to_absolute anchors a relative operand against getcwd. getcwd yields an
+         empty path when the current directory was removed, so the result stays
+         relative. The throw then names that failure instead of a missing
+         directory. */
+      if (!target.is_absolute())
+        throw ErrorWithLocation{
+            ec.source_location(),
+            StringView{"Unable to resolve '"} + arg_path +
+                "' because the current directory is unavailable"};
     }
   }
 

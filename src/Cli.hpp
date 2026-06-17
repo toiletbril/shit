@@ -171,6 +171,13 @@ fn wrap_text(StringView text, usize indent, usize width) throws -> String;
 
 fn show_message(StringView err) throws -> void;
 
+/* Arm a one-shot leading newline on the next show_message, so a diagnostic
+   raised while the editor sits mid-line, such as a warning a completion run
+   prints, starts on its own line instead of joining the prompt. The first
+   message consumes the arming, and disarming it before any message prints emits
+   nothing. */
+fn arm_message_leading_newline(bool armed) wontthrow -> void;
+
 /* Write bytes to the standard streams without going through the iostream
    layer. The shell uses these instead of std::cout and std::cerr so the binary
    does not pull in the stream machinery. */
