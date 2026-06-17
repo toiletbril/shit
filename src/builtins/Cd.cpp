@@ -55,8 +55,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (is_to_previous) {
     let const old_directory = cxt.get_variable_value("OLDPWD");
     if (!old_directory || old_directory->is_empty())
-      throw Error{"Unable to return to the previous directory because OLDPWD "
-                  "is not set"};
+      throw ErrorWithLocation{
+          ec.source_location(),
+          "Unable to return to the previous directory because OLDPWD is not set"};
     arg_path.append(old_directory->view());
   } else if (ec.args().count() > 1) {
     arg_path.append(ec.args()[1]);
@@ -67,7 +68,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   } else {
     /* Empty cd should go to the home directory. */
     let const home_directory = os::get_home_directory();
-    if (!home_directory) throw Error{"Unable to determine the home directory"};
+    if (!home_directory)
+      throw ErrorWithLocation{ec.source_location(),
+                              "Unable to determine the home directory"};
     arg_path.append(home_directory->text());
   }
 
@@ -110,7 +113,31 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  target = target.to_absolute().normalized();
+  /* bash resolves a relative operand against the logical PWD by default, the -L
+     mode, so a move lexically joins the operand onto PWD rather than appending it
+     to the physical getcwd. A cd .. out of a symlinked directory then returns to
+     the directory that holds the symlink instead of the physical parent. The
+     logical path is taken only when it names a directory, and the physical
+     resolution through getcwd stays as the fallback the way bash retries. */
+  if (target.is_absolute()) {
+    target = target.normalized();
+  } else {
+    let const logical_pwd = cxt.get_variable_value("PWD");
+    let logical_target = Path{};
+    if (logical_pwd.has_value() && !logical_pwd->is_empty() &&
+        logical_pwd->view()[0] == '/')
+    {
+      logical_target = Path{logical_pwd->view()}
+                           .push_component(target.text().view())
+                           .normalized();
+    }
+
+    if (!logical_target.is_empty() && logical_target.is_directory()) {
+      target = steal(logical_target);
+    } else {
+      target = target.to_absolute().normalized();
+    }
+  }
 
   if (target.exists()) {
     /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. OLDPWD
@@ -130,8 +157,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        chdir result drives an early throw before either variable is rewritten.
      */
     if (Path::set_current_directory(target).is_error())
-      throw Error{StringView{"Unable to change directory to '"} + arg_path +
-                  "' because the change failed"};
+      throw ErrorWithLocation{
+          ec.source_location(),
+          StringView{"Unable to change to the directory '"} + arg_path + "'"};
     /* A relative PATH entry, or the current directory as an empty entry, now
        names a different directory, so a cached resolution may point at the old
        cwd. The cache is marked stale so the next command re-resolves, the way
@@ -149,8 +177,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  throw Error{StringView{"Unable to change directory because the path '"} +
-              arg_path + "' does not exist"};
+  throw ErrorWithLocation{ec.source_location(),
+                          StringView{"The directory '"} + arg_path +
+                              "' does not exist"};
 }
 
 } /* namespace shit */

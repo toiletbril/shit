@@ -94,6 +94,6 @@
 /tmp
 /tmp
 cdpath=0
-shit: 6:1: error: Builtin 'cd': Unable to change directory because the path '/nonexistent-xyz-dir' does not exist.
+shit: 6:1: error: The directory '/nonexistent-xyz-dir' does not exist.
      6 |  cd /nonexistent-xyz-dir 2>&1; echo "miss=$?"
        |  ^~~~~~~~~~~~~~~~~~~~~~~ here.
