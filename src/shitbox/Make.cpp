@@ -70,6 +70,9 @@ struct makefile
   ArrayList<make_variable> variables;
   ArrayList<make_rule> rules;
   ArrayList<make_rule> pattern_rules;
+  /* The first ordinary explicit target, the bare-make goal. A target-specific
+     variable line does not set it, the way GNU make picks the first real rule. */
+  String default_goal;
   /* A name to array-index map, so a $(NAME) lookup is one hash probe rather
      than a scan of every variable, which a recipe pays once per reference per
      line. The array keeps the values so a value can still be appended in
@@ -395,8 +398,9 @@ static fn assignment_variable_name(StringView assignment) wontthrow -> StringVie
   let name = assignment.substring_of_length(0, *equals);
   if (!name.is_empty()) {
     let const last = name[name.length - 1];
-    if (last == '+' || last == '?' || last == ':')
+    if (last == '+' || last == '?' || last == ':') {
       name = name.substring_of_length(0, name.length - 1);
+    }
   }
   return trim(name);
 }
@@ -739,6 +743,11 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
       current = nullptr;
       for (const String &target : split_words(targets.view())) {
         let new_prerequisites = split_words(prerequisites.view());
+        /* The first ordinary explicit target is the bare-make goal, a pattern
+           rule and a target-specific assignment do not claim it. */
+        if (mk.default_goal.is_empty() &&
+            !target.view().find_character('%').has_value())
+          mk.default_goal = target.clone();
         /* A recipe-less rule already standing for this target, such as one a
            prior target-specific assignment created, takes this line's
            prerequisites and recipe rather than a second rule find_rule would
@@ -784,7 +793,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
 struct saved_make_variable
 {
   String name;
-  bool existed;
+  bool was_present;
   String old_value;
 };
 
@@ -855,7 +864,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       let const name = assignment_variable_name(assignment.view());
       saved_make_variable snapshot{String{name}, false, String{}};
       if (const String *current_value = mk.find_variable(name)) {
-        snapshot.existed = true;
+        snapshot.was_present = true;
         snapshot.old_value = String{current_value->view()};
       }
       saved_variables.push(steal(snapshot));
@@ -867,9 +876,14 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   defer {
     for (usize i = saved_variables.count(); i-- > 0;) {
       const saved_make_variable &snapshot = saved_variables[i];
-      if (let const *index = mk.variable_index.find(snapshot.name.view()))
-        mk.variables[*index].value =
-            snapshot.existed ? String{snapshot.old_value.view()} : String{};
+      if (snapshot.was_present) {
+        if (let const *index = mk.variable_index.find(snapshot.name.view()))
+          mk.variables[*index].value = String{snapshot.old_value.view()};
+      } else {
+        /* A variable the assignment created is unset again, not left empty, so a
+           later ?= still applies its default. */
+        mk.variable_index.erase(snapshot.name.view());
+      }
     }
   };
 
@@ -1017,9 +1031,9 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
 
   ArrayList<String> goals{};
   if (operands.is_empty()) {
-    if (mk.rules.is_empty())
+    if (mk.default_goal.is_empty())
       throw Error{"The makefile defines no targets and no default goal"};
-    goals.push(mk.rules[0].target.clone());
+    goals.push(mk.default_goal.clone());
   } else {
     for (const String &operand : operands)
       goals.push(operand.clone());
