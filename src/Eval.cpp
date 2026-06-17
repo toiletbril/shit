@@ -1177,8 +1177,8 @@ pure fn EvalContext::current_origin() const wontthrow -> const String &
   return m_current_origin;
 }
 
-fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location)
-    const throws -> void
+fn EvalContext::print_source_backtrace(
+    Maybe<SourceLocation> error_location) const throws -> void
 {
   for (usize i = m_source_frames.count(); i > 0; i--) {
     let const &frame = m_source_frames[i - 1];

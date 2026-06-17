@@ -55,9 +55,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (is_to_previous) {
     let const old_directory = cxt.get_variable_value("OLDPWD");
     if (!old_directory || old_directory->is_empty())
-      throw ErrorWithLocation{
-          ec.source_location(),
-          "Unable to return to the previous directory because OLDPWD is not set"};
+      throw ErrorWithLocation{ec.source_location(),
+                              "Unable to return to the previous directory "
+                              "because OLDPWD is not set"};
     arg_path.append(old_directory->view());
   } else if (ec.args().count() > 1) {
     arg_path.append(ec.args()[1]);
@@ -174,9 +174,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  throw ErrorWithLocation{ec.source_location(),
-                          StringView{"The directory '"} + arg_path +
-                              "' does not exist"};
+  throw ErrorWithLocation{ec.source_location(), StringView{"The directory '"} +
+                                                    arg_path +
+                                                    "' does not exist"};
 }
 
 } /* namespace shit */

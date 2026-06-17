@@ -586,9 +586,9 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   sigemptyset(&default_signals);
   sigaddset(&default_signals, SIGINT);
   sigaddset(&default_signals, SIGCHLD);
-  /* posix_spawn keeps the parent disposition for a signal absent from the default
-     set. SIGPIPE is added so an external pipe producer dies on a closed reader
-     rather than inheriting the shell's ignore. */
+  /* posix_spawn keeps the parent disposition for a signal absent from the
+     default set. SIGPIPE is added so an external pipe producer dies on a closed
+     reader rather than inheriting the shell's ignore. */
   sigaddset(&default_signals, SIGPIPE);
   posix_spawnattr_setsigdefault(&attr, &default_signals);
 
@@ -695,8 +695,8 @@ fn capture_program_output(const ArrayList<String> &argv,
     raw_args.push(const_cast<char *>(argument.c_str()));
   raw_args.push(nullptr);
 
-  /* The shell ignores SIGPIPE. The spawn restores the default in the child, so a
-     child that keeps writing after the read end closes on the timeout dies on
+  /* The shell ignores SIGPIPE. The spawn restores the default in the child, so
+     a child that keeps writing after the read end closes on the timeout dies on
      SIGPIPE rather than seeing EPIPE. */
   posix_spawnattr_t attr;
   posix_spawnattr_init(&attr);
@@ -1579,8 +1579,8 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
 
   if (child_pid == 0) {
     /* The shell ignores SIGPIPE and execve keeps an ignored disposition. The
-       default is restored here before the exec, so the measured program dies on a
-       broken pipe rather than inheriting the ignore. */
+       default is restored here before the exec, so the measured program dies on
+       a broken pipe rather than inheriting the ignore. */
     signal(SIGPIPE, SIG_DFL);
     if (suppress_output) {
       const int null_fd = open("/dev/null", O_WRONLY);

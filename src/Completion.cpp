@@ -2130,9 +2130,9 @@ static fn parse_make_database_targets(StringView database) throws
 }
 
 /* The explicit-rule targets read straight from a Makefile's text, the fallback
-   when the make database dump is empty because no GNU make is on the PATH and the
-   bundled make has no database mode. A recipe line, a comment, a dot rule, a
-   pattern rule, and a macro assignment are skipped, so a plain target rule
+   when the make database dump is empty because no GNU make is on the PATH and
+   the bundled make has no database mode. A recipe line, a comment, a dot rule,
+   a pattern rule, and a macro assignment are skipped, so a plain target rule
    contributes its names. */
 static fn parse_makefile_targets_directly(StringView text) throws
     -> ArrayList<String>
@@ -2154,8 +2154,8 @@ static fn parse_makefile_targets_directly(StringView text) throws
     if (!colon.has_value() || *colon == 0) {
       continue;
     }
-    if (let const equals = raw.find_character('='); equals.has_value() &&
-        *equals < *colon)
+    if (let const equals = raw.find_character('=');
+        equals.has_value() && *equals < *colon)
     {
       continue;
     }

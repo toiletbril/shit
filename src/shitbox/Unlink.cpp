@@ -40,22 +40,22 @@ fn Unlink::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  /* unlink removes the link itself, so a symlink to a directory is fine and only
-     a real directory is refused, the way unlink(2) and GNU unlink behave. */
+  /* unlink removes the link itself, so a symlink to a directory is fine and
+     only a real directory is refused, the way unlink(2) and GNU unlink behave.
+   */
   let const &target = operands[0];
   let const target_path = Path{target.view()};
   if (target_path.is_directory() && !target_path.is_symbolic_link()) {
-    report_soft_shitbox_error(ec, cxt,
-                              "unlink: cannot unlink '" + target +
-                                  "': it is a directory");
+    report_soft_shitbox_error(
+        ec, cxt, "unlink: cannot unlink '" + target + "': it is a directory");
     return 1;
   }
 
   /* The single-file removal is the shared rm path with recursion off. */
   if (!remove_path(target.view(), false)) {
     report_soft_shitbox_error(ec, cxt,
-                              "unlink: cannot unlink '" + target + "': " +
-                                  os::last_system_error_message());
+                              "unlink: cannot unlink '" + target +
+                                  "': " + os::last_system_error_message());
     return 1;
   }
   return 0;

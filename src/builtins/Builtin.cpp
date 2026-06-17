@@ -21,7 +21,8 @@ HELP_DESCRIPTION_DECL(
     "ignoring a shell function of the same name and never searching the PATH. "
     "With --list it prints every builtin one per line. A bare builtin in the "
     "shit mood prints the builtins in columns, and in the other moods it "
-    "succeeds without running anything. A name that is not a shell builtin is an "
+    "succeeds without running anything. A name that is not a shell builtin is "
+    "an "
     "error.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -49,8 +50,8 @@ static fn sorted_builtin_names() throws -> ArrayList<String>
   return names;
 }
 
-/* The builtins laid out in columns that fit a usual terminal width, the survey a
-   bare builtin prints in the shit mood. */
+/* The builtins laid out in columns that fit a usual terminal width, the survey
+   a bare builtin prints in the shit mood. */
 static fn print_builtin_columns(ExecContext &ec) throws -> void
 {
   let const sorted = sorted_builtin_names();
@@ -91,7 +92,8 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   /* The flags are not parsed generically, since every argument after the name
-     belongs to the target builtin and must pass through untouched. Only the bare
+     belongs to the target builtin and must pass through untouched. Only the
+     bare
      --help and --list on the builtin word itself are intercepted. */
   let const &name = ec.args()[1];
   if (name == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);

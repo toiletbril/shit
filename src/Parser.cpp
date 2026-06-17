@@ -999,10 +999,10 @@ hot fn Parser::parse_simple_command() throws -> Command *
          not a keyword, so the conditional is rejected there. */
       if (is_unquoted_word(token, "[[")) {
         if (m_lexer.is_posix_mode()) {
-          throw ErrorWithLocation{
-              token->source_location(),
-              "The [[ conditional is a bash extension that the sh mood does not "
-              "provide"};
+          throw ErrorWithLocation{token->source_location(),
+                                  "The [[ conditional is a bash extension that "
+                                  "the sh mood does not "
+                                  "provide"};
         }
         return attach_trailing_redirections(parse_conditional_command());
       }
@@ -1025,10 +1025,10 @@ hot fn Parser::parse_simple_command() throws -> Command *
         return attach_trailing_redirections(parse_paren_command());
       case Token::Kind::DoubleLeftSquareBracket: {
         if (m_lexer.is_posix_mode()) {
-          throw ErrorWithLocation{
-              token->source_location(),
-              "The [[ conditional is a bash extension that the sh mood does not "
-              "provide"};
+          throw ErrorWithLocation{token->source_location(),
+                                  "The [[ conditional is a bash extension that "
+                                  "the sh mood does not "
+                                  "provide"};
         }
         return attach_trailing_redirections(parse_conditional_command());
       }

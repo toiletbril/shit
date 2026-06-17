@@ -1,11 +1,11 @@
-#include <glob.h>
-
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Shitbox.hpp"
 #include "../Utils.hpp"
+
+#include <glob.h>
 
 /* A deliberately small make. It reads a Makefile, holds the variables and the
    target rules, expands $(NAME) and ${NAME}, and runs each recipe line through
@@ -23,10 +23,13 @@ HELP_DESCRIPTION_DECL(
     "in its own subshell. With no target it builds the first one. It supports "
     "recursive and := simple variables, += and ?= assignments, explicit rules, "
     "single-level pattern rules such as %.o: %.c with the automatic variables "
-    "$@, $<, and $^, the ifeq, ifneq, ifdef, and ifndef conditionals, backslash "
+    "$@, $<, and $^, the ifeq, ifneq, ifdef, and ifndef conditionals, "
+    "backslash "
     "line continuations, and the $(wildcard), $(shell), and $(VAR:a=b) "
-    "functions. The -B and -k flags and the -j parallelism flag are accepted and "
-    "ignored, since the build runs serially. It has no chained implicit rules.");
+    "functions. The -B and -k flags and the -j parallelism flag are accepted "
+    "and "
+    "ignored, since the build runs serially. It has no chained implicit "
+    "rules.");
 
 FLAG(MAKE_FILE, String, 'f', "file",
      "Read the named file instead of Makefile.");
@@ -196,8 +199,8 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
                  usize depth) throws -> String;
 
 /* The files each space-separated glob in the argument matches, joined by single
-   spaces, the way GNU make $(wildcard *.cc) lists sources. A pattern that matches
-   nothing contributes no words. */
+   spaces, the way GNU make $(wildcard *.cc) lists sources. A pattern that
+   matches nothing contributes no words. */
 static fn make_wildcard(StringView patterns) throws -> String
 {
   let result = String{};
@@ -214,12 +217,12 @@ static fn make_wildcard(StringView patterns) throws -> String
   return result;
 }
 
-/* A substitution reference $(VAR:pattern=replacement), so $(SRC:%.cc=o/%.o) maps
-   each word of VAR through the pattern. A pattern holding a % matches a stem the
-   replacement % then carries, and a pattern without one replaces a trailing
-   suffix, the $(SRC:.cc=.o) form. None means the name is not a substitution
-   reference, since a variable name carries no blank and a function argument that
-   holds a colon is read elsewhere. */
+/* A substitution reference $(VAR:pattern=replacement), so $(SRC:%.cc=o/%.o)
+   maps each word of VAR through the pattern. A pattern holding a % matches a
+   stem the replacement % then carries, and a pattern without one replaces a
+   trailing suffix, the $(SRC:.cc=.o) form. None means the name is not a
+   substitution reference, since a variable name carries no blank and a function
+   argument that holds a colon is read elsewhere. */
 static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
                                      StringView name, usize depth) throws
     -> Maybe<String>
@@ -242,13 +245,13 @@ static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
 
   let const pattern =
       expand(cxt, mk, rest.substring_of_length(0, *equals), depth + 1);
-  let const replacement = expand(cxt, mk, rest.substring(*equals + 1), depth + 1);
+  let const replacement =
+      expand(cxt, mk, rest.substring(*equals + 1), depth + 1);
 
   let value = String{};
   if (const String *stored = mk.find_variable(variable_name); stored != nullptr)
     value = expand(cxt, mk, stored->view(), depth + 1);
-  else if (Maybe<String> from_env =
-               os::get_environment_variable(variable_name);
+  else if (Maybe<String> from_env = os::get_environment_variable(variable_name);
            from_env.has_value())
     value = steal(*from_env);
 
@@ -266,8 +269,8 @@ static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
                word.view().substring(word.view().length -
                                      pattern.view().length) == pattern.view())
     {
-      out += word.view().substring_of_length(
-          0, word.view().length - pattern.view().length);
+      out += word.view().substring_of_length(0, word.view().length -
+                                                    pattern.view().length);
       out += replacement.view();
     } else {
       out += word.view();
@@ -310,20 +313,24 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
         let const command = expand(cxt, mk, name.substring(6), depth + 1);
         result += cxt.capture_command_substitution(command).view();
       } else if (name.length > 9 &&
-                 name.substring_of_length(0, 9) == "wildcard ") {
+                 name.substring_of_length(0, 9) == "wildcard ")
+      {
         let const patterns = expand(cxt, mk, name.substring(9), depth + 1);
         result += make_wildcard(patterns.view()).view();
-      } else if (name.length > 6 && name.substring_of_length(0, 6) == "error ") {
+      } else if (name.length > 6 && name.substring_of_length(0, 6) == "error ")
+      {
         /* $(error text) aborts the build with the message, the way GNU make
            stops on a misconfiguration. */
         throw Error{"The makefile stopped the build with the message '" +
                     expand(cxt, mk, name.substring(6), depth + 1) + "'"};
       } else if (name.length > 8 &&
-                 name.substring_of_length(0, 8) == "warning ") {
+                 name.substring_of_length(0, 8) == "warning ")
+      {
         /* $(warning text) is informational only. */
       } else if (Maybe<String> subst =
                      try_substitution_reference(cxt, mk, name, depth);
-                 subst.has_value()) {
+                 subst.has_value())
+      {
         result += subst->view();
       } else if (const String *value = mk.find_variable(name); value != nullptr)
       {
@@ -386,13 +393,14 @@ static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
   let const name = trim(name_part);
   let const trimmed_value = trim(value);
 
-  /* A := assignment is immediate, so its right-hand side expands now against the
-     values defined so far, the way GNU make evaluates a simple variable. A later
+  /* A := assignment is immediate, so its right-hand side expands now against
+     the values defined so far, the way GNU make evaluates a simple variable. A
+     later
      $(NAME) then reads the finished string. Expanding here also breaks the
-     self-reference in MAKE := $(MAKE) -j$(shell nproc), since $(MAKE) resolves to
-     the make program name before the variable is stored rather than recursing on
-     itself to the expansion-depth cap. A plain = stays lazy and keeps its raw
-     text. */
+     self-reference in MAKE := $(MAKE) -j$(shell nproc), since $(MAKE) resolves
+     to the make program name before the variable is stored rather than
+     recursing on itself to the expansion-depth cap. A plain = stays lazy and
+     keeps its raw text. */
   let const value_to_store = operator_character == ':'
                                  ? expand(cxt, mk, trimmed_value, 0)
                                  : String{trimmed_value};
@@ -412,8 +420,9 @@ static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
   mk.variables.push(make_variable{String{name}, String{value_to_store.view()}});
 }
 
-/* Whether the line ends in a backslash that continues it, an odd run of trailing
-   backslashes, so a doubled \\ is a literal backslash rather than a splice. */
+/* Whether the line ends in a backslash that continues it, an odd run of
+   trailing backslashes, so a doubled \\ is a literal backslash rather than a
+   splice. */
 static fn ends_with_continuation(StringView line) wontthrow -> bool
 {
   usize backslash_count = 0;
@@ -427,8 +436,8 @@ static fn ends_with_continuation(StringView line) wontthrow -> bool
 
 /* The source split into logical lines, with a trailing-backslash continuation
    spliced onto the line it continues, the way GNU make joins a multi-line
-   assignment or prerequisite list. The trailing newline of each physical line is
-   dropped, and the splice collapses the continuation's leading blanks to one
+   assignment or prerequisite list. The trailing newline of each physical line
+   is dropped, and the splice collapses the continuation's leading blanks to one
    space. */
 static fn join_continuations(StringView source) throws -> ArrayList<String>
 {
@@ -472,7 +481,8 @@ static fn leading_word(StringView text) wontthrow -> StringView
 
 /* The two operands of an ifeq or ifneq, the (a,b) form. The comma split honors
    nested parentheses, and each operand is trimmed, so ifeq ($(MODE), dbg) reads
-   the second operand as dbg. False when the line is not the parenthesized form. */
+   the second operand as dbg. False when the line is not the parenthesized form.
+ */
 static fn split_conditional_arguments(StringView rest, StringView &first,
                                       StringView &second) wontthrow -> bool
 {
@@ -556,9 +566,10 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
   for (const String &logical : join_continuations(source)) {
     StringView line = logical.view();
 
-    /* A line that starts with a tab is a recipe for the rule above it, kept only
-       inside an active conditional branch. The tab is dropped and the rest is
-       kept verbatim, since a recipe is shell text expanded only at build time. */
+    /* A line that starts with a tab is a recipe for the rule above it, kept
+       only inside an active conditional branch. The tab is dropped and the rest
+       is kept verbatim, since a recipe is shell text expanded only at build
+       time. */
     if (!line.is_empty() && line[0] == '\t') {
       if (do_is_active() && current != nullptr)
         current->recipe_lines.push(String{line.substring(1)});
@@ -577,17 +588,19 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
 
     let const directive = leading_word(trimmed);
 
-    /* The conditional directives gate the lines between them. An inactive branch
-       still tracks nested directives so the matching endif pops the right one. */
+    /* The conditional directives gate the lines between them. An inactive
+       branch still tracks nested directives so the matching endif pops the
+       right one. */
     if (directive == "ifeq" || directive == "ifneq" || directive == "ifdef" ||
         directive == "ifndef")
     {
       let const is_parent_active = do_is_active();
       let const is_taken =
-          is_parent_active && evaluate_conditional(
-                               cxt, mk, directive,
+          is_parent_active &&
+          evaluate_conditional(cxt, mk, directive,
                                trimmed.substring(directive.length));
-      conditionals.push(conditional_state{is_taken, is_taken, is_parent_active});
+      conditionals.push(
+          conditional_state{is_taken, is_taken, is_parent_active});
       current = nullptr;
       continue;
     }
@@ -606,7 +619,8 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
           top.is_branch_active = is_taken;
           if (is_taken) top.was_any_branch_taken = true;
         } else {
-          top.is_branch_active = top.is_parent_active && !top.was_any_branch_taken;
+          top.is_branch_active =
+              top.is_parent_active && !top.was_any_branch_taken;
           top.was_any_branch_taken = true;
         }
       }
@@ -742,8 +756,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
 
     if (recipe_lines == nullptr) {
       if (Path{goal}.exists()) return;
-      throw Error{"There is no rule to make the target '" + String{goal} +
-                  "'"};
+      throw Error{"There is no rule to make the target '" + String{goal} + "'"};
     }
   }
 
@@ -795,17 +808,17 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
     recipe_runtime.restore(cxt);
     defer { saved_runtime.restore(cxt); };
 
-    /* Each recipe line runs in its own subshell, the way GNU make spawns a shell
-       per line. The parentheses also keep the tail-command exec optimization from
-       replacing the make process when the recipe is a single external command,
-       which would otherwise abandon the remaining recipe lines and targets. The
-       newlines guard the closing paren against a trailing comment in the line. */
+    /* Each recipe line runs in its own subshell, the way GNU make spawns a
+       shell per line. The parentheses also keep the tail-command exec
+       optimization from replacing the make process when the recipe is a single
+       external command, which would otherwise abandon the remaining recipe
+       lines and targets. The newlines guard the closing paren against a
+       trailing comment in the line. */
     let subshell_command = String{"(\n"};
     subshell_command += command.view();
     subshell_command += "\n)";
-    let const status =
-        cxt.run_source(subshell_command.view(), "make", true,
-                       ec.source_location(), StringView{"make"});
+    let const status = cxt.run_source(subshell_command.view(), "make", true,
+                                      ec.source_location(), StringView{"make"});
     if (status != 0 && !should_ignore_errors)
       throw Error{"The recipe for the target '" + String{goal} +
                   "' failed with status " +
@@ -824,18 +837,17 @@ pure Utility::Kind Make::kind() const wontthrow { return Kind::Make; }
 fn Make::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32
 {
-  /* The parallelism flag -j, the always-make flag -B, and the keep-going flag -k
-     change nothing in this serial make, so they are accepted and dropped before
-     flag parsing rather than read as a target or rejected. The -jN form carries
-     an optional number. */
+  /* The parallelism flag -j, the always-make flag -B, and the keep-going flag
+     -k change nothing in this serial make, so they are accepted and dropped
+     before flag parsing rather than read as a target or rejected. The -jN form
+     carries an optional number. */
   ArrayList<String> filtered{};
   for (const String &arg : args) {
     let const text = arg.view();
     bool is_ignored_flag = text == "-j" || text == "-B" ||
                            text == "--always-make" || text == "-k" ||
                            text == "--keep-going";
-    if (!is_ignored_flag && text.length > 2 && text[0] == '-' &&
-        text[1] == 'j')
+    if (!is_ignored_flag && text.length > 2 && text[0] == '-' && text[1] == 'j')
     {
       is_ignored_flag = true;
       for (usize k = 2; k < text.length; k++)
