@@ -14,18 +14,6 @@ namespace shit {
 
 namespace shitbox {
 
-/* The bare-name resolution toggle, mirrored from the set -o shitbox option and
-   the --enable-shitbox flag so the command resolver reads it with no context in
-   scope. */
-static bool g_shitbox_names_enabled = false;
-
-fn shitbox_names_enabled() wontthrow -> bool { return g_shitbox_names_enabled; }
-
-fn set_shitbox_names_enabled(bool enabled) wontthrow -> void
-{
-  g_shitbox_names_enabled = enabled;
-}
-
 Utility::Utility() = default;
 
 flatten fn find_util(StringView name) throws -> Maybe<Utility::Kind>

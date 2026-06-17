@@ -54,12 +54,10 @@ struct precise_location
   bool has_preceding_newline;
 };
 
-/* A per-source index that turns the line and column lookup from a scan over the
-   whole prefix into a binary search. Without it a warning deep in the file
-   costs time proportional to its byte offset, so N warnings cost N squared. The
-   shell reuses one source for a whole analysis pass, so a single cached entry
-   keyed on the source pointer and length serves every located message in that
-   pass. */
+/* A per-source index that turns the line and column lookup from a prefix scan
+   into a binary search, since otherwise N warnings cost N squared. One source
+   serves a whole analysis pass, so a single cached entry keyed on the source
+   pointer and length serves every located message. */
 class SourceLineIndex
 {
 public:
@@ -204,10 +202,8 @@ get_context_pointing_to(StringView source, usize byte_position,
   usize start_offset = byte_position - last_newline_location;
 
   /* A preceding newline puts start_offset on that newline, so it steps one past
-     to the first byte of the line. A newline at offset zero starts line two and
-     must step too, which the flag captures where the bare offset zero could
-     not.
-   */
+     to the first byte of the line. The flag captures a newline at offset zero,
+     which starts line two and must step too. */
   if (has_preceding_newline && start_offset > 0) start_offset--;
 
   usize line_byte_count = 0;
@@ -436,11 +432,11 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position);
 
   /* The column counts code points from the line start to the caret. Both terms
-     must be code point counts, since subtracting the newline's byte offset from
-     a code point count underflows once a preceding line holds a multibyte byte.
-     On the first line there is no newline, so the count from the source start
-     plus one gives the column. A newline at offset zero still starts line two,
-     so the flag rather than the bare offset decides whether a line precedes. */
+     must be code point counts, since subtracting a byte offset from a code point
+     count underflows once a preceding line holds a multibyte byte. The first
+     line has no newline and counts from the source start plus one. A newline at
+     offset zero still starts line two, so the flag rather than the offset
+     decides whether a line precedes. */
   const usize codepoints_before_line =
       has_preceding_newline ? SOURCE_LINE_INDEX.codepoints_before(
                                   source, last_newline_location + 1)

@@ -150,13 +150,6 @@ fn util_names() throws -> const ArrayList<String> &;
 fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
     -> ArrayList<String>;
 
-/* Whether the bare utility names resolve as commands, set by the
-   --enable-shitbox flag at startup and the set -o shitbox option at run time.
-   The command resolver reads this without an EvalContext in scope, so the state
-   lives in a process global the option mirrors onto. */
-fn shitbox_names_enabled() wontthrow -> bool;
-fn set_shitbox_names_enabled(bool enabled) wontthrow -> void;
-
 /* Dispatch the utility whose name sits at args[name_index] of the context. The
    shitbox builtin passes 1 for `shitbox ls` and 0 for a bare-name invocation,
    so the utility always sees its own name at the front of the slice it reads.

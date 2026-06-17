@@ -94,9 +94,8 @@ fn take_pending_signal() wontthrow -> i32
 } /* namespace os */
 } /* namespace shit */
 
-/* The file creation mask call differs only by the name and the argument type
-   across the platforms, so the shared mask functions at the end of the file
-   reach the platform call through this one macro. */
+/* The file creation mask call differs only by name and argument type across
+   platforms. One macro bridges the shared mask functions to it. */
 #if SHIT_PLATFORM_IS WIN32
 #define SHIT_UMASK(mask) _umask(static_cast<int>(mask))
 #else
@@ -127,12 +126,9 @@ hot fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow
 {
   for (;;) {
     ssize_t r = read(fd, buf, size);
-    /* A signal that lands while the read blocks interrupts the call. A SIGINT
-       sets INTERRUPT_REQUESTED, so the read returns to the caller, which
-       reports the interrupt, rather than retrying and freezing the way a
-       stdin-reading utility would on a Ctrl-C. Any other interrupting signal
-       such as a SIGCHLD from a job that changes state retries, so the reader
-       does not mistake the interruption for end of input. */
+    /* A SIGINT sets INTERRUPT_REQUESTED and returns to the caller rather than
+       retrying and freezing on a Ctrl-C. Any other interrupting signal retries
+       so the reader does not mistake the interruption for end of input. */
     if (r == -1 && errno == EINTR) {
       if (INTERRUPT_REQUESTED) return shit::None;
       continue;
@@ -150,15 +146,12 @@ fn TempFileSet::cleanup_from(usize mark) wontthrow -> void { unused(mark); }
 
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
 {
-  /* The saved copy of the real stdout is close-on-exec, so a forked command
-     does not inherit it and hold the shell's own output open. An immortal
-     pipeline stage like yes would otherwise keep a downstream reader from ever
-     seeing end of input. */
+  /* The saved copy of the real stdout is close-on-exec so a forked command does
+     not inherit it and hold the shell's own output open. */
   const os::descriptor saved = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
   dup2(target, STDOUT_FILENO);
 
-  /* The original write end is close-on-exec for the same reason. The duplicate
-     now living on STDOUT_FILENO stays open for the command to write to. */
+  /* The original write end is close-on-exec for the same reason. */
   if (const int flags = fcntl(target, F_GETFD); flags != -1)
     fcntl(target, F_SETFD, flags | FD_CLOEXEC);
 
@@ -171,10 +164,8 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void
   close(saved);
 }
 
-/* Shell-internal descriptor backups live at or above this number, so a
-   script that addresses the single-digit descriptors POSIX guarantees it
-   never sees the shell's own bookkeeping, the way dash keeps its internal
-   copies above 9. */
+/* Shell-internal descriptor backups live at or above this number so a script
+   addressing the single-digit descriptors never sees the shell's bookkeeping. */
 constexpr int SHELL_BACKUP_FD_FLOOR = 10;
 
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
@@ -241,9 +232,8 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 
 fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
 {
-  /* A self copy, as in exec 1>&1, already has the descriptor where it belongs,
-     so the dup2 onto itself is skipped to avoid clearing the close-on-exec the
-     caller may rely on. */
+  /* A self copy such as exec 1>&1 skips the dup2 onto itself to avoid clearing
+     the close-on-exec the caller may rely on. */
   if (target == shell_fd) return true;
   return dup2(target, shell_fd) != -1;
 }
@@ -258,17 +248,15 @@ static fn passwd_field(StringView line, usize index) wontthrow -> StringView;
 fn get_current_user() throws -> Maybe<String>
 {
   /* The name comes from the environment rather than getpwuid, which a static
-     build cannot call without pulling in the runtime glibc and which the linker
-     warns about. A login shell sets LOGNAME and USER. */
+     build cannot call without pulling in the runtime glibc NSS modules. */
   if (const char *name = std::getenv("LOGNAME"); name != nullptr)
     return String{StringView{name}};
   if (const char *name = std::getenv("USER"); name != nullptr)
     return String{StringView{name}};
 
   /* A container that exports neither leaves the environment bare, so the name
-     is read from /etc/passwd by the current uid, the same direct read
-     get_home_for_user uses. getuid is a plain syscall, so the static build
-     stays free of the NSS modules getpwuid would pull in. */
+     is read from /etc/passwd by the current uid. getuid is a plain syscall, so
+     the static build avoids the NSS modules getpwuid would pull in. */
   let const contents = utils::read_entire_file("/etc/passwd");
   if (!contents) return shit::None;
   let const wanted_uid = utils::uint_to_text(static_cast<u64>(getuid()));
@@ -288,9 +276,8 @@ fn get_current_user() throws -> Maybe<String>
 
 fn get_hostname() throws -> Maybe<String>
 {
-  /* HOST_NAME_MAX is not portable across every libc, so a fixed buffer holds
-     the name and a trailing NUL guards against a truncated result that some
-     implementations leave unterminated. */
+  /* HOST_NAME_MAX is not portable, so a fixed buffer holds the name and a
+     trailing NUL guards a truncated result some libcs leave unterminated. */
   char buffer[256];
   if (gethostname(buffer, sizeof(buffer)) != 0) return shit::None;
   buffer[sizeof(buffer) - 1] = '\0';
@@ -306,12 +293,10 @@ fn get_home_directory() throws -> Maybe<Path>
 }
 
 /* The colon field at index of an /etc/passwd line, empty when the line has too
-   few fields. The format is name:passwd:uid:gid:gecos:home:shell, so the name
-   is field 0 and the home is field 5. The database is read directly rather than
-   through getpwnam or getpwent, which a static build cannot call without
-   pulling in the runtime glibc NSS modules and which the linker warns about,
-   the same reason get_current_user reads the environment. A user defined only
-   through NSS is not seen, the accepted tradeoff for the static build. */
+   few fields. The format is name:passwd:uid:gid:gecos:home:shell. The database
+   is read directly rather than through getpwnam, which a static build cannot
+   call without the glibc NSS modules. A user defined only through NSS is not
+   seen, the accepted tradeoff for the static build. */
 static fn passwd_field(StringView line, usize index) wontthrow -> StringView
 {
   usize field_start_position = 0;
@@ -474,14 +459,11 @@ fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 
 #define check_syscall(call) check_syscall_impl(call, #call)
 
-/* posix_spawn reports an exec failure to the parent through its return value
-   rather than through a child that runs the parent's cleanup, so there is no
-   spawned process to wait on. The fork path this replaces let the child print
-   the path and message and exit 127, so the caller always received a waitable
-   pid that yielded 127. This reproduces that on the cold failure path. The
-   error came from posix_spawn rather than errno, so it is passed in. A trivial
-   child is forked that only reports and exits 127, which gives the caller the
-   same waitable pid and status the fork path produced. */
+/* posix_spawn reports an exec failure through its return value, so there is no
+   spawned process to wait on. A trivial child is forked that only reports the
+   error and exits, giving the caller the same waitable pid and status the fork
+   path produced. The error came from posix_spawn rather than errno, so it is
+   passed in. */
 cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
     -> process
 {
@@ -526,20 +508,16 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   let const child_args = make_os_args(ec.args());
 
   /* glibc backs posix_spawn with clone(CLONE_VM | CLONE_VFORK), so the child
-     shares the parent address space until exec and pays no page-table copy, the
-     way dash's vfork does. The redirections become file actions and the signal
-     reset becomes spawn attributes, so the parent never enters a duplicated
-     evaluator the way the fork path did. */
+     shares the parent address space until exec and pays no page-table copy. The
+     redirections become file actions and the signal reset becomes spawn
+     attributes, so the parent never enters a duplicated evaluator. */
   posix_spawn_file_actions_t file_actions;
   posix_spawn_file_actions_init(&file_actions);
   defer { posix_spawn_file_actions_destroy(&file_actions); };
 
   /* Each redirect is placed onto its standard descriptor and the original is
-     closed, in this order, so the child sees the same descriptor layout the
-     fork child built. A descriptor that already sits on its target slot, as
-     when the inherited standard input is passed as in_fd, is left in place,
-     since the dup2 onto itself is a no-op and the close would shut the live
-     descriptor and leave the child with no standard input. */
+     closed. A descriptor already on its target slot is left in place, since the
+     dup2 onto itself is a no-op and the close would shut the live descriptor. */
   if (ec.in_fd && *ec.in_fd != STDIN_FILENO) {
     posix_spawn_file_actions_adddup2(&file_actions, *ec.in_fd, STDIN_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, *ec.in_fd);
@@ -553,10 +531,8 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
     posix_spawn_file_actions_addclose(&file_actions, *ec.err_fd);
   }
   /* The descriptor duplications come after the files are placed, so 2>&1 sees
-     the final standard output. Each dup reads the current target of its source
-     descriptor, so when both are present the source order decides the result.
-     The earlier dup is applied first and the later one reads its effect, which
-     reproduces the way dash routes a mixed 2>&1 1>&2 against 1>&2 2>&1. */
+     the final standard output. Each dup reads the current target of its source,
+     so the source order decides the result of a mixed 2>&1 1>&2. */
   ec.apply_dup_routing(
       [&]() {
         posix_spawn_file_actions_adddup2(&file_actions, STDOUT_FILENO,
@@ -571,13 +547,10 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   posix_spawnattr_init(&attr);
   defer { posix_spawnattr_destroy(&attr); };
 
-  /* The parent blocks the terminal-generated signals and handles SIGINT and
-     SIGCHLD itself, so without a reset the exec'd program would inherit the
-     blocked set and the parent's dispositions. An empty signal mask unblocks
-     everything the parent blocked, and the default set restores SIG_DFL for the
-     signals the parent installed handlers on. This matches the fork child's
-     reset_signal_handlers, so a foreground command still dies on Ctrl-C and a
-     producer in a pipe still dies on SIGPIPE. */
+  /* Without a reset the exec'd program would inherit the parent's blocked set
+     and dispositions. An empty mask unblocks everything the parent blocked and
+     the default set restores SIG_DFL, so a foreground command still dies on
+     Ctrl-C and a pipe producer still dies on SIGPIPE. */
   sigset_t empty_mask;
   sigemptyset(&empty_mask);
   posix_spawnattr_setsigmask(&attr, &empty_mask);
@@ -595,8 +568,7 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   short spawn_flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
   /* A foreground interactive command runs in its own process group so it can
      own the controlling terminal. pgid zero makes the child its own group
-     leader, the pgid then equal to its pid, which the caller hands the
-     terminal to. */
+     leader. */
   if (new_process_group) {
     posix_spawnattr_setpgroup(&attr, 0);
     spawn_flags |= POSIX_SPAWN_SETPGROUP;
@@ -611,10 +583,9 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
                   const_cast<char *const *>(child_args.begin()), environ);
 
   /* An ENOEXEC file is executable but carries no shebang and is not a binary.
-     When the caller can fall back, this is signalled so the file runs as a
-     shell script in place, the POSIX behavior, rather than failing 127. The
-     check runs before the descriptors are closed, so the script run still sees
-     the command's redirections on the context. */
+     It runs as a shell script in place, the POSIX behavior, rather than failing
+     127. The check runs before the descriptors are closed, so the script run
+     still sees the command's redirections. */
   if (spawn_error == ENOEXEC && allow_script_fallback) {
     was_fds_handed_to_fallback = true;
     throw shit::ExecFormatError{};
@@ -648,9 +619,8 @@ fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
 {
   struct stat directory_stat;
   if (stat(directory.c_str(), &directory_stat) != 0) return false;
-  /* Only a directory the current user or root owns is trusted, so a directory
-     owned by another user, which that user could swap a binary into, never
-     qualifies. */
+  /* Only a directory the current user or root owns is trusted, since another
+     user could swap a binary into a directory they own. */
   const bool owner_is_trusted =
       directory_stat.st_uid == 0 || directory_stat.st_uid == geteuid();
   /* A directory writable by group or other lets someone other than the owner
@@ -718,9 +688,8 @@ fn capture_program_output(const ArrayList<String> &argv,
     return None;
   }
 
-  /* Read the child's output until it closes the pipe or the deadline passes.
-     poll waits with the time left in the budget, so a child that stalls is cut
-     at the deadline rather than blocking the prompt. */
+  /* Read the child's output until it closes the pipe or the deadline passes, so
+     a child that stalls is cut rather than blocking the prompt. */
   let captured = String{heap_allocator()};
   const u64 deadline_nanos = monotonic_nanos() + timeout_nanos;
   bool was_timed_out = false;
@@ -772,10 +741,9 @@ fn capture_program_output(const ArrayList<String> &argv,
 fn give_controlling_terminal_to(process p) wontthrow -> void
 {
   if (!shell_has_controlling_terminal()) return;
-  /* The shell is the current foreground group, so handing the terminal away
-     would raise SIGTTOU on this write. It is ignored across the change and
-     the previous disposition restored. A failed tcsetpgrp, such as a child
-     that already exited, is left alone since the shell reclaims next. */
+  /* Handing the terminal away would raise SIGTTOU on this write, so it is
+     ignored across the change and the previous disposition restored. A failed
+     tcsetpgrp is left alone since the shell reclaims next. */
   void (*const previous)(int) = signal(SIGTTOU, SIG_IGN);
   tcsetpgrp(STDIN_FILENO, p);
   signal(SIGTTOU, previous);
@@ -797,11 +765,9 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   const pid_t child_pid = check_syscall(fork());
 
   if (child_pid == 0) {
-    /* A dup2 or close failure here throws through check_syscall. In the forked
-       child that would unwind back into the parent's evaluator inside the
-       duplicated process, running the parent's cleanup and never reaching
-       _exit. The child must always terminate directly, so a failure in the
-       descriptor setup is caught and reported, then the child exits. */
+    /* A throw here would unwind into the parent's evaluator inside the
+       duplicated process and run its cleanup. The child must terminate
+       directly, so a descriptor-setup failure is caught, reported, and exits. */
     try {
       if (in_fd) {
         check_syscall(dup2(*in_fd, STDIN_FILENO));
@@ -820,8 +786,7 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
 
 #if defined SHIT_HAS_ADDRESS_SANITIZER
       /* The forked stage exits through _exit, so the leak check should not run
-         here. Disabling it is belt and suspenders against a sandbox that traps
-         the sanitizer's tracer regardless. */
+         here, and a sandbox may trap the sanitizer's tracer regardless. */
       __lsan_disable();
 #endif
     } catch (const shit::Error &e) {
@@ -877,14 +842,12 @@ fn replace_process(ExecContext &&ec) throws -> void
   execv(ec.program_path().c_str(),
         const_cast<char *const *>(child_args.begin()));
 
-  /* execv returns only when it fails to replace the process. ENOEXEC means the
-     file is executable but carries no shebang and is not a binary, so it is run
-     as a shell script instead, the POSIX fallback, signalled to the caller by
+  /* execv returns only on failure. ENOEXEC means the file carries no shebang
+     and is not a binary, so it runs as a shell script instead, signalled by
      ExecFormatError. */
   if (errno == ENOEXEC) throw shit::ExecFormatError{};
   /* The program resolved but could not be executed, so the error carries the
-     command's location for a caret and the caller exits 126 the way bash does
-     for a file it found but could not run. */
+     command's location for a caret and the caller exits 126 the way bash does. */
   throw shit::ErrorWithLocation{
       ec.source_location(), "Unable to execute '" + ec.program_path().text() +
                                 "' because " + last_system_error_message()};
@@ -907,9 +870,8 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
     return shit::None;
   }
 
-  /* Close the pipe ends on exec, so a stage that dups one end onto its stdin or
-     stdout does not also inherit the other end. Otherwise a producer like yes
-     keeps a read end open and never sees the pipe close. The dup2 onto a
+  /* Close the pipe ends on exec, so a stage that dups one end does not inherit
+     the other and a producer never sees the pipe close. The dup2 onto a
      standard descriptor clears the flag there, so the redirection survives. */
   for (descriptor end : p) {
     const int flags = fcntl(end, F_GETFD);

@@ -263,11 +263,9 @@ cold fn Parser::recover_to_next_statement() throws -> void
 }
 
 /* Parse every top-level command, recovering from a syntax error instead of
-   aborting at the first. Each top-level parse runs under a try, and a thrown
-   located error is pushed into errors and parsing resumes at the next statement
-   boundary. A clean file parses in a single iteration whose tree is returned
-   for the caller to run. Once any error is recorded the tree never runs, so the
-   remaining iterations only keep parsing to collect more errors. */
+   aborting at the first. A thrown located error is pushed into errors and
+   parsing resumes at the next statement boundary. Once any error is recorded the
+   tree never runs, the remaining iterations only collect more errors. */
 cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
 {
   Expression *first_piece = nullptr;
@@ -1147,12 +1145,10 @@ hot fn Parser::parse_simple_command() throws -> Command *
       }
 
       /* NAME=(...) leading the command is a bash array assignment. The element
-         words are captured in every mood and join the prefix sequence the way
-         a scalar assignment does, so a command-less line of several
-         assignments, some of them arrays such as flags= pvars=() specs=(),
-         applies them all in order. POSIX mode downgrades the assignment to an
-         empty scalar at evaluation, so a sourced login profile that carries
-         one keeps sourcing. */
+         words are captured in every mood and join the prefix sequence like a
+         scalar assignment. POSIX mode downgrades it to an empty scalar at
+         evaluation, so a sourced login profile that carries one keeps
+         sourcing. */
       if (is_array_assignment) {
         ArrayList<const Token *> elements = consume_bash_array_assignment();
         array_args.push(array_builtin_assignment{
@@ -1169,12 +1165,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
            AssignCommand fast path. */
         return m_lexer.arena().create<AssignCommand>(*source_location, a);
       } else {
-        /* The assignment joins the prefix sequence in source order, either
-           ahead of a command word or as one of several assignments on a
-           command-less line. The ordered list lets a later assignment see an
-           earlier one and a repeated name accumulate, which a map would lose.
-           The command-less line persists the whole sequence in SimpleCommand.
-         */
+        /* The assignment joins the prefix sequence in source order. The ordered
+           list lets a later assignment see an earlier one and a repeated name
+           accumulate, which a map would lose. */
         local_vars.push(prefix_assignment{
             a->key().clone(), Word{a->value_word()}, a->is_append()});
       }
@@ -1823,14 +1816,11 @@ hot fn Parser::parse_paren_command() throws -> Command *
   ASSERT(open != nullptr);
   ASSERT(open->kind() == Token::Kind::LeftParen);
 
-  /* A (( )) arithmetic command changes the POSIX meaning of two opening
-     parentheses, which is a nested subshell, so POSIX mode keeps the
-     nested-subshell reading the way dash parses it, while the bash and the
-     default mood take the arithmetic command, the same mood policy the array
-     literal follows. A (( that closes with a lone ) at depth zero, such as
-     ((cmd; cmd); cmd), is a subshell whose first child is a subshell, the
-     same backoff bash performs, decided by a quote-aware scan of the raw
-     source before the arithmetic reading commits. */
+  /* Two opening parentheses are a nested subshell in POSIX, so POSIX mode keeps
+     that reading while the bash and default moods take the arithmetic command. A
+     (( that closes with a lone ) at depth zero, such as ((cmd; cmd); cmd), is a
+     subshell whose first child is a subshell, the same backoff bash performs,
+     decided by a quote-aware scan before the arithmetic reading commits. */
   Token *next = m_lexer.peek_shell_token();
   ASSERT(next != nullptr);
   if (!m_lexer.is_posix_mode() && next->kind() == Token::Kind::LeftParen &&

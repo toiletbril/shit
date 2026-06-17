@@ -56,6 +56,10 @@ struct make_rule
   String target;
   ArrayList<String> prerequisites;
   ArrayList<String> recipe_lines;
+  /* The target-specific variable assignments, the GNU make `target: VAR = value`
+     form, applied while the target and its prerequisites build and restored
+     after. Each entry is the raw `NAME op= value` text. */
+  ArrayList<String> variable_assignments;
 };
 
 /* The parsed Makefile, the variables and the rules in source order so the first
@@ -82,6 +86,13 @@ struct makefile
   fn find_rule(StringView target) const throws -> const make_rule *
   {
     for (const make_rule &rule : rules)
+      if (rule.target == target) return &rule;
+    return nullptr;
+  }
+
+  fn find_mutable_rule(StringView target) throws -> make_rule *
+  {
+    for (make_rule &rule : rules)
       if (rule.target == target) return &rule;
     return nullptr;
   }
@@ -373,6 +384,34 @@ static fn rule_colon(StringView line) wontthrow -> Maybe<usize>
     if (line[i] == ':' && !(i + 1 < line.length && line[i + 1] == '='))
       return i;
   return None;
+}
+
+/* The variable name an assignment names, the text before the '=' with a trailing
+   +, ?, or : operator character dropped and the blanks trimmed. */
+static fn assignment_variable_name(StringView assignment) wontthrow -> StringView
+{
+  let const equals = assignment.find_character('=');
+  if (!equals.has_value()) return StringView{};
+  let name = assignment.substring_of_length(0, *equals);
+  if (!name.is_empty()) {
+    let const last = name[name.length - 1];
+    if (last == '+' || last == '?' || last == ':')
+      name = name.substring_of_length(0, name.length - 1);
+  }
+  return trim(name);
+}
+
+/* Whether the text after a rule colon is a target-specific variable assignment,
+   the GNU make `target: NAME = value` form, a single variable name then an
+   assignment operator, rather than a prerequisite list. */
+static fn is_target_variable_assignment(StringView after_colon) wontthrow -> bool
+{
+  if (!after_colon.find_character('=').has_value()) return false;
+  let const name = assignment_variable_name(after_colon);
+  if (name.is_empty()) return false;
+  for (usize i = 0; i < name.length; i++)
+    if (name[i] == ' ' || name[i] == '\t') return false;
+  return true;
 }
 
 /* Parse one assignment, classifying the operator so := and = set the value, +=
@@ -669,6 +708,27 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
         colon.has_value() && (!equals.has_value() || *colon < *equals);
 
     if (is_rule) {
+      /* A `target: NAME = value` line is a target-specific variable assignment,
+         scoped to the target rather than a prerequisite list, so the assignment
+         attaches to the target's rule for the build to apply and restore. */
+      let const after_colon = statement.substring(*colon + 1);
+      if (is_target_variable_assignment(after_colon)) {
+        let const targets =
+            expand(cxt, mk, trim(statement.substring_of_length(0, *colon)), 0);
+        current = nullptr;
+        for (const String &target : split_words(targets.view())) {
+          make_rule *rule = mk.find_mutable_rule(target.view());
+          if (rule == nullptr) {
+            make_rule fresh{};
+            fresh.target = target.clone();
+            mk.rules.push(steal(fresh));
+            rule = &mk.rules[mk.rules.count() - 1];
+          }
+          rule->variable_assignments.push(String{trim(after_colon)});
+        }
+        continue;
+      }
+
       /* The targets and prerequisites expand when the rule is read, so
          $(OUT): $(OBJECTS) names the resolved files the way GNU make does. A
          target holding a % is a pattern rule and goes in the pattern list. */
@@ -678,9 +738,24 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
           expand(cxt, mk, statement.substring(*colon + 1), 0);
       current = nullptr;
       for (const String &target : split_words(targets.view())) {
+        let new_prerequisites = split_words(prerequisites.view());
+        /* A recipe-less rule already standing for this target, such as one a
+           prior target-specific assignment created, takes this line's
+           prerequisites and recipe rather than a second rule find_rule would
+           never reach. */
+        if (!target.view().find_character('%').has_value())
+          if (make_rule *existing = mk.find_mutable_rule(target.view());
+              existing != nullptr && existing->recipe_lines.is_empty())
+          {
+            for (String &prerequisite : new_prerequisites)
+              existing->prerequisites.push(steal(prerequisite));
+            current = existing;
+            continue;
+          }
+
         make_rule rule{};
         rule.target = target.clone();
-        rule.prerequisites = split_words(prerequisites.view());
+        rule.prerequisites = steal(new_prerequisites);
         if (target.view().find_character('%').has_value()) {
           mk.pattern_rules.push(steal(rule));
           current = &mk.pattern_rules[mk.pattern_rules.count() - 1];
@@ -704,9 +779,17 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
 /* Build one target, its prerequisites first, then its recipe lines through the
    shell. visiting guards against a dependency cycle and built skips a target
    already made. */
-static fn build_target(const ExecContext &ec, EvalContext &cxt,
-                       const makefile &mk, StringView goal,
-                       ArrayList<String> &visiting,
+/* One variable's value before a target-specific assignment overwrote it, so the
+   build restores it when the target's scope ends. */
+struct saved_make_variable
+{
+  String name;
+  bool existed;
+  String old_value;
+};
+
+static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
+                       StringView goal, ArrayList<String> &visiting,
                        ArrayList<String> &built) throws -> void
 {
   for (const String &done : built)
@@ -722,6 +805,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
      made. */
   const ArrayList<String> *recipe_lines = nullptr;
   ArrayList<String> prerequisites{};
+  const ArrayList<String> *target_assignments = nullptr;
 
   if (const make_rule *rule = mk.find_rule(goal); rule != nullptr) {
     for (const String &prerequisite : rule->prerequisites) {
@@ -730,6 +814,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
         prerequisites.push(word.clone());
     }
     recipe_lines = &rule->recipe_lines;
+    target_assignments = &rule->variable_assignments;
   } else {
     for (const make_rule &pattern : mk.pattern_rules) {
       let const stem = match_pattern(pattern.target.view(), goal);
@@ -759,6 +844,34 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
       throw Error{"There is no rule to make the target '" + String{goal} + "'"};
     }
   }
+
+  /* The target-specific assignments apply now, in effect for the prerequisite
+     builds and the recipe, and restore on the way out even when a recipe throws.
+     The saved values restore in reverse so a repeated += on one variable unwinds
+     cleanly. */
+  let saved_variables = ArrayList<saved_make_variable>{};
+  if (target_assignments != nullptr)
+    for (const String &assignment : *target_assignments) {
+      let const name = assignment_variable_name(assignment.view());
+      saved_make_variable snapshot{String{name}, false, String{}};
+      if (const String *current_value = mk.find_variable(name)) {
+        snapshot.existed = true;
+        snapshot.old_value = String{current_value->view()};
+      }
+      saved_variables.push(steal(snapshot));
+      let const equals = assignment.view().find_character('=');
+      apply_assignment(cxt, mk,
+                       assignment.view().substring_of_length(0, *equals),
+                       assignment.view().substring(*equals));
+    }
+  defer {
+    for (usize i = saved_variables.count(); i-- > 0;) {
+      const saved_make_variable &snapshot = saved_variables[i];
+      if (let const *index = mk.variable_index.find(snapshot.name.view()))
+        mk.variables[*index].value =
+            snapshot.existed ? String{snapshot.old_value.view()} : String{};
+    }
+  };
 
   visiting.push(String{goal});
   for (const String &prerequisite : prerequisites)
@@ -900,7 +1013,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   if (!source.has_value())
     throw Error{"Unable to read the makefile '" + makefile_path + "'"};
 
-  let const mk = parse_makefile(cxt, source->view());
+  let mk = parse_makefile(cxt, source->view());
 
   ArrayList<String> goals{};
   if (operands.is_empty()) {

@@ -1,0 +1,1480 @@
+#include "Expressions.hpp"
+#include "ExpressionsInternal.hpp"
+
+#include "Arena.hpp"
+#include "Builtin.hpp"
+#include "Cli.hpp"
+#include "Common.hpp"
+#include "Debug.hpp"
+#include "Errors.hpp"
+#include "Eval.hpp"
+#include "Lexer.hpp"
+#include "Optimizer.hpp"
+#include "Platform.hpp"
+#include "Shitbox.hpp"
+#include "Toiletline.hpp"
+#include "Tokens.hpp"
+#include "Trace.hpp"
+#include "Utils.hpp"
+
+namespace shit {
+
+namespace expressions {
+
+CompoundList::CompoundList() : Expression({0, 0}) {}
+
+/* The condition nodes live in the arena, torn down once on reset. */
+CompoundList::~CompoundList() = default;
+
+pure fn CompoundList::is_empty() const wontthrow -> bool
+{
+  return m_nodes.is_empty();
+}
+
+fn CompoundList::append_node(const CompoundListCondition *node) throws -> void
+{
+  ASSERT(node != nullptr);
+
+  m_location.length += node->source_location().length;
+  m_nodes.push(node);
+}
+
+cold fn CompoundList::to_string() const throws -> String
+{
+  return "CompoundList";
+}
+
+cold fn CompoundList::to_ast_string(usize layer) const throws -> String
+{
+  let s = String{};
+  let const pad = indent_for_layer(layer);
+
+  s += pad + "[" + to_string() + "]";
+  for (let const n : m_nodes) {
+    s += '\n';
+    s += pad + EXPRESSION_AST_INDENT + n->to_ast_string(layer + 1);
+  }
+
+  return s;
+}
+
+hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_nodes.count() > 0);
+
+  static const i64 NOTHING_WAS_EXECUTED = -256;
+
+  i64 ret = NOTHING_WAS_EXECUTED;
+
+  /* Only the last node of the list yields the list's status, so a terminal exec
+     rides into that node alone. Every earlier node runs with the flag cleared
+     and so forks normally, and the saved value is restored after the list so a
+     containing tail position is not disturbed. */
+  const bool was_terminal_exec_allowed = cxt.terminal_exec_allowed();
+  cxt.set_terminal_exec_allowed(false);
+  defer { cxt.set_terminal_exec_allowed(was_terminal_exec_allowed); };
+
+  for (usize index = 0; index < m_nodes.count(); index++) {
+    const CompoundListCondition *n = m_nodes[index];
+    ASSERT(n != nullptr);
+
+    const bool is_last_node = index + 1 >= m_nodes.count();
+    cxt.set_terminal_exec_allowed(was_terminal_exec_allowed && is_last_node);
+
+    /* An Or operand runs only after a failure and an And operand only after a
+       success, so a short-circuited operand does not run at all. The flag marks
+       whether this node ran, since set -e keys off the command that actually
+       produced the status, not a status carried over from a short-circuited
+       sibling. */
+    bool did_execute = false;
+    /* In bash mood an evaluation error fails the command and the list goes
+       on, the way bash continues after a readonly assignment or a [[ ]]
+       operand error, while a script-fatal error, the set -u read and the
+       ${name:?} report, still aborts the run. The error renders to stderr
+       here since nothing above will see it. */
+    auto do_run_node = [&]() throws -> i64 {
+      try {
+        return n->evaluate(cxt);
+      } catch (const ErrorBase &error) {
+        if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
+        LOG(Debug, "bash mood converted the error to command status %lld: %s",
+            static_cast<long long>(error.command_status()),
+            error.message().c_str());
+        const String *source = cxt.current_source();
+        show_message(
+            error.to_string(source != nullptr ? source->view() : StringView{}));
+        cxt.set_last_exit_status(static_cast<i32>(error.command_status()));
+        return error.command_status();
+      }
+    };
+    switch (n->kind()) {
+    case CompoundListCondition::Kind::None:
+      ret = do_run_node();
+      did_execute = true;
+      break;
+
+    case CompoundListCondition::Kind::Or:
+      if (ret != 0) {
+        ret = do_run_node();
+        did_execute = true;
+      }
+      break;
+
+    case CompoundListCondition::Kind::And:
+      if (ret == 0) {
+        ret = do_run_node();
+        did_execute = true;
+      }
+      break;
+    }
+
+    /* A break, continue, return, or exit inside a node stops the rest of the
+       list and unwinds to the boundary that consumes it. */
+    if (cxt.has_pending_control_flow()) break;
+
+    /* POSIX exempts set -e for a command that is an operand of && or || and not
+       the last command of the and-or list, and for a command the ! reserved
+       word negates. So the exit fires only when the node that ran is the last
+       of its chain, the next node starts a fresh chain or the list ends, and
+       the command carries no leading !. A short-circuited node did not run and
+       so cannot trigger the exit, which is what keeps a failing non-last
+       operand such as the false in `false && cmd` from exiting the shell. */
+    const bool ends_and_or_chain =
+        index + 1 >= m_nodes.count() ||
+        m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
+    if (cxt.error_exit() && !cxt.in_condition() && did_execute &&
+        !n->is_negated() && ends_and_or_chain && ret != 0 &&
+        ret != NOTHING_WAS_EXECUTED)
+    {
+      cxt.set_last_exit_status(static_cast<i32>(ret));
+      if (cxt.in_subshell()) {
+        cxt.request_exit(ret, source_location());
+        break;
+      }
+      utils::quit(static_cast<i32>(ret), true);
+    }
+  }
+
+  ASSERT(ret != NOTHING_WAS_EXECUTED);
+
+  return ret;
+}
+
+CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
+                                             const Command *expr)
+    : Expression(location), m_kind(kind), m_cmd(expr)
+{}
+
+/* The command lives in the arena, torn down once on reset. */
+CompoundListCondition::~CompoundListCondition() = default;
+
+pure fn CompoundListCondition::kind() const wontthrow -> Kind { return m_kind; }
+
+pure fn CompoundListCondition::is_negated() const wontthrow -> bool
+{
+  ASSERT(m_cmd != nullptr);
+  return m_cmd->is_negated();
+}
+
+cold fn CompoundListCondition::to_string() const throws -> String
+{
+  String k;
+  switch (kind()) {
+  case Kind::None: k = "None"; break;
+  case Kind::And: k = "&&"; break;
+  case Kind::Or: k = "||"; break;
+  default: unreachable();
+  }
+  return "CompoundListCondition, " + k;
+}
+
+cold fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
+{
+  ASSERT(m_cmd != nullptr);
+
+  let s = String{};
+  let const pad = indent_for_layer(layer);
+
+  s += pad + "[" + to_string() + "]\n";
+  s += pad + EXPRESSION_AST_INDENT + m_cmd->to_ast_string(layer + 1);
+
+  return s;
+}
+
+hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
+    -> i64
+{
+  ASSERT(m_cmd != nullptr);
+
+  /* A negated or timed command must run to completion here rather than exec the
+     shell in place, since the inverse has to apply and the report has to print
+     after the command returns, which an exec would skip. */
+  if (m_cmd->is_negated() || m_cmd->is_timed())
+    cxt.set_terminal_exec_allowed(false);
+
+  /* The timed command samples the child cpu and the monotonic clock around its
+     run, so the difference is its own wall and cpu time. */
+  double user_before = 0.0;
+  double system_before = 0.0;
+  u64 start_nanos = 0;
+  if (m_cmd->is_timed()) {
+    os::children_cpu_seconds(user_before, system_before);
+    start_nanos = os::monotonic_nanos();
+  }
+
+  let status = m_cmd->evaluate(cxt);
+
+  if (m_cmd->is_timed()) {
+    const u64 elapsed_nanos = os::monotonic_nanos() - start_nanos;
+    double user_after = 0.0;
+    double system_after = 0.0;
+    os::children_cpu_seconds(user_after, system_after);
+    const double real_seconds =
+        static_cast<double>(elapsed_nanos) / 1000000000.0;
+    let const report =
+        m_cmd->time_uses_posix_format()
+            ? utils::format_time_report_posix(real_seconds,
+                                              user_after - user_before,
+                                              system_after - system_before)
+            : utils::format_time_report_pretty(real_seconds,
+                                               user_after - user_before,
+                                               system_after - system_before);
+    print_error(report);
+    flush();
+  }
+
+  /* A pipeline prefixed with ! reports the inverse of its status, and that
+     inverse is what $? sees. */
+  if (m_cmd->is_negated()) {
+    status = (status == 0) ? 1 : 0;
+    cxt.set_last_exit_status(static_cast<i32>(status));
+  }
+
+  return status;
+}
+
+Pipeline::Pipeline(SourceLocation location) : Command(location) {}
+
+/* The stage commands live in the arena, torn down once on reset. */
+Pipeline::~Pipeline() = default;
+
+pure fn Pipeline::is_empty() const wontthrow -> bool
+{
+  return m_commands.is_empty();
+}
+
+fn Pipeline::append_command(const Command *node) throws -> void
+{
+  ASSERT(node != nullptr);
+
+  m_location.length += node->source_location().length;
+  m_commands.push(node);
+}
+
+cold fn Pipeline::to_string() const throws -> String
+{
+  let s = String{"Pipeline"};
+  if (is_async()) s += ", Async";
+  return s;
+}
+
+cold fn Pipeline::to_ast_string(usize layer) const throws -> String
+{
+  let s = String{};
+  let const pad = indent_for_layer(layer);
+
+  s += pad + "[" + to_string() + "]";
+  for (let const e : m_commands) {
+    s += '\n';
+    s += pad + EXPRESSION_AST_INDENT + e->to_ast_string(layer + 1);
+  }
+
+  return s;
+}
+
+/* Run a pipeline that has at least one compound stage. Every stage forks, the
+   way an external command does, so a compound stage evaluates its tree in a
+   child with the pipe already on its standard descriptors. A simple stage forks
+   too here and evaluates in the child, which is the rare mixed pipeline rather
+   than the common all-simple path that execute_contexts_with_pipes serves. */
+cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
+    -> i64
+{
+  LOG(Debug, "forking %zu pipeline stages, one child per stage",
+      m_commands.count());
+
+  let children = ArrayList<os::process>{};
+  os::process last_child = SHIT_INVALID_PROCESS;
+  os::descriptor last_stdin = SHIT_INVALID_FD;
+
+  /* A make_pipe or fork failure mid-loop leaves the previous stage's pipe read
+     end open and the already-forked children unreaped. On the error path the
+     open read end is closed and every spawned child is waited, then the error
+     is rethrown so the caller still reports it. The success path falls through
+     untouched. */
+  try {
+    for (usize stage_index = 0; stage_index < m_commands.count(); stage_index++)
+    {
+      const Command *stage = m_commands[stage_index];
+      ASSERT(stage != nullptr);
+
+      cxt.add_evaluated_expression();
+
+      let const is_first = (stage_index == 0);
+      let const is_last = (stage_index + 1 == m_commands.count());
+
+      let stage_in = Maybe<os::descriptor>{};
+      let stage_out = Maybe<os::descriptor>{};
+      let pipe = Maybe<os::Pipe>{};
+
+      if (!is_last) {
+        pipe = os::make_pipe();
+        if (!pipe) {
+          throw ErrorWithLocation{stage->source_location(),
+                                  "Could not open a pipe"};
+        }
+        stage_out = pipe->out;
+      }
+      if (!is_first) stage_in = last_stdin;
+
+#if SHIT_PLATFORM_IS WIN32
+      /* Windows has no fork. A stage whose full source span the parser recorded
+         re-execs in a fresh shell with the pipe ends as its standard input and
+         output. A stage without a recorded span, an if or a case, falls through
+         to fork_compound_stage, which reports it unsupported. */
+      const SourceLocation stage_location = stage->source_location();
+      const String *stage_source = cxt.current_source();
+      os::process child = SHIT_INVALID_PROCESS;
+      if (stage_source != nullptr &&
+          stage->source_end_position() >
+              stage_location.position + stage_location.length)
+      {
+        const StringView stage_text = stage_source->view().substring_of_length(
+            stage_location.position,
+            stage->source_end_position() - stage_location.position);
+        Maybe<os::process> spawned_stage = os::spawn_subshell_stage(
+            stage_text, stage_in, stage_out, cxt.is_bash_compatible());
+        if (!spawned_stage.has_value())
+          throw ErrorWithLocation{
+              stage_location, "Could not spawn the compound pipeline stage"};
+        child = *spawned_stage;
+      } else {
+        child = os::fork_compound_stage(stage_in, stage_out, {});
+      }
+#else
+      const os::process child =
+          os::fork_compound_stage(stage_in, stage_out, {});
+
+      if (child == 0) {
+        /* The child evaluates the stage in a subshell, so a variable change
+           such as a while-read does not escape, then exits with its status. A
+           diagnostic or an exit request inside still yields a child status
+           rather than unwinding back into the parent's evaluator. */
+        i32 stage_status = 0;
+        try {
+          cxt.enter_subshell();
+          stage_status = static_cast<i32>(stage->evaluate(cxt));
+          if (cxt.has_pending_control_flow() &&
+              cxt.pending_control_flow().kind == control_flow::Kind::Exit)
+          {
+            stage_status = static_cast<i32>(cxt.pending_control_flow().value);
+          }
+        } catch (const ErrorWithLocation &e) {
+          const String *source = cxt.current_source();
+          shit::show_message(
+              e.to_string(source != nullptr ? source->view() : StringView{}));
+          stage_status = 1;
+        } catch (const Error &e) {
+          shit::show_message(e.to_string());
+          stage_status = 1;
+        } catch (...) {
+          LOG(Debug, "swallowed an unknown error in the pipeline stage child");
+          stage_status = 1;
+        }
+        shit::flush();
+        os::exit_process_immediately(stage_status);
+      }
+#endif
+
+      /* The parent keeps neither pipe end open past the stage that owns it,
+         otherwise a reader never sees the writer close. */
+      if (stage_out) os::close_fd(*stage_out);
+      if (stage_in) os::close_fd(*stage_in);
+      if (!is_last) last_stdin = pipe->in;
+
+      children.push(child);
+      last_child = child;
+    }
+  } catch (...) {
+    if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
+    for (let const child : children) {
+      /* The wait reaps the child, so a spawned stage never lingers as a zombie
+         when the pipeline aborts. A failure to wait must not mask the original
+         error, so it is swallowed here. */
+      try {
+        os::wait_and_monitor_process(child);
+      } catch (...) {
+        LOG(Debug,
+            "swallowed a wait error while reaping an aborted pipeline child");
+      }
+    }
+    throw;
+  }
+
+  if (is_async()) {
+    if (last_child != SHIT_INVALID_PROCESS) {
+      cxt.set_last_background_pid(os::process_id_of(last_child));
+      const i32 id = cxt.register_job(last_child, "pipeline");
+      if (cxt.shell_is_interactive())
+        shit::print_error("[" + utils::int_to_text(id) + "] " +
+                          utils::uint_to_text(
+                              static_cast<u64>(os::process_id_of(last_child))) +
+                          "\n");
+    }
+    return 0;
+  }
+
+  /* The children are pushed in pipeline order, so their statuses are collected
+     in order. pipefail reports the rightmost stage that failed, or zero when
+     all succeeded, while the plain case reports the last stage alone. */
+  let stage_status = ArrayList<i32>{};
+  stage_status.reserve(children.count());
+  for (let const child : children)
+    stage_status.push(os::wait_and_monitor_process(child));
+
+  /* PIPESTATUS exposes each stage's status by position, the same way the
+     all-simple pipeline path publishes it, so a compound pipeline reads it too.
+   */
+  let pipe_status = ArrayList<String>{heap_allocator()};
+  pipe_status.reserve(stage_status.count());
+  for (usize i = 0; i < stage_status.count(); i++)
+    pipe_status.push(utils::int_to_text(stage_status[i], heap_allocator()));
+  cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
+
+  i32 ret = stage_status.is_empty() ? 0 : stage_status.back();
+  if (cxt.pipefail()) {
+    ret = 0;
+    for (usize i = stage_status.count(); i > 0; i--)
+      if (stage_status[i - 1] != 0) {
+        ret = stage_status[i - 1];
+        break;
+      }
+  }
+
+  LOG(Debug, "the pipeline stages were reaped, %s status is %d",
+      cxt.pipefail() ? "the pipefail" : "the last stage's", ret);
+
+  cxt.set_last_exit_status(ret);
+  return ret;
+}
+
+hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_commands.count() > 1);
+
+  /* A pipeline wires pipes and forks each stage, so its last stage cannot
+     replace the shell. Clear the terminal exec permission so no stage execs in
+     place. */
+  cxt.set_terminal_exec_allowed(false);
+
+  /* A pipeline of only simple commands keeps the fast path, which wires the
+     pipes once and forks each external directly with no extra subshell. A
+     compound stage cannot run that way, so a pipeline that holds one takes the
+     fork-per-stage path. A simple stage that carries a prefix assignment, such
+     as x=v cmd | cmd2, takes the fork path too, since the fast path builds the
+     stage from its argument words alone and the prefix must reach only that
+     stage's environment, which the per-stage fork applies in the child. */
+  bool has_compound_stage = false;
+  for (let const stage : m_commands) {
+    if (!stage->is_simple_command()) {
+      has_compound_stage = true;
+      break;
+    }
+    /* A command-less stage of bare assignments keeps the fast path, whose
+       empty-expansion check reports it, so the strict diagnostic for x=1 | cat
+       is preserved. */
+    const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
+    if (!simple->local_vars().is_empty() && !simple->args().is_empty()) {
+      has_compound_stage = true;
+      break;
+    }
+  }
+
+  /* A stage whose command word names a user function must run through the
+     per-stage fork path, since a function shadows a builtin and a program
+     inside a pipeline the same way it does outside one. The fast path below
+     builds an ExecContext that resolves only builtins and programs, so a
+     function stage would wrongly run a like-named builtin. The literal command
+     word is checked without expanding, which covers the common name-pipe form,
+     and the whole scan is skipped when no function is defined. */
+  if (!has_compound_stage && cxt.has_functions()) {
+    for (let const stage : m_commands) {
+      const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
+      if (simple->args().is_empty()) continue;
+      const Token *first = simple->args()[0];
+      if (first->kind() != Token::Kind::Word) continue;
+      const Word &word = static_cast<const tokens::WordToken *>(first)->word();
+      if (word.plain_literal_kind() == Word::PlainLiteral::NotPlain) continue;
+      if (cxt.find_function(word.to_literal_string().view()) != nullptr) {
+        has_compound_stage = true;
+        break;
+      }
+    }
+  }
+
+  LOG(Debug, "the pipeline has %zu stages, taking the %s path",
+      m_commands.count(),
+      has_compound_stage ? "fork-per-stage" : "all-simple fast");
+
+  if (has_compound_stage) return evaluate_with_compound_stages(cxt);
+
+  /* The stage exec contexts and their argument words live only until the
+     pipeline is wired and run, so they are built on the scratch arena under one
+     pipeline-scoped mark. The arena rewind runs no destructor, so any stage
+     still holding open descriptors on an early exit, a non-resolving command or
+     an empty stage, is closed by the defer before the release. The normal path
+     moves ecs into execute, leaving the defer's loop empty. */
+  let const pipeline_mark = cxt.scratch_mark();
+  let ecs = ArrayList<ExecContext>{cxt.scratch_allocator()};
+  defer
+  {
+    for (ExecContext &leftover : ecs)
+      leftover.close_fds();
+    cxt.scratch_release(pipeline_mark);
+  };
+  ecs.reserve(m_commands.count());
+
+  for (let const stage : m_commands) {
+    ASSERT(stage != nullptr);
+    ASSERT(stage->is_simple_command());
+    const SimpleCommand *e = static_cast<const SimpleCommand *>(stage);
+
+    cxt.add_evaluated_expression();
+
+    /* The stage expands here rather than through SimpleCommand::evaluate, so
+       the location moves onto the stage first and a runtime warning from its
+       words carets the stage that read the variable. */
+    cxt.set_current_location(e->source_location());
+
+    let stage_args = cxt.process_args(e->args(), /*args_are_transient=*/true);
+
+    /* A stage that expands to no command word, such as a bare assignment or an
+       unset variable, has no program to run. Report it instead of building an
+       exec context from an empty argument list, which would read past the
+       arguments. */
+    if (stage_args.is_empty()) {
+      throw ErrorWithLocation{e->source_location(),
+                              "A pipeline stage expanded to no command to run"};
+    }
+
+    /* A stage whose command does not resolve is non-fatal. Bash reports it,
+       runs the rest of the pipeline, and reports the last stage's status, so
+       the unresolved stage becomes a no-op context that closes its pipe to give
+       the next stage EOF and contributes 127 only under pipefail. Aborting here
+       instead would wrongly make the not-found stage govern the pipeline. */
+    Maybe<ExecContext> stage_ec;
+    try {
+      stage_ec = ExecContext::make_from(e->source_location(), steal(stage_args),
+                                        cxt.mood(), cxt.shitbox());
+    } catch (const CommandNotFound &not_found) {
+      report_command_not_found(cxt, not_found);
+      /* The stage still applies its own redirections, the way bash and dash
+         open a > target even for a command that was not found, then runs
+         nothing. The opened descriptors close with the stage, and a > onto its
+         standard output takes the slot ahead of the pipe, so the next stage
+         still sees EOF. */
+      let unresolved = ExecContext::make_unresolved(e->source_location());
+      bool was_unresolved_handed_off = false;
+      defer
+      {
+        if (!was_unresolved_handed_off) unresolved.close_fds();
+      };
+      e->redirect_exec_context(unresolved, cxt);
+      was_unresolved_handed_off = true;
+      ecs.push(steal(unresolved));
+      continue;
+    }
+    let ec = stage_ec.take();
+    /* Apply this stage's own redirections, such as 2>&1, before the pipe wires
+       its descriptors. The pipe only sets stdin and stdout, so a stderr
+       redirection composes with it. A later redirection in the same stage may
+       throw after an earlier one already opened a descriptor into the stage's
+       slots, so the descriptors opened so far are closed on that throw rather
+       than leaked, the way the simple command path guards its own descriptors.
+       The guard is disarmed once the stage is handed into the pipeline. */
+    bool was_stage_redirect_handed_off = false;
+    defer
+    {
+      if (!was_stage_redirect_handed_off) ec.close_fds();
+    };
+    e->redirect_exec_context(ec, cxt);
+    was_stage_redirect_handed_off = true;
+    ecs.push(steal(ec));
+  }
+
+  /* The pipeline status is the last stage's, and $? reads it from the store, so
+     the result is committed here the way the compound-stage path commits it.
+     The all-simple fast path otherwise returned the status without recording
+     it, so `false | read x; echo $?` read the stale status from before the
+     pipeline. */
+  const i64 ret =
+      utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
+}
+
+CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
+
+fn CompoundCommand::append_to(usize d, String &f, bool duplicate) throws -> void
+{
+  unused(d);
+  unused(f);
+  unused(duplicate);
+  throw ErrorWithLocation{source_location(),
+                          "Redirection on a compound command is not supported"};
+}
+
+fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) throws
+    -> void
+{
+  unused(d);
+  unused(f);
+  unused(duplicate);
+  throw ErrorWithLocation{source_location(),
+                          "Redirection on a compound command is not supported"};
+}
+
+fn CompoundCommand::set_fully_eliminated() const wontthrow -> void
+{
+  m_is_fully_eliminated = true;
+}
+
+pure fn CompoundCommand::is_fully_eliminated() const wontthrow -> bool
+{
+  return m_is_fully_eliminated;
+}
+
+IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
+                   const Expression *otherwise)
+    : CompoundCommand(location), m_branches(steal(branches)),
+      m_otherwise(otherwise)
+{}
+
+/* The branch conditions, the branch bodies, and the else body live in the
+   arena, torn down once on reset. */
+IfClause::~IfClause() = default;
+
+cold fn IfClause::to_string() const throws -> String { return "IfClause"; }
+
+cold fn IfClause::to_ast_string(usize layer) const throws -> String
+{
+  let const pad = indent_for_layer(layer);
+  let const child_pad = pad + EXPRESSION_AST_INDENT;
+  let s = pad + "[" + to_string() + "]";
+  for (let const &[ condition, body ] : m_branches) {
+    ASSERT(condition != nullptr);
+    ASSERT(body != nullptr);
+
+    s += "\n" + child_pad + condition->to_ast_string(layer + 1);
+    s += "\n" + child_pad + body->to_ast_string(layer + 1);
+  }
+
+  if (m_otherwise != nullptr)
+    s += "\n" + child_pad + m_otherwise->to_ast_string(layer + 1);
+
+  return s;
+}
+
+hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  /* A command inside a compound construct forks rather than replacing the
+     shell, so the terminal exec stays confined to a top-level simple command.
+   */
+  cxt.set_terminal_exec_allowed(false);
+
+  /* The analyze pass proved every reachable branch body does nothing, so the if
+     yields 0 without testing a condition or running a body. */
+  if (m_is_fully_eliminated) {
+    LOG(Debug, "running the fully eliminated if as a no-op");
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
+
+  /* The analyze pass proved which branch runs, so the conditions are skipped
+     and the chosen body runs straight away. An index past the last branch means
+     every condition failed, so the else body runs or the if yields 0. */
+  if (m_folded_branch.has_value()) {
+    LOG(Debug,
+        "running the folded if branch %zu of %zu without testing conditions",
+        *m_folded_branch, m_branches.count());
+    if (*m_folded_branch < m_branches.count())
+      return m_branches[*m_folded_branch].body->evaluate(cxt);
+    if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
+    return 0;
+  }
+
+  for (let const &[ condition, body ] : m_branches) {
+    ASSERT(condition != nullptr);
+    ASSERT(body != nullptr);
+
+    i64 condition_status;
+    {
+      cxt.enter_condition();
+      defer { cxt.leave_condition(); };
+      condition_status = condition->evaluate(cxt);
+    }
+
+    /* A jump inside the condition stops the if and stays pending. */
+    if (cxt.has_pending_control_flow()) return condition_status;
+    if (condition_status == 0) return body->evaluate(cxt);
+  }
+
+  if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
+
+  return 0;
+}
+
+cold fn IfClause::analyze(AnalysisContext &actx,
+                          bool is_unconditional) const throws -> void
+{
+  /* The dead-branch rule reads the constant table while it still holds the
+     values recorded before this if. The verdict of a condition is decided by
+     the command words alone and does not need the condition's own analyze to
+     have run, so the fold runs first, before any child analyze mutates the
+     table. */
+  optimizer::optimize_node(this, actx);
+
+  /* The first condition runs whenever the if runs. The elif conditions and all
+     bodies are conditional, since a branch may not be reached. */
+  let is_first_branch = true;
+  for (let const &[ condition, body ] : m_branches) {
+    ASSERT(condition != nullptr);
+    ASSERT(body != nullptr);
+
+    condition->analyze(actx, is_unconditional && is_first_branch);
+    body->analyze(actx, false);
+    is_first_branch = false;
+  }
+
+  if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
+
+  /* A branch ran conditionally and may have reassigned a name, so a value
+     recorded before this if is no longer proven to hold in the straight-line
+     block after it. Clearing the constant table at the if boundary keeps the
+     propagation to a single straight-line run. */
+  actx.constant_variables.clear();
+}
+
+cold fn IfClause::register_defined_functions(AnalysisContext &actx) const throws
+    -> void
+{
+  /* Every branch body and the conditions run in the current shell, so a
+     function defined in any of them is callable from a sibling and must be
+     registered before the ordered walk warns about a forward reference. */
+  for (let const &[ condition, body ] : m_branches) {
+    ASSERT(condition != nullptr);
+    ASSERT(body != nullptr);
+    condition->register_defined_functions(actx);
+    body->register_defined_functions(actx);
+  }
+
+  if (m_otherwise != nullptr) m_otherwise->register_defined_functions(actx);
+}
+
+pure fn IfClause::branches() const wontthrow -> const ArrayList<if_branch> &
+{
+  return m_branches;
+}
+
+pure fn IfClause::otherwise() const wontthrow -> const Expression *
+{
+  return m_otherwise;
+}
+
+fn IfClause::set_folded_branch(usize index) const wontthrow -> void
+{
+  m_folded_branch = index;
+}
+
+pure fn IfClause::has_folded_branch() const wontthrow -> bool
+{
+  return m_folded_branch.has_value();
+}
+
+pure fn IfClause::folded_branch_index() const wontthrow -> usize
+{
+  return *m_folded_branch;
+}
+
+fn IfClause::as_if_clause() const wontthrow -> const IfClause * { return this; }
+
+WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
+                     const Expression *body, bool is_until)
+    : CompoundCommand(location), m_condition(condition), m_body(body),
+      m_is_until(is_until)
+{}
+
+/* The condition and the body live in the arena, torn down once on reset. */
+WhileLoop::~WhileLoop() = default;
+
+cold fn WhileLoop::to_string() const throws -> String
+{
+  return m_is_until ? "UntilLoop" : "WhileLoop";
+}
+
+cold fn WhileLoop::to_ast_string(usize layer) const throws -> String
+{
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_body != nullptr);
+
+  let const pad = indent_for_layer(layer);
+  let const child_pad = pad + EXPRESSION_AST_INDENT;
+  let s = pad + "[" + to_string() + "]";
+  s += "\n" + child_pad + m_condition->to_ast_string(layer + 1);
+  s += "\n" + child_pad + m_body->to_ast_string(layer + 1);
+  return s;
+}
+
+/* The loop_disposition enum lives in ExpressionsInternal.hpp so CStyleForLoop in
+   ExpressionsArith.cpp shares it with resolve_loop_control. */
+fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
+{
+  if (!cxt.has_pending_control_flow()) return loop_disposition::RunNext;
+
+  let &control = cxt.pending_control_flow();
+  if (control.kind != control_flow::Kind::Break &&
+      control.kind != control_flow::Kind::Continue)
+  {
+    /* A return or an exit is not a loop's to consume, so this loop stops and
+       leaves it pending for the function or the shell. */
+    return loop_disposition::StopLoop;
+  }
+
+  /* A jump aimed at an outer loop decrements and stays pending, stopping this
+     loop so the outer one consumes it. */
+  if (control.value > 1) {
+    control.value -= 1;
+    LOG(All, "the loop jump targets an outer loop, %lld levels stay pending",
+        static_cast<long long>(control.value));
+    return loop_disposition::StopLoop;
+  }
+
+  /* The jump targets this loop. A break stops it, a continue runs the next
+     iteration. Either way the request is consumed here. */
+  let const is_break = control.kind == control_flow::Kind::Break;
+  cxt.clear_control_flow();
+  LOG(All, "consuming the %s aimed at this loop",
+      is_break ? "break" : "continue");
+  return is_break ? loop_disposition::StopLoop : loop_disposition::RunNext;
+}
+
+hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_body != nullptr);
+
+  /* A loop body runs repeatedly in the shell process, so no command in it may
+     replace the shell. */
+  cxt.set_terminal_exec_allowed(false);
+
+  LOG(Debug, "entering the %s loop%s", m_is_until ? "until" : "while",
+      m_folded_to_skip ? ", folded to skip the body" : "");
+
+  /* The analyze pass proved the body never runs, so the loop yields 0 without
+     evaluating the condition. A while false and an until true fold here. The
+     body-elimination mark is the same outcome reached from a different proof,
+     so it folds to the skip too. */
+  if (m_folded_to_skip || m_is_fully_eliminated) {
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
+
+  /* The body runs inside one more loop level, so a break or a continue clamps
+     its level against the nesting that is actually live. */
+  cxt.enter_loop();
+  defer { cxt.leave_loop(); };
+
+  i64 ret = 0;
+  for (;;) {
+    i64 condition_status;
+    {
+      cxt.enter_condition();
+      defer { cxt.leave_condition(); };
+      condition_status = m_condition->evaluate(cxt);
+    }
+    /* A jump inside the condition, such as an exit from a substitution, stops
+       the loop and stays pending for the caller. */
+    if (cxt.has_pending_control_flow()) break;
+
+    let const should_run_body =
+        m_is_until ? (condition_status != 0) : (condition_status == 0);
+    if (!should_run_body) break;
+
+    ret = m_body->evaluate(cxt);
+    if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
+  }
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
+}
+
+cold fn WhileLoop::analyze(AnalysisContext &actx,
+                           bool is_unconditional) const throws -> void
+{
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_body != nullptr);
+
+  /* The loop re-evaluates its condition every iteration and the body may
+     reassign any name, so a value recorded before the loop does not hold across
+     iterations. The constant table is cleared before the condition, so a
+     pre-loop constant is never inlined into it, which would freeze a loop whose
+     counter was folded to its initial value. A literal condition such as while
+     false still folds, since the verdict reads the literal words alone. */
+  actx.constant_variables.clear();
+
+  optimizer::optimize_node(this, actx);
+
+  m_condition->analyze(actx, is_unconditional);
+  m_body->analyze(actx, false);
+}
+
+cold fn WhileLoop::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
+{
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_body != nullptr);
+
+  /* The condition and the body both run in the current shell, so a function
+     defined in either is registered before the ordered walk. */
+  m_condition->register_defined_functions(actx);
+  m_body->register_defined_functions(actx);
+}
+
+pure fn WhileLoop::condition() const wontthrow -> const Expression *
+{
+  return m_condition;
+}
+
+pure fn WhileLoop::is_until() const wontthrow -> bool { return m_is_until; }
+
+fn WhileLoop::set_folded_to_skip() const wontthrow -> void
+{
+  m_folded_to_skip = true;
+}
+
+pure fn WhileLoop::is_folded_to_skip() const wontthrow -> bool
+{
+  return m_folded_to_skip;
+}
+
+fn WhileLoop::as_while_loop() const wontthrow -> const WhileLoop *
+{
+  return this;
+}
+
+SelectLoop::SelectLoop(SourceLocation location, StringView variable_name,
+                       ArrayList<const Token *> &&words, bool has_in_clause,
+                       const Expression *body)
+    : CompoundCommand(location), m_variable_name(variable_name),
+      m_has_in_clause(has_in_clause), m_body(body)
+{
+  m_words = steal(words);
+}
+
+SelectLoop::~SelectLoop() = default;
+
+cold fn SelectLoop::to_string() const throws -> String
+{
+  return "SelectLoop \"" + StringView{m_variable_name} + "\"";
+}
+
+cold fn SelectLoop::to_ast_string(usize layer) const throws -> String
+{
+  ASSERT(m_body != nullptr);
+  let const pad = indent_for_layer(layer);
+  return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
+         m_body->to_ast_string(layer + 1);
+}
+
+fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_body != nullptr);
+  cxt.set_terminal_exec_allowed(false);
+
+  /* The word list expands here, so a runtime warning from it carets this
+     select rather than the statement before it. */
+  cxt.set_current_location(source_location());
+
+  let const values =
+      m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
+  if (values.is_empty()) return 0;
+
+  LOG(Debug, "the select loop offers %zu choices for '%s'", values.count(),
+      m_variable_name.c_str());
+
+  cxt.enter_loop();
+  defer { cxt.leave_loop(); };
+
+  i64 ret = 0;
+  bool should_reprint_menu = true;
+  for (;;) {
+    /* The numbered menu and the prompt go to standard error, the way bash keeps
+       them out of the command's captured output. The menu reprints only after
+       an empty line. */
+    if (should_reprint_menu) {
+      let menu = String{};
+      for (usize i = 0; i < values.count(); i++) {
+        menu += utils::int_to_text(static_cast<i64>(i + 1));
+        menu += ") ";
+        menu.append(values[i].view());
+        menu += '\n';
+      }
+      shit::print_error(menu.view());
+      should_reprint_menu = false;
+    }
+    shit::print_error(cxt.get_variable_value("PS3").value_or(String{"#? "}));
+
+    bool was_newline_terminated = false;
+    let const input =
+        utils::read_line_from_fd(SHIT_STDIN, was_newline_terminated);
+    /* End of input ends the loop, and bash echoes a newline to standard output
+       the way a terminal end-of-file does, so the captured output gains a final
+       blank line that a break does not. */
+    if (!input) {
+      shit::print("\n");
+      break;
+    }
+
+    let const reply = String{StringView{*input}};
+    LOG(All, "the select prompt read the reply '%s'", reply.c_str());
+    cxt.set_shell_variable("REPLY", reply.view());
+    if (reply.is_empty()) {
+      should_reprint_menu = true;
+      continue;
+    }
+
+    /* A line that is a valid menu number binds the name to that word, any other
+       input binds the name to the empty string, the way bash reports a bad
+       choice. */
+    let const choice = utils::parse_decimal_integer(reply.view());
+    if (!choice.is_error() && choice.value() >= 1 &&
+        static_cast<usize>(choice.value()) <= values.count())
+    {
+      cxt.set_shell_variable(
+          m_variable_name,
+          values[static_cast<usize>(choice.value()) - 1].view());
+    } else {
+      cxt.set_shell_variable(m_variable_name, "");
+    }
+
+    ret = m_body->evaluate(cxt);
+    if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
+  }
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
+}
+
+ForLoop::ForLoop(SourceLocation location, StringView variable_name,
+                 ArrayList<const Token *> &&words, bool has_in_clause,
+                 const Expression *body)
+    : CompoundCommand(location), m_variable_name(variable_name),
+      m_has_in_clause(has_in_clause), m_body(body)
+{
+  m_words = steal(words);
+}
+
+/* The word tokens and the body live in the arena, torn down once on reset. */
+ForLoop::~ForLoop() = default;
+
+cold fn ForLoop::to_string() const throws -> String
+{
+  let result = String{"ForLoop \""};
+  result += StringView{m_variable_name};
+  result += "\"";
+  return result;
+}
+
+cold fn ForLoop::to_ast_string(usize layer) const throws -> String
+{
+  ASSERT(m_body != nullptr);
+
+  let const pad = indent_for_layer(layer);
+  let s = pad + "[" + to_string() + "]";
+  s += "\n" + pad + EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
+  return s;
+}
+
+hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_body != nullptr);
+
+  /* A loop body runs repeatedly in the shell process, so no command in it may
+     replace the shell. */
+  cxt.set_terminal_exec_allowed(false);
+
+  /* The analyze pass proved the loop runs nothing observable, an empty word
+     list or a no-op body, so the for yields 0 without expanding the words. */
+  if (m_is_fully_eliminated) {
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
+
+  /* The word list expands here, so a runtime warning from it carets this for
+     rather than the statement before it. */
+  cxt.set_current_location(source_location());
+  /* Without an in clause the loop walks the positional parameters. */
+  let const values =
+      m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
+
+  /* The default mood scopes the loop variable, putting its prior value back
+     once the loop ends so the name does not leak, while the bash and posix
+     moods leave it set the way those shells do. */
+  let const scope_variable = !(cxt.is_bash_compatible() || cxt.is_posix_mode());
+  Maybe<String> saved_value =
+      scope_variable ? cxt.get_variable_value(m_variable_name) : None;
+  defer
+  {
+    if (scope_variable) {
+      if (saved_value.has_value())
+        cxt.set_shell_variable(m_variable_name, saved_value->view());
+      else
+        cxt.unset_shell_variable(m_variable_name);
+    }
+  };
+
+  LOG(Debug, "the for loop binds '%s' over %zu values", m_variable_name.c_str(),
+      values.count());
+
+  /* The body runs inside one more loop level, so a break or a continue clamps
+     its level against the nesting that is actually live. */
+  cxt.enter_loop();
+  defer { cxt.leave_loop(); };
+
+  i64 ret = 0;
+  for (let const &value : values) {
+    cxt.set_shell_variable(m_variable_name, value);
+    ret = m_body->evaluate(cxt);
+    if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
+  }
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
+}
+
+cold fn ForLoop::analyze(AnalysisContext &actx,
+                         bool is_unconditional) const throws -> void
+{
+  ASSERT(m_body != nullptr);
+
+  unused(is_unconditional);
+
+  /* for over the words of an unquoted command substitution iterates IFS-split
+     words rather than lines, so a name with a space breaks apart. A $(cat
+     file) is shellcheck SC2013, read the lines with while read -r. A
+     $(find ...) is shellcheck SC2044, use find -exec or a read loop. */
+  for (let const t : m_words) {
+    if (t->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(t)->word();
+    for (let const &segment : word.segments) {
+      if (segment.kind != WordSegment::Kind::CommandSubstitution ||
+          segment.is_in_double_quotes)
+      {
+        continue;
+      }
+      let const body = segment.text.view();
+      usize start = 0;
+      while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
+        start++;
+      let const trimmed = body.substring(start);
+      if (trimmed.starts_with(StringView{"cat "}))
+        actx.warn(t->source_location(),
+                  "A for over the cat output iterates IFS-split words rather "
+                  "than lines",
+                  "read the lines with 'while IFS= read -r line' instead");
+      else if (trimmed.starts_with(StringView{"find "}) || trimmed == "find")
+        actx.warn(t->source_location(),
+                  "A for over the find output breaks a name with whitespace "
+                  "apart",
+                  "use find -exec or a 'while read -r' loop over find -print0");
+    }
+  }
+
+  /* The empty-list elimination rule reads the word list while it is still
+     unchanged, so the optimizer runs before the constant table is cleared for
+     the body. */
+  optimizer::optimize_node(this, actx);
+
+  /* The body runs repeatedly over the loop list and may reassign a name, so a
+     value recorded before the loop does not hold inside it. Clearing the
+     constant table before the body keeps a pre-loop constant from being inlined
+     into a counter the body increments. */
+  actx.constant_variables.clear();
+  m_body->analyze(actx, false);
+}
+
+cold fn ForLoop::register_defined_functions(AnalysisContext &actx) const throws
+    -> void
+{
+  ASSERT(m_body != nullptr);
+
+  /* The loop body runs in the current shell, so a function it defines is
+     registered before the ordered walk. */
+  m_body->register_defined_functions(actx);
+}
+
+fn ForLoop::as_for_loop() const wontthrow -> const ForLoop * { return this; }
+
+pure fn ForLoop::has_in_clause() const wontthrow -> bool
+{
+  return m_has_in_clause;
+}
+
+pure fn ForLoop::words() const wontthrow -> const ArrayList<const Token *> &
+{
+  return m_words;
+}
+
+CaseClause::CaseClause(SourceLocation location, const Token *word,
+                       ArrayList<case_item> &&items)
+    : CompoundCommand(location), m_word(word)
+{
+  m_items = steal(items);
+}
+
+/* The subject word, the pattern tokens, and the item bodies live in the arena,
+   torn down once on reset. */
+CaseClause::~CaseClause() = default;
+
+cold fn CaseClause::to_string() const throws -> String { return "CaseClause"; }
+
+cold fn CaseClause::to_ast_string(usize layer) const throws -> String
+{
+  let const pad = indent_for_layer(layer);
+  let const child_pad = pad + EXPRESSION_AST_INDENT;
+  let s = pad + "[" + to_string() + "]";
+  for (let const &item : m_items) {
+    ASSERT(item.body != nullptr);
+    s += "\n" + child_pad + item.body->to_ast_string(layer + 1);
+  }
+  return s;
+}
+
+fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_word != nullptr);
+
+  /* A command inside a case branch forks rather than replacing the shell, so
+     the terminal exec stays confined to a top-level simple command. */
+  cxt.set_terminal_exec_allowed(false);
+
+  /* The subject word and the patterns expand here, so a runtime warning from
+     them carets this case rather than the statement before it. */
+  cxt.set_current_location(source_location());
+
+  /* A case word and its patterns expand with variables and tilde but no field
+     splitting and no pathname globbing, so a pattern keeps its metacharacters
+     for matching. */
+  auto do_expand_no_glob = [&cxt](const Token *t) -> String {
+    ASSERT(t != nullptr);
+    if (t->kind() == Token::Kind::Word) {
+      /* The subject expansion throws a plain Error, an unset variable under set
+         -u, so it is relocated to a caret at the case word. */
+      try {
+        return cxt.expand_word_for_assignment(
+            static_cast<const tokens::WordToken *>(t)->word());
+      } catch (const Error &e) {
+        throw relocate_error(e, t->source_location());
+      }
+    }
+    return t->raw_string();
+  };
+
+  let const subject = do_expand_no_glob(m_word);
+
+  LOG(Debug, "the case subject expanded to '%s'", subject.c_str());
+
+  auto do_arm_matches = [&](const case_item &item) throws -> bool {
+    for (let const pattern_token : item.patterns) {
+      /* A pattern keeps its glob metacharacters for matching, yet a quoted or
+         escaped metacharacter in the pattern is a literal, so the expansion
+         carries a parallel mask the matcher reads. A pattern token that is not
+         a plain word, such as a reserved word arm, has no quoting structure and
+         stays fully active. */
+      let pattern_active = ArrayList<bool>{cxt.scratch_allocator()};
+      let pattern = String{};
+      if (pattern_token->kind() == Token::Kind::Word) {
+        try {
+          pattern = cxt.expand_case_pattern_masked(
+              static_cast<const tokens::WordToken *>(pattern_token)->word(),
+              pattern_active);
+        } catch (const Error &e) {
+          throw relocate_error(e, pattern_token->source_location());
+        }
+      } else {
+        pattern = pattern_token->raw_string();
+        for (usize k = 0; k < pattern.count(); k++)
+          pattern_active.push(true);
+      }
+      if (utils::glob_matches(pattern, subject, pattern_active, 0,
+                              cxt.extglob_enabled()))
+        return true;
+    }
+    return false;
+  };
+
+  /* The index walks the arms so a ;& fall-through can run the next arm body
+     without matching it, and a ;;& can resume matching at the arms past the one
+     that just ran. */
+  i64 result = 0;
+  bool did_run_a_body = false;
+  usize i = 0;
+  while (i < m_items.count()) {
+    if (!do_arm_matches(m_items[i])) {
+      i++;
+      continue;
+    }
+
+    LOG(All, "case arm %zu matched, running its body", i);
+
+    bool should_resume_matching = false;
+    for (;;) {
+      ASSERT(m_items[i].body != nullptr);
+      result = m_items[i].body->evaluate(cxt);
+      cxt.set_last_exit_status(static_cast<i32>(result));
+      did_run_a_body = true;
+
+      let const terminator = m_items[i].terminator;
+      if (terminator == case_terminator::FallThrough && i + 1 < m_items.count())
+      {
+        i++;
+        continue;
+      }
+      if (terminator == case_terminator::ContinueMatch) {
+        i++;
+        should_resume_matching = true;
+      }
+      break;
+    }
+    if (should_resume_matching) continue;
+    return result;
+  }
+
+  if (!did_run_a_body) {
+    LOG(Debug, "no case arm matched the subject");
+    cxt.set_last_exit_status(0);
+  }
+  return result;
+}
+
+cold fn CaseClause::analyze(AnalysisContext &actx,
+                            bool is_unconditional) const throws -> void
+{
+  unused(is_unconditional);
+  for (let const &item : m_items) {
+    ASSERT(item.body != nullptr);
+    item.body->analyze(actx, false);
+  }
+
+  /* A case with no catch-all *) arm silently does nothing for a value none of
+     the listed patterns match, so a typo or a new input slips through. This is
+     shellcheck SC2249. The catch-all is an unquoted * glob, a single
+     UnquotedText segment whose text is *. A quoted '*' matches only a literal
+     asterisk, so it is not a default. */
+  bool has_default_arm = false;
+  for (let const &item : m_items) {
+    for (let const pattern : item.patterns) {
+      if (pattern->kind() != Token::Kind::Word) continue;
+      let const &pattern_word =
+          static_cast<const tokens::WordToken *>(pattern)->word();
+      if (pattern_word.segments.count() == 1 &&
+          pattern_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+          pattern_word.segments[0].text.view() == "*")
+      {
+        has_default_arm = true;
+        break;
+      }
+    }
+    if (has_default_arm) break;
+  }
+  if (!has_default_arm) {
+    ASSERT(m_word != nullptr);
+    actx.warn(m_word->source_location(),
+              "This case has no default *) branch, a value no pattern "
+              "matches "
+              "is silently ignored");
+  }
+
+  /* An arm body runs only when its pattern matches and may reassign a name, so
+     a value recorded before the case is no longer proven after it. */
+  actx.constant_variables.clear();
+}
+
+cold fn CaseClause::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
+{
+  /* Each arm body runs in the current shell when its pattern matches, so a
+     function defined in any arm is registered before the ordered walk. */
+  for (let const &item : m_items) {
+    ASSERT(item.body != nullptr);
+    item.body->register_defined_functions(actx);
+  }
+}
+
+BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
+    : CompoundCommand(location), m_body(body)
+{}
+
+/* The body lives in the arena, torn down once on reset. */
+BraceGroup::~BraceGroup() = default;
+
+cold fn BraceGroup::to_string() const throws -> String { return "BraceGroup"; }
+
+cold fn BraceGroup::to_ast_string(usize layer) const throws -> String
+{
+  ASSERT(m_body != nullptr);
+
+  let const pad = indent_for_layer(layer);
+  return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
+         m_body->to_ast_string(layer + 1);
+}
+
+fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_body != nullptr);
+
+  /* A command inside a brace group forks rather than replacing the shell, so
+     the terminal exec stays confined to a top-level simple command. */
+  cxt.set_terminal_exec_allowed(false);
+
+  /* The analyze pass proved the body does nothing observable, so the group
+     yields 0 without running it. */
+  if (m_is_fully_eliminated) {
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
+
+  return m_body->evaluate(cxt);
+}
+
+cold fn BraceGroup::analyze(AnalysisContext &actx,
+                            bool is_unconditional) const throws -> void
+{
+  ASSERT(m_body != nullptr);
+
+  m_body->analyze(actx, is_unconditional);
+}
+
+cold fn BraceGroup::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
+{
+  ASSERT(m_body != nullptr);
+
+  /* A brace group runs in the current shell, so a function defined in its body
+     leaks to the enclosing scope and is registered before the ordered walk.
+     Subshell does not forward here, since a function defined in a subshell does
+     not escape it. */
+  m_body->register_defined_functions(actx);
+}
+
+
+} /* namespace expressions */
+
+} /* namespace shit */

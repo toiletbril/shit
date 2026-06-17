@@ -240,13 +240,10 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     } else if (!is_last) {
 #if SHIT_PLATFORM_IS POSIX
       /* A non-last builtin stage is bash's own subshell, so it forks and runs
-         in the child. The earlier in-process run blocked the shell when the
-         builtin produced more than the pipe buffer, since the next stage that
-         drains the pipe had not started yet, so seq of a large count into head
-         deadlocked. The forked child runs concurrently with its consumer and,
-         with the default signal disposition fork_compound_stage restores, a
-         write to a pipe whose reader has gone ends it through SIGPIPE the way
-         an external producer ends. */
+         in the child. An in-process run deadlocked when the builtin produced
+         more than the pipe buffer before its consumer started, as in seq into
+         head. The forked child runs concurrently, and with the default signal
+         disposition a write to a closed pipe ends it through SIGPIPE. */
       const os::process child =
           os::fork_compound_stage(ec.in_fd, ec.out_fd, ec.err_fd);
       if (child == 0) {
@@ -256,11 +253,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
         ec.in_fd = shit::None;
         ec.out_fd = shit::None;
         ec.err_fd = shit::None;
-        /* make_pipe marks both ends close-on-exec, which an external stage
-           relies on to drop the read end of its own output pipe at exec. A
-           forked builtin never execs, so the child closes that read end by
-           hand, otherwise the pipe stays open and a write never sees the reader
-           leave, which deadlocks a producer such as seq into head. */
+        /* make_pipe marks both ends close-on-exec, which an external stage drops
+           at exec. A forked builtin never execs, so the child closes that read
+           end by hand, otherwise a write never sees the reader leave. */
         if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
         cxt.set_in_pipeline_stage(true);
         cxt.enter_subshell();

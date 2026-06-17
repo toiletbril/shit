@@ -522,12 +522,11 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       break;
     }
 
-    /* A NAME[subscript]= assignment protects the subscript's operators, so the
-       |, &, ;, and parentheses a bitmask subscript such as key[a|b]=1 carries
-       stay in the word rather than ending it. The capture runs only when the
-       word so far is a bare array name and a balanced ] followed by = or +=
-       marks this an assignment, so a glob like x[1|2] in argument position is
-       left to split the way bash does. */
+    /* A NAME[subscript]= assignment protects the subscript's operators so a
+       bitmask subscript such as key[a|b]=1 stays in the word. It runs only when
+       the word so far is a bare array name and a balanced ] followed by = or +=
+       marks an assignment, so a glob like x[1|2] in argument position still
+       splits. */
     if (!is_inside_quote_or_escape && ch == '[' &&
         do_word_is_plain_array_name() &&
         do_subscript_closes_with_assignment(byte_count))
@@ -540,11 +539,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       continue;
     }
 
-    /* An extended-glob group such as @(a|b) is captured whole so its (, the
-       nested |, and ) stay in the word as bytes the matcher reads, rather than
-       the ( ending the word as a sentinel. The opener is one of ?*+@! followed
-       with no space by (. The matcher honors the group only when shopt extglob
-       is on, so this capture is a pure addition that dash rejects anyway. */
+    /* An extended-glob group such as @(a|b) is captured whole so its (, nested
+       |, and ) stay in the word for the matcher. The opener is one of ?*+@!
+       followed with no space by (. The matcher honors the group only under shopt
+       extglob, so the capture is a pure addition. */
     if (!is_inside_quote_or_escape &&
         (ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!') &&
         chop_character(byte_count + 1) == '(')
@@ -557,13 +555,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       continue;
     }
 
-    /* The common case in a large script is a run of plain identifier bytes
-       outside any quote or escape. Scan the whole run and append it in one
-       String append, which removes the per-byte lambda call, the per-byte
-       segment-kind branch, and the per-byte String growth the slow path below
-       would pay. The run ends at the first byte that opens a quote, an
-       expansion, a substitution, or an escape, or that ends the word, and that
-       byte falls through to the unchanged per-byte handling. */
+    /* A run of plain identifier bytes is the common case in a large script.
+       Scanning the whole run and appending it once removes the per-byte lambda
+       call and String growth the slow path pays. The run ends at the first byte
+       that opens a quote, expansion, substitution, or escape. */
     if (!is_inside_quote_or_escape && lexer::is_plain_unquoted_run_byte(ch)) {
       const let run_start = byte_count;
       /* The run stops before an extended-glob opener such as the ? of ?(, so
@@ -1059,14 +1054,11 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             probe = chop_character(byte_count);
           }
         }
-        /* The matching close brace lives at brace depth one, so a nested
-           ${...} in a default or alternate word does not end the outer
-           expansion early. A bare { does not raise the depth, matching dash,
-           which closes ${x:-a{b} at the first brace. A nested $(...),
-           $((...)), or backtick is copied as a balanced unit so a } inside it
-           is never counted. A single quote run, a double quote run, and a
-           backslash escape keep their bytes literal so a } they contain is
-           never counted either. */
+        /* The matching close brace lives at brace depth one, so a nested ${...}
+           does not end the outer expansion early. A bare { does not raise the
+           depth, matching dash. A nested $(...), $((...)), or backtick is copied
+           as a balanced unit, and a quote run or backslash escape keeps its
+           bytes literal, so a } inside any of them is never counted. */
         usize brace_depth = 1;
         char quote = 0;
         for (;;) {
@@ -1221,13 +1213,11 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     }
 
     if (ch == '`') {
-      /* A backtick opens an old-style command substitution. Single quotes take
-         everything literally and are handled above, so reaching here means the
-         backtick is unquoted or inside double quotes, where it stays active.
-         The region runs to the next unescaped backtick, and the POSIX backquote
-         unescaping strips a backslash that precedes a backtick, a dollar sign,
-         or another backslash. The unescaped bytes form the inner command source
-         and reuse the same CommandSubstitution segment as $(...). */
+      /* A backtick here opens an old-style command substitution, unquoted or
+         inside double quotes where it stays active. The region runs to the next
+         unescaped backtick, and the POSIX backquote unescaping strips a backslash
+         before a backtick, a dollar sign, or another backslash. The unescaped
+         bytes reuse the same CommandSubstitution segment as $(...). */
       const let relative_open_backtick_pos = byte_count;
       byte_count++;
       let inner = String{};

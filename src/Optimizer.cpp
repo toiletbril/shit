@@ -97,11 +97,9 @@ pure fn is_plain_variable_name(StringView name) wontthrow -> bool
 }
 
 /* True when a token is a bare unquoted $name reference that field-splits at run
-   time. An unquoted operand splits on IFS, so the recorded value of $name is
-   not the single test argument the run actually sees, and the test verdict must
-   not fold from it. A quoted "$name" carries the same VariableReference segment
-   with is_in_double_quotes set, which is_split_eligible reports as not split,
-   so it still folds. The check mirrors the unquoted-variable test warning. */
+   time. The recorded value of an unquoted $name is not the single test argument
+   the run actually sees, so the verdict must not fold from it. A quoted "$name"
+   reports as not split and still folds. */
 fn is_split_eligible_variable_operand(const Token *token) wontthrow -> bool
 {
   if (token == nullptr) return false;
@@ -116,9 +114,8 @@ fn is_split_eligible_variable_operand(const Token *token) wontthrow -> bool
 }
 
 /* The constant value of a test operand, declining an unquoted $name reference
-   that field-splits at run time. The fold judges a quoted or literal operand by
-   its propagated value, while an unquoted variable operand keeps its run-time
-   splitting and is left unfolded. */
+   that field-splits at run time. A quoted or literal operand folds by its
+   propagated value. */
 fn propagated_test_operand_value(const Token *token,
                                  const AnalysisContext &actx) throws
     -> Maybe<String>
@@ -132,12 +129,8 @@ fn propagated_test_operand_value(const Token *token,
 }
 
 /* The constant verdict of a literal test command, the arguments after the test
-   or [ word with the trailing ] of the bracket form already removed. Some(true)
-   or Some(false) for the simplest forms the fold can prove, None otherwise. The
-   operand value comes through propagated_test_operand_value, so a $name operand
-   recorded as a constant is judged by its recorded value unless it
-   field-splits.
- */
+   or [ word with the bracket form's trailing ] removed. Some(true) or
+   Some(false) for the simplest provable forms, None otherwise. */
 fn constant_test_verdict(const ArrayList<const Token *> &operands,
                          const AnalysisContext &actx) throws -> Maybe<bool>
 {
@@ -176,25 +169,13 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
   return None;
 }
 
-/* The names of commands proven not to mutate the shell environment, stored as a
-   packed-key table the dispatch reads as data rather than a name chain. A
-   command outside this table is assumed to write a variable or run code the
-   prepass cannot see, so the constant table is forgotten across it.
-
-   The safety reasoning is that a recorded constant only survives a command that
-   cannot change the value a later straight-line read would see. An external
-   coreutil and a read-only shitbox utility run in a child or write only their
-   own standard output, so neither touches the parent shell's variables. The
-   shell builtins true, false, :, echo, test, [, and pwd write no variable. The
-   env-mutating builtins export, unset, local, declare, typeset,
-   readonly, set, eval, source, and . are deliberately absent, so a command that
-   reaches one of them falls through to the conservative clear. read is absent
-   for the same reason, since it binds a name from input. printf is absent
-   because its -v form binds a variable. The caller still
-   clears the table on a command substitution argument, on an unquoted IFS or
-   array dependence already handled at the assignment, and on a name shadowed by
-   a function or an alias, so the table here only lists the bare neutral names.
- */
+/* The names of commands proven not to mutate the shell environment, a packed-key
+   table the dispatch reads as data. A command outside the table is assumed to
+   write a variable, so the constant table is forgotten across it. External
+   coreutils and read-only shitbox utilities write only their own output, and the
+   builtins true, false, :, echo, test, [, and pwd write no variable. The
+   env-mutating builtins, read, and printf -v are deliberately absent and fall
+   through to the conservative clear. */
 inline constexpr StaticStringMap<bool>::entry ENVIRONMENT_NEUTRAL_ENTRIES[] = {
     {SSK("echo"),     true},
     {SSK("true"),     true},
@@ -426,20 +407,14 @@ pure fn trim_arithmetic_whitespace(StringView text) wontthrow -> StringView
 }
 
 /* The constant result of an algebraic identity on a single binary operator, the
-   cases that collapse to a constant even when one operand is a run-time
-   variable. The folding rule caches an integer, so only an identity whose
-   result is a literal qualifies, which is x*0, 0*x, and x-x. The companion
-   identities x+0, 0+x, x*1, and 1*x reduce to the other operand rather than a
-   constant, so they cannot be cached in the integer slot and are left to the
-   evaluator. The split at the first top-level operator only fires on an
-   expression with no parenthesis, so a nested term cannot hide a different
-   operator that changes the value. None when no identity applies.
-
-   A bare variable operand is folded only when nounset is provably off, since
-   reading an unset name under set -u is an error this fold would swallow. The
-   nounset state is read from the live shell. With no live shell, or with
-   nounset on, a variable operand is declined and only an all-literal operand
-   pair folds. */
+   cases that collapse to a constant even when one operand is a run-time variable.
+   The folding rule caches an integer, so only x*0, 0*x, and x-x qualify. The
+   identities x+0, x*1, and their mirrors reduce to the other operand and are left
+   to the evaluator. The split fires only on a parenthesis-free expression, so a
+   nested term cannot hide a different operator. None when no identity applies. A
+   bare variable operand folds only when nounset is provably off in the live
+   shell, since reading an unset name under set -u is an error this fold would
+   swallow. */
 fn try_algebraic_simplify(StringView expression,
                           const AnalysisContext &actx) wontthrow -> Maybe<i64>
 {

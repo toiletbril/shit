@@ -189,17 +189,6 @@ static fn run_debug_completion_driver(StringView driver_line,
 }
 #endif
 
-/* Set when the shell is invoked through a name whose basename is sh or dash,
-   the way a system ln -s shit sh does. A script that names the shell after a
-   system POSIX shell then runs compatibility-clean, the way bash run as sh
-   switches to its POSIX mode. */
-static bool INVOKED_AS_POSIX_SHELL = false;
-
-/* Set when the basename is bash, so a script that names the shell bash gets the
-   bash extensions the way real bash does. The invocation name splits here, sh
-   and dash select POSIX mode while bash selects bash mode. */
-static bool INVOKED_AS_BASH = false;
-
 /* Parse a --mood value into a mood, with 'shit' the strict default, 'bash' the
    bash extensions, and 'sh' or 'posix' the dash semantics. An unknown spelling
    returns None so the caller reports the usage error. */
@@ -216,10 +205,11 @@ pure static fn parse_mood_name(StringView name) wontthrow -> Maybe<mimic_mood>
 }
 
 /* The runtime mood the session runs in, from --mood when given, then the
-   invocation basename, then the strict default. --dumb forces the sh mood when
-   --mood is absent. An invalid --mood value fails startup before this, so a
-   stray one falls back to the default. */
-pure static fn resolve_session_mood() wontthrow -> mimic_mood
+   invocation mood the basename selects, then the strict default. --dumb forces
+   the sh mood when --mood is absent. An invalid --mood value fails startup
+   before this, so a stray one falls back to the default. */
+pure static fn resolve_session_mood(mimic_mood invocation_mood) wontthrow
+    -> mimic_mood
 {
   if (FLAG_MOOD.is_set()) {
     if (Maybe<mimic_mood> parsed_mood = parse_mood_name(FLAG_MOOD.value());
@@ -230,9 +220,7 @@ pure static fn resolve_session_mood() wontthrow -> mimic_mood
     return mimic_mood::Default;
   }
   if (FLAG_DUMB.is_enabled()) return mimic_mood::Posix;
-  if (INVOKED_AS_POSIX_SHELL) return mimic_mood::Posix;
-  if (INVOKED_AS_BASH) return mimic_mood::Bash;
-  return mimic_mood::Default;
+  return invocation_mood;
 }
 
 /* Print the help or version text and return the exit code when one of those
@@ -292,9 +280,8 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 }
 
 /* Report a break, continue, or return that reached the top with no loop,
-   function, or sourced script to consume it. The jump carries the source and
-   the origin it was made in, so the caret points at the exact builtin and the
-   note names where it ran. */
+   function, or sourced script to consume it. The jump carries its source and
+   origin so the caret points at the exact builtin. */
 static fn report_escaped_control_flow(EvalContext &context,
                                       const String &fallback_source) -> void
 {
@@ -348,18 +335,16 @@ static fn run_script_contents(const String &script_contents,
   try {
     defer { context.end_command(); };
 
-    /* Reclaim the previous command's arena storage before the next parse, and
-       destroy the eval and dot ASTs that point into it. Function bodies live in
-       the separate function arena, so they survive this reset and a function
-       defined on one command stays callable on the next. */
+    /* Reclaim the previous command's arena before the next parse. Function
+       bodies live in the separate function arena, so they survive this reset
+       and a function defined on one command stays callable on the next. */
     context.clear_retained_sources();
     ast_arena.reset();
     context.reset_scratch_arena();
 
-    /* A precompiled tree, the cached PROMPT_COMMAND hook, skips the lex and the
-       parse and the analysis below, since those already ran when it was first
-       seen. The tree lives in a caller-owned arena that outlives this call, so
-       it is reused across prompts rather than rebuilt each one. */
+    /* A precompiled tree, the cached PROMPT_COMMAND hook, skips the lex, parse,
+       and analysis since those already ran. It lives in a caller-owned arena
+       that outlives this call, so it is reused across prompts. */
     Expression *ast = precompiled_ast;
     if (precompiled_ast == nullptr) {
       LOG(Debug, "parsing a chunk of %zu bytes", script_contents.count());
@@ -370,8 +355,7 @@ static fn run_script_contents(const String &script_contents,
       };
 
       /* Recover from each parse error so the whole file is reported at once. A
-         file with any parse error must not run, so a non-empty error list
-         prints every error and fails without evaluating the partial tree. */
+         file with any parse error must not run. */
       let parse_errors = ArrayList<shit::String>{heap_allocator()};
       ast = p.construct_ast(parse_errors);
 
@@ -396,23 +380,13 @@ static fn run_script_contents(const String &script_contents,
     }
 
     /* Validate the whole tree before running anything. An unconditional problem
-       stops execution and a conditional one only warns. POSIX mode and bash
-       mode both skip the whole stage, since neither dash nor bash runs a
-       shellcheck pass, so the tree runs without validation or constant folding
-       and the prompt reaches evaluation sooner. -W forces the stage back on in
-       either mode and reports every error as a warning, and --no-diagnostics
-       always skips it. The default mode keeps the analysis, so the diagnostics
-       stay intact. */
-    /* The compat decision reads the live context rather than the static mode
-       helper, so init-as-bash, which runs the config in bash mode then turns
-       bash mode off at the interactive seam, flips the analysis stage back on
-       for the session. The context fields are seeded from the same helpers at
-       startup, so a non-snapping run behaves exactly as before. */
-    /* The skip reads the context's diagnostics flag rather than only the
-       static one, so set -o no-diagnostics flips the stage at runtime. */
-    /* --show-optimizer-state forces the prepass to run whatever the mood, since
-       its whole purpose is to trace the prepass, so an interactive session that
-       settled into bash mood through its rc still shows the optimizer trace. */
+       stops execution and a conditional one only warns. POSIX and bash mode
+       both skip the stage, since neither dash nor bash runs a shellcheck pass.
+       -W forces it back on as warnings and --no-diagnostics always skips it.
+       The decision and the skip read the live context rather than the static
+       helpers, so init-as-bash and a runtime set -o no-diagnostics both flip the
+       stage for the session. --show-optimizer-state forces the prepass on
+       whatever the mood, since its whole purpose is to trace it. */
     let const run_analysis =
         precompiled_ast == nullptr &&
         (FLAG_SHOW_OPTIMIZER_STATE.is_enabled() ||
@@ -422,12 +396,11 @@ static fn run_script_contents(const String &script_contents,
     LOG(Debug, "the analysis stage %s for this chunk",
         run_analysis ? "runs" : "is skipped");
     /* An interactive -W chunk runs right away and the runtime resolution
-       reports a missing command itself, so the analysis copy of that report
-       stays quiet to avoid the doubled error at the prompt. */
-    /* The live shell is handed to the prepass so the no-local check can
-       query, only when it is about to warn, whether the name is already a
-       shell or environment variable, an update rather than a leak. The
-       query is lazy, so the analysis pays nothing per chunk for it. */
+       reports a missing command itself, so the analysis copy stays quiet to
+       avoid the doubled error. The live shell is handed to the prepass so the
+       no-local check can query, only when about to warn, whether the name is
+       already a variable. The query is lazy, so the analysis pays nothing for
+       it per chunk. */
     let const analysis_failed =
         run_analysis &&
         !analyze_ast(
@@ -569,9 +542,8 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
 
 /* Read a whole file and run it in the given context. A missing file is not an
    error, since a login shell sources profiles that may not exist. Returns
-   whether the file existed and ran, so a caller that wants the first existing
-   of several candidates, the way bash picks one login profile, can stop after
-   the first hit. */
+   whether the file existed and ran, so a caller can stop after the first hit of
+   several candidates. */
 static fn source_file(const Path &path, EvalContext &context,
                       BumpArena &ast_arena) -> bool
 {
@@ -585,12 +557,10 @@ static fn source_file(const Path &path, EvalContext &context,
   LOG(Info, "sourcing '%s', %zu bytes", path.c_str(), contents->count());
 
   /* The file runs through run_source, the same path the dot builtin uses, so it
-     parses into the active arena alongside the tree already being evaluated
-     rather than resetting it. A set --init-moods inside a sourced rc reaches
-     here while that rc's own tree is live, so resetting the arena would free
-     the node mid-walk. run_source also bounds the nesting and retains the AST.
-     The path names the source, so a parse error in it and a backtrace caret
-     carry the file rather than a bare line:col. */
+     parses into the active arena rather than resetting it. A set --init-moods
+     inside a sourced rc reaches here while that rc's tree is live, so a reset
+     would free the node mid-walk. The path names the source so a parse error
+     and a backtrace caret carry the file rather than a bare line:col. */
   unused(ast_arena);
   context.run_source(*contents, path.text().view(), /*consume_return=*/true,
                      /*call_site=*/None, path.text().view());
@@ -637,11 +607,9 @@ static fn source_bash_login_files(EvalContext &context,
   }
 }
 
-/* Source the system bashrc the way bash compiled with SYS_BASHRC reads it for
-   an interactive shell, the Void /etc/bash/bashrc or the Debian
-   /etc/bash.bashrc, whichever exists first. The system rc is what loads
-   bash-completion on most hosts, so skipping it leaves the programmable
-   completion unregistered. */
+/* Source the system bashrc the way bash compiled with SYS_BASHRC reads it, the
+   Void /etc/bash/bashrc or the Debian /etc/bash.bashrc, whichever exists first.
+   It loads bash-completion on most hosts. */
 static fn source_bash_system_rc(EvalContext &context,
                                 BumpArena &ast_arena) throws -> void
 {
@@ -651,11 +619,10 @@ static fn source_bash_system_rc(EvalContext &context,
 }
 
 /* bash-completion registers the complete -D dynamic loader when it loads. A
-   host whose rc chain never sources it, a stripped /etc/bash or a bare
-   ~/.bashrc, still gets the programmable completion under -L and in bash mode
-   by sourcing the stock script directly. The probe reads the default spec and
-   the script's own guard variable, so a chain that already loaded it does not
-   load it twice. */
+   host whose rc chain never sources it still gets programmable completion by
+   sourcing the stock script directly. The probe reads the default spec and the
+   script's guard variable so a chain that already loaded it does not load it
+   twice. */
 static fn ensure_bash_completion_loaded(EvalContext &context,
                                         BumpArena &ast_arena) throws -> void
 {
@@ -954,15 +921,22 @@ fn main(int argc, char **argv) -> int
   const bool does_name_mark_login =
       !program_basename.is_empty() && program_basename[0] == '-';
   if (does_name_mark_login) program_basename = program_basename.substring(1);
-  shit::INVOKED_AS_POSIX_SHELL =
-      program_basename == "sh" || program_basename == "dash";
-  shit::INVOKED_AS_BASH = program_basename == "bash";
+  /* A basename of sh or dash selects POSIX mode and bash selects bash mode, the
+     way a symlink named after a system shell behaves like that shell. Every
+     other name leaves the strict default for --mood and --dumb to override. */
+  const shit::mimic_mood invocation_mood =
+      (program_basename == "sh" || program_basename == "dash")
+          ? shit::mimic_mood::Posix
+      : program_basename == "bash" ? shit::mimic_mood::Bash
+                                   : shit::mimic_mood::Default;
   LOG(Info, "invocation basename is '%.*s'",
       static_cast<int>(program_basename.length), program_basename.data);
   LOG(Info, "selecting the %s mood",
-      shit::resolve_session_mood() == shit::mimic_mood::Posix  ? "posix"
-      : shit::resolve_session_mood() == shit::mimic_mood::Bash ? "bash"
-                                                               : "default");
+      shit::resolve_session_mood(invocation_mood) == shit::mimic_mood::Posix
+          ? "posix"
+      : shit::resolve_session_mood(invocation_mood) == shit::mimic_mood::Bash
+          ? "bash"
+          : "default");
 
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
@@ -991,7 +965,7 @@ fn main(int argc, char **argv) -> int
                            .to_string(source.view()));
     return 2;
   }
-  let const session_mood = shit::resolve_session_mood();
+  let const session_mood = shit::resolve_session_mood(invocation_mood);
 
   let init_moods = shit::ArrayList<shit::mimic_mood>{};
   for (usize i = 0; i < FLAG_INIT_MOODS.count(); i++) {

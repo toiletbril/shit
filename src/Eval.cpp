@@ -21,15 +21,13 @@
 #include <ctime>
 #include <exception>
 
-/* POSIX regcomp and regexec back the [[ =~ operator. The release build drops
-   libstdc++, so std::regex is unavailable and the libc regex is used instead.
- */
+/* POSIX regcomp and regexec back the [[ =~ operator, the release build drops
+   libstdc++ so std::regex is unavailable. */
 #if SHIT_PLATFORM_IS POSIX
 #include <regex.h>
 #endif
 
-/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test.
- */
+/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test. */
 #if SHIT_PLATFORM_IS WIN32
 #include <io.h>
 #endif
@@ -47,18 +45,15 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
       m_shell_is_interactive(shell_is_interactive),
       m_error_exit(should_error_exit)
 {
-  /* Seed the separator table from the default IFS, since the table starts
-     empty while m_field_separators is initialized to whitespace. */
+  /* The separator table starts empty while m_field_separators is whitespace. */
   set_field_separators(m_field_separators.view());
 
-  /* The shell start time anchors $SECONDS. The $RANDOM seed is deferred to the
-     first read of RANDOM, so a run that never reads it, the common -c case,
-     pays neither the seed nor the syscall it mixes in. */
+  /* The shell start time anchors $SECONDS. The $RANDOM seed is deferred to its
+     first read, a run that never reads it pays neither seed nor syscall. */
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
 
-  /* Every inherited environment variable is exported, so the set starts from
-     the process environment. An assignment then tests this set rather than
-     scanning the environment on every write. */
+  /* Every inherited environment variable is exported. An assignment then tests
+     this set rather than scanning the environment on every write. */
   for (let const &name : os::environment_names())
     m_exported_names.add(name.view());
 }
@@ -75,8 +70,7 @@ fn runtime_state::restore(EvalContext &context) const wontthrow -> void
 
 fn EvalContext::add_evaluated_expression() wontthrow -> void
 {
-  /* The count feeds only the -S report, so skip the increment unless -S asked
-     for it and keep the per-node hot path free of the bookkeeping. */
+  /* The count feeds only the -S report, the per-node hot path skips it. */
   if (!m_stats_enabled) return;
   m_expressions_executed_last++;
 }
@@ -89,9 +83,8 @@ fn EvalContext::end_command() wontthrow -> void
   m_expressions_executed_total += m_expressions_executed_last;
   m_commands_evaluated++;
 
-  /* Sample the arena before the next command resets it, so the peak reflects
-     the largest tree this run has built. The arena is null only outside a
-     parse, which end_command never runs in. */
+  /* Sample the arena before the next command resets it, for the peak report.
+     The arena is null only outside a parse, which end_command never runs in. */
   if (AST_ARENA != nullptr) {
     const usize used = AST_ARENA->bytes_used();
     if (used > m_peak_ast_arena_bytes) m_peak_ast_arena_bytes = used;
@@ -105,28 +98,20 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
 {
   LOG(All, "assigning variable '%.*s' to a value of %zu bytes",
       static_cast<int>(name.length), name.data, value.length);
-  /* The field separators are read once per expanded word, so the live value is
-     cached here to keep that path off the map and the environment. */
+  /* The field separators are read once per expanded word, the live value is
+     cached off the map and the environment. */
   if (name == "IFS") set_field_separators(value);
-  /* A new PATH names a different search order, so a cached resolution may point
-     at a directory PATH no longer lists. The resolver is pointed at the new
-     value, so a plain PATH=... assignment the store holds drives the search
-     even without an export, and the cache is marked stale so the next command
-     re-resolves. */
+  /* A new PATH names a different search order. The resolver is pointed at the
+     new value so a plain PATH=... drives the search without an export, and the
+     cache is marked stale for the next command. */
   if (name == "PATH") utils::set_path_for_resolution(String{value});
   m_shell_variables.set(name, value);
-  /* An exported name lives in the process environment, where export moved it
-     and cleared the shell copy. A plain reassignment writes the shell store
-     above, so an in-process read sees the new value, but a child still inherits
-     the stale environment entry. The environment is refreshed here when the
-     name is exported, so a child of `export FOO=1; FOO=2` sees 2. Membership is
-     the exported-names set, an O(1) test, so a non-exported assignment, the
-     common loop counter, never scans the environment. */
+  /* An exported name also lives in the process environment. The environment is
+     refreshed here when the name is exported, so a child of
+     `export FOO=1; FOO=2` sees 2. The exported-names set is an O(1) test, a
+     non-exported assignment never scans the environment. */
   if (m_exported_names.contains(name)) {
-    /* The environment write outlives the current statement, so inside a
-       subshell the name's prior value is read and logged for the restore on the
-       subshell's exit. Outside a subshell the log stays empty, so the prior
-       value is never read. */
+    /* Inside a subshell the prior value is logged for the restore on exit. */
     if (m_subshell_depth > 0)
       m_environment_undo_log.push(environment_undo_entry{
           String{name}, os::get_environment_variable(name)});
@@ -137,9 +122,8 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
 fn EvalContext::set_field_separators(StringView value) throws -> void
 {
   LOG(Debug, "caching %zu field separator bytes", value.length);
-  /* The table is built before m_field_separators is touched, since the
-     constructor seeds it from m_field_separators' own view, so value may alias
-     the buffer that the assignment below rewrites. */
+  /* The table is built before m_field_separators is touched, value may alias
+     the buffer the assignment below rewrites. */
   for (usize i = 0; i < 256; i++)
     m_field_separator_table[i] = false;
   for (usize i = 0; i < value.length; i++)
@@ -158,15 +142,11 @@ hot pure fn EvalContext::is_field_separator(char c) const wontthrow -> bool
 hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
     -> void
 {
-  /* A read-only variable rejects the assignment. The common case has no
-     read-only names, so the scan is skipped entirely. */
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
   /* An integer-marked name evaluates its value as arithmetic on every
-     assignment, the way bash applies declare -i, so the store receives the
-     decimal result rather than the raw text. An empty value stores zero the
-     way bash does. */
+     assignment, the way bash applies declare -i. An empty value stores zero. */
   if (is_integer_variable(name)) [[unlikely]] {
     let const result = value.length == 0 ? 0 : evaluate_arithmetic(value);
     char result_text[24];
@@ -199,16 +179,14 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
        which is the SHELL value the shell already holds. */
     set_shell_variable("BASH", get_variable_value("SHELL").value_or(String{}));
     /* COMP_WORDBREAKS carries readline's word-break set the way bash exposes
-       it. bash-completion's word reassembly walks COMP_LINE against it, so a
-       missing value collapses every word into one and the computed cursor
-       word lands at zero, which kills every completion function. */
+       it. bash-completion's word reassembly walks COMP_LINE against it, a
+       missing value collapses every word into one and kills completion. */
     if (!get_variable_value("COMP_WORDBREAKS").has_value())
       set_shell_variable("COMP_WORDBREAKS", StringView{" \t\n\"'><=;|&(:"});
     return;
   }
-  /* sh and dash advertise no version variable, so the bash identity is just
-     cleared and nothing replaces it. The clear matters for a mimicked sh whose
-     parent ran in bash mode, and is a no-op at startup where nothing is set. */
+  /* sh and dash advertise no version variable. The clear matters for a mimicked
+     sh whose parent ran in bash mode, and is a no-op at startup. */
   LOG(Info, "clearing the bash identity variables for a non-bash mood");
   force_unset_shell_variable("BASH_VERSION");
   force_unset_shell_variable("BASH");
@@ -216,34 +194,29 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
 
 fn EvalContext::unset_shell_variable(StringView name) throws -> void
 {
-  /* A read-only variable rejects removal the same way it rejects assignment,
-     so unset cannot defeat readonly. */
   if (is_readonly(name))
     throw Error{"Unable to unset '" + name + "' because it is read only"};
 
-  /* A local a caller declared peels back to that caller's saved value, the
-     bash upvar semantics bash-completion bubbles every result through. The
-     same-scope local keeps the plain removal below, the unset local bash
-     reads as empty. */
+  /* A local a caller declared peels back to that caller's saved value, the bash
+     upvar semantics bash-completion bubbles every result through. */
   if (peel_caller_local_binding(name)) return;
 
   force_unset_shell_variable(name);
   m_indexed_arrays.erase(name);
   clear_sparse_array(name);
-  /* unset drops the integer mark with the value, the way bash clears the
-     declare -i attribute, so a later assignment stores raw text again. */
+  /* unset drops the integer mark with the value, the way bash clears declare -i. */
   m_integer_names.remove(name);
 }
 
 fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
 {
-  /* The current scope's own local is not peeled, and outside a function there
-     is nothing to peel. */
+  /* The current scope's own local is not peeled, outside a function there is
+     nothing to peel. */
   if (m_local_scopes.count() < 2) return false;
   if (is_local_in_current_scope(name)) return false;
 
-  /* The innermost caller frame holding a saved binding is the one bash's
-     unset peels, so the scan walks from the nearest caller outward. */
+  /* The innermost caller frame holding a saved binding is the one bash's unset
+     peels, the scan walks from the nearest caller outward. */
   for (usize frame_index = m_local_scopes.count() - 1; frame_index-- > 0;) {
     ArrayList<local_binding> &frame = m_local_scopes[frame_index];
     for (usize i = frame.count(); i-- > 0;) {
@@ -252,14 +225,12 @@ fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
       LOG(Debug, "peeling the local binding of '%.*s' from caller frame %zu",
           static_cast<int>(name.length), name.data, frame_index);
 
-      /* The caller's saved state comes back right now, the same restore the
-         scope pop runs, so the read after the unset already sees the next
-         binding out and a following assignment writes it. */
+      /* The caller's saved state comes back now, the same restore the scope pop
+         runs, so a read after the unset sees the next binding out. */
       restore_local_binding(binding);
 
-      /* The restore entry is consumed, so the frame's pop no longer rewinds
-         this name and the value a deeper callee assigns next survives into
-         the caller's caller. */
+      /* The consumed restore entry no longer rewinds this name on the frame's
+         pop, so a value a deeper callee assigns survives into the caller. */
       frame.remove(i);
       return true;
     }
@@ -269,26 +240,23 @@ fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
 
 fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
 {
-  /* Restore through assign_variable, not set_shell_variable, since the scope
-     pop runs this inside a noexcept defer where a readonly name would
-     otherwise throw from a destructor and terminate the shell. Both callers
-     drop the binding right after, so the saved array moves out. */
+  /* Restore through assign_variable, not set_shell_variable, the scope pop runs
+     this inside a noexcept defer where a readonly name would throw from a
+     destructor and terminate the shell. */
   if (binding.previous_value.has_value())
     assign_variable(binding.name, *binding.previous_value);
   else
     force_unset_shell_variable(binding.name);
-  /* The store is written directly rather than through set_indexed_array,
-     since the readonly check could throw from the same noexcept defer. */
-  /* The dense run is restored first so the sparse re-insert below routes each
-     saved gap index beyond it the way the caller held it. */
+  /* The store is written directly rather than through set_indexed_array, the
+     readonly check could throw from the same noexcept defer. The dense run is
+     restored first so the sparse re-insert below routes each saved gap index
+     beyond it. */
   if (binding.previous_indexed_array.has_value())
     m_indexed_arrays.set(binding.name.view(),
                          steal(*binding.previous_indexed_array));
   else
     m_indexed_arrays.erase(binding.name.view());
-  /* The body's sparse elements drop and the caller's saved ones come back, so
-     a deep index the body set does not survive while a gap index the caller
-     held is restored rather than wiped. */
+  /* The body's sparse elements drop and the caller's saved ones come back. */
   clear_sparse_array(binding.name.view());
   for (usize i = 0; i < binding.previous_sparse_indices.count(); i++)
     set_array_element(binding.name.view(), binding.previous_sparse_indices[i],
@@ -303,9 +271,8 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     m_integer_names.add(binding.name.view());
   else
     m_integer_names.remove(binding.name.view());
-  /* The read-only mark the caller held is restored, and a local -r mark made in
-     this scope drops, written directly since the noexcept defer this runs under
-     must not throw. */
+  /* The caller's read-only mark is restored and a local -r made in this scope
+     drops, written directly since the noexcept defer must not throw. */
   if (binding.previous_was_readonly)
     m_readonly_names.add(binding.name.view());
   else
@@ -320,8 +287,8 @@ fn EvalContext::set_indexed_array(StringView name,
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
   /* The scalar entry is dropped so a $name read falls through to element zero
-     the way bash treats $a as ${a[0]}. Any sparse element of a prior array of
-     the same name is dropped too, since this replaces the whole array. */
+     the way bash treats $a as ${a[0]}. A prior array's sparse elements drop
+     too, this replaces the whole array. */
   m_shell_variables.erase(name);
   clear_sparse_array(name);
   m_indexed_arrays.set(name, steal(values));
@@ -337,10 +304,9 @@ fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 fn EvalContext::append_indexed_array(StringView name,
                                      ArrayList<String> values) throws -> void
 {
-  /* An existing array grows in place, so appending element by element stays
-     linear rather than rebuilding the whole array on each call. The readonly
-     guard and the scalar clear match set_indexed_array, since the in-place path
-     bypasses it. */
+  /* An existing array grows in place, appending stays linear rather than
+     rebuilding. The readonly guard and scalar clear match set_indexed_array,
+     which the in-place path bypasses. */
   if (let *existing = m_indexed_arrays.find(name)) {
     LOG(All, "appending %zu elements to the existing array '%.*s'",
         values.count(), static_cast<int>(name.length), name.data);
@@ -374,15 +340,11 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
                                              StringView message) wontthrow
     -> void
 {
-  /* no-diagnostics promises no warnings at all, so the runtime advisories
-     honor the live toggle the way the analysis stage does. */
   if (diagnostics_disabled()) return;
-  /* The whole location is rendered, so the filename the lexer stamped
-     prefixes a warning from a sourced file. A windowed resolution rebases
-     the absolute position onto the function's definition copy and swaps in
-     its owned filename, since the stamped view may outlive its buffer once
-     the defining command's sources are freed. A formatting failure is
-     swallowed so a diagnostic never becomes an error. */
+  /* A windowed resolution rebases the absolute position onto the function's
+     definition copy and swaps in its owned filename, the stamped view may
+     outlive its buffer once the defining command's sources are freed. A
+     formatting failure is swallowed so a diagnostic never becomes an error. */
   try {
     let const resolved_source = resolve_render_source(location);
     usize line_offset = 0;
@@ -404,10 +366,8 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     let warning = WarningWithLocation{location, message};
     warning.set_line_offset(line_offset);
     show_message(warning.to_string(resolved_source.text->view()));
-    /* A warning from a sourced file names the chain that reached it, the
-       same frames an error prints, since the user typed no source command
-       for an rc chain and the file alone does not say who pulled it in. A
-       warning in the typed line has no frames and stays a single report. */
+    /* A warning from a sourced file names the chain that reached it, the user
+       typed no source command for an rc chain. The typed line has no frames. */
     if (!m_source_frames.is_empty()) print_source_backtrace();
   } catch (...) {
     LOG(Debug, "formatting a runtime warning failed, the error is swallowed");
@@ -423,9 +383,9 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
   if (resolved_source.text == nullptr) return fallback;
   let const source = resolved_source.text->view();
 
-  /* A windowed resolution means the text is the definition copy while the
-     location is absolute, so the scan indexes through the rebase and the
-     found location converts back, keeping every stored location absolute. */
+  /* A windowed resolution holds the definition copy while the location is
+     absolute, the scan rebases in and the found location converts back so every
+     stored location stays absolute. */
   usize scan_start = fallback.position;
   usize absolute_shift = 0;
   if (resolved_source.is_windowed) {
@@ -439,10 +399,9 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
   }
   if (scan_start >= source.length) return fallback;
 
-  /* The command's span runs from its location to the end of its logical
-     line, a backslash-newline continues it. The first $name or ${name
-     spelling inside that span takes the caret, with the byte after the name
-     required to end it so $FOO does not match a $FOOBAR reference. */
+  /* The command's span runs to the end of its logical line, a backslash-newline
+     continues it. The first $name or ${name in that span takes the caret, the
+     byte after the name must end it so $FOO does not match $FOOBAR. */
   usize i = scan_start;
   while (i < source.length) {
     const char byte = source[i];
@@ -461,9 +420,8 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
         (name_start + name.length == source.length ||
          !lexer::is_variable_name(source[name_start + name.length])))
     {
-      /* The caret spans the $ or ${ through the name, and a brace pair
-         closing right after the name joins it so ${PAGER} underlines
-         whole. */
+      /* A closing brace right after the name joins the caret so ${PAGER}
+         underlines whole. */
       usize reference_end = name_start + name.length;
       if (is_braced && reference_end < source.length &&
           source[reference_end] == '}')
@@ -476,8 +434,8 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
     i++;
   }
 
-  /* Arithmetic reads a variable as a bare name with no dollar, so a second
-     pass takes the first name-delimited spelling inside the same span. */
+  /* Arithmetic reads a variable as a bare name, a second pass takes the first
+     name-delimited spelling inside the same span. */
   usize k = scan_start;
   while (k + name.length <= source.length) {
     const char byte = source[k];
@@ -498,14 +456,12 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
 
 fn EvalContext::report_unset_reference(StringView name) throws -> void
 {
-  /* A [[ -v name ]] existence test expands its operand only to read whether it
-     is set, so the warning stays silent there the way bash does not nounset on
-     the operand of -v. */
+  /* A [[ -v name ]] test expands its operand only to read whether it is set,
+     bash does not nounset on the operand of -v. */
   if (m_suppress_unset_warning) return;
 
-  /* -W downgrades the mood-seeded fatality to a warning so the run proceeds,
-     while an explicit set -u keeps the abort the script asked for. A lenient
-     run without -W expands the name to empty in silence. */
+  /* -W downgrades the mood-seeded fatality to a warning, an explicit set -u
+     keeps the abort. A lenient run without -W expands the name to empty. */
   if (m_runtime.error_unset &&
       (m_runtime.error_unset_explicit || !m_runtime.are_warnings_enabled))
   {
@@ -541,36 +497,29 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
   }
 }
 
-/* The flat-map key for one sparse indexed element, the array name and the
-   decimal index joined by a byte that cannot occur in a name. The map copies a
-   key it stores, so the callers build this on the per-command scratch arena. */
 fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 {
   LOG(All, "removing variable '%.*s' from the store and the environment",
       static_cast<int>(name.length), name.data);
   m_shell_variables.erase(name);
-  /* An exported variable also lives in the process environment, so it is
-     removed there too. Otherwise a later lookup falls back to the stale
-     environment value and the variable appears still set, which dash does not
-     do. The removal outlives the current statement, so inside a subshell the
-     prior value is logged first for the restore on the subshell's exit. */
+  /* An exported variable is removed from the environment too, otherwise a later
+     lookup falls back to the stale value and the variable appears still set,
+     which dash does not do. Inside a subshell the prior value is logged first
+     for the restore on exit. */
   record_environment_change(name);
   os::unset_environment_variable(name);
   unmark_exported(name);
   if (name == "IFS") set_field_separators(" \t\n");
-  /* An unset PATH drops the search order, so the resolver falls back to the
-     process environment's PATH, which this just removed and so reads None. An
-     export PATH=... routes through here to drop the bare copy, then sets the
-     environment and refreshes the resolver itself, so the None set here is
-     transient on that path. */
+  /* An unset PATH drops the search order, the resolver falls back to the
+     environment's PATH which this just removed. An export PATH=... routes
+     through here then refreshes the resolver itself. */
   if (name == "PATH")
     utils::set_path_for_resolution(os::get_environment_variable("PATH"));
 }
 
 fn EvalContext::record_environment_change(StringView name) throws -> void
 {
-  /* A top-level write is permanent, so the log stays empty and a later subshell
-     restore finds nothing to rewind. */
+  /* A top-level write is permanent, the log stays empty. */
   if (m_subshell_depth == 0) return;
   m_environment_undo_log.push(
       environment_undo_entry{String{name}, os::get_environment_variable(name)});
@@ -605,12 +554,9 @@ fn EvalContext::sync_exported_after_restore(StringView name,
 hot fn EvalContext::get_variable_value(StringView name) const throws
     -> Maybe<String>
 {
-  /* The ordinary name dominates every read, so its dispatch is reached first.
-     Every special single-character name is one byte, so a name longer than one
-     byte that does not begin with a digit or 'L' is an ordinary name that goes
-     straight to the store. The single-character specials, the positional digit
-     run, and $LINENO are split out below so the common read pays only the first
-     byte test. */
+  /* The ordinary name dominates every read and is dispatched first. The
+     single-character specials, the positional digit run, and $LINENO split out
+     below so the common read pays only the first-byte test. */
   const char first_byte = name.is_empty() ? '\0' : name[0];
 
   if (name.count() == 1) {
@@ -655,10 +601,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
   }
 
-  /* A purely numeric name selects a positional parameter, $1 upward. Only a
-     name that begins with a digit can be all digits, so the scan runs only
-     then. An index too large to fit, or beyond the count, has no value. The
-     single '0' name is handled above as the shell name. */
+  /* A purely numeric name selects a positional parameter, $1 upward. The single
+     '0' name is the shell name handled above. */
   if (first_byte >= '0' && first_byte <= '9') {
     let is_all_digits = true;
     for (usize i = 0; i < name.count(); i++)
@@ -667,9 +611,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         break;
       }
     if (is_all_digits) {
-      /* A positional beyond the count is unset rather than empty, so the
-         strict unset report fires on it and ${1-default} takes its default
-         the way bash reads an absent argument. */
+      /* A positional beyond the count is unset rather than empty, so the strict
+         unset report fires and ${1-default} takes its default. */
       if (name.count() > 9) return None;
       let const parsed_index = utils::parse_decimal_integer(name);
       if (parsed_index.is_error()) return None;
@@ -685,44 +628,34 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   if (let const *stored = m_shell_variables.find(name)) return *stored;
 
   /* A read of an array name with no scalar yields element zero, the way bash
-     treats $a as ${a[0]}. An array with no element zero, empty or sparse,
-     reads as unset the way bash answers ${a+set} for it. The empty-map guard
-     keeps an ordinary shell with no arrays from hashing the name a second
-     time on every variable read. */
+     treats $a as ${a[0]}. An array with no element zero reads as unset. The
+     empty-map guard skips the second hash for a shell with no arrays. */
   if (m_indexed_arrays.count() != 0)
     if (let const *array = m_indexed_arrays.find(name)) {
       if (array->is_empty()) return shit::None;
       return array->front();
     }
 
-  /* IFS is held live in m_field_separators rather than the store, so a read
-     with no prior assignment must report the cached separators. The store
-     lookup above wins first, so an explicit IFS= empty value still reads back
-     empty, while the unset default reads back space-tab-newline. This makes the
-     o=$IFS; IFS=:; ...; IFS=$o save and restore idiom round-trip. The first
-     byte gates the compare so an ordinary name skips it. */
+  /* IFS is held live in m_field_separators rather than the store. The store
+     lookup above wins, so IFS= empty reads back empty while the unset default
+     reads back space-tab-newline, making the IFS save/restore idiom round-trip. */
   if (first_byte == 'I' && name == "IFS") {
     return String{heap_allocator(), m_field_separators.view()};
   }
 
-  /* The branch the \G prompt segment renders, the shell's own dynamic
-     variable, so a script or a prompt command reads it without forking git.
-     Empty outside a repository, the short hash on a detached HEAD. A stored
-     value above wins the way the other dynamic names yield. */
+  /* The branch the \G prompt segment renders, read without forking git. Empty
+     outside a repository, the short hash on a detached HEAD. */
   if (first_byte == 'S' && name == "SHIT_GIT_BRANCH") {
     return utils::current_git_branch();
   }
 
-  /* $LINENO reports the line of the command currently evaluating. It yields to
-     a stored value above, so a script that assigns LINENO reads back what it
-     set, matching dash. With no assignment it computes the line from the
-     current source and position, which the command dispatcher keeps current. A
-     run with no real source, such as an interactive single line, reports
-     line 1. The first byte gates the compare so an ordinary name skips it. */
+  /* $LINENO reports the line of the command currently evaluating. A stored
+     value above wins, so a script that assigns LINENO reads it back. A run with
+     no real source reports line 1. */
   if (first_byte == 'L' && name == "LINENO") {
-    /* A windowed resolution maps the absolute position onto the definition
-       copy and adds the defining file's line offset back, so LINENO in a
-       function body reports the file line. */
+    /* A windowed resolution maps the absolute position onto the definition copy
+       and adds the defining file's line offset, so LINENO in a function body
+       reports the file line. */
     let const resolved_source = resolve_render_source(m_current_location);
     usize line = 1;
     if (resolved_source.text != nullptr) {
@@ -740,9 +673,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   }
 
   /* The bash dynamic variables are computed on each read. They apply in every
-     mood but POSIX, where these names stay ordinary so the mode behaves like
-     dash. A stored assignment above still wins, so RANDOM=5 reads back 5. The
-     first byte gates each compare so an ordinary name skips them. */
+     mood but POSIX, where these names stay ordinary like dash. A stored
+     assignment above wins, so RANDOM=5 reads back 5. */
   if (bash_dynamic_variables_enabled()) {
     if (first_byte == 'R' && name == "RANDOM") {
       if (!m_random_seeded) {
@@ -756,9 +688,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return utils::int_to_text(static_cast<i64>(std::time(nullptr)) -
                                 m_shell_start_time);
     }
-    /* SHELLOPTS is the colon list of the enabled set -o options, the variable
-       bash maintains and bash-completion greps for posix membership. The rows
-       mirror the live option getters in bash's alphabetical order. */
+    /* SHELLOPTS is the colon list of enabled set -o options, which
+       bash-completion greps for posix membership. The rows mirror the live
+       option getters in bash's alphabetical order. */
     if (first_byte == 'S' && name == "SHELLOPTS") {
       struct shellopts_row
       {
@@ -1360,9 +1292,6 @@ fn EvalContext::set_shitbox(bool enabled) wontthrow -> void
 {
   LOG(Info, "the shitbox option flips to %s", enabled ? "on" : "off");
   m_shitbox = enabled;
-  /* The command resolver runs with no context in scope, so the state is
-     mirrored onto the process global it reads. */
-  shitbox::set_shitbox_names_enabled(enabled);
 }
 
 pure fn EvalContext::shitbox() const wontthrow -> bool { return m_shitbox; }
@@ -1489,42 +1418,31 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_functions = steal(snapshot.functions);
   m_function_sources = steal(snapshot.function_sources);
   m_function_definition_infos = steal(snapshot.function_definition_infos);
-  /* An alias defined or removed inside a subshell or a command substitution
-     stays inside it, the way bash isolates an alias change in a subshell. */
+  /* An alias change inside a subshell stays inside it, the way bash isolates it. */
   m_aliases = steal(snapshot.aliases);
   m_positional_params = steal(snapshot.positional_params);
 
-  /* A set -e, set -f, or set -x inside a subshell or a command substitution
-     stays inside it, the way dash runs the inner code in a forked child whose
-     option flags die with the child. */
+  /* A set -e, -f, or -x inside a subshell stays inside it, the way dash forks a
+     child whose option flags die with it. */
   m_error_exit = snapshot.error_exit;
   m_enable_path_expansion = snapshot.is_path_expansion_enabled;
   m_enable_echo = snapshot.is_echo_enabled;
   m_enable_echo_expanded = snapshot.is_echo_expanded_enabled;
 
-  /* The mood, the strictness toggles, noclobber, and allexport revert with the
-     same rule, so a set -o pipefail, a set -u, a set -o noclobber, a set -a, or
-     a set --mood inside the subshell or the command substitution dies with it.
-   */
+  /* The mood, the strictness toggles, noclobber, and allexport revert with it. */
   snapshot.runtime.restore(*this);
   m_no_clobber = snapshot.no_clobber;
   m_export_all = snapshot.export_all;
 
-  /* A readonly or a declare -i inside the subshell or the command substitution
-     stays inside it, so the parent's name sets come back whole and a later
-     reassignment in the parent is not rejected by a mark the child made. */
+  /* A readonly or declare -i inside the subshell stays inside it, the parent's
+     name sets come back whole. */
   m_readonly_names = steal(snapshot.readonly_names);
   m_integer_names = steal(snapshot.integer_names);
 
-  /* A trap installed inside the subshell stays inside it. The parent's table is
-     restored whole, so an EXIT trap the parent set survives and an EXIT trap
-     the subshell set is dropped after it has already fired at the subshell's
-     end. A signal the subshell trapped that the parent does not is returned to
-     its default first, then the parent's own signal dispositions are
-     reinstalled from the restored table, so the process matches it. */
-  /* The common subshell and command substitution traps nothing, so the two
-     full table scans below are skipped entirely when neither the inner nor the
-     restored table holds an entry. */
+  /* A trap installed inside the subshell stays inside it. A signal the subshell
+     trapped that the parent does not is returned to default first, then the
+     parent's dispositions are reinstalled from the restored table. The scans are
+     skipped when neither table holds an entry. */
   if (m_traps.count() != 0 || snapshot.traps.count() != 0) {
     m_traps.for_each([&](StringView condition, const String &action) {
       unused(action);
@@ -1543,14 +1461,10 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
      match the prior void call that swallowed a failed chdir. */
   (void) Path::set_current_directory(snapshot.working_directory);
 
-  /* An export, an unset, or a reassignment of an exported name inside the
-     subshell wrote the process environment, which the restored variable map
-     above does not cover. Each such write logged the name's prior value while
-     the subshell ran, so they revert newest first back to the mark the snapshot
-     recorded, the way a forked subshell's environment dies with it. A subshell
-     that wrote no exported name logged nothing, so the count already matches
-     the mark and the loop does not run. The rewind precedes the PATH re-point
-     below, so an exported PATH reads its restored value. */
+  /* A write to an exported name inside the subshell hit the process environment,
+     which the restored variable map does not cover. Each write logged its prior
+     value, so they revert newest first back to the snapshot's mark. The rewind
+     precedes the PATH re-point below so an exported PATH reads its restored value. */
   LOG(Debug, "rewinding %zu environment writes made inside the subshell",
       m_environment_undo_log.count() - snapshot.environment_undo_mark);
   while (m_environment_undo_log.count() > snapshot.environment_undo_mark) {
@@ -1560,30 +1474,25 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
                                    entry.previous_value->view());
     else
       os::unset_environment_variable(entry.name.view());
-    /* The exported set follows the rewind, so a name the subshell created is
-       dropped and a name it merely changed stays exported. */
+    /* The exported set follows the rewind, a name the subshell created drops. */
     sync_exported_after_restore(entry.name.view(),
                                 entry.previous_value.has_value());
     m_environment_undo_log.pop_back();
   }
 
-  /* The cached field separators track the restored map, so an IFS change inside
-     the subshell or the command substitution does not leak its split behavior
-     to the parent. */
+  /* The cached field separators track the restored map so an inner IFS change
+     does not leak its split to the parent. */
   if (let const *ifs = m_shell_variables.find(StringView{"IFS", 3}))
     set_field_separators(ifs->view());
   else
     set_field_separators(" \t\n");
 
-  /* The resolver reads a process-global PATH rather than the restored map, so a
-     PATH change inside the subshell or the command substitution would leak its
-     search order to the parent. The search is re-pointed at the restored PATH,
-     read as None when the snapshot held no PATH so the resolver falls back the
-     way an unset PATH does. */
+  /* The resolver reads a process-global PATH, so it is re-pointed at the
+     restored PATH, read as None when the snapshot held none. */
   utils::set_path_for_resolution(get_variable_value("PATH"));
 
-  /* The exit status is intentionally not restored. A subshell and a command
-     substitution propagate the status of their last command to the parent. */
+  /* The exit status is intentionally not restored, a subshell propagates its
+     last command's status to the parent. */
 }
 
 fn EvalContext::option_flags_string() const throws -> String
@@ -1858,7 +1767,8 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
 }
 
 fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
-                          mimic_mood mood) throws -> ExecContext
+                          mimic_mood mood, bool is_shitbox_enabled) throws
+    -> ExecContext
 {
   ASSERT(args.count() > 0);
 
@@ -1874,7 +1784,7 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
        the shitbox builtin, which then runs the utility by that name. A real
        builtin still wins, and a shitbox utility beats an external program the
        way a busybox applet does. */
-    if (!resolved_builtin && shitbox::shitbox_names_enabled() &&
+    if (!resolved_builtin && is_shitbox_enabled &&
         shitbox::find_util(program.view()).has_value())
       resolved_builtin = Builtin::Kind::Shitbox;
 

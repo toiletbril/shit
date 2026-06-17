@@ -9,21 +9,17 @@
 #include "Path.hpp"
 #include "ResolvedCommand.hpp"
 
-/* The [[ =~ ]] operator compiles its pattern with the POSIX regex API, so the
-   compiled-regex cache holds a regex_t. Windows has no regcomp, so the operator
-   and the cache are POSIX-only. */
+/* The [[ =~ ]] operator compiles its pattern with the POSIX regex API. Windows
+   has no regcomp, so the operator and the cache are POSIX-only. */
 #if SHIT_PLATFORM_IS POSIX
 #include <regex.h>
 #endif
 
 namespace shit {
 
-/* A field is a candidate argument after variable expansion and field splitting.
-   It carries a parallel mask that marks which characters may act as glob
-   metacharacters, so globbing needs no source-position arithmetic. The text
-   lives on the scratch arena, since it lasts only as long as one command's
-   expansion, while the mask stays a heap bit vector so glob_matches reads it
-   unchanged. */
+/* A candidate argument after variable expansion and field splitting. The
+   parallel mask marks which characters may act as glob metacharacters. The text
+   lives on the scratch arena, the mask stays a heap bit vector. */
 struct glob_field
 {
   explicit glob_field(Allocator allocator)
@@ -31,9 +27,8 @@ struct glob_field
   {}
 
   String text;
-  /* The mask grows by repeated push, so it stays on the heap allocator where a
-     grow frees the old buffer, rather than the bump arena where every grow
-     would leak. */
+  /* The mask grows by push, so it stays on the heap allocator where a grow frees
+     the old buffer, the bump arena would leak every grow. */
   ArrayList<bool> glob_active;
 };
 
@@ -43,11 +38,9 @@ class WordSegment;
 class Expression;
 struct arith_token;
 
-/* One element of a [[ ]] conditional. An operand carries a word the evaluator
-   expands without field splitting, and the rest are the operators the
-   double-bracket grammar reads, the logical joiners, the parentheses, and the
-   string-comparison angles. A word operator such as == or -f arrives as an
-   operand and the evaluator classifies it by its text. */
+/* One element of a [[ ]] conditional. An operand carries a word expanded without
+   field splitting, the rest are the grammar operators. A word operator such as
+   == or -f arrives as an operand and is classified by its text. */
 struct conditional_element
 {
   enum class Kind : u8
@@ -66,16 +59,13 @@ struct conditional_element
   const Token *word{nullptr};
 };
 
-/* A pending non-local jump the evaluator carries instead of throwing. The break
-   and continue builtins request a loop jump, return requests a function jump,
-   and exit inside a subshell requests an exit. The tree-walk checks for a
-   pending request after each child and either consumes it at the matching
-   boundary or leaves it pending so an outer node consumes it. */
+/* A pending non-local jump the evaluator carries instead of throwing. The
+   tree-walk checks after each child and consumes it at the matching boundary or
+   leaves it pending for an outer node. */
 struct control_flow
 {
   enum class Kind : u8
   {
-    /* No jump is pending, so evaluation proceeds normally. */
     Normal,
     Break,
     Continue,
@@ -84,22 +74,18 @@ struct control_flow
   };
 
   Kind kind{Kind::Normal};
-  /* The loop level for break and continue, or the status for return and exit.
-   */
+  /* The loop level for break and continue, or the status for return and exit. */
   i64 value{0};
   /* Where the requesting builtin sits, so an escaped jump points a caret at it.
-     The source the offset indexes lives in source, set when the jump is made.
-   */
+     The offset indexes source, set when the jump is made. */
   SourceLocation location{0, 0};
   const String *source{nullptr};
   String origin{};
 };
 
-/* One frame of the source backtrace, pushed when run_source begins and popped
-   when it returns. The origin names the call descriptively, the call_site is
-   where the dot or eval sits in its parent, and parent_source is the text that
-   call site lives in so a caret renders against it. The parent_source is None
-   for a top-level source whose call site has no surrounding text. */
+/* One frame of the source backtrace, pushed when run_source begins. The origin
+   names the call, the call_site is where the dot or eval sits in its parent, and
+   parent_source is the text that call site lives in. */
 struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
@@ -111,35 +97,28 @@ struct source_frame
   String origin;
   SourceLocation call_site;
   const String *parent_source;
-  /* The bare path of a sourced file, the value BASH_SOURCE reports. It is empty
-     for an eval or a sourced command with no backing file. */
+  /* The bare path of a sourced file, the value BASH_SOURCE reports. Empty for an
+     eval or a sourced command with no backing file. */
   String source_path;
 };
 
-/* A variable binding saved when a local shadows it. The previous value is
-   None when the name was unset, so leaving the scope restores the unset
-   state rather than an empty string. The previous indexed array is saved the
-   same way, so a local array such as local arr=(...) restores the caller's
-   array on return and is cleared when the caller had none. */
+/* A variable binding saved when a local shadows it. A None previous value means
+   the name was unset, so leaving the scope restores the unset state. The indexed
+   array is saved the same way. */
 struct local_binding
 {
   String name;
   Maybe<String> previous_value;
   Maybe<ArrayList<String>> previous_indexed_array;
-  /* The associative array the name held, as parallel key and value lists, with
-     the flag set when the name was an associative array. A local -A restores
-     the caller's map on return and clears it when the caller had none. */
+  /* The associative array the name held, as parallel key and value lists. */
   bool previous_was_associative{false};
   ArrayList<String> previous_associative_keys{heap_allocator()};
   ArrayList<String> previous_associative_values{heap_allocator()};
-  /* The sparse elements the name held, the gap indices beyond the dense run,
-     so a local that shadows a caller's sparse array restores those elements
-     on return rather than the scope pop wiping them. */
+  /* The sparse elements the name held, restored rather than wiped by the pop. */
   ArrayList<usize> previous_sparse_indices{heap_allocator()};
   ArrayList<String> previous_sparse_values{heap_allocator()};
-  /* The integer mark the name carried in the caller. declare_local drops the
-     mark so a fresh local starts with no attributes the way bash localizes,
-     and leaving the scope puts the caller's mark back. */
+  /* The integer mark the caller held. declare_local drops it so a fresh local
+     starts clean, the pop puts it back. */
   bool previous_was_integer{false};
   /* The read-only mark the name carried in the caller, saved and restored the
      same way, so a local -r marks only this scope and the caller's later
@@ -177,67 +156,53 @@ struct environment_undo_entry
 };
 
 /* A live process substitution. The shell keeps one pipe end open as the /dev/fd
-   path the consuming command reads or writes, while the forked child runs the
-   inner command on the other end. The descriptor is closed and the child reaped
-   once the consuming command has finished. */
+   path the consuming command uses, the forked child runs the inner command on
+   the other end. The descriptor closes and the child reaps once done. */
 struct process_substitution
 {
   os::descriptor shell_fd;
   os::process child;
-  /* Where the command that opened the substitution sits, so a reap warning
-     renders a caret under it. The source is the text that location indexes. It
-     stays alive and unchanged through the command, so a view into it is held
-     rather than the owning String. It is empty when there is no surrounding
-     source. */
+  /* Where the command that opened the substitution sits, for a reap warning
+     caret. The source stays alive through the command, so a view is held rather
+     than the owning String. */
   SourceLocation location;
   StringView source;
 };
 
 /* A mark a command takes at entry, the count of pending substitutions and temp
-   files before it ran, so its own cleanup reaps only the substitutions it
-   opened and not an outer command's, as when a while loop reads done < <(cmd)
-   and its body, a simple command, must not reap the loop's producer mid-read.
- */
+   files before it ran, so its cleanup reaps only the ones it opened. A while
+   loop reading done < <(cmd) must not have its body reap the loop's producer. */
 struct process_substitution_mark
 {
   usize pending{0};
   usize temp{0};
 };
 
-/* A shell descriptor a bare exec moved inside an in-process subshell, backed
-   up so leave_subshell puts it back, the containment a forked subshell gets
-   for free. The depth names the subshell that owns the backup. */
+/* A shell descriptor a bare exec moved inside an in-process subshell, backed up
+   so leave_subshell puts it back. The depth names the owning subshell. */
 struct subshell_saved_descriptor
 {
   usize depth;
   os::saved_descriptor saved;
 };
 
-/* A snapshot of the mutable shell state, taken around a subshell or a command
-   substitution so a cd or an assignment inside does not leak to the parent. The
-   set option flags and the trap table are captured too, so a set -e, a set -f,
-   a set -x, or a trap inside the subshell stays inside it. */
-/* How a function body's absolute source positions map onto the stored
-   definition copy. The copy holds a "name () " header line, then the body
-   span verbatim, so an absolute position rebases by the body start and the
-   header length, and the printed line adds the offset back to the defining
-   file's numbering. */
+/* How a function body's absolute source positions map onto the stored definition
+   copy. The copy holds a "name () " header then the body verbatim, so an absolute
+   position rebases by the body start and header length, and the printed line adds
+   the offset back to the defining file's numbering. */
 struct function_definition_info
 {
   usize body_start_position{0};
   usize header_length{0};
   usize line_offset{0};
   String filename{};
-  /* The source instance the body was defined against. A call made while
-     this exact instance is still current needs no window, the absolute
-     positions already index the live text, which keeps the per-call cost
-     of a script running its own functions at one compare. */
+  /* The source instance the body was defined against. A call made while this
+     instance is still current needs no window, the absolute positions already
+     index the live text. */
   const String *defining_instance{nullptr};
-  /* The mood and the diagnostics state in effect when the function was defined,
-     so the body runs in its defining mood and fires no checks if it was defined
-     while diagnostics or warnings were off, regardless of the mood active at
-     the call. The mood rides as its underlying byte so this struct does not
-     need the mimic_mood enum ordered before it. */
+  /* The mood and diagnostics state when the function was defined, so the body
+     runs in its defining mood regardless of the mood at the call. The mood rides
+     as a byte so this struct need not order the mimic_mood enum before it. */
   u8 defining_mood{0};
   bool were_warnings_enabled_at_definition{false};
   bool were_diagnostics_disabled_at_definition{false};
@@ -260,11 +225,9 @@ enum class mimic_mood : u8
 
 class EvalContext;
 
-/* A snapshot of the mood and the diagnostic and strictness toggles, captured
-   and restored as a unit so a scope that runs a body under a different mood,
-   such as a function call or a mimicked script, saves and puts back the whole
-   set with one call instead of a flag at a time. The capture and restore act on
-   a context, so the swap reads as one struct rather than a flag at a time. */
+/* A snapshot of the mood and the diagnostic and strictness toggles, captured and
+   restored as a unit so a scope that runs a body under a different mood saves and
+   puts back the whole set with one call. */
 struct runtime_state
 {
   mimic_mood mood{mimic_mood::Default};
@@ -273,9 +236,8 @@ struct runtime_state
   bool error_unset{false};
   bool pipefail{false};
   bool failglob{false};
-  /* The explicit marks ride with their values, so a set -u or set -o pipefail
-     run inside a mood-swapped scope does not leave the mark set after the value
-     reverts, which would make a later mood switch skip reseeding the toggle. */
+  /* The explicit marks ride with their values, so a set -u inside a mood-swapped
+     scope does not leave the mark set after the value reverts. */
   bool error_unset_explicit{false};
   bool pipefail_explicit{false};
   bool failglob_explicit{false};
@@ -292,9 +254,8 @@ struct eval_state_snapshot
   StringMap<String> shell_variables;
   StringMap<const Expression *> functions;
   StringMap<String> function_sources;
-  /* The definition position mappings ride the snapshot beside the sources,
-     so a function the isolated run defined does not leave a stale mapping
-     behind that disagrees with the restored function table. */
+  /* The definition position mappings ride the snapshot beside the sources, so an
+     isolated run leaves no stale mapping disagreeing with the restored table. */
   StringMap<function_definition_info> function_definition_infos;
   StringMap<String> aliases;
   ArrayList<String> positional_params;
@@ -467,10 +428,9 @@ public:
     return m_indexed_arrays.find(name);
   }
 
-  /* The bash associative arrays, a name to string-keyed values. The values are
-     held in one flat map under a composite name-and-key, and the declared names
-     are tracked separately so an empty associative array still routes a string
-     subscript here rather than to the arithmetic indexed path. */
+  /* The bash associative arrays. The values live in one flat map under a
+     composite name-and-key, the declared names are tracked separately so an
+     empty associative array still routes a string subscript here. */
   fn declare_associative_array(StringView name) throws -> void;
   pure fn is_associative_array(StringView name) const wontthrow -> bool
   {
@@ -487,17 +447,14 @@ public:
      back. */
   fn clear_associative_array(StringView name) throws -> void;
 
-  /* Every element of an array name as a list, the indexed elements in order,
-     the associative values in store order, or a one-element list for a plain
-     scalar. A "${a[@]}" expansion emits one field per element from this, the
-     way "$@" keeps each positional parameter its own field. An unset name
-     yields an empty list. */
+  /* Every element of an array name as a list, the indexed elements in order, the
+     associative values in store order, or a one-element list for a scalar.
+     "${a[@]}" emits one field per element. An unset name yields an empty list. */
   fn collect_array_elements(StringView name) const throws -> ArrayList<String>;
 
-  /* Whether an array element or key is set, backing the [[ -v name[subscript]
-     ]] test. A @ or * subscript asks whether the array holds any element, an
-     associative subscript checks the key, and an indexed subscript checks that
-     the arithmetic index is within the stored elements. */
+  /* Whether an array element or key is set, backing [[ -v name[subscript] ]]. A
+     @ or * subscript asks whether the array holds any element, an associative
+     subscript checks the key, an indexed one checks the index is in range. */
   fn array_element_is_set(StringView name, StringView subscript) throws -> bool;
 
 #if SHIT_PLATFORM_IS POSIX
@@ -517,59 +474,47 @@ public:
      reassignment or an unset does not leave a far element behind. */
   fn clear_sparse_array(StringView name) throws -> void;
 
-  /* Assign an array literal, honoring an explicit [index]=value element that
-     places its value at that subscript, with a bare element taking the next
-     index after it. Without an explicit index this is the plain ordered
-     assignment. An append continues after the highest set index. */
+  /* Assign an array literal, honoring an explicit [index]=value element with a
+     bare element taking the next index. An append continues after the highest
+     set index. */
   fn assign_indexed_array_elements(StringView name, ArrayList<String> elements,
                                    bool is_append) throws -> void;
 
-  /* Log a name's current process-environment value before a write that outlives
-     the current statement, so a subshell restore can revert it. Called before
-     an export or an allexport assignment writes the environment. Outside a
-     subshell the write is permanent, so nothing is logged. */
+  /* Log a name's environment value before a write that outlives the statement,
+     so a subshell restore can revert it. Outside a subshell nothing is logged. */
   fn record_environment_change(StringView name) throws -> void;
 
-  /* The names that currently live in the process environment, the exported
-     ones, mirrored so an assignment tests an O(1) set rather than scanning the
-     environment on every write. mark_exported and unmark_exported keep it in
-     step with each environment write, and the set is seeded from the inherited
+  /* The exported names, mirrored so an assignment tests an O(1) set rather than
+     scanning the environment on every write. Seeded from the inherited
      environment at construction. */
   fn mark_exported(StringView name) throws -> void;
   fn unmark_exported(StringView name) throws -> void;
   pure fn is_exported(StringView name) const wontthrow -> bool;
 
-  /* Re-point the exported set after an environment value is restored, adding
-     the name when the restore writes a value and removing it when the restore
-     unsets, the way a subshell exit and a command-prefix teardown both rewind
-     the environment. */
+  /* Re-point the exported set after an environment value is restored, adding the
+     name when the restore writes a value and removing it when it unsets. */
   fn sync_exported_after_restore(StringView name, bool has_value) throws
       -> void;
 
   /* Set IFS and refresh the separator table together, so the table never drifts
-     from the cached value. A prefix IFS=... for a command applies it for the
-     command's duration and restores it after, the way a prefix PATH=... re-aims
-     the resolver. */
+     from the cached value. */
   fn set_field_separators(StringView value) throws -> void;
   fn get_variable_value(StringView name) const throws -> Maybe<String>;
 
-  /* The stored value of a plain shell variable, or nullptr when the name is
-     unset or names a special parameter. The pointer reads the value without a
-     copy and stays valid until the next assignment to that name. */
+  /* The stored value of a plain shell variable, or nullptr when unset or a
+     special parameter. Valid until the next assignment to that name. */
   hot fn lookup_shell_variable(StringView name) const wontthrow
       -> const String *
   {
     return m_shell_variables.find(name);
   }
 
-  /* The positional parameters, $1 upward, with $0 separate as the shell name.
-   */
+  /* The positional parameters, $1 upward, $0 separate as the shell name. */
   pure fn positional_params() const wontthrow -> const ArrayList<String> &;
   fn set_positional_params(ArrayList<String> params) wontthrow -> void;
 
-  /* Move the positional parameters out, leaving the store empty, so a function
-     call saves the caller's parameters without a deep copy and restores them by
-     moving the saved list back. */
+  /* Move the positional parameters out, so a function call saves the caller's
+     without a deep copy and restores them by moving the saved list back. */
   fn take_positional_params() wontthrow -> ArrayList<String>;
 
   fn set_last_exit_status(i32 status) wontthrow -> void;
@@ -594,37 +539,29 @@ public:
   fn most_recent_job() wontthrow -> job *;
   fn forget_done_jobs() throws -> void;
 
-  /* Poll the jobs, print a bash-style done line for every one that just
-     finished, then forget those entries. The prompt loop calls this before each
-     interactive prompt so a background job reports its completion the way bash
-     reports it, and the caller gates the call on an interactive shell so a
-     script stays silent. */
+  /* Poll the jobs, print a bash-style done line for each just-finished one, then
+     forget those entries. The prompt loop calls this before each interactive
+     prompt, gated on an interactive shell so a script stays silent. */
   fn notify_done_jobs() throws -> void;
-  /* The Done lines notify_done_jobs prints, with the caller's line ending,
-     so the editor's wake hook prints \r\n rows while the terminal sits in
-     raw mode. The finished jobs are forgotten either way. */
+  /* The Done lines notify_done_jobs prints, with the caller's line ending, so
+     the editor's wake hook prints \r\n rows in raw mode. */
   fn format_done_job_notifications(StringView line_ending) throws -> String;
 
-  /* monitor mode is set -m. It is on by default in an interactive shell, and it
-     gates the terminal handoff so a non-interactive run never touches the
-     controlling terminal. */
+  /* monitor mode is set -m, on by default in an interactive shell. It gates the
+     terminal handoff so a non-interactive run never touches the controlling
+     terminal. */
   fn set_monitor(bool enabled) wontthrow -> void;
   pure fn monitor() const wontthrow -> bool;
 
-  /* notify mode is set -b. The prompt's wake hook reads it and reports a
-     background job's completion immediately, the zsh notify behavior, while
-     off the report waits for the next prompt. */
+  /* notify mode is set -b. The prompt's wake hook reports a background job's
+     completion immediately, the zsh behavior, while off it waits for the prompt. */
   fn set_notify(bool enabled) wontthrow -> void;
   pure fn notify() const wontthrow -> bool;
 
-  /* Shell functions live in the parse arena, so the table is cleared before
-     each top-level parse to avoid pointing at freed storage. A function shadows
-     a builtin and a program of the same name. */
-  /* Registers a function and keeps a copy of its definition text, the source
-     span from the name to the body's close, which declare -f prints back.
-     The body start and the location stamp map the body's absolute positions
-     onto that copy, so a diagnostic inside a later call renders against it
-     with the defining file's name and line numbers. */
+  /* Registers a function and keeps a copy of its definition text, the span from
+     the name to the body's close that declare -f prints back. The body start and
+     location stamp map the body's absolute positions onto that copy, so a
+     diagnostic in a later call renders against it. */
   fn register_function(StringView name, const Expression *body,
                        StringView definition_text, usize body_start_position,
                        SourceLocation definition_location) throws -> void;
@@ -633,12 +570,10 @@ public:
   fn find_function_source(StringView name) const wontthrow -> const String *;
   fn function_definition_info_of(StringView name) const wontthrow
       -> const function_definition_info *;
-  /* The text and the mapping a location renders against. The current source
-     with identity numbering when the location indexes it, otherwise the
-     innermost function's definition copy with its window when the location
-     falls inside that body, the case of a function called after its
-     defining file's text was freed. Resolved only when a diagnostic or a
-     LINENO read fires, so a function call pays nothing for it. */
+  /* The text and mapping a location renders against. The current source with
+     identity numbering when the location indexes it, otherwise the innermost
+     function's definition copy with its window. Resolved only when a diagnostic
+     or a LINENO read fires. */
   struct resolved_render_source
   {
     const String *text{nullptr};
@@ -662,19 +597,16 @@ public:
      knows a function defined earlier resolves. */
   fn function_names() const throws -> HashSet;
 
-  /* Programmable completion. register_completion_spec records what the complete
-     builtin registers for a command, lookup returns it for the engine, and
-     run_completion_function calls a -F function with the COMP_ variables set
-     and returns the COMPREPLY entries it produced. */
+  /* Programmable completion. register records what complete sets for a command,
+     lookup returns it, and run_completion_function calls a -F function with the
+     COMP_ variables set and returns its COMPREPLY entries. */
   fn register_completion_spec(StringView command, completion_spec spec) throws
       -> void;
   pure fn lookup_completion_spec(StringView command) const wontthrow
       -> const completion_spec *;
-  /* The default completion that complete -D registers, used when no command
-     specific spec exists. bash-completion registers its dynamic loader this
-     way, so the engine runs it on an unknown command, the loader sources the
-     per command file and returns 124 to ask for a retry against the now
-     registered spec. */
+  /* The default completion complete -D registers, used when no command-specific
+     spec exists. bash-completion registers its dynamic loader this way, the
+     loader sources the per-command file and returns 124 to ask for a retry. */
   fn register_default_completion_spec(completion_spec spec) throws -> void;
   pure fn default_completion_spec() const wontthrow -> const completion_spec *;
   /* The whole spec table, read by complete -p to replay the registrations. */
@@ -690,14 +622,10 @@ public:
                              StringView line, usize point,
                              i32 *out_exit_status = nullptr) throws
       -> ArrayList<String>;
-  /* The bash -W word list semantics. The list text undergoes the shell
-     expansions and splits into fields, so '"${options[@]}"' reaches the
-     caller's array. complete -W and compgen -W both route through here so
-     the two paths cannot diverge. A list with no expansion byte splits plain
-     with no parse, the common shape, and a list that fails to parse splits
-     plain too rather than erroring out of a completion. allow_expansion off
-     keeps the plain split for the per-keystroke ghost path, which must not
-     parse on every key. */
+  /* The bash -W word list semantics. The list undergoes shell expansion and
+     splits into fields. complete -W and compgen -W both route through here. A
+     list with no expansion byte, or one that fails to parse, splits plain.
+     allow_expansion off keeps the plain split for the per-keystroke ghost path. */
   fn expand_wordlist_to_fields(StringView wordlist,
                                bool allow_expansion = true) throws
       -> ArrayList<String>;
@@ -725,14 +653,11 @@ public:
      terminal command and lets the trap run before the shell exits. */
   fn has_exit_trap() const wontthrow -> bool;
 
-  /* A real shell process runs its EXIT trap as it exits, so a forked subshell
-     runs its own EXIT trap at its end. This shell isolates a subshell by
-     snapshot rather than a fork, so the boundary clears the inherited EXIT
-     action on entry and fires whatever EXIT action the subshell set on exit.
-     The clear keeps the inherited parent action from firing at the subshell's
-     end, and the run happens before restore_state brings the parent table back.
-     The global one-shot guard run_exit_trap uses is left untouched, so the
-     parent still runs its own EXIT trap once when the shell ends. */
+  /* A subshell runs its own EXIT trap at its end. This shell isolates by
+     snapshot rather than fork, so the boundary clears the inherited EXIT action
+     on entry and fires the subshell's own on exit, before restore_state brings
+     the parent table back. The parent still runs its own EXIT trap once at the
+     shell's end. */
   fn clear_inherited_exit_trap() throws -> void;
   fn run_subshell_exit_trap() throws -> void;
 
@@ -745,25 +670,20 @@ public:
   fn is_readonly(StringView name) const wontthrow -> bool;
   fn readonly_names() const throws -> ArrayList<String>;
 
-  /* declare -i marks a variable so every assignment to it evaluates the value
-     as an arithmetic expression and stores the decimal result. declare +i and
-     unset clear the mark. The set is usually empty, the same way the readonly
-     set is. */
+  /* declare -i marks a variable so every assignment evaluates the value as
+     arithmetic and stores the decimal result. declare +i and unset clear it. */
   fn mark_integer(StringView name) throws -> void;
   fn unmark_integer(StringView name) throws -> void;
   fn is_integer_variable(StringView name) const wontthrow -> bool;
-  /* Joins an appended arithmetic expression onto the prior value already in
-     joined, a plus then the expression in parentheses so its own precedence
-     and commas stay self-contained, the way bash adds the two evaluations. A
-     blank expression joins as a plus zero, the way bash leaves the value
-     unchanged. */
+  /* Joins an appended arithmetic expression onto the prior value in joined, a
+     plus then the expression in parentheses so its precedence stays
+     self-contained. A blank expression joins as plus zero. */
   fn append_integer_expression(String &joined,
                                StringView expression) const throws -> void;
 
-  /* A function call pushes a local scope so a local builtin inside it can
-     shadow a variable and have the old value restored when the call returns.
-     declare_local records the current binding of a name in the innermost scope
-     before the caller overwrites it. */
+  /* A function call pushes a local scope so a local builtin can shadow a
+     variable and restore it on return. declare_local records the current binding
+     in the innermost scope before the overwrite. */
   fn enter_function_scope() throws -> void;
   fn leave_function_scope() throws -> void;
   /* The function-call name stack behind FUNCNAME, pushed by the call and
@@ -808,17 +728,13 @@ public:
   fn leave_subshell() wontthrow -> void;
   pure fn in_subshell() const wontthrow -> bool;
   /* Back the descriptor up before a bare exec moves it inside an in-process
-     subshell, so leave_subshell restores it and the move never leaks to the
-     parent the way a fork would have contained it. The first backup of a
-     descriptor per subshell wins, since it saw the original state. Outside a
-     subshell this is a no-op and the move stays permanent. */
+     subshell, so leave_subshell restores it. The first backup per subshell wins.
+     Outside a subshell this is a no-op and the move stays permanent. */
   fn snapshot_subshell_descriptor(i32 shell_fd) throws -> void;
 
-  /* The control-flow channel the break, continue, return, and exit builtins
-     write instead of throwing. A request records where it was made against the
-     current source, so an escaped jump points a caret at the builtin. The
-     tree-walk checks has_pending_control_flow after each child and consumes the
-     request at the matching loop, function, or subshell boundary. */
+  /* The control-flow channel break, continue, return, and exit write instead of
+     throwing. A request records where it was made for an escaped-jump caret. The
+     tree-walk consumes it at the matching loop, function, or subshell boundary. */
   fn request_break(i64 level, SourceLocation location) throws -> void;
   fn request_continue(i64 level, SourceLocation location) throws -> void;
   fn request_return(i64 status, SourceLocation location) throws -> void;
@@ -828,25 +744,21 @@ public:
   pure fn pending_control_flow() const wontthrow -> const control_flow &;
   fn clear_control_flow() wontthrow -> void;
 
-  /* The source currently being evaluated and its human name, so a control-flow
-     request or a deferred report formats a caret against the right text. Set
-     around a top-level run and around a sourced run, restoring the previous
-     frame afterwards. */
+  /* The source currently being evaluated and its name, so a deferred report
+     formats a caret against the right text. Set around a top-level and a sourced
+     run, restoring the previous frame after. */
   fn set_current_source(const String *source, String origin) wontthrow -> void;
   pure fn current_source() const wontthrow -> const String *;
   pure fn current_origin() const wontthrow -> const String &;
   /* Print the source backtrace, every dot or eval call site from the innermost
-     out, as context under a diagnostic. It prints nothing at the top level
-     where no source is on the stack. A frame at error_location is dropped,
-     since the error already printed a caret there and a second one repeats it.
-   */
+     out, as context under a diagnostic. A frame at error_location is dropped to
+     avoid repeating the caret the error already printed. */
   fn print_source_backtrace(
       Maybe<SourceLocation> error_location = None) const throws -> void;
 
-  /* The byte offset in the current source of the command being evaluated, the
-     position $LINENO reports the line of. A SimpleCommand and an assignment set
-     it as evaluation reaches them, which is the statement granularity autoconf
-     reads $LINENO at. */
+  /* The byte offset of the command being evaluated, the position $LINENO reports
+     the line of. A SimpleCommand and an assignment set it, the statement
+     granularity autoconf reads $LINENO at. */
   fn set_current_location(SourceLocation location) wontthrow -> void;
 
   /* The set builtin toggles these options at run time. error_exit is set -e,
@@ -1776,7 +1688,8 @@ class ExecContext
 {
 public:
   static fn make_from(SourceLocation location, ArrayList<String> &&args,
-                      mimic_mood mood) throws -> ExecContext;
+                      mimic_mood mood, bool is_shitbox_enabled) throws
+      -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution and
