@@ -62,6 +62,7 @@ public:
     Find,
     Which,
     WhoAmI,
+    Unlink,
   };
 
   pure virtual Kind kind() const wontthrow = 0;
@@ -107,15 +108,16 @@ inline constexpr StaticStringMap<Utility::Kind>::entry SHITBOX_ENTRIES[] = {
     {SSK("find"),     Utility::Kind::Find    },
     {SSK("which"),    Utility::Kind::Which   },
     {SSK("whoami"),   Utility::Kind::WhoAmI  },
+    {SSK("unlink"),   Utility::Kind::Unlink  },
 };
 
 inline constexpr StaticStringMap<Utility::Kind> SHITBOX_UTILS{
     SHITBOX_ENTRIES, sizeof(SHITBOX_ENTRIES) / sizeof(SHITBOX_ENTRIES[0])};
 
 /* The number of Utility::Kind values, the bound of the per-utility flag-list
-   table. WhoAmI is the last enumerator. */
+   table. Unlink is the last enumerator. */
 inline constexpr usize SHITBOX_UTIL_COUNT =
-    static_cast<usize>(Utility::Kind::WhoAmI) + 1;
+    static_cast<usize>(Utility::Kind::Unlink) + 1;
 
 /* The FLAG_LIST of a utility, registered at static-init time by the
    REGISTER_SHITBOX_UTIL_FLAGS line in its file, so the completion engine offers
@@ -238,7 +240,8 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Make);                                                                \
   U_CASE(Find);                                                                \
   U_CASE(Which);                                                               \
-  U_CASE(WhoAmI)
+  U_CASE(WhoAmI);                                                              \
+  U_CASE(Unlink)
 
 #define UTILITY_STRUCT(u)                                                      \
   class u : public Utility                                                     \
@@ -283,12 +286,18 @@ UTILITY_STRUCT(Make);
 UTILITY_STRUCT(Find);
 UTILITY_STRUCT(Which);
 UTILITY_STRUCT(WhoAmI);
+UTILITY_STRUCT(Unlink);
 
 /* Shared helpers the utilities lean on, so each utility file stays small.
    read_fd_to_string slurps a descriptor, read_named_or_stdin opens a path or
    reads the command's input for a "-" operand, and write_all_to_stdout sends a
    buffer to the command's standard output. */
 fn read_fd_to_string(os::descriptor fd) throws -> String;
+
+/* Remove a path, descending into a directory first when recursive, the shared
+   removal the rm and unlink utilities run. Returns false on the first failure
+   with the reason in os::last_system_error_message. */
+fn remove_path(StringView path, bool is_recursive) throws -> bool;
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
     -> Maybe<String>;
 

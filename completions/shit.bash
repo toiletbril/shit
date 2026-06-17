@@ -65,7 +65,7 @@ complete -o filenames -F _shit_complete shit
 # script runs under a normal bash where ls and the rest are the real tools.
 _shitbox_utils="basename cat cp dirname du env find grep head killall ln \
 ls make mkdir mv pkill ps realpath rm rmdir seq sleep sort tail tee touch tr \
-uniq wc which whoami yes"
+uniq unlink wc which whoami yes"
 
 _shitbox_util_flags()
 {

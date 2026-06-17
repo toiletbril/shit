@@ -33,3 +33,9 @@ echo "--- realpath lexical ---"
 "$BIN" -c 'shitbox rmdir a/b'
 echo "--- ls a after rmdir ---"
 "$BIN" -c 'shitbox ls a'
+echo "--- unlink removes a single file ---"
+"$BIN" -c 'shitbox touch victim; shitbox unlink victim; echo "unlink rc=$?"'
+"$BIN" -c 'shitbox ls' | grep -c victim
+echo "--- unlink a directory fails ---"
+"$BIN" -c 'shitbox unlink a' 2>&1
+echo "rc=$?"

@@ -24,17 +24,16 @@ namespace shit {
 
 namespace shitbox {
 
-/* Remove a path, descending into a directory first when recursive. Returns
-   false on the first failure with the reason in last_system_error_message. */
-static fn remove_path(StringView path, bool recursive) throws -> bool
+/* Declared in Shitbox.hpp and shared with unlink. */
+fn remove_path(StringView path, bool is_recursive) throws -> bool
 {
   let const target = Path{path};
-  if (recursive && target.is_directory() && !target.is_symbolic_link()) {
+  if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
     Maybe<ArrayList<String>> names = Path::read_directory(target);
     if (names.has_value())
       for (const String &name : *names) {
         let const child = PathBuilder{path}.append(name.view()).build();
-        if (!remove_path(child.text().view(), recursive)) return false;
+        if (!remove_path(child.text().view(), is_recursive)) return false;
       }
     return os::remove_directory(path);
   }

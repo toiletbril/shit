@@ -20,3 +20,11 @@ libfoo
 --- realpath lexical ---
 /usr/lib
 --- ls a after rmdir ---
+--- unlink removes a single file ---
+unlink rc=0
+0
+--- unlink a directory fails ---
+shit: 1:1: error: unlink: cannot unlink 'a': it is a directory.
+     1 |  shitbox unlink a
+       |  ^~~~~~~~~~~~~~~~ here.
+rc=1
