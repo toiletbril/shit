@@ -12,10 +12,10 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[name[=value] ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The readonly builtin marks each named variable so a later assignment to "
-    "it "
-    "fails, assigning the value first when an operand carries an equals sign. "
-    "With no operand it lists every read-only variable and its value.");
+    "The readonly builtin marks each named variable read-only. A later "
+    "assignment to it fails, and an operand with an equals sign assigns the "
+    "value first. With no operand it lists every read-only variable and its "
+    "value.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

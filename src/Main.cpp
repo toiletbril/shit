@@ -61,16 +61,12 @@ FLAG(IGNORED1, Bool, 'h', "\0", Posix, "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", Posix, "Ignored, left for compatibility.");
 
 FLAG(RCFILE, String, '\0', "rcfile", Bash,
-     "Source FILE as the interactive rc instead of ~/.bashrc, the way bash "
-     "reads "
-     "a named rc. The shit rc still runs, and a non-interactive run reads no "
-     "rc.");
+     "Source FILE as the interactive rc instead of ~/.bashrc. The shit rc still "
+     "runs, and a non-interactive run reads no rc.");
 FLAG(
     PRIVILEGED, Bool, 'p', "privileged", Bash,
-    "Run in privileged mode and skip every startup config file, so a config a "
-    "less-privileged user controls cannot run with raised privileges. Turned "
-    "on automatically when the effective and the real user or group id differ, "
-    "the setuid or setgid case.");
+    "Run in privileged mode and skip every startup config file. Turned on "
+    "automatically when the effective and the real user or group id differ.");
 
 FLAG(MOOD, String, 'M', "mood", Compat,
      "Select the runtime mood, one of 'shit', 'bash', or 'sh'. The default "
@@ -91,13 +87,10 @@ FLAG(
 FLAG(
     MIMICRY, Bool, 'I', "mimicry", Compat,
     "Mimic the shell a script's shebang names, for speed. A program whose "
-    "shebang is a shell shit can emulate runs in-process in the matching mode "
-    "rather than launching the shell, so a script-heavy run skips the fork and "
-    "the shell startup, where sh and dash run in POSIX mode, bash in bash "
-    "mode, "
-    "and shit in the default mode. A zsh, ksh, fish, or non-shell shebang "
-    "still "
-    "launches the real program.");
+    "shebang is a shell shit can emulate runs in-process in the matching mode. "
+    "sh and dash run in POSIX mode, bash in bash mode, and shit in the default "
+    "mode. A zsh, ksh, fish, or non-shell shebang still launches the real "
+    "program.");
 FLAG(DUMB, Bool, '\0', "dumb", Compat,
      "Makes shit extremely dumb. Equals to --mood sh -T --no-diagnostics.");
 
@@ -107,13 +100,13 @@ FLAG(WARNINGS, Bool, 'W', "force-warnings", Shit,
 FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Shit,
      "List the shellcheck-style checks the analysis stage reports, then exit.");
 FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Shit,
-     "Skip the analysis stage, so no warnings or pre-run diagnostics are "
-     "reported and evaluation begins sooner.");
+     "Skip the analysis stage. No warnings or pre-run diagnostics are "
+     "reported.");
 FLAG(
     SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
     "Suppress diagnostics and warnings only while the startup profiles and rc "
-    "files source, then restore them for the prompt. Pairs with -W so a strict "
-    "shell loads a lax bash config quietly yet keeps its checks afterward.");
+    "files source, then restore them for the prompt. Pairs with -W to load a lax "
+    "bash config quietly yet keep the checks afterward.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
      "Disable interactive tab completion and ghost-text.");
 FLAG(ENABLE_SHITBOX, Bool, '\0', "enable-shitbox", Shit,
@@ -145,8 +138,7 @@ FLAG(LOG, String, 'X', "debug-logging", Debug,
      "'all'. An unknown spelling is an error.");
 FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file", Debug,
      "Create the named file when missing and append the debug log to it "
-     "instead of stderr, so an interactive session logs without painting "
-     "over the prompt.");
+     "instead of stderr, keeping an interactive session's log off the prompt.");
 FLAG(DEBUG_COMPLETE_AT, String, '\0', "debug-complete-at", Debug,
      "Print the completion candidates for the given line with the cursor at "
      "its end, one per line the way an explicit tab lists them, after every "
@@ -238,9 +230,8 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';
     h += wrap_text(
-        "Options are also read from the SHIT_FLAGS environment variable, so a "
-        "flag set there is inherited by every invocation, while a flag given "
-        "on the command line still has the final say.\n\n",
+        "Options are also read from the SHIT_FLAGS environment variable. A flag "
+        "on the command line overrides one set there.\n\n",
         HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_flag_help(FLAG_LIST);
     h += '\n';

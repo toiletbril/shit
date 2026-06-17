@@ -11,8 +11,8 @@ HELP_SYNOPSIS_DECL("[-n count] [file ...]");
 
 HELP_DESCRIPTION_DECL(
     "The head utility writes the first count lines of each file, ten by "
-    "default, reading standard input when no file is given. It stops reading "
-    "once it has the lines it needs, so it never drains an endless input.");
+    "default, reading standard input when no file is given. It stops once it "
+    "has the lines it needs.");
 
 FLAG(HEAD_LINES, String, 'n', "", "Write the first count lines.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

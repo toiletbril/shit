@@ -13,10 +13,9 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-o option] [-DEI] [+o option] [name ...]");
 HELP_DESCRIPTION_DECL(
-    "The compopt builtin changes the completion options of each named command, "
-    "the way a bash completion function adjusts its own behavior. The shell "
-    "accepts the call so a completion function runs, while the interactive "
-    "completion engine does not yet consult these options, so it is a no-op.");
+    "The compopt builtin changes the completion options of each named command. "
+    "The shell accepts the call, while the interactive completion engine does "
+    "not yet consult these options. It is a no-op.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

@@ -13,7 +13,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-r] [name ...]");
 HELP_DESCRIPTION_DECL(
     "The hash builtin manages the cache of resolved command locations. With -r "
-    "it forgets every remembered location so the next use of each command "
+    "it forgets every remembered location. The next use of each command "
     "re-resolves it on PATH.");
 
 FLAG(RESET, Bool, 'r', "", "Forget remembered command locations.");
