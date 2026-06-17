@@ -162,7 +162,9 @@ dashdiff bashdiff mimicrydiff: SHELL := bash
 # unmatched glob is fatal, so the dash comparison runs shit with --mood sh where
 # those strictnesses are off and the behavior tracks dash.
 dashdiff: $(BIN)
-	@for f in $(SH_COMPAT); do \
+	@command -v $(DASH) >/dev/null 2>&1 || \
+		{ printf "	%-64s skipped, no $(DASH)\n" dashdiff; exit 0; }; \
+	for f in $(SH_COMPAT); do \
 		s="$$($(BIN) --mood sh "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
 		alt="$${f%.sh}_1.sh"; \
@@ -191,7 +193,9 @@ BASH_COMPAT := $(filter-out %_1.bash,$(wildcard bash/*.bash))
 # the other version's output, so the test passes when shit matches the local
 # bash on NAME.bash or matches bash running NAME_1.bash.
 bashdiff: $(BIN)
-	@for f in $(BASH_COMPAT); do \
+	@command -v $(BASH) >/dev/null 2>&1 || \
+		{ printf "	%-64s skipped, no $(BASH)\n" bashdiff; exit 0; }; \
+	for f in $(BASH_COMPAT); do \
 		s="$$($(BIN) --mood bash "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
 		alt="$${f%.bash}_1.bash"; \
@@ -216,7 +220,7 @@ bashdiff: $(BIN)
 # sh script against dash, since the POSIX mood targets dash semantics. stderr is
 # dropped, so a shifted diagnostic line number does not affect the comparison.
 mimicrydiff: $(BIN)
-	@for f in $(BASH_COMPAT); do \
+	@if command -v $(BASH) >/dev/null 2>&1; then for f in $(BASH_COMPAT); do \
 		s="$$($(BIN) -I -c "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
 		alt="$${f%.bash}_1.bash"; \
@@ -231,8 +235,8 @@ mimicrydiff: $(BIN)
 				<(printf '%s' "$$s") <(printf '%s' "$$b") >> $(FAILED_LIST); \
 			printf "	%-64s mimic FAILED :c\n" "$$f"; \
 		fi; \
-	done; \
-	for f in $(SH_COMPAT); do \
+	done; else printf "	%-64s skipped, no $(BASH)\n" mimicrydiff; fi; \
+	if command -v $(DASH) >/dev/null 2>&1; then for f in $(SH_COMPAT); do \
 		s="$$($(BIN) -I -c "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
 		alt="$${f%.sh}_1.sh"; \
@@ -247,7 +251,7 @@ mimicrydiff: $(BIN)
 				<(printf '%s' "$$s") <(printf '%s' "$$d") >> $(FAILED_LIST); \
 			printf "	%-64s mimic FAILED :c\n" "$$f"; \
 		fi; \
-	done
+	done; else printf "	%-64s skipped, no $(DASH)\n" mimicrydiff; fi
 
 # Time the builtin-only configure script through each shell, after checking that
 # the output is identical. Use the optimized shit build, MODE=rel, for a
