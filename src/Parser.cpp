@@ -995,8 +995,15 @@ hot fn Parser::parse_simple_command() throws -> Command *
       if (is_brace_word(token, '}')) return nullptr;
 
       /* [[ arrives as an ordinary word, so it is matched on the text before the
-         kind switch, the way the braces are. */
+         kind switch, the way the braces are. The sh mood is POSIX, where [[ is
+         not a keyword, so the conditional is rejected there. */
       if (is_unquoted_word(token, "[[")) {
+        if (m_lexer.is_posix_mode()) {
+          throw ErrorWithLocation{
+              token->source_location(),
+              "The [[ conditional is a bash extension that the sh mood does not "
+              "provide"};
+        }
         return attach_trailing_redirections(parse_conditional_command());
       }
 
@@ -1016,8 +1023,15 @@ hot fn Parser::parse_simple_command() throws -> Command *
       case Token::Kind::Case: return attach_trailing_redirections(parse_case());
       case Token::Kind::LeftParen:
         return attach_trailing_redirections(parse_paren_command());
-      case Token::Kind::DoubleLeftSquareBracket:
+      case Token::Kind::DoubleLeftSquareBracket: {
+        if (m_lexer.is_posix_mode()) {
+          throw ErrorWithLocation{
+              token->source_location(),
+              "The [[ conditional is a bash extension that the sh mood does not "
+              "provide"};
+        }
         return attach_trailing_redirections(parse_conditional_command());
+      }
 
       case Token::Kind::Then:
       case Token::Kind::Do:
