@@ -1,0 +1,7 @@
+== make targets without gnu make:
+all
+build
+clean
+test
+== make by prefix:
+clean
