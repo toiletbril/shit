@@ -3,9 +3,6 @@
 #include "Platform.hpp"
 #include "Trace.hpp"
 
-#include <cerrno>
-#include <cstdlib>
-
 #if SHIT_PLATFORM_IS POSIX
 #include <dirent.h>
 #include <sys/stat.h>
@@ -319,7 +316,8 @@ cold fn Path::current_directory() throws -> Path
   LOG(Debug, "reading the current working directory");
   let buffer = ArrayList<char>{};
   usize buffer_size = 4096;
-  for (;;) {
+  loop
+  {
     buffer.reserve(buffer_size);
     errno = 0;
     if (::getcwd(buffer.begin(), buffer_size) != nullptr)
@@ -350,7 +348,8 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
      so errno is cleared before each call. A NULL with a changed errno is a real
      error, which returns None rather than a truncated list the caller would
      mistake for the whole directory. */
-  for (;;) {
+  loop
+  {
     errno = 0;
     let const entry = ::readdir(handle);
     if (entry == nullptr) {
@@ -381,7 +380,8 @@ cold fn Path::read_directory_typed(const Path &dir) throws
   if (handle == nullptr) return None;
 
   let entries = ArrayList<directory_child>{};
-  for (;;) {
+  loop
+  {
     errno = 0;
     let const entry = ::readdir(handle);
     if (entry == nullptr) {

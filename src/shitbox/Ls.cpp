@@ -9,7 +9,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a1lh] [path ...]");
+HELP_SYNOPSIS_DECL("[-aA1lh] [path ...]");
 
 HELP_DESCRIPTION_DECL(
     "The ls utility lists the names in each directory operand, or the current "
@@ -19,6 +19,8 @@ HELP_DESCRIPTION_DECL(
     "is not a terminal.");
 
 FLAG(LS_ALL, Bool, 'a', "", "List entries whose name starts with a dot.");
+FLAG(LS_ALMOST_ALL, Bool, 'A', "",
+     "List dot entries but not the . and .. directory entries.");
 FLAG(LS_ONE, Bool, '1', "", "List one entry per line.");
 FLAG(LS_LONG, Bool, 'l', "",
      "Print the mode, owner, group, size, and time before each name.");
@@ -332,16 +334,23 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       output += ":\n";
     }
 
+    /* -a shows every entry including the dot files, -A shows the dot files but
+       not the . and .. directory entries, and the plain listing hides any dot
+       name. */
+    let const is_showing_all = FLAG_LS_ALL.is_enabled();
+    let const is_showing_dot_names =
+        is_showing_all || FLAG_LS_ALMOST_ALL.is_enabled();
+
     ArrayList<StringView> visible_names{};
     /* The dot and dot-dot entries are not in the directory read, so -a adds
-       them up front the way coreutils lists them before the rest. */
-    if (FLAG_LS_ALL.is_enabled()) {
+       them up front the way coreutils lists them before the rest, while -A
+       leaves them out. */
+    if (is_showing_all) {
       visible_names.push(StringView{"."});
       visible_names.push(StringView{".."});
     }
     for (const String &name : *names) {
-      if (!FLAG_LS_ALL.is_enabled() && !name.is_empty() &&
-          name.view()[0] == '.')
+      if (!is_showing_dot_names && !name.is_empty() && name.view()[0] == '.')
         continue;
       visible_names.push(name.view());
     }

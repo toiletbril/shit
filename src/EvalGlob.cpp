@@ -528,7 +528,7 @@ hot fn EvalContext::expand_path(glob_field field,
   /* Sort the matches in byte order, which is the POSIX collating order in the C
      locale and what dash produces. A plain compare also keeps a large expansion
      from spending most of its time in the sort comparator. */
-  utils::sort_ascending(values);
+  values.sort();
 
   LOG(All, "the glob pattern '%s' matched %zu paths", pattern.c_str(),
       values.count());
@@ -586,7 +586,7 @@ fn EvalContext::expand_glob_lenient(StringView pattern) throws
   input.push(steal(field));
   for (let &f : expand_path_recurse(steal(input)))
     values.push(steal(f.text));
-  utils::sort_ascending(values);
+  values.sort();
   LOG(Debug, "compgen -G probe matched %zu paths", values.count());
   return values;
 }

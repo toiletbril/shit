@@ -266,7 +266,8 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
     /* The body is written into the lexer-owned String the parsed redirection
        points at, so it accumulates as one. */
     let collected = String{};
-    for (;;) {
+    loop
+    {
       if (m_cursor_position >= m_source.length()) break;
 
       const let line_start = m_cursor_position;
@@ -349,7 +350,8 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
 hot flatten forceinline fn Lexer::skip_whitespace() wontthrow -> void
 {
   usize i = 0;
-  for (;;) {
+  loop
+  {
     while (lexer::is_whitespace(chop_character(i)))
       i++;
     /* A backslash before a newline continues the line and both bytes vanish.
@@ -511,7 +513,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     }
   };
 
-  for (;;) {
+  loop
+  {
     const let ch = chop_character(byte_count);
 
     const let is_inside_quote_or_escape =
@@ -695,7 +698,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           }
         };
 
-        for (;;) {
+        loop
+        {
           const char c = chop_character(byte_count);
           if (c == lexer::CEOF) {
             throw ErrorWithLocationAndDetails{
@@ -844,7 +848,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           byte_count++;
           let arithmetic = String{};
           usize group_depth = 0;
-          for (;;) {
+          loop
+          {
             const let c = chop_character(byte_count);
             if (c == lexer::CEOF) [[unlikely]] {
               throw ErrorWithLocationAndDetails{
@@ -868,7 +873,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
               const let quote = c;
               arithmetic += c;
               byte_count++;
-              for (;;) {
+              loop
+              {
                 const let q = chop_character(byte_count);
                 if (q == lexer::CEOF) break;
                 arithmetic += q;
@@ -886,7 +892,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             } else if (c == '`') {
               arithmetic += c;
               byte_count++;
-              for (;;) {
+              loop
+              {
                 const let b = chop_character(byte_count);
                 if (b == lexer::CEOF) break;
                 arithmetic += b;
@@ -911,7 +918,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
               byte_count++;
               usize paren_depth = 1;
               char nested_quote = 0;
-              for (;;) {
+              loop
+              {
                 const let p = chop_character(byte_count);
                 if (p == lexer::CEOF) break;
                 arithmetic += p;
@@ -974,7 +982,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
            a word can be told from one inside a word. A zero sentinel marks the
            start of the substitution, where a '#' also starts a word. */
         char previous_char = 0;
-        for (;;) {
+        loop
+        {
           const let c = chop_character(byte_count);
           if (c == lexer::CEOF) [[unlikely]] {
             throw ErrorWithLocationAndDetails{
@@ -1016,7 +1025,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
                previous_char == '\n'))
           {
             inner += c;
-            for (;;) {
+            loop
+            {
               const let comment_char = chop_character(byte_count);
               if (comment_char == lexer::CEOF || comment_char == '\n') {
                 break;
@@ -1061,7 +1071,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
            its bytes literal, so a } inside any of them is never counted. */
         usize brace_depth = 1;
         char quote = 0;
-        for (;;) {
+        loop
+        {
           const let c = chop_character(byte_count);
           if (c == lexer::CEOF) [[unlikely]] {
             throw ErrorWithLocationAndDetails{
@@ -1097,7 +1108,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           }
           if (c == '`') {
             name += c;
-            for (;;) {
+            loop
+            {
               const let b = chop_character(byte_count);
               if (b == lexer::CEOF) break;
               byte_count++;
@@ -1123,7 +1135,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             byte_count++;
             usize paren_depth = 1;
             char nested_quote = 0;
-            for (;;) {
+            loop
+            {
               const let p = chop_character(byte_count);
               if (p == lexer::CEOF) break;
               byte_count++;
@@ -1222,7 +1235,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       const let relative_open_backtick_pos = byte_count;
       byte_count++;
       let inner = String{};
-      for (;;) {
+      loop
+      {
         const let c = chop_character(byte_count);
         if (c == lexer::CEOF) [[unlikely]] {
           throw ErrorWithLocationAndDetails{
@@ -1533,7 +1547,8 @@ hot fn Lexer::lex_process_substitution(char direction) throws -> Token *
 
   usize depth = 1;
   char quote = 0;
-  for (;;) {
+  loop
+  {
     const char c = chop_character(byte_count);
     if (c == lexer::CEOF) [[unlikely]] {
       throw ErrorWithLocationAndDetails{

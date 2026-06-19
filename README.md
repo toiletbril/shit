@@ -101,6 +101,16 @@ $ make
 $ ./shit --help
 ```
 
+`make install` builds the release binary and installs it, the man page, and the
+bash completion under `PREFIX`, which defaults to `/usr/local`. `DESTDIR` stages
+the tree under a packaging root, `PREFIX` moves the install root, and
+`INSTALL_MOOD_SYMLINKS="sh bash dash"` adds the mood symlinks next to the binary.
+`make uninstall` removes everything the install placed.
+```bash
+$ make install PREFIX=/usr/local
+$ make uninstall PREFIX=/usr/local
+```
+
 ## Roadmap
 
 Is it usable?

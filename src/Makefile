@@ -57,6 +57,8 @@ else ifeq ($(MODE), cosmo_dbg)
 CXX := cosmoc++
 else ifeq ($(OS), Windows_NT)
 CXX := clang++
+else ifeq ($(origin CXX), default)
+CXX := clang++
 endif
 
 # If we're cross-compiling, use MingW.
@@ -108,12 +110,13 @@ CXXFLAGS := \
 	-fvisibility=hidden \
 	-fno-rtti \
 	-fno-semantic-interposition \
-	-Bsymbolic \
+	-Wno-unknown-pragmas \
+	-Wl,-Bsymbolic \
 	-fno-strict-aliasing \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
-LINK_LIBS :=
+LINK_LIBS := # nothing
 
 # Speed up the linking a bit.
 ifneq ($(shell which mold > $(DEVNULL) 2>&1),)
@@ -128,12 +131,12 @@ endif
 ifeq ($(MODE), rel)
 CXXFLAGS += \
 	-s \
-	-DNDEBUG \
-	-flto
+	-DNDEBUG
 ifneq ($(TARGET), Windows_NT)
 # TODO: windows optimization fucks up the RAM.
 CXXFLAGS += \
-	-O3
+	-O3 \
+	-flto
 endif
 ifeq ($(TARGET), Linux)
 # macOS ld64 has no fully static link, so static-pie stays Linux-only.
@@ -252,14 +255,47 @@ dirs: $(DIRS)
 shit: dirs
 	$(MAKE) $(OUT)
 
-install: shit
-ifneq ($(TARGET_WINDOWS), 1)
-	install -m 755 $(OUT) /usr/local/bin/shit
-	echo "Installed in '/usr/local/bin/shit'."
-else
+# Install layout. PREFIX is the root, DESTDIR stages a packaging tree under it,
+# and the three directories follow the filesystem hierarchy. The mood symlinks
+# default off, so a plain install never shadows a system sh, bash, or dash, and
+# a packager opts in with INSTALL_MOOD_SYMLINKS="sh bash dash".
+PREFIX ?= /usr/local
+DESTDIR ?=
+bindir ?= $(PREFIX)/bin
+mandir ?= $(PREFIX)/share/man/man1
+bashcompdir ?= $(PREFIX)/share/bash-completion/completions
+INSTALL_MOOD_SYMLINKS ?=
+
+REL_BINARY := ../shit
+MANPAGE := ../docs/shit.1
+BASH_COMPLETION := ../completions/shit.bash
+
+# Install always ships the release binary rather than whatever MODE the caller
+# built, so the optimized artifact lands rather than a sanitizer build.
+install:
+ifeq ($(TARGET), Windows_NT)
 	$(error Unable to figure out install directory for Windows. \
 			Please put '$(realpath ..)' in your PATH manually)
+else
+	$(MAKE) MODE=rel shit
+	mkdir -p "$(DESTDIR)$(bindir)" "$(DESTDIR)$(mandir)" "$(DESTDIR)$(bashcompdir)"
+	install -m 755 $(REL_BINARY) "$(DESTDIR)$(bindir)/shit"
+	install -m 644 $(MANPAGE) "$(DESTDIR)$(mandir)/shit.1"
+	install -m 644 $(BASH_COMPLETION) "$(DESTDIR)$(bashcompdir)/shit"
+	for mood in $(INSTALL_MOOD_SYMLINKS); do \
+		ln -sf shit "$(DESTDIR)$(bindir)/$$mood"; \
+	done
+	echo "Installed shit, its man page, and its bash completion under '$(DESTDIR)$(PREFIX)'."
 endif
+
+uninstall:
+	rm -f "$(DESTDIR)$(bindir)/shit"
+	rm -f "$(DESTDIR)$(mandir)/shit.1"
+	rm -f "$(DESTDIR)$(bashcompdir)/shit"
+	for mood in $(INSTALL_MOOD_SYMLINKS); do \
+		rm -f "$(DESTDIR)$(bindir)/$$mood"; \
+	done
+	echo "Removed shit, its man page, and its bash completion from '$(DESTDIR)$(PREFIX)'."
 
 CLANG_TIDY ?= clang-tidy
 
@@ -280,6 +316,6 @@ clean:
 	rm -rf ../perf*
 	rm -rf ../*.profraw ../*.profdata ../coverage # Coverage
 
-.PHONY: dirs shit install tidy fmt clean
+.PHONY: dirs shit install uninstall tidy fmt clean
 
 -include $(DEPS)

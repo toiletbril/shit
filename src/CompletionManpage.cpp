@@ -860,12 +860,27 @@ static fn help_text_for(StringView command, StringView subcommand = {}) throws
   if (help_argument.has_value() && !paths.is_empty() &&
       command_directory_is_trusted(paths[0].text().view()))
   {
-    /* argv is the absolute path, then the subcommand when one is given, then
-       the help argument split on spaces, so git runs as path, commit, --help.
-     */
+    /* argv is the absolute path, then the subcommand chain split on spaces,
+       then the help argument split on spaces, so git remote add runs as path,
+       remote, add, --help. The chain carries its words space-joined under one
+       key. */
     let argv = ArrayList<String>{};
     argv.push(String{paths[0].text().view()});
-    if (!subcommand.is_empty()) argv.push(String{subcommand});
+    {
+      usize word_start = 0;
+      while (word_start < subcommand.length) {
+        while (word_start < subcommand.length && subcommand[word_start] == ' ')
+          word_start++;
+        let word_end = word_start;
+        while (word_end < subcommand.length && subcommand[word_end] != ' ')
+          word_end++;
+
+        if (word_end > word_start)
+          argv.push(String{subcommand.substring_of_length(
+              word_start, word_end - word_start)});
+        word_start = word_end;
+      }
+    }
     let const argument_view = StringView{*help_argument};
     usize i = 0;
     while (i < argument_view.length) {
@@ -1112,22 +1127,74 @@ static fn help_subcommands_for(StringView command,
       help_cache_key(command, subcommand).view());
 }
 
-/* Whether a word names a subcommand the base command's --help lists, so a
-   second-level fork is reserved for a parsed subcommand rather than an
-   arbitrary word. */
-static fn is_known_help_subcommand(StringView command, StringView word) throws
-    -> bool
+/* Whether a word names a subcommand the chain so far lists, so a deeper fork is
+   reserved for a parsed subcommand rather than an arbitrary word. The prefix is
+   the space-joined chain already walked, empty at the base command. */
+static fn is_known_help_subcommand(StringView command,
+                                   StringView subcommand_prefix,
+                                   StringView word) throws -> bool
 {
-  for (let const &entry : help_subcommands_for(command))
+  for (let const &entry : help_subcommands_for(command, subcommand_prefix))
     if (entry.name.view() == word) return true;
   return false;
+}
+
+/* The depth a subcommand chain forks to, the command plus this many settled
+   subcommand words. A line past it stops forking, so a deep command line cannot
+   fork without bound. */
+static constexpr usize MAX_SUBCOMMAND_DEPTH = 4;
+
+/* The deepest valid subcommand chain on the line, the settled words after the
+   command that each name a subcommand of the chain built so far, joined with a
+   space. The walk stops at the first word that names no known subcommand, at a
+   dash-led word, at the token under the cursor, or at MAX_SUBCOMMAND_DEPTH, so
+   the fork count is bounded. The returned chain keys the option and subcommand
+   caches and splits back into argv at fork time. */
+static fn settled_subcommand_chain(StringView resolved_command, StringView line,
+                                   usize token_start) throws -> String
+{
+  let chain = String{};
+
+  /* The word offsets come from the surface command, a view into line, while the
+     resolved name keys the subcommand lookups. */
+  let const surface_command = command_word_of(line);
+  if (surface_command.is_empty()) return chain;
+
+  usize depth_count = 0;
+  usize i = static_cast<usize>(surface_command.data - line.data) +
+            surface_command.length;
+
+  while (depth_count < MAX_SUBCOMMAND_DEPTH) {
+    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
+      i++;
+    let const start = i;
+    while (i < line.length && line[i] != ' ' && line[i] != '\t')
+      i++;
+
+    /* A word that reaches the token under the cursor is the token itself rather
+       than a settled subcommand, so the chain ends before it. */
+    if (start >= token_start || i > token_start) {
+      break;
+    }
+    if (start == i) break;
+
+    let const word = line.substring_of_length(start, i - start);
+    if (word[0] == '-') break;
+    if (!is_known_help_subcommand(resolved_command, chain.view(), word)) break;
+
+    if (!chain.is_empty()) chain += " ";
+    chain += word;
+    depth_count++;
+  }
+
+  return chain;
 }
 
 /* Completes an option token from the command's --help text, the fallback after
    the manpage stage finds no page. The same explicit-tab and dash-token gates
    hold here. */
-fn complete_from_help(StringView line, StringView token, bool for_listing,
-                      EvalContext &context,
+fn complete_from_help(StringView line, StringView token, usize token_start,
+                      bool for_listing, EvalContext &context,
                       StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
@@ -1142,16 +1209,13 @@ fn complete_from_help(StringView line, StringView token, bool for_listing,
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved_name = resolve_completion_alias(surface_command, context);
 
-  /* A settled second word that names a parsed subcommand forks "command
-     subcommand --help" for its own options, so git commit -<tab> reads the
-     commit options rather than the top-level ones. */
-  let subcommand = StringView{};
-  if (let const second = second_word_of(line);
-      second.has_value() &&
-      is_known_help_subcommand(resolved_name.view(), *second))
-    subcommand = *second;
+  /* The settled subcommand chain forks "command sub1 sub2 --help" for its own
+     options, so git remote add -<tab> reads the add options rather than the
+     top-level ones. An empty chain reads the base command options. */
+  let const chain =
+      settled_subcommand_chain(resolved_name.view(), line, token_start);
 
-  let const &options = help_options_for(resolved_name.view(), subcommand);
+  let const &options = help_options_for(resolved_name.view(), chain.view());
   if (options.is_empty()) return None;
 
   let matches = matches_from_help_entries(options, token, descriptions);
@@ -1180,32 +1244,27 @@ fn complete_from_help_subcommands(StringView line, StringView token,
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved_name = resolve_completion_alias(surface_command, context);
 
-  let subcommand = StringView{};
-  if (is_first_argument_token(line, token_start)) {
-    /* The first-argument token lists the base subcommands. A command the man
-       index already lists never forks --help to relist them, the man stage is
-       authoritative, the fork is reserved for a tool like cargo with no man
-       pages. */
+  /* The settled subcommand chain forks "command sub1 sub2 --help" for its
+     sub-subcommands, so docker compose <tab> lists the compose subcommands. An
+     empty chain at the first-argument position lists the base subcommands. */
+  let const chain =
+      settled_subcommand_chain(resolved_name.view(), line, token_start);
+  if (chain.is_empty()) {
+    if (!is_first_argument_token(line, token_start)) return None;
+
+    /* A command the man index already lists never forks --help to relist them,
+       the man stage is authoritative, the fork is reserved for a tool like
+       cargo with no man pages. */
     if (is_man_subcommand_index_built) {
       let const man_subcommands =
           MAN_SUBCOMMAND_INDEX.find(resolved_name.view());
       if (man_subcommands != nullptr && !man_subcommands->is_empty())
         return None;
     }
-  } else if (let const second = second_word_of(line);
-             second.has_value() &&
-             is_known_help_subcommand(resolved_name.view(), *second))
-  {
-    /* A settled second word that names a parsed subcommand forks "command
-       subcommand --help" for its sub-subcommands, so git remote <tab> lists the
-       remote subcommands. */
-    subcommand = *second;
-  } else {
-    return None;
   }
 
   let const &subcommands =
-      help_subcommands_for(resolved_name.view(), subcommand);
+      help_subcommands_for(resolved_name.view(), chain.view());
   if (subcommands.is_empty()) return None;
 
   let matches = matches_from_help_entries(subcommands, token, descriptions);

@@ -4,8 +4,6 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 
-#include <initializer_list>
-
 namespace shit {
 
 /* A growable array over an explicit allocator, the std::vector replacement. */
@@ -207,7 +205,98 @@ public:
     m_capacity = m_length;
   }
 
+  /* Sort the list in place into ascending order by the comparator, which
+     returns true when its first argument orders before its second. A short list
+     uses an insertion sort, which writes far less than a bubble sort on a small
+     input and exits early when the run is nearly ordered, and a long list uses
+     a heap sort, so a large input stays O(n log n). This is the in-house
+     replacement for std::sort, which the codebase does not link. */
+  template <typename Compare>
+  fn sort(Compare is_less) throws -> void
+  {
+    if (m_length < 2) return;
+
+    if (m_length <= INSERTION_SORT_THRESHOLD)
+      insertion_sort(is_less);
+    else
+      heap_sort(is_less);
+  }
+
+  /* Sort ascending by the element operator<, the common case a caller reaches
+     for when no custom order is needed. */
+  fn sort() throws -> void
+  {
+    sort([](const T &a, const T &b) { return a < b; });
+  }
+
 private:
+  /* The length below which the insertion sort beats the heap sort, since its
+     constant factor is smaller on a short list. */
+  static constexpr usize INSERTION_SORT_THRESHOLD = 16;
+
+  /* Swap two elements by moving through a temporary, so no element is copied.
+   */
+  fn swap_elements(usize a, usize b) wontthrow -> void
+  {
+    T temporary = steal(m_data[a]);
+    m_data[a] = steal(m_data[b]);
+    m_data[b] = steal(temporary);
+  }
+
+  /* A stable insertion sort. It lifts each element out, shifts the larger
+     elements before it up by one, and drops it into the gap, so a nearly
+     ordered list does almost no work. */
+  template <typename Compare>
+  fn insertion_sort(Compare is_less) throws -> void
+  {
+    for (usize i = 1; i < m_length; i++) {
+      T key = steal(m_data[i]);
+      usize j = i;
+      while (j > 0 && is_less(key, m_data[j - 1])) {
+        m_data[j] = steal(m_data[j - 1]);
+        j--;
+      }
+      m_data[j] = steal(key);
+    }
+  }
+
+  /* Restore the max-heap property at root within the first heap_length
+     elements, sinking the root past any larger child. */
+  template <typename Compare>
+  fn sift_down(usize root, usize heap_length, Compare is_less) throws -> void
+  {
+    loop
+    {
+      usize largest = root;
+      let const left = 2 * root + 1;
+      let const right = 2 * root + 2;
+
+      if (left < heap_length && is_less(m_data[largest], m_data[left]))
+        largest = left;
+      if (right < heap_length && is_less(m_data[largest], m_data[right]))
+        largest = right;
+
+      if (largest == root) break;
+
+      swap_elements(root, largest);
+      root = largest;
+    }
+  }
+
+  /* An in-place heap sort. It builds a max-heap, then swaps the largest element
+     to the end and shrinks the heap, leaving the list ascending. */
+  template <typename Compare>
+  fn heap_sort(Compare is_less) throws -> void
+  {
+    for (usize parent = m_length / 2; parent > 0; parent--)
+      sift_down(parent - 1, m_length, is_less);
+
+    for (usize end = m_length; end > 1; end--) {
+      swap_elements(0, end - 1);
+      sift_down(0, end - 1, is_less);
+    }
+  }
+
   fn destroy_all() wontthrow -> void
   {
     for (usize i = 0; i < m_length; i++)

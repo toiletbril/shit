@@ -8,7 +8,6 @@
 /* Currently, Linux, Windows and Cosmopolitan builds are supported. */
 #if defined __linux__ || defined BSD || defined __APPLE__ ||                   \
     defined __COSMOPOLITAN__
-#include <cerrno>
 #include <fcntl.h>
 #include <pthread.h>
 #include <pwd.h>
@@ -36,8 +35,6 @@
 #include "Maybe.hpp"
 #include "Path.hpp"
 #include "String.hpp"
-
-#include <csignal>
 
 namespace shit {
 
@@ -245,6 +242,9 @@ fn enumerate_processes(bool include_resource_stats = false) throws
    utility renders a located error. make_directory takes the permission bits the
    umask still narrows. */
 fn make_directory(StringView path, u32 mode) wontthrow -> bool;
+/* Set the access and the modification times of an existing file to the current
+   time, the touch utility's update path for a file that already exists. */
+fn touch_file_times(StringView path) wontthrow -> bool;
 fn remove_directory(StringView path) wontthrow -> bool;
 fn remove_file(StringView path) wontthrow -> bool;
 fn rename_path(StringView from, StringView to) wontthrow -> bool;
@@ -448,7 +448,12 @@ fn get_home_for_user(StringView username) throws -> Maybe<Path>;
    database cannot be read or the platform has none. */
 fn enumerate_users() throws -> ArrayList<String>;
 
-fn set_default_signal_handlers() throws -> void;
+/* Install the shell signal handlers. The interactive shell blocks the
+   terminal-generated signals so a Ctrl-C, Ctrl-Z, or hangup at the prompt does
+   not take it down, while a non-interactive script leaves those at their
+   default so a SIGTERM or SIGHUP terminates the script the way dash and bash
+   behave. SIGINT routes to the polled handler in both modes. */
+fn set_default_signal_handlers(bool is_interactive) throws -> void;
 
 fn reset_signal_handlers() throws -> void;
 

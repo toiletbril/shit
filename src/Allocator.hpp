@@ -2,8 +2,6 @@
 
 #include "Common.hpp"
 
-#include <cstdlib>
-#include <cstring>
 #include <new>
 
 #if defined(_WIN32)

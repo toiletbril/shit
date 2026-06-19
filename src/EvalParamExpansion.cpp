@@ -1,4 +1,5 @@
 #include "Arena.hpp"
+#include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -9,8 +10,6 @@
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
-
-#include <cctype>
 
 /* The parameter expansion of the evaluator, the ${...} modifier dispatch
    with its default, alternate, trim, substring, replacement, and case

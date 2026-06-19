@@ -744,11 +744,12 @@ fn rule_dead_branch_elimination(const Expression *node,
 fn rule_loop_elimination(const Expression *node, AnalysisContext &actx) throws
     -> bool
 {
-  const expressions::WhileLoop *loop = node->as_while_loop();
-  if (loop == nullptr) return false;
-  if (loop->is_folded_to_skip()) return false;
+  const expressions::WhileLoop *loop_node = node->as_while_loop();
+  if (loop_node == nullptr) return false;
+  if (loop_node->is_folded_to_skip()) return false;
 
-  let const verdict = loop->condition()->try_static_condition_verdict(actx);
+  let const verdict =
+      loop_node->condition()->try_static_condition_verdict(actx);
   if (!verdict.has_value()) {
     LOG(All,
         "the loop fold declines, the condition is not statically decidable");
@@ -756,7 +757,7 @@ fn rule_loop_elimination(const Expression *node, AnalysisContext &actx) throws
   }
 
   let const body_would_run =
-      loop->is_until() ? (*verdict == false) : (*verdict == true);
+      loop_node->is_until() ? (*verdict == false) : (*verdict == true);
   if (body_would_run) {
     LOG(All,
         "the loop fold declines, the body would run under the static verdict");
@@ -764,11 +765,11 @@ fn rule_loop_elimination(const Expression *node, AnalysisContext &actx) throws
   }
 
   LOG(All, "loop elimination folded the %s loop to a skip",
-      loop->is_until() ? "until" : "while");
-  loop->set_folded_to_skip();
+      loop_node->is_until() ? "until" : "while");
+  loop_node->set_folded_to_skip();
   actx.optimizer_folded_loops++;
   if (actx.should_trace_optimizer)
-    actx.trace_optimizer_line(loop->is_until()
+    actx.trace_optimizer_line(loop_node->is_until()
                                   ? String{"folded until loop to a skip"}
                                   : String{"folded while loop to a skip"});
   return true;
@@ -811,20 +812,20 @@ fn rule_eliminate_compound_body(const Expression *node,
 fn rule_eliminate_empty_for(const Expression *node,
                             AnalysisContext &actx) throws -> bool
 {
-  const expressions::ForLoop *loop = node->as_for_loop();
-  if (loop == nullptr) return false;
-  if (loop->is_fully_eliminated()) return false;
+  const expressions::ForLoop *loop_node = node->as_for_loop();
+  if (loop_node == nullptr) return false;
+  if (loop_node->is_fully_eliminated()) return false;
 
   /* A for without an in clause walks the positional parameters, whose count is
      only known at run time, so an empty static word list there proves nothing.
      An explicit empty in clause iterates zero times whatever the arguments are.
    */
-  if (!loop->has_in_clause()) return false;
-  if (!loop->words().is_empty()) return false;
+  if (!loop_node->has_in_clause()) return false;
+  if (!loop_node->words().is_empty()) return false;
 
   LOG(All, "empty for-loop elimination folded a for with an empty in clause to "
            "a no-op");
-  loop->set_fully_eliminated();
+  loop_node->set_fully_eliminated();
   actx.optimizer_eliminated_compounds++;
   if (actx.should_trace_optimizer)
     actx.trace_optimizer_line(String{"eliminated empty for loop"});
@@ -841,13 +842,13 @@ fn rule_eliminate_empty_for(const Expression *node,
 fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
     -> bool
 {
-  const expressions::CStyleForLoop *loop = node->as_cstyle_for_loop();
-  if (loop == nullptr) return false;
-  if (loop->has_folded_condition()) return false;
+  const expressions::CStyleForLoop *loop_node = node->as_cstyle_for_loop();
+  if (loop_node == nullptr) return false;
+  if (loop_node->has_folded_condition()) return false;
 
   /* A blank condition is the for ((;;)) infinite form, which has no value to
      fold and must keep running. */
-  let const condition = loop->condition_clause();
+  let const condition = loop_node->condition_clause();
   let const trimmed = trim_arithmetic_whitespace(condition);
   if (trimmed.length == 0) return false;
 
@@ -865,7 +866,7 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
   let const value = try_fold_constant_arithmetic(trimmed);
   if (!value.has_value()) return false;
 
-  loop->set_folded_condition(*value);
+  loop_node->set_folded_condition(*value);
   LOG(All, "folded the c-style for condition '%.*s' to %lld",
       static_cast<int>(trimmed.length), trimmed.data,
       static_cast<long long>(*value));
@@ -878,7 +879,7 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
   /* A constant zero condition means the body never runs, so the whole loop is a
      proven no-op the body-elimination path skips. */
   if (*value == 0) {
-    loop->set_fully_eliminated();
+    loop_node->set_fully_eliminated();
     actx.optimizer_eliminated_compounds++;
     if (actx.should_trace_optimizer)
       actx.trace_optimizer_line(String{"eliminated c-style for loop"});

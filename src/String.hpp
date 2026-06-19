@@ -6,8 +6,6 @@
 #include "Maybe.hpp"
 #include "StringView.hpp"
 
-#include <cstring>
-
 namespace shit {
 
 /* An owned, growable byte string over an explicit allocator. A short string

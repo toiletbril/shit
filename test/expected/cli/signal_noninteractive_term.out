@@ -1,0 +1,4 @@
+== SIGTERM terminates a non-interactive loop:
+TERM: terminated
+== SIGHUP terminates a non-interactive loop:
+HUP: terminated

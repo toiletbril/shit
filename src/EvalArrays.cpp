@@ -197,7 +197,8 @@ fn EvalContext::set_array_element(StringView name, usize index,
        element contiguous too, so any element now at the run's end migrates from
        the sparse map into the dense run. */
     dense->push(String{heap_allocator(), value});
-    for (;;) {
+    loop
+    {
       let const key =
           sparse_array_key(name, dense->count(), scratch_allocator());
       let const *migrated = m_sparse_array_values.find(key.view());
@@ -755,7 +756,7 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
   });
   for (const String &environment_name : os::environment_names())
     do_consider(environment_name.view());
-  utils::sort_ascending(names);
+  names.sort();
   return names;
 }
 

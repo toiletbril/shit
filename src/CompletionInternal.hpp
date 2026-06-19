@@ -71,8 +71,8 @@ fn complete_from_manpage(StringView line, StringView token, bool for_listing,
                          EvalContext &context,
                          StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
-fn complete_from_help(StringView line, StringView token, bool for_listing,
-                      EvalContext &context,
+fn complete_from_help(StringView line, StringView token, usize token_start,
+                      bool for_listing, EvalContext &context,
                       StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_help_subcommands(StringView line, StringView token,

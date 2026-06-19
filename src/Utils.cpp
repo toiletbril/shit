@@ -10,13 +10,6 @@
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 
-#include <cctype>
-#include <csignal>
-#include <cstdarg>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-
 #if defined(__GLIBC__)
 #include <malloc.h>
 #endif
@@ -375,7 +368,8 @@ fn string_replace(String &s, const StringView to_replace,
   usize i = 0;
   usize previous = 0;
 
-  for (;;) {
+  loop
+  {
     previous = i;
     const usize match = find_subview(source, to_replace, i);
     if (match == NOT_FOUND_INDEX) break;
@@ -1724,7 +1718,8 @@ fn read_entire_file(StringView path) throws -> Maybe<String>
 
   let contents = String{};
   char buffer[4096];
-  for (;;) {
+  loop
+  {
     Maybe<usize> read_count = os::read_fd(*file, buffer, sizeof(buffer));
     if (!read_count || *read_count == 0) break;
     contents.append(StringView{buffer, *read_count});
@@ -1779,7 +1774,8 @@ fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>
   /* The /usr/bin/env form names the shell as the next token, after any env
      options, so the first non-option token is taken. */
   if (shell == "env") {
-    for (;;) {
+    loop
+    {
       let const token = do_next_token();
       if (token.length == 0) return None;
       if (token[0] == '-') continue;
@@ -1798,7 +1794,8 @@ fn read_entire_standard_input() throws -> String
 {
   let contents = String{};
   char buffer[4096];
-  for (;;) {
+  loop
+  {
     Maybe<usize> read_count = os::read_fd(SHIT_STDIN, buffer, sizeof(buffer));
     if (!read_count || *read_count == 0) break;
     contents.append(StringView{buffer, *read_count});
@@ -1811,7 +1808,8 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
 {
   let line = String{};
   bool has_read_any_byte = false;
-  for (;;) {
+  loop
+  {
     u8 one_byte = 0;
     Maybe<usize> read_count = os::read_fd(fd, &one_byte, 1);
     if (!read_count || *read_count == 0) break;
@@ -1836,7 +1834,8 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
 fn current_git_branch() throws -> String
 {
   let dir = Path::current_directory();
-  for (;;) {
+  loop
+  {
     let head = dir.clone();
     head.push_component(".git");
     /* A linked worktree or a submodule stores .git as a file holding a

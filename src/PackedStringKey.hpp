@@ -4,8 +4,6 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
-#include <cstring>
-
 namespace shit {
 
 /* A short byte string packed into a fixed sixteen-byte block held in two

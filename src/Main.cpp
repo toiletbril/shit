@@ -17,9 +17,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <cstdlib>
-#include <cstring>
-
 FLAG_LIST_DECL();
 
 /* clang-format off */
@@ -1221,7 +1218,7 @@ fn main(int argc, char **argv) -> int
    * still caches in any mode, so a simple script never spends the milliseconds
    * to traverse every PATH directory up front. */
   shit::utils::clear_path_map();
-  shit::os::set_default_signal_handlers();
+  shit::os::set_default_signal_handlers(should_be_interactive);
   LOG(Info, "installed the default signal handlers");
 
   /* The parse arena holds the AST and its tokens for one command, and is reset
@@ -1285,7 +1282,8 @@ fn main(int argc, char **argv) -> int
 
   /* A plain return must not be used past this point, since toiletline needs its
    * own cleanup. utils::quit() runs it. */
-  for (;;) {
+  loop
+  {
     ASSERT(!shit::os::is_child_process());
 
     let script_contents = shit::String{};
@@ -1384,7 +1382,8 @@ fn main(int argc, char **argv) -> int
 
         shit::String prompt = toiletline::build_prompt(context);
 
-        for (;;) {
+        loop
+        {
           let[code, input] = toiletline::get_input(prompt);
 
           switch (code) {

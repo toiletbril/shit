@@ -8,8 +8,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <algorithm>
-
 namespace shit {
 
 namespace shitbox {
@@ -171,7 +169,8 @@ fn read_fd_to_string(os::descriptor fd) throws -> String
 {
   String contents{};
   char buffer[4096];
-  for (;;) {
+  loop
+  {
     let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
     if (!read_count.has_value() || *read_count == 0) break;
     contents.append(StringView{buffer, *read_count});
@@ -207,15 +206,14 @@ fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>
 
 fn sort_string_list(ArrayList<String> &items) wontthrow -> void
 {
-  std::sort(items.begin(), items.end(),
-            [](const String &a, const String &b) { return a < b; });
+  items.sort([](const String &a, const String &b) { return a < b; });
 }
 
 fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void
 {
   /* The bytes compare as unsigned the way a byte-order sort orders them, so the
      views sort without copying each line into an owned String first. */
-  std::sort(items.begin(), items.end(), [](StringView a, StringView b) {
+  items.sort([](StringView a, StringView b) {
     let const min_length = a.length < b.length ? a.length : b.length;
     for (usize i = 0; i < min_length; i++)
       if (a[i] != b[i])

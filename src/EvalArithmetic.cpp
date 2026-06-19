@@ -9,8 +9,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <cstdint>
-
 namespace shit {
 
 namespace {
@@ -572,7 +570,8 @@ public:
   fn parse_binary(u8 min_precedence) throws -> i64
   {
     let lhs = parse_unary();
-    for (;;) {
+    loop
+    {
       let const op = peek_binary_operator();
       if (op.precedence < min_precedence) return lhs;
       pos += op.length;
@@ -997,7 +996,8 @@ public:
   fn parse_binary(u8 min_precedence) throws -> i64
   {
     let lhs = parse_operand();
-    for (;;) {
+    loop
+    {
       if (ti >= toks.count() || toks[ti].k != arith_token::kind::op) {
         return lhs;
       }
@@ -1376,7 +1376,8 @@ public:
   fn parse_binary(u8 min_precedence) throws -> wide_int
   {
     let lhs = parse_unary();
-    for (;;) {
+    loop
+    {
       let const op = peek_binary_operator();
       if (op.precedence < min_precedence) return lhs;
       pos += op.length;

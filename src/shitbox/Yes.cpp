@@ -45,7 +45,8 @@ fn Yes::execute(const ExecContext &ec, EvalContext &cxt,
      that closes its end breaks the write and ends the loop rather than the
      utility spinning forever. */
   let const out_fd = ec.out_fd.value_or(SHIT_STDOUT);
-  for (;;) {
+  loop
+  {
     /* A Ctrl-C at the terminal sets the shell's interrupt flag, so the loop
        checks it each pass and stops rather than spinning forever. */
     if (os::INTERRUPT_REQUESTED) return 130;

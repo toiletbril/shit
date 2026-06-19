@@ -143,7 +143,7 @@ fn compute_stats(const ArrayList<bench_sample> &samples,
   let ordered = ArrayList<double>{};
   for (usize i = 0; i < samples.count(); i++)
     ordered.push(accessor(samples[i]));
-  utils::sort_ascending(ordered);
+  ordered.sort();
   stats.median = ordered[ordered.count() / 2];
 
   return stats;

@@ -292,7 +292,8 @@ public:
   bool evaluate_top() throws
   {
     let should_negate = false;
-    for (;;) {
+    loop
+    {
       let const count = end - pos;
       if (count < 1) return !should_negate;
 

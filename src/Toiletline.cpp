@@ -13,11 +13,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
-
-#if !defined(SHIT_NO_TOILETLINE)
+#if !defined SHIT_NO_TOILETLINE
 
 namespace {
 

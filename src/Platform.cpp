@@ -8,12 +8,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <algorithm>
-#include <cctype>
-#include <csignal>
-#include <cstdarg>
-#include <cstring>
-
 /* A forked pipeline stage that never execs would run the address-sanitizer leak
    check at its own exit, which warns or hangs under a seccomp sandbox that
    blocks ptrace. The parent process reports the real leaks, so the forked child
@@ -111,7 +105,8 @@ namespace os {
 hot fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
     -> Maybe<usize>
 {
-  for (;;) {
+  loop
+  {
     ssize_t w = write(fd, buf, size);
     /* A signal that lands mid-write interrupts the call before any byte is
        transferred. Retry instead of reporting a spurious write failure. */
@@ -124,7 +119,8 @@ hot fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
 hot fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow
     -> Maybe<usize>
 {
-  for (;;) {
+  loop
+  {
     ssize_t r = read(fd, buf, size);
     /* A SIGINT sets INTERRUPT_REQUESTED and returns to the caller rather than
        retrying and freezing on a Ctrl-C. Any other interrupting signal retries
@@ -695,7 +691,8 @@ fn capture_program_output(const ArrayList<String> &argv,
   let captured = String{heap_allocator()};
   const u64 deadline_nanos = monotonic_nanos() + timeout_nanos;
   bool was_timed_out = false;
-  for (;;) {
+  loop
+  {
     const u64 now_nanos = monotonic_nanos();
     if (now_nanos >= deadline_nanos) {
       was_timed_out = true;
@@ -1004,7 +1001,8 @@ fn wait_and_monitor_process(process pid) throws -> i32
 
   i32 status{};
 
-  for (;;) {
+  loop
+  {
     pid_t w = waitpid(pid, &status, 0);
     /* A signal interrupted the wait. Retry instead of failing. */
     if (w == -1 && errno == EINTR) continue;
@@ -1065,7 +1063,8 @@ fn reap_process_quietly(process pid) throws -> i32
   LOG(Debug, "quietly reaping process %lld", static_cast<long long>(pid));
 
   i32 status{};
-  for (;;) {
+  loop
+  {
     const pid_t w = waitpid(pid, &status, 0);
     if (w == -1 && errno == EINTR) continue;
     /* The shell reaps a child through its SIGCHLD handling, so the child may be
@@ -1116,10 +1115,12 @@ fn process_from_pid(i64 pid) wontthrow -> process
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 {
   /* A bare number names the signal directly. */
-  if (!name.is_empty() &&
-      std::all_of(name.data, name.data + name.length,
-                  [](unsigned char c) { return std::isdigit(c) != 0; }))
-  {
+  let const is_all_digits = [&]() {
+    for (usize i = 0; i < name.length; i++)
+      if (name[i] < '0' || name[i] > '9') return false;
+    return true;
+  };
+  if (!name.is_empty() && is_all_digits()) {
     const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(name);
     if (parsed_value.is_error()) return shit::None;
     return static_cast<i32>(parsed_value.value());
@@ -1274,17 +1275,24 @@ static fn handle_interrupt(int s) wontthrow -> void
   INTERRUPT_REQUESTED = 1;
 }
 
-fn set_default_signal_handlers() throws -> void
+fn set_default_signal_handlers(bool is_interactive) throws -> void
 {
-  LOG(Info, "blocking the terminal signals and installing the shell handlers");
+  LOG(Info, "installing the shell signal handlers, interactive %d",
+      is_interactive ? 1 : 0);
 
-  /* The terminal-generated signals that would kill the shell stay blocked, but
-     SIGINT gets a handler instead, so a Ctrl-C in a shell loop sets the flag
-     the evaluator polls rather than spinning forever. An external command
-     resets the handler to the default through execv and so still dies on
-     Ctrl-C. */
-  sigset_t sm = make_sigset(SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
-  check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
+  /* The interactive shell blocks the terminal-generated signals that would kill
+     or stop it, so a Ctrl-C, Ctrl-Z, or hangup at the prompt does not take the
+     shell down. A non-interactive script leaves them at their default
+     disposition, so a SIGTERM, SIGQUIT, or SIGHUP terminates the script the way
+     dash and bash scripts behave, and a Ctrl-Z still suspends the job. SIGINT
+     gets the polled handler in both modes, so a Ctrl-C in a shell loop sets the
+     flag the evaluator polls rather than spinning forever, and an external
+     command resets the handler to the default through execv and so still dies
+     on Ctrl-C. */
+  if (is_interactive) {
+    sigset_t sm = make_sigset(SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
+    check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
+  }
 
   struct sigaction sa = {};
   sa.sa_flags = SA_SIGINFO;
@@ -1563,7 +1571,8 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
 
   int status = 0;
   struct rusage usage{};
-  for (;;) {
+  loop
+  {
     const pid_t waited = wait4(child_pid, &status, 0, &usage);
     if (waited == -1 && errno == EINTR) continue;
     break;
@@ -1627,6 +1636,14 @@ fn make_directory(StringView path, u32 mode) wontthrow -> bool
   return ::mkdir(path_string.c_str(), mode) == 0;
 }
 
+fn touch_file_times(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  /* A null times array sets both the access and the modification time to the
+     current time, the touch update for an existing file. */
+  return ::utimensat(AT_FDCWD, path_string.c_str(), nullptr, 0) == 0;
+}
+
 fn remove_directory(StringView path) wontthrow -> bool
 {
   const String path_string{path};
@@ -1661,7 +1678,8 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
      result is complete rather than truncated. The cap bounds a pathological
      filesystem. */
   usize capacity = 256;
-  for (;;) {
+  loop
+  {
     ArrayList<char> buffer{};
     buffer.reserve(capacity);
     let const length =
@@ -2729,10 +2747,12 @@ fn process_from_pid(i64 pid) wontthrow -> process
 
 fn signal_number_from_name(StringView name) -> Maybe<i32>
 {
-  if (!name.is_empty() &&
-      std::all_of(name.data, name.data + name.length,
-                  [](unsigned char c) { return std::isdigit(c) != 0; }))
-  {
+  let const is_all_digits = [&]() {
+    for (usize i = 0; i < name.length; i++)
+      if (name[i] < '0' || name[i] > '9') return false;
+    return true;
+  };
+  if (!name.is_empty() && is_all_digits()) {
     String name_string{name};
     return static_cast<i32>(std::strtol(name_string.c_str(), nullptr, 10));
   }
@@ -2901,11 +2921,17 @@ static fn handle_interrupt(int s) -> void
   signal(SIGINT, handle_interrupt);
 }
 
-fn set_default_signal_handlers() -> void
+fn set_default_signal_handlers(bool is_interactive) -> void
 {
-  if (signal(SIGTERM, SIG_IGN) == SIG_ERR ||
-      signal(SIGINT, handle_interrupt) == SIG_ERR)
-  {
+  /* The interactive shell ignores SIGTERM so a stray terminate does not close
+     the prompt, while a non-interactive script leaves it at the default so it
+     terminates as usual. SIGINT routes to the polled handler in both modes. */
+  if (is_interactive && signal(SIGTERM, SIG_IGN) == SIG_ERR) {
+    throw Error{"Could not install the signal handlers: " +
+                last_system_error_message()};
+  }
+
+  if (signal(SIGINT, handle_interrupt) == SIG_ERR) {
     throw Error{"Could not install the signal handlers: " +
                 last_system_error_message()};
   }
@@ -3100,6 +3126,21 @@ fn make_directory(StringView path, u32 mode) wontthrow -> bool
   unused(mode);
   const String path_string{path};
   return CreateDirectoryA(path_string.c_str(), nullptr) != 0;
+}
+
+fn touch_file_times(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  HANDLE handle =
+      CreateFileA(path_string.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ,
+                  nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (handle == INVALID_HANDLE_VALUE) return false;
+
+  FILETIME now;
+  GetSystemTimeAsFileTime(&now);
+  let const did_set = SetFileTime(handle, nullptr, &now, &now) != 0;
+  CloseHandle(handle);
+  return did_set;
 }
 
 fn remove_directory(StringView path) wontthrow -> bool

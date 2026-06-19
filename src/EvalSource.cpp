@@ -13,8 +13,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <exception>
-
 namespace shit {
 
 /* A cap on nested mimicked scripts, so a script that mimics another that mimics

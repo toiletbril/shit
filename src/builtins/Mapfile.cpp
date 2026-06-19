@@ -76,7 +76,8 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
       static_cast<int>(array_name.length), array_name.data);
 
   let lines = ArrayList<String>{heap_allocator()};
-  for (;;) {
+  loop
+  {
     if (max_lines > 0 && static_cast<i64>(lines.count()) >= max_lines) break;
 
     bool was_newline_terminated = false;

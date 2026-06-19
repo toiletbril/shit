@@ -46,7 +46,7 @@ static fn sorted_builtin_names() throws -> ArrayList<String>
   let names = ArrayList<String>{};
   for (let const &builtin_name : builtin_names())
     names.push_managed(builtin_name);
-  utils::sort_ascending(names);
+  names.sort();
   return names;
 }
 

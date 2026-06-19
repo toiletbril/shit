@@ -5,8 +5,6 @@
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 
-#include <initializer_list>
-
 namespace shit {
 
 using namespace expressions;

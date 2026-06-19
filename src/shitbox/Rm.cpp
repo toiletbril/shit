@@ -40,6 +40,24 @@ fn remove_path(StringView path, bool is_recursive) throws -> bool
   return os::remove_file(path);
 }
 
+/* Whether the operand names the . or .. directory entry, its basename after any
+   trailing slashes. POSIX requires rm to refuse such an operand so a recursive
+   remove cannot delete the working or the parent directory entry, and the -f
+   flag does not waive the refusal. */
+static fn names_dot_or_dotdot(StringView operand) wontthrow -> bool
+{
+  usize end = operand.length;
+  while (end > 1 && operand[end - 1] == '/')
+    end--;
+
+  usize start = end;
+  while (start > 0 && operand[start - 1] != '/')
+    start--;
+
+  let const base = operand.substring_of_length(start, end - start);
+  return base == StringView{"."} || base == StringView{".."};
+}
+
 Rm::Rm() = default;
 
 pure Utility::Kind Rm::kind() const wontthrow { return Kind::Rm; }
@@ -62,6 +80,15 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
   for (const String &operand : operands) {
+    if (names_dot_or_dotdot(operand.view())) {
+      report_soft_shitbox_error(ec, cxt,
+                                "rm: refusing to remove '.' or '..' directory: "
+                                "skipping '" +
+                                    operand + "'");
+      status = 1;
+      continue;
+    }
+
     if (!Path{operand.view()}.exists()) {
       if (should_force) continue;
       report_soft_shitbox_error(ec, cxt,

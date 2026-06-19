@@ -45,7 +45,8 @@ static fn copy_file(const ExecContext &ec, StringView source,
   defer { os::close_fd(*out_fd); };
 
   char buffer[4096];
-  for (;;) {
+  loop
+  {
     let const read_count = os::read_fd(*in_fd, buffer, sizeof(buffer));
     if (!read_count.has_value())
       throw Error{"cp: a read of '" + String{source} + "' failed"};

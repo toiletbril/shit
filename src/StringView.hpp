@@ -3,8 +3,6 @@
 #include "Common.hpp"
 #include "Maybe.hpp"
 
-#include <cstring>
-
 namespace shit {
 
 /* A non-owning view of bytes, the form a function takes when it does not own

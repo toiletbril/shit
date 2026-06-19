@@ -1,0 +1,10 @@
+== first-level subcommands:
+compose
+run
+== second-level sub-subcommands from 'docker compose --help':
+config
+up
+== third-level options from 'docker compose config --help':
+--services
+--volumes
+== an unknown deeper word does not fork:

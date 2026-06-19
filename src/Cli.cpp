@@ -6,9 +6,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <cstdio>
-#include <cstring>
-
 namespace shit {
 
 constexpr usize HELP_WRAP_WIDTH = 80;

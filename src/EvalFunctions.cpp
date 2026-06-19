@@ -102,7 +102,7 @@ fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
   out.reserve(m_functions.count());
   m_functions.for_each(
       [&](StringView name, const Expression *) { out.push_managed(name); });
-  utils::sort_ascending(out);
+  out.sort();
   return out;
 }
 
@@ -301,7 +301,7 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
   let out = ArrayList<String>{};
   out.reserve(m_readonly_names.count());
   m_readonly_names.for_each([&](StringView name) { out.push_managed(name); });
-  utils::sort_ascending(out);
+  out.sort();
   return out;
 }
 

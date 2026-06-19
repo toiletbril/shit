@@ -894,7 +894,8 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.leave_loop(); };
 
   i64 ret = 0;
-  for (;;) {
+  loop
+  {
     i64 condition_status;
     {
       cxt.enter_condition();
@@ -1015,7 +1016,8 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   i64 ret = 0;
   bool should_reprint_menu = true;
-  for (;;) {
+  loop
+  {
     /* The numbered menu and the prompt go to standard error, the way bash keeps
        them out of the command's captured output. The menu reprints only after
        an empty line. */
@@ -1334,7 +1336,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
     LOG(All, "case arm %zu matched, running its body", i);
 
     bool should_resume_matching = false;
-    for (;;) {
+    loop
+    {
       ASSERT(m_items[i].body != nullptr);
       result = m_items[i].body->evaluate(cxt);
       cxt.set_last_exit_status(static_cast<i32>(result));

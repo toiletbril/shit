@@ -15,10 +15,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <cctype>
-#include <cerrno>
-#include <cstdlib>
-#include <ctime>
 #include <exception>
 
 /* POSIX regcomp and regexec back the [[ =~ operator, the release build drops
@@ -974,7 +970,7 @@ fn EvalContext::alias_definitions() const throws -> ArrayList<String>
     definition.push('\'');
     out.push(steal(definition));
   });
-  utils::sort_ascending(out);
+  out.sort();
   return out;
 }
 
@@ -1388,7 +1384,7 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
     entry.append(value);
     assignments.push(steal(entry));
   });
-  utils::sort_ascending(assignments);
+  assignments.sort();
   return assignments;
 }
 

@@ -4,8 +4,6 @@
 #include "Containers.hpp"
 #include "Trace.hpp"
 
-#include <cstdlib>
-
 namespace shit {
 
 BumpArena *AST_ARENA = nullptr;
@@ -59,7 +57,8 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
 
 hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
 {
-  for (;;) {
+  loop
+  {
     if (!m_blocks.is_empty()) {
       let &block = m_blocks.back();
       let const aligned = (block.used + (alignment - 1)) & ~(alignment - 1);

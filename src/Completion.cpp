@@ -235,7 +235,8 @@ static pure fn is_in_command_position(StringView line,
                                       usize token_start) wontthrow -> bool
 {
   let i = token_start;
-  for (;;) {
+  loop
+  {
     while (i > 0 && is_word_separator(line[i - 1]))
       i--;
     if (i == 0) return true;
@@ -687,7 +688,8 @@ fn command_word_of(StringView line) wontthrow -> StringView
       i = k + 1;
     }
   }
-  for (;;) {
+  loop
+  {
     while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
       i++;
     let const start = i;
@@ -837,7 +839,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     if (!candidates.is_empty()) {
       /* The matches replace the pattern as one space-joined run of fields, the
          listing-UI trailing slash dropped. */
-      utils::sort_ascending(candidates);
+      candidates.sort();
       let joined = String{};
       for (usize i = 0; i < candidates.count(); i++) {
         if (i > 0) joined += ' ';
@@ -887,8 +889,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
         from_stage = complete_from_help_subcommands(
             line, token, token_start, for_listing, context, descriptions);
       if (!from_stage.has_value())
-        from_stage =
-            complete_from_help(line, token, for_listing, context, descriptions);
+        from_stage = complete_from_help(line, token, token_start, for_listing,
+                                        context, descriptions);
     }
     if (from_stage.has_value()) {
       candidates = steal(*from_stage);
@@ -905,7 +907,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   /* A token that matched nothing skips the sort and the prefix scan. */
   let longest_common_prefix = String{};
   if (!candidates.is_empty()) {
-    utils::sort_ascending(candidates);
+    candidates.sort();
     longest_common_prefix = compute_longest_common_prefix(candidates);
   }
 

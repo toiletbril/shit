@@ -56,12 +56,25 @@
   "Licensed under the 3-Clause BSD License.\n"                                 \
   "There is NO WARRANTY, to the extent permitted by law."
 
+/* clang-format off */
+#include <cctype>
+#include <cerrno>
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
+#include <clocale>
+#include <cstring>
+
 #include <type_traits>
+#include <initializer_list>
 #include <utility>
+#include <new>
+#include <exception>
+/* clang-format on */
 
 /* Crablang types. */
 
@@ -149,6 +162,10 @@ public:
    so the name leads and the type trails, matching the oo style. */
 #define fn  auto
 #define let auto
+
+/* An unconditional loop, written `loop` where a `for (;;)` or `while (true)`
+   would go, so the intent reads at a glance. */
+#define loop for (;;)
 
 /* Markers for a function's effect and exception behavior, written next to the
    fn so the declaration states intent. They map to the matching clang

@@ -8,9 +8,11 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-c] file ...");
 
-HELP_DESCRIPTION_DECL(
-    "The touch utility creates each named file when it is missing. With -c it "
-    "does not create a missing file.");
+HELP_DESCRIPTION_DECL("The touch utility sets the access and the modification "
+                      "times of each named "
+                      "file to the current time, creating the file when it is "
+                      "missing. With -c it "
+                      "does not create a missing file.");
 
 FLAG(TOUCH_NO_CREATE, Bool, 'c', "", "Do not create a file that is missing.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -37,7 +39,18 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
   for (const String &operand : operands) {
-    if (Path{operand.view()}.exists()) continue;
+    /* An existing file has its access and modification times set to now, the
+       touch update path, rather than being passed over. */
+    if (Path{operand.view()}.exists()) {
+      if (!os::touch_file_times(operand.view())) {
+        report_soft_shitbox_error(ec, cxt,
+                                  "touch: cannot touch '" + operand +
+                                      "': " + os::last_system_error_message());
+        status = 1;
+      }
+      continue;
+    }
+
     if (FLAG_TOUCH_NO_CREATE.is_enabled()) continue;
 
     let const fd =

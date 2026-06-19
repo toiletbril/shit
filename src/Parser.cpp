@@ -240,7 +240,8 @@ cold fn Parser::recover_to_next_statement() throws -> void
 {
   LOG(Debug, "skipping tokens to the next statement boundary");
   bool has_consumed_token = false;
-  for (;;) {
+  loop
+  {
     Token *token = m_lexer.peek_shell_token();
     ASSERT(token != nullptr);
 
@@ -271,7 +272,8 @@ cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
   Expression *first_piece = nullptr;
   let last_location = SourceLocation{};
 
-  for (;;) {
+  loop
+  {
     Token *token = m_lexer.peek_shell_token();
     ASSERT(token != nullptr);
     last_location = token->source_location();
@@ -342,7 +344,8 @@ hot fn Parser::parse_command_list(
   bool should_time_pending = false;
   bool is_time_posix_format = false;
 
-  for (;;) {
+  loop
+  {
     if (should_parse_command) {
       /* A leading time keyword times the command or pipeline that follows,
          including a compound command, and bash allows it before the ! negation.
@@ -477,7 +480,8 @@ hot fn Parser::parse_command_list(
 
       Token *last_pipe_token = token;
 
-      for (;;) {
+      loop
+      {
         Command *rhs = parse_simple_command();
         if (rhs == nullptr) {
           /* An ampersand glued to the pipe under POSIX mode means the script
@@ -971,7 +975,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
                                   redirections, fd_was_explicit);
   };
 
-  for (;;) {
+  loop
+  {
     Token *token = m_lexer.peek_shell_token();
     ASSERT(token != nullptr);
 
@@ -1225,7 +1230,8 @@ hot fn Parser::parse_if() throws -> Command *
   let branches = ArrayList<if_branch>{};
   const Expression *otherwise = nullptr;
 
-  for (;;) {
+  loop
+  {
     Expression *condition = parse_command_list({Token::Kind::Then});
     Token *then_token = m_lexer.next_shell_token();
     ASSERT(then_token != nullptr);
@@ -1294,11 +1300,12 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
                        done_token->source_location());
   }
 
-  let loop =
+  let loop_node =
       m_lexer.arena().create<WhileLoop>(location, condition, body, is_until);
   const SourceLocation done_location = done_token->source_location();
-  loop->set_source_end_position(done_location.position + done_location.length);
-  return loop;
+  loop_node->set_source_end_position(done_location.position +
+                                     done_location.length);
+  return loop_node;
 }
 
 static fn word_token_from_assignment(BumpArena &arena,
@@ -1450,7 +1457,8 @@ hot fn Parser::parse_for() throws -> Command *
   if (peeked->kind() == Token::Kind::Word && peeked->raw_string() == "in") {
     m_lexer.advance_past_last_peek();
     has_in_clause = true;
-    for (;;) {
+    loop
+    {
       Token *word = m_lexer.peek_shell_token();
       ASSERT(word != nullptr);
       /* A NAME=VALUE word in the list lexes as an assignment, so it is rebuilt
@@ -1478,7 +1486,8 @@ hot fn Parser::parse_for() throws -> Command *
   }
 
   /* Skip the separators between the header and 'do'. */
-  for (;;) {
+  loop
+  {
     Token *t = m_lexer.peek_shell_token();
     ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::Semicolon ||
@@ -1511,11 +1520,12 @@ hot fn Parser::parse_for() throws -> Command *
                        "done", done_token->source_location());
   }
 
-  let loop = m_lexer.arena().create<ForLoop>(location, variable_name.view(),
-                                             steal(words), has_in_clause, body);
+  let loop_node = m_lexer.arena().create<ForLoop>(
+      location, variable_name.view(), steal(words), has_in_clause, body);
   const SourceLocation done_location = done_token->source_location();
-  loop->set_source_end_position(done_location.position + done_location.length);
-  return loop;
+  loop_node->set_source_end_position(done_location.position +
+                                     done_location.length);
+  return loop_node;
 }
 
 /* A bash select loop, select name in words; do BODY; done. It shares the for
@@ -1554,7 +1564,8 @@ hot fn Parser::parse_select() throws -> Command *
   if (peeked->kind() == Token::Kind::Word && peeked->raw_string() == "in") {
     m_lexer.advance_past_last_peek();
     has_in_clause = true;
-    for (;;) {
+    loop
+    {
       Token *word = m_lexer.peek_shell_token();
       ASSERT(word != nullptr);
       /* A NAME=VALUE word in the list lexes as an assignment, so it is rebuilt
@@ -1581,7 +1592,8 @@ hot fn Parser::parse_select() throws -> Command *
     }
   }
 
-  for (;;) {
+  loop
+  {
     Token *t = m_lexer.peek_shell_token();
     ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::Semicolon ||
@@ -1687,7 +1699,8 @@ hot fn Parser::parse_case() throws -> Command *
 
   let items = ArrayList<case_item>{};
 
-  for (;;) {
+  loop
+  {
     Token *t = m_lexer.peek_shell_token();
     ASSERT(t != nullptr);
 
@@ -1707,7 +1720,8 @@ hot fn Parser::parse_case() throws -> Command *
 
     ArrayList<const Token *> patterns{heap_allocator()};
 
-    for (;;) {
+    loop
+    {
       Token *pattern = m_lexer.next_shell_token();
       ASSERT(pattern != nullptr);
 
@@ -1876,7 +1890,8 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
   const usize body_start_position = second->source_location().position + 1;
   usize body_end_position = body_start_position;
   usize depth = 0;
-  for (;;) {
+  loop
+  {
     Token *t = m_lexer.next_shell_token();
     ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::EndOfFile) {
@@ -1971,7 +1986,8 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
   const String step{allocator, header.substring(separators[1] + 1)};
 
   /* Skip the separators between the header and 'do'. */
-  for (;;) {
+  loop
+  {
     Token *t = m_lexer.peek_shell_token();
     ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::Semicolon ||
@@ -2018,7 +2034,8 @@ hot fn Parser::parse_conditional_command() throws -> Command *
      redirection, and && and || join primaries. The operand words are kept for
      the evaluator to expand without field splitting. */
   let elements = ArrayList<conditional_element>{};
-  for (;;) {
+  loop
+  {
     Token *t = m_lexer.next_shell_token();
     ASSERT(t != nullptr);
     if (is_unquoted_word(t, "]]")) break;
@@ -2087,7 +2104,8 @@ hot fn Parser::parse_conditional_command() throws -> Command *
             }
           };
           do_append_segments(first);
-          for (;;) {
+          loop
+          {
             Token *next = m_lexer.peek_shell_token();
             if (next == nullptr || is_unquoted_word(next, "]]") ||
                 next->kind() == Token::Kind::EndOfFile)
@@ -2138,7 +2156,8 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
   }
 
   /* Skip newlines before the body. */
-  for (;;) {
+  loop
+  {
     Token *t = m_lexer.peek_shell_token();
     ASSERT(t != nullptr);
     if (t->kind() != Token::Kind::Newline) break;
@@ -2194,7 +2213,8 @@ fn Parser::parse_keyword_function_definition() throws -> Command *
   }
 
   /* Skip newlines before the body. */
-  for (;;) {
+  loop
+  {
     Token *t = m_lexer.peek_shell_token();
     ASSERT(t != nullptr);
     if (t->kind() != Token::Kind::Newline) break;
@@ -2233,7 +2253,8 @@ fn Parser::consume_bash_array_assignment() throws -> ArrayList<const Token *>
      elements, while POSIX mode discards the list. */
   ArrayList<const Token *> elements{};
   usize depth = 1;
-  for (;;) {
+  loop
+  {
     Token *t = m_lexer.next_shell_token();
     ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::EndOfFile) {
@@ -2370,7 +2391,8 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
    * whether we should go into recursion with more precedence, continue
    * in a loop with the same precedence, or break, if found operator has
    * higher precedence. */
-  for (;;) {
+  loop
+  {
     Token *maybe_op = m_lexer.peek_expression_token();
     ASSERT(maybe_op != nullptr);
 

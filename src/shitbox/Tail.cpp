@@ -6,13 +6,15 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-n count] [file ...]");
+HELP_SYNOPSIS_DECL("[-n count] [-c count] [file ...]");
 
 HELP_DESCRIPTION_DECL(
     "The tail utility writes the last count lines of each file, ten by "
-    "default, reading standard input when no file is given.");
+    "default, reading standard input when no file is given. With -c it writes "
+    "the last count bytes instead.");
 
 FLAG(TAIL_LINES, String, 'n', "", "Write the last count lines.");
+FLAG(TAIL_BYTES, String, 'c', "", "Write the last count bytes.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Tail);
@@ -33,14 +35,24 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  i64 line_count = 10;
-  if (FLAG_TAIL_LINES.is_set()) {
+  /* The -c byte count takes precedence over -n when both are given, the way GNU
+     tail reads the last of the two. */
+  let const is_byte_mode = FLAG_TAIL_BYTES.is_set();
+  i64 count = 10;
+  if (is_byte_mode) {
+    let const parsed = utils::parse_decimal_integer(FLAG_TAIL_BYTES.value());
+    if (parsed.is_error() || parsed.value() < 0)
+      throw Error{"tail: invalid byte count '" +
+                  String{FLAG_TAIL_BYTES.value()} + "'"};
+
+    count = parsed.value();
+  } else if (FLAG_TAIL_LINES.is_set()) {
     let const parsed = utils::parse_decimal_integer(FLAG_TAIL_LINES.value());
     if (parsed.is_error() || parsed.value() < 0)
       throw Error{"tail: invalid line count '" +
                   String{FLAG_TAIL_LINES.value()} + "'"};
 
-    line_count = parsed.value();
+    count = parsed.value();
   }
 
   ArrayList<StringView> sources{};
@@ -72,8 +84,17 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       output += " <==\n";
     }
 
+    if (is_byte_mode) {
+      let const wanted_count = static_cast<usize>(count);
+      let const text = content->view();
+      let const start =
+          text.length > wanted_count ? text.length - wanted_count : 0;
+      output += text.substring(start);
+      continue;
+    }
+
     let const lines = split_keep_newlines(content->view());
-    let const wanted_count = static_cast<usize>(line_count);
+    let const wanted_count = static_cast<usize>(count);
     let const start =
         lines.count() > wanted_count ? lines.count() - wanted_count : 0;
     for (usize i = start; i < lines.count(); i++)

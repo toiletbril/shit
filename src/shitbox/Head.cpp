@@ -7,7 +7,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-n count] [file ...]");
+HELP_SYNOPSIS_DECL("[-n count] [-c count] [file ...]");
 
 HELP_DESCRIPTION_DECL(
     "The head utility writes the first count lines of each file, ten by "
@@ -15,6 +15,7 @@ HELP_DESCRIPTION_DECL(
     "has the lines it needs.");
 
 FLAG(HEAD_LINES, String, 'n', "", "Write the first count lines.");
+FLAG(HEAD_BYTES, String, 'c', "", "Write the first count bytes.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Head);
@@ -46,6 +47,27 @@ static fn read_up_to_lines(os::descriptor fd, i64 max_lines) throws -> String
   return out;
 }
 
+/* Read from the descriptor until max_bytes have arrived or the input ends. The
+   byte cap stops an endless producer the way the line cap does. */
+static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes) throws -> String
+{
+  String out{};
+  i64 byte_count = 0;
+  char buffer[4096];
+  while (byte_count < max_bytes) {
+    let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
+    if (!read_count.has_value() || *read_count == 0) {
+      break;
+    }
+    for (usize i = 0; i < *read_count && byte_count < max_bytes; i++) {
+      out.push(buffer[i]);
+      byte_count++;
+    }
+  }
+
+  return out;
+}
+
 Head::Head() = default;
 
 pure Utility::Kind Head::kind() const wontthrow { return Kind::Head; }
@@ -58,8 +80,19 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
+  /* The -c byte count takes precedence over -n when both are given, the way GNU
+     head reads the last of the two. */
+  let const is_byte_mode = FLAG_HEAD_BYTES.is_set();
   i64 count = 10;
-  if (FLAG_HEAD_LINES.is_set()) {
+  if (is_byte_mode) {
+    let const parsed_value =
+        utils::parse_decimal_integer(FLAG_HEAD_BYTES.value());
+    if (parsed_value.is_error() || parsed_value.value() < 0) {
+      throw Error{"head: invalid byte count '" +
+                  String{FLAG_HEAD_BYTES.value()} + "'"};
+    }
+    count = parsed_value.value();
+  } else if (FLAG_HEAD_LINES.is_set()) {
     let const parsed_value =
         utils::parse_decimal_integer(FLAG_HEAD_LINES.value());
     if (parsed_value.is_error() || parsed_value.value() < 0) {
@@ -100,7 +133,8 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       was_opened = true;
     }
 
-    let const text = read_up_to_lines(fd, count);
+    let const text = is_byte_mode ? read_up_to_bytes(fd, count)
+                                  : read_up_to_lines(fd, count);
     if (was_opened) os::close_fd(fd);
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;

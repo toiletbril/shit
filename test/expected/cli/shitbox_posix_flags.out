@@ -1,0 +1,19 @@
+== head -c 5:
+one
+t
+== tail -c 6:
+
+four
+
+== head -n 2 still works:
+one
+two
+== mkdir -m 700 sets the mode:
+1
+== ls -A lists the dot file but not . or ..:
+.hidden
+d700
+f.txt
+== touch creates a missing file, -c leaves it missing:
+made-exists
+ghost-missing

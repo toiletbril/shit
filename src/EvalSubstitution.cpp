@@ -11,8 +11,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <exception>
-
 /* The substitution captures of the evaluator, the $(...) and backtick pipe
    capture with its drain thread, the bare $(< file) read, and the <(cmd)
    process substitutions with their cleanup. Split out of Eval.cpp so the
@@ -35,7 +33,8 @@ fn drain_command_substitution_pipe(void *raw_context) wontthrow -> void
   /* A failed allocation here must not escape the thread and call terminate. */
   try {
     char buffer[4096];
-    for (;;) {
+    loop
+    {
       let const bytes_read =
           os::read_fd(drain->read_fd, buffer, sizeof(buffer));
       if (!bytes_read.has_value() || *bytes_read == 0) break;

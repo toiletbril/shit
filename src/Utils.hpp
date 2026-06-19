@@ -12,25 +12,6 @@ namespace shit {
 
 namespace utils {
 
-/* Sort a list in place into ascending order by the element operator<, the
-   in-house replacement for std::sort. The glob expansion depends on byte
-   ascending order, so the comparison stays the element less-than and nothing
-   reorders equal elements past each other. The implementation is an insertion
-   sort, since the lists a shell sorts are short. */
-template <class T>
-fn sort_ascending(ArrayList<T> &list) throws -> void
-{
-  for (usize i = 1; i < list.count(); i++) {
-    usize j = i;
-    while (j > 0 && list[j] < list[j - 1]) {
-      T temporary = steal(list[j]);
-      list[j] = steal(list[j - 1]);
-      list[j - 1] = steal(temporary);
-      j--;
-    }
-  }
-}
-
 fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
     -> String;
 

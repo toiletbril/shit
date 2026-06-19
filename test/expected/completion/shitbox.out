@@ -5,6 +5,7 @@ mv
 == ls flags through shitbox:
 --help
 -1
+-A
 -a
 -h
 -l
@@ -18,6 +19,7 @@ mv
 == bare utility flags under set -o shitbox:
 --help
 -1
+-A
 -a
 -h
 -l
