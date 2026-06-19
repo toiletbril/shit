@@ -1,0 +1,6 @@
+== -q on a resolving name is silent, status 0:
+status=0
+== -q on a missing name is silent, status 1:
+status=1
+== without -q the location still prints:
+1

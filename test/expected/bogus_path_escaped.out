@@ -8,6 +8,7 @@
   Unquoted "data/*/"
   Literal "*"
 ]
-shit: 2:6: error: The glob pattern 'data/*/*' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'data/*/*' or relax with set +o failglob.
+shit: 2:6: error: The glob pattern 'data/*/*' matched no file, it expands to its literal text, which is rarely intended.
      2 |  echo data/*/\*
        |       ^~~~~~~~~ here.
+note: Probe for matches with compgen -G 'data/*/*' or relax with set +o failglob.

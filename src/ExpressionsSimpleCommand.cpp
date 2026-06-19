@@ -556,6 +556,25 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
   }
 }
 
+/* Whether the command word is itself a glob pattern, an unquoted * or ? or a
+   bracket expression in its literal text. The lone [ that opens a test command
+   carries no closing ] in the same word and is left alone. A quoted segment
+   never globs. */
+static fn command_word_is_glob(const Word &word) wontthrow -> bool
+{
+  bool has_open_bracket = false;
+  for (const WordSegment &segment : word.segments) {
+    if (segment.kind != WordSegment::Kind::UnquotedText) continue;
+    for (usize i = 0; i < segment.text.count(); i++) {
+      let const c = segment.text[i];
+      if (c == '*' || c == '?') return true;
+      if (c == '[') has_open_bracket = true;
+      if (c == ']' && has_open_bracket) return true;
+    }
+  }
+  return false;
+}
+
 } /* namespace */
 
 hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
@@ -569,6 +588,30 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* Record where this command sits so a $LINENO in its words reports its line.
    */
   cxt.set_current_location(source_location());
+
+  /* A glob in command position is rarely intended, the shit mood rejects it
+     while a compatibility mood downgrades to a warning. The check reads the
+     typed command word before its expansion, so a pattern that happens to match
+     a single file is still caught. */
+  if (!m_args.is_empty() && m_args[0]->kind() == Token::Kind::Word) {
+    const Word &command_word =
+        static_cast<const tokens::WordToken *>(m_args[0])->word();
+    if (command_word_is_glob(command_word)) {
+      let const location = m_args[0]->source_location();
+      let const message =
+          StringView{"A glob pattern in command position is rarely intended as "
+                     "a command name"};
+      let const note =
+          StringView{"Quote it to run a literal name, or list the matches with "
+                     "compgen -G"};
+      if (cxt.mood() == mimic_mood::Default) {
+        let error = ErrorWithLocation{location, message};
+        error.set_note(note);
+        throw error;
+      }
+      cxt.show_runtime_warning_at(location, message, note);
+    }
+  }
 
   if (cxt.should_echo()) {
     shit::print(utils::merge_tokens_to_string(m_args) + "\n");

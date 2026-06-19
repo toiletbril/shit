@@ -7,6 +7,7 @@
 [Word
   Unquoted "word*"
 ]
-shit: 3:1: error: The glob pattern 'word*' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'word*' or relax with set +o failglob.
+shit: 3:1: error: The glob pattern 'word*' matched no file, it expands to its literal text, which is rarely intended.
      3 |  word*
        |  ^~~~~ here.
+note: Probe for matches with compgen -G 'word*' or relax with set +o failglob.

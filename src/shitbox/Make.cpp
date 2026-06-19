@@ -326,7 +326,8 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
            output, the way GNU make reads $(shell uname) or $(shell nproc). The
            argument is expanded first so an inner $(VAR) reaches the command. */
         let const command = expand(cxt, mk, name.substring(6), depth + 1);
-        result += cxt.capture_command_substitution(command).view();
+        result +=
+            cxt.capture_command_substitution(command, StringView{"make"}).view();
       } else if (name.length > 9 &&
                  name.substring_of_length(0, 9) == "wildcard ")
       {

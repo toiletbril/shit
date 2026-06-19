@@ -54,6 +54,8 @@ fn read_directory_cached(const Path &directory) throws
 fn environment_path_changed(String &cached_path) throws -> bool;
 fn path_command_names() throws -> const ArrayList<String> &;
 fn command_word_of(StringView line) wontthrow -> StringView;
+/* Whether the token carries an unquoted glob metacharacter, *, ?, or [. */
+pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool;
 fn resolve_completion_alias(StringView command, EvalContext &context) throws
     -> String;
 fn resolve_completion_command(StringView command, EvalContext &context) throws

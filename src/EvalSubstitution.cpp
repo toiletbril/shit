@@ -89,7 +89,8 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   return result;
 }
 
-fn EvalContext::capture_command_substitution(const String &source) throws
+fn EvalContext::capture_command_substitution(const String &source,
+                                             Maybe<StringView> filename) throws
     -> String
 {
   LOG(Debug, "capturing a command substitution of %zu bytes", source.count());
@@ -98,12 +99,14 @@ fn EvalContext::capture_command_substitution(const String &source) throws
     return steal(*file);
 
   /* Parse the inner command into the active parse arena. It coexists with the
-     outer tree and is reclaimed when the arena resets. */
+     outer tree and is reclaimed when the arena resets. A caller such as the
+     make $(shell) names a filename, so an error inside the command carets that
+     source rather than a bare unnamed line. */
   if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
 
   let parser = Parser{
-      Lexer{String{source.view()}, *AST_ARENA, false, None, mood()}
+      Lexer{String{source.view()}, *AST_ARENA, false, filename, mood()}
   };
   let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);

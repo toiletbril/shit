@@ -8,6 +8,7 @@
   Unquoted "*"
   Literal "*"
 ]
-shit: 2:6: error: The glob pattern '**' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G '**' or relax with set +o failglob.
+shit: 2:6: error: The glob pattern '**' matched no file, it expands to its literal text, which is rarely intended.
      2 |  echo *\*
        |       ^~~ here.
+note: Probe for matches with compgen -G '**' or relax with set +o failglob.

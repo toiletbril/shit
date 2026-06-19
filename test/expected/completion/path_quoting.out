@@ -1,0 +1,10 @@
+== a space in the match quotes it:
+'spacey file.txt'
+== a plain match stays unquoted:
+plainfile.txt
+== a dollar in the match quotes it:
+'dollar$x.txt'
+== inside a single quote the space match completes bare within it:
+spacey file.txt
+== inside a double quote the space match completes bare within it:
+spacey file.txt

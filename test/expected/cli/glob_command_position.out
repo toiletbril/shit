@@ -1,0 +1,10 @@
+== shit mood rejects a command-position glob (count):
+1
+== bash mood warns once, not fatal (count):
+1
+== a plain command is unaffected:
+plain-ok
+== the [ test command is not flagged (count):
+0
+== a quoted glob is not a command-position glob (count):
+0

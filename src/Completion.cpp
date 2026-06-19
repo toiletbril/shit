@@ -152,7 +152,7 @@ static pure fn is_unmatched_closing_paren(StringView line,
 
 /* True when an unquoted glob metacharacter appears in the token, so TAB
    resolves the glob rather than listing a directory. */
-static pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool
+pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool
 {
   for (usize i = 0; i < token.length; i++) {
     let const c = token[i];
@@ -187,6 +187,42 @@ static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
   while (end < line.length && !is_token_boundary(line[end]))
     end++;
   return end;
+}
+
+/* The byte just past an opening quote the cursor sits inside, and the quote
+   byte itself. A single quote takes everything literally and a double quote
+   only closes on another double quote, so a quote of the other kind inside does
+   not end the span. */
+struct open_quote_span
+{
+  usize content_start;
+  char quote_character;
+};
+
+/* When the cursor sits inside an unclosed quote, completion treats the quoted
+   content as one token, so a path holding a space completes inside the quote
+   rather than splitting on the space. */
+static pure fn find_open_quote(StringView line, usize cursor) wontthrow
+    -> Maybe<open_quote_span>
+{
+  char quote_character = 0;
+  usize content_start = 0;
+
+  for (usize i = 0; i < cursor; i++) {
+    let const c = line[i];
+    if (quote_character == 0) {
+      if (c == '\'' || c == '"') {
+        quote_character = c;
+        content_start = i + 1;
+      }
+    } else if (c == quote_character) {
+      quote_character = 0;
+    }
+  }
+
+  if (quote_character == 0) return None;
+
+  return open_quote_span{content_start, quote_character};
 }
 
 /* Whether the token starting at token_start sits in command position, the first
@@ -443,6 +479,45 @@ static pure fn split_path_token(StringView token) wontthrow -> path_token
   };
 }
 
+/* Whether a completion candidate carries a byte that the shell would parse
+   rather than read as a literal path, so the candidate must be quoted. The set
+   is whitespace, the glob metacharacters, and the operator and expansion bytes,
+   the leading tilde excluded since it expands a home the user wants. */
+static pure fn path_candidate_needs_quoting(StringView candidate) wontthrow
+    -> bool
+{
+  for (usize i = 0; i < candidate.length; i++) {
+    let const c = candidate[i];
+    if (c == ' ' || c == '\t' || c == '\n' || c == '*' || c == '?' ||
+        c == '[' || c == ']' || c == '(' || c == ')' || c == '{' || c == '}' ||
+        c == '\'' || c == '"' || c == '`' || c == '$' || c == '&' ||
+        c == '|' || c == ';' || c == '<' || c == '>' || c == '\\' ||
+        c == '!' || c == '#')
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+/* Wrap a candidate in single quotes, the way the user should type a path with a
+   special byte rather than backslash-escaping it. An embedded single quote ends
+   the run, emits an escaped quote, and reopens, the standard '\'' idiom. */
+static fn quote_path_candidate(StringView candidate) throws -> String
+{
+  let quoted = String{};
+  quoted.push('\'');
+  for (usize i = 0; i < candidate.length; i++) {
+    if (candidate[i] == '\'') {
+      quoted += "'\\''";
+    } else {
+      quoted.push(candidate[i]);
+    }
+  }
+  quoted.push('\'');
+  return quoted;
+}
+
 /* Resolve the directory the token's directory part names into a real disk path,
    expanding a leading tilde and rooting a relative path at base_directory. */
 static fn resolve_listing_directory(StringView directory_part,
@@ -486,9 +561,8 @@ static fn resolve_listing_directory(StringView directory_part,
 /* Complete a filesystem token. The directory part is listed and every entry
    whose name carries the partial basename becomes a candidate, with the
    directory part prefixed back on and a trailing slash on a directory. */
-static fn complete_filesystem(StringView token,
-                              const Path &base_directory) throws
-    -> ArrayList<String>
+static fn complete_filesystem(StringView token, const Path &base_directory,
+                              bool inside_quote) throws -> ArrayList<String>
 {
   let candidates = ArrayList<String>{};
 
@@ -523,6 +597,12 @@ static fn complete_filesystem(StringView token,
 
     /* The cached directory flag spares a stat for the trailing slash. */
     if (entry.is_directory) candidate += '/';
+
+    /* An unquoted token whose match needs a special byte is wrapped in quotes
+       rather than backslash-escaped. A token already inside a quote completes
+       the bare path within it and is not quoted again. */
+    if (!inside_quote && path_candidate_needs_quoting(candidate.view()))
+      candidate = quote_path_candidate(candidate.view());
 
     candidates.push(steal(candidate));
   }
@@ -788,9 +868,20 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      token start to the token end, so a cursor in the middle of a word replaces
      the word cleanly rather than keeping the bytes to its right. */
   let token_start = find_token_start(line, cursor);
-  let const token_end = find_token_end(line, cursor);
+  let token_end = find_token_end(line, cursor);
   let token = line.substring_of_length(token_start, token_end - token_start);
   let const is_command = is_in_command_position(line, token_start);
+
+  /* A cursor inside an open quote completes the bare path within it, so a match
+     holding a space lands inside the quote and is not re-quoted. The span runs
+     from just past the opening quote to the cursor, leaving any closing quote
+     to the right of the cursor untouched. */
+  let const open_quote = find_open_quote(line, cursor);
+  if (open_quote.has_value()) {
+    token_start = open_quote->content_start;
+    token_end = cursor;
+    token = line.substring_of_length(token_start, token_end - token_start);
+  }
 
   /* An option-value word such as --exit-node=host completes only the value
      after the equals sign, so the candidate replaces the value and keeps the
@@ -799,7 +890,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      spec and the filesystem, the way bash splits on the equals through
      COMP_WORDBREAKS. A command-position word is left whole, since an
      assignment such as name=value is its own token there. */
-  if (!is_command && token.length >= 2 && token[0] == '-')
+  if (!open_quote.has_value() && !is_command && token.length >= 2 &&
+      token[0] == '-')
     if (let const equals = token.find_character('='); equals.has_value()) {
       token_start = token_start + *equals + 1;
       token = line.substring_of_length(token_start, token_end - token_start);
@@ -900,7 +992,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
          list a whole directory to suggest nothing. The listing runs for the
          ghost only once a basename is typed, while an explicit tab still lists.
        */
-      candidates = complete_filesystem(token, base_directory);
+      candidates =
+          complete_filesystem(token, base_directory, open_quote.has_value());
     }
   }
 

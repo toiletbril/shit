@@ -9,6 +9,7 @@
 [Word
   Unquoted "doesnotexist_xyz*"
 ]
-shit: 3:1: error: The glob pattern 'doesnotexist_xyz*' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'doesnotexist_xyz*' or relax with set +o failglob.
+shit: 3:1: error: A glob pattern in command position is rarely intended as a command name.
      3 |  doesnotexist_xyz*
        |  ^~~~~~~~~~~~~~~~~ here.
+note: Quote it to run a literal name, or list the matches with compgen -G.

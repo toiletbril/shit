@@ -1194,7 +1194,9 @@ public:
      newlines stripped. The inner command runs in-process with the working
      directory and variables snapshotted, so a cd or an assignment inside does
      not leak to the parent. */
-  fn capture_command_substitution(const String &source) throws -> String;
+  fn capture_command_substitution(const String &source,
+                                  Maybe<StringView> filename = None) throws
+      -> String;
 
   /* Same capture, but the segment caches its parsed inner command so a $(...)
      in a loop body is lexed and parsed once and re-evaluated thereafter. The

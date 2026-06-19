@@ -76,6 +76,10 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   if (search_builtin(word).has_value()) return true;
   if (context.find_function(word) != nullptr) return true;
   if (context.get_alias(word).has_value()) return true;
+  /* A bare coreutil with no PATH binary still runs through the shitbox
+     fallback when the toggle is on, so it resolves here the way the runtime
+     resolver gates it rather than reading as a dead command. */
+  if (context.shitbox() && shitbox::find_util(word).has_value()) return true;
 
   /* Only the PATH search verdict caches, paying the directory stats once per
      distinct word, dropped when PATH changes. A function or alias is seen live
@@ -849,6 +853,10 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (!command_position && plain && !is_assignment) {
       if (!word.is_empty() && word[0] == '-') {
         do_push(word_start, word_end, colors::ansi::GRAY);
+      } else if (token_has_glob_metacharacter(word)) {
+        /* An unquoted glob argument reads yellow, the word is plain here so the
+           metacharacter is live rather than a quoted literal. */
+        do_push(word_start, word_end, colors::ansi::YELLOW);
       } else {
         let const is_word_terminated =
             word_is_terminated_by_separator(line, word_end, end);

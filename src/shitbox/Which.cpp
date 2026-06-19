@@ -8,15 +8,16 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] program [program ...]");
+HELP_SYNOPSIS_DECL("[-aq] program [program ...]");
 
 HELP_DESCRIPTION_DECL(
     "The which utility prints how each named program resolves, naming it a "
     "shell builtin or printing its PATH location. With -a it prints every PATH "
-    "match instead of the first. The status is non-zero when no name "
-    "resolves.");
+    "match instead of the first. With -q it prints nothing and only sets the "
+    "status. The status is non-zero when no name resolves.");
 
 FLAG(ALL, Bool, 'a', "all", "Show all matches.");
+FLAG(QUIET, Bool, 'q', "quiet", "Print nothing, only set the status.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Which);
@@ -39,36 +40,46 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
+  /* -q reports only through the status, so the output is never built or
+     printed and the resolution is tracked in a flag instead of the buffer. */
+  let const is_quiet = FLAG_QUIET.is_enabled();
   let output = String{};
+  bool found_any = false;
 
   for (let const &program_name : operands) {
     LOG(Debug, "which resolving '%s' against builtins and PATH",
         program_name.c_str());
     if (search_builtin(program_name.view()).has_value()) {
-      output += program_name;
-      /* The descriptive suffix is for a human at a terminal. A pipe gets just
-         the name, which stays machine readable. */
-      if (os::is_stdout_a_tty()) output += ": Shell builtin";
-      output += '\n';
+      found_any = true;
+      if (!is_quiet) {
+        output += program_name;
+        /* The descriptive suffix is for a human at a terminal. A pipe gets just
+           the name, which stays machine readable. */
+        if (os::is_stdout_a_tty()) output += ": Shell builtin";
+        output += '\n';
+      }
     } else if (let const paths = utils::search_program_path(
                    program_name, FLAG_ALL.is_enabled());
                paths.count() != 0)
     {
-      if (FLAG_ALL.is_enabled()) {
-        for (let const &path : paths) {
-          output += path.text();
+      found_any = true;
+      if (!is_quiet) {
+        if (FLAG_ALL.is_enabled()) {
+          for (let const &path : paths) {
+            output += path.text();
+            output += '\n';
+          }
+        } else {
+          output += paths[0].text();
           output += '\n';
         }
-      } else {
-        output += paths[0].text();
-        output += '\n';
       }
     }
   }
 
-  ec.print_to_stdout(output);
+  if (!is_quiet) ec.print_to_stdout(output);
 
-  return output.is_empty() ? 1 : 0;
+  return found_any ? 0 : 1;
 }
 
 } /* namespace shitbox */
