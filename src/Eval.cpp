@@ -55,12 +55,12 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
     m_exported_names.add(name.view());
 }
 
-fn runtime_state::capture(const EvalContext &context) wontthrow -> runtime_state
+fn RuntimeState::capture(const EvalContext &context) wontthrow -> RuntimeState
 {
   return context.m_runtime;
 }
 
-fn runtime_state::restore(EvalContext &context) const wontthrow -> void
+fn RuntimeState::restore(EvalContext &context) const wontthrow -> void
 {
   context.m_runtime = *this;
 }
@@ -1413,7 +1413,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_enable_echo,
                              m_enable_echo_expanded,
                              m_environment_undo_log.count(),
-                             runtime_state::capture(*this),
+                             RuntimeState::capture(*this),
                              m_no_clobber,
                              m_export_all};
 }

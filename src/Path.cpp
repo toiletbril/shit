@@ -606,12 +606,12 @@ fn Path::temp_directory() throws -> Path
 #endif
 }
 
-fn Path::read_entire_file(StringView path) throws -> Maybe<String>
+fn Path::read_entire_file() const throws -> Maybe<String>
 {
-  LOG(Debug, "reading the entire file '%.*s'", static_cast<int>(path.length),
-      path.data);
+  LOG(Debug, "reading the entire file '%s'", c_str());
 
-  let const file = os::open_file_descriptor(path, os::file_open_mode::Read);
+  let const file =
+      os::open_file_descriptor(text().view(), os::file_open_mode::Read);
   if (!file) return None;
 
   let contents = String{};

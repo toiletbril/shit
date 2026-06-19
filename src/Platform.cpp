@@ -254,7 +254,7 @@ fn get_current_user() throws -> Maybe<String>
   /* A container that exports neither leaves the environment bare, so the name
      is read from /etc/passwd by the current uid. getuid is a plain syscall, so
      the static build avoids the NSS modules getpwuid would pull in. */
-  let const contents = Path::read_entire_file("/etc/passwd");
+  let const contents = Path{StringView{"/etc/passwd"}}.read_entire_file();
   if (!contents) return shit::None;
   let const wanted_uid = utils::uint_to_text(static_cast<u64>(getuid()));
   let const text = contents->view();
@@ -308,7 +308,7 @@ fn get_home_for_user(StringView username) throws -> Maybe<Path>
 {
   if (username.is_empty()) return shit::None;
 
-  let const contents = Path::read_entire_file("/etc/passwd");
+  let const contents = Path{StringView{"/etc/passwd"}}.read_entire_file();
   if (!contents) return shit::None;
 
   let const text = contents->view();
@@ -325,7 +325,7 @@ fn enumerate_users() throws -> ArrayList<String>
 {
   ArrayList<String> users{};
 
-  let const contents = Path::read_entire_file("/etc/passwd");
+  let const contents = Path{StringView{"/etc/passwd"}}.read_entire_file();
   if (!contents) return users;
 
   let const text = contents->view();
@@ -1736,7 +1736,7 @@ fn format_mode_string(u32 mode) throws -> String
 static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
                             usize id_field_index) throws -> Maybe<String>
 {
-  let const contents = Path::read_entire_file(database_path);
+  let const contents = Path{database_path}.read_entire_file();
   if (!contents) return shit::None;
   let const wanted = utils::uint_to_text(static_cast<u64>(wanted_id));
   let const text = contents->view();
@@ -1828,7 +1828,7 @@ fn enumerate_processes(bool include_resource_stats) throws
        the kernel-thread fallback. */
     const String proc_pid = "/proc/" + name;
     const String comm_path = proc_pid + "/comm";
-    Maybe<String> comm = Path::read_entire_file(comm_path.view());
+    Maybe<String> comm = Path{comm_path.view()}.read_entire_file();
     if (!comm.has_value()) continue;
     /* The comm file ends with a newline the listing does not want. */
     String command_name = steal(*comm);
@@ -1843,7 +1843,7 @@ fn enumerate_processes(bool include_resource_stats) throws
        ps can render the owner the way it does. A process that has gone since
        the directory scan leaves the owner at zero. */
     const String status_path = proc_pid + "/status";
-    if (Maybe<String> status = Path::read_entire_file(status_path.view());
+    if (Maybe<String> status = Path{status_path.view()}.read_entire_file();
         status.has_value())
     {
       let const text = status->view();
@@ -1877,7 +1877,7 @@ fn enumerate_processes(bool include_resource_stats) throws
        thread exposes an empty cmdline, so the bracketed command name stands in
        the way ps shows it. */
     const String cmdline_path = proc_pid + "/cmdline";
-    if (Maybe<String> cmdline = Path::read_entire_file(cmdline_path.view());
+    if (Maybe<String> cmdline = Path{cmdline_path.view()}.read_entire_file();
         cmdline.has_value() && !cmdline->is_empty())
     {
       String command_line{};
@@ -1900,7 +1900,7 @@ fn enumerate_processes(bool include_resource_stats) throws
          after the last ')', where the state is first and the user and system
          times are the twelfth and thirteenth. */
       if (Maybe<String> stat =
-              Path::read_entire_file((proc_pid + "/stat").view());
+              Path{(proc_pid + "/stat").view()}.read_entire_file();
           stat.has_value())
       {
         let const text = stat->view();
@@ -1927,7 +1927,7 @@ fn enumerate_processes(bool include_resource_stats) throws
       /* /proc/<pid>/statm gives the sizes in pages, the first the virtual size
          and the second the resident set. */
       if (Maybe<String> statm =
-              Path::read_entire_file((proc_pid + "/statm").view());
+              Path{(proc_pid + "/statm").view()}.read_entire_file();
           statm.has_value())
       {
         let const page_kib = static_cast<u64>(sysconf(_SC_PAGESIZE)) / 1024;

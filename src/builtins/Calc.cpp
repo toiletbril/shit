@@ -54,9 +54,9 @@ fn evaluate_one(ExecContext &ec, EvalContext &cxt, StringView expression) throws
     show_message(error.to_string(expression));
     return 1;
   } catch (const Error &error) {
-    report_soft_builtin_error(ec, cxt, "cannot evaluate '" +
-                                           String{expression} + "', " +
-                                           error.message());
+    report_soft_builtin_error(ec, cxt,
+                              "cannot evaluate '" + String{expression} + "', " +
+                                  error.message());
     return 1;
   }
 }

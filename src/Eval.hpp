@@ -8,8 +8,8 @@
 #include "Maybe.hpp"
 #include "MimicMood.hpp"
 #include "Path.hpp"
-#include "RuntimeState.hpp"
 #include "ResolvedCommand.hpp"
+#include "RuntimeState.hpp"
 
 /* The [[ =~ ]] operator compiles its pattern with the POSIX regex API. Windows
    has no regcomp, so the operator and the cache are POSIX-only. */
@@ -266,7 +266,7 @@ struct eval_state_snapshot
      flag ride the snapshot too, so a set -o pipefail, a set -u, a set -o
      noclobber, a set -a, or a set --mood inside a subshell or a command
      substitution dies with the child rather than leaking to the parent. */
-  runtime_state runtime;
+  RuntimeState runtime;
   bool no_clobber;
   bool export_all;
 };
@@ -926,14 +926,14 @@ public:
   }
 
   /* Enter the mood and diagnostic state a function was defined in, deriving the
-     strictness from that mood, and return the previous runtime_state so a defer
-     restores it. The defining state arrives as one struct rather than a flag at
-     a time. runtime_state reads and writes the toggles, so it is a friend. */
-  friend struct runtime_state;
+     strictness from that mood, and return the previous RuntimeState so a defer
+     restores it. The defining state arrives as one object rather than a flag at
+     a time. RuntimeState reads and writes the toggles, so it is a friend. */
+  friend class RuntimeState;
   fn enter_definition_state(const function_definition_info &info) wontthrow
-      -> runtime_state
+      -> RuntimeState
   {
-    let const previous = runtime_state::capture(*this);
+    let const previous = RuntimeState::capture(*this);
     m_runtime.mood = static_cast<mimic_mood>(info.defining_mood);
     m_runtime.are_warnings_enabled = info.were_warnings_enabled_at_definition;
     m_runtime.are_diagnostics_disabled =
@@ -1500,10 +1500,10 @@ protected:
 
   /* The mood and the diagnostic and strictness toggles, grouped as one runtime
      state so a scope that swaps them for a function call or a mimicked script
-     saves and restores the whole set with one runtime_state copy. failglob
+     saves and restores the whole set with one RuntimeState copy. failglob
      defaults on, the strict shell default that catches a typo, the other
      toggles default off. */
-  runtime_state m_runtime{.failglob = true};
+  RuntimeState m_runtime{.failglob = true};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   bool m_mood_set_explicitly{false};

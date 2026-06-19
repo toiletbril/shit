@@ -531,7 +531,7 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
 static fn source_file(const Path &path, EvalContext &context,
                       BumpArena &ast_arena) -> bool
 {
-  Maybe<String> contents = Path::read_entire_file(path.text());
+  Maybe<String> contents = path.read_entire_file();
   if (!contents) {
     LOG(Info, "skipping '%s' because the file is missing or unreadable",
         path.c_str());
@@ -1307,7 +1307,7 @@ fn main(int argc, char **argv) -> int
           const shit::String &file_name = file_names[0];
           LOG(Info, "reading the script file '%s'", file_name.c_str());
           shit::Maybe<shit::String> contents =
-              shit::Path::read_entire_file(file_name.view());
+              shit::Path{file_name.view()}.read_entire_file();
           if (!contents) {
             /* The caret points at the operand in the joined invocation, the
                same line the flag parser renders its errors against, so the

@@ -128,9 +128,9 @@ public:
   cold mustuse static fn read_directory_typed(const Path &dir) throws
       -> Maybe<ArrayList<directory_child>>;
 
-  /* Read the whole file at path into a string through the os descriptor layer,
-     so no iostream file stream is pulled in. None when the open fails. */
-  mustuse static fn read_entire_file(StringView path) throws -> Maybe<String>;
+  /* Read the whole file at this path into a string through the os descriptor
+     layer, so no iostream file stream is pulled in. None when the open fails. */
+  mustuse fn read_entire_file() const throws -> Maybe<String>;
 
   /* Resolve a path against the filesystem, rooting a relative path that holds a
      slash, normalizing it, and trying the omitted command suffixes on a name

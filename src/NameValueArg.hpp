@@ -18,20 +18,17 @@ public:
                         arg.substring(*equals + 1)};
   }
 
-  mustuse pure fn get_name() const wontthrow -> StringView
-  {
-    return m_name;
-  }
+  mustuse pure fn get_name() const wontthrow -> StringView { return m_name; }
 
-  mustuse pure fn get pure fn get_value() const wontthrow
-      -> const Maybe<StringView> &
+  mustuse pure fn get_value() const wontthrow -> const Maybe<StringView> &
   {
     return m_value;
   }
 
 private:
   NameValueArg(StringView name, Maybe<StringView> value) wontthrow
-      : m_name(name), m_value(steal(value))
+      : m_name(name),
+        m_value(steal(value))
   {}
 
   StringView m_name;

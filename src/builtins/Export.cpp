@@ -38,7 +38,7 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let has_error = false;
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
-    let const parts = utils::NameValueArg::from(arg);
+    let const parts = NameValueArg::from(arg);
 
     let name = String{};
     let value = String{};

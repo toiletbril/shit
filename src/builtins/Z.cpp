@@ -80,7 +80,7 @@ static fn read_frecency_store() throws -> ArrayList<frecency_entry>
   let entries = ArrayList<frecency_entry>{};
   let path = frecency_store_path();
   if (!path) return entries;
-  let content = Path::read_entire_file(path->text().view());
+  let content = path->read_entire_file();
   if (!content) return entries;
 
   let const text = content->view();

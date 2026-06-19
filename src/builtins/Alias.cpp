@@ -53,7 +53,7 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i32 status = 0;
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
-    let const parts = utils::NameValueArg::from(arg);
+    let const parts = NameValueArg::from(arg);
 
     if (parts.get_value().has_value()) {
       LOG(All, "alias defining '%.*s'",

@@ -933,8 +933,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
        toggles off, so an unmatched glob or an unset variable in a recipe does
        not abort the build the way the default mood would. The prior runtime is
        restored on the way out, including an unwinding throw. */
-    let const saved_runtime = runtime_state::capture(cxt);
-    runtime_state recipe_runtime = saved_runtime;
+    let const saved_runtime = RuntimeState::capture(cxt);
+    RuntimeState recipe_runtime = saved_runtime;
     recipe_runtime.failglob = false;
     recipe_runtime.error_unset = false;
     recipe_runtime.are_warnings_enabled = false;
@@ -1029,7 +1029,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
     throw Error{"Unable to find a Makefile in the current directory"};
   }
 
-  Maybe<String> source = Path::read_entire_file(makefile_path.view());
+  Maybe<String> source = Path{makefile_path.view()}.read_entire_file();
   if (!source.has_value())
     throw Error{"Unable to read the makefile '" + makefile_path + "'"};
 
@@ -1057,7 +1057,7 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
     -> ArrayList<String>
 {
   let targets = ArrayList<String>{};
-  let const source = Path::read_entire_file(makefile.text().view());
+  let const source = makefile.read_entire_file();
   if (!source.has_value()) return targets;
 
   /* The parser expands variables and runs the := and conditional assignments,

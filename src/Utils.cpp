@@ -350,8 +350,8 @@ fn split_lines(StringView text) throws -> ArrayList<StringView>
   for (usize i = 0; i <= text.length; i++) {
     if (i != text.length && text[i] != '\n') continue;
 
-    lines.push(text.substring_of_length(line_start_position,
-                                        i - line_start_position));
+    lines.push(
+        text.substring_of_length(line_start_position, i - line_start_position));
     line_start_position = i + 1;
   }
   return lines;
@@ -1708,7 +1708,7 @@ fn current_git_branch() throws -> String
        'gitdir: <path>' pointer rather than a directory, so the real git dir is
        followed before reading HEAD. */
     let git_dir = head.clone();
-    if (let const dot_git = Path::read_entire_file(head.text().view())) {
+    if (let const dot_git = head.read_entire_file()) {
       let const pointer = dot_git->view();
       let const gitdir_prefix = StringView{"gitdir: "};
       if (pointer.starts_with(gitdir_prefix)) {
@@ -1730,7 +1730,7 @@ fn current_git_branch() throws -> String
     }
     let git_head = git_dir.clone();
     git_head.push_component("HEAD");
-    if (let const content = Path::read_entire_file(git_head.text().view())) {
+    if (let const content = git_head.read_entire_file()) {
       let text = content->view();
       while (!text.is_empty() &&
              (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))

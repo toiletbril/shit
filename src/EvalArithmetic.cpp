@@ -1227,9 +1227,12 @@ public:
   [[noreturn]] cold fn fail(StringView message) throws -> void
   {
     /* The caret indexes the expression at the current position, so calc, the
-       only caller of the wide evaluator, points it under the offending token. */
-    throw ErrorWithLocation{SourceLocation{pos, 1},
-                            "Arithmetic: " + message};
+       only caller of the wide evaluator, points it under the offending token.
+     */
+    throw ErrorWithLocation{
+        SourceLocation{pos, 1},
+        "Arithmetic: " + message
+    };
   }
 
   fn skip_spaces() wontthrow -> void
@@ -1308,8 +1311,10 @@ public:
        */
       ErrorWithLocation error{
           SourceLocation{pos, source.length - pos},
-          "Arithmetic: unexpected '" + String{source.substring(pos)} +
-              "' after the expression"};
+          "Arithmetic: unexpected '" + String{source.substring(pos)}
+          +
+              "' after the expression"
+      };
       error.set_note("an operator is missing between two values");
       throw error;
     }

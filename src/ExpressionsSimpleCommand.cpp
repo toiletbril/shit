@@ -1264,7 +1264,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
              cxt.warnings_enabled() ||
          definition_info->were_diagnostics_disabled_at_definition !=
              cxt.diagnostics_disabled());
-    Maybe<runtime_state> saved_runtime_state = None;
+    Maybe<RuntimeState> saved_runtime_state = None;
     if (needs_state_swap)
       saved_runtime_state = cxt.enter_definition_state(*definition_info);
     defer

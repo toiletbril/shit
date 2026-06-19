@@ -262,7 +262,7 @@ static fn man_subcommand_page_is_valid(StringView command,
       return true;
     }
 
-  let source = Path::read_entire_file(file_path->view());
+  let source = Path{file_path->view()}.read_entire_file();
   if (!source.has_value()) {
     MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), true);
     return true;
@@ -277,7 +277,7 @@ static fn man_subcommand_page_is_valid(StringView command,
       target_end++;
     let target = Path{file_path->view()}.parent().parent();
     target.push_component(rest.substring_of_length(0, target_end));
-    source = Path::read_entire_file(target.text().view());
+    source = target.read_entire_file();
     if (!source.has_value()) {
       MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), true);
       return true;

@@ -69,9 +69,8 @@ pure fn is_posix_reserved_word(StringView word) wontthrow -> bool;
    hexadecimal form also accepts a leading 0x. */
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 
-
-/* name_value_arg and split_name_value_arg live in NameValueArg.hpp so the
-   assignment builtins reach them without the rest of this header. */
+/* The NameValueArg class lives in NameValueArg.hpp so the assignment builtins
+   reach it without the rest of this header. */
 
 /* Format a signed integer as decimal into a fresh String, the StringView-native
    replacement for std::to_string. The unsigned form is for ids and sizes that

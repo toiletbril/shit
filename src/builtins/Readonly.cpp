@@ -54,7 +54,7 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
-    let const parts = utils::NameValueArg::from(arg);
+    let const parts = NameValueArg::from(arg);
 
     LOG(All, "readonly marking '%.*s' against later assignment",
         static_cast<int>(parts.get_name().length), parts.get_name().data);

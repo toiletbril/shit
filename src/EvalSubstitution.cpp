@@ -75,7 +75,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   let const filename = expand_word_for_assignment(
       static_cast<const tokens::WordToken *>(name)->word());
   LOG(Debug, "the substitution is a bare file read of '%s'", filename.c_str());
-  let content = Path::read_entire_file(filename.view());
+  let content = Path{filename.view()}.read_entire_file();
   /* An unreadable file yields an empty substitution, the way bash leaves
      COMPREPLY-style reads empty rather than aborting. */
   if (!content.has_value()) {
