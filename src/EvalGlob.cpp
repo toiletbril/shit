@@ -547,9 +547,9 @@ hot fn EvalContext::expand_path(glob_field field,
       warn_or_throw(m_runtime.failglob, m_runtime.failglob_explicit, location,
                     "The glob pattern '" + pattern +
                         "' matched no file, it expands to its literal text, "
-                        "which is rarely intended. Probe for matches with "
-                        "compgen -G '" +
-                        pattern + "' or relax with set +o failglob");
+                        "which is rarely intended",
+                    "Probe for matches with compgen -G '" + pattern +
+                        "' or relax with set +o failglob");
     values.push(steal(pattern));
   }
 

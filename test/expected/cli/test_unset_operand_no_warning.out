@@ -1,0 +1,10 @@
+== test -z on an unset var is silent:
+empty
+== [ -z on an unset var is silent:
+bracket-empty
+== test equality with an unset var is silent:
+not-x
+== a plain expansion still warns (count):
+1
+== the suppression does not leak past the test (count):
+1

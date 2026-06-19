@@ -228,6 +228,18 @@ enum class mimic_mood : u8
   Bash,
 };
 
+/* A warning the evaluator can silence for the span of a construct, tracked in
+   the suppressed-warnings bitset on the context. UnsetReference exempts an
+   unset name entirely, the way [[ -v ]] reads only whether a name is set, so
+   neither the warning nor the set -u abort fires. UnsetTestOperand silences
+   only the advisory unset warning while a test or [ expands its operands, the
+   set -u abort still fires. Each value names a bit position in the bitset. */
+enum class suppressible_warning : u8
+{
+  UnsetReference,
+  UnsetTestOperand,
+};
+
 class EvalContext;
 
 /* A snapshot of the mood and the diagnostic and strictness toggles, captured
@@ -786,16 +798,21 @@ public:
   {
     m_runtime.error_unset_explicit = enabled;
   }
-  /* A [[ -v name ]] existence test must stay silent about an unset operand, so
-     the conditional sets this around the operand expansion and
-     report_unset_reference honors it. */
-  fn set_suppress_unset_warning(bool enabled) wontthrow -> void
+  /* Mark a warning suppressed or not for the span of a construct, so a caller
+     saves the prior state, sets it, and restores it on the way out. */
+  fn set_warning_suppressed(suppressible_warning which, bool enabled) wontthrow
+      -> void
   {
-    m_suppress_unset_warning = enabled;
+    let const bit = u32{1} << static_cast<u32>(which);
+    if (enabled)
+      m_suppressed_warnings |= bit;
+    else
+      m_suppressed_warnings &= ~bit;
   }
-  pure fn suppresses_unset_warning() const wontthrow -> bool
+  pure fn is_warning_suppressed(suppressible_warning which) const wontthrow
+      -> bool
   {
-    return m_suppress_unset_warning;
+    return (m_suppressed_warnings & (u32{1} << static_cast<u32>(which))) != 0;
   }
   /* -W keeps a run going past a strict error by reporting it as a warning. The
      analysis stage reads the static flag, the runtime checks below read this
@@ -817,7 +834,8 @@ public:
      unmatched glob the one caller. Throws when fatal and not downgraded,
      warns under -W, returns for the lenient fallback otherwise. */
   fn warn_or_throw(bool fatal, bool explicitly_requested,
-                   SourceLocation location, StringView message) throws -> void;
+                   SourceLocation location, StringView message,
+                   StringView note = {}) throws -> void;
   /* Renders a located runtime warning at the command being evaluated, the
      shared path the -W downgrades print through. The _at form takes a finer
      location inside that command, the unset-variable caret on the reference
@@ -1518,7 +1536,9 @@ protected:
   bool m_mood_set_explicitly{false};
   bool m_no_clobber{false};
   bool m_export_all{false};
-  bool m_suppress_unset_warning{false};
+  /* The warnings suppressed for the current span, one bit per
+     suppressible_warning value. */
+  u32 m_suppressed_warnings{0};
   bool m_no_exec{false};
   bool m_mimicry{false};
   /* The nesting of mimicked scripts, bounded so a script that mimics another

@@ -400,6 +400,21 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
   m_glob_exempt_for_test = is_test_command;
   defer { m_glob_exempt_for_test = previous_glob_exempt; };
 
+  /* A test or [ command reads an operand to probe presence or emptiness, so an
+     unset variable there is the question the command asks rather than a
+     mistake. The unset warning is suppressed across the operand expansion the
+     way test -z "$x" reads, matching the glob exemption above. An explicit set
+     -u still aborts, so this silences only the advisory warning. */
+  let const previous_suppress_test_warning =
+      is_warning_suppressed(suppressible_warning::UnsetTestOperand);
+  if (is_test_command)
+    set_warning_suppressed(suppressible_warning::UnsetTestOperand, true);
+  defer
+  {
+    set_warning_suppressed(suppressible_warning::UnsetTestOperand,
+                           previous_suppress_test_warning);
+  };
+
   for (const Token *token : args) {
     let const location = token->source_location();
     try {

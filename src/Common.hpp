@@ -32,9 +32,15 @@
 #define SHIT_OS_INFO "<unset>"
 #endif
 
+#if !defined SHIT_LIBC
+#warning SHIT_LIBC should be defined. Please use provided makefile for \
+         compilation!
+#define SHIT_LIBC "<unknown libc>"
+#endif
+
 #define SHIT_BUILD_DATE (__DATE__ " at " __TIME__)
 
-#define SHIT_COMPILER SHIT_COMPILER_COMMAND " (" __VERSION__ ")"
+#define SHIT_COMPILER SHIT_COMPILER_COMMAND " (" __VERSION__ ", " SHIT_LIBC ")"
 
 /* Constants for --help and --version. */
 
@@ -43,8 +49,6 @@
 #define SHIT_VER_PATCH 8
 #define SHIT_VER_EXTRA "beta"
 
-/* The version as a compile-time string, so the startup does not rebuild it from
-   the numeric parts with a String allocation on every invocation. */
 #define SHIT_STRINGIFY_INNER(x) #x
 #define SHIT_STRINGIFY(x)       SHIT_STRINGIFY_INNER(x)
 #define SHIT_VERSION_STRING                                                    \

@@ -1363,7 +1363,18 @@ static fn rebuild_path_cache() throws -> void
   PATH_CACHE.clear();
   PATH_CACHE_IS_STALE = false;
   if (!MAYBE_PATH) return;
-  for (let const &dir_string : split_path_dirs(*MAYBE_PATH)) {
+
+  let const path_dirs = split_path_dirs(*MAYBE_PATH);
+
+  /* A counting pass sizes the cache once so the bulk insert does not climb a
+     rehash chain from sixteen slots. The directory listings cache, so the
+     insert pass below reads them back without a second readdir. */
+  usize total_entries = 0;
+  for (let const &dir_string : path_dirs)
+    total_entries += directory_listing(Path{dir_string.view()}).count();
+  PATH_CACHE.reserve(total_entries);
+
+  for (let const &dir_string : path_dirs) {
     let const directory = Path{dir_string.view()};
     for (let const &entry_name : directory_listing(directory)) {
       let name = entry_name.clone();

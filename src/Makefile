@@ -76,10 +76,25 @@ endif
 
 ifeq ($(MODE), cosmo)
 OS_INFO := "unknown-cosmo"
+LIBC_INFO := cosmopolitan libc
 else ifeq ($(MODE), cosmo_dbg)
 OS_INFO := "unknown-cosmo-dbg"
+LIBC_INFO := cosmopolitan libc
 else
-OS_INFO := $(shell uname -rvom || echo "<no uname>")
+# The distribution PRETTY_NAME from /etc/os-release leads the uname line when the
+# file is present, naming the distro alongside the kernel.
+OS_INFO := $(shell . /etc/os-release 2>/dev/null; printf '%s%s' "$${PRETTY_NAME:+$$PRETTY_NAME }" "$$(uname -rvom 2>/dev/null || echo '<no uname>')")
+endif
+
+# The libc implementation and version for the --version compiler line. getconf
+# names the glibc version directly, ldd reports the musl line otherwise, and a
+# cross build to Windows links the mingw C runtime.
+ifndef LIBC_INFO
+ifeq ($(TARGET), Windows_NT)
+LIBC_INFO := mingw msvcrt
+else
+LIBC_INFO := $(shell getconf GNU_LIBC_VERSION 2>/dev/null || ldd --version 2>&1 | head -n 1 || echo 'unknown libc')
+endif
 endif
 
 COMMIT_HASH := $(shell git rev-parse HEAD || echo "<no git>")
@@ -90,6 +105,7 @@ CXXFLAGS := # nothing
 
 DEFINES := \
 	-DSHIT_COMPILER_COMMAND="\"$(CXX)\"" \
+	-DSHIT_LIBC="\"$(LIBC_INFO)\"" \
 	-DSHIT_OS_INFO="\"$(OS_INFO)\"" \
 	-DSHIT_COMMIT_HASH="\"$(COMMIT_HASH)\"" \
 	-DSHIT_BUILD_MODE="\"$(MODE)\"" \

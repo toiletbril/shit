@@ -79,6 +79,21 @@ public:
 
   mustuse pure fn count() const wontthrow -> usize { return m_count; }
 
+  /* Grow the table up front to hold at least expected_count entries without a
+     later rehash, so a known bulk insert such as the PATH cache pays one
+     allocation rather than a doubling chain. The table rehashes at three
+     quarters full, so the capacity is sized for that load and rounded up to the
+     power of two the mask needs. */
+  cold fn reserve(usize expected_count) throws -> void
+  {
+    let const needed = (expected_count * 4 / 3) + 1;
+    usize new_capacity = m_capacity == 0 ? 16 : m_capacity;
+    while (new_capacity < needed)
+      new_capacity *= 2;
+
+    if (new_capacity > m_capacity) rehash(new_capacity);
+  }
+
   /* The value for the key, or nullptr when absent. The pointer is stable until
      the next set that grows the table. */
   hot mustuse pure fn find(StringView key) const wontthrow -> const Value *

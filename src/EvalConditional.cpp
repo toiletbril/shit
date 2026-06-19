@@ -318,9 +318,15 @@ struct ConditionalEvaluator
          a throw from the operand expansion cannot strand the suppression on and
          a nested -v test puts back the outer value rather than clearing it. */
       const bool is_existence_test = first_literal.view() == "-v";
-      const bool saved_suppress_unset = cxt.suppresses_unset_warning();
-      if (is_existence_test) cxt.set_suppress_unset_warning(true);
-      defer { cxt.set_suppress_unset_warning(saved_suppress_unset); };
+      const bool saved_suppress_unset =
+          cxt.is_warning_suppressed(suppressible_warning::UnsetReference);
+      if (is_existence_test)
+        cxt.set_warning_suppressed(suppressible_warning::UnsetReference, true);
+      defer
+      {
+        cxt.set_warning_suppressed(suppressible_warning::UnsetReference,
+                                   saved_suppress_unset);
+      };
       const String operand = operand_value(elements[pos - 1]);
       return eval_unary(first_literal.view(), operand.view());
     }

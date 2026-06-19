@@ -301,7 +301,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
   m_pending_heredocs.clear();
 }
 
-hot fn Lexer::lex_expression_token() throws -> Token *
+hot flatten fn Lexer::lex_expression_token() throws -> Token *
 {
   if (const let ch = chop_character(); ch != lexer::CEOF) [[likely]] {
     if (lexer::is_number(ch))
@@ -412,7 +412,7 @@ hot fn Lexer::lex_number() throws -> Token *
 }
 
 /* Hottest function in the entire codebase. */
-flatten hot fn Lexer::lex_identifier() throws -> Token *
+flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 {
   let word = Word{};
 
@@ -1371,7 +1371,7 @@ hot pure static fn lookup_operator(char ch) wontthrow -> Maybe<Token::Kind>
   }
 }
 
-hot fn Lexer::lex_sentinel() throws -> Token *
+hot forceinline fn Lexer::lex_sentinel() throws -> Token *
 {
   const let ch = chop_character();
   ASSERT(ch != lexer::CEOF);
@@ -1533,7 +1533,8 @@ hot fn Lexer::lex_sentinel() throws -> Token *
   return tok;
 }
 
-hot fn Lexer::lex_process_substitution(char direction) throws -> Token *
+hot forceinline fn Lexer::lex_process_substitution(char direction) throws
+    -> Token *
 {
   let const open_position = m_cursor_position;
   usize byte_count = 0;

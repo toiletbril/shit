@@ -111,7 +111,8 @@ public:
 protected:
   /* Stamp a location in the source being lexed with this lexer's filename, so
      every token and error the lexer makes points a caret at the named file. */
-  pure fn here(usize position, usize length) const wontthrow -> SourceLocation
+  pure forceinline fn here(usize position, usize length) const wontthrow
+      -> SourceLocation
   {
     return SourceLocation{position, length, m_filename};
   }

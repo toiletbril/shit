@@ -146,6 +146,10 @@ static fn build_man_subcommand_index() throws -> void
           directory.text().c_str());
       continue;
     }
+    /* A man1 tree holds thousands of pages, so the page map grows to hold this
+       directory's entries up front rather than climbing a rehash chain from
+       sixteen slots as each page inserts. */
+    MAN_PAGE_FILE_PATHS.reserve(MAN_PAGE_FILE_PATHS.count() + entries->count());
     for (let const &entry : *entries) {
       let const stripped = strip_man1_suffix(entry.view());
       if (!stripped.has_value() || stripped->is_empty()) continue;
