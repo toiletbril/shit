@@ -61,7 +61,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      status a command-not-found leaves. */
   let program_path = Path{};
   if (command_name.find_character('/').has_value()) {
-    let resolved = utils::canonicalize_path(command_name);
+    let resolved = Path::canonicalize(command_name);
     if (!resolved) {
       show_message("exec: '" + command_name + "': not found");
       utils::quit(127, true);

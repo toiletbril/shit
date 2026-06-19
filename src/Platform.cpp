@@ -254,16 +254,11 @@ fn get_current_user() throws -> Maybe<String>
   /* A container that exports neither leaves the environment bare, so the name
      is read from /etc/passwd by the current uid. getuid is a plain syscall, so
      the static build avoids the NSS modules getpwuid would pull in. */
-  let const contents = utils::read_entire_file("/etc/passwd");
+  let const contents = Path::read_entire_file("/etc/passwd");
   if (!contents) return shit::None;
   let const wanted_uid = utils::uint_to_text(static_cast<u64>(getuid()));
   let const text = contents->view();
-  usize line_start_position = 0;
-  for (usize i = 0; i <= text.length; i++) {
-    if (i != text.length && text[i] != '\n') continue;
-    let const line =
-        text.substring_of_length(line_start_position, i - line_start_position);
-    line_start_position = i + 1;
+  for (let const &line : utils::split_lines(text)) {
     if (passwd_field(line, 2) != wanted_uid.view()) continue;
     let const name = passwd_field(line, 0);
     if (!name.is_empty()) return String{name};
@@ -313,16 +308,11 @@ fn get_home_for_user(StringView username) throws -> Maybe<Path>
 {
   if (username.is_empty()) return shit::None;
 
-  let const contents = utils::read_entire_file("/etc/passwd");
+  let const contents = Path::read_entire_file("/etc/passwd");
   if (!contents) return shit::None;
 
   let const text = contents->view();
-  usize line_start_position = 0;
-  for (usize i = 0; i <= text.length; i++) {
-    if (i != text.length && text[i] != '\n') continue;
-    let const line =
-        text.substring_of_length(line_start_position, i - line_start_position);
-    line_start_position = i + 1;
+  for (let const &line : utils::split_lines(text)) {
     if (passwd_field(line, 0) != username) continue;
     let const home_field = passwd_field(line, 5);
     if (home_field.is_empty()) return shit::None;
@@ -335,16 +325,11 @@ fn enumerate_users() throws -> ArrayList<String>
 {
   ArrayList<String> users{};
 
-  let const contents = utils::read_entire_file("/etc/passwd");
+  let const contents = Path::read_entire_file("/etc/passwd");
   if (!contents) return users;
 
   let const text = contents->view();
-  usize line_start_position = 0;
-  for (usize i = 0; i <= text.length; i++) {
-    if (i != text.length && text[i] != '\n') continue;
-    let const line =
-        text.substring_of_length(line_start_position, i - line_start_position);
-    line_start_position = i + 1;
+  for (let const &line : utils::split_lines(text)) {
     let const name = passwd_field(line, 0);
     if (!name.is_empty()) users.push(String{name});
   }
@@ -1115,14 +1100,13 @@ fn process_from_pid(i64 pid) wontthrow -> process
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 {
   /* A bare number names the signal directly. */
-  if (utils::is_all_decimal_digits(name)) {
+  if (name.is_all_decimal_digits()) {
     const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(name);
     if (parsed_value.is_error()) return shit::None;
     return static_cast<i32>(parsed_value.value());
   }
 
-  String bare{name};
-  if (bare.starts_with("SIG")) bare = String{bare.substring(3)};
+  let const bare = utils::strip_sig_prefix(name);
 
   static constexpr StaticStringMap<i32>::entry NAME_ENTRIES[] = {
       {SSK("HUP"),  SIGHUP },
@@ -1752,16 +1736,11 @@ fn format_mode_string(u32 mode) throws -> String
 static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
                             usize id_field_index) throws -> Maybe<String>
 {
-  let const contents = utils::read_entire_file(database_path);
+  let const contents = Path::read_entire_file(database_path);
   if (!contents) return shit::None;
   let const wanted = utils::uint_to_text(static_cast<u64>(wanted_id));
   let const text = contents->view();
-  usize line_start_position = 0;
-  for (usize i = 0; i <= text.length; i++) {
-    if (i != text.length && text[i] != '\n') continue;
-    let const line =
-        text.substring_of_length(line_start_position, i - line_start_position);
-    line_start_position = i + 1;
+  for (let const &line : utils::split_lines(text)) {
     if (passwd_field(line, id_field_index) != wanted.view()) continue;
     let const name = passwd_field(line, 0);
     if (!name.is_empty()) return String{name};
@@ -1777,18 +1756,6 @@ fn uid_to_username(u32 uid) throws -> Maybe<String>
 fn gid_to_groupname(u32 gid) throws -> Maybe<String>
 {
   return lookup_name_by_id("/etc/group", gid, 2);
-}
-
-fn format_timestamp(i64 unix_time, const char *format) throws -> String
-{
-  time_t when = static_cast<time_t>(unix_time);
-  struct tm *local = ::localtime(&when);
-  if (local == nullptr) return String{};
-  char buffer[128];
-  usize written = ::strftime(buffer, sizeof(buffer), format, local);
-  return String{
-      StringView{buffer, written}
-  };
 }
 
 fn sleep_for_seconds(double seconds) wontthrow -> void
@@ -1861,7 +1828,7 @@ fn enumerate_processes(bool include_resource_stats) throws
        the kernel-thread fallback. */
     const String proc_pid = "/proc/" + name;
     const String comm_path = proc_pid + "/comm";
-    Maybe<String> comm = utils::read_entire_file(comm_path.view());
+    Maybe<String> comm = Path::read_entire_file(comm_path.view());
     if (!comm.has_value()) continue;
     /* The comm file ends with a newline the listing does not want. */
     String command_name = steal(*comm);
@@ -1876,7 +1843,7 @@ fn enumerate_processes(bool include_resource_stats) throws
        ps can render the owner the way it does. A process that has gone since
        the directory scan leaves the owner at zero. */
     const String status_path = proc_pid + "/status";
-    if (Maybe<String> status = utils::read_entire_file(status_path.view());
+    if (Maybe<String> status = Path::read_entire_file(status_path.view());
         status.has_value())
     {
       let const text = status->view();
@@ -1910,7 +1877,7 @@ fn enumerate_processes(bool include_resource_stats) throws
        thread exposes an empty cmdline, so the bracketed command name stands in
        the way ps shows it. */
     const String cmdline_path = proc_pid + "/cmdline";
-    if (Maybe<String> cmdline = utils::read_entire_file(cmdline_path.view());
+    if (Maybe<String> cmdline = Path::read_entire_file(cmdline_path.view());
         cmdline.has_value() && !cmdline->is_empty())
     {
       String command_line{};
@@ -1933,7 +1900,7 @@ fn enumerate_processes(bool include_resource_stats) throws
          after the last ')', where the state is first and the user and system
          times are the twelfth and thirteenth. */
       if (Maybe<String> stat =
-              utils::read_entire_file((proc_pid + "/stat").view());
+              Path::read_entire_file((proc_pid + "/stat").view());
           stat.has_value())
       {
         let const text = stat->view();
@@ -1960,7 +1927,7 @@ fn enumerate_processes(bool include_resource_stats) throws
       /* /proc/<pid>/statm gives the sizes in pages, the first the virtual size
          and the second the resident set. */
       if (Maybe<String> statm =
-              utils::read_entire_file((proc_pid + "/statm").view());
+              Path::read_entire_file((proc_pid + "/statm").view());
           statm.has_value())
       {
         let const page_kib = static_cast<u64>(sysconf(_SC_PAGESIZE)) / 1024;
@@ -2748,13 +2715,13 @@ fn process_from_pid(i64 pid) wontthrow -> process
 
 fn signal_number_from_name(StringView name) -> Maybe<i32>
 {
-  if (utils::is_all_decimal_digits(name)) {
-    String name_string{name};
-    return static_cast<i32>(std::strtol(name_string.c_str(), nullptr, 10));
+  if (name.is_all_decimal_digits()) {
+    const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(name);
+    if (parsed_value.is_error()) return shit::None;
+    return static_cast<i32>(parsed_value.value());
   }
 
-  String bare{name};
-  if (bare.starts_with("SIG")) bare = String{bare.substring(3)};
+  let const bare = utils::strip_sig_prefix(name);
   if (bare == "KILL") return 9;
   if (bare == "TERM") return 15;
   if (bare == "INT") return 2;
@@ -3250,18 +3217,6 @@ fn gid_to_groupname(u32 gid) throws -> Maybe<String>
   return shit::None;
 }
 
-fn format_timestamp(i64 unix_time, const char *format) throws -> String
-{
-  time_t when = static_cast<time_t>(unix_time);
-  struct tm *local = ::localtime(&when);
-  if (local == nullptr) return String{};
-  char buffer[128];
-  usize written = ::strftime(buffer, sizeof(buffer), format, local);
-  return String{
-      StringView{buffer, written}
-  };
-}
-
 fn sleep_for_seconds(double seconds) wontthrow -> void
 {
   if (seconds <= 0.0) return;
@@ -3329,13 +3284,13 @@ fn erase_extension_and_get_its_index(String &program_name) -> ext_index
     {
       const StringView extension = program_name.substring(*extension_pos);
 
-      if (usize found_index =
+      if (Maybe<usize> found_index =
               utils::find_pos_in_vec(OMITTED_SUFFIXES, extension);
-          found_index != utils::NOT_FOUND_INDEX)
+          found_index.has_value())
       {
         program_name =
             String{program_name.substring_of_length(0, *extension_pos)};
-        return found_index;
+        return *found_index;
       }
     }
   }

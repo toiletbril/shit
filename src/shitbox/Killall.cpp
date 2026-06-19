@@ -5,15 +5,17 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-s signal] name");
+HELP_SYNOPSIS_DECL("[-l] [-s signal] name");
 
 HELP_DESCRIPTION_DECL(
     "The killall utility sends a signal to every process whose name matches "
     "the operand exactly. The signal defaults to TERM and may be a name or a "
-    "number. The status is zero when a process matched and one when none did.");
+    "number. The status is zero when a process matched and one when none did. "
+    "With -l it lists the signal names and exits.");
 
 FLAG(KILLALL_SIGNAL, String, 's', "signal",
      "The signal to send, a name such as TERM or a number such as 15.");
+FLAG(KILLALL_LIST, Bool, 'l', "list", "List the signal names and exit.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Killall);
@@ -34,6 +36,11 @@ fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
+
+  if (FLAG_KILLALL_LIST.is_enabled()) {
+    ec.print_to_stdout(format_signal_list());
+    return 0;
+  }
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   if (operands.count() != 1) throw Error{"killall expects one process name"};

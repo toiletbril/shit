@@ -6,15 +6,17 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-s signal] pattern");
+HELP_SYNOPSIS_DECL("[-l] [-s signal] pattern");
 
 HELP_DESCRIPTION_DECL(
     "The pkill utility sends a signal to every process whose name contains the "
     "pattern. The signal defaults to TERM and may be a name or a number. The "
-    "status is zero when a process matched and one when none did.");
+    "status is zero when a process matched and one when none did. With -l it "
+    "lists the signal names and exits.");
 
 FLAG(PKILL_SIGNAL, String, 's', "signal",
      "The signal to send, a name such as TERM or a number such as 15.");
+FLAG(PKILL_LIST, Bool, 'l', "list", "List the signal names and exit.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Pkill);
@@ -48,6 +50,11 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
+
+  if (FLAG_PKILL_LIST.is_enabled()) {
+    ec.print_to_stdout(format_signal_list());
+    return 0;
+  }
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   if (operands.count() != 1) throw Error{"pkill expects one pattern"};

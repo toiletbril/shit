@@ -1,0 +1,15 @@
+== a located error carets the bad token:
+shit: 1:15: error: Arithmetic: unexpected '.0' after the expression.
+     1 |  2312312 / 1323.0
+       |                ^~ here.
+note: An operator is missing between two values.
+== a valid expression prints the value:
+14
+== 128-bit width still prints in full:
+1180591620717411303424
+== -i evaluates each piped line, continuing past a bad one:
+2
+shit: 1:6: error: Arithmetic: unexpected character.
+     1 |  bad +
+       |       ^~ here.
+100

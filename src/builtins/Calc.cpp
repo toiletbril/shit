@@ -2,23 +2,29 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Platform.hpp"
 #include "../Trace.hpp"
+#include "../Utils.hpp"
 
 /* calc evaluates each argument as an arithmetic expression and prints the value
    of the last one. It reuses the shell arithmetic evaluator, so the same
    operators and the same located error messages apply. In the default mood the
    value is computed in 128 bits, so a result wider than a signed 64-bit integer
-   prints in full. */
+   prints in full. With no expression on a terminal, or with -i, it reads
+   expressions interactively the way a freestanding calc does. */
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("expression ...");
+HELP_SYNOPSIS_DECL("[-i] [expression ...]");
 
 HELP_DESCRIPTION_DECL(
     "The calc builtin evaluates each argument as an arithmetic expression and "
     "prints the value of the last one. In the default mood it computes in 128 "
-    "bits.");
+    "bits. With no expression on a terminal, or with -i, it reads expressions "
+    "interactively.");
 
+FLAG(CALC_INTERACTIVE, Bool, 'i', "interactive",
+     "Read and evaluate expressions interactively.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Calc);
@@ -29,15 +35,77 @@ Calc::Calc() = default;
 
 pure Builtin::Kind Calc::kind() const wontthrow { return Kind::Calc; }
 
+namespace {
+
+/* Evaluate one expression and print its value, returning 0, or render a located
+   error against the expression and return 1. The evaluator caret indexes the
+   expression text, so rendering against it points the caret under the
+   offending token rather than the flat message the old path printed. */
+fn evaluate_one(ExecContext &ec, EvalContext &cxt, StringView expression) throws
+    -> i32
+{
+  bool nonzero = false;
+  try {
+    String result = cxt.evaluate_arithmetic_wide(expression, nonzero);
+    result += '\n';
+    ec.print_to_stdout(result);
+    return 0;
+  } catch (const ErrorWithLocation &error) {
+    show_message(error.to_string(expression));
+    return 1;
+  } catch (const Error &error) {
+    report_soft_builtin_error(ec, cxt, "cannot evaluate '" +
+                                           String{expression} + "', " +
+                                           error.message());
+    return 1;
+  }
+}
+
+/* Read expressions from the input descriptor and evaluate each, the desk
+   calculator loop. A prompt prints to standard error when the input is a
+   terminal so it stays out of a captured standard output. The loop ends on end
+   of input or an interrupt, and a bad line reports and continues rather than
+   ending the session. */
+fn run_repl(ExecContext &ec, EvalContext &cxt) throws -> i32
+{
+  let const input_fd = ec.in_fd.value_or(SHIT_STDIN);
+  let const is_prompted = os::is_fd_a_tty(input_fd);
+
+  loop
+  {
+    if (is_prompted) shit::print_error("calc> ");
+
+    bool was_delimiter_terminated = false;
+    Maybe<String> line =
+        utils::read_line_from_fd(input_fd, was_delimiter_terminated);
+    if (!line.has_value() || os::INTERRUPT_REQUESTED) break;
+    if (line->view().is_empty()) continue;
+
+    evaluate_one(ec, cxt, line->view());
+  }
+
+  if (is_prompted) shit::print_error("\n");
+  return 0;
+}
+
+} /* namespace */
+
 i32 Calc::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   let const operands = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* operands[0] is the program name the way every builtin reads it, so the
-     expressions start at index one. */
-  if (operands.count() < 2) return report_usage_error(ec, cxt, ec.program());
+  /* With -i, or with no expression on a terminal, calc reads expressions
+     interactively. A piped run with no expression keeps the usage error so it
+     does not hang waiting on input that is not coming. */
+  let const has_expression = operands.count() >= 2;
+  let const is_interactive =
+      FLAG_CALC_INTERACTIVE.is_enabled() ||
+      (!has_expression && os::is_stdin_a_tty() && os::is_stdout_a_tty());
+  if (is_interactive) return run_repl(ec, cxt);
+
+  if (!has_expression) return report_usage_error(ec, cxt, ec.program());
 
   LOG(Debug, "calc evaluating %zu arithmetic expressions",
       operands.count() - 1);
@@ -51,26 +119,7 @@ i32 Calc::execute(ExecContext &ec, EvalContext &cxt) const throws
     expression += operands[i].view();
   }
 
-  bool nonzero = false;
-  String result{};
-  try {
-    result = cxt.evaluate_arithmetic_wide(expression.view(), nonzero);
-  } catch (const ErrorWithLocation &error) {
-    /* The evaluator caret points into the joined expression, which is not the
-       command text the top-level handler renders against, so the failure is
-       reported as a clear named message that quotes the expression instead. */
-    report_soft_builtin_error(
-        ec, cxt, "cannot evaluate '" + expression + "', " + error.message());
-    return 1;
-  } catch (const Error &error) {
-    report_soft_builtin_error(
-        ec, cxt, "cannot evaluate '" + expression + "', " + error.message());
-    return 1;
-  }
-
-  result += '\n';
-  ec.print_to_stdout(result);
-  return 0;
+  return evaluate_one(ec, cxt, expression.view());
 }
 
 } /* namespace shit */

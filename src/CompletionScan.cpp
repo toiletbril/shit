@@ -205,7 +205,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
 
   let config_path = home->clone();
   config_path.push_component("/.ssh/config");
-  if (Maybe<String> config = utils::read_entire_file(config_path.text());
+  if (Maybe<String> config = Path::read_entire_file(config_path.text());
       config.has_value())
   {
     let const text = config->view();
@@ -244,7 +244,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
 
   let known_hosts_path = home->clone();
   known_hosts_path.push_component("/.ssh/known_hosts");
-  if (Maybe<String> known = utils::read_entire_file(known_hosts_path.text());
+  if (Maybe<String> known = Path::read_entire_file(known_hosts_path.text());
       known.has_value())
   {
     let const text = known->view();
@@ -433,7 +433,7 @@ fn complete_from_build_tools(StringView line, StringView token,
     if (second_word_of(line) != "run") return None;
     let const package_path = Path{StringView{"package.json"}};
     targets = cached_targets_for(package_path, [&]() throws {
-      let const contents = utils::read_entire_file(package_path.text());
+      let const contents = Path::read_entire_file(package_path.text());
       return contents.has_value() ? parse_package_json_scripts(contents->view())
                                   : ArrayList<String>{};
     });

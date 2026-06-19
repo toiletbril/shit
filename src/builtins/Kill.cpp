@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -12,13 +13,14 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-signal] %job|pid [...]");
+HELP_SYNOPSIS_DECL("[-l] [-signal] %job|pid [...]");
 HELP_DESCRIPTION_DECL(
     "The kill builtin sends a signal to each named job or process. The signal "
     "defaults to TERM and is named with a leading minus, such as -KILL, -9, or "
     "-SIGKILL. A target with a leading percent names a job, otherwise it is a "
-    "process id.");
+    "process id. With -l it lists the signal names and exits.");
 
+FLAG(KILL_LIST, Bool, 'l', "list", "List the signal names and exit.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Kill);
@@ -35,6 +37,13 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   ASSERT(!args.is_empty());
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  /* A leading -l or --list prints the signal names and exits, checked before
+     the signal parsing below so the -l is not read as a signal named l. */
+  if (args.count() > 1 && (args[1] == "-l" || args[1] == "--list")) {
+    ec.print_to_stdout(shitbox::format_signal_list());
+    return 0;
+  }
 
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);

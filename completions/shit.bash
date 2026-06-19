@@ -86,7 +86,7 @@ _shitbox_util_flags()
         grep)          echo "-i -v" ;;
         sort)          echo "-r" ;;
         uniq)          echo "-c" ;;
-        pkill|killall) echo "-s" ;;
+        pkill|killall) echo "-s -l" ;;
         make)          echo "-f" ;;
         find)          echo "-name -type -maxdepth -mindepth -print" ;;
         *)             echo "" ;;

@@ -323,6 +323,11 @@ fn format_human_size(u64 bytes) throws -> String;
    An empty spelling is the TERM default. */
 fn resolve_shitbox_signal(StringView spelled) throws -> i32;
 
+/* The numbered signal list the kill family prints under -l, one
+   "number) SIGNAME" per line, read from the platform signal table. Shared by
+   the kill builtin and the killall and pkill utilities. */
+fn format_signal_list() throws -> String;
+
 /* Report a utility error that must not abort the run, such as one bad operand
    in a list the utility still finishes, with a located caret in the default and
    posix moods and a soft line in the bash mood. A fatal error throws an Error

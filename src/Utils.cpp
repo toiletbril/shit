@@ -41,7 +41,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
        launching the shell. A background command keeps its fork, since an
        in-process subshell cannot run in the background. */
     if (cxt.mimicry() && !is_async) {
-      if (Maybe<mimic_mood> mode = detect_mimic_shell(ec.program_path());
+      if (Maybe<mimic_mood> mode = ec.program_path().detect_mimic_shell();
           mode.has_value())
       {
         LOG(Debug, "execute_context mimicking the shell for '%s'",
@@ -337,62 +337,37 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   return stage_status[stage_count - 1];
 }
 
-/* The offset of the first occurrence of needle at or after start, or
-   NOT_FOUND_INDEX when no occurrence remains. The bytes carry no null
-   terminator, so the match is a plain byte scan rather than a C string search.
- */
-static pure fn find_subview(StringView haystack, StringView needle,
-                            usize start) wontthrow -> usize
+pure fn strip_sig_prefix(StringView name) wontthrow -> StringView
 {
-  if (needle.length == 0)
-    return start <= haystack.length ? start : NOT_FOUND_INDEX;
-  if (needle.length > haystack.length) return NOT_FOUND_INDEX;
-
-  ASSERT(haystack.data != nullptr);
-  ASSERT(needle.data != nullptr);
-
-  for (usize i = start; i + needle.length <= haystack.length; i++) {
-    if (std::memcmp(haystack.data + i, needle.data, needle.length) == 0)
-      return i;
-  }
-
-  return NOT_FOUND_INDEX;
+  if (name.starts_with("SIG")) return name.substring(3);
+  return name;
 }
 
-fn string_replace(String &s, const StringView to_replace,
-                  const StringView replace_with) throws -> void
+fn split_lines(StringView text) throws -> ArrayList<StringView>
 {
-  let result = String{};
-  result.reserve(s.count());
+  let lines = ArrayList<StringView>{};
+  usize line_start_position = 0;
+  for (usize i = 0; i <= text.length; i++) {
+    if (i != text.length && text[i] != '\n') continue;
 
-  let const source = s.view();
-  usize i = 0;
-  usize previous = 0;
-
-  loop
-  {
-    previous = i;
-    const usize match = find_subview(source, to_replace, i);
-    if (match == NOT_FOUND_INDEX) break;
-
-    ASSERT(match >= previous, "match cannot precede the search start");
-    result.append(source.substring_of_length(previous, match - previous));
-    result.append(replace_with);
-
-    i = match + to_replace.length;
+    lines.push(text.substring_of_length(line_start_position,
+                                        i - line_start_position));
+    line_start_position = i + 1;
   }
-
-  result.append(source.substring(previous));
-  s = steal(result);
+  return lines;
 }
 
-fn lowercase_string(StringView s) throws -> String
+fn format_unix_timestamp(i64 unix_time, const char *format) throws -> String
 {
-  let lowered = String{};
-  lowered.reserve(s.count());
-  for (usize i = 0; i < s.count(); i++)
-    lowered.push(static_cast<char>(std::tolower(s[i])));
-  return lowered;
+  time_t when = static_cast<time_t>(unix_time);
+  struct tm *local = ::localtime(&when);
+  if (local == nullptr) return String{};
+
+  char buffer[128];
+  usize written = ::strftime(buffer, sizeof(buffer), format, local);
+  return String{
+      StringView{buffer, written}
+  };
 }
 
 pure fn is_posix_reserved_word(StringView word) wontthrow -> bool
@@ -608,25 +583,6 @@ static fn skip_ascii_whitespace(StringView text, usize &offset) wontthrow
     offset++;
 }
 
-pure fn split_name_value_arg(StringView arg) wontthrow -> name_value_arg
-{
-  let const equals = arg.find_character('=');
-  if (!equals.has_value()) return name_value_arg{arg, None};
-  return name_value_arg{arg.substring_of_length(0, *equals),
-                        arg.substring(*equals + 1)};
-}
-
-pure fn is_all_decimal_digits(StringView text) wontthrow -> bool
-{
-  if (text.is_empty()) return false;
-
-  for (usize i = 0; i < text.length; i++) {
-    if (text[i] < '0' || text[i] > '9') return false;
-  }
-
-  return true;
-}
-
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;
@@ -751,43 +707,12 @@ fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>
 }
 
 fn find_pos_in_vec(const ArrayList<String> &suffixes,
-                   StringView wanted) wontthrow -> usize
+                   StringView wanted) wontthrow -> Maybe<usize>
 {
   for (usize i = 0; i < suffixes.count(); i++) {
     if (suffixes[i] == wanted) return i;
   }
-  return NOT_FOUND_INDEX;
-}
-
-fn canonicalize_path(StringView path) throws -> Maybe<Path>
-{
-  LOG(Debug, "canonicalizing the path '%.*s'", static_cast<int>(path.length),
-      path.data);
-
-  let candidate = Path{path};
-
-  if (candidate.is_relative() && path.find_character('/').has_value()) {
-    candidate = candidate.to_absolute();
-  }
-
-  candidate = candidate.normalized();
-
-  /* A name with no extension may need one of the omitted suffixes added. The
-     ending dot is stripped by the path normalization, so a name written with a
-     trailing dot is left as typed. */
-  const bool ends_with_dot =
-      path.length > 0 && path.data[path.length - 1] == '.';
-  if (candidate.extension().is_empty() && !ends_with_dot) {
-    usize suffix_index = 0;
-    while (!candidate.exists() && suffix_index < os::OMITTED_SUFFIXES.count()) {
-      const String &suffix = os::OMITTED_SUFFIXES[suffix_index++];
-      candidate = candidate.with_extension(suffix.view());
-    }
-  }
-
-  if (!candidate.exists()) return shit::None;
-
-  return candidate;
+  return None;
 }
 
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
@@ -1731,88 +1656,6 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
   return best;
 }
 
-fn read_entire_file(StringView path) throws -> Maybe<String>
-{
-  LOG(Debug, "reading the entire file '%.*s'", static_cast<int>(path.length),
-      path.data);
-
-  let const file = os::open_file_descriptor(path, os::file_open_mode::Read);
-  if (!file) return None;
-
-  let contents = String{};
-  char buffer[4096];
-  loop
-  {
-    Maybe<usize> read_count = os::read_fd(*file, buffer, sizeof(buffer));
-    if (!read_count || *read_count == 0) break;
-    contents.append(StringView{buffer, *read_count});
-  }
-
-  os::close_fd(*file);
-
-  return contents;
-}
-
-fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>
-{
-  LOG(Debug, "probing '%s' for a shell shebang to mimic", program.c_str());
-
-  let const file =
-      os::open_file_descriptor(program.text().view(), os::file_open_mode::Read);
-  if (!file) return None;
-  char buffer[256];
-  let const read_count = os::read_fd(*file, buffer, sizeof(buffer));
-  os::close_fd(*file);
-  if (!read_count || *read_count < 3) return None;
-
-  let const head = StringView{buffer, *read_count};
-  if (!head.starts_with("#!")) return None;
-
-  /* The shebang ends at the first newline, and only its first line is read. */
-  usize line_end = 2;
-  while (line_end < head.length && head[line_end] != '\n')
-    line_end++;
-  let const line = head.substring_of_length(2, line_end - 2);
-
-  /* The basename of a whitespace-delimited token, dropping any directory path.
-   */
-  let const do_basename_of = [](StringView token) -> StringView {
-    usize last_slash = token.length;
-    for (usize i = 0; i < token.length; i++)
-      if (token[i] == '/') last_slash = i;
-    return last_slash == token.length ? token : token.substring(last_slash + 1);
-  };
-  /* Walk the line token by token, splitting on spaces and tabs. */
-  usize i = 0;
-  let const do_next_token = [&]() -> StringView {
-    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
-      i++;
-    usize const start = i;
-    while (i < line.length && line[i] != ' ' && line[i] != '\t')
-      i++;
-    return line.substring_of_length(start, i - start);
-  };
-
-  StringView shell = do_basename_of(do_next_token());
-  /* The /usr/bin/env form names the shell as the next token, after any env
-     options, so the first non-option token is taken. */
-  if (shell == "env") {
-    loop
-    {
-      let const token = do_next_token();
-      if (token.length == 0) return None;
-      if (token[0] == '-') continue;
-      shell = do_basename_of(token);
-      break;
-    }
-  }
-
-  if (shell == "sh" || shell == "dash") return mimic_mood::Posix;
-  if (shell == "bash") return mimic_mood::Bash;
-  if (shell == "shit") return mimic_mood::Default;
-  return None;
-}
-
 fn read_entire_standard_input() throws -> String
 {
   let contents = String{};
@@ -1865,7 +1708,7 @@ fn current_git_branch() throws -> String
        'gitdir: <path>' pointer rather than a directory, so the real git dir is
        followed before reading HEAD. */
     let git_dir = head.clone();
-    if (let const dot_git = read_entire_file(head.text().view())) {
+    if (let const dot_git = Path::read_entire_file(head.text().view())) {
       let const pointer = dot_git->view();
       let const gitdir_prefix = StringView{"gitdir: "};
       if (pointer.starts_with(gitdir_prefix)) {
@@ -1887,7 +1730,7 @@ fn current_git_branch() throws -> String
     }
     let git_head = git_dir.clone();
     git_head.push_component("HEAD");
-    if (let const content = read_entire_file(git_head.text().view())) {
+    if (let const content = Path::read_entire_file(git_head.text().view())) {
       let text = content->view();
       while (!text.is_empty() &&
              (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))

@@ -1029,7 +1029,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
     throw Error{"Unable to find a Makefile in the current directory"};
   }
 
-  Maybe<String> source = utils::read_entire_file(makefile_path.view());
+  Maybe<String> source = Path::read_entire_file(makefile_path.view());
   if (!source.has_value())
     throw Error{"Unable to read the makefile '" + makefile_path + "'"};
 
@@ -1057,7 +1057,7 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
     -> ArrayList<String>
 {
   let targets = ArrayList<String>{};
-  let const source = utils::read_entire_file(makefile.text().view());
+  let const source = Path::read_entire_file(makefile.text().view());
   if (!source.has_value()) return targets;
 
   /* The parser expands variables and runs the := and conditional assignments,

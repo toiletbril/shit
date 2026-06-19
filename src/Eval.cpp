@@ -616,7 +616,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   /* A purely numeric name selects a positional parameter, $1 upward. The single
      '0' name is the shell name handled above. */
   if (first_byte >= '0' && first_byte <= '9') {
-    if (utils::is_all_decimal_digits(name)) {
+    if (name.is_all_decimal_digits()) {
       /* A positional beyond the count is unset rather than empty, so the strict
          unset report fires and ${1-default} takes its default. */
       if (name.count() > 9) return None;
@@ -1807,7 +1807,7 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
   } else {
     /* canonicalize_path already tries the omitted suffixes, so a path-given
        program resolves its extension the way the PATH search does. */
-    resolved_program_path = utils::canonicalize_path(program.view());
+    resolved_program_path = Path::canonicalize(program.view());
   }
 
   /* Builtins take precedence over programs. */

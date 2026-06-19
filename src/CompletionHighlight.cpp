@@ -65,7 +65,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
     }
     /* An existing regular file resolves even when not executable, the name is
        found rather than missing and permission is a runtime matter. */
-    if (Maybe<Path> canonical = utils::canonicalize_path(expanded.view());
+    if (Maybe<Path> canonical = Path::canonicalize(expanded.view());
         canonical.has_value())
     {
       return canonical->is_regular_file() || canonical->is_directory();
@@ -432,7 +432,7 @@ static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
   if (name.is_empty()) return true;
   if (name.length == 1 && !is_highlight_name_start(name[0])) return true;
 
-  if (utils::is_all_decimal_digits(name)) return true;
+  if (name.is_all_decimal_digits()) return true;
 
   if (known_vars.contains(name)) return true;
   return os::get_environment_variable(name).has_value();

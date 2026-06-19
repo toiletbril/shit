@@ -6,7 +6,9 @@
 #include "Containers.hpp"
 #include "Errors.hpp"
 #include "Maybe.hpp"
+#include "MimicMood.hpp"
 #include "Path.hpp"
+#include "RuntimeState.hpp"
 #include "ResolvedCommand.hpp"
 
 /* The [[ =~ ]] operator compiles its pattern with the POSIX regex API. Windows
@@ -218,16 +220,6 @@ struct function_definition_info
    successful cd. */
 fn record_directory_access(StringView directory) throws -> void;
 
-/* The mode a mimicked script runs in, chosen from its shebang. A sh or dash
-   shebang gives Posix, a bash shebang gives Bash, and a shit shebang gives
-   Default. */
-enum class mimic_mood : u8
-{
-  Default,
-  Posix,
-  Bash,
-};
-
 /* A warning the evaluator can silence for the span of a construct, tracked in
    the suppressed-warnings bitset on the context. UnsetReference exempts an
    unset name entirely, the way [[ -v ]] reads only whether a name is set, so
@@ -241,30 +233,6 @@ enum class suppressible_warning : u8
 };
 
 class EvalContext;
-
-/* A snapshot of the mood and the diagnostic and strictness toggles, captured
-   and restored as a unit so a scope that runs a body under a different mood
-   saves and puts back the whole set with one call. */
-struct runtime_state
-{
-  mimic_mood mood{mimic_mood::Default};
-  bool are_warnings_enabled{false};
-  bool are_diagnostics_disabled{false};
-  bool error_unset{false};
-  bool pipefail{false};
-  bool failglob{false};
-  /* The explicit marks ride with their values, so a set -u inside a
-     mood-swapped scope does not leave the mark set after the value reverts. */
-  bool error_unset_explicit{false};
-  bool pipefail_explicit{false};
-  bool failglob_explicit{false};
-
-  /* Read the live mood and toggles off a context. */
-  mustuse static fn capture(const EvalContext &context) wontthrow
-      -> runtime_state;
-  /* Write this snapshot back into a context. */
-  fn restore(EvalContext &context) const wontthrow -> void;
-};
 
 struct eval_state_snapshot
 {

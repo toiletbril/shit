@@ -49,7 +49,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   if (AST_ARENA == nullptr)
     throw Error{"Unable to mimic '" + ec.program() + "' outside of a parse"};
 
-  let contents = utils::read_entire_file(ec.program_path().text());
+  let contents = Path::read_entire_file(ec.program_path().text());
   if (!contents.has_value())
     throw Error{"Unable to mimic '" + ec.program() +
                 "' because the script could not be read"};

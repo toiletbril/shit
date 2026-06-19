@@ -2,6 +2,7 @@
 
 #include "Common.hpp"
 #include "Containers.hpp"
+#include "MimicMood.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
 #include "Tokens.hpp"

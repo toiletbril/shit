@@ -36,10 +36,10 @@ to keep speed and diagnostics.
 `--init-moods`/`-L` accepts a comma-separated list of moods to steal and use
 init files from. It defaults to the value of `--mood`.
 
-The `shit` mood reads `/etc/shitrc` and `~/.shitrc`, the `bash` flavor reads
+The `shit` mood reads `/etc/shitrc` and `~/.shitrc`, the `bash` mood reads
 the bash rc and its completion, and `sh` reads the file named by `ENV`. So
 `--init-moods=shit,bash` runs a strict shit prompt that still loads the whole
-bash setup. `set --init-moods` reloads the listed flavors into a live session.
+bash setup. `set --init-moods` reloads the listed moods into a live session.
 The startup files from non-default mood always turn all errors to warnings.
 
 `SHIT_FLAGS` environment variable may be used to specify flags. The recommended

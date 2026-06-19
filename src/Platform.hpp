@@ -294,10 +294,6 @@ fn file_type_letter(u32 mode) wontthrow -> char;
 fn uid_to_username(u32 uid) throws -> Maybe<String>;
 fn gid_to_groupname(u32 gid) throws -> Maybe<String>;
 
-/* Format a unix timestamp into the local-time string the format spells, for the
-   shitbox ls long format. Empty when localtime fails. */
-fn format_timestamp(i64 unix_time, const char *format) throws -> String;
-
 /* Sleep for the given seconds, for the shitbox sleep utility. A fractional
    value sleeps the whole and the fractional part together. */
 fn sleep_for_seconds(double seconds) wontthrow -> void;

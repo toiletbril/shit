@@ -45,6 +45,20 @@ public:
       -> StringView;
 
   mustuse pure fn starts_with(StringView prefix) const wontthrow -> bool;
+
+  /* Whether the view is one or more decimal digits and nothing else, the strict
+     digit scan a numeric name, positional, or descriptor shares before it
+     parses. An empty view is not a number, and no sign or surrounding
+     whitespace is allowed, so a caller can tell a bare number apart. */
+  mustuse pure fn is_all_decimal_digits() const wontthrow -> bool
+  {
+    if (length == 0) return false;
+
+    for (usize i = 0; i < length; i++) {
+      if (data[i] < '0' || data[i] > '9') return false;
+    }
+    return true;
+  }
 };
 
 /* FNV-1a over the view's bytes, inline since the hash sits inside every map

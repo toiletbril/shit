@@ -133,7 +133,8 @@ static fn build_long_entry(const Path &path, StringView name,
   entry.group = cached_group_name(status.group_id, gid_cache);
   entry.size = FLAG_LS_HUMAN.is_enabled() ? format_human_size(status.size)
                                           : utils::uint_to_text(status.size);
-  entry.time = os::format_timestamp(status.modification_time, "%b %e %H:%M");
+  entry.time =
+      utils::format_unix_timestamp(status.modification_time, "%b %e %H:%M");
   entry.blocks = status.blocks;
   return entry;
 }

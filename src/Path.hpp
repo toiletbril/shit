@@ -4,6 +4,7 @@
 #include "Common.hpp"
 #include "ErrorOr.hpp"
 #include "Maybe.hpp"
+#include "MimicMood.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
 
@@ -126,6 +127,21 @@ public:
      caller such as the globstar walk that would otherwise stat every entry. */
   cold mustuse static fn read_directory_typed(const Path &dir) throws
       -> Maybe<ArrayList<directory_child>>;
+
+  /* Read the whole file at path into a string through the os descriptor layer,
+     so no iostream file stream is pulled in. None when the open fails. */
+  mustuse static fn read_entire_file(StringView path) throws -> Maybe<String>;
+
+  /* Resolve a path against the filesystem, rooting a relative path that holds a
+     slash, normalizing it, and trying the omitted command suffixes on a name
+     with no extension. None when nothing on disk matches. */
+  mustuse static fn canonicalize(StringView path) throws -> Maybe<Path>;
+
+  /* The shell this file's shebang names, for the mimicry feature, or None when
+     it is not a script shit can emulate. Only the first line is read. A sh or
+     dash interpreter maps to Posix, bash to Bash, and shit to Default,
+     including the /usr/bin/env form. */
+  mustuse fn detect_mimic_shell() const throws -> Maybe<mimic_mood>;
 
 private:
   String m_text{};

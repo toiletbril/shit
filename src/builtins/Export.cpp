@@ -38,18 +38,18 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let has_error = false;
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
-    let const parts = utils::split_name_value_arg(arg);
+    let const parts = utils::NameValueArg::from(arg);
 
     let name = String{};
     let value = String{};
-    let const has_new_value = parts.value.has_value();
+    let const has_new_value = parts.get_value().has_value();
     if (!has_new_value) {
       /* Export an existing variable by its current value. */
       name = arg;
       value = cxt.get_variable_value(arg).value_or(String{});
     } else {
-      name = String{parts.name};
-      value = String{*parts.value};
+      name = String{parts.get_name()};
+      value = String{*parts.get_value()};
     }
 
     /* A read-only variable rejects a new value the way an ordinary assignment

@@ -50,11 +50,11 @@ Select the runtime mood, one of
 Source the startup files for each listed mood, in order, given comma separated or
 by repeating the flag. The
 .B shit
-flavor reads /etc/shitrc and ~/.shitrc, the
+mood reads /etc/shitrc and ~/.shitrc, the
 .B bash
-flavor reads the bash rc and its completion, and the
+mood reads the bash rc and its completion, and the
 .B sh
-flavor reads the file named by ENV. Defaults to the value of
+mood reads the file named by ENV. Defaults to the value of
 .BR \-\-mood .
 .TP
 .BR \-I ", " \-\-mimicry
@@ -189,17 +189,17 @@ The command history file, ~/.shit_history by default.
 The frecency store the z builtin ranks, ~/.shit_directory_history by default.
 .TP
 .B ENV
-The startup file the sh flavor sources.
+The startup file the sh mood sources.
 .TP
 .B NO_COLOR
 Turn color off in the prompt and the diagnostics when set.
 .SH FILES
 .TP
 .I /etc/shitrc
-The system rc the shit flavor sources.
+The system rc the shit mood sources.
 .TP
 .I ~/.shitrc
-The user rc the shit flavor sources.
+The user rc the shit mood sources.
 .TP
 .I ~/.shit_history
 The default command history file.
@@ -231,9 +231,12 @@ These builtins are unique to shit and have no counterpart in bash or dash.
 .B calc
 Evaluate each argument as an arithmetic expression and print the value of the
 last one, with the same operators and located errors the shell arithmetic uses.
-In the default mood it computes in 128 bits, so a result wider than a signed
-64-bit integer prints in full, while the bash and posix moods keep the 64-bit
-wrap.
+A bad expression points a caret under the offending token. In the default mood
+it computes in 128 bits, so a result wider than a signed 64-bit integer prints
+in full, while the bash and posix moods keep the 64-bit wrap. With no expression
+on a terminal, or with
+.BR \-i ,
+it reads and evaluates expressions interactively.
 .TP
 .B bench
 Run each command repeatedly as a measured child and print a summary of the wall

@@ -1,0 +1,10 @@
+== kill -l lists SIGTERM (count):
+1
+== kill --list lists SIGKILL (count):
+1
+== killall -l lists SIGHUP (count):
+1
+== pkill -l lists SIGINT (count):
+1
+== the list is numbered name lines (count of '%d) SIG'):
+13

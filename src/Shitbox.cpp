@@ -223,6 +223,22 @@ fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void
   });
 }
 
+fn format_signal_list() throws -> String
+{
+  let out = String{};
+  for (let const name : os::signal_names()) {
+    if (let const number = os::signal_number_from_name(name);
+        number.has_value())
+    {
+      out += utils::int_to_text(*number, heap_allocator());
+      out += ") SIG";
+      out += name;
+      out += '\n';
+    }
+  }
+  return out;
+}
+
 fn format_human_size(u64 bytes) throws -> String
 {
   /* A value below 1024 prints as the plain byte count with no suffix, the way

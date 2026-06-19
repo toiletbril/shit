@@ -259,8 +259,8 @@ fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
     /* A leading tilde is expanded first, since the runtime expands it before
        resolving the command. */
     if (let const expanded = expand_leading_tilde(name.view()))
-      return utils::canonicalize_path(expanded->view()).has_value();
-    return utils::canonicalize_path(name.view()).has_value();
+      return Path::canonicalize(expanded->view()).has_value();
+    return Path::canonicalize(name.view()).has_value();
   }
 
   if (const bool *cached = actx.command_resolution_cache.find(name.view())) {

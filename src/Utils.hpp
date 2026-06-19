@@ -4,6 +4,7 @@
 #include "Common.hpp"
 #include "ErrorOr.hpp"
 #include "Eval.hpp"
+#include "NameValueArg.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
@@ -30,12 +31,10 @@ inline fn merge_args_to_string(const ArrayList<String> &args) throws -> String
   return result;
 }
 
-/* The index of the first matching suffix in the omitted-extension list, or
-   NOT_FOUND_INDEX when none match. */
-inline constexpr usize NOT_FOUND_INDEX = static_cast<usize>(-1);
-
+/* The index of the first matching suffix in the omitted-extension list, or None
+   when none match. */
 fn find_pos_in_vec(const ArrayList<String> &suffixes,
-                   StringView wanted) wontthrow -> usize;
+                   StringView wanted) wontthrow -> Maybe<usize>;
 
 fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     -> i32;
@@ -43,10 +42,19 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                bool is_async) throws -> i32;
 
-fn string_replace(String &s, StringView to_replace,
-                  StringView replace_with) throws -> void;
+/* The name with a leading SIG dropped, the spelling the signal tables key on.
+   A name without the prefix is returned unchanged. Shared by the POSIX and the
+   Windows signal lookups. */
+pure fn strip_sig_prefix(StringView name) wontthrow -> StringView;
 
-fn lowercase_string(StringView s) throws -> String;
+/* Split text into its newline-delimited lines, each line without its trailing
+   newline. A trailing newline yields a final empty line. Shared by the passwd
+   and group readers in the platform layer. */
+fn split_lines(StringView text) throws -> ArrayList<StringView>;
+
+/* Format a Unix timestamp as local time through strftime, the timestamp the ls
+   long listing prints. Empty when the time cannot be broken down. */
+fn format_unix_timestamp(i64 unix_time, const char *format) throws -> String;
 
 /* Whether the word is one of the POSIX shell reserved words, the set the type
    and command builtins report as a shell keyword. It matches dash's set rather
@@ -61,21 +69,9 @@ pure fn is_posix_reserved_word(StringView word) wontthrow -> bool;
    hexadecimal form also accepts a leading 0x. */
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 
-/* Whether the text is one or more decimal digits and nothing else, the strict
-   digit scan a numeric name, positional, or descriptor shares before it parses.
-   An empty view is not a number. Unlike parse_decimal_integer this allows no
-   sign or surrounding whitespace, so a caller can tell a bare number apart. */
-pure fn is_all_decimal_digits(StringView text) wontthrow -> bool;
 
-/* An argument split at its first '=', for the assignment builtins. The value is
-   absent when no '=' is present, so a bare name reads differently from name=.
- */
-struct name_value_arg
-{
-  StringView name;
-  Maybe<StringView> value;
-};
-pure fn split_name_value_arg(StringView arg) wontthrow -> name_value_arg;
+/* name_value_arg and split_name_value_arg live in NameValueArg.hpp so the
+   assignment builtins reach them without the rest of this header. */
 
 /* Format a signed integer as decimal into a fresh String, the StringView-native
    replacement for std::to_string. The unsigned form is for ids and sizes that
@@ -122,8 +118,6 @@ fn invalidate_line_number_cache() wontthrow -> void;
 fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>;
 fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>;
 
-fn canonicalize_path(StringView path) throws -> Maybe<Path>;
-
 /* The command name closest to name among the local names passed in, the
    builtins, and the PATH programs, within a couple of edits counting an
    adjacent transposition as one, for a did-you-mean hint on a command that was
@@ -131,21 +125,11 @@ fn canonicalize_path(StringView path) throws -> Maybe<Path>;
 fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     -> Maybe<String>;
 
-/* Read a whole file into a string through the os descriptor layer, so no
-   iostream file stream is pulled in. Returns None when the open fails. */
-fn read_entire_file(StringView path) throws -> Maybe<String>;
-
 /* The current git branch read from .git/HEAD without forking git, walking up
    from the working directory to the filesystem root. Empty outside a
    repository. A detached HEAD reads as the short commit hash. Shared by the
    \G and \g prompt segments and the SHIT_GIT_BRANCH dynamic variable. */
 fn current_git_branch() throws -> String;
-
-/* The shell a script's shebang names, for the mimicry feature, or None when the
-   resolved program is not a script shit can emulate. Only the first line is
-   read. A sh or dash interpreter maps to POSIX mode, bash to bash mode, and
-   shit to the default mode, including the /usr/bin/env form. */
-fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>;
 
 /* Read everything still available on standard input into a string. */
 fn read_entire_standard_input() throws -> String;

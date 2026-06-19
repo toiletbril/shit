@@ -606,6 +606,119 @@ fn Path::temp_directory() throws -> Path
 #endif
 }
 
+fn Path::read_entire_file(StringView path) throws -> Maybe<String>
+{
+  LOG(Debug, "reading the entire file '%.*s'", static_cast<int>(path.length),
+      path.data);
+
+  let const file = os::open_file_descriptor(path, os::file_open_mode::Read);
+  if (!file) return None;
+
+  let contents = String{};
+  char buffer[4096];
+  loop
+  {
+    Maybe<usize> read_count = os::read_fd(*file, buffer, sizeof(buffer));
+    if (!read_count || *read_count == 0) break;
+    contents.append(StringView{buffer, *read_count});
+  }
+
+  os::close_fd(*file);
+
+  return contents;
+}
+
+fn Path::canonicalize(StringView path) throws -> Maybe<Path>
+{
+  LOG(Debug, "canonicalizing the path '%.*s'", static_cast<int>(path.length),
+      path.data);
+
+  let candidate = Path{path};
+
+  if (candidate.is_relative() && path.find_character('/').has_value()) {
+    candidate = candidate.to_absolute();
+  }
+
+  candidate = candidate.normalized();
+
+  /* A name with no extension may need one of the omitted suffixes added. The
+     ending dot is stripped by the path normalization, so a name written with a
+     trailing dot is left as typed. */
+  const bool ends_with_dot =
+      path.length > 0 && path.data[path.length - 1] == '.';
+  if (candidate.extension().is_empty() && !ends_with_dot) {
+    usize suffix_index = 0;
+    while (!candidate.exists() && suffix_index < os::OMITTED_SUFFIXES.count()) {
+      const String &suffix = os::OMITTED_SUFFIXES[suffix_index++];
+      candidate = candidate.with_extension(suffix.view());
+    }
+  }
+
+  if (!candidate.exists()) return shit::None;
+
+  return candidate;
+}
+
+fn Path::detect_mimic_shell() const throws -> Maybe<mimic_mood>
+{
+  LOG(Debug, "probing '%s' for a shell shebang to mimic", c_str());
+
+  let const file =
+      os::open_file_descriptor(text().view(), os::file_open_mode::Read);
+  if (!file) return None;
+  char buffer[256];
+  let const read_count = os::read_fd(*file, buffer, sizeof(buffer));
+  os::close_fd(*file);
+  if (!read_count || *read_count < 3) return None;
+
+  let const head = StringView{buffer, *read_count};
+  if (!head.starts_with("#!")) return None;
+
+  /* The shebang ends at the first newline, and only its first line is read. */
+  usize line_end = 2;
+  while (line_end < head.length && head[line_end] != '\n')
+    line_end++;
+  let const line = head.substring_of_length(2, line_end - 2);
+
+  /* The basename of a whitespace-delimited token, dropping any directory path.
+   */
+  let const do_basename_of = [](StringView token) -> StringView {
+    usize last_slash = token.length;
+    for (usize i = 0; i < token.length; i++)
+      if (token[i] == '/') last_slash = i;
+    return last_slash == token.length ? token : token.substring(last_slash + 1);
+  };
+  /* Walk the line token by token, splitting on spaces and tabs. */
+  usize i = 0;
+  let const do_next_token = [&]() -> StringView {
+    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
+      i++;
+    usize const start = i;
+    while (i < line.length && line[i] != ' ' && line[i] != '\t')
+      i++;
+    return line.substring_of_length(start, i - start);
+  };
+
+  StringView shell = do_basename_of(do_next_token());
+  /* The /usr/bin/env form names the shell as the next token, after any env
+     options, so the first non-option token is taken. */
+  if (shell == "env") {
+    loop
+    {
+      let const token = do_next_token();
+      if (token.length == 0) return None;
+      if (token[0] == '-') continue;
+      shell = do_basename_of(token);
+      break;
+    }
+  }
+
+  if (shell == "sh" || shell == "dash") return mimic_mood::Posix;
+  if (shell == "bash") return mimic_mood::Bash;
+  if (shell == "shit") return mimic_mood::Default;
+  return None;
+}
+
 PathBuilder::PathBuilder(StringView root) : m_text(root) {}
 
 fn PathBuilder::append(StringView component) throws -> PathBuilder &

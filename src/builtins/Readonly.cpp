@@ -1,8 +1,8 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../NameValueArg.hpp"
 #include "../Trace.hpp"
-#include "../Utils.hpp"
 
 /* readonly marks a variable so a later assignment to it fails, or with no
    operand lists the variables already marked. */
@@ -54,16 +54,16 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
-    let const parts = utils::split_name_value_arg(arg);
+    let const parts = utils::NameValueArg::from(arg);
 
     LOG(All, "readonly marking '%.*s' against later assignment",
-        static_cast<int>(parts.name.length), parts.name.data);
+        static_cast<int>(parts.get_name().length), parts.get_name().data);
 
     /* An operand with an equals sign assigns the value first, then marks the
        name. A bare name marks whatever it currently holds. */
-    if (parts.value.has_value()) {
-      cxt.set_shell_variable(parts.name, *parts.value);
-      cxt.mark_readonly(parts.name);
+    if (parts.get_value().has_value()) {
+      cxt.set_shell_variable(parts.get_name(), *parts.get_value());
+      cxt.mark_readonly(parts.get_name());
     } else {
       cxt.mark_readonly(arg);
     }
