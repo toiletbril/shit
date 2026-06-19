@@ -1,9 +1,9 @@
 #include "Completion.hpp"
-#include "CompletionInternal.hpp"
 
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Colors.hpp"
+#include "CompletionInternal.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
 #include "Lexer.hpp"
@@ -19,8 +19,8 @@ namespace shit {
 namespace completion {
 
 /* A most-recently-used cache of directory listings, so the highlighter and TAB
-   do not re-readdir the same directory on every keystroke. Keyed by the path the
-   caller passed, with the mtime as the invalidation key. */
+   do not re-readdir the same directory on every keystroke. Keyed by the path
+   the caller passed, with the mtime as the invalidation key. */
 struct directory_listing_cache_entry
 {
   String directory_path{};
@@ -35,8 +35,8 @@ static directory_listing_cache_entry
 
 /* The cached listing of a directory. A hit whose recorded mtime still matches
    returns the stored entries, otherwise the directory is read fresh into the
-   most-recently-used slot. Returns nullptr when it cannot be read or stat'd. The
-   returned pointer stays valid until the next call. */
+   most-recently-used slot. Returns nullptr when it cannot be read or stat'd.
+   The returned pointer stays valid until the next call. */
 fn read_directory_cached(const Path &directory) throws
     -> const ArrayList<cached_directory_entry> *
 {
@@ -135,8 +135,8 @@ static pure fn is_command_separator(char c) wontthrow -> bool
 }
 
 /* Whether the closing paren at position matches no opener earlier on the line,
-   the shape of a case pattern's closing paren. A matched paren closes a subshell
-   or a substitution instead. */
+   the shape of a case pattern's closing paren. A matched paren closes a
+   subshell or a substitution instead. */
 static pure fn is_unmatched_closing_paren(StringView line,
                                           usize position) wontthrow -> bool
 {
@@ -702,8 +702,8 @@ fn command_word_of(StringView line) wontthrow -> StringView
    expansion, bounded against a cyclic alias. Symlinks are left alone so a name
    that dispatches on its argv[0], such as a busybox or rustup link, keeps the
    surface name the user typed. */
-fn resolve_completion_alias(StringView command,
-                            EvalContext &context) throws -> String
+fn resolve_completion_alias(StringView command, EvalContext &context) throws
+    -> String
 {
   let name = String{command};
   for (int depth = 0; depth < 8; depth++) {
@@ -723,8 +723,8 @@ fn resolve_completion_alias(StringView command,
   return name;
 }
 
-fn resolve_completion_command(StringView command,
-                                     EvalContext &context) throws -> String
+fn resolve_completion_command(StringView command, EvalContext &context) throws
+    -> String
 {
   let name = resolve_completion_alias(command, context);
   /* A name holding a slash is a path already, otherwise it is searched on
@@ -741,8 +741,8 @@ fn resolve_completion_command(StringView command,
 /* Split the line into whitespace words for COMP_WORDS, reporting the index of
    the cursor's word. An empty trailing word is appended when the cursor is past
    the last one. */
-fn split_completion_words(StringView line, usize cursor,
-                                 usize &cword) throws -> ArrayList<String>
+fn split_completion_words(StringView line, usize cursor, usize &cword) throws
+    -> ArrayList<String>
 {
   let words = ArrayList<String>{};
   usize i = 0;
@@ -806,7 +806,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   let const token_is_glob = token_has_glob_metacharacter(token);
 
   /* A command-position token holding a path separator is a program given by
-     path, so it completes against the filesystem rather than the command sets. */
+     path, so it completes against the filesystem rather than the command sets.
+   */
   let const token_has_path_separator = token.find_character('/').has_value();
 
   TRACELN("complete line '%.*s' cursor %zu token '%.*s' command %d",
@@ -855,7 +856,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else if (is_command && !token_has_path_separator) {
     /* An empty command token would enumerate every PATH command on each
        keystroke for the ghost, freezing a large PATH, so command completion
-       runs only once a prefix is typed. An explicit tab still lists them all. */
+       runs only once a prefix is typed. An explicit tab still lists them all.
+     */
     if (!token.is_empty() || for_listing)
       candidates = complete_command(token, token_is_glob, context);
   } else if (token_is_glob) {
@@ -894,7 +896,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     {
       /* A token ending in a slash has an empty basename, so the ghost would
          list a whole directory to suggest nothing. The listing runs for the
-         ghost only once a basename is typed, while an explicit tab still lists. */
+         ghost only once a basename is typed, while an explicit tab still lists.
+       */
       candidates = complete_filesystem(token, base_directory);
     }
   }

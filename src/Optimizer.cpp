@@ -169,13 +169,13 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
   return None;
 }
 
-/* The names of commands proven not to mutate the shell environment, a packed-key
-   table the dispatch reads as data. A command outside the table is assumed to
-   write a variable, so the constant table is forgotten across it. External
-   coreutils and read-only shitbox utilities write only their own output, and the
-   builtins true, false, :, echo, test, [, and pwd write no variable. The
-   env-mutating builtins, read, and printf -v are deliberately absent and fall
-   through to the conservative clear. */
+/* The names of commands proven not to mutate the shell environment, a
+   packed-key table the dispatch reads as data. A command outside the table is
+   assumed to write a variable, so the constant table is forgotten across it.
+   External coreutils and read-only shitbox utilities write only their own
+   output, and the builtins true, false, :, echo, test, [, and pwd write no
+   variable. The env-mutating builtins, read, and printf -v are deliberately
+   absent and fall through to the conservative clear. */
 inline constexpr StaticStringMap<bool>::entry ENVIRONMENT_NEUTRAL_ENTRIES[] = {
     {SSK("echo"),     true},
     {SSK("true"),     true},
@@ -407,14 +407,14 @@ pure fn trim_arithmetic_whitespace(StringView text) wontthrow -> StringView
 }
 
 /* The constant result of an algebraic identity on a single binary operator, the
-   cases that collapse to a constant even when one operand is a run-time variable.
-   The folding rule caches an integer, so only x*0, 0*x, and x-x qualify. The
-   identities x+0, x*1, and their mirrors reduce to the other operand and are left
-   to the evaluator. The split fires only on a parenthesis-free expression, so a
-   nested term cannot hide a different operator. None when no identity applies. A
-   bare variable operand folds only when nounset is provably off in the live
-   shell, since reading an unset name under set -u is an error this fold would
-   swallow. */
+   cases that collapse to a constant even when one operand is a run-time
+   variable. The folding rule caches an integer, so only x*0, 0*x, and x-x
+   qualify. The identities x+0, x*1, and their mirrors reduce to the other
+   operand and are left to the evaluator. The split fires only on a
+   parenthesis-free expression, so a nested term cannot hide a different
+   operator. None when no identity applies. A bare variable operand folds only
+   when nounset is provably off in the live shell, since reading an unset name
+   under set -u is an error this fold would swallow. */
 fn try_algebraic_simplify(StringView expression,
                           const AnalysisContext &actx) wontthrow -> Maybe<i64>
 {

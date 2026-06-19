@@ -60,13 +60,13 @@ FLAG(LOGIN, Bool, 'l', "login", Posix,
 FLAG(IGNORED1, Bool, 'h', "\0", Posix, "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", Posix, "Ignored, left for compatibility.");
 
-FLAG(RCFILE, String, '\0', "rcfile", Bash,
-     "Source FILE as the interactive rc instead of ~/.bashrc. The shit rc still "
-     "runs, and a non-interactive run reads no rc.");
 FLAG(
-    PRIVILEGED, Bool, 'p', "privileged", Bash,
-    "Run in privileged mode and skip every startup config file. Turned on "
-    "automatically when the effective and the real user or group id differ.");
+    RCFILE, String, '\0', "rcfile", Bash,
+    "Source FILE as the interactive rc instead of ~/.bashrc. The shit rc still "
+    "runs, and a non-interactive run reads no rc.");
+FLAG(PRIVILEGED, Bool, 'p', "privileged", Bash,
+     "Run in privileged mode and skip every startup config file. Turned on "
+     "automatically when the effective and the real user or group id differ.");
 
 FLAG(MOOD, String, 'M', "mood", Compat,
      "Select the runtime mood, one of 'shit', 'bash', or 'sh'. The default "
@@ -98,11 +98,11 @@ FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Shit,
 FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Shit,
      "Skip the analysis stage. No warnings or pre-run diagnostics are "
      "reported.");
-FLAG(
-    SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
-    "Suppress diagnostics and warnings only while the startup profiles and rc "
-    "files source, then restore them for the prompt. Pairs with -W to load a lax "
-    "bash config quietly yet keep the checks afterward.");
+FLAG(SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
+     "Suppress diagnostics and warnings only while the startup profiles and rc "
+     "files source, then restore them for the prompt. Pairs with -W to load a "
+     "lax "
+     "bash config quietly yet keep the checks afterward.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
      "Disable interactive tab completion and ghost-text.");
 FLAG(ENABLE_SHITBOX, Bool, '\0', "enable-shitbox", Shit,
@@ -225,10 +225,10 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
         HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';
-    h += wrap_text(
-        "Options are also read from the SHIT_FLAGS environment variable. A flag "
-        "on the command line overrides one set there.\n\n",
-        HELP_INDENT, HELP_WRAP_WIDTH);
+    h += wrap_text("Options are also read from the SHIT_FLAGS environment "
+                   "variable. A flag "
+                   "on the command line overrides one set there.\n\n",
+                   HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_flag_help(FLAG_LIST);
     h += '\n';
     print_error(h);

@@ -1,6 +1,3 @@
-#include "Expressions.hpp"
-#include "ExpressionsInternal.hpp"
-
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Cli.hpp"
@@ -8,6 +5,8 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "Expressions.hpp"
+#include "ExpressionsInternal.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Platform.hpp"
@@ -835,8 +834,8 @@ cold fn WhileLoop::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-/* The loop_disposition enum lives in ExpressionsInternal.hpp so CStyleForLoop in
-   ExpressionsArith.cpp shares it with resolve_loop_control. */
+/* The loop_disposition enum lives in ExpressionsInternal.hpp so CStyleForLoop
+   in ExpressionsArith.cpp shares it with resolve_loop_control. */
 fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
 {
   if (!cxt.has_pending_control_flow()) return loop_disposition::RunNext;
@@ -1473,7 +1472,6 @@ cold fn BraceGroup::register_defined_functions(
      not escape it. */
   m_body->register_defined_functions(actx);
 }
-
 
 } /* namespace expressions */
 

@@ -1,9 +1,8 @@
-#include "Completion.hpp"
-#include "CompletionInternal.hpp"
-
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Colors.hpp"
+#include "Completion.hpp"
+#include "CompletionInternal.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
 #include "Lexer.hpp"
@@ -557,8 +556,8 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
       continue;
     }
 
-    /* Any other run is an operator or a paren, colored bold, stopping at a name,
-       number, whitespace, or dollar so the loop cannot stall. */
+    /* Any other run is an operator or a paren, colored bold, stopping at a
+       name, number, whitespace, or dollar so the loop cannot stall. */
     let const operator_start = i;
     while (i < end && line[i] != '$' && !is_highlight_name_start(line[i]) &&
            !(line[i] >= '0' && line[i] <= '9') &&
@@ -591,8 +590,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     let const c = line[i];
 
     if (c == ' ' || c == '\t' || c == '\n') {
-      /* A newline ends a command the way a ';' does, so the next word returns to
-         command position and a keyword after it is recognized. */
+      /* A newline ends a command the way a ';' does, so the next word returns
+         to command position and a keyword after it is recognized. */
       if (c == '\n') {
         command_position = true;
         expecting_in = false;
@@ -944,7 +943,6 @@ fn highlight_line(StringView line, EvalContext &context) throws
   scan_highlight_range(line, 0, line.length, context, spans, known_vars);
   return spans;
 }
-
 
 } /* namespace completion */
 

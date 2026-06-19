@@ -1,9 +1,8 @@
-#include "Completion.hpp"
-#include "CompletionInternal.hpp"
-
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Colors.hpp"
+#include "Completion.hpp"
+#include "CompletionInternal.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
 #include "Lexer.hpp"
@@ -304,8 +303,8 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
    listing caches on the source file's mtime. None lets the cascade
    continue. */
 fn complete_from_build_tools(StringView line, StringView token,
-                                    usize token_start, bool for_listing,
-                                    EvalContext &context) throws
+                             usize token_start, bool for_listing,
+                             EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
   if (!for_listing) return None;
@@ -316,9 +315,8 @@ fn complete_from_build_tools(StringView line, StringView token,
   /* A `shitbox make` invocation routes the make utility through the multicall
      dispatcher, so the build tool is the second word when the front-end shitbox
      is the command word. */
-  let const tool = (command == "shitbox")
-                       ? second_word_of(line).value_or(command)
-                       : command;
+  let const tool =
+      (command == "shitbox") ? second_word_of(line).value_or(command) : command;
 
   let const capture = [&](const String &source) throws -> String {
     try {
@@ -430,8 +428,7 @@ fn complete_from_build_tools(StringView line, StringView token,
       }
       return names;
     });
-  } else if (tool == "npm" || tool == "yarn" || tool == "pnpm" ||
-             tool == "bun")
+  } else if (tool == "npm" || tool == "yarn" || tool == "pnpm" || tool == "bun")
   {
     if (second_word_of(line) != "run") return None;
     let const package_path = Path{StringView{"package.json"}};
@@ -532,8 +529,7 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
    FLAG lists, the set and shopt option names, and kill's signal and %job ids,
    all table reads with no subprocess. None lets the cascade continue. */
 fn complete_from_builtin_flags(StringView line, StringView token,
-                                      usize token_start,
-                                      EvalContext &context) throws
+                               usize token_start, EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
   let const command = command_word_of(line);
@@ -759,16 +755,16 @@ static fn push_spec_candidate(StringView entry, ArrayList<String> &candidates,
 }
 
 fn complete_from_spec(StringView line, StringView token, usize cursor,
-                             bool for_listing, EvalContext &context,
-                             StringMap<String> &descriptions) throws
+                      bool for_listing, EvalContext &context,
+                      StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   let const command = command_word_of(line);
   if (command.is_empty()) return None;
 
-  /* A cobra-style function truncates its description to COLUMNS, so the width is
-     set wide for the run and restored after, the whole description arriving for
-     shit's own dimmed column. */
+  /* A cobra-style function truncates its description to COLUMNS, so the width
+     is set wide for the run and restored after, the whole description arriving
+     for shit's own dimmed column. */
   let const saved_columns = context.get_variable_value("COLUMNS");
   context.set_shell_variable("COLUMNS", "100000");
   defer
@@ -779,7 +775,8 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
       context.unset_shell_variable("COLUMNS");
   };
   /* The surface name wins when it has a spec of its own. Otherwise it resolves
-     through an alias and a symlink, so g for a g='git' alias reads git's spec. */
+     through an alias and a symlink, so g for a g='git' alias reads git's spec.
+   */
   const completion_spec *spec = context.lookup_completion_spec(command);
   String resolved_command;
   if (spec == nullptr) {
@@ -934,7 +931,6 @@ fn command_substitution_body_start(StringView line, usize cursor) throws
   }
   return frames.is_empty() ? 0 : frames.back().body_start;
 }
-
 
 } /* namespace completion */
 

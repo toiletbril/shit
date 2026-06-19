@@ -264,8 +264,8 @@ cold fn Parser::recover_to_next_statement() throws -> void
 
 /* Parse every top-level command, recovering from a syntax error instead of
    aborting at the first. A thrown located error is pushed into errors and
-   parsing resumes at the next statement boundary. Once any error is recorded the
-   tree never runs, the remaining iterations only collect more errors. */
+   parsing resumes at the next statement boundary. Once any error is recorded
+   the tree never runs, the remaining iterations only collect more errors. */
 cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
 {
   Expression *first_piece = nullptr;
@@ -1817,7 +1817,8 @@ hot fn Parser::parse_paren_command() throws -> Command *
   ASSERT(open->kind() == Token::Kind::LeftParen);
 
   /* Two opening parentheses are a nested subshell in POSIX, so POSIX mode keeps
-     that reading while the bash and default moods take the arithmetic command. A
+     that reading while the bash and default moods take the arithmetic command.
+     A
      (( that closes with a lone ) at depth zero, such as ((cmd; cmd); cmd), is a
      subshell whose first child is a subshell, the same backoff bash performs,
      decided by a quote-aware scan before the arithmetic reading commits. */

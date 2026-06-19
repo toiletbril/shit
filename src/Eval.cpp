@@ -27,7 +27,8 @@
 #include <regex.h>
 #endif
 
-/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test. */
+/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test.
+ */
 #if SHIT_PLATFORM_IS WIN32
 #include <io.h>
 #endif
@@ -204,7 +205,8 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   force_unset_shell_variable(name);
   m_indexed_arrays.erase(name);
   clear_sparse_array(name);
-  /* unset drops the integer mark with the value, the way bash clears declare -i. */
+  /* unset drops the integer mark with the value, the way bash clears declare
+   * -i. */
   m_integer_names.remove(name);
 }
 
@@ -645,7 +647,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   /* IFS is held live in m_field_separators rather than the store. The store
      lookup above wins, so IFS= empty reads back empty while the unset default
-     reads back space-tab-newline, making the IFS save/restore idiom round-trip. */
+     reads back space-tab-newline, making the IFS save/restore idiom round-trip.
+   */
   if (first_byte == 'I' && name == "IFS") {
     return String{heap_allocator(), m_field_separators.view()};
   }
@@ -1425,7 +1428,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_functions = steal(snapshot.functions);
   m_function_sources = steal(snapshot.function_sources);
   m_function_definition_infos = steal(snapshot.function_definition_infos);
-  /* An alias change inside a subshell stays inside it, the way bash isolates it. */
+  /* An alias change inside a subshell stays inside it, the way bash isolates
+   * it. */
   m_aliases = steal(snapshot.aliases);
   m_positional_params = steal(snapshot.positional_params);
 
@@ -1436,7 +1440,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_enable_echo = snapshot.is_echo_enabled;
   m_enable_echo_expanded = snapshot.is_echo_expanded_enabled;
 
-  /* The mood, the strictness toggles, noclobber, and allexport revert with it. */
+  /* The mood, the strictness toggles, noclobber, and allexport revert with it.
+   */
   snapshot.runtime.restore(*this);
   m_no_clobber = snapshot.no_clobber;
   m_export_all = snapshot.export_all;
@@ -1448,8 +1453,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 
   /* A trap installed inside the subshell stays inside it. A signal the subshell
      trapped that the parent does not is returned to default first, then the
-     parent's dispositions are reinstalled from the restored table. The scans are
-     skipped when neither table holds an entry. */
+     parent's dispositions are reinstalled from the restored table. The scans
+     are skipped when neither table holds an entry. */
   if (m_traps.count() != 0 || snapshot.traps.count() != 0) {
     m_traps.for_each([&](StringView condition, const String &action) {
       unused(action);
@@ -1468,10 +1473,11 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
      match the prior void call that swallowed a failed chdir. */
   (void) Path::set_current_directory(snapshot.working_directory);
 
-  /* A write to an exported name inside the subshell hit the process environment,
-     which the restored variable map does not cover. Each write logged its prior
-     value, so they revert newest first back to the snapshot's mark. The rewind
-     precedes the PATH re-point below so an exported PATH reads its restored value. */
+  /* A write to an exported name inside the subshell hit the process
+     environment, which the restored variable map does not cover. Each write
+     logged its prior value, so they revert newest first back to the snapshot's
+     mark. The rewind precedes the PATH re-point below so an exported PATH reads
+     its restored value. */
   LOG(Debug, "rewinding %zu environment writes made inside the subshell",
       m_environment_undo_log.count() - snapshot.environment_undo_mark);
   while (m_environment_undo_log.count() > snapshot.environment_undo_mark) {
@@ -1481,7 +1487,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
                                    entry.previous_value->view());
     else
       os::unset_environment_variable(entry.name.view());
-    /* The exported set follows the rewind, a name the subshell created drops. */
+    /* The exported set follows the rewind, a name the subshell created drops.
+     */
     sync_exported_after_restore(entry.name.view(),
                                 entry.previous_value.has_value());
     m_environment_undo_log.pop_back();
@@ -1828,8 +1835,8 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
       /* A close builtin or PATH program is offered as a did-you-mean note, so a
          typo such as gti points at git. */
-      let error = CommandNotFound{location, "Program '" + program +
-                                                "' wasn't found"};
+      let error =
+          CommandNotFound{location, "Program '" + program + "' wasn't found"};
       if (Maybe<String> suggestion =
               utils::suggest_command(program.view(), ArrayList<String>{}))
       {

@@ -1,9 +1,8 @@
-#include "Completion.hpp"
-#include "CompletionInternal.hpp"
-
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Colors.hpp"
+#include "Completion.hpp"
+#include "CompletionInternal.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
 #include "Lexer.hpp"
@@ -332,8 +331,8 @@ fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
    a page. None means the position or the command has no subcommand story and
    the caller falls through to the option, spec, and filesystem stages. */
 fn complete_from_man_subcommands(StringView line, StringView token,
-                                        usize token_start, bool for_listing,
-                                        EvalContext &context) throws
+                                 usize token_start, bool for_listing,
+                                 EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
   if (!token.is_empty() && token[0] == '-') return None;
@@ -769,10 +768,11 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
 
 /* Completes an option token from the command's manpage. Runs only on an
    explicit tab and a dash token, so the ghost never forks man and a plain
-   argument completes as a filename. None falls through to the spec and files. */
-fn complete_from_manpage(StringView line, StringView token,
-                                bool for_listing, EvalContext &context,
-                                StringMap<String> &descriptions) throws
+   argument completes as a filename. None falls through to the spec and files.
+ */
+fn complete_from_manpage(StringView line, StringView token, bool for_listing,
+                         EvalContext &context,
+                         StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   if (!for_listing) return None;
@@ -860,8 +860,9 @@ static fn help_text_for(StringView command, StringView subcommand = {}) throws
   if (help_argument.has_value() && !paths.is_empty() &&
       command_directory_is_trusted(paths[0].text().view()))
   {
-    /* argv is the absolute path, then the subcommand when one is given, then the
-       help argument split on spaces, so git runs as path, commit, --help. */
+    /* argv is the absolute path, then the subcommand when one is given, then
+       the help argument split on spaces, so git runs as path, commit, --help.
+     */
     let argv = ArrayList<String>{};
     argv.push(String{paths[0].text().view()});
     if (!subcommand.is_empty()) argv.push(String{subcommand});
@@ -949,8 +950,8 @@ static fn help_cache_key(StringView command, StringView subcommand) throws
    the one capture, and frees the raw text. HELP_PARSED gates the fork so a
    second tab reads the parsed caches. A subcommand forks "command subcommand
    --help" under the compound key. */
-static fn ensure_help_parsed(StringView command, StringView subcommand = {})
-    throws -> void
+static fn ensure_help_parsed(StringView command,
+                             StringView subcommand = {}) throws -> void
 {
   let const key = help_cache_key(command, subcommand);
   if (HELP_PARSED.find(key.view()) != nullptr) return;
@@ -961,7 +962,8 @@ static fn ensure_help_parsed(StringView command, StringView subcommand = {})
 }
 
 /* The options a command's --help text lists, parsed once and cached. */
-static fn help_options_for(StringView command, StringView subcommand = {}) throws
+static fn help_options_for(StringView command,
+                           StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
 {
   ensure_help_parsed(command, subcommand);
@@ -988,9 +990,9 @@ static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
 }
 
 /* Whether a header line opens a subcommand section, matched case-insensitively
-   on a "commands:" or "subcommands:" tail. A bare all-caps header with no colon,
-   such as tailscale's "SUBCOMMANDS", also opens one, only when the whole line is
-   the single word. */
+   on a "commands:" or "subcommands:" tail. A bare all-caps header with no
+   colon, such as tailscale's "SUBCOMMANDS", also opens one, only when the whole
+   line is the single word. */
 static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
 {
   if (trimmed.is_empty()) return false;
@@ -1078,8 +1080,8 @@ static fn parse_help_subcommands(StringView text) throws
           trimmed.substring_of_length(column_end, trimmed.length - column_end));
 
     /* The column lists one or more comma-separated aliases such as `ft, fetch`,
-       each a usable subcommand the user may type, so every alias becomes its own
-       candidate under the shared description. */
+       each a usable subcommand the user may type, so every alias becomes its
+       own candidate under the shared description. */
     let const column = trimmed.substring_of_length(0, column_end);
     usize alias_start = 0;
     while (alias_start < column.length) {
@@ -1101,16 +1103,18 @@ static fn parse_help_subcommands(StringView text) throws
 }
 
 /* The subcommands a command's --help text lists, parsed once and cached. */
-static fn help_subcommands_for(StringView command, StringView subcommand = {})
-    throws -> const ArrayList<help_entry> &
+static fn help_subcommands_for(StringView command,
+                               StringView subcommand = {}) throws
+    -> const ArrayList<help_entry> &
 {
   ensure_help_parsed(command, subcommand);
-  return *HELP_SUBCOMMAND_CACHE.find(help_cache_key(command, subcommand).view());
+  return *HELP_SUBCOMMAND_CACHE.find(
+      help_cache_key(command, subcommand).view());
 }
 
 /* Whether a word names a subcommand the base command's --help lists, so a
-   second-level fork is reserved for a parsed subcommand rather than an arbitrary
-   word. */
+   second-level fork is reserved for a parsed subcommand rather than an
+   arbitrary word. */
 static fn is_known_help_subcommand(StringView command, StringView word) throws
     -> bool
 {
@@ -1122,9 +1126,9 @@ static fn is_known_help_subcommand(StringView command, StringView word) throws
 /* Completes an option token from the command's --help text, the fallback after
    the manpage stage finds no page. The same explicit-tab and dash-token gates
    hold here. */
-fn complete_from_help(StringView line, StringView token,
-                      bool for_listing, EvalContext &context,
-                             StringMap<String> &descriptions) throws
+fn complete_from_help(StringView line, StringView token, bool for_listing,
+                      EvalContext &context,
+                      StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   if (!for_listing) return None;
@@ -1159,9 +1163,9 @@ fn complete_from_help(StringView line, StringView token,
    as cargo that lists subcommands but has no manpage. The same gates as the
    manpage subcommand stage hold. */
 fn complete_from_help_subcommands(StringView line, StringView token,
-                                         usize token_start, bool for_listing,
-                                         EvalContext &context,
-                                         StringMap<String> &descriptions) throws
+                                  usize token_start, bool for_listing,
+                                  EvalContext &context,
+                                  StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   if (!for_listing) return None;
@@ -1183,12 +1187,15 @@ fn complete_from_help_subcommands(StringView line, StringView token,
        authoritative, the fork is reserved for a tool like cargo with no man
        pages. */
     if (is_man_subcommand_index_built) {
-      let const man_subcommands = MAN_SUBCOMMAND_INDEX.find(resolved_name.view());
-      if (man_subcommands != nullptr && !man_subcommands->is_empty()) return None;
+      let const man_subcommands =
+          MAN_SUBCOMMAND_INDEX.find(resolved_name.view());
+      if (man_subcommands != nullptr && !man_subcommands->is_empty())
+        return None;
     }
   } else if (let const second = second_word_of(line);
              second.has_value() &&
-             is_known_help_subcommand(resolved_name.view(), *second)) {
+             is_known_help_subcommand(resolved_name.view(), *second))
+  {
     /* A settled second word that names a parsed subcommand forks "command
        subcommand --help" for its sub-subcommands, so git remote <tab> lists the
        remote subcommands. */
@@ -1197,14 +1204,14 @@ fn complete_from_help_subcommands(StringView line, StringView token,
     return None;
   }
 
-  let const &subcommands = help_subcommands_for(resolved_name.view(), subcommand);
+  let const &subcommands =
+      help_subcommands_for(resolved_name.view(), subcommand);
   if (subcommands.is_empty()) return None;
 
   let matches = matches_from_help_entries(subcommands, token, descriptions);
   if (matches.is_empty()) return None;
   return matches;
 }
-
 
 } /* namespace completion */
 

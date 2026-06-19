@@ -541,8 +541,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
 
     /* An extended-glob group such as @(a|b) is captured whole so its (, nested
        |, and ) stay in the word for the matcher. The opener is one of ?*+@!
-       followed with no space by (. The matcher honors the group only under shopt
-       extglob, so the capture is a pure addition. */
+       followed with no space by (. The matcher honors the group only under
+       shopt extglob, so the capture is a pure addition. */
     if (!is_inside_quote_or_escape &&
         (ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!') &&
         chop_character(byte_count + 1) == '(')
@@ -1056,9 +1056,9 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
         }
         /* The matching close brace lives at brace depth one, so a nested ${...}
            does not end the outer expansion early. A bare { does not raise the
-           depth, matching dash. A nested $(...), $((...)), or backtick is copied
-           as a balanced unit, and a quote run or backslash escape keeps its
-           bytes literal, so a } inside any of them is never counted. */
+           depth, matching dash. A nested $(...), $((...)), or backtick is
+           copied as a balanced unit, and a quote run or backslash escape keeps
+           its bytes literal, so a } inside any of them is never counted. */
         usize brace_depth = 1;
         char quote = 0;
         for (;;) {
@@ -1215,9 +1215,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     if (ch == '`') {
       /* A backtick here opens an old-style command substitution, unquoted or
          inside double quotes where it stays active. The region runs to the next
-         unescaped backtick, and the POSIX backquote unescaping strips a backslash
-         before a backtick, a dollar sign, or another backslash. The unescaped
-         bytes reuse the same CommandSubstitution segment as $(...). */
+         unescaped backtick, and the POSIX backquote unescaping strips a
+         backslash before a backtick, a dollar sign, or another backslash. The
+         unescaped bytes reuse the same CommandSubstitution segment as $(...).
+       */
       const let relative_open_backtick_pos = byte_count;
       byte_count++;
       let inner = String{};

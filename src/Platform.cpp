@@ -165,7 +165,8 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void
 }
 
 /* Shell-internal descriptor backups live at or above this number so a script
-   addressing the single-digit descriptors never sees the shell's bookkeeping. */
+   addressing the single-digit descriptors never sees the shell's bookkeeping.
+ */
 constexpr int SHELL_BACKUP_FD_FLOOR = 10;
 
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
@@ -517,7 +518,8 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
 
   /* Each redirect is placed onto its standard descriptor and the original is
      closed. A descriptor already on its target slot is left in place, since the
-     dup2 onto itself is a no-op and the close would shut the live descriptor. */
+     dup2 onto itself is a no-op and the close would shut the live descriptor.
+   */
   if (ec.in_fd && *ec.in_fd != STDIN_FILENO) {
     posix_spawn_file_actions_adddup2(&file_actions, *ec.in_fd, STDIN_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, *ec.in_fd);
@@ -767,7 +769,8 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   if (child_pid == 0) {
     /* A throw here would unwind into the parent's evaluator inside the
        duplicated process and run its cleanup. The child must terminate
-       directly, so a descriptor-setup failure is caught, reported, and exits. */
+       directly, so a descriptor-setup failure is caught, reported, and exits.
+     */
     try {
       if (in_fd) {
         check_syscall(dup2(*in_fd, STDIN_FILENO));
@@ -847,7 +850,8 @@ fn replace_process(ExecContext &&ec) throws -> void
      ExecFormatError. */
   if (errno == ENOEXEC) throw shit::ExecFormatError{};
   /* The program resolved but could not be executed, so the error carries the
-     command's location for a caret and the caller exits 126 the way bash does. */
+     command's location for a caret and the caller exits 126 the way bash does.
+   */
   throw shit::ErrorWithLocation{
       ec.source_location(), "Unable to execute '" + ec.program_path().text() +
                                 "' because " + last_system_error_message()};

@@ -56,9 +56,9 @@ struct make_rule
   String target;
   ArrayList<String> prerequisites;
   ArrayList<String> recipe_lines;
-  /* The target-specific variable assignments, the GNU make `target: VAR = value`
-     form, applied while the target and its prerequisites build and restored
-     after. Each entry is the raw `NAME op= value` text. */
+  /* The target-specific variable assignments, the GNU make `target: VAR =
+     value` form, applied while the target and its prerequisites build and
+     restored after. Each entry is the raw `NAME op= value` text. */
   ArrayList<String> variable_assignments;
 };
 
@@ -71,7 +71,8 @@ struct makefile
   ArrayList<make_rule> rules;
   ArrayList<make_rule> pattern_rules;
   /* The first ordinary explicit target, the bare-make goal. A target-specific
-     variable line does not set it, the way GNU make picks the first real rule. */
+     variable line does not set it, the way GNU make picks the first real rule.
+   */
   String default_goal;
   /* A name to array-index map, so a $(NAME) lookup is one hash probe rather
      than a scan of every variable, which a recipe pays once per reference per
@@ -389,9 +390,11 @@ static fn rule_colon(StringView line) wontthrow -> Maybe<usize>
   return None;
 }
 
-/* The variable name an assignment names, the text before the '=' with a trailing
+/* The variable name an assignment names, the text before the '=' with a
+   trailing
    +, ?, or : operator character dropped and the blanks trimmed. */
-static fn assignment_variable_name(StringView assignment) wontthrow -> StringView
+static fn assignment_variable_name(StringView assignment) wontthrow
+    -> StringView
 {
   let const equals = assignment.find_character('=');
   if (!equals.has_value()) return StringView{};
@@ -408,7 +411,8 @@ static fn assignment_variable_name(StringView assignment) wontthrow -> StringVie
 /* Whether the text after a rule colon is a target-specific variable assignment,
    the GNU make `target: NAME = value` form, a single variable name then an
    assignment operator, rather than a prerequisite list. */
-static fn is_target_variable_assignment(StringView after_colon) wontthrow -> bool
+static fn is_target_variable_assignment(StringView after_colon) wontthrow
+    -> bool
 {
   if (!after_colon.find_character('=').has_value()) return false;
   let const name = assignment_variable_name(after_colon);
@@ -855,9 +859,9 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   }
 
   /* The target-specific assignments apply now, in effect for the prerequisite
-     builds and the recipe, and restore on the way out even when a recipe throws.
-     The saved values restore in reverse so a repeated += on one variable unwinds
-     cleanly. */
+     builds and the recipe, and restore on the way out even when a recipe
+     throws. The saved values restore in reverse so a repeated += on one
+     variable unwinds cleanly. */
   let saved_variables = ArrayList<saved_make_variable>{};
   if (target_assignments != nullptr)
     for (const String &assignment : *target_assignments) {
@@ -873,15 +877,16 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
                        assignment.view().substring_of_length(0, *equals),
                        assignment.view().substring(*equals));
     }
-  defer {
+  defer
+  {
     for (usize i = saved_variables.count(); i-- > 0;) {
       const saved_make_variable &snapshot = saved_variables[i];
       if (snapshot.was_present) {
         if (let const *index = mk.variable_index.find(snapshot.name.view()))
           mk.variables[*index].value = String{snapshot.old_value.view()};
       } else {
-        /* A variable the assignment created is unset again, not left empty, so a
-           later ?= still applies its default. */
+        /* A variable the assignment created is unset again, not left empty, so
+           a later ?= still applies its default. */
         mk.variable_index.erase(snapshot.name.view());
       }
     }

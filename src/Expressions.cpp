@@ -1,5 +1,4 @@
 #include "Expressions.hpp"
-#include "ExpressionsInternal.hpp"
 
 #include "Arena.hpp"
 #include "Builtin.hpp"
@@ -8,6 +7,7 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "ExpressionsInternal.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Platform.hpp"
@@ -123,7 +123,7 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
    as 2>/dev/null still suppresses it, and leaves the caller to report status
    127. */
 cold fn report_command_not_found(EvalContext &cxt,
-                                        const CommandNotFound &e) throws -> void
+                                 const CommandNotFound &e) throws -> void
 {
   const String *source = cxt.current_source();
   show_message(e.to_string(source != nullptr ? source->view() : StringView{}));

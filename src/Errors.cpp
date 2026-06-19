@@ -432,11 +432,11 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position);
 
   /* The column counts code points from the line start to the caret. Both terms
-     must be code point counts, since subtracting a byte offset from a code point
-     count underflows once a preceding line holds a multibyte byte. The first
-     line has no newline and counts from the source start plus one. A newline at
-     offset zero still starts line two, so the flag rather than the offset
-     decides whether a line precedes. */
+     must be code point counts, since subtracting a byte offset from a code
+     point count underflows once a preceding line holds a multibyte byte. The
+     first line has no newline and counts from the source start plus one. A
+     newline at offset zero still starts line two, so the flag rather than the
+     offset decides whether a line precedes. */
   const usize codepoints_before_line =
       has_preceding_newline ? SOURCE_LINE_INDEX.codepoints_before(
                                   source, last_newline_location + 1)

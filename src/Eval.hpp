@@ -27,8 +27,8 @@ struct glob_field
   {}
 
   String text;
-  /* The mask grows by push, so it stays on the heap allocator where a grow frees
-     the old buffer, the bump arena would leak every grow. */
+  /* The mask grows by push, so it stays on the heap allocator where a grow
+     frees the old buffer, the bump arena would leak every grow. */
   ArrayList<bool> glob_active;
 };
 
@@ -38,8 +38,9 @@ class WordSegment;
 class Expression;
 struct arith_token;
 
-/* One element of a [[ ]] conditional. An operand carries a word expanded without
-   field splitting, the rest are the grammar operators. A word operator such as
+/* One element of a [[ ]] conditional. An operand carries a word expanded
+   without field splitting, the rest are the grammar operators. A word operator
+   such as
    == or -f arrives as an operand and is classified by its text. */
 struct conditional_element
 {
@@ -74,7 +75,8 @@ struct control_flow
   };
 
   Kind kind{Kind::Normal};
-  /* The loop level for break and continue, or the status for return and exit. */
+  /* The loop level for break and continue, or the status for return and exit.
+   */
   i64 value{0};
   /* Where the requesting builtin sits, so an escaped jump points a caret at it.
      The offset indexes source, set when the jump is made. */
@@ -84,8 +86,8 @@ struct control_flow
 };
 
 /* One frame of the source backtrace, pushed when run_source begins. The origin
-   names the call, the call_site is where the dot or eval sits in its parent, and
-   parent_source is the text that call site lives in. */
+   names the call, the call_site is where the dot or eval sits in its parent,
+   and parent_source is the text that call site lives in. */
 struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
@@ -97,14 +99,14 @@ struct source_frame
   String origin;
   SourceLocation call_site;
   const String *parent_source;
-  /* The bare path of a sourced file, the value BASH_SOURCE reports. Empty for an
-     eval or a sourced command with no backing file. */
+  /* The bare path of a sourced file, the value BASH_SOURCE reports. Empty for
+     an eval or a sourced command with no backing file. */
   String source_path;
 };
 
 /* A variable binding saved when a local shadows it. A None previous value means
-   the name was unset, so leaving the scope restores the unset state. The indexed
-   array is saved the same way. */
+   the name was unset, so leaving the scope restores the unset state. The
+   indexed array is saved the same way. */
 struct local_binding
 {
   String name;
@@ -114,7 +116,8 @@ struct local_binding
   bool previous_was_associative{false};
   ArrayList<String> previous_associative_keys{heap_allocator()};
   ArrayList<String> previous_associative_values{heap_allocator()};
-  /* The sparse elements the name held, restored rather than wiped by the pop. */
+  /* The sparse elements the name held, restored rather than wiped by the pop.
+   */
   ArrayList<usize> previous_sparse_indices{heap_allocator()};
   ArrayList<String> previous_sparse_values{heap_allocator()};
   /* The integer mark the caller held. declare_local drops it so a fresh local
@@ -171,7 +174,8 @@ struct process_substitution
 
 /* A mark a command takes at entry, the count of pending substitutions and temp
    files before it ran, so its cleanup reaps only the ones it opened. A while
-   loop reading done < <(cmd) must not have its body reap the loop's producer. */
+   loop reading done < <(cmd) must not have its body reap the loop's producer.
+ */
 struct process_substitution_mark
 {
   usize pending{0};
@@ -186,10 +190,10 @@ struct subshell_saved_descriptor
   os::saved_descriptor saved;
 };
 
-/* How a function body's absolute source positions map onto the stored definition
-   copy. The copy holds a "name () " header then the body verbatim, so an absolute
-   position rebases by the body start and header length, and the printed line adds
-   the offset back to the defining file's numbering. */
+/* How a function body's absolute source positions map onto the stored
+   definition copy. The copy holds a "name () " header then the body verbatim,
+   so an absolute position rebases by the body start and header length, and the
+   printed line adds the offset back to the defining file's numbering. */
 struct function_definition_info
 {
   usize body_start_position{0};
@@ -201,8 +205,9 @@ struct function_definition_info
      index the live text. */
   const String *defining_instance{nullptr};
   /* The mood and diagnostics state when the function was defined, so the body
-     runs in its defining mood regardless of the mood at the call. The mood rides
-     as a byte so this struct need not order the mimic_mood enum before it. */
+     runs in its defining mood regardless of the mood at the call. The mood
+     rides as a byte so this struct need not order the mimic_mood enum before
+     it. */
   u8 defining_mood{0};
   bool were_warnings_enabled_at_definition{false};
   bool were_diagnostics_disabled_at_definition{false};
@@ -225,9 +230,9 @@ enum class mimic_mood : u8
 
 class EvalContext;
 
-/* A snapshot of the mood and the diagnostic and strictness toggles, captured and
-   restored as a unit so a scope that runs a body under a different mood saves and
-   puts back the whole set with one call. */
+/* A snapshot of the mood and the diagnostic and strictness toggles, captured
+   and restored as a unit so a scope that runs a body under a different mood
+   saves and puts back the whole set with one call. */
 struct runtime_state
 {
   mimic_mood mood{mimic_mood::Default};
@@ -236,8 +241,8 @@ struct runtime_state
   bool error_unset{false};
   bool pipefail{false};
   bool failglob{false};
-  /* The explicit marks ride with their values, so a set -u inside a mood-swapped
-     scope does not leave the mark set after the value reverts. */
+  /* The explicit marks ride with their values, so a set -u inside a
+     mood-swapped scope does not leave the mark set after the value reverts. */
   bool error_unset_explicit{false};
   bool pipefail_explicit{false};
   bool failglob_explicit{false};
@@ -254,8 +259,9 @@ struct eval_state_snapshot
   StringMap<String> shell_variables;
   StringMap<const Expression *> functions;
   StringMap<String> function_sources;
-  /* The definition position mappings ride the snapshot beside the sources, so an
-     isolated run leaves no stale mapping disagreeing with the restored table. */
+  /* The definition position mappings ride the snapshot beside the sources, so
+     an isolated run leaves no stale mapping disagreeing with the restored
+     table. */
   StringMap<function_definition_info> function_definition_infos;
   StringMap<String> aliases;
   ArrayList<String> positional_params;
@@ -447,9 +453,10 @@ public:
      back. */
   fn clear_associative_array(StringView name) throws -> void;
 
-  /* Every element of an array name as a list, the indexed elements in order, the
-     associative values in store order, or a one-element list for a scalar.
-     "${a[@]}" emits one field per element. An unset name yields an empty list. */
+  /* Every element of an array name as a list, the indexed elements in order,
+     the associative values in store order, or a one-element list for a scalar.
+     "${a[@]}" emits one field per element. An unset name yields an empty list.
+   */
   fn collect_array_elements(StringView name) const throws -> ArrayList<String>;
 
   /* Whether an array element or key is set, backing [[ -v name[subscript] ]]. A
@@ -481,7 +488,8 @@ public:
                                    bool is_append) throws -> void;
 
   /* Log a name's environment value before a write that outlives the statement,
-     so a subshell restore can revert it. Outside a subshell nothing is logged. */
+     so a subshell restore can revert it. Outside a subshell nothing is logged.
+   */
   fn record_environment_change(StringView name) throws -> void;
 
   /* The exported names, mirrored so an assignment tests an O(1) set rather than
@@ -491,8 +499,8 @@ public:
   fn unmark_exported(StringView name) throws -> void;
   pure fn is_exported(StringView name) const wontthrow -> bool;
 
-  /* Re-point the exported set after an environment value is restored, adding the
-     name when the restore writes a value and removing it when it unsets. */
+  /* Re-point the exported set after an environment value is restored, adding
+     the name when the restore writes a value and removing it when it unsets. */
   fn sync_exported_after_restore(StringView name, bool has_value) throws
       -> void;
 
@@ -539,9 +547,10 @@ public:
   fn most_recent_job() wontthrow -> job *;
   fn forget_done_jobs() throws -> void;
 
-  /* Poll the jobs, print a bash-style done line for each just-finished one, then
-     forget those entries. The prompt loop calls this before each interactive
-     prompt, gated on an interactive shell so a script stays silent. */
+  /* Poll the jobs, print a bash-style done line for each just-finished one,
+     then forget those entries. The prompt loop calls this before each
+     interactive prompt, gated on an interactive shell so a script stays silent.
+   */
   fn notify_done_jobs() throws -> void;
   /* The Done lines notify_done_jobs prints, with the caller's line ending, so
      the editor's wake hook prints \r\n rows in raw mode. */
@@ -554,13 +563,14 @@ public:
   pure fn monitor() const wontthrow -> bool;
 
   /* notify mode is set -b. The prompt's wake hook reports a background job's
-     completion immediately, the zsh behavior, while off it waits for the prompt. */
+     completion immediately, the zsh behavior, while off it waits for the
+     prompt. */
   fn set_notify(bool enabled) wontthrow -> void;
   pure fn notify() const wontthrow -> bool;
 
   /* Registers a function and keeps a copy of its definition text, the span from
-     the name to the body's close that declare -f prints back. The body start and
-     location stamp map the body's absolute positions onto that copy, so a
+     the name to the body's close that declare -f prints back. The body start
+     and location stamp map the body's absolute positions onto that copy, so a
      diagnostic in a later call renders against it. */
   fn register_function(StringView name, const Expression *body,
                        StringView definition_text, usize body_start_position,
@@ -625,7 +635,8 @@ public:
   /* The bash -W word list semantics. The list undergoes shell expansion and
      splits into fields. complete -W and compgen -W both route through here. A
      list with no expansion byte, or one that fails to parse, splits plain.
-     allow_expansion off keeps the plain split for the per-keystroke ghost path. */
+     allow_expansion off keeps the plain split for the per-keystroke ghost path.
+   */
   fn expand_wordlist_to_fields(StringView wordlist,
                                bool allow_expansion = true) throws
       -> ArrayList<String>;
@@ -682,8 +693,8 @@ public:
                                StringView expression) const throws -> void;
 
   /* A function call pushes a local scope so a local builtin can shadow a
-     variable and restore it on return. declare_local records the current binding
-     in the innermost scope before the overwrite. */
+     variable and restore it on return. declare_local records the current
+     binding in the innermost scope before the overwrite. */
   fn enter_function_scope() throws -> void;
   fn leave_function_scope() throws -> void;
   /* The function-call name stack behind FUNCNAME, pushed by the call and
@@ -728,13 +739,14 @@ public:
   fn leave_subshell() wontthrow -> void;
   pure fn in_subshell() const wontthrow -> bool;
   /* Back the descriptor up before a bare exec moves it inside an in-process
-     subshell, so leave_subshell restores it. The first backup per subshell wins.
-     Outside a subshell this is a no-op and the move stays permanent. */
+     subshell, so leave_subshell restores it. The first backup per subshell
+     wins. Outside a subshell this is a no-op and the move stays permanent. */
   fn snapshot_subshell_descriptor(i32 shell_fd) throws -> void;
 
   /* The control-flow channel break, continue, return, and exit write instead of
-     throwing. A request records where it was made for an escaped-jump caret. The
-     tree-walk consumes it at the matching loop, function, or subshell boundary. */
+     throwing. A request records where it was made for an escaped-jump caret.
+     The tree-walk consumes it at the matching loop, function, or subshell
+     boundary. */
   fn request_break(i64 level, SourceLocation location) throws -> void;
   fn request_continue(i64 level, SourceLocation location) throws -> void;
   fn request_return(i64 status, SourceLocation location) throws -> void;
@@ -745,8 +757,8 @@ public:
   fn clear_control_flow() wontthrow -> void;
 
   /* The source currently being evaluated and its name, so a deferred report
-     formats a caret against the right text. Set around a top-level and a sourced
-     run, restoring the previous frame after. */
+     formats a caret against the right text. Set around a top-level and a
+     sourced run, restoring the previous frame after. */
   fn set_current_source(const String *source, String origin) wontthrow -> void;
   pure fn current_source() const wontthrow -> const String *;
   pure fn current_origin() const wontthrow -> const String &;
@@ -756,9 +768,9 @@ public:
   fn print_source_backtrace(
       Maybe<SourceLocation> error_location = None) const throws -> void;
 
-  /* The byte offset of the command being evaluated, the position $LINENO reports
-     the line of. A SimpleCommand and an assignment set it, the statement
-     granularity autoconf reads $LINENO at. */
+  /* The byte offset of the command being evaluated, the position $LINENO
+     reports the line of. A SimpleCommand and an assignment set it, the
+     statement granularity autoconf reads $LINENO at. */
   fn set_current_location(SourceLocation location) wontthrow -> void;
 
   /* The set builtin toggles these options at run time. error_exit is set -e,

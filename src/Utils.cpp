@@ -253,9 +253,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
         ec.in_fd = shit::None;
         ec.out_fd = shit::None;
         ec.err_fd = shit::None;
-        /* make_pipe marks both ends close-on-exec, which an external stage drops
-           at exec. A forked builtin never execs, so the child closes that read
-           end by hand, otherwise a write never sees the reader leave. */
+        /* make_pipe marks both ends close-on-exec, which an external stage
+           drops at exec. A forked builtin never execs, so the child closes that
+           read end by hand, otherwise a write never sees the reader leave. */
         if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
         cxt.set_in_pipeline_stage(true);
         cxt.enter_subshell();

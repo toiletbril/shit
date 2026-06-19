@@ -1,6 +1,3 @@
-#include "Expressions.hpp"
-#include "ExpressionsInternal.hpp"
-
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Cli.hpp"
@@ -8,6 +5,8 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "Expressions.hpp"
+#include "ExpressionsInternal.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Platform.hpp"
@@ -42,9 +41,10 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   /* The [[ ]] evaluator reports a malformed expression as a plain error,
      relocated to this command's position to caret the [[ like the shell's other
-     located diagnostics. An already-located diagnostic passes through untouched.
-     The current location moves here first so a runtime warning from the operand
-     expansion carets this [[ rather than the statement before it. */
+     located diagnostics. An already-located diagnostic passes through
+     untouched. The current location moves here first so a runtime warning from
+     the operand expansion carets this [[ rather than the statement before it.
+   */
   cxt.set_current_location(source_location());
   i64 status;
   try {
@@ -487,10 +487,11 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
   ASSERT(m_body != nullptr);
 
   /* The recorded definition is a "name () " line then the body's source span,
-     the shape bash prints from declare -f. ble.sh clones a function by replacing
-     the leading name in this text and greps the "name ()" line, so both matter.
-     The source string dies with its frame while the function lives on, so the
-     store keeps its own copy. An unrecorded body span stores empty text. */
+     the shape bash prints from declare -f. ble.sh clones a function by
+     replacing the leading name in this text and greps the "name ()" line, so
+     both matter. The source string dies with its frame while the function lives
+     on, so the store keeps its own copy. An unrecorded body span stores empty
+     text. */
   let definition_text = String{cxt.scratch_allocator()};
   if (const String *source = cxt.current_source();
       source != nullptr &&
@@ -860,7 +861,6 @@ BINARY_EXPRESSION_DECLS(LogicalOr, ||);
 BINARY_EXPRESSION_DECLS(Xor, ^);
 BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
-
 
 } /* namespace expressions */
 
