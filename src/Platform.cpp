@@ -1680,6 +1680,13 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
   }
 }
 
+fn current_executable_path() wontthrow -> Maybe<String>
+{
+  /* /proc/self/exe resolves to the running binary on Linux. A platform without
+     it reports None, so the assimilate caller falls back to an error. */
+  return read_symlink("/proc/self/exe");
+}
+
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
 {
   const String path_string{path};
@@ -3157,6 +3164,15 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
      wrap, so cp on Windows copies a symlink's contents rather than the link. */
   unused(path);
   return shit::None;
+}
+
+fn current_executable_path() wontthrow -> Maybe<String>
+{
+  char module_path[MAX_PATH];
+  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0) return shit::None;
+  return String{
+      StringView{module_path}
+  };
 }
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool

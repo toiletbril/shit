@@ -22,6 +22,9 @@ HELP_DESCRIPTION_DECL(
 
 FLAG(HELP, Bool, '\0', "help", "Display help and list the utilities.");
 FLAG(SHITBOX_LIST, Bool, '\0', "list", "List the utility names, one per line.");
+FLAG(SHITBOX_ASSIMILATE, String, '\0', "assimilate",
+     "Install a symlink to this binary for each utility into the given "
+     "directory.");
 
 REGISTER_BUILTIN_FLAGS(Shitbox);
 
@@ -60,6 +63,33 @@ i32 Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws
     return 0;
   }
 
+  /* --assimilate DIR installs a symlink to this binary named for each utility
+     into DIR, the busybox-style install, so the utilities run with no shitbox
+     prefix once DIR is on PATH. */
+  if (ec.args().count() >= 2 && ec.args()[1] == "--assimilate") {
+    if (ec.args().count() < 3) return report_usage_error(ec, cxt, ec.program());
+
+    let const target = os::current_executable_path();
+    if (!target.has_value()) {
+      report_soft_builtin_error(
+          ec, cxt, "shitbox: cannot resolve this binary's path to assimilate");
+      return 1;
+    }
+
+    i32 status = 0;
+    for (const String &name : sorted_names) {
+      let link = Path{ec.args()[2].view()};
+      link.push_component(name.view());
+      if (!os::create_symlink(target->view(), link.text().view())) {
+        report_soft_builtin_error(ec, cxt,
+                                  "shitbox: cannot link '" + link.text() +
+                                      "': " + os::last_system_error_message());
+        status = 1;
+      }
+    }
+    return status;
+  }
+
   if (ec.args().count() < 2 || ec.args()[1] == "--help") {
     /* The help reads as three sections, the description, the two synopsis
        lines, and the utilities as a comma-separated block wrapped under the
@@ -70,6 +100,7 @@ i32 Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws
     listing += "\n\nSYNOPSIS\n";
     listing += "  shitbox [utility] [arg ...]\n";
     listing += "  shitbox --list\n";
+    listing += "  shitbox --assimilate DIR\n";
     listing += "\nUTILITIES\n";
 
     let joined_names = String{};

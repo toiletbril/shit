@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Lexer.hpp"
 #include "../Platform.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
@@ -61,6 +62,63 @@ fn evaluate_one(ExecContext &ec, EvalContext &cxt, StringView expression) throws
   }
 }
 
+/* Apply a calc REPL assignment of the form name=value, returning true when the
+   line was an assignment so the caller does not also evaluate it. The value is
+   stored as text after one eager evaluation validates it is a number or an
+   evaluatable expression, so a stored formula recomputes lazily on each later
+   reference. A == comparison is left for the evaluator, and a bad value reports
+   a located error and leaves the variable unset. */
+fn try_assignment(ExecContext &ec, EvalContext &cxt, StringView line) throws
+    -> bool
+{
+  usize i = 0;
+  while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
+    i++;
+  if (i >= line.length || !lexer::is_variable_name_start(line[i])) return false;
+
+  let const name_start = i;
+  while (i < line.length && lexer::is_variable_name(line[i]))
+    i++;
+  let const name = line.substring_of_length(name_start, i - name_start);
+
+  while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
+    i++;
+
+  /* A single = assigns, while == is a comparison the evaluator handles. */
+  if (i >= line.length || line[i] != '=') return false;
+  if (i + 1 < line.length && line[i + 1] == '=') return false;
+
+  usize value_start = i + 1;
+  while (value_start < line.length &&
+         (line[value_start] == ' ' || line[value_start] == '\t'))
+    value_start++;
+  usize value_end = line.length;
+  while (value_end > value_start &&
+         (line[value_end - 1] == ' ' || line[value_end - 1] == '\t'))
+    value_end--;
+  let const value = line.substring_of_length(value_start, value_end - value_start);
+
+  if (value.is_empty()) {
+    report_soft_builtin_error(ec, cxt, "calc: assignment to '" + String{name} +
+                                           "' needs a value");
+    return true;
+  }
+
+  bool nonzero = false;
+  try {
+    String result = cxt.evaluate_arithmetic_wide(value, nonzero);
+    cxt.set_shell_variable(name, value);
+    result += '\n';
+    ec.print_to_stdout(result);
+  } catch (const ErrorWithLocation &error) {
+    show_message(error.to_string(value));
+  } catch (const Error &error) {
+    report_soft_builtin_error(ec, cxt, "cannot evaluate '" + String{value} +
+                                           "', " + error.message());
+  }
+  return true;
+}
+
 /* Read expressions from the input descriptor and evaluate each, the desk
    calculator loop. A prompt prints to standard error when the input is a
    terminal so it stays out of a captured standard output. The loop ends on end
@@ -80,6 +138,7 @@ fn run_repl(ExecContext &ec, EvalContext &cxt) throws -> i32
         utils::read_line_from_fd(input_fd, was_delimiter_terminated);
     if (!line.has_value() || os::INTERRUPT_REQUESTED) break;
     if (line->view().is_empty()) continue;
+    if (try_assignment(ec, cxt, line->view())) continue;
 
     evaluate_one(ec, cxt, line->view());
   }

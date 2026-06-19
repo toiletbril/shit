@@ -1210,11 +1210,18 @@ static fn format_wide(wide_int value) throws -> String
   return text;
 }
 
+/* Evaluate an expression string to a 128-bit value, the entry the recursive
+   variable read uses so a calc variable holding a formula evaluates lazily on
+   each reference. Defined after the parser since it constructs one. */
+static fn evaluate_wide_expression(EvalContext *context, StringView expression,
+                                   usize depth) throws -> wide_int;
+
 /* A recursive-descent evaluator over 128-bit integers for the calc builtin,
    following C precedence with parentheses, the unary operators, the binary
    ladder, the comparisons, the logical pair, the ternary, and the comma. It
-   reads shell variables through the context but performs no assignment, so calc
-   stays a pure calculator. */
+   reads shell variables through the context and performs no assignment itself,
+   the calc REPL applies an assignment and stores the expression text so a
+   variable read here evaluates it lazily. */
 class WideArithmeticParser
 {
 public:
@@ -1261,13 +1268,28 @@ public:
   fn read_variable(StringView name) throws -> wide_int
   {
     ASSERT(context != nullptr);
+
+    String value;
     if (let const *stored = context->lookup_shell_variable(name)) {
-      if (stored->count() == 0) return 0;
-      return parse_wide_operand(stored->view());
+      value = String{stored->view()};
+    } else if (let const fetched = context->get_variable_value(name);
+               fetched.has_value()) {
+      value = String{fetched->view()};
     }
-    let const value = context->get_variable_value(name);
-    if (!value.has_value() || value->is_empty()) return 0;
-    return parse_wide_operand(value->view());
+
+    if (value.count() == 0) return 0;
+
+    /* A calc variable holds a number or a stored expression, evaluated lazily
+       here so a formula recomputes from the variables it names. The depth guard
+       stops a cycle such as x=x, and a value that is not a valid expression
+       reads as its leading number the way a shell string did. */
+    if (depth >= MAX_DEPTH) return parse_wide_operand(value.view());
+
+    try {
+      return evaluate_wide_expression(context, value.view(), depth + 1);
+    } catch (const Error &) {
+      return parse_wide_operand(value.view());
+    }
   }
 
   static fn wrap_add(wide_int a, wide_int b) wontthrow -> wide_int
@@ -1477,6 +1499,14 @@ public:
     fail("unexpected character");
   }
 };
+
+static fn evaluate_wide_expression(EvalContext *context, StringView expression,
+                                   usize depth) throws -> wide_int
+{
+  WideArithmeticParser sub{context, expression, 0};
+  sub.depth = depth;
+  return sub.parse();
+}
 
 } /* namespace */
 

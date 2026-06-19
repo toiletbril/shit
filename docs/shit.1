@@ -220,7 +220,10 @@ flag or
 .B "set \-o shitbox"
 the utility names resolve directly as commands without the prefix, and a builtin
 still wins over a utility while a utility wins over a program on PATH. A binary
-whose name is a utility, such as a symlink named ls, acts as that utility. In
+whose name is a utility, such as a symlink named ls, acts as that utility, and
+the utility's own flags reach its parser rather than the shell.
+.B "shitbox \-\-assimilate DIR"
+installs one such symlink per utility into DIR. In
 the default shit mood a bare utility name also falls back to the bundled utility
 when PATH holds no binary of that name, so a missing system coreutil is filled
 in, while a PATH binary still takes precedence.
@@ -236,7 +239,9 @@ it computes in 128 bits, so a result wider than a signed 64-bit integer prints
 in full, while the bash and posix moods keep the 64-bit wrap. With no expression
 on a terminal, or with
 .BR \-i ,
-it reads and evaluates expressions interactively.
+it reads and evaluates expressions interactively. An interactive line of the
+form name=value assigns the variable, the value stored as text so a stored
+formula recomputes lazily from the variables it names.
 .TP
 .B bench
 Run each command repeatedly as a measured child and print a summary of the wall

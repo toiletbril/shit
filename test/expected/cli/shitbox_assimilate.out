@@ -1,0 +1,6 @@
+== a symlink was installed for head:
+head-linked
+== a symlinked head routes its own -c flag to the utility:
+abc
+== a symlinked ls routes -A to ls (count of the dot file):
+1

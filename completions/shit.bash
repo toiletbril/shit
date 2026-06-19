@@ -98,9 +98,10 @@ _shitbox_complete()
     local current_word
     current_word=${COMP_WORDS[COMP_CWORD]}
 
-    # The first argument names the utility to run.
+    # The first argument names the utility to run, or a shitbox builtin flag.
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "$_shitbox_utils" -- "$current_word") )
+        COMPREPLY=( $(compgen -W "$_shitbox_utils --list --assimilate --help" \
+            -- "$current_word") )
         return
     fi
 

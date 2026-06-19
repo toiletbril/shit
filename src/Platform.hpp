@@ -258,6 +258,11 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool;
    symlink or cannot be read. */
 fn read_symlink(StringView path) wontthrow -> Maybe<String>;
 
+/* The absolute path of the running binary, the symlink target the shitbox
+   --assimilate install points each utility name at. None when the platform
+   cannot report it. */
+fn current_executable_path() wontthrow -> Maybe<String>;
+
 /* The metadata one lstat returns, for the shitbox ls long format to render a
    row without a syscall per field. stat_path fills it and returns false when
    the path cannot be read. The mode carries the type and the permission bits in

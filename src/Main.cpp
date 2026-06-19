@@ -715,6 +715,44 @@ fn main(int argc, char **argv) -> int
   unused(FLAG_COSMO_STRACE);
 #endif
 
+  /* A symlink or rename to a shitbox utility name runs that utility directly,
+     before the shell parses a single flag, so an invocation such as `ls -l`
+     reaches ls and its own flag parser rather than the shell CLI. The name is
+     the basename of argv[0] with any directory and a leading login dash
+     dropped. */
+  if (argc > 0) {
+    shit::StringView invocation = shit::StringView{argv[0]};
+    usize basename_start = 0;
+    for (usize i = 0; i < invocation.length; i++)
+      if (invocation[i] == '/') basename_start = i + 1;
+    invocation = invocation.substring(basename_start);
+    if (!invocation.is_empty() && invocation[0] == '-')
+      invocation = invocation.substring(1);
+
+    if (shit::shitbox::find_util(invocation).has_value()) {
+      LOG(Info, "acting as the shitbox utility '%.*s' from argv[0]",
+          static_cast<int>(invocation.length), invocation.data);
+      shit::os::set_default_signal_handlers(false);
+      shit::utils::clear_path_map();
+
+      let ast_arena = shit::BumpArena{};
+      shit::AST_ARENA = &ast_arena;
+      let function_arena = shit::BumpArena{};
+      shit::FUNCTION_ARENA = &function_arena;
+
+      let context = shit::EvalContext{false, false, false, false, false,
+                                      shit::String{invocation}};
+
+      shit::ArrayList<shit::String> operands{};
+      operands.reserve(static_cast<usize>(argc - 1));
+      for (int i = 1; i < argc; i++)
+        operands.push(shit::String{shit::StringView{argv[i]}});
+
+      return static_cast<int>(shit::shitbox::run_as_multicall(
+          invocation, steal(operands), context));
+    }
+  }
+
   bool is_login_shell = false;
   let file_names = shit::ArrayList<shit::String>{};
 
@@ -1160,16 +1198,9 @@ fn main(int argc, char **argv) -> int
     if (listed == shit::mimic_mood::Bash) should_seed_bash_identity = true;
   context.seed_shell_identity_variables(should_seed_bash_identity);
 
-  /* A binary reached through a shitbox utility name, such as a symlink named
-     ls, acts as that utility and exits rather than starting a shell. This is
-     the busybox multicall, so a build that renames the binary gets the
-     coreutility with no prefix. */
-  if (shit::shitbox::find_util(program_basename).has_value()) {
-    LOG(Info, "acting as the shitbox utility '%.*s'",
-        static_cast<int>(program_basename.length), program_basename.data);
-    return shit::shitbox::run_as_multicall(program_basename, file_names.clone(),
-                                           context);
-  }
+  /* A shitbox utility reached through a symlinked argv[0] already ran and
+     exited at the top of main, before any flag parsing, so the shell setup here
+     never sees that case. */
 
   /* SHLVL counts shell nesting. It is read from the inherited environment,
      incremented, and exported so a child shell continues the count. */

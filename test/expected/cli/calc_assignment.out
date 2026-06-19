@@ -1,0 +1,18 @@
+== assignment prints the value and stores it:
+5
+5
+10
+== a stored formula recomputes lazily when a referenced var changes:
+10
+11
+11
+100
+101
+== a == comparison is not an assignment:
+1
+0
+== a bad value is rejected and leaves the variable unset:
+shit: 1:4: error: Arithmetic: unexpected character.
+     1 |  2 +
+       |     ^~ here.
+0
