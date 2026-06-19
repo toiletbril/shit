@@ -1,6 +1,6 @@
 # make MODE=dbg/rel/prof/cosmo/cosmo_dbg
 MODE ?= dbg
-TARGET ?= # Linux/Windows_NT/TODO: Darwin
+TARGET ?= # Linux/Windows_NT/Darwin
 ARCH ?= $(shell uname -m) # TODO: arm64/x86_64
 
 SOURCES := $(wildcard *.cpp)
@@ -69,8 +69,14 @@ endif
 endif
 
 ifeq ($(TARGET), Darwin)
-ifneq ($(UNAME_S), Darwin)
-$(error cross-compiling to macOS is not supported yet)
+ifneq ($(shell uname -s), Darwin)
+ifeq ($(origin CXX), default)
+ifeq ($(ARCH), x86_64)
+$(error x86_64 Darwin build is not supported)
+else
+CXX := oa64-clang++
+endif
+endif
 endif
 endif
 
@@ -81,14 +87,9 @@ else ifeq ($(MODE), cosmo_dbg)
 OS_INFO := "unknown-cosmo-dbg"
 LIBC_INFO := cosmopolitan libc
 else
-# The distribution PRETTY_NAME from /etc/os-release leads the uname line when the
-# file is present, naming the distro alongside the kernel.
 OS_INFO := $(shell . /etc/os-release 2>/dev/null; printf '%s%s' "$${PRETTY_NAME:+$$PRETTY_NAME }" "$$(uname -rvom 2>/dev/null || echo '<no uname>')")
 endif
 
-# The libc implementation and version for the --version compiler line. getconf
-# names the glibc version directly, ldd reports the musl line otherwise, and a
-# cross build to Windows links the mingw C runtime.
 ifndef LIBC_INFO
 ifeq ($(TARGET), Windows_NT)
 LIBC_INFO := mingw msvcrt
@@ -127,14 +128,16 @@ CXXFLAGS := \
 	-fno-rtti \
 	-fno-semantic-interposition \
 	-Wno-unknown-pragmas \
-	-Wl,-Bsymbolic \
 	-fno-strict-aliasing \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
+ifneq ($(TARGET), Darwin)
+CXXFLAGS += -Wl,-Bsymbolic
+endif
+
 LINK_LIBS := # nothing
 
-# Speed up the linking a bit.
 ifneq ($(shell which mold > $(DEVNULL) 2>&1),)
 USE_LD := -fuse-ld=mold
 else ifneq ($(shell which lld > $(DEVNULL) 2>&1),)
@@ -271,10 +274,7 @@ dirs: $(DIRS)
 shit: dirs
 	$(MAKE) $(OUT)
 
-# Install layout. PREFIX is the root, DESTDIR stages a packaging tree under it,
-# and the three directories follow the filesystem hierarchy. The mood symlinks
-# default off, so a plain install never shadows a system sh, bash, or dash, and
-# a packager opts in with INSTALL_MOOD_SYMLINKS="sh bash dash".
+# INSTALL_MOOD_SYMLINKS="sh bash dash".
 PREFIX ?= /usr/local
 DESTDIR ?=
 bindir ?= $(PREFIX)/bin
@@ -286,8 +286,6 @@ REL_BINARY := ../shit
 MANPAGE := ../docs/shit.1
 BASH_COMPLETION := ../completions/shit.bash
 
-# Install always ships the release binary rather than whatever MODE the caller
-# built, so the optimized artifact lands rather than a sanitizer build.
 install:
 ifeq ($(TARGET), Windows_NT)
 	$(error Unable to figure out install directory for Windows. \
