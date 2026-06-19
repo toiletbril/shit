@@ -490,9 +490,8 @@ static pure fn path_candidate_needs_quoting(StringView candidate) wontthrow
     let const c = candidate[i];
     if (c == ' ' || c == '\t' || c == '\n' || c == '*' || c == '?' ||
         c == '[' || c == ']' || c == '(' || c == ')' || c == '{' || c == '}' ||
-        c == '\'' || c == '"' || c == '`' || c == '$' || c == '&' ||
-        c == '|' || c == ';' || c == '<' || c == '>' || c == '\\' ||
-        c == '!' || c == '#')
+        c == '\'' || c == '"' || c == '`' || c == '$' || c == '&' || c == '|' ||
+        c == ';' || c == '<' || c == '>' || c == '\\' || c == '!' || c == '#')
     {
       return true;
     }

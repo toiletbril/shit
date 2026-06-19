@@ -97,7 +97,8 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
         }
       }
     } else if (!make_one(operand.view(), named_mode, FLAG_MKDIR_MODE.is_set(),
-                         false)) {
+                         false))
+    {
       report_soft_shitbox_error(ec, cxt,
                                 "mkdir: cannot create directory '" + operand +
                                     "': " + os::last_system_error_message());
