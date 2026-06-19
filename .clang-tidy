@@ -16,10 +16,22 @@ Checks: |
   readability-non-const-parameter,
   readability-make-member-function-const,
   readability-static-accessed-through-instance,
+  -readability-identifier-naming,
+  -readability-identifier-length,
+  -readability-braces-around-statements,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -modernize-use-trailing-return-type,
+  -modernize-use-auto,
+  -modernize-use-nodiscard,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-reserved-identifier,
+  -bugprone-throwing-static-initialization,
+  -misc-non-private-member-variables-in-classes,
+  -misc-use-internal-linkage,
+  -readability-use-concise-preprocessor-directives,
+  -modernize-use-designated-initializers,
 
-# The allowlist above is authoritative. A parent or global .clang-tidy must not
-# merge in checks the house style rejects, such as identifier-naming, magic
-# numbers, braces around every statement, or trailing return types.
-InheritParentConfig: false
+InheritParentConfig: true
 
 ...
