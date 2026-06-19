@@ -13,13 +13,17 @@ done
        |  ^~~ here.
 [optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 1 compounds eliminated
 done
-=== c-style for whose condition is zero is eliminated ===
+=== c-style for with a blank init and a zero condition is eliminated ===
 [optimizer] folded c-style for condition: 0 = 0
 [optimizer] eliminated c-style for loop
 [optimizer-state] 1:1: warning: Eliminated c-style for whose condition is zero.
-     1 |  for ((i=0; 0; i++)); do echo a; done; echo done
+     1 |  for ((; 0; i++)); do echo a; done; echo done
        |  ^~~ here.
 [optimizer] summary: 1 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 1 compounds eliminated
+done
+=== c-style for with a non-blank init folds but keeps the init ===
+[optimizer] folded c-style for condition: 0 = 0
+[optimizer] summary: 1 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 0 compounds eliminated
 done
 === while false is eliminated ===
 [optimizer] folded while loop to a skip

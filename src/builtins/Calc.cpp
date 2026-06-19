@@ -4,6 +4,7 @@
 #include "../Eval.hpp"
 #include "../Lexer.hpp"
 #include "../Platform.hpp"
+#include "../Toiletline.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -22,7 +23,8 @@ HELP_DESCRIPTION_DECL(
     "The calc builtin evaluates each argument as an arithmetic expression and "
     "prints the value of the last one. In the default mood it computes in 128 "
     "bits. With no expression on a terminal, or with -i, it reads expressions "
-    "interactively.");
+    "interactively, where a name=value line binds a formula evaluated lazily on "
+    "each read and an unset variable is an error.");
 
 FLAG(CALC_INTERACTIVE, Bool, 'i', "interactive",
      "Read and evaluate expressions interactively.");
@@ -62,14 +64,13 @@ fn evaluate_one(ExecContext &ec, EvalContext &cxt, StringView expression) throws
   }
 }
 
-/* Apply a calc REPL assignment of the form name=value, returning true when the
-   line was an assignment so the caller does not also evaluate it. The value is
-   stored as text after one eager evaluation validates it is a number or an
-   evaluatable expression, so a stored formula recomputes lazily on each later
-   reference. A == comparison is left for the evaluator, and a bad value reports
-   a located error and leaves the variable unset. */
-fn try_assignment(ExecContext &ec, EvalContext &cxt, StringView line) throws
-    -> bool
+/* A standalone REPL line of the form name=value binds the variable to its
+   right-side expression text without evaluating it, the deferred definition, so
+   a formula may name a variable that is not set yet and recompute lazily on each
+   later read. The line prints nothing, since it is a definition. Returns true
+   when the line was an assignment, and a == comparison is left for the
+   evaluator. */
+fn try_define(EvalContext &cxt, StringView line) throws -> bool
 {
   usize i = 0;
   while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
@@ -96,54 +97,69 @@ fn try_assignment(ExecContext &ec, EvalContext &cxt, StringView line) throws
   while (value_end > value_start &&
          (line[value_end - 1] == ' ' || line[value_end - 1] == '\t'))
     value_end--;
-  let const value = line.substring_of_length(value_start, value_end - value_start);
 
-  if (value.is_empty()) {
-    report_soft_builtin_error(ec, cxt, "calc: assignment to '" + String{name} +
-                                           "' needs a value");
-    return true;
-  }
+  /* An empty right side is a typo rather than a formula, so it reports rather
+     than binding a name that would later read as zero and defeat the unset
+     error. */
+  if (value_end == value_start)
+    throw Error{"calc: assignment to '" + String{name} + "' needs a value"};
 
-  bool nonzero = false;
-  try {
-    String result = cxt.evaluate_arithmetic_wide(value, nonzero);
-    cxt.set_shell_variable(name, value);
-    result += '\n';
-    ec.print_to_stdout(result);
-  } catch (const ErrorWithLocation &error) {
-    show_message(error.to_string(value));
-  } catch (const Error &error) {
-    report_soft_builtin_error(ec, cxt, "cannot evaluate '" + String{value} +
-                                           "', " + error.message());
-  }
+  /* The right side is stored unevaluated, so the binding is a formula the next
+     read evaluates against the current context. */
+  cxt.set_shell_variable(
+      name, line.substring_of_length(value_start, value_end - value_start));
   return true;
 }
 
 /* Read expressions from the input descriptor and evaluate each, the desk
-   calculator loop. A prompt prints to standard error when the input is a
-   terminal so it stays out of a captured standard output. The loop ends on end
-   of input or an interrupt, and a bad line reports and continues rather than
-   ending the session. */
+   calculator loop. An interactive session reads through the toiletline editor
+   for line editing and history, while a piped run, or a shell that never
+   started the editor, falls back to a plain line read with a stderr prompt so
+   the input stays deterministic. The loop ends on end of input or a suspend,
+   and a bad line reports and continues rather than ending the session. */
 fn run_repl(ExecContext &ec, EvalContext &cxt) throws -> i32
 {
   let const input_fd = ec.in_fd.value_or(SHIT_STDIN);
-  let const is_prompted = os::is_fd_a_tty(input_fd);
+  let const is_terminal = os::is_fd_a_tty(input_fd);
+  let const use_editor = is_terminal && toiletline::is_active();
 
   loop
   {
-    if (is_prompted) shit::print_error("calc> ");
+    Maybe<String> line;
+    if (use_editor) {
+      let result = toiletline::get_input(String{"calc> "});
+      if (result.code == TL_PRESSED_EOF || result.code == TL_PRESSED_SUSPEND) {
+        break;
+      }
+      if (result.code != TL_PRESSED_ENTER) continue;
+      line = steal(result.text);
+    } else {
+      if (is_terminal) shit::print_error("calc> ");
+      bool was_delimiter_terminated = false;
+      line = utils::read_line_from_fd(input_fd, was_delimiter_terminated);
+      if (!line.has_value() || os::INTERRUPT_REQUESTED) {
+        break;
+      }
+    }
 
-    bool was_delimiter_terminated = false;
-    Maybe<String> line =
-        utils::read_line_from_fd(input_fd, was_delimiter_terminated);
-    if (!line.has_value() || os::INTERRUPT_REQUESTED) break;
     if (line->view().is_empty()) continue;
-    if (try_assignment(ec, cxt, line->view())) continue;
+
+    /* A standalone binding reports a readonly target or an empty value the way
+       a bad expression does, so a write that throws ends the line rather than
+       the whole session. */
+    try {
+      if (try_define(cxt, line->view())) continue;
+    } catch (const Error &error) {
+      report_soft_builtin_error(ec, cxt, error.message());
+      continue;
+    }
 
     evaluate_one(ec, cxt, line->view());
   }
 
-  if (is_prompted) shit::print_error("\n");
+  if (!use_editor && is_terminal) {
+    shit::print_error("\n");
+  }
   return 0;
 }
 
@@ -154,6 +170,13 @@ i32 Calc::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const operands = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  /* calc prints only errors, never the shell's advisory warnings such as the
+     unset-variable notice, so the whole run suppresses diagnostics and restores
+     the prior state on the way out. An unset variable is a calc error instead. */
+  let const were_diagnostics_disabled = cxt.diagnostics_disabled();
+  cxt.set_diagnostics_disabled(true);
+  defer { cxt.set_diagnostics_disabled(were_diagnostics_disabled); };
 
   /* With -i, or with no expression on a terminal, calc reads expressions
      interactively. A piped run with no expression keeps the usage error so it

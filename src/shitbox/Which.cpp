@@ -44,13 +44,13 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
      printed and the resolution is tracked in a flag instead of the buffer. */
   let const is_quiet = FLAG_QUIET.is_enabled();
   let output = String{};
-  bool found_any = false;
+  bool has_found_any = false;
 
   for (let const &program_name : operands) {
     LOG(Debug, "which resolving '%s' against builtins and PATH",
         program_name.c_str());
     if (search_builtin(program_name.view()).has_value()) {
-      found_any = true;
+      has_found_any = true;
       if (!is_quiet) {
         output += program_name;
         /* The descriptive suffix is for a human at a terminal. A pipe gets just
@@ -62,7 +62,7 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
                    program_name, FLAG_ALL.is_enabled());
                paths.count() != 0)
     {
-      found_any = true;
+      has_found_any = true;
       if (!is_quiet) {
         if (FLAG_ALL.is_enabled()) {
           for (let const &path : paths) {
@@ -79,7 +79,7 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (!is_quiet) ec.print_to_stdout(output);
 
-  return found_any ? 0 : 1;
+  return has_found_any ? 0 : 1;
 }
 
 } /* namespace shitbox */

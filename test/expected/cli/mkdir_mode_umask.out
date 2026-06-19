@@ -1,0 +1,5 @@
+== -m 755 under umask 077 keeps every bit (want 755):
+755
+== -p -m 777 names the deep directory exactly, parents stay umask-narrowed:
+named (want 777): 777
+parent (want 755): 755

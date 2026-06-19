@@ -1,10 +1,10 @@
 name: Release
 
-# A tag push builds the binaries and attaches them to the release. A manual
-# dispatch builds the same artifacts against an existing tag. The cross image is
-# built from the repository Dockerfile, an x86_64 Linux musl binary builds
-# natively in it and an aarch64 macOS binary builds through its osxcross
-# toolchain.
+# A tag push builds the release binary and attaches it to the release. A manual
+# dispatch builds the same artifact against an existing tag. The build runs in an
+# Alpine container so the binary links statically against musl libc with no
+# runtime dependency. The repository Dockerfile is for development only and is
+# not used here.
 on:
   push:
     tags: ['v*', '[0-9]*']
@@ -23,37 +23,33 @@ jobs:
   build:
     name: Release / Build and attach
     runs-on: ubuntu-24.04
+    container:
+      image: alpine:latest
     permissions:
       contents: write
     env:
       VERSION: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
+      # nodejs and git let the checkout action run inside the musl container, and
+      # the build toolchain is clang with lld for the static-pie link.
+      - name: Install the build toolchain
+        run: |
+          apk add --no-cache \
+            build-base musl-dev linux-headers clang llvm lld make git nodejs
+          git config --global --add safe.directory '*'
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Build the cross-compile image
-        run: docker build -t shit-cross -f Dockerfile .
-
-      # The image builds both targets in one run. The Makefile writes ../shit, so
-      # each target is copied to dist before the next overwrites it.
-      - name: Build the targets
+      # The Linux release target links static-pie, so the artifact carries no
+      # shared library dependency. The Makefile writes the binary to ./shit.
+      - name: Build the static musl binary
         run: |
+          make -C src MODE=rel TARGET=Linux ARCH=x86_64
           mkdir -p dist
-          docker run --rm -v "$PWD:/work" -w /work shit-cross sh -eu -c '
-            make -C src MODE=rel TARGET=Linux ARCH=x86_64
-            cp shit dist/shit-linux-amd64
-            make -C src MODE=rel TARGET=Darwin ARCH=aarch64
-            cp shit dist/shit-darwin-arm64
-            chmod 0755 dist/shit-linux-amd64 dist/shit-darwin-arm64
-          '
-
-      - name: Append the version to the artifact names
-        run: |
-          cd dist
-          mv shit-linux-amd64  "shit-linux-amd64-$VERSION"
-          mv shit-darwin-arm64 "shit-darwin-arm64-$VERSION"
+          install -m 755 shit "dist/shit-linux-amd64-$VERSION"
 
       - name: Create the GitHub release
         uses: softprops/action-gh-release@v2
@@ -62,4 +58,3 @@ jobs:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
             dist/shit-linux-amd64-${{ env.VERSION }}
-            dist/shit-darwin-arm64-${{ env.VERSION }}

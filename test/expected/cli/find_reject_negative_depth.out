@@ -1,0 +1,6 @@
+== -maxdepth -1 is rejected:
+1
+== -mindepth -3 is rejected:
+1
+== a valid -maxdepth 0 still works (lists only the root):
+.

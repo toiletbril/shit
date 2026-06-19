@@ -1,13 +1,16 @@
 unset SHIT_FLAGS
-# The calc REPL accepts name=value assignments. The value is stored as text so a
-# formula evaluates lazily and recomputes from the variables it names. A ==
-# comparison stays an expression, and a value that is not evaluatable is
-# rejected with a located error.
-echo "== assignment prints the value and stores it:"
+# The calc REPL binds a name=value line as a deferred formula, the right side
+# stored unevaluated so it recomputes from the variables it names on each read. A
+# standalone assignment prints nothing, an unset variable is an error rather than
+# a silent zero, a == comparison stays an expression, and an assignment used
+# mid-line is an expression that returns its value.
+echo "== a standalone assignment is silent, the read prints the value:"
 printf 'x = 2 + 3\nx\nx * 2\n' | "$BIN" -c 'calc -i' 2>&1
-echo "== a stored formula recomputes lazily when a referenced var changes:"
-printf 'a = 10\nb = a + 1\nb\na = 100\nb\n' | "$BIN" -c 'calc -i' 2>&1
+echo "== a formula binds before its inputs and recomputes lazily:"
+printf 'area = w * h\nw = 3\nh = 4\narea\nw = 10\narea\n' | "$BIN" -c 'calc -i' 2>&1
+echo "== an assignment is an expression mid-line, returning its value:"
+printf '(n = 5) + 1\nn\n' | "$BIN" -c 'calc -i' 2>&1
 echo "== a == comparison is not an assignment:"
 printf '5 == 5\n5 == 4\n' | "$BIN" -c 'calc -i' 2>&1
-echo "== a bad value is rejected and leaves the variable unset:"
-printf 'z = 2 +\nz\n' | "$BIN" -c 'calc -i' 2>&1
+echo "== an unset variable is an error, not a silent zero:"
+printf 'nope\n' | "$BIN" -c 'calc -i' 2>&1

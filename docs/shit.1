@@ -239,9 +239,14 @@ it computes in 128 bits, so a result wider than a signed 64-bit integer prints
 in full, while the bash and posix moods keep the 64-bit wrap. With no expression
 on a terminal, or with
 .BR \-i ,
-it reads and evaluates expressions interactively. An interactive line of the
-form name=value assigns the variable, the value stored as text so a stored
-formula recomputes lazily from the variables it names.
+it reads and evaluates expressions interactively through the line editor. An
+interactive line of the form name=value binds the variable to its right-side
+expression without evaluating it, a definition that prints nothing and recomputes
+lazily from the variables it names on each later read. An assignment used inside
+an expression, such as
+.BR "(x = 5) + 1" ,
+returns its value. An unset variable is an error rather than a silent zero, and
+calc prints only errors, never the shell's advisory warnings.
 .TP
 .B bench
 Run each command repeatedly as a measured child and print a summary of the wall

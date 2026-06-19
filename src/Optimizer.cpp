@@ -433,9 +433,9 @@ fn try_algebraic_simplify(StringView expression,
       has_grouping = true;
       break;
     }
-    /* A leading sign on the whole expression is a unary minus, not the binary
-       operator this matcher splits on, so the scan starts past position zero.
-     */
+    /* A leading sign on the whole expression binds as a unary minus. The scan
+       starts past position zero to keep this matcher from splitting on it as a
+       binary operator. */
     if (i > 0 && (byte == '*' || byte == '-')) {
       operator_position = i;
       operator_count++;
@@ -876,9 +876,14 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
                               String{trimmed} + " = " +
                               utils::int_to_text(*value));
 
-  /* A constant zero condition means the body never runs, so the whole loop is a
-     proven no-op the body-elimination path skips. */
-  if (*value == 0) {
+  /* A constant zero condition means the body never runs. The init clause still
+     runs once before the condition the way C semantics require, so a loop with a
+     non-blank init keeps the folded zero condition and the evaluator runs the
+     init then skips the body. Only a blank-init loop is a proven no-op the
+     body-elimination path drops whole. */
+  let const init_is_blank =
+      trim_arithmetic_whitespace(loop_node->init_clause()).length == 0;
+  if (*value == 0 && init_is_blank) {
     loop_node->set_fully_eliminated();
     actx.optimizer_eliminated_compounds++;
     if (actx.should_trace_optimizer)

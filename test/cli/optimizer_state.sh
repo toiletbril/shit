@@ -12,8 +12,11 @@ echo "=== if with no reachable body is eliminated ==="
 echo "=== for over an empty list is eliminated ==="
 "$BIN" --show-optimizer-state -c 'for x in; do echo a; done; echo done'
 
-echo "=== c-style for whose condition is zero is eliminated ==="
-"$BIN" --show-optimizer-state -c 'for ((i=0; 0; i++)); do echo a; done; echo done'
+echo "=== c-style for with a blank init and a zero condition is eliminated ==="
+"$BIN" --show-optimizer-state -c 'for ((; 0; i++)); do echo a; done; echo done'
+
+echo "=== c-style for with a non-blank init folds but keeps the init ==="
+"$BIN" --show-optimizer-state -c 'for ((i=5; 0; i++)); do echo a; done; echo done'
 
 echo "=== while false is eliminated ==="
 "$BIN" --show-optimizer-state -c 'while false; do echo a; done; echo done'

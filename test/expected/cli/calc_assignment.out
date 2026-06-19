@@ -1,18 +1,16 @@
-== assignment prints the value and stores it:
-5
+== a standalone assignment is silent, the read prints the value:
 5
 10
-== a stored formula recomputes lazily when a referenced var changes:
-10
-11
-11
-100
-101
+== a formula binds before its inputs and recomputes lazily:
+12
+40
+== an assignment is an expression mid-line, returning its value:
+6
+5
 == a == comparison is not an assignment:
 1
 0
-== a bad value is rejected and leaves the variable unset:
-shit: 1:4: error: Arithmetic: unexpected character.
-     1 |  2 +
-       |     ^~ here.
-0
+== an unset variable is an error, not a silent zero:
+shit: 1:1: error: Builtin 'calc': cannot evaluate 'nope', Arithmetic: the variable 'nope' is not set.
+     1 |  calc -i
+       |  ^~~~~~~ here.

@@ -1,0 +1,6 @@
+== rm -rf / is refused (count of the refusal):
+1
+== rm -rf // is refused (count):
+1
+== a normal file still removes:
+keep-removed

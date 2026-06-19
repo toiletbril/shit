@@ -1,0 +1,6 @@
+== rm -rf . is refused (count of the refusal):
+1
+== rm -rf .. is refused (count):
+1
+== the directory contents survive:
+keep-survives

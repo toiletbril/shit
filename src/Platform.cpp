@@ -1609,50 +1609,103 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
   return result;
 }
 
+/* The path String frees its heap buffer when its scope ends, and a free may
+   clobber errno before the caller reads last_system_error_message, so each
+   helper saves the syscall errno across the String destructor. The inner scope
+   ends the String first, then errno is restored. */
 fn make_directory(StringView path, u32 mode) wontthrow -> bool
 {
-  const String path_string{path};
-  return ::mkdir(path_string.c_str(), mode) == 0;
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String path_string{path};
+    did_succeed = ::mkdir(path_string.c_str(), mode) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
 }
 
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
 {
-  const String path_string{path};
-  return ::chmod(path_string.c_str(), mode) == 0;
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String path_string{path};
+    did_succeed = ::chmod(path_string.c_str(), mode) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
 }
 
 fn touch_file_times(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  /* A null times array sets both the access and the modification time to the
-     current time, the touch update for an existing file. */
-  return ::utimensat(AT_FDCWD, path_string.c_str(), nullptr, 0) == 0;
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String path_string{path};
+    /* A null times array sets both the access and the modification time to the
+       current time, the touch update for an existing file. */
+    did_succeed = ::utimensat(AT_FDCWD, path_string.c_str(), nullptr, 0) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
 }
 
 fn remove_directory(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  return ::rmdir(path_string.c_str()) == 0;
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String path_string{path};
+    did_succeed = ::rmdir(path_string.c_str()) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
 }
 
 fn remove_file(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  return ::unlink(path_string.c_str()) == 0;
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String path_string{path};
+    did_succeed = ::unlink(path_string.c_str()) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
 }
 
 fn rename_path(StringView from, StringView to) wontthrow -> bool
 {
-  const String from_string{from};
-  const String to_string{to};
-  return ::rename(from_string.c_str(), to_string.c_str()) == 0;
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String from_string{from};
+    const String to_string{to};
+    did_succeed = ::rename(from_string.c_str(), to_string.c_str()) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
 }
 
 fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
 {
-  const String target_string{target};
-  const String link_string{link_path};
-  return ::symlink(target_string.c_str(), link_string.c_str()) == 0;
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String target_string{target};
+    const String link_string{link_path};
+    did_succeed = ::symlink(target_string.c_str(), link_string.c_str()) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
 }
 
 fn read_symlink(StringView path) wontthrow -> Maybe<String>

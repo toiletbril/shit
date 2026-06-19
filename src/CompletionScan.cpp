@@ -554,10 +554,10 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     let const is_shitbox_builtin =
         builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Shitbox;
     Maybe<shitbox::Utility::Kind> util_for_flags;
-    bool offer_util_names = false;
+    bool should_offer_util_names = false;
     if (is_shitbox_builtin) {
       if (previous_settled_word(line, token_start) == command) {
-        if (token.is_empty() || token[0] != '-') offer_util_names = true;
+        if (token.is_empty() || token[0] != '-') should_offer_util_names = true;
       } else if (let const second = second_word_of(line); second.has_value()) {
         util_for_flags = shitbox::find_util(*second);
       }
@@ -568,7 +568,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
       util_for_flags = shitbox::find_util(command);
     }
 
-    if (offer_util_names) {
+    if (should_offer_util_names) {
       let names = ArrayList<String>{};
       for (const String &name : shitbox::util_names())
         if (name.view().starts_with(token)) names.push(String{name.view()});

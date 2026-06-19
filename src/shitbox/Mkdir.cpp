@@ -35,8 +35,9 @@ static fn make_one(StringView path, u32 mode, bool set_exact_mode,
 {
   if (os::make_directory(path, mode)) {
     /* The create narrows the bits by the umask, so an explicit -m re-applies
-       the exact mode the way POSIX mkdir sets it. */
-    if (set_exact_mode) os::set_file_mode(path, mode);
+       the exact mode the way POSIX mkdir sets it. A failed chmod leaves the
+       directory at the wrong mode, so it reports rather than passing. */
+    if (set_exact_mode && !os::set_file_mode(path, mode)) return false;
     return true;
   }
 
@@ -65,7 +66,10 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
   u32 named_mode = 0777;
   if (FLAG_MKDIR_MODE.is_set()) {
     let const parsed = utils::parse_octal_integer(FLAG_MKDIR_MODE.value());
-    if (parsed.is_error())
+    /* parse_octal_integer accepts a sign and saturates on overflow without an
+       error, so a sign-prefixed or oversized operand parses cleanly. The range
+       check rejects it rather than truncating to an over-permissive mode. */
+    if (parsed.is_error() || parsed.value() < 0 || parsed.value() > 07777)
       throw Error{"mkdir: invalid mode '" + String{FLAG_MKDIR_MODE.value()} +
                   "'"};
 

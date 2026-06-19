@@ -836,6 +836,11 @@ public:
      cached integer instead of re-parsing the clause on every iteration. */
   pure fn condition_clause() const wontthrow -> StringView;
 
+  /* The init clause, read by the same rule. The init runs once before the
+     condition even when the condition folds to zero, so the rule keeps the loop
+     alive to run it rather than eliminating the whole node. */
+  pure fn init_clause() const wontthrow -> StringView;
+
   fn set_folded_condition(i64 value) const wontthrow -> void;
   pure fn has_folded_condition() const wontthrow -> bool;
 

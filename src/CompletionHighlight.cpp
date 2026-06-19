@@ -86,7 +86,8 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
      above. */
   if (environment_path_changed(CACHED_PATH_VERDICT_PATH))
     PATH_SEARCH_VERDICTS.clear();
-  if (const bool *verdict = PATH_SEARCH_VERDICTS.find(word)) return *verdict;
+  if (const bool *verdict = PATH_SEARCH_VERDICTS.find(word); verdict != nullptr)
+    return *verdict;
   let const resolves = utils::search_program_path(word).count() > 0;
   LOG(All, "the path search resolves '%.*s' to %s",
       static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
@@ -112,15 +113,15 @@ static fn command_word_prefixes_any(StringView word,
   for (let const &builtin_name : builtin_names())
     if (has_prefix(builtin_name.view())) return true;
 
-  bool found = false;
+  bool was_found = false;
   context.function_names().for_each([&](StringView name) {
-    if (!found && has_prefix(name)) found = true;
+    if (!was_found && has_prefix(name)) was_found = true;
   });
-  if (found) return true;
+  if (was_found) return true;
   context.alias_names().for_each([&](StringView name) {
-    if (!found && has_prefix(name)) found = true;
+    if (!was_found && has_prefix(name)) was_found = true;
   });
-  if (found) return true;
+  if (was_found) return true;
 
   for (let const &command_name : path_command_names())
     if (has_prefix(command_name.view())) return true;
@@ -578,7 +579,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   };
 
   let stack = ArrayList<highlight_construct>{bump_allocator(HIGHLIGHT_ARENA)};
-  let command_position = true;
+  let is_command_position = true;
   let expecting_in = false;
   let for_variable_pending = false;
   let for_do_expected = false;
@@ -591,7 +592,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       /* A newline ends a command the way a ';' does, so the next word returns
          to command position and a keyword after it is recognized. */
       if (c == '\n') {
-        command_position = true;
+        is_command_position = true;
         expecting_in = false;
       }
       i++;
@@ -634,7 +635,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       }
       do_push(operator_start, i, colors::ansi::BOLD);
       if (has_opener || (has_separator && !has_redirect)) {
-        command_position = true;
+        is_command_position = true;
         expecting_in = false;
       }
       continue;
@@ -715,7 +716,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       do_push(word_start, word_end, colors::ansi::GREEN);
       expecting_in = false;
       for_variable_pending = false;
-      command_position = false;
+      is_command_position = false;
       /* A for loop requires do once its word list ends, a case takes patterns,
          so this only arms for a for. */
       if (!stack.is_empty() && stack.back() == highlight_construct::For)
@@ -727,7 +728,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
        identifier, the way the parser rejects for $f. */
     if (for_variable_pending) {
       for_variable_pending = false;
-      command_position = false;
+      is_command_position = false;
       /* A valid loop variable is cyan, a malformed one bold red. */
       if (!plain || !is_plain_identifier(word))
         do_push(word_start, word_end, colors::ansi::BOLD_RED);
@@ -738,16 +739,16 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
     /* A for loop requires do once its word list ends, so a word other than do
        in that position is misplaced and shown red. */
-    if (for_do_expected && command_position) {
+    if (for_do_expected && is_command_position) {
       for_do_expected = false;
       if (word != "do") {
         do_push(word_start, word_end, colors::ansi::BOLD_RED);
-        command_position = false;
+        is_command_position = false;
         continue;
       }
     }
 
-    if (command_position && plain && !is_assignment) {
+    if (is_command_position && plain && !is_assignment) {
       let is_keyword = true;
       let keyword_ok = true;
       let next_is_command = true;
@@ -805,7 +806,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (is_keyword) {
         do_push(word_start, word_end,
                 keyword_ok ? colors::ansi::GREEN : colors::ansi::BOLD_RED);
-        command_position = next_is_command;
+        is_command_position = next_is_command;
         if (opens_in) expecting_in = true;
         if (opens_for_variable) for_variable_pending = true;
         continue;
@@ -835,7 +836,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         }
         do_push(word_start, word_end, command_color);
       }
-      command_position = false;
+      is_command_position = false;
       continue;
     }
 
@@ -844,7 +845,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
        position, an expansion-built command moves past it. A flag dims to a
        subtle gray, and a plain argument that looks like a path colors per
        segment, the on-disk prefix cyan, the rest yellow or red. */
-    if (!command_position && plain && !is_assignment) {
+    if (!is_command_position && plain && !is_assignment) {
       if (!word.is_empty() && word[0] == '-') {
         do_push(word_start, word_end, colors::ansi::GRAY);
       } else if (token_has_glob_metacharacter(word)) {
@@ -859,7 +860,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     }
     for (let const &inner : word_spans)
       do_push(inner.start, inner.end, inner.sgr);
-    if (command_position && !is_assignment) command_position = false;
+    if (is_command_position && !is_assignment) is_command_position = false;
   }
 }
 
@@ -880,7 +881,7 @@ static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
     return true;
   };
 
-  let bind_next = false;
+  let should_bind_next = false;
   usize i = 0;
   while (i < line.length) {
     while (i < line.length && is_separator(line[i]))
@@ -891,9 +892,9 @@ static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
     if (i == start) break;
     let const token = line.substring_of_length(start, i - start);
 
-    if (bind_next) {
+    if (should_bind_next) {
       if (is_identifier(token)) known_vars.add(token);
-      bind_next = false;
+      should_bind_next = false;
     } else if (Maybe<usize> equals = token.find_character('=');
                equals.has_value() && equals.value() > 0)
     {
@@ -904,7 +905,7 @@ static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
         name = name.substring_of_length(0, bracket.value());
       if (is_identifier(name)) known_vars.add(name);
     }
-    bind_next = token == "for" || token == "select";
+    should_bind_next = token == "for" || token == "select";
   }
 }
 

@@ -1,0 +1,79 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [CStyleForLoop "x = 5; 0; x++"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "x=$x"]
+  [CompoundListCondition, None]
+    [CStyleForLoop "; 0;"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_blank"]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "x++"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "x="
+  Variable "x"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after_blank"
+]
+x=5
+after_blank
+[Code 0]

@@ -259,12 +259,12 @@ CXXFLAGS += \
 endif
 
 $(OBJ_DIR)/%.o: %.cpp Makefile
-	printf "\tCompiling %-42s $@... %-64s\r" $< ' '
+	printf "\tCompiling %-42s $@... %-12s\r" $< ' '
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $(CWD)$@
 
 # Linking.
 $(OUT): $(OBJECTS)
-	printf "\tLinking $(OUT)... %-64s\n" ' '
+	printf "\tLinking $(OUT)... %-64s\r" ' '
 	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) $(LINK_LIBS) -o $@
 
 dirs: $(DIRS)

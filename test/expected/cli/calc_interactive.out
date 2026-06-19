@@ -9,7 +9,7 @@ note: An operator is missing between two values.
 1180591620717411303424
 == -i evaluates each piped line, continuing past a bad one:
 2
-shit: 1:6: error: Arithmetic: unexpected character.
-     1 |  bad +
-       |       ^~ here.
+shit: 1:1: error: Builtin 'calc': cannot evaluate 'bad +', Arithmetic: the variable 'bad' is not set.
+     1 |  calc -i
+       |  ^~~~~~~ here.
 100

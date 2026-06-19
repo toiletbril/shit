@@ -1,0 +1,4 @@
+== touch advances the modification time of an existing file:
+advanced
+== touch -c still does not create a missing file:
+ghost-missing

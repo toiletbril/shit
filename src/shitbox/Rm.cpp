@@ -58,6 +58,20 @@ static fn names_dot_or_dotdot(StringView operand) wontthrow -> bool
   return base == StringView{"."} || base == StringView{".."};
 }
 
+/* Whether the operand names the root directory, every byte a slash. A recursive
+   remove of / would walk the whole filesystem, so rm refuses it the way GNU rm
+   does under its default preserve-root, and the -f flag does not waive it. The
+   dot guard already covers /. and /.. through their basename. */
+static fn names_root_directory(StringView operand) wontthrow -> bool
+{
+  if (operand.length == 0) return false;
+
+  for (usize i = 0; i < operand.length; i++)
+    if (operand[i] != '/') return false;
+
+  return true;
+}
+
 Rm::Rm() = default;
 
 pure Utility::Kind Rm::kind() const wontthrow { return Kind::Rm; }
@@ -85,6 +99,15 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
                                 "rm: refusing to remove '.' or '..' directory: "
                                 "skipping '" +
                                     operand + "'");
+      status = 1;
+      continue;
+    }
+
+    if (names_root_directory(operand.view())) {
+      report_soft_shitbox_error(
+          ec, cxt,
+          "rm: refusing to remove the root directory: skipping '" + operand +
+              "'");
       status = 1;
       continue;
     }

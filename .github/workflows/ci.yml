@@ -8,26 +8,32 @@ jobs:
   build-test-bench:
     name: Build, test and bench
     runs-on: ubuntu-24.04
+    container:
+      image: alpine:latest
     continue-on-error: true
-    env:
-      CXX: clang++-18
     steps:
+      # The toolchain installs first so the checkout action has nodejs and git
+      # inside the musl container, the build uses clang with lld, and dash, bash,
+      # and the coreutils back the benchmark comparisons and the golden tests.
+      - name: Install the toolchain
+        shell: sh
+        run: |
+          apk add --no-cache \
+            nodejs git make build-base musl-dev linux-headers \
+            clang llvm lld compiler-rt \
+            bash dash busybox coreutils
+          git config --global --add safe.directory '*'
+          llvm_bin=$(find /usr/lib /usr/bin -name llvm-profdata 2>/dev/null \
+            | head -1 | xargs -r dirname)
+          [ -n "$llvm_bin" ] && echo "$llvm_bin" >> "$GITHUB_PATH"
+          clang++ --version
+          ld.lld --version
+          busybox --version
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Setup
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 18 all
-          sudo ln -sf /usr/bin/lld-18    /usr/local/bin/lld
-          sudo ln -sf /usr/bin/ld.lld-18 /usr/local/bin/ld.lld
-          sudo apt-get install -y zsh dash golang-go busybox
-          clang++-18 --version
-          ld.lld-18 --version
-          busybox --version
 
       - name: Build ASAN binary
         run: make shit
@@ -45,6 +51,7 @@ jobs:
 
       - name: Assert shit is faster than dash
         if: '!cancelled()'
+        shell: bash
         run: |
           cd test
           run_min() {
@@ -73,6 +80,7 @@ jobs:
 
       - name: Assert shit is faster than bash by at least 3 times
         if: '!cancelled()'
+        shell: bash
         run: |
           cd test
           run_min() {
@@ -112,15 +120,16 @@ jobs:
 
       - name: Record coverage
         if: always()
+        shell: bash
         run: |
-          llvm-profdata-18 merge -sparse coverage/profraw/*.profraw \
+          llvm-profdata merge -sparse coverage/profraw/*.profraw \
             -o coverage/shit.profdata
           {
             echo '## Coverage'
             echo
             echo '| File | Line cover | Branch cover |'
             echo '| --- | --- | --- |'
-            llvm-cov-18 report ./shit-cov \
+            llvm-cov report ./shit-cov \
               -instr-profile=coverage/shit.profdata src \
               -ignore-filename-regex='toiletline' \
               | awk 'NF>=13 && $1!="Filename" && $1!~/^-/ \
@@ -130,7 +139,7 @@ jobs:
             echo
             echo '| File | Uncovered lines |'
             echo '| --- | --- |'
-            llvm-cov-18 export ./shit-cov \
+            llvm-cov export ./shit-cov \
               -instr-profile=coverage/shit.profdata src \
               -ignore-filename-regex='toiletline' -format=lcov \
               | awk '

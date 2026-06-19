@@ -303,6 +303,11 @@ pure fn CStyleForLoop::condition_clause() const wontthrow -> StringView
   return m_condition.view();
 }
 
+pure fn CStyleForLoop::init_clause() const wontthrow -> StringView
+{
+  return m_init.view();
+}
+
 fn CStyleForLoop::set_folded_condition(i64 value) const wontthrow -> void
 {
   m_folded_condition = value;

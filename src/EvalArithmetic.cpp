@@ -712,17 +712,20 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
       if (c == '_') return 63;
       return -1;
     };
-    i64 value = 0;
+    u64 value = 0;
     usize i = base_length + 1;
     while (i < from.length) {
       let const digit = do_digit_value(from[i]);
       if (digit < 0 || digit >= base) {
         break;
       }
-      value = value * base + digit;
+      /* The accumulation wraps in the unsigned domain so an oversized base#
+         literal such as 64#zzzzzzzzzz does not trigger signed-overflow, the
+         same wrap the other operand parsers take. */
+      value = value * static_cast<u64>(base) + static_cast<u64>(digit);
       i++;
     }
-    *out_value = value;
+    *out_value = static_cast<i64>(value);
     return i;
   }
 
@@ -1270,26 +1273,36 @@ public:
     ASSERT(context != nullptr);
 
     String value;
-    if (let const *stored = context->lookup_shell_variable(name)) {
+    bool was_found = false;
+    if (let const *stored = context->lookup_shell_variable(name);
+        stored != nullptr) {
       value = String{stored->view()};
+      was_found = true;
     } else if (let const fetched = context->get_variable_value(name);
                fetched.has_value()) {
       value = String{fetched->view()};
+      was_found = true;
+    }
+
+    if (!was_found) {
+      /* calc treats an unset variable as an error rather than reading it as
+         zero. The message names the missing variable plainly rather than
+         carrying a caret, since a nested binding read indexes the binding text,
+         not the typed line. */
+      throw Error{"Arithmetic: the variable '" + String{name} + "' is not set"};
     }
 
     if (value.count() == 0) return 0;
 
     /* A calc variable holds a number or a stored expression, evaluated lazily
-       here so a formula recomputes from the variables it names. The depth guard
-       stops a cycle such as x=x, and a value that is not a valid expression
-       reads as its leading number the way a shell string did. */
-    if (depth >= MAX_DEPTH) return parse_wide_operand(value.view());
+       here so a formula recomputes from the variables it names. A reference
+       cycle such as x=x grows the depth without end, so the cap reports rather
+       than reading a half-resolved value. */
+    if (depth >= MAX_DEPTH)
+      throw Error{"Arithmetic: the variable '" + String{name} +
+                  "' refers to itself"};
 
-    try {
-      return evaluate_wide_expression(context, value.view(), depth + 1);
-    } catch (const Error &) {
-      return parse_wide_operand(value.view());
-    }
+    return evaluate_wide_expression(context, value.view(), depth + 1);
   }
 
   static fn wrap_add(wide_int a, wide_int b) wontthrow -> wide_int
@@ -1345,10 +1358,50 @@ public:
 
   fn parse_comma() throws -> wide_int
   {
-    wide_int result = parse_ternary();
+    wide_int result = parse_assignment();
     while (consume(","))
-      result = parse_ternary();
+      result = parse_assignment();
     return result;
+  }
+
+  /* Bind a variable to its right-side expression text, the form calc stores so a
+     later read re-evaluates it against the current context rather than a value
+     recorded now. */
+  fn write_variable(StringView name, StringView expression_text) throws -> void
+  {
+    ASSERT(context != nullptr);
+    context->set_shell_variable(name, expression_text);
+  }
+
+  /* An assignment is an expression whose value is the evaluated right side, so a
+     mid-expression form such as (x = 5) + 1 reads. It binds the variable to the
+     right-side text, not the value, leaving the lazy re-evaluation to a later
+     read. A leading name with no following = rewinds and reads as a value, and a
+     == comparison is left for the binary ladder. */
+  fn parse_assignment() throws -> wide_int
+  {
+    let const save = pos;
+    skip_spaces();
+    if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
+      let const name_start = pos;
+      while (pos < source.length && lexer::is_variable_name(source[pos]))
+        pos++;
+      let const name = source.substring_of_length(name_start, pos - name_start);
+
+      skip_spaces();
+      if (starts_with("=") && !starts_with("==")) {
+        consume("=");
+        skip_spaces();
+        let const right_start = pos;
+        let const right_value = parse_assignment();
+        write_variable(name,
+                       source.substring_of_length(right_start,
+                                                  pos - right_start));
+        return right_value;
+      }
+      pos = save;
+    }
+    return parse_ternary();
   }
 
   fn parse_ternary() throws -> wide_int

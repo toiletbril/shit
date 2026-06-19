@@ -300,6 +300,12 @@ static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
 static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
                  usize depth) throws -> String
 {
+  /* A self-referential reference such as A = $(wildcard $(A)) recurses without
+     bound, and the function call, the substitution reference, and the plain
+     variable all recurse, so the cap sits at the entry and leaves the text
+     unexpanded once it is hit rather than guarding one branch. */
+  if (depth >= 16) return String{text};
+
   String result{};
   usize i = 0;
   while (i < text.length) {
@@ -350,10 +356,7 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
         result += subst->view();
       } else if (const String *value = mk.find_variable(name); value != nullptr)
       {
-        if (depth < 16)
-          result += expand(cxt, mk, value->view(), depth + 1).view();
-        else
-          result += value->view();
+        result += expand(cxt, mk, value->view(), depth + 1).view();
       } else if (Maybe<String> from_env = os::get_environment_variable(name);
                  from_env.has_value())
       {
@@ -453,7 +456,7 @@ static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
                                  ? expand(cxt, mk, trimmed_value, 0)
                                  : String{trimmed_value};
 
-  if (let const *index = mk.variable_index.find(name)) {
+  if (let const *index = mk.variable_index.find(name); index != nullptr) {
     make_variable &variable = mk.variables[*index];
     if (operator_character == '?') return;
     if (operator_character == '+') {
@@ -868,7 +871,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     for (const String &assignment : *target_assignments) {
       let const name = assignment_variable_name(assignment.view());
       saved_make_variable snapshot{String{name}, false, String{}};
-      if (const String *current_value = mk.find_variable(name)) {
+      if (const String *current_value = mk.find_variable(name);
+          current_value != nullptr) {
         snapshot.was_present = true;
         snapshot.old_value = String{current_value->view()};
       }
