@@ -1115,12 +1115,7 @@ fn process_from_pid(i64 pid) wontthrow -> process
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 {
   /* A bare number names the signal directly. */
-  let const is_all_digits = [&]() {
-    for (usize i = 0; i < name.length; i++)
-      if (name[i] < '0' || name[i] > '9') return false;
-    return true;
-  };
-  if (!name.is_empty() && is_all_digits()) {
+  if (utils::is_all_decimal_digits(name)) {
     const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(name);
     if (parsed_value.is_error()) return shit::None;
     return static_cast<i32>(parsed_value.value());
@@ -2753,12 +2748,7 @@ fn process_from_pid(i64 pid) wontthrow -> process
 
 fn signal_number_from_name(StringView name) -> Maybe<i32>
 {
-  let const is_all_digits = [&]() {
-    for (usize i = 0; i < name.length; i++)
-      if (name[i] < '0' || name[i] > '9') return false;
-    return true;
-  };
-  if (!name.is_empty() && is_all_digits()) {
+  if (utils::is_all_decimal_digits(name)) {
     String name_string{name};
     return static_cast<i32>(std::strtol(name_string.c_str(), nullptr, 10));
   }

@@ -432,13 +432,7 @@ static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
   if (name.is_empty()) return true;
   if (name.length == 1 && !is_highlight_name_start(name[0])) return true;
 
-  let all_digits = true;
-  for (usize k = 0; k < name.length; k++)
-    if (name[k] < '0' || name[k] > '9') {
-      all_digits = false;
-      break;
-    }
-  if (all_digits) return true;
+  if (utils::is_all_decimal_digits(name)) return true;
 
   if (known_vars.contains(name)) return true;
   return os::get_environment_variable(name).has_value();

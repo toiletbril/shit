@@ -22,6 +22,7 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
     -> String
 {
   let result = String{};
+  result.reserve(64);
   for (let const token : tokens) {
     ASSERT(token != nullptr);
     result += token->raw_string();
@@ -613,6 +614,17 @@ pure fn split_name_value_arg(StringView arg) wontthrow -> name_value_arg
   if (!equals.has_value()) return name_value_arg{arg, None};
   return name_value_arg{arg.substring_of_length(0, *equals),
                         arg.substring(*equals + 1)};
+}
+
+pure fn is_all_decimal_digits(StringView text) wontthrow -> bool
+{
+  if (text.is_empty()) return false;
+
+  for (usize i = 0; i < text.length; i++) {
+    if (text[i] < '0' || text[i] > '9') return false;
+  }
+
+  return true;
 }
 
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>

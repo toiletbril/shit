@@ -61,6 +61,12 @@ pure fn is_posix_reserved_word(StringView word) wontthrow -> bool;
    hexadecimal form also accepts a leading 0x. */
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 
+/* Whether the text is one or more decimal digits and nothing else, the strict
+   digit scan a numeric name, positional, or descriptor shares before it parses.
+   An empty view is not a number. Unlike parse_decimal_integer this allows no
+   sign or surrounding whitespace, so a caller can tell a bare number apart. */
+pure fn is_all_decimal_digits(StringView text) wontthrow -> bool;
+
 /* An argument split at its first '=', for the assignment builtins. The value is
    absent when no '=' is present, so a bare name reads differently from name=.
  */

@@ -601,15 +601,7 @@ fn Parser::build_file_or_dup_redirection(
       /* A word that is wholly digits names the descriptor at parse time, the
          fast path that needs no expansion. Anything else, such as $4 or ${fd},
          is a dynamic descriptor resolved when the redirection runs. */
-      bool is_all_digits = !literal.is_empty();
-      for (usize i = 0; i < literal.count(); i++) {
-        if (literal[i] < '0' || literal[i] > '9') {
-          is_all_digits = false;
-          break;
-        }
-      }
-
-      if (is_all_digits) {
+      if (utils::is_all_decimal_digits(literal.view())) {
         const let parsed_descriptor = utils::parse_decimal_integer(literal);
         if (parsed_descriptor.is_error()) {
           throw ErrorWithLocation{from->source_location(),

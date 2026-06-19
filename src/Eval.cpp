@@ -616,13 +616,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   /* A purely numeric name selects a positional parameter, $1 upward. The single
      '0' name is the shell name handled above. */
   if (first_byte >= '0' && first_byte <= '9') {
-    let is_all_digits = true;
-    for (usize i = 0; i < name.count(); i++)
-      if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {
-        is_all_digits = false;
-        break;
-      }
-    if (is_all_digits) {
+    if (utils::is_all_decimal_digits(name)) {
       /* A positional beyond the count is unset rather than empty, so the strict
          unset report fires and ${1-default} takes its default. */
       if (name.count() > 9) return None;
