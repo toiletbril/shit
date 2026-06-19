@@ -33,7 +33,7 @@ TEST_NAMES := $(INPUT_FILES:shit/%.shit=%)
 	if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1 || \
 	   { [ -f expected/$@_1.out ] && \
 	     diff $(DIFF_FLAGS) expected/$@_1.out $$out >/dev/null 2>&1; }; then \
-		printf "	%-64s ok\n" $@; \
+		printf "	%-64s ok\r" $@; \
 	else \
 		diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
 		printf "	%-64s FAILED :c\n" $@; \
@@ -65,7 +65,7 @@ cli_%: expected/cli/%.out
 	@out=$$(mktemp); \
 	BIN=$(BIN) sh cli/$*.sh > $$out 2>&1; \
 	if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
-		printf "	%-64s ok\n" cli/$*.sh; \
+		printf "	%-64s ok\r" cli/$*.sh; \
 	else \
 		diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
 		printf "	%-64s FAILED :c\n" cli/$*.sh; \
@@ -85,7 +85,7 @@ completion_%: expected/completion/%.out
 		out=$$(mktemp); \
 		BIN=$(BIN) sh completion/$*.sh > $$out 2>/dev/null; \
 		if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
-			printf "	%-64s ok\n" completion/$*.sh; \
+			printf "	%-64s ok\r" completion/$*.sh; \
 		else \
 			diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
 			printf "	%-64s FAILED :c\n" completion/$*.sh; \
@@ -132,7 +132,7 @@ dashdiff: $(BIN)
 		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
 		alt="$${f%.sh}_1.sh"; \
 		if [ "$$s" = "$$d" ]; then \
-			printf "	%-64s ok\n" "$$f"; \
+			printf "	%-64s ok\r" "$$f"; \
 		elif [ -f "$$alt" ] && \
 			d1="$$($(DASH) "$$alt" 2>/dev/null; printf X)" && \
 			[ "$$s" = "$${d1%X}" ]; then \
@@ -155,7 +155,7 @@ bashdiff: $(BIN)
 		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
 		alt="$${f%.bash}_1.bash"; \
 		if [ "$$s" = "$$b" ]; then \
-			printf "	%-64s ok\n" "$$f"; \
+			printf "	%-64s ok\r" "$$f"; \
 		elif [ -f "$$alt" ] && \
 			b1="$$($(BASH) "$$alt" 2>/dev/null; printf X)" && \
 			[ "$$s" = "$${b1%X}" ]; then \
@@ -180,7 +180,7 @@ mimicrydiff: $(BIN)
 		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
 		alt="$${f%.bash}_1.bash"; \
 		if [ "$$s" = "$$b" ]; then \
-			printf "	%-64s mimic ok\n" "$$f"; \
+			printf "	%-64s mimic ok\r" "$$f"; \
 		elif [ -f "$$alt" ] && \
 			b1="$$($(BASH) "$$alt" 2>/dev/null; printf X)" && \
 			[ "$$s" = "$${b1%X}" ]; then \
@@ -196,7 +196,7 @@ mimicrydiff: $(BIN)
 		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
 		alt="$${f%.sh}_1.sh"; \
 		if [ "$$s" = "$$d" ]; then \
-			printf "	%-64s mimic ok\n" "$$f"; \
+			printf "	%-64s mimic ok\r" "$$f"; \
 		elif [ -f "$$alt" ] && \
 			d1="$$($(DASH) "$$alt" 2>/dev/null; printf X)" && \
 			[ "$$s" = "$${d1%X}" ]; then \

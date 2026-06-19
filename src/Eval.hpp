@@ -1193,7 +1193,10 @@ public:
   /* Run the source of a $(...) and return its standard output with trailing
      newlines stripped. The inner command runs in-process with the working
      directory and variables snapshotted, so a cd or an assignment inside does
-     not leak to the parent. */
+     not leak to the parent. The filename, when given, backs the source
+     locations the parsed AST carries and is read again when an error renders
+     against that AST, so its bytes must outlive the parse arena. A string
+     literal is the safe caller. */
   fn capture_command_substitution(const String &source,
                                   Maybe<StringView> filename = None) throws
       -> String;

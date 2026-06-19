@@ -242,6 +242,10 @@ fn enumerate_processes(bool include_resource_stats = false) throws
    utility renders a located error. make_directory takes the permission bits the
    umask still narrows. */
 fn make_directory(StringView path, u32 mode) wontthrow -> bool;
+/* Set the permission bits of an existing path to the exact mode, the chmod the
+   mkdir -m path runs to land the bits the create's umask narrowing dropped. A
+   platform without POSIX mode bits accepts the mode and ignores it. */
+fn set_file_mode(StringView path, u32 mode) wontthrow -> bool;
 /* Set the access and the modification times of an existing file to the current
    time, the touch utility's update path for a file that already exists. */
 fn touch_file_times(StringView path) wontthrow -> bool;

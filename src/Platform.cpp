@@ -1636,6 +1636,12 @@ fn make_directory(StringView path, u32 mode) wontthrow -> bool
   return ::mkdir(path_string.c_str(), mode) == 0;
 }
 
+fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
+{
+  const String path_string{path};
+  return ::chmod(path_string.c_str(), mode) == 0;
+}
+
 fn touch_file_times(StringView path) wontthrow -> bool
 {
   const String path_string{path};
@@ -3126,6 +3132,15 @@ fn make_directory(StringView path, u32 mode) wontthrow -> bool
   unused(mode);
   const String path_string{path};
   return CreateDirectoryA(path_string.c_str(), nullptr) != 0;
+}
+
+fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
+{
+  /* Windows carries no POSIX permission bits on the create path, so the exact
+     mode is accepted and ignored the way make_directory ignores it. */
+  unused(path);
+  unused(mode);
+  return true;
 }
 
 fn touch_file_times(StringView path) wontthrow -> bool

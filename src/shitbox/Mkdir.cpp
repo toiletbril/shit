@@ -30,10 +30,16 @@ namespace shitbox {
 
 /* Create one directory, with the -p case treating an already-present directory
    as success the way mkdir -p does. */
-static fn make_one(StringView path, u32 mode, bool ignore_existing) throws
-    -> bool
+static fn make_one(StringView path, u32 mode, bool set_exact_mode,
+                   bool ignore_existing) throws -> bool
 {
-  if (os::make_directory(path, mode)) return true;
+  if (os::make_directory(path, mode)) {
+    /* The create narrows the bits by the umask, so an explicit -m re-applies
+       the exact mode the way POSIX mkdir sets it. */
+    if (set_exact_mode) os::set_file_mode(path, mode);
+    return true;
+  }
+
   if (ignore_existing && Path{path}.is_directory()) return true;
   return false;
 }
@@ -77,8 +83,11 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
         if (i < text.length && text[i] != '/') continue;
         let const prefix = text.substring_of_length(0, i);
         if (prefix.is_empty()) continue;
-        let const mode = (i == text.length) ? named_mode : 0777;
-        if (!make_one(prefix, mode, true)) {
+        let const is_named_directory = (i == text.length);
+        let const mode = is_named_directory ? named_mode : 0777;
+        let const should_set_exact_mode =
+            is_named_directory && FLAG_MKDIR_MODE.is_set();
+        if (!make_one(prefix, mode, should_set_exact_mode, true)) {
           report_soft_shitbox_error(
               ec, cxt,
               "mkdir: cannot create directory '" + String{prefix} +
@@ -87,7 +96,8 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
           break;
         }
       }
-    } else if (!make_one(operand.view(), named_mode, false)) {
+    } else if (!make_one(operand.view(), named_mode, FLAG_MKDIR_MODE.is_set(),
+                         false)) {
       report_soft_shitbox_error(ec, cxt,
                                 "mkdir: cannot create directory '" + operand +
                                     "': " + os::last_system_error_message());

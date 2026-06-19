@@ -59,10 +59,11 @@ static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes) throws -> String
     if (!read_count.has_value() || *read_count == 0) {
       break;
     }
-    for (usize i = 0; i < *read_count && byte_count < max_bytes; i++) {
-      out.push(buffer[i]);
-      byte_count++;
-    }
+    let const remaining_count = static_cast<usize>(max_bytes - byte_count);
+    let const take_count = *read_count < remaining_count ? *read_count
+                                                         : remaining_count;
+    out.append(StringView{buffer, take_count});
+    byte_count += static_cast<i64>(take_count);
   }
 
   return out;
