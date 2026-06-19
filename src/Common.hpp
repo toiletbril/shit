@@ -97,6 +97,7 @@ using uintptr = uintptr_t;
 #if defined __GNUC__ || defined __clang__ || defined __COSMOCC__
 #define T__HAS_GCC_EXTENSIONS 1
 #define t__used               __attribute__((used))
+#define t__pure               __attribute__((pure))
 #define t__forceinline        inline __attribute__((always_inline))
 #define t__unreachable()      __builtin_unreachable()
 #define t__debugtrap()        __builtin_trap()
@@ -105,15 +106,11 @@ using uintptr = uintptr_t;
        supports GNU extensions!
 #define T__HAS_GCC_EXTENSIONS 0
 #define t__used               /* None */
+#define t__pure               /* None */
 #define t__forceinline        /* None */
 #define t__unreachable()      abort()
 #define t__debugtrap()        abort()
 #endif
-
-#define donteliminate t__used
-#define forceinline   t__forceinline
-#define unused(x)     ((void) (x))
-
 #define t__concat_literal(x, y) x##y
 #define concat_literal(x, y)    t__concat_literal(x, y)
 
@@ -140,7 +137,6 @@ public:
   }
 };
 
-/* Defer a block until the end of the scope. */
 #define defer                                                                  \
   const auto &concat_literal(defer__, __LINE__) = t__exit_scope_help() + [&]()
 
@@ -149,58 +145,39 @@ public:
 
 #define sub_sat(a, b) ((a) > (b) ? (a) - (b) : 0)
 
-/* The length of statically allocated array. */
+#define unused(x) ((void) (x))
+
 #define countof(arr) (sizeof(arr) / sizeof(*(arr)))
+#define steal        std::move
+#define mustuse      [[nodiscard]]
 
-/* Move a value, reading as taking ownership out of the source. */
-#define steal std::move
-
-/* A return value the caller must not ignore. */
-#define mustuse [[nodiscard]]
-
-/* Every function is written `fn name(args) -> ret` and every variable `let x`,
-   so the name leads and the type trails, matching the oo style. */
-#define fn  auto
-#define let auto
-
-/* An unconditional loop, written `loop` where a `for (;;)` or `while (true)`
-   would go, so the intent reads at a glance. */
+#define fn   auto
+#define let  auto
 #define loop for (;;)
 
-/* Markers for a function's effect and exception behavior, written next to the
-   fn so the declaration states intent. They map to the matching clang
-   constructs. A pure function's result depends only on its arguments, written
-   before the fn. A wont_throw function never throws and a may_throw one may,
-   written after the parameter list where noexcept goes. */
-#if T__HAS_GCC_EXTENSIONS
-#define pure __attribute__((pure))
-#else
-#define pure
-#endif
-
-/* Every function and method states wontthrow or throws where noexcept goes,
-   both for free functions and members since noexcept applies to both. They map
-   to the noexcept keyword and its negation. */
 #define wontthrow noexcept
 #define throws    noexcept(false)
 
-/* Speed hints written before the fn, mapping to clang attributes. cold marks a
-   rarely-taken path such as error reporting so the compiler keeps it out of the
-   hot icache, hot marks the evaluation core, flatten inlines a small
-   dispatcher's whole call tree, and noinline pins a large cold body out of
-   line. A branch is hinted with the literal [[likely]]/[[unlikely]] where it
-   occurs. */
+#define donteliminate t__used
+#define forceinline   t__forceinline
+
 #if T__HAS_GCC_EXTENSIONS
-#define cold     [[gnu::cold]]
-#define hot      [[gnu::hot]]
-#define flatten  [[gnu::flatten]]
+#define pure t__pure
+#define cold [[gnu::cold]]
+#define hot  [[gnu::hot]]
+#if defined __clang__
+#define flatten [[gnu::flatten]]
+#else
+#define flatten /* nothing. GNU is too harsh with inlining. */
+#endif          /* __clang__ */
 #define noinline [[gnu::noinline]]
 #else
+#define pure
 #define cold
 #define hot
 #define flatten
 #define noinline
-#endif
+#endif /* T__HAS_GCC_EXTENSIONS */
 
 namespace shit {
 constexpr const char *EXPRESSION_AST_INDENT = " ";

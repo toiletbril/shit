@@ -127,7 +127,7 @@ hot pure fn is_variable_name(char ch) wontthrow -> bool
   return is_variable_name_start(ch) || is_number(ch);
 }
 
-pure fn is_special_parameter_char(char ch) wontthrow -> bool
+hot pure fn is_special_parameter_char(char ch) wontthrow -> bool
 {
   return ch == '?' || ch == '!' || ch == '#' || ch == '$' || ch == '*' ||
          ch == '@' || ch == '-';
