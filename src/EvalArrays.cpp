@@ -18,8 +18,7 @@ static fn sparse_array_key(StringView name, usize index,
   return key;
 }
 
-/* One sparse element, its index and its value, used to merge the sparse map
-   into the dense run when an array is enumerated. */
+/* One sparse element, used to merge the sparse map into the dense run. */
 struct sparse_array_entry
 {
   usize index;
@@ -27,8 +26,7 @@ struct sparse_array_entry
 };
 
 /* Every sparsely-held element of an array, sorted by ascending index. The
-   sparse indices always sit beyond the dense run, so appending these after the
-   dense elements yields the whole array in index order. */
+   indices always sit beyond the dense run. */
 static fn collect_sparse_array_entries(const StringMap<String> &sparse,
                                        StringView name,
                                        Allocator allocator) throws
@@ -36,8 +34,8 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
 {
   let out = ArrayList<sparse_array_entry>{allocator};
   let const prefix = sparse_array_key(name, 0, allocator);
-  /* The prefix is name plus the separator byte, so the leading "0" of the key
-     for index zero is dropped to leave just the name and separator. */
+  /* The prefix is name plus the separator byte, so the index-zero key's leading
+     "0" is dropped to leave just the name and separator. */
   let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
   sparse.for_each([&](StringView key, const String &value) throws {
     if (key.length <= name_prefix.length ||
@@ -54,8 +52,6 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
       });
     }
   });
-  /* An insertion sort keeps it simple, since a sparse array holds few far
-     elements. */
   for (usize i = 1; i < out.count(); i++) {
     let key = steal(out[i]);
     usize j = i;
@@ -70,9 +66,8 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
 
 fn EvalContext::clear_sparse_array(StringView name) throws -> void
 {
-  /* Only the indices are collected, no value is copied and the list is not
-     sorted, since the entries are erased by key regardless of order. The erase
-     runs after the scan so the map is not mutated while it is walked. */
+  /* The erase runs after the scan so the map is not mutated while it is walked.
+   */
   let indices = ArrayList<usize>{scratch_allocator()};
   let const prefix = sparse_array_key(name, 0, scratch_allocator());
   let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
@@ -97,9 +92,8 @@ fn EvalContext::clear_sparse_array(StringView name) throws -> void
         sparse_array_key(name, index, scratch_allocator()).view());
 }
 
-/* Whether an array-literal element is the explicit [index]=value form, and if
-   so its subscript text and its value. A leading '[' with a later "]=" marks
-   it, every other element is a positional value. */
+/* Whether an array-literal element is the explicit [index]=value form, reading
+   its subscript and value. Every other element is a positional value. */
 static fn parse_explicit_array_index(StringView element,
                                      StringView &subscript_out,
                                      StringView &value_out) wontthrow -> bool
@@ -121,10 +115,8 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
                                               const ArrayList<String> &elements,
                                               bool is_append) throws -> void
 {
-  /* POSIX mode has no arrays, but a sourced profile that carries a bash array
-     literal should keep sourcing, so the assignment stands in as an empty
-     scalar rather than a syntax error, the shim the parser used to apply at
-     parse time for every non-bash mood. */
+  /* POSIX mode has no arrays, so a bash array literal stands in as an empty
+     scalar rather than a syntax error. */
   if (is_posix_mode()) [[unlikely]] {
     LOG(Debug,
         "posix mode stores the array literal for '%.*s' as an empty scalar",
@@ -136,7 +128,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
   usize running_index = 0;
   if (is_append) {
     /* An append continues after the highest set index, the dense end or the
-       last sparse element, whichever is larger. */
+       last sparse element. */
     if (let const *array = lookup_indexed_array(name))
       running_index = array->count();
     let const sparse = collect_sparse_array_entries(m_sparse_array_values, name,
@@ -146,8 +138,6 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
       if (next_after_sparse > running_index) running_index = next_after_sparse;
     }
   } else {
-    /* A plain assignment replaces the array, clearing the dense run, the sparse
-       elements, and any scalar of the same name. */
     set_indexed_array(name, ArrayList<String>{heap_allocator()});
   }
 
@@ -172,10 +162,8 @@ fn EvalContext::set_array_element(StringView name, usize index,
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
   /* The dense run holds the contiguous prefix from index zero, and any element
-     past its end lives in the sparse map keyed by index, the way bash keeps an
-     indexed array without padding a gap. An empty dense array still marks the
-     name as indexed so a read routes here. A first write promotes an existing
-     scalar to element zero. */
+     past its end lives in the sparse map keyed by index, so a gap is not
+     padded. A first write promotes an existing scalar to element zero. */
   ArrayList<String> *dense = m_indexed_arrays.find(name);
   if (dense == nullptr) {
     let elements = ArrayList<String>{heap_allocator()};
@@ -193,9 +181,8 @@ fn EvalContext::set_array_element(StringView name, usize index,
     return;
   }
   if (index == dense_count) {
-    /* The write extends the contiguous run, which may make an earlier sparse
-       element contiguous too, so any element now at the run's end migrates from
-       the sparse map into the dense run. */
+    /* The write extends the contiguous run, so any element now at the run's end
+       migrates from the sparse map into the dense run. */
     dense->push(String{heap_allocator(), value});
     loop
     {
@@ -208,7 +195,6 @@ fn EvalContext::set_array_element(StringView name, usize index,
     }
     return;
   }
-  /* A write past the run's end leaves a gap, so it is held sparsely. */
   LOG(All, "holding element %zu of '%.*s' sparsely past the dense run of %zu",
       index, static_cast<int>(name.length), name.data, dense_count);
   m_sparse_array_values.set(
@@ -216,8 +202,7 @@ fn EvalContext::set_array_element(StringView name, usize index,
 }
 
 /* The flat-map key for an associative element, the array name and the element
-   key joined by a byte that does not occur in a name. The map copies a key it
-   stores, so the callers build this on the per-command scratch arena. */
+   key joined by a byte that does not occur in a name. */
 static fn associative_composite_key(StringView name, StringView key,
                                     Allocator allocator) throws -> String
 {
@@ -237,10 +222,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
-  /* An integer-marked name evaluates the element text as arithmetic and an
-     append adds the prior element's evaluation, the same treatment
-     set_shell_variable gives a scalar. The joined text lives on the scratch
-     arena and the stores below copy the decimal result. */
+  /* An integer-marked name evaluates the element text as arithmetic, the same
+     treatment set_shell_variable gives a scalar. */
   char integer_result[24];
   let do_integer_element_value = [&](Maybe<String> existing)
                                      throws -> StringView {
@@ -321,11 +304,8 @@ fn EvalContext::declare_associative_array(StringView name) throws -> void
 fn EvalContext::set_associative_element(StringView name, StringView key,
                                         StringView value) throws -> void
 {
-  /* Registering the name and clearing a same-named scalar matters only the
-     first time, since the name stays associative until an unset removes it. The
-     hot comp[$m]=1 loop sets thousands of elements under one already-registered
-     name, so the repeated set probes neither the name set nor the variable
-     store. */
+  /* The hot comp[$m]=1 loop probes neither the name set nor the variable store
+     after the first set. */
   if (!is_associative_array(name)) {
     m_associative_names.add(name);
     m_shell_variables.erase(name);
@@ -418,12 +398,10 @@ fn EvalContext::unset_array_element(StringView name,
     const i64 resolved =
         index < 0 ? index + array_negative_index_base(name) : index;
     if (resolved < 0) return;
-    /* An element inside the dense run leaves a hole at its index the way bash
-       does, rather than renumbering the tail. The elements after it move to the
-       sparse store under their original indices and the dense run is dropped
-       from the removed index on. An element past the dense run already lives in
-       the sparse store and is erased by its key. Erasing an absent key is a
-       no-op, matching bash unsetting a missing element silently. */
+    /* An element inside the dense run leaves a hole at its index rather than
+       renumbering the tail. The elements after it move to the sparse store
+       under their original indices, the dense run is dropped from the removed
+       index on, and an element past the dense run is erased by its key. */
     if (resolved < array_count) {
       for (usize i = static_cast<usize>(resolved) + 1;
            i < static_cast<usize>(array_count); i++)
@@ -446,18 +424,15 @@ fn EvalContext::declare_local(StringView name) throws -> void
   if (m_local_scopes.is_empty()) return;
   ASSERT(!m_local_scopes.is_empty());
   /* One binding per scope, the bash rule. A second local declaration of the
-     same name in the same scope keeps the first declaration's saved caller
-     state, so the scope pop restores the true pre-call value and the unset
-     peel finds exactly one entry to consume. */
+     same name keeps the first's saved caller state, so the scope pop restores
+     the true pre-call value and the unset peel finds one entry to consume. */
   if (is_local_in_current_scope(name)) return;
   LOG(All, "declaring '%.*s' local in scope depth %zu",
       static_cast<int>(name.length), name.data, m_local_scopes.count());
 
   /* The indexed array the name held is saved alongside the scalar value, so a
      local array restores the caller's array on return. A copy is taken since
-     the body may overwrite the stored array in place. The lookup is skipped
-     when no array exists at all, so a scalar local in an array-free script pays
-     nothing on the function-call path. */
+     the body may overwrite the stored array in place. */
   let previous_array = Maybe<ArrayList<String>>{};
   if (m_indexed_arrays.count() != 0)
     if (let const *array = lookup_indexed_array(name); array != nullptr) {
@@ -468,8 +443,8 @@ fn EvalContext::declare_local(StringView name) throws -> void
       previous_array = steal(copy);
     }
 
-  /* The associative array the name held is saved the same way, as parallel key
-     and value lists, so a local -A restores the caller's map on return. */
+  /* The associative array is saved the same way, so a local -A restores the
+     caller's map on return. */
   let const previous_was_associative = is_associative_array(name);
   let previous_keys = ArrayList<String>{heap_allocator()};
   let previous_values = ArrayList<String>{heap_allocator()};
@@ -478,9 +453,8 @@ fn EvalContext::declare_local(StringView name) throws -> void
     previous_values = associative_values(name);
   }
 
-  /* The sparse elements the name held are saved so a local that shadows a
-     caller's sparse array does not wipe those gap indices on return. The scan
-     is skipped when no sparse element exists at all. */
+  /* The sparse elements are saved so a local that shadows a caller's sparse
+     array does not wipe those gap indices on return. */
   let previous_sparse_indices = ArrayList<usize>{heap_allocator()};
   let previous_sparse_values = ArrayList<String>{heap_allocator()};
   if (m_sparse_array_values.count() != 0)
@@ -491,16 +465,14 @@ fn EvalContext::declare_local(StringView name) throws -> void
       previous_sparse_values.push(String{heap_allocator(), entry.value.view()});
     }
 
-  /* A local starts with no attributes the way bash localizes a name fresh, so
-     the caller's integer mark is dropped here and the saved flag puts it back
-     when the scope ends. */
+  /* A local starts with no attributes, so the caller's integer mark is dropped
+     here and the saved flag puts it back when the scope ends. */
   let const previous_was_integer = is_integer_variable(name);
   if (previous_was_integer) unmark_integer(name);
 
   /* The read-only mark is dropped the same way, so a local shadowing a
-     read-only caller name starts writable, and a local -r that marks this scope
-     does not leak past it to reject a later reassignment or a second call to
-     the same function. */
+     read-only caller name starts writable and a local -r marking this scope
+     does not leak past it. */
   let const previous_was_readonly = is_readonly(name);
   if (previous_was_readonly) unmark_readonly(name);
 
@@ -510,10 +482,9 @@ fn EvalContext::declare_local(StringView name) throws -> void
       steal(previous_sparse_indices), steal(previous_sparse_values),
       previous_was_integer, previous_was_readonly});
 
-  /* The live array forms are cleared so a local array starts empty rather than
-     showing the caller's elements, and the saved caller state comes back on the
-     scope pop. The scalar value is left in place, so a value-less local of a
-     scalar name keeps the caller's value the way this shell already does. */
+  /* The live array forms are cleared so a local array starts empty. The scalar
+     value is left in place, so a value-less local of a scalar name keeps the
+     caller's value. */
   m_indexed_arrays.erase(name);
   clear_sparse_array(name);
   clear_associative_array(name);
@@ -557,14 +528,10 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
 fn EvalContext::apply_array_subscript(StringView name,
                                       StringView subscript) throws -> String
 {
-  /* FUNCNAME reads the call-name stack, index zero the innermost frame the
-     way bash exposes it, @ and * the whole stack outward. */
   if (name == "FUNCNAME" && bash_dynamic_variables_enabled()) [[unlikely]] {
     let const depth = funcname_frame_count();
     if (subscript == "@" || subscript == "*") {
-      /* The * form joins with the first IFS byte the way "${a[*]}" does in
-         bash, and an empty IFS joins with nothing. The @ form keeps the
-         space. */
+      /* The * form joins with the first IFS byte, the @ form with a space. */
       let separator = ' ';
       let has_separator = true;
       if (subscript == "*") {
@@ -588,14 +555,10 @@ fn EvalContext::apply_array_subscript(StringView name,
     return String{scratch_allocator()};
   }
 
-  /* An associative array reads by a string key, with @ and * naming every value
-     joined by a space. The values come back in the store's order, which need
-     not match bash for more than one key. */
+  /* An associative array reads by a string key. The values come back in the
+     store's order, which need not match bash for more than one key. */
   if (is_associative_array(name)) {
     if (subscript == "@" || subscript == "*") {
-      /* The * form joins with the first IFS byte the way "${a[*]}" does in
-         bash, and an empty IFS joins with nothing. The @ form keeps the
-         space. */
       let separator = ' ';
       let has_separator = true;
       if (subscript == "*") {
@@ -620,14 +583,11 @@ fn EvalContext::apply_array_subscript(StringView name,
 
   const ArrayList<String> *array = lookup_indexed_array(name);
 
-  /* @ and * name the whole array, joined with a space. The single-string return
-     loses the per-element split of a quoted "${a[@]}", which is the same
-     limitation the positional "$@" has here. */
+  /* @ and * name the whole array. The single-string return loses the
+     per-element split of a quoted "${a[@]}", the same limitation the positional
+     "$@" has. */
   if (subscript == "@" || subscript == "*") {
     if (array == nullptr) return get_variable_value(name).value_or(String{});
-    /* The * form joins with the first IFS byte the way "${a[*]}" does in
-       bash, and an empty IFS joins with nothing. The @ form keeps the
-       space. */
     let separator = ' ';
     let has_separator = true;
     if (subscript == "*") {
@@ -642,8 +602,8 @@ fn EvalContext::apply_array_subscript(StringView name,
     return out;
   }
 
-  /* An arithmetic subscript selects one element, with a negative index counting
-     from the end the way bash does. */
+  /* An arithmetic subscript selects one element, a negative index counting from
+     the end. */
   i64 index = evaluate_arithmetic(subscript);
   if (array == nullptr) {
     /* A scalar reads as a one-element array, so ${name[0]} is the value and any
@@ -654,7 +614,6 @@ fn EvalContext::apply_array_subscript(StringView name,
   const i64 array_count = static_cast<i64>(array->count());
   if (index < 0) index += array_negative_index_base(name);
   if (index < 0 || index >= array_count) {
-    /* A subscript past the dense end may name a sparsely-held far element. */
     if (index >= 0) {
       let probe = String{scratch_allocator(), name};
       probe.push('\x01');
@@ -671,8 +630,8 @@ fn EvalContext::apply_array_subscript(StringView name,
 fn EvalContext::collect_array_elements(StringView name) const throws
     -> ArrayList<String>
 {
-  /* FUNCNAME enumerates the call-name stack, innermost first the way bash
-     orders it, so "${FUNCNAME[@]}" yields one frame per field. */
+  /* FUNCNAME enumerates the call-name stack innermost first, so
+     "${FUNCNAME[@]}" yields one frame per field. */
   if (name == "FUNCNAME" && bash_dynamic_variables_enabled() &&
       funcname_frame_count() > 0) [[unlikely]]
   {
@@ -691,15 +650,11 @@ fn EvalContext::collect_array_elements(StringView name) const throws
     out.reserve(array->count());
     for (const String &element : *array)
       out.push_managed(element.view());
-    /* The sparse elements sit past the dense run, so appending them in index
-       order yields the whole array in order. */
     for (sparse_array_entry &entry : collect_sparse_array_entries(
              m_sparse_array_values, name, scratch_allocator()))
       out.push(steal(entry.value));
     return out;
   }
-  /* A plain scalar reads as a one-element array, the way bash treats $a as
-     ${a[0]}, so "${a[@]}" of a scalar yields its single value. */
   if (Maybe<String> scalar = get_variable_value(name); scalar.has_value())
     out.push(steal(*scalar));
   return out;
@@ -714,26 +669,23 @@ fn EvalContext::array_element_is_set(StringView name,
   if (is_associative_array(name))
     return lookup_associative_element(name, subscript).has_value();
   /* An indexed subscript is an arithmetic expression, so arr[1+1] resolves the
-     way an indexed read would. A negative index counts from the end. */
+     way an indexed read would. */
   const i64 index = evaluate_arithmetic(subscript);
   if (const ArrayList<String> *array = lookup_indexed_array(name)) {
     const i64 array_count = static_cast<i64>(array->count());
     /* A negative index counts from the highest set index across the sparse
-       elements, the same base the read path uses, so [[ -v a[-1] ]] names the
-       element ${a[-1]} reads rather than a stale dense slot. */
+       elements, so [[ -v a[-1] ]] names the element ${a[-1]} reads. */
     const i64 resolved =
         index < 0 ? index + array_negative_index_base(name) : index;
     if (resolved >= 0 && resolved < array_count) {
       return true;
     }
-    /* An index past the dense run may name a sparsely-held element. */
     return resolved >= 0 &&
            m_sparse_array_values.find(
                sparse_array_key(name, static_cast<usize>(resolved),
                                 scratch_allocator())
                    .view()) != nullptr;
   }
-  /* A scalar answers for its sole index zero. */
   return index == 0 && get_variable_value(name).has_value();
 }
 
@@ -777,10 +729,9 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
       out.push(utils::uint_to_text(entry.index));
     return out;
   }
-  /* A scalar has the single index zero, an unset name has none. */
   if (get_variable_value(name).has_value())
     out.push(String{heap_allocator(), "0"});
   return out;
 }
 
-} /* namespace shit */
+} // namespace shit

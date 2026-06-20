@@ -5,11 +5,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* getopts optstring name [arg ...]. It parses one option per call from the
-   positional parameters, or from explicit args, tracking progress through
-   OPTIND and the per-argument index the EvalContext keeps. A leading colon in
-   optstring selects the silent error mode. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("optstring name [argument ...]");
@@ -120,8 +115,8 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_shell_variable("OPTARG", option_as_string);
     } else {
       cxt.unset_shell_variable("OPTARG");
-      shit::print_error(StringView{"getopts: illegal option -- "} +
-                        option_as_string + "\n");
+      report_soft_builtin_error(
+          ec, cxt, StringView{"Illegal option -- "} + option_as_string);
     }
     return do_finish(0);
   }
@@ -148,9 +143,9 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       } else {
         cxt.set_shell_variable(name, "?");
         cxt.unset_shell_variable("OPTARG");
-        shit::print_error(
-            StringView{"getopts: option requires an argument -- "} +
-            option_as_string + "\n");
+        report_soft_builtin_error(
+            ec, cxt,
+            StringView{"Option requires an argument -- "} + option_as_string);
       }
       return do_finish(0);
     }
@@ -158,7 +153,6 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return do_finish(0);
   }
 
-  /* An option that takes no argument leaves OPTARG unset. */
   LOG(All, "getopts advancing past option '%s'", option_as_string.c_str());
   do_advance_letter();
   cxt.unset_shell_variable("OPTARG");
@@ -166,4 +160,4 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return do_finish(0);
 }
 
-} /* namespace shit */
+} // namespace shit

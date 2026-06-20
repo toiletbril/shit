@@ -121,8 +121,6 @@ fn selected_resource() throws -> resource_entry
   return {"file(blocks)", RLIMIT_FSIZE, 512};
 }
 
-/* The limit value scaled and rendered, or unlimited, with the hard limit read
-   under -H and the soft limit otherwise. */
 fn render_limit(const struct rlimit &limit, rlim_t divisor) throws -> String
 {
   const rlim_t value = FLAG_HARD.is_enabled() ? limit.rlim_max : limit.rlim_cur;
@@ -130,7 +128,7 @@ fn render_limit(const struct rlimit &limit, rlim_t divisor) throws -> String
   return utils::uint_to_text(value / divisor);
 }
 
-} /* namespace */
+} // namespace
 
 cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
@@ -207,7 +205,6 @@ i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const args = PARSE_BUILTIN_ARGS(ec);
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* This platform does not expose resource limits, so report unlimited. */
   if (args.count() < 2) ec.print_to_stdout("unlimited\n");
   return 0;
 }
@@ -218,4 +215,4 @@ Ulimit::Ulimit() = default;
 
 pure Builtin::Kind Ulimit::kind() const wontthrow { return Kind::Ulimit; }
 
-} /* namespace shit */
+} // namespace shit

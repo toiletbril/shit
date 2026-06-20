@@ -64,11 +64,21 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     os::close_fd(*fd);
+
+    /* The create leaves the times at now, but the stamp is asserted through the
+       same touch_file_times the existing-file path uses, so both paths set the
+       times one way rather than relying on the open's side effect. */
+    if (!os::touch_file_times(operand.view())) {
+      report_soft_shitbox_error(ec, cxt,
+                                "touch: cannot touch '" + operand +
+                                    "': " + os::last_system_error_message());
+      status = 1;
+    }
   }
 
   return status;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

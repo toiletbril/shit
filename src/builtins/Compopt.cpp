@@ -4,11 +4,6 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* compopt changes the completion options of a command from inside a completion
-   function, such as compopt -o nospace. The shell accepts the call so a
-   completion function runs, while the interactive completion engine does not
-   yet consult these options, so it is a no-op. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-o option] [-DEI] [+o option] [name ...]");
@@ -45,4 +40,4 @@ fn Compopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

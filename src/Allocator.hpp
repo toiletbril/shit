@@ -11,16 +11,14 @@
 namespace shit {
 
 /* Forward declared, so the allocator header does not include the arena header,
-   which would close the ArrayList -> Allocator -> Arena include cycle. The bump
-   adapter reaches the arena through a free function defined in Arena.cpp. */
+   which would close the ArrayList -> Allocator -> Arena include cycle. */
 class BumpArena;
 fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment) throws
     -> void *;
 
-/* An allocator value, in the manner of Zig's std.mem.Allocator. It carries a
-   context and a table of operations, so a data structure is handed the
-   allocator it must use and frees through the same one. It is sixteen bytes and
-   passed by value. */
+/* An allocator value. It carries a context and a table of operations, so a data
+   structure is handed the allocator it must use and frees through the same one.
+   It is sixteen bytes and passed by value. */
 class Allocator
 {
 public:
@@ -76,8 +74,7 @@ public:
 namespace allocators {
 
 /* The bump adapter over a BumpArena. A free is a no-op and a resize never grows
-   in place, since the arena reclaims everything at once on reset. The whole
-   lifetime of its allocations is the lifetime of the arena. */
+   in place, since the arena reclaims everything at once on reset. */
 hot inline fn bump_alloc(void *context, usize length, usize alignment) throws
     -> void *
 {
@@ -107,17 +104,16 @@ inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
                                                bump_free};
 
 /* The heap adapter over the C allocator. It frees on demand, so it backs the
-   long-lived mutable data the bump model would leak, the variable store above
-   all. */
+   long-lived mutable data the bump model would leak. */
 inline fn heap_alloc(void *context, usize length, usize alignment) wontthrow
     -> void *
 {
   unused(context);
   /* malloc already meets every alignment up to alignof(max_align_t), so the
-     common request stays on the plain path with no extra work. An over-aligned
-     type takes aligned_alloc, whose result std::free accepts the same as a
-     malloc result, so the free path needs no change. aligned_alloc wants a size
-     that is a multiple of the alignment, so the length is rounded up. */
+     common request stays on the plain path. An over-aligned type takes
+     aligned_alloc, whose result std::free accepts the same as a malloc result.
+     aligned_alloc wants a size that is a multiple of the alignment, so the
+     length is rounded up. */
   if (alignment > alignof(max_align_t)) {
     let const rounded_length = (length + alignment - 1) & ~(alignment - 1);
 #if defined(_WIN32)
@@ -160,18 +156,16 @@ inline fn heap_free(void *context, void *pointer, usize length,
 inline constexpr Allocator::VTable HEAP_VTABLE{heap_alloc, heap_resize,
                                                heap_free};
 
-} /* namespace allocators */
+} // namespace allocators
 
-/* Make a bump allocator bound to an arena. */
 inline fn bump_allocator(BumpArena &arena) wontthrow -> Allocator
 {
   return Allocator{&arena, &allocators::BUMP_VTABLE};
 }
 
-/* Make a heap allocator over the C allocator. */
 inline fn heap_allocator() wontthrow -> Allocator
 {
   return Allocator{nullptr, &allocators::HEAP_VTABLE};
 }
 
-} /* namespace shit */
+} // namespace shit

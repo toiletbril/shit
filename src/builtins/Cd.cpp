@@ -67,7 +67,6 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       arg_path.append(ec.args()[i]);
     }
   } else {
-    /* Empty cd should go to the home directory. */
     let const home_directory = os::get_home_directory();
     if (!home_directory)
       throw ErrorWithLocation{ec.source_location(),
@@ -175,7 +174,6 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());
-    /* Track the visit for the z smart-cd builtin's frecency ranking. */
     record_directory_access(target.text().view());
     /* cd - and a move through a nonempty CDPATH entry report the directory they
        moved to, so a script sees where it landed. A plain cd stays silent. */
@@ -190,4 +188,4 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                                     "' does not exist"};
 }
 
-} /* namespace shit */
+} // namespace shit

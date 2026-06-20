@@ -268,7 +268,6 @@ get_context_pointing_to(StringView source, usize byte_position,
   for (usize i = byte_position - start_offset; i < byte_position; i++)
     if (source[i] == '\t') tabs_before_error++;
 
-  /* Calculate proper unicode offsets and lengths for underline. */
   const usize unicode_start_offset_position =
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position - start_offset);
 
@@ -342,20 +341,11 @@ cold fn ErrorBase::note_to_string() const throws -> String
 
   /* The note rides on its own line under the primary message in the note hue,
      the same shape an unlocated Note renders, so the suggestion reads as advice
-     rather than as part of the problem statement. */
-  /* The note reads as a standalone sentence, so its first letter is capitalized
-     whatever case the suggestion literal carried. */
-  String capitalized_note;
-  let first_byte = m_note[0];
-  if (first_byte >= 'a' && first_byte <= 'z') {
-    first_byte = static_cast<char>(first_byte - 'a' + 'A');
-  }
-  capitalized_note.push(first_byte);
-  capitalized_note += m_note.substring(1);
-
+     rather than as part of the problem statement. Each note literal is written
+     capitalized at its source. */
   let const color = diagnostic_colors_for(StringView{"note"});
   return String{"\n"} + color.severity + "note" + color.reset + ": " +
-         color.message + capitalized_note + "." + color.reset;
+         color.message + m_note + "." + color.reset;
 }
 
 cold fn ErrorBase::severity_word() const wontthrow -> String { return "error"; }
@@ -380,6 +370,8 @@ fn Error::to_string() const throws -> String
 Error::operator String() const throws { return to_string(); }
 
 Warning::Warning(StringView message) : Error(message) {}
+
+InterruptError::InterruptError() : Error("Interrupted") {}
 
 cold fn Warning::severity_word() const wontthrow -> String { return "warning"; }
 
@@ -579,4 +571,4 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   return result;
 }
 
-} /* namespace shit */
+} // namespace shit

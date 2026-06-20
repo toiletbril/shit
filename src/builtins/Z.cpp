@@ -32,8 +32,6 @@ namespace {
    cheap. */
 constexpr usize Z_FRECENCY_MAX = 500;
 
-/* One directory in the frecency store, its visit count and the epoch second of
-   the last visit. The score weights the count by how recently it was seen. */
 struct frecency_entry
 {
   String path;
@@ -143,7 +141,6 @@ static fn write_frecency_store(const ArrayList<frecency_entry> &entries) throws
   os::close_fd(*fd);
 }
 
-/* A case-insensitive substring test, so z dot matches Dotfiles. */
 static fn contains_ignore_case(StringView haystack, StringView needle) wontthrow
     -> bool
 {
@@ -165,7 +162,7 @@ static fn contains_ignore_case(StringView haystack, StringView needle) wontthrow
   return false;
 }
 
-} /* namespace */
+} // namespace
 
 fn record_directory_access(StringView directory) throws -> void
 {
@@ -262,4 +259,4 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

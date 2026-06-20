@@ -31,4 +31,4 @@ i32 True::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

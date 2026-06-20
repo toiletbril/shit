@@ -9,17 +9,14 @@ namespace shit {
 
 class Expression;
 
-/* The name and right hand side of an assignment word, the named result of
-   Word::get_assignment_split. The struct is forward-declared here and defined
+/* The name and right hand side of an assignment word. The struct is defined
    below Word, since its value field holds a Word by value and a Word is not yet
    complete at this point. */
 struct word_assignment_split;
 
 /* One lexed token of an arithmetic expression. The expression text never
    changes, so a $((...)) segment lexes its tokens once and re-evaluates from
-   them rather than re-scanning the bytes on every expansion in a loop body. The
-   value holds a parsed number, and the text views into the segment's own text
-   for a name, an operator, or the raw bytes of an array subscript. */
+   them rather than re-scanning the bytes on every expansion in a loop body. */
 struct arith_token
 {
   enum class kind : u8
@@ -37,30 +34,23 @@ struct arith_token
 class WordSegment
 {
 public:
-  /* The kind records how the evaluator may expand this segment. LiteralText is
-     final and the evaluator leaves it alone. UnquotedText expands a leading
-     tilde, splits on IFS after variable expansion, and globs. DoubleQuotedText
-     expands variables but never splits or globs. VariableReference holds a
-     variable name that the evaluator resolves at run time. */
+  /* The kind records how the evaluator may expand this segment. UnquotedText
+     expands a leading tilde, splits on IFS after variable expansion, and globs.
+     DoubleQuotedText expands variables but never splits or globs.
+     VariableReference holds a variable name resolved at run time. */
   enum class Kind : u8
   {
     LiteralText,
     UnquotedText,
     DoubleQuotedText,
     VariableReference,
-    /* The text holds the source inside $(...). The evaluator runs it and
-       splices the captured output. */
     CommandSubstitution,
-    /* The text holds the source inside $((...)). The evaluator computes it and
-       splices the decimal result. */
     ArithmeticExpansion,
     /* The text is a direction byte, < or >, then the source inside <(...) or
-       >(...). The evaluator runs the command on a pipe and splices the /dev/fd
-       path of the shell's end. */
+       >(...). */
     ProcessSubstitution,
-    /* The text holds the source inside ${ ... }, the bash 5.3 funsub. The
-       evaluator runs it in the current shell, so its assignments and cd
-       persist, and splices the captured output like CommandSubstitution. */
+    /* The bash 5.3 funsub runs in the current shell, so its assignments and cd
+       persist. */
     FunctionSubstitution,
   };
 
@@ -71,31 +61,26 @@ public:
   /* The constant decimal result of an ArithmeticExpansion segment whose source
      holds no parameter and no command substitution, computed once at analyze
      time. The evaluator reads it instead of re-parsing the arithmetic on every
-     expansion, which matters inside a loop body. None on any non-constant
-     segment. */
+     expansion. None on any non-constant segment. */
   mutable Maybe<i64> folded_arithmetic_result{};
 
-  /* The parsed inner command of a CommandSubstitution segment, lexed and parsed
-     once and reused on every later expansion. The outer AST of a loop body is
-     re-evaluated without re-parsing, so a $(...) in the body would otherwise
-     re-run the lexer and parser each iteration. The tree lives in AST_ARENA,
-     which resets between top-level commands, yet a function-body segment lives
-     in FUNCTION_ARENA and outlives that reset, so the cache records the arena
-     generation it was filled in and a hit from an earlier generation is treated
-     as stale and reparsed. A null pointer marks a never-parsed segment. */
+  /* The parsed inner command of a CommandSubstitution segment, reused on every
+     later expansion. The tree lives in AST_ARENA, which resets between
+     top-level commands, yet a function-body segment lives in FUNCTION_ARENA and
+     outlives that reset, so the cache records the arena generation it was
+     filled in and a hit from an earlier generation is treated as stale and
+     reparsed. */
   mutable const Expression *cached_substitution_ast{nullptr};
   mutable usize cached_substitution_generation{0};
 
   /* The lexed tokens of an ArithmeticExpansion segment, filled once and reused.
      The expression text is immutable, so the tokens stay valid for the
      segment's life and need no generation guard, unlike the substitution tree.
-     The evaluator reads the variable values at eval time, so the cache holds
-     the parse, not the result. Empty until the first arithmetic evaluation. */
+   */
   mutable ArrayList<arith_token> cached_arith_tokens{heap_allocator()};
   mutable bool arith_tokenized{false};
   /* Whether the cached tokens hold a simple expression the token evaluator can
-     run, decided once when the tokens are filled. A complex expression falls
-     back to the char parser. */
+     run. A complex expression falls back to the char parser. */
   mutable bool arith_simple{false};
 
   pure fn is_split_eligible() const wontthrow -> bool;
@@ -104,14 +89,14 @@ public:
 
   /* True when the segment text holds an unquoted glob metacharacter, one of
      '*',
-     '?', or '['. The plain-literal fast path in the evaluator consults this to
-     decide whether a word may skip pathname expansion. */
+     '?', or '['. The plain-literal fast path consults this to decide whether a
+     word may skip pathname expansion. */
   pure fn has_glob_metacharacter() const wontthrow -> bool;
 };
 
-/* A lexed word carries its quoting structure as ordered segments. The evaluator
-   expands the segments instead of consulting a source-position escape map, so
-   the byte offsets never drift apart from the produced text. */
+/* A lexed word carries its quoting structure as ordered segments, expanded in
+   place rather than against a source-position escape map, so the byte offsets
+   never drift apart from the produced text. */
 class Word
 {
 public:
@@ -122,15 +107,13 @@ public:
   fn to_pretty_string() const throws -> String;
 
   /* True when the literal text of the word is a non-empty run of ASCII digits,
-     the shape a descriptor prefix such as the 2 in 2>file takes. The parser
-     checks this in command position for every word, so it answers from the
-     segments directly and allocates no literal String. */
+     the shape a descriptor prefix such as the 2 in 2>file takes. The answer
+     comes from the segments directly and allocates no literal String. */
   pure fn is_all_ascii_digits() const wontthrow -> bool;
 
   /* True when a segment of the word runs a command or a function substitution.
-     The empty-command status logic and the assignment value reset both ask
-     this to decide whether to reset the exit status, so both answer it from
-     the segments through one method rather than each scanning in place. */
+     The empty-command status logic and the assignment value reset both ask this
+     to decide whether to reset the exit status. */
   pure fn runs_substitution() const wontthrow -> bool;
 
   /* A word is an assignment when its first segment is unquoted text holding an
@@ -142,7 +125,7 @@ public:
      segments into one field with no expansion, splitting, or globbing.
      PlainUnquotedOneSegment is a single unquoted segment free of glob
      metacharacters whose only remaining question is whether it holds an IFS
-     byte, which the evaluator answers against the live separators. */
+     byte. */
   enum class PlainLiteral : u8
   {
     NotPlain,
@@ -157,14 +140,11 @@ struct word_assignment_split
 {
   String name;
   Word value;
-  /* The word had the form NAME+=VALUE rather than NAME=VALUE, so evaluation
-     appends the value to the current value of NAME instead of replacing it. */
+  /* The word had the form NAME+=VALUE, so evaluation appends to the current
+     value of NAME instead of replacing it. */
   bool is_append;
 };
 
-/**
- * Simple tokens
- */
 class Token
 {
 public:
@@ -263,7 +243,6 @@ public:
   Token() = delete;
   virtual ~Token() = default;
 
-  /* Each token should provide it's own way to copy it. */
   Token(const Token &) = delete;
   Token(Token &&) noexcept = delete;
   Token &operator=(const Token &) = delete;
@@ -311,9 +290,9 @@ inline constexpr StaticStringMap<Token::Kind> KEYWORDS{
     KEYWORD_ENTRIES, sizeof(KEYWORD_ENTRIES) / sizeof(KEYWORD_ENTRIES[0])};
 
 /* clang-format off */
-/* The location goes through the lexer's here() so the keyword token carries
-   the stamped filename like every other token, and a warning anchored at a
-   for or case keyword names its file. */
+/* The location goes through the lexer's here() so the keyword token carries the
+   stamped filename, and a warning anchored at a for or case keyword names its
+   file. */
 #define KW_CASE(k)                                                             \
   case Token::Kind::k:                                                         \
     t = m_arena->create<tokens::k>(here(actual_cursor_position, byte_count));  \
@@ -418,8 +397,8 @@ public:
   pure fn key() const wontthrow -> const String &;
   pure fn value_word() const wontthrow -> const Word &;
 
-  /* The source spelled NAME+=VALUE, so the evaluator appends the value to the
-     current value of NAME instead of replacing it. */
+  /* The source spelled NAME+=VALUE, so the evaluator appends instead of
+     replacing. */
   pure fn is_append() const wontthrow -> bool;
 
 protected:
@@ -428,7 +407,6 @@ protected:
   bool m_is_append;
 };
 
-/* Tokens with values. */
 class Value : public Token
 {
 public:
@@ -560,6 +538,6 @@ BINARY_OPERATOR_TOKEN_STRUCT(Equals);
 BINARY_OPERATOR_TOKEN_STRUCT(DoubleEquals);
 BINARY_OPERATOR_TOKEN_STRUCT(ExclamationEquals);
 
-} /* namespace tokens */
+} // namespace tokens
 
-} /* namespace shit */
+} // namespace shit

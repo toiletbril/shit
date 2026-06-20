@@ -11,16 +11,14 @@
 
 /* The word expansion of the evaluator, the segment walk that emits fields
    with their glob masks, the assignment form that never splits, the case
-   pattern form that keeps the mask, and the compgen -W word list split.
-   Split out of Eval.cpp so the evaluator core stays the hot-path file. */
+   pattern form that keeps the mask, and the compgen -W word list split. */
 
 namespace shit {
 
 /* The optionally quoted "${name[@]}" or "${name[*]}" shape an alternate or
-   default modifier word takes, the one form the field-fidelity branches
-   accept, parsed once for both the array-subject and the scalar-subject
-   branch so the shape rules cannot drift apart. None means the word has
-   another shape. */
+   default modifier word takes, parsed once for both the array-subject and the
+   scalar-subject branch so the shape rules cannot drift apart. None means the
+   word has another shape. */
 struct modifier_array_word
 {
   StringView array_name;
@@ -62,9 +60,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
       word.segments.count());
   let const scratch = scratch_allocator();
 
-  /* Only copy the segments when a leading tilde must be rewritten. The common
-     word has no tilde and reads its segments in place. The copy, when it
-     happens, lives only until this word finishes expanding, so it goes on the
+  /* Only copy the segments when a leading tilde must be rewritten, on the
      scratch arena the command reclaims rather than the heap. */
   let const *segments = &word.segments;
   let tilde_expanded_segments = ArrayList<WordSegment>{scratch};
@@ -98,19 +94,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
     has_current = true;
   };
 
-  /* A field with no bytes is still pushed, which a non-whitespace IFS delimiter
-     run needs so that an empty field between two delimiters survives. do_flush
-     alone emits only a started field and so cannot stand in here. */
+  /* A field with no bytes is still pushed so an empty field between two
+     delimiters survives. do_flush emits only a started field. */
   let do_emit_empty_field = [&]() { fields.push(glob_field{scratch}); };
 
   /* IFS whitespace folds and a non-whitespace IFS byte delimits one field each,
-     matching dash. A single forward pass classifies every byte as a field byte,
-     a whitespace separator, or a delimiter separator, and emits one field per
-     run. A whitespace run that holds no delimiter ends the current field. A run
-     that holds k delimiters ends the current field and emits k minus one empty
-     fields, so a:b yields two fields and a::b yields an empty between them. A
-     leading delimiter forces a leading empty field, and a trailing whitespace
-     run or a trailing single delimiter leaves no empty field behind. */
+     matching dash. A whitespace run that holds no delimiter ends the current
+     field. A run that holds k delimiters ends the field and emits k minus one
+     empty fields. A leading delimiter forces a leading empty field, and a
+     trailing whitespace run or a trailing single delimiter leaves none. */
   let do_append_split_run = [&](StringView text, bool glob_active) {
     usize i = 0;
     while (i < text.length) {
@@ -123,8 +115,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
         continue;
       }
 
-      /* Count the delimiters inside the maximal separator run, since each one
-         past the first marks an empty field. A whitespace byte only folds. */
+      /* Each delimiter past the first inside the run marks an empty field, a
+         whitespace byte only folds. */
       const bool was_field_started = has_current;
       usize delimiter_count = 0;
       while (i < text.length && is_field_separator(text.data[i])) {
@@ -135,15 +127,13 @@ hot fn EvalContext::expand_word(const Word &word) throws
         i++;
       }
 
-      /* The accumulated field ends here whether the run folds or delimits. */
       do_flush();
       if (delimiter_count == 0) continue;
 
-      /* The first delimiter that follows an empty field forces that empty field
-         out, so a leading delimiter and a delimiter after another delimiter
-         both keep their empty. A delimiter that closes a non-empty field adds
-         no extra empty, since do_flush already emitted that field. Each further
-         delimiter in the run marks one more empty field. */
+      /* A delimiter that follows an empty field forces that empty field out, so
+         a leading delimiter and a delimiter after another both keep their
+         empty. A delimiter that closes a non-empty field adds no extra empty.
+       */
       if (!was_field_started) do_emit_empty_field();
       for (usize k = 1; k < delimiter_count; k++)
         do_emit_empty_field();
@@ -158,15 +148,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
     case WordSegment::Kind::DoubleQuotedText:
       do_append_run(segment_text, false);
       break;
-    /* Field splitting applies only to the results of expansions, so literal
-       text from the source stays one run even when it holds IFS bytes, the
-       way bash and dash keep a-b whole under IFS=-. */
+    /* Field splitting applies only to expansion results, so literal text stays
+       one run even when it holds IFS bytes, the way bash keeps a-b whole under
+       IFS=-. */
     case WordSegment::Kind::UnquotedText:
       do_append_run(segment_text, true);
       break;
     case WordSegment::Kind::VariableReference: {
-      /* "$@" expands to one field per positional parameter. The first joins any
-         preceding text, the last leaves its field open for following text. */
+      /* "$@" expands to one field per positional parameter, the first joining
+         preceding text and the last left open for following text. */
       if (segment.text == "@" && segment.is_in_double_quotes) {
         for (usize i = 0; i < m_positional_params.count(); i++) {
           if (i > 0) do_flush();
@@ -177,10 +167,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
         break;
       }
       /* An unquoted $@ or $* keeps each positional parameter as its own field
-         boundary, then field splits each parameter's own text under IFS.
-         Routing it through a single joined string instead would lose the
-         boundary, so a custom or an empty IFS would merge or mis-split the
-         parameters. The quoted "$*" join by the first IFS character stays in
+         boundary, then field splits each parameter's text under IFS. A single
+         joined string would lose the boundary. The quoted "$*" join stays in
          the default branch below. */
       if ((segment.text == "@" || segment.text == "*") &&
           !segment.is_in_double_quotes)
@@ -193,13 +181,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
         }
         break;
       }
-      /* "${!prefix@}" emits one field per matching variable name, the way "$@"
-         and "${a[@]}" do, while "${!prefix*}" joins them by the first IFS
-         character into one field. The general path returns a single
-         space-joined string, which loses the per-name boundary, so the name
-         listing is emitted here. The form is a leading '!' and a trailing '@'
-         or '*', which the indirect ${!ref} and the array-key ${!a[@]} do not
-         take. */
+      /* "${!prefix@}" emits one field per matching variable name, while
+         "${!prefix*}" joins them by the first IFS character. The general path
+         joins to one string, which loses the per-name boundary, so the listing
+         is emitted here. The form is a leading '!' and a trailing '@' or '*'.
+       */
       if (segment_text.length >= 2 && segment_text[0] == '!' &&
           (segment_text[segment_text.length - 1] == '@' ||
            segment_text[segment_text.length - 1] == '*'))
@@ -231,11 +217,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
         }
         break;
       }
-      /* "${!a[@]}" emits one field per subscript, the way "${a[@]}" emits one
-         per element, while "${!a[*]}" joins them by the first IFS character.
-         The joined string path loses the per-subscript boundary, so the field
-         form is produced here. The body is a leading '!' and a trailing [@] or
-         [*]. */
+      /* "${!a[@]}" emits one field per subscript, while "${!a[*]}" joins them
+         by the first IFS character. The body is a leading '!' and a trailing
+         [@] or [*]. */
       if (segment_text.length >= 5 && segment_text[0] == '!' &&
           segment_text[segment_text.length - 1] == ']' &&
           segment_text[segment_text.length - 3] == '[' &&
@@ -270,13 +254,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
         }
         break;
       }
-      /* "${a[@]}" emits one field per array element, the way "$@" does for the
-         positional parameters, while "${a[*]}" joins them by the first IFS
-         character into one field. An unquoted ${a[@]} or ${a[*]} keeps each
-         element its own field and splits it under IFS. The general path below
-         joins to a single string, which would lose the per-element boundary, so
-         the array @ and * forms are emitted here. A spec with a trailing
-         modifier does not end in ']' and falls through. */
+      /* "${a[@]}" emits one field per array element, while "${a[*]}" joins them
+         by the first IFS character. An unquoted form keeps each element its own
+         field and splits it under IFS. A spec with a trailing modifier does not
+         end in ']' and falls through. */
       if (segment_text.length >= 4 &&
           segment_text[segment_text.length - 1] == ']' &&
           segment_text[segment_text.length - 3] == '[' &&
@@ -319,10 +300,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
           break;
         }
       }
-      /* "${@:off:len}" and "${*:off:len}" slice the positional parameters the
-         way the array slice below slices elements, with index zero naming the
-         shell itself the way bash counts $0 into the slice. The @ form keeps
-         each parameter its own field, the * form joins them. */
+      /* "${@:off:len}" and "${*:off:len}" slice the positional parameters, with
+         index zero naming the shell itself the way bash counts $0 into the
+         slice. The @ form keeps each parameter its own field, the * form joins
+         them. */
       if (!segment_text.is_empty() &&
           (segment_text[0] == '@' || segment_text[0] == '*') &&
           segment_text.length > 1 && segment_text[1] == ':')
@@ -380,10 +361,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
         }
         break;
       }
-      /* "${a[@]:off:len}" and "${a[*]:off:len}" slice the element list, off
-         naming the first element and len the count, with a negative off counted
-         from the end. The @ form keeps each sliced element its own field, the *
-         form joins them. */
+      /* "${a[@]:off:len}" and "${a[*]:off:len}" slice the element list, with a
+         negative off counted from the end. The @ form keeps each sliced element
+         its own field, the * form joins them. */
       if (lexer::is_variable_name_start(segment_text[0])) {
         usize name_end = 1;
         while (name_end < segment_text.length &&
@@ -415,8 +395,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
             const StringView length_text = slice.substring(sep + 1);
             const i64 length =
                 length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
-            /* Unlike a string substring, an array slice rejects a negative
-               length the way bash does rather than counting from the end. */
+            /* An array slice rejects a negative length the way bash does rather
+               than counting from the end. */
             if (length < 0)
               throw Error{
                   "Unable to take the substring because the length names "
@@ -450,11 +430,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
           break;
         }
       }
-      /* "${a[@]MOD}" maps a value-transform modifier over each element, one
-         field per element the way "${a[@]}" does, while "${a[*]MOD}" joins the
-         modified elements. The / replacement, the # and % trims, and the ^ and
-         , case changes all map here, a different modifier falls through to the
-         general scalar path. */
+      /* "${a[@]MOD}" maps a value-transform modifier over each element, while
+         "${a[*]MOD}" joins the modified elements. The / replacement, the # and
+         % trims, and the ^ and , case changes map here, a different modifier
+         falls through to the general scalar path. */
       if (lexer::is_variable_name_start(segment_text[0])) {
         usize name_end = 1;
         while (name_end < segment_text.length &&
@@ -502,11 +481,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
         }
       }
       /* "${a[@]+word}" and "${a[@]-word}" pick between the word and the
-         elements with field fidelity, the nounset-safe array expansion idiom
-         bash-completion writes as ${a[@]+"${a[@]}"}. The dominant word shape,
-         one quoted or bare array expansion, emits one field per element the
-         way the plain "${a[@]}" does, and any other word shape falls through
-         to the general scalar path below. */
+         elements with field fidelity, the nounset-safe idiom bash-completion
+         writes as ${a[@]+"${a[@]}"}. A word that is one array expansion emits
+         one field per element, any other word shape falls through to the
+         general scalar path. */
       if (lexer::is_variable_name_start(segment_text[0])) {
         usize name_end = 1;
         while (name_end < segment_text.length &&
@@ -541,12 +519,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
             let const should_expand_word =
                 modifier_op == '+' ? !treat_as_unset : treat_as_unset;
 
-            /* The per-element emitter the plain "${a[@]}" cases use, one
-               field per element when quoted with @, an IFS join with *. The
-               quoting and the star follow the emitted word, so the subject
-               elements join under the subject's own [*] while a modifier
-               word such as "${b[*]}" joins under its inner star, the way
-               bash reads each expansion by its own spelling. */
+            /* The quoting and the star follow the emitted word, so the subject
+               elements join under the subject's own [*] while a modifier word
+               such as "${b[*]}" joins under its inner star, the way bash reads
+               each expansion by its own spelling. */
             let do_emit_elements = [&](const ArrayList<String> &values,
                                        bool quoted, bool star) throws {
               if (quoted && star) {
@@ -571,18 +547,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
             };
 
             if (!should_expand_word) {
-              /* + with an unset array contributes no field at all, and - with
-                 a set array reads the elements themselves under the outer
-                 quoting. */
+              /* + with an unset array contributes no field, - with a set array
+                 reads the elements under the outer quoting. */
               if (modifier_op == '-')
                 do_emit_elements(elements, segment.is_in_double_quotes,
                                  is_star);
               break;
             }
 
-            /* The word shape "${name[@]}" or its bare or starred forms, the
-               only shapes the idiom uses, expands to that array's elements.
-               The inner word's own quoting governs the split, so a quoted
+            /* The inner word's own quoting governs the split, so a quoted
                "${arr[@]}" keeps each element whole even though the outer
                modifier here is unquoted. */
             if (let const array_word = parse_modifier_array_word(modifier_word);
@@ -594,10 +567,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
                                array_word->is_star);
               break;
             }
-            /* Any other word shape, a plain literal alternate such as
-               ${a[@]+alt} or ${a[@]-default}, expands the modifier word
-               itself rather than re-reading the whole a[@] segment, which the
-               scalar path would mis-parse as ${a}. */
+            /* Any other word shape expands the modifier word itself rather than
+               re-reading the whole a[@] segment, which the scalar path would
+               mis-parse as ${a}. */
             let const value = expand_modifier_word(modifier_word);
             if (segment.is_in_double_quotes)
               do_append_run(value, false);
@@ -608,12 +580,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
         }
       }
       /* "${name+word}" and "${name-word}" with a bare scalar subject keep the
-         same field fidelity when the word is itself an array expansion. bash
-         reads the bare name of an array as its element zero, and
-         bash-completion writes ${words+"${words[@]}"}, where the general
-         scalar path below would join the elements into one string and lose
-         the empty ones on the re-split. A word of any other shape falls
-         through to that path unchanged. */
+         field fidelity when the word is itself an array expansion, the
+         ${words+"${words[@]}"} idiom bash-completion writes. The general scalar
+         path would join the elements and lose the empty ones on the re-split. A
+         word of any other shape falls through to that path. */
       if (lexer::is_variable_name_start(segment_text[0])) {
         usize name_end = 1;
         while (name_end < segment_text.length &&
@@ -632,8 +602,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
             let const subject_elements = collect_array_elements(
                 segment_text.substring_of_length(0, name_end));
             /* The bare name reads as element zero, so the plain form tests
-               whether any element exists and the colon form whether the
-               first is nonempty. */
+               whether any element exists and the colon form whether the first
+               is nonempty. */
             let const treat_as_unset = is_colon_form
                                            ? (subject_elements.is_empty() ||
                                               subject_elements[0].is_empty())
@@ -666,17 +636,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
               }
               break;
             }
-            /* + with an unset subject contributes no field, while - with a
-               set subject reads the subject itself, which is the general
-               path's case below. */
+            /* + with an unset subject contributes no field, - with a set
+               subject reads the subject itself through the general path. */
             if (modifier_op == '+') break;
           }
         }
       }
       /* A plain $name that names a set scalar appends the stored value by view,
-         with no copy, since the full parameter expansion would read the same
-         string. A spec with a modifier, an unset name, or a synthesized name is
-         not found in the store and falls through to the general path. */
+         with no copy. A spec with a modifier, an unset name, or a synthesized
+         name falls through to the general path. */
       if (!segment_text.is_empty() &&
           lexer::is_variable_name_start(segment_text[0]))
       {
@@ -695,14 +663,12 @@ hot fn EvalContext::expand_word(const Word &word) throws
             break;
           }
       }
-      /* apply_parameter_expansion already returns an owned String, so it is
-         bound directly rather than copied into a second allocation. */
       let const value = apply_parameter_expansion(segment.text.view());
       if (segment.is_in_double_quotes)
         do_append_run(value, false);
       else
-        /* An unquoted expansion undergoes field splitting and then pathname
-           expansion, so a * or ? from the value is an active glob. */
+        /* An unquoted expansion field splits and then glob expands, so a * or ?
+           from the value is an active glob. */
         do_append_split_run(value, true);
     } break;
 
@@ -715,7 +681,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
     } break;
 
     /* The funsub splices its captured output under the same quote and split
-       treatment as $(...), only the body's execution environment differs. */
+       treatment as $(...). */
     case WordSegment::Kind::FunctionSubstitution: {
       let const output = capture_function_substitution(segment);
       if (segment.is_in_double_quotes)
@@ -725,20 +691,18 @@ hot fn EvalContext::expand_word(const Word &word) throws
     } break;
 
     case WordSegment::Kind::ProcessSubstitution: {
-      /* The /dev/fd path is a single literal field, so it neither splits on IFS
-         nor globs, the way bash substitutes the process substitution. */
+      /* The /dev/fd path is a single literal field that neither splits nor
+         globs. */
       let const path = setup_process_substitution(segment.text.view());
       do_append_run(path, false);
     } break;
 
     case WordSegment::Kind::ArithmeticExpansion: {
       /* A constant arithmetic segment was folded at analyze time, so the result
-         is read straight from the cache rather than re-parsed here. */
+         is read from the cache. */
       let const result = segment.folded_arithmetic_result.has_value()
                              ? *segment.folded_arithmetic_result
                              : evaluate_arithmetic_cached(segment);
-      /* The field copies the digits in, so the conversion writes into a stack
-         buffer and appends a view, with no heap allocation. */
       char buffer[24];
       let const value = utils::int_to_text_into(result, buffer, sizeof(buffer));
       if (segment.is_in_double_quotes)
@@ -761,8 +725,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
       word.segments.count());
   /* Only copy the segments when a tilde must be rewritten, the leading one or
      one after an unquoted colon, the assignment-only rule bash applies to
-     PATH=~/bin:~/tmp. The common assignment reads its segments in place with
-     no per-command copy. */
+     PATH=~/bin:~/tmp. */
   let const *segments = &word.segments;
   let tilde_expanded_segments = ArrayList<WordSegment>{scratch_allocator()};
   let const has_leading_tilde =
@@ -822,8 +785,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
                                            ArrayList<bool> &active_out) throws
     -> String
 {
-  /* Only copy the segments when a leading tilde must be rewritten, mirroring
-     the assignment expansion the case word otherwise shares. */
+  /* Only copy the segments when a leading tilde must be rewritten. */
   let const *segments = &word.segments;
   let tilde_expanded_segments = ArrayList<WordSegment>{scratch_allocator()};
   if (!word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
@@ -838,8 +800,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
 
   let result = String{heap_allocator()};
 
-  /* Append a run of bytes that share one glob-active state, so the mask stays
-     parallel to the result the way expand_word builds it. */
+  /* The mask stays parallel to the result. */
   let do_emit_run = [&](StringView bytes, bool is_active) {
     result.append(bytes);
     for (usize k = 0; k < bytes.length; k++)
@@ -851,8 +812,6 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
     case WordSegment::Kind::DoubleQuotedText:
-      /* A quoted or double-quoted region is a literal member, so its
-         metacharacters never act as wildcards. */
       do_emit_run(segment_text, false);
       break;
     case WordSegment::Kind::UnquotedText:
@@ -871,13 +830,12 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       do_emit_run(output.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::ProcessSubstitution: {
-      /* The /dev/fd path is a literal that does not glob. */
       let const path = setup_process_substitution(segment.text.view());
       do_emit_run(path.view(), false);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      /* An arithmetic result is decimal digits and a sign, so it carries no
-         glob metacharacter and stays inactive. */
+      /* An arithmetic result carries no glob metacharacter, so it is
+         inactive. */
       let const number = segment.folded_arithmetic_result.has_value()
                              ? *segment.folded_arithmetic_result
                              : evaluate_arithmetic_cached(segment);
@@ -908,11 +866,10 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     return words;
   };
 
-  /* The ghost path never parses, so it skips even the metacharacter scan. */
   if (!allow_expansion) return do_split_plain();
 
-  /* A literal list, no expansion or quoting byte anywhere, splits with no
-     parse at all, the common -W shape. */
+  /* A literal list with no expansion or quoting byte splits with no parse, the
+     common -W shape. */
   let needs_expansion = false;
   for (usize i = 0; i < wordlist.length && !needs_expansion; i++) {
     const char character = wordlist[i];
@@ -922,13 +879,12 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
   }
   if (!needs_expansion) return do_split_plain();
 
-  /* The list expands by wrapping it in an array literal, so a structural byte
-     that would close the literal early and run the rest as a command, a
-     top-level ')' or ';' or '|' or '&' or '(' or a comment '#', is a break-out
-     a malicious or careless -W list could carry. Such a list degrades to the
-     plain split rather than executing the tail. The scan tracks quotes and the
-     $(...) and ${...} and backtick nesting so a paren inside an expansion is
-     not mistaken for a top-level one. */
+  /* The list expands by wrapping it in an array literal, so a top-level
+     structural byte that would close the literal early and run the rest as a
+     command is a break-out a malicious or careless -W list could carry. Such a
+     list degrades to the plain split rather than executing the tail. The scan
+     tracks quotes and the $(...), ${...}, and backtick nesting so a paren
+     inside an expansion is not mistaken for a top-level one. */
   let is_array_literal_safe = [&]() wontthrow -> bool {
     char quote = 0;
     usize paren_depth = 0;
@@ -955,7 +911,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
                  wordlist[i + 1] == '(')
       {
         /* $(( opens arithmetic that closes with )), so both parens are
-           counted and the )) decrements back to the top level cleanly. */
+           counted. */
         if (i + 2 < wordlist.length && wordlist[i + 2] == '(') {
           paren_depth += 2;
           i += 2;
@@ -991,8 +947,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
   }
 
   /* The list expands as an array literal in the current context, so a word
-     such as "${options[@]}" reaches the caller's array. The defer drops the
-     temp name on the success and the failure path alike. */
+     such as "${options[@]}" reaches the caller's array. */
   defer
   {
     m_indexed_arrays.erase("t__wordlist_fields");
@@ -1020,4 +975,4 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
   return fields;
 }
 
-} /* namespace shit */
+} // namespace shit

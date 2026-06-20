@@ -119,6 +119,16 @@ public:
   fn severity_word() const wontthrow -> String override;
 };
 
+/* A Ctrl-C raised mid-run. The mimic boundary tests this type rather than the
+   message text, so the interrupt survives a reworded message and a
+   program-thrown Error that happens to read "Interrupted" is not mistaken for
+   it. */
+class InterruptError : public Error
+{
+public:
+  InterruptError();
+};
+
 /* An Error that prints as a note and is shown rather than thrown. It carries no
    location, so it adds plain context under a primary error. */
 class Note : public Error
@@ -208,7 +218,7 @@ public:
 /* Rewraps a plain error at a source location, carrying the script-fatal mark
    and the command status over, so a relocated set -u read still aborts and a
    relocated [[ ]] operand error still reports its status. */
-inline fn relocate_error(const Error &error, SourceLocation location) throws
+inline fn relocate_error(const ErrorBase &error, SourceLocation location) throws
     -> ErrorWithLocation
 {
   let relocated = ErrorWithLocation{location, error.message().view()};

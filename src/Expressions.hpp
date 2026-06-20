@@ -17,7 +17,7 @@ class AssignCommand;
 class SimpleCommand;
 class ForLoop;
 class CStyleForLoop;
-} /* namespace expressions */
+} // namespace expressions
 
 /* The prepass walks the whole tree once before any command runs. It carries the
    source for the caret, and a fatal flag that stops execution. A warning is a
@@ -189,9 +189,7 @@ public:
   virtual fn as_cstyle_for_loop() const wontthrow
       -> const expressions::CStyleForLoop *;
 
-  /* A node lives in the parse arena, so its storage is reclaimed in bulk. This
-     no-ops for arena storage and frees an ordinary heap node otherwise. The
-     destructor still runs through the normal delete. */
+  /* This no-ops for arena storage and frees an ordinary heap node otherwise. */
   static fn operator delete(void *pointer) wontthrow->void;
 
   /* The prepass entry per node. The base does None, the command and the
@@ -655,7 +653,6 @@ protected:
 
   const Expression *m_condition;
   const Expression *m_body;
-  /* An until loop runs the body while the condition is non-zero. */
   bool m_is_until;
 
   /* Set when the analyze pass proved the condition never lets the body run, so
@@ -692,7 +689,6 @@ protected:
 
   String m_variable_name;
   ArrayList<const Token *> m_words{heap_allocator()};
-  /* Without an in clause, a for loop iterates the positional parameters. */
   bool m_has_in_clause;
   const Expression *m_body;
 };
@@ -1080,6 +1076,6 @@ BINARY_EXPRESSION_STRUCT(Xor);
 BINARY_EXPRESSION_STRUCT(Equal);
 BINARY_EXPRESSION_STRUCT(NotEqual);
 
-} /* namespace expressions */
+} // namespace expressions
 
-} /* namespace shit */
+} // namespace shit

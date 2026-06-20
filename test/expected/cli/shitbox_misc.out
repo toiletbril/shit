@@ -14,7 +14,7 @@ SHITBOX_TESTVAR=present
 shit: 1:1: error: pkill: Not enough arguments.
      1 |  shitbox pkill
        |  ^~~~~~~~~~~~~ here.
-shit: note: pkill --help for more info.
+shit: note: Try `pkill --help` for more info.
 rc=2
 --- pkill with no match ---
 rc=1
@@ -27,7 +27,7 @@ rc=1
 shit: 1:1: error: kill: Not enough arguments.
      1 |  shitbox kill
        |  ^~~~~~~~~~~~ here.
-shit: note: kill --help for more info.
+shit: note: Try `kill --help` for more info.
 rc=2
 --- kill with a non-numeric pid ---
 shit: 1:1: error: Builtin 'kill': 'notapid' is not a valid job or process id.

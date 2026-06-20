@@ -16,9 +16,6 @@ namespace utils {
 fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
     -> String;
 
-/* Join the argument list into a single space-separated string. The container is
-   the ArrayList<String> the exec-argv path now carries, so each element is
-   appended through its byte view. */
 inline fn merge_args_to_string(const ArrayList<String> &args) throws -> String
 {
   String result{};
@@ -43,104 +40,82 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                bool is_async) throws -> i32;
 
 /* The name with a leading SIG dropped, the spelling the signal tables key on.
-   A name without the prefix is returned unchanged. Shared by the POSIX and the
-   Windows signal lookups. */
+   A name without the prefix is returned unchanged. */
 pure fn strip_sig_prefix(StringView name) wontthrow -> StringView;
 
 /* Split text into its newline-delimited lines, each line without its trailing
-   newline. A trailing newline yields a final empty line. Shared by the passwd
-   and group readers in the platform layer. */
+   newline. A trailing newline yields a final empty line. */
 fn split_lines(StringView text) throws -> ArrayList<StringView>;
 
-/* Format a Unix timestamp as local time through strftime, the timestamp the ls
-   long listing prints. Empty when the time cannot be broken down. */
+/* Format a Unix timestamp as local time through strftime. Empty when the time
+   cannot be broken down. */
 fn format_unix_timestamp(i64 unix_time, const char *format) throws -> String;
 
-/* Whether the word is one of the POSIX shell reserved words, the set the type
-   and command builtins report as a shell keyword. It matches dash's set rather
-   than the lexer's, so a shell-specific token such as time is excluded. */
+/* Whether the word is one of the POSIX shell reserved words. It matches dash's
+   set rather than the lexer's, so a shell-specific token such as time is
+   excluded. */
 pure fn is_posix_reserved_word(StringView word) wontthrow -> bool;
 
-/* Parse a whole view as a signed integer, the StringView-native replacement for
-   std::stoll. Each base has its own function so the digit loop carries no base
-   branch and the compiler keeps the divisor a constant. Leading and trailing
-   ASCII whitespace and one optional sign are allowed, the value saturates to
-   the i64 range on overflow, and any other content yields an Error. The
-   hexadecimal form also accepts a leading 0x. */
+/* Parse a whole view as a signed integer. Each base has its own function so the
+   digit loop carries no base branch. Leading and trailing ASCII whitespace and
+   one optional sign are allowed, the value saturates to the i64 range on
+   overflow, and any other content yields an Error. */
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 
-/* The NameValueArg class lives in NameValueArg.hpp so the assignment builtins
-   reach it without the rest of this header. */
-
-/* Format a signed integer as decimal into a fresh String, the StringView-native
-   replacement for std::to_string. The unsigned form is for ids and sizes that
-   exceed the i64 range. */
-/* The default allocator lives on the forward declaration in ErrorOr.hpp, so it
-   is not repeated here. */
+/* The unsigned form is for ids and sizes that exceed the i64 range. */
 fn int_to_text(i64 value, Allocator allocator) throws -> String;
 fn uint_to_text(u64 value, Allocator allocator = heap_allocator()) throws
     -> String;
 
 /* Write the decimal text of value into the caller's buffer, which must hold at
    least twenty-one bytes, and return a view of the written span. No allocation
-   happens, so a hot conversion such as an arithmetic assignment whose result
-   the variable store copies for itself never touches the heap. */
+   happens, so a hot conversion never touches the heap. */
 fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
     -> StringView;
 
 /* Format a count of seconds as the whole minutes and fractional seconds form
-   the time and times builtins print, such as 0m0.123s. The seconds carry three
-   fractional digits and the minutes are whole. */
+   the time and times builtins print, such as 0m0.123s. */
 fn format_minutes_seconds(double seconds) throws -> String;
 
-/* The two reports the time keyword prints. The POSIX form matches bash time -p,
-   each label and the plain seconds with two decimals on its own line. The
-   pretty form is the default, an aligned block of the wall time, the user and
-   system cpu, and the cpu busy percent, for a single timed run. */
+/* The two reports the time keyword prints. The POSIX form matches bash time -p.
+   The pretty form is an aligned block of the wall time, the user and system
+   cpu, and the cpu busy percent. */
 fn format_time_report_posix(double real_seconds, double user_seconds,
                             double system_seconds) throws -> String;
 fn format_time_report_pretty(double real_seconds, double user_seconds,
                              double system_seconds) throws -> String;
 
-/* The 1-based line number the byte at position falls on in source, counting the
-   newlines strictly before it. The lookup is a binary search over a newline
-   offset table cached on the source pointer and length, so a script that reads
-   $LINENO on almost every line stays O(log n) per read rather than O(n) over
-   the prefix. The cache holds one source at a time, which fits the access
-   pattern where a long script reads its own LINENO repeatedly. */
+/* The 1-based line number the byte at position falls on in source. The lookup
+   is a binary search over a newline offset table cached on the source pointer
+   and length, so a script that reads $LINENO on almost every line stays
+   O(log n) per read. The cache holds one source at a time. */
 fn line_number_at(StringView source, usize position) throws -> usize;
 
-/* Drop the cached newline table that line_number_at keeps. The host calls this
-   when it frees a retained source, so a later source allocated at the same
-   address with the same length does not read a stale table. */
+/* Drop the cached newline table that line_number_at keeps, when the host frees
+   a retained source, so a later source at the same address with the same length
+   does not read a stale table. */
 fn invalidate_line_number_cache() wontthrow -> void;
 fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>;
 fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>;
 
 /* The command name closest to name among the local names passed in, the
-   builtins, and the PATH programs, within a couple of edits counting an
-   adjacent transposition as one, for a did-you-mean hint on a command that was
-   not found. None when nothing is close enough. */
+   builtins, and the PATH programs, within a couple of edits, for a did-you-mean
+   hint. None when nothing is close enough. */
 fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     -> Maybe<String>;
 
 /* The current git branch read from .git/HEAD without forking git, walking up
    from the working directory to the filesystem root. Empty outside a
-   repository. A detached HEAD reads as the short commit hash. Shared by the
-   \G and \g prompt segments and the SHIT_GIT_BRANCH dynamic variable. */
+   repository. A detached HEAD reads as the short commit hash. */
 fn current_git_branch() throws -> String;
 
 /* Read everything still available on standard input into a string. */
 fn read_entire_standard_input() throws -> String;
 
-/* Read one line from a descriptor, without the trailing newline. Returns
-   None at end of input with no bytes read. The read builtin passes the
-   command's input descriptor so a redirection or a heredoc is honored.
-   was_delimiter_terminated reports whether the delimiter ended the line, false
-   when end of input ended it, so the read builtin returns a non-zero status for
-   an unterminated final line. The delimiter defaults to a newline, and read -d
-   passes the first byte of its argument, or a NUL byte for an empty argument so
-   the input is slurped whole. */
+/* Read one line from a descriptor, without the trailing newline. Returns None
+   at end of input with no bytes read. was_delimiter_terminated reports whether
+   the delimiter ended the line. The delimiter defaults to a newline, and read
+   -d passes the first byte of its argument, or a NUL for an empty argument. */
 fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
                      char delimiter = '\n') throws -> Maybe<String>;
 
@@ -149,24 +124,19 @@ fn initialize_path_map() throws -> void;
 fn clear_path_map() throws -> void;
 
 /* Mark every cached PATH resolution stale so the next lookup re-resolves from
-   the filesystem. A cd, a PATH assignment, and hash -r call this, the way dash
-   sets its rehash flag, so a hit never stats on the common path yet a shadowing
-   directory or a reassigned PATH still wins on the next use. */
+   the filesystem. A cd, a PATH assignment, and hash -r call this. */
 fn invalidate_path_cache() throws -> void;
 
 /* Point program resolution at a PATH value, the shell variable store's PATH
    rather than the process environment, so a plain PATH=... assignment that
-   never exports still drives the search the way dash resolves against the
-   assigned value. None restores the search to the process environment's PATH.
-   The cache is marked stale so the next lookup re-resolves against the new
-   value. */
+   never exports still drives the search. None restores the search to the
+   process environment's PATH. */
 fn set_path_for_resolution(Maybe<String> path) throws -> void;
 
-/* Searches PATH for program binary. Returns absolute paths to the program. The
-   first resolved location is cached under the name and a later hit returns it
-   without a stat until the cache is invalidated. With find_all the search skips
-   the cache, scans every PATH directory, and returns every match, for which -a.
- */
+/* Searches PATH for program binary. The first resolved location is cached under
+   the name and a later hit returns it without a stat until the cache is
+   invalidated. With find_all the search skips the cache and returns every
+   match, for which -a. */
 fn search_program_path(StringView program_name, bool find_all = false) throws
     -> ArrayList<Path>;
 
@@ -178,15 +148,13 @@ fn glob_matches(StringView glob, StringView str,
                 bool extglob = false) throws -> bool;
 
 /* Hand quit the one context it reads the interactive state and the memory
-   report flag from, set once from Main when the context exists. quit gates the
-   goodbye message on the interactive state so it appears only at a prompt and
-   never for a script, a -c, or a subshell, and gates the memory report on the
-   --show-memory flag the context carries. */
+   report flag from. quit gates the goodbye message on the interactive state and
+   gates the memory report on the --show-memory flag the context carries. */
 fn set_quit_context(const EvalContext *context) wontthrow -> void;
 
 /* Do a cleanup if necessary, then call exit(code). */
 [[noreturn]] fn quit(i32 code, bool should_goodbye = false) throws -> void;
 
-} /* namespace utils */
+} // namespace utils
 
-} /* namespace shit */
+} // namespace shit

@@ -7,10 +7,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* exec replaces the shell with the named program, so it does not fork. With no
-   command it applies its redirections to the shell itself and returns. exec
-   names an executable file, not a builtin, since it replaces the process. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[command [argument ...]]");
@@ -63,14 +59,24 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (command_name.find_character('/').has_value()) {
     let resolved = Path::canonicalize(command_name);
     if (!resolved) {
-      show_message("exec: '" + command_name + "': not found");
+      const CommandNotFound not_found{ec.source_location(),
+                                      StringView{"Command '"} + command_name +
+                                          "' was not found"};
+      const String *source = cxt.current_source();
+      show_message(not_found.to_string(source != nullptr ? source->view()
+                                                         : StringView{}));
       utils::quit(127, true);
     }
     program_path = resolved.take();
   } else {
     let const found = utils::search_program_path(command_name);
     if (found.count() == 0) {
-      show_message("exec: '" + command_name + "': not found");
+      const CommandNotFound not_found{ec.source_location(),
+                                      StringView{"Command '"} + command_name +
+                                          "' was not found"};
+      const String *source = cxt.current_source();
+      show_message(not_found.to_string(source != nullptr ? source->view()
+                                                         : StringView{}));
       utils::quit(127, true);
     }
     ASSERT(found.count() > 0);
@@ -119,4 +125,4 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 }
 
-} /* namespace shit */
+} // namespace shit

@@ -6,10 +6,6 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* The shitbox builtin hosts the busybox-style coreutils. `shitbox ls` runs the
-   ls utility, and when the bare names resolve as commands the resolver routes
-   ls straight here with the name already at the front. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[utility] [arg ...]");
@@ -72,7 +68,7 @@ i32 Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const target = os::current_executable_path();
     if (!target.has_value()) {
       report_soft_builtin_error(
-          ec, cxt, "shitbox: cannot resolve this binary's path to assimilate");
+          ec, cxt, "Cannot resolve this binary's path to assimilate");
       return 1;
     }
 
@@ -80,7 +76,7 @@ i32 Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws
        per utility, so the user sees the real cause instead of a flood. */
     if (!Path{ec.args()[2].view()}.is_directory()) {
       report_soft_builtin_error(ec, cxt,
-                                "shitbox: cannot assimilate into '" +
+                                "Cannot assimilate into '" +
                                     String{ec.args()[2].view()} +
                                     "': not a directory");
       return 1;
@@ -96,7 +92,7 @@ i32 Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (link.is_symbolic_link()) os::remove_file(link.text().view());
       if (!os::create_symlink(target->view(), link.text().view())) {
         report_soft_builtin_error(ec, cxt,
-                                  "shitbox: cannot link '" + link.text() +
+                                  "Cannot link '" + link.text() +
                                       "': " + os::last_system_error_message());
         status = 1;
       }
@@ -132,4 +128,4 @@ i32 Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws
   return shitbox::dispatch(ec, cxt, 1);
 }
 
-} /* namespace shit */
+} // namespace shit

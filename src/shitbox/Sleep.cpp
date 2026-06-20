@@ -98,6 +98,6 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
   return os::INTERRUPT_REQUESTED ? 130 : 0;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

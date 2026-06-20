@@ -83,9 +83,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
                    "file as a shell script in place");
         /* The file has no shebang and is not a binary, so it runs as a shell
            script in place, the POSIX fallback. replace_process already placed
-           any redirections onto the standard descriptors and closed the
-           originals, so the context's own descriptors are cleared to keep the
-           run from reapplying the now-closed ones. */
+           the redirections, so the context's descriptors are cleared to avoid
+           reapplying the now-closed ones. */
         ec.in_fd.reset();
         ec.out_fd.reset();
         ec.err_fd.reset();
@@ -108,8 +107,6 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       unreachable();
     }
 
-    /* The command word is kept for the job table before the context is moved
-       into the spawn. */
     let const command = is_async ? String{ec.program().view()} : String{};
 
     LOG(Debug, "spawning the external command '%s'%s", ec.program().c_str(),
@@ -233,11 +230,10 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       last_child = child;
     } else if (!is_last) {
 #if SHIT_PLATFORM_IS POSIX
-      /* A non-last builtin stage is bash's own subshell, so it forks and runs
-         in the child. An in-process run deadlocked when the builtin produced
-         more than the pipe buffer before its consumer started, as in seq into
-         head. The forked child runs concurrently, and with the default signal
-         disposition a write to a closed pipe ends it through SIGPIPE. */
+      /* A non-last builtin stage is bash's own subshell, so it forks. An
+         in-process run deadlocked when the builtin filled the pipe buffer
+         before its consumer started, as in seq into head. The forked child runs
+         concurrently and ends through SIGPIPE on a write to a closed pipe. */
       const os::process child =
           os::fork_compound_stage(ec.in_fd, ec.out_fd, ec.err_fd);
       if (child == 0) {
@@ -286,10 +282,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 #endif
     } else {
       /* The last builtin stage runs in this process, so a read or a cd in it
-         affects the shell, and its status stands in for the stage. The
-         pipeline-stage flag rides the call so exec spawns a child rather than
-         replacing the whole shell. The defer clears it even when the builtin
-         throws, so the flag never leaks into a later command on the context. */
+         affects the shell and its status stands in for the stage. The
+         pipeline-stage flag makes exec spawn a child rather than replace the
+         shell, and the defer clears it even on a throw. */
       cxt.set_in_pipeline_stage(true);
       defer { cxt.set_in_pipeline_stage(false); };
       ret = execute_builtin(steal(ec), cxt);
@@ -346,8 +341,7 @@ pure fn strip_sig_prefix(StringView name) wontthrow -> StringView
 fn split_lines(StringView text) throws -> ArrayList<StringView>
 {
   let lines = ArrayList<StringView>{};
-  /* Counting the line breaks first reserves the exact size, so the push loop
-     does not climb the growth chain reallocating the views. */
+  /* Counting the line breaks first reserves the exact size. */
   usize line_count = 1;
   for (usize i = 0; i < text.length; i++)
     if (text[i] == '\n') line_count++;
@@ -435,8 +429,7 @@ fn uint_to_text(u64 value, Allocator allocator) throws -> String
 fn int_to_text(i64 value, Allocator allocator) throws -> String
 {
   /* The digits are written into a stack buffer and the result is built from the
-     view in one allocation, where the negative path used to build two Strings.
-   */
+     view in one allocation. */
   char buffer[21];
   return String{allocator, int_to_text_into(value, buffer, sizeof(buffer))};
 }
@@ -580,8 +573,6 @@ fn invalidate_line_number_cache() wontthrow -> void
   LINE_NUMBER_CACHE.invalidate();
 }
 
-/* Advance offset past any leading ASCII whitespace, shared by the integer
-   parsers which trim before and after the digit run. */
 static fn skip_ascii_whitespace(StringView text, usize &offset) wontthrow
     -> void
 {
@@ -732,8 +723,7 @@ static pure fn is_glob_char_active(const ArrayList<bool> &glob_active,
 namespace {
 
 /* One alternative of a bash extended-glob group, a slice of the glob and the
-   mask offset that slice begins at, so the recursive matcher reads the same
-   per-byte activity. */
+   mask offset that slice begins at. */
 struct extglob_alternative
 {
   StringView pattern;
@@ -964,7 +954,7 @@ bool byte_is_in_posix_class(StringView class_name, u8 byte) throws
   return false;
 }
 
-} /* namespace */
+} // namespace
 
 fn glob_matches(StringView glob, StringView str,
                 const ArrayList<bool> &glob_active, usize mask_offset,
@@ -1175,12 +1165,11 @@ fn glob_matches(StringView glob, StringView str,
   return false;
 }
 
-/* The shell is at a real interactive prompt. quit gates the goodbye on this so
-   a script, a -c, or a subshell exits silently the way dash does. */
 /* The one context quit reads the interactive state and the memory-report flag
-   from. A pointer rather than mirrored globals keeps the state on the context,
-   and a null pointer, the state before the context exists, reads as a
-   non-interactive shell with the report off. */
+   from, so quit gates the goodbye on a real interactive prompt and a script,
+   a -c, or a subshell exits silently the way dash does. A null pointer, the
+   state before the context exists, reads as a non-interactive shell with the
+   report off. */
 static const EvalContext *QUIT_CONTEXT = nullptr;
 
 fn set_quit_context(const EvalContext *context) wontthrow -> void
@@ -1381,13 +1370,10 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
   let dirs = ArrayList<String>{};
   let current = String{};
 
-  /* A directory that appears more than once in PATH, which a layered profile
-     easily produces, is kept only on its first occurrence. The eager scan and
-     the per-command resolve both read this list, so dropping the repeats avoids
-     reading the same directory and re-resolving the same files several times,
-     while keeping the first occurrence leaves the search order and the copy a
-     command resolves to unchanged. The directory count is small, so a linear
-     membership check is cheaper than a set. */
+  /* A directory that appears more than once in PATH is kept only on its first
+     occurrence, so the eager scan and the per-command resolve do not read it
+     and re-resolve its files twice. The first occurrence keeps the search order
+     unchanged. The directory count is small, so a linear check beats a set. */
   let const do_push_unique = [&](String dir) throws -> void {
     for (let const &seen : dirs)
       if (seen.view() == dir.view()) return;
@@ -1444,12 +1430,10 @@ fn initialize_path_map() throws -> void
   rebuild_path_cache();
 }
 
-/* Stat dir/name along PATH until a match, the way dash advances PATH and stats
-   each candidate once. The first hit ends the scan and is cached, so a cold
-   miss costs at most one stat per PATH directory up to the match rather than a
-   full directory read. With find_all the scan does not stop and collects every
-   match for which -a, and it does not write the cache, since a partial
-   single-result entry would later hide the other matches from which -a. */
+/* Stat dir/name along PATH until a match, the way dash stats each candidate
+   once. The first hit ends the scan and is cached. With find_all the scan
+   collects every match for which -a and does not write the cache, since a
+   partial entry would later hide the other matches. */
 static fn resolve_along_path(StringView program_name, bool find_all) throws
     -> ArrayList<Path>
 {
@@ -1758,6 +1742,6 @@ fn current_git_branch() throws -> String
   return String{};
 }
 
-} /* namespace utils */
+} // namespace utils
 
-} /* namespace shit */
+} // namespace shit

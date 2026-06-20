@@ -24,10 +24,8 @@ namespace shit {
 
 namespace shitbox {
 
-/* Read from the descriptor until max_lines newlines have arrived or the input
-   ends, copying no further. Stopping early matters for an endless producer such
-   as yes, since head reading to the end would never return and would keep the
-   producer alive. */
+/* Stopping at max_lines keeps an endless producer such as yes from running
+   forever, since reading to the end would never return. */
 static fn read_up_to_lines(os::descriptor fd, i64 max_lines) throws -> String
 {
   String out{};
@@ -47,8 +45,7 @@ static fn read_up_to_lines(os::descriptor fd, i64 max_lines) throws -> String
   return out;
 }
 
-/* Read from the descriptor until max_bytes have arrived or the input ends. The
-   byte cap stops an endless producer the way the line cap does. */
+/* The byte cap stops an endless producer the way the line cap does. */
 static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes) throws -> String
 {
   String out{};
@@ -154,6 +151,6 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

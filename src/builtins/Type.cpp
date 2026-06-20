@@ -5,9 +5,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* type reports how each name resolves, checking the same order the shell uses
-   to run a command, a function first, then a builtin, then the PATH. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("name [name ...]");
@@ -197,4 +194,4 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
   return did_find_all ? 0 : 1;
 }
 
-} /* namespace shit */
+} // namespace shit

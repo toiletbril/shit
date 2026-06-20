@@ -246,6 +246,45 @@ fn Path::is_socket() const wontthrow -> bool
   return stat_matches_type(m_text.c_str(), S_IFSOCK);
 }
 
+/* The mode-bit test the setuid, setgid, and sticky predicates share. A failed
+   stat reads as the bit absent rather than an error, the way the type
+   predicates treat a missing path. */
+static fn stat_mode_has_bits(const char *path, mode_t bits) wontthrow -> bool
+{
+  struct stat info{};
+  if (::stat(path, &info) != 0) return false;
+  return (info.st_mode & bits) != 0;
+}
+
+fn Path::has_setuid_bit() const wontthrow -> bool
+{
+  return stat_mode_has_bits(m_text.c_str(), S_ISUID);
+}
+
+fn Path::has_setgid_bit() const wontthrow -> bool
+{
+  return stat_mode_has_bits(m_text.c_str(), S_ISGID);
+}
+
+fn Path::has_sticky_bit() const wontthrow -> bool
+{
+  return stat_mode_has_bits(m_text.c_str(), S_ISVTX);
+}
+
+fn Path::is_owned_by_effective_user() const wontthrow -> bool
+{
+  struct stat info{};
+  if (::stat(m_text.c_str(), &info) != 0) return false;
+  return info.st_uid == ::geteuid();
+}
+
+fn Path::is_owned_by_effective_group() const wontthrow -> bool
+{
+  struct stat info{};
+  if (::stat(m_text.c_str(), &info) != 0) return false;
+  return info.st_gid == ::getegid();
+}
+
 fn Path::file_size() const wontthrow -> Maybe<u64>
 {
   struct stat info{};
@@ -449,6 +488,14 @@ fn Path::is_block_device() const wontthrow -> bool { return false; }
 fn Path::is_character_device() const wontthrow -> bool { return false; }
 fn Path::is_fifo() const wontthrow -> bool { return false; }
 fn Path::is_socket() const wontthrow -> bool { return false; }
+
+/* Windows carries no setuid, setgid, sticky, or POSIX ownership bit, so these
+   primaries are always false there. */
+fn Path::has_setuid_bit() const wontthrow -> bool { return false; }
+fn Path::has_setgid_bit() const wontthrow -> bool { return false; }
+fn Path::has_sticky_bit() const wontthrow -> bool { return false; }
+fn Path::is_owned_by_effective_user() const wontthrow -> bool { return false; }
+fn Path::is_owned_by_effective_group() const wontthrow -> bool { return false; }
 
 fn Path::file_size() const wontthrow -> Maybe<u64>
 {
@@ -741,4 +788,4 @@ fn PathBuilder::append_raw(StringView bytes) throws -> PathBuilder &
 
 fn PathBuilder::build() const throws -> Path { return Path{m_text}; }
 
-} /* namespace shit */
+} // namespace shit

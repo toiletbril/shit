@@ -50,8 +50,6 @@ static fn sorted_builtin_names() throws -> ArrayList<String>
   return names;
 }
 
-/* The builtins laid out in columns that fit a usual terminal width, the survey
-   a bare builtin prints in the shit mood. */
 static fn print_builtin_columns(ExecContext &ec) throws -> void
 {
   let const sorted = sorted_builtin_names();
@@ -131,4 +129,4 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   return execute_builtin(steal(sub), cxt);
 }
 
-} /* namespace shit */
+} // namespace shit

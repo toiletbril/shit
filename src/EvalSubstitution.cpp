@@ -13,8 +13,7 @@
 
 /* The substitution captures of the evaluator, the $(...) and backtick pipe
    capture with its drain thread, the bare $(< file) read, and the <(cmd)
-   process substitutions with their cleanup. Split out of Eval.cpp so the
-   evaluator core stays the hot-path file. */
+   process substitutions with their cleanup. */
 
 namespace shit {
 
@@ -76,8 +75,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
       static_cast<const tokens::WordToken *>(name)->word());
   LOG(Debug, "the substitution is a bare file read of '%s'", filename.c_str());
   let content = Path{filename.view()}.read_entire_file();
-  /* An unreadable file yields an empty substitution, the way bash leaves
-     COMPREPLY-style reads empty rather than aborting. */
+  /* An unreadable file yields an empty substitution rather than aborting. */
   if (!content.has_value()) {
     LOG(Debug, "the file read substitution of '%s' failed, expanding to empty",
         filename.c_str());
@@ -120,8 +118,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
     throw Error{"Process substitution outside of a parse"};
   ASSERT(!text.is_empty());
 
-  /* The first byte is the direction marker the lexer wrote, the rest is the
-     inner command source the child runs. */
+  /* The first byte is the direction marker the lexer wrote. */
   const char direction = text[0];
   const bool command_writes_the_pipe = direction == '<';
   LOG(Debug, "setting up a process substitution where the command %s the pipe",
@@ -129,10 +126,9 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
 
 #if SHIT_PLATFORM_IS WIN32
   /* Windows has no fork, so the substitution runs in a fresh shell that writes
-     its output to a temp file the consuming command reads by path. The <(cmd)
-     form is supported. The >(cmd) form would need the inner shell to run after
-     the outer command writes the file, an ordering the synchronous spawn here
-     cannot provide. */
+     its output to a temp file the consuming command reads by path. The >(cmd)
+     form would need the inner shell to run after the outer command writes the
+     file, an ordering the synchronous spawn here cannot provide. */
   if (!command_writes_the_pipe)
     throw Error{"Unable to run a >(cmd) process substitution because it is not "
                 "supported on this platform"};
@@ -141,8 +137,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
       substitution_path.has_value())
   {
     /* The temp file is read by the consuming command after this returns, so it
-       is tracked for deletion once that command finishes rather than removed
-       now. */
+       is tracked for deletion once that command finishes. */
     m_substitution_temp_files.track(Path{substitution_path->view()});
     return steal(*substitution_path);
   }
@@ -161,17 +156,11 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
     throw Error{"Could not open a pipe for the process substitution: " +
                 os::last_system_error_message()};
 
-  /* For <(cmd) the command writes its standard output into the pipe and the
-     shell reads the other end. For >(cmd) the command reads its standard input
-     from the pipe and the shell writes the other end. */
   const os::process child = command_writes_the_pipe
                                 ? os::fork_compound_stage(None, pipe->out, None)
                                 : os::fork_compound_stage(pipe->in, None, None);
 
   if (child == 0) {
-    /* The child does not need the shell's end, so it closes it before running
-       the inner command and exits without returning into the parent evaluator
-       inside the duplicated process. */
     os::close_fd(command_writes_the_pipe ? pipe->in : pipe->out);
     i32 status = 0;
     try {
@@ -186,15 +175,12 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
     os::exit_process_immediately(status);
   }
 
-  /* The shell keeps the end it reads or writes and closes the child's end. The
-     kept end must survive an exec so the consuming command inherits it and a
-     read of /dev/fd/N reaches this pipe. */
+  /* The kept end must survive an exec so the consuming command inherits it and
+     a read of /dev/fd/N reaches this pipe. */
   const os::descriptor shell_fd =
       command_writes_the_pipe ? pipe->in : pipe->out;
   os::close_fd(command_writes_the_pipe ? pipe->out : pipe->in);
   os::make_fd_inheritable(shell_fd);
-  /* The command currently evaluating is where this substitution was written, so
-     its location points a later reap warning at the right word. */
   let const location = m_current_location;
   const StringView source =
       m_current_source != nullptr ? m_current_source->view() : StringView{};
@@ -231,11 +217,9 @@ fn EvalContext::cleanup_process_substitutions(
     } catch (const Error &e) {
       LOG(Debug, "a process substitution reap failed and was swallowed: %s",
           e.message().c_str());
-      /* The child is reaped on a best-effort basis, so a wait failure is shown
-         as a warning and swallowed rather than propagated out of this no-throw
+      /* A wait failure is swallowed rather than propagated out of this no-throw
          cleanup. bash stays silent here, so the warning is suppressed in bash
-         mode, and the show is guarded so a failure to print cannot escape. The
-         warning points a caret at the command when its source is known. */
+         mode. */
       if (!is_bash_compatible()) {
         try {
           const String text =
@@ -283,10 +267,8 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
 
-  /* The segment text and its escape state never change between iterations, so
-     the inner command is lexed and parsed once and the tree is reused while the
-     arena that holds it is unreset. A cached tree from an earlier generation
-     points into reclaimed storage, so it is reparsed. */
+  /* A cached tree from an earlier arena generation points into reclaimed
+     storage, so it is reparsed when the generation no longer matches. */
   const usize generation = AST_ARENA->reset_generation();
   if (segment.cached_substitution_ast == nullptr ||
       segment.cached_substitution_generation != generation)
@@ -325,9 +307,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   defer { m_scratch_arena.release(substitution_mark); };
 
   /* The substitution body is its own source, so a located error inside it
-     carries an offset into that text. The current source is pointed at it for
-     the run, so an error rendered inline, such as a command not found, marks
-     the right byte, and the error caught below is formatted against it too. */
+     carries an offset into that text rather than into the enclosing line. */
   let const previous_source = m_current_source;
   let const previous_origin = m_current_origin;
   let const previous_location = m_current_location;
@@ -341,8 +321,6 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   let const pipe = os::make_pipe();
   if (!pipe) throw Error{"Could not open a pipe for command substitution"};
 
-  /* Drain the read end on a thread so output larger than the pipe buffer cannot
-     deadlock the commands writing into it. */
   let captured = String{heap_allocator()};
   let drain_context = command_substitution_drain_context{&captured, pipe->in};
   let const reader =
@@ -365,9 +343,9 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
      continue, return, or exit inside a substitution acts only within it and
      must not escape into the enclosing loop, function, or shell. */
   enter_subshell();
-  /* The inherited EXIT action belongs to the parent and does not fire at the
-     substitution's end. An EXIT action the inner code sets survives and fires
-     below, its output captured into the substitution like any other. */
+  /* The inherited EXIT action belongs to the parent and must not fire at the
+     substitution's end. An action the inner code sets survives and fires
+     below. */
   clear_inherited_exit_trap();
   std::exception_ptr error;
   try {
@@ -375,17 +353,15 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   } catch (...) {
     error = std::current_exception();
   }
-  /* A break, continue, return, or exit inside the substitution acts only within
-     it, so consume any pending jump here. An exit supplies the status. */
+  /* An exit inside the substitution supplies the status before the jump is
+     consumed. */
   if (has_pending_control_flow()) {
     if (pending_control_flow().kind == control_flow::Kind::Exit)
       set_last_exit_status(static_cast<i32>(pending_control_flow().value));
     clear_control_flow();
   }
-  /* The substitution ends here, so its own EXIT action runs while stdout still
-     points at the pipe, so its output joins the captured value. A throw from
-     the action is kept and rethrown after teardown, like a throw from the body.
-   */
+  /* The substitution's own EXIT action runs while stdout still points at the
+     pipe, so its output joins the captured value. */
   if (!error) {
     try {
       run_subshell_exit_trap();
@@ -405,12 +381,9 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   restore_state(steal(snapshot));
 
   if (error) {
-    /* A throw inside the substitution exits its subshell, the way bash contains
-       a fatal expansion error such as ${x?} to the command substitution rather
-       than aborting the parent. The error is rendered here against the
-       substitution source so its caret marks the right byte, with the source
-       backtrace under it, then the parent continues with the partial output and
-       a failing status. */
+    /* A throw inside the substitution is contained to its subshell the way bash
+       holds a fatal expansion error such as ${x?} to the command substitution
+       rather than aborting the parent. */
     LOG(Debug,
         "the command substitution failed, containing the error with status 1");
     try {
@@ -440,8 +413,6 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   if (AST_ARENA == nullptr)
     throw Error{"Function substitution outside of a parse"};
 
-  /* The same per-segment tree cache the $(...) capture keeps, so a funsub in
-     a loop body parses once per arena generation. */
   const usize generation = AST_ARENA->reset_generation();
   if (segment.cached_substitution_ast == nullptr ||
       segment.cached_substitution_generation != generation)
@@ -462,10 +433,9 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   LOG(Debug, "running a function substitution body of %zu bytes",
       source.count());
 
-  /* The body runs against the live state on purpose, no snapshot and no
-     subshell, so its assignments, cd, and definitions persist the way the
-     bash 5.3 funsub leaves them. Only the capture plumbing matches the
-     isolated path, the pipe, the drain thread, and the newline trim. */
+  /* The body runs against the live state, no snapshot and no subshell, so its
+     assignments, cd, and definitions persist the way the bash 5.3 funsub
+     leaves them. */
   let const previous_source = m_current_source;
   let const previous_origin = m_current_origin;
   let const previous_location = m_current_location;
@@ -519,9 +489,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   os::close_fd(pipe->in);
 
   if (error) {
-    /* The same containment the $(...) capture applies, the error renders
-       against the body source with the backtrace and the parent continues
-       with the partial output and a failing status. */
+    /* The same containment the $(...) capture applies. */
     LOG(Debug,
         "the function substitution failed, containing the error with status 1");
     try {
@@ -545,4 +513,4 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   return captured;
 }
 
-} /* namespace shit */
+} // namespace shit

@@ -23,11 +23,9 @@ namespace shit {
 
 namespace shitbox {
 
-/* Expand a set with a-z ranges into the flat run of bytes it names, so a-c
-   becomes abc. A descending range such as c-a expands in reverse to cba the way
-   GNU tr reads it. The bounds are read as unsigned bytes and the walk runs over
-   an int, so a range that touches the 0 or 255 edge does not overflow a char.
- */
+/* A descending range such as c-a expands in reverse to cba the way GNU tr reads
+   it. The bounds are read as unsigned bytes and the walk runs over an int, so a
+   range that touches the 0 or 255 edge does not overflow a char. */
 static fn expand_set(StringView set) throws -> String
 {
   String expanded{};
@@ -74,12 +72,9 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   let const set1 = expand_set(operands[0].view());
   let const set2 = is_deleting ? String{} : expand_set(operands[1].view());
 
-  /* A 256-entry table turns the per-byte set1 lookup into one indexed read, so
-     a large input runs in a single pass over its bytes rather than a scan of
-     set1 for every byte. The first occurrence of a byte in set1 wins, matching
-     the earlier find_character which returned the first index. A byte past the
-     end of set2 maps to its last byte, the way tr pads the shorter set with its
-     final character. */
+  /* The first occurrence of a byte in set1 wins. A byte past the end of set2
+     maps to its last byte, the way tr pads the shorter set with its final
+     character. */
   static constexpr usize BYTE_VALUE_COUNT = 256;
   bool is_in_set1[BYTE_VALUE_COUNT] = {};
   unsigned char translation[BYTE_VALUE_COUNT];
@@ -122,6 +117,6 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

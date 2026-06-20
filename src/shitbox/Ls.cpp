@@ -38,10 +38,7 @@ namespace shitbox {
    coreutils leaves after each name. */
 static constexpr usize COLUMN_GAP = 2;
 
-/* One long-format row split into its fields, kept apart so the listing can
-   right-justify the link count and the size and left-justify the owner and the
-   group against the widest entry in the same directory. The blocks ride along
-   so the total line sums them without a second stat. */
+/* The blocks ride along so the total line sums them without a second stat. */
 struct long_entry
 {
   String mode_string{};
@@ -63,9 +60,6 @@ struct id_name_entry
   String name{};
 };
 
-/* The owner name for a uid, served from the cache when seen before and read
-   from the passwd file and remembered otherwise. An id with no entry caches and
-   returns its numeric form. */
 static fn cached_owner_name(u32 uid, ArrayList<id_name_entry> &cache) throws
     -> String
 {
@@ -77,7 +71,6 @@ static fn cached_owner_name(u32 uid, ArrayList<id_name_entry> &cache) throws
   return name;
 }
 
-/* The group name for a gid, cached the same way as the owner name. */
 static fn cached_group_name(u32 gid, ArrayList<id_name_entry> &cache) throws
     -> String
 {
@@ -89,9 +82,6 @@ static fn cached_group_name(u32 gid, ArrayList<id_name_entry> &cache) throws
   return name;
 }
 
-/* Append a field to the output padded to a column width, with no temporary
-   string. The link count and the size pad on the left, the owner and the group
-   pad on the right. */
 static fn append_padded(String &output, StringView field, usize width,
                         bool pad_on_left) throws -> void
 {
@@ -104,10 +94,8 @@ static fn append_padded(String &output, StringView field, usize width,
       output += ' ';
 }
 
-/* The long-format fields for one path, the mode and owner and group and size
-   and time the ls long row prints, stat'd once. A path that cannot be stat'd
-   renders a sparse row so the listing still names it. The id caches spare a
-   passwd or group read per entry. */
+/* A path that cannot be stat'd renders a sparse row so the listing still names
+   it. */
 static fn build_long_entry(const Path &path, StringView name,
                            ArrayList<id_name_entry> &uid_cache,
                            ArrayList<id_name_entry> &gid_cache) throws
@@ -139,9 +127,8 @@ static fn build_long_entry(const Path &path, StringView name,
   return entry;
 }
 
-/* Append the aligned long rows for a set of entries to the output. The widths
-   are computed across the whole set first, so every row lines up the way the
-   coreutils long listing does. */
+/* The widths are computed across the whole set first, so every row lines up the
+   way the coreutils long listing does. */
 static fn render_long_entries(const ArrayList<long_entry> &entries,
                               String &output) throws -> void
 {
@@ -175,8 +162,6 @@ static fn render_long_entries(const ArrayList<long_entry> &entries,
   }
 }
 
-/* The widest entry of the column whose first row is column_index*rows, used to
-   size a column-major grid. */
 static fn column_width(const ArrayList<usize> &widths, usize column_index,
                        usize rows) wontthrow -> usize
 {
@@ -189,9 +174,8 @@ static fn column_width(const ArrayList<usize> &widths, usize column_index,
   return widest;
 }
 
-/* Append the names laid out in columns sized to the terminal, packed column by
-   column the way coreutils fills the grid down then across. One name per line
-   when the output is not a terminal or -1 is given. */
+/* The grid packs column by column the way coreutils fills it down then across.
+   One name per line when the output is not a terminal or -1 is given. */
 static fn render_columns(const ArrayList<StringView> &names,
                          String &output) throws -> void
 {
@@ -257,8 +241,8 @@ static fn render_columns(const ArrayList<StringView> &names,
   }
 }
 
-/* The total 1K blocks line coreutils prints before a long directory listing,
-   summed from the 512-byte block counts the entries carry from their stat. */
+/* coreutils prints the total in 1K blocks, summed from the 512-byte block
+   counts the entries carry, hence the divide by two. */
 static fn long_total_blocks(const ArrayList<long_entry> &entries) throws
     -> String
 {
@@ -375,6 +359,6 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

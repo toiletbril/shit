@@ -49,6 +49,6 @@ fn WhoAmI::execute(const ExecContext &ec, EvalContext &cxt,
   return 1;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

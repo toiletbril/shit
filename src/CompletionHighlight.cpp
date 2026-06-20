@@ -22,8 +22,7 @@ namespace completion {
    valid until the editor drains it. */
 static BumpArena HIGHLIGHT_ARENA{};
 
-/* Expand a leading tilde in a command path so ~/bin/foo is checked at the home
-   directory. None when the path names a user with no home. */
+/* None when the path names a user with no home. */
 static fn expand_command_tilde(StringView word) throws -> Maybe<String>
 {
   if (word.is_empty() || word[0] != '~') return None;
@@ -43,8 +42,6 @@ static fn expand_command_tilde(StringView word) throws -> Maybe<String>
 static String CACHED_PATH_VERDICT_PATH{};
 static StringMap<bool> PATH_SEARCH_VERDICTS{heap_allocator()};
 
-/* Whether the first word names a runnable command, a keyword, a builtin, a
-   function, an alias, a PATH executable, or an existing file given by path. */
 static fn first_word_resolves(StringView word, EvalContext &context) throws
     -> bool
 {
@@ -102,7 +99,6 @@ static fn command_word_prefixes_any(StringView word,
                                     EvalContext &context) throws -> bool
 {
   if (word.is_empty()) return false;
-  /* A path word is judged by the filesystem, not the command-name sets. */
   if (word.find_character('/').has_value()) return false;
 
   let const has_prefix = [&](StringView name) -> bool {
@@ -145,8 +141,7 @@ static pure fn is_highlight_name_char(char c) wontthrow -> bool
   return lexer::is_variable_name(c);
 }
 
-/* A word that is a single plain identifier, the form a for loop variable must
-   take. A leading digit or any non-name character fails the check. */
+/* The form a for loop variable must take. */
 static pure fn is_plain_identifier(StringView word) wontthrow -> bool
 {
   if (word.length == 0 || !is_highlight_name_start(word[0])) return false;
@@ -164,9 +159,7 @@ static pure fn is_highlight_word_break(char c) wontthrow -> bool
          c == ';' || c == '<' || c == '>' || c == '(' || c == ')';
 }
 
-/* The byte just past a $ expansion at dollar, covering $name, the special and
-   positional parameters, and ${...} with balanced braces. The $(...) form is
-   handled by the caller. */
+/* The $(...) form is handled by the caller. */
 static pure fn scan_dollar_expansion(StringView line, usize dollar,
                                      usize end) wontthrow -> usize
 {
@@ -229,8 +222,6 @@ static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
   return false;
 }
 
-/* The open shell constructs, so a continuation or closing keyword can be
-   checked against the construct it belongs to. */
 enum class highlight_construct : u8
 {
   If,
@@ -245,14 +236,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
                                ArrayList<highlight_span> &spans,
                                const HashSet &known_vars) throws -> void;
 
-/* Color the inside of a $(( )) as arithmetic rather than a command line. */
 static fn color_arithmetic(StringView line, usize begin, usize end,
                            EvalContext &context,
                            ArrayList<highlight_span> &spans,
                            const HashSet &known_vars) throws -> void;
 
-/* Whether the plain word names a path that exists on disk, painted cyan so a
-   real file stands apart from a typo. */
 static fn word_names_existing_path(StringView word) throws -> bool
 {
   if (word.is_empty()) return false;
@@ -268,9 +256,7 @@ static fn word_names_existing_path(StringView word) throws -> bool
   return Path{word}.exists();
 }
 
-/* Whether the directory holding a path's first unresolved segment contains an
-   entry that begins with that segment, so a path being typed toward a real file
-   colors yellow rather than red. */
+/* A path being typed toward a real file colors yellow rather than red. */
 static fn path_partial_prefixes_entry(StringView word, usize existing_end,
                                       StringView partial, bool has_tilde) throws
     -> bool
@@ -319,10 +305,9 @@ static fn word_is_terminated_by_separator(StringView line, usize word_end,
          next_byte == ';' || next_byte == '|' || next_byte == '&';
 }
 
-/* Color a path-like argument by segment. The resolved on-disk prefix is cyan,
-   the first unresolved segment cyan while it prefixes a real entry and is still
-   being typed, red once finished or unmatched. A plain non-path name is left in
-   the default color. Returns whether the word was treated as a path. */
+/* The resolved on-disk prefix is cyan, the first unresolved segment cyan while
+   it prefixes a real entry and is still being typed, red once finished or
+   unmatched. Returns whether the word was treated as a path. */
 static fn color_path_argument(usize word_start, StringView word,
                               bool word_is_terminated,
                               ArrayList<highlight_span> &spans) throws -> bool
@@ -372,24 +357,18 @@ static fn color_path_argument(usize word_start, StringView word,
     }
   }
 
-  /* The resolved prefix exists on disk, so it is bright cyan. */
   if (existing_end > 0)
     spans.push(highlight_span{word_start, word_start + existing_end,
                               colors::ansi::BRIGHT_CYAN});
 
-  /* A fully resolved path is entirely bright cyan, nothing remains to color. */
   if (existing_end >= word.length) return true;
 
-  /* The first segment past the resolved prefix is the part being typed, and any
-     deeper segment after it cannot exist so it is red. */
   usize segment_end = existing_end;
   while (segment_end < word.length && word[segment_end] != '/')
     segment_end++;
 
   let const partial =
       word.substring_of_length(existing_end, segment_end - existing_end);
-  /* A tail still being typed that prefixes a real entry is normal cyan against
-     the bright cyan of the resolved part, red once finished or unmatched. */
   let const tail_could_complete =
       !word_is_terminated &&
       path_partial_prefixes_entry(word, existing_end, partial, has_tilde);
@@ -436,10 +415,8 @@ static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
   return os::get_environment_variable(name).has_value();
 }
 
-/* Color a $ expansion that begins at i within the window. A $(...) recurses so
-   its inner command line colors like any other, while ${...}, $name, and the
-   special parameters are colored cyan as one span, or bold red when the named
-   variable is not set. Returns the index past it. */
+/* A $(...) recurses so its inner command line colors like any other. A named
+   variable that is not set colors bold red. */
 static fn color_dollar(StringView line, usize i, usize end,
                        ArrayList<highlight_span> &spans, EvalContext &context,
                        const HashSet &known_vars) throws -> usize
@@ -489,8 +466,6 @@ static fn color_dollar(StringView line, usize i, usize end,
         }
       }
     }
-    /* The bytes between the ( and the ) are the inner command line, which the
-       $( and ) frame in the default color. */
     let const inner_begin = i + 2 < end ? i + 2 : end;
     let const inner_end = close < inner_begin ? inner_begin : close;
     scan_highlight_range(line, inner_begin, inner_end, context, spans,
@@ -517,8 +492,6 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
   while (i < end) {
     let const c = line[i];
 
-    /* A nested $name or $(( )) inside the expression colors through the dollar
-       colorer the same as anywhere else. */
     if (c == '$') {
       let const next = color_dollar(line, i, end, spans, context, known_vars);
       i = next > i ? next : i + 1;
@@ -530,8 +503,6 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
       let const name_start = i;
       while (i < end && is_highlight_name_char(line[i]))
         i++;
-      /* Cyan when set and bold red when not, an undefined name evaluates to
-         zero. */
       let const name = line.substring_of_length(name_start, i - name_start);
       spans.push(highlight_span{name_start, i,
                                 dollar_name_is_set(name, known_vars)
@@ -540,7 +511,6 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
       continue;
     }
 
-    /* A number keeps the default color, consumed as one run. */
     if (c >= '0' && c <= '9') {
       while (i < end && (is_highlight_name_char(line[i]) || line[i] == '.'))
         i++;
@@ -552,8 +522,6 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
       continue;
     }
 
-    /* Any other run is an operator or a paren, colored bold, stopping at a
-       name, number, whitespace, or dollar so the loop cannot stall. */
     let const operator_start = i;
     while (i < end && line[i] != '$' && !is_highlight_name_start(line[i]) &&
            !(line[i] >= '0' && line[i] <= '9') &&
@@ -601,9 +569,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       break;
     }
 
-    /* An operator run, bold so the line's structure stands out from the
-       words. A separator or an opener moves the next word back to command
-       position, a redirection does not. */
+    /* A separator or an opener moves the next word back to command position, a
+       redirection does not. */
     if (c == '|' || c == '&' || c == ';' || c == '<' || c == '>' || c == '(' ||
         c == ')' || c == '{' || c == '}')
     {
@@ -638,8 +605,6 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       continue;
     }
 
-    /* A word, scanned to its break. Quoted strings and expansions color into
-       word_spans, a plain command or keyword word colors whole below. */
     let const word_start = i;
     let word_spans = ArrayList<highlight_span>{bump_allocator(HIGHLIGHT_ARENA)};
     while (i < end && !is_highlight_word_break(line[i])) {
@@ -708,7 +673,6 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     let const plain = word_spans.is_empty();
     let const is_assignment = word_looks_like_assignment(word);
 
-    /* A for or case awaits its in, which is the keyword there. */
     if (expecting_in && plain && word == "in") {
       do_push(word_start, word_end, colors::ansi::GREEN);
       expecting_in = false;
@@ -791,9 +755,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
             !stack.is_empty() && stack.back() == highlight_construct::Case;
         if (keyword_ok) stack.pop_back();
       } else if (word == "time" || word == "when") {
-        /* A prefix keyword, the command follows it. */
       } else if (word == "in") {
-        /* An in outside a for or case is misplaced. */
         keyword_ok = false;
         next_is_command = false;
       } else {
@@ -814,10 +776,6 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
          or red. A plain command name is bright blue when it resolves, blue
          while it still prefixes some command name so it could complete, and red
          once it prefixes nothing. */
-      /* A command word the user has finished, with whitespace or with a list
-         operator such as ';', '|', or '&', can no longer grow into a real
-         command, so it must resolve fully or read as a dead end. A still-typed
-         word may still complete and keeps its prefix color. */
       let const is_word_terminated =
           word_is_terminated_by_separator(line, word_end, end);
       if (word.find_character('/').has_value()) {
@@ -837,11 +795,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       continue;
     }
 
-    /* An argument, an expansion-built command, or an assignment prefix. The
-       inner spans stand. An assignment prefix keeps the next word in command
-       position, an expansion-built command moves past it. A flag dims to a
-       subtle gray, and a plain argument that looks like a path colors per
-       segment, the on-disk prefix cyan, the rest yellow or red. */
+    /* An assignment prefix keeps the next word in command position, an
+       expansion-built command moves past it. */
     if (!is_command_position && plain && !is_assignment) {
       if (!word.is_empty() && word[0] == '-') {
         do_push(word_start, word_end, colors::ansi::GRAY);
@@ -944,6 +899,6 @@ fn highlight_line(StringView line, EvalContext &context) throws
   return spans;
 }
 
-} /* namespace completion */
+} // namespace completion
 
-} /* namespace shit */
+} // namespace shit

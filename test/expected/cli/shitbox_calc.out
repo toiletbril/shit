@@ -20,5 +20,5 @@ shit: 1:6: error: Division by zero.
 shit: 1:1: error: calc: Not enough arguments.
      1 |  calc
        |  ^~~~ here.
-shit: note: calc --help for more info.
+shit: note: Try `calc --help` for more info.
 rc=2

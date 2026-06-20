@@ -1,10 +1,9 @@
 #pragma once
 
 /* A value or an Error, returned by a function that can fail instead of
-   throwing. The error path carries the same Error the throwing code built, so
-   the located reporting at the boundary stays identical. The variant is
-   accessed through get_if rather than get, so the no-exceptions build never
-   reaches a throwing path. */
+   throwing. The error path carries the same Error the throwing code built. The
+   variant is accessed through get_if rather than get, so the no-exceptions
+   build never reaches a throwing path. */
 
 #include "Allocator.hpp"
 #include "Common.hpp"
@@ -14,16 +13,14 @@
 namespace shit {
 
 namespace utils {
-/* Declared here rather than included from Utils.hpp, since Utils.hpp includes
-   ErrorOr.hpp and the include would close a cycle. The definition lives in
-   Utils.cpp. */
+/* Declared here rather than included from Utils.hpp, since the include would
+   close a cycle. */
 fn int_to_text(i64 value, Allocator allocator = heap_allocator()) throws
     -> String;
-} /* namespace utils */
+} // namespace utils
 
 /* The success payload of a fallible function that returns no value. A caller
-   writes ErrorOr<Ok> and returns Success on success, the way None is the one
-   instance of Nothing. */
+   writes ErrorOr<Ok> and returns Success on success. */
 class Ok
 {};
 
@@ -58,8 +55,6 @@ public:
       new (&m_storage) T(steal(other.value_reference()));
   }
 
-  /* An explicit deep copy, so a caller that means to duplicate the result says
-     so rather than leaning on an implicit copy. */
   mustuse fn clone() const throws -> ErrorOr { return ErrorOr{*this}; }
 
   fn operator=(const ErrorOr &other) throws->ErrorOr &
@@ -152,12 +147,11 @@ private:
                                                                : sizeof(Error)];
 };
 
-} /* namespace shit */
+} // namespace shit
 
 /* Evaluate a fallible expression, return its error early on failure, and yield
    its value otherwise. Used inside a function that itself returns an ErrorOr.
-   The name differs from the Maybe UNWRAP, since this one propagates an
-   Error rather than None. */
+ */
 #define TRY(expr)                                                              \
   ({                                                                           \
     auto t__result = (expr);                                                   \

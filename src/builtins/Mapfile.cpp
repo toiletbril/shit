@@ -50,7 +50,6 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (arg == "-t") {
       should_strip_newline = true;
     } else if (arg == "-n") {
-      /* -n takes the count as the next argument. */
       if (i + 1 < args.count()) {
         if (let const count = utils::parse_decimal_integer(args[++i].view());
             !count.is_error() && count.value() >= 0)
@@ -59,7 +58,6 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
         }
       }
     } else if (arg.length > 2 && arg[0] == '-' && arg[1] == 'n') {
-      /* The attached form -nN carries the count in the same argument. */
       if (let const count = utils::parse_decimal_integer(arg.substring(2));
           !count.is_error() && count.value() >= 0)
       {
@@ -97,4 +95,4 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

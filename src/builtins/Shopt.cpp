@@ -2,9 +2,7 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* shopt sets, unsets, and queries the bash shell options such as extglob,
-   globstar, nullglob, and dotglob. The states are tracked on the evaluator. An
-   option whose pattern engine is not yet wired still records its state so a
+/* An option whose pattern engine is not yet wired still records its state so a
    later query reads it back. */
 
 FLAG_LIST_DECL();
@@ -96,8 +94,6 @@ bool is_known_shopt_option(StringView name) throws
   return false;
 }
 
-/* The bash display line for one option, the name left-justified in a field then
-   a tab and the on or off state. */
 String shopt_status_line(StringView name, bool on) throws
 {
   constexpr usize NAME_FIELD_WIDTH = 20;
@@ -108,8 +104,6 @@ String shopt_status_line(StringView name, bool on) throws
   return line;
 }
 
-/* The OPTION NAMES help section, every shopt name in columns that fit a
-   usual terminal width, the same layout builtin -l prints. */
 String format_option_names_help() throws
 {
   usize longest = 0;
@@ -150,7 +144,7 @@ String shopt_reusable_line(StringView name, bool on, bool as_set_option) throws
   return line;
 }
 
-} /* namespace */
+} // namespace
 
 fn shopt_option_name_list() throws -> const ArrayList<StringView> &
 {
@@ -235,8 +229,6 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
      bridge bash provides so the same options answer either builtin. A config
      probes shopt -qo posix to detect the POSIX mode. */
   if (should_operate_on_set_options) {
-    /* A bare shopt -o or shopt -po lists every set option, the way the named
-       query prints one. */
     if (names.is_empty()) {
       if (!is_quiet)
         for (let const &name : shell_option_names(false))
@@ -299,4 +291,4 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   return status;
 }
 
-} /* namespace shit */
+} // namespace shit

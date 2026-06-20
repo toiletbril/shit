@@ -3,9 +3,6 @@
 #include "../Builtin.hpp"
 #include "../Trace.hpp"
 
-/* The eval builtin joins its arguments with spaces and runs the result in the
-   current shell. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[arg ...]");
@@ -54,4 +51,4 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                         StringView{"eval"});
 }
 
-} /* namespace shit */
+} // namespace shit

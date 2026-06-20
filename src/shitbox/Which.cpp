@@ -82,6 +82,6 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
   return has_found_any ? 0 : 1;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

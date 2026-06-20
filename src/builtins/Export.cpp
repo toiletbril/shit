@@ -44,7 +44,6 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let value = String{};
     let const has_new_value = parts.get_value().has_value();
     if (!has_new_value) {
-      /* Export an existing variable by its current value. */
       name = arg;
       value = cxt.get_variable_value(arg).value_or(String{});
     } else {
@@ -76,10 +75,8 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     /* The variable moves into the environment, so the bare shell copy is
-       removed and child processes inherit it. Inside a subshell the prior
-       environment value is logged so the export does not leak past it. The
-       unset is this move, not a user unset, so the integer mark it clears is
-       put back. */
+       removed and child processes inherit it. The unset is this move, not a
+       user unset, so the integer mark it clears is put back. */
     LOG(All, "export moving '%s' into the environment", name.c_str());
     cxt.unset_shell_variable(name);
     if (is_integer_name) cxt.mark_integer(name.view());
@@ -95,4 +92,4 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return has_error ? 2 : 0;
 }
 
-} /* namespace shit */
+} // namespace shit

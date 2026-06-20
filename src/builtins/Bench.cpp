@@ -48,8 +48,6 @@ constexpr usize MAX_SAMPLES = 100000;
 constexpr usize MIN_SAMPLES = 3;
 constexpr u64 DEFAULT_DURATION_MILLIS = 3000;
 
-/* The unit a metric is formatted in, picked so the printed number stays a few
-   significant figures wide. */
 enum class metric_unit : u8
 {
   Nanoseconds,
@@ -57,8 +55,6 @@ enum class metric_unit : u8
   Count,
 };
 
-/* The samples for one metric across every run of one command, kept as doubles
-   so the statistics avoid integer truncation. */
 struct metric_stats
 {
   double mean{0};
@@ -68,8 +64,7 @@ struct metric_stats
   double median{0};
 };
 
-/* Every per-sample number bench records for one run of a command. The perf
-   fields stay zero on a platform without hardware counters. */
+/* The perf fields stay zero on a platform without hardware counters. */
 struct bench_sample
 {
   double wall_nanos{0};
@@ -81,8 +76,6 @@ struct bench_sample
   double branch_misses{0};
 };
 
-/* The computed statistics for one command, one metric_stats per recorded
-   metric, plus the sample count and whether perf counters are present. */
 struct command_result
 {
   String label{};
@@ -97,8 +90,6 @@ struct command_result
   metric_stats branch_misses{};
 };
 
-/* A SGR escape, or an empty view when color is off, so the format strings stay
-   the same whether or not color is on. */
 fn colored(StringView code, bool may_color) wontthrow -> StringView
 {
   return may_color ? code : StringView{};
@@ -149,8 +140,6 @@ fn compute_stats(const ArrayList<bench_sample> &samples,
   return stats;
 }
 
-/* Format a metric value into a short number plus a unit suffix, scaling by the
-   metric's natural magnitude the way poop does so the column stays narrow. */
 cold fn format_metric(double value, metric_unit unit) throws -> String
 {
   double scaled = value;
@@ -206,10 +195,8 @@ cold fn format_metric(double value, metric_unit unit) throws -> String
   return String{buffer};
 }
 
-/* One metric row's pre-formatted numbers, kept as plain strings so the summary
-   pass can measure their visible width before it decides the column padding.
-   The color escapes are added at render time, not here, since they carry no
-   display width and would corrupt the measurement. */
+/* The color escapes are added at render time, not here, since they carry no
+   display width and would corrupt the width measurement. */
 struct metric_row
 {
   StringView name{};
@@ -220,8 +207,6 @@ struct metric_row
   String max{};
 };
 
-/* Format the four numbers of one metric row out of its statistics, leaving the
-   color and the padding for the render pass. */
 fn make_metric_row(StringView name, const metric_stats &stats,
                    metric_unit unit) throws -> metric_row
 {
@@ -235,18 +220,14 @@ fn make_metric_row(StringView name, const metric_stats &stats,
   return row;
 }
 
-/* Append n spaces, used to pad a value column out to its measured width. */
 fn append_padding(String &out, usize count) throws -> void
 {
   for (usize i = 0; i < count; i++)
     out.push(' ');
 }
 
-/* One line of the summary table, the metric name, its mean and standard
-   deviation, then its range, colored when allowed. The mean and the stddev are
-   padded to the widths the caller measured across every row of this command, so
-   the "+/-" and the "(" line up. The padding counts the visible characters of
-   the value, never the zero-width color escapes that wrap the number. */
+/* The padding counts the visible characters of the value, never the zero-width
+   color escapes that wrap the number, so the "+/-" and the "(" line up. */
 fn append_metric_line(String &out, const metric_row &row, usize mean_width,
                       usize std_dev_width, bool may_color) throws -> void
 {
@@ -277,10 +258,8 @@ fn append_metric_line(String &out, const metric_row &row, usize mean_width,
   out += ")\n";
 }
 
-/* The relative comparison of one metric against the first command, printed as a
-   speedup or slowdown with the percentage uncertainty. The ratio compares the
-   means, and the uncertainty propagates the two standard deviations through the
-   ratio. A near-equal pair within the uncertainty reads as roughly equal. */
+/* The ratio compares the means, and the uncertainty propagates the two standard
+   deviations through the ratio. */
 fn append_relative_line(String &out, StringView name, const metric_stats &first,
                         const metric_stats &other, bool may_color) throws
     -> void
@@ -320,8 +299,6 @@ fn append_relative_line(String &out, StringView name, const metric_stats &first,
   out += "\n";
 }
 
-/* Parse a non-negative integer flag value, throwing a builtin error when the
-   text is not a number. */
 fn parse_count_flag(StringView text, StringView flag_name) throws -> u64
 {
   u64 value = 0;
@@ -487,8 +464,6 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
   return result;
 }
 
-/* The summary block for one command, every metric on its own line under a
-   heading that names the command and the sample count. */
 fn append_summary(String &out, const command_result &result,
                   bool may_color) throws -> void
 {
@@ -529,8 +504,6 @@ fn append_summary(String &out, const command_result &result,
     append_metric_line(out, rows[i], mean_width, std_dev_width, may_color);
 }
 
-/* The relative comparison block for one later command against the first, the
-   same metrics expressed as a speedup or slowdown. */
 fn append_comparison(String &out, const command_result &first,
                      const command_result &other, bool may_color) throws -> void
 {
@@ -556,7 +529,7 @@ fn append_comparison(String &out, const command_result &first,
   }
 }
 
-} /* namespace */
+} // namespace
 
 Bench::Bench() = default;
 
@@ -627,4 +600,4 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

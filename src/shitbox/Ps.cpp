@@ -30,9 +30,6 @@ struct uid_name_cache_entry
   String name{};
 };
 
-/* The owner name for a uid, served from the cache when seen before and read
-   from the passwd file and remembered otherwise. A uid with no passwd entry
-   caches and returns its numeric form. */
 static fn owner_name_for_uid(u32 uid,
                              ArrayList<uid_name_cache_entry> &cache) throws
     -> String
@@ -62,11 +59,9 @@ static fn append_right(String &output, StringView text, usize width) throws
   output += text;
 }
 
-/* The BSD aux listing, the owner, the pid, the virtual and resident memory in
-   kibibytes, the process state, and the full command line of every process in
-   space-aligned columns. The %CPU, %MEM, TTY, and START columns of a full ps
-   are omitted, since they need a sampling pass and a controlling-terminal map
-   this listing does not gather. */
+/* The %CPU, %MEM, TTY, and START columns of a full ps are omitted, since they
+   need a sampling pass and a controlling-terminal map this listing does not
+   gather. */
 static fn render_aux(const ArrayList<os::process_entry> &processes,
                      String &output) throws -> void
 {
@@ -74,10 +69,10 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
   ArrayList<String> owners{};
   owners.reserve(processes.count());
 
-  usize user_width = 4; /* the USER header */
-  usize pid_width = 3;  /* the PID header */
-  usize vsz_width = 3;  /* the VSZ header */
-  usize rss_width = 3;  /* the RSS header */
+  usize user_width = 4;
+  usize pid_width = 3;
+  usize vsz_width = 3;
+  usize rss_width = 3;
 
   for (const os::process_entry &process : processes) {
     String owner = owner_name_for_uid(process.owner_id, uid_cache);
@@ -179,8 +174,6 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
     return 0;
   }
 
-  /* The pid is right-justified in five columns under a PID CMD header, the way
-     a small ps lays the two fields out. */
   output += "  PID CMD\n";
   for (const os::process_entry &process : processes) {
     let const pid = utils::int_to_text(process.pid);
@@ -196,6 +189,6 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

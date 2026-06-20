@@ -4,11 +4,6 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* let evaluates each argument as an arithmetic expression. The status is zero
-   when the last expression evaluates to a non-zero value and one when it
-   evaluates to zero, the same result ((...)) reports. It is an error with no
-   expression. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("expression ...");
@@ -48,4 +43,4 @@ i32 Let::execute(ExecContext &ec, EvalContext &cxt) const throws
   return last_value != 0 ? 0 : 1;
 }
 
-} /* namespace shit */
+} // namespace shit

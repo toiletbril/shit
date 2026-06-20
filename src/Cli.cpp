@@ -250,7 +250,6 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
       is_long = true;
     }
 
-    /* Skip the rest of the flags after '--' or treat '-' as an argument. */
     if (*flag_offset == '\0') {
       if (is_long) {
         LOG(Debug, "stopping option parsing at '--'");
@@ -283,7 +282,6 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           LOG(All, "toggled the flag '%s'",
               flag_name(bool_flag, is_long).c_str());
 
-          /* Check for combined flags, e.g -vAsn. */
           if (!is_long && *value_offset != '\0') {
             ++flag_offset;
             repeat = true;
@@ -294,21 +292,16 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
         case Flag::Kind::String:
         case Flag::Kind::ManyStrings: {
           if (*value_offset == '\0') {
-            /* There is None after the flag. Expect next argument
-             * to be the value. */
             LOG(All, "the flag '%s' expects the next argument as its value",
                 flag_name(flag, is_long).c_str());
             next_arg_is_value = true;
           } else {
-            /* Check for a separator. Short flags do not require a
-               separator between the flag and the value, but long
-               flags require a space or
-               '='. Treat missing separator for long flags as an
-               error. */
+            /* A short flag attaches its value with no separator, a long flag
+               requires '=' or a space, and a long flag with a missing separator
+               is an error. */
             if (*value_offset == '=') {
               value_offset++;
 
-              /* Value is provided with '='. */
               if (*value_offset != '\0') {
                 if (flag->kind() == Flag::Kind::String)
                   static_cast<FlagString *>(flag)->set(value_offset);
@@ -323,8 +316,6 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                             flag_name(flag, is_long) + "' flag"};
               }
             } else if (!is_long) {
-              /* Flag is short, value is provided without a
-               * separator. */
               if (flag->kind() == Flag::Kind::String)
                 static_cast<FlagString *>(flag)->set(value_offset);
               else
@@ -346,10 +337,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
       if (!found) {
         if (*flag_offset == '-') {
-          /* '-E-c' */
           throw Error{"Missing space between '-' and other options"};
         } else {
-          /* Trim the value before '=' and report unknown flag. */
+          /* The name before '=' is reported, trimming any attached value. */
           let error_message = String{};
           error_message += "Unknown flag '-";
 
@@ -389,7 +379,6 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     prev_is_long = is_long;
   }
 
-  /* Previous flag expected a value after space. */
   if (next_arg_is_value) {
     ASSERT(prev_flag != nullptr);
     throw Error{"No value provided for '" + flag_name(prev_flag, prev_is_long) +
@@ -671,4 +660,4 @@ cold fn show_message(StringView err) throws -> void
   print_error("\n");
 }
 
-} /* namespace shit */
+} // namespace shit

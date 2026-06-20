@@ -14,7 +14,6 @@ class HashSet
 public:
   explicit HashSet(Allocator allocator) : m_map(allocator) {}
 
-  /* The allocator the set owns, taken from the backing map. */
   pure fn allocator() const wontthrow -> Allocator { return m_map.allocator(); }
 
   hot fn add(StringView key) throws -> void { m_map.set(key, Nothing{}); }
@@ -28,8 +27,6 @@ public:
 
   mustuse pure fn count() const wontthrow -> usize { return m_map.count(); }
 
-  /* An explicit deep copy, so a caller that means to duplicate the set says so
-     rather than leaning on an implicit copy. */
   mustuse cold fn clone() const throws -> HashSet { return HashSet{*this}; }
 
   template <class Fn>

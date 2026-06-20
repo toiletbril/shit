@@ -6,9 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* fg brings a background job to the foreground and waits for it, resuming it
-   first if it was stopped. With no operand it acts on the most recent job. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[%job]");
@@ -75,4 +72,4 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} /* namespace shit */
+} // namespace shit

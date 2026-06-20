@@ -25,9 +25,6 @@ namespace shit {
 
 namespace shitbox {
 
-/* Copy one regular file's bytes through the descriptor layer, so no file stream
-   is pulled in, and name the copy on the verbose output. Throws a located error
-   naming the path that failed. */
 static fn copy_file(const ExecContext &ec, StringView source,
                     StringView destination, bool is_verbose) throws -> void
 {
@@ -71,7 +68,6 @@ static fn copy_file(const ExecContext &ec, StringView source,
                        "'\n");
 }
 
-/* Copy a file or, with the recursive flag, a whole directory tree. */
 static fn copy_path(const ExecContext &ec, StringView source,
                     StringView destination, bool is_recursive,
                     bool is_verbose) throws -> void
@@ -175,6 +171,6 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

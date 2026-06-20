@@ -138,8 +138,6 @@ bool append_b_argument(String &out, const String &arg) throws
     let const e = arg[i + 1];
     if (e == 'c') return true;
     if (e == 'x' && i + 2 < arg.length() && is_hex_digit(arg[i + 2])) {
-      /* A \xHH escape takes up to two hexadecimal digits, the bash extension.
-       */
       usize digit_index = i + 2;
       i32 value = 0;
       usize digit_count = 0;
@@ -191,8 +189,6 @@ bool append_b_argument(String &out, const String &arg) throws
   return false;
 }
 
-/* A byte that needs no quoting outside a quoted span, so a word of only these
-   reuses as shell input unchanged. */
 bool is_q_safe_byte(char c)
 {
   return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
@@ -325,14 +321,13 @@ void append_conversion(String &out, const String &spec, char conv,
     out += buffer;
   } break;
   default:
-    /* An unknown conversion is emitted verbatim. */
     out += spec;
     out += conv;
     break;
   }
 }
 
-} /* namespace */
+} // namespace
 
 Printf::Printf() = default;
 
@@ -518,4 +513,4 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

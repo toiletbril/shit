@@ -40,8 +40,6 @@ struct cached_target_list
 };
 static StringMap<cached_target_list> BUILD_TARGET_CACHE{heap_allocator()};
 
-/* The value of a -C or -f style option already settled on the line, reading
-   both the separated "-C dir" and the attached "-Cdir" spellings. */
 static fn settled_option_value(StringView line, StringView option) throws
     -> Maybe<String>
 {
@@ -74,9 +72,6 @@ static fn make_target_is_artifact(StringView name, const Path &directory) throws
   return candidate.exists();
 }
 
-/* The targets of a GNU make database dump, the rule-opening lines between
-   "# Files" and "# Finished Make data base". A comment, a dot rule, a recipe
-   line, a "# Not a target" disowned rule, and an artifact are skipped. */
 static fn parse_make_database_targets(StringView database,
                                       const Path &directory) throws
     -> ArrayList<String>
@@ -119,8 +114,6 @@ static fn parse_make_database_targets(StringView database,
   return targets;
 }
 
-/* The first line-leading name before a colon out of each line, the shape
-   ninja -t targets prints. */
 static fn parse_colon_led_names(StringView listing) throws -> ArrayList<String>
 {
   let names = ArrayList<String>{};
@@ -185,9 +178,8 @@ static fn parse_package_json_scripts(StringView text) throws
   return scripts;
 }
 
-/* The host names an ssh invocation can reach, the Host lines of the user's
-   ssh config without the glob patterns, and the first fields of known_hosts
-   without the hashed rows. */
+/* The Host lines of the ssh config without the glob patterns, and the first
+   fields of known_hosts without the hashed rows. */
 static fn collect_ssh_hosts() throws -> ArrayList<String>
 {
   let hosts = ArrayList<String>{};
@@ -261,7 +253,6 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
              row[field_end] != '\t')
         field_end++;
       let field = row.substring_of_length(0, field_end);
-      /* The first field can list host,host and carry a [host]:port form. */
       while (!field.is_empty()) {
         let const comma = field.find_character(',');
         let host =
@@ -278,9 +269,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
   return hosts;
 }
 
-/* Look the tool's targets up in the mtime cache, or rebuild them with the
-   collector and store them under the source file's path. The result points into
-   the cache. Null means the source file is missing. */
+/* Null means the source file is missing. The result points into the cache. */
 template <typename Collector>
 static fn cached_targets_for(const Path &source_file, Collector collect) throws
     -> const ArrayList<String> *
@@ -295,12 +284,8 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
   return &BUILD_TARGET_CACHE.find(key)->targets;
 }
 
-/* Complete a build tool's targets and kin, make and ninja targets through
-   the tool's own listing, cmake --build targets through its target help,
-   package.json script names for the npm family, and ssh hosts from the
-   user's ssh files. Subprocesses run only on an explicit tab, and every
-   listing caches on the source file's mtime. None lets the cascade
-   continue. */
+/* Subprocesses run only on an explicit tab, and every listing caches on the
+   source file's mtime. */
 fn complete_from_build_tools(StringView line, StringView token,
                              usize token_start, bool for_listing,
                              EvalContext &context) throws
@@ -326,8 +311,6 @@ fn complete_from_build_tools(StringView line, StringView token,
     }
   };
 
-  /* The cached branches point straight into the mtime cache, while the ssh
-     branch owns its freshly collected list. */
   let owned_targets = ArrayList<String>{};
   const ArrayList<String> *targets = &owned_targets;
 
@@ -336,7 +319,6 @@ fn complete_from_build_tools(StringView line, StringView token,
         settled_option_value(line, "-C").value_or(String{"."});
     let makefile_name = settled_option_value(line, "-f");
     if (!makefile_name.has_value()) {
-      /* GNU make reads these three names in this order. */
       for (let const candidate :
            {StringView{"GNUmakefile"}, StringView{"makefile"},
             StringView{"Makefile"}})
@@ -367,9 +349,7 @@ fn complete_from_build_tools(StringView line, StringView token,
           capture(invocation).view(), make_directory);
       if (!database_targets.is_empty()) return database_targets;
       /* An empty dump means no GNU make answered, so the bundled make parser
-         reads the Makefile and resolves its variables the way make would. The
-         artifact filter drops a name that names a path on disk, and the seen
-         set drops a second rule for the same target so a name lists once. */
+         reads the Makefile and resolves its variables the way make would. */
       let const intrinsic_targets =
           shitbox::collect_makefile_targets(context, makefile_path);
       let filtered = ArrayList<String>{};
@@ -408,7 +388,6 @@ fn complete_from_build_tools(StringView line, StringView token,
       let invocation = String{"cmake --build "};
       invocation += build_directory->view();
       invocation += " --target help 2>/dev/null";
-      /* The help lists one "... name" row per target. */
       let names = ArrayList<String>{};
       let const help = capture(invocation);
       let const text = help.view();
@@ -458,12 +437,8 @@ fn complete_from_build_tools(StringView line, StringView token,
   return candidates;
 }
 
-/* The dash candidates of one builtin, or of the shell binary when the kind
-   is None, built once per kind since every source table is immutable and the
-   ghost reads these on each keystroke. A builtin's list carries the -x and
-   --long forms of its FLAG rows, set's adds its option letters with -o and
-   -p from the switch table, and kill's holds the signal names alone the way
-   kill -<tab> lists them. Null means the kind registered no flags. */
+/* Built once per kind since every source table is immutable and the ghost reads
+   these on each keystroke. Null means the kind registered no flags. */
 static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
     -> const ArrayList<String> *
 {
@@ -524,9 +499,6 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
   return &per_kind_candidates[index];
 }
 
-/* Complete a builtin's or the shell binary's own flags from the registered
-   FLAG lists, the set and shopt option names, and kill's signal and %job ids,
-   all table reads with no subprocess. None lets the cascade continue. */
 fn complete_from_builtin_flags(StringView line, StringView token,
                                usize token_start, EvalContext &context) throws
     -> Maybe<ArrayList<String>>
@@ -546,9 +518,6 @@ fn complete_from_builtin_flags(StringView line, StringView token,
   let const completes_shell_binary =
       !builtin_kind.has_value() && shell_binary_name == "shit";
 
-  /* The shitbox builtin completes its utility names in the first operand slot
-     and the chosen utility's flags after, and a bare utility name completes its
-     own flags, all from the registered FLAG_LIST. */
   {
     let const is_shitbox_builtin =
         builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Shitbox;
@@ -576,7 +545,6 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     }
 
     if (util_for_flags.has_value()) {
-      /* A non-dash operand completes files through the cascade. */
       if (token.is_empty() || token[0] != '-') return None;
       let const flags = shitbox::shitbox_util_flag_list(*util_for_flags);
       if (flags == nullptr) return None;
@@ -699,7 +667,6 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     return None;
   }
 
-  /* Everything below is a flag, so the token must already start the dash. */
   if (token.is_empty() || token[0] != '-') return None;
 
   const ArrayList<String> *dash_candidates = dash_candidates_for(
@@ -711,27 +678,15 @@ fn complete_from_builtin_flags(StringView line, StringView token,
   return candidates;
 }
 
-/* True when the entry is a dash word the token did not ask for, so an empty
-   argument token completes files rather than option words. The caller remembers
-   the drop so a list emptied by it falls through to filename completion. */
+/* So an empty argument token completes files rather than option words. */
 static pure fn entry_is_unrequested_dash_word(
     StringView entry, bool token_asks_for_dash) wontthrow -> bool
 {
   return !token_asks_for_dash && !entry.is_empty() && entry[0] == '-';
 }
 
-/* Consult the completion spec registered for the line's command, when one
-   exists. The word list filters to the entries that start with the token, and
-   the -F function runs only on an explicit tab so the ghost does not run it on
-   every keystroke. None means no spec applied, so the caller completes
-   filenames, which is also the result when a -o default spec found nothing. */
-/* Splits a cobra-style completion entry, the value then two spaces then a
-   parenthesized description, into the value and the description. The value
-   joins the candidate list and the description joins the same map the --help
-   and man stages fill, so every source renders through one dimmed column. A
-   plain entry with no such description passes through as the value alone. The
-   description opens after a space, so a value that itself holds a parenthesis,
-   such as a filename, is left whole. */
+/* The description opens after a space, so a value that itself holds a
+   parenthesis, such as a filename, is left whole. */
 static fn push_spec_candidate(StringView entry, ArrayList<String> &candidates,
                               StringMap<String> &descriptions) throws -> void
 {
@@ -807,8 +762,6 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
         def->function_name.view(), default_words, default_cword, line, cursor,
         &status);
     if (status != 124) {
-      /* The same dash gate the spec paths below apply, so the default
-         function's reply offers options only once the token asks for them. */
       let const wants_dash_entries = !token.is_empty() && token[0] == '-';
       let loaded = ArrayList<String>{};
       for (let const &entry : reply) {
@@ -859,29 +812,19 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
     }
   }
 
-  /* An empty candidate set never claims the completion, whatever the spec's
-     options say, so a function that replied nothing for an operand falls to
-     the filesystem rather than leaving the token dead. */
   if (candidates.is_empty()) return None;
   return candidates;
 }
 
-/* One open command substitution while scanning toward the cursor. A $( body and
-   a backtick body are tracked the same, the kind only decides which closer ends
-   it. */
 struct completion_sub_frame
 {
   usize body_start;
   bool is_backtick;
 };
 
-/* The byte offset where the innermost still-open command substitution body
-   begins at the cursor, or zero when the cursor sits outside one. A $( and a
-   backtick open a body, a matching ) and the next backtick close it, so
-   completion inside echo $(git che re-roots to the inner git line and offers
-   git's subcommands rather than the outer command's arguments. An arithmetic
-   $(( carries no command, so its body never re-roots, and a single-quoted run
-   is literal, so its contents open nothing. */
+/* Completion inside echo $(git che re-roots to the inner git line. An
+   arithmetic $(( carries no command, so its body never re-roots, and a
+   single-quoted run is literal, so its contents open nothing. */
 fn command_substitution_body_start(StringView line, usize cursor) throws
     -> usize
 {
@@ -931,6 +874,6 @@ fn command_substitution_body_start(StringView line, usize cursor) throws
   return frames.is_empty() ? 0 : frames.back().body_start;
 }
 
-} /* namespace completion */
+} // namespace completion
 
-} /* namespace shit */
+} // namespace shit

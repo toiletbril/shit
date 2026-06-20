@@ -139,6 +139,6 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   return has_any_match ? 0 : 1;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

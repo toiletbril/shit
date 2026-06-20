@@ -29,7 +29,6 @@ i32 Return::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* return with no argument uses the status of the last command. */
   let const status = parse_optional_integer_arg(ec, cxt.last_exit_status());
 
   LOG(Debug, "return stopping the enclosing scope with status %lld",
@@ -38,4 +37,4 @@ i32 Return::execute(ExecContext &ec, EvalContext &cxt) const throws
   return static_cast<i32>(status);
 }
 
-} /* namespace shit */
+} // namespace shit

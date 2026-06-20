@@ -4,9 +4,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* The dot and source builtins read a file and run it in the current shell, so
-   its assignments and function definitions persist in the caller. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("file");
@@ -53,4 +50,4 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
                         ec.source_location(), StringView{path});
 }
 
-} /* namespace shit */
+} // namespace shit

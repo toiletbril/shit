@@ -38,6 +38,6 @@ fn stderr_wants_color() throws -> bool
   return os::is_stderr_a_tty() && !color_is_suppressed_by_environment();
 }
 
-} /* namespace colors */
+} // namespace colors
 
-} /* namespace shit */
+} // namespace shit

@@ -17,16 +17,12 @@ namespace shit {
 
 namespace completion {
 
-/* A name a man page or a --help text lists with the description printed beside
-   it. The completion menu shows the description dimmed after the name. */
 struct help_entry
 {
   String name;
   String description;
 };
 
-/* Keeps the entries whose name opens with the token, returns their names, and
-   carries each kept description into the menu's descriptions map. */
 static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
                                     StringView token,
                                     StringMap<String> &descriptions) throws
@@ -56,17 +52,11 @@ static fn manpage_name_for(StringView command) throws -> String
   return String{command};
 }
 
-/* The subcommand index scanned out of the man1 directories, a command name
-   mapped to the subcommands its dashed pages document, so git-commit.1 makes
-   commit a candidate for git. The readdir pass runs once per launch on the
-   first explicit tab. */
 static StringMap<ArrayList<String>> MAN_SUBCOMMAND_INDEX{heap_allocator()};
 /* Every stripped section-1 page name mapped to its full file path, the
    existence gate for the subcommand split and the source the synopsis
    validation reads directly rather than forking man per candidate. */
 static StringMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
-/* The synopsis verdict for each command-subcommand page, read at most once per
-   launch and only when the token matches its subcommand. */
 static StringMap<bool> MAN_SUBCOMMAND_PAGE_VALID{heap_allocator()};
 static bool is_man_subcommand_index_built = false;
 
@@ -111,8 +101,6 @@ static fn manpage_section1_directories() throws -> ArrayList<Path>
   return directories;
 }
 
-/* The page name with its .1 section suffix and an optional compression tail
-   removed, None when the entry is not a section-1 page. */
 static pure fn strip_man1_suffix(StringView entry) wontthrow
     -> Maybe<StringView>
 {
@@ -132,9 +120,8 @@ static pure fn strip_man1_suffix(StringView entry) wontthrow
   return None;
 }
 
-/* One readdir pass builds the page-name set, a second splits each dashed page
-   at its first dash. The tail is a subcommand only when the head page exists
-   too, so xdg-open invents no xdg, and a digit-leading version tail is none. */
+/* The tail is a subcommand only when the head page exists too, so xdg-open
+   invents no xdg, and a digit-leading version tail is none. */
 static fn build_man_subcommand_index() throws -> void
 {
   is_man_subcommand_index_built = true;
@@ -159,8 +146,6 @@ static fn build_man_subcommand_index() throws -> void
       MAN_PAGE_FILE_PATHS.set(*stripped, String{file_path.text().view()});
     }
   }
-  /* Candidate order does not matter, complete() sorts, so the pass walks the
-     path map itself. */
   MAN_PAGE_FILE_PATHS.for_each([&](StringView name, const String &) {
     let const dash = name.find_character('-');
     if (!dash.has_value() || *dash == 0) return;
@@ -174,9 +159,7 @@ static fn build_man_subcommand_index() throws -> void
   LOG(Info, "indexed %zu section-1 pages", MAN_PAGE_FILE_PATHS.count());
 }
 
-/* The synopsis region of a man page source, located by its .SH or mdoc .Sh
-   heading, with roff font escapes stripped and whitespace folded so it reads as
-   plain bytes. Empty when the page has no synopsis. */
+/* Empty when the page has no synopsis. */
 static fn cleaned_synopsis_of_page(StringView source) throws -> String
 {
   let synopsis = String{};
@@ -228,11 +211,9 @@ static fn cleaned_synopsis_of_page(StringView source) throws -> String
   return synopsis;
 }
 
-/* Whether the command-subcommand page documents the space-separated form in its
-   synopsis, so git-commit.1 opening with `git commit` survives while a
-   standalone ssh-keygen.1 does not. An unreadable or compressed page keeps its
-   candidate on the head-page rule alone. may_read is false on the ghost path,
-   which trusts a cached verdict rather than scan a page on a keystroke. */
+/* An unreadable or compressed page keeps its candidate on the head-page rule
+   alone. may_read is false on the ghost path, which trusts a cached verdict
+   rather than scan a page on a keystroke. */
 static fn man_subcommand_page_is_valid(StringView command,
                                        StringView subcommand,
                                        bool may_read) throws -> bool
@@ -294,8 +275,6 @@ static fn man_subcommand_page_is_valid(StringView command,
   return valid;
 }
 
-/* Whether the token at token_start is the line's first argument, the slot a
-   subcommand completes at. */
 static fn is_first_argument_token(StringView line, usize token_start) wontthrow
     -> bool
 {
@@ -309,8 +288,7 @@ static fn is_first_argument_token(StringView line, usize token_start) wontthrow
   return true;
 }
 
-/* The line's settled second word past the command, the subcommand slot, None
-   when the line has no completed second word or it opens with a dash. */
+/* None when the line has no completed second word or it opens with a dash. */
 fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
 {
   let const command = command_word_of(line);
@@ -329,12 +307,9 @@ fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
   return word;
 }
 
-/* Completes the first argument of a command from the subcommand index, so git
-   com offers commit the way the git-commit page promises. The index builds
-   once per launch on an explicit tab. The ghost path reads only an already
-   built and validated entry, so a keystroke never scans a directory or reads
-   a page. None means the position or the command has no subcommand story and
-   the caller falls through to the option, spec, and filesystem stages. */
+/* The index builds once per launch on an explicit tab. The ghost path reads
+   only an already built and validated entry, so a keystroke never scans a
+   directory or reads a page. */
 fn complete_from_man_subcommands(StringView line, StringView token,
                                  usize token_start, bool for_listing,
                                  EvalContext &context) throws
@@ -378,9 +353,7 @@ fn complete_from_man_subcommands(StringView line, StringView token,
   return matches;
 }
 
-/* Pulls each dash-word out of an option line's tag part, such as -a and --all
-   from `-a, --all`, dropping a trailing =VALUE. Shared by the manpage and the
-   --help parsers. */
+/* Shared by the manpage and the --help parsers. */
 static fn extract_dash_flags(StringView option_part) throws -> ArrayList<String>
 {
   let flags = ArrayList<String>{};
@@ -402,13 +375,8 @@ static fn extract_dash_flags(StringView option_part) throws -> ArrayList<String>
   return flags;
 }
 
-/* The options a command's manpage documents, each paired with the description
-   in its .TP block. The flag set is the same word scan as before, every -x and
-   --long at a word boundary, so the candidate list is unchanged, while a
-   line-oriented pass over the page records the description that sits inline
-   after the tag or on the indented line below it. man's overstrike formatting,
-   a byte backspace byte for bold and an underscore backspace char for an
-   underline, is stripped first. */
+/* man's overstrike formatting, a byte backspace byte for bold and an underscore
+   backspace char for an underline, is stripped first. */
 static fn parse_manpage_option_entries(StringView text) throws
     -> ArrayList<help_entry>
 {
@@ -423,8 +391,6 @@ static fn parse_manpage_option_entries(StringView text) throws
   }
   let const view = clean.view();
 
-  /* The description for each flag, read from the .TP option blocks, with man's
-     wrapped lines joined into the whole description. */
   let descriptions = StringMap<String>{heap_allocator()};
   let pending_flags = ArrayList<String>{};
   usize pending_indent = 0;
@@ -450,7 +416,6 @@ static fn parse_manpage_option_entries(StringView text) throws
     i = line_end + 1;
 
     let const indent = skip_blanks(raw, 0);
-    /* A blank line ends the current option's description block. */
     if (indent >= raw.length) {
       do_finalize_pending();
       continue;
@@ -470,8 +435,6 @@ static fn parse_manpage_option_entries(StringView text) throws
       continue;
     }
 
-    /* Any other line ends the pending block, and a dash line opens a new one.
-     */
     do_finalize_pending();
     if (raw[indent] != '-') continue;
 
@@ -491,8 +454,7 @@ static fn parse_manpage_option_entries(StringView text) throws
   }
   do_finalize_pending();
 
-  /* The authoritative flag list is the word scan, with the description attached
-     where the block pass found one. */
+  /* The authoritative flag list is the word scan. */
   let entries = ArrayList<help_entry>{};
   let seen = HashSet{heap_allocator()};
   for (usize j = 0; j < view.length; j++) {
@@ -723,10 +685,9 @@ static constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
     HELP_ALLOWLIST_ENTRIES,
     sizeof(HELP_ALLOWLIST_ENTRIES) / sizeof(HELP_ALLOWLIST_ENTRIES[0])};
 
-/* Whether the command reads its options from --help in preference to a manpage,
-   so the manpage stage skips it. Only a command whose help argument is not the
-   plain --help qualifies, the ffmpeg family, whose manpage carries the options
-   in a form the flag scanner does not read. */
+/* Only a command whose help argument is not the plain --help qualifies, the
+   ffmpeg family, whose manpage carries the options in a form the flag scanner
+   does not read. */
 static fn command_prefers_help_over_manpage(StringView command) throws -> bool
 {
   let argument = HELP_ALLOWLIST.find(command);
@@ -737,9 +698,8 @@ static fn command_prefers_help_over_manpage(StringView command) throws -> bool
    directory gate the --help fork uses. */
 static fn command_directory_is_trusted(StringView absolute_path) throws -> bool;
 
-/* The option flags a manpage documents, parsed once and cached under the page
-   name. The man invocation is the general path that works for any command on
-   the host, so the completer is not limited to a hardcoded set of tools. */
+/* The man invocation is the general path that works for any command on the
+   host, so the completer is not limited to a hardcoded set of tools. */
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<help_entry> &
 {
@@ -790,18 +750,14 @@ fn complete_from_manpage(StringView line, StringView token, bool for_listing,
       surface_command.find_character('/').has_value())
     return None;
 
-  /* The manpage is the resolved target's, so an aliased or symlinked command
-     reads the options of what it really runs. */
   let const resolved_name =
       resolve_completion_command(surface_command, context);
   let const command = resolved_name.view();
 
-  /* A command that prefers --help reads its options from there rather than the
-     manpage, so it skips this stage and the help stage below picks it up. */
   if (command_prefers_help_over_manpage(command)) return None;
 
-  /* git commit -<tab> reads the git-commit page when the index knows it, so the
-     options come from the subcommand page rather than the umbrella one. */
+  /* git commit -<tab> reads the git-commit subcommand page over the umbrella
+     one when the index knows it. */
   let page_name = manpage_name_for(command);
   if (let const subcommand_word = second_word_of(line);
       subcommand_word.has_value())
@@ -834,14 +790,7 @@ static StringMap<bool> HELP_PARSED{heap_allocator()};
    ~/.cargo/bin is trusted while a world-writable one like /tmp is not. */
 static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
 {
-  let last_slash = absolute_path.length;
-  for (usize i = 0; i < absolute_path.length; i++)
-    if (absolute_path[i] == '/') last_slash = i;
-  if (last_slash == absolute_path.length) return false;
-  let const directory = last_slash == 0
-                            ? StringView{"/"}
-                            : absolute_path.substring_of_length(0, last_slash);
-  return os::directory_is_trusted_for_exec(Path{directory});
+  return os::directory_is_trusted_for_exec(Path{absolute_path}.parent());
 }
 
 /* The wall-clock budget a single --help fork is allowed. A command whose --help
@@ -910,10 +859,6 @@ static fn help_text_for(StringView command, StringView subcommand = {}) throws
   return text;
 }
 
-/* The dash-options a --help text lists, each paired with the description in the
-   column beside it. An option line splits at the first run of two or more
-   spaces, every dash-word before it mapping to the one description, a trailing
-   =VALUE dropped. */
 static fn parse_help_option_entries(StringView text) throws
     -> ArrayList<help_entry>
 {
@@ -930,8 +875,6 @@ static fn parse_help_option_entries(StringView text) throws
     let const start = skip_blanks(raw, 0);
     if (start >= raw.length || raw[start] != '-') continue;
 
-    /* The first run of two or more spaces ends the option part and opens the
-       description column. */
     let gap = raw.length;
     for (usize j = start; j + 1 < raw.length; j++)
       if (raw[j] == ' ' && raw[j + 1] == ' ') {
@@ -956,9 +899,6 @@ static fn parse_help_option_entries(StringView text) throws
 static fn parse_help_subcommands(StringView text) throws
     -> ArrayList<help_entry>;
 
-/* The cache key for a fork, the bare command at the top level and the compound
-   "command subcommand" at the second level, the way the man path keys
-   command-subcommand. */
 static fn help_cache_key(StringView command, StringView subcommand) throws
     -> String
 {
@@ -969,10 +909,7 @@ static fn help_cache_key(StringView command, StringView subcommand) throws
   return key;
 }
 
-/* Forks the command's --help once, parses both options and subcommands out of
-   the one capture, and frees the raw text. HELP_PARSED gates the fork so a
-   second tab reads the parsed caches. A subcommand forks "command subcommand
-   --help" under the compound key. */
+/* HELP_PARSED gates the fork so a second tab reads the parsed caches. */
 static fn ensure_help_parsed(StringView command,
                              StringView subcommand = {}) throws -> void
 {
@@ -984,7 +921,6 @@ static fn ensure_help_parsed(StringView command,
   HELP_PARSED.set(key.view(), true);
 }
 
-/* The options a command's --help text lists, parsed once and cached. */
 static fn help_options_for(StringView command,
                            StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
@@ -993,8 +929,6 @@ static fn help_options_for(StringView command,
   return *HELP_OPTION_CACHE.find(help_cache_key(command, subcommand).view());
 }
 
-/* Whether a name reads as a subcommand rather than a description fragment,
-   non-empty, opening with a letter or digit, carrying only subcommand bytes. */
 static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
 {
   if (name.is_empty()) return false;
@@ -1049,12 +983,8 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
           equals_ignoring_case(StringView{"subcommands"}));
 }
 
-/* The subcommands a --help text lists under a commands section. cargo and other
-   tools with subcommands but no manpage list them under a "Commands:" header as
-   indented "name<spaces>description" or "name, alias<spaces>description" lines.
-   The scan reads the first token of each indented line under such a header,
-   drops options and the ... continuation marker, and stops at a blank line or
-   a line that returns to the left margin. */
+/* cargo and other tools with subcommands but no manpage list them under a
+   "Commands:" header as indented "name<spaces>description" lines. */
 static fn parse_help_subcommands(StringView text) throws
     -> ArrayList<help_entry>
 {
@@ -1088,8 +1018,6 @@ static fn parse_help_subcommands(StringView text) throws
       continue;
     }
 
-    /* The name column ends at the first run of two or more spaces, the gap
-       before the description. */
     let column_end = trimmed.length;
     for (usize j = 0; j + 1 < trimmed.length; j++)
       if (trimmed[j] == ' ' && trimmed[j + 1] == ' ') {
@@ -1125,7 +1053,6 @@ static fn parse_help_subcommands(StringView text) throws
   return subcommands;
 }
 
-/* The subcommands a command's --help text lists, parsed once and cached. */
 static fn help_subcommands_for(StringView command,
                                StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
@@ -1135,9 +1062,8 @@ static fn help_subcommands_for(StringView command,
       help_cache_key(command, subcommand).view());
 }
 
-/* Whether a word names a subcommand the chain so far lists, so a deeper fork is
-   reserved for a parsed subcommand rather than an arbitrary word. The prefix is
-   the space-joined chain already walked, empty at the base command. */
+/* A deeper fork is reserved for a parsed subcommand rather than an arbitrary
+   word. */
 static fn is_known_help_subcommand(StringView command,
                                    StringView subcommand_prefix,
                                    StringView word) throws -> bool
@@ -1152,19 +1078,14 @@ static fn is_known_help_subcommand(StringView command,
    fork without bound. */
 static constexpr usize MAX_SUBCOMMAND_DEPTH = 4;
 
-/* The deepest valid subcommand chain on the line, the settled words after the
-   command that each name a subcommand of the chain built so far, joined with a
-   space. The walk stops at the first word that names no known subcommand, at a
+/* The walk stops at the first word that names no known subcommand, at a
    dash-led word, at the token under the cursor, or at MAX_SUBCOMMAND_DEPTH, so
-   the fork count is bounded. The returned chain keys the option and subcommand
-   caches and splits back into argv at fork time. */
+   the fork count is bounded. */
 static fn settled_subcommand_chain(StringView resolved_command, StringView line,
                                    usize token_start) throws -> String
 {
   let chain = String{};
 
-  /* The word offsets come from the surface command, a view into line, while the
-     resolved name keys the subcommand lookups. */
   let const surface_command = command_word_of(line);
   if (surface_command.is_empty()) return chain;
 
@@ -1198,9 +1119,6 @@ static fn settled_subcommand_chain(StringView resolved_command, StringView line,
   return chain;
 }
 
-/* Completes an option token from the command's --help text, the fallback after
-   the manpage stage finds no page. The same explicit-tab and dash-token gates
-   hold here. */
 fn complete_from_help(StringView line, StringView token, usize token_start,
                       bool for_listing, EvalContext &context,
                       StringMap<String> &descriptions) throws
@@ -1213,13 +1131,8 @@ fn complete_from_help(StringView line, StringView token, usize token_start,
       surface_command.find_character('/').has_value())
     return None;
 
-  /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
-     surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved_name = resolve_completion_alias(surface_command, context);
 
-  /* The settled subcommand chain forks "command sub1 sub2 --help" for its own
-     options, so git remote add -<tab> reads the add options rather than the
-     top-level ones. An empty chain reads the base command options. */
   let const chain =
       settled_subcommand_chain(resolved_name.view(), line, token_start);
 
@@ -1231,9 +1144,6 @@ fn complete_from_help(StringView line, StringView token, usize token_start,
   return matches;
 }
 
-/* Completes a subcommand token from the command's --help text, for a tool such
-   as cargo that lists subcommands but has no manpage. The same gates as the
-   manpage subcommand stage hold. */
 fn complete_from_help_subcommands(StringView line, StringView token,
                                   usize token_start, bool for_listing,
                                   EvalContext &context,
@@ -1280,6 +1190,6 @@ fn complete_from_help_subcommands(StringView line, StringView token,
   return matches;
 }
 
-} /* namespace completion */
+} // namespace completion
 
-} /* namespace shit */
+} // namespace shit

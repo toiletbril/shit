@@ -272,22 +272,21 @@ Maybe<Builtin::Kind> search_builtin(StringView builtin_name) throws;
 /* True when the name is one of the POSIX special builtins, the set whose prefix
    assignments persist after the command and whose errors abort a
    non-interactive shell. The test is by name rather than by kind, since : is
-   special while true is not though both resolve to one kind. */
+   special while true is not. */
 fn is_special_builtin_name(StringView name) wontthrow -> bool;
 
-/* The builtin command names, recovered once from BUILTIN_ENTRIES and cached,
-   so command completion offers exactly the registered builtins. */
+/* The builtin command names, recovered once from BUILTIN_ENTRIES, for command
+   completion. */
 const ArrayList<String> &builtin_names() throws;
 
 /* The number of Builtin::Kind values, the bound of the per-kind flag-list
-   table below. Compopt is the last enumerator. */
+   table below. */
 inline constexpr usize BUILTIN_KIND_COUNT =
     static_cast<usize>(Builtin::Kind::Compopt) + 1;
 
 /* The FLAG_LIST of a builtin, registered at static-init time by the
-   REGISTER_BUILTIN_FLAGS line in its file, so the completion engine offers a
-   builtin's flags without a manpage. A kind with no registration reads back
-   null. */
+   REGISTER_BUILTIN_FLAGS line in its file. A kind with no registration reads
+   back null. */
 fn register_builtin_flag_list(Builtin::Kind kind,
                               const ArrayList<Flag *> *flags) wontthrow -> void;
 fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const ArrayList<Flag *> *;
@@ -333,9 +332,8 @@ fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
     -> bool;
 
 /* The long names of every set -o option, canonical spellings first and the
-   --help alias spellings after them when asked, so shopt -o can list the
-   options and the completion engine can offer them. shell_option_letters
-   carries every single-letter switch for the same engine. */
+   --help alias spellings after them when asked. shell_option_letters carries
+   every single-letter switch. */
 fn shell_option_names(bool include_alias_spellings) throws
     -> const ArrayList<StringView> &;
 fn shell_option_letters() throws -> const String &;
@@ -347,19 +345,15 @@ fn shopt_option_name_list() throws -> const ArrayList<StringView> &;
    engine offers the shell's flags for the command word shit. */
 fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &;
 
-/* Report a builtin error that must not abort the run, such as one bad name in a
-   loop that still processes the rest, with the same located caret in the
-   default and posix moods and the same soft unlocated line in the bash mood
-   that the dispatch gives a thrown error. A builtin that throws gets a fatal
-   located error instead, so this is for the keep-going case. */
+/* Report a builtin error that must not abort the run, with the same located
+   caret in the default and posix moods and the same soft unlocated line in the
+   bash mood. A builtin that throws gets a fatal located error instead. */
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void;
 
 /* The located missing-argument error a builtin or a utility prints when a
-   required operand is absent, shown with the same caret in every mood and
-   followed by a note that names the help. The program_name is the builtin name
-   for a builtin and the utility name for a shitbox utility, since a routed
-   utility reads shitbox as its program. Returns the usage status 2. */
+   required operand is absent, with a note that names the help. The program_name
+   is the builtin or utility name. Returns the usage status 2. */
 fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
                       StringView program_name) throws -> i32;
 
@@ -369,4 +363,4 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
 fn parse_optional_integer_arg(const ExecContext &ec, i64 default_value) throws
     -> i64;
 
-} /* namespace shit */
+} // namespace shit

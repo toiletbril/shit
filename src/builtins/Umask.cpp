@@ -33,7 +33,6 @@ namespace {
 
 constexpr u32 PERMISSION_BITS = 0777u;
 
-/* The nine permission bits of a who group, shifted to its position. */
 pure fn group_mask(char who) wontthrow -> u32
 {
   switch (who) {
@@ -100,7 +99,6 @@ fn apply_symbolic_mask(StringView spec, u32 current_mask) throws -> Maybe<u32>
       i++;
     }
 
-    /* The permission triplet is replicated into each named group's position. */
     u32 permission_bits = 0;
     if (who & 0700u) permission_bits |= permission << 6;
     if (who & 0070u) permission_bits |= permission << 3;
@@ -121,7 +119,7 @@ fn apply_symbolic_mask(StringView spec, u32 current_mask) throws -> Maybe<u32>
   return (~allowed) & PERMISSION_BITS;
 }
 
-} /* namespace */
+} // namespace
 
 Umask::Umask() = default;
 
@@ -183,4 +181,4 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

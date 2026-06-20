@@ -16,14 +16,13 @@ namespace shit {
 
 namespace {
 
-/* The byte that stands in for an opaque segment in the brace-expansion
-   template, a quoted run or a variable reference whose braces and commas must
-   not act as brace structure. It is followed by the segment's index. */
+/* The byte standing in for an opaque segment in the brace-expansion template, a
+   quoted run or variable reference whose braces and commas must not act as
+   brace structure. It is followed by the segment's index. */
 constexpr char BRACE_OPAQUE_MARKER = '\x01';
 
 /* True when a word carries a { in an unquoted segment, the only place brace
-   structure can appear. The scan is cheap so the common brace-free word skips
-   the expansion entirely. */
+   structure can appear. The common brace-free word skips the expansion. */
 pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
 {
   for (const WordSegment &segment : word.segments) {
@@ -34,9 +33,8 @@ pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
   return false;
 }
 
-/* Parse a signed integer and report the width of its digit run, so a sequence
-   such as {01..10} can pad its output to the wider operand. None when the text
-   is not a plain optionally-signed integer. */
+/* A signed integer with the width of its digit run, so {01..10} can pad its
+   output to the wider operand. */
 struct sequence_integer
 {
   i64 value;
@@ -59,8 +57,8 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
   i64 magnitude = 0;
   for (usize j = digit_start; j < text.length; j++) {
     const i64 digit = text[j] - '0';
-    /* A bound past the signed range is not a usable sequence, so the brace is
-       left literal rather than overflowing during the parse. */
+    /* A bound past the signed range leaves the brace literal rather than
+       overflowing during the parse. */
     if (magnitude > (9223372036854775807LL - digit) / 10) return None;
     magnitude = magnitude * 10 + digit;
   }
@@ -70,8 +68,8 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
   return sequence_integer{value, width, leading_zero};
 }
 
-/* Split a sequence body on its .. separators into two or three parts, the
-   start, the end, and an optional step. */
+/* Split a sequence body on its .. separators into start, end, and optional
+   step. */
 fn split_sequence_parts(StringView content, Allocator alloc) throws
     -> ArrayList<StringView>
 {
@@ -139,7 +137,6 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
     return elements;
   }
 
-  /* A single-letter range counts through the alphabet. */
   if (parts[0].length == 1 && parts[1].length == 1) {
     const char from = parts[0][0];
     const char to = parts[1][0];
@@ -160,8 +157,7 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
   return None;
 }
 
-/* The alternatives of a brace group body, the comma-separated list or the
-   sequence it spells, or None when the body is neither and the braces are
+/* The alternatives of a brace group body, or None when the braces are
    literal. */
 fn brace_group_alternatives(StringView content, Allocator alloc) throws
     -> Maybe<ArrayList<String>>
@@ -231,15 +227,12 @@ fn find_brace_group(StringView text, Allocator alloc) throws
 
 /* The deepest brace nesting expanded before the recursion is cut, so a
    pathological input such as {a,{b,{c,...}}} cannot overflow the native stack.
-   The cap matches the globstar one for one consistent bound on user-driven
-   recursion. */
+ */
 constexpr usize MAX_BRACE_DEPTH = 256;
 
-/* Expand the brace structure in a template string, leaving any opaque marker
-   untouched. The recursion handles a nested group inside an alternative and a
-   further group after the close, so the result is the cartesian product. A
-   nesting past the cap leaves the remaining text literal rather than recursing
-   further, the way a runaway expansion is bounded instead of crashing. */
+/* Expand the brace structure in a template string into the cartesian product,
+   leaving any opaque marker untouched. A nesting past the cap leaves the
+   remaining text literal rather than recursing further. */
 fn brace_expand_text(StringView text, Allocator alloc, usize depth = 0) throws
     -> ArrayList<String>
 {
@@ -269,10 +262,9 @@ fn brace_expand_text(StringView text, Allocator alloc, usize depth = 0) throws
   return results;
 }
 
-/* Expand the brace structure of a word into the words it spells. The unquoted
-   segments contribute their text to a template while every other segment is
-   recorded as an opaque marker, so a quoted brace or a variable stays intact.
-   Each expanded template is rebuilt into a word. */
+/* Expand the brace structure of a word into the words it spells. Every
+   non-unquoted segment is recorded as an opaque marker, so a quoted brace or a
+   variable stays intact. */
 fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
 {
   let opaque_segments = ArrayList<const WordSegment *>{alloc};
@@ -296,11 +288,9 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
     let run = String{alloc};
     for (usize i = 0; i < produced.count(); i++) {
       const char c = produced[i];
-      /* The marker is followed by an in-range segment index only when this
-         scanner inserted it. A literal 0x01 byte that reached the text from
-         $'\x01' is not a marker, so the index bound is checked at run time and
-         a failed check copies the byte verbatim rather than reading past the
-         segment list. */
+      /* A literal 0x01 byte from $'\x01' is not a marker, so the index bound is
+         checked at run time and a failed check copies the byte verbatim rather
+         than reading past the segment list. */
       const bool is_opaque_marker =
           c == BRACE_OPAQUE_MARKER && i + 1 < produced.count() &&
           static_cast<u8>(produced[i + 1]) < opaque_segments.count();
@@ -326,18 +316,17 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
   return words;
 }
 
-} /* namespace */
+} // namespace
 
 hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
                                  bool args_are_transient) throws
     -> ArrayList<String>
 {
   LOG(Debug, "expanding %zu argument tokens", args.count());
-  /* The argument vector is built first, on the scratch arena for a transient
-     request the caller scopes and frees, or on the heap otherwise. The per-word
-     expansion fields are reclaimed on return only for the heap form, since the
-     transient form leaves the fields on the caller's scratch region to be freed
-     with the vector after the command. The mark nests, so a command
+  /* The vector lives on the scratch arena for a transient request the caller
+     scopes and frees, or on the heap otherwise. The per-word fields are
+     reclaimed on return only for the heap form, since the transient form leaves
+     them on the caller's scratch region. The mark nests, so a command
      substitution inside one of these words reclaims only its own fields. */
   let expanded_args = args_are_transient
                           ? ArrayList<String>{scratch_allocator()}
@@ -351,10 +340,9 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
   };
 
   /* A declaration builtin, such as local or export, treats a name=value
-     argument as an assignment, so its value expands with no field splitting or
-     globbing. The command word is the first argument, and only its plain
-     literal form is treated this way, the same form bash decides on before any
-     expansion. */
+     argument as an assignment whose value expands with no field splitting or
+     globbing. Only the plain literal command word is decided this way, before
+     any expansion, the way bash does. */
   let is_declaration_command = false;
   let is_local_command = false;
   let is_declare_command = false;
@@ -363,8 +351,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
     const Word &command_word =
         static_cast<const tokens::WordToken *>(args[0])->word();
     if (command_word.plain_literal_kind() != Word::PlainLiteral::NotPlain) {
-      /* Nearly every command word is one literal segment, so its view serves
-         directly and the joined copy is built only for the rare split word. */
+      /* The joined copy is built only for the rare split word. */
       let joined_name = String{scratch_allocator()};
       StringView name;
       if (command_word.segments.count() == 1) {
@@ -380,9 +367,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
                                name == "export" || name == "readonly";
       is_test_command = name == "test";
     }
-    /* The lone bracket carries a glob metacharacter, so it never classifies as
-       a plain literal above, while as a command word it is the test builtin
-       and earns the same glob exemption. */
+    /* The lone bracket is the test builtin as a command word and earns the same
+       glob exemption, though it never classifies as a plain literal above. */
     else if (command_word.segments.count() == 1 &&
              command_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
              command_word.segments[0].text.view() == "[")
@@ -391,20 +377,16 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
     }
   }
 
-  /* A test or [ command reads its arguments to probe the filesystem, so an
-     unmatched glob there stays literal in silence and the probe returns false
-     naturally, rather than tripping failglob on the check that asks whether a
-     file exists. A user function named test keeps the exemption, the cost of
-     deciding before expansion. */
+  /* A test or [ command probes the filesystem, so an unmatched glob there stays
+     literal in silence and the probe returns false rather than tripping
+     failglob. A user function named test keeps the exemption. */
   let const previous_glob_exempt = m_glob_exempt_for_test;
   m_glob_exempt_for_test = is_test_command;
   defer { m_glob_exempt_for_test = previous_glob_exempt; };
 
-  /* A test or [ command reads an operand to probe presence or emptiness, so an
-     unset variable there is the question the command asks rather than a
-     mistake. The unset warning is suppressed across the operand expansion the
-     way test -z "$x" reads, matching the glob exemption above. An explicit set
-     -u still aborts, so this silences only the advisory warning. */
+  /* An unset variable in a test operand is the question the command asks, so
+     the unset warning is suppressed across the operand expansion. An explicit
+     set -u still aborts, so this silences only the advisory warning. */
   let const previous_suppress_test_warning =
       is_warning_suppressed(suppressible_warning::UnsetTestOperand);
   if (is_test_command)
@@ -418,9 +400,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
   for (const Token *token : args) {
     let const location = token->source_location();
     try {
-      /* A word token is expanded in place. Any other token is wrapped as one
-         unquoted literal word, which is the only case that needs a temporary.
-       */
+      /* Any non-word token is wrapped as one unquoted literal word. */
       let fallback_word = Word{};
       const Word *word = nullptr;
       if (token->kind() == Token::Kind::Word) {
@@ -430,18 +410,16 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
             static_cast<const tokens::Assignment *>(token);
         ASSERT(assignment_token != nullptr);
         if (is_declaration_command) {
-          /* A declaration builtin treats name=value as an assignment, so the
-             value expands with no field splitting or globbing, the way a plain
-             x=$1 does, rather than splitting into several arguments. */
+          /* A declaration builtin's name=value value expands with no splitting.
+           */
           let assignment = String{expanded_args.allocator()};
           assignment.append(assignment_token->key().view());
           if (assignment_token->is_append() &&
               (is_local_command || is_declare_command))
           {
-            /* local creates a fresh local that shadows an outer name, and
-               declare may apply the -i attribute on the same command, so the
-               name+=value form passes through literally and the builtin
-               computes the append after its own effects exist. */
+            /* local shadows an outer name and declare may apply -i on the same
+               command, so the name+=value form passes through literally and the
+               builtin computes the append after its own effects exist. */
             assignment += '+';
             assignment += '=';
             assignment.append(
@@ -450,18 +428,15 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
           } else {
             assignment += '=';
             /* The append form name+=value concatenates onto the name's current
-               value, so the string the builtin stores already carries it, the
-               way a plain x+=y assignment prepends the prior value. export and
-               readonly do not shadow, so the current value is read here
-               correctly. */
+               value. export and readonly do not shadow, so the current value is
+               read here correctly. */
             if (assignment_token->is_append())
               assignment.append(get_variable_value(assignment_token->key())
                                     .value_or(String{})
                                     .view());
             let const expanded_value =
                 expand_word_for_assignment(assignment_token->value_word());
-            /* An integer name adds rather than concatenates, so the join wraps
-               the appended expression for the arithmetic in the store. */
+            /* An integer name adds rather than concatenates. */
             if (assignment_token->is_append() &&
                 is_integer_variable(assignment_token->key()))
               append_integer_expression(assignment, expanded_value.view());
@@ -471,13 +446,9 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
           expanded_args.push(steal(assignment));
           continue;
         }
-        /* An assignment that appears as an argument, like echo k=$v, is an
-           ordinary word. Rebuild it as the literal key, an equals sign, and the
-           value segments, so the value still expands instead of staying
-           literal. */
+        /* An assignment as an argument, like echo k=$v, is an ordinary word
+           rebuilt so the value still expands. */
         let key_literal = String{StringView{assignment_token->key()}};
-        /* A non-declaration command keeps the literal text, so an append form
-           such as echo k+=v stays k+=v rather than losing the plus. */
         if (assignment_token->is_append()) key_literal += "+";
         key_literal += "=";
         fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
@@ -493,9 +464,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
       }
 
       /* The plain-literal fast path pushes a word that needs no expansion,
-         splitting, or globbing straight to the heap argument vector. The common
-         literal argument such as '-lt', '200000', 'echo', or a plain filename
-         takes this path and never enters expand_word or expand_path. */
+         splitting, or globbing straight to the argument vector. */
       let const do_expand_one_word = [&](const Word &expandable)
                                          throws -> void {
         let const plain_kind = expandable.plain_literal_kind();
@@ -506,8 +475,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
             literal.append(segment.text.view());
 
           /* A single unquoted segment still needs the IFS check, since an IFS
-             byte in its text would split it into more than one field. With no
-             IFS byte it is one field. */
+             byte in its text would split it into more than one field. */
           let should_split = false;
           if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
             for (usize i = 0; i < literal.count(); i++)
@@ -531,10 +499,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         }
       };
 
-      /* Brace expansion runs first in every mood but POSIX, turning one word
-         into the several the braces spell, each then taking the path above.
-         The brace scan is skipped when no { is present, so a brace-free word
-         pays nothing beyond the cheap check. */
+      /* Brace expansion runs first in every mood but POSIX. */
       if (bash_additions_enabled() && word_has_brace_candidate(*word)) {
         for (const Word &brace_word : expand_braces(*word, scratch_allocator()))
           do_expand_one_word(brace_word);
@@ -546,10 +511,9 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
     }
   }
 
-  /* The trace goes to standard error, the way bash does it, so it stays out of
-     a command substitution's captured output. The plus is repeated once per
-     enclosing subshell, so the top shell shows '+', a substitution '++', and a
-     nested one '+++'. */
+  /* The trace goes to standard error so it stays out of a command
+     substitution's captured output. The plus is repeated once per enclosing
+     subshell, so the top shell shows '+', a substitution '++'. */
   if (should_echo_expanded()) {
     let trace = String{};
     for (usize i = 0; i < m_subshell_depth + 1; i++)
@@ -563,4 +527,4 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
   return expanded_args;
 }
 
-} /* namespace shit */
+} // namespace shit

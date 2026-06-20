@@ -8,12 +8,10 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* calc evaluates each argument as an arithmetic expression and prints the value
-   of the last one. It reuses the shell arithmetic evaluator, so the same
-   operators and the same located error messages apply. In the default mood the
-   value is computed in 128 bits, so a result wider than a signed 64-bit integer
-   prints in full. With no expression on a terminal, or with -i, it reads
-   expressions interactively the way a freestanding calc does. */
+/* calc reuses the shell arithmetic evaluator, so the same operators and the
+   same located error messages apply. In the default mood the value is computed
+   in 128 bits, so a result wider than a signed 64-bit integer prints in full.
+ */
 
 FLAG_LIST_DECL();
 
@@ -39,10 +37,6 @@ pure Builtin::Kind Calc::kind() const wontthrow { return Kind::Calc; }
 
 namespace {
 
-/* Evaluate one expression and print its value, returning 0, or render a located
-   error against the expression and return 1. The evaluator caret indexes the
-   expression text, so rendering against it points the caret under the
-   offending token rather than the flat message the old path printed. */
 fn evaluate_one(ExecContext &ec, EvalContext &cxt, StringView expression) throws
     -> i32
 {
@@ -118,13 +112,11 @@ fn try_define(EvalContext &cxt, StringView line) throws -> bool
   return true;
 }
 
-/* Read expressions from the input descriptor and evaluate each, the desk
-   calculator loop. An interactive session reads through the toiletline editor
-   for line editing and history, while a piped run, or a shell that never
-   started the editor, falls back to a plain line read with a stderr prompt so
-   the input stays deterministic. The loop ends on end of input, while Ctrl-C
-   and Ctrl-Z echo their indicator and keep the session, and a bad line reports
-   and continues rather than ending the session. */
+/* An interactive session reads through the toiletline editor for line editing
+   and history, while a piped run, or a shell that never started the editor,
+   falls back to a plain line read with a stderr prompt so the input stays
+   deterministic. Ctrl-C and Ctrl-Z echo their indicator and keep the session,
+   and a bad line reports and continues rather than ending the session. */
 fn run_repl(ExecContext &ec, EvalContext &cxt) throws -> i32
 {
   let const input_fd = ec.in_fd.value_or(SHIT_STDIN);
@@ -229,7 +221,7 @@ fn run_repl(ExecContext &ec, EvalContext &cxt) throws -> i32
   return 0;
 }
 
-} /* namespace */
+} // namespace
 
 i32 Calc::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
@@ -271,4 +263,4 @@ i32 Calc::execute(ExecContext &ec, EvalContext &cxt) const throws
   return evaluate_one(ec, cxt, expression.view());
 }
 
-} /* namespace shit */
+} // namespace shit

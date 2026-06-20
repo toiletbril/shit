@@ -6,11 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* command runs its operand as a command while ignoring a shell function of the
-   same name, or with -v and -V reports how the operand resolves. The function
-   table is consulted only when a simple command runs, so resolving and running
-   the operand here already bypasses it. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-v] [-V] name [argument ...]");
@@ -140,4 +135,4 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   return utils::execute_context(steal(*sub), cxt, false);
 }
 
-} /* namespace shit */
+} // namespace shit

@@ -4,9 +4,6 @@
 #include "../NameValueArg.hpp"
 #include "../Trace.hpp"
 
-/* readonly marks a variable so a later assignment to it fails, or with no
-   operand lists the variables already marked. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[name[=value] ...]");
@@ -35,7 +32,6 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   ASSERT(!args.is_empty());
 
-  /* readonly with no operand lists the read-only variables and their values. */
   if (args.count() == 1) {
     let out = String{};
     for (let const &name : cxt.readonly_names()) {
@@ -72,4 +68,4 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

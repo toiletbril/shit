@@ -14,4 +14,4 @@ enum class mimic_mood : u8
   Bash,
 };
 
-} /* namespace shit */
+} // namespace shit

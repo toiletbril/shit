@@ -5,14 +5,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* time runs a command once and prints how long it took, the real elapsed time
-   from a monotonic clock plus the user and system time the children consumed.
-   The command runs through the shell so a builtin, a function, or an external
-   program all work, and the report goes to standard error so a redirection on
-   the command still steers the command's own output. The leading time keyword
-   handles a command or a compound directly, so this builtin is the form reached
-   through command time or builtin time. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("command [argument ...]");
@@ -84,4 +76,4 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} /* namespace shit */
+} // namespace shit

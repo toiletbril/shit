@@ -2,6 +2,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Shitbox.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -111,29 +112,30 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
     return 0;
   }
 
-  /* The command runs in the shell with the assignments already applied, so the
-     remaining operands are single-quoted into one line and evaluated. The
-     quotes keep each operand a literal word, with an embedded quote escaped the
-     way a shell expects, so a value with a space or a glob is not re-expanded.
-   */
-  let command_line = String{};
-  for (usize i = first_command; i < operands.count(); i++) {
-    if (i > first_command) command_line += ' ';
-    command_line += '\'';
-    let const word = operands[i].view();
-    for (usize k = 0; k < word.length; k++) {
-      if (word[k] == '\'')
-        command_line += "'\\''";
-      else
-        command_line.push(word[k]);
-    }
-    command_line += '\'';
+  /* The remaining operands are the utility and its arguments, already split, so
+     they run directly through the command resolution rather than being
+     re-quoted into one line and re-parsed. The assignments are live on the
+     environment, so a forked child inherits them and a builtin reads them in
+     place. A name that does not resolve is reported and the status is 127, the
+     way a bare command word fails, rather than aborting the shell. */
+  let env_args = ArrayList<String>{};
+  for (usize i = first_command; i < operands.count(); i++)
+    env_args.push_managed(operands[i]);
+
+  Maybe<ExecContext> sub;
+  try {
+    sub = ExecContext::make_from(ec.source_location(), steal(env_args),
+                                 cxt.mood(), cxt.shitbox());
+  } catch (const CommandNotFound &not_found) {
+    const String *source = cxt.current_source();
+    show_message(
+        not_found.to_string(source != nullptr ? source->view() : StringView{}));
+    return 127;
   }
 
-  return cxt.run_source(command_line.view(), "env", true, ec.source_location(),
-                        StringView{"env"});
+  return utils::execute_context(steal(*sub), cxt, false);
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

@@ -4,8 +4,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* shift drops the first n positional parameters, n defaulting to 1. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[n]");
@@ -56,4 +54,4 @@ i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

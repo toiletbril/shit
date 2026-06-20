@@ -153,9 +153,8 @@ fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &
 }
 
 #if !defined NDEBUG
-/* The completion test driver behind --debug-complete-at. It lists the
-   candidates for the given line with the cursor at its end, one per line the
-   way an explicit tab would, and the run exits with its status. */
+/* The completion test driver behind --debug-complete-at, listing the
+   candidates for the line with the cursor at its end, one per line. */
 static fn run_debug_completion_driver(StringView driver_line,
                                       EvalContext &context) throws -> i32
 {
@@ -174,9 +173,8 @@ static fn run_debug_completion_driver(StringView driver_line,
 }
 #endif
 
-/* Parse a --mood value into a mood, with 'shit' the strict default, 'bash' the
-   bash extensions, and 'sh' or 'posix' the dash semantics. An unknown spelling
-   returns None so the caller reports the usage error. */
+/* Parse a --mood value into a mood, returning None on an unknown spelling so
+   the caller reports the usage error. */
 pure static fn parse_mood_name(StringView name) wontthrow -> Maybe<mimic_mood>
 {
   if (name == "shit" || name == "default") {
@@ -189,10 +187,9 @@ pure static fn parse_mood_name(StringView name) wontthrow -> Maybe<mimic_mood>
   return None;
 }
 
-/* The runtime mood the session runs in, from --mood when given, then the
-   invocation mood the basename selects, then the strict default. --dumb forces
-   the sh mood when --mood is absent. An invalid --mood value fails startup
-   before this, so a stray one falls back to the default. */
+/* The session mood, from --mood when given, then the invocation mood, then the
+   strict default. --dumb forces the sh mood when --mood is absent, and an
+   invalid --mood fails startup before this. */
 pure static fn resolve_session_mood(mimic_mood invocation_mood) wontthrow
     -> mimic_mood
 {
@@ -264,8 +261,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 }
 
 /* Report a break, continue, or return that reached the top with no loop,
-   function, or sourced script to consume it. The jump carries its source and
-   origin so the caret points at the exact builtin. */
+   function, or sourced script to consume it. */
 static fn report_escaped_control_flow(EvalContext &context,
                                       const String &fallback_source) -> void
 {
@@ -305,9 +301,9 @@ static fn report_escaped_control_flow(EvalContext &context,
   context.clear_control_flow();
 }
 
-/* Lex, parse, validate, and evaluate one chunk of shell source in the given
-   context. The main loop and source_file share this so a sourced file runs the
-   same pipeline as an interactive line. Returns the resulting exit code. */
+/* Lex, parse, validate, and evaluate one chunk of shell source, shared by the
+   main loop and source_file so a sourced file runs the same pipeline as an
+   interactive line. */
 static fn run_script_contents(const String &script_contents,
                               EvalContext &context, BumpArena &ast_arena,
                               Maybe<StringView> filename = None,
@@ -320,15 +316,15 @@ static fn run_script_contents(const String &script_contents,
     defer { context.end_command(); };
 
     /* Reclaim the previous command's arena before the next parse. Function
-       bodies live in the separate function arena, so they survive this reset
-       and a function defined on one command stays callable on the next. */
+       bodies live in the separate function arena, so they survive this reset.
+     */
     context.clear_retained_sources();
     ast_arena.reset();
     context.reset_scratch_arena();
 
     /* A precompiled tree, the cached PROMPT_COMMAND hook, skips the lex, parse,
-       and analysis since those already ran. It lives in a caller-owned arena
-       that outlives this call, so it is reused across prompts. */
+       and analysis. It lives in a caller-owned arena that outlives this call.
+     */
     Expression *ast = precompiled_ast;
     if (precompiled_ast == nullptr) {
       LOG(Debug, "parsing a chunk of %zu bytes", script_contents.count());
@@ -338,8 +334,8 @@ static fn run_script_contents(const String &script_contents,
                 context.show_lexed_words(), filename, context.mood()}
       };
 
-      /* Recover from each parse error so the whole file is reported at once. A
-         file with any parse error must not run. */
+      /* Recover from each parse error so the whole file is reported at once,
+         and a file with any parse error must not run. */
       let parse_errors = ArrayList<shit::String>{heap_allocator()};
       ast = p.construct_ast(parse_errors);
 
@@ -363,14 +359,13 @@ static fn run_script_contents(const String &script_contents,
       }
     }
 
-    /* Validate the whole tree before running anything. An unconditional problem
-       stops execution and a conditional one only warns. POSIX and bash mode
-       both skip the stage, since neither dash nor bash runs a shellcheck pass.
-       -W forces it back on as warnings and --no-diagnostics always skips it.
-       The decision and the skip read the live context rather than the static
-       helpers, so a mood switch and a runtime set -o no-diagnostics both flip
-       the stage for the session. --show-optimizer-state forces the prepass on
-       whatever the mood, since its whole purpose is to trace it. */
+    /* Validate the whole tree before running anything, stopping on an
+       unconditional problem and warning on a conditional one. POSIX and bash
+       mode skip the stage the way dash and bash run no shellcheck pass, -W
+       forces it on as warnings, and --no-diagnostics always skips it. The
+       decision reads the live context so a mood switch or a runtime set -o
+       no-diagnostics flips it. --show-optimizer-state forces the prepass on to
+       trace it. */
     let const run_analysis =
         precompiled_ast == nullptr &&
         (FLAG_SHOW_OPTIMIZER_STATE.is_enabled() ||
@@ -382,9 +377,7 @@ static fn run_script_contents(const String &script_contents,
     /* An interactive -W chunk runs right away and the runtime resolution
        reports a missing command itself, so the analysis copy stays quiet to
        avoid the doubled error. The live shell is handed to the prepass so the
-       no-local check can query, only when about to warn, whether the name is
-       already a variable. The query is lazy, so the analysis pays nothing for
-       it per chunk. */
+       no-local check can lazily query whether a name is already a variable. */
     let const analysis_failed =
         run_analysis &&
         !analyze_ast(
@@ -392,8 +385,8 @@ static fn run_script_contents(const String &script_contents,
             context.alias_names(), &context, FLAG_WARNINGS.is_enabled(),
             FLAG_WARNINGS.is_enabled() && context.shell_is_interactive(),
             FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
-    /* A freshly parsed tree that parses and analyzes clean is handed back so a
-       caller that wants to reuse it, the PROMPT_COMMAND hook, caches it. */
+    /* A tree that parses and analyzes clean is handed back so the
+       PROMPT_COMMAND hook can cache it. */
     if (!analysis_failed && out_ast != nullptr) {
       *out_ast = ast;
     }
@@ -401,26 +394,23 @@ static fn run_script_contents(const String &script_contents,
     if (analysis_failed) {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
-      /* Under -n the tree is parsed and validated but never run. */
       exit_code = EXIT_SUCCESS;
     } else {
       LOG(Debug, "evaluating the chunk");
       context.set_current_source(&script_contents, "the script");
-      /* Run, timing the wall clock so the \D prompt segment can show how long
-         the last command took. */
+      /* Timed so the \D prompt segment can show the last command's duration. */
       const auto command_start_ns = shit::os::monotonic_nanos();
       exit_code = static_cast<int>(ast->evaluate(context));
       context.set_last_command_duration_ns(shit::os::monotonic_nanos() -
                                            command_start_ns);
       LOG(Debug, "the chunk finished with exit code %d", exit_code);
-      /* A trapped signal delivered during the last command of the chunk has no
-         following node to trigger its action, so the pending traps drain here
-         before the chunk ends, the way dash runs a pending trap before it reads
-         the next command or exits. */
+      /* A signal trapped during the last command of the chunk has no following
+         node to trigger its action, so the pending traps drain here the way
+         dash runs a pending trap before it reads the next command. */
       if (shit::os::SIGNAL_PENDING) context.run_pending_traps();
       report_escaped_control_flow(context, script_contents);
-      /* script_contents is local to this call, so drop the frame before it goes
-         out of scope and leaves a dangling pointer behind. */
+      /* script_contents is local, so drop the frame before it goes out of
+         scope and leaves a dangling pointer. */
       context.set_current_source(nullptr, "");
     }
     context.set_last_exit_status(static_cast<i32>(exit_code));
@@ -439,9 +429,8 @@ static fn run_script_contents(const String &script_contents,
       show_message(e.to_string(script_contents));
       show_message(e.details_to_string(script_contents));
     }
-    /* POSIX mode follows dash, which exits 2 on a fatal expansion or runtime
-       error such as a set -u unset reference, while bash and the default mode
-       keep the status-1 convention. */
+    /* POSIX mode follows dash and exits 2 on a fatal expansion or runtime
+       error, while bash and the default mode keep the status-1 convention. */
     exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
   } catch (const ErrorWithLocation &e) {
     if (!e.was_rendered()) show_message(e.to_string(script_contents));
@@ -475,15 +464,11 @@ static fn run_script_contents(const String &script_contents,
 
 /* Run the PROMPT_COMMAND hook before a primary prompt is drawn, the bash
    mechanism a prompt framework such as starship uses to recompute PS1 on every
-   prompt. The hook reads the exit status of the last command in $?, so the
-   saved status and the measured command duration are restored after it runs,
-   which keeps the prompt escapes and the next command reading the real values
-   rather than the ones the hook left behind. An empty or unset PROMPT_COMMAND
-   runs nothing. */
-/* The PROMPT_COMMAND text and the tree parsed from it, kept across prompts so a
-   hook whose text does not change parses once rather than every prompt. The
-   tree lives in its own arena, which the general per-command arena reset never
-   touches, so the cached pointer stays valid between prompts. */
+   prompt. The hook reads the last exit status in $?, so the saved status and
+   the measured command duration are restored after it runs. An empty or unset
+   PROMPT_COMMAND runs nothing. The cached text and parsed tree are kept across
+   prompts so an unchanged hook parses once, in an arena the per-command reset
+   never touches so the cached pointer stays valid. */
 static BumpArena PROMPT_COMMAND_ARENA{};
 static String PROMPT_COMMAND_CACHED_TEXT{};
 static Expression *PROMPT_COMMAND_CACHED_AST = nullptr;
@@ -540,11 +525,10 @@ static fn source_file(const Path &path, EvalContext &context,
 
   LOG(Info, "sourcing '%s', %zu bytes", path.c_str(), contents->count());
 
-  /* The file runs through run_source, the same path the dot builtin uses, so it
-     parses into the active arena rather than resetting it. A set --init-moods
-     inside a sourced rc reaches here while that rc's tree is live, so a reset
-     would free the node mid-walk. The path names the source so a parse error
-     and a backtrace caret carry the file rather than a bare line:col. */
+  /* The file runs through run_source, the dot builtin path, which parses into
+     the active arena rather than resetting it. A set --init-moods inside a
+     sourced rc reaches here while that rc's tree is live, so a reset would free
+     the node mid-walk. The path names the source for the diagnostics. */
   unused(ast_arena);
   context.run_source(*contents, path.text().view(), /*consume_return=*/true,
                      /*call_site=*/None, path.text().view());
@@ -602,11 +586,9 @@ static fn source_bash_system_rc(EvalContext &context,
     if (source_file(Path{path}, context, ast_arena)) break;
 }
 
-/* bash-completion registers the complete -D dynamic loader when it loads. A
-   host whose rc chain never sources it still gets programmable completion by
-   sourcing the stock script directly. The probe reads the default spec and the
-   script's guard variable so a chain that already loaded it does not load it
-   twice. */
+/* A host whose rc chain never sourced bash-completion still gets programmable
+   completion by sourcing the stock script directly. The default spec and the
+   guard variable are probed so an already-loaded chain is not loaded twice. */
 static fn ensure_bash_completion_loaded(EvalContext &context,
                                         BumpArena &ast_arena) throws -> void
 {
@@ -631,13 +613,12 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
 {
   /* Each flavor sources under its own mood, so a bash rc parses with the bash
      grammar and a posix profile with the dash grammar. The caller restores the
-     session mood afterward. A missing file is silently skipped. */
+     session mood afterward. */
   bool did_source_bash_rc = false;
   for (let flavor : moods) {
     /* A flavor already on the sourcing stack is skipped, so a set --init-moods
-       inside the very ~/.shitrc this is sourcing cannot re-source it and
-       recurse until the stack overflows. The bit clears when the flavor
-       finishes, even on a throw. */
+       inside the ~/.shitrc this is sourcing cannot re-source it and recurse to
+       overflow. The bit clears when the flavor finishes, even on a throw. */
     if (context.init_mood_sourcing(flavor)) {
       LOG(Info,
           "skipping the %s flavor, its startup files are already sourcing",
@@ -655,8 +636,8 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
                                       : "shit");
     switch (flavor) {
     case mimic_mood::Default:
-      /* The shit flavor reads the dash login profiles, then the system and the
-         home shit rc for an interactive shell. */
+      /* The shit flavor reads the dash login profiles, then the system and home
+         shit rc for an interactive shell. */
       if (is_login_shell) source_posix_login_files(context, ast_arena);
       if (should_be_interactive) {
         source_file(Path{"/etc/shitrc"}, context, ast_arena);
@@ -676,7 +657,7 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
     case mimic_mood::Bash:
       /* The bash flavor reads the bash login order, then the system rc and the
          user rc, the latter replaced by --rcfile. bash runs the system rc
-         before the user one even under --rcfile, so the order mirrors that. */
+         first even under --rcfile, so the order mirrors that. */
       if (is_login_shell) source_bash_login_files(context, ast_arena);
       if (should_be_interactive) {
         did_source_bash_rc = true;
@@ -689,23 +670,21 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
       break;
     }
     /* A flavor counts as initialized only when it actually sourced a file, so
-       the set --init-moods readout reports what loaded rather than every flavor
-       the resolver listed for a non-interactive run that sourced nothing. */
+       the set --init-moods readout reports what loaded. */
     if (is_login_shell || should_be_interactive) {
       context.mark_mood_initialized(flavor);
     }
   }
 
-  /* The bash programmable completion loads once after a bash rc sourced, so the
-     script parses under the bash grammar and its specs survive into the
-     session. */
+  /* The bash programmable completion loads once after a bash rc sourced, so it
+     parses under the bash grammar and its specs survive into the session. */
   if (did_source_bash_rc) {
     LOG(Info, "bootstrapping the bash programmable completion");
     ensure_bash_completion_loaded(context, ast_arena);
   }
 }
 
-} /* namespace shit */
+} // namespace shit
 
 fn main(int argc, char **argv) -> int
 {
@@ -716,9 +695,8 @@ fn main(int argc, char **argv) -> int
 #endif
 
   /* A symlink or rename to a shitbox utility name runs that utility directly,
-     before the shell parses a single flag, so an invocation such as `ls -l`
-     reaches ls and its own flag parser rather than the shell CLI. The name is
-     the basename of argv[0] with any directory and a leading login dash
+     before any flag parsing, so `ls -l` reaches ls and its own flag parser. The
+     name is the basename of argv[0] with any directory and a login dash
      dropped. */
   if (argc > 0) {
     shit::StringView invocation = shit::StringView{argv[0]};
@@ -757,12 +735,10 @@ fn main(int argc, char **argv) -> int
   let file_names = shit::ArrayList<shit::String>{};
 
   /* SHIT_FLAGS supplies command line options through the environment, such as
-     SHIT_FLAGS='-ahmu --mood bash -I', so a user sets the shell's
-     defaults once rather than on every invocation. The tokens are split on
-     whitespace and spliced in right after the program name, before the real
-     arguments, so a flag given on the command line still has the final say. The
-     token strings and the spliced pointer array outlive the parse below, so the
-     views stay valid. */
+     SHIT_FLAGS='-ahmu --mood bash -I'. The whitespace-split tokens are spliced
+     in right after the program name, before the real arguments, so a flag on
+     the command line still has the final say. The token strings and the spliced
+     pointer array outlive the parse below, so the views stay valid. */
   shit::ArrayList<shit::String> shit_flags_tokens{};
   shit::ArrayList<const char *> spliced_argv{};
   if (shit::Maybe<shit::String> shit_flags =
@@ -771,9 +747,9 @@ fn main(int argc, char **argv) -> int
   {
     let const view = shit_flags->view();
     usize token_start = 0;
-    /* A -c in SHIT_FLAGS would splice a command string into every invocation,
-       which the variable is not for, so the -c token and the command word
-       after it are dropped while a real command-line -c stays untouched. */
+    /* A -c in SHIT_FLAGS is dropped along with the command word after it, since
+       the variable must not splice a command into every invocation. A real
+       command-line -c stays untouched. */
     bool should_skip_next_command_word = false;
 
     for (usize i = 0; i <= view.length; i++) {
@@ -809,11 +785,10 @@ fn main(int argc, char **argv) -> int
       spliced_argv.is_empty() ? argc : static_cast<int>(spliced_argv.count());
 
   /* A terminal that launches the shell with a broken flag config, such as a
-     removed flag left in SHIT_FLAGS, must not exit and lock the user out of the
-     pane. When standard input is a terminal the shell drops to a rescue prompt
-     on default settings instead, so the config can be fixed from inside. The
-     rc chain is skipped in rescue so a broken rc does not compound the failure.
-     A non-interactive run keeps the usage exit the way dash does. */
+     removed flag left in SHIT_FLAGS, drops to a rescue prompt on default
+     settings rather than exiting and locking the user out of the pane. The rc
+     chain is skipped in rescue so a broken rc does not compound the failure,
+     and a non-interactive run keeps the usage exit the way dash does. */
   bool is_rescue_mode = false;
   let const do_enter_rescue = [&]() {
     shit::show_message("Entering rescue.");
@@ -823,9 +798,8 @@ fn main(int argc, char **argv) -> int
       file_names = shit::parse_flags(FLAG_LIST, argc, argv);
     } catch (...) {
       /* The real argv carried the bad flag too, so even the clean reparse
-         fails. The program name is kept as the sole operand the way the success
-         path keeps argv[0], so $0 and SHELL stay the real name rather than
-         degrading to the unknown-program placeholder. */
+         fails. The program name is kept as the sole operand so $0 and SHELL
+         stay the real name rather than the unknown-program placeholder. */
       shit::reset_flags(FLAG_LIST);
       file_names = shit::ArrayList<shit::String>{};
       if (argc > 0) file_names.push(shit::String{argv[0]});
@@ -846,22 +820,17 @@ fn main(int argc, char **argv) -> int
   } catch (const shit::Error &e) {
     shit::show_message(e.to_string());
     /* A flag error is a usage error, so a non-interactive shell exits with the
-       POSIX usage status rather than success, matching dash. */
+       POSIX usage status, matching dash. */
     if (!(shit::os::is_stdin_a_tty() || shit::os::is_stdout_a_tty())) {
       return 2;
     }
     do_enter_rescue();
   }
 
-  /* --dumb is the union of -P, -T, and --no-diagnostics, so it enables those
-     three component flags once here and the rest of the startup reads them
-     directly. It also turns color off the same as NO_COLOR set in the
-     environment, so the prompt and the diagnostics stay plain on a dumb
-     terminal. */
+  /* --dumb enables -T and --no-diagnostics here and turns color off the same as
+     NO_COLOR in the environment, so the prompt and diagnostics stay plain. The
+     sh mood is selected by resolve_session_mood. */
   if (FLAG_DUMB.is_enabled()) {
-    /* The sh mood is selected by resolve_session_mood when --dumb is set, so
-       the block only turns off completion and diagnostics and forces plain
-       output. */
     if (!FLAG_NO_COMPLETION.is_enabled()) FLAG_NO_COMPLETION.toggle();
     if (!FLAG_SUPPRESS_DIAGNOSTICS.is_enabled())
       FLAG_SUPPRESS_DIAGNOSTICS.toggle();
@@ -869,10 +838,8 @@ fn main(int argc, char **argv) -> int
   }
 
   /* Raise the runtime log level before any helper runs, so the trace covers
-     startup. The default stays Nothing, so a run without -X pays one
-     comparison per LOG call and prints nothing. An unknown level spelling is
-     a usage error, the way an unknown flag is. A release build compiled the
-     flag and every LOG call out. */
+     startup. The default stays Nothing, so a run without -X prints nothing.
+     An unknown level spelling is a usage error. */
 #if !defined NDEBUG
   if (FLAG_LOG.is_set()) {
     struct log_level_name
@@ -901,9 +868,8 @@ fn main(int argc, char **argv) -> int
     }
   }
 
-  /* The log sink opens before anything logs, in append mode so consecutive
-     runs accumulate into one trace a tail -f can follow. A file that cannot
-     open leaves the sink on stderr rather than dropping the trace. */
+  /* The log sink opens in append mode so consecutive runs accumulate into one
+     trace. A file that cannot open leaves the sink on stderr. */
   if (FLAG_DEBUG_OUTPUT_FILE.is_set() &&
       !FLAG_DEBUG_OUTPUT_FILE.value().is_empty())
   {
@@ -919,9 +885,8 @@ fn main(int argc, char **argv) -> int
   let program_path = shit::String{};
 
   if (file_names.count() > 0) {
-    /* The program path is the first argument. Move it out, then drop that slot
-       so the operands behind it shift to the front, with no copy of either the
-       path or the operands. */
+    /* The program path is the first argument, moved out and dropped so the
+       operands shift to the front with no copy. */
     program_path = steal(file_names[0]);
     file_names.remove(0);
   } else {
@@ -937,15 +902,11 @@ fn main(int argc, char **argv) -> int
       last_slash.has_value() ? program_path.substring(*last_slash + 1)
                              : program_path.view();
   /* A login shell receives argv[0] prefixed with a dash, such as -bash. The
-     dash is inspected once here, dropped before the name is matched the way
-     bash strips it to recognize its own invocation name, and read again
-     below as the login mark. $0 keeps the dashed spelling. */
+     dash is dropped before the name is matched the way bash strips it, and read
+     again below as the login mark. $0 keeps the dashed spelling. */
   const bool does_name_mark_login =
       !program_basename.is_empty() && program_basename[0] == '-';
   if (does_name_mark_login) program_basename = program_basename.substring(1);
-  /* A basename of sh or dash selects POSIX mode and bash selects bash mode, the
-     way a symlink named after a system shell behaves like that shell. Every
-     other name leaves the strict default for --mood and --dumb to override. */
   const shit::mimic_mood invocation_mood =
       (program_basename == "sh" || program_basename == "dash")
           ? shit::mimic_mood::Posix
@@ -964,19 +925,18 @@ fn main(int argc, char **argv) -> int
     return *code;
 
   /* A dash-prefixed invocation name, -bash or a bare -, is the login spawn
-     convention tmux and login use, the same mark the -l flag sets. */
+     convention tmux and login use, the same mark -l sets. */
   if (FLAG_LOGIN.is_enabled() || does_name_mark_login) {
     is_login_shell = true;
   }
   LOG(Info, "the shell %s a login shell", is_login_shell ? "is" : "is not");
 
-  /* The runtime mood and the startup-file moods. --mood selects the session
-     mood the shell runs in, while --init-moods lists which moods' startup files
-     to source, in order, and defaults to the session mood. An invalid spelling
-     in either is a usage error the way an unknown flag is. */
+  /* --mood selects the session mood, while --init-moods lists which moods'
+     startup files to source and defaults to the session mood. An invalid
+     spelling in either is a usage error. */
   if (FLAG_MOOD.is_set() && !shit::parse_mood_name(FLAG_MOOD.value())) {
-    /* The bad value is rendered with a caret, the located form the rest of the
-       diagnostics use, against a one-line source built from the flag. */
+    /* The bad value is rendered with a caret against a one-line source built
+       from the flag. */
     shit::String source = "--mood ";
     let const value_position = source.count();
     source += FLAG_MOOD.value();
@@ -1023,15 +983,13 @@ fn main(int argc, char **argv) -> int
   /* With no explicit --init-moods the session mood's files source. */
   if (init_moods.is_empty()) init_moods.push(session_mood);
 
-  /* A privileged shell skips every startup config file, so a profile or rc that
-     a less-privileged user controls cannot run with the raised privileges. The
-     -p flag forces it, and a setuid or setgid invocation turns it on by
-     default. */
+  /* A privileged shell skips every startup config file, so a profile or rc a
+     less-privileged user controls cannot run with the raised privileges. The -p
+     flag forces it, and a setuid or setgid invocation turns it on. */
   let const is_privileged =
       FLAG_PRIVILEGED.is_enabled() || shit::os::is_running_setuid();
   LOG(Info, "privileged mode is %s", is_privileged ? "on" : "off");
 
-  /* The stdin and interactive flags conflict, so only one survives. */
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
     bool is_tty = shit::os::is_stdin_a_tty();
 
@@ -1049,12 +1007,11 @@ fn main(int argc, char **argv) -> int
   bool should_read_stdin = false, should_execute_commands = false,
        should_read_files = false, should_be_interactive = false;
 
-  /* The input source is chosen by flag precedence, "-s" first, then "-c", then
-   * a file operand, then "-i" or no arguments. "-c" can be given several times.
-   */
+  /* The input source is chosen by flag precedence, -s first, then -c, then a
+     file operand, then -i or no arguments. */
   if (FLAG_STDIN.is_enabled()) {
-    /* Operands after -s are the positional parameters, so they are not
-       incompatible. Only the command and interactive flags conflict with -s. */
+    /* Operands after -s are the positional parameters, so only the command and
+       interactive flags conflict with -s. */
     if (!FLAG_COMMAND.is_empty() || FLAG_INTERACTIVE.is_enabled()) {
       shit::show_message(
           "Incompatible options or arguments were specified along "
@@ -1063,9 +1020,8 @@ fn main(int argc, char **argv) -> int
     }
     should_read_stdin = true;
   } else if (!FLAG_COMMAND.is_empty()) {
-    /* Operands after the command string are not incompatible, since POSIX reads
-       the first as $0 and the rest as the positional parameters. Only the
-       interactive flag conflicts with -c. */
+    /* Operands after the command string are the $0 and positional parameters
+       per POSIX, so only the interactive flag conflicts with -c. */
     if (FLAG_INTERACTIVE.is_enabled()) {
       shit::show_message(
           "Incompatible options or arguments were specified along "
@@ -1083,9 +1039,8 @@ fn main(int argc, char **argv) -> int
     should_be_interactive = true;
   }
 #if !defined NDEBUG
-  /* The completion test driver never prompts, so a bare driver run with no
-     other input reads the empty standard input and exits through the
-     driver's hook rather than initializing the editor. */
+  /* The completion test driver never prompts, so a bare driver run reads the
+     empty standard input and exits through the driver's hook. */
   if (FLAG_DEBUG_COMPLETE_AT.is_set() && should_be_interactive) {
     should_be_interactive = false;
     should_read_stdin = true;
@@ -1097,12 +1052,11 @@ fn main(int argc, char **argv) -> int
       : should_read_files       ? "the named script file"
                                 : "the interactive prompt");
 
-  /* Resolve $0 and the positional parameters $1 upward from the operands per
-     POSIX, since the rule differs by invocation mode. When running a script
-     file the first operand is the script path and becomes $0, while the rest
-     are its arguments. Under -c the first operand names $0 and the rest are the
-     arguments. An interactive or -s shell keeps the shell name as $0 and takes
-     every operand as a positional parameter. The context owns both. */
+  /* Resolve $0 and the positional parameters from the operands per POSIX, since
+     the rule differs by invocation mode. A script file or a -c run takes its
+     first operand as $0 and the rest as the arguments, while an interactive or
+     -s shell keeps the shell name as $0 and takes every operand as a positional
+     parameter. The context owns both. */
   let shell_name = program_path.clone();
   let positional_params = shit::ArrayList<shit::String>{};
 
@@ -1130,12 +1084,10 @@ fn main(int argc, char **argv) -> int
                                   shell_name.clone(),
                                   steal(positional_params)};
 
-  /* quit is a free function with no context in scope, so it is handed a pointer
-     to the one context to read the interactive state and the memory-report flag
-     from, rather than mirroring them into globals. */
+  /* quit is a free function, so it is handed a pointer to the one context to
+     read the interactive state and the memory-report flag from. */
   shit::utils::set_quit_context(&context);
 
-  /* Apply the remaining option flags that the constructor does not take. */
   context.set_stats_enabled(FLAG_STATS.is_enabled());
   context.set_show_ast(FLAG_AST.is_enabled());
   context.set_show_lexed_words(FLAG_ESCAPE_MAP.is_enabled());
@@ -1147,18 +1099,15 @@ fn main(int argc, char **argv) -> int
   context.set_login_shell(is_login_shell);
   context.set_custom_rcfile(FLAG_RCFILE.is_set());
   /* The session runs in the resolved mood. The startup files source with
-     strictness off, since they are written for a lax shell and read unset
-     variables such as $BASH_VERSION on the /etc/profile path, and the chain
-     swaps the mood per flavor so a bash rc parses under the bash grammar. The
-     strictness for the session mood is applied at the seam below once the
-     config has loaded, so a default-mood prompt fails loudly on a typo or a
-     failing pipeline stage. A non-interactive run sources nothing, so the seam
-     still runs and seeds its strictness from the mood. */
+     strictness off, since they read unset variables such as $BASH_VERSION on
+     the /etc/profile path, and the chain swaps the mood per flavor so a bash rc
+     parses under the bash grammar. The session strictness is applied at the
+     seam below once the config has loaded, and a non-interactive run that
+     sources nothing still runs the seam. */
   context.set_mood(session_mood);
   /* The CLI -u is the user's own ask the way set -u is, so the -W downgrade
      leaves it fatal and the mood seam keeps it on. -W mirrors onto the context
-     so the runtime strictness checks downgrade and set -W can flip it mid-run.
-   */
+     so the runtime checks downgrade and set -W can flip it mid-run. */
   context.set_error_unset(FLAG_NOUNSET.is_enabled());
   if (FLAG_NOUNSET.is_enabled()) context.set_error_unset_explicit(true);
   context.set_warnings_enabled(FLAG_WARNINGS.is_enabled());
@@ -1188,22 +1137,16 @@ fn main(int argc, char **argv) -> int
   context.set_shell_variable("SHIT_OS", SHIT_OS_INFO);
 
   /* Shell identity, so a script that probes for its host shell finds a known
-     name and takes a working branch rather than a fragile fallback. The mimicry
-     run seeds the same set for the shell it mimics, so the seeding is shared.
-     The shit version above stays present in every mood. A bash session or a
-     bash flavor in the init list advertises BASH_VERSION so a bash rc detects
-     it. */
+     name. The mimicry run shares this seeding, and the shit version above stays
+     present in every mood. A bash session or a bash flavor in the init list
+     advertises BASH_VERSION so a bash rc detects it. */
   bool should_seed_bash_identity = session_mood == shit::mimic_mood::Bash;
   for (let listed : init_moods)
     if (listed == shit::mimic_mood::Bash) should_seed_bash_identity = true;
   context.seed_shell_identity_variables(should_seed_bash_identity);
 
-  /* A shitbox utility reached through a symlinked argv[0] already ran and
-     exited at the top of main, before any flag parsing, so the shell setup here
-     never sees that case. */
-
-  /* SHLVL counts shell nesting. It is read from the inherited environment,
-     incremented, and exported so a child shell continues the count. */
+  /* SHLVL counts shell nesting, read from the environment, incremented, and
+     exported so a child shell continues the count. */
   i64 shell_level = 0;
   if (shit::Maybe<shit::String> inherited =
           shit::os::get_environment_variable("SHLVL");
@@ -1214,9 +1157,10 @@ fn main(int argc, char **argv) -> int
         !parsed_level.is_error() && parsed_level.value() > 0)
       shell_level = parsed_level.value();
   }
-  /* A corrupt or absurd inherited level is clamped so the increment cannot
-     overflow, the way bash bounds SHLVL to a sane range. */
-  if (shell_level > 999) shell_level = 0;
+  /* An inherited level past the cap is reset so the increment cannot overflow,
+     the way bash bounds SHLVL. The reset yields 1 after the increment below. */
+  constexpr i64 MAX_SHLVL = 999;
+  if (shell_level > MAX_SHLVL) shell_level = 0;
   shit::os::set_environment_variable("SHLVL",
                                      shit::utils::int_to_text(shell_level + 1));
   /* SHLVL lives in the environment, so the exported set must know it even on a
@@ -1229,10 +1173,9 @@ fn main(int argc, char **argv) -> int
   if (!shit::os::get_environment_variable("PS1").has_value())
     context.set_shell_variable("PS1", toiletline::default_prompt_template());
 
-  /* COLUMNS and LINES carry the terminal size the way bash sets them in an
-     interactive shell, so a config that divides by COLUMNS, such as ble.sh,
-     sees a non-zero width. They are seeded once here and not tracked across a
-     later resize. */
+  /* COLUMNS and LINES carry the terminal size the way bash sets them, so a
+     config that divides by COLUMNS, such as ble.sh, sees a non-zero width. They
+     are seeded once here and not tracked across a later resize. */
   if (should_be_interactive) {
     u32 columns = 0, rows = 0;
     if (shit::os::terminal_size(columns, rows)) {
@@ -1244,10 +1187,9 @@ fn main(int argc, char **argv) -> int
   bool should_quit = FLAG_ONE_COMMAND.is_enabled();
   i32 exit_code = EXIT_SUCCESS;
 
-  /* The path map is reset rather than fully seeded here, since the eager scan
-   * pays off only in interactive mode. A subsequent call to the same program
-   * still caches in any mode, so a simple script never spends the milliseconds
-   * to traverse every PATH directory up front. */
+  /* The path map is reset rather than seeded here, since the eager scan pays
+     off only in interactive mode. A later call still caches in any mode, so a
+     simple script never traverses every PATH directory up front. */
   shit::utils::clear_path_map();
   shit::os::set_default_signal_handlers(should_be_interactive);
   LOG(Info, "installed the default signal handlers");
@@ -1262,19 +1204,17 @@ fn main(int argc, char **argv) -> int
   let function_arena = shit::BumpArena{};
   shit::FUNCTION_ARENA = &function_arena;
 
-  /* The startup files source for each mood in the init list, in order, with the
-     mood swapped per flavor so a bash rc parses under the bash grammar. A
-     privileged shell sources nothing, the way bash's privileged mode leaves the
-     profiles and rc files unread. */
+  /* The startup files source for each mood in the init list, the mood swapped
+     per flavor so a bash rc parses under the bash grammar. A privileged shell
+     sources nothing, the way bash's privileged mode leaves them unread. */
   if (is_privileged || is_rescue_mode) {
     LOG(Info, "skipping every startup config file in %s mode",
         is_rescue_mode ? "rescue" : "privileged");
   } else {
-    /* --no-init-diagnostics turns diagnostics and warnings off for the duration
-       of the init sourcing, so a -W shell loads a lax bash config without
-       printing its unset-variable and glob warnings. A function defined while
-       this is off captures the quiet state, so it stays quiet at the prompt
-       too. The state returns afterward, restoring -W for the session. */
+    /* --no-init-diagnostics turns diagnostics and warnings off while the init
+       files source, so a -W shell loads a lax bash config quietly. A function
+       defined while this is off captures the quiet state. The state returns
+       afterward, restoring -W for the session. */
     let const saved_diagnostics_disabled = context.diagnostics_disabled();
     let const saved_warnings = context.warnings_enabled();
     if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled()) {
@@ -1295,42 +1235,38 @@ fn main(int argc, char **argv) -> int
 
   /* The startup config has loaded, so the session mood takes over and seeds its
      strictness. A default-mood shell turns nounset, pipefail, and failglob on
-     so a typo or a failing pipeline stage fails loudly, while a compatibility
-     mood keeps the lax bash or dash defaults. An explicit set -u survives. The
-     sourcing above swaps the mood per flavor, so the session mood is restored
-     here, unless the rc itself picked a mood with set --mood, which wins over
-     the startup default the way a command-line --mood would. */
+     while a compatibility mood keeps the lax bash or dash defaults, and an
+     explicit set -u survives. The sourcing swapped the mood per flavor, so the
+     session mood is restored here unless the rc picked one with set --mood,
+     which wins the way a command-line --mood would. */
   if (!context.mood_set_explicitly()) context.set_mood(session_mood);
   context.apply_strictness_for_mood();
 
   /* The profiles and rc files sourced through run_source each retained a heap
-     copy of their whole text and their parsed tree, held until the next
-     top-level command clears them. With the startup chain finished, that text
-     is dropped now rather than carried through the idle prompt, since a
-     function a profile defined keeps its body in the function arena and its
-     source in an owned copy, so nothing live indexes the dropped buffers. */
+     copy of their text and tree until the next top-level command clears them.
+     With the startup chain finished, that text is dropped now rather than
+     carried through the idle prompt. A function a profile defined keeps its
+     body in the function arena and its source in an owned copy, so nothing live
+     indexes the dropped buffers. */
   context.clear_retained_sources();
 
   /* A plain return must not be used past this point, since toiletline needs its
-   * own cleanup. utils::quit() runs it. */
+     own cleanup that utils::quit() runs. */
   loop
   {
     ASSERT(!shit::os::is_child_process());
 
     let script_contents = shit::String{};
     /* The named script file flows into the diagnostics so an error reads
-       path:line:col. A command string, standard input, or an interactive line
-       from the editor carries no path, so a prompt error stays a bare
-       line:col. */
+       path:line:col. A -c command, standard input, or an interactive line
+       carries no path, so a prompt error stays a bare line:col. */
     shit::Maybe<shit::StringView> source_filename = shit::None;
 
     try {
       if (should_read_files || should_read_stdin) {
         /* The shell runs exactly one script, the first operand, with the rest
-           of the operands as its positional parameters. If "-s" is used, or
-           when that operand is "-", read standard input, otherwise read the
-           named file, both through the descriptor layer so no iostream file
-           stream is pulled in. */
+           as positional parameters. -s or a "-" operand reads standard input,
+           otherwise the named file is read through the descriptor layer. */
         if (should_read_stdin || file_names[0] == "-") {
           LOG(Info, "reading the whole standard input");
           script_contents = shit::utils::read_entire_standard_input();
@@ -1340,8 +1276,7 @@ fn main(int argc, char **argv) -> int
           shit::Maybe<shit::String> contents =
               shit::Path{file_name.view()}.read_entire_file();
           if (!contents) {
-            /* The caret points at the operand in the joined invocation, the
-               same line the flag parser renders its errors against, so the
+            /* The caret points at the operand in the joined invocation, so the
                unopenable name is located rather than reported bare. */
             usize operand_offset = 0;
             for (int a = 0; a < parse_argc; a++) {
@@ -1361,8 +1296,8 @@ fn main(int argc, char **argv) -> int
           }
           script_contents = steal(*contents);
           source_filename = file_name.view();
-          /* A script-file run bottoms FUNCNAME out at "main" the way bash
-             marks it, while -c and stdin runs leave it off. */
+          /* A script-file run bottoms FUNCNAME out at "main" the way bash marks
+             it, while -c and stdin runs leave it off. */
           context.set_script_run(true);
         }
 
@@ -1382,33 +1317,27 @@ fn main(int argc, char **argv) -> int
           /* The set -b wake hook registers whenever the editor runs, even
              under -T, since job reporting is not completion. */
           toiletline::enable_job_notifications(context);
-          /* The line editor only completes at an interactive prompt, so the
-             engine is registered here and never on the script or -c path. The
-             -T flag leaves it unregistered, so the editor runs with no
-             completion callback and no ghost-text. */
+          /* The completion engine is registered only at an interactive prompt,
+             never on the script or -c path, and -T leaves it unregistered with
+             no completion callback. */
           if (!FLAG_NO_COMPLETION.is_enabled())
             toiletline::enable_completion(context);
-          /* The no-completion flag also silences the ghost suggestion, so the
-             history source does not keep offering one after completion is off.
-           */
+          /* -T also silences the ghost suggestion. */
           toiletline::set_ghost_enabled(!FLAG_NO_COMPLETION.is_enabled());
           shit::show_message(
               session_mood == shit::mimic_mood::Posix  ? "POSIX me harder!"
               : session_mood == shit::mimic_mood::Bash ? "Bash me harder!"
                                                        : "Welcome :3");
         } else {
-          /* This branch is reached only after a prior exit_raw_mode() call. */
           toiletline::enter_raw_mode();
         }
 
-        /* Report any background job that finished while the previous command
-           ran, the way bash prints a Done line before the next prompt. This is
-           the interactive branch, so a script never reaches it. */
+        /* Report any background job that finished during the previous command,
+           the way bash prints a Done line before the next prompt. */
         context.notify_done_jobs();
 
         /* Run the PROMPT_COMMAND hook before the template is expanded, so a
-           framework that assigns PS1 inside the hook has its assignment in
-           place by the time the prompt is built. */
+           framework that assigns PS1 inside it is in place by then. */
         run_prompt_command(context, ast_arena);
 
         shit::String prompt = toiletline::build_prompt(context);
@@ -1419,10 +1348,10 @@ fn main(int argc, char **argv) -> int
 
           switch (code) {
           case TL_PRESSED_TAB:
-            /* The completion engine handles TAB inside the editor and returns
-               TL_PRESSED_ENTER or TL_SUCCESS, so this fires only when there was
-               nothing to complete. Re-feed the line and keep prompting on the
-               same row rather than inserting a literal tab. */
+            /* The completion engine handles TAB inside the editor, so this
+               fires only when there was nothing to complete. The line is
+               re-fed to keep prompting on the same row rather than inserting a
+               literal tab. */
             toiletline::set_input(input);
             continue;
           case TL_PRESSED_EOF:
@@ -1440,12 +1369,10 @@ fn main(int argc, char **argv) -> int
             }
             break;
           case TL_PRESSED_INTERRUPT:
-            /* Ignore Ctrl-C. */
             shit::print("^C");
             shit::flush();
             break;
           case TL_PRESSED_SUSPEND:
-            /* Ignore Ctrl-Z. */
             shit::print("^Z");
             shit::flush();
             break;
@@ -1486,15 +1413,12 @@ fn main(int argc, char **argv) -> int
        used to clear the input line does not abort the command about to run. */
     shit::os::INTERRUPT_REQUESTED = 0;
 
-    /* This is the final chunk to run when should_quit is set, so the shell
-       exits with its status next. A terminal external command in it may replace
-       the shell process rather than fork, exec, and wait, the way dash execs
-       the last command under EV_EXIT. An interactive prompt keeps reading, and
-       an EXIT trap must run before the shell ends, so both keep the fork. The
-       exit-code and stats trailers print after the command runs, so the shell
-       keeps the fork to regain control and emit them. The flag rides only the
-       tail position from here, since the compound nodes clear it on every path
-       but the terminal simple command. */
+    /* When should_quit is set this is the final chunk, so a terminal external
+       command may replace the shell process rather than fork, exec, and wait,
+       the way dash execs the last command under EV_EXIT. An interactive prompt,
+       an EXIT trap, or a pending trailer keeps the fork to regain control. The
+       flag rides only the tail position, since the compound nodes clear it
+       everywhere but the terminal simple command. */
     const bool should_print_post_run_trailer =
         context.show_exit_code() || context.stats_enabled();
     context.set_terminal_exec_allowed(
@@ -1504,15 +1428,15 @@ fn main(int argc, char **argv) -> int
     exit_code = run_script_contents(script_contents, context, ast_arena,
                                     source_filename);
 
-    /* A child process reaches here when its exec() failed and it printed the
-     * error itself. */
+    /* A child process reaches here when its exec() failed and printed the error
+       itself. */
     if (should_quit || shit::os::is_child_process() ||
         (FLAG_ERROR_EXIT.is_enabled() && exit_code != 0))
     {
 #if !defined NDEBUG
-      /* The completion test driver runs after the staged chunks, so a -c
-         that registered specs or sourced a completion file is visible to
-         the engine, and the exit code reflects the driver alone. */
+      /* The completion test driver runs after the staged chunks, so a -c that
+         registered specs is visible to the engine, and the exit code reflects
+         the driver alone. */
       if (FLAG_DEBUG_COMPLETE_AT.is_set() && !shit::os::is_child_process()) {
         exit_code = shit::run_debug_completion_driver(
             FLAG_DEBUG_COMPLETE_AT.value(), context);

@@ -4,13 +4,9 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* complete registers a programmable-completion spec for a command, the bash
-   builtin a completion script calls, such as complete -o default -F _name name.
-   The spec is stored on the context, and the interactive completion engine
-   consults it when an argument to that command is completed. The -F function
-   and the -W word list drive the candidates, and -o default falls back to
-   filename completion when the spec yields nothing. The remaining options are
-   accepted so a config sources cleanly. */
+/* The -F function and the -W word list drive the candidates, and -o default
+   falls back to filename completion when the spec yields nothing. The remaining
+   options are accepted so a config sources cleanly. */
 
 FLAG_LIST_DECL();
 
@@ -60,7 +56,6 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* The spec the options build, then registered for each named command. */
   let function_name = String{};
   let word_list = String{};
   bool should_use_default = false;
@@ -70,8 +65,6 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   for (usize i = 1; i < args.count();) {
     let const arg = args[i].view();
-    /* A double dash ends option parsing, so complete -p -- man reads man as a
-       command name rather than another option. */
     if (arg == "--") {
       for (i++; i < args.count(); i++)
         commands.push_managed(args[i].view());
@@ -107,16 +100,12 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       i++;
       continue;
     }
-    /* These options carry a value that is accepted without effect, so the value
-       argument is skipped with them. */
     if (arg == "-A" || arg == "-G" || arg == "-C" || arg == "-X" ||
         arg == "-P" || arg == "-S")
     {
       i += 2;
       continue;
     }
-    /* Any other dash option, such as -r, -f, or the action letters, is
-       accepted without effect. */
     if (!arg.is_empty() && arg[0] == '-') {
       i++;
       continue;
@@ -201,4 +190,4 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

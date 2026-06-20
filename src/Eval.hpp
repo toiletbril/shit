@@ -30,7 +30,7 @@ struct glob_field
 
   String text;
   /* The mask grows by push, so it stays on the heap allocator where a grow
-     frees the old buffer, the bump arena would leak every grow. */
+     frees the old buffer, since the bump arena would leak every grow. */
   ArrayList<bool> glob_active;
 };
 
@@ -42,8 +42,7 @@ struct arith_token;
 
 /* One element of a [[ ]] conditional. An operand carries a word expanded
    without field splitting, the rest are the grammar operators. A word operator
-   such as
-   == or -f arrives as an operand and is classified by its text. */
+   such as == or -f arrives as an operand and is classified by its text. */
 struct conditional_element
 {
   enum class Kind : u8
@@ -62,9 +61,8 @@ struct conditional_element
   const Token *word{nullptr};
 };
 
-/* A pending non-local jump the evaluator carries instead of throwing. The
-   tree-walk checks after each child and consumes it at the matching boundary or
-   leaves it pending for an outer node. */
+/* A pending non-local jump the evaluator carries instead of throwing, consumed
+   at the matching boundary or left pending for an outer node. */
 struct control_flow
 {
   enum class Kind : u8
@@ -80,16 +78,15 @@ struct control_flow
   /* The loop level for break and continue, or the status for return and exit.
    */
   i64 value{0};
-  /* Where the requesting builtin sits, so an escaped jump points a caret at it.
-     The offset indexes source, set when the jump is made. */
+  /* Where the requesting builtin sits, so an escaped jump points a caret at
+     it. */
   SourceLocation location{0, 0};
   const String *source{nullptr};
   String origin{};
 };
 
-/* One frame of the source backtrace, pushed when run_source begins. The origin
-   names the call, the call_site is where the dot or eval sits in its parent,
-   and parent_source is the text that call site lives in. */
+/* One frame of the source backtrace, pushed when run_source begins. The
+   call_site is where the dot or eval sits in its parent_source. */
 struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
@@ -101,40 +98,30 @@ struct source_frame
   String origin;
   SourceLocation call_site;
   const String *parent_source;
-  /* The bare path of a sourced file, the value BASH_SOURCE reports. Empty for
-     an eval or a sourced command with no backing file. */
+  /* The bare path of a sourced file, the value BASH_SOURCE reports. */
   String source_path;
 };
 
 /* A variable binding saved when a local shadows it. A None previous value means
-   the name was unset, so leaving the scope restores the unset state. The
-   indexed array is saved the same way. */
+   the name was unset, so leaving the scope restores the unset state. */
 struct local_binding
 {
   String name;
   Maybe<String> previous_value;
   Maybe<ArrayList<String>> previous_indexed_array;
-  /* The associative array the name held, as parallel key and value lists. */
   bool previous_was_associative{false};
   ArrayList<String> previous_associative_keys{heap_allocator()};
   ArrayList<String> previous_associative_values{heap_allocator()};
-  /* The sparse elements the name held, restored rather than wiped by the pop.
-   */
   ArrayList<usize> previous_sparse_indices{heap_allocator()};
   ArrayList<String> previous_sparse_values{heap_allocator()};
-  /* The integer mark the caller held. declare_local drops it so a fresh local
-     starts clean, the pop puts it back. */
   bool previous_was_integer{false};
-  /* The read-only mark the name carried in the caller, saved and restored the
-     same way, so a local -r marks only this scope and the caller's later
-     reassignment, or a second call to the same function, is not rejected as
-     read-only. */
+  /* The read-only mark, so a local -r marks only this scope and the caller's
+     later reassignment is not rejected. */
   bool previous_was_readonly{false};
 };
 
 /* A background job, one entry in the job table. The id is the number jobs and
-   fg name with a percent, such as %1. The pid is the process group leader so a
-   signal reaches every stage of a pipeline. */
+   fg name with a percent, such as %1. The pid is the process group leader. */
 struct job
 {
   enum class State : u8
@@ -151,9 +138,9 @@ struct job
   i32 last_status{0};
 };
 
-/* One reverted process-environment write, the prior value of a name an export,
-   an unset, or a reassignment of an exported name changed inside a subshell.
-   The value is absent when the name was unset before the write. */
+/* One reverted process-environment write, the prior value of an exported name
+   changed inside a subshell, absent when the name was unset before the write.
+ */
 struct environment_undo_entry
 {
   String name;
@@ -162,22 +149,19 @@ struct environment_undo_entry
 
 /* A live process substitution. The shell keeps one pipe end open as the /dev/fd
    path the consuming command uses, the forked child runs the inner command on
-   the other end. The descriptor closes and the child reaps once done. */
+   the other end. */
 struct process_substitution
 {
   os::descriptor shell_fd;
   os::process child;
   /* Where the command that opened the substitution sits, for a reap warning
-     caret. The source stays alive through the command, so a view is held rather
-     than the owning String. */
+     caret. A view is held rather than the owning String. */
   SourceLocation location;
   StringView source;
 };
 
 /* A mark a command takes at entry, the count of pending substitutions and temp
-   files before it ran, so its cleanup reaps only the ones it opened. A while
-   loop reading done < <(cmd) must not have its body reap the loop's producer.
- */
+   files before it ran, so its cleanup reaps only the ones it opened. */
 struct process_substitution_mark
 {
   usize pending{0};
@@ -194,8 +178,7 @@ struct subshell_saved_descriptor
 
 /* How a function body's absolute source positions map onto the stored
    definition copy. The copy holds a "name () " header then the body verbatim,
-   so an absolute position rebases by the body start and header length, and the
-   printed line adds the offset back to the defining file's numbering. */
+   so an absolute position rebases by the body start and header length. */
 struct function_definition_info
 {
   usize body_start_position{0};
@@ -203,8 +186,7 @@ struct function_definition_info
   usize line_offset{0};
   String filename{};
   /* The source instance the body was defined against. A call made while this
-     instance is still current needs no window, the absolute positions already
-     index the live text. */
+     instance is still current needs no window. */
   const String *defining_instance{nullptr};
   /* The mood and diagnostics state when the function was defined, so the body
      runs in its defining mood regardless of the mood at the call. The mood
@@ -216,16 +198,13 @@ struct function_definition_info
 };
 
 /* Record a visit to a directory in the frecency store at
-   ~/.shit_directory_history, for the z smart-cd builtin. Called after a
-   successful cd. */
+   ~/.shit_directory_history, for the z smart-cd builtin. */
 fn record_directory_access(StringView directory) throws -> void;
 
-/* A warning the evaluator can silence for the span of a construct, tracked in
-   the suppressed-warnings bitset on the context. UnsetReference exempts an
-   unset name entirely, the way [[ -v ]] reads only whether a name is set, so
-   neither the warning nor the set -u abort fires. UnsetTestOperand silences
-   only the advisory unset warning while a test or [ expands its operands, the
-   set -u abort still fires. Each value names a bit position in the bitset. */
+/* A warning the evaluator can silence for the span of a construct.
+   UnsetReference exempts an unset name entirely, so neither the warning nor the
+   set -u abort fires. UnsetTestOperand silences only the advisory unset warning
+   while a test or [ expands its operands, the set -u abort still fires. */
 enum class suppressible_warning : u8
 {
   UnsetReference,
@@ -239,18 +218,14 @@ struct eval_state_snapshot
   StringMap<String> shell_variables;
   StringMap<const Expression *> functions;
   StringMap<String> function_sources;
-  /* The definition position mappings ride the snapshot beside the sources, so
-     an isolated run leaves no stale mapping disagreeing with the restored
-     table. */
   StringMap<function_definition_info> function_definition_infos;
   StringMap<String> aliases;
   ArrayList<String> positional_params;
   Path working_directory;
   StringMap<String> traps;
   /* The read-only and integer name sets ride the snapshot too, so a readonly or
-     a declare -i inside a subshell or a command substitution dies with the
-     child rather than leaking its mark to the parent. The exported set is
-     already covered by the environment undo log rewound below. */
+     a declare -i inside a subshell dies with the child rather than leaking its
+     mark to the parent. */
   HashSet readonly_names;
   HashSet integer_names;
   bool error_exit;
@@ -258,22 +233,18 @@ struct eval_state_snapshot
   bool is_echo_enabled;
   bool is_echo_expanded_enabled;
   /* The length of the environment undo log when the snapshot was taken, the
-     point restore_state rewinds the process environment back to. A subshell
-     that writes no exported name leaves the log untouched, so the restore is a
-     single length comparison. */
+     point restore_state rewinds the process environment back to. */
   usize environment_undo_mark;
   /* The mood and the strictness toggles, the noclobber flag, and the allexport
-     flag ride the snapshot too, so a set -o pipefail, a set -u, a set -o
-     noclobber, a set -a, or a set --mood inside a subshell or a command
-     substitution dies with the child rather than leaking to the parent. */
+     flag ride the snapshot too, so a set -o or set --mood inside a subshell
+     dies with the child rather than leaking to the parent. */
   RuntimeState runtime;
   bool no_clobber;
   bool export_all;
 };
 
 /* A programmable-completion spec the complete builtin registers for a command.
-   The interactive engine consults it when completing an argument to that
-   command. function_name is the -F function, word_list is the -W word list, and
+   function_name is the -F function, word_list is the -W word list, and
    should_use_default falls back to filename completion when the spec yields
    nothing. */
 struct completion_spec
@@ -337,23 +308,16 @@ public:
 
   /* Variable expand, tilde expand, field split, and glob each token. When
      args_are_transient is set the returned vector lives on the scratch arena
-     and the caller owns its lifetime through a scratch mark and release, so a
-     simple command pays no per-argument heap allocation. The default builds the
-     vector on the heap, which a caller that keeps the words past the command,
-     such as a for loop or an array assignment, needs. */
+     so a simple command pays no per-argument heap allocation. */
   fn process_args(const ArrayList<const Token *> &args,
                   bool args_are_transient = false) throws -> ArrayList<String>;
 
-  /* The allocator for transient expansion data, which a bump arena hands out
-     and reclaims whole when the command ends. The accessor is const so a
-     read-only query can still build its temporaries on the scratch arena,
-     which is mutable the way a cache is. */
+  /* The allocator for transient expansion data, reclaimed whole when the
+     command ends. */
   fn scratch_allocator() const wontthrow -> Allocator
   {
     return bump_allocator(m_scratch_arena);
   }
-  /* A scratch mark and its release, so a caller can scope a transient argument
-     vector to one command and reclaim it before the next loop iteration. */
   mustuse fn scratch_mark() const wontthrow -> BumpArena::Mark
   {
     return m_scratch_arena.mark();
@@ -362,34 +326,27 @@ public:
   {
     m_scratch_arena.release(saved);
   }
-  /* Reclaim the scratch arena, called between top-level commands. */
   fn reset_scratch_arena() wontthrow -> void { m_scratch_arena.reset(); }
 
   fn set_shell_variable(StringView name, StringView value) throws -> void;
 
   /* Seed the shell-identity variables a script probes to find its host shell. A
-     bash identity advertises BASH_VERSION and BASH, every other mode advertises
-     the sh and dash version names. Shared by the startup and the mimicry run so
-     a mimicked shell looks like the real one rather than a half-set
-     environment. */
+     bash identity advertises BASH_VERSION and BASH, every other mode the sh and
+     dash version names. */
   fn seed_shell_identity_variables(bool bash_identity) throws -> void;
   fn unset_shell_variable(StringView name) throws -> void;
 
   /* Remove a single array element or associative key, backing unset name[sub].
-     An indexed element is removed and the later elements shift down, an
-     associative key is dropped, and a subscript on a name that is not an array
-     does nothing. */
+   */
   fn unset_array_element(StringView name, StringView subscript) throws -> void;
 
-  /* The bash indexed arrays, a name to an ordered list of element strings. They
-     live beside the scalar variables, and a scalar read of an array name yields
-     element zero the way bash treats $a as ${a[0]}. */
+  /* The bash indexed arrays, a name to an ordered list of element strings. A
+     scalar read of an array name yields element zero the way bash treats $a as
+     ${a[0]}. */
   fn set_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
   /* Publish a one-element PIPESTATUS for a simple command, the way bash
-     refreshes it after every foreground command so a later ${PIPESTATUS[0]}
-     reads this command rather than a stale pipeline. A pipeline publishes its
-     own multi-element array instead. */
+     refreshes it after every foreground command. */
   fn publish_single_pipe_status(i32 status) throws -> void;
   fn append_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
@@ -398,14 +355,11 @@ public:
 
   /* Assign one array element from a raw subscript, routing an associative name
      to a string key and an indexed name to an arithmetic index. The append form
-     concatenates onto the current element. Used by the a[i]=v and m[k]=v
-     parser path so the subscript expansion stays inside the evaluator. */
+     concatenates onto the current element. */
   fn assign_array_element(StringView name, StringView subscript,
                           StringView value, bool is_append) throws -> void;
   /* Read one array element as an arithmetic integer from a raw subscript, the
-     read counterpart of assign_array_element for the a[i] arithmetic path. The
-     subscript is expanded inside the evaluator, then the element parses as an
-     operand. */
+     read counterpart of assign_array_element. */
   fn read_array_element_integer(StringView name, StringView subscript) throws
       -> i64;
   pure fn lookup_indexed_array(StringView name) const wontthrow
@@ -415,8 +369,7 @@ public:
   }
 
   /* The bash associative arrays. The values live in one flat map under a
-     composite name-and-key, the declared names are tracked separately so an
-     empty associative array still routes a string subscript here. */
+     composite name-and-key, the declared names are tracked separately. */
   fn declare_associative_array(StringView name) throws -> void;
   pure fn is_associative_array(StringView name) const wontthrow -> bool
   {
@@ -428,37 +381,30 @@ public:
       -> Maybe<String>;
   fn associative_keys(StringView name) const throws -> ArrayList<String>;
   fn associative_values(StringView name) const throws -> ArrayList<String>;
-  /* Forget every element of an associative array and the name's membership, so
-     a local -A leaving its scope drops its entries before the caller's are put
-     back. */
+  /* Forget every element of an associative array and the name's membership. */
   fn clear_associative_array(StringView name) throws -> void;
 
   /* Every element of an array name as a list, the indexed elements in order,
      the associative values in store order, or a one-element list for a scalar.
-     "${a[@]}" emits one field per element. An unset name yields an empty list.
-   */
+     An unset name yields an empty list. */
   fn collect_array_elements(StringView name) const throws -> ArrayList<String>;
 
-  /* Whether an array element or key is set, backing [[ -v name[subscript] ]]. A
-     @ or * subscript asks whether the array holds any element, an associative
-     subscript checks the key, an indexed one checks the index is in range. */
+  /* Whether an array element or key is set, backing [[ -v name[subscript] ]].
+   */
   fn array_element_is_set(StringView name, StringView subscript) throws -> bool;
 
 #if SHIT_PLATFORM_IS POSIX
   /* The compiled form of an extended regex, reused across matches so a hot =~
-     loop compiles each distinct pattern once. A bad pattern throws the same
-     invalid-regex error the inline regcomp raised. */
+     loop compiles each distinct pattern once. */
   fn cached_compiled_regex(StringView pattern) throws -> regex_t *;
 #endif
 
   /* The subscripts of an array as a list, the indices of an indexed array or
-     the keys of an associative one, backing both the joined ${!a[@]} string and
-     the per-field quoted "${!a[@]}" expansion. */
+     the keys of an associative one. */
   fn collect_array_subscripts(StringView name) const throws
       -> ArrayList<String>;
 
-  /* Drop every sparsely-held element of an indexed array, so a whole-array
-     reassignment or an unset does not leave a far element behind. */
+  /* Drop every sparsely-held element of an indexed array. */
   fn clear_sparse_array(StringView name) throws -> void;
 
   /* Assign an array literal, honoring an explicit [index]=value element with a
@@ -469,19 +415,16 @@ public:
                                    bool is_append) throws -> void;
 
   /* Log a name's environment value before a write that outlives the statement,
-     so a subshell restore can revert it. Outside a subshell nothing is logged.
-   */
+     so a subshell restore can revert it. */
   fn record_environment_change(StringView name) throws -> void;
 
   /* The exported names, mirrored so an assignment tests an O(1) set rather than
-     scanning the environment on every write. Seeded from the inherited
-     environment at construction. */
+     scanning the environment on every write. */
   fn mark_exported(StringView name) throws -> void;
   fn unmark_exported(StringView name) throws -> void;
   pure fn is_exported(StringView name) const wontthrow -> bool;
 
-  /* Re-point the exported set after an environment value is restored, adding
-     the name when the restore writes a value and removing it when it unsets. */
+  /* Re-point the exported set after an environment value is restored. */
   fn sync_exported_after_restore(StringView name, bool has_value) throws
       -> void;
 
@@ -491,7 +434,7 @@ public:
   fn get_variable_value(StringView name) const throws -> Maybe<String>;
 
   /* The stored value of a plain shell variable, or nullptr when unset or a
-     special parameter. Valid until the next assignment to that name. */
+     special parameter. */
   hot fn lookup_shell_variable(StringView name) const wontthrow
       -> const String *
   {
@@ -517,10 +460,9 @@ public:
   /* The process id of the most recent background command, for $!. */
   fn set_last_background_pid(i64 pid) wontthrow -> void;
 
-  /* The job table tracks the background commands started with the & operator so
-     jobs, fg, bg, wait, and kill can act on them. register_job adds a running
-     job and returns its id. update_jobs polls every job without blocking and
-     marks the ones that finished or stopped. */
+  /* The job table tracks the background commands started with the & operator.
+     register_job adds a running job and returns its id. update_jobs polls every
+     job without blocking and marks the ones that finished or stopped. */
   fn register_job(os::process pid, StringView command) throws -> i32;
   fn update_jobs() throws -> void;
   fn jobs() wontthrow -> ArrayList<job> &;
@@ -529,42 +471,33 @@ public:
   fn forget_done_jobs() throws -> void;
 
   /* Poll the jobs, print a bash-style done line for each just-finished one,
-     then forget those entries. The prompt loop calls this before each
-     interactive prompt, gated on an interactive shell so a script stays silent.
-   */
+     then forget those entries. Gated on an interactive shell. */
   fn notify_done_jobs() throws -> void;
-  /* The Done lines notify_done_jobs prints, with the caller's line ending, so
-     the editor's wake hook prints \r\n rows in raw mode. */
+  /* The Done lines notify_done_jobs prints, with the caller's line ending. */
   fn format_done_job_notifications(StringView line_ending) throws -> String;
 
   /* monitor mode is set -m, on by default in an interactive shell. It gates the
-     terminal handoff so a non-interactive run never touches the controlling
-     terminal. */
+     terminal handoff so a non-interactive run never touches the tty. */
   fn set_monitor(bool enabled) wontthrow -> void;
   pure fn monitor() const wontthrow -> bool;
 
   /* notify mode is set -b. The prompt's wake hook reports a background job's
-     completion immediately, the zsh behavior, while off it waits for the
-     prompt. */
+     completion immediately. */
   fn set_notify(bool enabled) wontthrow -> void;
   pure fn notify() const wontthrow -> bool;
 
-  /* Registers a function and keeps a copy of its definition text, the span from
-     the name to the body's close that declare -f prints back. The body start
-     and location stamp map the body's absolute positions onto that copy, so a
-     diagnostic in a later call renders against it. */
+  /* Registers a function and keeps the definition text declare -f prints back,
+     with a stamp mapping its absolute positions onto that copy. */
   fn register_function(StringView name, const Expression *body,
                        StringView definition_text, usize body_start_position,
                        SourceLocation definition_location) throws -> void;
-  /* The recorded definition text of a function, or null when the name is not
-     a function or its span was not recorded. */
+  /* The recorded definition text of a function, or null when unrecorded. */
   fn find_function_source(StringView name) const wontthrow -> const String *;
   fn function_definition_info_of(StringView name) const wontthrow
       -> const function_definition_info *;
   /* The text and mapping a location renders against. The current source with
      identity numbering when the location indexes it, otherwise the innermost
-     function's definition copy with its window. Resolved only when a diagnostic
-     or a LINENO read fires. */
+     function's definition copy with its window. */
   struct resolved_render_source
   {
     const String *text{nullptr};
@@ -576,7 +509,7 @@ public:
   };
   pure fn resolve_render_source(SourceLocation location) const wontthrow
       -> resolved_render_source;
-  /* Every defined function name, sorted, the list declare -F prints. */
+  /* The list declare -F prints, sorted. */
   mustuse fn sorted_function_names() const throws -> ArrayList<String>;
   fn find_function(StringView name) const wontthrow -> const Expression *;
   pure fn has_functions() const wontthrow -> bool;
@@ -584,20 +517,18 @@ public:
   fn unset_function(StringView name) throws -> void;
   fn clear_functions() wontthrow -> void;
 
-  /* The names of every defined function, so the prepass of a later command
-     knows a function defined earlier resolves. */
+  /* The names of every defined function, for the prepass. */
   fn function_names() const throws -> HashSet;
 
   /* Programmable completion. register records what complete sets for a command,
-     lookup returns it, and run_completion_function calls a -F function with the
-     COMP_ variables set and returns its COMPREPLY entries. */
+     and run_completion_function calls a -F function and returns its COMPREPLY.
+   */
   fn register_completion_spec(StringView command, completion_spec spec) throws
       -> void;
   pure fn lookup_completion_spec(StringView command) const wontthrow
       -> const completion_spec *;
   /* The default completion complete -D registers, used when no command-specific
-     spec exists. bash-completion registers its dynamic loader this way, the
-     loader sources the per-command file and returns 124 to ask for a retry. */
+     spec exists. */
   fn register_default_completion_spec(completion_spec spec) throws -> void;
   pure fn default_completion_spec() const wontthrow -> const completion_spec *;
   /* The whole spec table, read by complete -p to replay the registrations. */
@@ -614,89 +545,71 @@ public:
                              i32 *out_exit_status = nullptr) throws
       -> ArrayList<String>;
   /* The bash -W word list semantics. The list undergoes shell expansion and
-     splits into fields. complete -W and compgen -W both route through here. A
-     list with no expansion byte, or one that fails to parse, splits plain.
-     allow_expansion off keeps the plain split for the per-keystroke ghost path.
-   */
+     splits into fields. allow_expansion off keeps the plain split. */
   fn expand_wordlist_to_fields(StringView wordlist,
                                bool allow_expansion = true) throws
       -> ArrayList<String>;
 
-  /* The names of every shell variable, so variable completion can offer them
-     after a '$'. The environment names are added by the caller, since they live
-     in the process rather than the store. */
+  /* The names of every shell variable, for variable completion after a '$'. */
   fn variable_names(Allocator result_allocator = heap_allocator()) const throws
       -> HashSet;
 
   /* trap stores an action to run for a condition, keyed by the condition name
-     such as EXIT or INT. The EXIT action runs once when the shell ends. A
-     signal condition also installs the shell's signal handler, so the action
-     runs when the signal arrives. */
+     such as EXIT or INT. A signal condition installs the shell's handler. */
   fn set_trap(StringView condition, StringView action) throws -> void;
   fn remove_trap(StringView condition) throws -> void;
   pure fn traps() const wontthrow -> const StringMap<String> &;
   fn run_exit_trap() throws -> void;
 
-  /* Run the action of every signal whose flag the handler set, called at the
-     command boundary when os::SIGNAL_PENDING is set. A re-entrancy guard keeps
-     a trap action that itself triggers a signal from nesting the drain. */
+  /* Run the action of every signal whose flag the handler set, at the command
+     boundary. A re-entrancy guard keeps a triggered signal from nesting. */
   fn run_pending_traps() throws -> void;
-  /* True when an EXIT trap action is set, so the run loop keeps the fork for a
-     terminal command and lets the trap run before the shell exits. */
+  /* True when an EXIT trap action is set. */
   fn has_exit_trap() const wontthrow -> bool;
 
-  /* A subshell runs its own EXIT trap at its end. This shell isolates by
-     snapshot rather than fork, so the boundary clears the inherited EXIT action
-     on entry and fires the subshell's own on exit, before restore_state brings
-     the parent table back. The parent still runs its own EXIT trap once at the
-     shell's end. */
+  /* A subshell clears the inherited EXIT action on entry and fires its own on
+     exit. */
   fn clear_inherited_exit_trap() throws -> void;
   fn run_subshell_exit_trap() throws -> void;
 
-  /* readonly marks a variable so a later assignment to it fails. The set is
-     usually empty, so set_shell_variable only scans it when it is not. */
+  /* readonly marks a variable so a later assignment to it fails. */
   fn mark_readonly(StringView name) throws -> void;
-  /* Drop a name's read-only mark, used when a local shadows a read-only caller
-     name so the fresh local starts writable. */
+  /* Drop a name's read-only mark, when a local shadows a read-only caller
+     name. */
   fn unmark_readonly(StringView name) throws -> void;
   fn is_readonly(StringView name) const wontthrow -> bool;
   fn readonly_names() const throws -> ArrayList<String>;
 
   /* declare -i marks a variable so every assignment evaluates the value as
-     arithmetic and stores the decimal result. declare +i and unset clear it. */
+     arithmetic and stores the decimal result. */
   fn mark_integer(StringView name) throws -> void;
   fn unmark_integer(StringView name) throws -> void;
   fn is_integer_variable(StringView name) const wontthrow -> bool;
-  /* Joins an appended arithmetic expression onto the prior value in joined, a
-     plus then the expression in parentheses so its precedence stays
-     self-contained. A blank expression joins as plus zero. */
+  /* Joins an appended arithmetic expression onto the prior value in joined,
+     parenthesized so its precedence stays self-contained. */
   fn append_integer_expression(String &joined,
                                StringView expression) const throws -> void;
 
   /* A function call pushes a local scope so a local builtin can shadow a
-     variable and restore it on return. declare_local records the current
-     binding in the innermost scope before the overwrite. */
+     variable and restore it on return. */
   fn enter_function_scope() throws -> void;
   fn leave_function_scope() throws -> void;
-  /* The function-call name stack behind FUNCNAME, pushed by the call and
-     popped with its scope, innermost last. */
+  /* The function-call name stack behind FUNCNAME, innermost last. */
   fn push_function_call_name(StringView name) throws -> void;
   fn pop_function_call_name() wontthrow -> void;
   /* The FUNCNAME frame list bash exposes, the function calls innermost first,
-     one "source" per sourced file in the chain, and "main" at the bottom of a
-     script run. The frames exist only while a function call is active. */
+     one "source" per sourced file, and "main" at the bottom of a script run. */
   mustuse fn funcname_frame_count() const wontthrow -> usize;
   mustuse fn funcname_frame_at(usize index) const wontthrow -> StringView;
   /* Marks the run as a script file, the invocation whose FUNCNAME bottoms out
-     at "main" the way bash marks it. */
+     at "main". */
   fn set_script_run(bool is_script_run) wontthrow -> void
   {
     m_is_script_run = is_script_run;
   }
   pure fn in_function_scope() const wontthrow -> bool;
   fn declare_local(StringView name) throws -> void;
-  /* True when the name already has a local binding in the innermost scope, so a
-     re-declared local appends to its value while a first one starts fresh. */
+  /* True when the name already has a local binding in the innermost scope. */
   mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;
 
   /* alias maps a command word to its replacement text, consulted by the parser
@@ -705,8 +618,7 @@ public:
   fn remove_alias(StringView name) throws -> bool;
   fn get_alias(StringView name) const throws -> Maybe<String>;
   fn alias_definitions() const throws -> ArrayList<String>;
-  /* The defined alias names, so the prepass treats a use of one as resolvable.
-   */
+  /* The defined alias names, for the prepass. */
   fn alias_names() const throws -> HashSet;
 
   /* Save and restore the mutable state around a subshell or a command
@@ -715,19 +627,17 @@ public:
   fn restore_state(eval_state_snapshot snapshot) throws -> void;
 
   /* Track whether evaluation is inside a subshell or a command substitution, so
-     the exit builtin ends only that scope instead of the whole shell. */
+     the exit builtin ends only that scope. */
   fn enter_subshell() wontthrow -> void;
   fn leave_subshell() wontthrow -> void;
   pure fn in_subshell() const wontthrow -> bool;
   /* Back the descriptor up before a bare exec moves it inside an in-process
      subshell, so leave_subshell restores it. The first backup per subshell
-     wins. Outside a subshell this is a no-op and the move stays permanent. */
+     wins. */
   fn snapshot_subshell_descriptor(i32 shell_fd) throws -> void;
 
   /* The control-flow channel break, continue, return, and exit write instead of
-     throwing. A request records where it was made for an escaped-jump caret.
-     The tree-walk consumes it at the matching loop, function, or subshell
-     boundary. */
+     throwing, consumed at the matching loop, function, or subshell boundary. */
   fn request_break(i64 level, SourceLocation location) throws -> void;
   fn request_continue(i64 level, SourceLocation location) throws -> void;
   fn request_return(i64 status, SourceLocation location) throws -> void;
@@ -744,14 +654,13 @@ public:
   pure fn current_source() const wontthrow -> const String *;
   pure fn current_origin() const wontthrow -> const String &;
   /* Print the source backtrace, every dot or eval call site from the innermost
-     out, as context under a diagnostic. A frame at error_location is dropped to
-     avoid repeating the caret the error already printed. */
+     out, as context under a diagnostic. A frame at error_location is dropped.
+   */
   fn print_source_backtrace(
       Maybe<SourceLocation> error_location = None) const throws -> void;
 
   /* The byte offset of the command being evaluated, the position $LINENO
-     reports the line of. A SimpleCommand and an assignment set it, the
-     statement granularity autoconf reads $LINENO at. */
+     reports the line of. */
   fn set_current_location(SourceLocation location) wontthrow -> void;
 
   /* The set builtin toggles these options at run time. error_exit is set -e,
@@ -767,8 +676,7 @@ public:
   {
     m_runtime.error_unset_explicit = enabled;
   }
-  /* Mark a warning suppressed or not for the span of a construct, so a caller
-     saves the prior state, sets it, and restores it on the way out. */
+  /* Mark a warning suppressed or not for the span of a construct. */
   fn set_warning_suppressed(suppressible_warning which, bool enabled) wontthrow
       -> void
   {
@@ -784,8 +692,7 @@ public:
     return (m_suppressed_warnings & (u32{1} << static_cast<u32>(which))) != 0;
   }
   /* -W keeps a run going past a strict error by reporting it as a warning. The
-     analysis stage reads the static flag, the runtime checks below read this
-     mirror so set -W flips it mid-run too. */
+     runtime checks below read this mirror so set -W flips it mid-run. */
   fn set_warnings_enabled(bool enabled) wontthrow -> void
   {
     m_runtime.are_warnings_enabled = enabled;
@@ -795,27 +702,20 @@ public:
     return m_runtime.are_warnings_enabled;
   }
   /* A reference to an unset variable, fatal under set -u, downgraded to a
-     warning under -W unless the set -u was the script's explicit ask, expanded
-     to empty in a lenient run. The location rides the command being
-     evaluated. */
+     warning under -W unless the set -u was explicit, else expanded to empty. */
   fn report_unset_reference(StringView name) throws -> void;
-  /* A suspicious runtime condition the strict default treats as fatal, the
-     unmatched glob the one caller. Throws when fatal and not downgraded,
-     warns under -W, returns for the lenient fallback otherwise. */
+  /* A suspicious runtime condition the strict default treats as fatal. Throws
+     when fatal and not downgraded, warns under -W, returns otherwise. */
   fn warn_or_throw(bool fatal, bool explicitly_requested,
                    SourceLocation location, StringView message,
                    StringView note = {}) throws -> void;
-  /* Renders a located runtime warning at the command being evaluated, the
-     shared path the -W downgrades print through. The _at form takes a finer
-     location inside that command, the unset-variable caret on the reference
-     itself. */
+  /* Renders a located runtime warning at the command being evaluated. The _at
+     form takes a finer location inside that command. */
   cold fn show_runtime_warning(StringView message) wontthrow -> void;
   cold fn show_runtime_warning_at(SourceLocation location, StringView message,
                                   StringView note = {}) wontthrow -> void;
   /* The location of the $name or ${name spelling inside the command being
-     evaluated, found by scanning the command's source span, since word
-     segments carry no positions of their own. The statement location is the
-     fallback when the spelling is not found, a name built dynamically. */
+     evaluated. The statement location is the fallback when it is not found. */
   pure fn locate_variable_reference(StringView name) const wontthrow
       -> SourceLocation;
 
@@ -838,23 +738,19 @@ public:
      set -o allexport. */
   fn set_export_all(bool enabled) wontthrow -> void;
   pure fn export_all() const wontthrow -> bool;
-  /* noglob disables pathname expansion, set by -f and set -o noglob, and shares
-     the path-expansion flag the field splitting already reads. */
+  /* noglob disables pathname expansion, set by -f and set -o noglob. */
   fn set_no_glob(bool enabled) wontthrow -> void;
   pure fn no_glob() const wontthrow -> bool;
   /* noexec parses without running, set by -n and set -o noexec. */
   fn set_no_exec(bool enabled) wontthrow -> void;
   pure fn no_exec() const wontthrow -> bool;
   /* shitbox makes the bundled coreutility names resolve directly as commands,
-     set by --enable-shitbox at startup and set -o shitbox at run time. The
-     command resolver reads a process global the setter mirrors onto, since it
-     runs with no context in scope. */
+     set by --enable-shitbox at startup and set -o shitbox at run time. */
   fn set_shitbox(bool enabled) wontthrow -> void;
   pure fn shitbox() const wontthrow -> bool;
-  /* failglob makes a glob that matches no path a hard error, the shell default
-     that catches a typo. With it off the unmatched glob expands to its literal
-     pattern the way POSIX and dash do, set by --no-fail-glob and set -o
-     failglob. */
+  /* failglob makes a glob that matches no path a hard error. With it off the
+     unmatched glob expands to its literal pattern, set by --no-fail-glob and
+     set -o failglob. */
   fn set_failglob(bool enabled) wontthrow -> void;
   pure fn failglob() const wontthrow -> bool;
   /* Marks the glob strictness as the script's own set -o failglob rather than
@@ -863,9 +759,9 @@ public:
   {
     m_runtime.failglob_explicit = enabled;
   }
-  /* True while a test or [ command expands its arguments, so an unmatched
-     glob there stays a silent literal and the probe answers false instead of
-     tripping failglob on the very check that asks whether a file exists. */
+  /* True while a test or [ command expands its arguments, so an unmatched glob
+     there stays a silent literal and the probe answers false rather than
+     tripping failglob. */
   fn set_glob_exempt_for_test(bool enabled) wontthrow -> void
   {
     m_glob_exempt_for_test = enabled;
@@ -875,49 +771,39 @@ public:
     return m_glob_exempt_for_test;
   }
   /* The compgen -G probe, glob matches with failglob suppressed and a plain
-     name reported only when the file exists. Public so the compgen builtin
-     reaches it. */
+     name reported only when the file exists. */
   fn expand_glob_lenient(StringView pattern) throws -> ArrayList<String>;
 
   /* Bash mood enables the bash extensions that change the meaning of valid
-     POSIX syntax, such as the (( )) arithmetic command and brace expansion. The
-     evaluator reads it for brace expansion and the parser is handed it at
-     construction for the (( )) and C-style for syntax. The shell sits in
-     exactly one mood at a time, held in m_runtime, and the mood is selected
-     through set_mood by the --mood flag and the set --mood builtin. These
-     predicates name the active mood for the lexer, the completion, and the
-     globbing. */
+     POSIX syntax, such as the (( )) arithmetic command and brace expansion. */
   pure fn is_bash_compatible() const wontthrow -> bool
   {
     return m_runtime.mood == mimic_mood::Bash;
   }
 
-  /* POSIX mood behaves like dash. The non-posix-breaking bash additions that
-     are on in the default mood too, such as the extended globs, read this to
-     stay off only here. */
+  /* POSIX mood behaves like dash. The non-posix-breaking bash additions on in
+     the default mood, such as the extended globs, read this to stay off here.
+   */
   pure fn is_posix_mode() const wontthrow -> bool
   {
     return m_runtime.mood == mimic_mood::Posix;
   }
 
-  /* The mood the lexer reads, the single source of truth for the three moods.
-     set_mood changes only the mood, so a caller that wants the strictness moved
-     with it calls apply_strictness_for_mood after. */
+  /* The mood the lexer reads. set_mood changes only the mood, so a caller that
+     wants the strictness moved with it calls apply_strictness_for_mood after.
+   */
   fn set_mood(mimic_mood mood) wontthrow -> void { m_runtime.mood = mood; }
   pure fn mood() const wontthrow -> mimic_mood { return m_runtime.mood; }
 
-  /* The -c command string, the source of BASH_EXECUTION_STRING, set by Main on
-     the -c path and left empty otherwise so the variable reads unset. */
+  /* The -c command string, the source of BASH_EXECUTION_STRING. */
   fn set_execution_string(StringView text) throws -> void
   {
     m_execution_string = String{heap_allocator(), text};
   }
 
-  /* Seed the nounset, pipefail, and failglob strictness from the active mood,
-     so the strict default mood runs strict and a compatibility mood runs lax,
-     the way the named shell does. An explicit set -u, set -o pipefail, or set
-     -o failglob is the script's own ask, so it survives the mood switch
-     untouched. The startup seam and the set --mood builtin both call this. */
+  /* Seed the nounset, pipefail, and failglob strictness from the active mood.
+     An explicit set -u, set -o pipefail, or set -o failglob is the script's own
+     ask, so it survives the mood switch untouched. */
   fn apply_strictness_for_mood() wontthrow -> void
   {
     let const strict = m_runtime.mood == mimic_mood::Default;
@@ -928,8 +814,8 @@ public:
 
   /* Enter the mood and diagnostic state a function was defined in, deriving the
      strictness from that mood, and return the previous RuntimeState so a defer
-     restores it. The defining state arrives as one object rather than a flag at
-     a time. RuntimeState reads and writes the toggles, so it is a friend. */
+     restores it. RuntimeState reads and writes the toggles, so it is a friend.
+   */
   friend class RuntimeState;
   fn enter_definition_state(const function_definition_info &info) wontthrow
       -> RuntimeState
@@ -961,9 +847,7 @@ public:
   }
 
   /* set --mood records that the user chose the mood, so the post-rc restore in
-     main leaves a mood the rc selected in place rather than overwriting it with
-     the startup default the way it would for a mood only the flavor sourcing
-     touched. */
+     main leaves a mood the rc selected in place. */
   fn note_explicit_mood() wontthrow -> void { m_mood_set_explicitly = true; }
   pure fn mood_set_explicitly() const wontthrow -> bool
   {
@@ -971,8 +855,7 @@ public:
   }
 
   /* The moods whose startup files have finished sourcing this session, so set
-     --init-moods with no value reports what loaded. A flavor stays marked once
-     it sources, both at startup and from a later set --init-moods. */
+     --init-moods with no value reports what loaded. */
   fn mark_mood_initialized(mimic_mood mood) wontthrow -> void
   {
     m_initialized_moods |= static_cast<u8>(1U << static_cast<u8>(mood));
@@ -983,8 +866,7 @@ public:
   }
 
   /* Mimicry runs a shell script in-process in the matching mode rather than
-     launching the shell, mirrored here so the execution path reads it off the
-     context. */
+     launching the shell. */
   fn set_mimicry(bool enabled) wontthrow -> void { m_mimicry = enabled; }
   pure fn mimicry() const wontthrow -> bool { return m_mimicry; }
 
@@ -999,29 +881,25 @@ public:
     return !m_runtime.are_diagnostics_disabled;
   }
   /* Run the script at the resolved program in-process in the matching mode.
-     When isolated is true the run is contained in a snapshotted subshell so its
-     cd, exports, and exit do not leak, and when false the run is the terminal
-     command that the shell exits with, so the snapshot is skipped. */
+     When isolated is true the run is contained in a snapshotted subshell, and
+     when false the snapshot is skipped. */
   fn run_mimicked_script(ExecContext &ec, mimic_mood mode, bool isolated) throws
       -> i32;
-  /* The extended globs are on everywhere except POSIX mode, the way bash treats
-     a feature that POSIX rejects anyway as a pure addition. */
+  /* The extended globs are on everywhere except POSIX mode. */
   pure fn extglob_enabled() const wontthrow -> bool
   {
     return m_runtime.mood != mimic_mood::Posix;
   }
 
   /* The bash dynamic variables, FUNCNAME and RANDOM and their kin, exist
-     everywhere except POSIX mode, the same pure-addition rule the extended
-     globs follow, so a bash config sources in the default mood too. */
+     everywhere except POSIX mode. */
   pure fn bash_dynamic_variables_enabled() const wontthrow -> bool
   {
     return m_runtime.mood != mimic_mood::Posix;
   }
 
   /* The pure bash additions that POSIX rejects outright, brace expansion and
-     printf -v, ride every mood but POSIX under the same rule. The lexer holds
-     its own copy of this predicate for the token-level additions. */
+     printf -v, ride every mood but POSIX. */
   pure fn bash_additions_enabled() const wontthrow -> bool
   {
     return m_runtime.mood != mimic_mood::Posix;
@@ -1035,9 +913,7 @@ public:
   }
   pure fn is_shopt_enabled(StringView name) const wontthrow -> bool
   {
-    /* A name never set falls back to the bash default table, so a config that
-       probes shopt -q progcomp reads the real bash default with no per-launch
-       seeding cost. */
+    /* A name never set falls back to the bash default table. */
     const bool *value = m_shopt_options.find(name);
     if (value != nullptr) return *value;
     return shopt_default_is_on(name);
@@ -1052,30 +928,20 @@ public:
   fn leave_condition() wontthrow -> void;
   pure fn in_condition() const wontthrow -> bool;
 
-  /* The count of loops currently running in the active execution context. A
-     loop body increments it around the iterations and decrements after. The
-     break and continue builtins clamp their requested level to this count, so a
-     level past the nesting breaks every enclosing loop rather than escaping as
-     an error, and a request with no enclosing loop is dropped. A function call
-     and a subshell save and zero this around their body, so a jump inside them
-     sees only their own loops, matching dash. */
+  /* The count of loops currently running, the cap the break and continue
+     builtins clamp their level to. A function call and a subshell zero it. */
   fn enter_loop() wontthrow -> void;
   fn leave_loop() wontthrow -> void;
   pure fn loop_depth() const wontthrow -> usize;
   fn set_loop_depth(usize depth) wontthrow -> void;
 
-  /* The run loop sets this before the final chunk's evaluation when the shell
-     will exit with that chunk's status and no EXIT trap is pending. A terminal
-     external command then replaces the shell process instead of fork, exec, and
-     wait, the way dash execs the last command under EV_EXIT. The flag rides
-     only the tail position. A compound list clears it on every node but its
-     last, and every other node clears it, so only a command whose status
-     becomes the shell's status sees it set. */
+  /* The run loop sets this before the final chunk when the shell will exit with
+     that chunk's status and no EXIT trap is pending, so a terminal external
+     command replaces the shell process instead of fork and wait. */
   fn set_terminal_exec_allowed(bool enabled) wontthrow -> void;
 
-  /* Whether a completion function is evaluating right now. The terminal
-     retitle reads it so a tab press never renames the window after the
-     command a completion ran internally. */
+  /* Whether a completion function is evaluating right now. The terminal retitle
+     reads it so a tab press never renames the window. */
   fn set_completion_function_running(bool running) wontthrow -> void
   {
     m_is_completion_function_running = running;
@@ -1087,7 +953,7 @@ public:
 
   /* Whether a builtin is running as a stage of a multi-stage pipeline. exec
      reads it so exec in a pipeline stage spawns a child rather than replacing
-     the whole shell, the way bash runs each stage in its own process. */
+     the whole shell. */
   fn set_in_pipeline_stage(bool in_stage) wontthrow -> void
   {
     m_is_in_pipeline_stage = in_stage;
@@ -1098,8 +964,7 @@ public:
   }
   /* Whether a dispatched command may retitle the window. Only a command the
      user submitted at an interactive prompt qualifies, never a startup file,
-     an in-process subshell or substitution, or a completion-time run. A new
-     internal-run context extends this predicate rather than its call site. */
+     an in-process subshell or substitution, or a completion-time run. */
   pure fn should_retitle_for_command() const wontthrow -> bool
   {
     return shell_is_interactive() && startup_finished() && !in_subshell() &&
@@ -1114,87 +979,69 @@ public:
      substitution but no field splitting and no globbing. */
   fn expand_word_for_assignment(const Word &word) throws -> String;
 
-  /* Evaluate a [[ ]] conditional element list and report whether it is true.
-     The operands expand without field splitting, == and != glob match their
-     right side, < and > compare strings, and && and || join primaries. */
   /* Compute the integer value of a $((...)) or (( )) expression, resolving
      shell variables and applying any assignments inside it. */
   fn evaluate_arithmetic(StringView expression) throws -> i64;
 
   /* Evaluate an expression for the calc builtin and return its decimal text,
      setting out_nonzero for the exit status. In the default mood the value is
-     computed in 128 bits through the compiler's __int128, so a result wider
-     than 64 bits prints in full, while the bash and posix moods keep the 64-bit
-     wrap evaluate_arithmetic gives. */
+     computed in 128 bits, while the bash and posix moods keep the 64-bit wrap
+     evaluate_arithmetic gives. */
   fn evaluate_arithmetic_wide(StringView expression, bool &out_nonzero) throws
       -> String;
 
   /* The same value as evaluate_arithmetic, but a substitution-free expression
-     lexes its tokens once onto the segment and re-evaluates from them, so a
-     $((...)) in a loop body does not re-scan its bytes each expansion. A
-     complex expression or any lexing failure falls back to the char parser. */
+     lexes its tokens once onto the segment and re-evaluates from them. */
   fn evaluate_arithmetic_cached(const WordSegment &segment) throws -> i64;
 
   /* The same value as evaluate_arithmetic, but it lexes the clause once into
-     the caller-owned token store and re-evaluates from it. The C-style for loop
-     owns a token store per clause, so its condition and step do not re-scan
-     their bytes on every iteration. A complex clause or a lexing failure falls
-     back to the char parser, and a clause holding a substitution skips the
-     cache. */
+     the caller-owned token store and re-evaluates from it. A complex clause or
+     a lexing failure falls back to the char parser, and a clause holding a
+     substitution skips the cache. */
   fn evaluate_arithmetic_cached_clause(StringView expression,
                                        ArrayList<arith_token> &tokens,
                                        bool &is_tokenized,
                                        bool &is_simple) throws -> i64;
 
+  /* Evaluate a [[ ]] conditional element list and report whether it is true.
+     The operands expand without field splitting, == and != glob match their
+     right side, < and > compare strings, and && and || join primaries. */
   fn evaluate_conditional(const ArrayList<conditional_element> &elements) throws
       -> bool;
 
-  /* Expand a case pattern word the same way assignment context expands, with no
-     field splitting and no pathname globbing, plus a parallel mask that marks
-     which output bytes may act as glob metacharacters. A byte from a quoted or
-     double-quoted region is inactive, an unquoted literal byte is active, and a
-     byte from an unquoted expansion is active so a * or ? in the value matches
-     as a wildcard. The case matcher reads the mask so a quoted metacharacter in
-     the pattern matches literally. */
+  /* Expand a case pattern word the same way assignment context expands, plus a
+     parallel mask of which output bytes may act as glob metacharacters, so a
+     quoted metacharacter in the pattern matches literally. */
   fn expand_case_pattern_masked(const Word &word,
                                 ArrayList<bool> &active_out) throws -> String;
 
   /* Run the source of a $(...) and return its standard output with trailing
-     newlines stripped. The inner command runs in-process with the working
-     directory and variables snapshotted, so a cd or an assignment inside does
-     not leak to the parent. The filename, when given, backs the source
-     locations the parsed AST carries and is read again when an error renders
-     against that AST, so its bytes must outlive the parse arena. A string
-     literal is the safe caller. */
+     newlines stripped. The inner command runs in-process with state
+     snapshotted. The filename, when given, backs the source locations the
+     parsed AST carries, so its bytes must outlive the parse arena. */
   fn capture_command_substitution(const String &source,
                                   Maybe<StringView> filename = None) throws
       -> String;
 
   /* Same capture, but the segment caches its parsed inner command so a $(...)
-     in a loop body is lexed and parsed once and re-evaluated thereafter. The
-     evaluation still runs every call, so output and side effects are
-     unchanged. */
+     in a loop body is lexed and parsed once and re-evaluated thereafter. */
   fn capture_command_substitution(const WordSegment &segment) throws -> String;
 
   /* Run the source of a ${ ...; } funsub and return its standard output with
-     trailing newlines stripped, the bash 5.3 form. The body runs in the
-     current shell with no snapshot and no subshell, so its assignments, cd,
-     and function definitions persist. A break, continue, or return is
-     consumed inside it, while an exit stays pending and ends the shell after
-     the surrounding command, the way bash exits from a funsub. */
+     trailing newlines stripped, the bash 5.3 form. The body runs in the current
+     shell with no snapshot, so its assignments persist. A break, continue, or
+     return is consumed inside it, while an exit stays pending. */
   fn capture_function_substitution(const WordSegment &segment) throws -> String;
 
-  /* The $(< file) shorthand reads the named file directly the way bash does,
-     when the substitution body is only an input redirection naming one word
-     with no command. None when the body is anything else, so the caller parses
-     and runs it normally. */
+  /* The $(< file) shorthand reads the named file directly, when the
+     substitution body is only an input redirection naming one word with no
+     command. None when the body is anything else. */
   fn read_redirect_substitution(StringView source) throws -> Maybe<String>;
 
-  /* Run a <(...) or >(...) process substitution. The text leads with the
-     direction byte. A pipe is opened, the inner command runs in a forked child
-     on one end, and the shell keeps the other end open and returns its /dev/fd
-     path. The descriptor and the child are recorded so the command that uses
-     the path can clean them up when it finishes. */
+  /* Run a <(...) or >(...) process substitution. A pipe is opened, the inner
+     command runs in a forked child on one end, and the shell keeps the other
+     end open and returns its /dev/fd path. The descriptor and the child are
+     recorded for later cleanup. */
   fn setup_process_substitution(StringView text) throws -> String;
   /* Close the descriptors and reap the children of the process substitutions a
      command opened. Closing first sends SIGPIPE to a producer that has more to
@@ -1210,48 +1057,36 @@ public:
   fn run_captured_substitution(const Expression *ast,
                                const String &source) throws -> String;
 
-  /* Lex, parse, and evaluate a source string in the current context, without
-     capturing output or snapshotting state. The eval and dot builtins use this,
-     so a break, a return, or an assignment inside acts on the caller. */
-  /* Lex, parse, and evaluate a chunk of source in this context. A dot-source
-     consumes a return at the top of the chunk and ends there, while an eval
-     leaves the return pending so it propagates to the enclosing function or the
-     shell, which is why consume_return is false for eval. */
-  /* call_site names where the dot or eval that triggered this run sits in its
-     own parent source, so a backtrace frame points a caret at it. It is None
-     for a run with no surrounding source, such as the EXIT trap. filename is
-     the bare path of the source being run, stamped into every location its
-     lexer makes. */
+  /* Lex, parse, and evaluate a chunk of source in this context, without
+     capturing output or snapshotting state. A dot-source consumes a return at
+     the top of the chunk and ends there, while an eval leaves it pending, which
+     is why consume_return is false for eval. call_site names where the dot or
+     eval sits in its parent, and filename is the source's bare path. */
   fn run_source(StringView source, StringView origin = "a sourced command",
                 bool consume_return = true,
                 Maybe<SourceLocation> call_site = None,
                 Maybe<StringView> filename = None) throws -> i32;
 
-  /* A guard around a nested dot-source or eval run, and one around a function
-     call. Each increments a depth counter and throws a located error past the
-     cap rather than recursing until memory is exhausted. The caller pairs the
-     enter with a defer that calls the matching leave on every unwind path. */
+  /* A guard around a nested dot-source, eval run, or function call. Each throws
+     a located error past the recursion cap rather than exhausting memory. */
   fn enter_source(SourceLocation location) throws -> void;
   fn leave_source() wontthrow -> void;
   fn enter_function_call(SourceLocation location) throws -> void;
   fn leave_function_call() wontthrow -> void;
 
-  /* getopts keeps the position inside the current argument here, so a grouped
-     option such as -abc is parsed one letter per call. last_optind detects when
-     the script reset OPTIND to start a fresh scan. */
+  /* getopts keeps the position inside the current argument here, so -abc is
+     parsed one letter per call. last_optind detects an OPTIND reset. */
   pure fn getopts_char_index() const wontthrow -> usize;
   fn set_getopts_char_index(usize index) wontthrow -> void;
   pure fn getopts_last_optind() const wontthrow -> i64;
   fn set_getopts_last_optind(i64 optind) wontthrow -> void;
 
-  /* Destroy the ASTs retained from eval and dot. The caller does this before it
-     resets the parse arena, so a function those sources defined stays valid for
-     the rest of the current top-level command. */
+  /* Destroy the ASTs retained from eval and dot, before the parse arena is
+     reset, so a function those sources defined stays valid for the command. */
   fn clear_retained_sources() wontthrow -> void;
 
   /* Keep a top-level command's tree alive past its run, so a function it
-     defined stays callable on the next command. The retained trees are
-     destroyed by clear_retained_sources while the arena is still valid. */
+     defined stays callable on the next command. */
   fn retain_ast(Expression *ast) throws -> void;
 
   /* Expand a heredoc body, its $name and ${...} references, keeping the literal
@@ -1261,32 +1096,25 @@ public:
   fn expand_modifier_word(StringView word, bool remove_quotes = true) throws
       -> String;
 
-  /* The same expansion, plus a parallel mask that marks which output bytes may
-     act as glob metacharacters. A byte from a quoted, single-quoted, or escaped
-     region is inactive, an unquoted literal byte is active, and a byte from an
-     unquoted expansion is active so a * or ? in the value globs. The ${x#pat}
-     and ${x%pat} forms read the mask so a quoted * in the pattern matches
-     literally rather than as a wildcard. */
+  /* The same expansion, plus a parallel mask of which output bytes may act as
+     glob metacharacters, so the ${x#pat} and ${x%pat} forms match literally. */
   fn expand_modifier_word_masked(StringView word, ArrayList<bool> &active_out,
                                  bool remove_quotes = true) throws -> String;
 
   /* The shared body behind the two public forms. is_pattern_word makes a
-     backslash quote the following byte and mark it inactive, the # and % rule,
-     while the plain form keeps a backslash that precedes an ordinary byte. */
+     backslash quote the following byte, the # and % rule. */
   fn expand_modifier_word_worker(StringView word, ArrayList<bool> &active_out,
                                  bool remove_quotes,
                                  bool is_pattern_word) throws -> String;
 
   pure fn should_echo() const wontthrow -> bool;
-  /* The -v input echo, settable at runtime through set -o verbose the way the
-     other debug toggles flip through set. */
+  /* The -v input echo, settable at runtime through set -o verbose. */
   fn set_echo(bool enabled) wontthrow -> void { m_enable_echo = enabled; }
   pure fn should_echo_expanded() const wontthrow -> bool;
   pure fn shell_is_interactive() const wontthrow -> bool;
 
   /* False until the startup profile and rc files finish sourcing, so the
-     per-command terminal title is not set for the commands those files run, the
-     way bash leaves the title alone while reading its startup files. */
+     per-command terminal title is quiet while they run. */
   pure fn startup_finished() const wontthrow -> bool
   {
     return m_startup_finished;
@@ -1295,14 +1123,13 @@ public:
 
   fn make_stats_string() const throws -> String;
 
-  /* Stats counting is off unless -S asked for the report. The evaluate path
-     tests this so the per-node bookkeeping never runs when nobody reads it. */
+  /* Stats counting is off unless -S asked for the report, so the per-node
+     bookkeeping never runs when nobody reads it. */
   fn set_stats_enabled(bool enabled) wontthrow -> void;
   pure fn stats_enabled() const wontthrow -> bool;
 
   /* The shell's own debug toggles, seeded from the -A, -M, and -E flags and
-     flipped at runtime by set. The run loop reads the context rather than the
-     flags so set -A turns the dump on for the next command. */
+     flipped at runtime by set. */
   fn set_show_ast(bool enabled) wontthrow -> void { m_show_ast = enabled; }
   pure fn show_ast() const wontthrow -> bool { return m_show_ast; }
   fn set_show_lexed_words(bool enabled) wontthrow -> void
@@ -1319,8 +1146,7 @@ public:
   }
   pure fn show_exit_code() const wontthrow -> bool { return m_show_exit_code; }
 
-  /* The granular memory report at exit, requested by --show-memory and read by
-     quit through the context pointer rather than a separate global. */
+  /* The granular memory report at exit, requested by --show-memory. */
   fn set_memory_stats_enabled(bool enabled) wontthrow -> void
   {
     m_memory_stats_enabled = enabled;
@@ -1330,8 +1156,8 @@ public:
     return m_memory_stats_enabled;
   }
 
-  /* The --no-diagnostics skip, mirrored onto the context so set -o
-     no-diagnostics flips the per-chunk analysis gate at runtime. */
+  /* The --no-diagnostics skip, so set -o no-diagnostics flips the per-chunk
+     analysis gate at runtime. */
   fn set_diagnostics_disabled(bool disabled) wontthrow -> void
   {
     m_runtime.are_diagnostics_disabled = disabled;
@@ -1379,38 +1205,33 @@ protected:
   usize m_expansions_last{0};
   usize m_expansions_total{0};
   usize m_commands_evaluated{0};
-  /* The largest live AST arena footprint seen at the end of any command. The
-     stats path samples the arena once per command, off the hot path. */
+  /* The largest live AST arena footprint seen at the end of any command. */
   usize m_peak_ast_arena_bytes{0};
 
   mutable BumpArena m_scratch_arena{};
   StringMap<String> m_shell_variables{heap_allocator()};
   StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
-  /* The completion specs the complete builtin registered, keyed by command. */
   StringMap<completion_spec> m_completion_specs{heap_allocator()};
-  /* The default completion that complete -D registered, if any. */
   Maybe<completion_spec> m_default_completion_spec{};
   HashSet m_associative_names{heap_allocator()};
   StringMap<String> m_associative_values{heap_allocator()};
   /* An indexed array element whose subscript is past the dense limit, held by
-     its name and decimal index so a sparse far subscript such as a bitmask key
-     does not pad a huge dense gap. The name still reads as indexed. */
+     its name and decimal index so a sparse far subscript does not pad a huge
+     dense gap. The name still reads as indexed. */
   StringMap<String> m_sparse_array_values{heap_allocator()};
   StringMap<bool> m_shopt_options{heap_allocator()};
 #if SHIT_PLATFORM_IS POSIX
   /* The compiled form of each [[ =~ ]] pattern, keyed by the pattern text, so a
-     hot loop with a constant regex compiles it once and reuses it. The owning
-     wrapper frees each entry on teardown or eviction. */
+     hot loop with a constant regex compiles it once and reuses it. */
   StringMap<CompiledRegex> m_regex_cache{heap_allocator()};
 #endif
   /* The cached value of IFS, kept current by set_shell_variable, so word
-     splitting does not look it up in the map or the environment per word. */
+     splitting does not look it up per word. */
   String m_field_separators{" \t\n"};
 
   /* A byte-indexed table that answers whether a character is a field separator
-     in one load, instead of scanning IFS per byte. The layout is a contiguous
-     256-byte block, the shape a later SIMD scan reads to find separators in
-     bulk. It is rebuilt whenever IFS changes. */
+     in one load, instead of scanning IFS per byte. It is rebuilt whenever IFS
+     changes. */
   bool m_field_separator_table[256]{};
   pure fn is_field_separator(char c) const wontthrow -> bool;
   i32 m_last_exit_status{0};
@@ -1423,30 +1244,27 @@ protected:
   Maybe<i64> m_last_background_pid{};
   StringMap<const Expression *> m_functions{heap_allocator()};
   /* The definition text of each function, kept on the heap since a function
-     outlives the command and the source string it was parsed from. */
+     outlives the command it was parsed from. */
   StringMap<String> m_function_sources{heap_allocator()};
-  /* The position mapping for each stored definition, keyed like the sources,
-     read by resolve_render_source when a diagnostic fires inside a call. */
+  /* The position mapping for each stored definition, read by
+     resolve_render_source when a diagnostic fires inside a call. */
   StringMap<function_definition_info> m_function_definition_infos{
       heap_allocator()};
   usize m_subshell_depth{0};
   /* The descriptors bare execs moved inside live in-process subshells, kept
-     as a stack so leave_subshell unwinds its own depth's entries in reverse.
-   */
+     as a stack so leave_subshell unwinds its own depth's entries in reverse. */
   ArrayList<subshell_saved_descriptor> m_subshell_saved_descriptors{
       heap_allocator()};
   usize m_condition_depth{0};
   usize m_loop_depth{0};
 
   /* The prior values of process-environment names written while a subshell ran,
-     pushed newest last and rewound by restore_state on the subshell's exit. The
-     log is appended to only while m_subshell_depth is above zero, so a
-     top-level export pays nothing and the common command substitution that
-     writes no exported name leaves it empty. */
+     rewound by restore_state on the subshell's exit. The log is appended to
+     only while m_subshell_depth is above zero, so a top-level export pays
+     nothing. */
   ArrayList<environment_undo_entry> m_environment_undo_log{heap_allocator()};
   /* The names currently in the process environment, kept in step with every
-     environment write so an assignment tests membership in O(1) rather than
-     scanning the environment. */
+     environment write so an assignment tests membership in O(1). */
   HashSet m_exported_names{heap_allocator()};
   ArrayList<process_substitution> m_pending_process_substitutions{
       heap_allocator()};
@@ -1457,9 +1275,7 @@ protected:
 
   /* The nesting depth of dot-source and eval runs, and of function calls, each
      bounded so a runaway recursion errors with a located message rather than
-     growing the native stack and the arena until the process is killed. A
-     pathological autoconf self-test that regenerates and re-sources a file
-     forever is the motivating case. */
+     growing the native stack until the process is killed. */
   usize m_source_depth{0};
   usize m_function_call_depth{0};
 
@@ -1474,17 +1290,13 @@ protected:
   String m_current_origin{};
 
   /* The location in m_current_source of the command being evaluated, read by
-     $LINENO for its line and by the runtime warnings for their caret. The
-     whole location is kept rather than the bare position, so the filename the
-     lexer stamped rides into a warning from a sourced file. It starts at the
-     zero location so an interactive single line reports line 1. */
+     $LINENO for its line and by the runtime warnings for their caret. The whole
+     location is kept so the filename the lexer stamped rides into a warning. */
   SourceLocation m_current_location{};
 
   /* The chain of sourced-file and eval frames from the outermost down to the
-     one running now, so an error deep in a nested source prints every call site
-     rather than only the innermost. Each frame carries the call site and its
-     parent text, so a backtrace renders a caret at the dot or eval in the
-     parent. run_source pushes on entry, pops on exit. */
+     one running now, so an error deep in a nested source prints every call
+     site. Each frame carries the call site and its parent text. */
   ArrayList<source_frame> m_source_frames{heap_allocator()};
 
   /* ASTs from eval and dot, kept alive until the next top-level command so a
@@ -1492,36 +1304,30 @@ protected:
   ArrayList<Expression *> m_retained_source_asts{heap_allocator()};
 
   /* The source text of each eval and dot run, kept alive for as long as the
-     ASTs above. A control-flow jump made inside one points its caret at this
-     text, so the pointer must outlive the run that escaped it. */
-  /* The retained source buffers are heap-owned pointers, not inline elements,
-     so a nested run_source that grows the list never moves an earlier buffer
-     and leaves m_current_source or a control_flow::source dangling. */
+     ASTs above. The buffers are heap-owned pointers, not inline elements, so a
+     nested run_source that grows the list never moves an earlier buffer and
+     leaves m_current_source or a control_flow::source dangling. */
   ArrayList<String *> m_retained_sources{heap_allocator()};
 
   /* The mood and the diagnostic and strictness toggles, grouped as one runtime
-     state so a scope that swaps them for a function call or a mimicked script
-     saves and restores the whole set with one RuntimeState copy. failglob
-     defaults on, the strict shell default that catches a typo, the other
-     toggles default off. */
+     state so a scope that swaps them saves and restores the whole set with one
+     RuntimeState copy. failglob defaults on, the other toggles default off. */
   RuntimeState m_runtime{.failglob = true};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   bool m_mood_set_explicitly{false};
   bool m_no_clobber{false};
   bool m_export_all{false};
-  /* The warnings suppressed for the current span, one bit per
-     suppressible_warning value. */
+  /* One bit per suppressible_warning value. */
   u32 m_suppressed_warnings{0};
   bool m_no_exec{false};
   bool m_mimicry{false};
   /* The nesting of mimicked scripts, bounded so a script that mimics another
      cannot recurse without limit. */
   usize m_mimicry_depth{0};
-  /* The unix time the shell started, the base $SECONDS counts from. */
+  /* The base $SECONDS counts from. */
   i64 m_shell_start_time{0};
-  /* Whether the $RANDOM generator has been seeded, set on the first read so a
-     run that never reads RANDOM pays neither the seed nor its syscall. */
+  /* Whether the $RANDOM generator has been seeded, set on the first read. */
   mutable bool m_random_seeded{false};
   /* True while a test or [ command expands its arguments, so an unmatched
      glob stays a silent literal and the probe answers false. */
@@ -1537,32 +1343,22 @@ protected:
   bool m_is_completion_function_running{false};
   bool m_is_in_pipeline_stage{false};
 
-  /* Install the OS signal disposition for each signal in the trap table, called
-     after a subshell restore brings the parent's table back so the process
-     dispositions match it. */
+  /* Install the OS signal disposition for each signal in the trap table, after
+     a subshell restore brings the parent's table back. */
   fn install_trap_dispositions() throws -> void;
 
-  /* The names marked read-only, checked by set_shell_variable on every
-     assignment, so a set gives the membership test in O(1). */
   HashSet m_readonly_names{heap_allocator()};
-  /* The names declare -i marked as integers, checked by set_shell_variable so
-     an assignment to one evaluates its value as arithmetic. */
   HashSet m_integer_names{heap_allocator()};
-  /* The alias name to replacement table. */
   StringMap<String> m_aliases{heap_allocator()};
-  /* One entry per active function call, holding the bindings a local shadowed
-     so leaving the call restores them. */
+  /* One entry per active function call, holding the bindings a local shadowed.
+   */
   ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};
-  /* The active function-call names, innermost last, the stack FUNCNAME reads
-     with ${FUNCNAME[0]} as the top. */
   ArrayList<String> m_function_call_names{heap_allocator()};
   bool m_is_script_run{false};
-  /* The count of source frames that carry a file path, kept in step by the
-     frame push and pop so the FUNCNAME classification reads it in constant
-     time. */
+  /* The count of source frames that carry a file path, for the FUNCNAME
+     classification. */
   usize m_sourced_file_frames{0};
 
-  /* The background jobs and the id to give the next one. */
   ArrayList<job> m_jobs{heap_allocator()};
   i32 m_next_job_id{1};
   bool m_monitor{false};
@@ -1584,85 +1380,70 @@ protected:
      terminate the shell. */
   fn assign_variable(StringView name, StringView value) throws -> void;
 
-  /* Remove a variable without the read-only check, for the same local restore
-     path as assign_variable where a throw would terminate the shell. */
+  /* Remove a variable without the read-only check, the same local restore path
+     as assign_variable. */
   fn force_unset_shell_variable(StringView name) throws -> void;
   /* The unset peel, the bash upvar semantics. A local declared by a caller
      rather than the current scope restores that caller's saved value now and
-     cancels the restore its scope pop would have run, so the assignment that
-     follows writes the binding the next caller out sees. Returns whether a
-     binding was peeled. */
+     cancels the restore its scope pop would have run. Returns whether a binding
+     was peeled. */
   fn peel_caller_local_binding(StringView name) throws -> bool;
   /* The one restore a saved local binding gets, the scalar, the arrays, and
-     the integer mark, shared by the scope pop and the unset peel so the two
-     cannot drift. The binding's saved array moves out, both callers drop the
-     entry right after. */
+     the integer mark, shared by the scope pop and the unset peel. */
   fn restore_local_binding(local_binding &binding) throws -> void;
 
   /* Expand a ${...} body, which is a plain name or a name with a length, a
      default, an alternate, an assign, an error, or a prefix or suffix trim. */
   fn apply_parameter_expansion(StringView spec) throws -> String;
 
-  /* Expand the bash substring form ${name:offset:length}. The body is the text
-     after the first colon, an arithmetic offset and an optional arithmetic
-     length. A negative offset counts from the end, and a negative length leaves
-     that many characters off the end. */
+  /* Expand the bash substring form ${name:offset:length}, an arithmetic offset
+     and an optional arithmetic length, each counting from the end when
+     negative. */
   fn apply_substring_expansion(StringView name, StringView body) throws
       -> String;
   fn apply_substring_to_value(StringView value, StringView body) throws
       -> String;
 
   /* Expand the bash pattern-replacement forms ${name/pat/rep},
-     ${name//pat/rep}, ${name/#pat/rep}, and ${name/%pat/rep}. The spec begins
-     at the slash. The pattern is a glob, the replacement is a literal word, and
-     a leading second slash replaces every match while # and % anchor the
-     pattern to the start or the end. */
+     ${name//pat/rep}, ${name/#pat/rep}, and ${name/%pat/rep}. A leading second
+     slash replaces every match while # and % anchor the pattern to the start or
+     the end. */
   fn apply_pattern_replacement(StringView name, StringView spec) throws
       -> String;
 
-  /* The pattern-replacement core that works on an already-resolved value rather
-     than a name, so an array element ${a[i]/pat/rep} and the per-element form
-     ${a[@]/pat/rep} reuse it. */
+  /* The pattern-replacement core that works on an already-resolved value, so an
+     array element ${a[i]/pat/rep} and ${a[@]/pat/rep} reuse it. */
   fn pattern_replace_value(const String &value, StringView spec) throws
       -> String;
 
   /* Expand the bash case-modification forms ${name^}, ${name^^}, ${name,}, and
-     ${name,,}. The ^ raises and the , lowers, a single operator touches the
-     first character and a doubled one touches every character, and an optional
-     glob after the operator limits which characters are affected. */
+     ${name,,}. A single operator touches the first character, a doubled one
+     every character. */
   fn apply_case_modification(StringView name, StringView spec) throws -> String;
 
   fn apply_parameter_transform(StringView name, char op) throws -> String;
-  /* The value-only core of the case modification, shared with the array element
-     paths. */
+  /* The value-only core of the case modification. */
   fn apply_case_modification_to_value(StringView value, StringView spec) throws
       -> String;
   /* Apply one trailing value-transform modifier, the / replacement, the # and %
-     trims, or the ^ and , case changes, to a single value, so an array element
-     and a [@]/[*] field element share one mapping. */
+     trims, or the ^ and , case changes, to a single value. */
   fn apply_value_modifier(StringView value, StringView modifier) throws
       -> String;
 
   /* Expand the bash array element reference ${name[subscript]}. A subscript of
-     @ or * yields every element, an arithmetic subscript yields one, and a
-     negative index counts from the end. */
+     @ or * yields every element, an arithmetic one a single element. */
   fn apply_array_subscript(StringView name, StringView subscript) throws
       -> String;
-  /* One past the highest set index of an array, across the dense run and any
-     sparse element, so a negative subscript counts back from the true end the
-     way bash does even when the last element lives in a gap. */
+  /* One past the highest set index of an array, so a negative subscript counts
+     back from the true end. */
   fn array_negative_index_base(StringView name) const throws -> i64;
 
   /* Expand the bash ${!body} form. When body ends with * or @ it lists the
-     variable names that start with the prefix, sorted and space joined.
-     Otherwise it is indirect, body names a variable whose value names the
-     variable to expand. */
+     variable names that start with the prefix, otherwise it is indirect. */
   fn apply_indirect_or_name_listing(StringView body) throws -> String;
 
-  /* The set variable names that start with the prefix, gathered from the shell
-     store and the environment, deduplicated and sorted. Shared by the
-     ${!prefix*} string listing and the "${!prefix@}" per-name field expansion.
-   */
+  /* The set variable names that start with the prefix, from the shell store and
+     the environment, deduplicated and sorted. */
   fn matching_prefix_names(StringView prefix) const throws -> ArrayList<String>;
 
   /* Turn a word into fields, applying tilde, variable expansion, command
@@ -1688,8 +1469,8 @@ protected:
       -> void;
 };
 
-/* Lower-level execution context. Path is the program path to execute, expanded
- * from program. Program is non-altered first arg. */
+/* Lower-level execution context. The program path is expanded from the program,
+   the non-altered first argument. */
 class ExecContext
 {
 public:
@@ -1698,8 +1479,7 @@ public:
       -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,
-     skipping the PATH search. A simple command memoizes its resolution and
-     reuses it across the iterations of a loop. */
+     skipping the PATH search. A simple command memoizes its resolution. */
   static fn from_resolved(SourceLocation location, ResolvedCommand kind,
                           ArrayList<String> &&args) throws -> ExecContext;
 
@@ -1742,8 +1522,7 @@ public:
      both are present the one that came last in the source must run last. The
      two callables carry the platform's own way to point one descriptor at the
      other, a posix_spawn file action, a dup2, or a Windows handle assignment.
-     Apply_err_to_out points the standard error at the standard output for 2>&1,
-     and apply_out_to_err the reverse for 1>&2. */
+   */
   template <typename ApplyErrToOut, typename ApplyOutToErr>
   fn apply_dup_routing(ApplyErrToOut apply_err_to_out,
                        ApplyOutToErr apply_out_to_err) const -> void
@@ -1777,14 +1556,11 @@ private:
    context. The optimizer's constant fold calls this once the byte scan proves
    the source holds no variable and no substitution, so the parser never
    dereferences a context. A malformed constant, such as a division by zero,
-   throws. This is the Eval-side primitive the optimizer reaches, since the
-   arithmetic parser lives in this translation unit. */
+   throws. */
 fn evaluate_constant_arithmetic(StringView expression) throws -> i64;
 
 /* The index of the colon that separates the offset from the length in a
-   substring body, or the body length when there is none. Shared between the
-   parameter expansion and the array slice forms across the evaluator files.
- */
+   substring body, or the body length when there is none. */
 fn find_substring_length_separator(StringView body) wontthrow -> usize;
 
 /* Throw an error carrying the script-fatal mark, the abort the set -u read
@@ -1796,10 +1572,9 @@ fn find_substring_length_separator(StringView body) wontthrow -> usize;
    --init-moods flag and the set --init-moods builtin both ask. A shit flavor
    reads /etc/shitrc and ~/.shitrc, a bash flavor the bash rc and completion, a
    posix flavor the ENV file, and each adds its login profiles when is_login is
-   set. Defined in Main.cpp next to the file-sourcing helpers, declared here so
-   the set builtin can replay it into a live session. */
+   set. */
 fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
                      const ArrayList<mimic_mood> &moods, bool is_login_shell,
                      bool should_be_interactive) throws -> void;
 
-} /* namespace shit */
+} // namespace shit

@@ -20,12 +20,9 @@
 
 /* FLAG takes an optional flag_section argument before the description. The
    section is named unqualified, such as Compat, and the macro prepends
-   shit::flag_section the way it prepends shit::Flag to the kind, so a call site
-   spells neither qualifier. The five-argument form is the common one for
-   builtins and defaults to NoSection, which renders the flag at the top of
-   --help with no section heading. The six-argument form names the section the
-   flag renders under, so the help renderer reads the section off the flag
-   instead of matching long names. */
+   shit::flag_section. The five-argument form defaults to NoSection, which
+   renders the flag at the top of --help with no section heading. The
+   six-argument form names the section the flag renders under. */
 #define T__FLAG_SELECT(_1, _2, _3, _4, _5, _6, name, ...) name
 #define FLAG(...) T__FLAG_SELECT(__VA_ARGS__, T__FLAG6, T__FLAG5)(__VA_ARGS__)
 #define T__FLAG5(var_name, kind, short_name, long_name, description)           \
@@ -140,8 +137,6 @@ private:
   usize m_value_position{0};
 };
 
-/* These return arguments which are not flags. */
-
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const ArrayList<String> &args,
                    usize base_position = 0) throws -> ArrayList<String>;
@@ -150,8 +145,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     -> ArrayList<String>;
 
 /* Join the arguments into one space-separated line, the source a located flag
-   error renders its caret against. The caller rebuilds the same line the parser
-   measured its offsets in, so the caret lands under the offending flag. */
+   error renders its caret against. */
 fn join_command_line(int argc, const char *const *argv) throws -> String;
 
 fn reset_flags(const ArrayList<Flag *> &flags) throws -> void;
@@ -164,25 +158,21 @@ fn make_synopsis(StringView program_name,
 fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String;
 
 /* Word-wrap text so no line exceeds width columns, with every line indented by
-   indent spaces. The text breaks only at a space, so a word is never split, and
-   a single word longer than the available room is emitted whole. The result has
-   no trailing newline. */
+   indent spaces. The text breaks only at a space, and a single word longer than
+   the available room is emitted whole. The result has no trailing newline. */
 fn wrap_text(StringView text, usize indent, usize width) throws -> String;
 
 fn show_message(StringView err) throws -> void;
 
 /* Arm a one-shot leading newline on the next show_message, so a diagnostic
-   raised while the editor sits mid-line, such as a warning a completion run
-   prints, starts on its own line instead of joining the prompt. The first
-   message consumes the arming, and disarming it before any message prints emits
-   nothing. */
+   raised while the editor sits mid-line starts on its own line instead of
+   joining the prompt. The first message consumes the arming. */
 fn arm_message_leading_newline(bool armed) wontthrow -> void;
 
-/* Write bytes to the standard streams without going through the iostream
-   layer. The shell uses these instead of std::cout and std::cerr so the binary
-   does not pull in the stream machinery. */
+/* Write bytes to the standard streams without going through the iostream layer,
+   so the binary does not pull in the stream machinery. */
 fn print(StringView text) throws -> void;
 fn print_error(StringView text) throws -> void;
 fn flush() throws -> void;
 
-} /* namespace shit */
+} // namespace shit

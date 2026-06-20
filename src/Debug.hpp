@@ -4,18 +4,16 @@
 
 namespace shit {
 class String;
-} /* namespace shit */
+}
 
 #if !defined NDEBUG
 #include <cstdio>
-/* Print a TRACE-prefixed message with file and line to stderr. */
 #define TRACE(...)                                                             \
   do {                                                                         \
     unused(std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));       \
     unused(std::fprintf(stderr, __VA_ARGS__));                                 \
     unused(fflush(stderr));                                                    \
   } while (0)
-/* The same as TRACE with a trailing newline. */
 #define TRACELN(...)                                                           \
   do {                                                                         \
     unused(std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));       \
@@ -77,7 +75,6 @@ StringT t__string_from_struct(const T &x)
 #define VA_ARE_EMPTY(...) t__va_are_empty(__VA_ARGS__)
 
 #if !defined NDEBUG
-/* Cause the debugger to break on this call. */
 #define TRAP(...)                                                              \
   do {                                                                         \
     TRACELN("Encountered a debug trap");                                       \
@@ -91,7 +88,6 @@ StringT t__string_from_struct(const T &x)
 #endif
 
 #if !defined NDEBUG
-/* This code path is unreachable. */
 #define unreachable(...)                                                       \
   do {                                                                         \
     TRACELN("Reached an unreachable statement");                               \

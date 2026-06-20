@@ -186,4 +186,4 @@ public:
 namespace shit {
 constexpr const char *EXPRESSION_AST_INDENT = " ";
 constexpr const char *EXPRESSION_DOUBLE_AST_INDENT = "  ";
-} /* namespace shit */
+} // namespace shit

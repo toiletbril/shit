@@ -22,7 +22,6 @@ namespace expressions {
 
 CompoundList::CompoundList() : Expression({0, 0}) {}
 
-/* The condition nodes live in the arena, torn down once on reset. */
 CompoundList::~CompoundList() = default;
 
 pure fn CompoundList::is_empty() const wontthrow -> bool
@@ -66,9 +65,8 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
   i64 ret = NOTHING_WAS_EXECUTED;
 
   /* Only the last node of the list yields the list's status, so a terminal exec
-     rides into that node alone. Every earlier node runs with the flag cleared
-     and so forks normally, and the saved value is restored after the list so a
-     containing tail position is not disturbed. */
+     rides into that node alone. Every earlier node forks normally, and the
+     saved value is restored after the list. */
   const bool was_terminal_exec_allowed = cxt.terminal_exec_allowed();
   cxt.set_terminal_exec_allowed(false);
   defer { cxt.set_terminal_exec_allowed(was_terminal_exec_allowed); };
@@ -80,17 +78,14 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     const bool is_last_node = index + 1 >= m_nodes.count();
     cxt.set_terminal_exec_allowed(was_terminal_exec_allowed && is_last_node);
 
-    /* An Or operand runs only after a failure and an And operand only after a
-       success, so a short-circuited operand does not run at all. The flag marks
-       whether this node ran, since set -e keys off the command that actually
-       produced the status, not a status carried over from a short-circuited
-       sibling. */
+    /* The flag marks whether this node ran, since set -e keys off the command
+       that actually produced the status, not a status carried over from a
+       short-circuited sibling. */
     bool did_execute = false;
-    /* In bash mood an evaluation error fails the command and the list goes
-       on, the way bash continues after a readonly assignment or a [[ ]]
-       operand error, while a script-fatal error, the set -u read and the
-       ${name:?} report, still aborts the run. The error renders to stderr
-       here since nothing above will see it. */
+    /* In bash mood an evaluation error fails the command and the list goes on,
+       while a script-fatal error, the set -u read and the ${name:?} report,
+       still aborts the run. The error renders to stderr here since nothing
+       above will see it. */
     let do_run_node = [&]() throws -> i64 {
       try {
         return n->evaluate(cxt);
@@ -132,12 +127,10 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (cxt.has_pending_control_flow()) break;
 
     /* POSIX exempts set -e for a command that is an operand of && or || and not
-       the last command of the and-or list, and for a command the ! reserved
-       word negates. So the exit fires only when the node that ran is the last
-       of its chain, the next node starts a fresh chain or the list ends, and
-       the command carries no leading !. A short-circuited node did not run and
-       so cannot trigger the exit, which is what keeps a failing non-last
-       operand such as the false in `false && cmd` from exiting the shell. */
+       the last of the and-or list, and for a command the ! reserved word
+       negates. The exit fires only when the node that ran ends its chain and
+       carries no leading !, which keeps the false in `false && cmd` from
+       exiting the shell. */
     const bool ends_and_or_chain =
         index + 1 >= m_nodes.count() ||
         m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
@@ -164,7 +157,6 @@ CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
     : Expression(location), m_kind(kind), m_cmd(expr)
 {}
 
-/* The command lives in the arena, torn down once on reset. */
 CompoundListCondition::~CompoundListCondition() = default;
 
 pure fn CompoundListCondition::kind() const wontthrow -> Kind { return m_kind; }
@@ -254,7 +246,6 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
 
 Pipeline::Pipeline(SourceLocation location) : Command(location) {}
 
-/* The stage commands live in the arena, torn down once on reset. */
 Pipeline::~Pipeline() = default;
 
 pure fn Pipeline::is_empty() const wontthrow -> bool
@@ -291,11 +282,10 @@ cold fn Pipeline::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-/* Run a pipeline that has at least one compound stage. Every stage forks, the
-   way an external command does, so a compound stage evaluates its tree in a
-   child with the pipe already on its standard descriptors. A simple stage forks
-   too here and evaluates in the child, which is the rare mixed pipeline rather
-   than the common all-simple path that execute_contexts_with_pipes serves. */
+/* Run a pipeline that has at least one compound stage. Every stage forks, so a
+   compound stage evaluates its tree in a child with the pipe already on its
+   standard descriptors. This is the rare mixed pipeline rather than the common
+   all-simple path that execute_contexts_with_pipes serves. */
 cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
     -> i64
 {
@@ -366,9 +356,9 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
 
       if (child == 0) {
         /* The child evaluates the stage in a subshell, so a variable change
-           such as a while-read does not escape, then exits with its status. A
-           diagnostic or an exit request inside still yields a child status
-           rather than unwinding back into the parent's evaluator. */
+           does not escape, then exits with its status. A diagnostic or an exit
+           request inside still yields a child status rather than unwinding back
+           into the parent's evaluator. */
         i32 stage_status = 0;
         try {
           cxt.enter_subshell();
@@ -477,12 +467,11 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_terminal_exec_allowed(false);
 
   /* A pipeline of only simple commands keeps the fast path, which wires the
-     pipes once and forks each external directly with no extra subshell. A
-     compound stage cannot run that way, so a pipeline that holds one takes the
+     pipes once and forks each external directly. A compound stage takes the
      fork-per-stage path. A simple stage that carries a prefix assignment, such
      as x=v cmd | cmd2, takes the fork path too, since the fast path builds the
      stage from its argument words alone and the prefix must reach only that
-     stage's environment, which the per-stage fork applies in the child. */
+     stage's environment. */
   bool has_compound_stage = false;
   for (let const stage : m_commands) {
     if (!stage->is_simple_command()) {
@@ -500,12 +489,10 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   /* A stage whose command word names a user function must run through the
-     per-stage fork path, since a function shadows a builtin and a program
-     inside a pipeline the same way it does outside one. The fast path below
-     builds an ExecContext that resolves only builtins and programs, so a
-     function stage would wrongly run a like-named builtin. The literal command
-     word is checked without expanding, which covers the common name-pipe form,
-     and the whole scan is skipped when no function is defined. */
+     per-stage fork path, since the fast path below builds an ExecContext that
+     resolves only builtins and programs and would wrongly run a like-named
+     builtin. The literal command word is checked without expanding, and the
+     whole scan is skipped when no function is defined. */
   if (!has_compound_stage && cxt.has_functions()) {
     for (let const stage : m_commands) {
       const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
@@ -527,12 +514,10 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   if (has_compound_stage) return evaluate_with_compound_stages(cxt);
 
-  /* The stage exec contexts and their argument words live only until the
-     pipeline is wired and run, so they are built on the scratch arena under one
-     pipeline-scoped mark. The arena rewind runs no destructor, so any stage
-     still holding open descriptors on an early exit, a non-resolving command or
-     an empty stage, is closed by the defer before the release. The normal path
-     moves ecs into execute, leaving the defer's loop empty. */
+  /* The stage exec contexts and their argument words are built on the scratch
+     arena under one pipeline-scoped mark. The rewind runs no destructor, so a
+     stage still holding open descriptors on an early exit is closed by the
+     defer before the release. The normal path moves ecs into execute. */
   let const pipeline_mark = cxt.scratch_mark();
   let ecs = ArrayList<ExecContext>{cxt.scratch_allocator()};
   defer
@@ -557,31 +542,27 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     let stage_args = cxt.process_args(e->args(), /*args_are_transient=*/true);
 
-    /* A stage that expands to no command word, such as a bare assignment or an
-       unset variable, has no program to run. Report it instead of building an
-       exec context from an empty argument list, which would read past the
-       arguments. */
+    /* A stage that expands to no command word has no program to run, reported
+       instead of building an exec context from an empty argument list. */
     if (stage_args.is_empty()) {
       throw ErrorWithLocation{e->source_location(),
                               "A pipeline stage expanded to no command to run"};
     }
 
-    /* A stage whose command does not resolve is non-fatal. Bash reports it,
-       runs the rest of the pipeline, and reports the last stage's status, so
-       the unresolved stage becomes a no-op context that closes its pipe to give
-       the next stage EOF and contributes 127 only under pipefail. Aborting here
-       instead would wrongly make the not-found stage govern the pipeline. */
+    /* A stage whose command does not resolve is non-fatal, the way bash runs
+       the rest of the pipeline and reports the last stage's status. The
+       unresolved stage becomes a no-op context that closes its pipe to give the
+       next stage EOF and contributes 127 only under pipefail. */
     Maybe<ExecContext> stage_ec;
     try {
       stage_ec = ExecContext::make_from(e->source_location(), steal(stage_args),
                                         cxt.mood(), cxt.shitbox());
     } catch (const CommandNotFound &not_found) {
       report_command_not_found(cxt, not_found);
-      /* The stage still applies its own redirections, the way bash and dash
-         open a > target even for a command that was not found, then runs
-         nothing. The opened descriptors close with the stage, and a > onto its
-         standard output takes the slot ahead of the pipe, so the next stage
-         still sees EOF. */
+      /* The stage still applies its own redirections, the way bash opens a >
+         target even for a command that was not found, then runs nothing. A >
+         onto its standard output takes the slot ahead of the pipe, so the next
+         stage still sees EOF. */
       let unresolved = ExecContext::make_unresolved(e->source_location());
       bool was_unresolved_handed_off = false;
       defer
@@ -595,12 +576,10 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     let ec = stage_ec.take();
     /* Apply this stage's own redirections, such as 2>&1, before the pipe wires
-       its descriptors. The pipe only sets stdin and stdout, so a stderr
-       redirection composes with it. A later redirection in the same stage may
-       throw after an earlier one already opened a descriptor into the stage's
-       slots, so the descriptors opened so far are closed on that throw rather
-       than leaked, the way the simple command path guards its own descriptors.
-       The guard is disarmed once the stage is handed into the pipeline. */
+       its descriptors. A later redirection in the same stage may throw after an
+       earlier one opened a descriptor, so the descriptors opened so far are
+       closed on that throw rather than leaked. The guard is disarmed once the
+       stage is handed into the pipeline. */
     bool was_stage_redirect_handed_off = false;
     defer
     {
@@ -611,11 +590,10 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     ecs.push(steal(ec));
   }
 
-  /* The pipeline status is the last stage's, and $? reads it from the store, so
-     the result is committed here the way the compound-stage path commits it.
-     The all-simple fast path otherwise returned the status without recording
-     it, so `false | read x; echo $?` read the stale status from before the
-     pipeline. */
+  /* The pipeline status is the last stage's, committed here so $? reads it from
+     the store. The all-simple fast path otherwise returned the status without
+     recording it, so `false | read x; echo $?` read the stale status from
+     before the pipeline. */
   const i64 ret =
       utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
   cxt.set_last_exit_status(static_cast<i32>(ret));
@@ -659,8 +637,6 @@ IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
       m_otherwise(otherwise)
 {}
 
-/* The branch conditions, the branch bodies, and the else body live in the
-   arena, torn down once on reset. */
 IfClause::~IfClause() = default;
 
 cold fn IfClause::to_string() const throws -> String { return "IfClause"; }
@@ -723,7 +699,6 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       condition_status = condition->evaluate(cxt);
     }
 
-    /* A jump inside the condition stops the if and stays pending. */
     if (cxt.has_pending_control_flow()) return condition_status;
     if (condition_status == 0) return body->evaluate(cxt);
   }
@@ -813,7 +788,6 @@ WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
       m_is_until(is_until)
 {}
 
-/* The condition and the body live in the arena, torn down once on reset. */
 WhileLoop::~WhileLoop() = default;
 
 cold fn WhileLoop::to_string() const throws -> String
@@ -943,8 +917,6 @@ cold fn WhileLoop::register_defined_functions(
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
 
-  /* The condition and the body both run in the current shell, so a function
-     defined in either is registered before the ordered walk. */
   m_condition->register_defined_functions(actx);
   m_body->register_defined_functions(actx);
 }
@@ -998,10 +970,8 @@ cold fn SelectLoop::to_ast_string(usize layer) const throws -> String
 fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
-  cxt.set_terminal_exec_allowed(false);
 
-  /* The word list expands here, so a runtime warning from it carets this
-     select rather than the statement before it. */
+  cxt.set_terminal_exec_allowed(false);
   cxt.set_current_location(source_location());
 
   let const values =
@@ -1083,7 +1053,6 @@ ForLoop::ForLoop(SourceLocation location, StringView variable_name,
   m_words = steal(words);
 }
 
-/* The word tokens and the body live in the arena, torn down once on reset. */
 ForLoop::~ForLoop() = default;
 
 cold fn ForLoop::to_string() const throws -> String
@@ -1108,8 +1077,6 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
-  /* A loop body runs repeatedly in the shell process, so no command in it may
-     replace the shell. */
   cxt.set_terminal_exec_allowed(false);
 
   /* The analyze pass proved the loop runs nothing observable, an empty word
@@ -1119,8 +1086,6 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     return 0;
   }
 
-  /* The word list expands here, so a runtime warning from it carets this for
-     rather than the statement before it. */
   cxt.set_current_location(source_location());
   /* Without an in clause the loop walks the positional parameters. */
   let const values =
@@ -1145,8 +1110,6 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   LOG(Debug, "the for loop binds '%s' over %zu values", m_variable_name.c_str(),
       values.count());
 
-  /* The body runs inside one more loop level, so a break or a continue clamps
-     its level against the nesting that is actually live. */
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
 
@@ -1189,12 +1152,12 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
         actx.warn(t->source_location(),
                   "A for over the cat output iterates IFS-split words rather "
                   "than lines",
-                  "read the lines with 'while IFS= read -r line' instead");
+                  "Read the lines with 'while IFS= read -r line' instead");
       else if (trimmed.starts_with(StringView{"find "}) || trimmed == "find")
         actx.warn(t->source_location(),
                   "A for over the find output breaks a name with whitespace "
                   "apart",
-                  "use find -exec or a 'while read -r' loop over find -print0");
+                  "Use find -exec or a 'while read -r' loop over find -print0");
     }
   }
 
@@ -1216,8 +1179,6 @@ cold fn ForLoop::register_defined_functions(AnalysisContext &actx) const throws
 {
   ASSERT(m_body != nullptr);
 
-  /* The loop body runs in the current shell, so a function it defines is
-     registered before the ordered walk. */
   m_body->register_defined_functions(actx);
 }
 
@@ -1240,8 +1201,6 @@ CaseClause::CaseClause(SourceLocation location, const Token *word,
   m_items = steal(items);
 }
 
-/* The subject word, the pattern tokens, and the item bodies live in the arena,
-   torn down once on reset. */
 CaseClause::~CaseClause() = default;
 
 cold fn CaseClause::to_string() const throws -> String { return "CaseClause"; }
@@ -1262,12 +1221,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_word != nullptr);
 
-  /* A command inside a case branch forks rather than replacing the shell, so
-     the terminal exec stays confined to a top-level simple command. */
   cxt.set_terminal_exec_allowed(false);
-
-  /* The subject word and the patterns expand here, so a runtime warning from
-     them carets this case rather than the statement before it. */
   cxt.set_current_location(source_location());
 
   /* A case word and its patterns expand with variables and tilde but no field
@@ -1412,8 +1366,6 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
 cold fn CaseClause::register_defined_functions(
     AnalysisContext &actx) const throws -> void
 {
-  /* Each arm body runs in the current shell when its pattern matches, so a
-     function defined in any arm is registered before the ordered walk. */
   for (let const &item : m_items) {
     ASSERT(item.body != nullptr);
     item.body->register_defined_functions(actx);
@@ -1424,7 +1376,6 @@ BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
     : CompoundCommand(location), m_body(body)
 {}
 
-/* The body lives in the arena, torn down once on reset. */
 BraceGroup::~BraceGroup() = default;
 
 cold fn BraceGroup::to_string() const throws -> String { return "BraceGroup"; }
@@ -1442,8 +1393,6 @@ fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
-  /* A command inside a brace group forks rather than replacing the shell, so
-     the terminal exec stays confined to a top-level simple command. */
   cxt.set_terminal_exec_allowed(false);
 
   /* The analyze pass proved the body does nothing observable, so the group
@@ -1476,6 +1425,6 @@ cold fn BraceGroup::register_defined_functions(
   m_body->register_defined_functions(actx);
 }
 
-} /* namespace expressions */
+} // namespace expressions
 
-} /* namespace shit */
+} // namespace shit

@@ -5,8 +5,7 @@
 namespace shit {
 
 /* One shellcheck-style static check the analysis stage reports, paired with the
-   shellcheck code it mirrors so --list and the source that emits the warning
-   agree on the name. */
+   shellcheck code it mirrors. */
 struct shellcheck_check
 {
   StringView code;
@@ -66,10 +65,9 @@ inline const shellcheck_check SHELLCHECK_CHECKS[] = {
     {"SC3030", "mapfile and readarray are bash array builtins absent from sh"},
 };
 
-/* One shit strictness diagnostic, the advisories and downgraded strict
-   errors the shell's own default mood emits beyond the shellcheck mirrors.
-   Each is named by the option or rule that drives it, so --list-diagnostics
-   shows the full set a -W run can print. */
+/* One shit strictness diagnostic, the advisories and downgraded strict errors
+   the shell's own default mood emits beyond the shellcheck mirrors. Each is
+   named by the option or rule that drives it. */
 struct strictness_warning
 {
   StringView name;
@@ -96,4 +94,4 @@ inline const strictness_warning STRICTNESS_WARNINGS[] = {
      "error names the owning dialect"                                       },
 };
 
-} /* namespace shit */
+} // namespace shit

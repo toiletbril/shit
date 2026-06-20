@@ -10,13 +10,12 @@
 namespace shit {
 
 /* An open-addressing hash table from a string key to a Value over an explicit
-   allocator, the std::unordered_map replacement. The value defaults to String
-   for the variable store and the traps, and takes a pointer for the function
-   table. Each slot caches a PackedStringKey of the key's first sixteen bytes,
-   so a probe rejects a mismatch with a two-word compare before the full byte
-   compare. Linear probing, power-of-two capacity, grows past a load of three
-   quarters, and counts tombstones toward the load so an insert is never
-   dropped. */
+   allocator. The value defaults to String for the variable store and the traps,
+   and takes a pointer for the function table. Each slot caches a
+   PackedStringKey of the key's first sixteen bytes, so a probe rejects a
+   mismatch with a two-word compare before the full byte compare. Linear
+   probing, power-of-two capacity, grows past a load of three quarters, and
+   counts tombstones toward the load so an insert is never dropped. */
 template <class Value = String>
 class StringMap
 {
@@ -25,8 +24,7 @@ public:
 
   cold StringMap(const StringMap &other) : m_allocator(other.m_allocator)
   {
-    /* An empty source allocates no bucket array, so copying an unused table,
-       the common case when a subshell snapshot saves a map no command touched,
+    /* An empty source allocates no bucket array, so copying an unused table
        costs nothing until the first insert grows it lazily. */
     if (other.m_count == 0) return;
     rehash(other.m_capacity);
@@ -36,8 +34,6 @@ public:
     }
   }
 
-  /* An explicit deep copy, so a caller that means to duplicate the map says so
-     rather than leaning on an implicit copy. */
   mustuse cold fn clone() const throws -> StringMap { return StringMap{*this}; }
 
   StringMap(StringMap &&other) noexcept
@@ -80,10 +76,8 @@ public:
   mustuse pure fn count() const wontthrow -> usize { return m_count; }
 
   /* Grow the table up front to hold at least expected_count entries without a
-     later rehash, so a known bulk insert such as the PATH cache pays one
-     allocation rather than a doubling chain. The table rehashes at three
-     quarters full, so the capacity is sized for that load and rounded up to the
-     power of two the mask needs. */
+     later rehash. The table rehashes at three quarters full, so the capacity is
+     sized for that load and rounded up to a power of two. */
   cold fn reserve(usize expected_count) throws -> void
   {
     let const needed = (expected_count * 4 / 3) + 1;
@@ -118,28 +112,24 @@ public:
     return nullptr;
   }
 
-  /* The mutable value for the key, or nullptr when absent, so a caller can edit
-     a stored value in place without a copy-out then set. The pointer is stable
-     until the next set that grows the table. */
+  /* The mutable value for the key, or nullptr when absent. The pointer is
+     stable until the next set that grows the table. */
   hot flatten mustuse fn find(StringView key) wontthrow -> Value *
   {
     return const_cast<Value *>(static_cast<const StringMap *>(this)->find(key));
   }
 
-  /* The allocator the table owns, handed to a value built for it so a managed
-     insert keeps the value on the same arena or heap as the table. */
+  /* The allocator the table owns, handed to a value built for it. */
   pure fn allocator() const wontthrow -> Allocator { return m_allocator; }
 
-  /* Store a value the table owns by move. */
   hot fn set(StringView key, Value value) throws -> void
   {
     set_value(key, steal(value));
   }
 
   /* The value for a key, inserting the supplied default when the key is absent,
-     then returning a mutable reference. The caller passes the default already
-     built with the right allocator. The reference is valid until the next set
-     that grows the table. */
+     then returning a mutable reference. The reference is valid until the next
+     set that grows the table. */
   hot fn get_or_create(StringView key, Value default_value) throws -> Value &
   {
     if (const Value *existing = find(key))
@@ -147,24 +137,16 @@ public:
     return *set_value(key, steal(default_value));
   }
 
-  /* Store a String value built from a view, the form the variable store and the
-     traps use. Only instantiated when Value is String. An existing slot reuses
-     its String buffer rather than allocating a fresh String and freeing the old
-     one, so a tight reassignment loop such as a counter pays no per-turn
-     allocation once the buffer is large enough.
-
-     The value must not view the existing slot's own buffer, since clear then
-     append would read bytes the clear already truncated. Every caller builds
-     the value in a fresh String or a stack buffer first, so a self-assignment
-     such as x=$x still passes an independent view. */
+  /* Store a String value built from a view. An existing slot reuses its String
+     buffer, so a tight reassignment loop pays no per-turn allocation. The value
+     must not view the existing slot's own buffer, since clear then append would
+     read bytes the clear already truncated. */
   hot fn set(StringView key, StringView value) throws -> void
   {
     if (Value *existing = find(key)) {
       /* A buffer that once held a large value and now takes a far smaller one
          is rebuilt at the right size rather than reused, so a name that held a
-         big value does not pin that memory for the session. A small or
-         similar-sized value reuses the buffer, which keeps a counter loop
-         allocation free. */
+         big value does not pin that memory for the session. */
       let const buffer_is_wasteful =
           existing->count() > 256 && value.length < existing->count() / 2;
       if (!buffer_is_wasteful) {
@@ -204,7 +186,6 @@ public:
     }
   }
 
-  /* Visit each key and value in unspecified order. */
   template <class Fn>
   fn for_each(Fn callback) const throws -> void
   {
@@ -326,4 +307,4 @@ private:
   usize m_tombstones{0};
 };
 
-} /* namespace shit */
+} // namespace shit

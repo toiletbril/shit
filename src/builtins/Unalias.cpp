@@ -3,8 +3,6 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* unalias removes a command alias, or with -a removes every alias. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-a] name [name ...]");
@@ -61,4 +59,4 @@ i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws
   return status;
 }
 
-} /* namespace shit */
+} // namespace shit

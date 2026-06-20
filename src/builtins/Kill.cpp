@@ -7,10 +7,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* kill sends a signal to a job or a process. The signal defaults to TERM and is
-   named with a leading minus, such as -KILL, -9, or -SIGKILL. A target with a
-   leading percent names a job, otherwise it is a process id. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-l] [-signal] %job|pid [...]");
@@ -129,4 +125,4 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} /* namespace shit */
+} // namespace shit

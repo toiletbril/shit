@@ -27,9 +27,8 @@ cold String::String(const String &other) throws : m_allocator(other.m_allocator)
   append(other.view());
 }
 
-/* An inline source cannot have its pointer stolen, since the bytes live in its
-   own object, so they are copied into this inline buffer. A heap source hands
-   over its allocation and is left valid and empty. */
+/* An inline source cannot have its pointer stolen, so its bytes are copied into
+   this inline buffer. A heap source hands over its allocation. */
 String::String(String &&other) wontthrow : m_allocator(other.m_allocator)
 {
   if (other.is_inline()) {
@@ -100,9 +99,8 @@ cold fn String::reserve(usize needed) throws -> void
 {
   if (needed + 1 <= m_capacity) [[likely]]
     return;
-  /* A small buffer quadruples so a string built one append at a time leaves the
-     inline size in one realloc rather than several, while a large buffer
-     doubles to keep the overshoot bounded. */
+  /* A small buffer quadruples, a large buffer doubles to keep the overshoot
+     bounded. */
   let new_capacity = m_capacity < 64 ? m_capacity * 4 : m_capacity * 2;
   while (new_capacity < needed + 1)
     new_capacity *= 2;
@@ -111,8 +109,7 @@ cold fn String::reserve(usize needed) throws -> void
   if (preserved_length > 0) std::memcpy(fresh, m_data, preserved_length);
   fresh[preserved_length] = '\0';
   /* Release the old allocation before adopting the fresh one. An inline buffer
-     owns no allocation, so free_storage leaves it alone. The reset clears
-     m_length, so it is restored from the preserved value afterwards. */
+     owns no allocation, so free_storage leaves it alone. */
   free_storage();
   m_data = fresh;
   m_length = preserved_length;
@@ -156,9 +153,8 @@ fn String::find_substring(StringView needle, usize from) const wontthrow
   if (needle.length == 0) return from <= m_length ? Maybe<usize>{from} : None;
   if (needle.length > m_length) return None;
   /* memchr finds each candidate first byte with a vectorized scan and memcmp
-     confirms the rest, which skips the bulk of the per-position compares. The
-     scan is bounded so a first byte never lands where the needle would overrun
-     the end. */
+     confirms the rest. The scan is bounded so a first byte never lands where
+     the needle would overrun the end. */
   let i = from;
   while (i + needle.length <= m_length) {
     let const scan_length = m_length - needle.length - i + 1;
@@ -202,4 +198,4 @@ fn operator+(StringView left, StringView right) throws->String
   return result;
 }
 
-} /* namespace shit */
+} // namespace shit

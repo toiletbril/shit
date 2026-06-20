@@ -10,10 +10,6 @@
 #include <unistd.h>
 #endif
 
-/* times prints the user and system time the shell and its children have used,
-   two lines of two values each. The values come from the operating system, so
-   a platform without process accounting prints zeros. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("");
@@ -67,4 +63,4 @@ cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

@@ -12,10 +12,9 @@ class Nothing
 
 inline constexpr Nothing None{};
 
-/* A value or None, the replacement for std::optional. There is no failure
-   reason inside, so the caller handles the empty case itself. Reading the value
-   out of an empty Maybe traps in the debug build. The value is stored inline,
-   so no allocation happens. */
+/* A value or None. There is no failure reason inside, so the caller handles the
+   empty case itself. Reading the value out of an empty Maybe traps in the debug
+   build. The value is stored inline, so no allocation happens. */
 template <class T>
 class mustuse Maybe
 {
@@ -33,8 +32,6 @@ public:
     if (m_has_value) new (&m_storage) T(steal(other.reference()));
   }
 
-  /* An explicit deep copy, so a caller that means to duplicate the optional
-     says so rather than leaning on an implicit copy. */
   mustuse fn clone() const throws -> Maybe { return Maybe{*this}; }
 
   fn operator=(const Maybe &other) throws->Maybe &
@@ -106,8 +103,7 @@ public:
     return m_has_value ? reference() : steal(fallback);
   }
 
-  /* Equal to a bare value only when present and that value matches, so a
-     comparison reads like the one against a std::optional. */
+  /* Equal to a bare value only when present and that value matches. */
   mustuse fn operator==(const T &other) const throws->bool
   {
     return m_has_value && reference() == other;
@@ -147,4 +143,4 @@ private:
     t__result.take();                                                          \
   })
 
-} /* namespace shit */
+} // namespace shit

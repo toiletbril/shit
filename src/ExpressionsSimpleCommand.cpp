@@ -24,7 +24,6 @@ AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
     : Command(location), m_assignment(a)
 {}
 
-/* The assignment lives in the arena, torn down once on reset. */
 AssignCommand::~AssignCommand() = default;
 
 pure fn AssignCommand::assignment() const wontthrow -> const Assignment *
@@ -86,7 +85,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
               StringView{"This assignment to '"} + name +
                   "' in a function has no local, so the value leaks to the "
                   "global scope",
-              "declare it with local to keep it inside the function");
+              "Declare it with local to keep it inside the function");
   }
 
   /* An unconditional top-level assignment records the name as an existing
@@ -139,8 +138,6 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   LOG(All, "assigning the variable '%s'", m_assignment->key().c_str());
 
-  /* Record where this assignment sits so a $LINENO in its value reports its
-     line, since a script may read it as x=$LINENO. */
   cxt.set_current_location(source_location());
 
   /* The status the assignment leaves depends on the value. A value with no
@@ -234,8 +231,6 @@ SimpleCommand::SimpleCommand(SourceLocation location,
   }
 }
 
-/* The argument tokens and the redirection target tokens live in the arena,
-   torn down once on reset. */
 SimpleCommand::~SimpleCommand() = default;
 
 fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
@@ -277,12 +272,6 @@ fn assign_standard_fd(Maybe<os::descriptor> &in_fd,
   }
 }
 
-/* Resolve the descriptor a duplication copies from. A literal descriptor and
-   the close form were settled at parse time and pass straight through. A
-   dynamic word such as $4 is expanded to one field here, where a dash means
-   close and a numeric field names the descriptor. The result is a non-negative
-   descriptor or Redirection::DUP_FD_CLOSE for the close form. A field that is
-   neither throws a located error at the word. */
 /* A resolved duplication target, the descriptor or close marker in fd, or
    the csh both-streams filename when the bare >&word expanded to a name
    rather than a number, which bash reads as >word 2>&1. */
@@ -321,12 +310,8 @@ fn resolve_duplication(const Redirection &redir, EvalContext &cxt) throws
                               shit::None};
 }
 
-} /* namespace */
+} // namespace
 
-/* The pipeline-stage redirect path fills the stage's descriptor slots and the
-   cross-route flags the spawn applies after the files, so a `cmd 2>&1 >file`
-   stage still snapshots the final file target. The standalone simple-command
-   path in evaluate_impl is source-ordered, this one is not yet. */
 /* The file open mode a file redirection opens its target with. A plain > honors
    noclobber, >| overrides it, >> appends, <> opens read-write, and < and every
    other kind reads. */
@@ -475,7 +460,6 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
          by the stage's three descriptor slots and is left to the compound path.
        */
       if (r.dup_from_fd == r.target_fd) {
-        /* Self copy is a no-op. */
       } else if (r.target_fd == 2 && r.dup_from_fd == 1) {
         ec.dup_err_to_out = true;
         ec.dup_out_to_err_came_last = false;
@@ -575,7 +559,7 @@ static fn command_word_is_glob(const Word &word) wontthrow -> bool
   return false;
 }
 
-} /* namespace */
+} // namespace
 
 hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
@@ -618,13 +602,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     shit::flush();
   }
 
-  /* A simple command consumes its argument words and discards them when it
-     returns, so they are built on the scratch arena and reclaimed here rather
-     than heap-allocated per argument. The mark is taken before the expansion
-     and released on every exit from this command, so a loop body does not
-     accumulate a vector per iteration. A builtin that keeps a word past the
-     command copies it into the heap-backed store, so nothing the release frees
-     is still read. */
+  /* The argument words are built on the scratch arena and reclaimed on every
+     exit from this command, so a loop body does not accumulate a vector per
+     iteration. A builtin that keeps a word past the command copies it into the
+     heap-backed store, so nothing the release frees is still read. */
   let const args_mark = cxt.scratch_mark();
   defer { cxt.scratch_release(args_mark); };
   /* A <(...) or >(...) in the words below opens a pipe and forks a child or
@@ -633,8 +614,6 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      such as a while loop's producer, for that command to reap. */
   let const substitution_mark = cxt.mark_process_substitutions();
   let program_args = cxt.process_args(m_args, /*args_are_transient=*/true);
-  /* The descriptors stay open while the command runs and are closed and the
-     children reaped when this command returns, on every path. */
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args);
 
@@ -644,10 +623,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* A bare exec, the word exec with no further argument, applies its
      redirections to the shell's own descriptors permanently rather than around
-     a single command. A function named exec shadows the builtin the same way a
-     function shadows any command, so a shadowing function takes the ordinary
-     path. The redirection loop below routes each entry to the permanent path
-     instead of the temporary save and restore path when this is set. */
+     a single command. A function named exec shadows the builtin and takes the
+     ordinary path. */
   const Expression *command_word_function =
       (!program_args.is_empty() && cxt.has_functions())
           ? cxt.find_function(program_args[0])
@@ -666,22 +643,18 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       !program_args.is_empty() && command_word_function == nullptr &&
       is_special_builtin_name(program_args[0].view());
 
-  /* Open the redirection targets. A redirection takes effect even when the
-     command expands to None, so > file with no command still creates the
-     file. A heredoc on the standard input passes its staged descriptor to the
-     exec context through this slot, which closes it, and the guard closes it on
-     any path that does not hand it off. A file or a cross-route on the standard
-     output and error is staged in source order onto the real shell fd below
-     rather than into a slot. */
+  /* A redirection takes effect even when the command expands to None, so > file
+     with no command still creates the file. A heredoc on the standard input
+     passes its staged descriptor to the exec context through this slot, and the
+     guard closes it on any path that does not hand it off. A file or a
+     cross-route on the standard output and error is staged in source order onto
+     the real shell fd below rather than into a slot. */
   Maybe<os::descriptor> redirect_in_fd;
   bool was_redirect_in_fd_handed_off = false;
-  /* A redirect that points a real shell descriptor at its target around this
-     command, a file on fd 1 or fd 2, a cross-route like 2>&1, a duplication
-     onto an arbitrary descriptor like >&5, the close form >&-, and a numbered
-     heredoc among them. The backups put the descriptors back once the command
-     finishes, restored in reverse on every exit path. The standard fds are
-     routed here so a later 2>&1 copies the descriptor its source points at now,
-     in source order, rather than the one a deferred slot would place last. */
+  /* The backups put the descriptors back once the command finishes, restored in
+     reverse on every exit path. The standard fds are routed here in source
+     order so a later 2>&1 copies the descriptor its source points at now rather
+     than the one a deferred slot would place last. */
   ArrayList<os::saved_descriptor> dup_saved_descriptors{
       cxt.scratch_allocator()};
   defer
@@ -738,15 +711,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         }
 
         /* The temp file already lands on fd N when mkstemp handed back that
-           very number, since the standard descriptors took the lower slots. The
-           generic save then dup2 would back up the body itself and leave it
-           open on N after the command, so the collision is handled directly.
-           The restore closes fd N, which fd N was free before mkstemp claimed
-           it makes correct. */
+           very number. A generic save then dup2 would leave the body open on N
+           after the command, so the collision is handled directly and the
+           restore closes fd N, which was free before mkstemp claimed it. */
 #if SHIT_PLATFORM_IS WIN32
-        /* A Windows descriptor is a HANDLE, so the staged body never shares the
-           identity of a bare fd number the way a POSIX mkstemp descriptor can,
-           and the save then replace path always runs. */
         const bool body_is_target_fd =
             body_fd == os::descriptor_for_shell_fd(redir.fd);
 #else
@@ -834,7 +802,6 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
         /* A descriptor copied onto itself, as in 1>&1, changes nothing. */
         if (from_fd == redir.fd) {
-          /* Self copy is a no-op. */
           break;
         }
 
@@ -884,9 +851,6 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           shit::flush();
           const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
 #if SHIT_PLATFORM_IS WIN32
-          /* A Windows descriptor is a HANDLE, so the opened file is compared
-             against the handle that now occupies the shell slot rather than
-             against the bare fd number. */
           if (file_fd != os::descriptor_for_shell_fd(redir.fd))
             os::close_fd(file_fd);
 #else
@@ -901,32 +865,23 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           break;
         }
 
-        /* Every file redirect, the standard input, output, and error included,
-           is staged onto the real shell fd N in source order so a later 2>&1
-           copies the descriptor fd N points at now rather than the one the
-           spawn would place last. A redirect onto fd 1 or fd 2 mutates the
-           shell's own standard output or error in place, so the buffered output
-           is flushed first to land on the original descriptor. open returns the
-           lowest free fd, which is at least three while fds 0, 1, and 2 hold
-           the shell's stdio, so the file never lands on a standard fd itself.
-           The higher fd, such as 3>file, takes the same in-order path the
-           numbered heredoc and the compound redirect path use. */
+        /* Every file redirect is staged onto the real shell fd N in source
+           order so a later 2>&1 copies the descriptor fd N points at now rather
+           than the one the spawn would place last. A redirect onto fd 1 or fd 2
+           mutates the shell's own standard output or error in place, so the
+           buffered output is flushed first to land on the original descriptor.
+         */
         if (redir.fd == 1 || redir.fd == 2) shit::flush();
 #if SHIT_PLATFORM_IS WIN32
-        /* A Windows descriptor is a HANDLE, so the opened file never shares the
-           identity of a bare fd number and the save then replace path runs. */
         const bool file_is_target_fd =
             file_fd == os::descriptor_for_shell_fd(redir.fd);
 #else
         const bool file_is_target_fd = file_fd == redir.fd;
 #endif
         if (file_is_target_fd) {
-          /* open returned fd N itself, since fd N was the lowest free
-             descriptor, so the file already sits on its target. The generic
-             save then dup2 would back up the file and the close would shut fd
-             N, leaving the child without it, so the collision is recorded for
-             restore without a close, the same way the numbered heredoc handles
-             it. */
+          /* open returned fd N itself, so the file already sits on its target.
+             A generic save then dup2 then close would leave the child without
+             it, so the collision is recorded for restore without a close. */
           dup_saved_descriptors.push(
               os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
         } else {
@@ -960,23 +915,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   /* An expansion may drop every word, for example an unset $x used as the whole
-     command. There is None to run then, but the redirections above already
-     took effect. A command-less line still carries its assignments, which
-     persist in the current shell rather than apply only to a child. The
-     location was set at the top of this function, so a $LINENO in any value on
-     the line reports the same line, the way dash reports it. */
+     command. The redirections above already took effect, and a command-less
+     line still carries its assignments, which persist in the current shell
+     rather than apply only to a child. */
   if (program_args.is_empty()) {
-    /* The assignments commit left to right, each before the next is expanded,
-       so a later value reads an earlier same-line one and a repeated name or a
-       += accumulates against what the store already holds. */
     for (let const &var : m_local_vars) {
       const StringView name = var.name.view();
       let value = cxt.expand_word_for_assignment(var.value);
       if (var.is_append) {
-        /* The joined text is transient, copied by the store and the
-           environment write, so it lives on the per-command scratch arena. An
-           integer name evaluates the join to its decimal here, since the
-           environment write takes the value verbatim. */
         let appended = String{cxt.scratch_allocator()};
         if (let const existing = cxt.get_variable_value(name))
           appended.append(existing->view());
@@ -1036,16 +982,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   /* A prefix assignment before a special builtin persists after the command as
-     a regular shell variable, the way POSIX keeps it.
-     command_is_special_builtin, computed above the redirection loop, already
-     excludes a function-shadowed name. The persisted form commits to the store
-     below rather than the process environment, so it stays unexported, the way
-     dash leaves it. */
-
-  /* Per-command assignments apply to the environment for this command, a
-     function call included, so a child inherits them and a function sees them.
-     The previous values are restored on every exit path. */
-  /* The environment value a prefix assignment shadowed, restored on exit. */
+     a regular shell variable, the way POSIX keeps it, and commits to the store
+     below rather than the process environment so it stays unexported. A
+     per-command assignment otherwise applies to the environment for this
+     command and a child or function sees it, with the previous value restored
+     on every exit path. */
   struct saved_env_var
   {
     String name;
@@ -1075,13 +1016,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     } catch (const Error &e) {
       throw relocate_error(e, source_location());
     }
-    /* The append form prepends the current value of NAME, which a prefix reads
-       from the shell store before the environment so a non-exported shell
-       variable still contributes, treating an unset name as empty. The joined
-       text is transient, copied by the store and the environment write, so it
-       lives on the per-command scratch arena. An integer name evaluates the
-       join to its decimal here, since the environment write takes the value
-       verbatim. */
+    /* The append form prepends the current value of NAME, read from the shell
+       store before the environment so a non-exported shell variable still
+       contributes. An integer name evaluates the join to its decimal here,
+       since the environment write takes the value verbatim. */
     if (var.is_append) {
       let appended = String{cxt.scratch_allocator()};
       if (let const existing = cxt.get_variable_value(name))
@@ -1246,14 +1184,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     /* The body runs in the mood and the diagnostics state the function was
        defined in, so a function defined in bash mood runs bash even after a
-       later set --mood, and one defined while diagnostics or warnings were off
-       skips its checks. The defining mood drives the strictness too, while an
-       explicit set -u rides through apply_strictness_for_mood. The caller's
-       state returns when the call ends. */
-    /* The common case is a function defined and called in the same mood, so the
-       swap only happens when the defining state actually differs from the live
-       state. A matching call pays one map lookup and three comparisons and
-       skips the capture, the defer, and the four setters entirely. */
+       later set --mood. The defining mood drives the strictness too, while an
+       explicit set -u rides through apply_strictness_for_mood. The swap only
+       happens when the defining state differs from the live state, so a
+       matching call skips the capture, the defer, and the four setters
+       entirely. */
     let const *const definition_info =
         cxt.function_definition_info_of(program_name.view());
     let const needs_state_swap =
@@ -1273,15 +1208,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     };
 
     /* A located error thrown from the body carries an absolute position into
-       the file that defined the function. The top-level handler renders
-       against the typed line and cannot reach that file once this frame
-       unwinds and its name leaves the call stack, so the error is rendered
-       here while the stack still names the function. The position rebases onto
-       the function's definition copy, the filename swaps to the function's
-       owned copy, and the error is marked rendered so the top-level handler
-       keeps the exit status without printing it a second time. An error that
-       does not window, such as one already rendered by a nested call, is
-       rethrown untouched. */
+       the file that defined the function, which the top-level handler cannot
+       reach once this frame unwinds, so the error is rendered here while the
+       stack still names the function. The position rebases onto the definition
+       copy, the filename swaps to the function's owned copy, and the error is
+       marked rendered so the top-level handler keeps the status without
+       printing it twice. An already-rendered error is rethrown untouched. */
     let const do_window_error = [&](ErrorWithLocation &error)
                                     throws -> Maybe<StringView> {
       let const resolved = cxt.resolve_render_source(error.location());
@@ -1491,6 +1423,6 @@ cold fn SimpleCommand::to_ast_string(usize layer) const throws -> String
   return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
-} /* namespace expressions */
+} // namespace expressions
 
-} /* namespace shit */
+} // namespace shit

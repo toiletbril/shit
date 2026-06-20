@@ -55,8 +55,8 @@ fn EvalContext::find_job(i32 id) wontthrow -> job *
 
 fn EvalContext::most_recent_job() wontthrow -> job *
 {
-  /* Skip a finished job, so a bare fg or bg acts on a job that is still
-     running or stopped rather than a dead pid. */
+  /* Skip a finished job, so a bare fg or bg acts on a running or stopped job
+     rather than a dead pid. */
   for (usize i = m_jobs.count(); i > 0; i--) {
     ASSERT(i - 1 < m_jobs.count());
     if (m_jobs[i - 1].state != job::State::Done) return &m_jobs[i - 1];
@@ -130,4 +130,4 @@ fn EvalContext::set_notify(bool enabled) wontthrow -> void
 
 pure fn EvalContext::notify() const wontthrow -> bool { return m_notify; }
 
-} /* namespace shit */
+} // namespace shit

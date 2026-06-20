@@ -3,9 +3,6 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* Removes shell variables, or with -f shell functions. The flag parser rejects
-   an unknown option. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-f] [-v] name ...");
@@ -84,4 +81,4 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
   return has_error ? 2 : 0;
 }
 
-} /* namespace shit */
+} // namespace shit

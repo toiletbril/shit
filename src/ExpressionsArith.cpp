@@ -48,8 +48,6 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_current_location(source_location());
   i64 status;
   try {
-    /* A true conditional exits zero, the way the [[ ]] command reports success.
-     */
     status = cxt.evaluate_conditional(m_elements) ? 0 : 1;
   } catch (const Error &e) {
     throw relocate_error(e, source_location());
@@ -91,8 +89,6 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   LOG(Debug, "evaluating the arithmetic command '%s'", m_expression.c_str());
 
-  /* The expression reads variables, so a runtime warning from it carets this
-     (( )) rather than the statement before it. */
   cxt.set_current_location(source_location());
 
   /* An empty (( )) is a failure with no evaluation, the way bash reads it as a
@@ -134,8 +130,7 @@ cold fn SelectLoop::analyze(AnalysisContext &actx,
   ASSERT(m_body != nullptr);
   unused(is_unconditional);
   /* The body runs repeatedly and may reassign a name, so a value recorded
-     before the loop does not hold inside it, the same reason ForLoop clears the
-     constant table before analyzing its body. */
+     before the loop does not hold inside it. */
   actx.constant_variables.clear();
   m_body->analyze(actx, false);
 }
@@ -192,8 +187,6 @@ cold fn ArrayAssignCommand::to_ast_string(usize layer) const throws -> String
 
 fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  /* The element words expand here, so a runtime warning from them carets this
-     assignment rather than the statement before it. */
   cxt.set_current_location(source_location());
 
   /* The elements expand the way command arguments do, with field splitting and
@@ -220,8 +213,6 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
-  /* A loop body runs repeatedly in the shell process, so no command in it may
-     replace the shell. */
   cxt.set_terminal_exec_allowed(false);
 
   /* The analyze pass proved the body never runs, the condition folds to a
@@ -233,8 +224,6 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     return 0;
   }
 
-  /* The three arithmetic sections read variables, so a runtime warning from
-     them carets this loop rather than the statement before it. */
   cxt.set_current_location(source_location());
 
   LOG(Debug,
@@ -244,8 +233,6 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   if (!is_blank_clause(m_init.view())) cxt.evaluate_arithmetic(m_init.view());
 
-  /* The body runs inside one more loop level, so a break or a continue clamps
-     its level against the nesting that is actually live. */
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
 
@@ -285,8 +272,7 @@ cold fn CStyleForLoop::analyze(AnalysisContext &actx,
   optimizer::optimize_node(this, actx);
 
   /* The header and body reassign the counter on every iteration, so a constant
-     recorded before the loop does not hold inside or after it, the same reason
-     ForLoop clears the constant table before analyzing its body. */
+     recorded before the loop does not hold inside or after it. */
   actx.constant_variables.clear();
   m_body->analyze(actx, false);
 }
@@ -327,7 +313,6 @@ Subshell::Subshell(SourceLocation location, const Expression *body)
     : CompoundCommand(location), m_body(body)
 {}
 
-/* The body lives in the arena, torn down once on reset. */
 Subshell::~Subshell() = default;
 
 cold fn Subshell::to_string() const throws -> String { return "Subshell"; }
@@ -456,8 +441,8 @@ FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
     : CompoundCommand(location), m_name(name), m_body(body)
 {}
 
-/* The body lives in the persistent function arena, owned by the function table
-   rather than this node, so it is not deleted here. */
+/* The body is owned by the function table rather than this node, so it is not
+   deleted here. */
 FunctionDefinition::~FunctionDefinition() = default;
 
 pure fn FunctionDefinition::name() const wontthrow -> const String &
@@ -555,8 +540,6 @@ RedirectedCommand::RedirectedCommand(SourceLocation location,
   m_redirections = steal(redirections);
 }
 
-/* The child and the redirection target tokens live in the arena, torn down once
-   on reset. */
 RedirectedCommand::~RedirectedCommand() = default;
 
 cold fn RedirectedCommand::to_string() const throws -> String
@@ -586,8 +569,6 @@ cold fn RedirectedCommand::register_defined_functions(
 {
   ASSERT(m_child != nullptr);
 
-  /* The redirected command runs in the current shell, so a function defined in
-     it is registered before the ordered walk. */
   m_child->register_defined_functions(actx);
 }
 
@@ -598,8 +579,6 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   LOG(Debug, "applying %zu redirections around the compound command",
       m_redirections.count());
 
-  /* The redirection targets expand here, so a runtime warning from done < $f
-     carets this redirection rather than the statement before it. */
   cxt.set_current_location(source_location());
 
   /* A <(...) or >(...) in a redirection target, as in done < <(cmd), opens a
@@ -623,15 +602,11 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   ArrayList<os::saved_descriptor> saved_descriptors{cxt.scratch_allocator()};
   defer
   {
-    /* Any buffered shell output belongs on the redirected target, so it is
-       flushed before the descriptors go back. */
     shit::flush();
     for (usize i = saved_descriptors.count(); i > 0; i--)
       os::restore_descriptor(saved_descriptors[i - 1]);
   };
 
-  /* Stale buffered output from before the redirection belongs on the original
-     descriptor, so it is flushed before the descriptors move. */
   shit::flush();
 
   for (let const &redir : m_redirections) {
@@ -700,7 +675,6 @@ UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
     : Expression(location), m_rhs(rhs)
 {}
 
-/* The operand lives in the arena, torn down once on reset. */
 UnaryExpression::~UnaryExpression() = default;
 
 cold fn UnaryExpression::to_ast_string(usize layer) const throws -> String
@@ -720,7 +694,6 @@ BinaryExpression::BinaryExpression(SourceLocation location,
     : Expression(location), m_lhs(lhs), m_rhs(rhs)
 {}
 
-/* The operands live in the arena, torn down once on reset. */
 BinaryExpression::~BinaryExpression() = default;
 
 cold fn BinaryExpression::to_ast_string(usize layer) const throws -> String
@@ -826,7 +799,6 @@ Divide::Divide(SourceLocation location, const Expression *lhs,
 
 cold fn Divide::to_string() const throws -> String { return "/"; }
 
-/* Division checks the denominator first, since a divide by zero traps. */
 fn Divide::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_lhs != nullptr);
@@ -867,6 +839,6 @@ BINARY_EXPRESSION_DECLS(Xor, ^);
 BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
-} /* namespace expressions */
+} // namespace expressions
 
-} /* namespace shit */
+} // namespace shit

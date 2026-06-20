@@ -9,10 +9,9 @@
 namespace shit {
 
 /* An owned, growable byte string over an explicit allocator. A short string
-   lives in the inline buffer with no allocation, since the arithmetic loop
-   churns tiny strings through malloc and free. A longer string lives in a
-   heap or arena buffer. Either way m_data is the access pointer and the buffer
-   keeps a trailing null so c_str is free. */
+   lives in the inline buffer with no allocation, a longer string in a heap or
+   arena buffer. Either way m_data is the access pointer and the buffer keeps a
+   trailing null so c_str is free. */
 class String
 {
 public:
@@ -22,8 +21,7 @@ public:
   static constexpr usize INLINE_CAPACITY = 24;
 
   /* A default String is inline and empty, so it can serve as a container slot
-     before its real allocator and value are assigned. The default allocator is
-     heap, which only matters once the string grows past the inline buffer. */
+     before its real allocator and value are assigned. */
   String() : m_allocator(heap_allocator()) { reset_to_inline(); }
   explicit String(Allocator allocator) : m_allocator(allocator)
   {
@@ -41,14 +39,11 @@ public:
   fn operator=(const String &other) throws->String &;
   fn operator=(String &&other) wontthrow->String &;
 
-  /* An explicit deep copy, so a caller that means to duplicate the string says
-     so rather than leaning on an implicit copy. */
   mustuse fn clone() const throws -> String { return String{*this}; }
 
   ~String() { free_storage(); }
 
-  /* The allocator this string was built with, so a container can hand its own
-     allocator down to a string it stores. */
+  /* The allocator this string was built with. */
   mustuse pure fn allocator() const wontthrow -> Allocator
   {
     return m_allocator;
@@ -67,9 +62,7 @@ public:
   {
     return StringView{m_data, m_length};
   }
-  /* A String reads as a view wherever one is expected, so an owned string
-     passes to a comparison or a function taking a view without spelling out
-     view(). */
+  /* A String reads as a view wherever one is expected. */
   operator StringView() const wontthrow { return StringView{m_data, m_length}; }
   hot mustuse pure fn c_str() const wontthrow -> const char *
   {
@@ -83,7 +76,6 @@ public:
 
   cold fn reserve(usize needed) throws -> void;
 
-  /* The byte buffer, always null terminated. */
   mustuse pure fn data() const wontthrow -> const char * { return c_str(); }
   mustuse pure fn length() const wontthrow -> usize { return m_length; }
   hot mustuse pure fn back() const wontthrow -> char
@@ -98,8 +90,6 @@ public:
   fn operator+=(StringView other) throws->String &;
   fn operator+=(char c) throws->String &;
 
-  /* Search and slice forward to the view, so the owned string answers the same
-     questions through the view without exposing its buffer. */
   hot flatten mustuse pure fn find_character(char wanted) const wontthrow
       -> Maybe<usize>
   {
@@ -139,21 +129,16 @@ public:
     return m_data[0];
   }
 
-  /* The index of the first occurrence of a substring at or after a start, or
-     None when it is absent. */
   mustuse pure fn find_substring(StringView needle,
                                  usize from = 0) const wontthrow
       -> Maybe<usize>;
 
-  /* The index of the last occurrence of a byte, or None when it is absent. */
   mustuse pure fn find_last_character(char wanted) const wontthrow
       -> Maybe<usize>;
 
 private:
   cold fn free_storage() wontthrow -> void;
 
-  /* True when the string lives in the inline buffer rather than an allocation.
-   */
   mustuse pure fn is_inline() const wontthrow -> bool
   {
     return m_data == m_inline;
@@ -177,8 +162,8 @@ private:
 };
 
 /* Concatenate two byte ranges into a fresh heap String. A String and a literal
-   both read as a view, so str + "x", "x" + str, and str + str all resolve here.
-   The result is heap-backed, the default for an expression temporary. */
+   both read as a view, so str + "x", "x" + str, and str + str all resolve
+   here. */
 fn operator+(StringView left, StringView right) throws->String;
 
-} /* namespace shit */
+} // namespace shit

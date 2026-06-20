@@ -29,7 +29,6 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* The optional argument is how many enclosing loops to break, default one. */
   let const level = parse_optional_integer_arg(ec, 1);
   /* A non-positive count is rejected the way dash rejects an illegal number,
      rather than clamped, so break 0 aborts instead of breaking one loop. */
@@ -42,4 +41,4 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

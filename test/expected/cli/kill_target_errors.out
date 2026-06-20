@@ -2,7 +2,7 @@
 shit: 1:1: error: kill: Not enough arguments.
      1 |  kill
        |  ^~~~ here.
-shit: note: kill --help for more info.
+shit: note: Try `kill --help` for more info.
 rc=2
 == an unknown signal name is rejected:
 shit: 1:1: error: Builtin 'kill': 'BOGUSSIG' is not a valid signal.

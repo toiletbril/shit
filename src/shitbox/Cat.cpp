@@ -83,6 +83,6 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

@@ -4,9 +4,8 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* hash remembers command locations in shells that cache the PATH search. This
-   shell caches a resolved location per command name, and hash -r forgets every
-   one so the next use re-resolves, the way dash clears its command table. */
+/* hash -r forgets every cached command location so the next use re-resolves,
+   the way dash clears its command table. */
 
 FLAG_LIST_DECL();
 
@@ -43,4 +42,4 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

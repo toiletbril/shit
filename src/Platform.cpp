@@ -37,7 +37,6 @@
 
 #if defined __linux__
 #include <linux/perf_event.h>
-#include <sys/ioctl.h>
 #include <sys/syscall.h>
 #endif
 
@@ -85,8 +84,8 @@ fn take_pending_signal() wontthrow -> i32
   return 0;
 }
 
-} /* namespace os */
-} /* namespace shit */
+} // namespace os
+} // namespace shit
 
 /* The file creation mask call differs only by name and argument type across
    platforms. One macro bridges the shared mask functions to it. */
@@ -147,7 +146,6 @@ fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
   const os::descriptor saved = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
   dup2(target, STDOUT_FILENO);
 
-  /* The original write end is close-on-exec for the same reason. */
   if (const int flags = fcntl(target, F_GETFD); flags != -1)
     fcntl(target, F_SETFD, flags | FD_CLOEXEC);
 
@@ -192,7 +190,7 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
     close(saved.saved);
   } else {
     /* The descriptor was not open before, so close the one the redirection
-       opened on it to leave the shell as it was. */
+       opened on it. */
     close(saved.shell_fd);
   }
 }
@@ -630,8 +628,6 @@ fn capture_program_output(const ArrayList<String> &argv,
     return None;
   }
 
-  /* The child reads its input from the null device and writes both its output
-     streams into the pipe, and closes the descriptors it does not keep. */
   posix_spawn_file_actions_t file_actions;
   posix_spawn_file_actions_init(&file_actions);
   posix_spawn_file_actions_adddup2(&file_actions, devnull_fd, STDIN_FILENO);
@@ -641,8 +637,8 @@ fn capture_program_output(const ArrayList<String> &argv,
   posix_spawn_file_actions_addclose(&file_actions, write_end);
   posix_spawn_file_actions_addclose(&file_actions, devnull_fd);
 
-  /* posix_spawn wants a NUL-terminated array of mutable C strings. The argv
-     strings outlive the spawn, so pointing at their storage is safe. */
+  /* The argv strings outlive the spawn, so the NUL-terminated array points at
+     their storage rather than copying. */
   ArrayList<char *> raw_args{heap_allocator()};
   for (let const &argument : argv)
     raw_args.push(const_cast<char *>(argument.c_str()));
@@ -671,8 +667,8 @@ fn capture_program_output(const ArrayList<String> &argv,
     return None;
   }
 
-  /* Read the child's output until it closes the pipe or the deadline passes, so
-     a child that stalls is cut rather than blocking the prompt. */
+  /* A child that stalls is cut at the deadline rather than blocking the prompt.
+   */
   let captured = String{heap_allocator()};
   const u64 deadline_nanos = monotonic_nanos() + timeout_nanos;
   bool was_timed_out = false;
@@ -831,11 +827,9 @@ fn replace_process(ExecContext &&ec) throws -> void
      and is not a binary, so it runs as a shell script instead, signalled by
      ExecFormatError. */
   if (errno == ENOEXEC) throw shit::ExecFormatError{};
-  /* The program resolved but could not be executed, so the error carries the
-     command's location for a caret and the caller exits 126 the way bash does.
-   */
-  /* The error reason is read before the String concatenation, since building
-     the message allocates and an allocation could clobber errno that
+  /* The error carries the command's location for a caret and the caller exits
+     126 the way bash does. The reason is read before the String concatenation,
+     since building the message allocates and could clobber the errno that
      last_system_error_message reads. */
   let const reason = last_system_error_message();
   throw shit::ErrorWithLocation{
@@ -1004,7 +998,6 @@ fn wait_and_monitor_process(process pid) throws -> i32
     if (check_syscall(w) == pid) break;
   }
 
-  /* Print appropriate message if the process was sent a signal. */
   if (WIFSIGNALED(status)) {
     const i32 sig = WTERMSIG(status);
     const char *sig_str = strsignal(sig);
@@ -1017,7 +1010,7 @@ fn wait_and_monitor_process(process pid) throws -> i32
        dash do rather than reported as a job event. Ctrl-C prints a bare
        newline, and every other signal prints the located process message. */
     if (sig == SIGPIPE) {
-      /* Silent, the expected end of a pipeline producer. */
+      /* Reaped silently, see above. */
     } else if (sig != SIGINT) {
       shit::print("[Process " + utils::int_to_text(pid) + ": " + sig_desc +
                   ", signal " + utils::int_to_text(sig) + "]\n");
@@ -1026,20 +1019,6 @@ fn wait_and_monitor_process(process pid) throws -> i32
     }
 
     return 128 + sig;
-  } else if (WIFSTOPPED(status)) {
-    const i32 sig = WSTOPSIG(status);
-    const char *sig_str = strsignal(sig);
-    const String sig_desc = (sig_str != nullptr)
-                                ? String{StringView{sig_str}}
-                                : String{StringView{"Unknown"}};
-
-    shit::print("[Process " + utils::int_to_text(pid) + ": " + sig_desc +
-                ", signal " + utils::int_to_text(sig) + " and killed]\n");
-
-    /* A suspended process is not yet handled, so it is killed instead. */
-    check_syscall(kill(pid, SIGKILL));
-
-    return 128 + SIGKILL;
   } else if (!WIFEXITED(status)) {
     /* The process neither exited nor was signalled, so its status is unknown.
      */
@@ -1109,7 +1088,6 @@ fn process_from_pid(i64 pid) wontthrow -> process
 
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 {
-  /* A bare number names the signal directly. */
   if (name.is_all_decimal_digits()) {
     const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(name);
     if (parsed_value.is_error()) return shit::None;
@@ -1585,7 +1563,7 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
   return true;
 }
 
-} /* namespace */
+} // namespace
 
 fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
     -> Maybe<measured_result>
@@ -2017,14 +1995,15 @@ fn enumerate_processes(bool include_resource_stats) throws
   return processes;
 }
 
-} /* namespace os */
+} // namespace os
 
-} /* namespace shit */
+} // namespace shit
 
 #elif SHIT_PLATFORM_IS WIN32
 
 #include <io.h>
 #include <psapi.h>
+#include <sys/stat.h>
 #include <tlhelp32.h>
 
 namespace shit {
@@ -2166,8 +2145,6 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
   }
   result.saved = GetStdHandle(*slot);
   result.was_open = result.saved != INVALID_HANDLE_VALUE;
-  /* No replacement handle is installed, so the restore only puts the slot
-     back. */
   result.replacement = INVALID_HANDLE_VALUE;
   result.is_dup2_ok = true;
   return result;
@@ -2673,11 +2650,9 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
   DWORD disposition = OPEN_EXISTING;
   switch (mode) {
   case file_open_mode::Truncate: disposition = CREATE_ALWAYS; break;
-  /* CREATE_NEW fails when the file already exists, the way noclobber wants. */
   case file_open_mode::TruncateNoClobber: disposition = CREATE_NEW; break;
   case file_open_mode::Append: disposition = OPEN_ALWAYS; break;
   case file_open_mode::Read: disposition = OPEN_EXISTING; break;
-  /* OPEN_ALWAYS opens the file or creates it, the way <> needs. */
   case file_open_mode::ReadWrite: disposition = OPEN_ALWAYS; break;
   }
 
@@ -2696,7 +2671,6 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
                               disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (handle == INVALID_HANDLE_VALUE) return shit::None;
 
-  /* Append moves the write position to the end of the file. */
   if (mode == file_open_mode::Append)
     SetFilePointer(handle, 0, nullptr, FILE_END);
 
@@ -2813,7 +2787,6 @@ fn signal_name_from_number(i32 number) -> Maybe<String>
 
 fn signal_names() throws -> const ArrayList<StringView> &
 {
-  /* The names the Windows signal_number_from_name accepts. */
   static ArrayList<StringView> names = [] throws {
     let collected = ArrayList<StringView>{};
     static const StringView WINDOWS_SIGNAL_NAMES[] = {"HUP", "INT", "QUIT",
@@ -2867,7 +2840,6 @@ static fn append_windows_quoted_arg(String &out, StringView arg) -> void
       out += '"';
       i++;
     } else {
-      /* Backslashes that do not precede a quote stay literal. */
       for (usize k = 0; k < backslash_count; k++)
         out += '\\';
       out += arg[i];
@@ -2909,16 +2881,19 @@ fn last_system_error_message() -> String
   }
 
   StringView view{static_cast<char *>(errno_str)};
-  /* FormatMessage ends the text with a trailing period and spacing, so the last
-     few bytes are dropped to leave a bare message. */
-  if (view.find_character('.') || view.find_character(' ') ||
-      view.find_character('\n'))
-  {
-    view = view.substring_of_length(0, view.length >= 3 ? view.length - 3 : 0);
+  /* FormatMessage ends the text with a trailing period, spacing, and a CRLF, so
+     the trailing run of those bytes is trimmed to leave a bare message rather
+     than a fixed count that a shorter message would over-cut. */
+  while (view.length > 0) {
+    let const last_byte = view[view.length - 1];
+    if (last_byte != '.' && last_byte != ' ' && last_byte != '\r' &&
+        last_byte != '\n')
+    {
+      break;
+    }
+    view = view.substring_of_length(0, view.length - 1);
   }
 
-  /* The result is rebuilt rather than edited in place, so each kept byte is
-     pushed and a %N insert is replaced with a literal word. */
   String err{};
   for (usize i = 0; i < view.length; i++) {
     /* FormatMessage leaves a %N placeholder where an argument would go, which
@@ -2934,7 +2909,6 @@ fn last_system_error_message() -> String
   LocalFree(errno_str);
 
   if (err.length() > 0) {
-    /* The first letter is capitalized so the message reads as a sentence. */
     String capitalized{};
     capitalized.push(static_cast<char>(toupper(err[0])));
     capitalized += err.substring(1);
@@ -3209,14 +3183,22 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
 {
   const String target_string{target};
   const String link_string{link_path};
+/* An older mingw SDK omits these CreateSymbolicLink flags, so each is defined
+   here when the toolchain header does not provide it. */
+#ifndef SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
+#define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
+#endif
+#ifndef SYMBOLIC_LINK_FLAG_DIRECTORY
+#define SYMBOLIC_LINK_FLAG_DIRECTORY 0x1
+#endif
   /* A symlink to a directory needs the directory flag, so the target is probed
      once. The unprivileged-create flag lets the call succeed without elevation
      on a developer-mode Windows. */
-  DWORD flags = 0x2 /* SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE */;
+  DWORD flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
   const DWORD attributes = GetFileAttributesA(target_string.c_str());
   if (attributes != INVALID_FILE_ATTRIBUTES &&
       (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
-    flags |= 0x1 /* SYMBOLIC_LINK_FLAG_DIRECTORY */;
+    flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
   return CreateSymbolicLinkA(link_string.c_str(), target_string.c_str(),
                              flags) != 0;
 }
@@ -3327,9 +3309,9 @@ fn enumerate_processes(bool include_resource_stats) throws
   return processes;
 }
 
-} /* namespace os */
+} // namespace os
 
-} /* namespace shit */
+} // namespace shit
 
 #endif /* PLATFORM_IS(WIN32) */
 
@@ -3341,7 +3323,6 @@ namespace os {
 
 const ArrayList<String> OMITTED_SUFFIXES = []() {
   ArrayList<String> suffixes{};
-  /* First extension entry should be empty. */
   for (const char *suffix : {"", ".exe", ".com", ".scr", ".bat"})
     suffixes.push(String{StringView{suffix}});
   return suffixes;
@@ -3376,9 +3357,9 @@ fn erase_extension_and_get_its_index(String &program_name) -> ext_index
   return 0;
 }
 
-} /* namespace os */
+} // namespace os
 
-} /* namespace shit */
+} // namespace shit
 
 #endif /* COSMO || WIN32 */
 
@@ -3405,5 +3386,5 @@ fn get_file_creation_mask() wontthrow -> u32
 
 fn set_file_creation_mask(u32 mask) wontthrow -> void { SHIT_UMASK(mask); }
 
-} /* namespace os */
-} /* namespace shit */
+} // namespace os
+} // namespace shit

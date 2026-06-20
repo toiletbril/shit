@@ -1,9 +1,5 @@
 #pragma once
 
-/* Declarations shared across the Completion translation units, the cascade
-   stages in CompletionManpage.cpp and CompletionScan.cpp and the highlighter in
-   CompletionHighlight.cpp. The public surface stays in Completion.hpp. */
-
 #include "Completion.hpp"
 #include "Containers.hpp"
 #include "String.hpp"
@@ -23,8 +19,6 @@ struct cached_directory_entry
   bool is_directory{false};
 };
 
-/* True when the byte is a space or a tab, the blanks the --help and the manpage
-   parsers step over between an option and its description. */
 static pure forceinline fn is_blank(char byte) throws -> bool
 {
   return byte == ' ' || byte == '\t';
@@ -54,7 +48,6 @@ fn read_directory_cached(const Path &directory) throws
 fn environment_path_changed(String &cached_path) throws -> bool;
 fn path_command_names() throws -> const ArrayList<String> &;
 fn command_word_of(StringView line) wontthrow -> StringView;
-/* Whether the token carries an unquoted glob metacharacter, *, ?, or [. */
 pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool;
 fn resolve_completion_alias(StringView command, EvalContext &context) throws
     -> String;
@@ -98,6 +91,6 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
 fn command_substitution_body_start(StringView line, usize cursor) throws
     -> usize;
 
-} /* namespace completion */
+} // namespace completion
 
-} /* namespace shit */
+} // namespace shit

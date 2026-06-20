@@ -26,10 +26,8 @@ namespace shit {
 
 namespace shitbox {
 
-/* The predicates one find invocation filters on, parsed once from the command
-   line and read at every entry the walk visits. The name pattern points into
-   the argument that spelled it, and glob_active marks every byte of that
-   pattern as a live metacharacter the way an unquoted glob acts. */
+/* The name pattern points into the argument that spelled it, so the argument
+   outlives the walk that reads the pattern. */
 struct find_options
 {
   bool has_name{false};
@@ -40,10 +38,7 @@ struct find_options
   i64 min_depth{0};
 };
 
-/* Whether the entry of this type at this depth satisfies every predicate, so
-   the walk prints it. The depth bounds come first, then the type, then the name
-   glob. The type letter comes from the one stat the walk already took, where a
-   regular file reads as a dash the way the mode string spells it. */
+/* A regular file reads as a dash the way the mode string spells it. */
 static fn find_entry_matches(char type_letter, StringView filename, usize depth,
                              const find_options &options) throws -> bool
 {
@@ -71,9 +66,6 @@ static fn find_entry_matches(char type_letter, StringView filename, usize depth,
   return true;
 }
 
-/* Print the entry when it matches, then descend into a directory while the
-   depth stays under the maximum. The children are walked in sorted order so the
-   output is stable. */
 static fn find_walk(const Path &path, StringView display, usize depth,
                     const find_options &options, String &output) throws -> void
 {
@@ -113,8 +105,6 @@ static fn find_walk(const Path &path, StringView display, usize depth,
   }
 }
 
-/* The integer operand of a depth predicate, or a located error when it is
-   missing or not a number. */
 static fn parse_depth_argument(const ArrayList<String> &args, usize index,
                                StringView predicate) throws -> i64
 {
@@ -221,6 +211,6 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

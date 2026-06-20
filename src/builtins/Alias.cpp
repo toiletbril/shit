@@ -4,9 +4,6 @@
 #include "../NameValueArg.hpp"
 #include "../Trace.hpp"
 
-/* alias defines a command word replacement, or with no operand lists the
-   replacements already defined. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[name[=value] ...]");
@@ -38,7 +35,6 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(!args.is_empty());
 
-  /* alias with no operand lists every definition. */
   if (args.count() == 1) {
     let out = String{};
     for (let const &definition : cxt.alias_definitions()) {
@@ -78,4 +74,4 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} /* namespace shit */
+} // namespace shit

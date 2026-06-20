@@ -10,9 +10,9 @@ namespace shit {
 /* A bump arena hands out node storage from large blocks and frees every block
    at once on reset. The AST and its tokens live here for one command, so their
    many small allocations collapse into a handful of block allocations. An
-   object with a non-trivial destructor, such as a node that owns a heap String,
-   has its destructor registered at create and run on reset or release, since
-   the block reclaim alone would leak those owned members. */
+   object with a non-trivial destructor has its destructor registered at create
+   and run on reset or release, since the block reclaim alone would leak those
+   owned members. */
 class BumpArena
 {
 public:
@@ -28,20 +28,17 @@ public:
 
   /* Counts how many times the arena has been reset. A cache that holds a
      pointer into this arena stores the generation it was filled in, so a hit
-     after a reset, which reclaimed that storage, is recognised as stale and
-     refilled. */
+     after a reset is recognised as stale and refilled. */
   pure fn reset_generation() const wontthrow -> usize
   {
     return m_reset_generation;
   }
 
-  /* Sum the live bump bytes across every block. The stats path reads it to
-     report how much the current command's tree occupies. */
+  /* Sum the live bump bytes across every block. */
   fn bytes_used() const wontthrow -> usize;
 
   /* The number of blocks the arena holds and the total bytes they reserve, read
-     by the memory report so a reader can see the capacity the arena keeps past
-     what it currently uses. */
+     by the memory report. */
   fn block_count() const wontthrow -> usize { return m_blocks.count(); }
   fn bytes_capacity() const wontthrow -> usize
   {
@@ -52,8 +49,7 @@ public:
   }
 
   /* A saved bump position, so a scope can reclaim everything it allocated above
-     the mark while leaving earlier allocations alone. The marks nest, so a
-     command substitution inside an expansion releases only its own region. */
+     the mark while leaving earlier allocations alone. The marks nest. */
   struct Mark
   {
     usize block_count;
@@ -107,16 +103,13 @@ private:
 
 /* The arena that the lexer and parser allocate nodes from while a command is
    being built. The operator delete on a node consults it to tell arena storage
-   apart from an ordinary heap node. It is null outside a parse. */
+   apart from an ordinary heap node. */
 extern BumpArena *AST_ARENA;
 
 /* The arena that holds function bodies. A function body outlives the command
-   that defined it, so it is parsed here instead of the per-command arena, which
-   resets after every command. It is never reset during a run. */
+   that defined it, so it is parsed here instead of the per-command arena. */
 extern BumpArena *FUNCTION_ARENA;
 
-/* True when the pointer belongs to either arena, so a node delete knows to
-   leave the storage to the arena. */
 fn is_arena_pointer(const void *pointer) wontthrow -> bool;
 
-} /* namespace shit */
+} // namespace shit

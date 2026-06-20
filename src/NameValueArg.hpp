@@ -35,4 +35,4 @@ private:
   Maybe<StringView> m_value;
 };
 
-} /* namespace shit */
+} // namespace shit

@@ -20,8 +20,8 @@ flatten fn find_util(StringView name) throws -> Maybe<Utility::Kind>
 }
 
 /* The per-utility flag lists, a zero-initialized table immune to static-init
-   order, filled by each utility file's registrar after its FLAG_LIST is built,
-   since both sit in the same translation unit in order. */
+   order, filled by each utility file's registrar after its FLAG_LIST is
+   built. */
 static const ArrayList<Flag *> *SHITBOX_UTIL_FLAG_LISTS[SHITBOX_UTIL_COUNT] =
     {};
 
@@ -66,9 +66,7 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   let const name = ec.args()[name_index].view();
 
   /* The utility reads itself as the first argument, so a slice from the name
-     onward is copied once and handed over. The copy is small and lets the
-     utility parse flags with the name as the program word the way a builtin
-     reads ec.args(). */
+     onward is copied once and handed over, the name as the program word. */
   ArrayList<String> shifted{};
   shifted.reserve(ec.args().count() - name_index);
   for (usize i = name_index; i < ec.args().count(); i++)
@@ -77,28 +75,23 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   if (let const chosen = find_util(name); chosen.has_value()) {
     /* A utility error is rendered as a located error in every mood, so the bash
        mood shows the same caret the default mood does rather than the soft line
-       the builtin dispatch would print. The shitbox utilities are a shit
-       feature, so they read best with the located form the way the builtins do
-       in the default mood. */
+       the builtin dispatch would print. */
     try {
       return run_util(*chosen, ec, cxt, shifted);
     } catch (const ErrorWithLocation &error) {
       /* A flag-parse error carries a caret offset into the utility's own
-         argument vector, which does not line up with the whole command the
-         top-level handler renders against, so the caret would land on the wrong
-         token. Re-pointing it at the command location puts the caret under the
-         whole invocation the way the utility's thrown errors render. */
-      throw ErrorWithLocation{ec.source_location(), error.message()};
+         argument vector, which does not line up with the whole command, so the
+         caret would land on the wrong token. relocate_error re-points it at the
+         command location and carries the mark, the status, and the note. */
+      throw relocate_error(error, ec.source_location());
     } catch (const Error &error) {
-      throw ErrorWithLocation{ec.source_location(), error.message()};
+      throw relocate_error(error, ec.source_location());
     }
   }
 
-  /* A name that is not a shitbox utility but is a shell builtin, such as echo
-     or printf, routes to that builtin rather than getting a second
-     implementation, so `shitbox echo hi` runs the echo builtin. The routed
-     context carries the same descriptors the outer command was placed on, so
-     its output follows a redirection or a pipe. */
+  /* A name that is not a shitbox utility but is a shell builtin routes to that
+     builtin, so `shitbox echo hi` runs the echo builtin. The routed context
+     carries the same descriptors the outer command was placed on. */
   if (let const builtin_kind = search_builtin(name); builtin_kind.has_value()) {
     let routed = ExecContext::from_resolved(
         ec.source_location(), ResolvedCommand::from_builtin(*builtin_kind),
@@ -256,18 +249,16 @@ fn format_human_size(u64 bytes) throws -> String
   }
 
   /* Rounding the scaled value can reach 1024, which belongs in the next unit,
-     so a value that would render as 1024K crosses over to 1.0M when a larger
-     unit is available. */
+     so a value that would render as 1024K crosses over to 1.0M. */
   if (value >= 1023.5 && unit < sizeof(units)) {
     value /= 1024.0;
     unit++;
   }
 
   String out{};
-  /* A scaled value below ten keeps one decimal, the way coreutils renders 1.5K,
-     while a larger value rounds to a whole number such as 23K. A one-decimal
-     value that rounds up to ten drops the decimal so it reads 10K, not 10.0K.
-   */
+  /* A scaled value below ten keeps one decimal, while a larger value rounds to
+     a whole number. A one-decimal value that rounds up to ten drops the decimal
+     so it reads 10K, not 10.0K. */
   let const tenths = static_cast<u64>(value * 10.0 + 0.5);
   if (value < 10.0 && tenths < 100) {
     out += utils::uint_to_text(tenths / 10);
@@ -284,10 +275,8 @@ fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void
 {
   /* A keep-going utility error renders the located caret in every mood, the
-     same form a thrown utility error gets, so a bad operand in a list reads the
-     same whether the mood is the default or the bash one. The fallback line is
-     for the rare case with no source to caret against, such as the multicall
-     entry. */
+     same form a thrown utility error gets. The fallback line is for the rare
+     case with no source to caret against, such as the multicall entry. */
   const ErrorWithLocation located{ec.source_location(), message};
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view()));
@@ -295,6 +284,6 @@ fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
     print_error("shit: " + String{message} + "\n");
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

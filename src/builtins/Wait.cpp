@@ -5,9 +5,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* wait blocks until the named jobs finish, or until every job finishes when no
-   operand is given. The status is that of the last job waited for. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[%job|pid ...]");
@@ -35,7 +32,7 @@ i32 wait_for_job(job &job) throws
   return status;
 }
 
-} /* namespace */
+} // namespace
 
 Wait::Wait() = default;
 
@@ -102,4 +99,4 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
   return status;
 }
 
-} /* namespace shit */
+} // namespace shit

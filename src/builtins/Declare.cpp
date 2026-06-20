@@ -6,12 +6,9 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* declare and its alias typeset set variable attributes. The bash-specific use
-   here is -A to make a name an associative array and -a to make it indexed, so
-   a later subscript assignment routes to the right store. A plain name=value
-   sets a scalar, -x marks it for the environment, and -i marks it as an
-   integer so every assignment to it evaluates as arithmetic. The other
-   attribute letters are accepted without effect. */
+/* -A makes a name an associative array and -a makes it indexed, so a later
+   subscript assignment routes to the right store. -i marks a name an integer
+   so every assignment to it evaluates as arithmetic. */
 
 FLAG_LIST_DECL();
 
@@ -64,7 +61,7 @@ String quote_for_declare(StringView value) throws
   return quoted;
 }
 
-} /* namespace */
+} // namespace
 
 Declare::Declare() = default;
 
@@ -131,19 +128,14 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         let invalid = String{};
         invalid += arg[0];
         invalid += arg[c];
-        throw Error{"Unable to run declare because '" + invalid +
-                    "' is not a valid option"};
+        throw Error{"'" + invalid + "' is not a valid declare option"};
       }
       }
     }
   }
 
-  /* declare -f and -F query and list functions. With names, -F prints each
-     defined name bare and -f prints its recorded definition text, and any
-     missing name turns the status to 1, silently for -F the way bash answers
-     an existence probe, with a message for -f. Without names, -F lists every
-     function as "declare -f NAME" sorted and -f prints every recorded
-     definition. */
+  /* A missing name turns the status to 1, silently for -F the way bash answers
+     an existence probe, with a message for -f. */
   if (should_restrict_to_functions) {
     i32 status = 0;
     if (i >= args.count()) {
@@ -188,9 +180,8 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
     return status;
   }
 
-  /* declare -p NAME prints the current declaration of each name in the bash
-     syntax, the attribute flag then the name and a quoted value or an array
-     literal, so a script can reload the state. An unknown name is an error. */
+  /* declare -p prints in the bash syntax so a script can reload the state. An
+     unknown name is an error. */
   if (should_print) {
     i32 status = 0;
     for (; i < args.count(); i++) {
@@ -346,4 +337,4 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

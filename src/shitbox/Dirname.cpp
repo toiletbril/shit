@@ -44,6 +44,6 @@ fn Dirname::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

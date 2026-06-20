@@ -3,13 +3,6 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* compgen generates the completion candidates an action, a word list, or a
-   glob would produce, the way a bash completion function does, such as
-   compgen -W "a b c" -- "$cur". The -W word list undergoes the shell
-   expansions and filters to the words that start with the given prefix, each
-   printed on its own line, and -G probes the filesystem. The other options
-   are accepted so a completion script runs. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-W wordlist] [-G glob] [-A action] [-P prefix] "
@@ -134,4 +127,4 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return has_any_matched ? 0 : 1;
 }
 
-} /* namespace shit */
+} // namespace shit

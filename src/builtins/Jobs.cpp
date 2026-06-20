@@ -6,9 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* jobs lists the background jobs and the state each one is in, then forgets the
-   ones that have finished, the same as a shell prompt would. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-lnprs] [jobspec ...]");
@@ -80,9 +77,6 @@ fn may_color_jobs(EvalContext &cxt) throws -> bool
   return cxt.shell_is_interactive() && colors::stdout_wants_color();
 }
 
-/* Resolve a jobspec to the index in the table, where %N or a bare N names job
-   N, %+ or %% the current job, and %- the previous one. None when no job
-   matches, which the caller reports as a no-such-job error. */
 fn resolve_jobspec(const ArrayList<job> &jobs, StringView spec) throws
     -> Maybe<usize>
 {
@@ -104,7 +98,7 @@ fn resolve_jobspec(const ArrayList<job> &jobs, StringView spec) throws
   return shit::None;
 }
 
-} /* namespace */
+} // namespace
 
 Jobs::Jobs() = default;
 
@@ -156,7 +150,6 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (FLAG_JOBS_STOPPED.is_enabled() && job.state != job::State::Stopped)
       continue;
 
-    /* -p prints the process id alone, the form a script feeds to kill. */
     if (FLAG_JOBS_PIDS.is_enabled()) {
       out += utils::int_to_text(os::process_id_of(job.pid));
       out.push('\n');
@@ -167,7 +160,6 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     out.push(job_marker(jobs, index));
     out += " ";
 
-    /* -l inserts the process id between the job number and the state word. */
     if (FLAG_JOBS_LONG.is_enabled()) {
       out += utils::int_to_text(os::process_id_of(job.pid));
       out += " ";
@@ -192,4 +184,4 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} /* namespace shit */
+} // namespace shit

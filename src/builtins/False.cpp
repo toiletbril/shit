@@ -30,4 +30,4 @@ fn False::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 1;
 }
 
-} /* namespace shit */
+} // namespace shit

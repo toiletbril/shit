@@ -6,8 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test.
- */
 #if SHIT_PLATFORM_IS WIN32
 #include <io.h>
 #endif
@@ -65,8 +63,6 @@ public:
   }
   pure bool at_end() const wontthrow { return pos >= end; }
 
-  /* A malformed expression throws, so the builtin dispatch wraps the message
-     with the test name and a caret at the command word. */
   void fail(StringView message) throws { throw Error{String{message}}; }
 
   bool evaluate_unary(const String &op, const String &operand) throws
@@ -89,6 +85,11 @@ public:
     if (op == "-c") return operand_path.is_character_device();
     if (op == "-p") return operand_path.is_fifo();
     if (op == "-S") return operand_path.is_socket();
+    if (op == "-g") return operand_path.has_setgid_bit();
+    if (op == "-u") return operand_path.has_setuid_bit();
+    if (op == "-k") return operand_path.has_sticky_bit();
+    if (op == "-O") return operand_path.is_owned_by_effective_user();
+    if (op == "-G") return operand_path.is_owned_by_effective_group();
     /* -t takes a file-descriptor number rather than a path and is true when
        that descriptor is a terminal. The common 0, 1, and 2 map to the standard
        streams, and any other descriptor reads as not a terminal. */
@@ -107,9 +108,9 @@ public:
 #endif
     }
     fail(
-        StringView{"Unable to evaluate the test because '"} + op +
+        StringView{"'"} + op +
         "' is not a known unary operator, expected one of -z -n -e -f -d -s -r "
-        "-w -x -L -h -b -c -p -S -t");
+        "-w -x -L -h -b -c -p -S -g -u -k -O -G -t");
     return false;
   }
 
@@ -121,8 +122,7 @@ public:
        does. The analysis stage also warns on it as SC3014. */
     if (op == "=" || (op == "==" && is_bash_compatible)) return left == right;
     if (op == "==") {
-      fail("Unable to evaluate the test because '==' is a bashism, use = for "
-           "string equality in POSIX mode");
+      fail("'==' is a bashism, use = for string equality in POSIX mode");
       return false;
     }
     if (op == "!=") return left != right;
@@ -146,8 +146,8 @@ public:
       let const right_is_integer = parse_integer(right, right_number);
       if (!left_is_integer || !right_is_integer) {
         let const &not_a_number = left_is_integer ? right : left;
-        fail(StringView{"Unable to compare with '"} + op + "' because '" +
-             not_a_number + "' is not an integer");
+        fail(StringView{"Cannot compare with '"} + op + "', '" + not_a_number +
+             "' is not an integer");
         return false;
       }
       if (op == "-eq") return left_number == right_number;
@@ -157,7 +157,7 @@ public:
       if (op == "-gt") return left_number > right_number;
       return left_number >= right_number;
     }
-    fail(StringView{"Unable to evaluate the test because '"} + op +
+    fail(StringView{"'"} + op +
          "' is not a known binary operator, expected one of = != < > -eq -ne "
          "-lt -le -gt -ge -ef -nt -ot");
     return false;
@@ -168,15 +168,14 @@ public:
     return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
            s == "-s" || s == "-r" || s == "-w" || s == "-x" || s == "-L" ||
            s == "-h" || s == "-b" || s == "-c" || s == "-p" || s == "-S" ||
+           s == "-g" || s == "-u" || s == "-k" || s == "-O" || s == "-G" ||
            s == "-t";
   }
 
   pure bool is_binary_operator(const String &s) const wontthrow
   {
-    /* == is listed so the bashism routes to evaluate_binary, where it is
-       accepted as =, rather than falling through to the unexpected-argument
-       error. -ef, -nt, and -ot are the file-compare operators evaluate_binary
-       resolves against the two paths. */
+    /* -ef, -nt, and -ot are the file-compare operators evaluate_binary resolves
+       against the two paths. */
     return s == "=" || s == "==" || s == "!=" || s == "<" || s == ">" ||
            s == "-eq" || s == "-ne" || s == "-lt" || s == "-le" || s == "-gt" ||
            s == "-ge" || s == "-ef" || s == "-nt" || s == "-ot";
@@ -210,7 +209,7 @@ public:
   bool parse_factor() throws
   {
     if (at_end()) {
-      fail("Unable to evaluate the test because an argument is expected");
+      fail("An argument is expected");
       return false;
     }
     if (current() == "!") {
@@ -227,7 +226,7 @@ public:
       pos++;
       let const result = parse_expression();
       if (at_end() || current() != ")")
-        fail("Unable to evaluate the test because a ')' is expected");
+        fail("A ')' is expected");
       else
         pos++;
       return result;
@@ -242,9 +241,8 @@ public:
        argument is true when it is non-empty. */
     if (pos + 1 < end && is_binary_operator(args[pos + 1])) {
       if (pos + 2 >= end) {
-        fail(StringView{"Unable to evaluate the test because an argument is "
-                        "expected after '"} +
-             args[pos + 1] + "'");
+        fail(StringView{"An argument is expected after '"} + args[pos + 1] +
+             "'");
         pos = end;
         return false;
       }
@@ -332,7 +330,7 @@ public:
   }
 };
 
-} /* namespace */
+} // namespace
 
 Test::Test() = default;
 
@@ -387,4 +385,4 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
   return result ? 0 : 1;
 }
 
-} /* namespace shit */
+} // namespace shit

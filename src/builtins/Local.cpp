@@ -4,10 +4,6 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* local declares a variable local to the current function, so the value it had
-   in the caller returns when the function ends. It is an error outside a
-   function. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-aAilnrux] name[=value] ...");
@@ -77,8 +73,7 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
       default: {
         let invalid = String{};
         invalid += arg[c];
-        throw Error{"Unable to declare a local because '-" + invalid +
-                    "' is not a valid option"};
+        throw Error{"'-" + invalid + "' is not a valid local option"};
       }
       }
     }
@@ -142,4 +137,4 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

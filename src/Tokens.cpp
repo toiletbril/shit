@@ -86,8 +86,8 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
   if (segments.is_empty()) return false;
   bool has_seen_digit = false;
   for (let const &segment : segments) {
-    /* An expansion segment contributes a $ or a $(...) wrapper to the literal
-       text, so a word holding one is never all digits. */
+    /* An expansion segment contributes a $ wrapper, so a word holding one is
+       never all digits. */
     if (segment.kind == WordSegment::Kind::VariableReference ||
         segment.kind == WordSegment::Kind::CommandSubstitution ||
         segment.kind == WordSegment::Kind::ArithmeticExpansion ||
@@ -146,8 +146,8 @@ cold fn Word::to_pretty_string() const throws -> String
 
 /* Rebuild an expansion segment back into source form so a subscript that
    carries one, the $k of v[$k]=1, survives as text the evaluator expands again.
-   A literal segment contributes its bytes directly. A form the subscript never
-   takes returns false so the caller abandons the split. */
+   A form the subscript never takes returns false so the caller abandons the
+   split. */
 static fn append_subscript_segment_source(const WordSegment &segment,
                                           String &out) throws -> bool
 {
@@ -174,8 +174,7 @@ static fn append_subscript_segment_source(const WordSegment &segment,
 /* An array element assignment whose subscript holds an expansion, the $k in
    v[$k]=1, splits across segments since the = lands after the ] in a later
    segment. The subscript is rebuilt into source form and folded back into the
-   key, so the evaluator's existing a[i]=v path expands it. None when the word
-   is not this shape. */
+   key. None when the word is not this shape. */
 static fn
 array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     -> Maybe<word_assignment_split>
@@ -194,9 +193,9 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
   }
 
   let subscript = String{};
-  /* The remainder of segment 0 after the open bracket is the literal start of
-     the subscript. A close bracket there means the = would also sit in segment
-     0, which the caller already ruled out, so this is not an assignment. */
+  /* A close bracket in the remainder of segment 0 means the = would also sit in
+     segment 0, which the caller already ruled out, so this is not an
+     assignment. */
   const StringView head = first.text.substring(name_end + 1);
   if (head.find_character(']').has_value()) return shit::None;
   subscript.append(head);
@@ -219,8 +218,6 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     }
 
     subscript.append(segment.text.substring_of_length(0, *close));
-    /* The bytes after the close bracket are the assignment operator and the
-       start of the value. */
     const StringView after = segment.text.substring(*close + 1);
     bool is_append = false;
     usize value_start = 0;
@@ -262,9 +259,9 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 
   let const equals_position = first.text.find_character('=');
   if (!equals_position.has_value()) {
-    /* The open bracket is the cheap gate that keeps a plain command word off
-       the array-element scan, since only a NAME[ word can be an element
-       assignment whose subscript pushed the = into a later segment. */
+    /* Only a NAME[ word can be an element assignment whose subscript pushed the
+       = into a later segment, so the open bracket gates the array-element
+       scan. */
     if (first.text.find_character('[').has_value())
       return array_element_assignment_split(segments);
     return shit::None;
@@ -273,9 +270,8 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 
   ASSERT(*equals_position <= first.text.count());
 
-  /* The append form NAME+=VALUE carries a single trailing plus right before the
-     equals sign. The plus is not part of the name, so the name spans the bytes
-     before it. */
+  /* The append form NAME+=VALUE carries a trailing plus before the equals sign.
+     The plus is not part of the name. */
   const bool is_append = first.text[*equals_position - 1] == '+';
   const usize name_length = is_append ? *equals_position - 1 : *equals_position;
   if (name_length == 0) return shit::None;
@@ -286,8 +282,8 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
          lexer::is_variable_name(first.text[name_cursor]))
     name_cursor++;
   /* A name may carry a [subscript] for a bash array element assignment, such as
-     the a[1] in a[1]=x. The subscript is non-empty and runs to the closing
-     bracket at the end of the name. */
+     the a[1] in a[1]=x, running to the closing bracket at the end of the
+     name. */
   if (name_cursor < name_length && first.text[name_cursor] == '[') {
     if (first.text[name_length - 1] != ']' || name_length - name_cursor < 3) {
       return shit::None;
@@ -603,6 +599,6 @@ BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
 UNARY_OPERATOR_TOKEN_DECLS(ExclamationMark, "!", 13, LogicalNot);
 UNARY_OPERATOR_TOKEN_DECLS(Tilde, "~", 13, BinaryComplement);
 
-} /* namespace tokens */
+} // namespace tokens
 
-} /* namespace shit */
+} // namespace shit

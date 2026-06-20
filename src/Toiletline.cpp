@@ -44,8 +44,6 @@ fn tl_block_capacity(void *payload) -> usize &
 
 fn tl_arena_malloc(usize length) -> void *
 {
-  /* Reuse the first free block large enough, so repeated same-size line-buffer
-     allocations do not keep growing the arena. */
   for (tl_free_block **link = &TOILETLINE_FREE_LIST; *link != nullptr;
        link = &(*link)->next)
   {
@@ -103,9 +101,6 @@ fn tl_arena_realloc(void *pointer, usize length) -> void *
 #pragma GCC diagnostic pop
 #endif
 
-/* The context the completion engine reads, set by the host before each line is
-   read and cleared when completion is disabled. A null context means no
-   completion, the non-interactive default. */
 shit::EvalContext *COMPLETION_CONTEXT = nullptr;
 
 /* The storage the completion callback hands back to toiletline. The C-string
@@ -113,24 +108,18 @@ shit::EvalContext *COMPLETION_CONTEXT = nullptr;
    kept here until the next call replaces them. */
 shit::ArrayList<shit::String> COMPLETION_CANDIDATES{};
 shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{};
-/* The description text for each candidate, aligned by index with the candidate
-   pointers, an empty string where a candidate has none. The owned strings keep
-   the pointers alive while toiletline reads them. */
 shit::ArrayList<shit::String> COMPLETION_DESCRIPTIONS{};
 shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{};
 shit::String COMPLETION_LCP{};
 
-/* The byte offset of the codepoint at the given codepoint index in a UTF-8
-   buffer, walking from the start and counting the lead bytes. An index at or
-   past the codepoint count returns the byte length, so a clamped cursor maps to
-   the end of the buffer. */
+/* An index at or past the codepoint count returns the byte length, so a clamped
+   cursor maps to the end of the buffer. */
 fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
                             usize codepoint_index) -> usize
 {
   usize byte_offset = 0;
   usize seen_codepoints = 0;
   while (byte_offset < byte_length && seen_codepoints < codepoint_index) {
-    /* A byte that is not a UTF-8 continuation byte starts a codepoint. */
     if ((static_cast<unsigned char>(bytes[byte_offset]) & 0xC0) != 0x80)
       seen_codepoints += 1;
     byte_offset += 1;
@@ -143,16 +132,9 @@ fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
   return byte_offset;
 }
 
-/* Bridge toiletline's TAB and ghost queries onto the shell completion engine.
-   The engine completes the token under the cursor and the result is stored in
-   the static buffers above, which toiletline reads right after this returns.
-
-   Toiletline edits in codepoints, so the cursor arrives as a codepoint index
+/* Toiletline edits in codepoints, so the cursor arrives as a codepoint index
    and the token bounds must go back as codepoint indices, while the completion
-   engine works in bytes. The cursor is converted to a byte offset before the
-   engine runs, and the byte token bounds it returns are converted back to
-   codepoint indices here. Returns 1 when at least one candidate was produced, 0
-   otherwise. */
+   engine works in bytes. */
 fn shit_completion_callback(const char *buffer, size_t cursor,
                             tl_completion *out, int for_listing) -> int
 {
@@ -189,12 +171,9 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     for (let const &candidate : COMPLETION_CANDIDATES)
       COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
 
-    /* Each candidate carries its description, looked up by candidate text since
-       the engine keyed the map that way to survive the sort. A candidate with
-       no description points at the empty string, so the array stays aligned by
-       index with the candidates. The whole build is skipped when no description
-       was produced, the common case for a filesystem or command-name
-       completion, so a per-keystroke completion pays nothing for it. */
+    /* The candidate text keys the lookup since the engine keyed the map that
+       way to survive the sort. The build is skipped when no description was
+       produced, so a per-keystroke completion pays nothing for it. */
     COMPLETION_DESCRIPTIONS.clear();
     COMPLETION_DESCRIPTION_POINTERS.clear();
     out->descriptions = nullptr;
@@ -236,18 +215,10 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
   }
 }
 
-/* Bridge toiletline's render-time highlight query onto the shell. The shell
-   colors the whole line by token, a command word by whether it resolves, a
-   reserved word, a string, an expansion, an operator, and a comment, and
-   returns the colored spans.
-
-   Toiletline edits in codepoints and renders the spans in codepoints, while the
-   shell scans in bytes, so each byte span is converted back to codepoint
-   indices here, the same conversion the completion bridge performs. The
-   conversion is monotonic, so the spans stay sorted and non-overlapping.
-   Returns 1 when at least one span is filled, 0 otherwise. The body is guarded
-   because toiletline calls it through a C function pointer, so a throw must not
-   unwind through the C frames. */
+/* The conversion from byte spans to codepoint indices is monotonic, so the
+   spans stay sorted and non-overlapping. The body is guarded because toiletline
+   calls it through a C function pointer, so a throw must not unwind through the
+   C frames. */
 fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
@@ -279,9 +250,6 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
   }
 }
 
-/* The context the wake callback reads jobs from, set by
-   enable_job_notifications, and the formatted rows stashed between the
-   callback's query and print phases. */
 shit::EvalContext *JOB_CONTEXT = nullptr;
 shit::String WAKE_NOTIFICATION_STASH{};
 
@@ -385,12 +353,7 @@ fn enable_completion(shit::EvalContext &context) -> void
 {
   COMPLETION_CONTEXT = &context;
   ::tl_set_complete_callback(shit_completion_callback);
-  /* The highlighter is registered unconditionally and gates itself on the live
-     color decision, so a runtime change to NO_COLOR takes effect without
-     re-registering. The callback returns no spans when color is off. */
   ::tl_set_highlight_callback(shit_highlight_callback);
-  /* The ghost history suggestion vets each entry's command word, the fish
-     validation, so a recalled command that vanished is never suggested. */
   ::tl_set_ghost_validate_callback(shit_ghost_validate_callback);
 }
 
@@ -509,9 +472,6 @@ fn emit_newlines(StringView buffer) -> void
     throw shit::Error{"Toiletline: Couldn't emit newlines"};
 }
 
-/* The cwd shown in a prompt is shortened from the front with a leading ... once
-   it runs past this many bytes, so a deep path does not push the cursor across
-   the terminal. */
 static constexpr usize PROMPT_PWD_LENGTH = 24;
 
 static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
@@ -534,12 +494,8 @@ static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
   return shortened;
 }
 
-/* The branch the \G and \g prompt segments render, shared with the
-   SHIT_GIT_BRANCH dynamic variable through utils. */
 static fn git_branch() throws -> String { return utils::current_git_branch(); }
 
-/* A human duration for the \D prompt segment, quiet under a few milliseconds,
-   then milliseconds, then seconds with one decimal. */
 static fn format_prompt_duration(u64 nanos) throws -> String
 {
   const u64 milliseconds = nanos / 1000000ULL;
@@ -573,8 +529,6 @@ static fn prompt_strftime(const char *format) throws -> String
   };
 }
 
-/* The hostname, the full name for need_full and the part before the first dot
-   otherwise, falling back to the HOSTNAME variable and then localhost. */
 static fn prompt_hostname(bool need_full) throws -> String
 {
   String host = os::get_hostname().value_or(
@@ -616,8 +570,6 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     }
     u8 escaped = static_cast<u8>(prompt[i + 1]);
 
-    /* An octal escape \nnn takes up to three octal digits after the backslash
-       and emits the byte they name, the way bash does. */
     if (escaped >= '0' && escaped <= '7') {
       u32 value = 0;
       usize digits = 0;
@@ -635,21 +587,16 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     i++;
     switch (escaped) {
     case 'u': out += user; break;
-    /* \h is the hostname up to the first dot, \H is the full name. */
     case 'h': out += prompt_hostname(false); break;
     case 'H': out += prompt_hostname(true); break;
     case 'w': out += collapse_home_prefix(working_directory); break;
     case 'W': out += Path{working_directory}.filename(); break;
-    /* The working directory with the home collapsed to ~ and then shortened
-       from the front with an ellipsis, the form the default prompt uses so a
-       deep path stays short. */
     case 'P':
       out += shorten_path_with_ellipsis(
           collapse_home_prefix(working_directory).view(), PROMPT_PWD_LENGTH);
       break;
-    /* The current git branch, empty outside a repository, the same value
-       $SHIT_GIT_BRANCH reads. Any wrapping belongs to the PS1 text, the
-       default template spaces it through ${SHIT_GIT_BRANCH:+...}. */
+    /* Any wrapping belongs to the PS1 text, the default template spaces it
+       through ${SHIT_GIT_BRANCH:+...}. */
     case 'g': out += git_branch(); break;
     case '$': out += (user == "root") ? '#' : '$'; break;
     case 'n': out += '\n'; break;
@@ -669,7 +616,6 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case '@': out += prompt_strftime("%I:%M %p"); break;
     case 'A': out += prompt_strftime("%H:%M"); break;
     case 'd': out += prompt_strftime("%a %b %d"); break;
-    /* \s is the shell name, the basename of the zeroth positional parameter. */
     case 's': {
       if (Maybe<String> argv0 = context.get_variable_value("0");
           argv0.has_value())
@@ -681,8 +627,6 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
           version.has_value())
         out += *version;
       break;
-    /* The last exit status, colored green on success and red on failure when
-       the terminal takes color. */
     case '?': {
       const i32 status = context.last_exit_status();
       const bool should_use_color = colors::stdout_wants_color();
@@ -691,11 +635,9 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       out += utils::int_to_text(status);
       if (should_use_color) out += colors::ansi::RESET;
     } break;
-    /* The number of background jobs. */
     case 'j':
       out += utils::int_to_text(static_cast<i64>(context.jobs().count()));
       break;
-    /* The time the last command took, empty for an instant command. */
     case 'D':
       out += format_prompt_duration(context.last_command_duration_ns());
       break;
@@ -920,7 +862,6 @@ fn build_prompt(EvalContext &context) -> String
     was_user_resolved = true;
   }
 
-  /* The PS1 template, the user's when set, otherwise the built-in default. */
   String ps1_template;
   if (Maybe<String> ps1 = context.get_variable_value("PS1");
       ps1.has_value() && !ps1->is_empty())
@@ -938,10 +879,6 @@ fn build_prompt(EvalContext &context) -> String
      The exit status is restored, since a command substitution here must not
      clobber $? for the next command. */
 
-  /* A pure parameter-only template reuses the previous expansion while the
-     template and every value it reads are unchanged, sparing the parse. The
-     value reads cost the same lookups the expansion would pay, the branch
-     read included, so a hit and a miss agree byte for byte. */
   let scanned_inputs = shit::ArrayList<prompt_cache_input>{};
   const bool is_cacheable =
       scan_prompt_template_inputs(ps1_template.view(), scanned_inputs);
@@ -1064,8 +1001,6 @@ fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 
 fn default_prompt_template() -> String
 {
-  /* The same shape the line-editor build renders, the space-wrapped branch
-     through the :+ alternate when one exists. */
   let template_string = String{};
   template_string += "[\\u@\\h${SHIT_GIT_BRANCH:+ ($SHIT_GIT_BRANCH)} ";
   if (shit::colors::stdout_wants_color()) {

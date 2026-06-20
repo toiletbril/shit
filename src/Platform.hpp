@@ -5,7 +5,6 @@
 #define COSMO 0b100
 
 /* clang-format off */
-/* Currently, Linux, Windows and Cosmopolitan builds are supported. */
 #if defined __linux__ || defined BSD || defined __APPLE__ ||                   \
     defined __COSMOPOLITAN__
 #include <fcntl.h>
@@ -38,8 +37,6 @@
 
 namespace shit {
 
-/* ExecContext is defined in Eval.hpp. The os functions take it by reference, so
-   a forward declaration keeps this header below Eval in the include graph. */
 class ExecContext;
 
 namespace os {
@@ -83,9 +80,8 @@ struct Pipe
 
 fn make_pipe() wontthrow -> Maybe<Pipe>;
 
-/* A handle to one running os thread. The pipe drain in a command substitution
-   reads its end on this thread so output larger than the pipe buffer cannot
-   deadlock the writer. */
+/* The pipe drain in a command substitution reads its end on this thread so
+   output larger than the pipe buffer cannot deadlock the writer. */
 struct thread
 {
 #if SHIT_PLATFORM_IS WIN32
@@ -95,16 +91,11 @@ struct thread
 #endif
 };
 
-/* Start a thread that runs entry with context, or None when the os cannot
-   create it. The entry runs to completion and the thread keeps running until
-   join_thread returns. */
 fn start_thread(void (*entry)(void *), void *context) wontthrow
     -> Maybe<thread>;
 
-/* Wait for a started thread to finish and release its handle. */
 fn join_thread(thread t) wontthrow -> void;
 
-/* How a redirection target file is opened. */
 enum class file_open_mode : u8
 {
   Truncate,          /* >  create or truncate for writing */
@@ -125,19 +116,16 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>;
 
 /* Tracks the temporary files a process substitution leaves for the consuming
    command to read by path, and deletes them once that command finishes. On a
-   platform that leaves no temp file, such as POSIX with its child and pipe, it
-   holds nothing and does nothing, so it costs nothing there. */
+   platform that leaves no temp file, such as POSIX, it holds nothing. */
 class TempFileSet
 {
 public:
-  /* Remember a temp file to delete on a later cleanup. */
   fn track(Path path) throws -> void;
   /* The number of tracked files, a mark a command takes at entry so its own
-     cleanup deletes only the files tracked after it, not an outer command's. */
+     cleanup deletes only the files tracked after it. */
   mustuse fn count() const wontthrow -> usize;
   /* Delete every file tracked at or after the mark on a best-effort basis, and
-     keep one still held open by a reader for a later retry rather than leak it.
-   */
+     keep one still held open by a reader for a later retry. */
   fn cleanup_from(usize mark) wontthrow -> void;
 
 private:
@@ -167,8 +155,7 @@ fn wait_and_monitor_process(process p) throws -> i32;
 
 /* Wait for a process and reap it without the job-control reporting of
    wait_and_monitor_process, returning its exit status or 128 plus the signal.
-   A process substitution helper reaps this way, since its signal, such as the
-   SIGPIPE from a consumer that stops reading, is expected and not a job event.
+   A process substitution helper reaps this way, since its signal is expected.
  */
 fn reap_process_quietly(process p) throws -> i32;
 
@@ -195,13 +182,11 @@ fn signal_process(process p, i32 signal_number) wontthrow -> bool;
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>;
 
 /* Resolve a signal number such as 2 or 15 to its bare upper-case name such as
-   INT or TERM, or None when the number names no known signal. The trap builtin
-   uses it so a trap set or listed by number reports the same name a trap set by
-   name reports. */
+   INT or TERM, or None when the number names no known signal. */
 fn signal_name_from_number(i32 number) throws -> Maybe<String>;
 
-/* The signal names signal_number_from_name accepts, for the completion
-   engine to offer after kill -. Built once and reused. */
+/* The signal names signal_number_from_name accepts, for the completion engine
+   to offer after kill -. */
 fn signal_names() throws -> const ArrayList<StringView> &;
 
 /* Turn a numeric process id into the process handle the os layer uses. On POSIX
@@ -211,18 +196,16 @@ fn process_from_pid(i64 pid) wontthrow -> process;
 
 /* One live process the shitbox pkill, killall, and ps utilities read, its
    numeric id, the basename of its command, the owner uid, and the full command
-   line. The list is read once per run. The command line is empty for a process
-   that exposes none, such as a kernel thread. */
+   line. The command line is empty for a process that exposes none. */
 struct process_entry
 {
   i64 pid{0};
   String name{};
   u32 owner_id{0};
   String command_line{};
-  /* The BSD aux columns, filled only when resource stats are requested and left
-     zero otherwise. virtual_kib and resident_kib are kibibytes, state is the
-     single status letter R/S/D/Z/T, and cpu_ticks is the user plus system time
-     in clock ticks. */
+  /* The BSD aux columns, filled only when resource stats are requested.
+     virtual_kib and resident_kib are kibibytes, state is the single status
+     letter R/S/D/Z/T, and cpu_ticks is the user plus system time in ticks. */
   u64 virtual_kib{0};
   u64 resident_kib{0};
   char state{'?'};
@@ -231,20 +214,16 @@ struct process_entry
 
 /* Every process the current user can see, for the shitbox pkill and killall
    utilities to match a name against. Empty on a platform with no process
-   listing, such as a non-Linux POSIX without a /proc filesystem. The resource
-   stats, the memory, the state, and the cpu time, are read only when asked,
-   since pkill and killall match a name and do not need them. */
+   listing. The resource stats are read only when asked. */
 fn enumerate_processes(bool include_resource_stats = false) throws
     -> ArrayList<process_entry>;
 
 /* The filesystem mutations the shitbox coreutils run. Each returns false on
-   failure with the reason left in last_system_error_message, so the calling
-   utility renders a located error. make_directory takes the permission bits the
-   umask still narrows. */
+   failure with the reason left in last_system_error_message. make_directory
+   takes the permission bits the umask still narrows. */
 fn make_directory(StringView path, u32 mode) wontthrow -> bool;
 /* Set the permission bits of an existing path to the exact mode, the chmod the
-   mkdir -m path runs to land the bits the create's umask narrowing dropped. A
-   platform without POSIX mode bits accepts the mode and ignores it. */
+   mkdir -m path runs. A platform without POSIX mode bits ignores the mode. */
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool;
 /* Set the access and the modification times of an existing file to the current
    time, the touch utility's update path for a file that already exists. */
@@ -254,20 +233,17 @@ fn remove_file(StringView path) wontthrow -> bool;
 fn rename_path(StringView from, StringView to) wontthrow -> bool;
 fn create_symlink(StringView target, StringView link_path) wontthrow -> bool;
 /* The target a symlink points at, the raw link text rather than the resolved
-   path, so cp can recreate the link as it stands. None when the path is not a
-   symlink or cannot be read. */
+   path, so cp can recreate the link as it stands. */
 fn read_symlink(StringView path) wontthrow -> Maybe<String>;
 
 /* The absolute path of the running binary, the symlink target the shitbox
-   --assimilate install points each utility name at. None when the platform
-   cannot report it. */
+   --assimilate install points each utility name at. */
 fn current_executable_path() wontthrow -> Maybe<String>;
 
-/* The metadata one lstat returns, for the shitbox ls long format to render a
-   row without a syscall per field. stat_path fills it and returns false when
-   the path cannot be read. The mode carries the type and the permission bits in
-   the POSIX st_mode layout, and a symlink reports its own status rather than
-   the target it points at. */
+/* The metadata one lstat returns, for the shitbox ls long format. stat_path
+   fills it and returns false when the path cannot be read. The mode carries the
+   type and permission bits in the POSIX st_mode layout, and a symlink reports
+   its own status. */
 struct file_status
 {
   u32 mode{0};
@@ -281,21 +257,18 @@ struct file_status
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool;
 
-/* The ten-character permission string for a mode, the type letter and the three
-   rwx triplets the ls long format prints, such as drwxr-xr-x. The setuid,
-   setgid, and sticky bits render as s, s, and t in the execute slots. */
+/* The ten-character permission string for a mode, such as drwxr-xr-x. The
+   setuid, setgid, and sticky bits render as s, s, and t in the execute
+   slots. */
 fn format_mode_string(u32 mode) throws -> String;
 
 /* The single type letter for a mode, d for a directory, l for a symlink, c, b,
-   p, or s for the device, fifo, and socket types, and - for a regular file. The
-   shitbox find utility reads it from one stat to decide a -type match and
-   whether to descend, without a second syscall. */
+   p, or s for the device, fifo, and socket types, and - for a regular file. */
 fn file_type_letter(u32 mode) wontthrow -> char;
 
 /* The user name for a numeric uid and the group name for a numeric gid, read
-   directly from /etc/passwd and /etc/group the way get_current_user reads the
-   passwd file, so the static build stays free of getpwuid and getgrgid. None
-   when the id has no entry. */
+   directly from /etc/passwd and /etc/group, so the static build stays free of
+   getpwuid and getgrgid. */
 fn uid_to_username(u32 uid) throws -> Maybe<String>;
 fn gid_to_groupname(u32 gid) throws -> Maybe<String>;
 
@@ -312,15 +285,12 @@ fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow -> Maybe<usize>;
 fn close_fd(os::descriptor fd) wontthrow -> bool;
 
 /* Point the process standard output at target and return a handle to the
-   previous output, so a command substitution can capture everything written.
-   restore_stdout puts the previous output back. */
+   previous output, so a command substitution can capture everything written. */
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor;
 fn restore_stdout(os::descriptor saved) wontthrow -> void;
 
 /* The backup of a shell descriptor taken before a redirection points it
-   elsewhere. A compound command runs in the shell process, so a trailing
-   redirect must save the shell's own descriptor, point it at the target, and
-   put it back when the child finishes. */
+   elsewhere, put back when the child finishes. */
 struct saved_descriptor
 {
   /* The shell-level descriptor number that was redirected, such as 0, 1, 2, or
@@ -337,8 +307,7 @@ struct saved_descriptor
   bool is_dup2_ok{true};
   /* On Windows, the handle this redirection installed in the standard-handle
      slot, so restore closes that exact handle rather than whatever the slot
-     holds at restore time, which a later redirection inside the run may have
-     replaced. Unused on POSIX, which restores by dup2. */
+     holds at restore time. Unused on POSIX, which restores by dup2. */
   descriptor replacement{SHIT_INVALID_FD};
 };
 
@@ -347,8 +316,7 @@ struct saved_descriptor
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     -> saved_descriptor;
 /* Back up shell_fd without replacing it, so a run that may move the descriptor
-   underneath, a mimicked script's own exec redirection, can be put back with
-   restore_descriptor. */
+   underneath can be put back with restore_descriptor. */
 fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor;
 /* Put shell_fd back the way save_and_replace_descriptor found it, closing the
    backup. */
@@ -359,11 +327,9 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void;
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
 
 /* Point shell_fd at target permanently, the way exec with redirections and no
-   command does. Unlike save_and_replace_descriptor it takes no backup, so the
-   descriptor stays pointed at target for every later command until exec changes
-   or closes it again. Returns false when the dup2 fails, as from a duplication
-   onto a closed descriptor. The target descriptor is left for the caller to
-   close, since it was a temporary file or a copy of another descriptor. */
+   command does. Unlike save_and_replace_descriptor it takes no backup. Returns
+   false when the dup2 fails. The target descriptor is left for the caller to
+   close. */
 fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool;
 
 /* Close shell_fd permanently, the way exec N>&- does. Returns false when the
@@ -375,8 +341,7 @@ fn set_environment_variable(StringView key, StringView value) throws -> void;
 fn unset_environment_variable(StringView key) throws -> void;
 
 /* The names of every variable in the process environment, the keys left of the
-   first '=' in each entry. Variable completion offers these alongside the shell
-   variable names. */
+   first '=' in each entry. */
 fn environment_names() throws -> ArrayList<String>;
 
 fn is_child_process() wontthrow -> bool;
@@ -414,13 +379,11 @@ inline fn ostype_name() wontthrow -> StringView
 /* Whether the shell runs with an effective user or group id that differs from
    its real one, the setuid or setgid case. The shell skips its startup config
    files then, so a file an attacker controls cannot run with the raised
-   privileges, the way bash enters privileged mode. A platform without the
-   distinction reports false. */
+   privileges. */
 fn is_running_setuid() wontthrow -> bool;
 
-/* Reopen the controlling terminal onto fd 0, the recovery for a script run
-   that left stdin pointing away from the tty. Reports whether fd 0 is a
-   terminal afterwards. */
+/* Reopen the controlling terminal onto fd 0, the recovery for a script run that
+   left stdin pointing away from the tty. */
 fn reopen_terminal_as_stdin() wontthrow -> bool;
 
 /* The numeric process id of a spawned process, for $!. */
@@ -432,9 +395,8 @@ fn is_stderr_a_tty() wontthrow -> bool;
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool;
 
 /* Clear the close-on-exec flag so the descriptor survives an exec and a spawned
-   command inherits it. A process substitution keeps a pipe end open for the
-   command to reach through /dev/fd, which only works when the end is inherited.
- */
+   command inherits it, for a process substitution that keeps a pipe end open
+   for the command to reach through /dev/fd. */
 fn make_fd_inheritable(descriptor fd) wontthrow -> void;
 
 fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index;
@@ -456,15 +418,14 @@ fn enumerate_users() throws -> ArrayList<String>;
 /* Install the shell signal handlers. The interactive shell blocks the
    terminal-generated signals so a Ctrl-C, Ctrl-Z, or hangup at the prompt does
    not take it down, while a non-interactive script leaves those at their
-   default so a SIGTERM or SIGHUP terminates the script the way dash and bash
-   behave. SIGINT routes to the polled handler in both modes. */
+   default. SIGINT routes to the polled handler in both modes. */
 fn set_default_signal_handlers(bool is_interactive) throws -> void;
 
 fn reset_signal_handlers() throws -> void;
 
 /* Set to one by the SIGINT handler and polled by the evaluator, so a Ctrl-C
-   aborts the running command, such as a loop that would otherwise spin forever.
-   The main loop clears it before each interactive command. */
+   aborts the running command. The main loop clears it before each interactive
+   command. */
 extern volatile sig_atomic_t INTERRUPT_REQUESTED;
 
 /* Raised by the SIGCHLD handler when a child changes state, read and cleared
@@ -478,12 +439,11 @@ extern volatile sig_atomic_t SIGNAL_PENDING;
 
 /* Install the shell's async-safe handler for a signal a trap names, so its
    arrival sets a pending flag the evaluator drains. A signal the startup
-   blocked is unblocked here so the handler can run. */
+   blocked is unblocked here. */
 fn set_trap_handler(i32 signal_number) throws -> void;
 
 /* Install the ignore disposition for a signal, for a trap with an empty action
-   such as trap "" INT, so the signal is discarded rather than running anything.
- */
+   such as trap "" INT, so the signal is discarded. */
 fn set_trap_ignore(i32 signal_number) throws -> void;
 
 /* Restore a signal's default disposition when its trap is removed. SIGINT
@@ -494,9 +454,8 @@ fn clear_trap_handler(i32 signal_number) throws -> void;
    none remain. The evaluator calls it in a loop to run each pending trap. */
 fn take_pending_signal() wontthrow -> i32;
 
-/* A monotonic clock reading in nanoseconds, immune to wall-clock jumps, for
-   measuring an elapsed interval. POSIX reads CLOCK_MONOTONIC and Windows reads
-   QueryPerformanceCounter scaled to nanoseconds. */
+/* A monotonic clock reading in nanoseconds, immune to wall-clock jumps. POSIX
+   reads CLOCK_MONOTONIC and Windows reads QueryPerformanceCounter. */
 fn monotonic_nanos() wontthrow -> u64;
 
 /* The wall clock in microseconds since the Unix epoch, the source of the bash
@@ -514,16 +473,12 @@ fn format_local_time(StringView format, i64 epoch) throws -> String;
 fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool;
 
 /* The user and system seconds this process's children have consumed so far,
-   read from RUSAGE_CHILDREN. The difference across a command run is the
-   command's own cpu time, the accounting the time report prints. Windows has no
-   equivalent and reports zero. */
+   read from RUSAGE_CHILDREN. Windows has no equivalent and reports zero. */
 fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
     -> void;
 
 /* The Linux hardware performance counters a measured run collects. The counts
-   are valid only when measured_result::has_perf is true, which happens on Linux
-   when perf_event_open succeeded. Every other platform leaves has_perf false.
- */
+   are valid only when measured_result::has_perf is true. */
 struct perf_counts
 {
   u64 cpu_cycles{0};
@@ -535,9 +490,8 @@ struct perf_counts
 
 /* The result of running a command as a measured child. wall_nanos is the
    monotonic elapsed time around the child, peak_rss_bytes is the high-water
-   resident set the child reached, and exit_status is its wait status decoded
-   the way the shell reports one. The perf counts are filled only when has_perf
-   is true. */
+   resident set, and exit_status is its decoded wait status. The perf counts are
+   filled only when has_perf is true. */
 struct measured_result
 {
   u64 wall_nanos{0};
@@ -548,22 +502,14 @@ struct measured_result
 };
 
 /* Run argv as a child process, wait for it, and return the measurement, or None
-   when the child could not be spawned. When suppress_output is true the child's
-   standard output and standard error are pointed at the null device so a
-   benchmark loop stays quiet. The child keeps the shell's standard input. On
-   Linux the hardware perf counters are collected when perf_event_open is
-   permitted, and a non-Linux platform or a denied perf_event_open returns the
-   wall time and peak resident set alone. */
+   when the child could not be spawned. On Linux the hardware perf counters are
+   collected when perf_event_open is permitted. */
 fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
     -> Maybe<measured_result>;
 
 /* allow_script_fallback lets a single foreground command report an ENOEXEC file
-   to the caller through ExecFormatError, so the caller runs it as a shell
-   script in place. A pipeline stage or a background command leaves it false and
-   an unrunnable file fails the stage at runtime instead. new_process_group puts
-   the child in its own process group so an interactive foreground command can
-   own the controlling terminal, which is what tmux reads to name the window
-   after the running program. */
+   to the caller through ExecFormatError. new_process_group puts the child in
+   its own process group so it can own the controlling terminal. */
 fn execute_program(ExecContext &&ec, bool allow_script_fallback = false,
                    bool new_process_group = false) throws -> process;
 
@@ -572,59 +518,46 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback = false,
 fn shell_has_controlling_terminal() wontthrow -> bool;
 
 /* The fully resolved path with every symlink followed, so completion can read
-   the spec and manpage of what a symlinked command really runs. None when the
-   path cannot be resolved. On Windows it returns the input unchanged. */
+   the spec and manpage of what a symlinked command really runs. On Windows it
+   returns the input unchanged. */
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>;
 
 /* Whether the directory is safe to run a binary from for its --help text, so it
-   is owned by root or the current user and is not writable by group or other.
-   That accepts a user tool directory such as ~/.cargo/bin while rejecting a
-   world-writable directory such as /tmp or a path an attacker could prepend.
-   False when the directory cannot be stat'd. On Windows it returns false, so
-   the --help completion fork stays off until a Windows ownership check lands.
- */
+   is owned by root or the current user and is not writable by group or other,
+   rejecting a world-writable directory such as /tmp. On Windows it returns
+   false. */
 fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool;
 
 /* Run argv as a child, capturing its standard output and standard error, and
-   return that text. The child's standard input is the null device so a program
-   that would page or prompt reads end-of-file and exits. The capture is bounded
-   by timeout_nanos, and a child still running at the deadline is killed and
-   None is returned, so a slow or hung --help never freezes the prompt. None
-   also on a spawn or pipe failure. On Windows it returns None until a Windows
-   implementation lands. */
+   return that text. The capture is bounded by timeout_nanos, and a child still
+   running at the deadline is killed and None is returned, so a slow or hung
+   --help never freezes the prompt. */
 fn capture_program_output(const ArrayList<String> &argv,
                           u64 timeout_nanos) wontthrow -> Maybe<String>;
 
-/* Hand the controlling terminal to the given process's group, so it becomes
-   the foreground job tmux reports, ignoring SIGTTOU across the change. A no-op
-   without a controlling terminal. reclaim_controlling_terminal takes it back
-   for the shell's own group when the command finishes. */
+/* Hand the controlling terminal to the given process's group, ignoring SIGTTOU
+   across the change. A no-op without a controlling terminal. */
 fn give_controlling_terminal_to(process p) wontthrow -> void;
 fn reclaim_controlling_terminal() wontthrow -> void;
 
 /* Fork a child for a compound command used as a pipeline stage. In the child it
    places the pipe ends onto the standard descriptors, resets the signal
-   handlers the way an exec'd child does, and returns zero so the caller
-   evaluates the compound command's tree and exits. In the parent it returns the
-   child process. The fds are the pipe ends already chosen for this stage, each
-   None when the stage keeps the inherited descriptor. */
+   handlers, and returns zero so the caller evaluates the tree and exits. */
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                        Maybe<descriptor> err_fd) throws -> process;
 
 #if SHIT_PLATFORM_IS WIN32
 /* Run a compound pipeline stage on a platform with no fork by spawning a fresh
    shell that re-parses the stage's source, with the pipe ends wired as its
-   standard input and output. The process is returned unwaited so the pipeline
-   reaps it like a forked stage. Windows only. */
+   standard input and output. Windows only. */
 fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
                         Maybe<descriptor> out_fd, bool bash_compatible) throws
     -> Maybe<process>;
 #endif
 
 /* Terminate the current process at once with status, skipping the normal
-   unwinding. A forked pipeline-stage child calls this after it evaluates its
-   command so it never runs the parent's cleanup or unwinds back into the shared
-   evaluator inside the duplicated process. */
+   unwinding. A forked pipeline-stage child calls this so it never runs the
+   parent's cleanup inside the duplicated process. */
 [[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void;
 
 /* Replace the current shell process with the program, applying its
@@ -636,6 +569,6 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
    exec with redirections and no command. */
 fn redirect_self(const ExecContext &ec) throws -> void;
 
-} /* namespace os */
+} // namespace os
 
-} /* namespace shit */
+} // namespace shit

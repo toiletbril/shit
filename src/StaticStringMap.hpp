@@ -43,4 +43,4 @@ public:
   }
 };
 
-} /* namespace shit */
+} // namespace shit

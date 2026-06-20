@@ -46,6 +46,22 @@ namespace shitbox {
 
 namespace {
 
+/* The variables make predefines, so a makefile that reads one without assigning
+   it still finds a sane default. These sit at the lowest precedence, below a
+   makefile assignment and the environment, which the expander checks first. */
+constexpr StaticStringMap<const char *>::entry BUILTIN_VARIABLE_ENTRIES[] = {
+    {SSK("MAKE"),    "shitbox make"},
+    {SSK("CC"),      "cc"          },
+    {SSK("CXX"),     "c++"         },
+    {SSK("CPP"),     "cc -E"       },
+    {SSK("AR"),      "ar"          },
+    {SSK("ARFLAGS"), "rv"          },
+    {SSK("RM"),      "rm -f"       },
+};
+constexpr StaticStringMap<const char *> BUILTIN_VARIABLES{
+    BUILTIN_VARIABLE_ENTRIES,
+    sizeof(BUILTIN_VARIABLE_ENTRIES) / sizeof(BUILTIN_VARIABLE_ENTRIES[0])};
+
 struct make_variable
 {
   String name;
@@ -103,9 +119,7 @@ struct makefile
   }
 };
 
-/* The stem a pattern target matches against a goal, the text the % stands for,
-   or None when the goal does not fit the prefix and suffix around the %. So the
-   pattern %.o matches foo.o with the stem foo. */
+/* None when the goal does not fit the prefix and suffix around the %. */
 static fn match_pattern(StringView pattern, StringView goal) throws
     -> Maybe<String>
 {
@@ -120,8 +134,6 @@ static fn match_pattern(StringView pattern, StringView goal) throws
       prefix.length, goal.length - prefix.length - suffix.length)};
 }
 
-/* Replace every % in the text with the stem, the way a pattern rule turns %.c
-   into the matched source name. */
 static fn substitute_stem(StringView text, StringView stem) throws -> String
 {
   String out{};
@@ -134,12 +146,9 @@ static fn substitute_stem(StringView text, StringView stem) throws -> String
   return out;
 }
 
-/* Replace the automatic variables $@, $<, and $^ with the target, the first
-   prerequisite, and the whole prerequisite list, so a pattern recipe such as
-   $(CC) -c $< -o $@ names the right files. This runs on the raw recipe before
-   the $(NAME) expansion, and a $$ escape is carried through untouched so the
-   later expansion collapses it to a single $ without the following byte being
-   read as an automatic variable. */
+/* This runs on the raw recipe before the $(NAME) expansion, and a $$ escape is
+   carried through untouched so the later expansion collapses it to a single $
+   without the following byte being read as an automatic variable. */
 static fn substitute_automatic(StringView text, StringView target,
                                StringView first_prereq,
                                StringView all_prereqs) throws -> String
@@ -181,8 +190,6 @@ static fn is_blank(char c) wontthrow -> bool
   return c == ' ' || c == '\t' || c == '\r';
 }
 
-/* The text with leading and trailing blanks removed, so a value or a name is
-   read without its surrounding spaces. */
 static fn trim(StringView text) wontthrow -> StringView
 {
   usize start = 0;
@@ -194,7 +201,6 @@ static fn trim(StringView text) wontthrow -> StringView
   return text.substring_of_length(start, end - start);
 }
 
-/* Split a prerequisite or value list on blanks into its words. */
 static fn split_words(StringView text) throws -> ArrayList<String>
 {
   ArrayList<String> words{};
@@ -362,16 +368,10 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
                  from_env.has_value())
       {
         result += from_env->view();
-      } else if (name == "MAKE") {
-        /* $(MAKE) names the make program for a recursive build, so it re-enters
-           the bundled make rather than an external one. */
-        result += "shitbox make";
-      } else if (name == "CXX") {
-        /* make predefines CXX and CC, so a Makefile that never assigns them
-           still finds a compiler. */
-        result += "c++";
-      } else if (name == "CC") {
-        result += "cc";
+      } else if (Maybe<const char *> builtin = BUILTIN_VARIABLES.find(name);
+                 builtin.has_value())
+      {
+        result += StringView{*builtin};
       }
       i = j < text.length ? j + 1 : j;
     } else if (text[i] == '$' && i + 1 < text.length && text[i + 1] == '$') {
@@ -395,9 +395,6 @@ static fn rule_colon(StringView line) wontthrow -> Maybe<usize>
   return None;
 }
 
-/* The variable name an assignment names, the text before the '=' with a
-   trailing
-   +, ?, or : operator character dropped and the blanks trimmed. */
 static fn assignment_variable_name(StringView assignment) wontthrow
     -> StringView
 {
@@ -969,7 +966,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   built.push(String{goal});
 }
 
-} /* namespace */
+} // namespace
 
 Make::Make() = default;
 
@@ -1081,6 +1078,6 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
   return targets;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

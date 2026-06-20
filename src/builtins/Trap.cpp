@@ -6,11 +6,6 @@
 
 #include <cctype>
 
-/* trap lists the set traps with no argument, sets an action for one or more
-   conditions, and removes them with a leading dash. The EXIT action runs when
-   the shell ends. Other conditions are stored but not yet delivered
-   asynchronously. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[action condition ...]");
@@ -60,7 +55,7 @@ String normalize_condition(StringView raw) throws
   return name;
 }
 
-} /* namespace */
+} // namespace
 
 i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
@@ -97,7 +92,6 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   let const &action = args[1];
-  /* A lone dash as the action resets the named conditions to their defaults. */
   let const is_reset = action == "-";
 
   for (usize i = 2; i < args.count(); i++) {
@@ -113,4 +107,4 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

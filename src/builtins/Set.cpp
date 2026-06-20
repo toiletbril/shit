@@ -148,7 +148,6 @@ Maybe<mimic_mood> parse_mood_name(StringView name) throws
   return None;
 }
 
-/* The canonical name of a mood, for the set --mood readout with no value. */
 StringView mood_name(mimic_mood mood) throws
 {
   switch (mood) {
@@ -184,15 +183,11 @@ bool option_is_on(const EvalContext &cxt, const SetOption &option) throws
   return option.get != nullptr ? (cxt.*(option.get))() : false;
 }
 
-/* A startup fact carries a live get and no set, so the state lists while a
-   change is refused, since the choice happened at invocation. */
 bool option_is_startup_fact(const SetOption &option) throws
 {
   return option.set == nullptr && option.get != nullptr;
 }
 
-/* The one application path every entry point shares, so a startup fact is
-   refused the same way from set -o and the letter form. */
 void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
                             bool enable) throws
 {
@@ -292,7 +287,7 @@ String format_option_switches_help() throws
   return section;
 }
 
-} /* namespace */
+} // namespace
 
 fn query_shell_option(const EvalContext &cxt, StringView name) throws
     -> Maybe<bool>
@@ -358,7 +353,6 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
                                        format_option_switches_help().view());
   }
 
-  /* set with no arguments lists the shell variables. */
   if (args.count() == 1) {
     let out = String{};
     for (let const &assignment : cxt.sorted_variable_assignments()) {
@@ -497,7 +491,6 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
     }
     if (arg == "+p") continue;
 
-    /* A minus enables each following letter, a plus disables each one. */
     if (arg.length() > 1 && (arg[0] == '-' || arg[0] == '+')) {
       let const enable = arg[0] == '-';
       for (usize c = 1; c < arg.length(); c++) {
@@ -529,4 +522,4 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

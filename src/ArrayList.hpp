@@ -6,7 +6,6 @@
 
 namespace shit {
 
-/* A growable array over an explicit allocator, the std::vector replacement. */
 template <class T>
 class ArrayList
 {
@@ -16,9 +15,8 @@ public:
   ArrayList() : m_allocator(heap_allocator()) {}
   explicit ArrayList(Allocator allocator) : m_allocator(allocator) {}
 
-  /* A heap-backed list of the braced elements, so a static help table can be
-     spelled as a brace list. The initializer_list is header-only and adds no
-     standard-library link dependency. */
+  /* A heap-backed list of the braced elements. The initializer_list is
+     header-only and adds no standard-library link dependency. */
   ArrayList(std::initializer_list<T> elements) : m_allocator(heap_allocator())
   {
     reserve(elements.size());
@@ -35,8 +33,6 @@ public:
     m_length = other.m_length;
   }
 
-  /* An explicit deep copy, so a caller that means to duplicate the list says so
-     rather than leaning on an implicit copy. */
   mustuse cold fn clone() const throws -> ArrayList { return ArrayList{*this}; }
 
   ArrayList(ArrayList &&other) noexcept
@@ -102,16 +98,14 @@ public:
 
   /* Build the element with the list's own allocator and push it, so a call site
      never spells out the allocator and a scratch list stops minting heap
-     values. The element type is constructed from the allocator and the
-     forwarded arguments, the way String takes an allocator and a view. */
+     values. */
   template <typename... Args>
   hot fn push_managed(Args &&...args) throws -> void
   {
     push(T{m_allocator, static_cast<Args &&>(args)...});
   }
 
-  /* Destroy and drop the last element. The caller guarantees the list is not
-     empty. */
+  /* The caller guarantees the list is not empty. */
   fn pop_back() wontthrow -> void
   {
     ASSERT(m_length > 0, "pop_back on an empty list");
@@ -120,8 +114,7 @@ public:
   }
 
   /* Remove the element at index, shifting every later element down by one so
-     the order is kept. The shift moves rather than copies, so no element is
-     duplicated. The caller guarantees index is in range. */
+     the order is kept. The caller guarantees index is in range. */
   fn remove(usize index) wontthrow -> void
   {
     ASSERT(index < m_length, "remove past the end of the list");
@@ -182,10 +175,8 @@ public:
     m_capacity = new_capacity;
   }
 
-  /* Release the reserved slots past the current length. A list built once and
-     then left alone keeps the growth overshoot for its whole lifetime, which a
-     long-lived arena never reclaims, so a one-time builder calls this to hand
-     the slack back. */
+  /* Release the reserved slots past the current length, so a one-time builder
+     hands the growth overshoot back rather than pinning it for its lifetime. */
   cold fn shrink_to_fit() throws -> void
   {
     if (m_length == m_capacity) return;
@@ -205,12 +196,9 @@ public:
     m_capacity = m_length;
   }
 
-  /* Sort the list in place into ascending order by the comparator, which
-     returns true when its first argument orders before its second. A short list
-     uses an insertion sort, which writes far less than a bubble sort on a small
-     input and exits early when the run is nearly ordered, and a long list uses
-     a heap sort, so a large input stays O(n log n). This is the in-house
-     replacement for std::sort, which the codebase does not link. */
+  /* Sort the list in place into ascending order by the comparator. A short list
+     uses an insertion sort and a long list a heap sort, so a large input stays
+     O(n log n). */
   template <typename Compare>
   fn sort(Compare is_less) throws -> void
   {
@@ -222,8 +210,6 @@ public:
       heap_sort(is_less);
   }
 
-  /* Sort ascending by the element operator<, the common case a caller reaches
-     for when no custom order is needed. */
   fn sort() throws -> void
   {
     sort([](const T &a, const T &b) { return a < b; });
@@ -234,8 +220,6 @@ private:
      constant factor is smaller on a short list. */
   static constexpr usize INSERTION_SORT_THRESHOLD = 16;
 
-  /* Swap two elements by moving through a temporary, so no element is copied.
-   */
   fn swap_elements(usize a, usize b) wontthrow -> void
   {
     T temporary = steal(m_data[a]);
@@ -243,9 +227,7 @@ private:
     m_data[b] = steal(temporary);
   }
 
-  /* A stable insertion sort. It lifts each element out, shifts the larger
-     elements before it up by one, and drops it into the gap, so a nearly
-     ordered list does almost no work. */
+  /* A stable insertion sort, so a nearly ordered list does almost no work. */
   template <typename Compare>
   fn insertion_sort(Compare is_less) throws -> void
   {
@@ -313,4 +295,4 @@ private:
   usize m_capacity{0};
 };
 
-} /* namespace shit */
+} // namespace shit

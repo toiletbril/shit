@@ -6,9 +6,8 @@
 #include "Utils.hpp"
 
 /* The completion bridge of the evaluator, the spec registry the complete
-   builtin fills and the COMP_WORDS function runner the interactive engine
-   calls on an explicit tab. Split out of Eval.cpp so the evaluator core
-   stays the hot-path file. */
+   builtin fills and the COMP_WORDS function runner the interactive engine calls
+   on tab. */
 
 namespace shit {
 
@@ -59,17 +58,16 @@ fn EvalContext::run_completion_function(StringView function_name,
       static_cast<int>(function_name.length), function_name.data, words.count(),
       cword);
 
-  /* A completion function is bash code that reads and writes arrays, COMP_WORDS
-     and COMPREPLY above all, so the call evaluates in bash mode whatever the
-     interactive session's mode, then the mode is put back. */
+  /* A completion function is bash code reading and writing COMP_WORDS and
+     COMPREPLY, so the call evaluates in bash mode whatever the session's mode.
+   */
   let const saved_mood = m_runtime.mood;
   m_runtime.mood = mimic_mood::Bash;
   defer { m_runtime.mood = saved_mood; };
 
-  /* bash-completion is written for bash's lax defaults and reads unset names
-     such as SHELLOPTS freely, so the mood-seeded strictness relaxes for the
-     function run the way the mood does. An explicit set -u or set -o failglob
-     is the user's own ask and stays fatal, the same rule -W follows. */
+  /* bash-completion reads unset names such as SHELLOPTS freely, so the
+     mood-seeded strictness relaxes for the function run. An explicit set -u or
+     set -o failglob is the user's own ask and stays fatal. */
   let const saved_error_unset = m_runtime.error_unset;
   let const saved_failglob = m_runtime.failglob;
   if (!m_runtime.error_unset_explicit) m_runtime.error_unset = false;
@@ -80,8 +78,6 @@ fn EvalContext::run_completion_function(StringView function_name,
     m_runtime.failglob = saved_failglob;
   };
 
-  /* The completion variables bash exposes to the function, the words of the
-     line, the index of the word under the cursor, and the raw line and byte. */
   let comp_words = ArrayList<String>{};
   comp_words.reserve(words.count());
   for (let const &word : words)
@@ -91,13 +87,12 @@ fn EvalContext::run_completion_function(StringView function_name,
   set_shell_variable("COMP_LINE", line);
   set_shell_variable("COMP_POINT", utils::int_to_text(static_cast<i64>(point)));
   /* bash-completion reassembles the words against COMP_WORDBREAKS, so it is set
-     for the function run when a non-bash session left it unset. Without this
-     the function reads it unset and the run warns under the strict default. */
+     for the function run when a non-bash session left it unset. */
   if (!get_variable_value("COMP_WORDBREAKS").has_value())
     set_shell_variable("COMP_WORDBREAKS", StringView{" \t\n\"'><=;|&(:"});
 
-  /* bash invokes the function with the command, the current word, and the
-     previous word as its first three positional parameters. */
+  /* bash passes the command, the current word, and the previous word as $1 $2
+   * $3. */
   let call_params = ArrayList<String>{};
   call_params.push(
       words.is_empty() ? String{} : String{heap_allocator(), words[0].view()});
@@ -118,8 +113,6 @@ fn EvalContext::run_completion_function(StringView function_name,
   set_loop_depth(0);
   defer { set_loop_depth(saved_loop_depth); };
   enter_function_scope();
-  /* The completion function reads its own name through FUNCNAME the way any
-     called function does, so the call name rides the scope. */
   push_function_call_name(function_name);
   defer
   {
@@ -129,16 +122,12 @@ fn EvalContext::run_completion_function(StringView function_name,
   let const saved_terminal_exec = terminal_exec_allowed();
   set_terminal_exec_allowed(false);
   defer { set_terminal_exec_allowed(saved_terminal_exec); };
-  /* The retitle gate reads this, so a command a completion runs internally,
-     the man fork or a loader's child, never renames the window. */
   set_completion_function_running(true);
   defer { set_completion_function_running(false); };
 
   /* A completion function that errors must not abort the prompt, so any error
-     is swallowed and yields no candidates, and a stray break or return is
-     consumed so it does not escape into the line editor. The swallow logs the
-     error, since a completion that silently produces nothing is otherwise
-     undebuggable. */
+     is swallowed and a stray break or return is consumed. The swallow logs the
+     error to keep a silent no-candidate result debuggable. */
   try {
     body->evaluate(*this);
   } catch (const ErrorBase &error) {
@@ -146,9 +135,8 @@ fn EvalContext::run_completion_function(StringView function_name,
         static_cast<int>(function_name.length), function_name.data,
         error.message().c_str());
   }
-  /* The function's return status is read before the control flow is cleared, so
-     a dynamic loader that returns 124 to request a retry is seen by the caller.
-   */
+  /* The return status is read before the control flow is cleared, so a dynamic
+     loader that returns 124 to request a retry is seen by the caller. */
   if (out_exit_status != nullptr) *out_exit_status = last_exit_status();
   if (has_pending_control_flow()) clear_control_flow();
 
@@ -167,4 +155,4 @@ fn EvalContext::run_completion_function(StringView function_name,
   return result;
 }
 
-} /* namespace shit */
+} // namespace shit

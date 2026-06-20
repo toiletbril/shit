@@ -5,10 +5,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* Reads one line from standard input and splits it on IFS into the named
-   variables, the last variable taking the remainder. The flag parser rejects
-   an unknown option. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-r] [name ...]");
@@ -181,4 +177,4 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   return was_newline_terminated ? 0 : 1;
 }
 
-} /* namespace shit */
+} // namespace shit

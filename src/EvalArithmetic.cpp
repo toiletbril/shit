@@ -14,8 +14,7 @@ namespace shit {
 namespace {
 
 /* The count of leading bytes that are digits in the given radix, so a value
-   with trailing non-digit bytes reads only its numeric prefix the way base-0
-   strtoll did. A hexadecimal scan accepts both letter cases. */
+   with trailing non-digit bytes reads only its numeric prefix. */
 pure fn count_leading_digits(StringView text, u32 radix) wontthrow -> usize
 {
   usize length = 0;
@@ -39,14 +38,10 @@ pure fn count_leading_digits(StringView text, u32 radix) wontthrow -> usize
   return length;
 }
 
-/* Read a numeric operand the way base-0 strtoll did, detecting the radix from
-   the prefix so a leading 0x reads as hexadecimal, a leading 0 reads as octal,
-   and anything else reads as decimal. Only the leading run of valid digits is
-   read, so a trailing non-digit suffix is ignored rather than rejected. A value
-   with no leading digit or one that overflows reads as zero, the same result
-   the old strtoll path produced after its throw was caught. The utils parsers
-   take no base argument, so the radix is chosen here from the prefix and the
-   matching parser runs on the scanned digit run. */
+/* Read a numeric operand, detecting the radix from the prefix so a leading 0x
+   reads as hexadecimal, a leading 0 reads as octal, and anything else reads as
+   decimal. Only the leading run of valid digits is read, and a value with no
+   leading digit or one that overflows reads as zero. */
 pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
 {
   let body = text;
@@ -77,9 +72,8 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
 }
 
 /* Signed arithmetic in $((...)) wraps two's-complement the way dash does, so
-   the add, subtract, and multiply run in u64 where overflow is defined and the
-   result casts back to i64. A direct i64 overflow would be undefined and trips
-   UBSan in the dbg build. */
+   the add, subtract, and multiply run in u64 where overflow is defined. A
+   direct i64 overflow would be undefined and trips UBSan in the dbg build. */
 pure fn arithmetic_add(i64 lhs, i64 rhs) wontthrow -> i64
 {
   return static_cast<i64>(static_cast<u64>(lhs) + static_cast<u64>(rhs));
@@ -96,8 +90,7 @@ pure fn arithmetic_multiply(i64 lhs, i64 rhs) wontthrow -> i64
 }
 
 /* Exponentiation by squaring in u64 so the result wraps in 64 bits the way the
-   other operators do. The caller rejects a negative exponent, so the count is
-   non-negative here. */
+   other operators do. The caller rejects a negative exponent. */
 pure fn arithmetic_power(i64 base, i64 exponent) wontthrow -> i64
 {
   let result = static_cast<u64>(1);
@@ -112,8 +105,7 @@ pure fn arithmetic_power(i64 base, i64 exponent) wontthrow -> i64
 }
 
 /* INT64_MIN / -1 and INT64_MIN % -1 overflow the signed result and trap on
-   x86, so the wrapped values are returned directly. Division yields INT64_MIN
-   and modulo yields 0, which is the two's-complement wrap. */
+   x86, so the two's-complement wrap of INT64_MIN and 0 is returned directly. */
 pure fn arithmetic_divide(i64 lhs, i64 rhs) wontthrow -> i64
 {
   if (lhs == INT64_MIN && rhs == -1) return INT64_MIN;
@@ -126,11 +118,10 @@ pure fn arithmetic_modulo(i64 lhs, i64 rhs) wontthrow -> i64
   return lhs % rhs;
 }
 
-/* dash masks the shift count to the low 6 bits, so a count of 64 shifts by 0
-   and a negative count shifts by its low 6 bits. The shift runs in u64 where a
-   shift by a value below the width is defined, and for the right shift the sign
-   is carried by hand so a negative operand keeps its arithmetic-shift result.
- */
+/* dash masks the shift count to the low 6 bits, so a count of 64 shifts by 0.
+   The shift runs in u64 where a shift below the width is defined, and the right
+   shift carries the sign by hand so a negative operand keeps its
+   arithmetic-shift result. */
 pure fn arithmetic_shift_left(i64 lhs, i64 rhs) wontthrow -> i64
 {
   let const count = static_cast<u64>(rhs) & 63u;
@@ -148,8 +139,6 @@ pure fn arithmetic_shift_right(i64 lhs, i64 rhs) wontthrow -> i64
   return static_cast<i64>(value);
 }
 
-/* Defined below the parser, declared here so parse_primary reads a number
-   literal through the same lexer the cached-token path uses. */
 static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize;
 
 /* A recursive-descent evaluator for $((...)), following C operator precedence,
@@ -164,16 +153,16 @@ public:
   StringView source;
   usize pos;
 
-  /* A parenthesized subexpression descends through parse_primary, so a source
-     such as thousands of open parentheses would overflow the native stack. The
-     depth is counted at each primary and capped before the recursion. */
+  /* A parenthesized subexpression recurses through parse_primary, so the depth
+     is capped before the recursion to keep the native stack from overflowing.
+   */
   usize depth{0};
   static constexpr usize MAX_DEPTH = 512;
 
   /* The dead operand of a short-circuited || or && and the untaken arm of a
-     ternary are still parsed so their tokens are consumed, but an assignment
-     inside them must not take effect. While this flag is set the assignment
-     path skips the store, matching the side-effect semantics dash gives. */
+     ternary are parsed to consume their tokens, but an assignment inside them
+     must not take effect, so this flag makes the assignment path skip the
+     store. */
   bool m_is_skipping{false};
 
   [[noreturn]] cold fn fail(StringView message) throws -> void
@@ -192,9 +181,6 @@ public:
   {
     skip_spaces();
     if (pos + op.length > source.length) return false;
-    /* The operator probes run hot with one to three bytes each, so the
-       compare is an unrolled byte loop the compiler keeps inline rather than
-       a memcmp call per probe. */
     for (usize k = 0; k < op.length; k++)
       if (source[pos + k] != op[k]) return false;
     return true;
@@ -209,10 +195,8 @@ public:
 
   fn read_variable_value(StringView name) throws -> i64
   {
-    /* A plain shell variable, the common operand, reads its digits straight
-       from the stored value with no copy. The operand parser stops at the first
-       non-digit and reads a non-numeric value as zero, which matches the old
-       strtoll path. */
+    /* A plain shell variable reads its digits straight from the stored value
+       with no copy. */
     ASSERT(context != nullptr);
     if (let const *stored = context->lookup_shell_variable(name)) {
       if (stored->count() == 0) return 0;
@@ -221,10 +205,9 @@ public:
 
     let const value = context->get_variable_value(name);
     if (!value.has_value()) {
-      /* An unset name in arithmetic goes through the same reporter as an unset
-         parameter expansion, so $((nope)) is not silently zero under the
-         strict mood. A skipped ternary branch reads without effect the way its
-         assignments are suppressed, so it never reports. */
+      /* An unset name in arithmetic reports under the strict mood rather than
+         reading as a silent zero. A skipped ternary branch never reports, the
+         way its assignments are suppressed. */
       if (!m_is_skipping) context->report_unset_reference(name);
       return 0;
     }
@@ -233,7 +216,7 @@ public:
   }
 
   /* The name of the variable at the cursor, or an empty view when no name sits
-     there. Used as the target of an increment or a decrement. */
+     there. */
   fn read_lvalue_name() wontthrow -> StringView
   {
     skip_spaces();
@@ -252,26 +235,25 @@ public:
   {
     if (m_is_skipping) return;
     ASSERT(context != nullptr);
-    /* The store copies the value into its own heap String, so the conversion
-       writes into a stack buffer and passes a view, with no transient heap
-       allocation at all. */
+    /* The store copies the value, so the conversion writes into a stack buffer
+       and passes a view rather than allocating. */
     char buffer[24];
     context->set_shell_variable(
         name, utils::int_to_text_into(value, buffer, sizeof(buffer)));
   }
 
-  /* An assignment or step target, a name and an optional [subscript] for an
-     array element. The subscript is the raw bytes between the brackets, which
-     the evaluator expands when the element is read or written. */
+  /* An assignment or step target, a name and an optional [subscript]. The
+     subscript is the raw bytes between the brackets, expanded when the element
+     is read or written. */
   struct lvalue
   {
     StringView name;
     Maybe<StringView> subscript;
   };
 
-  /* A [subscript] right after a name, with the bracket content returned as a
-     view, or None when no bracket sits there. Nested brackets are balanced so
-     a[b[0]] reads the whole inner expression. */
+  /* A [subscript] right after a name, or None when no bracket sits there.
+     Nested brackets are balanced so a[b[0]] reads the whole inner expression.
+   */
   fn read_optional_subscript() throws -> Maybe<StringView>
   {
     if (pos >= source.length || source[pos] != '[') return None;
@@ -292,7 +274,6 @@ public:
     return subscript;
   }
 
-  /* A name at the cursor with its optional array subscript. */
   fn read_lvalue() throws -> lvalue
   {
     let const name = read_lvalue_name();
@@ -324,7 +305,6 @@ public:
     write_variable(target.name, value);
   }
 
-  /* A prefix ++ or -- changes the variable and yields the new value. */
   fn prefix_step(i64 delta) throws -> i64
   {
     const lvalue target = read_lvalue();
@@ -334,7 +314,6 @@ public:
     return updated;
   }
 
-  /* A postfix ++ or -- yields the old value and then changes the variable. */
   fn postfix_step(const lvalue &target, i64 delta) throws -> i64
   {
     const i64 original = read_lvalue_value(target);
@@ -344,27 +323,24 @@ public:
 
   fn parse() throws -> i64
   {
-    /* An empty expression is zero, the way bash reads $(( )) and ${a[$unset]}
-       with the subscript expanding to nothing. */
+    /* An empty expression is zero, the way bash reads $(( )). */
     skip_spaces();
     if (pos == source.length) return 0;
     let const result = parse_comma();
     skip_spaces();
     if (pos != source.length) {
-      /* The leftover text after a complete expression usually means an operator
-         is missing, so the cause rides a trailing note rather than the message.
-       */
+      /* Leftover text after a complete expression usually means an operator is
+         missing, so the cause rides a trailing note. */
       Error error{"Arithmetic: unexpected '" + String{source.substring(pos)} +
                   "' after the expression"};
-      error.set_note("an operator is missing between two values");
+      error.set_note("An operator is missing between two values");
       throw error;
     }
     return result;
   }
 
-  /* The comma operator evaluates each subexpression in order and yields the
-     last, the lowest precedence so a C-style for clause such as i=0, j=10
-     runs both assignments. */
+  /* The comma operator is the lowest precedence, so a C-style for clause such
+     as i=0, j=10 runs both assignments. */
   fn parse_comma() throws -> i64
   {
     i64 result = parse_assignment();
@@ -401,9 +377,7 @@ public:
     let const save = pos;
     skip_spaces();
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
-      /* The name is a contiguous slice of the expression the parser holds for
-         the whole evaluation, so a view into it avoids a per-read allocation.
-       */
+      /* The name is a view into the expression rather than a per-read copy. */
       let const name_start = pos;
       while (pos < source.length && lexer::is_variable_name(source[pos]))
         pos++;
@@ -428,8 +402,7 @@ public:
           {"^=",  '^'},
       };
       /* The probe loop runs only when the next byte can open a compound
-         operator, so the common plain assignment and the bare-name read skip
-         the ten probes. */
+         operator, so the plain assignment and the bare-name read skip it. */
       skip_spaces();
       let const next_byte = pos < source.length ? source[pos] : '\0';
       if (next_byte == '<' || next_byte == '>' || next_byte == '+' ||
@@ -458,9 +431,9 @@ public:
     return parse_ternary();
   }
 
-  /* Parse an operand while suppressing its assignments so its tokens are
-     consumed without taking effect. The flag is saved and restored, so a
-     nested skip region inside an already-skipped one stays skipped. */
+  /* Parse an operand while suppressing its assignments. The flag is saved and
+     restored so a nested skip inside an already-skipped region stays skipped.
+   */
   fn parse_skipped(i64 (ArithmeticParser::*parse_branch)()) throws -> i64
   {
     let const was_skipping = m_is_skipping;
@@ -473,8 +446,8 @@ public:
   {
     let const condition = parse_binary(1);
     if (consume("?")) {
-      /* Only the taken arm runs, the other arm is parsed but suppressed so an
-         assignment in the dead arm leaves the variable unchanged. */
+      /* Only the taken arm runs, the other is parsed under suppression so an
+         assignment in it leaves the variable unchanged. */
       if (condition != 0) {
         let const if_true = parse_assignment();
         if (!consume(":")) fail("expected ':' in a conditional");
@@ -490,9 +463,9 @@ public:
     return condition;
   }
 
-  /* One binary operator at the cursor, its dispatch tag, its precedence with
-     11 the tightest ** and 1 the loosest ||, and its token length. Precedence
-     0 means no binary operator opens here. */
+  /* One binary operator, its dispatch tag, its precedence with 11 the tightest
+     ** and 1 the loosest ||, and its token length. Precedence 0 means no binary
+     operator opens here. */
   struct binary_operator
   {
     char kind;
@@ -500,10 +473,9 @@ public:
     u8 length;
   };
 
-  /* Reads the operator at the cursor without consuming it. The byte pair
-     decides the doubled forms, so | against || and < against << need no
-     rescans, and a compound assignment suffix such as += or <<= answers no
-     operator since the assignment level above the ladder owns those. */
+  /* Reads the operator at the cursor without consuming it. A compound
+     assignment suffix such as += or <<= answers no operator, since the
+     assignment level above the ladder owns those. */
   fn peek_binary_operator() wontthrow -> binary_operator
   {
     skip_spaces();
@@ -562,11 +534,8 @@ public:
   }
 
   /* The binary ladder as one precedence-climbing loop, one frame for a whole
-     run of operators instead of a call per precedence level, since the chain
-     of nine cascade levels showed up whole in the profile. ** climbs right
-     associatively by re-entering at its own precedence, the logical pair
-     short-circuits by parsing the dead side under suppression the way the
-     cascade did, and the ternary, assignment, and comma levels stay above. */
+     run of operators rather than a call per precedence level, since the nine
+     cascade levels showed up whole in the profile. */
   fn parse_binary(u8 min_precedence) throws -> i64
   {
     let lhs = parse_unary();
@@ -577,8 +546,7 @@ public:
       pos += op.length;
 
       if (op.kind == 'A' || op.kind == 'O') {
-        /* The dead side is parsed under suppression so its tokens are
-           consumed without its assignments taking effect. */
+        /* The dead side is parsed under suppression. */
         let const lhs_decides = (op.kind == 'A') == (lhs == 0);
         i64 rhs = 0;
         if (lhs_decides) {
@@ -633,8 +601,7 @@ public:
   fn parse_unary() throws -> i64
   {
     /* The doubled operators are checked before the single + and - so a leading
-       ++ or -- is read as one prefix step rather than two unary signs. The
-       first byte gates the probes, so the common operand pays one read. */
+       ++ or -- is read as one prefix step rather than two unary signs. */
     skip_spaces();
     let const first = pos < source.length ? source[pos] : '\0';
     if (first == '+') {
@@ -671,17 +638,12 @@ public:
       return value;
     }
     if (pos < source.length && lexer::is_number(source[pos])) {
-      /* A number literal reads through the shared lexer, which measures the
-         base#digits radix form, a 0x hex, a 0 octal, or a decimal run and
-         reports the bytes it consumed. */
       i64 value = 0;
       pos += lex_arith_number(source.substring(pos), &value);
       return value;
     }
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
-      /* The name is a contiguous slice of the expression the parser holds for
-         the whole evaluation, so a view into it avoids a per-read allocation. A
-         trailing ++ or -- right after the name is a postfix step on it. */
+      /* A trailing ++ or -- right after the name is a postfix step on it. */
       const lvalue target = read_lvalue();
       if (consume("++")) return postfix_step(target, 1);
       if (consume("--")) return postfix_step(target, -1);
@@ -691,9 +653,9 @@ public:
   }
 };
 
-/* Lexes one arithmetic number literal at the front of `from`, the same forms
-   parse_primary reads, a base#digits radix literal, a 0x hex, a 0 octal, or a
-   decimal run. Stores the value and returns the byte count it consumed. */
+/* Lexes one arithmetic number literal at the front of `from`, a base#digits
+   radix literal, a 0x hex, a 0 octal, or a decimal run. Stores the value and
+   returns the byte count it consumed. */
 static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
 {
   if (let const base_length = count_leading_digits(from, 10);
@@ -720,8 +682,7 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
         break;
       }
       /* The accumulation wraps in the unsigned domain so an oversized base#
-         literal such as 64#zzzzzzzzzz does not trigger signed-overflow, the
-         same wrap the other operand parsers take. */
+         literal does not trigger signed-overflow. */
       value = value * static_cast<u64>(base) + static_cast<u64>(digit);
       i++;
     }
@@ -753,8 +714,8 @@ static const StringView ARITH_OPERATORS[] = {
 };
 
 /* Lexes the whole arithmetic expression into tokens once. A number carries its
-   value, a name and an operator carry a view into the source, and an array
-   subscript carries the balanced raw bytes between its brackets. */
+   value, a name and an operator carry a view, and a subscript carries the
+   balanced raw bytes between its brackets. */
 static fn tokenize_arithmetic(StringView src,
                               ArrayList<arith_token> &out) throws -> void
 {
@@ -816,7 +777,7 @@ static fn tokenize_arithmetic(StringView src,
       }
     }
     /* An unrecognized byte becomes a one-byte op so the simple evaluator fails
-       on it the way the char parser does. */
+       on it. */
     if (!is_matched) {
       out.push(
           arith_token{arith_token::kind::op, 0, src.substring_of_length(i, 1)});
@@ -835,8 +796,8 @@ static pure fn arith_op_is_complex(StringView t) wontthrow -> bool
          t == "--" || t == "&&" || t == "||";
 }
 
-/* True when every token is a plain arithmetic token, so the fast path can
-   evaluate it with no assignment, branch, or short-circuit to order. */
+/* True when every token is a plain arithmetic token the fast path can evaluate
+   with no side effect to order. */
 static pure fn
 arith_tokens_are_simple(const ArrayList<arith_token> &toks) wontthrow -> bool
 {
@@ -856,9 +817,8 @@ struct arith_binop
 };
 
 /* The dispatch tag and precedence of a binary operator token, mirroring
-   peek_binary_operator. Precedence 0 means the token is not a binary operator,
-   the short-circuit pair is excluded since a simple expression never holds it.
- */
+   peek_binary_operator. The short-circuit pair is excluded since a simple
+   expression never holds it. */
 static pure fn arith_classify_binop(StringView t) wontthrow -> arith_binop
 {
   if (t == "**") return {'P', 11};
@@ -881,8 +841,8 @@ static pure fn arith_classify_binop(StringView t) wontthrow -> arith_binop
   return {0, 0};
 }
 
-/* Applies a binary operator, the same arithmetic helpers and rules the char
-   parser's ladder uses, so the fast path and the full parser agree. */
+/* Applies a binary operator through the same helpers the char parser's ladder
+   uses, so the fast path and the full parser agree. */
 static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
 {
   switch (kind) {
@@ -913,9 +873,9 @@ static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
   }
 }
 
-/* Reads a variable's integer value, the same path read_variable_value takes, an
-   unset name reports and reads as zero. The fast path runs only on a
-   side-effect-free expression, so the report is never suppressed. */
+/* Reads a variable's integer value, an unset name reports and reads as zero.
+   The fast path runs only on a side-effect-free expression, so the report is
+   never suppressed. */
 static fn arith_read_variable(EvalContext *context, StringView name) throws
     -> i64
 {
@@ -934,10 +894,9 @@ static fn arith_read_variable(EvalContext *context, StringView name) throws
 }
 
 /* A precedence-climbing evaluator over the cached token stream for a simple
-   expression, numbers, variable reads, unary operators, parentheses, and binary
-   operators. It has no assignment, ternary, comma, or short-circuit, so it
-   never orders a side effect, which the caller guarantees by the simple check.
- */
+   expression. It has no assignment, ternary, comma, or short-circuit, so it
+   never orders a side effect, which the caller guarantees by the simple
+   check. */
 class ArithmeticTokenEvaluator
 {
 public:
@@ -1018,19 +977,18 @@ public:
     if (toks.is_empty()) return 0;
     let const result = parse_binary(1);
     if (ti != toks.count()) {
-      /* The leftover token after a complete expression usually means an
-         operator is missing, so the cause rides a trailing note rather than the
-         message. */
+      /* Leftover text after a complete expression usually means an operator is
+         missing, so the cause rides a trailing note. */
       Error error{"Arithmetic: unexpected '" + String{toks[ti].text} +
                   "' after the expression"};
-      error.set_note("an operator is missing between two values");
+      error.set_note("An operator is missing between two values");
       throw error;
     }
     return result;
   }
 };
 
-} /* namespace */
+} // namespace
 
 fn EvalContext::read_array_element_integer(StringView name,
                                            StringView subscript) throws -> i64
@@ -1043,11 +1001,9 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
 {
   LOG(All, "evaluating the arithmetic expression of %zu bytes",
       expression.length);
-  /* Parameter expansion runs first, so a $1, a $x, or a ${...} inside the
-     arithmetic becomes its value before the expression is parsed. A bare name
-     is still resolved during evaluation. When the source holds no parameter to
-     expand, which the d=$((d+1)) hot loop hits every iteration, the expansion
-     copy is skipped and the original is parsed directly. */
+  /* Parameter expansion runs first, so a $1, a $x, or a ${...} becomes its
+     value before the parse. A source with no parameter to expand, the
+     d=$((d+1)) hot loop case, skips the expansion copy and parses directly. */
   if (!expression.find_character('$').has_value() &&
       !expression.find_character('`').has_value())
   {
@@ -1075,9 +1031,8 @@ fn EvalContext::evaluate_arithmetic_cached_clause(
     StringView expression, ArrayList<arith_token> &tokens, bool &is_tokenized,
     bool &is_simple) throws -> i64
 {
-  /* A parameter or command substitution inside the arithmetic needs the full
-     expansion path, so only a substitution-free expression, the hot loop case
-     such as d=$((d+1)), takes the cached token path. */
+  /* A parameter or command substitution needs the full expansion path, so only
+     a substitution-free expression takes the cached token path. */
   if (expression.find_character('$').has_value() ||
       expression.find_character('`').has_value())
   {
@@ -1089,8 +1044,8 @@ fn EvalContext::evaluate_arithmetic_cached_clause(
     try {
       tokenize_arithmetic(expression, tokens);
     } catch (...) {
-      /* A lexing failure leaves the token path off for this clause, so the
-         char parser reports the same error and the cache never adds one. */
+      /* A lexing failure leaves the token path off, so the char parser reports
+         the same error. */
       tokens.clear();
       is_tokenized = true;
       is_simple = false;
@@ -1100,9 +1055,8 @@ fn EvalContext::evaluate_arithmetic_cached_clause(
     is_simple = arith_tokens_are_simple(tokens);
   }
 
-  /* A complex expression, an assignment, a ternary, a comma, a short-circuit,
-     an increment, or an array element, runs through the full char parser, which
-     keeps the side-effect ordering the fast path does not. */
+  /* A complex expression runs through the full char parser, which keeps the
+     side-effect ordering the fast path does not. */
   if (!is_simple) return evaluate_arithmetic(expression);
 
   ArithmeticTokenEvaluator evaluator{this, tokens};
@@ -1120,11 +1074,8 @@ fn evaluate_constant_arithmetic(StringView expression) throws -> i64
 
 namespace {
 
-/* The calc builtin computes in 128 bits in the default mood, so the compiler's
-   __int128 is used for the value and the unsigned form for the wrapping
-   operators. A compiler without the extension falls back to 64 bits, which the
-   guard at the top of this file already requires, so the fallback never
-   compiles in practice. */
+/* The calc builtin computes in 128 bits in the default mood through the
+   compiler's __int128, with the unsigned form for the wrapping operators. */
 #if T__HAS_GCC_EXTENSIONS
 using wide_int = __int128;
 using wide_uint = unsigned __int128;
@@ -1134,7 +1085,7 @@ using wide_uint = u64;
 #endif
 
 /* Read a numeric operand into a 128-bit value, detecting the radix from a 0x or
-   0 prefix the way the 64-bit operand parser does. */
+   0 prefix. */
 static pure fn parse_wide_operand(StringView text) wontthrow -> wide_int
 {
   let body = text;
@@ -1174,8 +1125,8 @@ static pure fn parse_wide_operand(StringView text) wontthrow -> wide_int
   return is_negative ? static_cast<wide_int>(-result) : result;
 }
 
-/* Lex one decimal, hexadecimal, or octal number literal at the front of from
-   into a 128-bit value, returning the bytes consumed. */
+/* Lex one number literal at the front of from into a 128-bit value, returning
+   the bytes consumed. */
 static fn lex_wide_number(StringView from, wide_int *out_value) throws -> usize
 {
   usize consumed;
@@ -1190,7 +1141,6 @@ static fn lex_wide_number(StringView from, wide_int *out_value) throws -> usize
   return consumed;
 }
 
-/* The 128-bit value as decimal text, the form calc prints. */
 static fn format_wide(wide_int value) throws -> String
 {
   let const is_negative = value < 0;
@@ -1215,15 +1165,13 @@ static fn format_wide(wide_int value) throws -> String
 
 /* Evaluate an expression string to a 128-bit value, the entry the recursive
    variable read uses so a calc variable holding a formula evaluates lazily on
-   each reference. Defined after the parser since it constructs one. */
+   each reference. */
 static fn evaluate_wide_expression(EvalContext *context, StringView expression,
                                    usize depth) throws -> wide_int;
 
 /* A recursive-descent evaluator over 128-bit integers for the calc builtin,
-   following C precedence with parentheses, the unary operators, the binary
-   ladder, the comparisons, the logical pair, the ternary, and the comma. It
-   reads shell variables through the context and performs no assignment itself,
-   the calc REPL applies an assignment and stores the expression text so a
+   following C precedence. It reads shell variables through the context and
+   performs no assignment itself, the calc REPL stores the expression text so a
    variable read here evaluates it lazily. */
 class WideArithmeticParser
 {
@@ -1232,18 +1180,18 @@ public:
   StringView source;
   usize pos;
   usize depth{0};
-  /* The top-level parser reads the typed line, so an error against it carets
-     the real token. A nested parser reads a stored formula text, so its caret
-     would index the binding rather than the typed line, and it reports
-     unlocated. */
+  /* The top-level parser reads the typed line and carets a real token. A nested
+     parser reads a stored formula, so it reports unlocated. */
   bool is_top_level{false};
   static constexpr usize MAX_DEPTH = 512;
 
   [[noreturn]] cold fn fail(StringView message) throws -> void
   {
-    /* The caret indexes the expression at the current position, so calc, the
-       only caller of the wide evaluator, points it under the offending token. */
-    throw ErrorWithLocation{SourceLocation{pos, 1}, message};
+    /* The caret indexes the expression at the current position. */
+    throw ErrorWithLocation{
+        SourceLocation{pos, 1},
+        message
+    };
   }
 
   fn skip_spaces() wontthrow -> void
@@ -1289,8 +1237,7 @@ public:
 
     if (!was_found) {
       /* calc treats an unset variable as an error rather than reading it as
-         zero. A top-level read carets the name, a nested read reports unlocated
-         since its position indexes the binding rather than the typed line. */
+         zero. */
       let message = "The variable '" + String{name} + "' is not set";
       if (is_top_level)
         throw ErrorWithLocation{
@@ -1303,9 +1250,8 @@ public:
     if (value.count() == 0) return 0;
 
     /* A calc variable holds a number or a stored expression, evaluated lazily
-       here so a formula recomputes from the variables it names. A reference
-       cycle such as x=x grows the depth without end, so the cap reports rather
-       than reading a half-resolved value. */
+       here. A reference cycle such as x=x grows the depth without end, so the
+       cap reports rather than reading a half-resolved value. */
     if (depth >= MAX_DEPTH) {
       let message = "The variable '" + String{name} + "' refers to itself";
       if (is_top_level)
@@ -1355,16 +1301,15 @@ public:
     let const result = parse_comma();
     skip_spaces();
     if (pos != source.length) {
-      /* The leftover text after a complete expression usually means an operator
-         is missing, so the cause rides a trailing note rather than the message.
-       */
+      /* Leftover text after a complete expression usually means an operator is
+         missing, so the cause rides a trailing note. */
       ErrorWithLocation error{
           SourceLocation{pos, source.length - pos},
           "Unexpected '" + String{source.substring(pos)}
           +
               "' after the expression"
       };
-      error.set_note("an operator is missing between two values");
+      error.set_note("An operator is missing between two values");
       throw error;
     }
     return result;
@@ -1378,9 +1323,9 @@ public:
     return result;
   }
 
-  /* Bind a variable to its right-side expression text, the form calc stores so
-     a later read re-evaluates it against the current context rather than a
-     value recorded now. */
+  /* Bind a variable to its right-side expression text, so a later read
+     re-evaluates it against the current context rather than a recorded value.
+   */
   fn write_variable(StringView name, StringView expression_text) throws -> void
   {
     ASSERT(context != nullptr);
@@ -1389,10 +1334,9 @@ public:
 
   /* An assignment is an expression whose value is the evaluated right side, so
      a mid-expression form such as (x = 5) + 1 reads. It binds the variable to
-     the right-side text, not the value, leaving the lazy re-evaluation to a
-     later read. A leading name with no following = rewinds and reads as a
-     value, and a
-     == comparison is left for the binary ladder. */
+     the right-side text rather than the value. A leading name with no following
+     = rewinds and reads as a value, and a == comparison is left for the binary
+     ladder. */
   fn parse_assignment() throws -> wide_int
   {
     let const save = pos;
@@ -1575,13 +1519,13 @@ static fn evaluate_wide_expression(EvalContext *context, StringView expression,
   return sub.parse();
 }
 
-} /* namespace */
+} // namespace
 
 fn EvalContext::evaluate_arithmetic_wide(StringView expression,
                                          bool &out_nonzero) throws -> String
 {
-  /* The bash and posix moods keep the 64-bit semantics, so calc reports the
-     same wrap those shells give. Only the default mood widens to 128 bits. */
+  /* The bash and posix moods keep the 64-bit semantics. Only the default mood
+     widens to 128 bits. */
   if (mood() != mimic_mood::Default) {
     let const value = evaluate_arithmetic(expression);
     out_nonzero = value != 0;
@@ -1606,4 +1550,4 @@ fn EvalContext::evaluate_arithmetic_wide(StringView expression,
   return format_wide(value);
 }
 
-} /* namespace shit */
+} // namespace shit

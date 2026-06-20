@@ -30,8 +30,6 @@ static fn is_blank(char c) wontthrow -> bool
          c == '\v';
 }
 
-/* One file's count line, the selected fields right-justified in eight columns
-   each, with the name appended when one is given. */
 static fn format_counts(u64 lines, u64 words, u64 bytes, bool should_show_lines,
                         bool should_show_words, bool should_show_bytes,
                         StringView name) throws -> String
@@ -136,6 +134,6 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

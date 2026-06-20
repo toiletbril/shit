@@ -55,7 +55,6 @@ fn read_directory_cached(const Path &directory) throws
     if (has_status && entry.modification_time == status.modification_time) {
       LOG(All, "directory listing cache hit for '%.*s'",
           static_cast<int>(path_view.length), path_view.data);
-      /* Move the hit to the front, at most a three-entry shift. */
       if (slot != 0) {
         directory_listing_cache_entry hit = steal(entry);
         for (usize back = slot; back > 0; back--) {
@@ -76,8 +75,7 @@ fn read_directory_cached(const Path &directory) throws
   let listing = Path::read_directory_typed(directory);
   if (!listing.has_value()) return nullptr;
 
-  /* The directory flag is resolved once per read from the dirent type. Only a
-     symlink or an unknown type falls back to a stat. */
+  /* Only a symlink or an unknown dirent type falls back to a stat. */
   let resolved_entries = ArrayList<cached_directory_entry>{};
   resolved_entries.reserve(listing->count());
   for (let &child : *listing) {
@@ -98,7 +96,6 @@ fn read_directory_cached(const Path &directory) throws
         cached_directory_entry{steal(child.name), is_directory});
   }
 
-  /* The ring shifts down by one and the fresh listing lands at the front. */
   for (usize back = DIRECTORY_LISTING_CACHE_SLOT_COUNT - 1; back > 0; back--)
     DIRECTORY_LISTING_CACHE[back] = steal(DIRECTORY_LISTING_CACHE[back - 1]);
 
@@ -127,8 +124,6 @@ static pure fn is_word_separator(char c) wontthrow -> bool
   return lexer::is_whitespace(c) || c == '\n';
 }
 
-/* True for a byte that ends one command and begins another, so the word right
-   after it is again in command position. */
 static pure fn is_command_separator(char c) wontthrow -> bool
 {
   return c == ';' || c == '|' || c == '&' || c == '(' || c == '\n';
@@ -161,15 +156,11 @@ pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool
   return false;
 }
 
-/* True for a byte that ends the token under the cursor, a word separator or a
-   command separator, so `ls|gre` leaves `gre` under the cursor. */
 static pure fn is_token_boundary(char c) wontthrow -> bool
 {
   return is_word_separator(c) || is_command_separator(c);
 }
 
-/* The byte offset where the token under the cursor begins. The scan walks back
-   from the cursor over non-boundary bytes. */
 static pure fn find_token_start(StringView line, usize cursor) wontthrow
     -> usize
 {
@@ -179,8 +170,6 @@ static pure fn find_token_start(StringView line, usize cursor) wontthrow
   return start;
 }
 
-/* The byte offset just past the token the cursor sits inside, so a replacement
-   covers the whole word rather than the bytes left of the cursor. */
 static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
 {
   let end = cursor;
@@ -225,10 +214,6 @@ static pure fn find_open_quote(StringView line, usize cursor) wontthrow
   return open_quote_span{content_start, quote_character};
 }
 
-/* Whether the token starting at token_start sits in command position, the first
-   word of a command. The scan looks back over whitespace to the previous
-   non-space byte and reports command position when that byte ends a command or
-   the token is the very first on the line. */
 /* The leading words a command word can follow, the ! and time keywords, the
    compound keywords whose body opens with a command, and the wrapper commands
    whose argument is itself a command the way fish skips sudo. for, case, and in
@@ -293,8 +278,6 @@ static pure fn is_in_command_position(StringView line,
   }
 }
 
-/* A glob-active mask with every position set, for an unquoted completion token
-   whose every byte is a live glob metacharacter. */
 static fn all_active_glob_mask(usize length) throws -> ArrayList<bool>
 {
   let mask = ArrayList<bool>{};
@@ -329,8 +312,6 @@ static fn add_unique_command(ArrayList<String> &candidates, HashSet &seen,
   candidates.push(String{name});
 }
 
-/* The longest prefix shared by every candidate. With one candidate it is that
-   candidate, with none it is empty. */
 static fn
 compute_longest_common_prefix(const ArrayList<String> &candidates) throws
     -> String
@@ -358,21 +339,13 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
   return prefix;
 }
 
-/* Collect every command name that matches the typed token. The builtins come
-   from the registry name list, the functions and aliases from the context, and
-   the executables from a scan of the PATH directories. A token holding a glob
-   metacharacter matches by glob, so a bare glob first word lists the command
-   names it matches rather than cwd entries. */
 /* The PATH executable names, cached so the per-keystroke ghost does not read
    every PATH directory on each keystroke. The cache rebuilds only when the PATH
-   value changes, which an interactive session does rarely, so a freeze on a
-   large PATH becomes a one-time cost rather than a per-key one. */
+   value changes. */
 static String CACHED_COMPLETION_PATH{};
 static ArrayList<String> CACHED_PATH_COMMANDS{};
 static bool is_cached_path_commands_valid = false;
 
-/* Whether the live PATH differs from the cached copy, updating the copy on a
-   change. */
 fn environment_path_changed(String &cached_path) throws -> bool
 {
   const char *path = std::getenv("PATH");
@@ -455,8 +428,7 @@ static fn complete_command(StringView token, bool token_is_glob,
   return candidates;
 }
 
-/* Split a filesystem token into the directory part and the partial basename.
-   The directory part keeps its trailing separator so the basename joins back
+/* The directory part keeps its trailing separator so the basename joins back
    on. */
 struct path_token
 {
@@ -517,8 +489,6 @@ static fn quote_path_candidate(StringView candidate) throws -> String
   return quoted;
 }
 
-/* Resolve the directory the token's directory part names into a real disk path,
-   expanding a leading tilde and rooting a relative path at base_directory. */
 static fn resolve_listing_directory(StringView directory_part,
                                     const Path &base_directory) throws -> Path
 {
@@ -535,7 +505,6 @@ static fn resolve_listing_directory(StringView directory_part,
                                : os::get_home_for_user(name);
     if (home.has_value()) {
       let resolved_path = home->clone();
-      /* Drop the name and the separator after it, then append the rest. */
       let rest_start = name_end;
       if (rest_start < directory_part.length &&
           directory_part[rest_start] == '/')
@@ -557,9 +526,6 @@ static fn resolve_listing_directory(StringView directory_part,
   return resolved_path;
 }
 
-/* Complete a filesystem token. The directory part is listed and every entry
-   whose name carries the partial basename becomes a candidate, with the
-   directory part prefixed back on and a trailing slash on a directory. */
 static fn complete_filesystem(StringView token, const Path &base_directory,
                               bool inside_quote) throws -> ArrayList<String>
 {
@@ -638,7 +604,6 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
   let const glob_active = all_active_glob_mask(parts.basename_part.length);
 
   for (let const &entry : *entries) {
-    /* A dotfile only matches a pattern the user began with a dot. */
     if (entry.length() > 0 && entry.view()[0] == '.' &&
         (parts.basename_part.is_empty() || parts.basename_part[0] != '.'))
     {
@@ -666,25 +631,16 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
   return candidates;
 }
 
-/* Whether the token names a variable expansion, a leading '$'. */
 static pure fn token_is_variable(StringView token) wontthrow -> bool
 {
   return token.length >= 1 && token[0] == '$';
 }
 
-/* Complete a variable token. The name after the '$' (or '${') becomes a prefix
-   matched against the shell variable names and the environment names, and each
-   match is formatted back into the form the user typed, '$NAME' or '${NAME}'.
-   The brace form is only offered when the typed token has no name characters
-   after a metacharacter the completion does not parse, so a plain '$' or '${'
-   prefix completes cleanly. */
 static fn complete_variable(StringView token, EvalContext &context) throws
     -> ArrayList<String>
 {
   let candidates = ArrayList<String>{};
 
-  /* Strip the leading '$' and an optional '{'. The brace form is reproduced on
-     every candidate. */
   let has_brace = token.length >= 2 && token[1] == '{';
   usize name_start = has_brace ? 2 : 1;
   let const prefix = token.substring(name_start);
@@ -727,8 +683,6 @@ static fn token_is_tilde_user_prefix(StringView token) wontthrow -> bool
          !token.find_character('/').has_value();
 }
 
-/* Complete a ~name token against the system users, each candidate written back
-   as ~name with a trailing / since a home is a directory. */
 static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 {
   let candidates = ArrayList<String>{};
@@ -820,9 +774,6 @@ fn resolve_completion_command(StringView command, EvalContext &context) throws
   return name;
 }
 
-/* Split the line into whitespace words for COMP_WORDS, reporting the index of
-   the cursor's word. An empty trailing word is appended when the cursor is past
-   the last one. */
 fn split_completion_words(StringView line, usize cursor, usize &cword) throws
     -> ArrayList<String>
 {
@@ -929,8 +880,6 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else if (inline_glob) {
     candidates = complete_glob(token, base_directory);
     if (!candidates.is_empty()) {
-      /* The matches replace the pattern as one space-joined run of fields, the
-         listing-UI trailing slash dropped. */
       candidates.sort();
       let joined = String{};
       for (usize i = 0; i < candidates.count(); i++) {
@@ -998,7 +947,6 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     }
   }
 
-  /* A token that matched nothing skips the sort and the prefix scan. */
   let longest_common_prefix = String{};
   if (!candidates.is_empty()) {
     candidates.sort();
@@ -1015,6 +963,6 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   };
 }
 
-} /* namespace completion */
+} // namespace completion
 
-} /* namespace shit */
+} // namespace shit

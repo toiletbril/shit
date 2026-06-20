@@ -25,11 +25,9 @@ public:
   bool pipefail_explicit{false};
   bool failglob_explicit{false};
 
-  /* Read the live mood and toggles off a context. */
   mustuse static fn capture(const EvalContext &context) wontthrow
       -> RuntimeState;
-  /* Write this snapshot back into a context. */
   fn restore(EvalContext &context) const wontthrow -> void;
 };
 
-} /* namespace shit */
+} // namespace shit

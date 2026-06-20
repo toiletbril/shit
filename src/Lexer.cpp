@@ -60,8 +60,8 @@ hot pure fn is_shell_sentinel(char ch) wontthrow -> bool
 {
   /* A brace is not a sentinel. POSIX recognizes '{' and '}' as reserved words
      only when a token is exactly '{' or '}' in command position, so the lexer
-     keeps a brace as an ordinary identifier character and the parser checks the
-     word text. This way 'a{b}c' lexes as one word. */
+     keeps a brace as an ordinary identifier character and 'a{b}c' lexes as one
+     word. */
   switch (ch) {
   case '\n':
   case '|':
@@ -81,10 +81,8 @@ hot pure fn is_part_of_identifier(char ch) wontthrow -> bool
 }
 
 /* A byte that the identifier lexer copies verbatim into the current
-   UnquotedText segment while outside any quote and outside an escape. It is an
-   ordinary identifier byte that does not open a quote, an expansion, a command
-   substitution, or an escape, so a run of these bytes lexes to one literal
-   append with no per-byte state change. */
+   UnquotedText segment while outside any quote and outside an escape. A run of
+   these bytes lexes to one literal append with no per-byte state change. */
 hot pure fn is_plain_unquoted_run_byte(char ch) wontthrow -> bool
 {
   return is_part_of_identifier(ch) && ch != '$' && ch != '`' && ch != '\\' &&
@@ -93,8 +91,7 @@ hot pure fn is_plain_unquoted_run_byte(char ch) wontthrow -> bool
 
 hot pure fn is_string_quote(char ch) wontthrow -> bool
 {
-  /* A backtick is not a string quote. It opens a command substitution, which
-     the identifier lexer handles inline. */
+  /* A backtick is not a string quote. It opens a command substitution. */
   switch (ch) {
   case '"':
   case '\'': return true;
@@ -133,7 +130,7 @@ hot pure fn is_special_parameter_char(char ch) wontthrow -> bool
          ch == '@' || ch == '-';
 }
 
-} /* namespace lexer */
+} // namespace lexer
 
 Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
              Maybe<StringView> filename, mimic_mood mood)
@@ -243,9 +240,8 @@ cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
     -> const String *
 {
   /* The body lives in the same arena as the parsed nodes that point at it, so
-     its lifetime matches the AST. A command substitution caches its parsed tree
-     past the temporary lexer that built it, and a lexer-owned heap body freed
-     in ~Lexer would dangle behind the cached Redirection. */
+     its lifetime matches the AST. A lexer-owned heap body freed in ~Lexer would
+     dangle behind a cached Redirection whose tree outlives the lexer. */
   let body = m_arena->create<String>();
   ASSERT(body != nullptr);
 
@@ -263,8 +259,6 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
       m_pending_heredocs.count());
 
   for (heredoc_pending &pending : m_pending_heredocs) {
-    /* The body is written into the lexer-owned String the parsed redirection
-       points at, so it accumulates as one. */
     let collected = String{};
     loop
     {
@@ -322,10 +316,9 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
 {
   Token *t{};
   if (const let ch = chop_character(); ch != lexer::CEOF) [[likely]] {
-    /* A <(...) or >(...) process substitution is not valid POSIX, so it is a
-       pure addition that is active in the default mode as well as bash mode,
-       the way [[ ]] and (( )) are. The < or > opens it only when a ( follows
-       with no space. */
+    /* A <(...) or >(...) process substitution is a pure addition active in the
+       default mood as well as bash mood. The < or > opens it only when a (
+       follows with no space. */
     if ((ch == '<' || ch == '>') && chop_character(1) == '(') {
       t = lex_process_substitution(ch);
     } else if (lexer::is_shell_sentinel(ch)) {
@@ -355,17 +348,15 @@ hot flatten forceinline fn Lexer::skip_whitespace() wontthrow -> void
     while (lexer::is_whitespace(chop_character(i)))
       i++;
     /* A backslash before a newline continues the line and both bytes vanish.
-       Stripping it here at the token boundary means a continuation between a
-       case-pattern '|' and the next alternative reads as the join it is, the
-       same as dash. A backslash before any other byte is left for the
-       identifier lexer to treat as an escape. */
+       Stripping it here means a continuation between a case-pattern '|' and the
+       next alternative reads as the join it is, the same as dash. A backslash
+       before any other byte is left for the identifier lexer. */
     if (chop_character(i) == '\\' && chop_character(i + 1) == '\n') {
       i += 2;
       continue;
     }
     /* A '#' at a token boundary begins a comment that runs to the end of the
-       line. The newline is left in place so it still terminates the command,
-       and a leading '#!' shebang is just the first such comment. */
+       line. The newline is left in place so it still terminates the command. */
     if (chop_character(i) == '#') {
       while (chop_character(i) != '\n' && chop_character(i) != lexer::CEOF)
         i++;
@@ -397,8 +388,6 @@ hot fn Lexer::lex_number() throws -> Token *
   while (lexer::is_number(chop_character(length)))
     length++;
 
-  /* The whole digit run is appended once rather than byte by byte, the way
-     lex_identifier batches its plain runs. */
   let digits = String{};
   digits.append(m_source.view().substring_of_length(m_cursor_position, length));
 
@@ -423,9 +412,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   Maybe<char> quote_char;
 
   /* Set when the open quote enclosed at least one character. When the matching
-     close quote arrives with it still clear, the quote enclosed nothing and an
-     empty segment is synthesized so the word keeps one empty field, the way ""
-     and '' each expand to one empty argument rather than to none. */
+     close quote arrives with it still clear, an empty segment is synthesized so
+     the word keeps one empty field, the way "" and '' each expand to one empty
+     argument. */
   bool did_quote_enclose_content = false;
 
   /* Append a character to the open segment, starting a new one when the kind
@@ -444,9 +433,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   };
 
   /* Append a whole run of plain unquoted bytes to the current UnquotedText
-     segment in one String append, the batched form of calling do_append_char
-     with UnquotedText for each byte. A run only ever extends or starts an
-     UnquotedText segment, since the bytes carry no quote and no escape. */
+     segment in one String append, the batched form of do_append_char. */
   let do_append_unquoted_run = [&word](StringView run) {
     if (!word.segments.is_empty() &&
         word.segments.back().kind == WordSegment::Kind::UnquotedText)
@@ -478,8 +465,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
   /* A balanced [ ... ] starting at the offset closes on a ] that is followed by
      = or +=, the shape of an array element assignment. The lookahead consumes
-     nothing, it only decides whether the bracket run is a protected subscript.
-   */
+     nothing. */
   let do_subscript_closes_with_assignment = [this](usize start) -> bool {
     usize offset = start + 1;
     usize depth = 1;
@@ -496,9 +482,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     return after == '=' || (after == '+' && chop_character(offset + 1) == '=');
   };
 
-  /* Advance offset past a balanced open and close pair, the one nested inside a
-     subscript or an extended-glob group, stopping at the matching close or at
-     the end of the source. */
+  /* Advance offset past a balanced open and close pair, stopping at the
+     matching close or at the end of the source. */
   let do_scan_to_matched_close = [this](usize &offset, char open,
                                         char close) -> void {
     usize depth = 1;
@@ -526,16 +511,14 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     }
 
     /* A NAME[subscript]= assignment protects the subscript's operators so a
-       bitmask subscript such as key[a|b]=1 stays in the word. It runs only when
-       the word so far is a bare array name and a balanced ] followed by = or +=
-       marks an assignment, so a glob like x[1|2] in argument position still
-       splits. */
+       bitmask subscript such as key[a|b]=1 stays in the word. A glob like
+       x[1|2] in argument position still splits. */
     if (!is_inside_quote_or_escape && ch == '[' &&
         do_word_is_plain_array_name() &&
         do_subscript_closes_with_assignment(byte_count))
     {
       const let subscript_start = byte_count;
-      byte_count++; /* the [ */
+      byte_count++;
       do_scan_to_matched_close(byte_count, '[', ']');
       do_append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + subscript_start, byte_count - subscript_start));
@@ -545,13 +528,13 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     /* An extended-glob group such as @(a|b) is captured whole so its (, nested
        |, and ) stay in the word for the matcher. The opener is one of ?*+@!
        followed with no space by (. The matcher honors the group only under
-       shopt extglob, so the capture is a pure addition. */
+       shopt extglob. */
     if (!is_inside_quote_or_escape &&
         (ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!') &&
         chop_character(byte_count + 1) == '(')
     {
       const let group_start = byte_count;
-      byte_count += 2; /* the opener and the ( */
+      byte_count += 2;
       do_scan_to_matched_close(byte_count, '(', ')');
       do_append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + group_start, byte_count - group_start));
@@ -565,8 +548,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     if (!is_inside_quote_or_escape && lexer::is_plain_unquoted_run_byte(ch)) {
       const let run_start = byte_count;
       /* The run stops before an extended-glob opener such as the ? of ?(, so
-         the opener reaches the group capture above on the next turn rather than
-         being swallowed as a plain byte. */
+         the opener reaches the group capture above on the next turn. */
       let do_opens_extglob_at = [this](usize offset) -> bool {
         const char c = chop_character(offset);
         return (c == '?' || c == '*' || c == '+' || c == '@' || c == '!') &&
@@ -576,8 +558,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         byte_count++;
         const char next = chop_character(byte_count);
         /* The run stops before a '[' so the assignment-subscript capture above
-           can decide whether to protect the bracket group, the way it stops
-           before an extglob opener. */
+           can decide whether to protect the bracket group. */
         if (next == '[' || !lexer::is_plain_unquoted_run_byte(next)) {
           break;
         }
@@ -588,8 +569,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     }
 
     if (should_escape) {
-      /* The previous character was a backslash. A backslash before a newline
-         continues the line and leaves None behind, so the newline byte is
+      /* A backslash before a newline continues the line, so the newline byte is
          consumed without appending anything. */
       should_escape = false;
       if (ch != '\n') do_append_char(WordSegment::Kind::LiteralText, ch);
@@ -598,7 +578,6 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     }
 
     if (quote_char == '\'') {
-      /* Single quotes take everything literally up to the closing quote. */
       if (ch == '\'') {
         if (!did_quote_enclose_content)
           word.segments.push(
@@ -614,8 +593,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
     if (ch == '\\') {
       /* Inside double quotes a backslash only escapes $, `, ", \, and a
-         newline. Before any other character it stays a literal backslash, so
-         "\n" is a backslash and an n, not an escape. Outside double quotes a
+         newline, so "\n" is a backslash and an n. Outside double quotes a
          backslash escapes the next character. */
       if (quote_char == '"') {
         did_quote_enclose_content = true;
@@ -646,9 +624,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
       continue;
     }
 
-    /* Past the close quote, any character reached while still inside the double
-       quote is enclosed content, whether it is a literal, an expansion, or a
-       substitution. */
+    /* Any character reached while still inside the double quote is enclosed
+       content, whether literal, an expansion, or a substitution. */
     if (is_in_double_quotes) did_quote_enclose_content = true;
 
     if (!quote_char && lexer::is_string_quote(ch)) {
@@ -664,9 +641,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
       char next = chop_character(byte_count);
 
       /* $'...' is bash ANSI-C quoting. The backslash escapes are decoded here
-         and the result is a final literal segment that neither expands nor
-         globs, the way single quotes produce a literal but with escapes. A
-         pure addition, so it rides every mood but POSIX. */
+         into a final literal segment that neither expands nor globs. It rides
+         every mood but POSIX. */
       if (next == '\'' && bash_additions_enabled()) {
         byte_count++;
         bool did_emit_any = false;
@@ -754,9 +730,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
           case 'c': {
             /* Control modifier. bash uppercases the letter then takes the low
                five bits, so \cA is 0x01 and \c[ is the escape 0x1b, while \c?
-               is the delete 0x7f. The earlier xor with 0x40 only matched this
-               for the bytes 0x40 to 0x5f and was wrong for a digit or
-               punctuation. */
+               is the delete 0x7f. */
             const char k = chop_character(byte_count);
             if (k == lexer::CEOF) {
               do_emit_literal('\\');
@@ -765,7 +739,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             }
             byte_count++;
             /* A control target written as an escaped backslash, \c\\, is
-               ctrl-backslash, so the second backslash is consumed here. */
+               ctrl-backslash. */
             const char target = k;
             if (k == '\\' && chop_character(byte_count) == '\\') {
               byte_count++;
@@ -819,8 +793,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             break;
           }
         }
-        /* An empty $'' still produces one empty field, the way '' and "" each
-           keep an empty argument rather than dropping it. */
+        /* An empty $'' still produces one empty field, the way '' and "" do. */
         if (!did_emit_any)
           word.segments.push(
               WordSegment{WordSegment::Kind::LiteralText, String{}, false});
@@ -828,22 +801,18 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
       }
 
       /* $"..." is bash locale translation. With no message catalog it is the
-         plain double-quoted string, so the dollar is dropped and the following
-         quote lexes as an ordinary double quote, with expansions inside still
-         active. Inside an existing double quote a $" is a dollar then the close
-         quote, so this only fires at the top level. */
+         plain double-quoted string, so the dollar is dropped. Inside an
+         existing double quote a $" is a dollar then the close quote, so this
+         only fires at the top level. */
       if (next == '"' && is_bash_compatible() && !is_in_double_quotes) {
         continue;
       }
 
       if (next == '(') {
-        /* Command substitution. Scan to the matching close paren, honoring
-           quotes and nesting so an inner ) does not end it early. */
         byte_count++;
 
-        /* $(( starts arithmetic expansion. Scan to the matching )), allowing
-           grouping parens inside. A subshell substitution is written with a
-           space, $( (cmd) ). */
+        /* $(( starts arithmetic expansion. A subshell substitution is written
+           with a space, $( (cmd) ). */
         if (chop_character(byte_count) == '(') {
           byte_count++;
           let arithmetic = String{};
@@ -909,9 +878,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
                 if (b == '`') break;
               }
             } else if (c == '$' && chop_character(byte_count + 1) == '(') {
-              /* Copy a nested $(...) or $((...)) by paren balance, honoring
-                 quotes inside it so an inner ) within a string does not
-                 unbalance the count. */
+              /* Copy a nested $(...) by paren balance, honoring quotes inside
+                 so an inner ) within a string does not unbalance the count. */
               arithmetic += c;
               byte_count++;
               arithmetic += chop_character(byte_count);
@@ -980,7 +948,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         char quote = 0;
         /* Tracks the byte before the current one so an unquoted '#' that starts
            a word can be told from one inside a word. A zero sentinel marks the
-           start of the substitution, where a '#' also starts a word. */
+           start of the substitution. */
         char previous_char = 0;
         loop
         {
@@ -1016,8 +984,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             continue;
           }
           /* An unquoted '#' at a word boundary begins a comment that runs to
-             the next newline, the same as the main lexer's skip_whitespace. A
-             ')' inside the comment is text, so it must not close the
+             the next newline, so a ')' inside it must not close the
              substitution. The comment bytes are kept in inner since the inner
              lexer skips them again when it re-lexes the captured source. */
           if (c == '#' &&
@@ -1052,8 +1019,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         byte_count++;
         let name = String{};
         /* A ${ followed by whitespace is the bash 5.3 funsub, a command body
-           that runs in the current shell, riding every mood but POSIX like
-           the other pure additions. The leading whitespace drops and the
+           that runs in the current shell. The leading whitespace drops and the
            same balanced walk below finds the close brace. */
         bool is_function_substitution = false;
         if (bash_additions_enabled()) {
@@ -1066,9 +1032,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         }
         /* The matching close brace lives at brace depth one, so a nested ${...}
            does not end the outer expansion early. A bare { does not raise the
-           depth, matching dash. A nested $(...), $((...)), or backtick is
-           copied as a balanced unit, and a quote run or backslash escape keeps
-           its bytes literal, so a } inside any of them is never counted. */
+           depth, matching dash. A nested $(...), backtick, quote run, or
+           backslash escape keeps a } inside it from being counted. */
         usize brace_depth = 1;
         char quote = 0;
         loop
@@ -1127,9 +1092,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             continue;
           }
           if (c == '$' && chop_character(byte_count) == '(') {
-            /* Copy a nested $(...) or $((...)) by paren balance, honoring
-               quotes inside it so an inner ) within a string does not unbalance
-               the count. */
+            /* Copy a nested $(...) by paren balance, honoring quotes inside so
+               an inner ) within a string does not unbalance the count. */
             name += c;
             name += chop_character(byte_count);
             byte_count++;
@@ -1179,10 +1143,10 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             byte_count++;
             continue;
           }
-          /* The funsub body is command text, so a bare { opens a function
-             body or a brace group whose } must not close the substitution,
-             while a variable reference keeps the dash reading where only a
-             nested ${ raises the depth. */
+          /* The funsub body is command text, so a bare { opens a function body
+             or a brace group whose } must not close the substitution, while a
+             variable reference keeps the dash reading where only a nested ${
+             raises the depth. */
           if (c == '{' && is_function_substitution) {
             brace_depth++;
             name += c;
@@ -1217,7 +1181,6 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
                                        steal(special), is_in_double_quotes});
       } else {
-        /* A dollar sign that names None stays a literal dollar sign. */
         do_append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
                                            : WordSegment::Kind::UnquotedText,
                        '$');
@@ -1226,12 +1189,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     }
 
     if (ch == '`') {
-      /* A backtick here opens an old-style command substitution, unquoted or
-         inside double quotes where it stays active. The region runs to the next
-         unescaped backtick, and the POSIX backquote unescaping strips a
-         backslash before a backtick, a dollar sign, or another backslash. The
-         unescaped bytes reuse the same CommandSubstitution segment as $(...).
-       */
+      /* A backtick opens an old-style command substitution. The region runs to
+         the next unescaped backtick, and the POSIX backquote unescaping strips
+         a backslash before a backtick, a dollar sign, or another backslash. */
       const let relative_open_backtick_pos = byte_count;
       byte_count++;
       let inner = String{};
@@ -1290,10 +1250,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
   /* The token spans from the word's first byte over byte_count bytes, the
      continuation backslash and newline included, so the location starts at the
-     cursor rather than past the continuations. An earlier form shifted the
-     start by the continuation count, which moved a continued word's caret off
-     its first byte onto a later line. The keyword token macro reads this name
-     too, so it stays a local. */
+     cursor rather than past the continuations. */
   const let actual_cursor_position = m_cursor_position;
   ASSERT(actual_cursor_position <= m_source.length());
 
@@ -1315,8 +1272,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   } else if (word.segments.count() == 1 &&
              word.segments[0].kind == WordSegment::Kind::UnquotedText)
   {
-    /* A bare word may name a keyword. A quoted or escaped word never does, so
-       only a single unquoted segment qualifies. */
+    /* A quoted or escaped word never names a keyword, so only a single unquoted
+       segment qualifies. */
     const String &word_text = word.segments[0].text;
     if (const let kw =
             KEYWORDS.find(StringView{word_text.data(), word_text.count()}))
@@ -1338,12 +1295,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   return t;
 }
 
-/* Only single-character operators are defined here. Further parsing is done in
- * related routines. */
-
-/* The token kind a single operator character begins, or None when the
-   character is not an operator. The switch keeps this allocation free and the
-   compiler lowers it to a jump table. */
+/* The token kind a single operator character begins, or None when the character
+   is not an operator. */
 hot pure static fn lookup_operator(char ch) wontthrow -> Maybe<Token::Kind>
 {
   switch (ch) {
@@ -1415,8 +1368,7 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
       TOKEN_CASE_ONE(RightParen);
       TOKEN_CASE_ONE(LeftParen);
     /* ; is a separator, ;; ends a case arm, and the bash fall-through forms ;&
-       and ;;& continue into the next arm or keep matching. They are a pure
-       addition since dash rejects an & after a semicolon, so they stay on in
+       and ;;& continue into the next arm or keep matching. They stay on in
        every mode the way [[ ]] does. */
     case Token::Kind::Semicolon: {
       if (chop_character(1) == ';') {
@@ -1451,9 +1403,8 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
       TOKEN_CASE_TWO(LeftSquareBracket, '[', DoubleLeftSquareBracket);
       TOKEN_CASE_TWO(ExclamationMark, '=', ExclamationEquals);
     /* & is the background operator, && the logical and. &> and &>> redirect
-       both standard streams to a file, recognized before the plain & since
-       they change the POSIX meaning, so they ride every mood but POSIX the
-       way the other pure bash additions do. */
+       both standard streams to a file, recognized before the plain & and riding
+       every mood but POSIX. */
     case Token::Kind::Ampersand: {
       if (bash_additions_enabled() && chop_character(1) == '>') {
         if (chop_character(2) == '>') {
@@ -1475,8 +1426,7 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
     } break;
 
     /* | is a pipe, || the logical or. |& pipes both standard output and
-       standard error, the shorthand for 2>&1 |, riding every mood but POSIX
-       the way the other pure bash additions do. */
+       standard error, the shorthand for 2>&1 |, riding every mood but POSIX. */
     case Token::Kind::Pipe: {
       if (chop_character(1) == '|') {
         tok = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
@@ -1494,11 +1444,9 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
       TOKEN_CASE_THREE(Greater, '>', DoubleGreater, '=', GreaterEquals);
 
     /* < is input redirect, << a heredoc, <= a comparison. <<< is the bash
-       here-string, which feeds a single expanded word as standard input. It
-       changes the POSIX reading of << with a <word delimiter, so POSIX mode
-       keeps tokenizing << then <, while the default and bash moods read the
-       here-string the way the other pure bash additions ride the default
-       mood. */
+       here-string, which feeds a single expanded word as standard input. POSIX
+       mode keeps tokenizing << then <, while the default and bash moods read
+       the here-string. */
     case Token::Kind::Less: {
       if (chop_character(1) == '<') {
         if (chop_character(2) == '<' && bash_additions_enabled()) {
@@ -1523,8 +1471,6 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
     s += "Unknown operator '";
     s += ch;
     s += "'";
-    /* The caret spans the single unknown byte, since extra_length stays zero on
-       this path and a zero-width caret would point at nothing. */
     throw ErrorWithLocation{here(m_cursor_position, 1), s};
   }
 
@@ -1540,11 +1486,10 @@ hot forceinline fn Lexer::lex_process_substitution(char direction) throws
 {
   let const open_position = m_cursor_position;
   usize byte_count = 0;
-  byte_count++; /* the < or > */
-  byte_count++; /* the ( */
+  byte_count += 2;
 
-  /* The direction byte leads the segment text so the evaluator knows which way
-     the pipe runs without a second field. */
+  /* The direction byte leads the segment text so the evaluator knows the pipe
+     direction without a second field. */
   let inner = String{};
   inner += direction;
 
@@ -1604,4 +1549,4 @@ hot forceinline fn Lexer::lex_process_substitution(char direction) throws
   return t;
 }
 
-} /* namespace shit */
+} // namespace shit

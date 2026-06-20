@@ -59,7 +59,7 @@ hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
      promptly and control returns to the prompt. */
   if (os::INTERRUPT_REQUESTED) {
     os::INTERRUPT_REQUESTED = 0;
-    throw Error{"Interrupted"};
+    throw InterruptError{};
   }
   /* A trapped signal arrived since the last node, so its action runs here at
      the command boundary before the next node. The single flag keeps the common
@@ -354,7 +354,7 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
   return false;
 }
 
-} /* namespace */
+} // namespace
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
@@ -444,11 +444,8 @@ IfStatement::IfStatement(SourceLocation location, const Expression *condition,
 {
   ASSERT(condition != nullptr);
   ASSERT(then != nullptr);
-  /* And *otherwise may be nullptr. */
 }
 
-/* The condition, the then branch, and the else branch live in the arena, which
-   runs each node's destructor once on reset. */
 IfStatement::~IfStatement() = default;
 
 hot fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
@@ -457,8 +454,6 @@ hot fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
   ASSERT(m_then != nullptr);
 
   const i64 condition = m_condition->evaluate(cxt);
-  /* A jump set while evaluating the condition stops the if and stays pending.
-   */
   if (cxt.has_pending_control_flow()) return condition;
 
   LOG(Debug, "the if condition yielded %lld, running the %s branch",
@@ -621,9 +616,6 @@ cold fn is_test_numeric_operator_word(StringView op) wontthrow -> bool
          op == "-gt" || op == "-ge";
 }
 
-/* True when every segment of the word is plain text with no expansion, so the
-   runtime value equals the source text. Read by the constant-test and the
-   glob-pattern lints. */
 cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
 {
   for (let const &segment : word.segments)
@@ -636,17 +628,12 @@ cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
   return true;
 }
 
-/* True when an optional minus is followed by one or more digits and nothing
-   else, the operand shape the numeric test operators accept. */
 cold pure fn view_is_integer_literal(StringView view) wontthrow -> bool
 {
   usize start = view.length >= 1 && view[0] == '-' ? 1 : 0;
   return start < view.length && view.substring(start).is_all_decimal_digits();
 }
 
-/* True when the view carries the needle anywhere, the substring probe
-   StringView itself does not offer. Both sides are tiny lint inputs, so the
-   plain scan costs nothing measurable. */
 cold pure fn view_contains(StringView view, StringView needle) wontthrow -> bool
 {
   if (needle.length == 0 || needle.length > view.length) return false;
@@ -655,8 +642,6 @@ cold pure fn view_contains(StringView view, StringView needle) wontthrow -> bool
   return false;
 }
 
-/* Whether any operand names standard input explicitly, the - and /dev/stdin
-   spellings, the exemption the never-reads-stdin warnings share. */
 cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
     -> bool
 {
@@ -667,9 +652,6 @@ cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
   return false;
 }
 
-/* True when one of the leading short-option clusters carries the letter, the
-   way -rf carries r and f. A long option or a plain operand is not a
-   cluster. */
 cold fn args_have_short_flag(const ArrayList<const Token *> &args,
                              char letter) throws -> bool
 {
@@ -740,8 +722,6 @@ constexpr StaticStringMap<bool> SYSTEM_DIRECTORIES{
 cold fn SimpleCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
-  /* A missing command is only warned about, so the conditional context no
-     longer changes the prepass outcome for this node. */
   unused(is_unconditional);
 
   /* A constant $((...)) in any argument or assignment prefix is folded once by
@@ -851,7 +831,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         {
           actx.warn(m_args[i]->source_location(),
                     "A test reads an unquoted variable",
-                    "quote it to avoid an empty or split argument");
+                    "Quote it to avoid an empty or split argument");
           break;
         }
       }
@@ -868,7 +848,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   {
     actx.warn(source_location(),
               "A read without -r mangles a backslash in the input",
-              "add -r to read the line literally");
+              "Add -r to read the line literally");
   }
 
   /* The bashism lints, each fired only when the shebang names a POSIX shell so
@@ -892,20 +872,20 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                   "An echo " + view +
                       " relies on a bash builtin, the POSIX echo prints the "
                       "flag as text",
-                  "use printf instead under a sh shebang");
+                  "Use printf instead under a sh shebang");
       }
     }
     if (command_literal == "declare" || command_literal == "typeset")
       actx.warn(m_args[0]->source_location(),
                 StringView{"The "} + command_literal.view() +
                     " builtin is not in POSIX",
-                "assign the variable plainly under a sh shebang, or switch the "
+                "Assign the variable plainly under a sh shebang, or switch the "
                 "shebang to bash");
     if (command_literal == "source")
       actx.warn(m_args[0]->source_location(),
                 "The name source is the bash spelling, the POSIX dot command "
                 "is '.'",
-                "use '.' under a sh shebang");
+                "Use '.' under a sh shebang");
     if (command_literal == "local")
       actx.warn(m_args[0]->source_location(),
                 "The local builtin is not in POSIX sh, the value stays global",
@@ -944,22 +924,22 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   if (!command_is_shadowed) {
     if (command_literal == "egrep")
       actx.warn(m_args[0]->source_location(), "The egrep command is deprecated",
-                "use grep -E for the extended regular expression match");
+                "Use grep -E for the extended regular expression match");
     else if (command_literal == "fgrep")
       actx.warn(m_args[0]->source_location(), "The fgrep command is deprecated",
-                "use grep -F for the fixed string match");
+                "Use grep -F for the fixed string match");
     else if (command_literal == "expr")
       actx.warn(m_args[0]->source_location(),
                 "An expr forks for arithmetic the shell does natively",
-                "use $((...)) for the calculation");
+                "Use $((...)) for the calculation");
     else if (command_literal == "let")
       actx.warn(m_args[0]->source_location(),
                 "A let runs arithmetic as a command",
-                "use the ((...)) compound so the operands need no quoting");
+                "Use the ((...)) compound so the operands need no quoting");
     else if (command_literal == "local" && actx.function_scope_depth == 0)
       actx.warn(m_args[0]->source_location(),
                 "A local outside a function has no scope to bind",
-                "declare the variable plainly or move it into a function");
+                "Declare the variable plainly or move it into a function");
   }
 
   if (command_literal == "echo" && !command_is_shadowed &&
@@ -972,7 +952,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.warn(m_args[0]->source_location(),
                 "An echo of a command substitution prints what the command "
                 "already prints",
-                "run the command on its own instead");
+                "Run the command on its own instead");
     }
   }
 
@@ -999,7 +979,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.warn(m_args[1]->source_location(),
                 "The double-quoted trap action expands now, when the trap is "
                 "set, not when it fires",
-                "single-quote it so it expands as the signal arrives");
+                "Single-quote it so it expands as the signal arrives");
   }
 
   /* printf reads its format argument as the template, so a variable or a
@@ -1050,7 +1030,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         actx.warn(m_args[format_index]->source_location(),
                   "The printf format comes from a variable, the data can "
                   "inject format directives",
-                  "use printf '%s' to print it");
+                  "Use printf '%s' to print it");
     }
   }
 
@@ -1059,7 +1039,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      or alias named which is the user's own, so the lint is off for it. */
   if (command_literal == "which" && !command_is_shadowed) {
     actx.warn(m_args[0]->source_location(), "The which command is non-standard",
-              "use command -v for a portable lookup");
+              "Use command -v for a portable lookup");
   }
 
   /* An unquoted command substitution splits its captured output on IFS and
@@ -1092,7 +1072,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.warn(m_args[i]->source_location(),
                 "Declaring and assigning from a command substitution in one "
                 "command masks the command's exit status",
-                "split the declaration and the assignment so a failure is "
+                "Split the declaration and the assignment so a failure is "
                 "seen");
       break;
     }
@@ -1121,7 +1101,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
     actx.warn(m_args[i]->source_location(),
               "An unquoted command substitution splits its output",
-              "quote it to keep one argument");
+              "Quote it to keep one argument");
   }
 
   /* rm -r with a "$var/" operand deletes / outright when the variable is
@@ -1180,7 +1160,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         actx.warn(m_args[i]->source_location(),
                   "The unquoted grep pattern can glob against the local files "
                   "before grep sees it",
-                  "quote the pattern");
+                  "Quote the pattern");
       } else if (!view.is_empty() && view[0] == '*') {
         actx.warn(m_args[i]->source_location(),
                   "A grep reads a regular expression, where a leading * has "
@@ -1243,12 +1223,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (word.segments.count() == 1 && !segment.is_in_double_quotes) {
         actx.warn(m_args[i]->source_location(),
                   "An unquoted $@ word-splits and globs each argument",
-                  "quote it as \"$@\" to pass the arguments through unchanged");
+                  "Quote it as \"$@\" to pass the arguments through unchanged");
       } else if (word.segments.count() > 1) {
         actx.warn(m_args[i]->source_location(),
                   "$@ inside a longer word concatenates the surrounding text "
                   "onto the first and last argument",
-                  "use $* for one joined string or a separate \"$@\" word");
+                  "Use $* for one joined string or a separate \"$@\" word");
       }
       break;
     }
@@ -1281,7 +1261,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (!body_runs_more_than_echo)
         actx.warn(m_args[i]->source_location(),
                   "A command substitution wraps a useless echo",
-                  "the text can be used directly without the subshell");
+                  "The text can be used directly without the subshell");
     }
   }
 
@@ -1313,7 +1293,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         actx.warn(redirection.target->source_location(),
                   "2>&1 before the file redirect duplicates the terminal, so "
                   "stderr stays on the terminal",
-                  "put the file redirect first as in '>file 2>&1'");
+                  "Put the file redirect first as in '>file 2>&1'");
       }
       if (redirection.kind == Redirection::Kind::ReadInput &&
           redirection.target != nullptr &&
@@ -1339,7 +1319,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                     "The command reads and truncates '" + read_target.view() +
                         "' at once, the truncation empties the input before "
                         "it is read",
-                    "write to a temporary and move it over");
+                    "Write to a temporary and move it over");
         }
       }
     }
@@ -1399,13 +1379,13 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           !is_test_binary_operator_word(previous_literal.view()))
       {
         actx.warn(m_args[i]->source_location(), "== is undefined in POSIX test",
-                  "use = for string equality");
+                  "Use = for string equality");
       }
       let const previous_is_bang = previous_literal.view() == "!";
       if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
         actx.warn(m_args[i]->source_location(),
                   "A test with -a or -o is obsolescent",
-                  "join two tests with && or || instead");
+                  "Join two tests with && or || instead");
       } else if (view == "!" && i + 1 < m_args.count() &&
                  m_args[i + 1]->kind() == Token::Kind::Word)
       {
@@ -1414,10 +1394,10 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                              .to_literal_string();
         if (next.view() == "-z") {
           actx.warn(m_args[i]->source_location(), "A negated -z is just -n",
-                    "test with -n instead");
+                    "Test with -n instead");
         } else if (next.view() == "-n") {
           actx.warn(m_args[i]->source_location(), "A negated -n is just -z",
-                    "test with -z instead");
+                    "Test with -z instead");
         } else if (i + 2 < m_args.count() &&
                    m_args[i + 2]->kind() == Token::Kind::Word)
         {
@@ -1432,7 +1412,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
             actx.warn(m_args[i]->source_location(),
                       StringView{"A negated "} + op + " is just " +
                           inverse.value(),
-                      StringView{"drop the ! and use "} + inverse.value());
+                      StringView{"Drop the ! and use "} + inverse.value());
           }
         }
       }
@@ -1469,7 +1449,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (!(operand.view().length >= 1 && operand.view()[0] == '-')) {
         actx.warn(m_args[1]->source_location(),
                   "A one-operand test is the nonempty-string test",
-                  "write it with -n to read clearer");
+                  "Write it with -n to read clearer");
       }
     }
 
@@ -1496,7 +1476,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           actx.warn(m_args[i + 1]->source_location(),
                     "The operand is a literal, so this " + view +
                         " test is constant",
-                    "test a variable or drop the check");
+                    "Test a variable or drop the check");
       }
 
       if (is_test_numeric_operator_word(view)) {
@@ -1529,7 +1509,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
             actx.warn(m_args[i + 1]->source_location(),
                       "[ and test compare strings byte for byte and never "
                       "glob-match",
-                      "use a case or the [[ ]] form for the pattern");
+                      "Use a case or the [[ ]] form for the pattern");
           }
         }
       }
@@ -1542,7 +1522,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           actx.warn(m_args[i]->source_location(),
                     "The test buffers the whole grep output only to check it "
                     "is nonempty",
-                    "run grep -q directly and test its exit status");
+                    "Run grep -q directly and test its exit status");
           break;
         }
       }
@@ -1556,7 +1536,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       {
         actx.warn(m_args[i]->source_location(),
                   "Testing $? checks the exit status indirectly",
-                  "test the command directly with if or && so an intervening "
+                  "Test the command directly with if or && so an intervening "
                   "command cannot clobber the status");
       }
     }
@@ -1611,7 +1591,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     if (Maybe<String> suggestion =
             utils::suggest_command(StringView{*name}, local_names))
     {
-      suggestion_note = "did you mean '" + *suggestion + "'?";
+      suggestion_note = "Did you mean '" + *suggestion + "'?";
     }
     /* Point at the command word, not at the whole command. With an assignment
        prefix the command location is the assignment, not the program name. A
@@ -1722,7 +1702,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
             !actx.known_aliases.contains(name->view()) && file_is_plain_operand)
         {
           actx.warn(cat_args[0]->source_location(), "A useless cat",
-                    "give the file to the next command directly instead of "
+                    "Give the file to the next command directly instead of "
                     "piping cat");
         }
       }
@@ -1760,7 +1740,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
       if (!has_null_flag)
         actx.warn(next->args()[0]->source_location(),
                   "An xargs splits the find output on whitespace and quotes",
-                  "pair find -print0 with xargs -0 or use find -exec");
+                  "Pair find -print0 with xargs -0 or use find -exec");
     }
 
     if (!next_is_user && NON_STDIN_READERS.find(next_name->view()).has_value())
@@ -1785,7 +1765,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
       actx.warn(next->args()[0]->source_location(),
                 "Grepping the ps output races the process table and matches "
                 "the grep itself",
-                "use pgrep to match a process by name");
+                "Use pgrep to match a process by name");
 
     /* ls piped into grep parses the formatted listing, which mangles a name
        with a space or a newline, shellcheck SC2010, use a glob or find. */
@@ -1793,7 +1773,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
       actx.warn(next->args()[0]->source_location(),
                 "Grepping the ls listing mangles a name with a space or a "
                 "newline",
-                "match the names with a glob or with find instead");
+                "Match the names with a glob or with find instead");
 
     /* grep whose output only feeds wc -l counts matches with a second
        process, shellcheck SC2126, use grep -c. */
@@ -1804,7 +1784,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
     {
       actx.warn(stage->args()[0]->source_location(),
                 "Counting grep output with wc -l runs an extra process",
-                "use grep -c to count the matching lines directly");
+                "Use grep -c to count the matching lines directly");
     }
   }
 
@@ -1907,13 +1887,11 @@ cold fn IfStatement::register_defined_functions(
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
 
-  /* The condition and both branches run in the current shell, so a function
-     defined in any of them is registered before the ordered walk. */
   m_condition->register_defined_functions(actx);
   m_then->register_defined_functions(actx);
   if (m_otherwise != nullptr) m_otherwise->register_defined_functions(actx);
 }
 
-} /* namespace expressions */
+} // namespace expressions
 
-} /* namespace shit */
+} // namespace shit

@@ -8,10 +8,9 @@ namespace shit {
 
 /* A short byte string packed into a fixed sixteen-byte block held in two
    machine words. A lookup compares two integers rather than walking bytes,
-   which the compiler lowers to a couple of wide register compares, and the
-   layout is contiguous so a later pass can scan many keys with one SIMD
-   instruction. A key longer than sixteen bytes keeps only its first sixteen
-   bytes here and relies on a full compare to disambiguate. */
+   which the compiler lowers to a couple of wide register compares. A key longer
+   than sixteen bytes keeps only its first sixteen bytes here and relies on a
+   full compare to disambiguate. */
 class PackedStringKey
 {
 public:
@@ -55,9 +54,8 @@ public:
   }
 
   /* Unpack the bytes back into a String, stopping at the first NUL or the
-     sixteen-byte limit. A key built from a name with no embedded NUL and no
-     more than sixteen bytes round-trips exactly, which holds for every builtin
-     name. */
+     sixteen-byte limit. A key with no embedded NUL and no more than sixteen
+     bytes round-trips exactly, which holds for every builtin name. */
   cold mustuse fn to_string() const throws -> String
   {
     char buffer[16];
@@ -85,7 +83,7 @@ public:
   }
 };
 
-} /* namespace shit */
+} // namespace shit
 
 /* Build a PackedStringKey from a string literal at compile time, so a static
    StaticStringMap entry reads as SSK("name") rather than the full call. */

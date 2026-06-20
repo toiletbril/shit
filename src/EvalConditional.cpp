@@ -1,3 +1,4 @@
+#include "Builtin.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -8,9 +9,8 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-/* POSIX regcomp and regexec back the [[ =~ operator. The release build drops
-   libstdc++, so std::regex is unavailable and the libc regex is used instead.
- */
+/* POSIX regcomp and regexec back the [[ =~ operator, since the release build
+   drops libstdc++ and std::regex with it. */
 #if SHIT_PLATFORM_IS POSIX
 #include <regex.h>
 #endif
@@ -27,17 +27,16 @@ namespace {
 
 /* A recursive-descent evaluator over the [[ ]] element list. The grammar joins
    primaries with && and ||, allows ! and parentheses, and reads unary and
-   binary primaries the way the double-bracket conditional does, with no field
-   splitting on the operands. */
+   binary primaries with no field splitting on the operands. */
 struct ConditionalEvaluator
 {
   EvalContext &cxt;
   const ArrayList<conditional_element> &elements;
   usize pos = 0;
   /* When a && or || branch is already decided, the other side is parsed to
-     advance past its tokens but not evaluated, so a glob, a regex, a bad
-     integer, or a command substitution on the dead branch runs no side effect
-     and raises no evaluation error, the way bash short-circuits [[ ]]. */
+     advance past its tokens but not evaluated, so a glob, regex, bad integer,
+     or command substitution on the dead branch runs no side effect and raises
+     no error, the way bash short-circuits [[ ]]. */
   bool is_skipping = false;
 
   using Kind = conditional_element::Kind;
@@ -45,8 +44,6 @@ struct ConditionalEvaluator
   pure bool at_end() const wontthrow { return pos >= elements.count(); }
   pure Kind kind_at(usize i) const wontthrow { return elements[i].kind; }
 
-  /* The literal text of the token the evaluator stopped before, so an error
-     names what was unexpected rather than leaving the reader to guess. */
   String unexpected_token() throws
   {
     return at_end() ? String{} : operand_literal(elements[pos]);
@@ -65,9 +62,9 @@ struct ConditionalEvaluator
     return String{heap_allocator()};
   }
 
-  /* The expanded value of an operand, with no field splitting. The expansion
-     throws a plain Error, an unset variable under set -u, so it is relocated to
-     a caret at the operand the way process_args locates a command argument. */
+  /* The expanded value of an operand, with no field splitting. A thrown Error,
+     such as an unset variable under set -u, is relocated to a caret at the
+     operand. */
   String operand_value(const conditional_element &e) throws
   {
     if (e.word != nullptr && e.word->kind() == Token::Kind::Word) {
@@ -83,8 +80,8 @@ struct ConditionalEvaluator
   }
 
   /* The right side of == or != is a pattern, so it expands with a parallel mask
-     that marks which *, ?, and [ stay active. A quoted or escaped metacharacter
-     is masked off and matches literally, the way bash treats a quoted RHS. */
+     marking which *, ?, and [ stay active. A quoted or escaped metacharacter is
+     masked off and matches literally. */
   String operand_pattern_masked(const conditional_element &e,
                                 ArrayList<bool> &active) throws
   {
@@ -119,8 +116,6 @@ struct ConditionalEvaluator
            s == "-ef" || s == "-nt" || s == "-ot";
   }
 
-  /* The extended-regex metacharacters, escaped to a literal when a quoted byte
-     of the pattern must match itself. */
   static pure bool is_regex_metacharacter(char c) wontthrow
   {
     return c == '.' || c == '^' || c == '$' || c == '*' || c == '+' ||
@@ -128,21 +123,17 @@ struct ConditionalEvaluator
            c == '{' || c == '}' || c == '|' || c == '\\';
   }
 
-  /* The =~ operator matches the value against an extended regular expression. A
-     POSIX regcomp with the extended grammar mirrors the ERE bash uses, and a
-     search rather than a full match finds the pattern anywhere in the value,
-     the way [[ =~ does. On a match BASH_REMATCH is filled with the whole match
-     at index 0 and each capture group after it, an unmatched group reading as
-     an empty string the way bash leaves it. */
+  /* The =~ operator searches the value for an extended regular expression,
+     finding the pattern anywhere in it. On a match BASH_REMATCH holds the whole
+     match at index 0 and each capture group after it, an unmatched group
+     reading as an empty string. */
   bool regex_match(StringView value, StringView pattern,
                    const ArrayList<bool> &active) throws
   {
 #if SHIT_PLATFORM_IS POSIX
     /* A byte the mask marks inactive came from a quoted or escaped part of the
-       right operand, so a regex metacharacter there is backslash-escaped to
-       match itself, the way bash matches a quoted portion of the operand
-       literally. An active byte stays live regex. The escaped pattern is the
-       cache key, built null-terminated for the regcomp a miss runs. */
+       operand, so a regex metacharacter there is backslash-escaped to match
+       itself. The escaped pattern is the cache key. */
     let escaped_pattern = String{cxt.scratch_allocator()};
     for (usize i = 0; i < pattern.length; i++) {
       const bool is_literal = i < active.count() && !active[i];
@@ -151,10 +142,9 @@ struct ConditionalEvaluator
       }
       escaped_pattern += pattern[i];
     }
-    /* The pattern compiles once and is reused on later matches through the
-       context cache, so a hot =~ loop pays regcomp only the first time. regexec
-       reads a C string, so the value is copied into a null-terminated buffer.
-     */
+    /* The pattern is reused through the context cache, so a hot =~ loop pays
+       regcomp only the first time. regexec reads a C string, so the value is
+       copied into a null-terminated buffer. */
     regex_t *compiled = cxt.cached_compiled_regex(escaped_pattern.view());
     let const value_text = String{cxt.scratch_allocator(), value};
     let const group_count = compiled->re_nsub + 1;
@@ -166,8 +156,7 @@ struct ConditionalEvaluator
     LOG(All, "the =~ regex %s the value",
         match_result == 0 ? "matched" : "did not match");
     if (match_result == REG_NOMATCH) {
-      /* bash clears BASH_REMATCH on a non-match, so a later read does not see a
-         prior match's captures. */
+      /* bash clears BASH_REMATCH on a non-match. */
       cxt.set_indexed_array("BASH_REMATCH",
                             ArrayList<String>{heap_allocator()});
       return false;
@@ -233,10 +222,9 @@ struct ConditionalEvaluator
       let const size = path.file_size();
       return size.has_value() && size.value() > 0;
     }
-    /* -t tests whether a file descriptor is an open terminal, the way a script
-       gates an interactive feature on a real tty. Any descriptor is checked,
-       not only the standard three, since a config such as ble.sh dups the
-       controlling terminal onto a higher descriptor and tests that. */
+    /* -t tests whether a file descriptor is an open terminal. Any descriptor is
+       checked, not only the standard three, since a config such as ble.sh dups
+       the controlling terminal onto a higher descriptor and tests that. */
     if (op == "-t") {
       if (ErrorOr<i64> descriptor = utils::parse_decimal_integer(operand);
           !descriptor.is_error())
@@ -248,21 +236,29 @@ struct ConditionalEvaluator
 #else
         return os::is_fd_a_tty(static_cast<os::descriptor>(descriptor.value()));
 #endif
-      /* bash reports a non-integer -t operand as an error with status 2 and
-         goes on, so the throw carries that status for the command-level
-         catch. */
+      /* bash reports a non-integer -t operand with status 2, so the throw
+         carries that status for the command-level catch. */
       let error = Error{"Unable to test '-t " + operand +
                         "' because the operand is not an integer"};
       error.set_command_status(2);
       throw error;
     }
-    /* -o tests a shell option by name. Only the emacs line-editing option is
-       reported, as on, since shit's interactive editing is emacs style. Every
-       other option name reads as off for now, so a config that gates on the
-       editing mode such as ble.sh sees emacs and proceeds. */
-    if (op == "-o") return operand == "emacs";
-    /* The remaining file-type tests fall back to existence, which covers the
-       common scripts without a full stat-mode surface. */
+    if (op == "-h" || op == "-L") return path.is_symbolic_link();
+    if (op == "-b") return path.is_block_device();
+    if (op == "-c") return path.is_character_device();
+    if (op == "-p") return path.is_fifo();
+    if (op == "-S") return path.is_socket();
+    if (op == "-g") return path.has_setgid_bit();
+    if (op == "-u") return path.has_setuid_bit();
+    if (op == "-k") return path.has_sticky_bit();
+    if (op == "-O") return path.is_owned_by_effective_user();
+    if (op == "-G") return path.is_owned_by_effective_group();
+    /* -o tests a shell option by name. The emacs line-editing pseudo-option has
+       no set toggle, so it answers on. An unknown name reads off. */
+    if (op == "-o") {
+      if (operand == "emacs") return true;
+      return query_shell_option(cxt, operand).value_or(false);
+    }
     return path.exists();
   }
 
@@ -272,10 +268,9 @@ struct ConditionalEvaluator
     if (op == "-nt") return Path{left}.is_newer_than(Path{right});
     if (op == "-ot") return Path{left}.is_older_than(Path{right});
 
-    /* The arithmetic comparison operands are full arithmetic expressions in
-       bash, so 1+1 and a bare variable name evaluate rather than only a literal
-       integer. An empty operand reads as zero the way an arithmetic context
-       treats an unset value. */
+    /* The arithmetic comparison operands are full arithmetic expressions, so
+       1+1 and a bare variable name evaluate rather than only a literal integer.
+       An empty operand reads as zero. */
     let const do_to_number = [&](StringView operand) throws -> i64 {
       for (usize i = 0; i < operand.length; i++) {
         if (operand[i] != ' ' && operand[i] != '\t')
@@ -305,18 +300,15 @@ struct ConditionalEvaluator
 
     const String first_literal = operand_literal(first);
 
-    /* A unary operator followed by an operand. */
     if (is_unary_op(first_literal.view()) && pos + 1 < elements.count() &&
         kind_at(pos + 1) == Kind::Operand)
     {
       pos += 2;
       if (is_skipping) return false;
-      /* The -v existence test reads whether its operand is set, so the
-         unset-variable diagnostic stays silent while the operand, its
-         subscript, and the test itself expand, the way bash does not nounset
-         the operand of -v. The prior value is saved and a defer restores it, so
-         a throw from the operand expansion cannot strand the suppression on and
-         a nested -v test puts back the outer value rather than clearing it. */
+      /* bash does not nounset the operand of -v, so the unset-variable
+         diagnostic stays silent while it expands. The defer restores the prior
+         value, so a throw cannot strand the suppression on and a nested -v test
+         puts back the outer value. */
       const bool is_existence_test = first_literal.view() == "-v";
       const bool saved_suppress_unset =
           cxt.is_warning_suppressed(suppressible_warning::UnsetReference);
@@ -331,8 +323,6 @@ struct ConditionalEvaluator
       return eval_unary(first_literal.view(), operand.view());
     }
 
-    /* A binary primary, with the operator either a < or > angle or a word
-       operator such as == or -eq. */
     if (pos + 1 < elements.count()) {
       const Kind next = kind_at(pos + 1);
       if (next == Kind::Less || next == Kind::Greater) {
@@ -353,8 +343,8 @@ struct ConditionalEvaluator
           pos += 3;
           if (is_skipping) return false;
           const String left = operand_value(elements[pos - 3]);
-          /* == and != glob-match, and =~ regex-matches, with a quoting mask, so
-             a quoted metacharacter of the right operand matches literally. The
+          /* == and != glob-match and =~ regex-matches with a quoting mask, so a
+             quoted metacharacter of the right operand matches literally. The
              other binary operators read a plain string right operand. */
           if (op == "==" || op == "=" || op == "!=") {
             let active = ArrayList<bool>{cxt.scratch_allocator()};
@@ -385,7 +375,6 @@ struct ConditionalEvaluator
       }
     }
 
-    /* A lone operand is true when it is non-empty. */
     pos++;
     if (is_skipping) return false;
     const String value = operand_value(elements[pos - 1]);
@@ -414,7 +403,7 @@ struct ConditionalEvaluator
     bool and_result = eval_term();
     while (!at_end() && kind_at(pos) == Kind::And) {
       pos++;
-      /* A false left already decides the and, so the right is parsed without
+      /* A false left decides the and, so the right is parsed without
          evaluation. The skip nests, so an outer skip stays set. */
       const bool was_skipping = is_skipping;
       is_skipping = is_skipping || !and_result;
@@ -430,8 +419,6 @@ struct ConditionalEvaluator
     bool or_result = eval_and();
     while (!at_end() && kind_at(pos) == Kind::Or) {
       pos++;
-      /* A true left already decides the or, so the right is parsed without
-         evaluation. */
       const bool was_skipping = is_skipping;
       is_skipping = is_skipping || or_result;
       const bool rhs = eval_and();
@@ -442,28 +429,26 @@ struct ConditionalEvaluator
   }
 };
 
-} /* namespace */
+} // namespace
 
 #if SHIT_PLATFORM_IS POSIX
 /* The most distinct regex patterns the cache holds before it is cleared, so a
-   pathological loop that builds a fresh pattern every iteration stays bounded
-   rather than growing the table without end. A real script reuses a handful. */
+   loop that builds a fresh pattern every iteration stays bounded. */
 static constexpr usize REGEX_CACHE_CAP = 128;
 
 fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
 {
-  /* The key is the pattern text alone, which is sound only because compilation
-     depends on nothing else, the flags are always REG_EXTENDED. A future option
-     that changes compilation, such as REG_ICASE for nocasematch, must fold into
-     the key so two intended compilations of one pattern do not collide. */
+  /* The key is the pattern text alone, sound only because the flags are always
+     REG_EXTENDED. A future option that changes compilation, such as REG_ICASE
+     for nocasematch, must fold into the key or two compilations collide. */
   if (CompiledRegex *cached = m_regex_cache.find(pattern)) {
     LOG(All, "regex cache hit for the pattern '%.*s'",
         static_cast<int>(pattern.length), pattern.data);
     return cached->get();
   }
 
-  /* A bounded miss path. When the cache is full it is cleared whole, which
-     frees every compiled entry, rather than tracking a per-entry age. */
+  /* When the cache is full it is cleared whole rather than tracking a per-entry
+     age. */
   if (m_regex_cache.count() >= REGEX_CACHE_CAP) {
     LOG(Debug, "regex cache full, dropping %zu compiled patterns",
         m_regex_cache.count());
@@ -475,10 +460,8 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
   let const pattern_text = String{scratch_allocator(), pattern};
   regex_t compiled;
   if (regcomp(&compiled, pattern_text.c_str(), REG_EXTENDED) != 0) {
-    /* bash returns status 2 for a malformed regex, which the conditional turns
-       into an evaluation error. The pattern is named so the message points at
-       the offending expression, and the caller relocates the caret onto the
-       regex operand. */
+    /* bash returns status 2 for a malformed regex. The pattern is named so the
+       message points at the offending expression. */
     let message = String{scratch_allocator()};
     message += "Unable to evaluate the [[ ]] because the regular expression '";
     message += pattern;
@@ -510,4 +493,4 @@ fn EvalContext::evaluate_conditional(
   return is_conditional_true;
 }
 
-} /* namespace shit */
+} // namespace shit

@@ -67,6 +67,6 @@ fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
   return any_signaled ? 0 : 1;
 }
 
-} /* namespace shitbox */
+} // namespace shitbox
 
-} /* namespace shit */
+} // namespace shit

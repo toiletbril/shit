@@ -6,9 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* bg resumes a stopped job in the background. With no operand it acts on the
-   most recent job. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[%job]");
@@ -62,4 +59,4 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} // namespace shit

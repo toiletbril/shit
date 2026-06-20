@@ -7,11 +7,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* newgrp changes the real and effective group of the shell, which a process can
-   only do by re-execing, so it hands off to the system newgrp program the way a
-   login shell does. The program sets the group and starts a fresh shell, so
-   newgrp never returns on success. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[group]");
@@ -69,4 +64,4 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 }
 
-} /* namespace shit */
+} // namespace shit

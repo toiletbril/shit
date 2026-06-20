@@ -7,10 +7,8 @@
 namespace shit {
 
 /* A command name resolved to what runs it, either a builtin chosen by its Kind
-   or an external program at a Path. This is the specific two-case struct that
-   replaces a std::variant of the two, so the discriminant and the payload read
-   plainly and carry no library machinery. The unused payload of the inactive
-   case stays default-constructed, which is cheap for both a Kind and an empty
+   or an external program at a Path. The unused payload of the inactive case
+   stays default-constructed, which is cheap for both a Kind and an empty
    Path. */
 class ResolvedCommand
 {
@@ -19,10 +17,10 @@ public:
   {
     Builtin,
     Program,
-    /* A command that did not resolve to a builtin or a program. It is built
-       only for a pipeline stage whose command was not found, so the stage runs
-       nothing and yields 127 while the rest of the pipeline still runs,
-       matching bash. The single-command path throws CommandNotFound instead. */
+    /* A command that did not resolve to a builtin or a program, built only for
+       a pipeline stage whose command was not found, so the stage yields 127
+       while the rest of the pipeline still runs. The single-command path throws
+       CommandNotFound instead. */
     Unresolved,
   };
 
@@ -57,4 +55,4 @@ public:
   mustuse bool is_unresolved() const { return kind == Kind::Unresolved; }
 };
 
-} /* namespace shit */
+} // namespace shit

@@ -10,22 +10,17 @@
 
 namespace shit {
 
-/* The owning filesystem path this shell uses in place of std::filesystem::path.
-   The text is a String, so a path carries no std::string and no heavyweight
-   library. Pure-text questions, such as the parent or the filename, are
-   answered by scanning the bytes. Questions that touch the disk, such as exists
-   or is_directory, go through one syscall each rather than the std::filesystem
-   machinery, which the shell measured as slow. The separator is the platform
-   one, and a forward slash is always accepted on input so a script written for
-   POSIX keeps working on Windows. */
+/* The owning filesystem path this shell uses. Pure-text questions, such as the
+   parent or the filename, are answered by scanning the bytes, while questions
+   that touch the disk go through one syscall each. The separator is the
+   platform one, and a forward slash is always accepted on input so a script
+   written for POSIX keeps working on Windows. */
 class Path
 {
 public:
   Path() = default;
   explicit Path(StringView text);
 
-  /* An explicit deep copy, so a caller that means to duplicate the path says so
-     rather than leaning on an implicit copy. */
   mustuse fn clone() const throws -> Path { return Path{*this}; }
 
   hot mustuse pure fn text() const wontthrow -> const String &;
@@ -38,8 +33,8 @@ public:
   mustuse fn parent() const throws -> Path;
   /* The final component, after the last separator. */
   mustuse pure fn filename() const wontthrow -> StringView;
-  /* The trailing extension of the filename including the dot, or empty when the
-     filename has none. A leading dot does not start an extension. */
+  /* The trailing extension of the filename including the dot, or empty when
+     none. A leading dot does not start an extension. */
   mustuse pure fn extension() const wontthrow -> StringView;
 
   /* True when the path starts at a root, a leading separator on POSIX or a
@@ -47,8 +42,8 @@ public:
   mustuse pure fn is_absolute() const wontthrow -> bool;
   mustuse pure fn is_relative() const wontthrow -> bool;
 
-  /* Resolve . and .. components and collapse repeated separators, the
-     std::filesystem lexically_normal without touching the disk. */
+  /* Resolve . and .. components and collapse repeated separators, without
+     touching the disk. */
   cold mustuse fn normalized() const throws -> Path;
 
   /* This path joined onto a base when it is relative, the base being the
@@ -76,6 +71,14 @@ public:
   mustuse fn is_character_device() const wontthrow -> bool;
   mustuse fn is_fifo() const wontthrow -> bool;
   mustuse fn is_socket() const wontthrow -> bool;
+  /* The permission and ownership tests the test builtin's -g -u -k -O -G
+     primaries need. Each is always false on Windows where the bit has no
+     equivalent. */
+  mustuse fn has_setuid_bit() const wontthrow -> bool;
+  mustuse fn has_setgid_bit() const wontthrow -> bool;
+  mustuse fn has_sticky_bit() const wontthrow -> bool;
+  mustuse fn is_owned_by_effective_user() const wontthrow -> bool;
+  mustuse fn is_owned_by_effective_group() const wontthrow -> bool;
   mustuse fn file_size() const wontthrow -> Maybe<u64>;
   /* The mtime in whole seconds, None when the path is missing, the staleness
      key the completion target caches refresh on. */
@@ -87,16 +90,15 @@ public:
   mustuse fn is_executable() const wontthrow -> bool;
 
   /* The two-file comparisons the test builtin's -ef, -nt, and -ot ask for. Each
-     stats both paths and reads false when either path is missing, the way dash
-     reports a comparison against an absent file. is_same_file_as matches when
-     the two name one file, equal device and inode. */
+     stats both paths and reads false when either path is missing.
+     is_same_file_as matches when the two name one file, equal device and
+     inode. */
   mustuse fn is_same_file_as(const Path &other) const wontthrow -> bool;
   mustuse fn is_newer_than(const Path &other) const wontthrow -> bool;
   mustuse fn is_older_than(const Path &other) const wontthrow -> bool;
 
   hot mustuse pure fn operator==(const Path &other) const wontthrow->bool;
 
-  /* The working directory of the process. */
   cold mustuse static fn current_directory() throws -> Path;
   static fn set_current_directory(const Path &path) throws -> ErrorOr<Ok>;
   /* The directory for temporary files, from TMPDIR or a platform default. */
@@ -135,21 +137,20 @@ public:
 
   /* Resolve a path against the filesystem, rooting a relative path that holds a
      slash, normalizing it, and trying the omitted command suffixes on a name
-     with no extension. None when nothing on disk matches. */
+     with no extension. */
   mustuse static fn canonicalize(StringView path) throws -> Maybe<Path>;
 
   /* The shell this file's shebang names, for the mimicry feature, or None when
-     it is not a script shit can emulate. Only the first line is read. A sh or
-     dash interpreter maps to Posix, bash to Bash, and shit to Default,
-     including the /usr/bin/env form. */
+     it is not a script shit can emulate. A sh or dash interpreter maps to
+     Posix, bash to Bash, and shit to Default, including the /usr/bin/env form.
+   */
   mustuse fn detect_mimic_shell() const throws -> Maybe<mimic_mood>;
 
 private:
   String m_text{};
 };
 
-/* A small builder for assembling a path from a root and a run of components,
-   so a caller spells the intent rather than juggling separators by hand. */
+/* A small builder for assembling a path from a root and a run of components. */
 class PathBuilder
 {
 public:
@@ -168,4 +169,4 @@ private:
   String m_text{};
 };
 
-} /* namespace shit */
+} // namespace shit

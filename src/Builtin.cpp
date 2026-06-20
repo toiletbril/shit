@@ -202,8 +202,8 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
     show_message(located.to_string(source->view()));
   else
     print_error(String{"shit: "} + program_name + ": Not enough arguments.\n");
-  show_message(
-      Note{String{program_name} + " --help for more info"}.to_string());
+  show_message(Note{String{"Try `"} + program_name + " --help` for more info"}
+                   .to_string());
   return 2;
 }
 

@@ -1,0 +1,20 @@
+== a fifo is -p, a plain file is not:
+fifo-yes
+plain-not-fifo
+== /dev/null is a character device, a plain file is not:
+char-yes
+plain-not-char
+== a plain file is neither a block device nor a socket:
+blk-no
+sock-no
+== -O reports the file is owned by the effective user:
+owned
+== -o reads the real state of a shell option:
+pipefail-on
+pipefail-off
+emacs-on
+unknown-off
+== the [ ] builtin agrees with [[ ]] on the file-type primaries:
+bracket-fifo-yes
+bracket-setuid-no
+bracket-owned

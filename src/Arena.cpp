@@ -81,8 +81,7 @@ hot fn BumpArena::owns(const void *pointer) const wontthrow -> bool
 {
   let const candidate = static_cast<const u8 *>(pointer);
   /* The live tree allocates from the most recent block, so the scan runs back
-     to front and the common hit returns on the first compare rather than after
-     walking every earlier block. */
+     to front and the common hit returns on the first compare. */
   for (usize i = m_blocks.count(); i > 0; i--) {
     const block &block = m_blocks[i - 1];
     if (candidate >= block.base && candidate < block.base + block.size) {
@@ -114,8 +113,7 @@ fn BumpArena::release(Mark saved) wontthrow -> void
   run_destructors_down_to(saved.destructor_count);
 
   /* Reset the bump pointer to the marked position, keeping the blocks so a loop
-     body reuses the same storage each turn instead of asking the system again.
-     The blocks past the mark stay allocated but become free space. */
+     body reuses the same storage each turn. */
   for (usize i = saved.block_count; i < m_blocks.count(); i++)
     m_blocks[i].used = 0;
 
@@ -145,4 +143,4 @@ cold fn BumpArena::reset() wontthrow -> void
   if (!m_blocks.is_empty()) m_blocks.front().used = 0;
 }
 
-} /* namespace shit */
+} // namespace shit
