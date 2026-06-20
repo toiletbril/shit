@@ -88,7 +88,9 @@ fn resolve_jobspec(const ArrayList<job> &jobs, StringView spec) throws
 {
   if (jobs.is_empty()) return shit::None;
   StringView body = spec;
-  if (!body.is_empty() && body[0] == '%') body = body.substring(1);
+  if (!body.is_empty() && body[0] == '%') {
+    body = body.substring(1);
+  }
   if (body.is_empty() || body == "+" || body == "%") return jobs.count() - 1;
   if (body == "-")
     return jobs.count() >= 2 ? jobs.count() - 2 : jobs.count() - 1;

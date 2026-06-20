@@ -4,7 +4,7 @@ rc=1
 reached
 rc=0
 == an unknown mood is rejected:
-shit: 1:1: error: Builtin 'set': unknown --mood value 'badmood', expected 'shit', 'bash', or 'sh'.
+shit: 1:1: error: Builtin 'set': Unknown --mood value 'badmood', expected 'shit', 'bash', or 'sh'.
      1 |  set --mood badmood
        |  ^~~~~~~~~~~~~~~~~~ here.
 rc=1

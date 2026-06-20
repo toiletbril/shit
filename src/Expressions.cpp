@@ -400,8 +400,9 @@ fn analyze_ast(const Expression *root, StringView source,
     {
       interpreter_is_sh = true;
     }
-    if (contains_dash || (interpreter_is_sh && !contains_bash))
+    if (contains_dash || (interpreter_is_sh && !contains_bash)) {
       actx.shebang_is_posix_sh = true;
+    }
   }
 
   LOG(Debug, "analyzing the ast, the posix sh shebang gate is %s",
@@ -639,11 +640,8 @@ cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
    else, the operand shape the numeric test operators accept. */
 cold pure fn view_is_integer_literal(StringView view) wontthrow -> bool
 {
-  usize i = view.length >= 1 && view[0] == '-' ? 1 : 0;
-  if (i >= view.length) return false;
-  for (; i < view.length; i++)
-    if (view[i] < '0' || view[i] > '9') return false;
-  return true;
+  usize start = view.length >= 1 && view[0] == '-' ? 1 : 0;
+  return start < view.length && view.substring(start).is_all_decimal_digits();
 }
 
 /* True when the view carries the needle anywhere, the substring probe

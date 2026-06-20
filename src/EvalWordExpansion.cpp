@@ -82,7 +82,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
   let current = glob_field{scratch};
   let has_current = false;
 
-  auto do_flush = [&]() {
+  let const do_flush = [&]() {
     if (has_current) {
       fields.push(steal(current));
       current = glob_field{scratch};
@@ -90,7 +90,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
     }
   };
 
-  auto do_append_run = [&](StringView text, bool glob_active) {
+  let do_append_run = [&](StringView text, bool glob_active) {
     current.text.append(text);
     current.glob_active.reserve(current.glob_active.count() + text.length);
     for (usize k = 0; k < text.length; k++)
@@ -101,7 +101,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
   /* A field with no bytes is still pushed, which a non-whitespace IFS delimiter
      run needs so that an empty field between two delimiters survives. do_flush
      alone emits only a started field and so cannot stand in here. */
-  auto do_emit_empty_field = [&]() { fields.push(glob_field{scratch}); };
+  let do_emit_empty_field = [&]() { fields.push(glob_field{scratch}); };
 
   /* IFS whitespace folds and a non-whitespace IFS byte delimits one field each,
      matching dash. A single forward pass classifies every byte as a field byte,
@@ -111,7 +111,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
      fields, so a:b yields two fields and a::b yields an empty between them. A
      leading delimiter forces a leading empty field, and a trailing whitespace
      run or a trailing single delimiter leaves no empty field behind. */
-  auto do_append_split_run = [&](StringView text, bool glob_active) {
+  let do_append_split_run = [&](StringView text, bool glob_active) {
     usize i = 0;
     while (i < text.length) {
       const char byte = text.data[i];
@@ -323,14 +323,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
          way the array slice below slices elements, with index zero naming the
          shell itself the way bash counts $0 into the slice. The @ form keeps
          each parameter its own field, the * form joins them. */
-      if ((segment_text[0] == '@' || segment_text[0] == '*') &&
+      if (!segment_text.is_empty() &&
+          (segment_text[0] == '@' || segment_text[0] == '*') &&
           segment_text.length > 1 && segment_text[1] == ':')
       {
         let const is_star = segment_text[0] == '*';
         let const slice = segment_text.substring(2);
         let const param_count = m_positional_params.count();
         const i64 total = static_cast<i64>(param_count) + 1;
-        auto do_positional_at = [&](i64 index) wontthrow -> StringView {
+        let do_positional_at = [&](i64 index) wontthrow -> StringView {
           return index == 0 ? m_shell_name.view()
                             : m_positional_params[static_cast<usize>(index - 1)]
                                   .view();
@@ -546,8 +547,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
                elements join under the subject's own [*] while a modifier
                word such as "${b[*]}" joins under its inner star, the way
                bash reads each expansion by its own spelling. */
-            auto do_emit_elements = [&](const ArrayList<String> &values,
-                                        bool quoted, bool star) throws {
+            let do_emit_elements = [&](const ArrayList<String> &values,
+                                       bool quoted, bool star) throws {
               if (quoted && star) {
                 let const ifs = m_field_separators.view();
                 let joined = String{scratch_allocator()};
@@ -804,11 +805,13 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     case WordSegment::Kind::FunctionSubstitution:
       result += capture_function_substitution(segment);
       break;
-    case WordSegment::Kind::ArithmeticExpansion:
-      result += utils::int_to_text(segment.folded_arithmetic_result.has_value()
-                                       ? *segment.folded_arithmetic_result
-                                       : evaluate_arithmetic_cached(segment));
-      break;
+    case WordSegment::Kind::ArithmeticExpansion: {
+      let const number = segment.folded_arithmetic_result.has_value()
+                             ? *segment.folded_arithmetic_result
+                             : evaluate_arithmetic_cached(segment);
+      char buffer[24];
+      result += utils::int_to_text_into(number, buffer, sizeof(buffer));
+    } break;
     default: result += segment_text; break;
     }
   }
@@ -837,7 +840,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
 
   /* Append a run of bytes that share one glob-active state, so the mask stays
      parallel to the result the way expand_word builds it. */
-  auto do_emit_run = [&](StringView bytes, bool is_active) {
+  let do_emit_run = [&](StringView bytes, bool is_active) {
     result.append(bytes);
     for (usize k = 0; k < bytes.length; k++)
       active_out.push(is_active);
@@ -878,7 +881,9 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       let const number = segment.folded_arithmetic_result.has_value()
                              ? *segment.folded_arithmetic_result
                              : evaluate_arithmetic_cached(segment);
-      do_emit_run(utils::int_to_text(number).view(), false);
+      char buffer[24];
+      do_emit_run(utils::int_to_text_into(number, buffer, sizeof(buffer)),
+                  false);
     } break;
     }
   }
@@ -889,7 +894,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
                                           bool allow_expansion) throws
     -> ArrayList<String>
 {
-  auto do_split_plain = [&]() throws -> ArrayList<String> {
+  let do_split_plain = [&]() throws -> ArrayList<String> {
     let words = ArrayList<String>{};
     usize start = 0;
     for (usize i = 0; i <= wordlist.length; i++) {
@@ -924,7 +929,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
      plain split rather than executing the tail. The scan tracks quotes and the
      $(...) and ${...} and backtick nesting so a paren inside an expansion is
      not mistaken for a top-level one. */
-  auto is_array_literal_safe = [&]() wontthrow -> bool {
+  let is_array_literal_safe = [&]() wontthrow -> bool {
     char quote = 0;
     usize paren_depth = 0;
     usize brace_depth = 0;

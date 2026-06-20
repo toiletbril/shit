@@ -50,8 +50,30 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
-    let const written = os::write_fd(*fd, input.view().data, input.count());
-    unused(written);
+    /* write_fd returns a single write's count, which can fall short of the
+       request, so the loop writes the rest until the file holds the whole input
+       or a write fails. A failure reports rather than dropping the data
+       silently, so a full disk or a permission loss is not mistaken for
+       success.
+     */
+    usize written_count = 0;
+    bool did_write_fail = false;
+    while (written_count < input.count()) {
+      let const chunk = os::write_fd(*fd, input.view().data + written_count,
+                                     input.count() - written_count);
+      if (!chunk.has_value() || *chunk == 0) {
+        did_write_fail = true;
+        break;
+      }
+
+      written_count += *chunk;
+    }
+
+    if (did_write_fail) {
+      report_soft_shitbox_error(
+          ec, cxt, "tee: " + operand + ": " + os::last_system_error_message());
+      status = 1;
+    }
     os::close_fd(*fd);
   }
 

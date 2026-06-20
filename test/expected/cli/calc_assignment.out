@@ -10,7 +10,19 @@
 == a == comparison is not an assignment:
 1
 0
-== an unset variable is an error, not a silent zero:
-shit: 1:1: error: Builtin 'calc': cannot evaluate 'nope', Arithmetic: the variable 'nope' is not set.
-     1 |  calc -i
-       |  ^~~~~~~ here.
+== an unset variable is a located capitalized error, not a silent zero:
+shit: 1:1: error: The variable 'nope' is not set.
+     1 |  nope
+       |  ^~~~ here.
+== a set but empty variable reads zero, only an unset name is an error:
+0
+== an empty assignment is rejected rather than binding an empty value:
+shit: 1:1: error: Assignment to 'z' needs a value.
+     1 |  z =
+       |  ^~ here.
+== a division by zero is a located capitalized error:
+shit: 1:6: error: Division by zero.
+     1 |  1 / 0
+       |       ^~ here.
+== an unset name inside a stored formula errors when the formula reads:
+shit: error: The variable 'base' is not set.

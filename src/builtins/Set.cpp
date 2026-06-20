@@ -409,7 +409,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       }
       let const parsed = parse_mood_name(value);
       if (!parsed.has_value())
-        throw Error{String{"unknown --mood value '"} + value +
+        throw Error{String{"Unknown --mood value '"} + value +
                     "', expected 'shit', 'bash', or 'sh'"};
       cxt.set_mood(*parsed);
       cxt.apply_strictness_for_mood();
@@ -457,7 +457,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
         if (name.is_empty()) continue;
         let const parsed = parse_mood_name(name);
         if (!parsed.has_value())
-          throw Error{String{"unknown --init-moods value '"} + name +
+          throw Error{String{"Unknown --init-moods value '"} + name +
                       "', expected 'shit', 'bash', or 'sh'"};
         moods.push(*parsed);
       }
@@ -483,7 +483,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       let const &name = args[++i];
       let const option = find_option_by_name(name);
       if (option == nullptr)
-        throw Error{StringView{"unknown -o option '"} + name + "'"};
+        throw Error{StringView{"Unknown -o option '"} + name + "'"};
       apply_or_reject_option(cxt, *option, enable);
       continue;
     }
@@ -507,7 +507,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
           let invalid_option = String{};
           invalid_option += arg[0];
           invalid_option += letter;
-          throw Error{StringView{"unknown option '"} + invalid_option + "'"};
+          throw Error{StringView{"Unknown option '"} + invalid_option + "'"};
         }
         apply_or_reject_option(cxt, *option, enable);
       }

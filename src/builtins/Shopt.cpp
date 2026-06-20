@@ -218,7 +218,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   };
 
   i32 status = 0;
-  auto do_reject_unknown = [&](StringView name) throws -> bool {
+  let do_reject_unknown = [&](StringView name) throws -> bool {
     if (is_known_shopt_option(name)) return false;
     /* A -q probe wants the status without the message, so it stays silent. Any
        other invocation throws a located error the dispatch renders with a caret
@@ -228,7 +228,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
       status = 1;
       return true;
     }
-    throw Error{StringView{"unknown shopt option '"} + name + "'"};
+    throw Error{StringView{"Unknown shopt option '"} + name + "'"};
   };
 
   /* shopt -o operates on the set -o options rather than the shopt names, the
@@ -250,7 +250,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
           if (is_quiet)
             status = 1;
           else
-            throw Error{StringView{"unknown shopt option '"} + name + "'"};
+            throw Error{StringView{"Unknown shopt option '"} + name + "'"};
         }
       } else if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
       {
@@ -261,7 +261,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
         if (is_quiet)
           status = 1;
         else
-          throw Error{StringView{"unknown shopt option '"} + name + "'"};
+          throw Error{StringView{"Unknown shopt option '"} + name + "'"};
       }
     }
     return status;

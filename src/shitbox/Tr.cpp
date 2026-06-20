@@ -67,8 +67,9 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   let const is_deleting = FLAG_TR_DELETE.is_enabled();
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
-  if (!is_deleting && operands.count() < 2)
+  if (!is_deleting && operands.count() < 2) {
     throw Error{"tr expects two sets unless -d is given"};
+  }
 
   let const set1 = expand_set(operands[0].view());
   let const set2 = is_deleting ? String{} : expand_set(operands[1].view());
@@ -79,18 +80,27 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
      the earlier find_character which returned the first index. A byte past the
      end of set2 maps to its last byte, the way tr pads the shorter set with its
      final character. */
-  bool is_in_set1[256] = {};
-  unsigned char translation[256];
-  for (usize i = 0; i < 256; i++)
+  static constexpr usize BYTE_VALUE_COUNT = 256;
+  bool is_in_set1[BYTE_VALUE_COUNT] = {};
+  unsigned char translation[BYTE_VALUE_COUNT];
+  for (usize i = 0; i < BYTE_VALUE_COUNT; i++)
     translation[i] = static_cast<unsigned char>(i);
+
+  /* set2 is indexed by the distinct ordinal of the set1 byte, not its raw scan
+     position, so a duplicate byte earlier in set1 does not shift every later
+     mapping the way a raw position would. */
+  usize distinct_count = 0;
   for (usize i = 0; i < set1.count(); i++) {
     let const from = static_cast<unsigned char>(set1.view()[i]);
     if (is_in_set1[from]) continue;
     is_in_set1[from] = true;
     if (!is_deleting && set2.count() > 0) {
-      let const index = i < set2.count() ? i : set2.count() - 1;
+      let const index =
+          distinct_count < set2.count() ? distinct_count : set2.count() - 1;
       translation[from] = static_cast<unsigned char>(set2.view()[index]);
     }
+
+    distinct_count++;
   }
 
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));

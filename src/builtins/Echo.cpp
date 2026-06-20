@@ -173,7 +173,9 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  if (!should_suppress_newline && !should_stop) output += '\n';
+  if (!should_suppress_newline && !should_stop) {
+    output += '\n';
+  }
 
   ec.print_to_stdout(output);
 

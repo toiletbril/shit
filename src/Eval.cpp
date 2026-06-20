@@ -599,8 +599,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       usize joined_length = 0;
       for (usize i = 0; i < m_positional_params.count(); i++)
         joined_length += m_positional_params[i].count();
-      if (has_separator && m_positional_params.count() > 1)
+      if (has_separator && m_positional_params.count() > 1) {
         joined_length += m_positional_params.count() - 1;
+      }
       joined.reserve(joined_length);
       for (usize i = 0; i < m_positional_params.count(); i++) {
         if (i > 0 && has_separator) joined.push(separator);
@@ -830,8 +831,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       if (funcname_frame_count() > 0) {
         let const *info =
             m_function_definition_infos.find(funcname_frame_at(0));
-        if (info != nullptr && !info->filename.is_empty())
+        if (info != nullptr && !info->filename.is_empty()) {
           return String{heap_allocator(), info->filename.view()};
+        }
       }
       /* A script-file run roots the stack at the script itself, so outside
          any dot-source the scalar reads as $0, the way bash sets
@@ -1142,13 +1144,6 @@ fn EvalContext::print_source_backtrace(
          it prints with the Trace severity rather than Error. */
       let const sourced_here = TraceWithLocation{frame.call_site};
       show_message(sourced_here.to_string(*frame.parent_source));
-    } else {
-#if 0
-      /* The origin line is context under the primary error, so it carries the
-         note severity word rather than printing bare. */
-      show_message(Note{"This error was raised while running " + frame.origin}
-                       .to_string());
-#endif
     }
   }
 }

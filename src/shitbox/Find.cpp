@@ -122,8 +122,8 @@ static fn parse_depth_argument(const ArrayList<String> &args, usize index,
     throw Error{"find: " + String{predicate} + " expects a number"};
 
   /* A negative value is rejected rather than parsed, since max_depth carries -1
-     as its no-limit sentinel, so a negative -maxdepth would otherwise read as an
-     unbounded walk rather than the error find gives. */
+     as its no-limit sentinel, so a negative -maxdepth would otherwise read as
+     an unbounded walk rather than the error find gives. */
   let const parsed_value = utils::parse_decimal_integer(args[index].view());
   if (parsed_value.is_error() || parsed_value.value() < 0) {
     throw Error{"find: " + String{predicate} +

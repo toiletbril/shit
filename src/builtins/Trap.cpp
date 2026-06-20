@@ -42,19 +42,14 @@ String normalize_condition(StringView raw) throws
   let name = String{};
   for (usize i = 0; i < raw.count(); i++)
     name.push(static_cast<char>(toupper(static_cast<unsigned char>(raw[i]))));
-  if (name.starts_with("SIG") && name.count() > 3)
+  if (name.starts_with("SIG") && name.count() > 3) {
     name = String{name.substring(3)};
+  }
   if (name == "0") return String{"EXIT"};
 
   /* A condition written as a bare number names a signal, so it folds to the
      same name the name form yields. The number 0 already became EXIT above. */
-  let is_all_digits = !name.is_empty();
-  for (usize i = 0; i < name.count(); i++)
-    if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {
-      is_all_digits = false;
-      break;
-    }
-  if (is_all_digits) {
+  if (name.view().is_all_decimal_digits()) {
     let const parsed = utils::parse_decimal_integer(name.view());
     if (!parsed.is_error()) {
       if (let const signal_name =

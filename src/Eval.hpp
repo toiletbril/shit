@@ -464,7 +464,8 @@ public:
   /* Assign an array literal, honoring an explicit [index]=value element with a
      bare element taking the next index. An append continues after the highest
      set index. */
-  fn assign_indexed_array_elements(StringView name, ArrayList<String> elements,
+  fn assign_indexed_array_elements(StringView name,
+                                   const ArrayList<String> &elements,
                                    bool is_append) throws -> void;
 
   /* Log a name's environment value before a write that outlives the statement,

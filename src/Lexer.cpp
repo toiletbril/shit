@@ -393,14 +393,14 @@ hot forceinline fn Lexer::chop_character(usize offset) wontthrow -> char
 
 hot fn Lexer::lex_number() throws -> Token *
 {
-  char ch;
-  let digits = String{};
   usize length = 0;
-
-  while (lexer::is_number((ch = chop_character(length)))) {
-    digits += ch;
+  while (lexer::is_number(chop_character(length)))
     length++;
-  }
+
+  /* The whole digit run is appended once rather than byte by byte, the way
+     lex_identifier batches its plain runs. */
+  let digits = String{};
+  digits.append(m_source.view().substring_of_length(m_cursor_position, length));
 
   Token *const num =
       m_arena->create<tokens::Number>(here(m_cursor_position, length), digits);
@@ -431,7 +431,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   /* Append a character to the open segment, starting a new one when the kind
      changes. A variable reference never merges, since each one carries its own
      name. */
-  auto do_append_char = [&word](WordSegment::Kind kind, char ch) {
+  let do_append_char = [&word](WordSegment::Kind kind, char ch) {
     if (!word.segments.is_empty() && word.segments.back().kind == kind &&
         kind != WordSegment::Kind::VariableReference)
     {
@@ -447,7 +447,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
      segment in one String append, the batched form of calling do_append_char
      with UnquotedText for each byte. A run only ever extends or starts an
      UnquotedText segment, since the bytes carry no quote and no escape. */
-  auto do_append_unquoted_run = [&word](StringView run) {
+  let do_append_unquoted_run = [&word](StringView run) {
     if (!word.segments.is_empty() &&
         word.segments.back().kind == WordSegment::Kind::UnquotedText)
     {
@@ -462,7 +462,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
   /* The word so far is a bare array name, the left side of a NAME[subscript]
      reference, when it is one unquoted run that reads as a variable name. */
-  auto do_word_is_plain_array_name = [&word]() -> bool {
+  let do_word_is_plain_array_name = [&word]() -> bool {
     if (word.segments.count() != 1) return false;
     const WordSegment &segment = word.segments[0];
     if (segment.kind != WordSegment::Kind::UnquotedText ||
@@ -480,7 +480,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
      = or +=, the shape of an array element assignment. The lookahead consumes
      nothing, it only decides whether the bracket run is a protected subscript.
    */
-  auto do_subscript_closes_with_assignment = [this](usize start) -> bool {
+  let do_subscript_closes_with_assignment = [this](usize start) -> bool {
     usize offset = start + 1;
     usize depth = 1;
     while (depth > 0) {
@@ -499,8 +499,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   /* Advance offset past a balanced open and close pair, the one nested inside a
      subscript or an extended-glob group, stopping at the matching close or at
      the end of the source. */
-  auto do_scan_to_matched_close = [this](usize &offset, char open,
-                                         char close) -> void {
+  let do_scan_to_matched_close = [this](usize &offset, char open,
+                                        char close) -> void {
     usize depth = 1;
     while (depth > 0) {
       const char c = chop_character(offset);
@@ -567,7 +567,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
       /* The run stops before an extended-glob opener such as the ? of ?(, so
          the opener reaches the group capture above on the next turn rather than
          being swallowed as a plain byte. */
-      auto do_opens_extglob_at = [this](usize offset) -> bool {
+      let do_opens_extglob_at = [this](usize offset) -> bool {
         const char c = chop_character(offset);
         return (c == '?' || c == '*' || c == '+' || c == '@' || c == '!') &&
                chop_character(offset + 1) == '(';
@@ -670,17 +670,17 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
       if (next == '\'' && bash_additions_enabled()) {
         byte_count++;
         bool did_emit_any = false;
-        auto do_emit_literal = [&](char byte) {
+        let do_emit_literal = [&](char byte) {
           do_append_char(WordSegment::Kind::LiteralText, byte);
           did_emit_any = true;
         };
-        auto do_hex_value = [](char h) -> i32 {
+        let do_hex_value = [](char h) -> i32 {
           if (h >= '0' && h <= '9') return h - '0';
           if (h >= 'a' && h <= 'f') return h - 'a' + 10;
           if (h >= 'A' && h <= 'F') return h - 'A' + 10;
           return -1;
         };
-        auto do_emit_codepoint = [&](u32 cp) {
+        let do_emit_codepoint = [&](u32 cp) {
           if (cp < 0x80) {
             do_emit_literal(static_cast<char>(cp));
           } else if (cp < 0x800) {
@@ -736,10 +736,11 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
           case 'x': {
             i32 value = 0;
             i32 digit_count = 0;
-            while (digit_count < 2 &&
-                   do_hex_value(chop_character(byte_count)) >= 0)
-            {
-              value = value * 16 + do_hex_value(chop_character(byte_count));
+            while (digit_count < 2) {
+              let const digit = do_hex_value(chop_character(byte_count));
+              if (digit < 0) break;
+
+              value = value * 16 + digit;
               byte_count++;
               digit_count++;
             }
@@ -782,12 +783,11 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             const i32 max_digit_count = e == 'u' ? 4 : 8;
             u32 codepoint = 0;
             i32 digit_count = 0;
-            while (digit_count < max_digit_count &&
-                   do_hex_value(chop_character(byte_count)) >= 0)
-            {
-              codepoint =
-                  codepoint * 16 +
-                  static_cast<u32>(do_hex_value(chop_character(byte_count)));
+            while (digit_count < max_digit_count) {
+              let const digit = do_hex_value(chop_character(byte_count));
+              if (digit < 0) break;
+
+              codepoint = codepoint * 16 + static_cast<u32>(digit);
               byte_count++;
               digit_count++;
             }
@@ -1520,10 +1520,12 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
     }
   } else {
     let s = String{};
-    s += "unknown operator '";
+    s += "Unknown operator '";
     s += ch;
     s += "'";
-    throw ErrorWithLocation{here(m_cursor_position, extra_length), s};
+    /* The caret spans the single unknown byte, since extra_length stays zero on
+       this path and a zero-width caret would point at nothing. */
+    throw ErrorWithLocation{here(m_cursor_position, 1), s};
   }
 
   ASSERT(tok != nullptr);

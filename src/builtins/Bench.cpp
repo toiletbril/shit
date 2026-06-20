@@ -439,7 +439,7 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
 
     let const measured = os::run_measured(child_argv, true);
     if (!measured.has_value())
-      throw Error{StringView{"could not run '"} + command + "'"};
+      throw Error{StringView{"Unable to run '"} + command + "'"};
 
     /* A Ctrl-C delivered while the measured child held the foreground lands
        here, so the loop breaks before the slow sample is recorded. */
@@ -571,7 +571,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (arguments.count() < 2) {
-    throw Error{StringView{"no command given"}};
+    throw Error{StringView{"No command given"}};
   }
 
   Maybe<u64> run_limit = None;

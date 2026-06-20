@@ -86,7 +86,9 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (!read) break;
 
     let element = String{StringView{*read}};
-    if (!should_strip_newline && was_newline_terminated) element += "\n";
+    if (!should_strip_newline && was_newline_terminated) {
+      element += "\n";
+    }
     lines.push(steal(element));
   }
 

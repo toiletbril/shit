@@ -377,7 +377,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const operand_base = format_index + 1;
   let const operand_count = args.count() - operand_base;
   let const empty_operand = String{};
-  auto do_operand_at = [&](usize index) wontthrow -> const String & {
+  let do_operand_at = [&](usize index) wontthrow -> const String & {
     return index < operand_count ? args[operand_base + index] : empty_operand;
   };
 
@@ -388,7 +388,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   /* Read the next operand as the integer value of a * field width or precision,
      append its decimal text into the spec, and advance the operand cursor. */
-  auto do_consume_star = [&](String &spec) throws {
+  let do_consume_star = [&](String &spec) throws {
     spec.append(
         utils::int_to_text(parse_printf_integer(do_operand_at(operand_index)))
             .view());

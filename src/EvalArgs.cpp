@@ -496,7 +496,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
          splitting, or globbing straight to the heap argument vector. The common
          literal argument such as '-lt', '200000', 'echo', or a plain filename
          takes this path and never enters expand_word or expand_path. */
-      auto expand_one_word = [&](const Word &expandable) throws -> void {
+      let const do_expand_one_word = [&](const Word &expandable)
+                                         throws -> void {
         let const plain_kind = expandable.plain_literal_kind();
         let did_take_fast_path = false;
         if (plain_kind != Word::PlainLiteral::NotPlain) {
@@ -536,9 +537,9 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
          pays nothing beyond the cheap check. */
       if (bash_additions_enabled() && word_has_brace_candidate(*word)) {
         for (const Word &brace_word : expand_braces(*word, scratch_allocator()))
-          expand_one_word(brace_word);
+          do_expand_one_word(brace_word);
       } else {
-        expand_one_word(*word);
+        do_expand_one_word(*word);
       }
     } catch (const Error &e) {
       throw relocate_error(e, location);

@@ -152,7 +152,8 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         if (should_print_function_names_only) {
           line += "declare -f ";
           line.append(name.view());
-        } else if (const String *source = cxt.find_function_source(name.view()))
+        } else if (const String *source = cxt.find_function_source(name.view());
+                   source != nullptr)
         {
           line.append(source->view());
         }
@@ -174,7 +175,9 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         let line = String{name};
         line += '\n';
         ec.print_to_stdout(line.view());
-      } else if (const String *source = cxt.find_function_source(name)) {
+      } else if (const String *source = cxt.find_function_source(name);
+                 source != nullptr)
+      {
         if (!source->is_empty()) {
           let line = String{source->view()};
           line += '\n';
@@ -192,7 +195,9 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
     i32 status = 0;
     for (; i < args.count(); i++) {
       const StringView name = args[i].view();
-      if (const ArrayList<String> *elements = cxt.lookup_indexed_array(name)) {
+      if (const ArrayList<String> *elements = cxt.lookup_indexed_array(name);
+          elements != nullptr)
+      {
         let line = String{"declare -a"};
         if (cxt.is_integer_variable(name)) line += 'i';
         line += ' ';

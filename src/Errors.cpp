@@ -180,7 +180,7 @@ cold static fn calc_precise_position(StringView source,
 
 template <class T>
   requires std::is_integral_v<T>
-cold static fn number_string_length(T value) throws -> usize
+cold static fn number_string_length(T value) wontthrow -> usize
 {
   usize digit_count = 0;
   while (value > 0) {
@@ -204,7 +204,9 @@ get_context_pointing_to(StringView source, usize byte_position,
   /* A preceding newline puts start_offset on that newline, so it steps one past
      to the first byte of the line. The flag captures a newline at offset zero,
      which starts line two and must step too. */
-  if (has_preceding_newline && start_offset > 0) start_offset--;
+  if (has_preceding_newline && start_offset > 0) {
+    start_offset--;
+  }
 
   usize line_byte_count = 0;
 
@@ -345,8 +347,9 @@ cold fn ErrorBase::note_to_string() const throws -> String
      whatever case the suggestion literal carried. */
   String capitalized_note;
   let first_byte = m_note[0];
-  if (first_byte >= 'a' && first_byte <= 'z')
+  if (first_byte >= 'a' && first_byte <= 'z') {
     first_byte = static_cast<char>(first_byte - 'a' + 'A');
+  }
   capitalized_note.push(first_byte);
   capitalized_note += m_note.substring(1);
 
@@ -369,9 +372,9 @@ cold fn ErrorBase::to_string(StringView source) const throws -> String
 
 fn Error::to_string() const throws -> String
 {
-  let const color = diagnostic_colors_for(severity_word());
-  return color.severity + severity_word() + color.reset + ": " + color.message +
-         message() + "." + color.reset + note_to_string();
+  /* An unlocated Error renders the same line the base builds, which ignores the
+     source, so it delegates rather than keeping a second copy of the format. */
+  return ErrorBase::to_string(StringView{});
 }
 
 Error::operator String() const throws { return to_string(); }
@@ -531,7 +534,9 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
 
   if (byte_position > 0 && byte_position == source.count() &&
       source[byte_position - 1] == '\n')
+  {
     byte_position--;
+  }
 
   auto [details_line_number, details_last_newline_location,
         details_has_preceding_newline] =

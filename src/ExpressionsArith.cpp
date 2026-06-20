@@ -834,7 +834,7 @@ fn Divide::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   let const denom = m_rhs->evaluate(cxt);
   if (denom == 0)
-    throw ErrorWithLocation{m_rhs->source_location(), "Division by 0"};
+    throw ErrorWithLocation{m_rhs->source_location(), "Division by zero"};
 
   return m_lhs->evaluate(cxt) / denom;
 }

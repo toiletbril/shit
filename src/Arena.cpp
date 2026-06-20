@@ -80,7 +80,11 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
 hot fn BumpArena::owns(const void *pointer) const wontthrow -> bool
 {
   let const candidate = static_cast<const u8 *>(pointer);
-  for (const block &block : m_blocks) {
+  /* The live tree allocates from the most recent block, so the scan runs back
+     to front and the common hit returns on the first compare rather than after
+     walking every earlier block. */
+  for (usize i = m_blocks.count(); i > 0; i--) {
+    const block &block = m_blocks[i - 1];
     if (candidate >= block.base && candidate < block.base + block.size) {
       return true;
     }

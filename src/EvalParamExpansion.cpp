@@ -127,14 +127,14 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
 
   /* Append one byte and record whether it may act as a glob metacharacter, so
      the mask stays parallel to out. */
-  auto do_emit_byte = [&](char byte, bool is_active) {
+  let const do_emit_byte = [&](char byte, bool is_active) {
     out += byte;
     active_out.push(is_active);
   };
 
   /* Append a run of bytes that share one glob-active state, used for an
      expansion result whose every byte takes the same mask. */
-  auto do_emit_run = [&](StringView bytes, bool is_active) {
+  let do_emit_run = [&](StringView bytes, bool is_active) {
     out.append(bytes);
     for (usize k = 0; k < bytes.length; k++)
       active_out.push(is_active);
@@ -343,7 +343,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       /* An ordinary name appends its stored value straight from the store, so
          the common reference pays no temporary String the way a synthesized
          special name would. */
-      if (const String *stored = lookup_shell_variable(name))
+      if (const String *stored = lookup_shell_variable(name); stored != nullptr)
         do_emit_run(stored->view(), !is_in_double_quote);
       else
         do_emit_run(expand_variable(name), !is_in_double_quote);

@@ -90,9 +90,9 @@ i32 Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws
     for (const String &name : sorted_names) {
       let link = Path{ec.args()[2].view()};
       link.push_component(name.view());
-      /* A re-run refreshes the install, so an existing symlink is removed before
-         the create rather than failing with EEXIST. A real file at the path is
-         left alone so assimilate never clobbers a user's binary. */
+      /* A re-run refreshes the install, so an existing symlink is removed
+         before the create rather than failing with EEXIST. A real file at the
+         path is left alone so assimilate never clobbers a user's binary. */
       if (link.is_symbolic_link()) os::remove_file(link.text().view());
       if (!os::create_symlink(target->view(), link.text().view())) {
         report_soft_builtin_error(ec, cxt,

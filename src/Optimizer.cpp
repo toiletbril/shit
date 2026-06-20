@@ -162,7 +162,7 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
       return None;
     }
     if (*op == "=") return Maybe<bool>{*lhs == *rhs};
-    if (*op == "!=") return Maybe<bool>{!(*lhs == *rhs)};
+    if (*op == "!=") return Maybe<bool>{*lhs != *rhs};
     return None;
   }
 
@@ -756,8 +756,7 @@ fn rule_loop_elimination(const Expression *node, AnalysisContext &actx) throws
     return false;
   }
 
-  let const body_would_run =
-      loop_node->is_until() ? (*verdict == false) : (*verdict == true);
+  let const body_would_run = loop_node->is_until() ? !*verdict : *verdict;
   if (body_would_run) {
     LOG(All,
         "the loop fold declines, the body would run under the static verdict");
@@ -877,8 +876,8 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
                               utils::int_to_text(*value));
 
   /* A constant zero condition means the body never runs. The init clause still
-     runs once before the condition the way C semantics require, so a loop with a
-     non-blank init keeps the folded zero condition and the evaluator runs the
+     runs once before the condition the way C semantics require, so a loop with
+     a non-blank init keeps the folded zero condition and the evaluator runs the
      init then skips the body. Only a blank-init loop is a proven no-op the
      body-elimination path drops whole. */
   let const init_is_blank =

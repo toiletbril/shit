@@ -51,8 +51,16 @@ fn Yes::execute(const ExecContext &ec, EvalContext &cxt,
        checks it each pass and stops rather than spinning forever. */
     if (os::INTERRUPT_REQUESTED) return 130;
 
-    let const written = os::write_fd(out_fd, line.view().data, line.count());
-    if (!written.has_value() || *written == 0) break;
+    /* A short write advances through the line rather than re-emitting the whole
+       line next pass, which would corrupt the stream with a partial then a full
+       copy. */
+    usize written_count = 0;
+    while (written_count < line.count()) {
+      let const chunk = os::write_fd(out_fd, line.view().data + written_count,
+                                     line.count() - written_count);
+      if (!chunk.has_value() || *chunk == 0) return 0;
+      written_count += *chunk;
+    }
   }
 
   return 0;

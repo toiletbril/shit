@@ -51,9 +51,18 @@ static fn copy_file(const ExecContext &ec, StringView source,
     if (!read_count.has_value())
       throw Error{"cp: a read of '" + String{source} + "' failed"};
     if (*read_count == 0) break;
-    let const written = os::write_fd(*out_fd, buffer, *read_count);
-    if (!written.has_value() || *written != *read_count) {
-      throw Error{"cp: a write to '" + String{destination} + "' failed"};
+    /* A short write continues with the remaining bytes rather than aborting the
+       copy and losing them, since write_fd returns a single write's count that
+       can fall short of the request. */
+    usize written_count = 0;
+    while (written_count < *read_count) {
+      let const chunk = os::write_fd(*out_fd, buffer + written_count,
+                                     *read_count - written_count);
+      if (!chunk.has_value() || *chunk == 0) {
+        throw Error{"cp: a write to '" + String{destination} + "' failed"};
+      }
+
+      written_count += *chunk;
     }
   }
 

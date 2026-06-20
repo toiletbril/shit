@@ -205,8 +205,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
 
   let config_path = home->clone();
   config_path.push_component("/.ssh/config");
-  if (Maybe<String> config = config_path.read_entire_file();
-      config.has_value())
+  if (Maybe<String> config = config_path.read_entire_file(); config.has_value())
   {
     let const text = config->view();
     usize i = 0;

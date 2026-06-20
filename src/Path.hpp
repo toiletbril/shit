@@ -129,7 +129,8 @@ public:
       -> Maybe<ArrayList<directory_child>>;
 
   /* Read the whole file at this path into a string through the os descriptor
-     layer, so no iostream file stream is pulled in. None when the open fails. */
+     layer, so no iostream file stream is pulled in. None when the open fails.
+   */
   mustuse fn read_entire_file() const throws -> Maybe<String>;
 
   /* Resolve a path against the filesystem, rooting a relative path that holds a

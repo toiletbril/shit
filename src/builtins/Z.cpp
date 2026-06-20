@@ -242,7 +242,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (best == nullptr)
-    throw Error{StringView{"z: no matching directory for '"} + query + "'"};
+    throw Error{StringView{"No matching directory for '"} + query + "'"};
 
   let const target = Path{best->path.view()}.to_absolute().normalized();
 
@@ -250,7 +250,8 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const old_directory = Path::current_directory();
   if (Path::set_current_directory(target).is_error())
-    throw Error{StringView{"z: could not cd to '"} + target.text() + "'"};
+    throw Error{StringView{"Unable to change directory to '"} + target.text() +
+                "'"};
   utils::invalidate_path_cache();
   if (!old_directory.is_empty())
     cxt.set_shell_variable("OLDPWD", old_directory.text());

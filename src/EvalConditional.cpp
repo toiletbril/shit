@@ -349,7 +349,7 @@ struct ConditionalEvaluator
         const String op = operand_literal(elements[pos + 1]);
         if (is_binary_word_op(op.view())) {
           if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
-            throw Error{"[[: expected operand after '" + op + "'"};
+            throw Error{"Expected an operand after '" + op + "'"};
           pos += 3;
           if (is_skipping) return false;
           const String left = operand_value(elements[pos - 3]);
@@ -402,7 +402,7 @@ struct ConditionalEvaluator
       pos++;
       const bool is_inner_true = eval_or();
       if (at_end() || kind_at(pos) != Kind::CloseParen)
-        throw Error{"[[: expected ')'"};
+        throw Error{"Expected ')'"};
       pos++;
       return is_inner_true;
     }

@@ -740,8 +740,8 @@ fn main(int argc, char **argv) -> int
       let function_arena = shit::BumpArena{};
       shit::FUNCTION_ARENA = &function_arena;
 
-      let context = shit::EvalContext{false, false, false, false, false,
-                                      shit::String{invocation}};
+      let context = shit::EvalContext{false, false, false,
+                                      false, false, shit::String{invocation}};
 
       shit::ArrayList<shit::String> operands{};
       operands.reserve(static_cast<usize>(argc - 1));
@@ -1241,7 +1241,7 @@ fn main(int argc, char **argv) -> int
     }
   }
 
-  bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
+  bool should_quit = FLAG_ONE_COMMAND.is_enabled();
   i32 exit_code = EXIT_SUCCESS;
 
   /* The path map is reset rather than fully seeded here, since the eager scan

@@ -346,6 +346,13 @@ pure fn strip_sig_prefix(StringView name) wontthrow -> StringView
 fn split_lines(StringView text) throws -> ArrayList<StringView>
 {
   let lines = ArrayList<StringView>{};
+  /* Counting the line breaks first reserves the exact size, so the push loop
+     does not climb the growth chain reallocating the views. */
+  usize line_count = 1;
+  for (usize i = 0; i < text.length; i++)
+    if (text[i] == '\n') line_count++;
+  lines.reserve(line_count);
+
   usize line_start_position = 0;
   for (usize i = 0; i <= text.length; i++) {
     if (i != text.length && text[i] != '\n') continue;
@@ -427,12 +434,11 @@ fn uint_to_text(u64 value, Allocator allocator) throws -> String
 
 fn int_to_text(i64 value, Allocator allocator) throws -> String
 {
-  if (value >= 0) return uint_to_text(static_cast<u64>(value), allocator);
-  /* Negating in u64 avoids the overflow that -INT64_MIN would hit in i64. */
-  const u64 magnitude = ~static_cast<u64>(value) + 1;
-  let result = String{allocator, "-"};
-  result.append(uint_to_text(magnitude, allocator));
-  return result;
+  /* The digits are written into a stack buffer and the result is built from the
+     view in one allocation, where the negative path used to build two Strings.
+   */
+  char buffer[21];
+  return String{allocator, int_to_text_into(value, buffer, sizeof(buffer))};
 }
 
 fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow

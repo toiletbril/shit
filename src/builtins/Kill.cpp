@@ -119,7 +119,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         target_text.c_str());
     if (!os::signal_process(pid, signal_number)) {
       report_soft_builtin_error(ec, cxt,
-                                StringView{"cannot signal '"} + target_text +
+                                StringView{"Cannot signal '"} + target_text +
                                     "' because " +
                                     os::last_system_error_message());
       status = 1;

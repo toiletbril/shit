@@ -1,5 +1,5 @@
 == a located error carets the bad token:
-shit: 1:15: error: Arithmetic: unexpected '.0' after the expression.
+shit: 1:15: error: Unexpected '.0' after the expression.
      1 |  2312312 / 1323.0
        |                ^~ here.
 note: An operator is missing between two values.
@@ -9,7 +9,7 @@ note: An operator is missing between two values.
 1180591620717411303424
 == -i evaluates each piped line, continuing past a bad one:
 2
-shit: 1:1: error: Builtin 'calc': cannot evaluate 'bad +', Arithmetic: the variable 'bad' is not set.
-     1 |  calc -i
-       |  ^~~~~~~ here.
+shit: 1:1: error: The variable 'bad' is not set.
+     1 |  bad +
+       |  ^~~ here.
 100

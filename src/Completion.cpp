@@ -600,8 +600,9 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
     /* An unquoted token whose match needs a special byte is wrapped in quotes
        rather than backslash-escaped. A token already inside a quote completes
        the bare path within it and is not quoted again. */
-    if (!inside_quote && path_candidate_needs_quoting(candidate.view()))
+    if (!inside_quote && path_candidate_needs_quoting(candidate.view())) {
       candidate = quote_path_candidate(candidate.view());
+    }
 
     candidates.push(steal(candidate));
   }
@@ -935,8 +936,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       for (usize i = 0; i < candidates.count(); i++) {
         if (i > 0) joined += ' ';
         let match = candidates[i].view();
-        if (!match.is_empty() && match[match.length - 1] == '/')
+        if (!match.is_empty() && match[match.length - 1] == '/') {
           match = match.substring_of_length(0, match.length - 1);
+        }
         joined.append(match);
       }
       candidates.clear();

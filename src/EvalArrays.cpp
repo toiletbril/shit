@@ -118,7 +118,7 @@ static fn parse_explicit_array_index(StringView element,
 }
 
 fn EvalContext::assign_indexed_array_elements(StringView name,
-                                              ArrayList<String> elements,
+                                              const ArrayList<String> &elements,
                                               bool is_append) throws -> void
 {
   /* POSIX mode has no arrays, but a sourced profile that carries a bash array
@@ -242,8 +242,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
      set_shell_variable gives a scalar. The joined text lives on the scratch
      arena and the stores below copy the decimal result. */
   char integer_result[24];
-  auto do_integer_element_value = [&](Maybe<String> existing)
-                                      throws -> StringView {
+  let do_integer_element_value = [&](Maybe<String> existing)
+                                     throws -> StringView {
     let joined = String{scratch_allocator()};
     if (is_append) {
       if (existing.has_value()) joined.append(existing->view());
@@ -744,7 +744,7 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
       static_cast<int>(prefix.length), prefix.data);
   let names = ArrayList<String>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
-  auto do_consider = [&](StringView candidate) throws {
+  let do_consider = [&](StringView candidate) throws {
     if (candidate.starts_with(prefix) && !seen.contains(candidate)) {
       seen.add(candidate);
       names.push_managed(candidate);

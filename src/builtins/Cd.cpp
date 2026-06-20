@@ -54,10 +54,11 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (is_to_previous) {
     let const old_directory = cxt.get_variable_value("OLDPWD");
-    if (!old_directory || old_directory->is_empty())
+    if (!old_directory || old_directory->is_empty()) {
       throw ErrorWithLocation{ec.source_location(),
                               "Unable to return to the previous directory "
                               "because OLDPWD is not set"};
+    }
     arg_path.append(old_directory->view());
   } else if (ec.args().count() > 1) {
     arg_path.append(ec.args()[1]);
@@ -178,8 +179,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     record_directory_access(target.text().view());
     /* cd - and a move through a nonempty CDPATH entry report the directory they
        moved to, so a script sees where it landed. A plain cd stays silent. */
-    if (is_to_previous || was_reached_through_cdpath)
+    if (is_to_previous || was_reached_through_cdpath) {
       ec.print_to_stdout(target.text() + "\n");
+    }
     return 0;
   }
 

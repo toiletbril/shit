@@ -1232,17 +1232,18 @@ public:
   StringView source;
   usize pos;
   usize depth{0};
+  /* The top-level parser reads the typed line, so an error against it carets
+     the real token. A nested parser reads a stored formula text, so its caret
+     would index the binding rather than the typed line, and it reports
+     unlocated. */
+  bool is_top_level{false};
   static constexpr usize MAX_DEPTH = 512;
 
   [[noreturn]] cold fn fail(StringView message) throws -> void
   {
     /* The caret indexes the expression at the current position, so calc, the
-       only caller of the wide evaluator, points it under the offending token.
-     */
-    throw ErrorWithLocation{
-        SourceLocation{pos, 1},
-        "Arithmetic: " + message
-    };
+       only caller of the wide evaluator, points it under the offending token. */
+    throw ErrorWithLocation{SourceLocation{pos, 1}, message};
   }
 
   fn skip_spaces() wontthrow -> void
@@ -1268,28 +1269,35 @@ public:
     return true;
   }
 
-  fn read_variable(StringView name) throws -> wide_int
+  fn read_variable(StringView name, usize name_position) throws -> wide_int
   {
     ASSERT(context != nullptr);
 
     String value;
     bool was_found = false;
     if (let const *stored = context->lookup_shell_variable(name);
-        stored != nullptr) {
+        stored != nullptr)
+    {
       value = String{stored->view()};
       was_found = true;
     } else if (let const fetched = context->get_variable_value(name);
-               fetched.has_value()) {
+               fetched.has_value())
+    {
       value = String{fetched->view()};
       was_found = true;
     }
 
     if (!was_found) {
       /* calc treats an unset variable as an error rather than reading it as
-         zero. The message names the missing variable plainly rather than
-         carrying a caret, since a nested binding read indexes the binding text,
-         not the typed line. */
-      throw Error{"Arithmetic: the variable '" + String{name} + "' is not set"};
+         zero. A top-level read carets the name, a nested read reports unlocated
+         since its position indexes the binding rather than the typed line. */
+      let message = "The variable '" + String{name} + "' is not set";
+      if (is_top_level)
+        throw ErrorWithLocation{
+            SourceLocation{name_position, name.length},
+            steal(message)
+        };
+      throw Error{steal(message)};
     }
 
     if (value.count() == 0) return 0;
@@ -1298,9 +1306,15 @@ public:
        here so a formula recomputes from the variables it names. A reference
        cycle such as x=x grows the depth without end, so the cap reports rather
        than reading a half-resolved value. */
-    if (depth >= MAX_DEPTH)
-      throw Error{"Arithmetic: the variable '" + String{name} +
-                  "' refers to itself"};
+    if (depth >= MAX_DEPTH) {
+      let message = "The variable '" + String{name} + "' refers to itself";
+      if (is_top_level)
+        throw ErrorWithLocation{
+            SourceLocation{name_position, name.length},
+            steal(message)
+        };
+      throw Error{steal(message)};
+    }
 
     return evaluate_wide_expression(context, value.view(), depth + 1);
   }
@@ -1322,7 +1336,7 @@ public:
   }
   fn wrap_power(wide_int base, wide_int exponent) throws -> wide_int
   {
-    if (exponent < 0) fail("exponent less than 0");
+    if (exponent < 0) fail("Exponent less than 0");
     wide_uint result = 1;
     wide_uint factor = static_cast<wide_uint>(base);
     wide_uint remaining = static_cast<wide_uint>(exponent);
@@ -1346,7 +1360,7 @@ public:
        */
       ErrorWithLocation error{
           SourceLocation{pos, source.length - pos},
-          "Arithmetic: unexpected '" + String{source.substring(pos)}
+          "Unexpected '" + String{source.substring(pos)}
           +
               "' after the expression"
       };
@@ -1364,19 +1378,20 @@ public:
     return result;
   }
 
-  /* Bind a variable to its right-side expression text, the form calc stores so a
-     later read re-evaluates it against the current context rather than a value
-     recorded now. */
+  /* Bind a variable to its right-side expression text, the form calc stores so
+     a later read re-evaluates it against the current context rather than a
+     value recorded now. */
   fn write_variable(StringView name, StringView expression_text) throws -> void
   {
     ASSERT(context != nullptr);
     context->set_shell_variable(name, expression_text);
   }
 
-  /* An assignment is an expression whose value is the evaluated right side, so a
-     mid-expression form such as (x = 5) + 1 reads. It binds the variable to the
-     right-side text, not the value, leaving the lazy re-evaluation to a later
-     read. A leading name with no following = rewinds and reads as a value, and a
+  /* An assignment is an expression whose value is the evaluated right side, so
+     a mid-expression form such as (x = 5) + 1 reads. It binds the variable to
+     the right-side text, not the value, leaving the lazy re-evaluation to a
+     later read. A leading name with no following = rewinds and reads as a
+     value, and a
      == comparison is left for the binary ladder. */
   fn parse_assignment() throws -> wide_int
   {
@@ -1394,9 +1409,8 @@ public:
         skip_spaces();
         let const right_start = pos;
         let const right_value = parse_assignment();
-        write_variable(name,
-                       source.substring_of_length(right_start,
-                                                  pos - right_start));
+        write_variable(
+            name, source.substring_of_length(right_start, pos - right_start));
         return right_value;
       }
       pos = save;
@@ -1409,7 +1423,7 @@ public:
     let const condition = parse_binary(1);
     if (consume("?")) {
       let const if_true = parse_ternary();
-      if (!consume(":")) fail("expected ':' in a conditional");
+      if (!consume(":")) fail("Expected ':' in a conditional");
       let const if_false = parse_ternary();
       return condition != 0 ? if_true : if_false;
     }
@@ -1472,11 +1486,11 @@ public:
       case 'P': lhs = wrap_power(lhs, rhs); break;
       case '*': lhs = wrap_mul(lhs, rhs); break;
       case '/':
-        if (rhs == 0) fail("division by zero");
+        if (rhs == 0) fail("Division by zero");
         lhs = lhs / rhs;
         break;
       case '%':
-        if (rhs == 0) fail("division by zero");
+        if (rhs == 0) fail("Division by zero");
         lhs = lhs % rhs;
         break;
       case '+': lhs = wrap_add(lhs, rhs); break;
@@ -1529,12 +1543,12 @@ public:
   {
     depth++;
     defer { depth--; };
-    if (depth > MAX_DEPTH) fail("expression nested too deeply");
+    if (depth > MAX_DEPTH) fail("Expression nested too deeply");
 
     skip_spaces();
     if (consume("(")) {
       let const value = parse_comma();
-      if (!consume(")")) fail("expected ')'");
+      if (!consume(")")) fail("Expected ')'");
       return value;
     }
     if (pos < source.length && lexer::is_number(source[pos])) {
@@ -1547,9 +1561,9 @@ public:
       while (pos < source.length && lexer::is_variable_name(source[pos]))
         pos++;
       return read_variable(
-          source.substring_of_length(name_start, pos - name_start));
+          source.substring_of_length(name_start, pos - name_start), name_start);
     }
-    fail("unexpected character");
+    fail("Unexpected character");
   }
 };
 
@@ -1578,6 +1592,7 @@ fn EvalContext::evaluate_arithmetic_wide(StringView expression,
       !expression.find_character('`').has_value())
   {
     WideArithmeticParser parser{this, expression, 0};
+    parser.is_top_level = true;
     let const value = parser.parse();
     out_nonzero = value != 0;
     return format_wide(value);
@@ -1585,6 +1600,7 @@ fn EvalContext::evaluate_arithmetic_wide(StringView expression,
 
   let const expanded_word = expand_modifier_word(expression);
   WideArithmeticParser parser{this, expanded_word.view(), 0};
+  parser.is_top_level = true;
   let const value = parser.parse();
   out_nonzero = value != 0;
   return format_wide(value);

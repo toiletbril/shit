@@ -57,7 +57,9 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
      redirected from a file or a pipe even at an interactive prompt. */
   if (FLAG_READ_PROMPT.is_set() &&
       os::is_fd_a_tty(ec.in_fd.value_or(SHIT_STDIN)))
+  {
     shit::print_error(FLAG_READ_PROMPT.value());
+  }
 
   /* With no operand the line goes to REPLY, otherwise to the operands in
      order. The operand names are addressed by an offset into names. */
@@ -67,7 +69,7 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   const usize first_operand = 1;
   let const operand_count = has_operands ? names.count() - first_operand : 1;
   const String reply_name = "REPLY";
-  auto do_operand_name = [&](usize index) -> String {
+  let do_operand_name = [&](usize index) -> String {
     if (!has_operands) return reply_name;
     ASSERT(first_operand + index < names.count());
     return names[first_operand + index];
@@ -99,16 +101,16 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   let const field_separators = cxt.get_variable_value("IFS").value_or(
       String{cxt.scratch_allocator(), " \t\n"});
-  auto do_is_separator = [&field_separators](char c) {
+  let do_is_separator = [&field_separators](char c) {
     return field_separators.find_character(c).has_value();
   };
   /* POSIX folds an IFS whitespace run into a single delimiter, while each IFS
      non-whitespace character delimits one field on its own, so an empty field
      can sit between two non-whitespace delimiters. */
-  auto do_is_ifs_whitespace = [&do_is_separator](char c) {
+  let do_is_ifs_whitespace = [&do_is_separator](char c) {
     return (c == ' ' || c == '\t' || c == '\n') && do_is_separator(c);
   };
-  auto do_is_ifs_nonwhitespace = [&](char c) {
+  let do_is_ifs_nonwhitespace = [&](char c) {
     return do_is_separator(c) && !do_is_ifs_whitespace(c);
   };
 

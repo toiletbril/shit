@@ -8,10 +8,11 @@
 #include <glob.h>
 
 /* A deliberately small make. It reads a Makefile, holds the variables and the
-   target rules, expands $(NAME) and ${NAME}, and runs each recipe line through
-   the shell. There are no pattern rules, no automatic variables, and no
-   parallelism. The subset is enough to drive a configure-then-make build on a
-   bare system. */
+   target rules, expands $(NAME) and ${NAME}, applies single-level pattern
+   rules, and runs each recipe line through the shell. It has no automatic
+   variables, and it accepts the -j, -B, and -k flags while always building
+   serially. The subset is enough to drive a configure-then-make build on a bare
+   system. */
 
 FLAG_LIST_DECL();
 
@@ -872,7 +873,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       let const name = assignment_variable_name(assignment.view());
       saved_make_variable snapshot{String{name}, false, String{}};
       if (const String *current_value = mk.find_variable(name);
-          current_value != nullptr) {
+          current_value != nullptr)
+      {
         snapshot.was_present = true;
         snapshot.old_value = String{current_value->view()};
       }
@@ -887,7 +889,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     for (usize i = saved_variables.count(); i-- > 0;) {
       const saved_make_variable &snapshot = saved_variables[i];
       if (snapshot.was_present) {
-        if (let const *index = mk.variable_index.find(snapshot.name.view()))
+        if (let const *index = mk.variable_index.find(snapshot.name.view());
+            index != nullptr)
           mk.variables[*index].value = String{snapshot.old_value.view()};
       } else {
         /* A variable the assignment created is unset again, not left empty, so
@@ -956,10 +959,11 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     subshell_command += "\n)";
     let const status = cxt.run_source(subshell_command.view(), "make", true,
                                       ec.source_location(), StringView{"make"});
-    if (status != 0 && !should_ignore_errors)
+    if (status != 0 && !should_ignore_errors) {
       throw Error{"The recipe for the target '" + String{goal} +
                   "' failed with status " +
                   utils::int_to_text(status, heap_allocator())};
+    }
   }
 
   built.push(String{goal});

@@ -16,7 +16,7 @@ shopt -u nullglob
 == -p prints the replayable form when on:
 shopt -s nullglob
 == an unknown name is an error:
-shit: 1:1: error: Builtin 'shopt': unknown shopt option 'bogusopt'.
+shit: 1:1: error: Builtin 'shopt': Unknown shopt option 'bogusopt'.
      1 |  shopt bogusopt
        |  ^~~~~~~~~~~~~~ here.
 rc=1

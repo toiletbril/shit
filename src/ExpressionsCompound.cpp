@@ -91,7 +91,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
        operand error, while a script-fatal error, the set -u read and the
        ${name:?} report, still aborts the run. The error renders to stderr
        here since nothing above will see it. */
-    auto do_run_node = [&]() throws -> i64 {
+    let do_run_node = [&]() throws -> i64 {
       try {
         return n->evaluate(cxt);
       } catch (const ErrorBase &error) {
@@ -1273,7 +1273,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no pathname globbing, so a pattern keeps its metacharacters
      for matching. */
-  auto do_expand_no_glob = [&cxt](const Token *t) -> String {
+  let const do_expand_no_glob = [&cxt](const Token *t) -> String {
     ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::Word) {
       /* The subject expansion throws a plain Error, an unset variable under set
@@ -1292,7 +1292,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   LOG(Debug, "the case subject expanded to '%s'", subject.c_str());
 
-  auto do_arm_matches = [&](const case_item &item) throws -> bool {
+  let do_arm_matches = [&](const case_item &item) throws -> bool {
     for (let const pattern_token : item.patterns) {
       /* A pattern keeps its glob metacharacters for matching, yet a quoted or
          escaped metacharacter in the pattern is a literal, so the expansion

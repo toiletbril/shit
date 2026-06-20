@@ -240,7 +240,8 @@ static fn man_subcommand_page_is_valid(StringView command,
   let page_name = String{command};
   page_name.push('-');
   page_name.append(subcommand);
-  if (let const cached = MAN_SUBCOMMAND_PAGE_VALID.find(page_name.view()))
+  if (let const cached = MAN_SUBCOMMAND_PAGE_VALID.find(page_name.view());
+      cached != nullptr)
     return *cached;
   if (!may_read) return false;
 
@@ -433,8 +434,9 @@ static fn parse_manpage_option_entries(StringView text) throws
     if (pending_flags.is_empty()) return;
     let const desc = trim_blanks(pending_description.view());
     for (let const &flag : pending_flags)
-      if (!desc.is_empty() && descriptions.find(flag.view()) == nullptr)
+      if (!desc.is_empty() && descriptions.find(flag.view()) == nullptr) {
         descriptions.set(flag.view(), String{desc});
+      }
     pending_flags.clear();
     pending_description = String{};
   };
@@ -741,7 +743,9 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool;
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<help_entry> &
 {
-  if (let const cached = MANPAGE_OPTION_CACHE.find(page_name)) return *cached;
+  if (let const cached = MANPAGE_OPTION_CACHE.find(page_name);
+      cached != nullptr)
+    return *cached;
   let parsed_options = ArrayList<help_entry>{};
   /* man forks only when it resolves into a trusted directory, so an alias or a
      planted man is never run. The resolved absolute path runs in place of the

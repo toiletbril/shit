@@ -25,7 +25,7 @@ hot pure static fn get_sequence_kind(Token::Kind tk) wontthrow
   case Token::Kind::Semicolon:
   case Token::Kind::DoubleSemicolon: return CompoundListCondition::Kind::None;
   case Token::Kind::DoubleAmpersand: return CompoundListCondition::Kind::And;
-  case Token::Kind::DoublePipe: return CompoundListCondition::Kind::Or; break;
+  case Token::Kind::DoublePipe: return CompoundListCondition::Kind::Or;
 
   default: unreachable("Invalid shell sequence token: %d", ENUM(tk));
   }
@@ -111,7 +111,7 @@ cold pure static fn find_standalone_keyword(StringView source,
                                             StringView keyword) wontthrow
     -> Maybe<SourceLocation>
 {
-  auto do_is_boundary = [](char c) {
+  let do_is_boundary = [](char c) {
     return std::isspace(static_cast<unsigned char>(c)) != 0 || c == ';' ||
            c == '&' || c == '|';
   };
@@ -198,7 +198,7 @@ cold static fn unexpected_command_token_message(const Token *token) throws
   case Token::Kind::Pipe: return "'|' has no command before it to pipe from";
   default: {
     const let ast = token->to_ast_string();
-    return "expected a command, found '" + ast.view() + "'";
+    return "Expected a command, found '" + ast.view() + "'";
   }
   }
 }
@@ -407,11 +407,11 @@ hot fn Parser::parse_command_list(
     switch (token->kind()) {
     /* These operators require a command after them. */
     case Token::Kind::Ampersand:
-      if (lhs) lhs->make_async();
+      if (lhs != nullptr) lhs->make_async();
       [[fallthrough]];
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
-      if (!lhs) {
+      if (lhs == nullptr) {
         const let ast = token->to_ast_string();
         String msg = "Expected a command ";
         msg += compound_list->is_empty() ? "before" : "after";
@@ -944,7 +944,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
   let array_args = ArrayList<array_builtin_assignment>{heap_allocator()};
   let redirections = ArrayList<expressions::Redirection>{};
 
-  auto do_build_command = [&]() -> Command * {
+  let do_build_command = [&]() -> Command * {
     if (!source_location) return nullptr;
 
     ArrayList<const Token *> args{};
@@ -960,9 +960,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
     return c;
   };
 
-  auto do_add_redirection = [&](i32 fd, Token::Kind op_kind,
-                                SourceLocation op_location,
-                                bool fd_was_explicit) {
+  let do_add_redirection = [&](i32 fd, Token::Kind op_kind,
+                               SourceLocation op_location,
+                               bool fd_was_explicit) {
     build_file_or_dup_redirection(fd, op_kind, op_location, source_location,
                                   redirections, fd_was_explicit);
   };
@@ -1229,8 +1229,8 @@ hot fn Parser::parse_if() throws -> Command *
     ASSERT(then_token != nullptr);
     if (then_token->kind() != Token::Kind::Then) {
       const let detail = is_empty_list(condition)
-                             ? "expected a command for the condition"
-                             : "expected 'then' after the condition";
+                             ? "Expected a command for the condition"
+                             : "Expected 'then' after the condition";
       throw ErrorWithLocationAndDetails{location, "Unterminated if",
                                         then_token->source_location(), detail};
     }
@@ -1277,8 +1277,8 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   ASSERT(do_token != nullptr);
   if (do_token->kind() != Token::Kind::Do) {
     const let detail = is_empty_list(condition)
-                           ? "expected a command for the loop condition"
-                           : "expected 'do'";
+                           ? "Expected a command for the loop condition"
+                           : "Expected 'do'";
     throw ErrorWithLocationAndDetails{location, "Unterminated loop",
                                       do_token->source_location(), detail};
   }

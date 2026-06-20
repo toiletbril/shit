@@ -127,6 +127,6 @@
 on=0
 off=0
 one three count=3
-shit: 5:1: error: Builtin 'set': unknown option '-Z'.
+shit: 5:1: error: Builtin 'set': Unknown option '-Z'.
      5 |  set -Z 2>&1; echo "bad=$?"
        |  ^~~~~~ here.

@@ -46,7 +46,6 @@ static fn owner_name_for_uid(u32 uid,
   return name;
 }
 
-/* Append text left-justified in a field of the given width, padding after. */
 static fn append_left(String &output, StringView text, usize width) throws
     -> void
 {
@@ -55,7 +54,6 @@ static fn append_left(String &output, StringView text, usize width) throws
     output += ' ';
 }
 
-/* Append text right-justified in a field of the given width, padding before. */
 static fn append_right(String &output, StringView text, usize width) throws
     -> void
 {

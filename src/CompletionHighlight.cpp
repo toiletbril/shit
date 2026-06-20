@@ -106,8 +106,7 @@ static fn command_word_prefixes_any(StringView word,
   if (word.find_character('/').has_value()) return false;
 
   let const has_prefix = [&](StringView name) -> bool {
-    return name.length >= word.length &&
-           name.substring_of_length(0, word.length) == word;
+    return name.starts_with(word);
   };
 
   for (let const &builtin_name : builtin_names())
@@ -301,9 +300,7 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
   if (entries == nullptr) return false;
 
   for (let const &entry : *entries)
-    if (entry.name.count() >= partial.length &&
-        entry.name.view().substring_of_length(0, partial.length) == partial)
-    {
+    if (entry.name.view().starts_with(partial)) {
       return true;
     }
 
@@ -447,10 +444,10 @@ static fn color_dollar(StringView line, usize i, usize end,
                        ArrayList<highlight_span> &spans, EvalContext &context,
                        const HashSet &known_vars) throws -> usize
 {
-  /* $(( ... )) is arithmetic, not a command substitution, so its inside colors
-     as an expression of bare names, numbers, and operators rather than a
-     command line. The two opening and two closing parens frame the bytes the
-     arithmetic colorer reads. */
+  /* $(( ... )) frames an arithmetic expression, so its inside colors as bare
+     names, numbers, and operators rather than as a command line. The two
+     opening and two closing parens frame the bytes the arithmetic colorer
+     reads. */
   if (i + 2 < end && line[i + 1] == '(' && line[i + 2] == '(') {
     usize depth = 0;
     let close = end;

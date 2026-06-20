@@ -143,9 +143,11 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
            through all flags first and pick the longest match. */
         let const flag_length = flags[i]->long_name().length;
 
+        /* strncmp stops at the argument's NUL, so a short argument such as --f
+           against the flag --foobar does not read past the argument the way a
+           fixed-length memcmp would. */
         if (flag_length > longest_length &&
-            /* Yay let's add starts_with in C++20. */
-            std::memcmp(flags[i]->long_name().data, flag_start, flag_length) ==
+            std::strncmp(flags[i]->long_name().data, flag_start, flag_length) ==
                 0)
         {
           *result_flag = flags[i];
@@ -540,8 +542,7 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
      the same column. A flag whose names reach the column gets its description
      on the next line. */
   static constexpr usize DESCRIPTION_COLUMN = 26;
-  static constexpr usize WRAP_WIDTH = 80;
-  static constexpr usize TEXT_WIDTH = WRAP_WIDTH - DESCRIPTION_COLUMN;
+  static constexpr usize TEXT_WIDTH = HELP_WRAP_WIDTH - DESCRIPTION_COLUMN;
 
   let const do_render_flag = [&](const shit::Flag *f) throws {
     s += "\n";

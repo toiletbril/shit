@@ -2,7 +2,7 @@
 
 [![Shit is faster than Bash at least by 3 times](https://github.com/toiletbril/shit/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/shit/actions/workflows/ci.yml)
 
-Man, my shell is **shit**™ (built on top of
+Man, my shell is **shit** (built on top of
 [toiletline](https://github.com/toiletbril/toiletline))
 
 Have you even seen warnings from software that uses Bison as it's parsing
@@ -85,7 +85,7 @@ the executable; `cat`, `diff`, `printf` to run the tests; `clang-format`,
 The `MODE` variable controls build type:
 * `rel` is an optimized build;
 * `prof` is an optimized build with debug symbols for profiling;
-* `coverage` is an optimized build with debug symbols for collecting coverage;
+* `cov` is an optimized build with debug symbols for collecting coverage;
 * `dbg` includes all symbols and Asan with Ubsan;
 * `cosmo` is an optimized build which will try to use `cosmoc++` from the
   Cosmopolitan toolchain.
@@ -96,7 +96,7 @@ commands.
 
 An example of the excruciatingly complex build process:
 ```bash
-$ export MODE=<rel/prof/dbg/cosmo>
+$ export MODE=<rel/prof/dbg/cov/cosmo/cosmo_dbg>
 $ make
 $ ./shit --help
 ```

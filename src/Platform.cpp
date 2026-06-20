@@ -834,9 +834,13 @@ fn replace_process(ExecContext &&ec) throws -> void
   /* The program resolved but could not be executed, so the error carries the
      command's location for a caret and the caller exits 126 the way bash does.
    */
+  /* The error reason is read before the String concatenation, since building
+     the message allocates and an allocation could clobber errno that
+     last_system_error_message reads. */
+  let const reason = last_system_error_message();
   throw shit::ErrorWithLocation{
-      ec.source_location(), "Unable to execute '" + ec.program_path().text() +
-                                "' because " + last_system_error_message()};
+      ec.source_location(),
+      "Unable to execute '" + ec.program_path().text() + "' because " + reason};
 }
 
 fn redirect_self(const ExecContext &ec) throws -> void
@@ -974,7 +978,13 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
     offset += static_cast<usize>(written);
   }
 
-  lseek(fd, 0, SEEK_SET);
+  /* The descriptor is rewound so the caller reads the bytes just written. A
+     failed rewind would leave it at the end, so it closes and reports None
+     rather than handing back an fd positioned past the data. */
+  if (lseek(fd, 0, SEEK_SET) < 0) {
+    close(fd);
+    return shit::None;
+  }
   return fd;
 }
 
@@ -1008,7 +1018,7 @@ fn wait_and_monitor_process(process pid) throws -> i32
        newline, and every other signal prints the located process message. */
     if (sig == SIGPIPE) {
       /* Silent, the expected end of a pipeline producer. */
-    } else if (sig & ~(SIGINT)) {
+    } else if (sig != SIGINT) {
       shit::print("[Process " + utils::int_to_text(pid) + ": " + sig_desc +
                   ", signal " + utils::int_to_text(sig) + "]\n");
     } else {
@@ -3222,10 +3232,9 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
 fn current_executable_path() wontthrow -> Maybe<String>
 {
   char module_path[MAX_PATH];
-  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0) return shit::None;
-  return String{
-      StringView{module_path}
-  };
+  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
+    return shit::None;
+  return String{StringView{module_path}};
 }
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
