@@ -342,6 +342,49 @@ static fn history_file_path() -> shit::Maybe<shit::Path>
   return path;
 }
 
+static constexpr char SHIT_CALC_HISTORY_FILE[] = ".shit_calc_history";
+
+/* The calc REPL keeps its expression history in ~/.shit_calc_history, apart
+   from the shell command history. The SHIT_CALC_HISTORY environment variable
+   redirects it for a test or a one-off session. None when there is no home and
+   no override. */
+static fn calc_history_file_path() -> shit::Maybe<shit::Path>
+{
+  if (let const override_path =
+          shit::os::get_environment_variable("SHIT_CALC_HISTORY");
+      override_path.has_value() && !override_path->is_empty())
+  {
+    return shit::Path{override_path->view()};
+  }
+  let home = shit::os::get_home_directory();
+  if (!home) return shit::None;
+  let path = home->clone();
+  path.push_component(SHIT_CALC_HISTORY_FILE);
+  return path;
+}
+
+/* The in-memory history is swapped to the calc file on entry and back to the
+   shell file on leave, so a recalled calc expression never lands in the shell
+   command history and a shell command never appears in the calc REPL. The shell
+   history is dumped first so a later reload restores it whole. */
+fn enter_calc_history() -> void
+{
+  if (shit::Maybe<shit::Path> shell = history_file_path(); shell.has_value())
+    ::tl_history_dump(shell->c_str());
+
+  if (shit::Maybe<shit::Path> calc = calc_history_file_path(); calc.has_value())
+    ::tl_history_load(calc->c_str());
+}
+
+fn leave_calc_history() -> void
+{
+  if (shit::Maybe<shit::Path> calc = calc_history_file_path(); calc.has_value())
+    ::tl_history_dump(calc->c_str());
+
+  if (shit::Maybe<shit::Path> shell = history_file_path(); shell.has_value())
+    ::tl_history_load(shell->c_str());
+}
+
 fn set_title(const String &title) -> void
 {
   /* A terminal that rejects the title escape is cosmetic, not an error worth
@@ -364,6 +407,11 @@ fn disable_completion() -> void
   ::tl_set_highlight_callback(nullptr);
   ::tl_set_ghost_validate_callback(nullptr);
 }
+
+/* True while the shell completion and highlighter are registered, so the calc
+   REPL restores them on leave only when they were on, leaving a -T shell
+   completion-free. */
+fn completion_is_enabled() -> bool { return COMPLETION_CONTEXT != nullptr; }
 
 fn enable_job_notifications(shit::EvalContext &context) -> void
 {

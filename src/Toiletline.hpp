@@ -40,6 +40,14 @@ String expand_prompt_template(StringView prompt, shit::EvalContext &context);
 void enable_completion(shit::EvalContext &context);
 void disable_completion();
 
+/* True while the shell completion and highlighter are registered. */
+bool completion_is_enabled();
+
+/* Swap the in-memory history to ~/.shit_calc_history on entry to the calc REPL
+   and back to the shell command history on leave, so the two never mix. */
+void enter_calc_history();
+void leave_calc_history();
+
 /* Register the set -b wake hook on the editor, so a finished background job
    reports above the live prompt. Independent of completion so -T keeps it. */
 void enable_job_notifications(shit::EvalContext &context);

@@ -127,14 +127,31 @@ fn run_repl(ExecContext &ec, EvalContext &cxt) throws -> i32
      the editor REPL takes raw mode for itself the way the main loop does and
      restores it on the way out. Without this the kernel and the editor both
      echo the line, the control keys leak, and the editor state goes invalid. */
-  if (should_use_editor) toiletline::enter_raw_mode();
+  /* The shell completion and the syntax highlighter read shell tokens, which a
+     calc expression is not, so they are turned off for the REPL while the
+     native toiletline line editing and history navigation stay. The prior state
+     is captured so a -T shell is left completion-free on the way out. The
+     history swaps to ~/.shit_calc_history so a recalled calc line never mixes
+     with the shell command history. */
+  let const was_completion_enabled =
+      should_use_editor && toiletline::completion_is_enabled();
+  if (should_use_editor) {
+    toiletline::enter_raw_mode();
+    toiletline::disable_completion();
+    toiletline::enter_calc_history();
+  }
+
   defer
   {
-    /* This defer runs in a noexcept scope-exit destructor, and exit_raw_mode
-       throws when the terminal cannot leave raw mode, so the throw is reported
-       here rather than propagated, the way the main loop guards its own call.
-     */
     if (should_use_editor) {
+      toiletline::leave_calc_history();
+      if (was_completion_enabled) toiletline::enable_completion(cxt);
+
+      /* This defer runs in a noexcept scope-exit destructor, and exit_raw_mode
+         throws when the terminal cannot leave raw mode, so the throw is
+         reported here rather than propagated, the way the main loop guards its
+         own call.
+       */
       try {
         toiletline::exit_raw_mode();
       } catch (const Error &error) {
