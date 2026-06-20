@@ -469,24 +469,45 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
                                          throws -> void {
         let const plain_kind = expandable.plain_literal_kind();
         let did_take_fast_path = false;
-        if (plain_kind != Word::PlainLiteral::NotPlain) {
-          let literal = String{expanded_args.allocator()};
-          for (const WordSegment &segment : expandable.segments)
-            literal.append(segment.text.view());
-
+        if (plain_kind == Word::PlainLiteral::PlainNoSplit) {
+          /* The value is constant and never splits, so the memoized
+             concatenation is copied straight into the argument vector. */
+          expanded_args.push(
+              String{expanded_args.allocator(), expandable.constant_value()});
+          did_take_fast_path = true;
+        } else if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
           /* A single unquoted segment still needs the IFS check, since an IFS
              byte in its text would split it into more than one field. */
+          let literal =
+              String{expanded_args.allocator(), expandable.segments[0].text.view()};
+
           let should_split = false;
-          if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
-            for (usize i = 0; i < literal.count(); i++)
-              if (is_field_separator(literal[i])) {
-                should_split = true;
-                break;
-              }
-          }
+          for (usize i = 0; i < literal.count(); i++)
+            if (is_field_separator(literal[i])) {
+              should_split = true;
+              break;
+            }
 
           if (!should_split) {
             expanded_args.push(steal(literal));
+            did_take_fast_path = true;
+          }
+        }
+
+        /* A lone "$@" expands to one field per positional parameter with no
+           splitting and no globbing, so the parameters are copied straight into
+           the vector rather than each routing through a glob_field and the
+           directory scan. This is the hot path of a set -- "$@" extra growth
+           loop, which otherwise pays the full machine once per existing
+           parameter on every turn. */
+        if (!did_take_fast_path && expandable.segments.count() == 1) {
+          const WordSegment &only = expandable.segments[0];
+          if (only.kind == WordSegment::Kind::VariableReference &&
+              only.is_in_double_quotes && only.text.view() == "@")
+          {
+            for (const String &param : m_positional_params)
+              expanded_args.push(
+                  String{expanded_args.allocator(), param.view()});
             did_take_fast_path = true;
           }
         }

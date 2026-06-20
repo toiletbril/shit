@@ -53,6 +53,19 @@ public:
     return low_word == other.low_word && high_word == other.high_word;
   }
 
+  /* The byte length of a key with no embedded NUL, read as the position of the
+     first zero byte and capped at sixteen. A key built from a name round-trips
+     its length here, so a packed match alone does not let a NUL-padded query
+     stand in for a shorter name. */
+  hot mustuse pure fn packed_length() const wontthrow -> usize
+  {
+    for (usize i = 0; i < 8; i++)
+      if (((low_word >> (8 * i)) & 0xFF) == 0) return i;
+    for (usize i = 0; i < 8; i++)
+      if (((high_word >> (8 * i)) & 0xFF) == 0) return 8 + i;
+    return 16;
+  }
+
   /* Unpack the bytes back into a String, stopping at the first NUL or the
      sixteen-byte limit. A key with no embedded NUL and no more than sixteen
      bytes round-trips exactly, which holds for every builtin name. */

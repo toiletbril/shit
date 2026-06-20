@@ -36,9 +36,14 @@ public:
   {
     if (text.count() > 16) return None;
     let const wanted = PackedStringKey::from_view(text);
+    /* A NUL-padded query packs the same as the shorter name it pads, since the
+       pad bytes read as the zero fill, so the length is matched to keep a query
+       such as a name followed by a NUL from dispatching to that name. */
 #pragma clang loop unroll_count(4)
     for (usize i = 0; i < entry_count; i++)
-      if (entries[i].key == wanted) return entries[i].value;
+      if (entries[i].key == wanted &&
+          text.count() == entries[i].key.packed_length())
+        return entries[i].value;
     return None;
   }
 };

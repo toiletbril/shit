@@ -78,7 +78,21 @@ hot fn Word::to_literal_string() const throws -> String
 
 pure fn Word::plain_literal_kind() const wontthrow -> PlainLiteral
 {
-  return optimizer::classify_plain_literal(*this);
+  if (!m_has_cached_plain_kind) {
+    m_cached_plain_kind = optimizer::classify_plain_literal(*this);
+    m_has_cached_plain_kind = true;
+  }
+  return m_cached_plain_kind;
+}
+
+fn Word::constant_value() const throws -> StringView
+{
+  if (!m_has_constant_value) {
+    for (const WordSegment &segment : segments)
+      m_constant_value.append(segment.text.view());
+    m_has_constant_value = true;
+  }
+  return m_constant_value.view();
 }
 
 pure fn Word::is_all_ascii_digits() const wontthrow -> bool

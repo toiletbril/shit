@@ -1253,6 +1253,19 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
          carries a parallel mask the matcher reads. A pattern token that is not
          a plain word, such as a reserved word arm, has no quoting structure and
          stays fully active. */
+      /* A constant literal pattern carries no active glob metacharacter, since
+         the plain-literal class excludes an unquoted star, question, or bracket,
+         so the arm matches on an exact compare and skips the mask build and the
+         glob matcher. */
+      if (pattern_token->kind() == Token::Kind::Word) {
+        const Word &pattern_word =
+            static_cast<const tokens::WordToken *>(pattern_token)->word();
+        if (pattern_word.plain_literal_kind() != Word::PlainLiteral::NotPlain) {
+          if (subject.view() == pattern_word.constant_value()) return true;
+          continue;
+        }
+      }
+
       let pattern_active = ArrayList<bool>{cxt.scratch_allocator()};
       let pattern = String{};
       if (pattern_token->kind() == Token::Kind::Word) {

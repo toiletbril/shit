@@ -134,6 +134,21 @@ public:
   };
 
   pure fn plain_literal_kind() const wontthrow -> PlainLiteral;
+
+  /* The constant value of a PlainNoSplit word, the concatenation of its segment
+     texts. It is built once and reused, since the segments never change after
+     the parse, so a loop body that names the same literal pays the concatenation
+     once rather than once per turn. */
+  fn constant_value() const throws -> StringView;
+
+private:
+  /* The plain-literal class and the constant value are pure functions of the
+     fixed segments, so they are memoized on the word and a tight loop reads the
+     cache rather than rescanning the segments every evaluation. */
+  mutable PlainLiteral m_cached_plain_kind{PlainLiteral::NotPlain};
+  mutable bool m_has_cached_plain_kind{false};
+  mutable String m_constant_value{};
+  mutable bool m_has_constant_value{false};
 };
 
 struct word_assignment_split
