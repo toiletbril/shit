@@ -104,8 +104,9 @@ public:
          and the byte compare is skipped. A longer key shares only its prefix in
          the pack, so it still confirms through the byte compare. */
       if (slot.state == slot::Occupied && slot.packed == wanted &&
-          (key.count() <= 16 ? slot.key.count() == key.count()
-                             : slot.key == key)) [[likely]]
+          (key.count() <= PackedStringKey::BYTE_CAPACITY
+               ? slot.key.count() == key.count()
+               : slot.key == key)) [[likely]]
       {
         return &slot.value;
       }
@@ -173,8 +174,9 @@ public:
          key of sixteen bytes or fewer, the same fast path find and set_value
          use. */
       if (slot.state == slot::Occupied && slot.packed == wanted &&
-          (key.count() <= 16 ? slot.key.count() == key.count()
-                             : slot.key == key))
+          (key.count() <= PackedStringKey::BYTE_CAPACITY
+               ? slot.key.count() == key.count()
+               : slot.key == key))
       {
         /* Free the stored key and value but keep the slot objects alive, so a
            later place into this tombstone assigns into a live object rather
@@ -232,8 +234,9 @@ private:
     for (usize probe = 0; probe < m_capacity; probe++) {
       let &slot = m_slots[i];
       if (slot.state == slot::Occupied && slot.packed == wanted &&
-          (key.count() <= 16 ? slot.key.count() == key.count()
-                             : slot.key == key))
+          (key.count() <= PackedStringKey::BYTE_CAPACITY
+               ? slot.key.count() == key.count()
+               : slot.key == key))
       {
         slot.value = steal(value);
         return &slot.value;

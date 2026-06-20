@@ -34,7 +34,7 @@ public:
 
   hot mustuse fn find(StringView text) const throws -> Maybe<Value>
   {
-    if (text.count() > 16) return None;
+    if (text.count() > PackedStringKey::BYTE_CAPACITY) return None;
     let const wanted = PackedStringKey::from_view(text);
     /* A NUL-padded query packs the same as the shorter name it pads, since the
        pad bytes read as the zero fill, so the length is matched to keep a query
