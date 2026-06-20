@@ -29,6 +29,16 @@ i32 Return::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  /* bash and the default mood reject a return outside a function or a sourced
+     file, reporting the misuse and continuing with status 2, while dash lets
+     the return end the script, so the sh mood falls through to the request
+     below. */
+  if (!cxt.is_posix_mode() && !cxt.in_function_scope() && !cxt.is_sourcing()) {
+    report_soft_builtin_error(
+        ec, cxt, "can only `return' from a function or sourced script");
+    return 2;
+  }
+
   let const status = parse_optional_integer_arg(ec, cxt.last_exit_status());
 
   LOG(Debug, "return stopping the enclosing scope with status %lld",

@@ -615,6 +615,9 @@ public:
     m_is_script_run = is_script_run;
   }
   pure fn in_function_scope() const wontthrow -> bool;
+  /* True while a dot-source or eval run is on the stack, so return knows it has
+     a sourced file to return from even outside a function. */
+  pure fn is_sourcing() const wontthrow -> bool { return m_source_depth > 0; }
   fn declare_local(StringView name) throws -> void;
   /* True when the name already has a local binding in the innermost scope. */
   mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;
@@ -1507,6 +1510,11 @@ public:
   bool dup_err_to_out{false};
   bool dup_out_to_err{false};
   bool dup_out_to_err_came_last{false};
+
+  /* exec -c hands the program an empty environment. The flag rides the context
+     to the spawn site, where the envp becomes a single null instead of environ.
+   */
+  bool should_use_empty_environment{false};
 
   pure fn is_builtin() const wontthrow -> bool;
   pure fn is_unresolved() const wontthrow -> bool;

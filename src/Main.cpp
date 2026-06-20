@@ -784,11 +784,19 @@ fn main(int argc, char **argv) -> int
   let const parse_argc =
       spliced_argv.is_empty() ? argc : static_cast<int>(spliced_argv.count());
 
-  /* A terminal that launches the shell with a broken flag config, such as a
-     removed flag left in SHIT_FLAGS, drops to a rescue prompt on default
-     settings rather than exiting and locking the user out of the pane. The rc
-     chain is skipped in rescue so a broken rc does not compound the failure,
-     and a non-interactive run keeps the usage exit the way dash does. */
+  /* A login shell that launches with a broken flag config, such as a removed
+     flag left in SHIT_FLAGS, drops to a rescue prompt on default settings
+     rather than exiting and locking the user out of the session. A login shell
+     is the lockout-risk case, marked by a dash-prefixed argv[0], a bare - or
+     -bash, so the rescue prompt is offered only there and any other invocation
+     keeps the usage exit the way dash does. The rc chain is skipped in rescue
+     so a broken rc does not compound the failure. */
+  let const invocation_path =
+      argc > 0 ? shit::Path{shit::StringView{argv[0]}} : shit::Path{};
+  let const invocation_name = invocation_path.filename();
+  const bool is_login_invocation =
+      !invocation_name.is_empty() && invocation_name[0] == '-';
+
   bool is_rescue_mode = false;
   let const do_enter_rescue = [&]() {
     shit::show_message("Entering rescue.");
@@ -813,15 +821,15 @@ fn main(int argc, char **argv) -> int
        reader sees which argument the parser rejected. */
     shit::show_message(
         e.to_string(shit::join_command_line(parse_argc, parse_argv)));
-    if (!(shit::os::is_stdin_a_tty() || shit::os::is_stdout_a_tty())) {
+    if (!is_login_invocation) {
       return 2;
     }
     do_enter_rescue();
   } catch (const shit::Error &e) {
     shit::show_message(e.to_string());
-    /* A flag error is a usage error, so a non-interactive shell exits with the
-       POSIX usage status, matching dash. */
-    if (!(shit::os::is_stdin_a_tty() || shit::os::is_stdout_a_tty())) {
+    /* A flag error is a usage error, so a non-login shell exits with the POSIX
+       usage status, matching dash. */
+    if (!is_login_invocation) {
       return 2;
     }
     do_enter_rescue();

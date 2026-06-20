@@ -21,6 +21,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(SHOW, Bool, 'v', "", "Print the resolution of the name in a terse form.");
 FLAG(SHOW_VERBOSE, Bool, 'V', "",
      "Print the resolution of the name verbosely.");
+FLAG(COMMAND_DEFAULT_PATH, Bool, 'p', "",
+     "Resolve against a default PATH that finds the standard utilities.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(CommandBuiltin);
@@ -116,6 +118,18 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   let operand_args = ArrayList<String>{};
   for (usize i = 1; i < args.count(); i++)
     operand_args.push_managed(args[i]);
+
+  /* -p resolves against a default PATH that finds the standard utilities even
+     when the caller's PATH is unset or stripped, the POSIX behavior. The
+     default is in force only while make_from resolves the program, then the
+     resolver reverts to the environment PATH. */
+  let const should_use_default_path = FLAG_COMMAND_DEFAULT_PATH.is_enabled();
+  if (should_use_default_path)
+    utils::set_path_for_resolution(String{"/usr/bin:/bin"});
+  defer
+  {
+    if (should_use_default_path) utils::set_path_for_resolution(shit::None);
+  };
 
   /* An operand that does not resolve is non-fatal, the same as a bare command
      word. Report it to stderr and return 127 rather than letting the not-found

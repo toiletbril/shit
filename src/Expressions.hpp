@@ -438,9 +438,12 @@ protected:
 
   /* The resolution of the command word, memoized so a command run repeatedly in
      a loop body does not search PATH on every iteration. The name guards the
-     cache, since an expanded name from a variable may differ between runs. */
+     cache, since an expanded name from a variable may differ between runs, and
+     the mood guards it too, since a mood-gated builtin such as let resolves
+     differently after a set --mood switch. */
   mutable String m_resolved_name{};
   mutable Maybe<ResolvedCommand> m_resolved_kind{};
+  mutable mimic_mood m_resolved_mood{};
 
   ArrayList<Redirection> m_redirections{heap_allocator()};
   ArrayList<array_builtin_assignment> m_array_args{heap_allocator()};

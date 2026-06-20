@@ -1,0 +1,4 @@
+== login shell with a bad flag enters rescue:
+1
+== non-login shell with the same bad flag does not:
+0

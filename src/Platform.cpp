@@ -20,6 +20,7 @@
 #if SHIT_PLATFORM_IS POSIX
 #include <dirent.h>
 #include <fcntl.h>
+#include <glob.h>
 #include <poll.h>
 #include <pwd.h>
 #include <signal.h>
@@ -223,6 +224,11 @@ fn reopen_terminal_as_stdin() wontthrow -> bool
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 {
   return shell_fd;
+}
+
+fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
+{
+  return static_cast<os::descriptor>(fd_number);
 }
 
 fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
@@ -558,10 +564,15 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
 
   pid_t child_pid = 0;
   /* The shell environment is passed as envp, so a prefix assignment the parent
-     committed before this call reaches the child. */
+     committed before this call reaches the child. An exec -c in a subshell or a
+     pipeline stage instead passes a single null, so the child starts empty. */
+  char *const empty_environment[] = {nullptr};
   const int spawn_error =
       posix_spawn(&child_pid, ec.program_path().c_str(), &file_actions, &attr,
-                  const_cast<char *const *>(child_args.begin()), environ);
+                  const_cast<char *const *>(child_args.begin()),
+                  ec.should_use_empty_environment
+                      ? const_cast<char *const *>(empty_environment)
+                      : environ);
 
   /* An ENOEXEC file is executable but carries no shebang and is not a binary.
      It runs as a shell script in place, the POSIX behavior, rather than failing
@@ -594,6 +605,22 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
   Path result{StringView{resolved_path}};
   free(resolved_path);
   return result;
+}
+
+fn glob_matches(StringView pattern, Allocator allocator) throws
+    -> ArrayList<String>
+{
+  let matches = ArrayList<String>{allocator};
+
+  const String pattern_string{pattern};
+  glob_t glob_result{};
+  if (glob(pattern_string.c_str(), 0, nullptr, &glob_result) == 0) {
+    for (usize i = 0; i < glob_result.gl_pathc; i++)
+      matches.push(String{allocator, StringView{glob_result.gl_pathv[i]}});
+  }
+  globfree(&glob_result);
+
+  return matches;
 }
 
 fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
@@ -820,8 +847,15 @@ fn replace_process(ExecContext &&ec) throws -> void
 
   reset_signal_handlers();
 
-  execv(ec.program_path().c_str(),
-        const_cast<char *const *>(child_args.begin()));
+  /* exec -c replaces the inherited environ with a single null, so the program
+     starts with an empty environment. execve takes the envp explicitly where
+     execv would have read environ. */
+  char *const empty_environment[] = {nullptr};
+  execve(ec.program_path().c_str(),
+         const_cast<char *const *>(child_args.begin()),
+         ec.should_use_empty_environment
+             ? const_cast<char *const *>(empty_environment)
+             : environ);
 
   /* execv returns only on failure. ENOEXEC means the file carries no shebang
      and is not a binary, so it runs as a shell script instead, signalled by
@@ -2167,6 +2201,37 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
   return path.clone();
 }
 
+fn glob_matches(StringView pattern, Allocator allocator) throws
+    -> ArrayList<String>
+{
+  let matches = ArrayList<String>{allocator};
+
+  const String pattern_string{pattern};
+  WIN32_FIND_DATAA find_data;
+  const HANDLE handle = FindFirstFileA(pattern_string.c_str(), &find_data);
+  if (handle == INVALID_HANDLE_VALUE) return matches;
+  defer { FindClose(handle); };
+
+  /* FindFirstFile yields bare names and matches only the last component, so the
+     pattern's directory prefix is kept to rebuild a path the way the POSIX glob
+     returns it. */
+  usize prefix_length = 0;
+  for (usize i = 0; i < pattern.length; i++)
+    if (pattern[i] == '/' || pattern[i] == '\\') prefix_length = i + 1;
+  const StringView prefix = pattern.substring_of_length(0, prefix_length);
+
+  do {
+    const StringView name{find_data.cFileName};
+    if (name == "." || name == "..") continue;
+
+    let entry = String{allocator, prefix};
+    entry += name;
+    matches.push(steal(entry));
+  } while (FindNextFileA(handle, &find_data) != 0);
+
+  return matches;
+}
+
 fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
 {
   /* Windows ownership and ACL checks differ from the POSIX owner and mode bits,
@@ -2191,6 +2256,14 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) return SHIT_INVALID_FD;
   return GetStdHandle(*slot);
+}
+
+fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
+{
+  /* A Windows descriptor is a HANDLE, so the shell fd number is mapped to its C
+     runtime handle the way the -t test maps one. */
+  return reinterpret_cast<os::descriptor>(
+      _get_osfhandle(static_cast<int>(fd_number)));
 }
 
 fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
@@ -2403,12 +2476,20 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
                          HANDLE_FLAG_INHERIT);
   }
 
+  /* exec -c starts the child with an empty environment. An empty CreateProcess
+     environment block is two null bytes, a single empty string closed by the
+     block terminator, while a null pointer means the child inherits the shell's
+     environment. */
+  char empty_environment_block[] = {'\0', '\0'};
+  LPVOID environment_block =
+      ec.should_use_empty_environment ? empty_environment_block : nullptr;
+
   /* CreateProcessA may rewrite lpCommandLine in place, so the owned buffer is
      handed over as a mutable pointer rather than a const view. */
   if (CreateProcessA(ec.program_path().c_str(),
                      const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
-                     should_inherit_handles, 0, nullptr, nullptr, &startup_info,
-                     &process_info) == 0)
+                     should_inherit_handles, 0, environment_block, nullptr,
+                     &startup_info, &process_info) == 0)
   {
     throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
   }

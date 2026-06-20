@@ -207,6 +207,17 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
   return 2;
 }
 
+fn quote_for_declare(StringView value) throws -> String
+{
+  let quoted = String{};
+  for (usize i = 0; i < value.length; i++) {
+    const char c = value[i];
+    if (c == '"' || c == '\\' || c == '$' || c == '`') quoted += '\\';
+    quoted += c;
+  }
+  return quoted;
+}
+
 fn parse_optional_integer_arg(const ExecContext &ec, i64 default_value) throws
     -> i64
 {

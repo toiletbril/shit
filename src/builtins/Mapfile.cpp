@@ -45,33 +45,77 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
   StringView array_name = "MAPFILE";
   /* The maximum number of lines to read, where zero is bash's unlimited. */
   i64 max_lines = 0;
+  /* -s skips this many leading lines, -O begins assigning at this index into
+     the existing array, -d sets the line delimiter, and -u reads from a
+     descriptor.
+   */
+  i64 skip_count = 0;
+  i64 origin = 0;
+  let has_origin = false;
+  char delimiter = '\n';
+  let read_fd = ec.in_fd.value_or(SHIT_STDIN);
+
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
     if (arg == "-t") {
       should_strip_newline = true;
-    } else if (arg == "-n") {
-      if (i + 1 < args.count()) {
-        if (let const count = utils::parse_decimal_integer(args[++i].view());
-            !count.is_error() && count.value() >= 0)
-        {
-          max_lines = count.value();
-        }
-      }
-    } else if (arg.length > 2 && arg[0] == '-' && arg[1] == 'n') {
-      if (let const count = utils::parse_decimal_integer(arg.substring(2));
-          !count.is_error() && count.value() >= 0)
-      {
-        max_lines = count.value();
-      }
-    } else if (!arg.is_empty() && arg[0] == '-') {
       continue;
-    } else {
+    }
+    if (arg.is_empty() || arg[0] != '-' || arg == "-") {
       array_name = arg;
+      continue;
+    }
+
+    /* A value option carries its value as the rest of the cluster or the next
+       operand, the -nN and -n N forms both. */
+    let const letter = arg[1];
+    let value = StringView{};
+    let has_value = false;
+    if (arg.length > 2) {
+      value = arg.substring(2);
+      has_value = true;
+    } else if (i + 1 < args.count() &&
+               (letter == 'n' || letter == 's' || letter == 'O' ||
+                letter == 'd' || letter == 'u'))
+    {
+      value = args[++i].view();
+      has_value = true;
+    }
+
+    if (letter == 'd') {
+      delimiter = value.is_empty() ? '\0' : value[0];
+      continue;
+    }
+
+    if (!has_value) continue;
+
+    if (letter == 'u') {
+      if (let const fd = utils::parse_decimal_integer(value); !fd.is_error())
+        read_fd = os::descriptor_from_fd_number(fd.value());
+      continue;
+    }
+
+    let const number = utils::parse_decimal_integer(value);
+    if (number.is_error() || number.value() < 0) continue;
+    if (letter == 'n') {
+      max_lines = number.value();
+    } else if (letter == 's') {
+      skip_count = number.value();
+    } else if (letter == 'O') {
+      origin = number.value();
+      has_origin = true;
     }
   }
 
   LOG(Debug, "mapfile reading lines into array '%.*s'",
       static_cast<int>(array_name.length), array_name.data);
+
+  /* The skipped lines are read and dropped before any line is stored, so -s
+     advances past them without counting against -n. */
+  for (i64 skipped = 0; skipped < skip_count; skipped++) {
+    bool was_terminated = false;
+    if (!utils::read_line_from_fd(read_fd, was_terminated, delimiter)) break;
+  }
 
   let lines = ArrayList<String>{heap_allocator()};
   loop
@@ -79,19 +123,36 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (max_lines > 0 && static_cast<i64>(lines.count()) >= max_lines) break;
 
     bool was_newline_terminated = false;
-    let const read = utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN),
-                                              was_newline_terminated);
+    let const read =
+        utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter);
     if (!read) break;
 
     let element = String{StringView{*read}};
-    if (!should_strip_newline && was_newline_terminated) {
-      element += "\n";
-    }
+    if (!should_strip_newline && was_newline_terminated)
+      element.push(delimiter);
     lines.push(steal(element));
   }
 
   LOG(Debug, "mapfile stored %zu lines", lines.count());
-  cxt.set_indexed_array(array_name, steal(lines));
+
+  /* -O assigns into the existing array from the origin index, keeping the
+     elements outside the written range, while the plain form replaces the
+     array.
+   */
+  if (has_origin) {
+    for (usize element_index = 0; element_index < lines.count();
+         element_index++)
+    {
+      char index_text[24];
+      const StringView subscript =
+          utils::int_to_text_into(origin + static_cast<i64>(element_index),
+                                  index_text, sizeof(index_text));
+      cxt.assign_array_element(array_name, subscript,
+                               lines[element_index].view(), false);
+    }
+  } else {
+    cxt.set_indexed_array(array_name, steal(lines));
+  }
   return 0;
 }
 

@@ -15,6 +15,8 @@ HELP_DESCRIPTION_DECL(
     "value.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+FLAG(READONLY_PRINT, Bool, 'p', "",
+     "List the read-only variables in a reusable form.");
 
 REGISTER_BUILTIN_FLAGS(Readonly);
 
@@ -32,15 +34,26 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   ASSERT(!args.is_empty());
 
+  /* A bare readonly, and the -p form which strips to the same bare argument
+     vector, list every read-only variable. The bash mood prints the declare -r
+     form bash reloads, while the default and sh moods print the POSIX readonly
+     form dash reloads. */
   if (args.count() == 1) {
+    let const is_declare_form = cxt.is_bash_compatible();
     let out = String{};
     for (let const &name : cxt.readonly_names()) {
-      out += "readonly ";
+      out += is_declare_form ? "declare -r " : "readonly ";
       out += name;
       if (let const value = cxt.get_variable_value(name)) {
-        out += "='";
-        out += value->view();
-        out += "'";
+        if (is_declare_form) {
+          out += "=\"";
+          out += quote_for_declare(value->view());
+          out += "\"";
+        } else {
+          out += "='";
+          out += value->view();
+          out += "'";
+        }
       }
       out += "\n";
     }

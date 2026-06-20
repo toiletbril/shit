@@ -46,6 +46,27 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
     throw Error{"Unable to source the file '" + path +
                 "' because it cannot be opened"};
 
+  /* Operands after the file become the positional parameters the sourced file
+     reads as $1 upward, restored to the caller's afterward. With no extra
+     operand the caller's parameters carry through unchanged, the way bash
+     leaves them. Passing operands to the dot command is a bash extension, so
+     the sh mood ignores them the way dash does. */
+  let const has_extra_args =
+      !cxt.is_posix_mode() && ec.args().count() > path_index + 1;
+  let saved_params = ArrayList<String>{};
+  if (has_extra_args) {
+    let params = ArrayList<String>{};
+    for (usize i = path_index + 1; i < ec.args().count(); i++)
+      params.push_managed(ec.args()[i]);
+
+    saved_params = cxt.take_positional_params();
+    cxt.set_positional_params(steal(params));
+  }
+  defer
+  {
+    if (has_extra_args) cxt.set_positional_params(steal(saved_params));
+  };
+
   return cxt.run_source(*contents, "the file '" + path + "'", true,
                         ec.source_location(), StringView{path});
 }

@@ -1672,6 +1672,12 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
   if (!program.find_character('/').has_value()) {
     resolved_builtin = search_builtin(program.view());
 
+    /* let is a bash extension absent from a POSIX sh, so the sh mood resolves
+       it as an external command and reports it not found the way dash does. */
+    if (resolved_builtin == Builtin::Kind::Let && mood == mimic_mood::Posix) {
+      resolved_builtin = None;
+    }
+
     /* With the shitbox option on, a bare utility name resolves to the shitbox
        builtin, beating an external program the way a busybox applet does. */
     if (!resolved_builtin && is_shitbox_enabled &&

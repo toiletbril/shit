@@ -2,10 +2,9 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
+#include "../Platform.hpp"
 #include "../Shitbox.hpp"
 #include "../Utils.hpp"
-
-#include <glob.h>
 
 /* A deliberately small make. It reads a Makefile, holds the variables and the
    target rules, expands $(NAME) and ${NAME}, applies single-level pattern
@@ -223,18 +222,16 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
 /* The files each space-separated glob in the argument matches, joined by single
    spaces, the way GNU make $(wildcard *.cc) lists sources. A pattern that
    matches nothing contributes no words. */
-static fn make_wildcard(StringView patterns) throws -> String
+static fn make_wildcard(EvalContext &cxt, StringView patterns) throws -> String
 {
   let result = String{};
   for (const String &pattern : split_words(patterns)) {
-    glob_t glob_result{};
-    if (glob(pattern.c_str(), 0, nullptr, &glob_result) == 0) {
-      for (usize k = 0; k < glob_result.gl_pathc; k++) {
-        if (!result.is_empty()) result += ' ';
-        result += glob_result.gl_pathv[k];
-      }
+    for (const String &match :
+         os::glob_matches(pattern.view(), cxt.scratch_allocator()))
+    {
+      if (!result.is_empty()) result += ' ';
+      result += match.view();
     }
-    globfree(&glob_result);
   }
   return result;
 }
@@ -345,7 +342,7 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
                  name.substring_of_length(0, 9) == "wildcard ")
       {
         let const patterns = expand(cxt, mk, name.substring(9), depth + 1);
-        result += make_wildcard(patterns.view()).view();
+        result += make_wildcard(cxt, patterns.view()).view();
       } else if (name.length > 6 && name.substring_of_length(0, 6) == "error ")
       {
         /* $(error text) aborts the build with the message, the way GNU make

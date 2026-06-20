@@ -46,11 +46,39 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  /* -L keeps the logical path, the default, and -P resolves the symlinks to the
+     physical directory. The options combine and stop at the first operand, a --
+     terminator, or a lone dash that names the previous directory. */
+  let is_physical = false;
+  usize operand_index = 1;
+  while (operand_index < ec.args().count()) {
+    const StringView option = ec.args()[operand_index].view();
+    if (option == "--") {
+      operand_index++;
+      break;
+    }
+
+    if (option.length < 2 || option[0] != '-') break;
+    let is_options = true;
+    for (usize k = 1; k < option.length; k++)
+      if (option[k] != 'L' && option[k] != 'P') {
+        is_options = false;
+        break;
+      }
+    if (!is_options) break;
+
+    for (usize k = 1; k < option.length; k++)
+      is_physical = option[k] == 'P';
+    operand_index++;
+  }
+
+  let const operand_count = ec.args().count() - operand_index;
   let arg_path = String{};
 
   /* A lone dash operand names the previous directory, so cd - moves to OLDPWD
      and prints the directory it lands in, the way POSIX and dash do. */
-  let const is_to_previous = ec.args().count() == 2 && ec.args()[1] == "-";
+  let const is_to_previous =
+      operand_count == 1 && ec.args()[operand_index] == "-";
 
   if (is_to_previous) {
     let const old_directory = cxt.get_variable_value("OLDPWD");
@@ -60,9 +88,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                               "because OLDPWD is not set"};
     }
     arg_path.append(old_directory->view());
-  } else if (ec.args().count() > 1) {
-    arg_path.append(ec.args()[1]);
-    for (usize i = 2; i < ec.args().count(); i++) {
+  } else if (operand_count > 0) {
+    arg_path.append(ec.args()[operand_index]);
+    for (usize i = operand_index + 1; i < ec.args().count(); i++) {
       arg_path += ' ';
       arg_path.append(ec.args()[i]);
     }
@@ -84,9 +112,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      entry prints the directory it landed in, the way dash announces a CDPATH
      move. */
   bool was_reached_through_cdpath = false;
-  if (!is_to_previous && ec.args().count() > 1 &&
-      cdpath_search_applies(arg_path))
-  {
+  if (!is_to_previous && operand_count > 0 && cdpath_search_applies(arg_path)) {
     if (let const cdpath = cxt.get_variable_value("CDPATH")) {
       const StringView entries = cdpath->view();
       usize start = 0;
@@ -143,6 +169,13 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             StringView{"Unable to resolve '"} + arg_path +
                 "' because the current directory is unavailable"};
     }
+  }
+
+  /* -P resolves the symlinks so PWD names the physical directory, while the
+     default -L keeps the logical path the operand spelled. A path that does not
+     resolve is left as it stands, so the existence check below reports it. */
+  if (is_physical) {
+    if (let resolved = os::canonical_path(target)) target = resolved.take();
   }
 
   if (target.exists()) {

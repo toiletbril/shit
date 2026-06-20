@@ -28,7 +28,12 @@ i32 Let::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  if (ec.args().count() < 2) return report_usage_error(ec, cxt, ec.program());
+  /* An empty let is an error reported with status 1, the value ((...)) gives a
+     zero result, rather than the usage status 2, matching bash. */
+  if (ec.args().count() < 2) {
+    report_soft_builtin_error(ec, cxt, "expression expected");
+    return 1;
+  }
 
   /* Each argument is one expression, evaluated in order so an earlier
      assignment is visible to a later one, and the last value decides the

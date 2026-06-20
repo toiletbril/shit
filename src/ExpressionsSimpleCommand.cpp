@@ -1275,8 +1275,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* Reuse a memoized resolution when the command word is unchanged, otherwise
      search PATH once and remember the result for the next run. */
-  const bool is_cache_valid =
-      m_resolved_kind.has_value() && program_args[0] == m_resolved_name;
+  const bool is_cache_valid = m_resolved_kind.has_value() &&
+                              program_args[0] == m_resolved_name &&
+                              m_resolved_mood == cxt.mood();
 
   /* A command word that resolves to nothing is non-fatal. Report it to stderr,
      set status 127, and continue so the surrounding list, and-or chain, and
@@ -1317,6 +1318,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       /* The argument vector moved into the context, so the cached name reads
          from it there rather than from the now-emptied local. */
       m_resolved_name = ec.program();
+      m_resolved_mood = cxt.mood();
     }
   }
 

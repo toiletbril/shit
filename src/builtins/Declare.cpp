@@ -45,24 +45,6 @@ REGISTER_BUILTIN_FLAGS(Declare);
 
 namespace shit {
 
-namespace {
-
-/* The value a declare -p line wraps in double quotes, with the characters that
-   are special inside double quotes escaped, so the printed line reloads to the
-   same value the way bash quotes it. */
-String quote_for_declare(StringView value) throws
-{
-  let quoted = String{};
-  for (usize i = 0; i < value.length; i++) {
-    const char c = value[i];
-    if (c == '"' || c == '\\' || c == '$' || c == '`') quoted += '\\';
-    quoted += c;
-  }
-  return quoted;
-}
-
-} // namespace
-
 Declare::Declare() = default;
 
 pure Builtin::Kind Declare::kind() const wontthrow { return Kind::Declare; }

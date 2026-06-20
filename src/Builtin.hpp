@@ -353,6 +353,11 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
 fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
                       StringView program_name) throws -> i32;
 
+/* The value a declare -x, declare -r, or declare -p line wraps in double
+   quotes, with the characters special inside double quotes escaped, so the
+   printed line reloads to the same value the way bash quotes it. */
+fn quote_for_declare(StringView value) throws -> String;
+
 /* The optional first integer argument of a builtin such as exit, return, break,
    continue, and shift, or default_value when no argument is given. A malformed
    argument propagates its parse error to the caller. */

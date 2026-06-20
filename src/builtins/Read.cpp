@@ -25,6 +25,7 @@ FLAG(READ_SILENT, Bool, 's', "", "Do not echo the input from a terminal.");
 FLAG(READ_DELIM, String, 'd', "",
      "Read until the first byte of the given delimiter instead of a newline, "
      "or until a NUL byte when the delimiter is empty.");
+FLAG(READ_FD, String, 'u', "", "Read from the given file descriptor.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Read);
@@ -47,6 +48,27 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   ASSERT(!names.is_empty());
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  /* The array, count, timeout, silent, delimiter, and descriptor options are
+     bash extensions, so the sh mood rejects them the way dash rejects an
+     illegal read option, while -r and -p stay portable. */
+  if (cxt.is_posix_mode() &&
+      (FLAG_READ_ARRAY.is_set() || FLAG_READ_TIMEOUT.is_set() ||
+       FLAG_READ_NCHARS.is_set() || FLAG_READ_SILENT.is_enabled() ||
+       FLAG_READ_DELIM.is_set() || FLAG_READ_FD.is_set()))
+  {
+    report_soft_builtin_error(ec, cxt, "Illegal option");
+    return 2;
+  }
+
+  /* -u reads from the named descriptor rather than the read's own input, which
+     is the command's redirected descriptor or the shell's standard input. */
+  let read_fd = ec.in_fd.value_or(SHIT_STDIN);
+  if (FLAG_READ_FD.is_set()) {
+    if (let const parsed = utils::parse_decimal_integer(FLAG_READ_FD.value());
+        !parsed.is_error())
+      read_fd = os::descriptor_from_fd_number(parsed.value());
+  }
 
   /* A -p prompt prints to standard error, and only when the read's own input is
      a terminal, the way bash stays quiet for a read whose descriptor is
@@ -82,12 +104,45 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
                                                 : FLAG_READ_DELIM.value()[0])
           : '\n';
 
-  /* The command's input descriptor honors a redirection or a heredoc on the
-     read, falling back to the shell's standard input when none is present. The
-     line is copied into a heap String for the splitting below. */
+  /* read -n reads at most the given number of bytes, stopping early on the
+     delimiter, so it never consumes more of a pipe than asked. Reaching the
+     count is a success the way the delimiter is, while end of input before the
+     count yields the short-read status below. With no -n the whole line is
+     read.
+   */
+  i64 max_bytes = 0;
+  if (FLAG_READ_NCHARS.is_set()) {
+    if (let const parsed =
+            utils::parse_decimal_integer(FLAG_READ_NCHARS.value());
+        !parsed.is_error())
+      max_bytes = parsed.value();
+  }
+
   let was_newline_terminated = false;
-  let const read_line = utils::read_line_from_fd(
-      ec.in_fd.value_or(SHIT_STDIN), was_newline_terminated, delimiter);
+  let read_line = Maybe<String>{};
+  if (FLAG_READ_NCHARS.is_set()) {
+    let buffer = String{};
+    i64 bytes_read = 0;
+    while (bytes_read < max_bytes) {
+      char byte = 0;
+      let const got = os::read_fd(read_fd, &byte, 1);
+      if (!got.has_value() || *got == 0) break;
+
+      if (byte == delimiter) {
+        was_newline_terminated = true;
+        break;
+      }
+
+      buffer.push(byte);
+      bytes_read++;
+    }
+
+    if (bytes_read >= max_bytes) was_newline_terminated = true;
+    if (bytes_read > 0 || was_newline_terminated) read_line = steal(buffer);
+  } else {
+    read_line =
+        utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter);
+  }
   if (!read_line) {
     for (usize i = 0; i < operand_count; i++)
       cxt.set_shell_variable(do_operand_name(i), "");

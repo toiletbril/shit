@@ -326,6 +326,11 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void;
    duplication like 2>&1 that points one shell descriptor at another. */
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
 
+/* The descriptor a user-facing fd number names, for read -u and mapfile -u. On
+   POSIX the number is the descriptor, and on Windows it maps to the C runtime
+   handle the way the -t test does. */
+fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor;
+
 /* Point shell_fd at target permanently, the way exec with redirections and no
    command does. Unlike save_and_replace_descriptor it takes no backup. Returns
    false when the dup2 fails. The target descriptor is left for the caller to
@@ -521,6 +526,14 @@ fn shell_has_controlling_terminal() wontthrow -> bool;
    the spec and manpage of what a symlinked command really runs. On Windows it
    returns the input unchanged. */
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>;
+
+/* The paths a shell glob pattern matches, for the shitbox make $(wildcard ...)
+   function. The matches are transient, so the caller passes the arena they live
+   in. A pattern that matches nothing yields an empty list. On Windows the
+   wildcard applies to the last path component the way FindFirstFile expands it.
+ */
+fn glob_matches(StringView pattern, Allocator allocator) throws
+    -> ArrayList<String>;
 
 /* Whether the directory is safe to run a binary from for its --help text, so it
    is owned by root or the current user and is not writable by group or other,

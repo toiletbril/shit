@@ -14,11 +14,21 @@ HELP_SYNOPSIS_DECL("[command [argument ...]]");
 HELP_DESCRIPTION_DECL(
     "The exec builtin replaces the shell with the named command instead of "
     "forking a child, so control does not return on success. The command names "
-    "an executable file, not a builtin. With no command the builtin applies "
-    "its "
-    "redirections to the shell itself and returns.");
+    "an executable file, not a builtin. The -l option prefixes the command's "
+    "zeroth argument with a dash, so the program sees itself as a login shell "
+    "the way login does. The -a option names that zeroth argument, and the -c "
+    "option runs the command with an empty environment. With no command the "
+    "builtin applies its redirections to the shell itself and returns. The "
+    "options are read in the default and bash moods, while the sh mood passes "
+    "them through as the dash exec does.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+FLAG(EXEC_LOGIN, Bool, 'l', "",
+     "Prefix the command's zeroth argument with a dash.");
+FLAG(EXEC_ARGV0, String, 'a', "",
+     "Pass the given name as the zeroth argument.");
+FLAG(EXEC_CLEAR_ENV, Bool, 'c', "",
+     "Run the command with an empty environment.");
 
 REGISTER_BUILTIN_FLAGS(Exec);
 
@@ -30,17 +40,76 @@ pure fn Exec::kind() const wontthrow -> Builtin::Kind { return Kind::Exec; }
 
 fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  unused(cxt);
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  /* exec reads its options before the command name and stops at the first
+     non-option word or at a -- terminator, the way bash does. -l prefixes the
+     command's zeroth argument with a dash so the program reads itself as a
+     login shell, -a names that zeroth argument, and -c hands the program an
+     empty environment. The flags combine in a cluster, while -a takes the rest
+     of its cluster or the next word as its value. The sh mood skips this scan,
+     since the dash exec parses no options and runs the first word as the
+     command. */
+  let should_be_login_shell = false;
+  let should_use_empty_environment = false;
+  let has_custom_argv0 = false;
+  let custom_argv0 = String{};
+  usize command_index = 1;
+
+  if (!cxt.is_posix_mode()) {
+    while (command_index < args.count()) {
+      const StringView arg = args[command_index].view();
+      if (arg == "--") {
+        command_index++;
+        break;
+      }
+
+      if (arg.length < 2 || arg[0] != '-') break;
+
+      let did_consume_value_word = false;
+      for (usize k = 1; k < arg.length; k++) {
+        let const option = arg[k];
+        if (option == 'l') {
+          should_be_login_shell = true;
+        } else if (option == 'c') {
+          should_use_empty_environment = true;
+        } else if (option == 'a') {
+          if (k + 1 < arg.length) {
+            has_custom_argv0 = true;
+            custom_argv0 = arg.substring(k + 1);
+          } else if (command_index + 1 < args.count()) {
+            has_custom_argv0 = true;
+            custom_argv0 = args[command_index + 1];
+            did_consume_value_word = true;
+          } else {
+            report_soft_builtin_error(ec, cxt,
+                                      "Option requires an argument -- a");
+            return 2;
+          }
+
+          break;
+        } else {
+          let option_text = String{};
+          option_text.push(option);
+          report_soft_builtin_error(
+              ec, cxt, StringView{"Invalid option -- "} + option_text);
+          return 2;
+        }
+      }
+
+      command_index++;
+      if (did_consume_value_word) command_index++;
+    }
+  }
+
   /* exec with only redirections changes the shell's own descriptors and
      returns, so the rest of the session inherits them. Inside an in-process
      subshell each touched descriptor is backed up first, so the change stays
      contained at the subshell's end. */
-  if (args.count() == 1) {
+  if (command_index >= args.count()) {
     LOG(Debug, "exec applying redirections to the shell's own descriptors");
     if (ec.in_fd.has_value()) cxt.snapshot_subshell_descriptor(0);
     if (ec.out_fd.has_value()) cxt.snapshot_subshell_descriptor(1);
@@ -49,7 +118,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  let const &command_name = args[1];
+  let const &command_name = args[command_index];
 
   LOG(Info, "exec replacing the shell with '%s'", command_name.c_str());
 
@@ -84,8 +153,20 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let command_args = ArrayList<String>{};
-  for (usize i = 1; i < args.count(); i++)
+  for (usize i = command_index; i < args.count(); i++)
     command_args.push_managed(args[i]);
+
+  /* The zeroth argument the program reads is the -a name when given, otherwise
+     the command word, and -l prepends a dash so the program reads itself as a
+     login shell. The resolved program path is untouched, only argv[0] changes.
+   */
+  if (has_custom_argv0) command_args[0] = custom_argv0;
+
+  if (should_be_login_shell) {
+    let dashed_argv0 = StringView{"-"} + command_args[0];
+    command_args[0] = steal(dashed_argv0);
+  }
+
   let command = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_program(program_path),
       steal(command_args));
@@ -95,6 +176,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   command.dup_err_to_out = ec.dup_err_to_out;
   command.dup_out_to_err = ec.dup_out_to_err;
   command.dup_out_to_err_came_last = ec.dup_out_to_err_came_last;
+  command.should_use_empty_environment = should_use_empty_environment;
 
   /* Inside an in-process subshell, a command substitution, or a pipeline
      stage, the process the exec would replace is that inner scope, not the

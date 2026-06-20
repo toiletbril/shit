@@ -15,11 +15,10 @@ shit: 1:1: warning: A let runs arithmetic as a command.
      1 |  let
        |  ^~~ here.
 note: Use the ((...)) compound so the operands need no quoting.
-shit: 1:1: error: let: Not enough arguments.
+shit: 1:1: error: Builtin 'let': expression expected.
      1 |  let
        |  ^~~ here.
-shit: note: Try `let --help` for more info.
-rc=2
+rc=1
 --- calc with no expression ---
 shit: 1:1: error: calc: Not enough arguments.
      1 |  shitbox calc

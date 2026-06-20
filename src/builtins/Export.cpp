@@ -16,6 +16,10 @@ HELP_DESCRIPTION_DECL(
     "exporting PATH refreshes command resolution.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+FLAG(EXPORT_PRINT, Bool, 'p', "",
+     "List the exported variables in a reusable form.");
+FLAG(EXPORT_UNMARK, Bool, 'n', "",
+     "Remove the export attribute, keeping the variable in the shell.");
 
 REGISTER_BUILTIN_FLAGS(Export);
 
@@ -34,6 +38,59 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   ASSERT(!args.is_empty());
+
+  /* A bare export, and the -p form, list every exported variable. The bash mood
+     prints the declare -x form bash reloads, while the default and sh moods
+     print the POSIX export form dash reloads. The names are sorted so the
+     listing is stable. */
+  if (FLAG_EXPORT_PRINT.is_enabled() || args.count() == 1) {
+    let const is_declare_form = cxt.is_bash_compatible();
+    let names = os::environment_names();
+    names.sort();
+
+    let out = String{};
+    for (let const &name : names) {
+      let const value = os::get_environment_variable(name).value_or(String{});
+      out += is_declare_form ? "declare -x " : "export ";
+      out += name;
+      if (is_declare_form) {
+        out += "=\"";
+        out += quote_for_declare(value.view());
+        out += "\"";
+      } else {
+        out += "='";
+        out += value.view();
+        out += "'";
+      }
+      out += "\n";
+    }
+    ec.print_to_stdout(out);
+    return 0;
+  }
+
+  /* -n removes the export attribute and keeps the variable as a plain shell
+     variable holding the value it had in the environment, the reverse of the
+     move export makes below. */
+  if (FLAG_EXPORT_UNMARK.is_enabled()) {
+    for (usize i = 1; i < args.count(); i++) {
+      /* A NAME=VALUE operand assigns the new value and then unexports NAME,
+         while a bare name keeps the value it held in the environment, the way
+         bash reads export -n. */
+      let const parts = NameValueArg::from(args[i]);
+      let const name = String{parts.get_name()};
+      let const value = parts.get_value().has_value()
+                            ? Maybe<String>{String{*parts.get_value()}}
+                            : os::get_environment_variable(name);
+
+      LOG(All, "export removing '%s' from the environment", name.c_str());
+      cxt.record_environment_change(name);
+      os::unset_environment_variable(name);
+      cxt.unmark_exported(name);
+      if (value.has_value()) cxt.set_shell_variable(name, value->view());
+    }
+
+    return 0;
+  }
 
   let has_error = false;
   for (usize i = 1; i < args.count(); i++) {

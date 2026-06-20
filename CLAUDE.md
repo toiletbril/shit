@@ -10,10 +10,15 @@ interactive editor is a vendored C submodule under src/toiletline.
 The Makefile is src/Makefile. `make MODE=rel` writes the optimized binary to
 ../shit, `make MODE=dbg` writes ../shit-dbg with AddressSanitizer and the
 UndefinedBehaviorSanitizer, and `make MODE=cov` writes ../shit-cov. The default
-mode is dbg. The completion suite needs the debug binary, since
-`--debug-complete-at` is gated behind NDEBUG. Cross compile a Windows binary with
-`make TARGET=Windows_NT MODE=rel` through mingw, and the Alpine musl build links
-a static-pie binary through clang. Prefer a make target over a raw compiler call.
+mode is dbg. A bare `make` builds the shell into its object tree from a clean
+checkout, since the object directories are created as an order-only prerequisite
+and the default goal is the shit target. The completion suite needs the debug
+binary, since `--debug-complete-at` is gated behind NDEBUG. Cross compile a
+Windows binary with `make TARGET=Windows_NT MODE=rel` through mingw, and the
+Alpine musl build links a static-pie binary through clang. Cross-compilation is
+restricted to Windows_NT and Darwin, so a TARGET that differs from the host and
+is neither is rejected, and a Linux target stays native-only. Prefer a make
+target over a raw compiler call.
 Clean a stale artifact with `make clean`, never a bare `rm` of ../shit. `make
 install` and `make uninstall` place the binary, docs/shit.1, and
 completions/shit.bash under PREFIX.
@@ -37,7 +42,8 @@ command_word_is_glob. `--init-moods`, short `-L`, lists the startup flavors to
 load. The mood, the diagnostics toggles, and the three strictness toggles with
 their explicit marks live in one `runtime_state` struct (Eval.hpp), which
 capture and restore copy whole. Main.cpp enters rescue rather than exiting when a
-flag fails to parse at a terminal.
+flag fails to parse in a login shell, the lockout-risk case marked by a
+dash-prefixed argv[0], while any other invocation keeps the usage exit.
 
 All errors are located in all moods.
 

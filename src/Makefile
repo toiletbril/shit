@@ -11,13 +11,16 @@ DIRS := $(wildcard */.)
 SOURCES += $(wildcard */**.cpp)
 HEADERS += $(wildcard */**.hpp)
 
+# The host OS, Windows_NT on Windows and the uname elsewhere.
+ifeq ($(OS), Windows_NT)
+HOST_OS := Windows_NT
+else
+HOST_OS := $(shell uname -s)
+endif
+
 # Windows_NT/Linux/Darwin
 ifeq ($(TARGET),)
-ifeq ($(OS), Windows_NT)
-TARGET := Windows_NT
-else
-TARGET := $(shell uname -s)
-endif
+TARGET := $(HOST_OS)
 endif
 
 # Validate TARGET
@@ -25,6 +28,17 @@ ifneq ($(TARGET), Linux)
 ifneq ($(TARGET), Windows_NT)
 ifneq ($(TARGET), Darwin)
 $(error Unknown target: $(TARGET))
+endif
+endif
+endif
+
+# Cross-compilation is supported only to Windows_NT through mingw and to Darwin
+# through osxcross. A target that differs from the host and is neither is
+# rejected, so a Linux target stays native-only.
+ifneq ($(TARGET), $(HOST_OS))
+ifneq ($(TARGET), Windows_NT)
+ifneq ($(TARGET), Darwin)
+$(error Cross-compilation to '$(TARGET)' from '$(HOST_OS)' is not supported, only Windows_NT and Darwin are cross-compile targets)
 endif
 endif
 endif
@@ -257,6 +271,15 @@ CXXFLAGS += \
 	-static-libgcc \
 	-static-libstdc++
 endif
+
+# A bare `make` builds the shell, the same as `make shit`, rather than the first
+# object the rules below would otherwise name as the default goal.
+.DEFAULT_GOAL := shit
+
+# Every object is built into $(OBJ_DIR), so its directory tree must exist first.
+# The order-only prerequisite creates it before any compile, so a plain
+# `make MODE=rel` from a clean tree works without first running the shit target.
+$(OBJECTS): | dirs
 
 $(OBJ_DIR)/%.o: %.cpp Makefile
 	printf "\tCompiling %-42s $@... %-12s\r" $< ' '

@@ -44,10 +44,31 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
-  /* A leading -name or -number names the signal to send. A numeric form such as
-     -9 names the number directly, while a name such as -KILL or -SIGTERM
-     resolves through the platform table. */
-  if (args.count() > 1 && args[1].length() > 1 && args[1][0] == '-') {
+  /* -s names the signal by name and -n by number, the option forms that name
+     the signal apart from the -SIGNAL shorthand. Both also accept the other
+     spelling, so kill -s 9 and kill -n KILL resolve the same as kill -9. */
+  if (args.count() > 1 && (args[1] == "-s" || args[1] == "-n")) {
+    if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
+
+    let const spec = String{args[2]};
+    if (let const parsed = utils::parse_decimal_integer(spec.view());
+        !parsed.is_error() && !spec.is_empty() && spec[0] >= '0' &&
+        spec[0] <= '9')
+    {
+      signal_number = static_cast<i32>(parsed.value());
+    } else if (let const resolved = os::signal_number_from_name(spec);
+               resolved.has_value())
+    {
+      signal_number = *resolved;
+    } else {
+      throw Error{"'" + spec + "' is not a valid signal"};
+    }
+
+    first_target = 3;
+  } else if (args.count() > 1 && args[1].length() > 1 && args[1][0] == '-') {
+    /* A leading -name or -number names the signal to send. A numeric form such
+       as -9 names the number directly, while a name such as -KILL or -SIGTERM
+       resolves through the platform table. */
     let const name = String{args[1].substring(1)};
     if (let const parsed_signal = utils::parse_decimal_integer(name.view());
         !parsed_signal.is_error() && !name.is_empty() && name[0] >= '0' &&
