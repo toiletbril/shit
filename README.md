@@ -63,11 +63,13 @@ every builtin from `bash` and POSIX standard, with the addition of:
 - `bench` -- built-in benchmark infrastructure inspired by Performance
   Optimizer Observation Platform ([poop](https://github.com/andrewrk/poop) for
   short)
-- `calc` -- an arithmetic evaluator that prints in 128 bits in the default mood
 - and more
 
 It also bundles a busybox-style set of coreutilities behind the `shitbox`
-builtin.
+builtin, including `calc`, an arithmetic evaluator that prints in 128 bits in
+the default mood and keeps the 64-bit wrap in the bash and POSIX moods. A binary
+of the same name on `PATH` is preferred, so a `calc` on `PATH` runs in place of
+the bundled one, unless the shitbox applet mode is enabled.
 
 # Development
 

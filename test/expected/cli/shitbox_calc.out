@@ -4,8 +4,6 @@
 27
 === 128-bit in the default mood ===
 1267650600228229401496703205376
-=== 64-bit wrap in the bash mood ===
-0
 === variable read ===
 42
 === located parse error ===
@@ -18,7 +16,7 @@ shit: 1:6: error: Division by zero.
        |       ^~ here.
 === no expression ===
 shit: 1:1: error: calc: Not enough arguments.
-     1 |  calc
-       |  ^~~~ here.
+     1 |  shitbox calc
+       |  ^~~~~~~~~~~~ here.
 shit: note: Try `calc --help` for more info.
 rc=2

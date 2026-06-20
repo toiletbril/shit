@@ -1,9 +1,9 @@
-#include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Lexer.hpp"
 #include "../Platform.hpp"
+#include "../Shitbox.hpp"
 #include "../Toiletline.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
@@ -11,14 +11,15 @@
 /* calc reuses the shell arithmetic evaluator, so the same operators and the
    same located error messages apply. In the default mood the value is computed
    in 128 bits, so a result wider than a signed 64-bit integer prints in full.
- */
+   It is a shitbox utility, so a calc binary on PATH is preferred and the
+   bundled evaluator runs only when PATH carries none. */
 
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-i] [expression ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The calc builtin evaluates each argument as an arithmetic expression and "
+    "The calc utility evaluates each argument as an arithmetic expression and "
     "prints the value of the last one. In the default mood it computes in 128 "
     "bits. With no expression on a terminal, or with -i, it reads expressions "
     "interactively.");
@@ -27,18 +28,20 @@ FLAG(CALC_INTERACTIVE, Bool, 'i', "interactive",
      "Read and evaluate expressions interactively.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_BUILTIN_FLAGS(Calc);
+REGISTER_SHITBOX_UTIL_FLAGS(Calc);
 
 namespace shit {
 
+namespace shitbox {
+
 Calc::Calc() = default;
 
-pure Builtin::Kind Calc::kind() const wontthrow { return Kind::Calc; }
+pure Utility::Kind Calc::kind() const wontthrow { return Kind::Calc; }
 
 namespace {
 
-fn evaluate_one(ExecContext &ec, EvalContext &cxt, StringView expression) throws
-    -> i32
+fn evaluate_one(const ExecContext &ec, EvalContext &cxt,
+                StringView expression) throws -> i32
 {
   bool nonzero = false;
   try {
@@ -117,7 +120,7 @@ fn try_define(EvalContext &cxt, StringView line) throws -> bool
    falls back to a plain line read with a stderr prompt so the input stays
    deterministic. Ctrl-C and Ctrl-Z echo their indicator and keep the session,
    and a bad line reports and continues rather than ending the session. */
-fn run_repl(ExecContext &ec, EvalContext &cxt) throws -> i32
+fn run_repl(const ExecContext &ec, EvalContext &cxt) throws -> i32
 {
   let const input_fd = ec.in_fd.value_or(SHIT_STDIN);
   let const is_terminal = os::is_fd_a_tty(input_fd);
@@ -240,11 +243,13 @@ fn run_repl(ExecContext &ec, EvalContext &cxt) throws -> i32
 
 } // namespace
 
-i32 Calc::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Calc::execute(const ExecContext &ec, EvalContext &cxt,
+                 const ArrayList<String> &args) const throws -> i32
 {
-  let const operands = PARSE_BUILTIN_ARGS(ec);
+  let const operands = parse_util_operands(FLAG_LIST, args);
+  defer { reset_flags(FLAG_LIST); };
 
-  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   /* calc prints only errors, never the shell's advisory warnings such as the
      unset-variable notice, so the whole run suppresses diagnostics and restores
@@ -257,27 +262,28 @@ i32 Calc::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* With -i, or with no expression on a terminal, calc reads expressions
      interactively. A piped run with no expression keeps the usage error so it
      does not hang waiting on input that is not coming. */
-  let const has_expression = operands.count() >= 2;
+  let const has_expression = !operands.is_empty();
   let const is_interactive =
       FLAG_CALC_INTERACTIVE.is_enabled() ||
       (!has_expression && os::is_stdin_a_tty() && os::is_stdout_a_tty());
   if (is_interactive) return run_repl(ec, cxt);
 
-  if (!has_expression) return report_usage_error(ec, cxt, ec.program());
+  if (!has_expression) return report_usage_error(ec, cxt, args[0].view());
 
-  LOG(Debug, "calc evaluating %zu arithmetic expressions",
-      operands.count() - 1);
+  LOG(Debug, "calc evaluating %zu arithmetic expressions", operands.count());
 
   /* The arguments join into one expression so `calc 1 + 2` reads as a single
      arithmetic expression rather than three separate ones, the way a desk
      calculator and a bare $(( )) do. */
   String expression{};
-  for (usize i = 1; i < operands.count(); i++) {
-    if (i > 1) expression += ' ';
+  for (usize i = 0; i < operands.count(); i++) {
+    if (i > 0) expression += ' ';
     expression += operands[i].view();
   }
 
   return evaluate_one(ec, cxt, expression.view());
 }
+
+} // namespace shitbox
 
 } // namespace shit

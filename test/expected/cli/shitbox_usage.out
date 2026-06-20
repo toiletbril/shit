@@ -22,8 +22,8 @@ shit: note: Try `let --help` for more info.
 rc=2
 --- calc with no expression ---
 shit: 1:1: error: calc: Not enough arguments.
-     1 |  calc
-       |  ^~~~ here.
+     1 |  shitbox calc
+       |  ^~~~~~~~~~~~ here.
 shit: note: Try `calc --help` for more info.
 rc=2
 --- shitbox cp with one operand ---

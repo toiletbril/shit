@@ -61,6 +61,7 @@ public:
     Which,
     WhoAmI,
     Unlink,
+    Calc,
   };
 
   pure virtual Kind kind() const wontthrow = 0;
@@ -107,6 +108,7 @@ inline constexpr StaticStringMap<Utility::Kind>::entry SHITBOX_ENTRIES[] = {
     {SSK("which"),    Utility::Kind::Which   },
     {SSK("whoami"),   Utility::Kind::WhoAmI  },
     {SSK("unlink"),   Utility::Kind::Unlink  },
+    {SSK("calc"),     Utility::Kind::Calc    },
 };
 
 inline constexpr StaticStringMap<Utility::Kind> SHITBOX_UTILS{
@@ -115,7 +117,7 @@ inline constexpr StaticStringMap<Utility::Kind> SHITBOX_UTILS{
 /* The number of Utility::Kind values, the bound of the per-utility flag-list
    table. */
 inline constexpr usize SHITBOX_UTIL_COUNT =
-    static_cast<usize>(Utility::Kind::Unlink) + 1;
+    static_cast<usize>(Utility::Kind::Calc) + 1;
 
 /* The FLAG_LIST of a utility, registered at static-init time by the
    REGISTER_SHITBOX_UTIL_FLAGS line in its file. A utility with no registration
@@ -227,7 +229,8 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Find);                                                                \
   U_CASE(Which);                                                               \
   U_CASE(WhoAmI);                                                              \
-  U_CASE(Unlink)
+  U_CASE(Unlink);                                                              \
+  U_CASE(Calc)
 
 #define UTILITY_STRUCT(u)                                                      \
   class u : public Utility                                                     \
@@ -273,6 +276,7 @@ UTILITY_STRUCT(Find);
 UTILITY_STRUCT(Which);
 UTILITY_STRUCT(WhoAmI);
 UTILITY_STRUCT(Unlink);
+UTILITY_STRUCT(Calc);
 
 /* Shared helpers the utilities lean on. read_fd_to_string slurps a descriptor,
    read_named_or_stdin opens a path or reads the command's input for a "-"

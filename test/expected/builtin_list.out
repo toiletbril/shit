@@ -20,7 +20,6 @@ bench
 bg
 break
 builtin
-calc
 cd
 command
 compgen
@@ -67,14 +66,14 @@ unalias
 unset
 wait
 z
-shit has 55 builtins:
+shit has 54 builtins:
 
   .          :          [          alias      bench      bg         break
-  builtin    calc       cd         command    compgen    complete   compopt
-  continue   declare    echo       eval       exec       exit       export
-  false      fg         getopts    hash       jobs       kill       let
-  local      mapfile    newgrp     printf     pwd        read       readarray
-  readonly   return     set        shift      shitbox    shopt      source
-  test       time       times      trap       true       type       typeset
-  ulimit     umask      unalias    unset      wait       z
+  builtin    cd         command    compgen    complete   compopt    continue
+  declare    echo       eval       exec       exit       export     false
+  fg         getopts    hash       jobs       kill       let        local
+  mapfile    newgrp     printf     pwd        read       readarray  readonly
+  return     set        shift      shitbox    shopt      source     test
+  time       times      trap       true       type       typeset    ulimit
+  umask      unalias    unset      wait       z
 [Code 0]

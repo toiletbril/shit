@@ -242,27 +242,24 @@ installs one such symlink per utility into DIR. In the default shit mood a bare
 utility name also falls back to the bundled utility when PATH holds no binary of
 that name, so a missing system coreutil is filled in. A PATH binary still takes
 precedence.
-.SH SHIT BUILTINS
-These builtins are unique to shit and have no counterpart in bash or dash.
 .TP
 .B calc
-Each argument is evaluated as an arithmetic expression, and the value of the
-last one is printed, with the same operators and located errors the shell
-arithmetic uses. In
-the default mood the value is computed in 128 bits, so a result wider than a
-signed 64-bit integer prints in full, while the Bash and POSIX moods keep the
-64-bit wrap. With no expression on a terminal, or with
+The bundled calc utility evaluates each argument as an arithmetic expression and
+prints the value of the last one, with the same operators and located errors the
+shell arithmetic uses. In the default mood the value is computed in 128 bits, so
+a result wider than a signed 64-bit integer prints in full, while the Bash and
+POSIX moods keep the 64-bit wrap. With no expression on a terminal, or with
 .BR \-i ,
-expressions are read and evaluated interactively through the line editor. The
-shell completion and the syntax highlighter are turned off for the REPL, since a
-calc expression is not a shell command, and the history is kept in
-~/.shit_calc_history apart from the shell command history. An interactive line
-of the form name=value binds the variable to its right-side
-expression without evaluating it. The definition prints nothing and recomputes
-lazily from the variables it names on each later read. An assignment used inside
-an expression, such as
+expressions are read and evaluated interactively through the line editor, with
+the shell completion and the highlighter turned off and the history kept in
+~/.shit_calc_history. An interactive line of the form name=value binds the
+variable to its right-side expression unevaluated, recomputed lazily on each
+later read, and an assignment inside an expression, such as
 .BR "(x = 5) + 1" ,
-returns its value.
+returns its value. A calc binary on PATH is preferred, so the bundled utility
+runs only when PATH holds none, unless the shitbox applet mode is on.
+.SH SHIT BUILTINS
+These builtins are unique to shit and have no counterpart in bash or dash.
 .TP
 .B bench
 Each command is run repeatedly as a measured child, and a summary of the wall
