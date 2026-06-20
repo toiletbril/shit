@@ -103,17 +103,104 @@ inline fn bump_free(void *context, void *pointer, usize length,
 inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
                                                bump_free};
 
+/* A size-classed cache over the C allocator. musl returns a freed page group to
+   the kernel at once, so a tight allocate then free of the same size churns mmap
+   and munmap once per turn, which dominates the bench on Alpine where glibc would
+   have cached the page. A freed block parks on a per-class free list and is
+   handed back on the next request of that class, so the kernel sees a steady
+   working set. The cache is bounded per class so a burst does not pin memory.
+   The pool is single threaded, since the evaluator never shares an allocator
+   across threads, and it is audited in docs/globals-audit.md. */
+struct heap_pool
+{
+  static constexpr usize MIN_CLASS_SHIFT = 4;  /* the smallest class is 16 bytes */
+  static constexpr usize MAX_CLASS_SHIFT = 16; /* the largest pooled block is 64 KiB */
+  static constexpr usize CLASS_COUNT = MAX_CLASS_SHIFT - MIN_CLASS_SHIFT + 1;
+  static constexpr usize MAX_BLOCKS_PER_CLASS = 512;
+
+  struct node
+  {
+    node *next;
+  };
+
+  node *bins[CLASS_COUNT] = {};
+  u32 counts[CLASS_COUNT] = {};
+
+  /* The class shift is the ceiling of the base two logarithm of the length, so a
+     block always covers the request, never below the smallest class. A length
+     above the largest class yields a shift past MAX_CLASS_SHIFT, which take and
+     give read as the uncached path. */
+  hot static fn class_shift_for(usize length) wontthrow -> usize
+  {
+    let const size = length <= (usize{1} << MIN_CLASS_SHIFT)
+                         ? (usize{1} << MIN_CLASS_SHIFT)
+                         : length;
+    let shift = static_cast<usize>(64 - __builtin_clzll(size - 1));
+    if (shift < MIN_CLASS_SHIFT) shift = MIN_CLASS_SHIFT;
+    return shift;
+  }
+
+  hot fn take(usize length) wontthrow -> void *
+  {
+    let const shift = class_shift_for(length);
+    if (shift > MAX_CLASS_SHIFT) return std::malloc(length);
+
+    let const class_index = shift - MIN_CLASS_SHIFT;
+    if (bins[class_index] != nullptr) {
+      let const reused = bins[class_index];
+      bins[class_index] = reused->next;
+      counts[class_index]--;
+      return reused;
+    }
+
+    return std::malloc(usize{1} << shift);
+  }
+
+  hot fn give(void *pointer, usize length) wontthrow -> void
+  {
+    if (pointer == nullptr) return;
+
+    let const shift = class_shift_for(length);
+    if (shift > MAX_CLASS_SHIFT) {
+      std::free(pointer);
+      return;
+    }
+
+    let const class_index = shift - MIN_CLASS_SHIFT;
+    if (counts[class_index] >= MAX_BLOCKS_PER_CLASS) {
+      std::free(pointer);
+      return;
+    }
+
+    let const recycled = static_cast<node *>(pointer);
+    recycled->next = bins[class_index];
+    bins[class_index] = recycled;
+    counts[class_index]++;
+  }
+};
+
+/* The single process-wide cache, one instance across every translation unit
+   through the inline function local static. The pool is trivially destructible,
+   so it registers no exit destructor and its storage stays valid through process
+   teardown. A heap free from a file-scope cache destructor at process exit then
+   reaches live storage whatever the static destruction order names. */
+hot inline fn heap_pool_instance() wontthrow -> heap_pool &
+{
+  static heap_pool pool;
+  return pool;
+}
+
 /* The heap adapter over the C allocator. It frees on demand, so it backs the
    long-lived mutable data the bump model would leak. */
-inline fn heap_alloc(void *context, usize length, usize alignment) wontthrow
+hot inline fn heap_alloc(void *context, usize length, usize alignment) wontthrow
     -> void *
 {
   unused(context);
   /* malloc already meets every alignment up to alignof(max_align_t), so the
-     common request stays on the plain path. An over-aligned type takes
+     common request stays on the pooled path. An over-aligned type takes
      aligned_alloc, whose result std::free accepts the same as a malloc result.
      aligned_alloc wants a size that is a multiple of the alignment, so the
-     length is rounded up. */
+     length is rounded up. The over-aligned path is rare and stays uncached. */
   if (alignment > alignof(max_align_t)) {
     let const rounded_length = (length + alignment - 1) & ~(alignment - 1);
 #if defined(_WIN32)
@@ -124,7 +211,7 @@ inline fn heap_alloc(void *context, usize length, usize alignment) wontthrow
     return std::aligned_alloc(alignment, rounded_length);
 #endif
   }
-  return std::malloc(length);
+  return heap_pool_instance().take(length);
 }
 inline fn heap_resize(void *context, void *pointer, usize old_length,
                       usize new_length, usize alignment) wontthrow -> bool
@@ -136,21 +223,23 @@ inline fn heap_resize(void *context, void *pointer, usize old_length,
   unused(alignment);
   return false;
 }
-inline fn heap_free(void *context, void *pointer, usize length,
-                    usize alignment) wontthrow -> void
+hot inline fn heap_free(void *context, void *pointer, usize length,
+                        usize alignment) wontthrow -> void
 {
   unused(context);
-  unused(length);
-#if defined(_WIN32)
-  /* An over-aligned block came from _aligned_malloc, so it is freed with the
-     matching _aligned_free rather than free. */
   if (alignment > alignof(max_align_t)) {
+#if defined(_WIN32)
+    /* An over-aligned block came from _aligned_malloc, so it is freed with the
+       matching _aligned_free rather than free. */
     _aligned_free(pointer);
+#else
+    /* An over-aligned block came from aligned_alloc, which std::free accepts. It
+       skips the pool, so a pooled block always belongs to one size class. */
+    std::free(pointer);
+#endif
     return;
   }
-#endif
-  unused(alignment);
-  std::free(pointer);
+  heap_pool_instance().give(pointer, length);
 }
 
 inline constexpr Allocator::VTable HEAP_VTABLE{heap_alloc, heap_resize,

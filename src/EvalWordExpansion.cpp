@@ -86,11 +86,23 @@ hot fn EvalContext::expand_word(const Word &word) throws
     }
   };
 
+  /* The glob mask stays empty while every run is inert, since an empty mask
+     reads as all-false through first_active_glob and so skips the heap vector
+     and the per-byte push for a quoted or literal word, the common case. The
+     first active run materializes the mask, back-filling false for the bytes
+     already appended so the mask stays aligned with the text. */
   let do_append_run = [&](StringView text, bool glob_active) {
+    let const text_count_before = current.text.count();
     current.text.append(text);
-    current.glob_active.reserve(current.glob_active.count() + text.length);
-    for (usize k = 0; k < text.length; k++)
-      current.glob_active.push(glob_active);
+
+    if (glob_active || !current.glob_active.is_empty()) {
+      current.glob_active.reserve(current.text.count());
+      while (current.glob_active.count() < text_count_before)
+        current.glob_active.push(false);
+      for (usize k = 0; k < text.length; k++)
+        current.glob_active.push(glob_active);
+    }
+
     has_current = true;
   };
 

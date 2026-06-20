@@ -1068,6 +1068,15 @@ fn build_prompt(shit::EvalContext &context) -> String
   throw shit::Error{"This build has no line editor"};
 }
 
+/* A profiling build renders no prompt, so the template passes through
+   unexpanded rather than walking the escape grammar. */
+fn expand_prompt_template(StringView prompt, shit::EvalContext &context)
+    -> String
+{
+  unused(context);
+  return String{prompt};
+}
+
 } /* namespace toiletline */
 
 #endif /* SHIT_NO_TOILETLINE */

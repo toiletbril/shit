@@ -116,7 +116,13 @@ hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask,
                               bool extglob) wontthrow -> Maybe<usize>
 {
   let open_bracket = Maybe<usize>{};
-  for (usize i = 0; i < mask.count(); i++) {
+  /* The mask is read by text position and an absent tail entry counts as inert,
+     so an empty mask names a fully quoted or literal word with no glob. A byte
+     the mask marks inert opens nothing, including an extglob opener that a quote
+     made literal, which keeps the empty-mask field off the glob path. */
+  for (usize i = 0; i < text.length; i++) {
+    if (i >= mask.count() || !mask[i]) continue;
+
     let const ch = text.data[i];
     /* An extended-glob opener such as @( forces a directory scan, since the
        alternatives it holds match real names. */
@@ -124,7 +130,6 @@ hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask,
         (ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!') &&
         text.data[i + 1] == '(')
       return i;
-    if (!mask[i]) continue;
     if (ch == '*' || ch == '?') return i;
     if (ch == '[') {
       if (!open_bracket) open_bracket = i;

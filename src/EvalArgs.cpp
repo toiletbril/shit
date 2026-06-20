@@ -491,6 +491,84 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
           }
         }
 
+        /* The single-field fast path covers a word that can neither split nor
+           glob, so it expands straight into one argument with no glob_field, no
+           directory scan, and no copy through expand_path. A quoted variable,
+           a literal run, a double-quoted run, and an arithmetic result all
+           qualify. A positional or array reference, an unquoted segment, a
+           substitution, and a leading tilde fall through to the full machine. */
+        if (!did_take_fast_path) {
+          let is_single_field = !expandable.segments.is_empty();
+          for (const WordSegment &segment : expandable.segments) {
+            if (!is_single_field) break;
+
+            if (segment.is_tilde_candidate() && !segment.text.is_empty() &&
+                segment.text.first_character() == '~')
+            {
+              is_single_field = false;
+              break;
+            }
+
+            switch (segment.kind) {
+            case WordSegment::Kind::LiteralText:
+            case WordSegment::Kind::DoubleQuotedText:
+            case WordSegment::Kind::ArithmeticExpansion: break;
+            case WordSegment::Kind::VariableReference: {
+              /* An unquoted reference splits, and a reference naming a
+                 positional list or an array element expands to many fields. The
+                 '@', '*', and '[' bytes mark exactly those, so their absence
+                 leaves a scalar that stays one field. The spec is walked once
+                 for the three markers rather than three times. */
+              let const spec = segment.text.view();
+              let has_multi_field_marker = !segment.is_in_double_quotes;
+              for (usize i = 0; !has_multi_field_marker && i < spec.length; i++) {
+                let const byte = spec[i];
+                if (byte == '@' || byte == '*' || byte == '[') {
+                  has_multi_field_marker = true;
+                }
+              }
+              if (has_multi_field_marker) is_single_field = false;
+            } break;
+            default: is_single_field = false; break;
+            }
+          }
+
+          if (is_single_field) {
+            let value = String{expanded_args.allocator()};
+            for (const WordSegment &segment : expandable.segments) {
+              switch (segment.kind) {
+              case WordSegment::Kind::VariableReference: {
+                /* A plain set scalar reads straight from the store into the
+                   field, skipping the value copy a general expansion returns.
+                   An unset, special, or modified reference still runs the full
+                   parameter expansion. */
+                let const spec = segment.text.view();
+                let is_plain_name =
+                    !spec.is_empty() && lexer::is_variable_name_start(spec[0]);
+                for (usize i = 1; is_plain_name && i < spec.length; i++)
+                  if (!lexer::is_variable_name(spec[i])) is_plain_name = false;
+                if (is_plain_name)
+                  if (let const *stored = lookup_shell_variable(spec)) {
+                    value += stored->view();
+                    break;
+                  }
+                value += apply_parameter_expansion(spec);
+              } break;
+              case WordSegment::Kind::ArithmeticExpansion: {
+                let const number = segment.folded_arithmetic_result.has_value()
+                                       ? *segment.folded_arithmetic_result
+                                       : evaluate_arithmetic_cached(segment);
+                char buffer[24];
+                value += utils::int_to_text_into(number, buffer, sizeof(buffer));
+              } break;
+              default: value += segment.text.view(); break;
+              }
+            }
+            expanded_args.push(steal(value));
+            did_take_fast_path = true;
+          }
+        }
+
         if (!did_take_fast_path) {
           for (glob_field &field : expand_word(expandable)) {
             for (String &g : expand_path(steal(field), location))

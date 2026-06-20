@@ -99,11 +99,13 @@ public:
     for (usize probe = 0; probe < m_capacity; probe++) {
       let const &slot = m_slots[i];
       if (slot.state == slot::Empty) return nullptr;
-      /* The packed compare rejects a mismatch in two words before the byte
-         compare runs, and the byte compare confirms a key past sixteen bytes.
-       */
+      /* The packed compare holds the first sixteen zero-filled bytes, so for a
+         key that short an equal pack and an equal length already prove equality
+         and the byte compare is skipped. A longer key shares only its prefix in
+         the pack, so it still confirms through the byte compare. */
       if (slot.state == slot::Occupied && slot.packed == wanted &&
-          slot.key == key) [[likely]]
+          (key.count() <= 16 ? slot.key.count() == key.count()
+                             : slot.key == key)) [[likely]]
       {
         return &slot.value;
       }
@@ -167,10 +169,12 @@ public:
     for (usize probe = 0; probe < m_capacity; probe++) {
       let &slot = m_slots[i];
       if (slot.state == slot::Empty) return;
-      /* The packed compare rejects a mismatch in two words before the byte
-         compare, the same fast reject find and set_value use. */
+      /* The packed compare with the length check skips the byte compare for a
+         key of sixteen bytes or fewer, the same fast path find and set_value
+         use. */
       if (slot.state == slot::Occupied && slot.packed == wanted &&
-          slot.key == key)
+          (key.count() <= 16 ? slot.key.count() == key.count()
+                             : slot.key == key))
       {
         /* Free the stored key and value but keep the slot objects alive, so a
            later place into this tombstone assigns into a live object rather
@@ -228,7 +232,8 @@ private:
     for (usize probe = 0; probe < m_capacity; probe++) {
       let &slot = m_slots[i];
       if (slot.state == slot::Occupied && slot.packed == wanted &&
-          slot.key == key)
+          (key.count() <= 16 ? slot.key.count() == key.count()
+                             : slot.key == key))
       {
         slot.value = steal(value);
         return &slot.value;

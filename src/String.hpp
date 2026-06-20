@@ -41,7 +41,12 @@ public:
 
   mustuse fn clone() const throws -> String { return String{*this}; }
 
-  ~String() { free_storage(); }
+  /* An inline string owns no external buffer, so the common destruction skips
+     the cold free path with one pointer compare and never leaves this header. */
+  ~String()
+  {
+    if (m_data != m_inline) free_storage();
+  }
 
   /* The allocator this string was built with. */
   mustuse pure fn allocator() const wontthrow -> Allocator
