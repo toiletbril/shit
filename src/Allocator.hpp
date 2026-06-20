@@ -104,17 +104,19 @@ inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
                                                bump_free};
 
 /* A size-classed cache over the C allocator. musl returns a freed page group to
-   the kernel at once, so a tight allocate then free of the same size churns mmap
-   and munmap once per turn, which dominates the bench on Alpine where glibc would
-   have cached the page. A freed block parks on a per-class free list and is
-   handed back on the next request of that class, so the kernel sees a steady
-   working set. The cache is bounded per class so a burst does not pin memory.
-   The pool is single threaded, since the evaluator never shares an allocator
-   across threads, and it is audited in docs/globals-audit.md. */
+   the kernel at once, so a tight allocate then free of the same size churns
+   mmap and munmap once per turn, which dominates the bench on Alpine where
+   glibc would have cached the page. A freed block parks on a per-class free
+   list and is handed back on the next request of that class, so the kernel sees
+   a steady working set. The cache is bounded per class so a burst does not pin
+   memory. The pool is single threaded, since the evaluator never shares an
+   allocator across threads, and it is audited in docs/globals-audit.md. */
 struct heap_pool
 {
-  static constexpr usize MIN_CLASS_SHIFT = 4;  /* the smallest class is 16 bytes */
-  static constexpr usize MAX_CLASS_SHIFT = 16; /* the largest pooled block is 64 KiB */
+  static constexpr usize MIN_CLASS_SHIFT =
+      4; /* the smallest class is 16 bytes */
+  static constexpr usize MAX_CLASS_SHIFT =
+      16; /* the largest pooled block is 64 KiB */
   static constexpr usize CLASS_COUNT = MAX_CLASS_SHIFT - MIN_CLASS_SHIFT + 1;
   static constexpr usize MAX_BLOCKS_PER_CLASS = 512;
 
@@ -126,8 +128,8 @@ struct heap_pool
   node *bins[CLASS_COUNT] = {};
   u32 counts[CLASS_COUNT] = {};
 
-  /* The class shift is the ceiling of the base two logarithm of the length, so a
-     block always covers the request, never below the smallest class. A length
+  /* The class shift is the ceiling of the base two logarithm of the length, so
+     a block always covers the request, never below the smallest class. A length
      above the largest class yields a shift past MAX_CLASS_SHIFT, which take and
      give read as the uncached path. */
   hot static fn class_shift_for(usize length) wontthrow -> usize
@@ -181,9 +183,10 @@ struct heap_pool
 
 /* The single process-wide cache, one instance across every translation unit
    through the inline function local static. The pool is trivially destructible,
-   so it registers no exit destructor and its storage stays valid through process
-   teardown. A heap free from a file-scope cache destructor at process exit then
-   reaches live storage whatever the static destruction order names. */
+   so it registers no exit destructor and its storage stays valid through
+   process teardown. A heap free from a file-scope cache destructor at process
+   exit then reaches live storage whatever the static destruction order names.
+ */
 hot inline fn heap_pool_instance() wontthrow -> heap_pool &
 {
   static heap_pool pool;
@@ -233,8 +236,8 @@ hot inline fn heap_free(void *context, void *pointer, usize length,
        matching _aligned_free rather than free. */
     _aligned_free(pointer);
 #else
-    /* An over-aligned block came from aligned_alloc, which std::free accepts. It
-       skips the pool, so a pooled block always belongs to one size class. */
+    /* An over-aligned block came from aligned_alloc, which std::free accepts.
+       It skips the pool, so a pooled block always belongs to one size class. */
     std::free(pointer);
 #endif
     return;

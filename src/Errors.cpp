@@ -354,10 +354,10 @@ cold fn ErrorBase::note_to_string() const throws -> String
 
   /* A note that already ends in terminal punctuation, such as a "Did you
      mean ...?" suggestion, keeps its own mark rather than gaining a second. */
-  let const note_period = (m_note.back() == '.' || m_note.back() == '?' ||
-                           m_note.back() == '!')
-                              ? ""
-                              : ".";
+  let const note_period =
+      (m_note.back() == '.' || m_note.back() == '?' || m_note.back() == '!')
+          ? ""
+          : ".";
 
   return String{"\n"} + color.severity + "note" + color.reset + ": " +
          color.message + m_note + note_period + color.reset;
@@ -481,7 +481,8 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
     result += m_message;
 
     /* A message that already ends in terminal punctuation, such as a "Did you
-       mean ...?" suggestion, keeps its own mark rather than gaining a second. */
+       mean ...?" suggestion, keeps its own mark rather than gaining a second.
+     */
     if (let const last_char = m_message.back();
         last_char != '.' && last_char != '?' && last_char != '!')
       result += '.';

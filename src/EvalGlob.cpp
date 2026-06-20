@@ -118,8 +118,8 @@ hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask,
   let open_bracket = Maybe<usize>{};
   /* The mask is read by text position and an absent tail entry counts as inert,
      so an empty mask names a fully quoted or literal word with no glob. A byte
-     the mask marks inert opens nothing, including an extglob opener that a quote
-     made literal, which keeps the empty-mask field off the glob path. */
+     the mask marks inert opens nothing, including an extglob opener that a
+     quote made literal, which keeps the empty-mask field off the glob path. */
   for (usize i = 0; i < text.length; i++) {
     if (i >= mask.count() || !mask[i]) continue;
 

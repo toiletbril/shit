@@ -137,8 +137,8 @@ public:
 
   /* The constant value of a PlainNoSplit word, the concatenation of its segment
      texts. It is built once and reused, since the segments never change after
-     the parse, so a loop body that names the same literal pays the concatenation
-     once rather than once per turn. */
+     the parse, so a loop body that names the same literal pays the
+     concatenation once rather than once per turn. */
   fn constant_value() const throws -> StringView;
 
 private:

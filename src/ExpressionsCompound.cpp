@@ -1254,9 +1254,9 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
          a plain word, such as a reserved word arm, has no quoting structure and
          stays fully active. */
       /* A constant literal pattern carries no active glob metacharacter, since
-         the plain-literal class excludes an unquoted star, question, or bracket,
-         so the arm matches on an exact compare and skips the mask build and the
-         glob matcher. */
+         the plain-literal class excludes an unquoted star, question, or
+         bracket, so the arm matches on an exact compare and skips the mask
+         build and the glob matcher. */
       if (pattern_token->kind() == Token::Kind::Word) {
         const Word &pattern_word =
             static_cast<const tokens::WordToken *>(pattern_token)->word();

@@ -35,8 +35,9 @@ struct glob_field
 };
 
 /* The index of the first active glob metacharacter in a field, or None when the
-   field is all literal. The argument expander reads it to push a glob-free field
-   straight through, skipping the directory scan that expand_path would run. */
+   field is all literal. The argument expander reads it to push a glob-free
+   field straight through, skipping the directory scan that expand_path would
+   run. */
 hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask,
                               bool extglob) wontthrow -> Maybe<usize>;
 

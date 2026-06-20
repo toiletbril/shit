@@ -42,7 +42,8 @@ public:
   mustuse fn clone() const throws -> String { return String{*this}; }
 
   /* An inline string owns no external buffer, so the common destruction skips
-     the cold free path with one pointer compare and never leaves this header. */
+     the cold free path with one pointer compare and never leaves this header.
+   */
   ~String()
   {
     if (m_data != m_inline) free_storage();

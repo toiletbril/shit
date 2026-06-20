@@ -478,8 +478,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         } else if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
           /* A single unquoted segment still needs the IFS check, since an IFS
              byte in its text would split it into more than one field. */
-          let literal =
-              String{expanded_args.allocator(), expandable.segments[0].text.view()};
+          let literal = String{expanded_args.allocator(),
+                               expandable.segments[0].text.view()};
 
           let should_split = false;
           for (usize i = 0; i < literal.count(); i++)
@@ -517,7 +517,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
            directory scan, and no copy through expand_path. A quoted variable,
            a literal run, a double-quoted run, and an arithmetic result all
            qualify. A positional or array reference, an unquoted segment, a
-           substitution, and a leading tilde fall through to the full machine. */
+           substitution, and a leading tilde fall through to the full machine.
+         */
         if (!did_take_fast_path) {
           let is_single_field = !expandable.segments.is_empty();
           for (const WordSegment &segment : expandable.segments) {
@@ -542,7 +543,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
                  for the three markers rather than three times. */
               let const spec = segment.text.view();
               let has_multi_field_marker = !segment.is_in_double_quotes;
-              for (usize i = 0; !has_multi_field_marker && i < spec.length; i++) {
+              for (usize i = 0; !has_multi_field_marker && i < spec.length; i++)
+              {
                 let const byte = spec[i];
                 if (byte == '@' || byte == '*' || byte == '[') {
                   has_multi_field_marker = true;
@@ -580,7 +582,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
                                        ? *segment.folded_arithmetic_result
                                        : evaluate_arithmetic_cached(segment);
                 char buffer[24];
-                value += utils::int_to_text_into(number, buffer, sizeof(buffer));
+                value +=
+                    utils::int_to_text_into(number, buffer, sizeof(buffer));
               } break;
               default: value += segment.text.view(); break;
               }
@@ -595,7 +598,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
             /* A field with no active glob is its own single result, so it is
                pushed straight in, skipping the directory scan and the result
                vector expand_path would build for it. This is the per-field hot
-               path of an unquoted command substitution split into many words. */
+               path of an unquoted command substitution split into many words.
+             */
             if (!m_enable_path_expansion ||
                 !first_active_glob(field.text.view(), field.glob_active,
                                    extglob_enabled())
