@@ -649,6 +649,7 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("kubens"),            "--help"     },
         {SSK("kustomize"),         "--help"     },
         {SSK("skaffold"),          "--help"     },
+        {SSK("flamegraph"),        "--help"     },
         /* Cloud and infrastructure. */
         {SSK("doctl"),             "--help"     },
         {SSK("flyctl"),            "--help"     },
