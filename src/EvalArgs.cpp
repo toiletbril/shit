@@ -592,6 +592,18 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
 
         if (!did_take_fast_path) {
           for (glob_field &field : expand_word(expandable)) {
+            /* A field with no active glob is its own single result, so it is
+               pushed straight in, skipping the directory scan and the result
+               vector expand_path would build for it. This is the per-field hot
+               path of an unquoted command substitution split into many words. */
+            if (!m_enable_path_expansion ||
+                !first_active_glob(field.text.view(), field.glob_active,
+                                   extglob_enabled())
+                     .has_value())
+            {
+              expanded_args.push_managed(field.text.view());
+              continue;
+            }
             for (String &g : expand_path(steal(field), location))
               expanded_args.push_managed(StringView{g.c_str(), g.count()});
           }

@@ -107,11 +107,11 @@ fn EvalContext::expand_path_once(const glob_field &field,
   return expanded;
 }
 
-namespace {
-
 /* The index of the first active metacharacter that actually forms a glob. A '['
    without a later ']' is a literal bracket, so the command word '[' needs no
-   directory scan. None when the field is all literal. */
+   directory scan. None when the field is all literal. The argument expander
+   reads it to push a glob-free field without the directory scan, so it lives in
+   the shit namespace rather than this file. */
 hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask,
                               bool extglob) wontthrow -> Maybe<usize>
 {
@@ -139,6 +139,8 @@ hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask,
   }
   return shit::None;
 }
+
+namespace {
 
 /* The recursion depth cap for a ** walk, stopping a symlink cycle from looping
    forever. */
