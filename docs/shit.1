@@ -13,28 +13,31 @@ shit \- a fast POSIX and bash compatible shell
 .RI [ argument ...]
 .SH DESCRIPTION
 .B shit
-is a fast POSIX and bash compatible shell. It runs an interactive prompt when
-standard input is a terminal and no script is given, runs a script file named on
-the command line, or runs a command string given with
+is a fast POSIX and bash compatible shell. An interactive prompt is run when
+standard input is a terminal and no script is given. A script file named on the
+command line is run instead, or a command string is run when it is given with
 .BR \-c .
-Before a script runs, the default mood walks the parsed tree to fold constants,
-prune dead branches, and report shellcheck-style diagnostics.
+Before a script runs, the parsed tree is walked by the default mood. Constants
+are folded, dead branches are pruned, and shellcheck-style diagnostics are
+reported.
 .SH MOODS
-The shell runs under one of three moods that set how strict it is. The default
+The shell runs under one of three moods. The mood sets how strict the run is.
+The default
 .B shit
-mood is the strictest bash superset and it warns on the questionable constructs
+mood is the strictest bash superset, and a questionable construct is warned on
 through the analysis stage. The
 .B bash
 mood runs the bash extensions with the analysis stage off. The
 .B sh
-mood behaves like dash. The mood drives the nounset, pipefail, and failglob
-strictness, the analysis stage, and the parser features.
+mood behaves like dash. The nounset, pipefail, and failglob strictness, the
+analysis stage, and the parser features are all driven by the mood.
 .PP
 A binary named or symlinked to
 .BR sh ", " dash ", or " bash
-picks the matching mood and turns diagnostics off. The
+is matched to the corresponding mood, and diagnostics are turned off. The mood
+is changed at runtime by the
 .B set --mood
-builtin changes the mood at runtime, and a
+builtin, and a
 .B set --mood
 inside the rc sticks for the session. An explicit
 .BR "set -u" ", " "set -o pipefail" ", or " "set -o failglob"
@@ -43,137 +46,140 @@ is the script's own ask and survives a later mood switch.
 .SS Mood and startup
 .TP
 .BR \-M ", " \-\-mood =\fINAME\fR
-Select the runtime mood, one of
+The runtime mood is selected, one of
 .BR shit ", " bash ", or " sh .
 .TP
 .BR \-L ", " \-\-init\-moods =\fILIST\fR
-Source the startup files for each listed mood, in order, given comma separated or
-by repeating the flag. The
+The startup files for each listed mood are sourced, in order. The list is given
+comma separated or by repeating the flag. The
 .B shit
 mood reads /etc/shitrc and ~/.shitrc, the
 .B bash
 mood reads the bash rc and its completion, and the
 .B sh
-mood reads the file named by ENV. Defaults to the value of
+mood reads the file named by ENV. The list defaults to the value of
 .BR \-\-mood .
 .TP
 .BR \-I ", " \-\-mimicry
-Run a script whose shebang names a shell shit can emulate in-process in the
-matching mood rather than launching the real shell, for speed.
+A script whose shebang names a shell shit can emulate is run in-process in the
+matching mood rather than under the real shell, for speed.
 .TP
 .B \-\-dumb
-Equivalent to
-.BR "\-\-mood sh \-T \-\-no\-diagnostics" .
+The flags
+.BR "\-\-mood sh \-T \-\-no\-diagnostics"
+are applied together.
 .TP
 .BR \-p ", " \-\-privileged
-Skip every startup config file, turned on automatically in the setuid or setgid
-case.
+Every startup config file is skipped. The flag is turned on automatically in the
+setuid or setgid case.
 .TP
 .BI \-\-rcfile= FILE
-Source FILE as the interactive rc instead of ~/.bashrc.
+FILE is sourced as the interactive rc instead of ~/.bashrc.
 .SS Diagnostics
 .TP
 .BR \-W ", " \-\-force\-warnings
-Keep the analysis stage but report every error as a warning and let the run
-proceed.
+The analysis stage is kept, but every error is reported as a warning and the run
+proceeds.
 .TP
 .B \-\-no\-diagnostics
-Skip the analysis stage so evaluation begins sooner.
+The analysis stage is skipped, so evaluation begins sooner.
 .TP
 .B \-\-no\-init\-diagnostics
-Suppress diagnostics and warnings only while the startup files source, then
-restore them for the prompt. Pairs with
+Diagnostics and warnings are suppressed only while the startup files source,
+then restored for the prompt. The flag pairs with
 .BR \-W .
 .TP
 .B \-\-list\-diagnostics
-List the shellcheck-style checks the analysis stage reports, then exit.
+The shellcheck-style checks the analysis stage reports are listed, then the
+shell exits.
 .TP
 .BR \-T ", " \-\-no\-completion
-Disable interactive tab completion and ghost-text.
+Interactive tab completion and ghost-text are disabled.
 .TP
 .B \-\-enable\-shitbox
-Resolve the bundled shitbox utility names such as
+The bundled shitbox utility names such as
 .BR ls ", " mkdir ", and " cp
-directly as commands, the same as
+resolve directly as commands, the same as
 .BR "set \-o shitbox" .
 .SS POSIX
 .TP
 .BR \-c " \fICOMMAND\fR"
-Read commands from the string COMMAND.
+Commands are read from the string COMMAND.
 .TP
 .BR \-i ", " \-\-interactive
-Force interactive mode.
+Interactive mode is forced.
 .TP
 .BR \-s ", " \-\-stdin
-Read commands from standard input.
+Commands are read from standard input.
 .TP
 .BR \-e ", " \-\-error\-exit
-Exit on the first failing command.
+The shell exits on the first failing command.
 .TP
 .BR \-f ", " \-\-no\-glob
-Disable pathname expansion.
+Pathname expansion is disabled.
 .TP
 .BR \-u ", " \-\-no\-unset
-Treat an unset variable as an error.
+An unset variable is treated as an error.
 .TP
 .BR \-C ", " \-\-no\-clobber
-Refuse to overwrite an existing file through a plain redirection.
+An existing file is not overwritten through a plain redirection.
 .TP
 .BR \-n ", " \-\-no\-exec
-Parse the script without running it.
+The script is parsed without being run.
 .TP
 .BR \-t ", " \-\-one\-command
-Read and run a single command, then exit.
+A single command is read and run, then the shell exits.
 .TP
 .BR \-x ", " \-\-xtrace
-Print each command after expansion.
+Each command is printed after expansion.
 .TP
 .BR \-v ", " \-\-verbose
-Print each line as it is read.
+Each line is printed as it is read.
 .TP
 .BR \-a ", " \-\-export\-all
-Mark every later assignment for the environment.
+Every later assignment is marked for the environment.
 .TP
 .BR \-l ", " \-\-login
-Run as a login shell.
+The shell runs as a login shell.
 .SS Information
 .TP
 .B \-\-help
-Display the help message and exit.
+The help message is displayed, then the shell exits.
 .TP
 .B \-\-version
-Display the version and notices and exit.
+The version and notices are displayed, then the shell exits.
 .TP
 .BR \-V ", " \-\-short\-version
-Display the short version and exit.
+The short version is displayed, then the shell exits.
 .SS Debugging
 .TP
 .BR \-A ", " \-\-show\-ast
-Print the syntax tree before executing each command.
+The syntax tree is printed before each command runs.
 .TP
 .BR \-E ", " \-\-show\-exit\-code
-Print the exit code after each command.
+The exit code is printed after each command.
 .TP
 .BR \-R ", " \-\-show\-lexed\-words
-Print the escape bitmap after each parsed command.
+The escape bitmap is printed after each parsed command.
 .TP
 .B \-\-show\-optimizer\-state
-Trace the analysis prepass decisions and print a located line for every node the
-analysis stage eliminated to standard error, then a final summary.
+The analysis prepass decisions are traced, and a located line is printed to
+standard error for every node the analysis stage eliminated, then a final
+summary.
 .TP
 .B \-\-show\-stats
-Print per-command statistics.
+Per-command statistics are printed.
 .TP
 .B \-\-show\-memory
-Print a memory report at exit.
+A memory report is printed at exit.
 .TP
 .BI \-X " LEVEL" "\fR, \fB\-\-debug\-logging=" LEVEL
-Enable internal logging at LEVEL, one of
+Internal logging is enabled at LEVEL, one of
 .BR info ", " debug ", or " all .
-Compiled in only in a debug build.
+The flag is compiled in only in a debug build.
 .TP
 .BI \-\-debug\-logging\-file= FILE
-Append the debug log to FILE instead of standard error.
+The debug log is appended to FILE instead of standard error.
 .SH RESCUE
 When a flag in SHIT_FLAGS or in the argument list fails to parse and standard
 input is a terminal, the shell enters rescue rather than exiting. A
@@ -181,8 +187,8 @@ non-interactive run keeps the usage exit.
 .SH ENVIRONMENT
 .TP
 .B SHIT_FLAGS
-Default flags applied before the command line, where a flag on the command line
-still wins. The recommended value is
+The default flags are applied before the command line. A flag on the command
+line still wins. The recommended value is
 .BR "\-W \-I \-\-init\-moods=shit,bash" .
 .TP
 .B SHIT_HISTORY
@@ -195,7 +201,7 @@ The frecency store the z builtin ranks, ~/.shit_directory_history by default.
 The startup file the sh mood sources.
 .TP
 .B NO_COLOR
-Turn color off in the prompt and the diagnostics when set.
+Color is turned off in the prompt and the diagnostics when the variable is set.
 .SH FILES
 .TP
 .I /etc/shitrc
@@ -221,50 +227,49 @@ routes to that builtin. With the
 .B \-\-enable\-shitbox
 flag or
 .B "set \-o shitbox"
-the utility names resolve directly as commands without the prefix, and a builtin
-still wins over a utility while a utility wins over a program on PATH. A binary
+the utility names resolve directly as commands without the prefix. A builtin
+still wins over a utility, and a utility wins over a program on PATH. A binary
 whose name is a utility, such as a symlink named ls, acts as that utility, and
 the utility's own flags reach its parser rather than the shell.
 .B "shitbox \-\-assimilate DIR"
-installs one such symlink per utility into DIR. In
-the default shit mood a bare utility name also falls back to the bundled utility
-when PATH holds no binary of that name, so a missing system coreutil is filled
-in, while a PATH binary still takes precedence.
-.PP
+installs one such symlink per utility into DIR. In the default shit mood a bare
+utility name also falls back to the bundled utility when PATH holds no binary of
+that name, so a missing system coreutil is filled in. A PATH binary still takes
+precedence.
 .SH SHIT BUILTINS
 These builtins are unique to shit and have no counterpart in bash or dash.
 .TP
 .B calc
-Evaluate each argument as an arithmetic expression and print the value of the
-last one, with the same operators and located errors the shell arithmetic uses.
-A bad expression points a caret under the offending token. In the default mood
-it computes in 128 bits, so a result wider than a signed 64-bit integer prints
-in full, while the bash and posix moods keep the 64-bit wrap. With no expression
-on a terminal, or with
+Each argument is evaluated as an arithmetic expression, and the value of the
+last one is printed, with the same operators and located errors the shell
+arithmetic uses. In
+the default mood the value is computed in 128 bits, so a result wider than a
+signed 64-bit integer prints in full, while the Bash and POSIX moods keep the
+64-bit wrap. With no expression on a terminal, or with
 .BR \-i ,
-it reads and evaluates expressions interactively through the line editor. An
+expressions are read and evaluated interactively through the line editor. An
 interactive line of the form name=value binds the variable to its right-side
-expression without evaluating it, a definition that prints nothing and recomputes
+expression without evaluating it. The definition prints nothing and recomputes
 lazily from the variables it names on each later read. An assignment used inside
 an expression, such as
 .BR "(x = 5) + 1" ,
-returns its value. An unset variable is an error rather than a silent zero, and
-calc prints only errors, never the shell's advisory warnings.
+returns its value.
 .TP
 .B bench
-Run each command repeatedly as a measured child and print a summary of the wall
-time, the peak resident set, and the available perf counters as mean, standard
-deviation, and range. With more than one command it prints each later command
-against the first as a relative speed.
+Each command is run repeatedly as a measured child, and a summary of the wall
+time, the peak resident set, and the available perf counters is printed as mean,
+standard deviation, and range. With more than one command, each later command is
+printed against the first as a relative speed.
 .TP
 .B z
-Change to a frequently visited directory ranked by a frecency store at
-~/.shit_directory_history, which weights each directory by its visit count and
-how recently it was seen. The operands join into one query that matches a
-directory by case insensitive substring.
+The shell changes to a frequently visited directory ranked by a frecency store
+at ~/.shit_directory_history. The store weights each directory by its visit
+count and how recently it was seen. The operands join into one query, and a
+directory
+is matched by case insensitive substring.
 .SH EXIT STATUS
-The shell exits with the status of the last command it ran. A usage error such as
-an unknown flag in a non-interactive run exits with status 2.
+The shell exits with the status of the last command it ran. A usage error such
+as an unknown flag in a non-interactive run exits with status 2.
 .SH SEE ALSO
 .BR bash (1),
 .BR dash (1),
