@@ -15,20 +15,24 @@ jobs:
       # The toolchain installs first so the checkout action has nodejs and git
       # inside the musl container, the build uses clang with lld, and dash, bash,
       # and the coreutils back the benchmark comparisons and the golden tests.
+      # The git-doc pages and the mandoc man reader back the completion golden,
+      # which sources git subcommands from the man1 files and git options from a
+      # man git fork.
       - name: Install the toolchain
         shell: sh
         run: |
           apk add --no-cache \
-            nodejs git make build-base musl-dev linux-headers \
+            nodejs git git-doc make build-base musl-dev linux-headers \
             clang llvm lld compiler-rt \
-            bash dash busybox coreutils
+            bash dash busybox coreutils \
+            mandoc
           git config --global --add safe.directory '*'
           llvm_bin=$(find /usr/lib /usr/bin -name llvm-profdata 2>/dev/null \
             | head -1 | xargs -r dirname)
           [ -n "$llvm_bin" ] && echo "$llvm_bin" >> "$GITHUB_PATH"
           clang++ --version
           ld.lld --version
-          busybox --version
+          busybox | head -1
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,6 +57,7 @@ jobs:
         if: '!cancelled()'
         shell: bash
         run: |
+          ./shit --version
           cd test
           run_min() {
             min=""
@@ -82,6 +87,7 @@ jobs:
         if: '!cancelled()'
         shell: bash
         run: |
+          ./shit --version
           cd test
           run_min() {
             min=""

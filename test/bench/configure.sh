@@ -535,20 +535,29 @@ probe_getopts_loop() {
     report_check "getopts option parsing"
     go_seen=0
     go_rounds=0
+
+    # One long argument vector is parsed in a single forward pass rather than a
+    # fixed list reparsed each round. The OPTIND reset a reparse needs is honored
+    # by some shells and ignored by others, which made the accumulated total
+    # differ across shells.
+    set --
     while [ "$go_rounds" -lt "$SCALE" ]; do
-        OPTIND=1
-        while getopts "vqo:I:" go_flag -v -q -o target -I include -v; do
-            case $go_flag in
-            v) go_seen=$(( go_seen + 1 )) ;;
-            q) go_seen=$(( go_seen + 10 )) ;;
-            o) go_seen=$(( go_seen + ${#OPTARG} * 100 )) ;;
-            I) go_seen=$(( go_seen + ${#OPTARG} * 1000 )) ;;
-            *) go_seen=0 ;;
-            esac
-            WORK_UNITS=$(( WORK_UNITS + 1 ))
-        done
+        set -- "$@" -v -q -o target -I include -v
         go_rounds=$(( go_rounds + 1 ))
     done
+
+    OPTIND=1
+    while getopts "vqo:I:" go_flag "$@"; do
+        case $go_flag in
+        v) go_seen=$(( go_seen + 1 )) ;;
+        q) go_seen=$(( go_seen + 10 )) ;;
+        o) go_seen=$(( go_seen + ${#OPTARG} * 100 )) ;;
+        I) go_seen=$(( go_seen + ${#OPTARG} * 1000 )) ;;
+        *) go_seen=0 ;;
+        esac
+        WORK_UNITS=$(( WORK_UNITS + 1 ))
+    done
+
     note "getopts accumulated $go_seen across $go_rounds rounds"
     report_result "$go_seen"
 }

@@ -314,7 +314,14 @@ get_context_pointing_to(StringView source, usize byte_position,
   if (message.has_value()) {
     msg += ' ';
     msg += *message;
-    msg += '.';
+
+    /* The trailing caret label keeps its own terminal punctuation rather than
+       gaining a second mark, matching the located note path. */
+    let const view = *message;
+    if (let const last_char =
+            view.is_empty() ? '\0' : view.data[view.length - 1];
+        last_char != '.' && last_char != '?' && last_char != '!')
+      msg += '.';
   }
   msg += color.reset;
 
@@ -344,8 +351,16 @@ cold fn ErrorBase::note_to_string() const throws -> String
      rather than as part of the problem statement. Each note literal is written
      capitalized at its source. */
   let const color = diagnostic_colors_for(StringView{"note"});
+
+  /* A note that already ends in terminal punctuation, such as a "Did you
+     mean ...?" suggestion, keeps its own mark rather than gaining a second. */
+  let const note_period = (m_note.back() == '.' || m_note.back() == '?' ||
+                           m_note.back() == '!')
+                              ? ""
+                              : ".";
+
   return String{"\n"} + color.severity + "note" + color.reset + ": " +
-         color.message + m_note + "." + color.reset;
+         color.message + m_note + note_period + color.reset;
 }
 
 cold fn ErrorBase::severity_word() const wontthrow -> String { return "error"; }
@@ -464,7 +479,13 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
     result += ": ";
     result += color.message;
     result += m_message;
-    result += '.';
+
+    /* A message that already ends in terminal punctuation, such as a "Did you
+       mean ...?" suggestion, keeps its own mark rather than gaining a second. */
+    if (let const last_char = m_message.back();
+        last_char != '.' && last_char != '?' && last_char != '!')
+      result += '.';
+
     result += color.reset;
   } else {
     /* A trace frame carries no message, so the location alone follows the
