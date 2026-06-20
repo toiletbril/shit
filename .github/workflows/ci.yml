@@ -108,8 +108,8 @@ jobs:
           case "$bash_seconds" in ''|*[!0-9.]*) echo "bad bash timing"; exit 1;; esac
           case "$shit_seconds" in ''|*[!0-9.]*) echo "bad shit timing"; exit 1;; esac
           awk -v s="$shit_seconds" -v b="$bash_seconds" \
-              'BEGIN { exit !(s + 0 > 0 && s * 3 <= b + 0) }' \
-            || { echo "shit is not at least 3 times faster than bash"; exit 1; }
+              'BEGIN { exit !(s + 0 > 0 && s * 5 <= b + 0) }' \
+            || { echo "shit is not at least 5 times faster than bash"; exit 1; }
 
       - name: Build coverage binary
         if: '!cancelled()'
