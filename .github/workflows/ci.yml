@@ -22,10 +22,8 @@ jobs:
         shell: sh
         run: |
           apk add --no-cache \
-            nodejs git git-doc make build-base musl-dev linux-headers \
-            clang llvm lld compiler-rt \
-            bash dash busybox coreutils \
-            mandoc
+            nodejs git git-doc make build-base musl-dev linux-headers clang \
+            llvm lld compiler-rt yash bash dash zsh busybox coreutils mandoc
           git config --global --add safe.directory '*'
           llvm_bin=$(find /usr/lib /usr/bin -name llvm-profdata 2>/dev/null \
             | head -1 | xargs -r dirname)

@@ -117,6 +117,7 @@ refill:
 
 ZSH ?= zsh
 ASH ?= busybox ash
+YASH ?= yash
 BASH ?= bash
 DASH ?= dash
 
@@ -224,6 +225,7 @@ bench:
 		printf "  %-10s" "$(BASH)"; ( time SCALE=$$scale $(BASH) $(BENCH) >"$$b" 2>&1 ) 2>&1; \
 		printf "  %-10s" "$(ZSH)";  ( time SCALE=$$scale $(ZSH)  $(BENCH) >"$$z" 2>&1 ) 2>&1; \
 		printf "  %-10s" "$(ASH)"; ( time SCALE=$$scale $(ASH) $(BENCH) >"$$g" 2>&1 ) 2>&1; \
+		printf "  %-10s" "$(YASH)"; ( time SCALE=$$scale $(YASH) $(BENCH) >"$$g" 2>&1 ) 2>&1; \
 		printf "  %-10s" "$(BIN)";  ( time SCALE=$$scale $(BIN) --mood sh $(BENCH) >"$$s" 2>&1 ) 2>&1; \
 		if cmp "$$d" "$$s"; then echo "output matches dash"; \
 		else echo "output differs from dash:"; diff "$$d" "$$s" | head -20; fi; \
