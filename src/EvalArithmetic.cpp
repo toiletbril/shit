@@ -1524,28 +1524,30 @@ static fn evaluate_wide_expression(EvalContext *context, StringView expression,
 fn EvalContext::evaluate_arithmetic_wide(StringView expression,
                                          bool &out_nonzero) throws -> String
 {
-  /* The bash and posix moods keep the 64-bit semantics. Only the default mood
-     widens to 128 bits. */
-  if (mood() != mimic_mood::Default) {
-    let const value = evaluate_arithmetic(expression);
-    out_nonzero = value != 0;
-    return utils::int_to_text(value, heap_allocator());
-  }
-
-  if (!expression.find_character('$').has_value() &&
-      !expression.find_character('`').has_value())
+  /* calc always evaluates through the wide parser, so the unset-variable error
+     and the lazy binding apply in every mood rather than only the default. A
+     $ or a ` first expands through the word expander. */
+  String expanded;
+  StringView to_parse = expression;
+  if (expression.find_character('$').has_value() ||
+      expression.find_character('`').has_value())
   {
-    WideArithmeticParser parser{this, expression, 0};
-    parser.is_top_level = true;
-    let const value = parser.parse();
-    out_nonzero = value != 0;
-    return format_wide(value);
+    expanded = expand_modifier_word(expression);
+    to_parse = expanded.view();
   }
 
-  let const expanded_word = expand_modifier_word(expression);
-  WideArithmeticParser parser{this, expanded_word.view(), 0};
+  WideArithmeticParser parser{this, to_parse, 0};
   parser.is_top_level = true;
   let const value = parser.parse();
+
+  /* The default mood prints the full 128-bit value, while the bash and posix
+     moods wrap it to 64 bits the way their shell arithmetic does. */
+  if (mood() != mimic_mood::Default) {
+    let const wrapped = static_cast<i64>(value);
+    out_nonzero = wrapped != 0;
+    return utils::int_to_text(wrapped, heap_allocator());
+  }
+
   out_nonzero = value != 0;
   return format_wide(value);
 }

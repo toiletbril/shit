@@ -1,0 +1,14 @@
+== bash mood: an unset variable is an error, not a silent zero:
+shit: 1:1: error: The variable 'das' is not set.
+     1 |  das
+       |  ^~~ here.
+== bash mood: a name=value binding recomputes lazily on each read:
+7
+== sh mood: the same unset error applies:
+shit: 1:1: error: The variable 'nope' is not set.
+     1 |  nope
+       |  ^~~~ here.
+== bash mood wraps the overflow to 64 bits:
+-9223372036854775808
+== the default mood keeps the full 128-bit value:
+9223372036854775808
