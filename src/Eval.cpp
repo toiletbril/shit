@@ -1071,6 +1071,11 @@ static constexpr usize MAX_FUNCTION_CALL_DEPTH = 900;
    release build overflows the native stack near a thousand levels and a
    sanitizer build past two hundred, so the cap stays well below both. */
 static constexpr usize MAX_SUBSTITUTION_DEPTH = 128;
+/* A cap on nested parameter expansion, which re-enters the dispatch for each
+   ${name:-${...}} default and spends fewer native frames per level than command
+   substitution, so a release build overflows near nine thousand levels and the
+   cap stays well below it. */
+static constexpr usize MAX_PARAMETER_EXPANSION_DEPTH = 256;
 
 fn EvalContext::enter_source(SourceLocation location) throws -> void
 {
@@ -1121,6 +1126,22 @@ fn EvalContext::leave_substitution() wontthrow -> void
 {
   ASSERT(m_substitution_depth > 0);
   m_substitution_depth--;
+}
+
+fn EvalContext::enter_parameter_expansion() throws -> void
+{
+  if (m_parameter_expansion_depth >= MAX_PARAMETER_EXPANSION_DEPTH) {
+    LOG(Debug, "parameter expansion depth %zu exceeds cap %zu",
+        m_parameter_expansion_depth, MAX_PARAMETER_EXPANSION_DEPTH);
+    throw Error{"Parameter expansion nested too deeply"};
+  }
+  m_parameter_expansion_depth++;
+}
+
+fn EvalContext::leave_parameter_expansion() wontthrow -> void
+{
+  ASSERT(m_parameter_expansion_depth > 0);
+  m_parameter_expansion_depth--;
 }
 
 fn EvalContext::set_error_exit(bool enabled) wontthrow -> void

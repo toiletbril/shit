@@ -1,0 +1,6 @@
+== deep nesting is guarded, not crashing:
+1
+== exit status is a clean error, not a signal death:
+ok
+== shallow nesting still expands:
+hi

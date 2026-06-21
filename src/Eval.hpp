@@ -1095,6 +1095,8 @@ public:
   fn leave_function_call() wontthrow -> void;
   fn enter_substitution() throws -> void;
   fn leave_substitution() wontthrow -> void;
+  fn enter_parameter_expansion() throws -> void;
+  fn leave_parameter_expansion() wontthrow -> void;
 
   /* getopts keeps the position inside the current argument here, so -abc is
      parsed one letter per call. last_optind detects an OPTIND reset. */
@@ -1302,6 +1304,7 @@ protected:
   usize m_source_depth{0};
   usize m_function_call_depth{0};
   usize m_substitution_depth{0};
+  usize m_parameter_expansion_depth{0};
 
   /* Set once the startup files finish, so the per-command title is quiet while
      they run. */

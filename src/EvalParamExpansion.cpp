@@ -425,6 +425,12 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 {
   LOG(All, "applying the parameter expansion '${%.*s}'",
       static_cast<int>(spec.length), spec.data);
+
+  /* A nested ${name:-${...}} default re-enters this dispatch at each level, so
+     the depth is capped before the native stack is exhausted. */
+  enter_parameter_expansion();
+  defer { leave_parameter_expansion(); };
+
   if (spec.is_empty()) return String{scratch_allocator()};
 
   /* ${!name} reads the value of the variable that name names, or lists the
