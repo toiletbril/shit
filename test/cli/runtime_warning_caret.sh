@@ -5,7 +5,7 @@ unset SHIT_FLAGS
 script=$(mktemp)
 cat > "$script" <<'EOF'
 previous_statement=1
-[[ -z "$UNSET_COND" ]]
+[[ x = "$UNSET_COND" ]]
 previous_statement=2
 case $UNSET_SUBJECT in *) : ;; esac
 previous_statement=3

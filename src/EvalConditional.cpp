@@ -312,12 +312,17 @@ struct ConditionalEvaluator
       const bool is_existence_test = first_literal.view() == "-v";
       const bool saved_suppress_unset =
           cxt.is_warning_suppressed(suppressible_warning::UnsetReference);
+      const bool saved_suppress_test_operand =
+          cxt.is_warning_suppressed(suppressible_warning::UnsetTestOperand);
+      cxt.set_warning_suppressed(suppressible_warning::UnsetTestOperand, true);
       if (is_existence_test)
         cxt.set_warning_suppressed(suppressible_warning::UnsetReference, true);
       defer
       {
         cxt.set_warning_suppressed(suppressible_warning::UnsetReference,
                                    saved_suppress_unset);
+        cxt.set_warning_suppressed(suppressible_warning::UnsetTestOperand,
+                                   saved_suppress_test_operand);
       };
       const String operand = operand_value(elements[pos - 1]);
       return eval_unary(first_literal.view(), operand.view());
