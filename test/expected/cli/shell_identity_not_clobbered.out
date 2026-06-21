@@ -1,0 +1,7 @@
+== an inherited SHELL is preserved, not clobbered:
+preserved
+== an unset SHELL is seeded with the invocation path:
+seeded-invocation
+== BASH names the invocation symlink while SHELL stays inherited:
+bash-is-invocation
+shell-preserved

@@ -137,11 +137,18 @@ private:
   usize m_value_position{0};
 };
 
+/* operand_value_flag names the one flag whose value is read from the first
+   non-option operand the way the shell's -c command is, so a recognized boolean
+   flag that follows it is parsed as a flag rather than swallowed as the value.
+   It is null for every builtin, which take an option value from the next
+   argument verbatim the way bash's getopt does. */
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
-                   const ArrayList<String> &args,
-                   usize base_position = 0) throws -> ArrayList<String>;
+                   const ArrayList<String> &args, usize base_position = 0,
+                   const Flag *operand_value_flag = nullptr) throws
+    -> ArrayList<String>;
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
-               const char *const *argv, usize base_position = 0) throws
+               const char *const *argv, usize base_position = 0,
+               const Flag *operand_value_flag = nullptr) throws
     -> ArrayList<String>;
 
 /* Join the arguments into one space-separated line, the source a located flag

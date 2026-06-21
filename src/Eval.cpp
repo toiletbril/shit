@@ -154,7 +154,7 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
     versinfo.push(String{"release"});
     versinfo.push(String{SHIT_OS_INFO});
     set_indexed_array("BASH_VERSINFO", steal(versinfo));
-    set_shell_variable("BASH", get_variable_value("SHELL").value_or(String{}));
+    set_shell_variable("BASH", m_shell_executable_path.view());
     /* bash-completion's word reassembly walks COMP_LINE against
        COMP_WORDBREAKS, a missing value collapses every word into one and kills
        completion. */

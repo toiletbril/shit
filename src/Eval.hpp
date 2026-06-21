@@ -341,6 +341,15 @@ public:
      bash identity advertises BASH_VERSION and BASH, every other mode the sh and
      dash version names. */
   fn seed_shell_identity_variables(bool bash_identity) throws -> void;
+
+  /* The pathname used to invoke this shell, the symlink spelling such as
+     /usr/local/bin/bash when shit is symlinked to bash, recorded so BASH names
+     the invocation path the way bash records its own. */
+  fn set_shell_executable_path(StringView path) throws -> void
+  {
+    m_shell_executable_path = String{heap_allocator(), path};
+  }
+
   fn unset_shell_variable(StringView name) throws -> void;
 
   /* Remove a single array element or associative key, backing unset name[sub].
@@ -1249,6 +1258,7 @@ protected:
   u64 m_last_command_duration_ns{0};
 
   String m_shell_name{};
+  String m_shell_executable_path{};
   String m_execution_string{};
   ArrayList<String> m_positional_params{heap_allocator()};
   Maybe<i64> m_last_background_pid{};

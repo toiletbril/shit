@@ -162,8 +162,8 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
 }
 
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
-                   const ArrayList<String> &args, usize base_position) throws
-    -> ArrayList<String>
+                   const ArrayList<String> &args, usize base_position,
+                   const Flag *operand_value_flag) throws -> ArrayList<String>
 {
   let os_argv = ArrayList<const char *>{};
   os_argv.reserve(args.count());
@@ -172,7 +172,7 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
     os_argv.push(arg.c_str());
 
   return parse_flags(flags, static_cast<int>(os_argv.count()), os_argv.begin(),
-                     base_position);
+                     base_position, operand_value_flag);
 }
 
 static fn flag_name(const Flag *f, bool is_long) throws -> String
@@ -189,8 +189,8 @@ static fn flag_name(const Flag *f, bool is_long) throws -> String
 }
 
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
-               const char *const *argv, usize base_position) throws
-    -> ArrayList<String>
+               const char *const *argv, usize base_position,
+               const Flag *operand_value_flag) throws -> ArrayList<String>
 {
   ASSERT(argc >= 0);
 
@@ -212,13 +212,17 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     ASSERT(argv[i] != nullptr);
 
     if (next_arg_is_value) {
-      /* A flag awaiting its value does not swallow a following recognized
-         boolean flag, so `-c -l command` parses -l as the login flag and takes
-         command as the -c value. bash reads the -c command from the first
-         non-option operand the same way, rather than from the option that
-         follows -c. */
+      /* The command flag reads its value from the first non-option operand the
+         way the shell's -c does, so a recognized boolean flag that follows it
+         is parsed as a flag rather than swallowed, and `-c -l command` runs
+         command under -l. This applies to the command flag alone. Every other
+         flag, and every builtin such as read, takes the next argument verbatim,
+         so a delimiter or filename that begins with a dash is kept as the
+         value. */
       bool next_is_known_bool_flag = false;
-      if (argv[i][0] == '-' && argv[i][1] != '\0') {
+      if (prev_flag == operand_value_flag && operand_value_flag != nullptr &&
+          argv[i][0] == '-' && argv[i][1] != '\0')
+      {
         let const is_long_token = argv[i][1] == '-';
         let const token_offset = is_long_token ? &argv[i][2] : &argv[i][1];
         if (*token_offset != '\0') {

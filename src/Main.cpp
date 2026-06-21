@@ -803,7 +803,7 @@ fn main(int argc, char **argv) -> int
     is_rescue_mode = true;
     shit::reset_flags(FLAG_LIST);
     try {
-      file_names = shit::parse_flags(FLAG_LIST, argc, argv);
+      file_names = shit::parse_flags(FLAG_LIST, argc, argv, 0, &FLAG_COMMAND);
     } catch (...) {
       /* The real argv carried the bad flag too, so even the clean reparse
          fails. The program name is kept as the sole operand so $0 and SHELL
@@ -815,7 +815,8 @@ fn main(int argc, char **argv) -> int
   };
 
   try {
-    file_names = shit::parse_flags(FLAG_LIST, parse_argc, parse_argv);
+    file_names =
+        shit::parse_flags(FLAG_LIST, parse_argc, parse_argv, 0, &FLAG_COMMAND);
   } catch (const shit::ErrorWithLocation &e) {
     /* An unknown flag carries a caret into the joined command line, so the
        reader sees which argument the parser rejected. */
@@ -916,12 +917,13 @@ fn main(int argc, char **argv) -> int
       !program_basename.is_empty() && program_basename[0] == '-';
   if (does_name_mark_login) program_basename = program_basename.substring(1);
 
-  /* SHELL, $0, and the shell name a child reads must name a runnable file. A
-     login shell's argv[0] is the shell name with a leading dash and no
-     directory, the form login and getty set, such as -bash or a bare -. The dash
-     marks the login and is not part of a runnable path, so it is dropped here. A
-     dash inside a directory path is a real filename and is left alone, and a bare
-     dash keeps its spelling since it names nothing to run. */
+  /* SHELL and BASH must name a runnable file a child can exec. A login shell's
+     argv[0] is the shell name with a leading dash and no directory, the form
+     login and getty set, such as -bash or a bare -. The dash marks the login
+     and is not part of a runnable path, so it is dropped here for the
+     executable identity. $0 keeps the dashed spelling verbatim the way bash
+     does, below. A dash inside a directory path is a real filename and is left
+     alone, and a bare dash keeps its spelling since it names nothing to run. */
   let executable_path = program_path.clone();
   if (does_name_mark_login && !last_slash.has_value() &&
       program_path.view().length > 1)
@@ -1079,7 +1081,7 @@ fn main(int argc, char **argv) -> int
      first operand as $0 and the rest as the arguments, while an interactive or
      -s shell keeps the shell name as $0 and takes every operand as a positional
      parameter. The context owns both. */
-  let shell_name = executable_path.clone();
+  let shell_name = program_path.clone();
   let positional_params = shit::ArrayList<shit::String>{};
 
   usize first_param_index = 0;
@@ -1151,7 +1153,16 @@ fn main(int argc, char **argv) -> int
 
   /* Seed the standard and shell-specific variables a script may read. The
      version and runtime values come from the build. */
-  context.set_shell_variable("SHELL", executable_path);
+  /* BASH names the path used to invoke this shell, the symlink spelling such as
+     /usr/local/bin/bash when shit is symlinked to bash, and the shit path when
+     shit runs directly. */
+  context.set_shell_executable_path(executable_path);
+  /* SHELL is owned by login, getty, or the display manager, so an inherited
+     value is left untouched the way bash never reassigns it. Only a shell that
+     received no SHELL seeds its own invocation path, which is the symlink
+     spelling when shit is symlinked to bash and the shit path otherwise. */
+  if (!shit::os::get_environment_variable("SHELL").has_value())
+    context.set_shell_variable("SHELL", executable_path);
   context.set_shell_variable("PWD", shit::Path::current_directory().text());
   context.set_shell_variable("SHIT_VERSION", SHIT_VERSION_STRING);
   context.set_shell_variable("SHIT_COMMIT", SHIT_COMMIT_HASH);
