@@ -1086,12 +1086,15 @@ public:
                 Maybe<SourceLocation> call_site = None,
                 Maybe<StringView> filename = None) throws -> i32;
 
-  /* A guard around a nested dot-source, eval run, or function call. Each throws
-     a located error past the recursion cap rather than exhausting memory. */
+  /* A guard around a nested dot-source, eval run, function call, or command
+     substitution. Each throws a located error past the recursion cap rather than
+     exhausting memory. */
   fn enter_source(SourceLocation location) throws -> void;
   fn leave_source() wontthrow -> void;
   fn enter_function_call(SourceLocation location) throws -> void;
   fn leave_function_call() wontthrow -> void;
+  fn enter_substitution() throws -> void;
+  fn leave_substitution() wontthrow -> void;
 
   /* getopts keeps the position inside the current argument here, so -abc is
      parsed one letter per call. last_optind detects an OPTIND reset. */
@@ -1298,6 +1301,7 @@ protected:
      growing the native stack until the process is killed. */
   usize m_source_depth{0};
   usize m_function_call_depth{0};
+  usize m_substitution_depth{0};
 
   /* Set once the startup files finish, so the per-command title is quiet while
      they run. */

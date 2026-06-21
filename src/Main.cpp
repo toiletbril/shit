@@ -64,6 +64,8 @@ FLAG(
 FLAG(PRIVILEGED, Bool, 'p', "privileged", Bash,
      "Run in privileged mode and skip every startup config file. Turned on "
      "automatically when the effective and the real user or group id differ.");
+FLAG(POSIX_COMPAT, Bool, '\0', "posix", Bash,
+     "Run in POSIX mode, equivalent to --mood sh.");
 
 FLAG(MOOD, String, 'M', "mood", Compat,
      "Select the runtime mood, one of 'shit', 'bash', or 'sh'. The default "
@@ -202,6 +204,7 @@ pure static fn resolve_session_mood(mimic_mood invocation_mood) wontthrow
     return mimic_mood::Default;
   }
   if (FLAG_DUMB.is_enabled()) return mimic_mood::Posix;
+  if (FLAG_POSIX_COMPAT.is_enabled()) return mimic_mood::Posix;
   return invocation_mood;
 }
 
@@ -1059,8 +1062,10 @@ fn main(int argc, char **argv) -> int
                          "Falling back to reading files.");
     }
     should_read_files = true;
-  } else {
+  } else if (FLAG_INTERACTIVE.is_enabled() || shit::os::is_stdin_a_tty()) {
     should_be_interactive = true;
+  } else {
+    should_read_stdin = true;
   }
 #if !defined NDEBUG
   /* The completion test driver never prompts, so a bare driver run reads the

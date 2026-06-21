@@ -29,6 +29,10 @@ default is `shit`. Binary symlinked as `sh`, `dash`, or `bash` will pick the
 matching mood and disable diagnostics. `set --mood` changes the mood at
 runtime. `-W` keeps the diagnostics but turns every error into a warning.
 
+`--posix` selects POSIX mode, the same as `--mood sh`. A terminal that re-execs
+the shell with `--posix` to load its integration through the `ENV` file is
+honored rather than rejected.
+
 `-I` is mimicry. **shit** will detect `sh`, `dash`, `bash` shebangs and run the
 script inside itself in the matching mood rather than launching the real shell
 to keep speed and diagnostics.

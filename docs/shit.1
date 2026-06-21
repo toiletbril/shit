@@ -75,6 +75,13 @@ setuid or setgid case.
 .TP
 .BI \-\-rcfile= FILE
 FILE is sourced as the interactive rc instead of ~/.bashrc.
+.TP
+.B \-\-posix
+POSIX mode is selected, the same as
+.BR "\-\-mood sh" .
+A terminal that re-execs the shell with
+.B \-\-posix
+to inject its integration through the ENV file is honored.
 .SS Diagnostics
 .TP
 .BR \-W ", " \-\-force\-warnings

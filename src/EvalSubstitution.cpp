@@ -267,6 +267,11 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
 
+  /* A nested $(...) reparses and re-evaluates its inner command at each level,
+     so the depth is capped here before the native stack is exhausted. */
+  enter_substitution();
+  defer { leave_substitution(); };
+
   /* A cached tree from an earlier arena generation points into reclaimed
      storage, so it is reparsed when the generation no longer matches. */
   const usize generation = AST_ARENA->reset_generation();

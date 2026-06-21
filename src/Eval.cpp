@@ -1066,6 +1066,11 @@ static constexpr usize MAX_SOURCE_DEPTH = 400;
    overflow point at a greater depth by spending fewer native frames per level.
  */
 static constexpr usize MAX_FUNCTION_CALL_DEPTH = 900;
+/* A cap on nested command substitution, which reparses and re-evaluates the
+   inner command at each level and so spends the most native frames per level. A
+   release build overflows the native stack near a thousand levels and a
+   sanitizer build past two hundred, so the cap stays well below both. */
+static constexpr usize MAX_SUBSTITUTION_DEPTH = 128;
 
 fn EvalContext::enter_source(SourceLocation location) throws -> void
 {
@@ -1100,6 +1105,22 @@ fn EvalContext::leave_function_call() wontthrow -> void
 {
   ASSERT(m_function_call_depth > 0);
   m_function_call_depth--;
+}
+
+fn EvalContext::enter_substitution() throws -> void
+{
+  if (m_substitution_depth >= MAX_SUBSTITUTION_DEPTH) {
+    LOG(Debug, "substitution depth %zu exceeds cap %zu", m_substitution_depth,
+        MAX_SUBSTITUTION_DEPTH);
+    throw Error{"Command substitution nested too deeply"};
+  }
+  m_substitution_depth++;
+}
+
+fn EvalContext::leave_substitution() wontthrow -> void
+{
+  ASSERT(m_substitution_depth > 0);
+  m_substitution_depth--;
 }
 
 fn EvalContext::set_error_exit(bool enabled) wontthrow -> void

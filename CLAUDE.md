@@ -1,9 +1,9 @@
 # shit project notes
 
 This file records the conventions and the architecture of the shell so a
-session does not relearn them from scratch. shit is a fast POSIX and bash
-compatible shell in C++ and C, where speed is the defining goal. The
-interactive editor is a vendored C submodule under src/toiletline.
+session does not relearn them from scratch. shit is a C++ and C shell where
+speed is the defining goal. The interactive editor is a vendored C submodule
+under src/toiletline.
 
 ## Build
 
@@ -13,36 +13,27 @@ UndefinedBehaviorSanitizer, and `make MODE=cov` writes ../shit-cov. The default
 mode is dbg. A bare `make` builds the shell into its object tree from a clean
 checkout, since the object directories are created as an order-only prerequisite
 and the default goal is the shit target. The completion suite needs the debug
-binary, since `--debug-complete-at` is gated behind NDEBUG. Cross compile a
-Windows binary with `make TARGET=Windows_NT MODE=rel` through mingw, and the
-Alpine musl build links a static-pie binary through clang. Cross-compilation is
-restricted to Windows_NT and Darwin, so a TARGET that differs from the host and
-is neither is rejected, and a Linux target stays native-only. Prefer a make
-target over a raw compiler call.
-Clean a stale artifact with `make clean`, never a bare `rm` of ../shit. `make
-install` and `make uninstall` place the binary, docs/shit.1, and
-completions/shit.bash under PREFIX.
+binary, since `--debug-complete-at` is gated behind NDEBUG. Prefer a make target
+over a raw compiler call, and clean a stale artifact with `make clean`, never a
+bare `rm` of ../shit. The full MODE catalog, the cross-compilation targets, and
+the install with its PREFIX are documented in the README.
 
 ## Moods
 
-The shell runs under one of three moods. The default shit mood is the strictest
-bash superset and runs the analysis prepass, the bash mood runs the extensions
-with the analysis off, and the sh mood behaves like dash. The `--mood` flag,
-short `-M`, selects one of `shit`, `bash`, or `sh`. A binary named or symlinked
-to `sh`, `dash`, or `bash` picks the matching mood and turns diagnostics off. The
-`set --mood` builtin changes the mood at runtime and sticks when set inside the
-rc.
+The flags, the moods, and the UX behavior are documented in the man page
+docs/shit.1, read with `mandoc docs/shit.1`. The man page is the source of truth,
+and a flag, a mood, or a UX change updates it. The architecture notes below cover
+what the man page does not.
 
 The mood drives the nounset, pipefail, and failglob strictness through
 `apply_strictness_for_mood`. An explicit `set -u`, `set -o pipefail`, or `set -o
 failglob` survives a later mood switch through the per-toggle explicit marks. A
 glob in command position is fatal in the default mood and a warning in a
 compatibility mood, checked in SimpleCommand::evaluate_impl through
-command_word_is_glob. `--init-moods`, short `-L`, lists the startup flavors to
-load. The mood, the diagnostics toggles, and the three strictness toggles with
-their explicit marks live in one `runtime_state` struct (Eval.hpp), which
-capture and restore copy whole. Main.cpp enters rescue rather than exiting when a
-flag fails to parse in a login shell, the lockout-risk case marked by a
+command_word_is_glob. The mood, the diagnostics toggles, and the three strictness
+toggles with their explicit marks live in one `runtime_state` struct (Eval.hpp),
+which capture and restore copy whole. Main.cpp enters rescue rather than exiting
+when a flag fails to parse in a login shell, the lockout-risk case marked by a
 dash-prefixed argv[0], while any other invocation keeps the usage exit.
 
 All errors are located in all moods.
@@ -157,7 +148,10 @@ tests, and the harness carries alternate goldens.
 
 Before finishing a plan, update this CLAUDE.md, the README, docs/shit.1, and
 completions/shit.bash so the docs, the manual, and the completions stay in sync.
-A new flag, a new mood, a new builtin, or a renamed option touches all four.
+A new flag, a new mood, a new builtin, or a renamed option touches all four. The
+flag, mood, and UX documentation lives in the man page docs/shit.1, so that file
+is the primary write for such a change and this CLAUDE.md only routes to it. A
+flag also updates completions/shit.bash so the completion offers it.
 
 ## Logging and debugging
 
