@@ -212,17 +212,44 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     ASSERT(argv[i] != nullptr);
 
     if (next_arg_is_value) {
-      next_arg_is_value = false;
+      /* A flag awaiting its value does not swallow a following recognized
+         boolean flag, so `-c -l command` parses -l as the login flag and takes
+         command as the -c value. bash reads the -c command from the first
+         non-option operand the same way, rather than from the option that
+         follows -c. */
+      bool next_is_known_bool_flag = false;
+      if (argv[i][0] == '-' && argv[i][1] != '\0') {
+        let const is_long_token = argv[i][1] == '-';
+        let const token_offset = is_long_token ? &argv[i][2] : &argv[i][1];
+        if (*token_offset != '\0') {
+          Flag *probe_flag = nullptr;
+          const char *probe_value = nullptr;
+          if (find_flag(flags, token_offset, is_long_token, &probe_flag,
+                        &probe_value) &&
+              probe_flag->kind() == Flag::Kind::Bool)
+          {
+            next_is_known_bool_flag = true;
+          }
+        }
+      }
 
-      ASSERT(prev_flag != nullptr);
-      LOG(All, "attaching the next argument '%s' as the value of the flag '%s'",
-          argv[i], flag_name(prev_flag, prev_is_long).c_str());
-      if (prev_flag->kind() == Flag::Kind::String)
-        static_cast<FlagString *>(prev_flag)->set(argv[i]);
-      else
-        static_cast<FlagManyStrings *>(prev_flag)->append(argv[i]);
+      if (!next_is_known_bool_flag) {
+        next_arg_is_value = false;
 
-      continue;
+        ASSERT(prev_flag != nullptr);
+        LOG(All,
+            "attaching the next argument '%s' as the value of the flag '%s'",
+            argv[i], flag_name(prev_flag, prev_is_long).c_str());
+        if (prev_flag->kind() == Flag::Kind::String)
+          static_cast<FlagString *>(prev_flag)->set(argv[i]);
+        else
+          static_cast<FlagManyStrings *>(prev_flag)->append(argv[i]);
+
+        continue;
+      }
+
+      /* The pending value flag is kept while the recognized boolean flag below
+         is parsed, so the next non-flag operand still becomes its value. */
     }
 
     /* The first argument is the invocation name even when it opens with a
@@ -295,6 +322,11 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
             LOG(All, "the flag '%s' expects the next argument as its value",
                 flag_name(flag, is_long).c_str());
             next_arg_is_value = true;
+            /* The flag awaiting its value is remembered here rather than at the
+               end of the loop, so a recognized boolean flag parsed before the
+               value arrives does not overwrite it. */
+            prev_flag = flag;
+            prev_is_long = is_long;
           } else {
             /* A short flag attaches its value with no separator, a long flag
                requires '=' or a space, and a long flag with a missing separator
@@ -374,9 +406,6 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
         }
       }
     }
-
-    prev_flag = flag;
-    prev_is_long = is_long;
   }
 
   if (next_arg_is_value) {

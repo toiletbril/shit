@@ -1,0 +1,4 @@
+== a bool flag after -c is parsed as a flag, the command still runs:
+marker-noglob
+== the login flag after -c does not become the -c command:
+marker-login

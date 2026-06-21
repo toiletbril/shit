@@ -915,6 +915,20 @@ fn main(int argc, char **argv) -> int
   const bool does_name_mark_login =
       !program_basename.is_empty() && program_basename[0] == '-';
   if (does_name_mark_login) program_basename = program_basename.substring(1);
+
+  /* SHELL, $0, and the shell name a child reads must name a runnable file. A
+     login shell's argv[0] is the shell name with a leading dash and no
+     directory, the form login and getty set, such as -bash or a bare -. The dash
+     marks the login and is not part of a runnable path, so it is dropped here. A
+     dash inside a directory path is a real filename and is left alone, and a bare
+     dash keeps its spelling since it names nothing to run. */
+  let executable_path = program_path.clone();
+  if (does_name_mark_login && !last_slash.has_value() &&
+      program_path.view().length > 1)
+  {
+    executable_path = shit::String{program_path.view().substring(1)};
+  }
+
   const shit::mimic_mood invocation_mood =
       (program_basename == "sh" || program_basename == "dash")
           ? shit::mimic_mood::Posix
@@ -1065,7 +1079,7 @@ fn main(int argc, char **argv) -> int
      first operand as $0 and the rest as the arguments, while an interactive or
      -s shell keeps the shell name as $0 and takes every operand as a positional
      parameter. The context owns both. */
-  let shell_name = program_path.clone();
+  let shell_name = executable_path.clone();
   let positional_params = shit::ArrayList<shit::String>{};
 
   usize first_param_index = 0;
@@ -1137,7 +1151,7 @@ fn main(int argc, char **argv) -> int
 
   /* Seed the standard and shell-specific variables a script may read. The
      version and runtime values come from the build. */
-  context.set_shell_variable("SHELL", program_path);
+  context.set_shell_variable("SHELL", executable_path);
   context.set_shell_variable("PWD", shit::Path::current_directory().text());
   context.set_shell_variable("SHIT_VERSION", SHIT_VERSION_STRING);
   context.set_shell_variable("SHIT_COMMIT", SHIT_COMMIT_HASH);
