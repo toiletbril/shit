@@ -1059,6 +1059,9 @@ fn EvalContext::set_current_location(SourceLocation location) wontthrow -> void
   m_current_location = location;
 }
 
+/* TODO: these caps are hand-tuned below the observed native overflow point.
+   Query the actual stack size per platform, getrlimit RLIMIT_STACK on POSIX and
+   the thread stack on Windows, and derive the caps from it. */
 /* A cap on nested dot-source and eval runs, below the native stack overflow
    point since each level spends many native frames between run_source calls. */
 static constexpr usize MAX_SOURCE_DEPTH = 400;
