@@ -1,0 +1,3 @@
+== a login shell names SHELL and $0 by the runnable spelling:
+SHELL=runnable
+zero=runnable
