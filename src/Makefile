@@ -169,7 +169,9 @@ ifneq ($(TARGET), Windows_NT)
 # TODO: windows optimization fucks up the RAM.
 CXXFLAGS += \
 	-O3 \
-	-flto
+	-flto \
+	-U_FORTIFY_SOURCE \
+	-D_FORTIFY_SOURCE=2
 endif
 ifeq ($(TARGET), Linux)
 # macOS ld64 has no fully static link, so static-pie stays Linux-only.
@@ -226,7 +228,9 @@ ifneq ($(TARGET), Windows_NT)
 # TODO: windows optimization fucks up the RAM.
 CXXFLAGS += \
 	-static-pie \
-	-O3
+	-O3 \
+	-U_FORTIFY_SOURCE \
+	-D_FORTIFY_SOURCE=2
 endif
 ifeq ($(TARGET), Linux)
 CXXFLAGS += \
