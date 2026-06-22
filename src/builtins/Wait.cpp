@@ -25,9 +25,12 @@ namespace {
 /* Wait for one job to finish, reusing a status already collected. */
 i32 wait_for_job(job &job) throws
 {
-  if (job.state == job::State::Done) return job.last_status;
-  let const status = os::wait_and_monitor_process(job.pid);
-  job.state = job::State::Done;
+  if (job.state == job::State::Done || job.state == job::State::Stopped)
+    return job.last_status;
+
+  let was_stopped = false;
+  let const status = os::wait_and_monitor_process(job.pid, &was_stopped);
+  job.state = was_stopped ? job::State::Stopped : job::State::Done;
   job.last_status = status;
   return status;
 }

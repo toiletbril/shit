@@ -1,0 +1,8 @@
+== disown %1 leaves one running job:
+1
+== disown -a leaves none:
+0
+== bare disown drops the most recent job:
+0
+== an unknown job id is an error:
+1

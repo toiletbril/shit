@@ -25,18 +25,20 @@ fn EvalContext::register_job(os::process pid, StringView command) throws -> i32
   return m_jobs.back().id;
 }
 
-fn EvalContext::register_stopped_job(os::process pid, StringView command) throws
-    -> i32
+fn EvalContext::register_stopped_job(os::process pid, StringView command,
+                                     i32 status) throws -> i32
 {
-  let new_job = job{};
-  new_job.id = m_next_job_id++;
-  new_job.pid = pid;
-  new_job.command = command;
-  new_job.state = job::State::Stopped;
-  m_jobs.push(steal(new_job));
-  ASSERT(!m_jobs.is_empty());
-  LOG(Info, "registered stopped job %d", m_jobs.back().id);
-  return m_jobs.back().id;
+  let const id = register_job(pid, command);
+  job &registered = m_jobs.back();
+  registered.state = job::State::Stopped;
+  registered.last_status = status;
+  return id;
+}
+
+fn EvalContext::notify_stopped_job(i32 id, StringView command) throws -> void
+{
+  print_error("[" + utils::int_to_text(id) + "]+ Stopped  " + String{command} +
+              "\n");
 }
 
 fn EvalContext::update_jobs() throws -> void
@@ -53,7 +55,8 @@ fn EvalContext::update_jobs() throws -> void
       job.last_status = status;
       break;
     case os::process_state::Stopped: job.state = job::State::Stopped; break;
-    default: job.state = job::State::Running; break;
+    case os::process_state::Running: job.state = job::State::Running; break;
+    case os::process_state::Unchanged: break;
     }
   }
 }
@@ -88,6 +91,21 @@ fn EvalContext::forget_done_jobs() throws -> void
   LOG(Debug, "dropping finished jobs, keeping %zu of %zu", kept.count(),
       m_jobs.count());
   m_jobs = steal(kept);
+}
+
+fn EvalContext::remove_job(i32 id) throws -> bool
+{
+  let kept = ArrayList<job>{};
+  let did_remove = false;
+  for (job &job : m_jobs) {
+    if (job.id == id) {
+      did_remove = true;
+      continue;
+    }
+    kept.push(steal(job));
+  }
+  m_jobs = steal(kept);
+  return did_remove;
 }
 
 fn EvalContext::format_done_job_notifications(StringView line_ending) throws

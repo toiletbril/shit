@@ -46,6 +46,38 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       {
         LOG(Debug, "execute_context mimicking the shell for '%s'",
             ec.program().c_str());
+#if SHIT_PLATFORM_IS POSIX
+        if (cxt.shell_is_interactive() && os::shell_has_controlling_terminal())
+        {
+          let const command = String{ec.program().view()};
+
+          shit::flush();
+          let const child = os::fork_job_process();
+          if (os::process_id_of(child) == 0) {
+            i32 status = 1;
+            try {
+              status = cxt.run_mimicked_script(ec, *mode, false);
+            } catch (const ErrorBase &error) {
+              const String *source = cxt.current_source();
+              show_message(error.to_string(source != nullptr ? source->view()
+                                                             : StringView{}));
+              status = static_cast<i32>(error.command_status());
+            } catch (...) {}
+            os::exit_process_immediately(status);
+          }
+
+          os::give_controlling_terminal_to(child);
+          let was_stopped = false;
+          const i32 status = os::wait_and_monitor_process(child, &was_stopped);
+          os::reclaim_controlling_terminal();
+
+          if (was_stopped) {
+            const i32 id = cxt.register_stopped_job(child, command, status);
+            cxt.notify_stopped_job(id, command.view());
+          }
+          return status;
+        }
+#endif
         /* The terminal command the shell exits with needs no isolation, the
            same condition the replace path below uses, so its run skips the
            snapshot. */
@@ -107,8 +139,6 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       unreachable();
     }
 
-    let const command = String{ec.program().view()};
-
     LOG(Debug, "spawning the external command '%s'%s", ec.program().c_str(),
         is_async ? " in the background" : "");
 
@@ -119,6 +149,10 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
      */
     const bool is_foreground_job = !is_async && cxt.shell_is_interactive() &&
                                    os::shell_has_controlling_terminal();
+
+    let const command = (is_async || is_foreground_job)
+                            ? String{ec.program().view()}
+                            : String{};
 
     os::process p = SHIT_INVALID_PROCESS;
     try {
@@ -147,13 +181,13 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
 
     LOG(Debug, "waiting for the foreground child to finish");
     if (is_foreground_job) os::give_controlling_terminal_to(p);
-    bool was_stopped = false;
+    let was_stopped = false;
     const i32 foreground_status = os::wait_and_monitor_process(
         p, is_foreground_job ? &was_stopped : nullptr);
     if (is_foreground_job) os::reclaim_controlling_terminal();
     if (was_stopped) {
-      const i32 id = cxt.register_stopped_job(p, command);
-      shit::print_error("[" + int_to_text(id) + "]+ Stopped  " + command + "\n");
+      const i32 id = cxt.register_stopped_job(p, command, foreground_status);
+      cxt.notify_stopped_job(id, command.view());
     }
     return foreground_status;
   }

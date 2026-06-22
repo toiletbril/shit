@@ -812,6 +812,30 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   return child_pid;
 }
 
+fn fork_job_process() throws -> process
+{
+  LOG(Debug, "forking a mimicked job into its own process group");
+
+  const pid_t child_pid = check_syscall(fork());
+
+  if (child_pid == 0) {
+    try {
+      reset_signal_handlers();
+      (void) setpgid(0, 0);
+
+#if defined SHIT_HAS_ADDRESS_SANITIZER
+      __lsan_disable();
+#endif
+    } catch (...) {
+      exit_process_immediately(1);
+    }
+    return 0;
+  }
+
+  (void) setpgid(child_pid, child_pid);
+  return child_pid;
+}
+
 [[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void
 {
   _exit(status);
@@ -1098,9 +1122,9 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
   i32 status = 0;
   const pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
-  /* Still running, or already reaped, which the job table also treats as done.
-   */
-  if (result == 0) return process_state::Running;
+  /* No new transition since the last poll, so the caller keeps the recorded
+     state, which preserves a stop the foreground wait already consumed. */
+  if (result == 0) return process_state::Unchanged;
   if (result == -1) {
     status_out = 0;
     return process_state::Exited;
@@ -2631,6 +2655,11 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
      case used as a pipeline stage. */
   throw shit::Error{
       "A compound command in a pipeline is not supported on this platform"};
+}
+
+fn fork_job_process() -> process
+{
+  throw shit::Error{"Job control is not supported on this platform"};
 }
 
 [[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void

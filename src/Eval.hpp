@@ -480,12 +480,15 @@ public:
      register_job adds a running job and returns its id. update_jobs polls every
      job without blocking and marks the ones that finished or stopped. */
   fn register_job(os::process pid, StringView command) throws -> i32;
-  fn register_stopped_job(os::process pid, StringView command) throws -> i32;
+  fn register_stopped_job(os::process pid, StringView command,
+                          i32 status) throws -> i32;
+  fn notify_stopped_job(i32 id, StringView command) throws -> void;
   fn update_jobs() throws -> void;
   fn jobs() wontthrow -> ArrayList<job> &;
   fn find_job(i32 id) wontthrow -> job *;
   fn most_recent_job() wontthrow -> job *;
   fn forget_done_jobs() throws -> void;
+  fn remove_job(i32 id) throws -> bool;
 
   /* Poll the jobs, print a bash-style done line for each just-finished one,
      then forget those entries. Gated on an interactive shell. */
@@ -1088,8 +1091,8 @@ public:
                 Maybe<StringView> filename = None) throws -> i32;
 
   /* A guard around a nested dot-source, eval run, function call, or command
-     substitution. Each throws a located error past the recursion cap rather than
-     exhausting memory. */
+     substitution. Each throws a located error past the recursion cap rather
+     than exhausting memory. */
   fn enter_source(SourceLocation location) throws -> void;
   fn leave_source() wontthrow -> void;
   fn enter_function_call(SourceLocation location) throws -> void;

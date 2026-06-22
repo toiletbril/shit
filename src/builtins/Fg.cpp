@@ -67,15 +67,14 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const bool reclaim =
       cxt.shell_is_interactive() && os::shell_has_controlling_terminal();
   if (reclaim) os::give_controlling_terminal_to(job->pid);
-  bool was_stopped = false;
+  let was_stopped = false;
   let const status = os::wait_and_monitor_process(job->pid, &was_stopped);
   if (reclaim) os::reclaim_controlling_terminal();
 
   if (was_stopped) {
     job->state = job::State::Stopped;
     job->last_status = status;
-    shit::print_error("[" + utils::int_to_text(job->id) + "]+ Stopped  " +
-                      job->command + "\n");
+    cxt.notify_stopped_job(job->id, job->command.view());
     return status;
   }
 

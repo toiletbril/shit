@@ -54,6 +54,7 @@ public:
     Jobs,
     Fg,
     Bg,
+    Disown,
     Wait,
     Kill,
     Time,
@@ -123,6 +124,7 @@ inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
     {SSK("jobs"),      Builtin::Kind::Jobs          },
     {SSK("fg"),        Builtin::Kind::Fg            },
     {SSK("bg"),        Builtin::Kind::Bg            },
+    {SSK("disown"),    Builtin::Kind::Disown        },
     {SSK("wait"),      Builtin::Kind::Wait          },
     {SSK("kill"),      Builtin::Kind::Kill          },
     {SSK("time"),      Builtin::Kind::Time          },
@@ -184,6 +186,7 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   B_CASE(Jobs);                                                                \
   B_CASE(Fg);                                                                  \
   B_CASE(Bg);                                                                  \
+  B_CASE(Disown);                                                              \
   B_CASE(Wait);                                                                \
   B_CASE(Kill);                                                                \
   B_CASE(Time);                                                                \
@@ -243,6 +246,7 @@ BUILTIN_STRUCT(Unalias);
 BUILTIN_STRUCT(Jobs);
 BUILTIN_STRUCT(Fg);
 BUILTIN_STRUCT(Bg);
+BUILTIN_STRUCT(Disown);
 BUILTIN_STRUCT(Wait);
 BUILTIN_STRUCT(Kill);
 BUILTIN_STRUCT(Time);

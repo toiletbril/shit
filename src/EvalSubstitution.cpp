@@ -103,6 +103,9 @@ fn EvalContext::capture_command_substitution(const String &source,
   if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
 
+  enter_substitution();
+  defer { leave_substitution(); };
+
   let parser = Parser{
       Lexer{String{source.view()}, *AST_ARENA, false, filename, mood()}
   };

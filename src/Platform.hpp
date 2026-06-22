@@ -160,17 +160,20 @@ fn wait_and_monitor_process(process p, bool *was_stopped = nullptr) throws
  */
 fn reap_process_quietly(process p) throws -> i32;
 
-/* The live state of a process, polled without blocking for the job table. */
+/* The live state of a process, polled without blocking for the job table.
+   Unchanged means the poll reported no new transition, so the caller keeps the
+   state it already recorded rather than overwriting a consumed stop. */
 enum class process_state : u8
 {
   Running,
   Exited,
   Stopped,
+  Unchanged,
 };
 
-/* Check a process without blocking. Returns Running while it is alive, Exited
-   with the status placed in status_out once it ends, and Stopped while it is
-   suspended. */
+/* Check a process without blocking. Returns Stopped or Exited on a new
+   transition with the status placed in status_out, Running on a resume, and
+   Unchanged when nothing new is reported since the last poll. */
 fn poll_process(process p, i32 &status_out) wontthrow -> process_state;
 
 /* Send a signal to a process by its numeric signal, for the kill builtin and
@@ -559,6 +562,12 @@ fn reclaim_controlling_terminal() wontthrow -> void;
    handlers, and returns zero so the caller evaluates the tree and exits. */
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                        Maybe<descriptor> err_fd) throws -> process;
+
+/* Fork a child for a job in its own process group. In the child it resets the
+   signal handlers, joins a new group, and returns zero so the caller runs the
+   job and exits. The parent joins the child to the group and returns its pid.
+ */
+fn fork_job_process() throws -> process;
 
 #if SHIT_PLATFORM_IS WIN32
 /* Run a compound pipeline stage on a platform with no fork by spawning a fresh
