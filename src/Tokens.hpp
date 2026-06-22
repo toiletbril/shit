@@ -274,7 +274,7 @@ public:
   /* A token lives in the parse arena, so its storage is reclaimed in bulk. This
      no-ops for arena storage and frees an ordinary heap token otherwise. The
      destructor still runs through the normal delete. */
-  static fn operator delete(void *pointer) wontthrow->void;
+  static fn operator delete(opaque *pointer) wontthrow->void;
 
 protected:
   Token(SourceLocation location);

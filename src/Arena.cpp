@@ -9,14 +9,14 @@ namespace shit {
 BumpArena *AST_ARENA = nullptr;
 BumpArena *FUNCTION_ARENA = nullptr;
 
-fn is_arena_pointer(const void *pointer) wontthrow -> bool
+fn is_arena_pointer(const opaque *pointer) wontthrow -> bool
 {
   return (AST_ARENA != nullptr && AST_ARENA->owns(pointer)) ||
          (FUNCTION_ARENA != nullptr && FUNCTION_ARENA->owns(pointer));
 }
 
 hot fn bump_arena_allocate(BumpArena *arena, usize length,
-                           usize alignment) throws -> void *
+                           usize alignment) throws -> opaque *
 {
   return arena->allocate(length, alignment);
 }
@@ -55,7 +55,7 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
   m_blocks.push(block{base, size, 0});
 }
 
-hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
+hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
 {
   loop
   {
@@ -77,7 +77,7 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
   }
 }
 
-hot fn BumpArena::owns(const void *pointer) const wontthrow -> bool
+hot fn BumpArena::owns(const opaque *pointer) const wontthrow -> bool
 {
   let const candidate = static_cast<const u8 *>(pointer);
   /* The live tree allocates from the most recent block, so the scan runs back

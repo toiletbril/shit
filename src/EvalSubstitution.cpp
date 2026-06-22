@@ -25,7 +25,7 @@ struct command_substitution_drain_context
   os::descriptor read_fd;
 };
 
-fn drain_command_substitution_pipe(void *raw_context) wontthrow -> void
+fn drain_command_substitution_pipe(opaque *raw_context) wontthrow -> void
 {
   let const drain =
       static_cast<command_substitution_drain_context *>(raw_context);

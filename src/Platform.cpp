@@ -102,7 +102,7 @@ namespace shit {
 
 namespace os {
 
-hot fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
+hot fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>
 {
   loop
@@ -116,7 +116,7 @@ hot fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
   }
 }
 
-hot fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow
+hot fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
     -> Maybe<usize>
 {
   loop
@@ -928,11 +928,11 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
  */
 struct thread_start_context
 {
-  void (*entry)(void *);
-  void *context;
+  void (*entry)(opaque *);
+  opaque *context;
 };
 
-fn thread_trampoline(void *raw_context) wontthrow -> void *
+fn thread_trampoline(opaque *raw_context) wontthrow -> opaque *
 {
   let const start = static_cast<thread_start_context *>(raw_context);
   let const entry = start->entry;
@@ -942,7 +942,7 @@ fn thread_trampoline(void *raw_context) wontthrow -> void *
   return nullptr;
 }
 
-fn start_thread(void (*entry)(void *), void *context) wontthrow -> Maybe<thread>
+fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow -> Maybe<thread>
 {
   let const start = new thread_start_context{entry, context};
   pthread_t handle{};
@@ -1261,7 +1261,7 @@ static fn make_sigset_impl(int first, ...) wontthrow -> sigset_t
 
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
-static fn sigchild_handler(int n, siginfo_t *siginfo, void *ctx) wontthrow
+static fn sigchild_handler(int n, siginfo_t *siginfo, opaque *ctx) wontthrow
     -> void
 {
   unused(n);
@@ -2074,7 +2074,7 @@ namespace shit {
 
 namespace os {
 
-fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
+fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>
 {
   DWORD w = -1;
@@ -2083,7 +2083,7 @@ fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
   return static_cast<usize>(w);
 }
 
-fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow -> Maybe<usize>
+fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
 {
   DWORD r = -1;
   if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
@@ -2726,8 +2726,8 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
    C-style entry and its context across that signature and returns zero. */
 struct thread_start_context
 {
-  void (*entry)(void *);
-  void *context;
+  void (*entry)(opaque *);
+  opaque *context;
 };
 
 fn thread_trampoline(LPVOID raw_context) -> DWORD
@@ -2740,7 +2740,7 @@ fn thread_trampoline(LPVOID raw_context) -> DWORD
   return 0;
 }
 
-fn start_thread(void (*entry)(void *), void *context) wontthrow -> Maybe<thread>
+fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow -> Maybe<thread>
 {
   let const start = new thread_start_context{entry, context};
   HANDLE handle =

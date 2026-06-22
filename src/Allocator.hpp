@@ -14,7 +14,7 @@ namespace shit {
    which would close the ArrayList -> Allocator -> Arena include cycle. */
 class BumpArena;
 fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment) throws
-    -> void *;
+    -> opaque *;
 
 /* An allocator value. It carries a context and a table of operations, so a data
    structure is handed the allocator it must use and frees through the same one.
@@ -24,27 +24,27 @@ class Allocator
 public:
   struct VTable
   {
-    void *(*alloc)(void *context, usize length, usize alignment);
+    opaque *(*alloc)(opaque *context, usize length, usize alignment);
     /* Grow or shrink in place. Returns false when the block cannot change size
        without moving, so the caller allocates and copies. */
-    bool (*resize)(void *context, void *pointer, usize old_length,
+    bool (*resize)(opaque *context, opaque *pointer, usize old_length,
                    usize new_length, usize alignment);
-    void (*free)(void *context, void *pointer, usize length, usize alignment);
+    void (*free)(opaque *context, opaque *pointer, usize length, usize alignment);
   };
 
-  void *context;
+  opaque *context;
   const VTable *vtable;
 
-  hot flatten fn raw_alloc(usize length, usize alignment) const throws -> void *
+  hot flatten fn raw_alloc(usize length, usize alignment) const throws -> opaque *
   {
     return vtable->alloc(context, length, alignment);
   }
-  fn raw_resize(void *pointer, usize old_length, usize new_length,
+  fn raw_resize(opaque *pointer, usize old_length, usize new_length,
                 usize alignment) const wontthrow -> bool
   {
     return vtable->resize(context, pointer, old_length, new_length, alignment);
   }
-  flatten fn raw_free(void *pointer, usize length,
+  flatten fn raw_free(opaque *pointer, usize length,
                       usize alignment) const wontthrow -> void
   {
     vtable->free(context, pointer, length, alignment);
@@ -75,13 +75,13 @@ namespace allocators {
 
 /* The bump adapter over a BumpArena. A free is a no-op and a resize never grows
    in place, since the arena reclaims everything at once on reset. */
-hot inline fn bump_alloc(void *context, usize length, usize alignment) throws
-    -> void *
+hot inline fn bump_alloc(opaque *context, usize length, usize alignment) throws
+    -> opaque *
 {
   return bump_arena_allocate(static_cast<BumpArena *>(context), length,
                              alignment);
 }
-inline fn bump_resize(void *context, void *pointer, usize old_length,
+inline fn bump_resize(opaque *context, opaque *pointer, usize old_length,
                       usize new_length, usize alignment) wontthrow -> bool
 {
   unused(context);
@@ -91,7 +91,7 @@ inline fn bump_resize(void *context, void *pointer, usize old_length,
   unused(alignment);
   return false;
 }
-inline fn bump_free(void *context, void *pointer, usize length,
+inline fn bump_free(opaque *context, opaque *pointer, usize length,
                     usize alignment) wontthrow -> void
 {
   unused(context);
@@ -142,7 +142,7 @@ struct heap_pool
     return shift;
   }
 
-  hot fn take(usize length) wontthrow -> void *
+  hot fn take(usize length) wontthrow -> opaque *
   {
     let const shift = class_shift_for(length);
     if (shift > MAX_CLASS_SHIFT) return std::malloc(length);
@@ -158,7 +158,7 @@ struct heap_pool
     return std::malloc(usize{1} << shift);
   }
 
-  hot fn give(void *pointer, usize length) wontthrow -> void
+  hot fn give(opaque *pointer, usize length) wontthrow -> void
   {
     if (pointer == nullptr) return;
 
@@ -195,8 +195,8 @@ hot inline fn heap_pool_instance() wontthrow -> heap_pool &
 
 /* The heap adapter over the C allocator. It frees on demand, so it backs the
    long-lived mutable data the bump model would leak. */
-hot inline fn heap_alloc(void *context, usize length, usize alignment) wontthrow
-    -> void *
+hot inline fn heap_alloc(opaque *context, usize length, usize alignment) wontthrow
+    -> opaque *
 {
   unused(context);
   /* malloc already meets every alignment up to alignof(max_align_t), so the
@@ -216,7 +216,7 @@ hot inline fn heap_alloc(void *context, usize length, usize alignment) wontthrow
   }
   return heap_pool_instance().take(length);
 }
-inline fn heap_resize(void *context, void *pointer, usize old_length,
+inline fn heap_resize(opaque *context, opaque *pointer, usize old_length,
                       usize new_length, usize alignment) wontthrow -> bool
 {
   unused(context);
@@ -226,7 +226,7 @@ inline fn heap_resize(void *context, void *pointer, usize old_length,
   unused(alignment);
   return false;
 }
-hot inline fn heap_free(void *context, void *pointer, usize length,
+hot inline fn heap_free(opaque *context, opaque *pointer, usize length,
                         usize alignment) wontthrow -> void
 {
   unused(context);

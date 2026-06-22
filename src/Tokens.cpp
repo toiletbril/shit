@@ -17,7 +17,7 @@ pure fn Token::source_location() const wontthrow -> SourceLocation
   return m_location;
 }
 
-fn Token::operator delete(void *pointer) wontthrow -> void
+fn Token::operator delete(opaque *pointer) wontthrow -> void
 {
   if (is_arena_pointer(pointer)) return;
   ::operator delete(pointer);

@@ -91,7 +91,7 @@ struct thread
 #endif
 };
 
-fn start_thread(void (*entry)(void *), void *context) wontthrow
+fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow
     -> Maybe<thread>;
 
 fn join_thread(thread t) wontthrow -> void;
@@ -282,9 +282,9 @@ fn sleep_for_seconds(double seconds) wontthrow -> void;
 
 extern const ArrayList<String> OMITTED_SUFFIXES;
 
-fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
+fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
-fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow -> Maybe<usize>;
+fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>;
 
 fn close_fd(os::descriptor fd) wontthrow -> bool;
 

@@ -22,8 +22,8 @@ public:
   BumpArena(const BumpArena &) = delete;
   BumpArena &operator=(const BumpArena &) = delete;
 
-  hot fn allocate(usize size, usize alignment) throws -> void *;
-  fn owns(const void *pointer) const wontthrow -> bool;
+  hot fn allocate(usize size, usize alignment) throws -> opaque *;
+  fn owns(const opaque *pointer) const wontthrow -> bool;
   cold fn reset() wontthrow -> void;
 
   /* Counts how many times the arena has been reset. A cache that holds a
@@ -68,7 +68,7 @@ public:
        skipped and only the genuinely-owning ones cost a slot. */
     if constexpr (!std::is_trivially_destructible_v<T>)
       m_destructors.push(pending_destructor{
-          object, [](void *p) { static_cast<T *>(p)->~T(); }});
+          object, [](opaque *p) { static_cast<T *>(p)->~T(); }});
     return object;
   }
 
@@ -84,8 +84,8 @@ private:
      run when the storage above it is reclaimed. */
   struct pending_destructor
   {
-    void *object;
-    void (*run)(void *);
+    opaque *object;
+    void (*run)(opaque *);
   };
 
   static constexpr usize DEFAULT_BLOCK_SIZE = 64 * 1024;
@@ -110,6 +110,6 @@ extern BumpArena *AST_ARENA;
    that defined it, so it is parsed here instead of the per-command arena. */
 extern BumpArena *FUNCTION_ARENA;
 
-fn is_arena_pointer(const void *pointer) wontthrow -> bool;
+fn is_arena_pointer(const opaque *pointer) wontthrow -> bool;
 
 } // namespace shit

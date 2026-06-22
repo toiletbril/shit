@@ -36,18 +36,18 @@ struct tl_free_block
 };
 tl_free_block *TOILETLINE_FREE_LIST = nullptr;
 
-fn tl_block_capacity(void *payload) -> usize &
+fn tl_block_capacity(opaque *payload) -> usize &
 {
   return *reinterpret_cast<usize *>(static_cast<char *>(payload) -
                                     TL_ALLOC_HEADER);
 }
 
-fn tl_arena_malloc(usize length) -> void *
+fn tl_arena_malloc(usize length) -> opaque *
 {
   for (tl_free_block **link = &TOILETLINE_FREE_LIST; *link != nullptr;
        link = &(*link)->next)
   {
-    void *payload = *link;
+    opaque *payload = *link;
     if (tl_block_capacity(payload) >= length) {
       *link = (*link)->next;
       return payload;
@@ -60,7 +60,7 @@ fn tl_arena_malloc(usize length) -> void *
   return base + TL_ALLOC_HEADER;
 }
 
-fn tl_arena_free(void *pointer) -> void
+fn tl_arena_free(opaque *pointer) -> void
 {
   if (pointer == nullptr) return;
   tl_free_block *block = static_cast<tl_free_block *>(pointer);
@@ -68,12 +68,12 @@ fn tl_arena_free(void *pointer) -> void
   TOILETLINE_FREE_LIST = block;
 }
 
-fn tl_arena_realloc(void *pointer, usize length) -> void *
+fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 {
   if (pointer == nullptr) return tl_arena_malloc(length);
   usize old_capacity = tl_block_capacity(pointer);
   if (old_capacity >= length) return pointer;
-  void *fresh = tl_arena_malloc(length);
+  opaque *fresh = tl_arena_malloc(length);
   std::memcpy(fresh, pointer, old_capacity);
   tl_arena_free(pointer);
   return fresh;

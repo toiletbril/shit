@@ -190,7 +190,7 @@ public:
       -> const expressions::CStyleForLoop *;
 
   /* This no-ops for arena storage and frees an ordinary heap node otherwise. */
-  static fn operator delete(void *pointer) wontthrow->void;
+  static fn operator delete(opaque *pointer) wontthrow->void;
 
   /* The prepass entry per node. The base does None, the command and the
      control flow nodes override it. is_unconditional says whether this node is
