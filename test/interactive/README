@@ -1,0 +1,17 @@
+Interactive pty harnesses
+=========================
+
+The harnesses here drive shit through a pseudo-terminal, so they cover the
+job-control and signal behavior that needs a real controlling terminal. They are
+run by hand rather than wired into make test, since the defects they guard are
+timing-based and a golden cannot capture them. Each prints PASS or FAIL and exits
+with a matching status.
+
+Build the debug binary first with `make -C src MODE=dbg`, then run a harness with
+its path or let it default to ../../shit-dbg.
+
+mimic_terminal_handoff.py
+    Runs a mimicked foreground command in an interactive session whose terminal
+    has TOSTOP enabled, and checks that the job completes and the prompt returns.
+    It guards the fork synchronization in src/Utils.cpp, where the child blocks on
+    a pipe until the parent hands over the controlling terminal.

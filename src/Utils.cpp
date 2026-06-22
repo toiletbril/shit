@@ -51,9 +51,25 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
         {
           let const command = String{ec.program().view()};
 
+          /* A pipe synchronizes the terminal handoff. The child blocks on it
+             until the parent has called give_controlling_terminal_to, so the
+             child never touches the terminal before the handoff and stops under
+             TOSTOP. A failed pipe falls back to the unsynchronized handoff,
+             which is benign while TOSTOP stays off. */
+          let const sync_pipe = os::make_pipe();
+
           shit::flush();
           let const child = os::fork_job_process();
           if (os::process_id_of(child) == 0) {
+            if (sync_pipe.has_value()) {
+              /* The child drops its write end first, so the read sees end of
+                 file and unblocks if the parent dies before the handoff rather
+                 than waiting forever. */
+              os::close_fd(sync_pipe->out);
+              char handoff_byte = 0;
+              (void)os::read_fd(sync_pipe->in, &handoff_byte, 1);
+              os::close_fd(sync_pipe->in);
+            }
             i32 status = 1;
             try {
               status = cxt.run_mimicked_script(ec, *mode, false);
@@ -66,7 +82,13 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
             os::exit_process_immediately(status);
           }
 
+          if (sync_pipe.has_value()) os::close_fd(sync_pipe->in);
           os::give_controlling_terminal_to(child);
+          if (sync_pipe.has_value()) {
+            (void)os::write_fd(sync_pipe->out, "x", 1);
+            os::close_fd(sync_pipe->out);
+          }
+
           let was_stopped = false;
           const i32 status = os::wait_and_monitor_process(child, &was_stopped);
           os::reclaim_controlling_terminal();
