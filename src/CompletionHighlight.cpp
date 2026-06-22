@@ -229,6 +229,7 @@ enum class highlight_construct : u8
   For,
   Case,
   Function,
+  Conditional,
 };
 
 static fn scan_highlight_range(StringView line, usize begin, usize end,
@@ -673,6 +674,17 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     let const plain = word_spans.is_empty();
     let const is_assignment = word_looks_like_assignment(word);
 
+    /* The ]] that closes a [[ conditional reads as a keyword and pops the
+       construct, the way fi closes an if and done closes a loop. */
+    if (plain && word == "]]" && !stack.is_empty() &&
+        stack.back() == highlight_construct::Conditional)
+    {
+      do_push(word_start, word_end, colors::ansi::GREEN);
+      stack.pop_back();
+      is_command_position = false;
+      continue;
+    }
+
     if (expecting_in && plain && word == "in") {
       do_push(word_start, word_end, colors::ansi::GREEN);
       expecting_in = false;
@@ -728,6 +740,13 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         stack.push(highlight_construct::Case);
         next_is_command = false;
         opens_in = true;
+      } else if (word == "[[" && !context.is_posix_mode()) {
+        /* The [[ conditional is a reserved word the parser matches as text, not
+           a command, so the operands inside it leave command position. The sh
+           mood is POSIX, where [[ is not a keyword, so it falls through to the
+           command coloring there the way the parser rejects it. */
+        stack.push(highlight_construct::Conditional);
+        next_is_command = false;
       } else if (word == "function") {
         stack.push(highlight_construct::Function);
         next_is_command = false;

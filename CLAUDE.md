@@ -107,7 +107,9 @@ per-keystroke highlighter in src/CompletionHighlight.cpp, with shared helpers in
 src/CompletionInternal.hpp. The highlighter and TAB completion share one
 most-recently-used cache of directory listings keyed by path and invalidated by
 mtime. src/Toiletline.cpp bridges the editor to the evaluator, and
-src/toiletline/toiletline.h is the editor.
+src/toiletline/toiletline.h is the editor. The `--debug-highlight-at` flag, a
+debug-only test driver gated behind NDEBUG like `--debug-complete-at`, prints the
+highlight spans for a line so the highlighter is testable without the editor.
 
 src/Errors.cpp renders the located caret and the trailing note, capitalized on
 its own line, with the shellcheck-style messages in src/Diagnostics.hpp. The

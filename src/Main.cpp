@@ -138,6 +138,10 @@ FLAG(DEBUG_COMPLETE_AT, String, '\0', "debug-complete-at", Debug,
      "Print the completion candidates for the given line with the cursor at "
      "its end, one per line the way an explicit tab lists them, after every "
      "-c chunk has run, then exit. The completion test driver.");
+FLAG(DEBUG_HIGHLIGHT_AT, String, '\0', "debug-highlight-at", Debug,
+     "Print the syntax-highlight spans for the given line, one per line as the "
+     "span text and the escape that colors it with the escape byte shown as "
+     "\\e, then exit. The highlighter test driver.");
 #endif
 
 #if SHIT_PLATFORM_IS COSMO
@@ -167,6 +171,31 @@ static fn run_debug_completion_driver(StringView driver_line,
   let listing = String{};
   for (let const &candidate : driver_result.candidates) {
     listing += candidate.view();
+    listing += '\n';
+  }
+  print(listing);
+  flush();
+  return 0;
+}
+
+/* The highlighter test driver behind --debug-highlight-at, printing each colored
+   span of the line as its text and the escape that colors it, with the escape
+   byte shown as \e so the golden stays readable. */
+static fn run_debug_highlight_driver(StringView driver_line,
+                                     EvalContext &context) throws -> i32
+{
+  let const spans = completion::highlight_line(driver_line, context);
+  let listing = String{};
+  for (let const &span : spans) {
+    listing += driver_line.substring_of_length(span.start, span.end - span.start);
+    listing += '\t';
+    for (usize i = 0; i < span.sgr.length; i++) {
+      if (span.sgr[i] == '\x1b') {
+        listing += "\\e";
+      } else {
+        listing.push(span.sgr[i]);
+      }
+    }
     listing += '\n';
   }
   print(listing);
@@ -1068,9 +1097,12 @@ fn main(int argc, char **argv) -> int
     should_read_stdin = true;
   }
 #if !defined NDEBUG
-  /* The completion test driver never prompts, so a bare driver run reads the
-     empty standard input and exits through the driver's hook. */
-  if (FLAG_DEBUG_COMPLETE_AT.is_set() && should_be_interactive) {
+  /* The completion and the highlighter test drivers never prompt, so a bare
+     driver run reads the empty standard input and exits through the driver's
+     hook. */
+  if ((FLAG_DEBUG_COMPLETE_AT.is_set() || FLAG_DEBUG_HIGHLIGHT_AT.is_set()) &&
+      should_be_interactive)
+  {
     should_be_interactive = false;
     should_read_stdin = true;
   }
@@ -1478,6 +1510,10 @@ fn main(int argc, char **argv) -> int
       if (FLAG_DEBUG_COMPLETE_AT.is_set() && !shit::os::is_child_process()) {
         exit_code = shit::run_debug_completion_driver(
             FLAG_DEBUG_COMPLETE_AT.value(), context);
+      }
+      if (FLAG_DEBUG_HIGHLIGHT_AT.is_set() && !shit::os::is_child_process()) {
+        exit_code = shit::run_debug_highlight_driver(
+            FLAG_DEBUG_HIGHLIGHT_AT.value(), context);
       }
 #endif
       LOG(Info, "exiting after the final chunk with code %d", exit_code);
