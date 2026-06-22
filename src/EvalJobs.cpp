@@ -25,6 +25,20 @@ fn EvalContext::register_job(os::process pid, StringView command) throws -> i32
   return m_jobs.back().id;
 }
 
+fn EvalContext::register_stopped_job(os::process pid, StringView command) throws
+    -> i32
+{
+  let new_job = job{};
+  new_job.id = m_next_job_id++;
+  new_job.pid = pid;
+  new_job.command = command;
+  new_job.state = job::State::Stopped;
+  m_jobs.push(steal(new_job));
+  ASSERT(!m_jobs.is_empty());
+  LOG(Info, "registered stopped job %d", m_jobs.back().id);
+  return m_jobs.back().id;
+}
+
 fn EvalContext::update_jobs() throws -> void
 {
   for (job &job : m_jobs) {

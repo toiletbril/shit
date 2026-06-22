@@ -107,7 +107,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       unreachable();
     }
 
-    let const command = is_async ? String{ec.program().view()} : String{};
+    let const command = String{ec.program().view()};
 
     LOG(Debug, "spawning the external command '%s'%s", ec.program().c_str(),
         is_async ? " in the background" : "");
@@ -147,8 +147,14 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
 
     LOG(Debug, "waiting for the foreground child to finish");
     if (is_foreground_job) os::give_controlling_terminal_to(p);
-    const i32 foreground_status = os::wait_and_monitor_process(p);
+    bool was_stopped = false;
+    const i32 foreground_status = os::wait_and_monitor_process(
+        p, is_foreground_job ? &was_stopped : nullptr);
     if (is_foreground_job) os::reclaim_controlling_terminal();
+    if (was_stopped) {
+      const i32 id = cxt.register_stopped_job(p, command);
+      shit::print_error("[" + int_to_text(id) + "]+ Stopped  " + command + "\n");
+    }
     return foreground_status;
   }
 

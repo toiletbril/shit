@@ -480,6 +480,7 @@ public:
      register_job adds a running job and returns its id. update_jobs polls every
      job without blocking and marks the ones that finished or stopped. */
   fn register_job(os::process pid, StringView command) throws -> i32;
+  fn register_stopped_job(os::process pid, StringView command) throws -> i32;
   fn update_jobs() throws -> void;
   fn jobs() wontthrow -> ArrayList<job> &;
   fn find_job(i32 id) wontthrow -> job *;

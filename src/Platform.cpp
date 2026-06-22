@@ -1016,20 +1016,26 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   return fd;
 }
 
-fn wait_and_monitor_process(process pid) throws -> i32
+fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
 {
   ASSERT(pid >= 0);
 
   LOG(Debug, "waiting on process %lld", static_cast<long long>(pid));
 
   i32 status{};
+  const int wait_flags = was_stopped != nullptr ? WUNTRACED : 0;
 
   loop
   {
-    pid_t w = waitpid(pid, &status, 0);
+    pid_t w = waitpid(pid, &status, wait_flags);
     /* A signal interrupted the wait. Retry instead of failing. */
     if (w == -1 && errno == EINTR) continue;
     if (check_syscall(w) == pid) break;
+  }
+
+  if (was_stopped != nullptr && WIFSTOPPED(status)) {
+    *was_stopped = true;
+    return 128 + WSTOPSIG(status);
   }
 
   if (WIFSIGNALED(status)) {
@@ -2783,8 +2789,9 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   return handle;
 }
 
-fn wait_and_monitor_process(process p) -> i32
+fn wait_and_monitor_process(process p, bool *was_stopped) -> i32
 {
+  unused(was_stopped);
   if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
     throw Error{"Could not wait for the process to finish: " +
                 last_system_error_message()};

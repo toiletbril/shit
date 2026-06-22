@@ -151,7 +151,8 @@ fn make_os_args(const ArrayList<String> &args) throws -> os_args;
 
 fn last_system_error_message() throws -> String;
 
-fn wait_and_monitor_process(process p) throws -> i32;
+fn wait_and_monitor_process(process p, bool *was_stopped = nullptr) throws
+    -> i32;
 
 /* Wait for a process and reap it without the job-control reporting of
    wait_and_monitor_process, returning its exit status or 128 plus the signal.
