@@ -19,6 +19,15 @@ fn indent_for_layer(usize layer) throws -> String;
 fn report_command_not_found(EvalContext &cxt, const CommandNotFound &e) throws
     -> void;
 
+/* Rebases a function-body error onto the stored definition copy when the error
+   sits inside a live function call, so an error from an eval-defined or a
+   sourced-file function renders against the body and the defining filename
+   rather than the caller's line. The returned view is the windowed source, or
+   None when no window applies and the caller renders against the current
+   source. */
+fn window_function_body_error(EvalContext &cxt, ErrorWithLocation &error)
+    wontthrow -> Maybe<StringView>;
+
 namespace expressions {
 
 /* What a single redirection resolves to before any descriptor is placed. */

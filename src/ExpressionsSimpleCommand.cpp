@@ -1210,32 +1210,17 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* A located error thrown from the body carries an absolute position into
        the file that defined the function, which the top-level handler cannot
        reach once this frame unwinds, so the error is rendered here while the
-       stack still names the function. The position rebases onto the definition
-       copy, the filename swaps to the function's owned copy, and the error is
-       marked rendered so the top-level handler keeps the status without
-       printing it twice. An already-rendered error is rethrown untouched. */
-    let const do_window_error = [&](ErrorWithLocation &error)
-                                    throws -> Maybe<StringView> {
-      let const resolved = cxt.resolve_render_source(error.location());
-      if (!resolved.is_windowed || resolved.text == nullptr) return None;
-      let rebased = error.location();
-      rebased.position = rebased.position - resolved.body_start_position +
-                         resolved.header_length;
-      rebased.filename = resolved.filename.is_empty()
-                             ? Maybe<StringView>{}
-                             : Maybe<StringView>{resolved.filename};
-      if (rebased.position > resolved.text->count()) return None;
-      error.set_location(rebased);
-      error.set_line_offset(resolved.line_offset);
-      return resolved.text->view();
-    };
-
+       stack still names the function. window_function_body_error rebases the
+       position onto the definition copy and swaps the filename, and the error is
+       marked rendered so the top-level handler keeps the status without printing
+       it twice. An already-rendered error is rethrown untouched. */
     i64 function_ret = 0;
     try {
       function_ret = function_body->evaluate(cxt);
     } catch (ErrorWithLocationAndDetails &error) {
       if (!error.was_rendered())
-        if (let const windowed = do_window_error(error); windowed.has_value()) {
+        if (let const windowed = window_function_body_error(cxt, error);
+            windowed.has_value()) {
           show_message(error.to_string(*windowed));
           show_message(error.details_to_string(*windowed));
           error.set_rendered();
@@ -1243,7 +1228,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       throw;
     } catch (ErrorWithLocation &error) {
       if (!error.was_rendered())
-        if (let const windowed = do_window_error(error); windowed.has_value()) {
+        if (let const windowed = window_function_body_error(cxt, error);
+            windowed.has_value()) {
           show_message(error.to_string(*windowed));
           error.set_rendered();
         }

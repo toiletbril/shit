@@ -69,7 +69,7 @@ hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
   return evaluate_impl(cxt);
 }
 
-fn Expression::operator delete(void *pointer) wontthrow -> void
+fn Expression::operator delete(opaque *pointer) wontthrow -> void
 {
   if (is_arena_pointer(pointer)) return;
   ::operator delete(pointer);
@@ -131,6 +131,25 @@ cold fn report_command_not_found(EvalContext &cxt,
      the error the way a fatal error does, so the chain of dot or source calls
      that led here is named. It prints nothing at the top level. */
   cxt.print_source_backtrace(e.location());
+}
+
+fn window_function_body_error(EvalContext &cxt, ErrorWithLocation &error)
+    wontthrow -> Maybe<StringView>
+{
+  let const resolved = cxt.resolve_render_source(error.location());
+  if (!resolved.is_windowed || resolved.text == nullptr) return None;
+
+  let rebased = error.location();
+  rebased.position =
+      rebased.position - resolved.body_start_position + resolved.header_length;
+  rebased.filename = resolved.filename.is_empty()
+                         ? Maybe<StringView>{}
+                         : Maybe<StringView>{resolved.filename};
+  if (rebased.position > resolved.text->count()) return None;
+
+  error.set_location(rebased);
+  error.set_line_offset(resolved.line_offset);
+  return resolved.text->view();
 }
 
 cold fn Expression::analyze(AnalysisContext &actx,

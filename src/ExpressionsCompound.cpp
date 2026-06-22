@@ -91,6 +91,32 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         return n->evaluate(cxt);
       } catch (const InterruptError &) {
         throw;
+      } catch (ErrorWithLocation &error) {
+        if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
+        LOG(Debug,
+            "bash mood converted the located error to command status %lld: %s",
+            static_cast<long long>(error.command_status()),
+            error.message().c_str());
+        /* A located error from an eval-defined or a sourced-file function body
+           rebases onto the defining copy here, since this catch fires while the
+           call name stack still names the function. A body with no window, or a
+           located error outside a call, renders against the current source. An
+           error a deeper frame already rendered, such as a function defined in
+           the default mood and called from bash, keeps its status without a
+           second render. */
+        if (!error.was_rendered()) {
+          if (let const windowed = window_function_body_error(cxt, error);
+              windowed.has_value()) {
+            show_message(error.to_string(*windowed));
+          } else {
+            const String *source = cxt.current_source();
+            show_message(error.to_string(source != nullptr ? source->view()
+                                                            : StringView{}));
+          }
+          error.set_rendered();
+        }
+        cxt.set_last_exit_status(static_cast<i32>(error.command_status()));
+        return error.command_status();
       } catch (const ErrorBase &error) {
         if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
         LOG(Debug, "bash mood converted the error to command status %lld: %s",
