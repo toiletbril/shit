@@ -1,0 +1,6 @@
+== sh mood lists a running background job:
+1
+== sh mood waits for it and completes:
+1
+== --posix behaves the same as --mood sh:
+1
