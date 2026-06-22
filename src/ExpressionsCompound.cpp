@@ -89,6 +89,8 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     let do_run_node = [&]() throws -> i64 {
       try {
         return n->evaluate(cxt);
+      } catch (const InterruptError &) {
+        throw;
       } catch (const ErrorBase &error) {
         if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
         LOG(Debug, "bash mood converted the error to command status %lld: %s",
