@@ -1,3 +1,4 @@
-shit: 1:11: error: Unable to evaluate the [[ ]] because the regular expression '(' is invalid.
+shit: 1:11: error: Unable to evaluate the [[ ]].
      1 |  [[ abc =~ ( ]]
        |            ^~ here.
+note: The regular expression '(' is invalid.

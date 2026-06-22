@@ -1971,11 +1971,17 @@ hot fn Parser::parse_conditional_command() throws -> Command *
      redirection. The operand words are kept for the evaluator to expand without
      field splitting. */
   let elements = ArrayList<conditional_element>{};
+  usize close_end_position =
+      open->source_location().position + open->source_location().length;
   loop
   {
     Token *t = m_lexer.next_shell_token();
     ASSERT(t != nullptr);
-    if (is_unquoted_word(t, "]]")) break;
+    if (is_unquoted_word(t, "]]")) {
+      close_end_position =
+          t->source_location().position + t->source_location().length;
+      break;
+    }
     if (t->kind() == Token::Kind::EndOfFile) {
       throw ErrorWithLocationAndDetails{open->source_location(),
                                         "Unterminated '[['",
@@ -2064,8 +2070,10 @@ hot fn Parser::parse_conditional_command() throws -> Command *
     }
   }
 
-  return m_lexer.arena().create<expressions::ConditionalCommand>(
+  let const node = m_lexer.arena().create<expressions::ConditionalCommand>(
       open->source_location(), steal(elements));
+  node->set_source_end_position(close_end_position);
+  return node;
 }
 
 hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *

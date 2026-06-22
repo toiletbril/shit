@@ -23,6 +23,22 @@
 
 namespace shit {
 
+/* A malformed [[ ]] fails with a short primary message and the rationale on a
+   note line. The catch in ConditionalCommand::evaluate_impl relocates it onto
+   the whole [[ ]] span. */
+cold [[noreturn]] static fn fail_conditional(StringView message,
+                                             StringView reason) throws -> void
+{
+  let error = Error{message};
+  error.set_note(reason);
+  throw error;
+}
+
+cold [[noreturn]] static fn fail_conditional(StringView reason) throws -> void
+{
+  fail_conditional("Unable to evaluate the [[ ]]", reason);
+}
+
 namespace {
 
 /* A recursive-descent evaluator over the [[ ]] element list. The grammar joins
@@ -167,8 +183,7 @@ struct ConditionalEvaluator
          reading as false. */
       char error_text[256];
       regerror(match_result, compiled, error_text, sizeof(error_text));
-      throw Error{"Unable to match the =~ pattern because " +
-                  String{error_text}};
+      fail_conditional("Unable to match the =~ pattern", error_text);
     }
 
     let rematch = ArrayList<String>{heap_allocator()};
@@ -188,8 +203,8 @@ struct ConditionalEvaluator
     unused(value);
     unused(pattern);
     unused(active);
-    throw Error{"Unable to use =~ in the [[ ]] because it is not supported on "
-                "this platform"};
+    fail_conditional("Unable to use =~ in the [[ ]]",
+                     "It is not supported on this platform");
 #endif
   }
 
@@ -238,8 +253,8 @@ struct ConditionalEvaluator
 #endif
       /* bash reports a non-integer -t operand with status 2, so the throw
          carries that status for the command-level catch. */
-      let error = Error{"Unable to test '-t " + operand +
-                        "' because the operand is not an integer"};
+      let error = Error{"Unable to test '-t " + operand + "'"};
+      error.set_note("The operand is not an integer");
       error.set_command_status(2);
       throw error;
     }
@@ -290,13 +305,10 @@ struct ConditionalEvaluator
 
   bool eval_primary() throws
   {
-    if (at_end())
-      throw Error{"Unable to evaluate the [[ ]] because the expression ends "
-                  "unexpectedly"};
+    if (at_end()) fail_conditional("The expression ends unexpectedly");
     const conditional_element &first = elements[pos];
     if (first.kind != Kind::Operand)
-      throw Error{"Unable to evaluate the [[ ]] because an operator appears "
-                  "where an operand is expected"};
+      fail_conditional("An operator appears where an operand is expected");
 
     const String first_literal = operand_literal(first);
 
@@ -332,8 +344,7 @@ struct ConditionalEvaluator
       const Kind next = kind_at(pos + 1);
       if (next == Kind::Less || next == Kind::Greater) {
         if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
-          throw Error{"Unable to evaluate the [[ ]] because an operand is "
-                      "missing after a comparison"};
+          fail_conditional("An operand is missing after a comparison");
         pos += 3;
         if (is_skipping) return false;
         const String left = operand_value(elements[pos - 3]);
@@ -467,11 +478,11 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
   if (regcomp(&compiled, pattern_text.c_str(), REG_EXTENDED) != 0) {
     /* bash returns status 2 for a malformed regex. The pattern is named so the
        message points at the offending expression. */
-    let message = String{scratch_allocator()};
-    message += "Unable to evaluate the [[ ]] because the regular expression '";
-    message += pattern;
-    message += "' is invalid";
-    throw Error{message.view()};
+    let reason = String{scratch_allocator()};
+    reason += "The regular expression '";
+    reason += pattern;
+    reason += "' is invalid";
+    fail_conditional(reason.view());
   }
   m_regex_cache.set(pattern, CompiledRegex{compiled});
   return m_regex_cache.find(pattern)->get();
@@ -482,18 +493,16 @@ fn EvalContext::evaluate_conditional(
     const ArrayList<conditional_element> &elements) throws -> bool
 {
   if (elements.is_empty())
-    throw Error{"Unable to evaluate the [[ ]] because the conditional "
-                "expression is empty"};
+    fail_conditional("The conditional expression is empty");
   LOG(Debug, "evaluating a [[ ]] conditional of %zu elements",
       elements.count());
   let evaluator = ConditionalEvaluator{*this, elements};
   const bool is_conditional_true = evaluator.eval_or();
   if (!evaluator.at_end()) {
-    throw Error{
-        "Unable to evaluate the [[ ]] because the token '" +
-        evaluator.unexpected_token() +
-        "' came after a complete conditional, so it may be an operator shit "
-        "does not support or a missing && or || between two tests"};
+    fail_conditional("The token '" + evaluator.unexpected_token() +
+                     "' came after a complete conditional, so it may be an "
+                     "operator shit does not support or a missing && or || "
+                     "between two tests");
   }
   return is_conditional_true;
 }

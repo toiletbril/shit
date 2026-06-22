@@ -40,17 +40,19 @@ cold fn ConditionalCommand::to_ast_string(usize layer) const throws -> String
 fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   /* The [[ ]] evaluator reports a malformed expression as a plain error,
-     relocated to this command's position to caret the [[ like the shell's other
-     located diagnostics. An already-located diagnostic passes through
-     untouched. The current location moves here first so a runtime warning from
-     the operand expansion carets this [[ rather than the statement before it.
-   */
+     relocated to the whole [[ ]] span so the caret covers the construct. An
+     already-located diagnostic passes through untouched. The current location
+     moves here first so a runtime warning from the operand expansion carets this
+     [[ rather than the statement before it. */
   cxt.set_current_location(source_location());
   i64 status;
   try {
     status = cxt.evaluate_conditional(m_elements) ? 0 : 1;
   } catch (const Error &e) {
-    throw relocate_error(e, source_location());
+    SourceLocation span = source_location();
+    if (source_end_position() > span.position)
+      span.length = source_end_position() - span.position;
+    throw relocate_error(e, span);
   }
   LOG(Debug, "the [[ ]] conditional yielded status %lld",
       static_cast<long long>(status));
