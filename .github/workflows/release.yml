@@ -1,17 +1,22 @@
 name: Release
 
 # A tag push builds the release binary and attaches it to the release. A manual
-# dispatch builds the same artifact against an existing tag. The build runs in an
-# Alpine container so the binary links statically against musl libc with no
-# runtime dependency. The repository Dockerfile is for development only and is
-# not used here.
+# dispatch builds from a chosen branch or commit and attaches the artifacts to a
+# chosen tag. The build runs in an Alpine container so the binary links
+# statically against musl libc with no runtime dependency. The repository
+# Dockerfile is for development only and is not used here.
 on:
   push:
     tags: ['v*', '[0-9]*']
   workflow_dispatch:
     inputs:
+      ref:
+        description: 'Branch, tag, or commit to build from'
+        required: true
+        default: master
+        type: string
       tag:
-        description: 'Existing tag to attach the artifacts to'
+        description: 'Tag name to create and attach the artifacts to'
         required: true
         type: string
 
@@ -41,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event.inputs.ref || github.ref }}
 
       # The Linux release target links static-pie, so the artifact carries no
       # shared library dependency. The Makefile writes the binary to ./shit.
@@ -51,10 +56,22 @@ jobs:
           mkdir -p dist
           install -m 755 shit "dist/shit-linux-amd64-$VERSION"
 
+      # The artifact rides the workflow run too, so a dispatch can be downloaded
+      # without a release.
+      - name: Upload the binary as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shit-linux-amd64-${{ env.VERSION }}
+          path: dist/shit-linux-amd64-${{ env.VERSION }}
+          if-no-files-found: error
+
+      # A dispatch creates the named tag at the chosen ref when it does not exist,
+      # while a tag push reuses its own existing tag.
       - name: Create the GitHub release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          target_commitish: ${{ github.event.inputs.ref }}
           files: |
             dist/shit-linux-amd64-${{ env.VERSION }}
