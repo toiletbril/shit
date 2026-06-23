@@ -1419,6 +1419,33 @@ fn main(int argc, char **argv) -> int
            framework that assigns PS1 inside it is in place by then. */
         run_prompt_command(context, ast_arena);
 
+        /* A command whose output did not end in a newline leaves the cursor off
+           the first column, where the prompt would otherwise run into it. A
+           marker, spaces to the line width, and a carriage return push the
+           prompt to a fresh line the way fish and zsh do. On a clean line the
+           prompt overwrites the marker, so nothing shows. The terminal width
+           query also gates the marker to a real terminal. */
+        if (should_be_interactive) {
+          u32 marker_columns = 0, marker_rows = 0;
+          if (shit::os::terminal_size(marker_columns, marker_rows) &&
+              marker_columns > 0)
+          {
+            shit::String eol_marker{};
+            if (shit::colors::stdout_wants_color()) {
+              eol_marker += shit::colors::ansi::INVERSE;
+              eol_marker += "%";
+              eol_marker += shit::colors::ansi::RESET;
+            } else {
+              eol_marker += "%";
+            }
+            for (u32 column = 1; column < marker_columns; column++)
+              eol_marker.push(' ');
+            eol_marker.push('\r');
+            shit::print(eol_marker);
+            shit::flush();
+          }
+        }
+
         shit::String prompt = toiletline::build_prompt(context);
 
         loop

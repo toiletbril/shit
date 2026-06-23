@@ -16,6 +16,7 @@ namespace ansi {
 inline const StringView RESET = "\x1b[0m";
 inline const StringView BOLD = "\x1b[1m";
 inline const StringView DIM = "\x1b[2m";
+inline const StringView INVERSE = "\x1b[7m";
 inline const StringView RED = "\x1b[31m";
 inline const StringView GREEN = "\x1b[32m";
 inline const StringView YELLOW = "\x1b[33m";
