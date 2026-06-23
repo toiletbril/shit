@@ -147,13 +147,17 @@ mimicrydiff: $(BIN)
 BENCH := bench/configure.sh
 BENCH_BASH := bench/configure.bash
 BENCH_SHIT := bench/configure.shit
+PRIMES := bench/primes.bash
+PRIMES_PY := bench/primes.py
+PRIMES_LIMIT ?= 100000
 SCALE ?= 100
 
 bench: BIN := ../shit
 bench:
 	@SCALE='$(SCALE)' BIN='$(BIN)' DASH='$(DASH)' BASH='$(BASH)' ZSH='$(ZSH)' \
 		ASH='$(ASH)' YASH='$(YASH)' BENCH='$(BENCH)' BENCH_BASH='$(BENCH_BASH)' \
-		BENCH_SHIT='$(BENCH_SHIT)' /bin/bash bench.sh
+		BENCH_SHIT='$(BENCH_SHIT)' PRIMES='$(PRIMES)' PRIMES_PY='$(PRIMES_PY)' \
+		PRIMES_LIMIT='$(PRIMES_LIMIT)' /bin/bash bench.sh
 
 .PHONY: test clean shit_tests refill dashdiff bashdiff mimicrydiff bench \
 		completion_tests completion_refill cli_tests
