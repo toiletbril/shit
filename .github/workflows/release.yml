@@ -1,11 +1,5 @@
 name: Release
 
-# A tag push builds the release binaries and attaches them to the release. A
-# manual dispatch builds from a chosen branch or commit and attaches the
-# artifacts to a chosen tag. The three targets cross-compile from one Alpine
-# container, Linux through musl, Windows through mingw, and Darwin arm64 through
-# osxcross, the same method the dedoc project uses. The repository Dockerfile is
-# for development only and is not used here.
 on:
   push:
     tags: ['v*', '[0-9]*']
@@ -26,63 +20,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-image:
+    uses: ./.github/workflows/build-image.yml
+    permissions:
+      contents: read
+      packages: write
+
   build:
     name: Release / Cross-compile and attach
+    needs: build-image
     runs-on: ubuntu-24.04
-    container:
-      image: alpine:latest
     permissions:
       contents: write
+      packages: read
     env:
       VERSION: ${{ github.event.inputs.tag || github.ref_name }}
-      # The osxcross arm64 SDK. A 10.x SDK cannot target arm64, so an 11.x or
-      # newer one is required for aarch64-apple-darwin.
-      MAC_SDK_URL: 'https://github.com/joseluisq/macosx-sdks/releases/download/11.3/MacOSX11.3.sdk.tar.xz'
+      IMAGE: ${{ needs.build-image.outputs.image }}
     steps:
-      # clang and lld build the static Linux binary, mingw cross-compiles the
-      # Windows binary, and the rest builds osxcross for the Darwin arm64 binary.
-      # nodejs and git let the checkout action run inside the musl container.
-      - name: Install the cross toolchains
-        run: |
-          apk add --no-cache \
-            build-base musl-dev linux-headers clang llvm lld make git nodejs \
-            mingw-w64-gcc bash curl xz cmake patch python3 \
-            libxml2-dev openssl-dev fts-dev bsd-compat-headers
-          git config --global --add safe.directory '*'
-
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
           ref: ${{ github.event.inputs.ref || github.ref }}
 
-      # osxcross provides oa64-clang++, the compiler the Makefile uses for a
-      # Darwin target on a non-Darwin host. It is built here rather than cached,
-      # since the release runs rarely.
-      - name: Build the osxcross arm64 toolchain
-        run: |
-          git clone --depth=1 https://github.com/tpoechtrager/osxcross /opt/osxcross
-          cd /opt/osxcross
-          curl -L -o "tarballs/$(basename "$MAC_SDK_URL")" "$MAC_SDK_URL"
-          UNATTENDED=yes OSX_VERSION_MIN=11.0 ENABLE_ARCHS=arm64 ./build.sh
+      - name: Log in to the registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Each target writes to ../shit or ../shit.exe and reads its own object
-      # tree, so the binaries are installed into dist before the next build runs.
+      - name: Pull the cross toolchain image
+        run: docker pull "$IMAGE"
+
       - name: Cross-compile the three release binaries
         run: |
-          export PATH="/opt/osxcross/target/bin:$PATH"
-          mkdir -p dist
+          docker run --rm -v "$PWD:/src" -w /src -e "VERSION=$VERSION" "$IMAGE" \
+            sh -euc '
+              mkdir -p dist
+              make -C src MODE=rel TARGET=Linux ARCH=x86_64
+              install -m 755 shit "dist/shit-linux-amd64-$VERSION"
+              make -C src MODE=rel TARGET=Windows_NT ARCH=x86_64
+              install -m 755 shit.exe "dist/shit-win32-amd64-$VERSION.exe"
+              make -C src MODE=rel TARGET=Darwin ARCH=aarch64
+              install -m 755 shit "dist/shit-darwin-aarch64-$VERSION"
+            '
 
-          make -C src MODE=rel TARGET=Linux ARCH=x86_64
-          install -m 755 shit "dist/shit-linux-amd64-$VERSION"
-
-          make -C src MODE=rel TARGET=Windows_NT ARCH=x86_64
-          install -m 755 shit.exe "dist/shit-win32-amd64-$VERSION.exe"
-
-          make -C src MODE=rel TARGET=Darwin ARCH=aarch64
-          install -m 755 shit "dist/shit-darwin-aarch64-$VERSION"
-
-      # The artifacts ride the workflow run too, so a dispatch can be downloaded
-      # without a release.
       - name: Upload the binaries as workflow artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -90,8 +72,6 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-      # A dispatch creates the named tag at the chosen ref when it does not exist,
-      # while a tag push reuses its own existing tag.
       - name: Create the GitHub release
         uses: softprops/action-gh-release@v2
         with:

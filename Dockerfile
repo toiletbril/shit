@@ -1,6 +1,9 @@
-# Image to cross-compile static shit binaries, an x86_64 Linux musl build and an
-# aarch64 macOS build through osxcross. The Linux target builds natively on this
-# Alpine image, the macOS target builds with the osxcross clang toolchain.
+# Image to cross-compile the three static shit release binaries, an x86_64 Linux
+# musl build, an x86_64 Windows build through mingw, and an aarch64 macOS build
+# through osxcross. The Linux target builds natively on this Alpine image, the
+# Windows target builds with mingw, and the macOS target builds with the
+# osxcross clang toolchain. The release workflow caches this image and runs the
+# build inside it, so the slow osxcross build is reused across runs.
 
 FROM alpine:latest
 
@@ -14,6 +17,8 @@ RUN apk add \
     clang \
     llvm \
     lld \
+    make \
+    mingw-w64-gcc \
     git \
     cmake \
     patch \

@@ -1,0 +1,52 @@
+name: Build the cross toolchain image
+
+on:
+  workflow_call:
+    outputs:
+      image:
+        description: The cross toolchain image reference to pull and run.
+        value: ${{ jobs.build.outputs.image }}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: shit-cross
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Tag the image by the Dockerfile hash
+        id: meta
+        run: |
+          hash=$(sha256sum Dockerfile | cut -c1-16)
+          base="${REGISTRY}/${{ github.repository }}/${IMAGE_NAME}"
+          echo "image=${base}:${hash}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to the registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reuse the cached image when the Dockerfile is unchanged
+        id: cache
+        run: |
+          if docker manifest inspect "${{ steps.meta.outputs.image }}" >/dev/null 2>&1; then
+            echo "hit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push the image on a cache miss
+        if: steps.cache.outputs.hit != 'true'
+        run: |
+          docker build -t "${{ steps.meta.outputs.image }}" .
+          docker push "${{ steps.meta.outputs.image }}"
