@@ -3,3 +3,12 @@ ls
 one.txt
 two.txt
 rc=0
+--- unknown flag on a symlinked utility reports an error, not a crash ---
+shit: 1:6: error: Unknown flag '--bogus'.
+     1 |  tail --bogus
+       |       ^~~~~~~ here.
+rc=1
+--- a symlinked utility names the shit binary in its help ---
+1
+--- a symlinked utility reports the shit version on --version ---
+1

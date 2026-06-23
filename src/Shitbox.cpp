@@ -110,6 +110,17 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   let const chosen = find_util(util_name);
   ASSERT(chosen.has_value());
 
+  /* A symlinked utility reports the shit version on --version, so a user who
+     ran what looks like a system program sees the binary behind it. The scan
+     stops at --, where a later --version is an operand. */
+  for (const String &operand : operands) {
+    if (operand == "--") break;
+    if (operand == "--version") {
+      show_version();
+      return 0;
+    }
+  }
+
   ArrayList<String> args{};
   args.reserve(operands.count() + 1);
   args.push(String{util_name});
@@ -119,11 +130,25 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   let ec = ExecContext::from_resolved(
       SourceLocation{}, ResolvedCommand::from_builtin(Builtin::Kind::Shitbox),
       steal(args));
+  ec.is_multicall = true;
 
   try {
     return run_util(*chosen, ec, cxt, ec.args());
+  } catch (const ErrorWithLocation &e) {
+    /* An unknown flag carries a caret into the joined argument vector, so the
+       reader sees which argument the utility rejected. */
+    show_message(e.to_string(utils::merge_args_to_string(ec.args())));
+    return 1;
   } catch (const Error &e) {
-    print_error("shit: " + String{util_name} + ": " + e.message() + "\n");
+    show_message(e.to_string());
+    return 1;
+  } catch (const std::exception &e) {
+    /* A standard exception such as an out-of-memory throw would otherwise
+       escape to terminate, the way the shell guards its own top level. */
+    show_message("shit: " + String{util_name} + ": " + e.what());
+    return 1;
+  } catch (...) {
+    show_message("shit: " + String{util_name} + ": unexpected error");
     return 1;
   }
 }
@@ -155,6 +180,17 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   help_text += '\n';
   help_text += make_flag_help(flags);
   help_text += '\n';
+
+  /* A symlinked utility looks like a system program, so the help names the
+     shit binary behind it. */
+  if (ec.is_multicall) {
+    help_text += wrap_text("This utility is bundled with the shit shell and "
+                           "runs from the shit binary reached through a "
+                           "symlink, not a system program of the same name.",
+                           HELP_INDENT, HELP_WRAP_WIDTH);
+    help_text += '\n';
+  }
+
   ec.print_to_stdout(help_text);
 }
 

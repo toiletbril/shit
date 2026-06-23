@@ -838,10 +838,6 @@ public:
   {
     m_current_command = steal(text);
   }
-  pure fn current_command() const wontthrow -> StringView
-  {
-    return m_current_command.view();
-  }
 
   /* Seed the nounset, pipefail, and failglob strictness from the active mood.
      An explicit set -u, set -o pipefail, or set -o failglob is the script's own
@@ -1559,6 +1555,10 @@ public:
      to the spawn site, where the envp becomes a single null instead of environ.
    */
   bool should_use_empty_environment{false};
+
+  /* A shitbox utility reached through a symlink rather than the shitbox builtin,
+     so its help can note that the binary is the shit shell. */
+  bool is_multicall{false};
 
   pure fn is_builtin() const wontthrow -> bool;
   pure fn is_unresolved() const wontthrow -> bool;

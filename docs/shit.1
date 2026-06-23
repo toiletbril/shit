@@ -261,7 +261,9 @@ flag or
 the utility names resolve directly as commands without the prefix. A builtin
 still wins over a utility, and a utility wins over a program on PATH. A binary
 whose name is a utility, such as a symlink named ls, acts as that utility, and
-the utility's own flags reach its parser rather than the shell.
+the utility's own flags reach its parser rather than the shell. A symlinked
+utility prints the shit version on \-\-version, so the binary behind the name is
+visible, and its help names the shit shell.
 .B "shitbox \-\-assimilate DIR"
 installs one such symlink per utility into DIR. In the default shit mood a bare
 utility name also falls back to the bundled utility when PATH holds no binary of
