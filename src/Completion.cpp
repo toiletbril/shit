@@ -909,8 +909,12 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else {
     /* The argument cascade runs in the bash and the default moods, the POSIX
        mood goes straight to files. The builtin flag tables answer first, then
-       the registered specs, then the man sources, then the build tools, and the
-       --help fork is the last resort. */
+       the registered specs, then the build tools, then the man sources, and the
+       --help fork is the last resort. The build tools answer before the man
+       sources, so a recognized build tool in the current directory offers its
+       targets even when a like-named subcommand man page exists. The build-tool
+       stage gates itself to a known tool with a build file present, so it
+       returns nothing for any other command. */
     Maybe<ArrayList<String>> from_stage = None;
     if (!is_posix_completion) {
       from_stage =
@@ -919,14 +923,14 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
         from_stage = complete_from_spec(line, token, cursor, for_listing,
                                         context, descriptions);
       if (!from_stage.has_value())
+        from_stage = complete_from_build_tools(line, token, token_start,
+                                               for_listing, context);
+      if (!from_stage.has_value())
         from_stage = complete_from_man_subcommands(line, token, token_start,
                                                    for_listing, context);
       if (!from_stage.has_value())
         from_stage = complete_from_manpage(line, token, for_listing, context,
                                            descriptions);
-      if (!from_stage.has_value())
-        from_stage = complete_from_build_tools(line, token, token_start,
-                                               for_listing, context);
       if (!from_stage.has_value())
         from_stage = complete_from_help_subcommands(
             line, token, token_start, for_listing, context, descriptions);
