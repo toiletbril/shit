@@ -227,6 +227,24 @@ String list_options(const EvalContext &cxt) throws
   return out;
 }
 
+/* Apply the -o name long option, the form the standalone -o and the trailing o
+   of a bundle share. The index advances past the consumed name, and a missing
+   name lists the options. */
+void apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
+                               const ArrayList<String> &args, usize &i,
+                               bool enable) throws
+{
+  if (i + 1 >= args.count()) {
+    ec.print_to_stdout(list_options(cxt));
+    return;
+  }
+  let const &name = args[++i];
+  let const option = find_option_by_name(name);
+  if (option == nullptr)
+    throw Error{StringView{"Unknown -o option '"} + name + "'"};
+  apply_or_reject_option(cxt, *option, enable);
+}
+
 /* The full option table, one row per option with its letter, its long name,
    and its description. set -p passes the context and gains a state column,
    while set --help passes null and gains the alias spellings, so both
@@ -468,17 +486,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
     /* The long form -o name and +o name names one option, or lists them all
        when no name follows. */
     if (arg == "-o" || arg == "+o") {
-      let const enable = arg[0] == '-';
-      if (i + 1 >= args.count()) {
-        ec.print_to_stdout(list_options(cxt));
-        continue;
-      }
-      ASSERT(i + 1 < args.count());
-      let const &name = args[++i];
-      let const option = find_option_by_name(name);
-      if (option == nullptr)
-        throw Error{StringView{"Unknown -o option '"} + name + "'"};
-      apply_or_reject_option(cxt, *option, enable);
+      apply_long_option_by_name(ec, cxt, args, i, arg[0] == '-');
       continue;
     }
 
@@ -496,18 +504,10 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       for (usize c = 1; c < arg.length(); c++) {
         let const letter = arg[c];
 
-        /* The o letter ends the bundle and names one option read from the next
+        /* The o letter ends the bundle and names one option from the next
            argument, the way bash accepts set -euo pipefail. */
         if (letter == 'o') {
-          if (i + 1 >= args.count()) {
-            ec.print_to_stdout(list_options(cxt));
-          } else {
-            let const &name = args[++i];
-            let const option = find_option_by_name(name);
-            if (option == nullptr)
-              throw Error{StringView{"Unknown -o option '"} + name + "'"};
-            apply_or_reject_option(cxt, *option, enable);
-          }
+          apply_long_option_by_name(ec, cxt, args, i, enable);
           break;
         }
 

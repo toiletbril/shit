@@ -1431,6 +1431,9 @@ fn main(int argc, char **argv) -> int
               marker_columns > 0)
           {
             shit::String eol_marker{};
+            /* One allocation holds the glyph, the fill spaces, and the
+               controls, so the fill loop never regrows the buffer. */
+            eol_marker.reserve(marker_columns + 12);
             if (shit::colors::stdout_wants_color()) {
               eol_marker += shit::colors::ansi::INVERSE;
               eol_marker += "\\n";

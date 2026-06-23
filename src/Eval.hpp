@@ -1556,8 +1556,8 @@ public:
    */
   bool should_use_empty_environment{false};
 
-  /* A shitbox utility reached through a symlink rather than the shitbox
-     builtin, so its help can note that the binary is the shit shell. */
+  /* Set when a shitbox utility runs from a symlink. Its help names the shit
+     binary behind it. */
   bool is_multicall{false};
 
   pure fn is_builtin() const wontthrow -> bool;
