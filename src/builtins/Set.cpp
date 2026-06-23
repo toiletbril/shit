@@ -495,6 +495,22 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       let const enable = arg[0] == '-';
       for (usize c = 1; c < arg.length(); c++) {
         let const letter = arg[c];
+
+        /* The o letter ends the bundle and names one option read from the next
+           argument, the way bash accepts set -euo pipefail. */
+        if (letter == 'o') {
+          if (i + 1 >= args.count()) {
+            ec.print_to_stdout(list_options(cxt));
+          } else {
+            let const &name = args[++i];
+            let const option = find_option_by_name(name);
+            if (option == nullptr)
+              throw Error{StringView{"Unknown -o option '"} + name + "'"};
+            apply_or_reject_option(cxt, *option, enable);
+          }
+          break;
+        }
+
         let const option = find_option_by_letter(letter);
         if (option == nullptr) {
           let invalid_option = String{};
