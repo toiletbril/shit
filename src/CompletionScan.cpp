@@ -302,13 +302,22 @@ fn complete_from_build_tools(StringView line, StringView token,
   let const tool =
       (command == "shitbox") ? second_word_of(line).value_or(command) : command;
 
-  let const capture = [&](const String &source) throws -> String {
-    try {
-      return context.capture_command_substitution(source);
-    } catch (...) {
-      LOG(Debug, "swallowed a target listing failure");
-      return String{};
-    }
+  /* A build-tool probe forks the tool through the bounded helper, so a slow or
+     stdin-reading tool, such as a make whose $(shell ...) blocks, never freezes
+     the prompt. The name resolves to a path first, since the helper runs the
+     path directly with no PATH search, and the helper points stdin at /dev/null
+     and kills a probe that overruns the deadline. */
+  let const probe_timeout_nanos = 2'000'000'000ULL;
+  let const capture = [&](const ArrayList<String> &probe_argv) throws -> String {
+    if (probe_argv.is_empty()) return String{};
+    let const resolved = utils::search_program_path(probe_argv[0].view());
+    if (resolved.is_empty()) return String{};
+    let argv = ArrayList<String>{};
+    argv.push(String{resolved[0].text().view()});
+    for (usize i = 1; i < probe_argv.count(); i++)
+      argv.push(String{probe_argv[i].view()});
+    return os::capture_program_output(argv, probe_timeout_nanos)
+        .value_or(String{});
   };
 
   let owned_targets = ArrayList<String>{};
@@ -340,13 +349,16 @@ fn complete_from_build_tools(StringView line, StringView token,
     if (!makefile_path.exists()) return None;
     let const make_directory = Path{directory.view()};
     targets = cached_targets_for(makefile_path, [&]() throws {
-      let invocation = String{"make -C "};
-      invocation += directory.view();
-      invocation += " -f ";
-      invocation += makefile_name->view();
-      invocation += " -pRrq : 2>/dev/null";
-      let database_targets = parse_make_database_targets(
-          capture(invocation).view(), make_directory);
+      let probe = ArrayList<String>{};
+      probe.push(String{"make"});
+      probe.push(String{"-C"});
+      probe.push(String{directory.view()});
+      probe.push(String{"-f"});
+      probe.push(String{makefile_name->view()});
+      probe.push(String{"-pRrq"});
+      probe.push(String{":"});
+      let database_targets =
+          parse_make_database_targets(capture(probe).view(), make_directory);
       if (!database_targets.is_empty()) return database_targets;
       /* An empty dump means no GNU make answered, so the bundled make parser
          reads the Makefile and resolves its variables the way make would. */
@@ -371,10 +383,13 @@ fn complete_from_build_tools(StringView line, StringView token,
                                   .value_or(String{"build.ninja"})
                                   .view());
     targets = cached_targets_for(build_file, [&]() throws {
-      let invocation = String{"ninja -C "};
-      invocation += directory.view();
-      invocation += " -t targets 2>/dev/null";
-      return parse_colon_led_names(capture(invocation).view());
+      let probe = ArrayList<String>{};
+      probe.push(String{"ninja"});
+      probe.push(String{"-C"});
+      probe.push(String{directory.view()});
+      probe.push(String{"-t"});
+      probe.push(String{"targets"});
+      return parse_colon_led_names(capture(probe).view());
     });
   } else if (tool == "cmake") {
     /* Only the --target operand of cmake --build completes, through the
@@ -385,11 +400,14 @@ fn complete_from_build_tools(StringView line, StringView token,
     let cache_file = Path{build_directory->view()};
     cache_file.push_component("CMakeCache.txt");
     targets = cached_targets_for(cache_file, [&]() throws {
-      let invocation = String{"cmake --build "};
-      invocation += build_directory->view();
-      invocation += " --target help 2>/dev/null";
+      let probe = ArrayList<String>{};
+      probe.push(String{"cmake"});
+      probe.push(String{"--build"});
+      probe.push(String{build_directory->view()});
+      probe.push(String{"--target"});
+      probe.push(String{"help"});
       let names = ArrayList<String>{};
-      let const help = capture(invocation);
+      let const help = capture(probe);
       let const text = help.view();
       usize i = 0;
       while (i < text.length) {

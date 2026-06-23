@@ -334,10 +334,14 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
       if (name.length > 6 && name.substring_of_length(0, 6) == "shell ") {
         /* The $(shell cmd) function runs the command and substitutes its
            output, the way GNU make reads $(shell uname) or $(shell nproc). The
-           argument is expanded first so an inner $(VAR) reaches the command. */
-        let const command = expand(cxt, mk, name.substring(6), depth + 1);
-        result += cxt.capture_command_substitution(command, StringView{"make"})
-                      .view();
+           argument is expanded first so an inner $(VAR) reaches the command.
+           Completion suppresses the run, so listing targets never forks the
+           makefile's commands and never blocks on a slow one. */
+        if (!cxt.make_shell_suppressed()) {
+          let const command = expand(cxt, mk, name.substring(6), depth + 1);
+          result += cxt.capture_command_substitution(command, StringView{"make"})
+                        .view();
+        }
       } else if (name.length > 9 &&
                  name.substring_of_length(0, 9) == "wildcard ")
       {
@@ -1061,6 +1065,13 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
   let targets = ArrayList<String>{};
   let const source = makefile.read_entire_file();
   if (!source.has_value()) return targets;
+
+  /* Completion lists target names only, so the makefile's $(shell ...)
+     functions are left unrun while it parses, both to keep a tab from forking
+     the makefile's commands and to never block on a slow one. */
+  let const saved_suppressed = cxt.make_shell_suppressed();
+  cxt.set_make_shell_suppressed(true);
+  defer { cxt.set_make_shell_suppressed(saved_suppressed); };
 
   /* The parser expands variables and runs the := and conditional assignments,
      so a $(VAR) target name resolves to its real text the way make reads it. A

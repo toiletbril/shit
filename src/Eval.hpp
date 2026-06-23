@@ -839,6 +839,18 @@ public:
     m_current_command = steal(text);
   }
 
+  /* While listing makefile targets for completion, the bundled make parser
+     leaves $(shell ...) unrun, so a tab never forks the makefile's commands and
+     never blocks on a slow one. */
+  fn set_make_shell_suppressed(bool suppressed) wontthrow -> void
+  {
+    m_make_shell_suppressed = suppressed;
+  }
+  pure fn make_shell_suppressed() const wontthrow -> bool
+  {
+    return m_make_shell_suppressed;
+  }
+
   /* Seed the nounset, pipefail, and failglob strictness from the active mood.
      An explicit set -u, set -o pipefail, or set -o failglob is the script's own
      ask, so it survives the mood switch untouched. */
@@ -1285,6 +1297,7 @@ protected:
   String m_shell_executable_path{};
   String m_execution_string{};
   String m_current_command{};
+  bool m_make_shell_suppressed{false};
   ArrayList<String> m_positional_params{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
   StringMap<const Expression *> m_functions{heap_allocator()};

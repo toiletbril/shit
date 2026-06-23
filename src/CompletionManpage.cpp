@@ -699,6 +699,11 @@ static fn command_prefers_help_over_manpage(StringView command) throws -> bool
    directory gate the --help fork uses. */
 static fn command_directory_is_trusted(StringView absolute_path) throws -> bool;
 
+/* The wall-clock budget a single man or --help fork is allowed. A command whose
+   probe runs longer is killed and caches the empty string, so the prompt never
+   freezes on it and it is never forked again this session. */
+static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
+
 /* The man invocation is the general path that works for any command on the
    host, so the completer is not limited to a hardcoded set of tools. */
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
@@ -722,15 +727,17 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
     return *MANPAGE_OPTION_CACHE.find(page_name);
   }
-  try {
-    let const page = context.capture_command_substitution(
-        String{man_paths[0].text().view()} + " " + String{page_name} +
-        " 2>/dev/null");
-    parsed_options = parse_manpage_option_entries(page.view());
-  } catch (...) {
-    LOG(Debug, "swallowed a man invocation failure for '%.*s'",
-        static_cast<int>(page_name.length), page_name.data);
-  }
+  /* man runs through the bounded fork helper, so a slow or paging man never
+     freezes the prompt. The helper points stdin at /dev/null and stdout at a
+     pipe, so man emits plain text and a deadline kills a man that overruns. */
+  unused(context);
+  let argv = ArrayList<String>{};
+  argv.push(String{man_paths[0].text().view()});
+  argv.push(String{page_name});
+  if (Maybe<String> page =
+          os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
+      page.has_value())
+    parsed_options = parse_manpage_option_entries(page->view());
   MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
   return *MANPAGE_OPTION_CACHE.find(page_name);
 }
@@ -794,10 +801,6 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
   return os::directory_is_trusted_for_exec(Path{absolute_path}.parent());
 }
 
-/* The wall-clock budget a single --help fork is allowed. A command whose --help
-   runs longer is killed and caches the empty string, so the prompt never
-   freezes on it and it is never forked again this session. */
-static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
 
 /* A command's raw --help text, captured once. The fork passes two gates, the
    command is on the allowlist and resolves into a trusted directory. The
