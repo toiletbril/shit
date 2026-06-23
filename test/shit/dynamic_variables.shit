@@ -1,0 +1,20 @@
+# BASH_COMMAND holds the unexpanded source text of the command running now.
+print_command() { echo "command: $BASH_COMMAND"; }
+print_command
+
+# BASH_LINENO reports the call-site line of each frame, parallel to FUNCNAME, so
+# its length matches the FUNCNAME length.
+report_line() { echo "frames: ${#BASH_LINENO[@]} ${#FUNCNAME[@]}"; }
+report_line
+
+# PS2 and PS4 carry the standard defaults, while PS3 stays unset the way bash
+# leaves it.
+echo "PS2=[$PS2] PS3=[${PS3-unset}] PS4=[$PS4]"
+
+# A set TIMEFORMAT drives the time report and %% renders a literal percent. An
+# empty value prints no report.
+TIMEFORMAT='[%%]'
+time true
+TIMEFORMAT=''
+time true
+echo "done"

@@ -942,7 +942,8 @@ fn thread_trampoline(opaque *raw_context) wontthrow -> opaque *
   return nullptr;
 }
 
-fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow -> Maybe<thread>
+fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow
+    -> Maybe<thread>
 {
   let const start = new thread_start_context{entry, context};
   pthread_t handle{};
@@ -2740,7 +2741,8 @@ fn thread_trampoline(LPVOID raw_context) -> DWORD
   return 0;
 }
 
-fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow -> Maybe<thread>
+fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow
+    -> Maybe<thread>
 {
   let const start = new thread_start_context{entry, context};
   HANDLE handle =

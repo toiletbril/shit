@@ -67,7 +67,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
                  than waiting forever. */
               os::close_fd(sync_pipe->out);
               char handoff_byte = 0;
-              (void)os::read_fd(sync_pipe->in, &handoff_byte, 1);
+              (void) os::read_fd(sync_pipe->in, &handoff_byte, 1);
               os::close_fd(sync_pipe->in);
             }
             i32 status = 1;
@@ -85,7 +85,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
           if (sync_pipe.has_value()) os::close_fd(sync_pipe->in);
           os::give_controlling_terminal_to(child);
           if (sync_pipe.has_value()) {
-            (void)os::write_fd(sync_pipe->out, "x", 1);
+            (void) os::write_fd(sync_pipe->out, "x", 1);
             os::close_fd(sync_pipe->out);
           }
 
@@ -565,6 +565,96 @@ fn format_time_report_pretty(double real_seconds, double user_seconds,
   report += "  sys    " + format_minutes_seconds(system_seconds) + "\n";
   std::snprintf(buffer, sizeof(buffer), "  cpu    %.0f%%\n", cpu_percent);
   report += buffer;
+  return report;
+}
+
+fn format_time_report_custom(StringView format, double real_seconds,
+                             double user_seconds, double system_seconds) throws
+    -> String
+{
+  let report = String{};
+
+  for (usize i = 0; i < format.length; i++) {
+    if (format[i] != '%') {
+      report.push(format[i]);
+      continue;
+    }
+
+    i++;
+    if (i >= format.length) {
+      report.push('%');
+      break;
+    }
+    if (format[i] == '%') {
+      report.push('%');
+      continue;
+    }
+
+    /* A precision digit and the long-format flag may precede a time conversion,
+       so %3lR is three fractional digits in the minutes form. The precision is
+       clamped to six, the way bash caps it. */
+    usize precision = 3;
+    if (format[i] >= '0' && format[i] <= '9') {
+      precision = static_cast<usize>(format[i] - '0');
+      if (precision > 6) precision = 6;
+      i++;
+    }
+
+    bool is_long_format = false;
+    if (i < format.length && format[i] == 'l') {
+      is_long_format = true;
+      i++;
+    }
+
+    if (i >= format.length) {
+      report.push('%');
+      break;
+    }
+
+    char buffer[64];
+    let const code = format[i];
+
+    double value = 0.0;
+    switch (code) {
+    case 'R': value = real_seconds; break;
+    case 'U': value = user_seconds; break;
+    case 'S': value = system_seconds; break;
+
+    case 'P': {
+      /* The cpu busy percent prints with two decimals, the bash default, and
+         takes no precision. */
+      const double cpu_percent =
+          real_seconds > 0.0
+              ? (user_seconds + system_seconds) / real_seconds * 100.0
+              : 0.0;
+      std::snprintf(buffer, sizeof(buffer), "%.2f", cpu_percent);
+      report += buffer;
+      continue;
+    }
+
+    default:
+      /* An unrecognized conversion emits the percent and the letter. */
+      report.push('%');
+      report.push(code);
+      continue;
+    }
+
+    if (value < 0.0) value = 0.0;
+
+    if (is_long_format) {
+      const i64 minutes = static_cast<i64>(value) / 60;
+      const double remainder = value - static_cast<double>(minutes * 60);
+      std::snprintf(buffer, sizeof(buffer), "%ldm%.*fs",
+                    static_cast<long>(minutes), static_cast<int>(precision),
+                    remainder);
+    } else {
+      std::snprintf(buffer, sizeof(buffer), "%.*f", static_cast<int>(precision),
+                    value);
+    }
+    report += buffer;
+  }
+
+  report.push('\n');
   return report;
 }
 

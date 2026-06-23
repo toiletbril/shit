@@ -210,6 +210,23 @@ The interactive calc REPL history file, ~/.shit_calc_history by default.
 .B ENV
 The startup file the sh mood sources.
 .TP
+.B TIMEFORMAT
+The format the time keyword prints. The conversions are %% for a literal
+percent, %R, %U, and %S for the real, user, and system seconds, and %P for the
+cpu busy percent. A precision from zero to six and the long minutes flag l may
+precede a time conversion, as in %3lR. An empty value prints no report, an unset value
+prints the aligned default, and the \-p form of time prints the posix report.
+.TP
+.B PS2
+The continuation prompt default, "> ", carried for compatibility.
+.TP
+.B PS3
+The prompt the select loop prints, "#? " by default.
+.TP
+.B PS4
+The prefix the set \-x trace prints, "+ " by default. The first character is
+repeated once per enclosing subshell.
+.TP
 .B NO_COLOR
 Color is turned off in the prompt and the diagnostics when the variable is set.
 .SH FILES
@@ -234,9 +251,10 @@ The
 builtin hosts a set of small bundled coreutilities, so a system with only a
 compiler can run a configure and a make under shit.
 .B "shitbox ls"
-runs the bundled ls, and a name that is already a builtin, such as
-.BR echo ,
-routes to that builtin. With the
+runs the bundled ls. A bundled utility is tried first, and a name with no
+matching utility falls back to a shell builtin of that name, so
+.B "shitbox echo"
+runs the echo builtin. With the
 .B \-\-enable\-shitbox
 flag or
 .B "set \-o shitbox"

@@ -69,9 +69,27 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   os::children_cpu_seconds(user_after, system_after);
 
   const double real_seconds = static_cast<double>(elapsed_nanos) / 1000000000.0;
-  shit::print_error(utils::format_time_report_pretty(
-      real_seconds, user_after - user_before, system_after - system_before));
-  shit::flush();
+  const double user_cpu = user_after - user_before;
+  const double system_cpu = system_after - system_before;
+
+  /* A set TIMEFORMAT drives the format, an empty value prints nothing, and an
+     unset value keeps the pretty default, matching the time keyword. */
+  String report;
+  if (let const time_format = cxt.get_variable_value("TIMEFORMAT");
+      time_format.has_value())
+  {
+    if (!time_format->is_empty())
+      report = utils::format_time_report_custom(
+          time_format->view(), real_seconds, user_cpu, system_cpu);
+  } else {
+    report =
+        utils::format_time_report_pretty(real_seconds, user_cpu, system_cpu);
+  }
+
+  if (!report.is_empty()) {
+    shit::print_error(report);
+    shit::flush();
+  }
 
   return status;
 }

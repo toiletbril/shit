@@ -143,8 +143,10 @@ Run `make -C test test` for the main suite and the completion suite under the
 debug binary, and `make -C test bench` for the benchmark. Wrap an interactive
 launch in a timeout. The `refill` target regenerates goldens, and the `REFILL`
 variable scopes it to named tests. Read each regenerated golden before trusting
-it, since refill blesses whatever the binary prints. macOS diverges on a few
-tests, and the harness carries alternate goldens.
+it, since refill blesses whatever the binary prints. The dashdiff, bashdiff,
+mimicrydiff, and bench recipes live in per-target scripts under test/, launched
+with /bin/bash, since the diffs use process substitution. macOS diverges on a
+few tests, and the harness carries alternate goldens.
 
 ## Finishing a change
 

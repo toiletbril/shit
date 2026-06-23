@@ -94,7 +94,8 @@ template <class T>
 String value_to_log_string(T value)
 {
   char buffer[32];
-  std::snprintf(buffer, sizeof(buffer), "%p", static_cast<const opaque *>(value));
+  std::snprintf(buffer, sizeof(buffer), "%p",
+                static_cast<const opaque *>(value));
   return String{buffer};
 }
 

@@ -25,8 +25,9 @@ fn report_command_not_found(EvalContext &cxt, const CommandNotFound &e) throws
    rather than the caller's line. The returned view is the windowed source, or
    None when no window applies and the caller renders against the current
    source. */
-fn window_function_body_error(EvalContext &cxt, ErrorWithLocation &error)
-    wontthrow -> Maybe<StringView>;
+fn window_function_body_error(EvalContext &cxt,
+                              ErrorWithLocation &error) wontthrow
+    -> Maybe<StringView>;
 
 namespace expressions {
 

@@ -627,13 +627,17 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
   }
 
   /* The trace goes to standard error so it stays out of a command
-     substitution's captured output. The plus is repeated once per enclosing
-     subshell, so the top shell shows '+', a substitution '++'. */
+     substitution's captured output. The first character of PS4 is repeated once
+     per enclosing subshell, then the whole prefix follows, so the default '+ '
+     shows '+ ' in the top shell and '++ ' in a substitution. */
   if (should_echo_expanded()) {
     let trace = String{};
-    for (usize i = 0; i < m_subshell_depth + 1; i++)
-      trace.push('+');
-    trace.push(' ');
+    let const ps4 = get_variable_value("PS4").value_or(String{"+ "});
+    if (!ps4.is_empty()) {
+      for (usize i = 0; i < m_subshell_depth; i++)
+        trace.push(ps4[0]);
+      trace.append(ps4.view());
+    }
     trace.append(utils::merge_args_to_string(expanded_args));
     trace.push('\n');
     shit::print_error(trace);

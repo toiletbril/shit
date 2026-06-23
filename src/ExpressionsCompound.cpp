@@ -106,12 +106,13 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
            second render. */
         if (!error.was_rendered()) {
           if (let const windowed = window_function_body_error(cxt, error);
-              windowed.has_value()) {
+              windowed.has_value())
+          {
             show_message(error.to_string(*windowed));
           } else {
             const String *source = cxt.current_source();
             show_message(error.to_string(source != nullptr ? source->view()
-                                                            : StringView{}));
+                                                           : StringView{}));
           }
           error.set_rendered();
         }
@@ -250,16 +251,32 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
     os::children_cpu_seconds(user_after, system_after);
     const double real_seconds =
         static_cast<double>(elapsed_nanos) / 1000000000.0;
-    let const report =
-        m_cmd->time_uses_posix_format()
-            ? utils::format_time_report_posix(real_seconds,
-                                              user_after - user_before,
-                                              system_after - system_before)
-            : utils::format_time_report_pretty(real_seconds,
-                                               user_after - user_before,
-                                               system_after - system_before);
-    print_error(report);
-    flush();
+    const double user_cpu = user_after - user_before;
+    const double system_cpu = system_after - system_before;
+
+    /* The -p form prints the posix report and ignores TIMEFORMAT. Otherwise a
+       set TIMEFORMAT drives the format, an empty value prints nothing the way
+       bash treats a null TIMEFORMAT, and an unset value keeps the pretty
+       default so the existing reports are unchanged. */
+    String report;
+    if (m_cmd->time_uses_posix_format()) {
+      report =
+          utils::format_time_report_posix(real_seconds, user_cpu, system_cpu);
+    } else if (let const time_format = cxt.get_variable_value("TIMEFORMAT");
+               time_format.has_value())
+    {
+      if (!time_format->is_empty())
+        report = utils::format_time_report_custom(
+            time_format->view(), real_seconds, user_cpu, system_cpu);
+    } else {
+      report =
+          utils::format_time_report_pretty(real_seconds, user_cpu, system_cpu);
+    }
+
+    if (!report.is_empty()) {
+      print_error(report);
+      flush();
+    }
   }
 
   /* A pipeline prefixed with ! reports the inverse of its status, and that

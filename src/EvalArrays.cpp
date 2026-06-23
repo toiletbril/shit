@@ -555,6 +555,36 @@ fn EvalContext::apply_array_subscript(StringView name,
     return String{scratch_allocator()};
   }
 
+  if (name == "BASH_LINENO" && bash_dynamic_variables_enabled()) [[unlikely]] {
+    let const depth = funcname_frame_count();
+    if (subscript == "@" || subscript == "*") {
+      /* The * form joins with the first IFS byte, the @ form with a space. */
+      let separator = ' ';
+      let has_separator = true;
+      if (subscript == "*") {
+        has_separator = !m_field_separators.is_empty();
+        if (has_separator) separator = m_field_separators.first_character();
+      }
+      let out = String{scratch_allocator()};
+      for (usize i = 0; i < depth; i++) {
+        if (i > 0 && has_separator) {
+          out.push(separator);
+        }
+        out.append(utils::uint_to_text(funcname_line_at(i)).view());
+      }
+      return out;
+    }
+
+    let const index = evaluate_arithmetic(subscript);
+    if (index >= 0 && static_cast<usize>(index) < depth) {
+      return String{
+          scratch_allocator(),
+          utils::uint_to_text(funcname_line_at(static_cast<usize>(index)))
+              .view()};
+    }
+    return String{scratch_allocator()};
+  }
+
   /* An associative array reads by a string key. The values come back in the
      store's order, which need not match bash for more than one key. */
   if (is_associative_array(name)) {
@@ -641,6 +671,17 @@ fn EvalContext::collect_array_elements(StringView name) const throws
     for (usize i = 0; i < depth; i++)
       frames.push_managed(funcname_frame_at(i));
     return frames;
+  }
+
+  if (name == "BASH_LINENO" && bash_dynamic_variables_enabled() &&
+      funcname_frame_count() > 0) [[unlikely]]
+  {
+    let const depth = funcname_frame_count();
+    let lines = ArrayList<String>{heap_allocator()};
+    lines.reserve(depth);
+    for (usize i = 0; i < depth; i++)
+      lines.push_managed(utils::uint_to_text(funcname_line_at(i)).view());
+    return lines;
   }
 
   if (is_associative_array(name)) return associative_values(name);

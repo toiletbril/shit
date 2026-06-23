@@ -133,8 +133,9 @@ cold fn report_command_not_found(EvalContext &cxt,
   cxt.print_source_backtrace(e.location());
 }
 
-fn window_function_body_error(EvalContext &cxt, ErrorWithLocation &error)
-    wontthrow -> Maybe<StringView>
+fn window_function_body_error(EvalContext &cxt,
+                              ErrorWithLocation &error) wontthrow
+    -> Maybe<StringView>
 {
   let const resolved = cxt.resolve_render_source(error.location());
   if (!resolved.is_windowed || resolved.text == nullptr) return None;

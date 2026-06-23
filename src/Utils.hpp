@@ -85,6 +85,15 @@ fn format_time_report_posix(double real_seconds, double user_seconds,
 fn format_time_report_pretty(double real_seconds, double user_seconds,
                              double system_seconds) throws -> String;
 
+/* The report a set TIMEFORMAT renders. The bash conversions are honored, %%, a
+   literal percent, %[p][l]R, %[p][l]U, and %[p][l]S for the real, user, and
+   system seconds, and %P for the cpu busy percent, where p is a precision from
+   zero to six and l selects the minutes form. A trailing newline is appended.
+ */
+fn format_time_report_custom(StringView format, double real_seconds,
+                             double user_seconds, double system_seconds) throws
+    -> String;
+
 /* The 1-based line number the byte at position falls on in source. The lookup
    is a binary search over a newline offset table cached on the source pointer
    and length, so a script that reads $LINENO on almost every line stays

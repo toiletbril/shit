@@ -603,21 +603,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   /* $LINENO reports the line of the command currently evaluating, a stored
      value above winning so a script that assigns LINENO reads it back. */
   if (first_byte == 'L' && name == "LINENO") {
-    /* A windowed resolution adds the defining file's line offset. */
-    let const resolved_source = resolve_render_source(m_current_location);
-    usize line = 1;
-    if (resolved_source.text != nullptr) {
-      const usize render_position =
-          resolved_source.is_windowed
-              ? m_current_location.position -
-                    resolved_source.body_start_position +
-                    resolved_source.header_length
-              : m_current_location.position;
-      line =
-          utils::line_number_at(resolved_source.text->view(), render_position) +
-          (resolved_source.is_windowed ? resolved_source.line_offset : 0);
-    }
-    return utils::uint_to_text(line);
+    return utils::uint_to_text(line_number_at_location(m_current_location));
   }
 
   /* The bash dynamic variables are computed on each read in every mood but
@@ -758,6 +744,18 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       if (m_is_script_run) return String{heap_allocator(), m_shell_name.view()};
       return String{heap_allocator()};
     }
+
+    if (first_byte == 'B' && name == "BASH_LINENO") {
+      if (funcname_frame_count() > 0)
+        return utils::uint_to_text(funcname_line_at(0));
+      return shit::None;
+    }
+
+    if (first_byte == 'B' && name == "BASH_COMMAND" &&
+        !m_current_command.is_empty())
+    {
+      return String{heap_allocator(), m_current_command.view()};
+    }
   }
 
   if (let const env = os::get_environment_variable(name))
@@ -809,12 +807,15 @@ fn EvalContext::leave_function_scope() throws -> void
 fn EvalContext::push_function_call_name(StringView name) throws -> void
 {
   m_function_call_names.push(String{heap_allocator(), name});
+  m_function_call_locations.push(m_current_location);
 }
 
 fn EvalContext::pop_function_call_name() wontthrow -> void
 {
-  if (!m_function_call_names.is_empty())
+  if (!m_function_call_names.is_empty()) {
     m_function_call_names.remove(m_function_call_names.count() - 1);
+    m_function_call_locations.remove(m_function_call_locations.count() - 1);
+  }
 }
 
 fn EvalContext::funcname_frame_count() const wontthrow -> usize
@@ -831,6 +832,40 @@ fn EvalContext::funcname_frame_at(usize index) const wontthrow -> StringView
     return m_function_call_names[call_count - 1 - index].view();
   if (index < call_count + m_sourced_file_frames) return StringView{"source"};
   return StringView{"main"};
+}
+
+fn EvalContext::line_number_at_location(
+    const SourceLocation &location) const throws -> usize
+{
+  /* A windowed resolution adds the defining file's line offset. */
+  let const resolved_source = resolve_render_source(location);
+  usize line = 1;
+  if (resolved_source.text != nullptr) {
+    const usize render_position =
+        resolved_source.is_windowed
+            ? location.position - resolved_source.body_start_position +
+                  resolved_source.header_length
+            : location.position;
+    line =
+        utils::line_number_at(resolved_source.text->view(), render_position) +
+        (resolved_source.is_windowed ? resolved_source.line_offset : 0);
+  }
+  return line;
+}
+
+fn EvalContext::funcname_line_at(usize index) const throws -> usize
+{
+  /* A source or main frame past the function calls reports 0, the way bash
+     bottoms out BASH_LINENO. An outer call-site location is rendered against
+     the live source window, so the innermost frame and a single-source script
+     are exact, while a frame whose defining file was sourced and freed can
+     misnumber.
+   */
+  let const call_count = m_function_call_names.count();
+  if (index < call_count)
+    return line_number_at_location(
+        m_function_call_locations[call_count - 1 - index]);
+  return 0;
 }
 
 pure fn EvalContext::in_function_scope() const wontthrow -> bool

@@ -178,16 +178,17 @@ static fn run_debug_completion_driver(StringView driver_line,
   return 0;
 }
 
-/* The highlighter test driver behind --debug-highlight-at, printing each colored
-   span of the line as its text and the escape that colors it, with the escape
-   byte shown as \e so the golden stays readable. */
+/* The highlighter test driver behind --debug-highlight-at, printing each
+   colored span of the line as its text and the escape that colors it, with the
+   escape byte shown as \e so the golden stays readable. */
 static fn run_debug_highlight_driver(StringView driver_line,
                                      EvalContext &context) throws -> i32
 {
   let const spans = completion::highlight_line(driver_line, context);
   let listing = String{};
   for (let const &span : spans) {
-    listing += driver_line.substring_of_length(span.start, span.end - span.start);
+    listing +=
+        driver_line.substring_of_length(span.start, span.end - span.start);
     listing += '\t';
     for (usize i = 0; i < span.sgr.length; i++) {
       if (span.sgr[i] == '\x1b') {
@@ -1242,6 +1243,14 @@ fn main(int argc, char **argv) -> int
      back to the same default when the prompt is built. */
   if (!shit::os::get_environment_variable("PS1").has_value())
     context.set_shell_variable("PS1", toiletline::default_prompt_template());
+
+  /* The continuation and xtrace prompts carry the standard defaults unless the
+     environment supplies them, the way bash seeds PS2 and PS4. PS3 is left
+     unset, since the select loop falls back to its own default. */
+  if (!shit::os::get_environment_variable("PS2").has_value())
+    context.set_shell_variable("PS2", "> ");
+  if (!shit::os::get_environment_variable("PS4").has_value())
+    context.set_shell_variable("PS4", "+ ");
 
   /* COLUMNS and LINES carry the terminal size the way bash sets them, so a
      config that divides by COLUMNS, such as ble.sh, sees a non-zero width. They

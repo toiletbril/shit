@@ -621,6 +621,13 @@ public:
      one "source" per sourced file, and "main" at the bottom of a script run. */
   mustuse fn funcname_frame_count() const wontthrow -> usize;
   mustuse fn funcname_frame_at(usize index) const wontthrow -> StringView;
+  /* The call-site line of frame index, the value BASH_LINENO exposes. A frame
+     past the function calls reports zero. */
+  mustuse fn funcname_line_at(usize index) const throws -> usize;
+  /* The 1-based line a source location falls on, shared by $LINENO and
+     BASH_LINENO. */
+  mustuse fn
+  line_number_at_location(const SourceLocation &location) const throws -> usize;
   /* Marks the run as a script file, the invocation whose FUNCNAME bottoms out
      at "main". */
   fn set_script_run(bool is_script_run) wontthrow -> void
@@ -822,6 +829,18 @@ public:
   fn set_execution_string(StringView text) throws -> void
   {
     m_execution_string = String{heap_allocator(), text};
+  }
+
+  /* The source text of the command running now, the value BASH_COMMAND reads.
+     It is recorded only in the moods that expose the bash dynamic variables, so
+     the posix mood pays nothing for it. */
+  fn set_current_command(String text) throws -> void
+  {
+    m_current_command = steal(text);
+  }
+  pure fn current_command() const wontthrow -> StringView
+  {
+    return m_current_command.view();
   }
 
   /* Seed the nounset, pipefail, and failglob strictness from the active mood.
@@ -1269,6 +1288,7 @@ protected:
   String m_shell_name{};
   String m_shell_executable_path{};
   String m_execution_string{};
+  String m_current_command{};
   ArrayList<String> m_positional_params{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
   StringMap<const Expression *> m_functions{heap_allocator()};
@@ -1385,6 +1405,9 @@ protected:
    */
   ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};
   ArrayList<String> m_function_call_names{heap_allocator()};
+  /* The call-site location of each active function call, parallel to
+     m_function_call_names, read by BASH_LINENO. */
+  ArrayList<SourceLocation> m_function_call_locations{heap_allocator()};
   bool m_is_script_run{false};
   /* The count of source frames that carry a file path, for the FUNCNAME
      classification. */

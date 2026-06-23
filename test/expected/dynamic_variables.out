@@ -1,0 +1,113 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "print_command"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "command: $BASH_COMMAND"]
+  [CompoundListCondition, None]
+    [SimpleCommand "print_command"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "report_line"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "frames: $#BASH_LINENO[@] $#FUNCNAME[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "report_line"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "PS2=[$PS2] PS3=[$PS3-unset] PS4=[$PS4]"]
+  [CompoundListCondition, None]
+    [Assign TIMEFORMAT=[%%]]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [Assign TIMEFORMAT=]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "print_command"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "command: "
+  Variable "BASH_COMMAND"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "print_command"
+]
+[Word
+  Unquoted "report_line"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "frames: "
+  Variable "#BASH_LINENO[@]"
+  DoubleQuoted " "
+  Variable "#FUNCNAME[@]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "report_line"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "PS2=["
+  Variable "PS2"
+  DoubleQuoted "] PS3=["
+  Variable "PS3-unset"
+  DoubleQuoted "] PS4=["
+  Variable "PS4"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "TIMEFORMAT="
+  Literal "[%%]"
+]
+[Word
+  Unquoted "time"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "TIMEFORMAT="
+  Literal ""
+]
+[Word
+  Unquoted "time"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "done"
+]
+command: echo command: $BASH_COMMAND
+frames: 1 1
+PS2=[> ] PS3=[unset] PS4=[+ ]
+[%]
+done
+[Code 0]

@@ -573,6 +573,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
    */
   cxt.set_current_location(source_location());
 
+  /* BASH_COMMAND reads the source text of the command running now. It is built
+     only in the moods that expose the bash dynamic variables, so the posix mood
+     pays nothing on the hot path. */
+  if (cxt.bash_dynamic_variables_enabled())
+    cxt.set_current_command(utils::merge_tokens_to_string(m_args));
+
   /* A glob in command position is rarely intended, the shit mood rejects it
      while a compatibility mood downgrades to a warning. The check reads the
      typed command word before its expansion, so a pattern that happens to match
@@ -1211,16 +1217,17 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        the file that defined the function, which the top-level handler cannot
        reach once this frame unwinds, so the error is rendered here while the
        stack still names the function. window_function_body_error rebases the
-       position onto the definition copy and swaps the filename, and the error is
-       marked rendered so the top-level handler keeps the status without printing
-       it twice. An already-rendered error is rethrown untouched. */
+       position onto the definition copy and swaps the filename, and the error
+       is marked rendered so the top-level handler keeps the status without
+       printing it twice. An already-rendered error is rethrown untouched. */
     i64 function_ret = 0;
     try {
       function_ret = function_body->evaluate(cxt);
     } catch (ErrorWithLocationAndDetails &error) {
       if (!error.was_rendered())
         if (let const windowed = window_function_body_error(cxt, error);
-            windowed.has_value()) {
+            windowed.has_value())
+        {
           show_message(error.to_string(*windowed));
           show_message(error.details_to_string(*windowed));
           error.set_rendered();
@@ -1229,7 +1236,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     } catch (ErrorWithLocation &error) {
       if (!error.was_rendered())
         if (let const windowed = window_function_body_error(cxt, error);
-            windowed.has_value()) {
+            windowed.has_value())
+        {
           show_message(error.to_string(*windowed));
           error.set_rendered();
         }

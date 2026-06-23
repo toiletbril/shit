@@ -482,10 +482,12 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       const StringView subscript =
           name.substring_of_length(*bracket + 1, name.length - *bracket - 2);
       if (subscript == "@" || subscript == "*") {
-        if (array_name == "FUNCNAME" && bash_dynamic_variables_enabled())
-            [[unlikely]]
+        if ((array_name == "FUNCNAME" || array_name == "BASH_LINENO") &&
+            bash_dynamic_variables_enabled()) [[unlikely]]
+        {
           return String{scratch_allocator(),
                         utils::uint_to_text(funcname_frame_count())};
+        }
         if (is_associative_array(array_name))
           return String{
               heap_allocator(),

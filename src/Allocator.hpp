@@ -29,13 +29,15 @@ public:
        without moving, so the caller allocates and copies. */
     bool (*resize)(opaque *context, opaque *pointer, usize old_length,
                    usize new_length, usize alignment);
-    void (*free)(opaque *context, opaque *pointer, usize length, usize alignment);
+    void (*free)(opaque *context, opaque *pointer, usize length,
+                 usize alignment);
   };
 
   opaque *context;
   const VTable *vtable;
 
-  hot flatten fn raw_alloc(usize length, usize alignment) const throws -> opaque *
+  hot flatten fn raw_alloc(usize length, usize alignment) const throws
+      -> opaque *
   {
     return vtable->alloc(context, length, alignment);
   }
@@ -195,8 +197,8 @@ hot inline fn heap_pool_instance() wontthrow -> heap_pool &
 
 /* The heap adapter over the C allocator. It frees on demand, so it backs the
    long-lived mutable data the bump model would leak. */
-hot inline fn heap_alloc(opaque *context, usize length, usize alignment) wontthrow
-    -> opaque *
+hot inline fn heap_alloc(opaque *context, usize length,
+                         usize alignment) wontthrow -> opaque *
 {
   unused(context);
   /* malloc already meets every alignment up to alignof(max_align_t), so the
