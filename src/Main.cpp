@@ -1433,12 +1433,15 @@ fn main(int argc, char **argv) -> int
             shit::String eol_marker{};
             if (shit::colors::stdout_wants_color()) {
               eol_marker += shit::colors::ansi::INVERSE;
-              eol_marker += "%";
+              eol_marker += "\\n";
               eol_marker += shit::colors::ansi::RESET;
             } else {
-              eol_marker += "%";
+              eol_marker += "\\n";
             }
-            for (u32 column = 1; column < marker_columns; column++)
+            /* The marker is the two-column \n glyph, so the spaces fill the
+               rest of the line and the carriage return lands the prompt at
+               column one. */
+            for (u32 column = 2; column < marker_columns; column++)
               eol_marker.push(' ');
             eol_marker.push('\r');
             shit::print(eol_marker);

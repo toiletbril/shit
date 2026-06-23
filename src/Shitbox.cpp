@@ -169,6 +169,18 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
                    const ArrayList<Flag *> &flags) throws -> void
 {
   let help_text = String{};
+
+  /* A symlinked utility looks like a system program, so the help opens by
+     naming the shit binary behind it, set off by a blank line on each side. */
+  if (ec.is_multicall) {
+    help_text += "\n";
+    help_text += wrap_text("This utility is bundled with the shit shell and "
+                           "runs from the shit binary reached through a "
+                           "symlink, not a system program of the same name.",
+                           HELP_INDENT, HELP_WRAP_WIDTH);
+    help_text += "\n\n";
+  }
+
   if (!description.is_empty()) {
     help_text += "DESCRIPTION\n";
     help_text += wrap_text(description, HELP_INDENT, HELP_WRAP_WIDTH);
@@ -180,16 +192,6 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   help_text += '\n';
   help_text += make_flag_help(flags);
   help_text += '\n';
-
-  /* A symlinked utility looks like a system program, so the help names the
-     shit binary behind it. */
-  if (ec.is_multicall) {
-    help_text += wrap_text("This utility is bundled with the shit shell and "
-                           "runs from the shit binary reached through a "
-                           "symlink, not a system program of the same name.",
-                           HELP_INDENT, HELP_WRAP_WIDTH);
-    help_text += '\n';
-  }
 
   ec.print_to_stdout(help_text);
 }

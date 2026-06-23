@@ -99,7 +99,7 @@ using usize = size_t;
 using uintptr = uintptr_t;
 
 /* void is ambiguous. opaque is an alias for it, for clarity. opaque * is void
-   *, so casts and C interfaces are unchanged. */
+ *, so casts and C interfaces are unchanged. */
 using opaque = void;
 
 #if defined __GNUC__ || defined __clang__ || defined __COSMOCC__
