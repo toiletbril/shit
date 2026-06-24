@@ -993,6 +993,35 @@ fn build_prompt(EvalContext &context) -> String
   return rendered;
 }
 
+fn render_ps0(EvalContext &context) -> String
+{
+  Maybe<String> ps0 = context.get_variable_value("PS0");
+  if (!ps0.has_value() || ps0->is_empty()) return String{};
+
+  /* PS0 takes the parameter, command, and arithmetic passes the prompt takes,
+     so the starship hook's ${STARSHIP_START_TIME:$((...)):0} runs its arithmetic
+     side effect and stamps the start time. The exit status is restored, since the
+     command about to run must still read the previous $?. */
+  const i32 saved_status = context.last_exit_status();
+  String guarded = guard_prompt_backslashes(ps0->view());
+  String expanded;
+  try {
+    expanded = unguard_prompt_backslashes(
+        context.expand_heredoc_body(guarded.view()).view());
+  } catch (const shit::ErrorBase &) {
+    context.set_last_exit_status(saved_status);
+    return String{};
+  }
+  context.set_last_exit_status(saved_status);
+
+  let const working_directory = Path::current_directory().text();
+  let const user = os::get_current_user().value_or(String{"???"});
+  String rendered = expand_prompt_escapes(expanded.view(), user.view(),
+                                          working_directory.view(), context);
+  if (!colors::stdout_wants_color()) return strip_ansi_color(rendered.view());
+  return rendered;
+}
+
 } /* namespace toiletline */
 
 #else /* SHIT_NO_TOILETLINE */
@@ -1089,6 +1118,13 @@ fn expand_prompt_template(StringView prompt, shit::EvalContext &context)
 {
   unused(context);
   return String{prompt};
+}
+
+/* A profiling build runs no interactive loop, so PS0 never fires. */
+fn render_ps0(shit::EvalContext &context) -> String
+{
+  unused(context);
+  return String{};
 }
 
 } /* namespace toiletline */
