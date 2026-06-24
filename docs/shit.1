@@ -229,6 +229,16 @@ repeated once per enclosing subshell.
 .TP
 .B NO_COLOR
 Color is turned off in the prompt and the diagnostics when the variable is set.
+.TP
+.B SHIT_ANSI_*
+A color escape is provided under each of these names so a prompt template
+carries an attribute without an escape byte. The recognized colors are BLACK,
+RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, and WHITE, each also with a BRIGHT_
+prefixed high\-intensity form, along with the attributes BOLD, DIM, and RESET.
+The names resolve in every mood. A recognized name reads back empty when color
+is off, the way NO_COLOR and a redirected prompt turn the escapes off, so the
+prompt stays plain. A stored assignment to one of the names wins over the
+provided escape.
 .SH FILES
 .TP
 .I /etc/shitrc

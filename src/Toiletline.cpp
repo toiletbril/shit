@@ -794,7 +794,7 @@ fn default_prompt_template() -> String
      alternate around the SHIT_GIT_BRANCH dynamic variable, so the prompt
      closes up to a single space outside a repository. */
   let template_string = String{};
-  template_string += R"([\u@\h${SHIT_GIT_BRANCH:+ ($SHIT_GIT_BRANCH)} )";
+  template_string += R"([${SHIT_GIT_BRANCH:+$SHIT_GIT_BRANCH at }\u@\h )";
   if (colors::stdout_wants_color()) {
     template_string += colors::ansi::GREEN;
     template_string += R"(\P)";

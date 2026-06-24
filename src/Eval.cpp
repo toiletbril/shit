@@ -2,16 +2,19 @@
 
 #include "Arena.hpp"
 #include "Cli.hpp"
+#include "Colors.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
+#include "PackedStringKey.hpp"
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "ResolvedCommand.hpp"
 #include "Shitbox.hpp"
+#include "StaticStringMap.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -514,6 +517,41 @@ fn EvalContext::sync_exported_after_restore(StringView name,
     m_exported_names.remove(name);
 }
 
+/* The SHIT_ANSI_ family names the sixteen standard SGR foreground colors and
+   the bold, dim, and reset attributes, so a prompt template carries a color
+   without spelling an escape. The suffix after the prefix keys this table. */
+static fn ansi_escape_for_color(StringView color_name) throws
+    -> Maybe<StringView>
+{
+  static constexpr StaticStringMap<const char *>::entry ANSI_ENTRIES[] = {
+      {SSK("BLACK"),          "\x1b[30m"},
+      {SSK("RED"),            "\x1b[31m"},
+      {SSK("GREEN"),          "\x1b[32m"},
+      {SSK("YELLOW"),         "\x1b[33m"},
+      {SSK("BLUE"),           "\x1b[34m"},
+      {SSK("MAGENTA"),        "\x1b[35m"},
+      {SSK("CYAN"),           "\x1b[36m"},
+      {SSK("WHITE"),          "\x1b[37m"},
+      {SSK("BRIGHT_BLACK"),   "\x1b[90m"},
+      {SSK("BRIGHT_RED"),     "\x1b[91m"},
+      {SSK("BRIGHT_GREEN"),   "\x1b[92m"},
+      {SSK("BRIGHT_YELLOW"),  "\x1b[93m"},
+      {SSK("BRIGHT_BLUE"),    "\x1b[94m"},
+      {SSK("BRIGHT_MAGENTA"), "\x1b[95m"},
+      {SSK("BRIGHT_CYAN"),    "\x1b[96m"},
+      {SSK("BRIGHT_WHITE"),   "\x1b[97m"},
+      {SSK("BOLD"),           "\x1b[1m" },
+      {SSK("DIM"),            "\x1b[2m" },
+      {SSK("RESET"),          "\x1b[0m" },
+  };
+  static constexpr StaticStringMap<const char *> ANSI_ESCAPES{
+      ANSI_ENTRIES, sizeof(ANSI_ENTRIES) / sizeof(ANSI_ENTRIES[0])};
+
+  if (let const escape = ANSI_ESCAPES.find(color_name))
+    return StringView{*escape};
+  return None;
+}
+
 hot fn EvalContext::get_variable_value(StringView name) const throws
     -> Maybe<String>
 {
@@ -598,6 +636,19 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (first_byte == 'S' && name == "SHIT_GIT_BRANCH") {
     return utils::current_git_branch();
+  }
+
+  /* The SHIT_ANSI_ color variables resolve in every mood, so a portable prompt
+     names a color the same way under sh. A stored assignment above wins. The
+     escape reads back empty when the stream wants no color, so a piped prompt
+     and a NO_COLOR run stay plain. */
+  if (first_byte == 'S' && name.starts_with("SHIT_ANSI_")) {
+    if (let const escape =
+            ansi_escape_for_color(name.substring(sizeof("SHIT_ANSI_") - 1)))
+    {
+      if (!colors::stdout_wants_color()) return String{heap_allocator()};
+      return String{heap_allocator(), *escape};
+    }
   }
 
   /* $LINENO reports the line of the command currently evaluating, a stored
