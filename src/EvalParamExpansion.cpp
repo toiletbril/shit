@@ -678,8 +678,6 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     ASSERT(current.has_value());
     return String{scratch_allocator(), current->view()};
   case '+':
-    /* The :+ and + alternate forms test whether a name is set, so an unset name
-       expands to empty by design and draws no warning. */
     if (treat_as_unset) return String{scratch_allocator()};
     return expand_modifier_word(word);
   case '?':

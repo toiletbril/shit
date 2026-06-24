@@ -149,6 +149,8 @@ fn set_path_for_resolution(Maybe<String> path) throws -> void;
 fn search_program_path(StringView program_name, bool find_all = false) throws
     -> ArrayList<Path>;
 
+fn path_command_names() throws -> const ArrayList<String> &;
+
 /* Match str against glob, reading glob_active for which bytes act as
    metacharacters. With extglob set the bash extended-glob groups ?(..), *(..),
    +(..), @(..), and !(..) are recognized, otherwise they are plain bytes. */

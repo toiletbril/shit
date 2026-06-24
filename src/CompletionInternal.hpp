@@ -46,7 +46,6 @@ static pure forceinline fn trim_blanks(StringView text) throws -> StringView
 fn read_directory_cached(const Path &directory) throws
     -> const ArrayList<cached_directory_entry> *;
 fn environment_path_changed(String &cached_path) throws -> bool;
-fn path_command_names() throws -> const ArrayList<String> &;
 fn command_word_of(StringView line) wontthrow -> StringView;
 pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool;
 fn resolve_completion_alias(StringView command, EvalContext &context) throws

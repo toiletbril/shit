@@ -125,8 +125,6 @@ struct local_binding
   /* The read-only mark, so a local -r marks only this scope and the caller's
      later reassignment is not rejected. */
   bool previous_was_readonly{false};
-  /* The export mark, so a local -x exports only this scope and the caller's
-     export state is restored when the function returns. */
   bool previous_was_exported{false};
 };
 
@@ -452,8 +450,6 @@ public:
   fn set_field_separators(StringView value) throws -> void;
   fn get_variable_value(StringView name) const throws -> Maybe<String>;
 
-  /* The dynamic and computed variable names available in the current mood,
-     appended for the completion and the highlighter to treat as set. */
   fn append_dynamic_variable_names(ArrayList<StringView> &out) const throws
       -> void;
 

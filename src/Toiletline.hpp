@@ -33,9 +33,6 @@ String build_prompt(shit::EvalContext &context);
    filled in. */
 String expand_prompt_template(StringView prompt, shit::EvalContext &context);
 
-/* Expand PS0 after a command line is read and before it runs, the bash hook a
-   framework such as starship uses to stamp the command start time. The result
-   is empty when PS0 is unset, so the caller prints nothing. */
 String render_ps0(shit::EvalContext &context);
 
 /* Register the shell completion engine as the line editor's TAB and ghost-text

@@ -245,10 +245,6 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
   else
     m_readonly_names.remove(binding.name.view());
 
-  /* A local -x put the name in the environment for the body. The caller's
-     export state is restored here, so the environment entry the local added is
-     removed and a caller export is left intact. The value restore above already
-     synced the environment for a name that stays exported. */
   if (binding.previous_was_exported) {
     m_exported_names.add(binding.name.view());
     if (binding.previous_value.has_value())
@@ -528,11 +524,6 @@ fn EvalContext::sync_exported_after_restore(StringView name,
     m_exported_names.remove(name);
 }
 
-/* The SHIT_ANSI_ family names the sixteen standard SGR foreground colors and
-   the bold, dim, and reset attributes, so a prompt template carries a color
-   without spelling an escape. The full names key the table, so the same data
-   feeds the dynamic-variable enumeration the completion and the highlighter
-   read. */
 struct ansi_color_variable
 {
   const char *name;
@@ -654,10 +645,6 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     return utils::current_git_branch();
   }
 
-  /* The SHIT_ANSI_ color variables resolve in every mood, so a portable prompt
-     names a color the same way under sh. A stored assignment above wins. The
-     escape reads back empty when the stream wants no color, so a piped prompt
-     and a NO_COLOR run stay plain. */
   if (first_byte == 'S' && name.starts_with("SHIT_ANSI_")) {
     if (let const escape = ansi_escape_for_color(name)) {
       if (!colors::stdout_wants_color()) return String{heap_allocator()};
@@ -828,12 +815,6 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   return shit::None;
 }
 
-/* The names get_variable_value synthesizes on read are absent from the variable
-   store, so the completion and the highlighter read them here as set rather
-   than computing a value, which would advance RANDOM or read the clock on a
-   keystroke. IFS, LINENO, SHIT_GIT_BRANCH, and the SHIT_ANSI_ family resolve in
-   every mood, while the bash dynamic names follow the same POSIX gate
-   get_variable_value applies. */
 fn EvalContext::append_dynamic_variable_names(
     ArrayList<StringView> &out) const throws -> void
 {

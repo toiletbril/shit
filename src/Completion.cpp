@@ -339,13 +339,6 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
   return prefix;
 }
 
-/* The PATH executable names, cached so the per-keystroke ghost does not read
-   every PATH directory on each keystroke. The cache rebuilds only when the PATH
-   value changes. */
-static String CACHED_COMPLETION_PATH{};
-static ArrayList<String> CACHED_PATH_COMMANDS{};
-static bool is_cached_path_commands_valid = false;
-
 fn environment_path_changed(String &cached_path) throws -> bool
 {
   const char *path = std::getenv("PATH");
@@ -353,40 +346,6 @@ fn environment_path_changed(String &cached_path) throws -> bool
   if (cached_path.view() == current) return false;
   cached_path = String{current};
   return true;
-}
-
-fn path_command_names() throws -> const ArrayList<String> &
-{
-  if (!environment_path_changed(CACHED_COMPLETION_PATH) &&
-      is_cached_path_commands_valid)
-  {
-    return CACHED_PATH_COMMANDS;
-  }
-
-  /* A directory repeated in PATH is read only once, a layered profile does not
-     multiply the scan. */
-  let const current = CACHED_COMPLETION_PATH.view();
-  CACHED_PATH_COMMANDS.clear();
-  let seen_directories = HashSet{heap_allocator()};
-  usize segment_start = 0;
-  for (usize i = 0; i <= current.length; i++) {
-    if (i != current.length && current[i] != os::PATH_DELIMITER) continue;
-    let const segment =
-        current.substring_of_length(segment_start, i - segment_start);
-    segment_start = i + 1;
-    let const dir_view = segment.is_empty() ? StringView{"."} : segment;
-    if (seen_directories.contains(dir_view)) continue;
-    seen_directories.add(dir_view);
-    let const directory = Path{dir_view};
-    if (Maybe<ArrayList<String>> entries = Path::read_directory(directory)) {
-      for (let &entry : *entries)
-        CACHED_PATH_COMMANDS.push(steal(entry));
-    }
-  }
-  is_cached_path_commands_valid = true;
-  LOG(Info, "rebuilt the path command cache, %zu names",
-      CACHED_PATH_COMMANDS.count());
-  return CACHED_PATH_COMMANDS;
 }
 
 static fn complete_command(StringView token, bool token_is_glob,
@@ -419,7 +378,7 @@ static fn complete_command(StringView token, bool token_is_glob,
     add_unique_command(candidates, seen, name, token, token_is_glob);
   });
 
-  for (let const &entry : path_command_names())
+  for (let const &entry : utils::path_command_names())
     add_unique_command(candidates, seen, entry.view(), token, token_is_glob);
 
   LOG(All, "collected %zu command candidates for token '%.*s'",
@@ -669,9 +628,6 @@ static fn complete_variable(StringView token, EvalContext &context) throws
   for (let const &name : os::environment_names())
     do_add_name(name.view());
 
-  /* The dynamic names the evaluator synthesizes on read, such as
-     SHIT_GIT_BRANCH and the SHIT_ANSI_ family, are not in the store, so they
-     are offered here. */
   let dynamic_names = ArrayList<StringView>{heap_allocator()};
   context.append_dynamic_variable_names(dynamic_names);
   for (let const &name : dynamic_names)

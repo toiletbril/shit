@@ -1409,6 +1409,12 @@ static bool PATH_CACHE_IS_STALE = false;
    there only marks the cache stale and the resolver stays lazy. */
 static bool PATH_MAP_IS_EAGER = false;
 
+static ArrayList<String> PATH_COMMAND_NAMES{};
+static bool PATH_COMMAND_NAMES_IS_VALID = false;
+
+static ArrayList<String> BUILT_PATH_DIRS{};
+static bool BUILT_PATH_DIRS_IS_VALID = false;
+
 static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
 /* Defined below, declared here so the cache rebuild can split the current PATH
@@ -1442,13 +1448,29 @@ static fn directory_listing(const Path &directory) throws
    directory's copy of a name wins. A directory whose listing is already cached
    is not read again, so a PATH change that only adds a directory reads just
    that one from disk. */
+static fn path_dir_lists_equal(const ArrayList<String> &a,
+                               const ArrayList<String> &b) wontthrow -> bool
+{
+  if (a.count() != b.count()) return false;
+  for (usize i = 0; i < a.count(); i++)
+    if (a[i].view() != b[i].view()) return false;
+  return true;
+}
+
 static fn rebuild_path_cache() throws -> void
 {
   PATH_CACHE.clear();
   PATH_CACHE_IS_STALE = false;
+  PATH_COMMAND_NAMES_IS_VALID = false;
   if (!MAYBE_PATH) return;
 
   let const path_dirs = split_path_dirs(*MAYBE_PATH);
+
+  BUILT_PATH_DIRS.clear();
+  BUILT_PATH_DIRS.reserve(path_dirs.count());
+  for (let const &dir_string : path_dirs)
+    BUILT_PATH_DIRS.push(String{dir_string.view()});
+  BUILT_PATH_DIRS_IS_VALID = true;
 
   /* A counting pass sizes the cache once so the bulk insert does not climb a
      rehash chain from sixteen slots. The directory listings cache, so the
@@ -1477,6 +1499,10 @@ fn clear_path_map() throws -> void
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
   DIR_LISTING_CACHE.clear();
+  PATH_COMMAND_NAMES.clear();
+  PATH_COMMAND_NAMES_IS_VALID = false;
+  BUILT_PATH_DIRS.clear();
+  BUILT_PATH_DIRS_IS_VALID = false;
   PATH_CACHE_IS_STALE = false;
   PATH_MAP_IS_EAGER = false;
 }
@@ -1503,15 +1529,23 @@ fn set_path_for_resolution(Maybe<String> path) throws -> void
     return;
 
   MAYBE_PATH = steal(path);
-  if (PATH_MAP_IS_EAGER) {
-    /* The listing cache survives a PATH change, so the rebuild reads from disk
-       only the directories the new PATH adds and reuses the rest. */
-    LOG(Info, "set_path_for_resolution rebuilding for a changed PATH");
-    rebuild_path_cache();
-  } else {
+  if (!PATH_MAP_IS_EAGER) {
     /* A non-interactive run never seeded the map, so it stays lazy. */
     PATH_CACHE_IS_STALE = true;
+    return;
   }
+
+  if (MAYBE_PATH.has_value() && BUILT_PATH_DIRS_IS_VALID &&
+      !PATH_CACHE_IS_STALE)
+  {
+    let const new_dirs = split_path_dirs(*MAYBE_PATH);
+    if (path_dir_lists_equal(new_dirs, BUILT_PATH_DIRS)) return;
+  }
+
+  /* The listing cache survives a PATH change, so the rebuild reads from disk
+     only the directories the new PATH adds and reuses the rest. */
+  LOG(Info, "set_path_for_resolution rebuilding for a changed PATH");
+  rebuild_path_cache();
 }
 
 /* Split PATH into its directory components. The last component carries no
@@ -1580,6 +1614,26 @@ fn initialize_path_map() throws -> void
      rebuilds it eagerly while reading only the directories the change adds. */
   PATH_MAP_IS_EAGER = true;
   rebuild_path_cache();
+}
+
+fn path_command_names() throws -> const ArrayList<String> &
+{
+  if (!PATH_MAP_IS_EAGER)
+    initialize_path_map();
+  else if (PATH_CACHE_IS_STALE)
+    rebuild_path_cache();
+
+  if (!PATH_COMMAND_NAMES_IS_VALID) {
+    PATH_COMMAND_NAMES.clear();
+    PATH_COMMAND_NAMES.reserve(PATH_CACHE.count());
+    PATH_CACHE.for_each([](StringView name, const ArrayList<Path> &paths) {
+      unused(paths);
+      PATH_COMMAND_NAMES.push(String{name});
+    });
+    PATH_COMMAND_NAMES_IS_VALID = true;
+  }
+
+  return PATH_COMMAND_NAMES;
 }
 
 /* Stat dir/name along PATH until a match, the way dash stats each candidate

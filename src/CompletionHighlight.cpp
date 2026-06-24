@@ -118,7 +118,7 @@ static fn command_word_prefixes_any(StringView word,
   });
   if (was_found) return true;
 
-  for (let const &command_name : path_command_names())
+  for (let const &command_name : utils::path_command_names())
     if (has_prefix(command_name.view())) return true;
 
   return false;
@@ -895,10 +895,6 @@ fn highlight_line(StringView line, EvalContext &context) throws
   let known_vars = HashSet{arena};
   if (line.find_character('$').has_value()) {
     known_vars = context.variable_names(arena);
-    /* The names the evaluator synthesizes on read are not in the store, so the
-       shared enumeration adds them as set rather than computing a value, which
-       would advance RANDOM or read the clock on a keystroke. The mood gate
-       lives there, so a POSIX run still reds an unset $RANDOM. */
     let dynamic_names = ArrayList<StringView>{arena};
     context.append_dynamic_variable_names(dynamic_names);
     for (let const &name : dynamic_names)

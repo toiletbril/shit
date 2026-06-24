@@ -998,10 +998,6 @@ fn render_ps0(EvalContext &context) -> String
   Maybe<String> ps0 = context.get_variable_value("PS0");
   if (!ps0.has_value() || ps0->is_empty()) return String{};
 
-  /* PS0 takes the parameter, command, and arithmetic passes the prompt takes,
-     so the starship hook's ${STARSHIP_START_TIME:$((...)):0} runs its arithmetic
-     side effect and stamps the start time. The exit status is restored, since the
-     command about to run must still read the previous $?. */
   const i32 saved_status = context.last_exit_status();
   String guarded = guard_prompt_backslashes(ps0->view());
   String expanded;
@@ -1120,7 +1116,6 @@ fn expand_prompt_template(StringView prompt, shit::EvalContext &context)
   return String{prompt};
 }
 
-/* A profiling build runs no interactive loop, so PS0 never fires. */
 fn render_ps0(shit::EvalContext &context) -> String
 {
   unused(context);

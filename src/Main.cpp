@@ -1537,10 +1537,6 @@ fn main(int argc, char **argv) -> int
         should_quit && !context.shell_is_interactive() &&
         !context.has_exit_trap() && !should_print_post_run_trailer);
 
-    /* PS0 expands after the line is read and before it runs, the bash hook a
-       prompt framework such as starship uses to stamp the command start time.
-       It fires only for an interactive command, so a sourced script pays
-       nothing. */
     if (context.shell_is_interactive() && !script_contents.is_empty()) {
       shit::String ps0 = toiletline::render_ps0(context);
       if (!ps0.is_empty()) {
