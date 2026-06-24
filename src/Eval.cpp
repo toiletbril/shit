@@ -244,6 +244,19 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     m_readonly_names.add(binding.name.view());
   else
     m_readonly_names.remove(binding.name.view());
+
+  /* A local -x put the name in the environment for the body. The caller's
+     export state is restored here, so the environment entry the local added is
+     removed and a caller export is left intact. The value restore above already
+     synced the environment for a name that stays exported. */
+  if (binding.previous_was_exported) {
+    m_exported_names.add(binding.name.view());
+    if (binding.previous_value.has_value())
+      os::set_environment_variable(binding.name, *binding.previous_value);
+  } else if (is_exported(binding.name)) {
+    m_exported_names.remove(binding.name.view());
+    os::unset_environment_variable(binding.name);
+  }
 }
 
 fn EvalContext::set_indexed_array(StringView name,

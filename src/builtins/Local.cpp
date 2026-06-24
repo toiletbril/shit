@@ -23,7 +23,8 @@ FLAG(LOCAL_LOWERCASE, Bool, 'l', "", "Accepted without effect.");
 FLAG(LOCAL_NAMEREF, Bool, 'n', "", "Accepted without effect.");
 FLAG(LOCAL_READONLY, Bool, 'r', "", "Accepted without effect.");
 FLAG(LOCAL_UPPERCASE, Bool, 'u', "", "Accepted without effect.");
-FLAG(LOCAL_EXPORT, Bool, 'x', "", "Accepted without effect.");
+FLAG(LOCAL_EXPORT, Bool, 'x', "",
+     "Export the local into the environment so a child process sees it.");
 
 REGISTER_BUILTIN_FLAGS(Local);
 
@@ -52,6 +53,7 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
   bool should_make_indexed = false;
   bool should_make_associative = false;
   bool should_mark_integer = false;
+  bool should_mark_export = false;
   usize first_name = 1;
   for (; first_name < args.count(); first_name++) {
     const StringView arg = args[first_name].view();
@@ -65,8 +67,8 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
       case 'a': should_make_indexed = true; break;
       case 'A': should_make_associative = true; break;
       case 'i': should_mark_integer = true; break;
+      case 'x': should_mark_export = true; break;
       case 'r':
-      case 'x':
       case 'l':
       case 'u':
       case 'n': break;
@@ -131,6 +133,17 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
       } else {
         cxt.set_shell_variable(name, value);
       }
+    }
+
+    /* -x moves the local into the environment, so a child process sees it for
+       the life of the function. The name is marked before the value is stored
+       again, so set_shell_variable routes it through to the environment, and
+       the saved binding restores the caller's export state on return. */
+    if (should_mark_export && !should_make_indexed && !should_make_associative)
+    {
+      cxt.mark_exported(name);
+      cxt.set_shell_variable(
+          name, cxt.get_variable_value(name).value_or(String{}).view());
     }
   }
 

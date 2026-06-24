@@ -476,11 +476,16 @@ fn EvalContext::declare_local(StringView name) throws -> void
   let const previous_was_readonly = is_readonly(name);
   if (previous_was_readonly) unmark_readonly(name);
 
+  /* The export mark is saved so the scope pop restores the caller's export
+     state. It is left in place here, so a plain local keeps any inherited
+     export until the body reassigns the name. */
+  let const previous_was_exported = is_exported(name);
+
   m_local_scopes.back().push(local_binding{
       String{name}, get_variable_value(name), steal(previous_array),
       previous_was_associative, steal(previous_keys), steal(previous_values),
       steal(previous_sparse_indices), steal(previous_sparse_values),
-      previous_was_integer, previous_was_readonly});
+      previous_was_integer, previous_was_readonly, previous_was_exported});
 
   /* The live array forms are cleared so a local array starts empty. The scalar
      value is left in place, so a value-less local of a scalar name keeps the

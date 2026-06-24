@@ -20,5 +20,6 @@ OPTIONS
   -n                      Accepted without effect.
   -r                      Accepted without effect.
   -u                      Accepted without effect.
-  -x                      Accepted without effect.
+  -x                      Export the local into the environment so a child
+                          process sees it.
 rc=0
