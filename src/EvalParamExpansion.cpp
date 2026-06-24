@@ -678,17 +678,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     ASSERT(current.has_value());
     return String{scratch_allocator(), current->view()};
   case '+':
-    if (treat_as_unset) {
-      /* The :+ and + alternate forms expand to empty on an unset name, which -W
-         surfaces as a warning so a missing export or a typo does not hide. A
-         set-but-empty name carries a value and does not warn. */
-      if (!is_set && m_runtime.are_warnings_enabled)
-        show_runtime_warning_at(
-            locate_variable_reference(name),
-            "The variable '" + String{name} +
-                "' is not set, the alternate form expands to empty");
-      return String{scratch_allocator()};
-    }
+    /* The :+ and + alternate forms test whether a name is set, so an unset name
+       expands to empty by design and draws no warning. */
+    if (treat_as_unset) return String{scratch_allocator()};
     return expand_modifier_word(word);
   case '?':
     if (treat_as_unset) {

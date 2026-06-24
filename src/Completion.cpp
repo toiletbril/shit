@@ -669,6 +669,13 @@ static fn complete_variable(StringView token, EvalContext &context) throws
   for (let const &name : os::environment_names())
     do_add_name(name.view());
 
+  /* The dynamic names the evaluator synthesizes on read, such as SHIT_GIT_BRANCH
+     and the SHIT_ANSI_ family, are not in the store, so they are offered here. */
+  let dynamic_names = ArrayList<StringView>{heap_allocator()};
+  context.append_dynamic_variable_names(dynamic_names);
+  for (let const &name : dynamic_names)
+    do_add_name(name);
+
   LOG(All, "%zu variable names match prefix '%.*s'", candidates.count(),
       static_cast<int>(prefix.length), prefix.data);
 

@@ -8,13 +8,11 @@
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
-#include "PackedStringKey.hpp"
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "ResolvedCommand.hpp"
 #include "Shitbox.hpp"
-#include "StaticStringMap.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -519,36 +517,41 @@ fn EvalContext::sync_exported_after_restore(StringView name,
 
 /* The SHIT_ANSI_ family names the sixteen standard SGR foreground colors and
    the bold, dim, and reset attributes, so a prompt template carries a color
-   without spelling an escape. The suffix after the prefix keys this table. */
-static fn ansi_escape_for_color(StringView color_name) throws
-    -> Maybe<StringView>
+   without spelling an escape. The full names key the table, so the same data
+   feeds the dynamic-variable enumeration the completion and the highlighter
+   read. */
+struct ansi_color_variable
 {
-  static constexpr StaticStringMap<const char *>::entry ANSI_ENTRIES[] = {
-      {SSK("BLACK"),          "\x1b[30m"},
-      {SSK("RED"),            "\x1b[31m"},
-      {SSK("GREEN"),          "\x1b[32m"},
-      {SSK("YELLOW"),         "\x1b[33m"},
-      {SSK("BLUE"),           "\x1b[34m"},
-      {SSK("MAGENTA"),        "\x1b[35m"},
-      {SSK("CYAN"),           "\x1b[36m"},
-      {SSK("WHITE"),          "\x1b[37m"},
-      {SSK("BRIGHT_BLACK"),   "\x1b[90m"},
-      {SSK("BRIGHT_RED"),     "\x1b[91m"},
-      {SSK("BRIGHT_GREEN"),   "\x1b[92m"},
-      {SSK("BRIGHT_YELLOW"),  "\x1b[93m"},
-      {SSK("BRIGHT_BLUE"),    "\x1b[94m"},
-      {SSK("BRIGHT_MAGENTA"), "\x1b[95m"},
-      {SSK("BRIGHT_CYAN"),    "\x1b[96m"},
-      {SSK("BRIGHT_WHITE"),   "\x1b[97m"},
-      {SSK("BOLD"),           "\x1b[1m" },
-      {SSK("DIM"),            "\x1b[2m" },
-      {SSK("RESET"),          "\x1b[0m" },
-  };
-  static constexpr StaticStringMap<const char *> ANSI_ESCAPES{
-      ANSI_ENTRIES, sizeof(ANSI_ENTRIES) / sizeof(ANSI_ENTRIES[0])};
+  const char *name;
+  const char *escape;
+};
 
-  if (let const escape = ANSI_ESCAPES.find(color_name))
-    return StringView{*escape};
+static constexpr ansi_color_variable SHIT_ANSI_COLORS[] = {
+    {"SHIT_ANSI_BLACK",          "\x1b[30m"},
+    {"SHIT_ANSI_RED",            "\x1b[31m"},
+    {"SHIT_ANSI_GREEN",          "\x1b[32m"},
+    {"SHIT_ANSI_YELLOW",         "\x1b[33m"},
+    {"SHIT_ANSI_BLUE",           "\x1b[34m"},
+    {"SHIT_ANSI_MAGENTA",        "\x1b[35m"},
+    {"SHIT_ANSI_CYAN",           "\x1b[36m"},
+    {"SHIT_ANSI_WHITE",          "\x1b[37m"},
+    {"SHIT_ANSI_BRIGHT_BLACK",   "\x1b[90m"},
+    {"SHIT_ANSI_BRIGHT_RED",     "\x1b[91m"},
+    {"SHIT_ANSI_BRIGHT_GREEN",   "\x1b[92m"},
+    {"SHIT_ANSI_BRIGHT_YELLOW",  "\x1b[93m"},
+    {"SHIT_ANSI_BRIGHT_BLUE",    "\x1b[94m"},
+    {"SHIT_ANSI_BRIGHT_MAGENTA", "\x1b[95m"},
+    {"SHIT_ANSI_BRIGHT_CYAN",    "\x1b[96m"},
+    {"SHIT_ANSI_BRIGHT_WHITE",   "\x1b[97m"},
+    {"SHIT_ANSI_BOLD",           "\x1b[1m" },
+    {"SHIT_ANSI_DIM",            "\x1b[2m" },
+    {"SHIT_ANSI_RESET",          "\x1b[0m" },
+};
+
+static fn ansi_escape_for_color(StringView name) throws -> Maybe<StringView>
+{
+  for (let const &color : SHIT_ANSI_COLORS)
+    if (StringView{color.name} == name) return StringView{color.escape};
   return None;
 }
 
@@ -643,8 +646,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
      escape reads back empty when the stream wants no color, so a piped prompt
      and a NO_COLOR run stay plain. */
   if (first_byte == 'S' && name.starts_with("SHIT_ANSI_")) {
-    if (let const escape =
-            ansi_escape_for_color(name.substring(sizeof("SHIT_ANSI_") - 1)))
+    if (let const escape = ansi_escape_for_color(name))
     {
       if (!colors::stdout_wants_color()) return String{heap_allocator()};
       return String{heap_allocator(), *escape};
@@ -812,6 +814,36 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   if (let const env = os::get_environment_variable(name))
     return String{heap_allocator(), env->view()};
   return shit::None;
+}
+
+/* The names get_variable_value synthesizes on read are absent from the variable
+   store, so the completion and the highlighter read them here as set rather than
+   computing a value, which would advance RANDOM or read the clock on a
+   keystroke. IFS, LINENO, SHIT_GIT_BRANCH, and the SHIT_ANSI_ family resolve in
+   every mood, while the bash dynamic names follow the same POSIX gate
+   get_variable_value applies. */
+fn EvalContext::append_dynamic_variable_names(ArrayList<StringView> &out) const
+    throws -> void
+{
+  out.push(StringView{"IFS"});
+  out.push(StringView{"LINENO"});
+  out.push(StringView{"SHIT_GIT_BRANCH"});
+
+  for (let const &color : SHIT_ANSI_COLORS)
+    out.push(StringView{color.name});
+
+  if (!bash_dynamic_variables_enabled()) return;
+
+  static constexpr const char *BASH_DYNAMIC_NAMES[] = {
+      "RANDOM",   "SECONDS",     "SHELLOPTS",     "EPOCHSECONDS",
+      "EPOCHREALTIME", "BASHPID", "PPID",         "UID",
+      "EUID",     "HOSTNAME",    "BASH_MONOSECONDS", "BASH_ARGV0",
+      "BASH_EXECUTION_STRING", "GROUPS", "HOSTTYPE", "MACHTYPE",
+      "SRANDOM",  "OSTYPE",      "BASH_SUBSHELL", "FUNCNAME",
+      "BASH_SOURCE", "BASH_LINENO", "BASH_COMMAND",
+  };
+  for (let const name : BASH_DYNAMIC_NAMES)
+    out.push(StringView{name});
 }
 
 pure fn EvalContext::positional_params() const wontthrow

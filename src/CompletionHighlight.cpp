@@ -895,23 +895,15 @@ fn highlight_line(StringView line, EvalContext &context) throws
   let known_vars = HashSet{arena};
   if (line.find_character('$').has_value()) {
     known_vars = context.variable_names(arena);
-    /* The variables the evaluator synthesizes on read are not in the store, so
-       they are added here as set rather than computed, which would advance
-       RANDOM or read the clock on a keystroke. IFS and LINENO exist in every
-       mode, while the rest are bash-mode only, the way get_variable_value gates
-       them, so a POSIX run reds an unset $RANDOM. */
-    known_vars.add(StringView{"IFS"});
-    known_vars.add(StringView{"LINENO"});
-    known_vars.add(StringView{"SHIT_GIT_BRANCH"});
-    if (context.is_bash_compatible()) {
-      known_vars.add(StringView{"RANDOM"});
-      known_vars.add(StringView{"SECONDS"});
-      known_vars.add(StringView{"EPOCHSECONDS"});
-      known_vars.add(StringView{"EPOCHREALTIME"});
-      known_vars.add(StringView{"BASHPID"});
-      known_vars.add(StringView{"BASH_SUBSHELL"});
-      known_vars.add(StringView{"BASH_SOURCE"});
-    }
+    /* The names the evaluator synthesizes on read are not in the store, so the
+       shared enumeration adds them as set rather than computing a value, which
+       would advance RANDOM or read the clock on a keystroke. The mood gate lives
+       there, so a POSIX run still reds an unset $RANDOM. */
+    let dynamic_names = ArrayList<StringView>{arena};
+    context.append_dynamic_variable_names(dynamic_names);
+    for (let const &name : dynamic_names)
+      known_vars.add(name);
+
     add_line_bound_variables(line, known_vars);
   }
   scan_highlight_range(line, 0, line.length, context, spans, known_vars);

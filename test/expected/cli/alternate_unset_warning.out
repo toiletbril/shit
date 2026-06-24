@@ -1,6 +1,6 @@
-== -W warns on an unset :+:
-1
+== -W is silent on an unset :+:
+0
 == plain run is silent:
 0
-== a set name does not warn under -W:
+== a set name is silent under -W:
 0

@@ -449,6 +449,11 @@ public:
   fn set_field_separators(StringView value) throws -> void;
   fn get_variable_value(StringView name) const throws -> Maybe<String>;
 
+  /* The dynamic and computed variable names available in the current mood,
+     appended for the completion and the highlighter to treat as set. */
+  fn append_dynamic_variable_names(ArrayList<StringView> &out) const throws
+      -> void;
+
   /* The stored value of a plain shell variable, or nullptr when unset or a
      special parameter. */
   hot fn lookup_shell_variable(StringView name) const wontthrow

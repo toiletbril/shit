@@ -1,10 +1,10 @@
 unset SHIT_FLAGS
-# -W surfaces an unset variable in the ${name:+word} alternate form as a warning,
-# while a plain run leaves the unset-safe alternate alone and a set name does not
-# warn.
-echo "== -W warns on an unset :+:"
+# The ${name:+word} alternate form tests whether a name is set, so an unset name
+# expands to empty by design and never warns, not even under -W. Each grep count
+# is zero because no warning is printed.
+echo "== -W is silent on an unset :+:"
 "$BIN" -W -c 'echo "[${UNSETV:+x}]"' 2>&1 | grep -c "is not set"
 echo "== plain run is silent:"
 "$BIN" --mood bash -c 'echo "[${UNSETV:+x}]"' 2>&1 | grep -c "is not set"
-echo "== a set name does not warn under -W:"
+echo "== a set name is silent under -W:"
 "$BIN" -W -c 'V=val; echo "[${V:+y}]"' 2>&1 | grep -c "is not set"
