@@ -17,9 +17,6 @@ is a fast POSIX and bash compatible shell. An interactive prompt is run when
 standard input is a terminal and no script is given. A script file named on the
 command line is run instead, or a command string is run when it is given with
 .BR \-c .
-Before a script runs, the parsed tree is walked by the default mood. Constants
-are folded, dead branches are pruned, and shellcheck-style diagnostics are
-reported.
 .SH MOODS
 The shell runs under one of three moods. The mood sets how strict the run is.
 The default
@@ -62,7 +59,7 @@ mood reads the file named by ENV. The list defaults to the value of
 .TP
 .BR \-I ", " \-\-mimicry
 A script whose shebang names a shell shit can emulate is run in-process in the
-matching mood rather than under the real shell, for speed.
+matching mood rather than under the real shell, for diagnostics and speed.
 .TP
 .B \-\-dumb
 The flags
@@ -189,8 +186,7 @@ The flag is compiled in only in a debug build.
 The debug log is appended to FILE instead of standard error.
 .SH RESCUE
 When a flag in SHIT_FLAGS or in the argument list fails to parse and standard
-input is a terminal, the shell enters rescue rather than exiting. A
-non-interactive run keeps the usage exit.
+input is a terminal, the login shell will enter rescue.
 .SH ENVIRONMENT
 .TP
 .B SHIT_FLAGS
@@ -208,14 +204,10 @@ The frecency store the z builtin ranks, ~/.shit_directory_history by default.
 The interactive calc REPL history file, ~/.shit_calc_history by default.
 .TP
 .B ENV
-The startup file the sh mood sources.
+The startup file sourced in sh mood.
 .TP
 .B TIMEFORMAT
-The format the time keyword prints. The conversions are %% for a literal
-percent, %R, %U, and %S for the real, user, and system seconds, and %P for the
-cpu busy percent. A precision from zero to six and the long minutes flag l may
-precede a time conversion, as in %3lR. An empty value prints no report, an unset value
-prints the aligned default, and the \-p form of time prints the posix report.
+The format the time printed by time.
 .TP
 .B PS2
 The continuation prompt default, "> ", carried for compatibility.
@@ -226,6 +218,23 @@ The prompt the select loop prints, "#? " by default.
 .B PS4
 The prefix the set \-x trace prints, "+ " by default. The first character is
 repeated once per enclosing subshell.
+.TP
+.B SHIT_VERSION
+The shell version, in the major.minor.patch\-extra form such as 0.0.8\-beta.
+.TP
+.B SHIT_COMMIT
+The commit the binary was built from, <no git> when none was recorded.
+.TP
+.B SHIT_BUILD_MODE
+The build mode of the binary, one of dbg, rel, or cov.
+.TP
+.B SHIT_OS
+The host the binary was built on, the distribution and kernel identification.
+.TP
+.B SHIT_GIT_BRANCH
+The branch around the working directory, read from .git without forking git.
+The short commit hash is read on a detached head, and an empty value outside a
+repository. A stored assignment wins.
 .TP
 .B NO_COLOR
 Color is turned off in the prompt and the diagnostics when the variable is set.
