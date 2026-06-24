@@ -659,8 +659,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
      escape reads back empty when the stream wants no color, so a piped prompt
      and a NO_COLOR run stay plain. */
   if (first_byte == 'S' && name.starts_with("SHIT_ANSI_")) {
-    if (let const escape = ansi_escape_for_color(name))
-    {
+    if (let const escape = ansi_escape_for_color(name)) {
       if (!colors::stdout_wants_color()) return String{heap_allocator()};
       return String{heap_allocator(), *escape};
     }
@@ -830,13 +829,13 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 }
 
 /* The names get_variable_value synthesizes on read are absent from the variable
-   store, so the completion and the highlighter read them here as set rather than
-   computing a value, which would advance RANDOM or read the clock on a
+   store, so the completion and the highlighter read them here as set rather
+   than computing a value, which would advance RANDOM or read the clock on a
    keystroke. IFS, LINENO, SHIT_GIT_BRANCH, and the SHIT_ANSI_ family resolve in
    every mood, while the bash dynamic names follow the same POSIX gate
    get_variable_value applies. */
-fn EvalContext::append_dynamic_variable_names(ArrayList<StringView> &out) const
-    throws -> void
+fn EvalContext::append_dynamic_variable_names(
+    ArrayList<StringView> &out) const throws -> void
 {
   out.push(StringView{"IFS"});
   out.push(StringView{"LINENO"});
@@ -848,12 +847,29 @@ fn EvalContext::append_dynamic_variable_names(ArrayList<StringView> &out) const
   if (!bash_dynamic_variables_enabled()) return;
 
   static constexpr const char *BASH_DYNAMIC_NAMES[] = {
-      "RANDOM",   "SECONDS",     "SHELLOPTS",     "EPOCHSECONDS",
-      "EPOCHREALTIME", "BASHPID", "PPID",         "UID",
-      "EUID",     "HOSTNAME",    "BASH_MONOSECONDS", "BASH_ARGV0",
-      "BASH_EXECUTION_STRING", "GROUPS", "HOSTTYPE", "MACHTYPE",
-      "SRANDOM",  "OSTYPE",      "BASH_SUBSHELL", "FUNCNAME",
-      "BASH_SOURCE", "BASH_LINENO", "BASH_COMMAND",
+      "RANDOM",
+      "SECONDS",
+      "SHELLOPTS",
+      "EPOCHSECONDS",
+      "EPOCHREALTIME",
+      "BASHPID",
+      "PPID",
+      "UID",
+      "EUID",
+      "HOSTNAME",
+      "BASH_MONOSECONDS",
+      "BASH_ARGV0",
+      "BASH_EXECUTION_STRING",
+      "GROUPS",
+      "HOSTTYPE",
+      "MACHTYPE",
+      "SRANDOM",
+      "OSTYPE",
+      "BASH_SUBSHELL",
+      "FUNCNAME",
+      "BASH_SOURCE",
+      "BASH_LINENO",
+      "BASH_COMMAND",
   };
   for (let const name : BASH_DYNAMIC_NAMES)
     out.push(StringView{name});

@@ -897,8 +897,8 @@ fn highlight_line(StringView line, EvalContext &context) throws
     known_vars = context.variable_names(arena);
     /* The names the evaluator synthesizes on read are not in the store, so the
        shared enumeration adds them as set rather than computing a value, which
-       would advance RANDOM or read the clock on a keystroke. The mood gate lives
-       there, so a POSIX run still reds an unset $RANDOM. */
+       would advance RANDOM or read the clock on a keystroke. The mood gate
+       lives there, so a POSIX run still reds an unset $RANDOM. */
     let dynamic_names = ArrayList<StringView>{arena};
     context.append_dynamic_variable_names(dynamic_names);
     for (let const &name : dynamic_names)

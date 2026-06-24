@@ -339,8 +339,9 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
            makefile's commands and never blocks on a slow one. */
         if (!cxt.make_shell_suppressed()) {
           let const command = expand(cxt, mk, name.substring(6), depth + 1);
-          result += cxt.capture_command_substitution(command, StringView{"make"})
-                        .view();
+          result +=
+              cxt.capture_command_substitution(command, StringView{"make"})
+                  .view();
         }
       } else if (name.length > 9 &&
                  name.substring_of_length(0, 9) == "wildcard ")

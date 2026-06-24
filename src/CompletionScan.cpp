@@ -308,7 +308,8 @@ fn complete_from_build_tools(StringView line, StringView token,
      path directly with no PATH search, and the helper points stdin at /dev/null
      and kills a probe that overruns the deadline. */
   let const probe_timeout_nanos = 2'000'000'000ULL;
-  let const capture = [&](const ArrayList<String> &probe_argv) throws -> String {
+  let const capture = [&](const ArrayList<String> &probe_argv)
+                          throws -> String {
     if (probe_argv.is_empty()) return String{};
     let const resolved = utils::search_program_path(probe_argv[0].view());
     if (resolved.is_empty()) return String{};

@@ -801,7 +801,6 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
   return os::directory_is_trusted_for_exec(Path{absolute_path}.parent());
 }
 
-
 /* A command's raw --help text, captured once. The fork passes two gates, the
    command is on the allowlist and resolves into a trusted directory. The
    resolved absolute path runs as the only argv entry, not through a shell, so

@@ -29,22 +29,12 @@ default is `shit`. Binary symlinked as `sh`, `dash`, or `bash` will pick the
 matching mood and disable diagnostics. `set --mood` changes the mood at
 runtime. `-W` keeps the diagnostics but turns every error into a warning.
 
-`--posix` selects POSIX mode, the same as `--mood sh`. A terminal that re-execs
-the shell with `--posix` to load its integration through the `ENV` file is
-honored rather than rejected.
-
 `-I` is mimicry. **shit** will detect `sh`, `dash`, `bash` shebangs and run the
 script inside itself in the matching mood rather than launching the real shell
 to keep speed and diagnostics.
 
 `--init-moods`/`-L` accepts a comma-separated list of moods to steal and use
 init files from. It defaults to the value of `--mood`.
-
-The `shit` mood reads `/etc/shitrc` and `~/.shitrc`, the `bash` mood reads
-the bash rc and its completion, and `sh` reads the file named by `ENV`. So
-`--init-moods=shit,bash` runs a strict shit prompt that still loads the whole
-bash setup. `set --init-moods` reloads the listed moods into a live session.
-The startup files from non-default mood always turn all errors to warnings.
 
 `SHIT_FLAGS` environment variable may be used to specify flags. The recommended
 is `-W -I --init-moods=shit,bash`. Flag on the command line still wins.
