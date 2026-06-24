@@ -30,17 +30,8 @@ SHELL := /bin/bash
 TEST_NAMES := $(INPUT_FILES:shit/%.shit=%)
 
 %: expected/%.out
-	@out=$$(mktemp); \
-	cat shit/$@.shit | $(BIN) $(BIN_FLAGS) - > $$out 2>&1; \
-	if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1 || \
-	   { [ -f expected/$@_1.out ] && \
-	     diff $(DIFF_FLAGS) expected/$@_1.out $$out >/dev/null 2>&1; }; then \
-		printf "	%-64s ok\r" $@; \
-	else \
-		diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
-		printf "	%-64s FAILED :c\n" $@; \
-	fi; \
-	rm -f $$out
+	@BIN='$(BIN)' BIN_FLAGS='$(BIN_FLAGS)' DIFF_FLAGS='$(DIFF_FLAGS)' \
+		FAILED_LIST='$(FAILED_LIST)' /bin/bash shittests.sh $*
 
 clean:
 	@rm -f $(FAILED_LIST) $(SHIT_HISTORY) $(SHIT_DIRECTORY_HISTORY)
@@ -57,24 +48,21 @@ test: $(BIN)
 	@cat $(FAILED_LIST)
 	@test ! -s $(FAILED_LIST)
 
-shit_tests: $(TEST_NAMES)
+shit_tests: $(BIN)
+	@BIN='$(BIN)' BIN_FLAGS='$(BIN_FLAGS)' DIFF_FLAGS='$(DIFF_FLAGS)' \
+		FAILED_LIST='$(FAILED_LIST)' /bin/bash shittests.sh $(TEST_NAMES)
 
 
 CLI_INPUT := $(wildcard cli/*.sh)
 CLI_NAMES := $(CLI_INPUT:cli/%.sh=cli_%)
 
 cli_%: expected/cli/%.out
-	@out=$$(mktemp); \
-	BIN=$(BIN) sh cli/$*.sh > $$out 2>&1; \
-	if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
-		printf "	%-64s ok\r" cli/$*.sh; \
-	else \
-		diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
-		printf "	%-64s FAILED :c\n" cli/$*.sh; \
-	fi; \
-	rm -f $$out
+	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
+		/bin/bash clitests.sh cli/$*.sh
 
-cli_tests: $(CLI_NAMES)
+cli_tests: $(BIN)
+	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
+		/bin/bash clitests.sh $(CLI_INPUT)
 
 
 COMPLETION_INPUT := $(wildcard completion/*.sh)
