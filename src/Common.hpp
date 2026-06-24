@@ -45,9 +45,9 @@
 /* Constants for --help and --version. */
 
 #define SHIT_VER_MAJOR 0
-#define SHIT_VER_MINOR 0
-#define SHIT_VER_PATCH 8
-#define SHIT_VER_EXTRA "beta"
+#define SHIT_VER_MINOR 1
+#define SHIT_VER_PATCH 0
+#define SHIT_VER_EXTRA "rc"
 
 #define SHIT_STRINGIFY_INNER(x) #x
 #define SHIT_STRINGIFY(x)       SHIT_STRINGIFY_INNER(x)
