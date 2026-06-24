@@ -792,15 +792,23 @@ fn default_prompt_template() -> String
 {
   /* The branch renders space-wrapped only when one exists, the bash :+
      alternate around the SHIT_GIT_BRANCH dynamic variable, so the prompt
-     closes up to a single space outside a repository. */
+     closes up to a single space outside a repository. The branch name is
+     colored cyan when color is on, and the line editor skips the escape run
+     when it measures the prompt width. */
   let template_string = String{};
-  template_string += R"([${SHIT_GIT_BRANCH:+$SHIT_GIT_BRANCH at }\u@\h )";
-  if (colors::stdout_wants_color()) {
+  const bool should_use_color = colors::stdout_wants_color();
+
+  if (should_use_color) {
+    template_string += R"([${SHIT_GIT_BRANCH:+)";
+    template_string += colors::ansi::CYAN;
+    template_string += R"($SHIT_GIT_BRANCH)";
+    template_string += colors::ansi::RESET;
+    template_string += R"( at }\u@\h )";
     template_string += colors::ansi::GREEN;
     template_string += R"(\P)";
     template_string += colors::ansi::RESET;
   } else {
-    template_string += R"(\P)";
+    template_string += R"([${SHIT_GIT_BRANCH:+$SHIT_GIT_BRANCH at }\u@\h \P)";
   }
   template_string += R"(] )";
   return template_string;
@@ -1050,13 +1058,19 @@ fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 fn default_prompt_template() -> String
 {
   let template_string = String{};
-  template_string += "[\\u@\\h${SHIT_GIT_BRANCH:+ ($SHIT_GIT_BRANCH)} ";
-  if (shit::colors::stdout_wants_color()) {
+  const bool should_use_color = shit::colors::stdout_wants_color();
+
+  if (should_use_color) {
+    template_string += "[\\u@\\h${SHIT_GIT_BRANCH:+ (";
+    template_string += shit::colors::ansi::CYAN;
+    template_string += "$SHIT_GIT_BRANCH";
+    template_string += shit::colors::ansi::RESET;
+    template_string += ")} ";
     template_string += shit::colors::ansi::GREEN;
     template_string += "\\P";
     template_string += shit::colors::ansi::RESET;
   } else {
-    template_string += "\\P";
+    template_string += "[\\u@\\h${SHIT_GIT_BRANCH:+ ($SHIT_GIT_BRANCH)} \\P";
   }
   template_string += "] ";
   return template_string;
