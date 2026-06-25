@@ -38,9 +38,8 @@ pure fn Read::kind() const wontthrow -> Builtin::Kind { return Kind::Read; }
 
 fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  /* -r is accepted, and since backslash processing is not done here the read is
-     raw either way. The first returned element is the command name, so the
-     operand names begin at index 1. */
+  /* The first returned element is the command name, so the operand names begin
+     at index 1. */
   let const names =
       parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);
   defer { reset_flags(FLAG_LIST); };

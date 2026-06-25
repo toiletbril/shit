@@ -373,6 +373,43 @@ hot fn EvalContext::expand_word(const Word &word) throws
         }
         break;
       }
+      /* "${@MOD}" and "${*MOD}" map a value-transform modifier over each
+         positional parameter, the @ form keeping each its own field and the *
+         form joining them, the same way "${a[@]MOD}" maps over an array. */
+      if (!segment_text.is_empty() &&
+          (segment_text[0] == '@' || segment_text[0] == '*') &&
+          segment_text.length > 1 &&
+          (segment_text[1] == '/' || segment_text[1] == '#' ||
+           segment_text[1] == '%' || segment_text[1] == '^' ||
+           segment_text[1] == ','))
+      {
+        let const is_star = segment_text[0] == '*';
+        let const modifier = segment_text.substring(1);
+        if (segment.is_in_double_quotes && is_star) {
+          let const ifs = m_field_separators.view();
+          let joined = String{scratch_allocator()};
+          for (usize i = 0; i < m_positional_params.count(); i++) {
+            if (i > 0 && !ifs.is_empty()) {
+              joined.push(ifs[0]);
+            }
+            joined.append(
+                apply_value_modifier(m_positional_params[i].view(), modifier)
+                    .view());
+          }
+          do_append_run(joined, false);
+        } else {
+          for (usize i = 0; i < m_positional_params.count(); i++) {
+            if (i > 0) do_flush();
+            let const modified =
+                apply_value_modifier(m_positional_params[i].view(), modifier);
+            if (segment.is_in_double_quotes)
+              do_append_run(modified.view(), false);
+            else
+              do_append_split_run(modified.view(), true);
+          }
+        }
+        break;
+      }
       /* "${a[@]:off:len}" and "${a[*]:off:len}" slice the element list, with a
          negative off counted from the end. The @ form keeps each sliced element
          its own field, the * form joins them. */
