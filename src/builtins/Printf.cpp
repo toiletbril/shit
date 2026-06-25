@@ -228,6 +228,7 @@ void append_q_argument(String &out, const String &arg) throws
       case '\v': out += "\\v"; break;
       case '\f': out += "\\f"; break;
       case '\r': out += "\\r"; break;
+      case '\x1b': out += "\\E"; break;
       case '\'': out += "\\'"; break;
       case '\\': out += "\\\\"; break;
       default:

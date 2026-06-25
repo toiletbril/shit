@@ -998,6 +998,7 @@ static fn append_shell_quoted(String &out, StringView arg) throws -> void
       case '\v': out += "\\v"; break;
       case '\f': out += "\\f"; break;
       case '\r': out += "\\r"; break;
+      case '\x1b': out += "\\E"; break;
       case '\'': out += "\\'"; break;
       case '\\': out += "\\\\"; break;
       default: {
