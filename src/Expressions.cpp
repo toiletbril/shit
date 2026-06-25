@@ -1499,7 +1499,10 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
 
       if (is_test_numeric_operator_word(view)) {
         for (usize side = i - 1; side <= i + 1; side += 2) {
-          if (side >= operand_end || m_args[side]->kind() != Token::Kind::Word)
+          /* Index zero is the test or [ command word, never an operand, so the
+             numeric-operator check skips it. */
+          if (side == 0 || side >= operand_end ||
+              m_args[side]->kind() != Token::Kind::Word)
             continue;
           let const &operand =
               static_cast<const tokens::WordToken *>(m_args[side])->word();
