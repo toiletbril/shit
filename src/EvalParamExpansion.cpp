@@ -1045,8 +1045,16 @@ fn EvalContext::apply_parameter_transform(StringView name, char op) throws
      the '' an empty-but-set value yields. */
   if (!value.has_value()) return String{scratch_allocator()};
 
-  let const text = value->view();
+  return apply_parameter_transform_to_value(value->view(), op, name);
+}
 
+/* The value-only core, shared by the scalar name path and the per-element array
+   field mapping in "${a[@]@op}". The name backs the A assignment form and the a
+   attribute listing. */
+fn EvalContext::apply_parameter_transform_to_value(StringView text, char op,
+                                                   StringView name) throws
+    -> String
+{
   let out = String{scratch_allocator()};
   switch (op) {
   case 'U':

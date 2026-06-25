@@ -1489,6 +1489,8 @@ protected:
   fn apply_case_modification(StringView name, StringView spec) throws -> String;
 
   fn apply_parameter_transform(StringView name, char op) throws -> String;
+  fn apply_parameter_transform_to_value(StringView value, char op,
+                                        StringView name) throws -> String;
   /* The value-only core of the case modification. */
   fn apply_case_modification_to_value(StringView value, StringView spec) throws
       -> String;

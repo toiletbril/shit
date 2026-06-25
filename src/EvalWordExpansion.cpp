@@ -376,15 +376,29 @@ hot fn EvalContext::expand_word(const Word &word) throws
       /* "${@MOD}" and "${*MOD}" map a value-transform modifier over each
          positional parameter, the @ form keeping each its own field and the *
          form joining them, the same way "${a[@]MOD}" maps over an array. */
+      const char positional_at_op =
+          !segment_text.is_empty() && segment_text.length > 2 &&
+                  segment_text[1] == '@' &&
+                  (segment_text[2] == 'Q' || segment_text[2] == 'E' ||
+                   segment_text[2] == 'U' || segment_text[2] == 'L' ||
+                   segment_text[2] == 'u' || segment_text[2] == 'P')
+              ? segment_text[2]
+              : '\0';
       if (!segment_text.is_empty() &&
           (segment_text[0] == '@' || segment_text[0] == '*') &&
           segment_text.length > 1 &&
           (segment_text[1] == '/' || segment_text[1] == '#' ||
            segment_text[1] == '%' || segment_text[1] == '^' ||
-           segment_text[1] == ','))
+           segment_text[1] == ',' || positional_at_op != '\0'))
       {
         let const is_star = segment_text[0] == '*';
         let const modifier = segment_text.substring(1);
+        let do_transform = [&](StringView value) -> String {
+          if (positional_at_op != '\0')
+            return apply_parameter_transform_to_value(value, positional_at_op,
+                                                      StringView{});
+          return apply_value_modifier(value, modifier);
+        };
         if (segment.is_in_double_quotes && is_star) {
           let const ifs = m_field_separators.view();
           let joined = String{scratch_allocator()};
@@ -392,16 +406,13 @@ hot fn EvalContext::expand_word(const Word &word) throws
             if (i > 0 && !ifs.is_empty()) {
               joined.push(ifs[0]);
             }
-            joined.append(
-                apply_value_modifier(m_positional_params[i].view(), modifier)
-                    .view());
+            joined.append(do_transform(m_positional_params[i].view()).view());
           }
           do_append_run(joined, false);
         } else {
           for (usize i = 0; i < m_positional_params.count(); i++) {
             if (i > 0) do_flush();
-            let const modified =
-                apply_value_modifier(m_positional_params[i].view(), modifier);
+            let const modified = do_transform(m_positional_params[i].view());
             if (segment.is_in_double_quotes)
               do_append_run(modified.view(), false);
             else
@@ -491,6 +502,18 @@ hot fn EvalContext::expand_word(const Word &word) throws
         const char field_modifier_op = name_end + 3 < segment_text.length
                                            ? segment_text[name_end + 3]
                                            : '\0';
+        /* The @op transform marker carries its letter one byte further. Only the
+           per-element value transforms map over an array, the whole-array A and
+           K forms fall through. */
+        const char at_transform_op =
+            field_modifier_op == '@' && name_end + 4 < segment_text.length
+                ? segment_text[name_end + 4]
+                : '\0';
+        const bool is_mapped_at_op =
+            at_transform_op == 'Q' || at_transform_op == 'E' ||
+            at_transform_op == 'U' || at_transform_op == 'L' ||
+            at_transform_op == 'u' || at_transform_op == 'P' ||
+            at_transform_op == 'a';
         if (name_end + 3 < segment_text.length &&
             segment_text[name_end] == '[' &&
             (segment_text[name_end + 1] == '@' ||
@@ -498,12 +521,18 @@ hot fn EvalContext::expand_word(const Word &word) throws
             segment_text[name_end + 2] == ']' &&
             (field_modifier_op == '/' || field_modifier_op == '#' ||
              field_modifier_op == '%' || field_modifier_op == '^' ||
-             field_modifier_op == ','))
+             field_modifier_op == ',' || is_mapped_at_op))
         {
           let const array_name = segment_text.substring_of_length(0, name_end);
           let const modifier = segment_text.substring(name_end + 3);
           let const is_star = segment_text[name_end + 1] == '*';
           let const elements = collect_array_elements(array_name);
+          let do_transform = [&](StringView element_value) -> String {
+            if (is_mapped_at_op)
+              return apply_parameter_transform_to_value(
+                  element_value, at_transform_op, array_name);
+            return apply_value_modifier(element_value, modifier);
+          };
           if (segment.is_in_double_quotes && is_star) {
             let const ifs = m_field_separators.view();
             let joined = String{scratch_allocator()};
@@ -511,15 +540,13 @@ hot fn EvalContext::expand_word(const Word &word) throws
               if (i > 0 && !ifs.is_empty()) {
                 joined.push(ifs[0]);
               }
-              joined.append(
-                  apply_value_modifier(elements[i].view(), modifier).view());
+              joined.append(do_transform(elements[i].view()).view());
             }
             do_append_run(joined, false);
           } else {
             for (usize i = 0; i < elements.count(); i++) {
               if (i > 0) do_flush();
-              let const modified =
-                  apply_value_modifier(elements[i].view(), modifier);
+              let const modified = do_transform(elements[i].view());
               if (segment.is_in_double_quotes)
                 do_append_run(modified.view(), false);
               else
