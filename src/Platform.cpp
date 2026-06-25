@@ -1310,16 +1310,17 @@ fn set_default_signal_handlers(bool is_interactive) throws -> void
       is_interactive ? 1 : 0);
 
   /* The interactive shell blocks the terminal-generated signals that would kill
-     or stop it, so a Ctrl-C, Ctrl-Z, or hangup at the prompt does not take the
-     shell down. A non-interactive script leaves them at their default
-     disposition, so a SIGTERM, SIGQUIT, or SIGHUP terminates the script the way
-     dash and bash scripts behave, and a Ctrl-Z still suspends the job. SIGINT
-     gets the polled handler in both modes, so a Ctrl-C in a shell loop sets the
-     flag the evaluator polls rather than spinning forever, and an external
-     command resets the handler to the default through execv and so still dies
-     on Ctrl-C. */
+     or stop it at the prompt, so a Ctrl-C, a SIGTERM, or a Ctrl-Z does not take
+     the shell down. SIGHUP stays at its default disposition so a hangup ends
+     the shell rather than leaving it reparented to init and spinning on a loop
+     whose output was redirected off the dead terminal. A non-interactive script
+     leaves them all at their default disposition the way dash and bash scripts
+     behave, and a Ctrl-Z still suspends the job. SIGINT gets the polled handler
+     in both modes, so a Ctrl-C in a shell loop sets the flag the evaluator
+     polls rather than spinning forever, and an external command resets the
+     handler to the default through execv and so still dies on Ctrl-C. */
   if (is_interactive) {
-    sigset_t sm = make_sigset(SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
+    sigset_t sm = make_sigset(SIGTERM, SIGQUIT, SIGSTOP, SIGTSTP);
     check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
   }
 
