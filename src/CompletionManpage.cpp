@@ -353,7 +353,6 @@ fn complete_from_man_subcommands(StringView line, StringView token,
   return matches;
 }
 
-/* Shared by the manpage and the --help parsers. */
 static fn extract_dash_flags(StringView option_part) throws -> ArrayList<String>
 {
   let flags = ArrayList<String>{};

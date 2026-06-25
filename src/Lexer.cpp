@@ -400,7 +400,6 @@ hot fn Lexer::lex_number() throws -> Token *
   return num;
 }
 
-/* Hottest function in the entire codebase. */
 flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 {
   let word = Word{};

@@ -330,10 +330,6 @@ static fn redirection_open_mode(Redirection::Kind kind,
   }
 }
 
-/* The redirection_outcome enum and the resolved_redirection struct live in
-   ExpressionsInternal.hpp so RedirectedCommand in ExpressionsArith.cpp shares
-   them. */
-
 /* Resolve one redirection to an unplaced outcome, the shared open-and-stage
    work the three redirection sites repeat, so each keeps only its own
    descriptor placement. A heredoc or here-string body is staged to a temp

@@ -46,7 +46,6 @@ pure fn is_constant_arithmetic_byte(char byte) wontthrow -> bool
   }
 }
 
-/* The first byte of a C-style identifier, a letter or an underscore. */
 pure fn is_identifier_start(char byte) wontthrow -> bool
 {
   return (byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||

@@ -33,7 +33,7 @@ public:
     return key;
   }
 
-  /* Pack the first thirty-two bytes of a view at lookup time. */
+  /* Pack the first sixty-four bytes of a view at lookup time. */
   hot static fn from_view(StringView text) wontthrow -> PackedStringKey
   {
     PackedStringKey key{};

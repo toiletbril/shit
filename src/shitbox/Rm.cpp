@@ -24,7 +24,6 @@ namespace shit {
 
 namespace shitbox {
 
-/* Declared in Shitbox.hpp and shared with unlink. */
 fn remove_path(StringView path, bool is_recursive) throws -> bool
 {
   let const target = Path{path};
