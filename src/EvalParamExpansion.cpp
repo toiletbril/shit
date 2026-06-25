@@ -1056,6 +1056,7 @@ fn EvalContext::apply_parameter_transform_to_value(StringView text, char op,
     -> String
 {
   let out = String{scratch_allocator()};
+  out.reserve(text.length);
   switch (op) {
   case 'U':
     for (usize i = 0; i < text.length; i++)
@@ -1165,6 +1166,7 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
   }
 
   let out = String{scratch_allocator()};
+  out.reserve(value.length);
   for (usize i = 0; i < value.length; i++) {
     char character = value[i];
     const bool is_affected = should_modify_all || i == 0;

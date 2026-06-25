@@ -494,6 +494,7 @@ hot fn EvalContext::expand_path(glob_field field,
   let fields = expand_path_recurse(steal(input));
 
   let values = ArrayList<String>{scratch};
+  values.reserve(fields.count());
   for (let &f : fields)
     values.push(steal(f.text));
 

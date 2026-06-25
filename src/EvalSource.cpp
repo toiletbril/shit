@@ -103,6 +103,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   let previous_shell_name = String{m_shell_name};
   let params = ArrayList<String>{};
+  params.reserve(ec.args().count() - 1);
   for (usize i = 1; i < ec.args().count(); i++)
     params.push_managed(ec.args()[i].view());
 
