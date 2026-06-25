@@ -49,7 +49,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
 
   /* A missing or unreadable parent directory yields no match, so the caller
      applies the failglob policy rather than raising an error here. */
-  let const entries = Path::read_directory(parent_dir);
+  let entries = Path::read_directory(parent_dir);
   if (!entries.has_value()) {
     LOG(Debug,
         "the parent directory is unreadable, the glob '%.*s' yields no match",
@@ -73,6 +73,15 @@ fn EvalContext::expand_path_once(const glob_field &field,
   ASSERT(has_glob);
   ASSERT(!glob.is_empty());
 
+  /* The directory read omits . and .. , so a dotted pattern that should reach
+     them has them fed back in. globskipdots, on by default since bash 5.3, keeps
+     them out, and a leading-dot-less pattern never names them. */
+  let const pattern_leads_with_dot = glob[0] == '.';
+  if (pattern_leads_with_dot && !is_shopt_enabled("globskipdots")) {
+    entries->push(String{"."});
+    entries->push(String{".."});
+  }
+
   for (let const &entry_name : *entries) {
     let const filename = entry_name.view();
 
@@ -81,12 +90,10 @@ fn EvalContext::expand_path_once(const glob_field &field,
 
     if (!should_expand_files && !full_path.is_directory()) continue;
 
-    /* A leading-dot-less pattern skips a dotfile unless dotglob is on, and
-       never matches . or .. . globskipdots keeps . and .. out even of a dotted
-       pattern, on by default since bash 5.3. */
-    let const pattern_leads_with_dot = glob[0] == '.';
+    /* A leading-dot-less pattern skips a dotfile unless dotglob is on. The . and
+       .. fed in above are kept only for a dotted pattern. */
     if (filename == "." || filename == "..") {
-      if (!pattern_leads_with_dot || is_shopt_enabled("globskipdots")) continue;
+      if (!pattern_leads_with_dot) continue;
     } else if (!pattern_leads_with_dot && !filename.is_empty() &&
                filename[0] == '.' && !is_shopt_enabled("dotglob"))
     {
