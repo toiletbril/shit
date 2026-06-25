@@ -1129,9 +1129,9 @@ public:
   mustuse fn find_loop_redirect_fd(i32 target_fd, const String &path,
                                    os::file_open_mode mode) const wontthrow
       -> Maybe<os::descriptor>;
-  fn retain_loop_redirect_fd(i32 target_fd, const String &path,
-                             os::file_open_mode mode, os::descriptor fd) throws
-      -> void;
+  mustuse fn retain_loop_redirect_fd(i32 target_fd, const String &path,
+                                     os::file_open_mode mode,
+                                     os::descriptor fd) throws -> bool;
 
   /* Run a parsed inner command under the substitution machinery, capturing its
      stdout and snapshotting state so a cd or an assignment inside does not

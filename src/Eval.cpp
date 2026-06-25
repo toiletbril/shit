@@ -1406,6 +1406,11 @@ fn EvalContext::leave_loop() wontthrow -> void
   m_loop_depth--;
 }
 
+/* A loop appending to many distinct targets keeps each open until the loop
+   exits, so the count is bounded and a target past the bound reopens every
+   iteration the way bash does, rather than exhausting the descriptor table. */
+static constexpr usize MAX_LOOP_REDIRECT_FDS = 16;
+
 fn EvalContext::mark_loop_redirect_fds() const wontthrow
     -> loop_redirect_fd_mark
 {
@@ -1437,12 +1442,15 @@ fn EvalContext::find_loop_redirect_fd(i32 target_fd, const String &path,
 
 fn EvalContext::retain_loop_redirect_fd(i32 target_fd, const String &path,
                                         os::file_open_mode mode,
-                                        os::descriptor fd) throws -> void
+                                        os::descriptor fd) throws -> bool
 {
+  if (m_loop_redirect_fds.count() >= MAX_LOOP_REDIRECT_FDS) return false;
+
   m_loop_redirect_fds.push(loop_redirect_fd{
       target_fd, mode, String{heap_allocator(), path.view()},
         fd
   });
+  return true;
 }
 
 pure fn EvalContext::loop_depth() const wontthrow -> usize

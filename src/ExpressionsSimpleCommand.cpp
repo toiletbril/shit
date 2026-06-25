@@ -434,8 +434,9 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
   }
 
   let const file_fd = opened.take();
-  if (should_memoize_append) {
-    cxt.retain_loop_redirect_fd(redir.fd, target_path, mode, file_fd);
+  if (should_memoize_append &&
+      cxt.retain_loop_redirect_fd(redir.fd, target_path, mode, file_fd))
+  {
     return resolved_redirection{redirection_outcome::OpenedFile, redir.fd,
                                 file_fd, -1, /*is_cached=*/true};
   }
@@ -688,8 +689,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   };
   defer
   {
-    if (!was_redirect_in_fd_handed_off && redirect_in_fd)
+    if (!was_redirect_in_fd_handed_off && redirect_in_fd) {
       os::close_fd(*redirect_in_fd);
+    }
   };
 
   /* Set just before a redirection resource failure throws, an open that failed
@@ -896,7 +898,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
            mutates the shell's own standard output or error in place, so the
            buffered output is flushed first to land on the original descriptor.
          */
-        if (redir.fd == 1 || redir.fd == 2) shit::flush();
+        if (redir.fd == 1 || redir.fd == 2) {
+          shit::flush();
+        }
 #if SHIT_PLATFORM_IS WIN32
         const bool file_is_target_fd =
             file_fd == os::descriptor_for_shell_fd(redir.fd);
@@ -1374,7 +1378,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        -A m=([k]=v) route to the string-keyed store rather than the indexed one.
      */
     let is_associative_request = false;
-    if (is_declare || is_local)
+    if (is_declare || is_local) {
       for (let const arg : m_args) {
         let const text = arg->raw_string();
         if (text.length() >= 2 && text.view()[0] == '-') {
@@ -1387,8 +1391,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
             is_associative_request = true;
         }
       }
+    }
     for (let const &assignment : m_array_args) {
-      if (is_local || is_function_local) cxt.declare_local(assignment.name);
+      if (is_local || is_function_local) {
+        cxt.declare_local(assignment.name);
+      }
       ArrayList<String> values = cxt.process_args(assignment.elements);
       if (is_associative_request) {
         /* The array is keyed by string, so the declaration registers the name
