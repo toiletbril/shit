@@ -202,6 +202,7 @@ struct conditional_evaluator
     let const value_text = String{cxt.scratch_allocator(), value};
     let const group_count = compiled->re_nsub + 1;
     let matches = ArrayList<regmatch_t>{cxt.scratch_allocator()};
+    matches.reserve(group_count);
     for (usize i = 0; i < group_count; i++)
       matches.push(regmatch_t{});
     const int match_result =
@@ -224,6 +225,7 @@ struct conditional_evaluator
     }
 
     let rematch = ArrayList<String>{heap_allocator()};
+    rematch.reserve(group_count);
     for (usize i = 0; i < group_count; i++) {
       if (matches[i].rm_so < 0) {
         rematch.push(String{heap_allocator()});

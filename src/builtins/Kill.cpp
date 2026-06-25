@@ -96,7 +96,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i32 status = 0;
   for (usize i = first_target; i < args.count(); i++) {
     const String &target = args[i];
-    const String target_text = target.clone();
+    const String &target_text = target;
 
     let pid = os::process{};
     if (!target.is_empty() && target[0] == '%') {

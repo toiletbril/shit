@@ -455,6 +455,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       let const name = body.substring_of_length(0, name_end);
       let const target = get_variable_value(name);
       let rewritten = String{scratch_allocator()};
+      rewritten.reserve(body.length + name.length);
       /* bash makes an unset indirection name with a modifier an "invalid
          indirect expansion" failure. A fatal error here would be harsher than
          bash, so the unset name stands in for the target and the modifier sees

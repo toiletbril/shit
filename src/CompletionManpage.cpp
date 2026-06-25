@@ -404,7 +404,7 @@ static fn parse_manpage_option_entries(StringView text) throws
         descriptions.set(flag.view(), String{desc});
       }
     pending_flags.clear();
-    pending_description = String{};
+    pending_description.clear();
   };
 
   usize i = 0;
