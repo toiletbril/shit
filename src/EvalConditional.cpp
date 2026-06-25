@@ -361,10 +361,10 @@ struct conditional_evaluator
          diagnostic stays silent while it expands. The defer restores the prior
          value, so a throw cannot strand the suppression on and a nested -v test
          puts back the outer value. */
-      const bool is_existence_test = first_literal.view() == "-v";
-      const bool saved_suppress_unset =
+      let const is_existence_test = first_literal.view() == "-v";
+      let const saved_suppress_unset =
           cxt.is_warning_suppressed(suppressible_warning::UnsetReference);
-      const bool saved_suppress_test_operand =
+      let const saved_suppress_test_operand =
           cxt.is_warning_suppressed(suppressible_warning::UnsetTestOperand);
       cxt.set_warning_suppressed(suppressible_warning::UnsetTestOperand, true);
       if (is_existence_test)

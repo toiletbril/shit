@@ -64,7 +64,7 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
   }
   const i64 value = text[0] == '-' ? -magnitude : magnitude;
   const usize width = text.length - digit_start;
-  const bool leading_zero = width > 1 && text[digit_start] == '0';
+  let const leading_zero = width > 1 && text[digit_start] == '0';
   return sequence_integer{value, width, leading_zero};
 }
 
@@ -243,8 +243,8 @@ fn brace_expand_text(StringView text, Allocator alloc, usize depth = 0) throws
     return results;
   }
 
-  const StringView preamble = text.substring_of_length(0, group->open);
-  const StringView postamble = text.substring(group->close + 1);
+  let const preamble = text.substring_of_length(0, group->open);
+  let const postamble = text.substring(group->close + 1);
   let const post_expansions = brace_expand_text(postamble, alloc, depth + 1);
 
   for (const String &alternative : group->alternatives) {

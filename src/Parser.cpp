@@ -455,7 +455,7 @@ hot fn Parser::parse_command_list(
 
       /* A |& pipe routes the left command's standard error into the pipe too,
          the shorthand for 2>&1 |. */
-      const bool does_left_pipe_stderr =
+      let const does_left_pipe_stderr =
           token->kind() == Token::Kind::PipeAmpersand;
       m_lexer.advance_past_last_peek();
       skip_newlines_after_pipe();

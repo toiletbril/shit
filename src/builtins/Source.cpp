@@ -43,8 +43,9 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Info, "source running file '%s' in the current shell", path.c_str());
   let const contents = Path{path.view()}.read_entire_file();
   if (!contents.has_value())
-    throw Error{"Unable to source the file '" + path +
-                "' because it cannot be opened"};
+    throw ErrorWithLocation{ec.source_location(),
+                            "Unable to source the file '" + path + "': " +
+                                os::last_system_error_message()};
 
   /* Operands after the file become the positional parameters the sourced file
      reads as $1 upward, restored to the caller's afterward. With no extra
