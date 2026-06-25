@@ -972,52 +972,7 @@ fn EvalContext::pattern_replace_value(const String &value,
    the '\'' break-out. */
 static fn append_shell_quoted(String &out, StringView arg) throws -> void
 {
-  if (arg.is_empty()) {
-    out += "''";
-    return;
-  }
-
-  bool has_control_byte = false;
-  for (usize i = 0; i < arg.length; i++) {
-    let const byte = static_cast<unsigned char>(arg[i]);
-    if (byte < 0x20 || byte == 0x7f) {
-      has_control_byte = true;
-      break;
-    }
-  }
-
-  if (has_control_byte) {
-    out += "$'";
-    for (usize i = 0; i < arg.length; i++) {
-      let const character = arg[i];
-      switch (character) {
-      case '\a': out += "\\a"; break;
-      case '\b': out += "\\b"; break;
-      case '\t': out += "\\t"; break;
-      case '\n': out += "\\n"; break;
-      case '\v': out += "\\v"; break;
-      case '\f': out += "\\f"; break;
-      case '\r': out += "\\r"; break;
-      case '\x1b': out += "\\E"; break;
-      case '\'': out += "\\'"; break;
-      case '\\': out += "\\\\"; break;
-      default: {
-        let const byte = static_cast<unsigned char>(character);
-        if (byte < 0x20 || byte == 0x7f) {
-          out.push('\\');
-          out.push(static_cast<char>('0' + ((byte >> 6) & 7)));
-          out.push(static_cast<char>('0' + ((byte >> 3) & 7)));
-          out.push(static_cast<char>('0' + (byte & 7)));
-        } else {
-          out.push(character);
-        }
-        break;
-      }
-      }
-    }
-    out += "'";
-    return;
-  }
+  if (utils::append_ansi_c_quote_if_needed(out, arg)) return;
 
   out.push('\'');
   for (usize i = 0; i < arg.length; i++) {

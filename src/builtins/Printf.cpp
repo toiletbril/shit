@@ -229,53 +229,7 @@ bool is_q_safe_byte(char c)
    backslash-escaped. */
 void append_q_argument(String &out, const String &arg) throws
 {
-  if (arg.is_empty()) {
-    out += "''";
-    return;
-  }
-
-  bool has_control_byte = false;
-  for (usize i = 0; i < arg.count(); i++) {
-    const unsigned char byte = static_cast<unsigned char>(arg[i]);
-    if (byte < 0x20 || byte == 0x7f) {
-      has_control_byte = true;
-      break;
-    }
-  }
-
-  if (has_control_byte) {
-    out += "$'";
-    for (usize i = 0; i < arg.count(); i++) {
-      const char c = arg[i];
-      switch (c) {
-      case '\a': out += "\\a"; break;
-      case '\b': out += "\\b"; break;
-      case '\t': out += "\\t"; break;
-      case '\n': out += "\\n"; break;
-      case '\v': out += "\\v"; break;
-      case '\f': out += "\\f"; break;
-      case '\r': out += "\\r"; break;
-      case '\x1b': out += "\\E"; break;
-      case '\'': out += "\\'"; break;
-      case '\\': out += "\\\\"; break;
-      default:
-        if (static_cast<unsigned char>(c) < 0x20 ||
-            static_cast<unsigned char>(c) == 0x7f)
-        {
-          char octal[8];
-          std::snprintf(
-              octal, sizeof(octal), "\\%03o",
-              static_cast<unsigned int>(static_cast<unsigned char>(c)));
-          out += octal;
-        } else {
-          out += c;
-        }
-        break;
-      }
-    }
-    out += "'";
-    return;
-  }
+  if (utils::append_ansi_c_quote_if_needed(out, arg.view())) return;
 
   for (usize i = 0; i < arg.count(); i++) {
     const char c = arg[i];

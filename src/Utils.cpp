@@ -880,6 +880,55 @@ fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>
   return String{expanded.text().view()};
 }
 
+fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool
+{
+  if (arg.is_empty()) {
+    out += "''";
+    return true;
+  }
+
+  bool has_control_byte = false;
+  for (usize i = 0; i < arg.length; i++) {
+    let const byte = static_cast<unsigned char>(arg[i]);
+    if (byte < 0x20 || byte == 0x7f) {
+      has_control_byte = true;
+      break;
+    }
+  }
+  if (!has_control_byte) return false;
+
+  out += "$'";
+  for (usize i = 0; i < arg.length; i++) {
+    let const character = arg[i];
+    switch (character) {
+    case '\a': out += "\\a"; break;
+    case '\b': out += "\\b"; break;
+    case '\t': out += "\\t"; break;
+    case '\n': out += "\\n"; break;
+    case '\v': out += "\\v"; break;
+    case '\f': out += "\\f"; break;
+    case '\r': out += "\\r"; break;
+    case '\x1b': out += "\\E"; break;
+    case '\'': out += "\\'"; break;
+    case '\\': out += "\\\\"; break;
+    default: {
+      let const byte = static_cast<unsigned char>(character);
+      if (byte < 0x20 || byte == 0x7f) {
+        out.push('\\');
+        out.push(static_cast<char>('0' + ((byte >> 6) & 7)));
+        out.push(static_cast<char>('0' + ((byte >> 3) & 7)));
+        out.push(static_cast<char>('0' + (byte & 7)));
+      } else {
+        out.push(character);
+      }
+      break;
+    }
+    }
+  }
+  out += "'";
+  return true;
+}
+
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
 static pure fn is_glob_char_active(const ArrayList<bool> &glob_active,

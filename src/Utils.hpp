@@ -38,6 +38,11 @@ fn find_pos_in_vec(const ArrayList<String> &suffixes,
    path has no leading tilde or the named user has no home. */
 fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>;
 
+/* Quote an empty or control-byte-carrying value into the '' or $'...' ANSI-C
+   form the way printf %q and ${var@Q} share. Returns false when the value has no
+   control byte, so the caller applies its own non-control quoting. */
+fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool;
+
 fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     -> i32;
 
