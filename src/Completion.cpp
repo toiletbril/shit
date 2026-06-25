@@ -495,7 +495,7 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
   TRACELN(
       "completing filesystem token '%.*s', dir '%.*s', base '%.*s'",
       static_cast<int>(token.length), token.data,
-      static_cast<int>(parts.basename_part.length), parts.basename_part.data,
+      static_cast<int>(parts.directory_part.length), parts.directory_part.data,
       static_cast<int>(parts.basename_part.length), parts.basename_part.data);
 
   let listing_directory =
