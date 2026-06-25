@@ -26,7 +26,7 @@ namespace shitbox {
 
 Mv::Mv() = default;
 
-pure Utility::Kind Mv::kind() const wontthrow { return Kind::Mv; }
+pure fn Mv::kind() const wontthrow -> Utility::Kind { return Kind::Mv; }
 
 fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32

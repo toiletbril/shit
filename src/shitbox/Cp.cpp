@@ -128,7 +128,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
 
 Cp::Cp() = default;
 
-pure Utility::Kind Cp::kind() const wontthrow { return Kind::Cp; }
+pure fn Cp::kind() const wontthrow -> Utility::Kind { return Kind::Cp; }
 
 fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32

@@ -25,7 +25,7 @@ namespace shit {
 
 Trap::Trap() = default;
 
-pure Builtin::Kind Trap::kind() const wontthrow { return Kind::Trap; }
+pure fn Trap::kind() const wontthrow -> Builtin::Kind { return Kind::Trap; }
 
 namespace {
 
@@ -70,7 +70,7 @@ String format_listed_condition(StringView condition,
 
 } // namespace
 
-i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.is_empty());

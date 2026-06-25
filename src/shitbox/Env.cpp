@@ -62,7 +62,7 @@ static fn print_environment(const ExecContext &ec) throws -> void
 
 Env::Env() = default;
 
-pure Utility::Kind Env::kind() const wontthrow { return Kind::Env; }
+pure fn Env::kind() const wontthrow -> Utility::Kind { return Kind::Env; }
 
 fn Env::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<String> &args) const throws -> i32

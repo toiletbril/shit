@@ -18,9 +18,9 @@ namespace shit {
 
 True::True() = default;
 
-pure Builtin::Kind True::kind() const wontthrow { return Kind::True; }
+pure fn True::kind() const wontthrow -> Builtin::Kind { return Kind::True; }
 
-i32 True::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn True::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   unused(cxt);
 

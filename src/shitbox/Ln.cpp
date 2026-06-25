@@ -24,7 +24,7 @@ namespace shitbox {
 
 Ln::Ln() = default;
 
-pure Utility::Kind Ln::kind() const wontthrow { return Kind::Ln; }
+pure fn Ln::kind() const wontthrow -> Utility::Kind { return Kind::Ln; }
 
 fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32

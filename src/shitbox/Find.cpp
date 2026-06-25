@@ -125,7 +125,7 @@ static fn parse_depth_argument(const ArrayList<String> &args, usize index,
 
 Find::Find() = default;
 
-pure Utility::Kind Find::kind() const wontthrow { return Kind::Find; }
+pure fn Find::kind() const wontthrow -> Utility::Kind { return Kind::Find; }
 
 fn Find::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32

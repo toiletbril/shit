@@ -119,7 +119,7 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
 
 Ps::Ps() = default;
 
-pure Utility::Kind Ps::kind() const wontthrow { return Kind::Ps; }
+pure fn Ps::kind() const wontthrow -> Utility::Kind { return Kind::Ps; }
 
 fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32

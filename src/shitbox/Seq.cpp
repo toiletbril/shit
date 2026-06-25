@@ -30,7 +30,7 @@ static fn parse_integer(StringView text) throws -> i64
 
 Seq::Seq() = default;
 
-pure Utility::Kind Seq::kind() const wontthrow { return Kind::Seq; }
+pure fn Seq::kind() const wontthrow -> Utility::Kind { return Kind::Seq; }
 
 fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<String> &args) const throws -> i32

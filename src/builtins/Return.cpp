@@ -20,9 +20,9 @@ namespace shit {
 
 Return::Return() = default;
 
-pure Builtin::Kind Return::kind() const wontthrow { return Kind::Return; }
+pure fn Return::kind() const wontthrow -> Builtin::Kind { return Kind::Return; }
 
-i32 Return::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 

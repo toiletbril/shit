@@ -362,9 +362,9 @@ fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
 
 Set::Set() = default;
 
-pure Builtin::Kind Set::kind() const wontthrow { return Kind::Set; }
+pure fn Set::kind() const wontthrow -> Builtin::Kind { return Kind::Set; }
 
-i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.is_empty());

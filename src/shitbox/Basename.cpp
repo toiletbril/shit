@@ -22,7 +22,10 @@ namespace shitbox {
 
 Basename::Basename() = default;
 
-pure Utility::Kind Basename::kind() const wontthrow { return Kind::Basename; }
+pure fn Basename::kind() const wontthrow -> Utility::Kind
+{
+  return Kind::Basename;
+}
 
 fn Basename::execute(const ExecContext &ec, EvalContext &cxt,
                      const ArrayList<String> &args) const throws -> i32

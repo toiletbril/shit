@@ -34,9 +34,9 @@ namespace shit {
 
 Read::Read() = default;
 
-pure Builtin::Kind Read::kind() const wontthrow { return Kind::Read; }
+pure fn Read::kind() const wontthrow -> Builtin::Kind { return Kind::Read; }
 
-i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   /* -r is accepted, and since backslash processing is not done here the read is
      raw either way. The first returned element is the command name, so the

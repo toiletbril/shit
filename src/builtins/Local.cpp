@@ -32,9 +32,9 @@ namespace shit {
 
 Local::Local() = default;
 
-pure Builtin::Kind Local::kind() const wontthrow { return Kind::Local; }
+pure fn Local::kind() const wontthrow -> Builtin::Kind { return Kind::Local; }
 
-i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   /* The attribute flags are read straight off the arguments rather than through
      the shared flag parser, since that parser rejects an unknown letter and the

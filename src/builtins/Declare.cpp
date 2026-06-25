@@ -47,9 +47,12 @@ namespace shit {
 
 Declare::Declare() = default;
 
-pure Builtin::Kind Declare::kind() const wontthrow { return Kind::Declare; }
+pure fn Declare::kind() const wontthrow -> Builtin::Kind
+{
+  return Kind::Declare;
+}
 
-i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.is_empty());

@@ -68,7 +68,7 @@ static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes) throws -> String
 
 Head::Head() = default;
 
-pure Utility::Kind Head::kind() const wontthrow { return Kind::Head; }
+pure fn Head::kind() const wontthrow -> Utility::Kind { return Kind::Head; }
 
 fn Head::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32

@@ -22,7 +22,10 @@ namespace shitbox {
 
 Dirname::Dirname() = default;
 
-pure Utility::Kind Dirname::kind() const wontthrow { return Kind::Dirname; }
+pure fn Dirname::kind() const wontthrow -> Utility::Kind
+{
+  return Kind::Dirname;
+}
 
 fn Dirname::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<String> &args) const throws -> i32

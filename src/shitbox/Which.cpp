@@ -28,7 +28,7 @@ namespace shitbox {
 
 Which::Which() = default;
 
-pure Utility::Kind Which::kind() const wontthrow { return Kind::Which; }
+pure fn Which::kind() const wontthrow -> Utility::Kind { return Kind::Which; }
 
 fn Which::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<String> &args) const throws -> i32

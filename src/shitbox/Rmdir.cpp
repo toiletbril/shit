@@ -20,7 +20,7 @@ namespace shitbox {
 
 Rmdir::Rmdir() = default;
 
-pure Utility::Kind Rmdir::kind() const wontthrow { return Kind::Rmdir; }
+pure fn Rmdir::kind() const wontthrow -> Utility::Kind { return Kind::Rmdir; }
 
 fn Rmdir::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<String> &args) const throws -> i32

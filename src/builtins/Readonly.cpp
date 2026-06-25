@@ -24,9 +24,12 @@ namespace shit {
 
 Readonly::Readonly() = default;
 
-pure Builtin::Kind Readonly::kind() const wontthrow { return Kind::Readonly; }
+pure fn Readonly::kind() const wontthrow -> Builtin::Kind
+{
+  return Kind::Readonly;
+}
 
-i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = PARSE_BUILTIN_ARGS(ec);
 

@@ -21,9 +21,9 @@ namespace shit {
 
 Let::Let() = default;
 
-pure Builtin::Kind Let::kind() const wontthrow { return Kind::Let; }
+pure fn Let::kind() const wontthrow -> Builtin::Kind { return Kind::Let; }
 
-i32 Let::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Let::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);

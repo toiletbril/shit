@@ -35,7 +35,7 @@ static fn count_prefix(u64 run_length) throws -> String
 
 Uniq::Uniq() = default;
 
-pure Utility::Kind Uniq::kind() const wontthrow { return Kind::Uniq; }
+pure fn Uniq::kind() const wontthrow -> Utility::Kind { return Kind::Uniq; }
 
 fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32

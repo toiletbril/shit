@@ -254,7 +254,7 @@ static fn long_total_blocks(const ArrayList<long_entry> &entries) throws
 
 Ls::Ls() = default;
 
-pure Utility::Kind Ls::kind() const wontthrow { return Kind::Ls; }
+pure fn Ls::kind() const wontthrow -> Utility::Kind { return Kind::Ls; }
 
 fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32

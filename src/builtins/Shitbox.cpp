@@ -28,9 +28,12 @@ namespace shit {
 
 Shitbox::Shitbox() = default;
 
-pure Builtin::Kind Shitbox::kind() const wontthrow { return Kind::Shitbox; }
+pure fn Shitbox::kind() const wontthrow -> Builtin::Kind
+{
+  return Kind::Shitbox;
+}
 
-i32 Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 

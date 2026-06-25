@@ -24,9 +24,9 @@ namespace shit {
 
 Pwd::Pwd() = default;
 
-pure Builtin::Kind Pwd::kind() const wontthrow { return Kind::Pwd; }
+pure fn Pwd::kind() const wontthrow -> Builtin::Kind { return Kind::Pwd; }
 
-i32 Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = PARSE_BUILTIN_ARGS(ec);
 

@@ -51,7 +51,7 @@ static fn expand_set(StringView set) throws -> String
 
 Tr::Tr() = default;
 
-pure Utility::Kind Tr::kind() const wontthrow { return Kind::Tr; }
+pure fn Tr::kind() const wontthrow -> Utility::Kind { return Kind::Tr; }
 
 fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32

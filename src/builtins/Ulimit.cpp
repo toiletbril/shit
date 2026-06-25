@@ -130,7 +130,7 @@ fn render_limit(const struct rlimit &limit, rlim_t divisor) throws -> String
 
 } // namespace
 
-cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
+cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   unused(cxt);
 
@@ -198,7 +198,7 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 
 #else /* not POSIX */
 
-i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   unused(cxt);
 
@@ -213,6 +213,6 @@ i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 
 Ulimit::Ulimit() = default;
 
-pure Builtin::Kind Ulimit::kind() const wontthrow { return Kind::Ulimit; }
+pure fn Ulimit::kind() const wontthrow -> Builtin::Kind { return Kind::Ulimit; }
 
 } // namespace shit

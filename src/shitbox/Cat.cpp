@@ -37,7 +37,7 @@ static fn number_prefix(i64 line_number) throws -> String
 
 Cat::Cat() = default;
 
-pure Utility::Kind Cat::kind() const wontthrow { return Kind::Cat; }
+pure fn Cat::kind() const wontthrow -> Utility::Kind { return Kind::Cat; }
 
 fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<String> &args) const throws -> i32

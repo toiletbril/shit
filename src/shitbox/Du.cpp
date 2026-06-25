@@ -47,7 +47,7 @@ static fn total_size(const Path &path) throws -> u64
 
 Du::Du() = default;
 
-pure Utility::Kind Du::kind() const wontthrow { return Kind::Du; }
+pure fn Du::kind() const wontthrow -> Utility::Kind { return Kind::Du; }
 
 fn Du::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32

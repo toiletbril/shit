@@ -331,9 +331,9 @@ void append_conversion(String &out, const String &spec, char conv,
 
 Printf::Printf() = default;
 
-pure Builtin::Kind Printf::kind() const wontthrow { return Kind::Printf; }
+pure fn Printf::kind() const wontthrow -> Builtin::Kind { return Kind::Printf; }
 
-i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 

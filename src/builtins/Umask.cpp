@@ -123,7 +123,7 @@ fn apply_symbolic_mask(StringView spec, u32 current_mask) throws -> Maybe<u32>
 
 Umask::Umask() = default;
 
-pure Builtin::Kind Umask::kind() const wontthrow { return Kind::Umask; }
+pure fn Umask::kind() const wontthrow -> Builtin::Kind { return Kind::Umask; }
 
 cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
 {

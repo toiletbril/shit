@@ -22,7 +22,7 @@ namespace shitbox {
 
 Unlink::Unlink() = default;
 
-pure Utility::Kind Unlink::kind() const wontthrow { return Kind::Unlink; }
+pure fn Unlink::kind() const wontthrow -> Utility::Kind { return Kind::Unlink; }
 
 fn Unlink::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<String> &args) const throws -> i32

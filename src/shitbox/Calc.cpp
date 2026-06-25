@@ -36,7 +36,7 @@ namespace shitbox {
 
 Calc::Calc() = default;
 
-pure Utility::Kind Calc::kind() const wontthrow { return Kind::Calc; }
+pure fn Calc::kind() const wontthrow -> Utility::Kind { return Kind::Calc; }
 
 namespace {
 

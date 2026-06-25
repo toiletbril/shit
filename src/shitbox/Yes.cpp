@@ -20,7 +20,7 @@ namespace shitbox {
 
 Yes::Yes() = default;
 
-pure Utility::Kind Yes::kind() const wontthrow { return Kind::Yes; }
+pure fn Yes::kind() const wontthrow -> Utility::Kind { return Kind::Yes; }
 
 fn Yes::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<String> &args) const throws -> i32

@@ -39,9 +39,9 @@ i32 wait_for_job(job &job) throws
 
 Wait::Wait() = default;
 
-pure Builtin::Kind Wait::kind() const wontthrow { return Kind::Wait; }
+pure fn Wait::kind() const wontthrow -> Builtin::Kind { return Kind::Wait; }
 
-i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.is_empty());

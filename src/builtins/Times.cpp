@@ -27,7 +27,7 @@ namespace shit {
 
 Times::Times() = default;
 
-pure Builtin::Kind Times::kind() const wontthrow { return Kind::Times; }
+pure fn Times::kind() const wontthrow -> Builtin::Kind { return Kind::Times; }
 
 cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
 {

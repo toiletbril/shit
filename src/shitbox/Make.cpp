@@ -972,7 +972,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
 
 Make::Make() = default;
 
-pure Utility::Kind Make::kind() const wontthrow { return Kind::Make; }
+pure fn Make::kind() const wontthrow -> Utility::Kind { return Kind::Make; }
 
 fn Make::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32

@@ -33,9 +33,9 @@ namespace shit {
 
 Type::Type() = default;
 
-pure Builtin::Kind Type::kind() const wontthrow { return Kind::Type; }
+pure fn Type::kind() const wontthrow -> Builtin::Kind { return Kind::Type; }
 
-i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = PARSE_BUILTIN_ARGS(ec);
 

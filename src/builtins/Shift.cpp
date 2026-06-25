@@ -21,9 +21,9 @@ namespace shit {
 
 Shift::Shift() = default;
 
-pure Builtin::Kind Shift::kind() const wontthrow { return Kind::Shift; }
+pure fn Shift::kind() const wontthrow -> Builtin::Kind { return Kind::Shift; }
 
-i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Shift::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 

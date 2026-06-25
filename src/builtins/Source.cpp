@@ -21,9 +21,9 @@ namespace shit {
 
 Source::Source() = default;
 
-pure Builtin::Kind Source::kind() const wontthrow { return Kind::Source; }
+pure fn Source::kind() const wontthrow -> Builtin::Kind { return Kind::Source; }
 
-i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 

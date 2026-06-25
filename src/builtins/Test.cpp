@@ -370,9 +370,9 @@ public:
 
 Test::Test() = default;
 
-pure Builtin::Kind Test::kind() const wontthrow { return Kind::Test; }
+pure fn Test::kind() const wontthrow -> Builtin::Kind { return Kind::Test; }
 
-i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   /* Strip the program name, and for the [ form the required trailing ]. The
      last operand index ends the expression, one before the trailing ] in the

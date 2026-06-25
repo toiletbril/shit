@@ -27,7 +27,7 @@ namespace shitbox {
 
 Sleep::Sleep() = default;
 
-pure Utility::Kind Sleep::kind() const wontthrow { return Kind::Sleep; }
+pure fn Sleep::kind() const wontthrow -> Utility::Kind { return Kind::Sleep; }
 
 fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<String> &args) const throws -> i32

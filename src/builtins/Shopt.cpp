@@ -163,9 +163,9 @@ fn shopt_option_name_list() throws -> const ArrayList<StringView> &
 
 Shopt::Shopt() = default;
 
-pure Builtin::Kind Shopt::kind() const wontthrow { return Kind::Shopt; }
+pure fn Shopt::kind() const wontthrow -> Builtin::Kind { return Kind::Shopt; }
 
-i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.is_empty());

@@ -23,7 +23,7 @@ namespace shitbox {
 
 Tee::Tee() = default;
 
-pure Utility::Kind Tee::kind() const wontthrow { return Kind::Tee; }
+pure fn Tee::kind() const wontthrow -> Utility::Kind { return Kind::Tee; }
 
 fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<String> &args) const throws -> i32

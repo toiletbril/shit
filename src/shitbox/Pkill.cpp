@@ -40,7 +40,7 @@ fn resolve_shitbox_signal(StringView spelled) throws -> i32
 
 Pkill::Pkill() = default;
 
-pure Utility::Kind Pkill::kind() const wontthrow { return Kind::Pkill; }
+pure fn Pkill::kind() const wontthrow -> Utility::Kind { return Kind::Pkill; }
 
 fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<String> &args) const throws -> i32

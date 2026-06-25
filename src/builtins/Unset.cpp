@@ -23,9 +23,9 @@ namespace shit {
 
 Unset::Unset() = default;
 
-pure Builtin::Kind Unset::kind() const wontthrow { return Kind::Unset; }
+pure fn Unset::kind() const wontthrow -> Builtin::Kind { return Kind::Unset; }
 
-i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Unset::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const names =
       parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);

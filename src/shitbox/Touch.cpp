@@ -25,7 +25,7 @@ namespace shitbox {
 
 Touch::Touch() = default;
 
-pure Utility::Kind Touch::kind() const wontthrow { return Kind::Touch; }
+pure fn Touch::kind() const wontthrow -> Utility::Kind { return Kind::Touch; }
 
 fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<String> &args) const throws -> i32

@@ -47,7 +47,7 @@ static fn make_one(StringView path, u32 mode, bool set_exact_mode,
 
 Mkdir::Mkdir() = default;
 
-pure Utility::Kind Mkdir::kind() const wontthrow { return Kind::Mkdir; }
+pure fn Mkdir::kind() const wontthrow -> Utility::Kind { return Kind::Mkdir; }
 
 fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<String> &args) const throws -> i32

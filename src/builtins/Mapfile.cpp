@@ -32,9 +32,12 @@ namespace shit {
 
 Mapfile::Mapfile() = default;
 
-pure Builtin::Kind Mapfile::kind() const wontthrow { return Kind::Mapfile; }
+pure fn Mapfile::kind() const wontthrow -> Builtin::Kind
+{
+  return Kind::Mapfile;
+}
 
-i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.is_empty());

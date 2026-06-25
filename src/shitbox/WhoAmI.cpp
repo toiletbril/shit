@@ -22,7 +22,7 @@ namespace shitbox {
 
 WhoAmI::WhoAmI() = default;
 
-pure Utility::Kind WhoAmI::kind() const wontthrow { return Kind::WhoAmI; }
+pure fn WhoAmI::kind() const wontthrow -> Utility::Kind { return Kind::WhoAmI; }
 
 fn WhoAmI::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<String> &args) const throws -> i32

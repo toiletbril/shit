@@ -26,7 +26,10 @@ namespace shitbox {
 
 Killall::Killall() = default;
 
-pure Utility::Kind Killall::kind() const wontthrow { return Kind::Killall; }
+pure fn Killall::kind() const wontthrow -> Utility::Kind
+{
+  return Kind::Killall;
+}
 
 fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<String> &args) const throws -> i32

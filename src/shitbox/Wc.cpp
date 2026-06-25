@@ -59,7 +59,7 @@ static fn format_counts(u64 lines, u64 words, u64 bytes, bool should_show_lines,
 
 Wc::Wc() = default;
 
-pure Utility::Kind Wc::kind() const wontthrow { return Kind::Wc; }
+pure fn Wc::kind() const wontthrow -> Utility::Kind { return Kind::Wc; }
 
 fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32

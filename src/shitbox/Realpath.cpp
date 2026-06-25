@@ -22,7 +22,10 @@ namespace shitbox {
 
 Realpath::Realpath() = default;
 
-pure Utility::Kind Realpath::kind() const wontthrow { return Kind::Realpath; }
+pure fn Realpath::kind() const wontthrow -> Utility::Kind
+{
+  return Kind::Realpath;
+}
 
 fn Realpath::execute(const ExecContext &ec, EvalContext &cxt,
                      const ArrayList<String> &args) const throws -> i32

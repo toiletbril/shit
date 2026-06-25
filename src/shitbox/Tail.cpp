@@ -25,7 +25,7 @@ namespace shitbox {
 
 Tail::Tail() = default;
 
-pure Utility::Kind Tail::kind() const wontthrow { return Kind::Tail; }
+pure fn Tail::kind() const wontthrow -> Utility::Kind { return Kind::Tail; }
 
 fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32

@@ -76,7 +76,7 @@ static fn contains(StringView haystack, StringView needle,
 
 Grep::Grep() = default;
 
-pure Utility::Kind Grep::kind() const wontthrow { return Kind::Grep; }
+pure fn Grep::kind() const wontthrow -> Utility::Kind { return Kind::Grep; }
 
 fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32

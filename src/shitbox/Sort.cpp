@@ -22,7 +22,7 @@ namespace shitbox {
 
 Sort::Sort() = default;
 
-pure Utility::Kind Sort::kind() const wontthrow { return Kind::Sort; }
+pure fn Sort::kind() const wontthrow -> Utility::Kind { return Kind::Sort; }
 
 fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32

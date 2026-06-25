@@ -20,9 +20,12 @@ namespace shit {
 
 Unalias::Unalias() = default;
 
-pure Builtin::Kind Unalias::kind() const wontthrow { return Kind::Unalias; }
+pure fn Unalias::kind() const wontthrow -> Builtin::Kind
+{
+  return Kind::Unalias;
+}
 
-i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = PARSE_BUILTIN_ARGS(ec);
 
