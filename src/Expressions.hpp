@@ -445,6 +445,11 @@ protected:
   mutable Maybe<ResolvedCommand> m_resolved_kind{};
   mutable mimic_mood m_resolved_mood{};
 
+  /* Whether the command word is a literal glob, memoized since the typed word
+     never changes after the parse, so a command in a loop body scans its word
+     once. */
+  mutable Maybe<bool> m_command_word_is_glob{};
+
   ArrayList<Redirection> m_redirections{heap_allocator()};
   ArrayList<array_builtin_assignment> m_array_args{heap_allocator()};
 };
@@ -539,6 +544,11 @@ protected:
   /* A stage is any command, either a simple command exec'd in a forked child or
      a compound command whose tree is evaluated in a forked child. */
   ArrayList<const Command *> m_commands{heap_allocator()};
+
+  /* Whether a stage forces the fork-per-stage path, memoized since the stage
+     shapes never change after the parse, so a pipeline in a loop body scans its
+     stages once. */
+  mutable Maybe<bool> m_has_compound_stage{};
 };
 
 /* A compound command groups one or more command lists, like a loop body or an

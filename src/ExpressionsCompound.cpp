@@ -522,21 +522,26 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
      as x=v cmd | cmd2, takes the fork path too, since the fast path builds the
      stage from its argument words alone and the prefix must reach only that
      stage's environment. */
-  bool has_compound_stage = false;
-  for (let const stage : m_commands) {
-    if (!stage->is_simple_command()) {
-      has_compound_stage = true;
-      break;
+  if (!m_has_compound_stage.has_value()) {
+    bool found_compound_stage = false;
+    for (let const stage : m_commands) {
+      if (!stage->is_simple_command()) {
+        found_compound_stage = true;
+        break;
+      }
+      /* A command-less stage of bare assignments keeps the fast path, whose
+         empty-expansion check reports it, so the strict diagnostic for x=1 | cat
+         is preserved. */
+      const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
+      if (!simple->local_vars().is_empty() && !simple->args().is_empty()) {
+        found_compound_stage = true;
+        break;
+      }
     }
-    /* A command-less stage of bare assignments keeps the fast path, whose
-       empty-expansion check reports it, so the strict diagnostic for x=1 | cat
-       is preserved. */
-    const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
-    if (!simple->local_vars().is_empty() && !simple->args().is_empty()) {
-      has_compound_stage = true;
-      break;
-    }
+    m_has_compound_stage = found_compound_stage;
   }
+
+  bool has_compound_stage = *m_has_compound_stage;
 
   /* A stage whose command word names a user function must run through the
      per-stage fork path, since the fast path below builds an ExecContext that

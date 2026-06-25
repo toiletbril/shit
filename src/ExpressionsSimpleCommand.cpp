@@ -582,7 +582,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (!m_args.is_empty() && m_args[0]->kind() == Token::Kind::Word) {
     const Word &command_word =
         static_cast<const tokens::WordToken *>(m_args[0])->word();
-    if (command_word_is_glob(command_word)) {
+    if (!m_command_word_is_glob.has_value())
+      m_command_word_is_glob = command_word_is_glob(command_word);
+
+    if (*m_command_word_is_glob) {
       let const location = m_args[0]->source_location();
       let const message =
           StringView{"A glob pattern in command position is rarely intended as "
