@@ -909,11 +909,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     const String *source = cxt.current_source();
     show_message(redirection_error.to_string(source != nullptr ? source->view()
                                                                : StringView{}));
-    /* dash reports a redirection failure with status 2, the value a script
-       reads in $? after the failed command. */
-    cxt.set_last_exit_status(2);
-    cxt.publish_single_pipe_status(2);
-    return 2;
+    /* bash reports a redirection failure with status 1 and dash with 2, the
+       value a script reads in $? after the failed command. */
+    let const redirection_status = cxt.is_bash_compatible() ? 1 : 2;
+    cxt.set_last_exit_status(redirection_status);
+    cxt.publish_single_pipe_status(redirection_status);
+    return redirection_status;
   }
 
   /* An expansion may drop every word, for example an unset $x used as the whole
