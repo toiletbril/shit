@@ -1112,6 +1112,8 @@ fn EvalContext::apply_parameter_transform(StringView name, char op) throws
     return out;
   case 'a':
     if (lookup_indexed_array(name) != nullptr) out.push('a');
+    if (is_associative_array(name)) out.push('A');
+    if (is_integer_variable(name)) out.push('i');
     if (is_readonly(name)) out.push('r');
     if (is_exported(name)) out.push('x');
     return out;

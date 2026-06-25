@@ -1569,6 +1569,10 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 fn EvalContext::option_flags_string() const throws -> String
 {
   let flags = String{};
+  /* hashall and braceexpand are on by default outside the posix mood, the way
+     bash reports them, while dash names neither. */
+  let const bash_flags_on = !is_posix_mode();
+  if (bash_flags_on) flags += 'h';
   if (m_error_exit) flags += 'e';
   if (!m_enable_path_expansion) flags += 'f';
   if (export_all()) flags += 'a';
@@ -1577,6 +1581,7 @@ fn EvalContext::option_flags_string() const throws -> String
   if (error_unset()) flags += 'u';
   if (no_clobber()) flags += 'C';
   if (m_shell_is_interactive) flags += 'i';
+  if (bash_flags_on) flags += 'B';
 
   return flags;
 }
