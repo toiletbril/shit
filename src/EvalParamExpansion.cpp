@@ -844,6 +844,24 @@ fn EvalContext::apply_pattern_replacement(StringView name,
   return pattern_replace_value(current.value_or(String{}), spec);
 }
 
+/* The replacement text of ${x/pat/rep} reads & as the matched span and a
+   backslash as an escape, so \& is a literal & and a backslash before any other
+   byte is dropped, the way bash splices a match. */
+static fn append_pattern_replacement(String &out, StringView replacement,
+                                     StringView matched) throws -> void
+{
+  for (usize i = 0; i < replacement.length; i++) {
+    if (replacement[i] == '\\' && i + 1 < replacement.length) {
+      out.push(replacement[i + 1]);
+      i++;
+    } else if (replacement[i] == '&') {
+      out.append(matched);
+    } else {
+      out.push(replacement[i]);
+    }
+  }
+}
+
 fn EvalContext::pattern_replace_value(const String &value,
                                       StringView spec) throws -> String
 {
@@ -890,7 +908,8 @@ fn EvalContext::pattern_replace_value(const String &value,
     if (let const matched = longest_pattern_match_at(
             pattern.view(), pattern_active, value.view(), 0, extglob_enabled()))
     {
-      out += replacement;
+      append_pattern_replacement(out, replacement.view(),
+                                 value.view().substring_of_length(0, *matched));
       out.append(value.view().substring(*matched));
     } else {
       out.append(value.view());
@@ -906,7 +925,8 @@ fn EvalContext::pattern_replace_value(const String &value,
                               pattern_active, 0, extglob_enabled()))
       {
         out.append(value.view().substring_of_length(0, start));
-        out += replacement;
+        append_pattern_replacement(out, replacement.view(),
+                                   value.view().substring(start));
         return out;
       }
     }
@@ -925,7 +945,8 @@ fn EvalContext::pattern_replace_value(const String &value,
       matched = longest_pattern_match_at(pattern.view(), pattern_active,
                                          value.view(), i, extglob_enabled());
     if (matched.has_value()) {
-      out += replacement;
+      append_pattern_replacement(out, replacement.view(),
+                                 value.view().substring_of_length(i, *matched));
       has_replaced = true;
       if (*matched == 0) {
         out.push(value.view()[i]);

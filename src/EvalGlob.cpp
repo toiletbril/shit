@@ -81,13 +81,17 @@ fn EvalContext::expand_path_once(const glob_field &field,
 
     if (!should_expand_files && !full_path.is_directory()) continue;
 
-    if (glob[0] != '.' && !filename.is_empty() && filename[0] == '.') continue;
-
-    /* globskipdots, on by default since bash 5.3, keeps . and .. out of a match
-       even when the pattern itself starts with a dot. */
-    if ((filename == "." || filename == "..") &&
-        is_shopt_enabled("globskipdots"))
+    /* A leading-dot-less pattern skips a dotfile unless dotglob is on, and
+       never matches . or .. . globskipdots keeps . and .. out even of a dotted
+       pattern, on by default since bash 5.3. */
+    let const pattern_leads_with_dot = glob[0] == '.';
+    if (filename == "." || filename == "..") {
+      if (!pattern_leads_with_dot || is_shopt_enabled("globskipdots")) continue;
+    } else if (!pattern_leads_with_dot && !filename.is_empty() &&
+               filename[0] == '.' && !is_shopt_enabled("dotglob"))
+    {
       continue;
+    }
 
     if (utils::glob_matches(glob, filename, field.glob_active, stem_start,
                             extglob_enabled()))
@@ -503,7 +507,11 @@ hot fn EvalContext::expand_path(glob_field field,
                         "which is rarely intended",
                     "Probe for matches with compgen -G '" + pattern +
                         "' or relax with set +o failglob");
-    values.push(steal(pattern));
+    /* nullglob drops a no-match glob entirely, while the default keeps its
+       literal text. A test or [ probe always keeps the literal so its file test
+       still runs. */
+    if (m_glob_exempt_for_test || !is_shopt_enabled("nullglob"))
+      values.push(steal(pattern));
   }
 
   return values;
