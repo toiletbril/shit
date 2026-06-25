@@ -1,0 +1,110 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=before]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "special=[$x]"]
+  [CompoundListCondition, None]
+    [Assign y=keep]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "regular=[$y]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "baz=1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "export_prefix=[$foo][$baz]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "redirect_status=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "still_here"]
+[Word
+  Unquoted "x=before"
+]
+[Word
+  Unquoted "x=after"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "special=["
+  Variable "x"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "y=keep"
+]
+[Word
+  Unquoted "y=temp"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "regular=["
+  Variable "y"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "foo=bar"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "baz=1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "export_prefix=["
+  Variable "foo"
+  DoubleQuoted "]["
+  Variable "baz"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/no/such/directory/file"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "redirect_status="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "still_here"
+]
+special=[after]
+regular=[keep]
+export_prefix=[bar][1]
+shit: 13:7: error: Could not open '/no/such/directory/file': No such file or directory.
+    13 |  cat < /no/such/directory/file 2>/dev/null
+       |        ^~~~~~~~~~~~~~~~~~~~~~~ here.
+redirect_status=2
+still_here
+[Code 0]

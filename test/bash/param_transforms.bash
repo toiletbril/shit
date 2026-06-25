@@ -10,6 +10,8 @@ empty=""
 echo "${empty@Q}"
 q="a'b"
 echo "${q@Q}"
+esc=$'\e[1m'
+echo "${esc@Q}"
 m="Hello World"
 echo "${m@U}"
 echo "${m@L}"

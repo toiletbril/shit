@@ -36,3 +36,10 @@ echo "${word/#H/J}"
 echo "${word/%o/0}"
 echo "${word/#x/J}"
 echo "${word/%x/0}"
+
+amp=hello
+echo "${amp/l/[&]}"
+echo "${amp//l/<&>}"
+echo "${amp/e/\&}"
+dotted=a.b.c
+echo "${dotted//./[&]}"

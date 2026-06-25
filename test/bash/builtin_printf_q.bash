@@ -12,4 +12,5 @@ printf '%q\n' '~tilde'
 printf '%q\n' '#hash'
 printf '%q\n' $'tab\there'
 printf '%q\n' $'ctrl\x01end'
+printf '%q\n' $'esc\x1bend'
 printf '%q %q\n' foo bar
