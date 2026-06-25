@@ -82,7 +82,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (is_to_previous) {
     let const old_directory = cxt.get_variable_value("OLDPWD");
-    if (!old_directory || old_directory->is_empty()) {
+    if (!old_directory.has_value() || old_directory->is_empty()) {
       throw ErrorWithLocation{ec.source_location(),
                               "Unable to return to the previous directory "
                               "because OLDPWD is not set"};
@@ -96,7 +96,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   } else {
     let const home_directory = os::get_home_directory();
-    if (!home_directory)
+    if (!home_directory.has_value())
       throw ErrorWithLocation{ec.source_location(),
                               "Unable to determine the home directory"};
     arg_path.append(home_directory->text());

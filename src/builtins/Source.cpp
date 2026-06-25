@@ -42,7 +42,7 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const path = ec.args()[path_index].clone();
   LOG(Info, "source running file '%s' in the current shell", path.c_str());
   let const contents = Path{path.view()}.read_entire_file();
-  if (!contents)
+  if (!contents.has_value())
     throw Error{"Unable to source the file '" + path +
                 "' because it cannot be opened"};
 

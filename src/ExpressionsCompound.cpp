@@ -92,7 +92,9 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
       } catch (const InterruptError &) {
         throw;
       } catch (ErrorWithLocation &error) {
-        if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
+        if (!cxt.is_bash_compatible() || error.is_script_fatal()) {
+          throw;
+        }
         LOG(Debug,
             "bash mood converted the located error to command status %lld: %s",
             static_cast<long long>(error.command_status()),
@@ -119,7 +121,9 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         cxt.set_last_exit_status(static_cast<i32>(error.command_status()));
         return error.command_status();
       } catch (const ErrorBase &error) {
-        if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
+        if (!cxt.is_bash_compatible() || error.is_script_fatal()) {
+          throw;
+        }
         LOG(Debug, "bash mood converted the error to command status %lld: %s",
             static_cast<long long>(error.command_status()),
             error.message().c_str());
@@ -229,8 +233,9 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
   /* A negated or timed command must run to completion here rather than exec the
      shell in place, since the inverse has to apply and the report has to print
      after the command returns, which an exec would skip. */
-  if (m_cmd->is_negated() || m_cmd->is_timed())
+  if (m_cmd->is_negated() || m_cmd->is_timed()) {
     cxt.set_terminal_exec_allowed(false);
+  }
 
   /* The timed command samples the child cpu and the monotonic clock around its
      run, so the difference is its own wall and cpu time. */
@@ -363,7 +368,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
 
       if (!is_last) {
         pipe = os::make_pipe();
-        if (!pipe) {
+        if (!pipe.has_value()) {
           throw ErrorWithLocation{stage->source_location(),
                                   "Could not open a pipe"};
         }

@@ -1462,7 +1462,7 @@ static fn rebuild_path_cache() throws -> void
   PATH_CACHE.clear();
   PATH_CACHE_IS_STALE = false;
   PATH_COMMAND_NAMES_IS_VALID = false;
-  if (!MAYBE_PATH) return;
+  if (!MAYBE_PATH.has_value()) return;
 
   let const path_dirs = split_path_dirs(*MAYBE_PATH);
 
@@ -1590,7 +1590,7 @@ static bool CACHED_PATH_DIRS_VALID = false;
 
 static fn path_dirs() throws -> const ArrayList<String> &
 {
-  if (!MAYBE_PATH) {
+  if (!MAYBE_PATH.has_value()) {
     CACHED_PATH_DIRS = ArrayList<String>{};
     CACHED_PATH_DIRS_VALID = false;
     return CACHED_PATH_DIRS;
@@ -1646,7 +1646,7 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
   /* The search reads MAYBE_PATH, which the shell keeps in step with its PATH
      variable, so a plain PATH=... assignment that the store holds but the
      environment does not still drives the order. */
-  if (!MAYBE_PATH) return ArrayList<Path>{};
+  if (!MAYBE_PATH.has_value()) return ArrayList<Path>{};
 
   LOG(Debug, "statting candidates for '%.*s' along PATH%s",
       static_cast<int>(program_name.length), program_name.data,
@@ -1837,7 +1837,7 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     do_consider(local.view());
   for (let const &builtin : builtin_names())
     do_consider(builtin.view());
-  if (MAYBE_PATH) {
+  if (MAYBE_PATH.has_value()) {
     for (let const &dir_string : split_path_dirs(*MAYBE_PATH)) {
       if (Maybe<ArrayList<String>> entries =
               Path::read_directory(Path{dir_string.view()}))

@@ -3,6 +3,8 @@
 # mood. The input file has a fixed size so the human form is the same on every
 # machine.
 unset SHIT_FLAGS
+# A fixed umask keeps the rendered file mode the same on every machine.
+umask 022
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 d=$(mktemp -d) || exit 1
 cd "$d" || exit 1

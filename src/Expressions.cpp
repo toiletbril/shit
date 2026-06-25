@@ -1591,7 +1591,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (name && !actx.should_silence_unresolved_commands &&
+  if (name.has_value() && !actx.should_silence_unresolved_commands &&
       !command_resolves(actx, *name) &&
       !actx.defined_functions.contains(
           StringView{name->data(), name->count()}) &&

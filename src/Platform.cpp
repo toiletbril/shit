@@ -283,7 +283,7 @@ fn get_hostname() throws -> Maybe<String>
 
 fn get_home_directory() throws -> Maybe<Path>
 {
-  if (const Maybe<String> home = get_environment_variable("HOME"))
+  if (let const home = get_environment_variable("HOME"); home.has_value())
     return Path{StringView{*home}};
   return shit::None;
 }

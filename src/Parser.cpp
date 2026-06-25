@@ -570,13 +570,13 @@ fn Parser::build_file_or_dup_redirection(
         throw ErrorWithLocation{from->source_location(),
                                 "Expected a descriptor after '&'"};
       }
-      const Word &from_word = static_cast<tokens::WordToken *>(from)->word();
+      let const &from_word = static_cast<tokens::WordToken *>(from)->word();
 
       redir.kind = (op_kind == Token::Kind::Less)
                        ? expressions::Redirection::Kind::DuplicateInput
                        : expressions::Redirection::Kind::DuplicateOutput;
 
-      const String literal = from_word.to_literal_string();
+      let const literal = from_word.to_literal_string();
 
       /* The close form >&- and <&- closes fd outright. The dash arrives as part
          of the following word, so it is matched on the literal. */
@@ -911,8 +911,16 @@ mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
    assignment rather than a word. */
 static pure fn is_assignment_builtin_name(StringView name) wontthrow -> bool
 {
-  return name == "local" || name == "declare" || name == "typeset" ||
-         name == "readonly" || name == "export";
+  static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
+      {SSK("local"),    true},
+      {SSK("declare"),  true},
+      {SSK("typeset"),  true},
+      {SSK("readonly"), true},
+      {SSK("export"),   true},
+  };
+  static constexpr StaticStringMap<bool> ASSIGNMENT_BUILTINS{ENTRIES,
+                                                             countof(ENTRIES)};
+  return ASSIGNMENT_BUILTINS.find(name).has_value();
 }
 
 /* Returns a command, a compound command, or nullptr when a list terminator is
@@ -1371,9 +1379,9 @@ hot fn Parser::parse_for() throws -> Command *
   /* The loop variable must be a plain name. A $ expansion such as for $f, a
      quoted word, or a non-identifier is rejected the way dash and bash reject
      it. */
-  const Word &name_word =
+  let const &name_word =
       static_cast<const tokens::WordToken *>(name_token)->word();
-  bool is_name_plain =
+  let is_name_plain =
       name_word.segments.count() == 1 &&
       name_word.segments[0].kind == WordSegment::Kind::UnquotedText;
   if (is_name_plain) {
@@ -1580,8 +1588,8 @@ static fn word_token_from_assignment(BumpArena &arena,
                                      const Assignment *a) throws
     -> tokens::WordToken *
 {
-  Word word{};
-  String prefix = a->key().clone();
+  let word = Word{};
+  let prefix = a->key().clone();
   prefix += a->is_append() ? "+=" : "=";
   word.segments.push(
       WordSegment{WordSegment::Kind::UnquotedText, steal(prefix), false});
@@ -1603,7 +1611,7 @@ static fn word_token_from_raw(BumpArena &arena, StringView text,
                               SourceLocation location) throws
     -> tokens::WordToken *
 {
-  Word word{};
+  let word = Word{};
   word.segments.push(
       WordSegment{WordSegment::Kind::UnquotedText, String{text}, false});
   return arena.create<tokens::WordToken>(location, steal(word));
@@ -1676,8 +1684,8 @@ hot fn Parser::parse_case() throws -> Command *
       } else if (pattern->kind() != Token::Kind::Word) {
         /* A keyword such as done used as a literal pattern, the way ble.sh
            writes (done), is taken by its source text rather than rejected. */
-        const SourceLocation pattern_location = pattern->source_location();
-        const StringView text = m_lexer.source().substring_of_length(
+        let const pattern_location = pattern->source_location();
+        let const text = m_lexer.source().substring_of_length(
             pattern_location.position, pattern_location.length);
         if (KEYWORDS.find(text).has_value()) {
           pattern =
@@ -1707,8 +1715,8 @@ hot fn Parser::parse_case() throws -> Command *
 
     Token *after = m_lexer.peek_shell_token();
     ASSERT(after != nullptr);
-    case_terminator terminator = case_terminator::Break;
-    bool is_last_arm = false;
+    let terminator = case_terminator::Break;
+    let is_last_arm = false;
     switch (after->kind()) {
     case Token::Kind::DoubleSemicolon: m_lexer.advance_past_last_peek(); break;
     case Token::Kind::SemicolonAmpersand:
@@ -1916,12 +1924,13 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
         location, "Expected '(( init; condition; step ))' in a C-style for"};
   }
 
-  const Allocator allocator = bump_allocator(m_lexer.arena());
-  const String init{allocator, header.substring_of_length(0, separators[0])};
-  const String condition{
+  let const allocator = bump_allocator(m_lexer.arena());
+  let const init =
+      String{allocator, header.substring_of_length(0, separators[0])};
+  let const condition = String{
       allocator, header.substring_of_length(separators[0] + 1,
                                             separators[1] - separators[0] - 1)};
-  const String step{allocator, header.substring(separators[1] + 1)};
+  let const step = String{allocator, header.substring(separators[1] + 1)};
 
   loop
   {

@@ -44,7 +44,7 @@ namespace {
 /* A recursive-descent evaluator over the [[ ]] element list. The grammar joins
    primaries with && and ||, allows ! and parentheses, and reads unary and
    binary primaries with no field splitting on the operands. */
-struct ConditionalEvaluator
+struct conditional_evaluator
 {
   EvalContext &cxt;
   const ArrayList<conditional_element> &elements;
@@ -57,17 +57,17 @@ struct ConditionalEvaluator
 
   using Kind = conditional_element::Kind;
 
-  pure bool at_end() const wontthrow { return pos >= elements.count(); }
-  pure Kind kind_at(usize i) const wontthrow { return elements[i].kind; }
+  pure fn at_end() const wontthrow -> bool { return pos >= elements.count(); }
+  pure fn kind_at(usize i) const wontthrow -> Kind { return elements[i].kind; }
 
-  String unexpected_token() throws
+  fn unexpected_token() throws -> String
   {
     return at_end() ? String{} : operand_literal(elements[pos]);
   }
 
   /* The literal source text of an operand, used to recognize a word operator
      such as == or -f without expanding it. */
-  String operand_literal(const conditional_element &e) throws
+  fn operand_literal(const conditional_element &e) throws -> String
   {
     if (e.word != nullptr && e.word->kind() == Token::Kind::Word) {
       return static_cast<const tokens::WordToken *>(e.word)
@@ -81,7 +81,7 @@ struct ConditionalEvaluator
   /* The expanded value of an operand, with no field splitting. A thrown Error,
      such as an unset variable under set -u, is relocated to a caret at the
      operand. */
-  String operand_value(const conditional_element &e) throws
+  fn operand_value(const conditional_element &e) throws -> String
   {
     if (e.word != nullptr && e.word->kind() == Token::Kind::Word) {
       try {
@@ -98,8 +98,8 @@ struct ConditionalEvaluator
   /* The right side of == or != is a pattern, so it expands with a parallel mask
      marking which *, ?, and [ stay active. A quoted or escaped metacharacter is
      masked off and matches literally. */
-  String operand_pattern_masked(const conditional_element &e,
-                                ArrayList<bool> &active) throws
+  fn operand_pattern_masked(const conditional_element &e,
+                            ArrayList<bool> &active) throws -> String
   {
     if (e.word != nullptr && e.word->kind() == Token::Kind::Word) {
       try {
@@ -116,23 +116,60 @@ struct ConditionalEvaluator
     return raw;
   }
 
-  static pure bool is_unary_op(StringView s) wontthrow
+  static pure fn is_unary_op(StringView s) wontthrow -> bool
   {
-    return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
-           s == "-r" || s == "-w" || s == "-x" || s == "-s" || s == "-h" ||
-           s == "-L" || s == "-b" || s == "-c" || s == "-p" || s == "-S" ||
-           s == "-g" || s == "-u" || s == "-k" || s == "-O" || s == "-G" ||
-           s == "-v" || s == "-t" || s == "-o";
+    static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
+        {SSK("-z"), true},
+        {SSK("-n"), true},
+        {SSK("-e"), true},
+        {SSK("-f"), true},
+        {SSK("-d"), true},
+        {SSK("-r"), true},
+        {SSK("-w"), true},
+        {SSK("-x"), true},
+        {SSK("-s"), true},
+        {SSK("-h"), true},
+        {SSK("-L"), true},
+        {SSK("-b"), true},
+        {SSK("-c"), true},
+        {SSK("-p"), true},
+        {SSK("-S"), true},
+        {SSK("-g"), true},
+        {SSK("-u"), true},
+        {SSK("-k"), true},
+        {SSK("-O"), true},
+        {SSK("-G"), true},
+        {SSK("-v"), true},
+        {SSK("-t"), true},
+        {SSK("-o"), true},
+    };
+    static constexpr StaticStringMap<bool> UNARY_OPS{ENTRIES, countof(ENTRIES)};
+    return UNARY_OPS.find(s).has_value();
   }
 
-  static pure bool is_binary_word_op(StringView s) wontthrow
+  static pure fn is_binary_word_op(StringView s) wontthrow -> bool
   {
-    return s == "=" || s == "==" || s == "!=" || s == "=~" || s == "-eq" ||
-           s == "-ne" || s == "-lt" || s == "-le" || s == "-gt" || s == "-ge" ||
-           s == "-ef" || s == "-nt" || s == "-ot";
+    static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
+        {SSK("="),   true},
+        {SSK("=="),  true},
+        {SSK("!="),  true},
+        {SSK("=~"),  true},
+        {SSK("-eq"), true},
+        {SSK("-ne"), true},
+        {SSK("-lt"), true},
+        {SSK("-le"), true},
+        {SSK("-gt"), true},
+        {SSK("-ge"), true},
+        {SSK("-ef"), true},
+        {SSK("-nt"), true},
+        {SSK("-ot"), true},
+    };
+    static constexpr StaticStringMap<bool> BINARY_WORD_OPS{ENTRIES,
+                                                           countof(ENTRIES)};
+    return BINARY_WORD_OPS.find(s).has_value();
   }
 
-  static pure bool is_regex_metacharacter(char c) wontthrow
+  static pure fn is_regex_metacharacter(char c) wontthrow -> bool
   {
     return c == '.' || c == '^' || c == '$' || c == '*' || c == '+' ||
            c == '?' || c == '(' || c == ')' || c == '[' || c == ']' ||
@@ -143,8 +180,8 @@ struct ConditionalEvaluator
      finding the pattern anywhere in it. On a match BASH_REMATCH holds the whole
      match at index 0 and each capture group after it, an unmatched group
      reading as an empty string. */
-  bool regex_match(StringView value, StringView pattern,
-                   const ArrayList<bool> &active) throws
+  fn regex_match(StringView value, StringView pattern,
+                 const ArrayList<bool> &active) throws -> bool
   {
 #if SHIT_PLATFORM_IS POSIX
     /* A byte the mask marks inactive came from a quoted or escaped part of the
@@ -208,7 +245,7 @@ struct ConditionalEvaluator
 #endif
   }
 
-  bool eval_unary(StringView op, StringView operand) throws
+  fn eval_unary(StringView op, StringView operand) throws -> bool
   {
     if (op == "-z") return operand.is_empty();
     if (op == "-n") return !operand.is_empty();
@@ -277,7 +314,8 @@ struct ConditionalEvaluator
     return path.exists();
   }
 
-  bool eval_binary(StringView left, StringView op, StringView right) throws
+  fn eval_binary(StringView left, StringView op, StringView right) throws
+      -> bool
   {
     if (op == "-ef") return Path{left}.is_same_file_as(Path{right});
     if (op == "-nt") return Path{left}.is_newer_than(Path{right});
@@ -303,7 +341,7 @@ struct ConditionalEvaluator
     return left_number >= right_number;
   }
 
-  bool eval_primary() throws
+  fn eval_primary() throws -> bool
   {
     if (at_end()) fail_conditional("The expression ends unexpectedly");
     const conditional_element &first = elements[pos];
@@ -397,7 +435,7 @@ struct ConditionalEvaluator
     return !value.is_empty();
   }
 
-  bool eval_term() throws
+  fn eval_term() throws -> bool
   {
     if (!at_end() && kind_at(pos) == Kind::Not) {
       pos++;
@@ -414,9 +452,9 @@ struct ConditionalEvaluator
     return eval_primary();
   }
 
-  bool eval_and() throws
+  fn eval_and() throws -> bool
   {
-    bool and_result = eval_term();
+    let and_result = eval_term();
     while (!at_end() && kind_at(pos) == Kind::And) {
       pos++;
       /* A false left decides the and, so the right is parsed without
@@ -430,9 +468,9 @@ struct ConditionalEvaluator
     return and_result;
   }
 
-  bool eval_or() throws
+  fn eval_or() throws -> bool
   {
-    bool or_result = eval_and();
+    let or_result = eval_and();
     while (!at_end() && kind_at(pos) == Kind::Or) {
       pos++;
       const bool was_skipping = is_skipping;
@@ -457,7 +495,7 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
   /* The key is the pattern text alone, sound only because the flags are always
      REG_EXTENDED. A future option that changes compilation, such as REG_ICASE
      for nocasematch, must fold into the key or two compilations collide. */
-  if (CompiledRegex *cached = m_regex_cache.find(pattern)) {
+  if (CompiledRegex *cached = m_regex_cache.find(pattern); cached != nullptr) {
     LOG(All, "regex cache hit for the pattern '%.*s'",
         static_cast<int>(pattern.length), pattern.data);
     return cached->get();
@@ -496,7 +534,7 @@ fn EvalContext::evaluate_conditional(
     fail_conditional("The conditional expression is empty");
   LOG(Debug, "evaluating a [[ ]] conditional of %zu elements",
       elements.count());
-  let evaluator = ConditionalEvaluator{*this, elements};
+  let evaluator = conditional_evaluator{*this, elements};
   const bool is_conditional_true = evaluator.eval_or();
   if (!evaluator.at_end()) {
     fail_conditional("The token '" + evaluator.unexpected_token() +

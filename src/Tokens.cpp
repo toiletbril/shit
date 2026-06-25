@@ -88,7 +88,7 @@ pure fn Word::plain_literal_kind() const wontthrow -> PlainLiteral
 fn Word::constant_value() const throws -> StringView
 {
   if (!m_has_constant_value) {
-    for (const WordSegment &segment : segments)
+    for (let const &segment : segments)
       m_constant_value.append(segment.text.view());
     m_has_constant_value = true;
   }
