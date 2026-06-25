@@ -171,9 +171,19 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
     throw Error{"Could not open a pipe for the process substitution: " +
                 os::last_system_error_message()};
 
+  bool was_pipe_handed_off = false;
+  defer
+  {
+    if (!was_pipe_handed_off) {
+      os::close_fd(pipe->in);
+      os::close_fd(pipe->out);
+    }
+  };
+
   const os::process child = command_writes_the_pipe
                                 ? os::fork_compound_stage(None, pipe->out, None)
                                 : os::fork_compound_stage(pipe->in, None, None);
+  was_pipe_handed_off = true;
 
   if (child == 0) {
     os::close_fd(command_writes_the_pipe ? pipe->in : pipe->out);

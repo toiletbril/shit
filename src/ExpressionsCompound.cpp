@@ -345,12 +345,14 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   let children = ArrayList<os::process>{};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
+  let pending_pipe = Maybe<os::Pipe>{};
 
   /* A make_pipe or fork failure mid-loop leaves the previous stage's pipe read
-     end open and the already-forked children unreaped. On the error path the
-     open read end is closed and every spawned child is waited, then the error
-     is rethrown so the caller still reports it. The success path falls through
-     untouched. */
+     end open, the current stage's freshly made pipe open at both ends, and the
+     already-forked children unreaped. On the error path the previous read end
+     and the current pipe are closed and every spawned child is waited, then the
+     error is rethrown so the caller still reports it. The success path falls
+     through untouched. */
   try {
     for (usize stage_index = 0; stage_index < m_commands.count(); stage_index++)
     {
@@ -373,6 +375,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
                                   "Could not open a pipe"};
         }
         stage_out = pipe->out;
+        pending_pipe = pipe;
       }
       if (!is_first) stage_in = last_stdin;
 
@@ -440,11 +443,16 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       if (stage_out) os::close_fd(*stage_out);
       if (stage_in) os::close_fd(*stage_in);
       if (!is_last) last_stdin = pipe->in;
+      pending_pipe = None;
 
       children.push(child);
       last_child = child;
     }
   } catch (...) {
+    if (pending_pipe.has_value()) {
+      os::close_fd(pending_pipe->in);
+      os::close_fd(pending_pipe->out);
+    }
     if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
     for (let const child : children) {
       /* The wait reaps the child, so a spawned stage never lingers as a zombie
