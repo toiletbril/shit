@@ -74,8 +74,8 @@ fn EvalContext::expand_path_once(const glob_field &field,
   ASSERT(!glob.is_empty());
 
   /* The directory read omits . and .. , so a dotted pattern that should reach
-     them has them fed back in. globskipdots, on by default since bash 5.3, keeps
-     them out, and a leading-dot-less pattern never names them. */
+     them has them fed back in. globskipdots, on by default since bash 5.3,
+     keeps them out, and a leading-dot-less pattern never names them. */
   let const pattern_leads_with_dot = glob[0] == '.';
   if (pattern_leads_with_dot && !is_shopt_enabled("globskipdots")) {
     entries->push(String{"."});
@@ -90,7 +90,8 @@ fn EvalContext::expand_path_once(const glob_field &field,
 
     if (!should_expand_files && !full_path.is_directory()) continue;
 
-    /* A leading-dot-less pattern skips a dotfile unless dotglob is on. The . and
+    /* A leading-dot-less pattern skips a dotfile unless dotglob is on. The .
+       and
        .. fed in above are kept only for a dotted pattern. */
     if (filename == "." || filename == "..") {
       if (!pattern_leads_with_dot) continue;

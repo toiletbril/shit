@@ -21,10 +21,10 @@ static constexpr usize DRAIN_CHUNK_LENGTH = 4096;
 
 /* The drain thread reads the pipe into its own libc buffer while the inner
    command writes the other end, so output larger than the pipe buffer cannot
-   deadlock. The buffer is grown with libc realloc because the inner command runs
-   on the main thread against the shared heap pool, whose free list is single
-   threaded. The captured bytes copy into the result String on the main thread
-   once the drain has joined. */
+   deadlock. The buffer is grown with libc realloc because the inner command
+   runs on the main thread against the shared heap pool, whose free list is
+   single threaded. The captured bytes copy into the result String on the main
+   thread once the drain has joined. */
 struct command_substitution_drain_context
 {
   char *data;
@@ -44,16 +44,16 @@ fn drain_command_substitution_pipe(opaque *raw_context) wontthrow -> void
       while (grown_capacity < drain->length + DRAIN_CHUNK_LENGTH)
         grown_capacity *= 2;
 
-      let grown = static_cast<char *>(std::realloc(drain->data, grown_capacity));
+      let grown =
+          static_cast<char *>(std::realloc(drain->data, grown_capacity));
       if (grown == nullptr) break;
 
       drain->data = grown;
       drain->capacity = grown_capacity;
     }
 
-    let const bytes_read = os::read_fd(drain->read_fd,
-                                       drain->data + drain->length,
-                                       DRAIN_CHUNK_LENGTH);
+    let const bytes_read = os::read_fd(
+        drain->read_fd, drain->data + drain->length, DRAIN_CHUNK_LENGTH);
     if (!bytes_read.has_value() || *bytes_read == 0) break;
     drain->length += static_cast<usize>(*bytes_read);
   }
@@ -341,7 +341,8 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   if (!pipe) throw Error{"Could not open a pipe for command substitution"};
 
   let captured = String{heap_allocator()};
-  let drain_context = command_substitution_drain_context{nullptr, 0, 0, pipe->in};
+  let drain_context =
+      command_substitution_drain_context{nullptr, 0, 0, pipe->in};
   let const reader =
       os::start_thread(drain_command_substitution_pipe, &drain_context);
   if (!reader) {
@@ -398,8 +399,8 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   os::join_thread(*reader);
   os::close_fd(pipe->in);
 
-  /* The drain has joined, so the captured bytes copy into the pool-backed result
-     on this thread alone. */
+  /* The drain has joined, so the captured bytes copy into the pool-backed
+     result on this thread alone. */
   if (drain_context.data != nullptr) {
     captured.append(StringView{drain_context.data, drain_context.length});
     std::free(drain_context.data);
@@ -477,7 +478,8 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   if (!pipe) throw Error{"Could not open a pipe for function substitution"};
 
   let captured = String{heap_allocator()};
-  let drain_context = command_substitution_drain_context{nullptr, 0, 0, pipe->in};
+  let drain_context =
+      command_substitution_drain_context{nullptr, 0, 0, pipe->in};
   let const reader =
       os::start_thread(drain_command_substitution_pipe, &drain_context);
   if (!reader) {
@@ -515,8 +517,8 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   os::join_thread(*reader);
   os::close_fd(pipe->in);
 
-  /* The drain has joined, so the captured bytes copy into the pool-backed result
-     on this thread alone. */
+  /* The drain has joined, so the captured bytes copy into the pool-backed
+     result on this thread alone. */
   if (drain_context.data != nullptr) {
     captured.append(StringView{drain_context.data, drain_context.length});
     std::free(drain_context.data);

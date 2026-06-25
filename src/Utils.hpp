@@ -34,13 +34,13 @@ fn find_pos_in_vec(const ArrayList<String> &suffixes,
                    StringView wanted) wontthrow -> Maybe<usize>;
 
 /* Expand a leading ~ or ~user prefix in a path to the home directory, the
-   lightweight form the analysis prepass and the highlighter share. None when the
-   path has no leading tilde or the named user has no home. */
+   lightweight form the analysis prepass and the highlighter share. None when
+   the path has no leading tilde or the named user has no home. */
 fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>;
 
 /* Quote an empty or control-byte-carrying value into the '' or $'...' ANSI-C
-   form the way printf %q and ${var@Q} share. Returns false when the value has no
-   control byte, so the caller applies its own non-control quoting. */
+   form the way printf %q and ${var@Q} share. Returns false when the value has
+   no control byte, so the caller applies its own non-control quoting. */
 fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool;
 
 fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws

@@ -330,7 +330,8 @@ static fn color_path_argument(usize word_start, StringView word,
     let const typed_prefix = word.substring_of_length(0, scan);
     let exists = false;
     if (has_tilde) {
-      if (Maybe<String> expanded = utils::expand_leading_tilde_path(typed_prefix);
+      if (Maybe<String> expanded =
+              utils::expand_leading_tilde_path(typed_prefix);
           expanded.has_value())
         exists = Path{expanded->view()}.exists();
     } else {

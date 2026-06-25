@@ -37,8 +37,8 @@ struct printf_number
 /* Parse the leading numeric prefix of a printf integer argument the way bash
    does, so '12abc' yields 12 while a base-zero 0x or a leading 0 still selects
    the base. is_valid is false when no digit is present or a byte follows the
-   number, a trailing space included, the case bash reports as an invalid number.
-   An argument that opens with a quote yields the next byte's code. */
+   number, a trailing space included, the case bash reports as an invalid
+   number. An argument that opens with a quote yields the next byte's code. */
 fn parse_printf_number(const String &arg) throws -> printf_number
 {
   if (!arg.is_empty() && (arg[0] == '\'' || arg[0] == '"'))
@@ -46,7 +46,8 @@ fn parse_printf_number(const String &arg) throws -> printf_number
             false};
 
   usize i = 0;
-  while (i < arg.count() && (arg[i] == ' ' || arg[i] == '\t')) i++;
+  while (i < arg.count() && (arg[i] == ' ' || arg[i] == '\t'))
+    i++;
   let const number_start = i;
   if (i < arg.count() && (arg[i] == '+' || arg[i] == '-')) i++;
 
@@ -58,11 +59,14 @@ fn parse_printf_number(const String &arg) throws -> printf_number
   if (is_hexadecimal) {
     i += 2;
     digit_start = i;
-    while (i < arg.count() && is_hex_digit(arg[i])) i++;
+    while (i < arg.count() && is_hex_digit(arg[i]))
+      i++;
   } else if (is_octal) {
-    while (i < arg.count() && arg[i] >= '0' && arg[i] <= '7') i++;
+    while (i < arg.count() && arg[i] >= '0' && arg[i] <= '7')
+      i++;
   } else {
-    while (i < arg.count() && arg[i] >= '0' && arg[i] <= '9') i++;
+    while (i < arg.count() && arg[i] >= '0' && arg[i] <= '9')
+      i++;
   }
   let const number_end = i;
 

@@ -502,9 +502,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
         const char field_modifier_op = name_end + 3 < segment_text.length
                                            ? segment_text[name_end + 3]
                                            : '\0';
-        /* The @op transform marker carries its letter one byte further. Only the
-           per-element value transforms map over an array, the whole-array A and
-           K forms fall through. */
+        /* The @op transform marker carries its letter one byte further. Only
+           the per-element value transforms map over an array, the whole-array A
+           and K forms fall through. */
         const char at_transform_op =
             field_modifier_op == '@' && name_end + 4 < segment_text.length
                 ? segment_text[name_end + 4]

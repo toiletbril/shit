@@ -1066,9 +1066,8 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
   if (WIFSIGNALED(status)) {
     const i32 sig = WTERMSIG(status);
     const char *sig_str = strsignal(sig);
-    const String sig_desc = (sig_str != nullptr)
-                                ? String{sig_str}
-                                : String{"Unknown"};
+    const String sig_desc =
+        (sig_str != nullptr) ? String{sig_str} : String{"Unknown"};
 
     /* A broken pipe is the normal way a producer ends once its consumer stops
        reading, such as seq into head, so it is reaped silently the way bash and
