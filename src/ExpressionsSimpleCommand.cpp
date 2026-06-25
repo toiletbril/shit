@@ -1277,6 +1277,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      command substitution proceed on the 127 the way a normal failing command
      drives them. The catch is narrow, so a real located error from elsewhere
      still aborts the command. */
+  /* $_ reads the last argument of the previous command, so it is captured here
+     before the argument vector moves into the exec context and set after the
+     command runs. */
+  let const last_argument =
+      program_args.is_empty() ? String{} : program_args.back();
+
   Maybe<ExecContext> resolved_ec;
   try {
     resolved_ec =
@@ -1323,6 +1329,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   was_redirect_in_fd_handed_off = true;
 
   const i64 ret = utils::execute_context(steal(ec), cxt, is_async());
+  cxt.set_last_argument(last_argument.view());
 
   /* An assignment builtin with NAME=(...) array arguments applies them after it
      runs, in the scope the builtin selects. local binds a local array, and a

@@ -578,6 +578,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return String{heap_allocator(),
                     utils::uint_to_text(m_positional_params.count())};
     case '0': return String{heap_allocator(), m_shell_name};
+    case '_': return String{heap_allocator(), m_last_argument.view()};
 
     case '*':
     case '@': {

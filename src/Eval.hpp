@@ -472,6 +472,12 @@ public:
   fn set_last_exit_status(i32 status) wontthrow -> void;
   pure fn last_exit_status() const wontthrow -> i32;
 
+  /* The last argument of the previous simple command, the value $_ reads. */
+  fn set_last_argument(StringView value) throws -> void
+  {
+    m_last_argument = String{value};
+  }
+
   /* The wall-clock nanoseconds the last top-level command took, for the \D
      prompt segment. */
   fn set_last_command_duration_ns(u64 nanos) wontthrow -> void;
@@ -1299,6 +1305,8 @@ protected:
 
   String m_shell_name{};
   String m_shell_executable_path{};
+  /* The last argument of the previous simple command, the value $_ reads. */
+  String m_last_argument{};
   String m_execution_string{};
   String m_current_command{};
   bool m_make_shell_suppressed{false};
