@@ -25,31 +25,61 @@ namespace shit {
 
 namespace {
 
-/* Parse one signed integer argument the way printf does, in base zero. A
-   leading 0x marks hexadecimal, otherwise the digits are decimal. An argument
-   that opens with a single or a double quote yields the char code of the byte
-   that follows, or zero when nothing follows, as POSIX specifies. A malformed
-   argument yields zero. */
-i64 parse_printf_integer(const String &arg) throws
+pure fn is_hex_digit(char c) wontthrow -> bool;
+
+struct printf_number
+{
+  i64 value;
+  bool is_valid;
+  bool is_hex;
+};
+
+/* Parse the leading numeric prefix of a printf integer argument the way bash
+   does, so '12abc' yields 12 while a base-zero 0x or a leading 0 still selects
+   the base. is_valid is false when no digit is present or a byte follows the
+   number, a trailing space included, the case bash reports as an invalid number.
+   An argument that opens with a quote yields the next byte's code. */
+fn parse_printf_number(const String &arg) throws -> printf_number
 {
   if (!arg.is_empty() && (arg[0] == '\'' || arg[0] == '"'))
-    return arg.count() > 1 ? static_cast<unsigned char>(arg[1]) : 0;
+    return {arg.count() > 1 ? static_cast<unsigned char>(arg[1]) : 0, true,
+            false};
 
-  usize first_digit = 0;
-  if (first_digit < arg.count() &&
-      (arg[first_digit] == '+' || arg[first_digit] == '-'))
-    first_digit++;
-  let const is_hexadecimal =
-      first_digit + 1 < arg.count() && arg[first_digit] == '0' &&
-      (arg[first_digit + 1] == 'x' || arg[first_digit + 1] == 'X');
-  /* A leading zero that is not 0x marks octal, as the C base-zero strtoll the
-     old code used did, so printf '%d' 010 yields 8. */
-  let const is_octal = !is_hexadecimal && first_digit < arg.count() &&
-                       arg[first_digit] == '0' && first_digit + 1 < arg.count();
-  let const parsed = is_hexadecimal ? utils::parse_hexadecimal_integer(arg)
-                     : is_octal     ? utils::parse_octal_integer(arg)
-                                    : utils::parse_decimal_integer(arg);
-  return parsed.is_error() ? 0 : parsed.value();
+  usize i = 0;
+  while (i < arg.count() && (arg[i] == ' ' || arg[i] == '\t')) i++;
+  let const number_start = i;
+  if (i < arg.count() && (arg[i] == '+' || arg[i] == '-')) i++;
+
+  let const is_hexadecimal = i + 1 < arg.count() && arg[i] == '0' &&
+                             (arg[i + 1] == 'x' || arg[i + 1] == 'X');
+  let const is_octal = !is_hexadecimal && i < arg.count() && arg[i] == '0' &&
+                       i + 1 < arg.count();
+  usize digit_start = i;
+  if (is_hexadecimal) {
+    i += 2;
+    digit_start = i;
+    while (i < arg.count() && is_hex_digit(arg[i])) i++;
+  } else if (is_octal) {
+    while (i < arg.count() && arg[i] >= '0' && arg[i] <= '7') i++;
+  } else {
+    while (i < arg.count() && arg[i] >= '0' && arg[i] <= '9') i++;
+  }
+  let const number_end = i;
+
+  let const number_text =
+      arg.view().substring_of_length(number_start, number_end - number_start);
+  let const parsed = is_hexadecimal
+                         ? utils::parse_hexadecimal_integer(number_text)
+                     : is_octal ? utils::parse_octal_integer(number_text)
+                                : utils::parse_decimal_integer(number_text);
+  let const has_digits = number_end > digit_start;
+  return {parsed.is_error() ? 0 : parsed.value(),
+          has_digits && number_end == arg.count(), is_hexadecimal};
+}
+
+i64 parse_printf_integer(const String &arg) throws
+{
+  return parse_printf_number(arg).value;
 }
 
 pure fn is_hex_digit(char c) wontthrow -> bool
@@ -256,8 +286,19 @@ void append_q_argument(String &out, const String &arg) throws
 
 /* Render one conversion through the C library, so a width or a precision in the
    specification is honored. */
+fn report_invalid_number(ExecContext &ec, const String &arg, bool is_hex,
+                         i32 &exit_status) throws -> void
+{
+  let message = String{"shit: printf: "};
+  message += arg.view();
+  message += is_hex ? ": invalid hex number\n" : ": invalid number\n";
+  ec.print_to_stderr(message.view());
+  exit_status = 1;
+}
+
 void append_conversion(String &out, const String &spec, char conv,
-                       const String &arg) throws
+                       const String &arg, ExecContext &ec,
+                       i32 &exit_status) throws
 {
   char buffer[256];
 
@@ -287,21 +328,27 @@ void append_conversion(String &out, const String &spec, char conv,
   case 'c': out += arg.is_empty() ? '\0' : arg[0]; break;
   case 'd':
   case 'i': {
+    let const number = parse_printf_number(arg);
+    if (!number.is_valid)
+      report_invalid_number(ec, arg, number.is_hex, exit_status);
     let const with_ll = spec + "lld";
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
-                  static_cast<long long>(parse_printf_integer(arg)));
+                  static_cast<long long>(number.value));
     out += buffer;
   } break;
   case 'x':
   case 'X':
   case 'o':
   case 'u': {
+    let const number = parse_printf_number(arg);
+    if (!number.is_valid)
+      report_invalid_number(ec, arg, number.is_hex, exit_status);
     String with_ll = spec + "ll";
     with_ll.push(conv);
     /* The unsigned conversions share the char-code and base parsing with the
        signed ones, so printf '%x' "'A" yields the char code the same way. */
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
-                  static_cast<unsigned long long>(parse_printf_integer(arg)));
+                  static_cast<unsigned long long>(number.value));
     out += buffer;
   } break;
   case 'f':
@@ -375,6 +422,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   };
 
   let out = String{};
+  i32 exit_status = 0;
   usize operand_index = 0;
   bool consumed_a_conversion = false;
   bool should_stop = false;
@@ -445,7 +493,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           if (spec == "%")
             out += formatted;
           else
-            append_conversion(out, spec, 's', formatted);
+            append_conversion(out, spec, 's', formatted, ec, exit_status);
           operand_index++;
           consumed_a_conversion = true;
           i = close + 1;
@@ -481,7 +529,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (should_stop) break;
         continue;
       }
-      append_conversion(out, spec, conv, arg);
+      append_conversion(out, spec, conv, arg, ec, exit_status);
       operand_index++;
       consumed_a_conversion = true;
     }
@@ -501,14 +549,14 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const subscript = target.substring_of_length(
           *open_bracket + 1, target.length - *open_bracket - 2);
       cxt.assign_array_element(array_name, subscript, out.view(), false);
-      return 0;
+      return exit_status;
     }
     cxt.set_shell_variable(target, out.view());
-    return 0;
+    return exit_status;
   }
 
   ec.print_to_stdout(out);
-  return 0;
+  return exit_status;
 }
 
 } // namespace shit
