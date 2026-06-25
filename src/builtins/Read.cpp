@@ -148,21 +148,67 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_shell_variable(do_operand_name(i), "");
     return 1;
   }
-  let const line = String{StringView{*read_line}};
+  /* Without -r a backslash escapes the next byte, so a backslash before the
+     line delimiter joins the next line and a backslash before any other byte
+     makes it a literal that no longer splits on IFS. The -r and -n forms keep
+     every byte. */
+  let accumulated = String{StringView{*read_line}};
+  let const should_process_escapes =
+      !FLAG_READ_RAW.is_enabled() && !FLAG_READ_NCHARS.is_set();
+  if (should_process_escapes) {
+    let do_trailing_backslash_count = [&accumulated]() -> usize {
+      usize backslash_count = 0;
+      while (backslash_count < accumulated.length() &&
+             accumulated[accumulated.length() - 1 - backslash_count] == '\\')
+        backslash_count++;
+      return backslash_count;
+    };
+    /* An odd run of trailing backslashes leaves one escaping the delimiter, so
+       the delimiter is dropped and the next line is read and appended. */
+    while (was_newline_terminated && do_trailing_backslash_count() % 2 == 1) {
+      accumulated.pop_back();
+      let const continued =
+          utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter);
+      if (!continued.has_value()) break;
+      accumulated.append(continued->view());
+    }
+  }
+
+  /* The de-escaped bytes pair with a mask marking which one came from a
+     backslash escape, so the splitter below keeps an escaped IFS byte inside
+     its field. The mask is all false in the raw forms. */
+  let line = String{};
+  let is_literal_byte = ArrayList<bool>{};
+  line.reserve(accumulated.length());
+  is_literal_byte.reserve(accumulated.length());
+  for (usize i = 0; i < accumulated.length(); i++) {
+    if (should_process_escapes && accumulated[i] == '\\') {
+      if (i + 1 >= accumulated.length()) break;
+      line.push(accumulated[i + 1]);
+      is_literal_byte.push(true);
+      i++;
+    } else {
+      line.push(accumulated[i]);
+      is_literal_byte.push(false);
+    }
+  }
 
   let const field_separators = cxt.get_variable_value("IFS").value_or(
       String{cxt.scratch_allocator(), " \t\n"});
-  let do_is_separator = [&field_separators](char c) {
-    return field_separators.find_character(c).has_value();
+  let do_is_separator = [&](usize i) {
+    return !is_literal_byte[i] &&
+           field_separators.find_character(line[i]).has_value();
   };
   /* POSIX folds an IFS whitespace run into a single delimiter, while each IFS
      non-whitespace character delimits one field on its own, so an empty field
      can sit between two non-whitespace delimiters. */
-  let do_is_ifs_whitespace = [&do_is_separator](char c) {
-    return (c == ' ' || c == '\t' || c == '\n') && do_is_separator(c);
+  let do_is_ifs_whitespace = [&](usize i) {
+    return !is_literal_byte[i] &&
+           (line[i] == ' ' || line[i] == '\t' || line[i] == '\n') &&
+           field_separators.find_character(line[i]).has_value();
   };
-  let do_is_ifs_nonwhitespace = [&](char c) {
-    return do_is_separator(c) && !do_is_ifs_whitespace(c);
+  let do_is_ifs_nonwhitespace = [&](usize i) {
+    return do_is_separator(i) && !do_is_ifs_whitespace(i);
   };
 
   /* read -a NAME splits the line into every field and stores them in the named
@@ -170,18 +216,18 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_READ_ARRAY.is_set()) {
     let words = ArrayList<String>{heap_allocator()};
     usize cursor = 0;
-    while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
+    while (cursor < line.length() && do_is_ifs_whitespace(cursor))
       cursor++;
     while (cursor < line.length()) {
       const usize start = cursor;
-      while (cursor < line.length() && !do_is_separator(line[cursor]))
+      while (cursor < line.length() && !do_is_separator(cursor))
         cursor++;
       words.push(String{line.substring_of_length(start, cursor - start)});
-      while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
+      while (cursor < line.length() && do_is_ifs_whitespace(cursor))
         cursor++;
-      if (cursor < line.length() && do_is_ifs_nonwhitespace(line[cursor])) {
+      if (cursor < line.length() && do_is_ifs_nonwhitespace(cursor)) {
         cursor++;
-        while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
+        while (cursor < line.length() && do_is_ifs_whitespace(cursor))
           cursor++;
       }
     }
@@ -192,7 +238,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   usize cursor = 0;
   /* Leading IFS whitespace before the first field is skipped and produces no
      empty field. */
-  while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
+  while (cursor < line.length() && do_is_ifs_whitespace(cursor))
     cursor++;
 
   for (usize i = 0; i < operand_count; i++) {
@@ -201,15 +247,17 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
          whitespace trimmed. A trailing non-whitespace IFS delimiter is kept,
          since dash leaves the empty field it introduces inside the remainder.
        */
-      let rest = String{line.substring(cursor)};
-      while (!rest.is_empty() && do_is_ifs_whitespace(rest.back()))
-        rest.pop_back();
-      cxt.set_shell_variable(do_operand_name(i), rest);
+      usize end_position = line.length();
+      while (end_position > cursor && do_is_ifs_whitespace(end_position - 1))
+        end_position--;
+      cxt.set_shell_variable(
+          do_operand_name(i),
+          line.substring_of_length(cursor, end_position - cursor));
       break;
     }
 
     let const start = cursor;
-    while (cursor < line.length() && !do_is_separator(line[cursor]))
+    while (cursor < line.length() && !do_is_separator(cursor))
       cursor++;
     cxt.set_shell_variable(do_operand_name(i),
                            line.substring_of_length(start, cursor - start));
@@ -217,11 +265,11 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     /* Consume one delimiter. A run of IFS whitespace folds to one, then an
        optional single non-whitespace IFS character, then trailing whitespace,
        so 'x : y' and 'x:y' both split into the same fields. */
-    while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
+    while (cursor < line.length() && do_is_ifs_whitespace(cursor))
       cursor++;
-    if (cursor < line.length() && do_is_ifs_nonwhitespace(line[cursor])) {
+    if (cursor < line.length() && do_is_ifs_nonwhitespace(cursor)) {
       cursor++;
-      while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
+      while (cursor < line.length() && do_is_ifs_whitespace(cursor))
         cursor++;
     }
   }
