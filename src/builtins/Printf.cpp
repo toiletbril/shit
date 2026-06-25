@@ -7,9 +7,6 @@
 #include <cstdlib>
 #include <cstring>
 
-/* Interprets a format string with the common conversions and backslash escapes,
-   recycling the format over any remaining arguments, like the POSIX utility. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-v var] format [argument ...]");

@@ -21,8 +21,8 @@ HELP_DESCRIPTION_DECL(
     "associative types.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
-/* The attribute letters are hand-parsed in execute, so these FLAG rows only
-   feed the help text and never the parser. */
+/* The FLAG rows feed only the help text. The attribute letters are hand-parsed
+   in execute. */
 FLAG(DECLARE_INDEXED, Bool, 'a', "", "Declare an indexed array.");
 FLAG(DECLARE_ASSOCIATIVE, Bool, 'A', "", "Declare an associative array.");
 FLAG(DECLARE_FUNCTIONS, Bool, 'f', "",

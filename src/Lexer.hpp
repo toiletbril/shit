@@ -41,8 +41,7 @@ pure fn is_special_parameter_char(char ch) wontthrow -> bool;
 
 } /* namespace lexer */
 
-/* Dumb note: Main idea is that none of the routines except
- * advance_past_last_peek(), skip_whitespace() and advance_forward() move
+/* Only advance_past_last_peek, skip_whitespace, and advance_forward move the
  * internal cursor. */
 class Lexer
 {

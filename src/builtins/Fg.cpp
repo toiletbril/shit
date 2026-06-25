@@ -56,7 +56,7 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return done_status;
   }
 
-  /* Resume a stopped job before waiting, so fg works after a Ctrl-Z. */
+  /* A stopped job cannot finish under the wait until it is resumed. */
   if (job->state == job::State::Stopped) {
     if (const Maybe<i32> cont = os::signal_number_from_name("CONT"))
       os::signal_process(job->pid, *cont);

@@ -36,9 +36,8 @@ pure fn Local::kind() const wontthrow -> Builtin::Kind { return Kind::Local; }
 
 fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  /* The attribute flags are read straight off the arguments rather than through
-     the shared flag parser, since that parser rejects an unknown letter and the
-     bash attribute letters are not declared as flags here. */
+  /* The bash attribute letters are read straight off the arguments. The shared
+     flag parser rejects an unknown letter. */
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 

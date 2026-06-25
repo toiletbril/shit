@@ -34,7 +34,6 @@ public:
     return m_reset_generation;
   }
 
-  /* Sum the live bump bytes across every block. */
   fn bytes_used() const wontthrow -> usize;
 
   /* The number of blocks the arena holds and the total bytes they reserve, read

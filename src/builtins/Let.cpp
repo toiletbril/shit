@@ -35,9 +35,8 @@ fn Let::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 1;
   }
 
-  /* Each argument is one expression, evaluated in order so an earlier
-     assignment is visible to a later one, and the last value decides the
-     status. */
+  /* An earlier assignment is visible to a later expression, since they evaluate
+     in order. */
   LOG(Debug, "let evaluating %zu arithmetic expressions",
       ec.args().count() - 1);
 

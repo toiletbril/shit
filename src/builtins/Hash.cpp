@@ -4,9 +4,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* hash -r forgets every cached command location so the next use re-resolves,
-   the way dash clears its command table. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-r] [name ...]");
