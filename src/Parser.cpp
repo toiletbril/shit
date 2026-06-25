@@ -93,13 +93,9 @@ is_list_terminator(const Token *token,
     -> bool
 {
   ASSERT(token != nullptr);
-  if (kind_in(token->kind(), terminators)) return true;
-  if (kind_in(Token::Kind::RightBracket, terminators) &&
-      is_brace_word(token, '}'))
-  {
-    return true;
-  }
-  return false;
+  return kind_in(token->kind(), terminators) ||
+         (kind_in(Token::Kind::RightBracket, terminators) &&
+          is_brace_word(token, '}'));
 }
 
 /* The byte location of the keyword as a whole word somewhere in the source. A

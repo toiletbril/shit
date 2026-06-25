@@ -1485,8 +1485,7 @@ hot forceinline fn Lexer::lex_process_substitution(char direction) throws
     -> Token *
 {
   let const open_position = m_cursor_position;
-  usize byte_count = 0;
-  byte_count += 2;
+  usize byte_count = 2;
 
   /* The direction byte leads the segment text so the evaluator knows the pipe
      direction without a second field. */

@@ -345,9 +345,7 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
     /* A leading '!' or '^' negates the class, mirroring the matcher which skips
        either one before it scans for the closing ']'. The prepass skipped only
        '^' before, so it rejected a form the matcher accepts. */
-    if (scan < bytes.count() &&
-        (bytes[scan].ch == '!' || bytes[scan].ch == '^'))
-    {
+    if (bytes[scan].ch == '!' || bytes[scan].ch == '^') {
       scan++;
     }
 
@@ -1634,10 +1632,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      see, so a constant survives across them. Every other command, including a
      function call, an unset, an export, or a command substitution argument,
      forgets the whole table. */
-  let const is_variable_neutral_builtin =
-      optimizer::command_is_environment_neutral(command_literal.view());
-
-  bool clears_constants = !is_variable_neutral_builtin;
+  bool clears_constants =
+      !optimizer::command_is_environment_neutral(command_literal.view());
   if (!clears_constants) {
     /* A command substitution runs arbitrary code, so even a neutral builtin
        carrying one forgets the table to stay conservative. */

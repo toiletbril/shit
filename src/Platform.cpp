@@ -1091,8 +1091,6 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
   } else {
     return WEXITSTATUS(status);
   }
-
-  unreachable();
 }
 
 fn reap_process_quietly(process pid) throws -> i32

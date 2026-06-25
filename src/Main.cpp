@@ -1123,10 +1123,8 @@ fn main(int argc, char **argv) -> int
   let positional_params = shit::ArrayList<shit::String>{};
 
   usize first_param_index = 0;
-  if (should_read_files && !file_names.is_empty()) {
-    shell_name = file_names[0].clone();
-    first_param_index = 1;
-  } else if (should_execute_commands && !file_names.is_empty()) {
+  if ((should_read_files || should_execute_commands) && !file_names.is_empty())
+  {
     shell_name = file_names[0].clone();
     first_param_index = 1;
   }

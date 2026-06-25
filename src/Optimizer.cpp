@@ -181,8 +181,7 @@ inline constexpr StaticStringMap<bool>::entry ENVIRONMENT_NEUTRAL_ENTRIES[] = {
 };
 
 inline constexpr StaticStringMap<bool> ENVIRONMENT_NEUTRAL_NAMES{
-    ENVIRONMENT_NEUTRAL_ENTRIES, sizeof(ENVIRONMENT_NEUTRAL_ENTRIES) /
-                                     sizeof(ENVIRONMENT_NEUTRAL_ENTRIES[0])};
+    ENVIRONMENT_NEUTRAL_ENTRIES, countof(ENVIRONMENT_NEUTRAL_ENTRIES)};
 
 } // namespace
 
