@@ -50,11 +50,13 @@ struct resolved_redirection
   i32 target_fd{-1};
   os::descriptor opened_fd{};
   i32 dup_from_fd{-1};
+  bool is_cached{false};
 };
 
 fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
                        SourceLocation fallback_location,
-                       bool *open_or_stage_failed = nullptr) throws
+                       bool *open_or_stage_failed = nullptr,
+                       bool allow_fd_memoization = false) throws
     -> resolved_redirection;
 
 /* What a loop does with the control flow pending after its body ran. */

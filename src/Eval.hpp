@@ -176,6 +176,19 @@ struct process_substitution_mark
   usize temp{0};
 };
 
+struct loop_redirect_fd
+{
+  i32 target_fd{-1};
+  os::file_open_mode mode{};
+  String path;
+  os::descriptor fd{};
+};
+
+struct loop_redirect_fd_mark
+{
+  usize count{0};
+};
+
 /* A shell descriptor a bare exec moved inside an in-process subshell, backed up
    so leave_subshell puts it back. The depth names the owning subshell. */
 struct subshell_saved_descriptor
@@ -1111,6 +1124,15 @@ public:
   fn cleanup_process_substitutions(process_substitution_mark mark) wontthrow
       -> void;
 
+  mustuse fn mark_loop_redirect_fds() const wontthrow -> loop_redirect_fd_mark;
+  fn cleanup_loop_redirect_fds(loop_redirect_fd_mark mark) wontthrow -> void;
+  mustuse fn find_loop_redirect_fd(i32 target_fd, const String &path,
+                                   os::file_open_mode mode) const wontthrow
+      -> Maybe<os::descriptor>;
+  fn retain_loop_redirect_fd(i32 target_fd, const String &path,
+                             os::file_open_mode mode, os::descriptor fd) throws
+      -> void;
+
   /* Run a parsed inner command under the substitution machinery, capturing its
      stdout and snapshotting state so a cd or an assignment inside does not
      leak. Both capture overloads share this once they hold an AST. */
@@ -1342,6 +1364,7 @@ protected:
      read by path, deleted once that command finishes. Empty and free on a
      platform that reaps a child and a pipe instead, such as POSIX. */
   os::TempFileSet m_substitution_temp_files{};
+  ArrayList<loop_redirect_fd> m_loop_redirect_fds{heap_allocator()};
 
   /* The nesting depth of dot-source and eval runs, and of function calls, each
      bounded so a runaway recursion errors with a located message rather than

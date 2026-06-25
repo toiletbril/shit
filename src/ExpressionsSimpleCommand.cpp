@@ -341,8 +341,8 @@ static fn redirection_open_mode(Redirection::Kind kind,
    so a duplication-resolve or a word-expansion error stays fatal. */
 fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
                        SourceLocation fallback_location,
-                       bool *open_or_stage_failed) throws
-    -> resolved_redirection
+                       bool *open_or_stage_failed,
+                       bool allow_fd_memoization) throws -> resolved_redirection
 {
   if (redir.kind == Redirection::Kind::Heredoc ||
       redir.kind == Redirection::Kind::HereString)
@@ -414,6 +414,17 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
   let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
 
   const String &target_path = target[0];
+
+  const bool should_memoize_append = allow_fd_memoization &&
+                                     mode == os::file_open_mode::Append &&
+                                     cxt.loop_depth() > 0;
+  if (should_memoize_append) {
+    let cached = cxt.find_loop_redirect_fd(redir.fd, target_path, mode);
+    if (cached.has_value())
+      return resolved_redirection{redirection_outcome::OpenedFile, redir.fd,
+                                  cached.value(), -1, /*is_cached=*/true};
+  }
+
   let opened = os::open_file_descriptor(target_path, mode);
   if (!opened) {
     if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
@@ -421,8 +432,16 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
                             "Could not open '" + target_path +
                                 "': " + os::last_system_error_message()};
   }
+
+  let const file_fd = opened.take();
+  if (should_memoize_append) {
+    cxt.retain_loop_redirect_fd(redir.fd, target_path, mode, file_fd);
+    return resolved_redirection{redirection_outcome::OpenedFile, redir.fd,
+                                file_fd, -1, /*is_cached=*/true};
+  }
+
   return resolved_redirection{redirection_outcome::OpenedFile, redir.fd,
-                              opened.take(), -1};
+                              file_fd, -1, /*is_cached=*/false};
 }
 
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,
@@ -680,7 +699,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   try {
     for (let const &redir : m_redirections) {
       let const r = resolve_redirection(redir, cxt, source_location(),
-                                        &did_redirection_open_fail);
+                                        &did_redirection_open_fail,
+                                        /*allow_fd_memoization=*/!is_bare_exec);
       switch (r.kind) {
       case redirection_outcome::Heredoc: {
         const os::descriptor body_fd = r.opened_fd;
@@ -892,7 +912,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         } else {
           dup_saved_descriptors.push(
               os::save_and_replace_descriptor(redir.fd, file_fd));
-          os::close_fd(file_fd);
+          if (!r.is_cached) os::close_fd(file_fd);
         }
         break;
       }

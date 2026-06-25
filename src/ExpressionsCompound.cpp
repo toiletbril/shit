@@ -530,8 +530,8 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
         break;
       }
       /* A command-less stage of bare assignments keeps the fast path, whose
-         empty-expansion check reports it, so the strict diagnostic for x=1 | cat
-         is preserved. */
+         empty-expansion check reports it, so the strict diagnostic for x=1 |
+         cat is preserved. */
       const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
       if (!simple->local_vars().is_empty() && !simple->args().is_empty()) {
         found_compound_stage = true;
@@ -920,6 +920,9 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
 
+  let const redirect_fd_mark = cxt.mark_loop_redirect_fds();
+  defer { cxt.cleanup_loop_redirect_fds(redirect_fd_mark); };
+
   i64 ret = 0;
   loop
   {
@@ -1036,6 +1039,9 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
+
+  let const redirect_fd_mark = cxt.mark_loop_redirect_fds();
+  defer { cxt.cleanup_loop_redirect_fds(redirect_fd_mark); };
 
   i64 ret = 0;
   bool should_reprint_menu = true;
@@ -1165,6 +1171,9 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
+
+  let const redirect_fd_mark = cxt.mark_loop_redirect_fds();
+  defer { cxt.cleanup_loop_redirect_fds(redirect_fd_mark); };
 
   i64 ret = 0;
   for (let const &value : values) {
