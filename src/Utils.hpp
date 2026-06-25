@@ -33,6 +33,11 @@ inline fn merge_args_to_string(const ArrayList<String> &args) throws -> String
 fn find_pos_in_vec(const ArrayList<String> &suffixes,
                    StringView wanted) wontthrow -> Maybe<usize>;
 
+/* Expand a leading ~ or ~user prefix in a path to the home directory, the
+   lightweight form the analysis prepass and the highlighter share. None when the
+   path has no leading tilde or the named user has no home. */
+fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>;
+
 fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     -> i32;
 

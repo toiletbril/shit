@@ -22,21 +22,6 @@ namespace completion {
    valid until the editor drains it. */
 static BumpArena HIGHLIGHT_ARENA{};
 
-/* None when the path names a user with no home. */
-static fn expand_command_tilde(StringView word) throws -> Maybe<String>
-{
-  if (word.is_empty() || word[0] != '~') return None;
-  let const slash = word.find_character('/');
-  let const user = slash.has_value() ? word.substring_of_length(1, *slash - 1)
-                                     : word.substring(1);
-  let home =
-      user.is_empty() ? os::get_home_directory() : os::get_home_for_user(user);
-  if (!home.has_value()) return None;
-  let expanded = home->clone();
-  if (slash.has_value()) expanded.push_component(word.substring(*slash + 1));
-  return String{expanded.text().view()};
-}
-
 /* The PATH search verdicts first_word_resolves caches, keyed by the word and
    dropped when PATH changes. */
 static String CACHED_PATH_VERDICT_PATH{};
@@ -55,7 +40,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   if (word.find_character('/').has_value()) {
     let expanded = String{word};
     if (!word.is_empty() && word[0] == '~') {
-      if (Maybe<String> home_expanded = expand_command_tilde(word))
+      if (Maybe<String> home_expanded = utils::expand_leading_tilde_path(word))
         expanded = steal(*home_expanded);
       else
         return false;
@@ -249,7 +234,7 @@ static fn word_names_existing_path(StringView word) throws -> bool
      keystroke. */
   if (word[0] == '-') return false;
   if (word[0] == '~') {
-    if (Maybe<String> expanded = expand_command_tilde(word);
+    if (Maybe<String> expanded = utils::expand_leading_tilde_path(word);
         expanded.has_value())
       return Path{expanded->view()}.exists();
     return false;
@@ -270,7 +255,7 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
   if (existing_end > 0) {
     let const prefix = word.substring_of_length(0, existing_end);
     if (has_tilde) {
-      if (Maybe<String> expanded = expand_command_tilde(prefix))
+      if (Maybe<String> expanded = utils::expand_leading_tilde_path(prefix))
         directory = steal(*expanded);
       else
         return false;
@@ -345,7 +330,7 @@ static fn color_path_argument(usize word_start, StringView word,
     let const typed_prefix = word.substring_of_length(0, scan);
     let exists = false;
     if (has_tilde) {
-      if (Maybe<String> expanded = expand_command_tilde(typed_prefix);
+      if (Maybe<String> expanded = utils::expand_leading_tilde_path(typed_prefix);
           expanded.has_value())
         exists = Path{expanded->view()}.exists();
     } else {

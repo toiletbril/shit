@@ -864,6 +864,22 @@ fn find_pos_in_vec(const ArrayList<String> &suffixes,
   return None;
 }
 
+fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>
+{
+  if (name.is_empty() || name[0] != '~') return None;
+
+  let const slash = name.find_character('/');
+  let const user = slash.has_value() ? name.substring_of_length(1, *slash - 1)
+                                     : name.substring(1);
+  Maybe<Path> home =
+      user.is_empty() ? os::get_home_directory() : os::get_home_for_user(user);
+  if (!home.has_value()) return None;
+
+  let expanded = *home;
+  if (slash.has_value()) expanded.push_component(name.substring(*slash + 1));
+  return String{expanded.text().view()};
+}
+
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
 static pure fn is_glob_char_active(const ArrayList<bool> &glob_active,
