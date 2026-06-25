@@ -123,7 +123,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
 
   /* The first byte is the direction marker the lexer wrote. */
   const char direction = text[0];
-  const bool command_writes_the_pipe = direction == '<';
+  let const command_writes_the_pipe = direction == '<';
   LOG(Debug, "setting up a process substitution where the command %s the pipe",
       command_writes_the_pipe ? "writes" : "reads");
 
@@ -180,12 +180,11 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
 
   /* The kept end must survive an exec so the consuming command inherits it and
      a read of /dev/fd/N reaches this pipe. */
-  const os::descriptor shell_fd =
-      command_writes_the_pipe ? pipe->in : pipe->out;
+  let const shell_fd = command_writes_the_pipe ? pipe->in : pipe->out;
   os::close_fd(command_writes_the_pipe ? pipe->out : pipe->in);
   os::make_fd_inheritable(shell_fd);
   let const location = m_current_location;
-  const StringView source =
+  let const source =
       m_current_source != nullptr ? m_current_source->view() : StringView{};
   m_pending_process_substitutions.push(
       process_substitution{shell_fd, child, location, source});
@@ -225,7 +224,7 @@ fn EvalContext::cleanup_process_substitutions(
          mode. */
       if (!is_bash_compatible()) {
         try {
-          const String text =
+          let const text =
               "A process substitution child could not be reaped. " +
               e.message();
           show_message(sub.source.is_empty()
@@ -241,8 +240,8 @@ fn EvalContext::cleanup_process_substitutions(
                  "swallowed");
       if (!is_bash_compatible()) {
         try {
-          const StringView text =
-              "A process substitution child could not be reaped.";
+          let const text =
+              StringView{"A process substitution child could not be reaped."};
           show_message(sub.source.is_empty()
                            ? Warning{text}.to_string()
                            : WarningWithLocation{sub.location, text}.to_string(

@@ -137,10 +137,11 @@ static pure fn is_unmatched_closing_paren(StringView line,
 {
   usize depth = 0;
   for (usize k = 0; k < position; k++) {
-    if (line[k] == '(')
+    if (line[k] == '(') {
       depth++;
-    else if (line[k] == ')' && depth > 0)
+    } else if (line[k] == ')' && depth > 0) {
       depth--;
+    }
   }
   return depth == 0;
 }
@@ -263,8 +264,9 @@ static pure fn is_in_command_position(StringView line,
     if (i == 0) return true;
     if (is_command_separator(line[i - 1])) return true;
     /* A case pattern's closing paren opens the arm's body. */
-    if (line[i - 1] == ')' && is_unmatched_closing_paren(line, i - 1))
+    if (line[i - 1] == ')' && is_unmatched_closing_paren(line, i - 1)) {
       return true;
+    }
     /* A transparent keyword prefix is stepped over, the word after time or ! is
        still a command word. */
     let word_start = i;

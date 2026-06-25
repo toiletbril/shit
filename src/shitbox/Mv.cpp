@@ -51,7 +51,7 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
   i32 status = 0;
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
-    String target{destination};
+    let target = String{destination};
     if (destination_is_directory)
       target = PathBuilder{destination}
                    .append(Path{source}.filename())

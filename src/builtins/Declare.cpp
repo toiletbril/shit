@@ -190,8 +190,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         line += ")\n";
         ec.print_to_stdout(line.view());
       } else if (cxt.is_associative_array(name)) {
-        const ArrayList<String> keys = cxt.associative_keys(name);
-        const ArrayList<String> values = cxt.associative_values(name);
+        let const keys = cxt.associative_keys(name);
+        let const values = cxt.associative_values(name);
         let line = String{"declare -A"};
         if (cxt.is_integer_variable(name)) line += 'i';
         line += ' ';

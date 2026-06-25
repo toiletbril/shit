@@ -26,7 +26,7 @@ fn EvalContext::register_function(StringView name, const Expression *body,
   info.body_start_position = body_start_position;
   info.header_length = name.length + StringView{" () \n"}.length;
   if (m_current_source != nullptr && !definition_text.is_empty()) {
-    const usize body_line =
+    let const body_line =
         utils::line_number_at(m_current_source->view(), body_start_position);
     info.line_offset = body_line > 2 ? body_line - 2 : 0;
   }

@@ -73,7 +73,7 @@ static fn names_root_directory(StringView operand) wontthrow -> bool
 
 Rm::Rm() = default;
 
-pure Utility::Kind Rm::kind() const wontthrow { return Kind::Rm; }
+pure fn Rm::kind() const wontthrow -> Utility::Kind { return Kind::Rm; }
 
 fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32

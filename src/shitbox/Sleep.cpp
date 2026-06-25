@@ -48,8 +48,8 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    const String number{duration};
-    const char *start = number.c_str();
+    let const number = String{duration};
+    let const start = number.c_str();
     char *end = nullptr;
     let const seconds_value = std::strtod(start, &end);
 
@@ -57,7 +57,7 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
        sleep takes, so a duration is rejected unless it parsed a finite,
        non-negative decimal number. A nan compares false against zero, so it
        needs the explicit finite check rather than the sign test alone. */
-    const char *digits = start;
+    let digits = start;
     if (*digits == '+' || *digits == '-') digits++;
     const bool is_hex_prefix =
         digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X');

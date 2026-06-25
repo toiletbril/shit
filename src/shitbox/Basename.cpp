@@ -41,7 +41,7 @@ fn Basename::execute(const ExecContext &ec, EvalContext &cxt,
   /* The path is held in a named local so its filename view does not dangle
      past a temporary. */
   let const path = Path{operands[0].view()};
-  StringView name = path.filename();
+  let name = path.filename();
   if (operands.count() > 1) {
     let const suffix = operands[1].view();
     if (suffix.length < name.length &&

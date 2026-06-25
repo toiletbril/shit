@@ -109,7 +109,7 @@ struct conditional_evaluator
         throw relocate_error(err, e.word->source_location());
       }
     }
-    String raw =
+    let raw =
         e.word != nullptr ? e.word->raw_string() : String{heap_allocator()};
     for (usize i = 0; i < raw.count(); i++)
       active.push(true);

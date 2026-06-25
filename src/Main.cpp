@@ -737,8 +737,9 @@ fn main(int argc, char **argv) -> int
     for (usize i = 0; i < invocation.length; i++)
       if (invocation[i] == '/') basename_start = i + 1;
     invocation = invocation.substring(basename_start);
-    if (!invocation.is_empty() && invocation[0] == '-')
+    if (!invocation.is_empty() && invocation[0] == '-') {
       invocation = invocation.substring(1);
+    }
 
     if (shit::shitbox::find_util(invocation).has_value()) {
       LOG(Info, "acting as the shitbox utility '%.*s' from argv[0]",

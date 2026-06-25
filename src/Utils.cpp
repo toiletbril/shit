@@ -1098,7 +1098,7 @@ constexpr StaticStringMap<posix_class_test> POSIX_CLASSES{
 
 /* Whether the byte belongs to the named class. An unknown name matches
    nothing, the way bash treats a class it does not know. */
-bool byte_is_in_posix_class(StringView class_name, u8 byte) throws
+fn byte_is_in_posix_class(StringView class_name, u8 byte) throws -> bool
 {
   if (const Maybe<posix_class_test> test = POSIX_CLASSES.find(class_name);
       test.has_value())

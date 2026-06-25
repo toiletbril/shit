@@ -144,7 +144,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
   for (const String &element : elements) {
     StringView subscript;
     StringView value;
-    usize index = running_index;
+    let index = running_index;
     if (parse_explicit_array_index(element.view(), subscript, value)) {
       index = static_cast<usize>(evaluate_arithmetic(subscript));
       set_array_element(name, index, value);

@@ -54,21 +54,21 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      print. When time is the shell's final command the tail-exec optimization
      would replace the shell process with the command and the report would never
      run, so the flag is cleared around the run and restored after. */
-  const bool saved_terminal_exec = cxt.terminal_exec_allowed();
+  let const saved_terminal_exec = cxt.terminal_exec_allowed();
   cxt.set_terminal_exec_allowed(false);
   defer { cxt.set_terminal_exec_allowed(saved_terminal_exec); };
 
-  const u64 start_nanos = os::monotonic_nanos();
+  let const start_nanos = os::monotonic_nanos();
 
-  const i32 status = cxt.run_source(command, "time", false,
+  let const status = cxt.run_source(command, "time", false,
                                     ec.source_location(), StringView{"time"});
 
-  const u64 elapsed_nanos = os::monotonic_nanos() - start_nanos;
+  let const elapsed_nanos = os::monotonic_nanos() - start_nanos;
 
   double user_after = 0, system_after = 0;
   os::children_cpu_seconds(user_after, system_after);
 
-  const double real_seconds = static_cast<double>(elapsed_nanos) / 1000000000.0;
+  let const real_seconds = static_cast<double>(elapsed_nanos) / 1000000000.0;
   const double user_cpu = user_after - user_before;
   const double system_cpu = system_after - system_before;
 

@@ -115,7 +115,7 @@ fn EvalContext::format_done_job_notifications(StringView line_ending) throws
 
   let out = String{};
   for (usize i = 0; i < m_jobs.count(); i++) {
-    const job &job = m_jobs[i];
+    let const &job = m_jobs[i];
     if (job.state != job::State::Done) continue;
 
     /* The bash current-job marker, '+' for the last entry and '-' for the one

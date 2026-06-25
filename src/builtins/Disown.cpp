@@ -64,7 +64,7 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (names.count() <= 1) {
-    const job *job = cxt.most_recent_job();
+    let const job = cxt.most_recent_job();
     if (job == nullptr) throw Error{"There is no such job"};
     cxt.remove_job(job->id);
     return 0;

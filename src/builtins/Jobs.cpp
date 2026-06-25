@@ -115,7 +115,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   cxt.update_jobs();
 
   let const may_color = may_color_jobs(cxt);
-  const ArrayList<job> &jobs = cxt.jobs();
+  let const &jobs = cxt.jobs();
 
   LOG(Debug, "jobs listing %zu registered jobs", jobs.count());
 
@@ -143,7 +143,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let out = String{};
   for (let index : selected) {
-    const job &job = jobs[index];
+    let const &job = jobs[index];
 
     if (FLAG_JOBS_RUNNING.is_enabled() && job.state != job::State::Running)
       continue;

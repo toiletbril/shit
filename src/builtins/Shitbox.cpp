@@ -54,7 +54,7 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      can read the set without parsing the help text. */
   if (ec.args().count() >= 2 && ec.args()[1] == "--list") {
     let names_output = String{};
-    for (const String &name : sorted_names) {
+    for (let const &name : sorted_names) {
       names_output += name.view();
       names_output += '\n';
     }
@@ -86,7 +86,7 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     i32 status = 0;
-    for (const String &name : sorted_names) {
+    for (let const &name : sorted_names) {
       let link = Path{ec.args()[2].view()};
       link.push_component(name.view());
       /* A re-run refreshes the install, so an existing symlink is removed
@@ -117,7 +117,7 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     listing += "\nUTILITIES\n";
 
     let joined_names = String{};
-    for (const String &name : sorted_names) {
+    for (let const &name : sorted_names) {
       if (!joined_names.is_empty()) joined_names += ", ";
       joined_names += name.view();
     }

@@ -253,10 +253,12 @@ private:
       let const left = 2 * root + 1;
       let const right = 2 * root + 2;
 
-      if (left < heap_length && is_less(m_data[largest], m_data[left]))
+      if (left < heap_length && is_less(m_data[largest], m_data[left])) {
         largest = left;
-      if (right < heap_length && is_less(m_data[largest], m_data[right]))
+      }
+      if (right < heap_length && is_less(m_data[largest], m_data[right])) {
         largest = right;
+      }
 
       if (largest == root) break;
 
