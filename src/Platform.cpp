@@ -190,8 +190,6 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
     dup2(saved.saved, saved.shell_fd);
     close(saved.saved);
   } else {
-    /* The descriptor was not open before, so close the one the redirection
-       opened on it. */
     close(saved.shell_fd);
   }
 }
