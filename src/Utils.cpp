@@ -1838,7 +1838,7 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
   for (let const &builtin : builtin_names())
     do_consider(builtin.view());
   if (MAYBE_PATH.has_value()) {
-    for (let const &dir_string : split_path_dirs(*MAYBE_PATH)) {
+    for (let const &dir_string : path_dirs()) {
       if (Maybe<ArrayList<String>> entries =
               Path::read_directory(Path{dir_string.view()}))
       {
