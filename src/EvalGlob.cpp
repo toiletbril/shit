@@ -535,6 +535,7 @@ fn EvalContext::expand_glob_lenient(StringView pattern) throws
 
   let field = glob_field{scratch};
   field.text.append(pattern);
+  field.glob_active.reserve(pattern.length);
   for (usize i = 0; i < pattern.length; i++)
     field.glob_active.push(true);
 

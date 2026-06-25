@@ -151,7 +151,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      line delimiter joins the next line and a backslash before any other byte
      makes it a literal that no longer splits on IFS. The -r and -n forms keep
      every byte. */
-  let accumulated = String{StringView{*read_line}};
+  let accumulated = String{read_line->view()};
   let const should_process_escapes =
       !FLAG_READ_RAW.is_enabled() && !FLAG_READ_NCHARS.is_set();
   if (should_process_escapes) {

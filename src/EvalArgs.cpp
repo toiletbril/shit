@@ -448,7 +448,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         }
         /* An assignment as an argument, like echo k=$v, is an ordinary word
            rebuilt so the value still expands. */
-        let key_literal = String{StringView{assignment_token->key()}};
+        let key_literal = String{assignment_token->key().view()};
         if (assignment_token->is_append()) key_literal += "+";
         key_literal += "=";
         fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,

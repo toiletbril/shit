@@ -130,7 +130,7 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter);
     if (!read) break;
 
-    let element = String{StringView{*read}};
+    let element = String{read->view()};
     if (!should_strip_newline && was_newline_terminated)
       element.push(delimiter);
     lines.push(steal(element));

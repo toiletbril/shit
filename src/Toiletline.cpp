@@ -582,10 +582,9 @@ static fn prompt_hostname(bool need_full) throws -> String
   String host = os::get_hostname().value_or(
       os::get_environment_variable("HOSTNAME").value_or("localhost"));
   if (need_full) return host;
-  usize dot_index = 0;
-  while (dot_index < host.length() && host.view()[dot_index] != '.')
-    dot_index++;
-  return String{host.view().substring_of_length(0, dot_index)};
+  let const dot = host.view().find_character('.');
+  return String{
+      host.view().substring_of_length(0, dot.value_or(host.length()))};
 }
 
 /* Collapse a leading home directory to ~ the way bash does, only when the home
@@ -595,12 +594,15 @@ static fn collapse_home_prefix(StringView path) throws -> String
 {
   let shown = String{path};
   Maybe<Path> home = os::get_home_directory();
-  if (home && shown.starts_with(home->text()) &&
-      (shown.length() == home->count() || shown.view()[home->count()] == '/'))
+  if (!home.has_value()) return shown;
+
+  let const home_length = home->count();
+  if (shown.starts_with(home->text()) &&
+      (shown.length() == home_length || shown.view()[home_length] == '/'))
   {
     let collapsed = String{};
     collapsed += "~";
-    collapsed += shown.substring(home->count());
+    collapsed += shown.substring(home_length);
     shown = steal(collapsed);
   }
   return shown;

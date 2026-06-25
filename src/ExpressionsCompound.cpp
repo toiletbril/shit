@@ -1063,7 +1063,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       break;
     }
 
-    let const reply = String{StringView{*input}};
+    let const &reply = *input;
     LOG(All, "the select prompt read the reply '%s'", reply.c_str());
     cxt.set_shell_variable("REPLY", reply.view());
     if (reply.is_empty()) {

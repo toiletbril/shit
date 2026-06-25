@@ -251,9 +251,9 @@ fn get_current_user() throws -> Maybe<String>
   /* The name comes from the environment rather than getpwuid, which a static
      build cannot call without pulling in the runtime glibc NSS modules. */
   if (const char *name = std::getenv("LOGNAME"); name != nullptr)
-    return String{StringView{name}};
+    return String{name};
   if (const char *name = std::getenv("USER"); name != nullptr)
-    return String{StringView{name}};
+    return String{name};
 
   /* A container that exports neither leaves the environment bare, so the name
      is read from /etc/passwd by the current uid. getuid is a plain syscall, so
@@ -278,7 +278,7 @@ fn get_hostname() throws -> Maybe<String>
   if (gethostname(buffer, sizeof(buffer)) != 0) return shit::None;
   buffer[sizeof(buffer) - 1] = '\0';
 
-  return String{StringView{buffer}};
+  return String{buffer};
 }
 
 fn get_home_directory() throws -> Maybe<Path>
@@ -380,7 +380,7 @@ fn make_fd_inheritable(descriptor fd) wontthrow -> void
 #if SHIT_PLATFORM_ISNT COSMO
 const ArrayList<String> OMITTED_SUFFIXES = []() {
   ArrayList<String> suffixes{};
-  suffixes.push(String{StringView{""}});
+  suffixes.push(String{});
   return suffixes;
 }();
 
@@ -397,7 +397,7 @@ fn get_environment_variable(StringView key) throws -> Maybe<String>
       static_cast<int>(key.length), key.data);
   const String key_string{key};
   const char *e = std::getenv(key_string.c_str());
-  if (e != nullptr) return String{StringView{e}};
+  if (e != nullptr) return String{e};
   return shit::None;
 }
 
@@ -462,7 +462,7 @@ cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
     String msg{};
     msg += program_path.text();
     msg += ": ";
-    msg += String{StringView{strerror(spawn_error)}};
+    msg += String{strerror(spawn_error)};
     msg += '\n';
     (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
     /* The program was resolved but could not be executed, so bash exits 126,
@@ -1067,8 +1067,8 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
     const i32 sig = WTERMSIG(status);
     const char *sig_str = strsignal(sig);
     const String sig_desc = (sig_str != nullptr)
-                                ? String{StringView{sig_str}}
-                                : String{StringView{"Unknown"}};
+                                ? String{sig_str}
+                                : String{"Unknown"};
 
     /* A broken pipe is the normal way a producer ends once its consumer stops
        reading, such as seq into head, so it is reaped silently the way bash and
@@ -1240,7 +1240,7 @@ hot fn make_os_args(const ArrayList<String> &args) throws -> os_args
 
 cold fn last_system_error_message() throws -> String
 {
-  return String{StringView{strerror(errno)}};
+  return String{strerror(errno)};
 }
 
 static fn make_sigset_impl(int first, ...) wontthrow -> sigset_t
@@ -2414,7 +2414,7 @@ fn get_environment_variable(StringView key) -> Maybe<String>
   char buffer[WIN32_MAX_ENV_SIZE] = {0};
   if (GetEnvironmentVariableA(key_string.c_str(), buffer, sizeof(buffer)) == 0)
     return shit::None;
-  return String{StringView{buffer}};
+  return String{buffer};
 }
 
 fn set_environment_variable(StringView key, StringView value) -> void
@@ -3333,7 +3333,7 @@ fn current_executable_path() wontthrow -> Maybe<String>
   char module_path[MAX_PATH];
   if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
     return shit::None;
-  return String{StringView{module_path}};
+  return String{module_path};
 }
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
@@ -3417,7 +3417,7 @@ fn enumerate_processes(bool include_resource_stats) throws
   do {
     process_entry process{};
     process.pid = static_cast<i64>(entry.th32ProcessID);
-    process.name = String{StringView{entry.szExeFile}};
+    process.name = String{entry.szExeFile};
     /* The snapshot exposes the executable name rather than the full argument
        vector, so the command line stands in as that name. */
     process.command_line = process.name.clone();
@@ -3441,7 +3441,7 @@ namespace os {
 const ArrayList<String> OMITTED_SUFFIXES = []() {
   ArrayList<String> suffixes{};
   for (const char *suffix : {"", ".exe", ".com", ".scr", ".bat"})
-    suffixes.push(String{StringView{suffix}});
+    suffixes.push(String{suffix});
   return suffixes;
 }();
 

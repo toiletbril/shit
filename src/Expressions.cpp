@@ -356,15 +356,10 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
        are accepted the way the matcher accepts them. A '[' with no reachable
        ']' at all, such as [abc, stays the unterminated class the matcher's
        caller rejects. */
-    bool has_closing_bracket = false;
-    for (; scan < bytes.count(); scan++) {
-      if (bytes[scan].ch == ']') {
-        has_closing_bracket = true;
-        break;
-      }
-    }
+    for (; scan < bytes.count(); scan++)
+      if (bytes[scan].ch == ']') break;
 
-    if (!has_closing_bracket) return true;
+    if (scan == bytes.count()) return true;
 
     position = scan + 1;
   }
