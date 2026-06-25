@@ -231,24 +231,24 @@ pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
 {
   /* The shopt names bash ships enabled. globstar stays off the way bash ships
      it. */
-  static const StringView DEFAULT_ON_SHOPT_NAMES[] = {
-      "progcomp",
-      "promptvars",
-      "sourcepath",
-      "extquote",
-      "complete_fullquote",
-      "hostcomplete",
-      "cmdhist",
-      "checkwinsize",
-      "force_fignore",
-      "globasciiranges",
-      "globskipdots",
-      "expand_aliases",
-      "interactive_comments",
+  static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
+      {SSK("progcomp"),             true},
+      {SSK("promptvars"),           true},
+      {SSK("sourcepath"),           true},
+      {SSK("extquote"),             true},
+      {SSK("complete_fullquote"),   true},
+      {SSK("hostcomplete"),         true},
+      {SSK("cmdhist"),              true},
+      {SSK("checkwinsize"),         true},
+      {SSK("force_fignore"),        true},
+      {SSK("globasciiranges"),      true},
+      {SSK("globskipdots"),         true},
+      {SSK("expand_aliases"),       true},
+      {SSK("interactive_comments"), true},
   };
-  for (const StringView default_name : DEFAULT_ON_SHOPT_NAMES)
-    if (name == default_name) return true;
-  return false;
+  static constexpr StaticStringMap<bool> DEFAULT_ON_SHOPT_NAMES{
+      ENTRIES, countof(ENTRIES)};
+  return DEFAULT_ON_SHOPT_NAMES.find(name).has_value();
 }
 
 fn EvalContext::run_source(StringView source, StringView origin,
