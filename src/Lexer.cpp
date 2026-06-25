@@ -1363,7 +1363,7 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
   } break;
   /* clang-format on */
 
-  if (const let op = lookup_operator(ch)) {
+  if (const let op = lookup_operator(ch); op.has_value()) {
     switch (*op) {
       TOKEN_CASE_ONE(RightParen);
       TOKEN_CASE_ONE(LeftParen);

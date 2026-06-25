@@ -163,22 +163,58 @@ public:
     return false;
   }
 
-  pure bool is_unary_operator(const String &s) const wontthrow
+  pure fn is_unary_operator(const String &s) const wontthrow -> bool
   {
-    return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
-           s == "-s" || s == "-r" || s == "-w" || s == "-x" || s == "-L" ||
-           s == "-h" || s == "-b" || s == "-c" || s == "-p" || s == "-S" ||
-           s == "-g" || s == "-u" || s == "-k" || s == "-O" || s == "-G" ||
-           s == "-t";
+    static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
+        {SSK("-z"), true},
+        {SSK("-n"), true},
+        {SSK("-e"), true},
+        {SSK("-f"), true},
+        {SSK("-d"), true},
+        {SSK("-s"), true},
+        {SSK("-r"), true},
+        {SSK("-w"), true},
+        {SSK("-x"), true},
+        {SSK("-L"), true},
+        {SSK("-h"), true},
+        {SSK("-b"), true},
+        {SSK("-c"), true},
+        {SSK("-p"), true},
+        {SSK("-S"), true},
+        {SSK("-g"), true},
+        {SSK("-u"), true},
+        {SSK("-k"), true},
+        {SSK("-O"), true},
+        {SSK("-G"), true},
+        {SSK("-t"), true},
+    };
+    static constexpr StaticStringMap<bool> UNARY_OPS{ENTRIES, countof(ENTRIES)};
+    return UNARY_OPS.find(s.view()).has_value();
   }
 
-  pure bool is_binary_operator(const String &s) const wontthrow
+  pure fn is_binary_operator(const String &s) const wontthrow -> bool
   {
     /* -ef, -nt, and -ot are the file-compare operators evaluate_binary resolves
        against the two paths. */
-    return s == "=" || s == "==" || s == "!=" || s == "<" || s == ">" ||
-           s == "-eq" || s == "-ne" || s == "-lt" || s == "-le" || s == "-gt" ||
-           s == "-ge" || s == "-ef" || s == "-nt" || s == "-ot";
+    static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
+        {SSK("="),   true},
+        {SSK("=="),  true},
+        {SSK("!="),  true},
+        {SSK("<"),   true},
+        {SSK(">"),   true},
+        {SSK("-eq"), true},
+        {SSK("-ne"), true},
+        {SSK("-lt"), true},
+        {SSK("-le"), true},
+        {SSK("-gt"), true},
+        {SSK("-ge"), true},
+        {SSK("-ef"), true},
+        {SSK("-nt"), true},
+        {SSK("-ot"), true},
+    };
+    static constexpr StaticStringMap<bool> BINARY_OPS{ENTRIES,
+                                                      countof(ENTRIES)};
+    return BINARY_OPS.find(s.view()).has_value();
   }
 
   /* A unary operator at index reads as a plain operand rather than an operator

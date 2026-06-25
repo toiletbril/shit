@@ -1853,11 +1853,11 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
 
     /* With the shitbox option on, a bare utility name resolves to the shitbox
        builtin, beating an external program the way a busybox applet does. */
-    if (!resolved_builtin && is_shitbox_enabled &&
+    if (!resolved_builtin.has_value() && is_shitbox_enabled &&
         shitbox::find_util(program.view()).has_value())
       resolved_builtin = Builtin::Kind::Shitbox;
 
-    if (!resolved_builtin) {
+    if (!resolved_builtin.has_value()) {
       let program_search_paths = utils::search_program_path(program.view());
       if (program_search_paths.count() > 0)
         resolved_program_path = steal(program_search_paths[0]);

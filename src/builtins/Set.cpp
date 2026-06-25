@@ -136,16 +136,19 @@ const SetOption SET_OPTIONS[] = {
    extensions, and 'sh' or 'posix' the dash semantics. An unknown spelling
    returns None so the caller reports the usage error the same way --mood does
    at startup. */
-Maybe<mimic_mood> parse_mood_name(StringView name) throws
+fn parse_mood_name(StringView name) throws -> Maybe<mimic_mood>
 {
-  if (name == "shit" || name == "default") {
-    return mimic_mood::Default;
-  }
-  if (name == "bash") return mimic_mood::Bash;
-  if (name == "sh" || name == "posix" || name == "dash") {
-    return mimic_mood::Posix;
-  }
-  return None;
+  static constexpr StaticStringMap<mimic_mood>::entry ENTRIES[] = {
+      {SSK("shit"),    mimic_mood::Default},
+      {SSK("default"), mimic_mood::Default},
+      {SSK("bash"),    mimic_mood::Bash   },
+      {SSK("sh"),      mimic_mood::Posix  },
+      {SSK("posix"),   mimic_mood::Posix  },
+      {SSK("dash"),    mimic_mood::Posix  },
+  };
+  static constexpr StaticStringMap<mimic_mood> MOOD_NAMES{ENTRIES,
+                                                          countof(ENTRIES)};
+  return MOOD_NAMES.find(name);
 }
 
 StringView mood_name(mimic_mood mood) throws
