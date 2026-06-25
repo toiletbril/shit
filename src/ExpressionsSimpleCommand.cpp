@@ -1040,11 +1040,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
     }
 
-    /* A special builtin keeps the assignment, so it commits to the store and
-       leaves nothing for the defer to restore. set_shell_variable refreshes the
-       IFS and PATH caches itself, so the temporary-cache bookkeeping below is
-       skipped on this path. */
-    if (command_is_special_builtin) {
+    /* A special builtin keeps the assignment outside the bash mood, so it
+       commits to the store and leaves nothing for the defer to restore.
+       set_shell_variable refreshes the IFS and PATH caches itself, so the
+       temporary-cache bookkeeping below is skipped on this path. The bash mood
+       drops the assignment after the command the way bash does, so it falls to
+       the temporary path instead. */
+    if (command_is_special_builtin && !cxt.is_bash_compatible()) {
       cxt.set_shell_variable(name, expanded_value);
       if (cxt.export_all()) {
         cxt.record_environment_change(name);
