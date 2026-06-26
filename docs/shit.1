@@ -204,15 +204,17 @@ in command mode. The incremental history search is opened by
 .B Ctrl\-R
 in insert mode and by the
 .B /
-key in command mode. The colon key opens an ex command, where
+key in command mode. Enter accepts the highlighted match into the line and
+leaves the search without running it. Ctrl\-G cancels the search, and the line
+is restored to its state from before the search began. The colon key opens an
+ex command, where
 .BR q ", " q! ", " wq ", " wq! ", " x ", and " quit
 exit the shell. The cursor shape tracks the submode, a bar in insert, a block in
 command, and an underline in visual or while an operator waits for its motion.
 .PP
 A block selection is entered with
 .B Ctrl\-V
-from command mode or from emacs, a column rectangle across several lines. The
-keys
+in command mode, a column rectangle across several lines. The keys
 .BR d " and " x
 delete the rectangle, and
 .BR I ", " c ", or " C
@@ -220,6 +222,15 @@ insert the typed text at the left column of every selected line, so several
 lines are indented at once. The arrows and
 .B h j k l
 move within the rectangle.
+.PP
+A multi-cursor edit is entered with
+.B Ctrl\-V
+in emacs mode and selects nothing. A cursor sits at the same column on every
+spanned line, and
+.BR Up " or " Down
+grows the span by one line. A typed character is inserted at every cursor at
+once, and Backspace erases at every cursor. The edit is left with
+.BR Ctrl\-G .
 .SH RESCUE
 When a flag in SHIT_FLAGS or in the argument list fails to parse and standard
 input is a terminal, the login shell will enter rescue.
