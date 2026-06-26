@@ -35,8 +35,6 @@ static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
   } catch (...) {
     return false;
   }
-
-  return false;
 }
 
 fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,

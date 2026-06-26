@@ -697,7 +697,6 @@ fn complete_from_builtin_flags(StringView line, StringView token,
   return candidates;
 }
 
-/* So an empty argument token completes files rather than option words. */
 static pure fn entry_is_unrequested_dash_word(
     StringView entry, bool token_asks_for_dash) wontthrow -> bool
 {
