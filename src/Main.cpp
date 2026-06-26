@@ -104,6 +104,9 @@ FLAG(SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
      "bash config quietly yet keep the checks afterward.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
      "Disable interactive tab completion and ghost-text.");
+FLAG(NO_SYNTAX_HIGHLIGHTING, Bool, '\0', "no-syntax-highlighting", Shit,
+     "Disable the syntax coloring and the ghost suggestion, leaving tab "
+     "completion working.");
 FLAG(ENABLE_SHITBOX, Bool, '\0', "enable-shitbox", Shit,
      "Resolve the bundled shitbox utility names such as ls and mkdir directly "
      "as commands, the same as set -o shitbox.");
@@ -1400,8 +1403,14 @@ fn main(int argc, char **argv) -> int
              no completion callback. */
           if (!FLAG_NO_COMPLETION.is_enabled())
             toiletline::enable_completion(context);
-          /* -T also silences the ghost suggestion. */
-          toiletline::set_ghost_enabled(!FLAG_NO_COMPLETION.is_enabled());
+
+          /* The ghost suggestion and the syntax coloring are driven by one
+             switch, and -T has already dropped both by leaving completion
+             unregistered. */
+          let const should_highlight = !FLAG_NO_COMPLETION.is_enabled() &&
+                                       !FLAG_NO_SYNTAX_HIGHLIGHTING.is_enabled();
+          toiletline::set_highlight_enabled(should_highlight);
+          toiletline::set_ghost_enabled(should_highlight);
           shit::show_message(
               session_mood == shit::mimic_mood::Posix  ? "POSIX me harder!"
               : session_mood == shit::mimic_mood::Bash ? "Bash me harder!"

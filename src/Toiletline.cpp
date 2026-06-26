@@ -427,6 +427,11 @@ fn set_ghost_enabled(bool enabled) -> void
   ::tl_set_ghost_enabled(enabled ? 1 : 0);
 }
 
+fn set_highlight_enabled(bool enabled) -> void
+{
+  ::tl_set_highlight_callback(enabled ? shit_highlight_callback : nullptr);
+}
+
 fn set_edit_mode(bool is_vi) -> void
 {
   ::tl_set_edit_mode(is_vi ? TL_EDIT_MODE_VI_INSERT : TL_EDIT_MODE_EMACS);

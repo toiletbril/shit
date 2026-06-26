@@ -58,6 +58,11 @@ void enable_job_notifications(shit::EvalContext &context);
    off so neither completion nor history offers an inline hint. */
 void set_ghost_enabled(bool enabled);
 
+/* Register or clear the syntax highlight callback. The no-syntax-highlighting
+   flag clears it so the line is drawn plain while tab completion still
+   resolves. */
+void set_highlight_enabled(bool enabled);
+
 void set_edit_mode(bool is_vi);
 
 usize utf8_strlen(const String &s, usize byte_count = static_cast<usize>(-1));

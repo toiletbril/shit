@@ -38,7 +38,8 @@ _shit_complete()
 --command --error-exit --no-glob --one-command --verbose --xtrace --export-all \
 --no-clobber --no-exec --no-unset --login --rcfile --privileged --posix --mood \
 --init-moods --mimicry --dumb --force-warnings --list-diagnostics \
---no-diagnostics --no-init-diagnostics --no-completion --enable-shitbox \
+--no-diagnostics --no-init-diagnostics --no-completion --no-syntax-highlighting \
+--enable-shitbox \
 --show-ast \
 --show-optimizer-state --show-exit-code --show-lexed-words --show-stats --show-memory \
 --debug-logging --debug-logging-file"
