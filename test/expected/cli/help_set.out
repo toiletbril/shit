@@ -32,6 +32,8 @@ OPTION SWITCHES
   -m  monitor                       Run background jobs in their own process group with notifications.
       failglob                      Fail a command whose glob matches nothing.
   -b  notify                        Report a background job's completion immediately instead of before the next prompt.
+      vi                            Use vi-style command-line editing.
+      emacs                         Use emacs-style command-line editing, the default.
   -h  hashall                       Accepted without effect.
   -v  verbose                       Write input to standard error as it is read, the -v flag.
   -k  keyword                       Accepted without effect.
@@ -52,9 +54,9 @@ OPTION SWITCHES
   The -o long names:
     errexit, error-exit, xtrace, nounset, no-unset, pipefail, allexport,
     export-all, noclobber, no-clobber, noglob, no-glob, noexec, no-exec,
-    shitbox, monitor, failglob, notify, hashall, verbose, keyword, functrace,
-    braceexpand, show-ast, show-lexed-words, show-exit-code, force-warnings,
-    mimicry, force-diagnostics, show-stats, no-diagnostics, show-memory, login,
-    rcfile
+    shitbox, monitor, failglob, notify, vi, emacs, hashall, verbose, keyword,
+    functrace, braceexpand, show-ast, show-lexed-words, show-exit-code,
+    force-warnings, mimicry, force-diagnostics, show-stats, no-diagnostics,
+    show-memory, login, rcfile
 
 rc=0

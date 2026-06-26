@@ -21,6 +21,8 @@ set +o shitbox
 set +o monitor
 set -o failglob
 set +o notify
+set +o vi
+set -o emacs
 set +o hashall
 set +o verbose
 set +o keyword

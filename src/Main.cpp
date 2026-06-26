@@ -1453,6 +1453,8 @@ fn main(int argc, char **argv) -> int
 
         shit::String prompt = toiletline::build_prompt(context);
 
+        toiletline::set_edit_mode(context.vi_mode());
+
         loop
         {
           let[code, input] = toiletline::get_input(prompt);
@@ -1478,6 +1480,10 @@ fn main(int argc, char **argv) -> int
               toiletline::set_input(input);
               continue;
             }
+            break;
+          case TL_PRESSED_QUIT:
+            toiletline::emit_newlines(input);
+            shit::utils::quit(exit_code, true);
             break;
           case TL_PRESSED_INTERRUPT:
             shit::print("^C");

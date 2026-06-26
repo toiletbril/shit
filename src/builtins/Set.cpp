@@ -85,6 +85,10 @@ const SetOption SET_OPTIONS[] = {
     {'b', "notify", &EvalContext::set_notify, &EvalContext::notify,
      "Report a background job's completion immediately instead of before the "
      "next prompt."},
+    {'\0', "vi", &EvalContext::set_vi_mode, &EvalContext::vi_mode,
+     "Use vi-style command-line editing."},
+    {'\0', "emacs", &EvalContext::set_emacs_mode, &EvalContext::emacs_mode,
+     "Use emacs-style command-line editing, the default."},
     {'h', "hashall", nullptr, nullptr, "Accepted without effect."},
     {'v', "verbose", &EvalContext::set_echo, &EvalContext::should_echo,
      "Write input to standard error as it is read, the -v flag."},

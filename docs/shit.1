@@ -184,6 +184,42 @@ The flag is compiled in only in a debug build.
 .TP
 .BI \-\-debug\-logging\-file= FILE
 The debug log is appended to FILE instead of standard error.
+.SH LINE EDITING
+The interactive line editor starts in emacs mode. A vi-style modal editor is
+selected by
+.B set \-o vi
+and the emacs default is restored by
+.BR "set \-o emacs" .
+In vi mode each line begins in insert mode. Escape enters command mode. Command
+mode provides the motions, the operators with counts, the named registers, the
+change repeat, and a visual selection. The last edit is undone by
+.B u
+in command mode and by
+.B Ctrl\-_
+in either mode. The undone edit is redone by
+.BR Ctrl\-^ ,
+or by
+.B Ctrl\-R
+in command mode. The incremental history search is opened by
+.B Ctrl\-R
+in insert mode and by the
+.B /
+key in command mode. The colon key opens an ex command, where
+.BR q ", " q! ", " wq ", " wq! ", " x ", and " quit
+exit the shell. The cursor shape tracks the submode, a bar in insert, a block in
+command, and an underline in visual or while an operator waits for its motion.
+.PP
+A block selection is entered with
+.B Ctrl\-V
+from command mode or from emacs, a column rectangle across several lines. The
+keys
+.BR d " and " x
+delete the rectangle, and
+.BR I ", " c ", or " C
+insert the typed text at the left column of every selected line, so several
+lines are indented at once. The arrows and
+.B h j k l
+move within the rectangle.
 .SH RESCUE
 When a flag in SHIT_FLAGS or in the argument list fails to parse and standard
 input is a terminal, the login shell will enter rescue.

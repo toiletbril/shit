@@ -427,6 +427,11 @@ fn set_ghost_enabled(bool enabled) -> void
   ::tl_set_ghost_enabled(enabled ? 1 : 0);
 }
 
+fn set_edit_mode(bool is_vi) -> void
+{
+  ::tl_set_edit_mode(is_vi ? TL_EDIT_MODE_VI_INSERT : TL_EDIT_MODE_EMACS);
+}
+
 fn utf8_strlen(const String &s, usize count) -> usize
 {
   return (count != static_cast<usize>(-1)) ? ::tl_utf8_strnlen(s.c_str(), count)
@@ -1045,6 +1050,8 @@ fn enable_completion(shit::EvalContext &context) -> void { unused(context); }
 fn disable_completion() -> void {}
 
 fn set_ghost_enabled(bool enabled) -> void { unused(enabled); }
+
+fn set_edit_mode(bool is_vi) -> void { unused(is_vi); }
 
 fn utf8_strlen(const String &s, usize count) -> usize
 {

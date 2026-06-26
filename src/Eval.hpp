@@ -529,6 +529,11 @@ public:
   fn set_notify(bool enabled) wontthrow -> void;
   pure fn notify() const wontthrow -> bool;
 
+  fn set_vi_mode(bool enabled) wontthrow -> void { m_vi_mode = enabled; }
+  pure fn vi_mode() const wontthrow -> bool { return m_vi_mode; }
+  fn set_emacs_mode(bool enabled) wontthrow -> void { m_vi_mode = !enabled; }
+  pure fn emacs_mode() const wontthrow -> bool { return !m_vi_mode; }
+
   /* Registers a function and keeps the definition text declare -f prints back,
      with a stamp mapping its absolute positions onto that copy. */
   fn register_function(StringView name, const Expression *body,
@@ -1461,6 +1466,7 @@ protected:
   i32 m_next_job_id{1};
   bool m_monitor{false};
   bool m_notify{false};
+  bool m_vi_mode{false};
   bool m_enable_path_expansion;
   bool m_shitbox{false};
   bool m_enable_echo;
