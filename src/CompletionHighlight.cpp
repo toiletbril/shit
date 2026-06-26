@@ -518,6 +518,63 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
   }
 }
 
+struct heredoc_pending_highlight
+{
+  StringView delimiter;
+  bool should_strip_tabs;
+};
+
+/* Color the heredoc bodies queued on the line just closed, each running from
+   the line after its << operator to a line equal to its delimiter. The body
+   and the closing delimiter read as a here-string, so the lines are not colored
+   as commands. A <<- delimiter is matched after the leading tabs are skipped. */
+static fn scan_heredoc_bodies(StringView line, usize position, usize end,
+                              const ArrayList<heredoc_pending_highlight> &pending,
+                              ArrayList<highlight_span> &spans) throws -> usize
+{
+  let i = position;
+
+  for (let const &heredoc : pending) {
+    let const body_start = i;
+    let was_closed = false;
+
+    while (i < end) {
+      let line_end = i;
+      while (line_end < end && line[line_end] != '\n')
+        line_end++;
+
+      let content_start = i;
+      if (heredoc.should_strip_tabs) {
+        while (content_start < line_end && line[content_start] == '\t')
+          content_start++;
+      }
+
+      let const content =
+          line.substring_of_length(content_start, line_end - content_start);
+      let const next = (line_end < end) ? line_end + 1 : line_end;
+
+      if (content == heredoc.delimiter) {
+        if (body_start < line_end)
+          spans.push(highlight_span{body_start, line_end, colors::ansi::YELLOW});
+        i = next;
+        was_closed = true;
+        break;
+      }
+
+      i = next;
+    }
+
+    if (!was_closed) {
+      if (body_start < end)
+        spans.push(highlight_span{body_start, end, colors::ansi::YELLOW});
+      i = end;
+      break;
+    }
+  }
+
+  return i;
+}
+
 /* Color one command line, the window [begin, end). A command substitution
    recurses through color_dollar with its own command-position and construct
    state, so a nested command line colors on its own. */
@@ -531,6 +588,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   };
 
   let stack = ArrayList<highlight_construct>{bump_allocator(HIGHLIGHT_ARENA)};
+  let pending_heredocs =
+      ArrayList<heredoc_pending_highlight>{bump_allocator(HIGHLIGHT_ARENA)};
   let is_command_position = true;
   let expecting_in = false;
   let for_variable_pending = false;
@@ -546,6 +605,12 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (c == '\n') {
         is_command_position = true;
         expecting_in = false;
+        i++;
+        if (!pending_heredocs.is_empty()) {
+          i = scan_heredoc_bodies(line, i, end, pending_heredocs, spans);
+          pending_heredocs.clear();
+        }
+        continue;
       }
       i++;
       continue;
@@ -554,6 +619,49 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (c == '#') {
       do_push(i, end, colors::ansi::DIM);
       break;
+    }
+
+    /* A << heredoc operator takes a delimiter word and queues a body, while <<<
+       is a here-string that stays on one line and falls through to the operator
+       scan. The optional - after << strips leading tabs from the body and the
+       closing delimiter. */
+    if (c == '<' && i + 1 < end && line[i + 1] == '<' &&
+        !(i + 2 < end && line[i + 2] == '<'))
+    {
+      let const operator_start = i;
+      i += 2;
+      let should_strip_tabs = false;
+      if (i < end && line[i] == '-') {
+        should_strip_tabs = true;
+        i++;
+      }
+      do_push(operator_start, i, colors::ansi::BOLD);
+
+      while (i < end && (line[i] == ' ' || line[i] == '\t'))
+        i++;
+
+      let const delimiter_start = i;
+      while (i < end && !is_highlight_word_break(line[i]))
+        i++;
+
+      let const delimiter_word =
+          line.substring_of_length(delimiter_start, i - delimiter_start);
+      if (!delimiter_word.is_empty()) {
+        do_push(delimiter_start, i, colors::ansi::YELLOW);
+
+        let delimiter = delimiter_word;
+        if (delimiter.length >= 2) {
+          let const quote = delimiter[0];
+          if ((quote == '\'' || quote == '"') &&
+              delimiter[delimiter.length - 1] == quote)
+          {
+            delimiter = delimiter.substring_of_length(1, delimiter.length - 2);
+          }
+        }
+        pending_heredocs.push(
+            heredoc_pending_highlight{delimiter, should_strip_tabs});
+      }
+      continue;
     }
 
     /* A separator or an opener moves the next word back to command position, a

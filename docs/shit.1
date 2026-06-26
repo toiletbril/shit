@@ -196,7 +196,11 @@ and the emacs default is restored by
 .BR "set \-o emacs" .
 In vi mode each line begins in insert mode. Escape enters command mode. Command
 mode provides the motions, the operators with counts, the named registers, the
-change repeat, and a visual selection. The last edit is undone by
+change repeat, and a visual selection. The visual selection is charwise from
+.B v
+and whole lines from
+.BR V .
+The last edit is undone by
 .B u
 in command mode and by
 .B Ctrl\-_
@@ -215,6 +219,10 @@ ex command, where
 .BR q ", " q! ", " wq ", " wq! ", " x ", and " quit
 exit the shell. The cursor shape tracks the submode, a bar in insert, a block in
 command, and an underline in visual or while an operator waits for its motion.
+In command mode the arrow keys step between the buffer rows and do not recall
+history, which the insert-mode arrows still do. With an operator pending, Up or
+Down acts on the current line together with the line above or below, the
+linewise dk and dj.
 .PP
 A block selection is entered with
 .B Ctrl\-V
