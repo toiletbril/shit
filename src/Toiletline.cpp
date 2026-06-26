@@ -1056,6 +1056,8 @@ fn disable_completion() -> void {}
 
 fn set_ghost_enabled(bool enabled) -> void { unused(enabled); }
 
+fn set_highlight_enabled(bool enabled) -> void { unused(enabled); }
+
 fn set_edit_mode(bool is_vi) -> void { unused(is_vi); }
 
 fn utf8_strlen(const String &s, usize count) -> usize
