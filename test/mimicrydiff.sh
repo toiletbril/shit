@@ -10,7 +10,19 @@
 # BASH_COMPAT_FILES. The file list avoids the name BASH_COMPAT, which bash reads
 # as its own compatibility level.
 
-if command -v $BASH >/dev/null 2>&1; then
+bash_skip_reason=""
+if ! command -v $BASH >/dev/null 2>&1; then
+    bash_skip_reason="no $BASH"
+else
+    bash_version=$($BASH -c 'printf "%s.%s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"' 2>/dev/null)
+    bash_major=${bash_version%%.*}
+    bash_minor=${bash_version#*.}
+    if [ -z "$bash_major" ] || [ "$bash_major" -lt 5 ] || { [ "$bash_major" -eq 5 ] && [ "$bash_minor" -lt 3 ]; }; then
+        bash_skip_reason="$BASH is bash ${bash_version:-unknown}, need 5.3+"
+    fi
+fi
+
+if [ -z "$bash_skip_reason" ]; then
     for f in $BASH_COMPAT_FILES; do
         s="$($BIN -I -c "$f" 2>/dev/null; printf X)"; s="${s%X}"
         b="$($BASH "$f" 2>/dev/null; printf X)"; b="${b%X}"
@@ -26,7 +38,7 @@ if command -v $BASH >/dev/null 2>&1; then
         fi
     done
 else
-    printf "\t%-64s skipped, no $BASH\n" mimicrydiff
+    printf "\t%-64s skipped, %s\n" mimicrydiff "$bash_skip_reason"
 fi
 
 if command -v $DASH >/dev/null 2>&1; then

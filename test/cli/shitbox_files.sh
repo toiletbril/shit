@@ -19,7 +19,10 @@ echo "--- ls a ---"
 # The owner, the group, and the time of a long row vary by machine, so only the
 # mode, the link count, the size, and the name are kept for a stable golden.
 echo "--- ls -l sym (mode nlink size name) ---"
-"$BIN" -c 'shitbox ls -l sym' | awk '{print $1, $2, $5, $NF}'
+# Linux always reports a symlink as mode 0777, while macOS stores the real
+# symlink permissions, so the meaningless symlink mode field is folded to the
+# Linux form before the row is trimmed.
+"$BIN" -c 'shitbox ls -l sym' | sed 's/^l[rwxsStT-]\{9\}/lrwxrwxrwx/' | awk '{print $1, $2, $5, $NF}'
 echo "--- ls after operations ---"
 "$BIN" -c 'shitbox ls'
 echo "--- du -s nums.txt ---"

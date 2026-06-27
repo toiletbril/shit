@@ -6,6 +6,9 @@ check_signal() {
   signal_name="$1"
   "$BIN" -c 'while :; do :; done' &
   loop_pid=$!
+  # The macOS driver shell reports a SIGHUP-killed background job with a Hangup
+  # line, so the job is disowned to keep that diagnostic out of the output.
+  disown "$loop_pid" 2>/dev/null
   sleep 0.5
   kill -"$signal_name" "$loop_pid" 2>/dev/null
   waited=0

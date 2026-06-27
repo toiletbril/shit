@@ -41,6 +41,14 @@
 #include <sys/syscall.h>
 #endif
 
+#if defined __APPLE__
+#include <libproc.h>
+#include <mach-o/dyld.h>
+#include <sys/proc.h>
+#include <sys/proc_info.h>
+#include <sys/sysctl.h>
+#endif
+
 /* posix_spawn takes the child environment as an envp argument. The shell passes
    its own process environment, which prefix assignments mutate before the spawn
    and restore after, so the declaration of environ is needed here. */
@@ -1784,9 +1792,28 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
 
 fn current_executable_path() wontthrow -> Maybe<String>
 {
+#if defined __APPLE__
+  /* macOS exposes no /proc/self/exe, so the running binary is read through
+     _NSGetExecutablePath. The first call sizes the buffer, and the result is
+     canonicalized since it may carry .. or pass through a symlink. */
+  u32 capacity = 0;
+  _NSGetExecutablePath(nullptr, &capacity);
+  if (capacity == 0) return shit::None;
+
+  ArrayList<char> buffer{};
+  buffer.reserve(capacity);
+  if (_NSGetExecutablePath(buffer.begin(), &capacity) != 0) return shit::None;
+
+  let const raw_path = StringView{buffer.begin()};
+  if (let const canonical = canonical_path(Path{raw_path}); canonical)
+    return String{canonical->view()};
+
+  return String{raw_path};
+#else
   /* /proc/self/exe resolves to the running binary on Linux. A platform without
      it reports None, so the assimilate caller falls back to an error. */
   return read_symlink("/proc/self/exe");
+#endif
 }
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
@@ -1903,10 +1930,78 @@ static fn nth_space_field(StringView text, usize index) wontthrow -> StringView
   return StringView{};
 }
 
+#if defined __APPLE__
+/* The single status letter ps shows for a macOS process, mapped from the kinfo
+   p_stat field the way the BSD ps reads it. */
+static fn mac_process_state_letter(char stat_value) wontthrow -> char
+{
+  switch (stat_value) {
+  case SIDL: return 'I';
+  case SRUN: return 'R';
+  case SSLEEP: return 'S';
+  case SSTOP: return 'T';
+  case SZOMB: return 'Z';
+  default: return '?';
+  }
+}
+#endif
+
 fn enumerate_processes(bool include_resource_stats) throws
     -> ArrayList<process_entry>
 {
   ArrayList<process_entry> processes{};
+
+#if defined __APPLE__
+  /* macOS exposes no /proc, so the process table is read through sysctl with
+     KERN_PROC_ALL. The first call sizes the kinfo_proc array, and the resource
+     columns are filled per pid through the libproc calls when asked. */
+  int name_mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0};
+  usize byte_length = 0;
+  if (::sysctl(name_mib, 4, nullptr, &byte_length, nullptr, 0) != 0)
+    return processes;
+
+  ArrayList<struct kinfo_proc> records{};
+  records.reserve(byte_length / sizeof(struct kinfo_proc) + 1);
+  if (::sysctl(name_mib, 4, records.begin(), &byte_length, nullptr, 0) != 0)
+    return processes;
+
+  let const entry_count = byte_length / sizeof(struct kinfo_proc);
+  for (usize i = 0; i < entry_count; i++) {
+    let const &record = records.begin()[i];
+
+    process_entry process{};
+    process.pid = static_cast<i64>(record.kp_proc.p_pid);
+    process.name = String{StringView{record.kp_proc.p_comm}};
+    process.owner_id = static_cast<u32>(record.kp_eproc.e_ucred.cr_uid);
+    process.state = mac_process_state_letter(record.kp_proc.p_stat);
+
+    if (include_resource_stats) {
+      char path_buffer[PROC_PIDPATHINFO_MAXSIZE];
+      if (::proc_pidpath(record.kp_proc.p_pid, path_buffer,
+                         sizeof(path_buffer)) > 0)
+        process.command_line = String{StringView{path_buffer}};
+
+      struct proc_taskinfo task_info{};
+      if (::proc_pidinfo(record.kp_proc.p_pid, PROC_PIDTASKINFO, 0, &task_info,
+                         sizeof(task_info)) ==
+          static_cast<int>(sizeof(task_info)))
+      {
+        process.resident_kib =
+            static_cast<u64>(task_info.pti_resident_size) / 1024;
+        process.virtual_kib =
+            static_cast<u64>(task_info.pti_virtual_size) / 1024;
+        process.cpu_ticks = static_cast<u64>(task_info.pti_total_user +
+                                             task_info.pti_total_system);
+      }
+    }
+
+    if (process.command_line.is_empty())
+      process.command_line = "[" + process.name + "]";
+
+    processes.push(steal(process));
+  }
+  return processes;
+#else
   /* The process list is read from /proc, the Linux and Cosmopolitan way. A
      directory whose name is all digits is one process, and its comm file holds
      the command name the way ps reads it. A platform without /proc opens
@@ -2054,6 +2149,7 @@ fn enumerate_processes(bool include_resource_stats) throws
     processes.push(steal(process));
   }
   return processes;
+#endif
 }
 
 } // namespace os

@@ -151,6 +151,12 @@ through the same script. The dashdiff, bashdiff, and mimicrydiff scripts compare
 through process substitution. macOS diverges on a few tests, and the harness
 carries alternate goldens.
 
+The bashdiff and mimicrydiff bash comparisons require a bash 5.3 or newer
+reference, since the goldens encode bash 5.x behavior, and both scripts skip the
+bash comparison loudly when `$BASH` is older. The macOS system `/bin/bash` is
+bash 3.2, so a macOS run passes the modern bash through `BASH`, as in `make -C
+test bashdiff BASH=/opt/homebrew/bin/bash`.
+
 ## Finishing a change
 
 Before finishing a plan, update this CLAUDE.md, the README, docs/shit.1, and

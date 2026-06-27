@@ -11,6 +11,14 @@ if ! command -v $BASH >/dev/null 2>&1; then
     exit 0
 fi
 
+bash_version=$($BASH -c 'printf "%s.%s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"' 2>/dev/null)
+bash_major=${bash_version%%.*}
+bash_minor=${bash_version#*.}
+if [ -z "$bash_major" ] || [ "$bash_major" -lt 5 ] || { [ "$bash_major" -eq 5 ] && [ "$bash_minor" -lt 3 ]; }; then
+    printf "\t%-64s skipped, %s is bash %s, need 5.3+\n" bashdiff "$BASH" "${bash_version:-unknown}"
+    exit 0
+fi
+
 for f in $BASH_COMPAT_FILES; do
     s="$($BIN --mood bash "$f" 2>/dev/null; printf X)"; s="${s%X}"
     b="$($BASH "$f" 2>/dev/null; printf X)"; b="${b%X}"
