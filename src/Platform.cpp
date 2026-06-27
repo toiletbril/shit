@@ -1913,7 +1913,8 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
 
 /* The index-th whitespace-separated field of a line, empty when the line has
    too few fields, for reading the space-delimited /proc stat files. */
-static fn nth_space_field(StringView text, usize index) wontthrow -> StringView
+static donteliminate fn nth_space_field(StringView text, usize index) wontthrow
+    -> StringView
 {
   usize field = 0;
   usize i = 0;
