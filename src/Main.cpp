@@ -59,11 +59,15 @@ FLAG(IGNORED2, Bool, 'm', "\0", Posix, "Ignored, left for compatibility.");
 
 FLAG(
     RCFILE, String, '\0', "rcfile", Bash,
-    "Source FILE as the interactive rc instead of ~/.bashrc. The shit rc still "
-    "runs, and a non-interactive run reads no rc.");
+    "Source FILE as the interactive rc. In the shit mood it replaces /etc/shitrc "
+    "and ~/.shitrc, and in the bash mood it replaces ~/.bashrc. A non-interactive "
+    "run reads no rc.");
 FLAG(PRIVILEGED, Bool, 'p', "privileged", Bash,
      "Run in privileged mode and skip every startup config file. Turned on "
      "automatically when the effective and the real user or group id differ.");
+FLAG(CLEAN, Bool, '\0', "clean", Shit,
+     "Start a clean shell. No startup file is read in any mood, and PATH is set "
+     "to a minimal default.");
 FLAG(POSIX_COMPAT, Bool, '\0', "posix", Bash,
      "Run in POSIX mode, equivalent to --mood sh.");
 
@@ -673,11 +677,16 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
     switch (flavor) {
     case mimic_mood::Default:
       /* The shit flavor reads the dash login profiles, then the system and home
-         shit rc for an interactive shell. */
+         shit rc for an interactive shell. A --rcfile replaces the shit rc with
+         the named file, the same way it replaces the bash rc in the bash mood. */
       if (is_login_shell) source_posix_login_files(context, ast_arena);
       if (should_be_interactive) {
-        source_file(Path{"/etc/shitrc"}, context, ast_arena);
-        source_home_file(".shitrc", context, ast_arena);
+        if (FLAG_RCFILE.is_set()) {
+          source_file(Path{FLAG_RCFILE.value()}, context, ast_arena);
+        } else {
+          source_file(Path{"/etc/shitrc"}, context, ast_arena);
+          source_home_file(".shitrc", context, ast_arena);
+        }
       }
       break;
     case mimic_mood::Posix:
@@ -881,6 +890,14 @@ fn main(int argc, char **argv) -> int
     if (!FLAG_SUPPRESS_DIAGNOSTICS.is_enabled())
       FLAG_SUPPRESS_DIAGNOSTICS.toggle();
     shit::os::set_environment_variable("NO_COLOR", "1");
+  }
+
+  /* --clean resets PATH to a minimal default before the context seeds its
+     variables from the environment. The startup files are skipped further down.
+     The inherited PATH is dropped so a clean shell finds only the standard
+     utility directories. */
+  if (FLAG_CLEAN.is_enabled()) {
+    shit::os::set_environment_variable("PATH", "/usr/bin:/bin");
   }
 
   /* Raise the runtime log level before any helper runs, so the trace covers
@@ -1287,10 +1304,13 @@ fn main(int argc, char **argv) -> int
 
   /* The startup files source for each mood in the init list, the mood swapped
      per flavor so a bash rc parses under the bash grammar. A privileged shell
-     sources nothing, the way bash's privileged mode leaves them unread. */
-  if (is_privileged || is_rescue_mode) {
+     sources nothing, the way bash's privileged mode leaves them unread, and
+     --clean skips them too for a shell that runs nothing before the prompt. */
+  if (is_privileged || is_rescue_mode || FLAG_CLEAN.is_enabled()) {
     LOG(Info, "skipping every startup config file in %s mode",
-        is_rescue_mode ? "rescue" : "privileged");
+        is_rescue_mode      ? "rescue"
+        : FLAG_CLEAN.is_enabled() ? "clean"
+                                  : "privileged");
   } else {
     /* --no-init-diagnostics turns diagnostics and warnings off while the init
        files source, so a -W shell loads a lax bash config quietly. A function

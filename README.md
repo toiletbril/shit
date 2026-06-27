@@ -43,6 +43,10 @@ When encountering broken flags or arguments in `SHIT_FLAGS`, or supplied when
 launched the binary, **shit** acting as a login shell will skip the rc chain,
 and give you a rescue session to fix the config from.
 
+The `--clean` flag starts a shell that reads no startup file in any mood and sets
+a minimal PATH. The `--rcfile` flag names a file to source as the interactive rc
+in place of the mood's own rc.
+
 ## Additional bull**shit**
 
 Modern interactive mode, heavily inspired by

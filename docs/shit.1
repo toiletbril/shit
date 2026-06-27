@@ -70,8 +70,13 @@ are applied together.
 Every startup config file is skipped. The flag is turned on automatically in the
 setuid or setgid case.
 .TP
+.B \-\-clean
+A clean shell is started. No startup file is read in any mood, and PATH is set
+to a minimal default.
+.TP
 .BI \-\-rcfile= FILE
-FILE is sourced as the interactive rc instead of ~/.bashrc.
+FILE is sourced as the interactive rc. The shit mood sources it in place of
+/etc/shitrc and ~/.shitrc, and the bash mood in place of ~/.bashrc.
 .TP
 .B \-\-posix
 POSIX mode is selected, the same as
