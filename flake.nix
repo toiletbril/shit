@@ -150,6 +150,21 @@
           };
         };
 
+      darwinModules.default = { config, lib, pkgs, ... }:
+        let
+          cfg = config.programs.shit;
+        in
+        {
+          options.programs.shit = {
+            enable = lib.mkEnableOption "shit — the fastest cross-platform Bash and POSIX-compatible shell";
+          };
+
+          config = lib.mkIf cfg.enable {
+            environment.systemPackages = [ pkgs.shit ];
+            environment.shells = [ pkgs.shit ];
+          };
+        };
+
       homeModules.default = { config, lib, pkgs, ... }:
         let
           cfg = config.programs.shit;
