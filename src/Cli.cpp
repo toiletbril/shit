@@ -19,7 +19,7 @@ Flag::Flag(Flag::Kind kind, char short_name, StringView long_name,
 
 pure fn Flag::kind() const wontthrow -> Flag::Kind { return m_kind; }
 
-fn Flag::set_position(u32 n) throws -> void { m_position = n; }
+fn Flag::set_position(u32 position) throws -> void { m_position = position; }
 
 pure fn Flag::position() const wontthrow -> usize { return m_position; }
 
@@ -640,7 +640,7 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
   static const StringView SECTION_HEADERS[] = {
       "OPTIONS",      "POSIX OPTIONS", "BASH OPTIONS", "COMPATIBILITY OPTIONS",
       "SHIT OPTIONS", "DEBUG OPTIONS"};
-  for (u8 section = 0; section < 6; section++) {
+  for (u8 section = 0; section < countof(SECTION_HEADERS); section++) {
     bool header_printed = false;
     for (let const flag : flags) {
       if (static_cast<u8>(flag->section()) != section) continue;

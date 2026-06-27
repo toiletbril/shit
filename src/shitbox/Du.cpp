@@ -36,6 +36,8 @@ static fn total_size(const Path &path) throws -> u64
     Maybe<ArrayList<String>> names = Path::read_directory(path);
     if (names.has_value())
       for (let const &name : *names) {
+        if (os::INTERRUPT_REQUESTED) return sum;
+
         let const child =
             PathBuilder{path.text().view()}.append(name.view()).build();
         sum += total_size(child);

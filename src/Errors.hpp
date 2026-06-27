@@ -149,10 +149,8 @@ public:
   ExecFormatError();
 };
 
-/**
- * An error with location in the source code. The source must be supplied to
- * resolve context.
- */
+/* An error with location in the source code. The source must be supplied to
+   resolve context. */
 class ErrorWithLocation : public ErrorBase
 {
 public:

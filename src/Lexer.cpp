@@ -1262,7 +1262,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
   Token *t{};
 
-  if (auto assignment_split = word.get_assignment_split();
+  if (let assignment_split = word.get_assignment_split();
       assignment_split.has_value())
   {
     t = m_arena->create<tokens::Assignment>(

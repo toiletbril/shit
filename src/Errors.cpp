@@ -182,8 +182,8 @@ template <class T>
   requires std::is_integral_v<T>
 cold static fn number_string_length(T value) wontthrow -> usize
 {
-  usize digit_count = 0;
-  while (value > 0) {
+  usize digit_count = 1;
+  while (value >= 10) {
     digit_count++;
     value /= 10;
   }

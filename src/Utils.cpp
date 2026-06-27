@@ -1771,7 +1771,7 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
   if (PATH_CACHE_IS_STALE) {
     LOG(Info,
         "search_program_path clearing stale cache before resolving '%.*s'",
-        (int) program_name.length, program_name.data);
+        static_cast<int>(program_name.length), program_name.data);
     PATH_CACHE.clear();
     PATH_CACHE_IS_STALE = false;
   }

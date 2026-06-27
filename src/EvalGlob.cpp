@@ -399,9 +399,9 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment,
   if (name_end == text.length() && word_continues) return;
 
   let const directory = resolve_tilde_prefix(name);
-  if (name.is_empty() && !directory)
+  if (name.is_empty() && !directory.has_value())
     throw Error{"Could not figure out home directory"};
-  if (!directory) return;
+  if (!directory.has_value()) return;
 
   LOG(All, "the tilde prefix '~%.*s' expands to '%.*s'",
       static_cast<int>(name.length), name.data,

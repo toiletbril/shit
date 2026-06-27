@@ -77,7 +77,7 @@ hot pure static fn is_unquoted_word(const Token *token,
   if (word.segments.count() != 1 ||
       word.segments[0].kind != WordSegment::Kind::UnquotedText)
     return false;
-  const auto &segment_text = word.segments[0].text;
+  let const &segment_text = word.segments[0].text;
   if (segment_text.count() != text.length) return false;
   for (usize i = 0; i < text.length; i++)
     if (segment_text[i] != text[i]) return false;

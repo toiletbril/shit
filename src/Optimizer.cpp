@@ -89,7 +89,7 @@ pure fn is_plain_variable_name(StringView name) wontthrow -> bool
 /* True when a token is a bare unquoted $name reference that field-splits at run
    time. Its recorded value is not the single test argument the run sees, so the
    verdict must not fold from it. A quoted "$name" still folds. */
-fn is_split_eligible_variable_operand(const Token *token) wontthrow -> bool
+pure fn is_split_eligible_variable_operand(const Token *token) wontthrow -> bool
 {
   if (token == nullptr) return false;
   if (token->kind() != Token::Kind::Word) return false;

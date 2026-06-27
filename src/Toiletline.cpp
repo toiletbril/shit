@@ -336,7 +336,7 @@ static fn history_file_path() -> shit::Maybe<shit::Path>
     return shit::Path{override_path->view()};
   }
   let home = shit::os::get_home_directory();
-  if (!home) return shit::None;
+  if (!home.has_value()) return shit::None;
   let path = home->clone();
   path.push_component(SHIT_HISTORY_FILE);
   return path;
@@ -357,7 +357,7 @@ static fn calc_history_file_path() -> shit::Maybe<shit::Path>
     return shit::Path{override_path->view()};
   }
   let home = shit::os::get_home_directory();
-  if (!home) return shit::None;
+  if (!home.has_value()) return shit::None;
   let path = home->clone();
   path.push_component(SHIT_CALC_HISTORY_FILE);
   return path;

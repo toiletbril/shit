@@ -328,8 +328,9 @@ struct conditional_evaluator
        An empty operand reads as zero. */
     let const do_to_number = [&](StringView operand) throws -> i64 {
       for (usize i = 0; i < operand.length; i++) {
-        if (operand[i] != ' ' && operand[i] != '\t')
+        if (operand[i] != ' ' && operand[i] != '\t') {
           return cxt.evaluate_arithmetic(operand);
+        }
       }
       return 0;
     };

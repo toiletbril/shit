@@ -87,8 +87,8 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
 
   /* A builtin runs inside the shell process, so it keeps the shell's own signal
      handlers. Resetting them to the default here would let a Ctrl-C during a
-     builtin terminate the whole shell, and it cost two extra syscalls on every
-     builtin command. */
+     builtin terminate the whole shell, and would cost two extra syscalls on
+     every builtin command. */
   defer { ec.close_fds(); };
 
   /* A builtin stage of a pipeline carries the pipe ends in its context. A

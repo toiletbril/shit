@@ -62,7 +62,7 @@ public:
 
   pure fn kind() const wontthrow -> Kind;
   pure fn position() const wontthrow -> usize;
-  fn set_position(u32 n) throws -> void;
+  fn set_position(u32 position) throws -> void;
   pure fn short_name() const wontthrow -> char;
   pure fn long_name() const wontthrow -> StringView;
   pure fn section() const wontthrow -> flag_section;

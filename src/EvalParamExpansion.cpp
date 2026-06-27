@@ -624,8 +624,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   /* ${name/pat/rep} and its // # % variants are bash pattern replacement, the
      non-colon form whose operator is a slash. A name of @ or * applies per
      element. */
-  if (!is_colon_form && rest[0] == '/' && name != "@" && name != "*")
+  if (!is_colon_form && rest[0] == '/' && name != "@" && name != "*") {
     return apply_pattern_replacement(name, rest);
+  }
 
   /* ${name^}, ${name,}, and the doubled and tilde forms are bash case
      modification, the non-colon caret, comma, or tilde operator. */

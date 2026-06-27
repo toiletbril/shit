@@ -38,7 +38,6 @@ struct find_options
   i64 min_depth{0};
 };
 
-/* A regular file reads as a dash the way the mode string spells it. */
 static fn find_entry_matches(char type_letter, StringView filename, usize depth,
                              const find_options &options) throws -> bool
 {
@@ -95,6 +94,8 @@ static fn find_walk(const Path &path, StringView display, usize depth,
   sort_string_list(*names);
 
   for (let const &child_name : *names) {
+    if (os::INTERRUPT_REQUESTED) return;
+
     String child_display{display};
     if (!child_display.is_empty() && child_display.back() != '/') {
       child_display += '/';

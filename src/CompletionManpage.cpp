@@ -683,7 +683,7 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
 };
 static constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
     HELP_ALLOWLIST_ENTRIES,
-    sizeof(HELP_ALLOWLIST_ENTRIES) / sizeof(HELP_ALLOWLIST_ENTRIES[0])};
+    countof(HELP_ALLOWLIST_ENTRIES)};
 
 /* Only a command whose help argument is not the plain --help qualifies, the
    ffmpeg family, whose manpage carries the options in a form the flag scanner

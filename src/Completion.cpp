@@ -239,7 +239,7 @@ static constexpr StaticStringMap<bool>::entry TRANSPARENT_PREFIX_ENTRIES[] = {
 };
 static constexpr StaticStringMap<bool> TRANSPARENT_PREFIXES{
     TRANSPARENT_PREFIX_ENTRIES,
-    sizeof(TRANSPARENT_PREFIX_ENTRIES) / sizeof(TRANSPARENT_PREFIX_ENTRIES[0])};
+    countof(TRANSPARENT_PREFIX_ENTRIES)};
 
 static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
 {
@@ -708,7 +708,7 @@ fn resolve_completion_alias(StringView command, EvalContext &context) throws
     -> String
 {
   let name = String{command};
-  for (int depth = 0; depth < 8; depth++) {
+  for (usize depth = 0; depth < 8; depth++) {
     let const expansion = context.get_alias(name.view());
     if (!expansion.has_value()) break;
     let const expanded = expansion->view();

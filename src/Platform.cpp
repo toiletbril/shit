@@ -2978,7 +2978,7 @@ fn make_os_args(const ArrayList<String> &args) -> os_args
   return command_line;
 }
 
-fn last_system_error_message() -> String
+cold fn last_system_error_message() throws -> String
 {
   LPSTR errno_str{};
   DWORD win_errno = GetLastError();
@@ -2991,8 +2991,8 @@ fn last_system_error_message() -> String
 
   if (ret == 0) {
     return utils::uint_to_text(win_errno) +
-           StringView{" (Error message couldn't be proccessed due to "
-                      "FormatMessage() fail)"};
+           StringView{" (Error message could not be processed due to "
+                      "a FormatMessage() failure)"};
   }
 
   StringView view{static_cast<char *>(errno_str)};
