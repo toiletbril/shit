@@ -196,7 +196,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
   };
 
   let config_path = home->clone();
-  config_path.push_component("/.ssh/config");
+  config_path.push_component(".ssh/config");
   if (Maybe<String> config = config_path.read_entire_file(); config.has_value())
   {
     let const text = config->view();
@@ -234,7 +234,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
   }
 
   let known_hosts_path = home->clone();
-  known_hosts_path.push_component("/.ssh/known_hosts");
+  known_hosts_path.push_component(".ssh/known_hosts");
   if (Maybe<String> known = known_hosts_path.read_entire_file();
       known.has_value())
   {

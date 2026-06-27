@@ -158,8 +158,8 @@ public:
      widening source_location, which the error caret reads. */
   pure fn source_end_position() const wontthrow -> usize;
   fn set_source_end_position(usize position) wontthrow -> void;
-  /* Expressions should override evaluate_impl() instead. This method is used
-   * mainly for initialization before the actual evaluation. */
+  /* A node overrides evaluate_impl, this wrapper runs the shared per-node
+     bookkeeping before it. */
   fn evaluate(EvalContext &cxt) const throws -> i64;
 
   /* Each expression provides its own way to copy, so the implicit copies and

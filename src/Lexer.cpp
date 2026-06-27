@@ -408,7 +408,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 {
   let word = Word{};
 
-  usize byte_count = 0, relative_last_quote_char_pos = 0;
+  usize byte_count = 0;
+  usize relative_last_quote_char_pos = 0;
 
   bool should_escape = false;
 
