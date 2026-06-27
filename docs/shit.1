@@ -59,7 +59,8 @@ mood reads the file named by ENV. The list defaults to the value of
 .TP
 .BR \-I ", " \-\-mimicry
 A script whose shebang names a shell shit can emulate is run in-process in the
-matching mood rather than under the real shell, for diagnostics and speed.
+matching mood. The in-process run keeps the diagnostics and saves the launch of
+the real shell.
 .TP
 .B \-\-dumb
 The flags
@@ -91,7 +92,7 @@ The analysis stage is kept, but every error is reported as a warning and the run
 proceeds.
 .TP
 .B \-\-no\-diagnostics
-The analysis stage is skipped, so evaluation begins sooner.
+The analysis stage is skipped. No warning or pre-run diagnostic is reported.
 .TP
 .B \-\-no\-init\-diagnostics
 Diagnostics and warnings are suppressed only while the startup files source,
@@ -192,7 +193,7 @@ Internal logging is enabled at LEVEL, one of
 The flag is compiled in only in a debug build.
 .TP
 .BI \-\-debug\-logging\-file= FILE
-The debug log is appended to FILE instead of standard error.
+The debug log is appended to FILE in place of standard error.
 .SH LINE EDITING
 The interactive line editor starts in emacs mode. A vi-style modal editor is
 selected by
@@ -220,12 +221,12 @@ in insert mode and by the
 key in command mode. Enter accepts the highlighted match into the line and
 leaves the search without running it. Ctrl\-G cancels the search, and the line
 is restored to its state from before the search began. The colon key opens an
-ex command, where
+ex command. The commands
 .BR q ", " q! ", " wq ", " wq! ", " x ", and " quit
 exit the shell. The cursor shape tracks the submode, a bar in insert, a block in
 command, and an underline in visual or while an operator waits for its motion.
 In command mode the arrow keys step between the buffer rows and do not recall
-history, which the insert-mode arrows still do. With an operator pending, Up or
+history. The insert-mode arrows still recall it. With an operator pending, Up or
 Down acts on the current line together with the line above or below, the
 linewise dk and dj.
 .PP
@@ -270,8 +271,70 @@ The interactive calc REPL history file, ~/.shit_calc_history by default.
 .B ENV
 The startup file sourced in sh mood.
 .TP
+.B PATH
+The colon\-separated command search path. The \-\-clean flag resets it to a
+minimal default.
+.TP
+.B HOME
+The home directory. It is read by tilde expansion and by the default rc and
+history paths.
+.TP
+.B PWD
+The current working directory, maintained by cd and z.
+.TP
+.B OLDPWD
+The previous working directory, set by cd and z. cd \- returns to it.
+.TP
+.B SHELL
+The path to the shell, set from the environment, or to the running binary when
+it is unset.
+.TP
+.B SHLVL
+The shell nesting depth, read from the environment, incremented, and set back so
+a child shell counts one deeper.
+.TP
+.B CDPATH
+The colon\-separated search path cd consults for a relative operand.
+.TP
+.B IFS
+The field separator for word splitting and the join of $*, a space, a tab, and a
+newline by default.
+.TP
+.B "COLUMNS, LINES"
+The terminal width and height, set for an interactive shell from the terminal
+size.
+.TP
+.B PROMPT_COMMAND
+A command run before each interactive prompt is drawn.
+.TP
+.B TERM
+The terminal type, read to decide whether color is supported.
+.TP
+.B MANPATH
+The manual search path, read by completion to offer a subcommand and an option
+from the pages.
+.TP
+.B PIPESTATUS
+The indexed array of the exit status of each stage of the last pipeline.
+.TP
+.B REPLY
+The line read by read when no name is given, and the line the select loop
+records.
+.TP
+.B "OPTIND, OPTARG"
+The option index and the option argument getopts maintains as it walks the
+positional parameters.
+.TP
 .B TIMEFORMAT
-The format the time printed by time.
+The format the time builtin prints its report in.
+.TP
+.B PS1
+The primary prompt template, rendered before each interactive command. A default
+template is supplied when it is unset.
+.TP
+.B PS0
+The prompt rendered and printed after a command line is read and before it runs,
+empty by default.
 .TP
 .B PS2
 The continuation prompt default, "> ", carried for compatibility.
@@ -312,6 +375,44 @@ The names resolve in every mood. A recognized name reads back empty when color
 is off, the way NO_COLOR and a redirected prompt turn the escapes off, so the
 prompt stays plain. A stored assignment to one of the names wins over the
 provided escape.
+.TP
+.B "RANDOM, SRANDOM, SECONDS, LINENO, EPOCHSECONDS, EPOCHREALTIME"
+These resolve on each read. RANDOM and SRANDOM give a fresh random value,
+SECONDS counts the seconds since the shell started, LINENO gives the line of the
+current command, and EPOCHSECONDS and EPOCHREALTIME give the wall clock time in
+seconds. They resolve in every mood but sh.
+.TP
+.B "BASHPID, PPID, UID, EUID, GROUPS, HOSTNAME, HOSTTYPE, MACHTYPE, OSTYPE"
+These describe the running process and the host, resolved on each read. BASHPID
+is the process id, PPID is the parent, UID and EUID are the real and the
+effective user, GROUPS is the real group, and HOSTNAME, HOSTTYPE, MACHTYPE, and
+OSTYPE name the host and the platform. They resolve in every mood but sh.
+.TP
+.B "SHELLOPTS, BASH_SUBSHELL, BASH_ARGV0, BASH_EXECUTION_STRING, BASH_MONOSECONDS"
+These report shell state on each read. SHELLOPTS lists the enabled set \-o
+options, BASH_SUBSHELL counts the subshell depth, BASH_ARGV0 is the shell name,
+BASH_EXECUTION_STRING is the argument of \-c, and BASH_MONOSECONDS is a
+monotonic millisecond counter. They resolve in every mood but sh.
+.TP
+.B "FUNCNAME, BASH_SOURCE, BASH_LINENO, BASH_COMMAND"
+These trace the running code. FUNCNAME names the function in progress,
+BASH_SOURCE is the file it was read from, BASH_LINENO is the line of the call,
+and BASH_COMMAND is the command being executed. The array forms give the whole
+call stack. They resolve in every mood but sh.
+.TP
+.B BASH_REMATCH
+The indexed array of the groups the last [[ ... =~ ... ]] match captured.
+.TP
+.B "BASH, BASH_VERSION, BASH_VERSINFO"
+A bash identity is advertised under these names so a bash rc detects it. They
+are seeded only in the bash mood. BASH is the path to the shell, BASH_VERSION is
+the version string, and BASH_VERSINFO is its indexed components.
+.TP
+.B "COMP_WORDS, COMP_CWORD, COMP_LINE, COMP_POINT, COMP_WORDBREAKS, COMPREPLY"
+A programmable completion function reads these and writes COMPREPLY. COMP_WORDS
+holds the words on the line, COMP_CWORD is the index of the word under the
+cursor, COMP_LINE is the whole line, COMP_POINT is the cursor offset, and
+COMP_WORDBREAKS is the characters that split a word.
 .SH FILES
 .TP
 .I /etc/shitrc
@@ -344,7 +445,7 @@ flag or
 the utility names resolve directly as commands without the prefix. A builtin
 still wins over a utility, and a utility wins over a program on PATH. A binary
 whose name is a utility, such as a symlink named ls, acts as that utility, and
-the utility's own flags reach its parser rather than the shell. A symlinked
+the utility's own flags reach its parser. A symlinked
 utility prints the shit version on \-\-version, so the binary behind the name is
 visible, and its help names the shit shell.
 .B "shitbox \-\-assimilate DIR"

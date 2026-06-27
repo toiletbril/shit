@@ -5,8 +5,8 @@
 Man, my shell is **shit** (built on top of
 [toiletline](https://github.com/toiletbril/toiletline))
 
-Have you even seen warnings from software that uses Bison as it's parsing
-engine? Did you encounter any the coreutils' error messages? Perhaps spent a
+Have you ever seen warnings from software that uses Bison as its parsing
+engine? Did you encounter any of the coreutils' error messages? Perhaps spent a
 day debugging a Bash script?
 
 Shit is the fastest cross-platform Bash and POSIX-compatible shell there is,
@@ -20,7 +20,7 @@ itself, a strict superset of Bash, with the analysis and optimization stages
 enabled.
 
 Before a single command runs, **shit** walks the whole parsed tree to optimize
-and analyze it. Default mood prohibits non-deterministic globs, substituions,
+and analyze it. Default mood prohibits non-deterministic globs, substitutions,
 variables or anything else that will make the shell behave unexpectedly. Every
 error or warning at that stage is called a diagnostic.
 
@@ -30,8 +30,8 @@ matching mood and disable diagnostics. `set --mood` changes the mood at
 runtime. `-W` keeps the diagnostics but turns every error into a warning.
 
 `-I` is mimicry. **shit** will detect `sh`, `dash`, `bash` shebangs and run the
-script inside itself in the matching mood rather than launching the real shell
-to keep speed and diagnostics.
+script inside itself in the matching mood. The in-process run keeps speed and
+diagnostics.
 
 `--init-moods`/`-L` accepts a comma-separated list of moods to steal and use
 init files from. It defaults to the value of `--mood`.
@@ -40,25 +40,21 @@ init files from. It defaults to the value of `--mood`.
 is `-W -I --init-moods=shit,bash`. Flag on the command line still wins.
 
 When encountering broken flags or arguments in `SHIT_FLAGS`, or supplied when
-launched the binary, **shit** acting as a login shell will skip the rc chain,
+the binary is launched, **shit** acting as a login shell will skip the rc chain,
 and give you a rescue session to fix the config from.
-
-The `--clean` flag starts a shell that reads no startup file in any mood and sets
-a minimal PATH. The `--rcfile` flag names a file to source as the interactive rc
-in place of the mood's own rc.
 
 ## Additional bull**shit**
 
 Modern interactive mode, heavily inspired by
-[fish](https://github.com/fish-shell/fish-shell), with syntax highlighting.
+[fish](https://github.com/fish-shell/fish-shell), with syntax highlighting,
 sensible word-jumps and controls, full UTF-8 support, wide character (CJK and
 emoji) width handling, multiline editing, history search and persistent
 history.
 
 **shit** also has more than 50 builtins, each with `--help`. That includes
 every builtin from `bash` and POSIX standard, with the addition of:
-- `z` -- a port of [zoxide](https://github.com/ajeetdsouza/zoxide)
-- `bench` -- built-in benchmark infrastructure inspired by Performance
+- `z`, a port of [zoxide](https://github.com/ajeetdsouza/zoxide)
+- `bench`, built-in benchmark infrastructure inspired by Performance
   Optimizer Observation Platform ([poop](https://github.com/andrewrk/poop) for
   short)
 - and more
@@ -83,12 +79,12 @@ the executable; `cat`, `diff`, `printf` to run the tests; `clang-format`,
 `clang-tidy` (better 18 or newer) to check the code.
 
 The `MODE` variable controls build type:
-* `rel` is an optimized build;
-* `prof` is an optimized build with debug symbols for profiling;
-* `cov` is an optimized build with debug symbols for collecting coverage;
-* `dbg` includes all symbols and Asan with Ubsan;
-* `cosmo` is an optimized build which will try to use `cosmoc++` from the
-  Cosmopolitan toolchain.
+* `rel` is an optimized build.
+* `prof` is an optimized build with debug symbols for profiling.
+* `cov` is an optimized build with debug symbols for collecting coverage.
+* `dbg` includes all symbols and Asan with Ubsan.
+* `cosmo` is an optimized build that uses `cosmoc++` from the Cosmopolitan
+  toolchain.
 * `cosmo_dbg` is a debug Cosmopolitan build.
 
 `$CXXFLAGS` environment variable can be used to append new flags to the build
@@ -102,7 +98,7 @@ $ ./shit --help
 ```
 
 `make install` builds the release binary and installs it, the man page, and the
-bash completion under `PREFIX`, which defaults to `/usr/local`. `DESTDIR` stages
+bash completion under `PREFIX`, default `/usr/local`. `DESTDIR` stages
 the tree under a packaging root, `PREFIX` moves the install root, and
 `INSTALL_MOOD_SYMLINKS="sh bash dash"` adds the mood symlinks next to the binary.
 `make uninstall` removes everything the install placed.
@@ -130,7 +126,7 @@ Is it good?
 - [x] Blocks and functions.
 - [x] `sh`-compatible.
 
-Is is exceptional? 
+Is it exceptional?
 - [x] `bash`-compatible.
 - [x] Most of shellcheck built-in as warnings.
 - [x] Own bells and whistles.

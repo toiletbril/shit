@@ -1,9 +1,8 @@
+#!/bin/bash
 # bash completion for the shit shell.
 #
-# Source it from ~/.bashrc, or drop it into a bash-completion directory such as
-# /usr/share/bash-completion/completions/shit, so completing an argument to the
-# shit command offers its flags and the mood values. It loads under bash and
-# under shit's bash mood, which reads the bash completion.
+# Do:
+# mv shit.bash /usr/share/bash-completion/completions/shit
 
 _shit_complete()
 {
@@ -14,7 +13,6 @@ _shit_complete()
     local mood_values="shit bash sh"
     local log_levels="info debug all"
 
-    # A flag that takes a value completes that value rather than another flag.
     case $previous_word in
         -M|--mood)
             COMPREPLY=( $(compgen -W "$mood_values" -- "$current_word") )
@@ -47,8 +45,6 @@ _shit_complete()
     local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -p -M -L -I -W \
 -T -A -E -R -X"
 
-    # A leading dash asks for a flag, anything else completes a file the way a
-    # script or operand reads.
     if [[ $current_word == --* ]]; then
         COMPREPLY=( $(compgen -W "$long_flags" -- "$current_word") )
     elif [[ $current_word == -* ]]; then
@@ -60,10 +56,6 @@ _shit_complete()
 
 complete -o filenames -F _shit_complete shit
 
-# Completion for the shitbox builtin. Completing the first argument offers the
-# utility names, and completing a later argument offers that utility's flags or
-# a file. The bare utility names are left to the system completions, since this
-# script runs under a normal bash where ls and the rest are the real tools.
 _shitbox_utils="basename calc cat cp dirname du env find grep head killall ln \
 ls make mkdir mv pkill ps realpath rm rmdir seq sleep sort tail tee touch tr \
 uniq unlink wc which whoami yes"
@@ -99,14 +91,12 @@ _shitbox_complete()
     local current_word
     current_word=${COMP_WORDS[COMP_CWORD]}
 
-    # The first argument names the utility to run, or a shitbox builtin flag.
     if [[ $COMP_CWORD -eq 1 ]]; then
         COMPREPLY=( $(compgen -W "$_shitbox_utils --list --assimilate --help" \
             -- "$current_word") )
         return
     fi
 
-    # A later argument completes the chosen utility's flags or a file.
     local util=${COMP_WORDS[1]}
     if [[ $current_word == -* ]]; then
         COMPREPLY=( $(compgen -W "$(_shitbox_util_flags "$util")" -- "$current_word") )
