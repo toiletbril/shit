@@ -258,7 +258,8 @@ and {001..10} pads the width. Braces nest and multiply. A lone {a} stays
 literal.
 .TP
 .B Quoting
-$'...' reads the C escapes \\n, \\t, \\xHH, and \\OOO.
+$'...' reads the C escapes \\n, \\t, \\xHH, and \\OOO. $"..." marks a string
+for translation, the plain double quote when no catalog is present.
 .TP
 .B "Redirection and substitution"
 &> and &>> send both output streams to a file, and |& pipes both. <(cmd) and

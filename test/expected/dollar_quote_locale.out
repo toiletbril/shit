@@ -1,0 +1,52 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=world]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "plain"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "hello $x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "premidpost"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a $"]
+[Word
+  Unquoted "x=world"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  DoubleQuoted "plain"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  DoubleQuoted "hello "
+  Variable "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "pre"
+  DoubleQuoted "mid"
+  Unquoted "post"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "a $"
+]
+[plain]
+[hello world]
+premidpost
+a $
+[Code 0]

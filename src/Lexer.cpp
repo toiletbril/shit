@@ -805,10 +805,11 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
       }
 
       /* $"..." is bash locale translation. With no message catalog it is the
-         plain double-quoted string, so the dollar is dropped. Inside an
-         existing double quote a $" is a dollar then the close quote, so this
-         only fires at the top level. */
-      if (next == '"' && is_bash_compatible() && !is_in_double_quotes) {
+         plain double-quoted string, so the dollar is dropped. It rides every
+         mood but POSIX, the way $'...' does. Inside an existing double quote a
+         $" is a dollar then the close quote, so this only fires at the top
+         level. */
+      if (next == '"' && bash_additions_enabled() && !is_in_double_quotes) {
         continue;
       }
 
