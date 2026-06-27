@@ -1848,15 +1848,15 @@ pure fn ExecContext::program_path() const wontthrow -> const Path &
 
 fn ExecContext::close_fds() throws -> void
 {
-  if (in_fd) {
+  if (in_fd.has_value()) {
     os::close_fd(*in_fd);
     in_fd.reset();
   }
-  if (out_fd) {
+  if (out_fd.has_value()) {
     os::close_fd(*out_fd);
     out_fd.reset();
   }
-  if (err_fd) {
+  if (err_fd.has_value()) {
     os::close_fd(*err_fd);
     err_fd.reset();
   }

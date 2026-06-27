@@ -120,10 +120,13 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
 
 pure fn Word::runs_substitution() const wontthrow -> bool
 {
-  for (let const &segment : segments)
+  for (let const &segment : segments) {
     if (segment.kind == WordSegment::Kind::CommandSubstitution ||
         segment.kind == WordSegment::Kind::FunctionSubstitution)
+    {
       return true;
+    }
+  }
   return false;
 }
 

@@ -1,0 +1,10 @@
+#!/bin/env shit
+v=hello
+echo "${v:0:-2}"
+echo "${v: -3:2}"
+echo "${v:(-3)}"
+echo "${v:10}"
+echo "${v//l/L}"
+w=a.b.c
+echo "${w%.*}"
+echo "${w##*.}"

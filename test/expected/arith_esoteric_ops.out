@@ -1,0 +1,74 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 2 ** 3 ** 2 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( -2 ** 2 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( ~0 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( -10 % 3 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 10 % -3 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( +-+5 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0 ? 20 : 30 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 3 & 5 | 2 ^ 1 ))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 2 ** 3 ** 2 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " -2 ** 2 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " ~0 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " -10 % 3 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 10 % -3 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " +-+5 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0 ? 20 : 30 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 3 & 5 | 2 ^ 1 "
+]
+512
+4
+-1
+-1
+1
+-5
+30
+3
+[Code 0]

@@ -239,7 +239,9 @@ fn command_word_literal(const Token *token) throws -> Maybe<String>
     if (segment.kind != WordSegment::Kind::LiteralText &&
         segment.kind != WordSegment::Kind::DoubleQuotedText &&
         segment.kind != WordSegment::Kind::UnquotedText)
+    {
       return None;
+    }
     name.append(segment.text.view());
   }
   return name;

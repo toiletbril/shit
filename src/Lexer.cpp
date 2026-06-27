@@ -147,7 +147,9 @@ flatten fn Lexer::peek_expression_token() throws -> Token *
   skip_whitespace();
   if (m_peek_cache != nullptr && !m_peek_cache_is_shell &&
       m_peek_cache_position == m_cursor_position)
+  {
     return m_peek_cache;
+  }
   Token *const t = lex_expression_token();
   m_peek_cache = t;
   m_peek_cache_is_shell = false;
@@ -160,7 +162,9 @@ flatten fn Lexer::peek_shell_token() throws -> Token *
   skip_whitespace();
   if (m_peek_cache != nullptr && m_peek_cache_is_shell &&
       m_peek_cache_position == m_cursor_position)
+  {
     return m_peek_cache;
+  }
   Token *const t = lex_shell_token();
   m_peek_cache = t;
   m_peek_cache_is_shell = true;

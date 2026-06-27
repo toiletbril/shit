@@ -1,0 +1,75 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign v=hello]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$v:0:-2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$v: -3:2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$v:(-3)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$v:10"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$v//l/L"]
+  [CompoundListCondition, None]
+    [Assign w=a.b.c]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$w%.*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$w##*."]
+[Word
+  Unquoted "v=hello"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "v:0:-2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "v: -3:2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "v:(-3)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "v:10"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "v//l/L"
+]
+[Word
+  Unquoted "w=a.b.c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "w%.*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "w##*."
+]
+hel
+ll
+llo
+
+heLLo
+a.b
+c
+[Code 0]
