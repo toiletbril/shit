@@ -1,5 +1,5 @@
-/* Toiletline.hpp is not included to define toiletline configuration macros here
- * rather than in the header. */
+/* The toiletline configuration macros are defined here, so Toiletline.hpp is
+ * not included. */
 
 #include "Arena.hpp"
 #include "Cli.hpp"

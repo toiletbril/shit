@@ -292,13 +292,13 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
       continue;
     }
 
-    bool repeat = true;
+    bool should_repeat = true;
 
     Flag *flag{};
     const char *value_offset{};
 
-    while (repeat) {
-      repeat = false;
+    while (should_repeat) {
+      should_repeat = false;
 
       let const found =
           find_flag(flags, flag_offset, is_long, &flag, &value_offset);
@@ -315,7 +315,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
           if (!is_long && *value_offset != '\0') {
             ++flag_offset;
-            repeat = true;
+            should_repeat = true;
             continue;
           }
         } break;
@@ -525,7 +525,7 @@ cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
   const usize text_width = width > indent ? width - indent : 1;
   usize line_used = 0;
   usize word_start = 0;
-  bool line_started = false;
+  bool is_line_started = false;
   /* Each space, and the end of the text, closes a word. A word is placed on the
      current line when it still fits, otherwise a new indented line begins. A
      word wider than the line is emitted whole rather than split. */
@@ -534,15 +534,15 @@ cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
     if (!at_end && text[i] != ' ') continue;
     const usize word_length = i - word_start;
     if (word_length > 0) {
-      if (line_started && line_used + 1 + word_length > text_width) {
+      if (is_line_started && line_used + 1 + word_length > text_width) {
         out += '\n';
-        line_started = false;
+        is_line_started = false;
         line_used = 0;
       }
-      if (!line_started) {
+      if (!is_line_started) {
         for (usize j = 0; j < indent; j++)
           out += ' ';
-        line_started = true;
+        is_line_started = true;
       } else {
         out += ' ';
         line_used++;
@@ -641,13 +641,13 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
       "OPTIONS",      "POSIX OPTIONS", "BASH OPTIONS", "COMPATIBILITY OPTIONS",
       "SHIT OPTIONS", "DEBUG OPTIONS"};
   for (u8 section = 0; section < countof(SECTION_HEADERS); section++) {
-    bool header_printed = false;
+    bool was_header_printed = false;
     for (let const flag : flags) {
       if (static_cast<u8>(flag->section()) != section) continue;
-      if (!header_printed) {
+      if (!was_header_printed) {
         if (!s.is_empty()) s += "\n\n";
         s += SECTION_HEADERS[section];
-        header_printed = true;
+        was_header_printed = true;
       }
       do_render_flag(flag);
     }

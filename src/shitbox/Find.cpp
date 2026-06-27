@@ -46,14 +46,17 @@ static fn find_entry_matches(char type_letter, StringView filename, usize depth,
     return false;
   }
 
-  if (options.type_filter == 'f' && type_letter != '-') {
-    return false;
-  }
-  if (options.type_filter == 'd' && type_letter != 'd') {
-    return false;
-  }
-  if (options.type_filter == 'l' && type_letter != 'l') {
-    return false;
+  switch (options.type_filter) {
+  case 'f':
+    if (type_letter != '-') return false;
+    break;
+  case 'd':
+    if (type_letter != 'd') return false;
+    break;
+  case 'l':
+    if (type_letter != 'l') return false;
+    break;
+  default: break;
   }
 
   if (options.has_name && !utils::glob_matches(options.name_pattern, filename,
