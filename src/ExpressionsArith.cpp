@@ -43,8 +43,7 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      relocated to the whole [[ ]] span so the caret covers the construct. An
      already-located diagnostic passes through untouched. The current location
      moves here first so a runtime warning from the operand expansion carets
-     this
-     [[ rather than the statement before it. */
+     this [[ rather than the statement before it. */
   cxt.set_current_location(source_location());
   i64 status;
   try {

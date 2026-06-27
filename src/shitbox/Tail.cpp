@@ -65,22 +65,23 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_print_headers = sources.count() > 1;
   let output = String{};
   i32 status = 0;
-  for (usize s = 0; s < sources.count(); s++) {
-    Maybe<String> content = read_named_or_stdin(ec, sources[s]);
+  for (usize source_index = 0; source_index < sources.count(); source_index++) {
+    Maybe<String> content = read_named_or_stdin(ec, sources[source_index]);
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
       report_soft_shitbox_error(ec, cxt,
-                                "tail: cannot open '" + String{sources[s]} +
+                                "tail: cannot open '" +
+                                    String{sources[source_index]} +
                                     "': " + os::last_system_error_message());
       status = 1;
       continue;
     }
 
     if (should_print_headers) {
-      if (s > 0) output += '\n';
+      if (source_index > 0) output += '\n';
       output += "==> ";
-      output += sources[s];
+      output += sources[source_index];
       output += " <==\n";
     }
 

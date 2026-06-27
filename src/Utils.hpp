@@ -28,8 +28,7 @@ inline fn merge_args_to_string(const ArrayList<String> &args) throws -> String
   return result;
 }
 
-/* The index of the first matching suffix in the omitted-extension list, or None
-   when none match. */
+/* The index of the first suffix equal to wanted, or None when none match. */
 fn find_pos_in_vec(const ArrayList<String> &suffixes,
                    StringView wanted) wontthrow -> Maybe<usize>;
 
