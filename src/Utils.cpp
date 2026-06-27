@@ -23,10 +23,11 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
 {
   let result = String{};
   result.reserve(64);
-  for (let const token : tokens) {
+  for (usize i = 0; i < tokens.count(); i++) {
+    let const token = tokens[i];
     ASSERT(token != nullptr);
     result += token->raw_string();
-    if (token != tokens.back()) {
+    if (i + 1 < tokens.count()) {
       result += ' ';
     }
   }

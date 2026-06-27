@@ -63,12 +63,10 @@ fn evaluate_one(const ExecContext &ec, EvalContext &cxt,
 }
 
 /* A standalone REPL line of the form name=value binds the variable to its
-   right-side expression text without evaluating it, the deferred definition, so
-   a formula may name a variable that is not set yet and recompute lazily on
-   each later read. The line prints nothing, since it is a definition. Returns
-   true
-   when the line was an assignment, and a == comparison is left for the
-   evaluator. */
+   right-side expression text without evaluating it. A formula may name a
+   variable that is not set yet and recompute on each later read. The line
+   prints nothing. The return is true when the line was an assignment, and a ==
+   comparison is left for the evaluator. */
 fn try_define(EvalContext &cxt, StringView line) throws -> bool
 {
   usize i = 0;

@@ -19,12 +19,12 @@ struct cached_directory_entry
   bool is_directory{false};
 };
 
-static pure forceinline fn is_blank(char byte) throws -> bool
+static pure forceinline fn is_blank(char byte) wontthrow -> bool
 {
   return byte == ' ' || byte == '\t';
 }
 
-static pure forceinline fn skip_blanks(StringView text, usize from) throws
+static pure forceinline fn skip_blanks(StringView text, usize from) wontthrow
     -> usize
 {
   while (from < text.length && is_blank(text[from]))
@@ -32,7 +32,7 @@ static pure forceinline fn skip_blanks(StringView text, usize from) throws
   return from;
 }
 
-static pure forceinline fn trim_blanks(StringView text) throws -> StringView
+static pure forceinline fn trim_blanks(StringView text) wontthrow -> StringView
 {
   let const start = skip_blanks(text, 0);
   let end = text.length;

@@ -790,10 +790,16 @@ static fn tokenize_arithmetic(StringView src,
    char parser, since the token fast path keeps no side-effect ordering. */
 static pure fn arith_op_is_complex(StringView t) wontthrow -> bool
 {
-  return t == "=" || t == "+=" || t == "-=" || t == "*=" || t == "/=" ||
-         t == "%=" || t == "&=" || t == "|=" || t == "^=" || t == "<<=" ||
-         t == ">>=" || t == "?" || t == ":" || t == "," || t == "++" ||
-         t == "--" || t == "&&" || t == "||";
+  static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
+      {SSK("="), true},   {SSK("+="), true},  {SSK("-="), true},
+      {SSK("*="), true},  {SSK("/="), true},  {SSK("%="), true},
+      {SSK("&="), true},  {SSK("|="), true},  {SSK("^="), true},
+      {SSK("<<="), true}, {SSK(">>="), true}, {SSK("?"), true},
+      {SSK(":"), true},   {SSK(","), true},   {SSK("++"), true},
+      {SSK("--"), true},  {SSK("&&"), true},  {SSK("||"), true},
+  };
+  static constexpr StaticStringMap<bool> COMPLEX_OPS{ENTRIES, countof(ENTRIES)};
+  return COMPLEX_OPS.find(t).has_value();
 }
 
 /* True when every token is a plain arithmetic token the fast path can evaluate

@@ -359,7 +359,7 @@ fn try_fold_arithmetic_with_constants(StringView expression,
 
 /* Strip the leading and trailing arithmetic whitespace from a span. The span is
    returned narrowed, never widened. */
-pure fn trim_arithmetic_whitespace(StringView text) wontthrow -> StringView
+static pure fn trim_arithmetic_whitespace(StringView text) wontthrow -> StringView
 {
   usize start_position = 0;
   while (start_position < text.length &&
@@ -379,8 +379,9 @@ pure fn trim_arithmetic_whitespace(StringView text) wontthrow -> StringView
    different operator. A bare variable operand folds only when nounset is
    provably off in the live shell, since reading an unset name under set -u is
    an error this fold would swallow. */
-fn try_algebraic_simplify(StringView expression,
-                          const AnalysisContext &actx) wontthrow -> Maybe<i64>
+static fn try_algebraic_simplify(StringView expression,
+                                 const AnalysisContext &actx) wontthrow
+    -> Maybe<i64>
 {
   let const expr = trim_arithmetic_whitespace(expression);
   if (expr.length == 0) return None;

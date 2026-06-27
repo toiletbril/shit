@@ -83,7 +83,7 @@ hot pure fn is_part_of_identifier(char ch) wontthrow -> bool
 /* A byte that the identifier lexer copies verbatim into the current
    UnquotedText segment while outside any quote and outside an escape. A run of
    these bytes lexes to one literal append with no per-byte state change. */
-hot pure fn is_plain_unquoted_run_byte(char ch) wontthrow -> bool
+hot pure static fn is_plain_unquoted_run_byte(char ch) wontthrow -> bool
 {
   return is_part_of_identifier(ch) && ch != '$' && ch != '`' && ch != '\\' &&
          ch != '"' && ch != '\'';
@@ -99,7 +99,7 @@ hot pure fn is_string_quote(char ch) wontthrow -> bool
   }
 }
 
-hot pure fn is_ascii_char(char ch) wontthrow -> bool
+hot pure static fn is_ascii_char(char ch) wontthrow -> bool
 {
   return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 }
