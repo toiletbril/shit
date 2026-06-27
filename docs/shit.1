@@ -194,6 +194,102 @@ The flag is compiled in only in a debug build.
 .TP
 .BI \-\-debug\-logging\-file= FILE
 The debug log is appended to FILE in place of standard error.
+.SH BASH SYNTAX
+The bash language beyond POSIX sh is accepted in every mood but sh. The forms
+below are the additions, with the traps a compatible reimplementation has to get
+right.
+.SS Arrays
+.TP
+.B Indexed
+An array is built with a=(x y z), an element is set with a[2]=z, and more are
+appended with a+=(w). ${a[i]} reads an element through an arithmetic subscript,
+${a[@]} and ${a[*]} list the elements, ${#a[@]} counts them, and ${!a[@]} lists
+the indices. A negative index counts from the end. A gap left by a[5]=q makes a
+sparse array whose ${!a[@]} skips the holes.
+.TP
+.B Associative
+An associative array is declared with declare \-A m, then set with m[key]=v and
+read with ${m[key]}. ${!m[@]} lists the keys, and unset 'm[key]' removes one
+entry.
+.TP
+.B "The quoting trap"
+"${a[@]}" keeps each element a separate field, while "${a[*]}" joins them on the
+first byte of IFS. An inner ${a[*]} inside ${x[@]+"${a[*]}"} still joins on IFS.
+A read of ${a[@]} under set \-u raises an error when a is unset.
+.SS Conditionals and arithmetic
+.TP
+.B "[[ ... ]]"
+The test command takes ==, !=, the numeric \-eq family, the file tests including
+\-nt and \-ot, && and ||, and =~ for a POSIX regex that fills BASH_REMATCH. The
+right side of == is a glob when it is bare and a literal when it is quoted, and
+=~ splits the same way. && and || short\-circuit, so a dead branch that holds a
+malformed regex is never compiled.
+.TP
+.B "(( ... )) and $(( ... ))"
+Arithmetic takes the C operators, ++ and \-\-, **, the ternary, the comma, the
+assignment operators, and a based literal such as 16#ff. A name is re\-evaluated
+as an expression, so a[b[c]] resolves c, then b, then a. An empty (( )) exits 1,
+while $(( )) yields its value.
+.SS Parameter expansion
+.TP
+.B Substring
+${v:offset:length} cuts a substring. A negative offset is written with a leading
+space, ${v: \-3}. Without the space ${v:\-3} is the default\-value form. A
+negative length stops that many characters from the end.
+.TP
+.B Replacement
+${v/pat/rep} replaces the first match and ${v//pat/rep} every match, anchored by
+/# at the front and /% at the end. An & in the replacement stands for the
+matched text, and \\& is a literal &.
+.TP
+.B "Case and transform"
+${v^^} and ${v,,} change the case of every character, ${v^} and ${v,} the first,
+each with an optional pattern. The ${v@Q}, @E, @A, @P, and @a transforms quote,
+expand, render, and report the value.
+.TP
+.B Indirection
+${!ref} reads the variable that ref names. ${!pre*} and ${!pre@} list the names
+that start with pre.
+.SS Word generation
+.TP
+.B "Brace expansion"
+{a,b,c} lists words, {1..10} and {a..z} count a range, {1..10..2} adds a step,
+and {001..10} pads the width. Braces nest and multiply. A lone {a} stays
+literal.
+.TP
+.B Quoting
+$'...' reads the C escapes \\n, \\t, \\xHH, and \\OOO.
+.TP
+.B "Redirection and substitution"
+&> and &>> send both output streams to a file, and |& pipes both. <(cmd) and
+>(cmd) are process substitutions on a /dev/fd path, and <<< is a here\-string
+that appends one newline.
+.TP
+.B Globbing
+shopt \-s extglob turns on ?(), *(), +(), @(), and !(), and shopt \-s globstar
+turns on **. dotglob, nullglob, and failglob change how a leading dot, a
+non\-match, and a failed match are treated. In the default mood a non\-matching
+glob and a glob in command position are fatal, and a compatibility mood warns.
+.SS Builtins and pitfalls
+.TP
+.B Attributes
+declare, local, typeset, and readonly take \-a, \-A, \-i, \-r, and \-x. printf
+takes \-v to assign its result, and mapfile and readarray with \-t read the
+lines of the input into an array.
+.TP
+.B "Pipeline status"
+Under set \-o pipefail the pipeline reports the rightmost failing stage, and the
+default mood turns pipefail on. PIPESTATUS holds every stage's status in either
+case.
+.TP
+.B "Word splitting"
+An unquoted $@ or $* splits on IFS. "$@" keeps the parameters apart, and "$*"
+joins them on the first byte of IFS. A run of a non\-whitespace IFS character
+makes an empty field, and a run of whitespace collapses.
+.TP
+.B read
+read \-r keeps a backslash literal. A plain read treats a trailing backslash as
+a line continuation.
 .SH LINE EDITING
 The interactive line editor starts in emacs mode. A vi-style modal editor is
 selected by
