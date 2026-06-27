@@ -1806,7 +1806,7 @@ fn current_executable_path() wontthrow -> Maybe<String>
 
   let const raw_path = StringView{buffer.begin()};
   if (let const canonical = canonical_path(Path{raw_path}); canonical)
-    return String{canonical->view()};
+    return String{canonical->text()};
 
   return String{raw_path};
 #else
