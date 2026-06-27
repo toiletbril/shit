@@ -57,17 +57,19 @@ FLAG(LOGIN, Bool, 'l', "login", Posix,
 FLAG(IGNORED1, Bool, 'h', "\0", Posix, "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", Posix, "Ignored, left for compatibility.");
 
-FLAG(
-    RCFILE, String, '\0', "rcfile", Bash,
-    "Source FILE as the interactive rc. In the shit mood it replaces /etc/shitrc "
-    "and ~/.shitrc, and in the bash mood it replaces ~/.bashrc. A non-interactive "
-    "run reads no rc.");
+FLAG(RCFILE, String, '\0', "rcfile", Bash,
+     "Source FILE as the interactive rc. In the shit mood it replaces "
+     "/etc/shitrc "
+     "and ~/.shitrc, and in the bash mood it replaces ~/.bashrc. A "
+     "non-interactive "
+     "run reads no rc.");
 FLAG(PRIVILEGED, Bool, 'p', "privileged", Bash,
      "Run in privileged mode and skip every startup config file. Turned on "
      "automatically when the effective and the real user or group id differ.");
-FLAG(CLEAN, Bool, '\0', "clean", Shit,
-     "Start a clean shell. No startup file is read in any mood, and PATH is set "
-     "to a minimal default.");
+FLAG(
+    CLEAN, Bool, '\0', "clean", Shit,
+    "Start a clean shell. No startup file is read in any mood, and PATH is set "
+    "to a minimal default.");
 FLAG(POSIX_COMPAT, Bool, '\0', "posix", Bash,
      "Run in POSIX mode, equivalent to --mood sh.");
 
@@ -678,7 +680,8 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
     case mimic_mood::Default:
       /* The shit flavor reads the dash login profiles, then the system and home
          shit rc for an interactive shell. A --rcfile replaces the shit rc with
-         the named file, the same way it replaces the bash rc in the bash mood. */
+         the named file, the same way it replaces the bash rc in the bash mood.
+       */
       if (is_login_shell) source_posix_login_files(context, ast_arena);
       if (should_be_interactive) {
         if (FLAG_RCFILE.is_set()) {
@@ -1308,7 +1311,7 @@ fn main(int argc, char **argv) -> int
      --clean skips them too for a shell that runs nothing before the prompt. */
   if (is_privileged || is_rescue_mode || FLAG_CLEAN.is_enabled()) {
     LOG(Info, "skipping every startup config file in %s mode",
-        is_rescue_mode      ? "rescue"
+        is_rescue_mode            ? "rescue"
         : FLAG_CLEAN.is_enabled() ? "clean"
                                   : "privileged");
   } else {
@@ -1427,8 +1430,9 @@ fn main(int argc, char **argv) -> int
           /* The ghost suggestion and the syntax coloring are driven by one
              switch, and -T has already dropped both by leaving completion
              unregistered. */
-          let const should_highlight = !FLAG_NO_COMPLETION.is_enabled() &&
-                                       !FLAG_NO_SYNTAX_HIGHLIGHTING.is_enabled();
+          let const should_highlight =
+              !FLAG_NO_COMPLETION.is_enabled() &&
+              !FLAG_NO_SYNTAX_HIGHLIGHTING.is_enabled();
           toiletline::set_highlight_enabled(should_highlight);
           toiletline::set_ghost_enabled(should_highlight);
           shit::show_message(

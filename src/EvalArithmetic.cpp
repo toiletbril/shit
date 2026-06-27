@@ -791,12 +791,24 @@ static fn tokenize_arithmetic(StringView src,
 static pure fn arith_op_is_complex(StringView t) wontthrow -> bool
 {
   static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
-      {SSK("="), true},   {SSK("+="), true},  {SSK("-="), true},
-      {SSK("*="), true},  {SSK("/="), true},  {SSK("%="), true},
-      {SSK("&="), true},  {SSK("|="), true},  {SSK("^="), true},
-      {SSK("<<="), true}, {SSK(">>="), true}, {SSK("?"), true},
-      {SSK(":"), true},   {SSK(","), true},   {SSK("++"), true},
-      {SSK("--"), true},  {SSK("&&"), true},  {SSK("||"), true},
+      {SSK("="),   true},
+      {SSK("+="),  true},
+      {SSK("-="),  true},
+      {SSK("*="),  true},
+      {SSK("/="),  true},
+      {SSK("%="),  true},
+      {SSK("&="),  true},
+      {SSK("|="),  true},
+      {SSK("^="),  true},
+      {SSK("<<="), true},
+      {SSK(">>="), true},
+      {SSK("?"),   true},
+      {SSK(":"),   true},
+      {SSK(","),   true},
+      {SSK("++"),  true},
+      {SSK("--"),  true},
+      {SSK("&&"),  true},
+      {SSK("||"),  true},
   };
   static constexpr StaticStringMap<bool> COMPLEX_OPS{ENTRIES, countof(ENTRIES)};
   return COMPLEX_OPS.find(t).has_value();

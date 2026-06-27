@@ -411,10 +411,10 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         /* make_pipe opened both ends in the parent, so this child inherited the
            read end of its own output pipe. The stage only writes through its
            standard output, so that read end is closed here. It carries
-           close-on-exec, so a stage that execs in place drops it for free, but a
-           stage that runs its command as a grandchild instead of execing would
-           otherwise keep the pipe open and a producer in this stage would never
-           see its consumer leave. */
+           close-on-exec, so a stage that execs in place drops it for free, but
+           a stage that runs its command as a grandchild instead of execing
+           would otherwise keep the pipe open and a producer in this stage would
+           never see its consumer leave. */
         if (pipe.has_value()) os::close_fd(pipe->in);
 
         /* The child evaluates the stage in a subshell, so a variable change

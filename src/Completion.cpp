@@ -238,8 +238,7 @@ static constexpr StaticStringMap<bool>::entry TRANSPARENT_PREFIX_ENTRIES[] = {
     {SSK("builtin"), true},
 };
 static constexpr StaticStringMap<bool> TRANSPARENT_PREFIXES{
-    TRANSPARENT_PREFIX_ENTRIES,
-    countof(TRANSPARENT_PREFIX_ENTRIES)};
+    TRANSPARENT_PREFIX_ENTRIES, countof(TRANSPARENT_PREFIX_ENTRIES)};
 
 static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
 {

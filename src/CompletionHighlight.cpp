@@ -527,9 +527,10 @@ struct heredoc_pending_highlight
 /* The queued heredoc bodies are colored as a here-string, so the body lines are
    not mis-colored as commands. A <<- delimiter is matched once its leading tabs
    are skipped, the way the lexer strips them. */
-static fn scan_heredoc_bodies(StringView line, usize position, usize end,
-                              const ArrayList<heredoc_pending_highlight> &pending,
-                              ArrayList<highlight_span> &spans) throws -> usize
+static fn
+scan_heredoc_bodies(StringView line, usize position, usize end,
+                    const ArrayList<heredoc_pending_highlight> &pending,
+                    ArrayList<highlight_span> &spans) throws -> usize
 {
   let i = position;
 
@@ -554,7 +555,8 @@ static fn scan_heredoc_bodies(StringView line, usize position, usize end,
 
       if (content == heredoc.delimiter) {
         if (body_start < line_end)
-          spans.push(highlight_span{body_start, line_end, colors::ansi::YELLOW});
+          spans.push(
+              highlight_span{body_start, line_end, colors::ansi::YELLOW});
         i = next;
         was_closed = true;
         break;
@@ -620,8 +622,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       break;
     }
 
-    /* A << queues a heredoc body that the closing delimiter ends, while <<< is a
-       one-line here-string and falls through to the operator scan. */
+    /* A << queues a heredoc body that the closing delimiter ends, while <<< is
+       a one-line here-string and falls through to the operator scan. */
     if (c == '<' && i + 1 < end && line[i + 1] == '<' &&
         !(i + 2 < end && line[i + 2] == '<'))
     {

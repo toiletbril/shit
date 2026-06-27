@@ -1433,7 +1433,8 @@ fn EvalContext::find_loop_redirect_fd(i32 target_fd, const String &path,
 {
   for (let const &entry : m_loop_redirect_fds) {
     if (entry.target_fd == target_fd && entry.mode == mode &&
-        entry.path == path) {
+        entry.path == path)
+    {
       return entry.fd;
     }
   }
@@ -1909,7 +1910,8 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
     /* With the shitbox option on, a bare utility name resolves to the shitbox
        builtin, beating an external program the way a busybox applet does. */
     if (!resolved_builtin.has_value() && is_shitbox_enabled &&
-        shitbox::find_util(program.view()).has_value()) {
+        shitbox::find_util(program.view()).has_value())
+    {
       resolved_builtin = Builtin::Kind::Shitbox;
     }
 

@@ -438,7 +438,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
                 expand_word_for_assignment(assignment_token->value_word());
             /* An integer name adds rather than concatenates. */
             if (assignment_token->is_append() &&
-                is_integer_variable(assignment_token->key())) {
+                is_integer_variable(assignment_token->key()))
+            {
               append_integer_expression(assignment, expanded_value.view());
             } else {
               assignment.append(expanded_value.view());

@@ -361,7 +361,8 @@ fn try_fold_arithmetic_with_constants(StringView expression,
 
 /* Strip the leading and trailing arithmetic whitespace from a span. The span is
    returned narrowed, never widened. */
-static pure fn trim_arithmetic_whitespace(StringView text) wontthrow -> StringView
+static pure fn trim_arithmetic_whitespace(StringView text) wontthrow
+    -> StringView
 {
   usize start_position = 0;
   while (start_position < text.length &&

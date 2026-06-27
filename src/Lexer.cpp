@@ -240,8 +240,8 @@ hot fn Lexer::advance_past_last_peek() throws -> usize
   return r;
 }
 
-cold fn Lexer::register_heredoc(StringView delimiter, bool should_strip_tabs) throws
-    -> const String *
+cold fn Lexer::register_heredoc(StringView delimiter,
+                                bool should_strip_tabs) throws -> const String *
 {
   /* The body lives in the same arena as the parsed nodes that point at it, so
      its lifetime matches the AST. A lexer-owned heap body freed in ~Lexer would
