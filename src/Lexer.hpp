@@ -19,7 +19,7 @@ class BumpArena;
 struct heredoc_pending
 {
   String delimiter;
-  bool strip_tabs;
+  bool should_strip_tabs;
   String *body;
 };
 
@@ -105,7 +105,7 @@ public:
      the lexer fills when the current line ends. The buffer is an arena String
      the Eval layer reads through the parsed Redirection field that points at
      it. */
-  fn register_heredoc(StringView delimiter, bool strip_tabs) throws
+  fn register_heredoc(StringView delimiter, bool should_strip_tabs) throws
       -> const String *;
 
 protected:

@@ -669,14 +669,14 @@ fn Parser::build_file_or_dup_redirection(
 }
 
 fn Parser::build_both_streams_redirection(
-    bool append, SourceLocation op_location,
+    bool is_append, SourceLocation op_location,
     Maybe<SourceLocation> &first_location,
     ArrayList<expressions::Redirection> &out) throws -> void
 {
   /* The standard output goes to the file, then the standard error follows it,
      the pair bash builds for &>file. */
   build_file_or_dup_redirection(
-      1, append ? Token::Kind::DoubleGreater : Token::Kind::Greater,
+      1, is_append ? Token::Kind::DoubleGreater : Token::Kind::Greater,
       op_location, first_location, out, /*fd_was_explicit=*/true);
   out.push(stderr_to_stdout_dup());
 }

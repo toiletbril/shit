@@ -2,8 +2,8 @@
 
 /* A value or an Error, returned by a function that can fail instead of
    throwing. The error path carries the same Error the throwing code built. The
-   variant is accessed through get_if rather than get, so the no-exceptions
-   build never reaches a throwing path. */
+   active member is read through is_error and then value or error, so the
+   no-exceptions build never reaches a throwing path. */
 
 #include "Allocator.hpp"
 #include "Common.hpp"

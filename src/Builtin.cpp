@@ -63,11 +63,16 @@ fn is_special_builtin_name(StringView name) wontthrow -> bool
   /* The POSIX special builtin set, matched by name. The colon and the dot are
      special while their plain-word siblings true and source-as-a-program are
      not, so the kind cannot decide this. */
-  return name == ":" || name == "." || name == "break" || name == "continue" ||
-         name == "eval" || name == "exec" || name == "exit" ||
-         name == "export" || name == "readonly" || name == "return" ||
-         name == "set" || name == "shift" || name == "times" ||
-         name == "trap" || name == "unset";
+  static constexpr StaticStringMap<bool>::entry SPECIAL_BUILTIN_ENTRIES[] = {
+      {SSK(":"), true},        {SSK("."), true},      {SSK("break"), true},
+      {SSK("continue"), true}, {SSK("eval"), true},   {SSK("exec"), true},
+      {SSK("exit"), true},     {SSK("export"), true}, {SSK("readonly"), true},
+      {SSK("return"), true},   {SSK("set"), true},    {SSK("shift"), true},
+      {SSK("times"), true},    {SSK("trap"), true},   {SSK("unset"), true},
+  };
+  static constexpr StaticStringMap<bool> SPECIAL_BUILTINS{
+      SPECIAL_BUILTIN_ENTRIES, countof(SPECIAL_BUILTIN_ENTRIES)};
+  return SPECIAL_BUILTINS.find(name).has_value();
 }
 
 fn builtin_names() throws -> const ArrayList<String> &

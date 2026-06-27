@@ -32,17 +32,17 @@ namespace shitbox {
 static fn total_size(const Path &path) throws -> u64
 {
   if (path.is_directory() && !path.is_symbolic_link()) {
-    u64 sum = 0;
+    u64 total_bytes = 0;
     Maybe<ArrayList<String>> names = Path::read_directory(path);
     if (names.has_value())
       for (let const &name : *names) {
-        if (os::INTERRUPT_REQUESTED) return sum;
+        if (os::INTERRUPT_REQUESTED) return total_bytes;
 
         let const child =
             PathBuilder{path.text().view()}.append(name.view()).build();
-        sum += total_size(child);
+        total_bytes += total_size(child);
       }
-    return sum;
+    return total_bytes;
   }
   return path.file_size().value_or(0);
 }

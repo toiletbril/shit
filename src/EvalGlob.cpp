@@ -91,8 +91,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
     if (!should_expand_files && !full_path.is_directory()) continue;
 
     /* A leading-dot-less pattern skips a dotfile unless dotglob is on. The .
-       and
-       .. fed in above are kept only for a dotted pattern. */
+       and .. fed in above are kept only for a dotted pattern. */
     if (filename == "." || filename == "..") {
       if (!pattern_leads_with_dot) continue;
     } else if (!pattern_leads_with_dot && !filename.is_empty() &&

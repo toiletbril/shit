@@ -38,8 +38,10 @@ public:
   {
     if (this != &other) {
       reset();
-      m_has_value = other.m_has_value;
-      if (m_has_value) new (&m_storage) T(other.reference());
+      if (other.m_has_value) {
+        new (&m_storage) T(other.reference());
+        m_has_value = true;
+      }
     }
     return *this;
   }
@@ -100,7 +102,7 @@ public:
   /* The value when present, otherwise the fallback. */
   mustuse fn value_or(T fallback) const throws -> T
   {
-    return m_has_value ? reference() : steal(fallback);
+    return m_has_value ? value() : steal(fallback);
   }
 
   /* Equal to a bare value only when present and that value matches. */

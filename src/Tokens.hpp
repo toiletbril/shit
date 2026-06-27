@@ -302,7 +302,7 @@ inline constexpr StaticStringMap<Token::Kind>::entry KEYWORD_ENTRIES[] = {
 };
 
 inline constexpr StaticStringMap<Token::Kind> KEYWORDS{
-    KEYWORD_ENTRIES, sizeof(KEYWORD_ENTRIES) / sizeof(KEYWORD_ENTRIES[0])};
+    KEYWORD_ENTRIES, countof(KEYWORD_ENTRIES)};
 
 /* clang-format off */
 /* The location goes through the lexer's here() so the keyword token carries the

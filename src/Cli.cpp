@@ -206,7 +206,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
   Flag *prev_flag{};
   bool next_arg_is_value = false;
   bool prev_is_long = false;
-  bool ignore_rest = false;
+  bool should_ignore_rest = false;
 
   for (int i = 0; i < argc; i++) {
     ASSERT(argv[i] != nullptr);
@@ -259,7 +259,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     /* The first argument is the invocation name even when it opens with a
        dash, the login convention that spawns a shell as -bash, so it is
        never read as a flag bundle. */
-    if (ignore_rest || argv[i][0] != '-' || i == 0) {
+    if (should_ignore_rest || argv[i][0] != '-' || i == 0) {
       /* The program name is the first operand and does not end option parsing.
          The next operand is the script, after which every argument belongs to
          the script as a positional parameter, not to the shell, the way
@@ -267,7 +267,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
       const bool is_program_name = args.is_empty();
       LOG(Debug, "taking '%s' as an operand", argv[i]);
       args.push_managed(StringView{argv[i]});
-      if (!is_program_name) ignore_rest = true;
+      if (!is_program_name) should_ignore_rest = true;
       continue;
     }
 
@@ -284,7 +284,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     if (*flag_offset == '\0') {
       if (is_long) {
         LOG(Debug, "stopping option parsing at '--'");
-        ignore_rest = true;
+        should_ignore_rest = true;
       } else {
         args.push_managed(StringView{argv[i]});
       }

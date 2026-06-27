@@ -236,7 +236,7 @@ hot fn Lexer::advance_past_last_peek() throws -> usize
   return r;
 }
 
-cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
+cold fn Lexer::register_heredoc(StringView delimiter, bool should_strip_tabs) throws
     -> const String *
 {
   /* The body lives in the same arena as the parsed nodes that point at it, so
@@ -248,7 +248,7 @@ cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
   LOG(Debug, "registering a pending heredoc with delimiter '%.*s'",
       static_cast<int>(delimiter.length), delimiter.data);
 
-  m_pending_heredocs.push({String{delimiter}, strip_tabs, body});
+  m_pending_heredocs.push({String{delimiter}, should_strip_tabs, body});
 
   return body;
 }
@@ -275,7 +275,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
 
       usize line_offset = line_start;
       usize line_length = i - line_start;
-      if (pending.strip_tabs) {
+      if (pending.should_strip_tabs) {
         while (line_length > 0 && m_source[line_offset] == '\t') {
           line_offset++;
           line_length--;

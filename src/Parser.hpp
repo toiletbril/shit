@@ -69,7 +69,7 @@ private:
   /* Build the &> and &>> both-streams redirection, fd 1 to the file followed by
      fd 2 duplicating fd 1, the way bash expands &>file into >file 2>&1. */
   fn build_both_streams_redirection(
-      bool append, SourceLocation op_location,
+      bool is_append, SourceLocation op_location,
       Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out) throws -> void;
 

@@ -302,7 +302,7 @@ fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void;
 
 /* A byte count in the human-readable form ls -h and du -h print, the largest
    1024-based unit whose value is below 1024, with one decimal below ten and a
-   K, M, G, or T suffix. */
+   K, M, G, T, or P suffix. */
 fn format_human_size(u64 bytes) throws -> String;
 
 /* Resolve a signal spelling to its number for pkill and killall, a decimal
