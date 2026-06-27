@@ -30,3 +30,9 @@ echo "negated=$?"
 
 # A compound stage in the middle of a longer pipeline still wires through.
 seq 1 5 | { while read n; do echo "n=$n"; done; } | wc -l
+
+# A downstream stage that exits early frees a compound or function producer,
+# so a large producer behind a subshell or a function does not deadlock.
+seq 1 100000 | (cat) | head -3
+count_up() { seq 1 100000; }
+count_up | cat | head -2
