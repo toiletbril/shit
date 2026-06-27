@@ -138,30 +138,106 @@
       nixosModules.default = { config, lib, pkgs, ... }:
         let
           cfg = config.programs.shit;
+          shitPkg = if pkgs ? shit then pkgs.shit else
+            pkgs.callPackage ({ stdenv, clang, gnumake, git }:
+              stdenv.mkDerivation {
+                pname = "shit";
+                version = "0.1.0";
+                src = self;
+                nativeBuildInputs = [ clang gnumake git ];
+                preBuild = ''
+                  if [ ! -f src/toiletline/toiletline.h ]; then
+                    echo "providing toiletline submodule from flake input"
+                    rm -rf src/toiletline
+                    cp -r ${toiletline} src/toiletline
+                  fi
+                '';
+                buildPhase = ''
+                  runHook preBuild
+                  make -C src -j$NIX_BUILD_CORES MODE=rel CXX=${clang}/bin/clang++
+                  runHook postBuild
+                '';
+                installPhase = ''
+                  runHook preInstall
+                  mkdir -p $out/bin
+                  cp ./shit $out/bin/
+                  runHook postInstall
+                '';
+                meta = with lib; {
+                  description = "The fastest cross-platform Bash and POSIX-compatible shell";
+                  homepage = "https://github.com/toiletbril/shit";
+                  license = licenses.mit;
+                  mainProgram = "shit";
+                  platforms = platforms.unix;
+                };
+              }) { };
         in
         {
           options.programs.shit = {
             enable = lib.mkEnableOption "shit — the fastest cross-platform Bash and POSIX-compatible shell";
+            package = lib.mkOption {
+              type = lib.types.package;
+              default = shitPkg;
+              description = "The shit package to use";
+            };
           };
 
           config = lib.mkIf cfg.enable {
-            environment.systemPackages = [ pkgs.shit ];
-            environment.shells = [ pkgs.shit ];
+            environment.systemPackages = [ cfg.package ];
+            environment.shells = [ cfg.package ];
           };
         };
 
       darwinModules.default = { config, lib, pkgs, ... }:
         let
           cfg = config.programs.shit;
+          shitPkg = if pkgs ? shit then pkgs.shit else
+            pkgs.callPackage ({ stdenv, clang, gnumake, git }:
+              stdenv.mkDerivation {
+                pname = "shit";
+                version = "0.1.0";
+                src = self;
+                nativeBuildInputs = [ clang gnumake git ];
+                preBuild = ''
+                  if [ ! -f src/toiletline/toiletline.h ]; then
+                    echo "providing toiletline submodule from flake input"
+                    rm -rf src/toiletline
+                    cp -r ${toiletline} src/toiletline
+                  fi
+                '';
+                buildPhase = ''
+                  runHook preBuild
+                  make -C src -j$NIX_BUILD_CORES MODE=rel CXX=${clang}/bin/clang++
+                  runHook postBuild
+                '';
+                installPhase = ''
+                  runHook preInstall
+                  mkdir -p $out/bin
+                  cp ./shit $out/bin/
+                  runHook postInstall
+                '';
+                meta = with lib; {
+                  description = "The fastest cross-platform Bash and POSIX-compatible shell";
+                  homepage = "https://github.com/toiletbril/shit";
+                  license = licenses.mit;
+                  mainProgram = "shit";
+                  platforms = platforms.unix;
+                };
+              }) { };
         in
         {
           options.programs.shit = {
             enable = lib.mkEnableOption "shit — the fastest cross-platform Bash and POSIX-compatible shell";
+            package = lib.mkOption {
+              type = lib.types.package;
+              default = shitPkg;
+              description = "The shit package to use";
+            };
           };
 
           config = lib.mkIf cfg.enable {
-            environment.systemPackages = [ pkgs.shit ];
-            environment.shells = [ pkgs.shit ];
+            environment.systemPackages = [ cfg.package ];
+            environment.shells = [ cfg.package ];
           };
         };
 
