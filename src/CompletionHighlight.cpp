@@ -901,16 +901,13 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         stack.push(highlight_construct::Function);
         next_is_command = false;
         function_name_pending = true;
-      } else if (word == "then") {
+      } else if (word == "then" || word == "else" || word == "elif") {
         keyword_ok =
             !stack.is_empty() && stack.back() == highlight_construct::If;
       } else if (word == "do") {
         keyword_ok = !stack.is_empty() &&
                      (stack.back() == highlight_construct::WhileUntil ||
                       stack.back() == highlight_construct::For);
-      } else if (word == "else" || word == "elif") {
-        keyword_ok =
-            !stack.is_empty() && stack.back() == highlight_construct::If;
       } else if (word == "fi") {
         keyword_ok =
             !stack.is_empty() && stack.back() == highlight_construct::If;

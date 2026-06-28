@@ -46,7 +46,7 @@ test: $(BIN)
 	@cat $(FAILED_LIST)
 	@test ! -s $(FAILED_LIST)
 
-shit_tests: $(TEST_NAMES)
+shit_tests: $(BIN) $(TEST_NAMES)
 
 
 CLI_INPUT := $(wildcard cli/*.sh)
@@ -56,7 +56,7 @@ cli_%: expected/cli/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-cli-test.sh cli/$*.sh
 
-cli_tests: $(CLI_NAMES)
+cli_tests: $(BIN) $(CLI_NAMES)
 
 
 COMPLETION_INPUT := $(wildcard completion/*.sh)
@@ -87,7 +87,7 @@ highlight_%: expected/highlight/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-highlight-test.sh highlight/$*.sh
 
-highlight_tests: $(HIGHLIGHT_NAMES)
+highlight_tests: $(BIN) $(HIGHLIGHT_NAMES)
 
 
 REFILL ?=
