@@ -1224,6 +1224,9 @@ fn main(int argc, char **argv) -> int
   if (!shit::os::get_environment_variable("SHELL").has_value())
     context.set_shell_variable("SHELL", executable_path);
   context.set_shell_variable("PWD", shit::Path::current_directory().text());
+  /* SHIT names this shell's invocation path in every mood, the shit identity
+     mate of BASH, which is seeded only under the bash identity. */
+  context.set_shell_variable("SHIT", executable_path);
   context.set_shell_variable("SHIT_VERSION", SHIT_VERSION_STRING);
   context.set_shell_variable("SHIT_COMMIT", SHIT_COMMIT_HASH);
   context.set_shell_variable("SHIT_BUILD_MODE", SHIT_BUILD_MODE);
