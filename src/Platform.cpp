@@ -124,6 +124,12 @@ hot fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
   }
 }
 
+hot fn write_to_numbered_fd(i64 fd_number, const opaque *buf,
+                            usize size) wontthrow -> Maybe<usize>
+{
+  return write_fd(static_cast<os::descriptor>(fd_number), buf, size);
+}
+
 hot fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
     -> Maybe<usize>
 {
@@ -2175,6 +2181,15 @@ fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
   if (WriteFile(fd, buf, size, &w, 0) == FALSE) /* NOLINT */
     return shit::None;
   return static_cast<usize>(w);
+}
+
+fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
+    -> Maybe<usize>
+{
+  let const handle = reinterpret_cast<os::descriptor>(
+      _get_osfhandle(static_cast<int>(fd_number)));
+  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+  return write_fd(handle, buf, size);
 }
 
 fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>

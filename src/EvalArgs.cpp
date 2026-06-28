@@ -682,7 +682,10 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
   /* The trace goes to standard error so it stays out of a command
      substitution's captured output. The first character of PS4 is repeated once
      per enclosing subshell, then the whole prefix follows, so the default '+ '
-     shows '+ ' in the top shell and '++ ' in a substitution. */
+     shows '+ ' in the top shell and '++ ' in a substitution. BASH_XTRACEFD
+     names a descriptor the trace is steered to, which ble.sh uses to keep its
+     own trace off the terminal, and an unset or unparsable value falls back to
+     standard error. */
   if (should_echo_expanded()) {
     let trace = String{};
     let const ps4 = get_variable_value("PS4").value_or(String{"+ "});
@@ -693,7 +696,20 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
     }
     trace.append(utils::merge_args_to_string(expanded_args));
     trace.push('\n');
-    shit::print_error(trace);
+
+    Maybe<i64> xtrace_fd;
+    if (Maybe<String> xtrace_fd_value = get_variable_value("BASH_XTRACEFD");
+        xtrace_fd_value.has_value())
+    {
+      let const parsed = utils::parse_decimal_integer(xtrace_fd_value->view());
+      if (!parsed.is_error() && parsed.value() >= 0)
+        xtrace_fd = parsed.value();
+    }
+
+    if (xtrace_fd.has_value())
+      (void) os::write_to_numbered_fd(*xtrace_fd, trace.data(), trace.length());
+    else
+      shit::print_error(trace);
   }
 
   return expanded_args;

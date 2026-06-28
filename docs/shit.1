@@ -443,6 +443,10 @@ The prompt the select loop prints, "#? " by default.
 The prefix the set \-x trace prints, "+ " by default. The first character is
 repeated once per enclosing subshell.
 .TP
+.B BASH_XTRACEFD
+The descriptor the set \-x trace is written to. The trace stays on standard
+error when the variable is unset or holds no valid descriptor.
+.TP
 .B SHIT
 The path this shell was invoked through, the shit identity mate of BASH. The
 value is present in every mood, where BASH is seeded only under the bash

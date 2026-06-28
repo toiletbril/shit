@@ -1,0 +1,11 @@
+== trace steers to the descriptor, stdout still shows:
+hi
+== captured at the descriptor:
++ echo hi
++ set +x
+== without BASH_XTRACEFD the trace stays on stderr:
++ echo hi
++ set +x
+== an unparsable BASH_XTRACEFD falls back to stderr:
++ echo hi
++ set +x

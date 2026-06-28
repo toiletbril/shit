@@ -284,6 +284,8 @@ extern const ArrayList<String> OMITTED_SUFFIXES;
 
 fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
+fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
+    -> Maybe<usize>;
 fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
 
