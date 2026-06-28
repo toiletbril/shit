@@ -702,8 +702,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         xtrace_fd_value.has_value())
     {
       let const parsed = utils::parse_decimal_integer(xtrace_fd_value->view());
-      if (!parsed.is_error() && parsed.value() >= 0)
-        xtrace_fd = parsed.value();
+      if (!parsed.is_error() && parsed.value() >= 0) xtrace_fd = parsed.value();
     }
 
     if (xtrace_fd.has_value())

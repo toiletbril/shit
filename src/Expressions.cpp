@@ -118,7 +118,8 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
   has_fatal = true;
 }
 
-cold fn AnalysisContext::note_variable_assignment(StringView name) throws -> void
+cold fn AnalysisContext::note_variable_assignment(StringView name) throws
+    -> void
 {
   if (name.is_empty()) return;
 
@@ -133,10 +134,9 @@ cold fn AnalysisContext::note_variable_assignment(StringView name) throws -> voi
   }
 }
 
-cold fn AnalysisContext::note_variable_read(StringView name,
-                                            SourceLocation location,
-                                            bool is_top_level_unconditional)
-    throws -> void
+cold fn AnalysisContext::note_variable_read(
+    StringView name, SourceLocation location,
+    bool is_top_level_unconditional) throws -> void
 {
   if (!is_top_level_unconditional) return;
   if (has_seen_runtime_definer) return;
@@ -1733,16 +1733,16 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   if (is_top_level_unconditional && !command_is_shadowed) {
     if (VARIABLE_TARGET_COMMANDS.find(command_literal.view()).has_value()) {
       for (usize i = 1; i < m_args.count(); i++) {
-        let const word =
-            m_args[i]->kind() == Token::Kind::Word
-                ? static_cast<const tokens::WordToken *>(m_args[i])
-                      ->word()
-                      .to_literal_string()
-                : m_args[i]->raw_string();
+        let const word = m_args[i]->kind() == Token::Kind::Word
+                             ? static_cast<const tokens::WordToken *>(m_args[i])
+                                   ->word()
+                                   .to_literal_string()
+                             : m_args[i]->raw_string();
         actx.note_variable_assignment(operand_target_name(word.view()));
       }
     } else if (!VARIABLE_PROBE_COMMANDS.find(command_literal.view())
-                    .has_value()) {
+                    .has_value())
+    {
       for (usize i = 1; i < m_args.count(); i++) {
         if (m_args[i]->kind() != Token::Kind::Word) continue;
 

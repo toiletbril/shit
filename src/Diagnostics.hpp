@@ -90,7 +90,7 @@ inline const strictness_warning STRICTNESS_WARNINGS[] = {
      "value, the read errors in the strict default and -W reports it"       },
     {"arith-assign",
      "an assignment whose whole value is an arithmetic expansion reads as a "
-     "let, NAME=$((...)) is suggested as let NAME=..."                       },
+     "let, NAME=$((...)) is suggested as let NAME=..."                      },
     {"typeset-spelling",
      "typeset is the ksh name of declare, the declare spelling is clearer"  },
     {"unquoted-test",

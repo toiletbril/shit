@@ -293,7 +293,8 @@ static fn all_active_glob_mask(usize length) throws -> ArrayList<bool>
    it matches. */
 static fn command_name_matches(StringView name, StringView token,
                                bool token_is_glob,
-                               const ArrayList<bool> &glob_active) throws -> bool
+                               const ArrayList<bool> &glob_active) throws
+    -> bool
 {
   if (!token_is_glob) return name.starts_with(token);
 
