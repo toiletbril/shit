@@ -76,6 +76,7 @@ globstar
 --help
 -a
 -d
+-e
 -n
 -p
 -r

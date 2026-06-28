@@ -26,6 +26,9 @@ FLAG(READ_DELIM, String, 'd', "",
      "Read until the first byte of the given delimiter instead of a newline, "
      "or until a NUL byte when the delimiter is empty.");
 FLAG(READ_FD, String, 'u', "", "Read from the given file descriptor.");
+FLAG(READ_EDIT, Bool, 'e', "",
+     "Accepted for compatibility, the line editor is always used at a "
+     "terminal.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Read);
@@ -48,13 +51,14 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* The array, count, timeout, silent, delimiter, and descriptor options are
-     bash extensions, so the sh mood rejects them the way dash rejects an
-     illegal read option, while -r and -p stay portable. */
+  /* The array, count, timeout, silent, delimiter, descriptor, and editor
+     options are bash extensions, so the sh mood rejects them the way dash
+     rejects an illegal read option, while -r and -p stay portable. */
   if (cxt.is_posix_mode() &&
       (FLAG_READ_ARRAY.is_set() || FLAG_READ_TIMEOUT.is_set() ||
        FLAG_READ_NCHARS.is_set() || FLAG_READ_SILENT.is_enabled() ||
-       FLAG_READ_DELIM.is_set() || FLAG_READ_FD.is_set()))
+       FLAG_READ_DELIM.is_set() || FLAG_READ_FD.is_set() ||
+       FLAG_READ_EDIT.is_enabled()))
   {
     report_soft_builtin_error(ec, cxt, "Illegal option");
     return 2;
