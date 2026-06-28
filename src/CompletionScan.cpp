@@ -284,6 +284,34 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
   return &BUILD_TARGET_CACHE.find(key)->targets;
 }
 
+namespace {
+
+enum class build_tool_kind : u8
+{
+  make,
+  ninja,
+  cmake,
+  node_runner,
+  ssh,
+};
+
+constexpr StaticStringMap<build_tool_kind>::entry BUILD_TOOL_ENTRIES[] = {
+    {SSK("make"),  build_tool_kind::make       },
+    {SSK("ninja"), build_tool_kind::ninja      },
+    {SSK("cmake"), build_tool_kind::cmake      },
+    {SSK("npm"),   build_tool_kind::node_runner},
+    {SSK("yarn"),  build_tool_kind::node_runner},
+    {SSK("pnpm"),  build_tool_kind::node_runner},
+    {SSK("bun"),   build_tool_kind::node_runner},
+    {SSK("ssh"),   build_tool_kind::ssh        },
+    {SSK("scp"),   build_tool_kind::ssh        },
+};
+
+constexpr StaticStringMap<build_tool_kind> BUILD_TOOLS{
+    BUILD_TOOL_ENTRIES, countof(BUILD_TOOL_ENTRIES)};
+
+} // namespace
+
 /* Subprocesses run only on an explicit tab, and every listing caches on the
    source file's mtime. */
 fn complete_from_build_tools(StringView line, StringView token,
@@ -324,7 +352,11 @@ fn complete_from_build_tools(StringView line, StringView token,
   let owned_targets = ArrayList<String>{};
   const ArrayList<String> *targets = &owned_targets;
 
-  if (tool == "make") {
+  Maybe<build_tool_kind> tool_kind = BUILD_TOOLS.find(tool);
+  if (!tool_kind.has_value()) return None;
+
+  switch (tool_kind.value()) {
+  case build_tool_kind::make: {
     let const directory =
         settled_option_value(line, "-C").value_or(String{"."});
     let makefile_name = settled_option_value(line, "-f");
@@ -344,9 +376,6 @@ fn complete_from_build_tools(StringView line, StringView token,
     }
     let makefile_path = Path{directory.view()};
     makefile_path.push_component(makefile_name->view());
-    /* A -f naming a file that does not exist, or any path that vanished
-       between the probe and now, completes to nothing rather than running
-       make against a missing file. */
     if (!makefile_path.exists()) return None;
     let const make_directory = Path{directory.view()};
     targets = cached_targets_for(makefile_path, [&]() throws {
@@ -361,8 +390,6 @@ fn complete_from_build_tools(StringView line, StringView token,
       let database_targets =
           parse_make_database_targets(capture(probe).view(), make_directory);
       if (!database_targets.is_empty()) return database_targets;
-      /* An empty dump means no GNU make answered, so the bundled make parser
-         reads the Makefile and resolves its variables the way make would. */
       let const intrinsic_targets =
           shitbox::collect_makefile_targets(context, makefile_path);
       let filtered = ArrayList<String>{};
@@ -376,7 +403,9 @@ fn complete_from_build_tools(StringView line, StringView token,
       }
       return filtered;
     });
-  } else if (tool == "ninja") {
+    break;
+  }
+  case build_tool_kind::ninja: {
     let const directory =
         settled_option_value(line, "-C").value_or(String{"."});
     let build_file = Path{directory.view()};
@@ -392,9 +421,9 @@ fn complete_from_build_tools(StringView line, StringView token,
       probe.push(String{"targets"});
       return parse_colon_led_names(capture(probe).view());
     });
-  } else if (tool == "cmake") {
-    /* Only the --target operand of cmake --build completes, through the
-       generator's own target help. */
+    break;
+  }
+  case build_tool_kind::cmake: {
     if (previous_settled_word(line, token_start) != "--target") return None;
     let const build_directory = settled_option_value(line, "--build");
     if (!build_directory.has_value()) return None;
@@ -425,8 +454,9 @@ fn complete_from_build_tools(StringView line, StringView token,
       }
       return names;
     });
-  } else if (tool == "npm" || tool == "yarn" || tool == "pnpm" || tool == "bun")
-  {
+    break;
+  }
+  case build_tool_kind::node_runner: {
     if (second_word_of(line) != "run") return None;
     let const package_path = Path{StringView{"package.json"}};
     targets = cached_targets_for(package_path, [&]() throws {
@@ -434,17 +464,17 @@ fn complete_from_build_tools(StringView line, StringView token,
       return contents.has_value() ? parse_package_json_scripts(contents->view())
                                   : ArrayList<String>{};
     });
-  } else if (tool == "ssh" || tool == "scp") {
-    /* The host argument only, so an scp path operand still completes as a
-       file. A token that carries / or : is a path or a remote spec. */
+    break;
+  }
+  case build_tool_kind::ssh: {
     if (token.find_character('/').has_value() ||
         token.find_character(':').has_value())
     {
       return None;
     }
     owned_targets = collect_ssh_hosts();
-  } else {
-    return None;
+    break;
+  }
   }
 
   if (targets == nullptr) return None;

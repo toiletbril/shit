@@ -30,9 +30,7 @@ static StringMap<bool> PATH_SEARCH_VERDICTS{heap_allocator()};
 static fn first_word_resolves(StringView word, EvalContext &context) throws
     -> bool
 {
-  /* A reserved word is valid shell syntax, never colored unresolvable, and !
-     and time lead a command rather than name one. */
-  if (word == "!" || word == "time") return true;
+  if (word == "!") return true;
   if (KEYWORDS.find(word).has_value()) return true;
 
   /* A path word resolves against the filesystem, not the command-name sets, a
@@ -230,6 +228,90 @@ enum class highlight_construct : u8
   Function,
   Conditional,
 };
+
+namespace {
+
+enum class keyword_role : u8
+{
+  open,
+  check,
+  close,
+  plain,
+  misplaced_in,
+};
+
+struct keyword_spec
+{
+  keyword_role role;
+  highlight_construct construct = highlight_construct::If;
+  highlight_construct construct_alt = highlight_construct::If;
+  bool has_alt = false;
+  bool next_is_command = false;
+  bool opens_in = false;
+  bool opens_for_variable = false;
+  bool sets_function_pending = false;
+  bool requires_non_posix = false;
+};
+
+constexpr StaticStringMap<keyword_spec>::entry HIGHLIGHT_KEYWORD_ENTRIES[] = {
+    {SSK("if"),
+     {.role = keyword_role::open,
+      .construct = highlight_construct::If,
+      .next_is_command = true}                                            },
+    {SSK("while"),
+     {.role = keyword_role::open,
+      .construct = highlight_construct::WhileUntil,
+      .next_is_command = true}                                            },
+    {SSK("until"),
+     {.role = keyword_role::open,
+      .construct = highlight_construct::WhileUntil,
+      .next_is_command = true}                                            },
+    {SSK("for"),
+     {.role = keyword_role::open,
+      .construct = highlight_construct::For,
+      .opens_in = true,
+      .opens_for_variable = true}                                         },
+    {SSK("case"),
+     {.role = keyword_role::open,
+      .construct = highlight_construct::Case,
+      .opens_in = true}                                                   },
+    {SSK("[["),
+     {.role = keyword_role::open,
+      .construct = highlight_construct::Conditional,
+      .requires_non_posix = true}                                         },
+    {SSK("function"),
+     {.role = keyword_role::open,
+      .construct = highlight_construct::Function,
+      .sets_function_pending = true}                                      },
+    {SSK("then"),
+     {.role = keyword_role::check, .construct = highlight_construct::If}  },
+    {SSK("else"),
+     {.role = keyword_role::check, .construct = highlight_construct::If}  },
+    {SSK("elif"),
+     {.role = keyword_role::check, .construct = highlight_construct::If}  },
+    {SSK("do"),
+     {.role = keyword_role::check,
+      .construct = highlight_construct::WhileUntil,
+      .construct_alt = highlight_construct::For,
+      .has_alt = true}                                                    },
+    {SSK("fi"),
+     {.role = keyword_role::close, .construct = highlight_construct::If}  },
+    {SSK("done"),
+     {.role = keyword_role::close,
+      .construct = highlight_construct::WhileUntil,
+      .construct_alt = highlight_construct::For,
+      .has_alt = true}                                                    },
+    {SSK("esac"),
+     {.role = keyword_role::close, .construct = highlight_construct::Case}},
+    {SSK("time"),     {.role = keyword_role::plain}                       },
+    {SSK("when"),     {.role = keyword_role::plain}                       },
+    {SSK("in"),       {.role = keyword_role::misplaced_in}                },
+};
+
+constexpr StaticStringMap<keyword_spec> HIGHLIGHT_KEYWORDS{
+    HIGHLIGHT_KEYWORD_ENTRIES, countof(HIGHLIGHT_KEYWORD_ENTRIES)};
+
+} // namespace
 
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
@@ -877,54 +959,42 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       let next_is_command = true;
       let opens_in = false;
       let opens_for_variable = false;
-      if (word == "if") {
-        stack.push(highlight_construct::If);
-      } else if (word == "while" || word == "until") {
-        stack.push(highlight_construct::WhileUntil);
-      } else if (word == "for") {
-        stack.push(highlight_construct::For);
-        next_is_command = false;
-        opens_in = true;
-        opens_for_variable = true;
-      } else if (word == "case") {
-        stack.push(highlight_construct::Case);
-        next_is_command = false;
-        opens_in = true;
-      } else if (word == "[[" && !context.is_posix_mode()) {
-        /* The [[ conditional is a reserved word the parser matches as text, not
-           a command, so the operands inside it leave command position. The sh
-           mood is POSIX, where [[ is not a keyword, so it falls through to the
-           command coloring there the way the parser rejects it. */
-        stack.push(highlight_construct::Conditional);
-        next_is_command = false;
-      } else if (word == "function") {
-        stack.push(highlight_construct::Function);
-        next_is_command = false;
-        function_name_pending = true;
-      } else if (word == "then" || word == "else" || word == "elif") {
-        keyword_ok =
-            !stack.is_empty() && stack.back() == highlight_construct::If;
-      } else if (word == "do") {
-        keyword_ok = !stack.is_empty() &&
-                     (stack.back() == highlight_construct::WhileUntil ||
-                      stack.back() == highlight_construct::For);
-      } else if (word == "fi") {
-        keyword_ok =
-            !stack.is_empty() && stack.back() == highlight_construct::If;
-        if (keyword_ok) stack.pop_back();
-      } else if (word == "done") {
-        keyword_ok = !stack.is_empty() &&
-                     (stack.back() == highlight_construct::WhileUntil ||
-                      stack.back() == highlight_construct::For);
-        if (keyword_ok) stack.pop_back();
-      } else if (word == "esac") {
-        keyword_ok =
-            !stack.is_empty() && stack.back() == highlight_construct::Case;
-        if (keyword_ok) stack.pop_back();
-      } else if (word == "time" || word == "when") {
-      } else if (word == "in") {
-        keyword_ok = false;
-        next_is_command = false;
+      if (Maybe<keyword_spec> spec = HIGHLIGHT_KEYWORDS.find(word);
+          spec.has_value() &&
+          !(spec.value().requires_non_posix && context.is_posix_mode()))
+      {
+        let const &keyword = spec.value();
+        switch (keyword.role) {
+        case keyword_role::open:
+          stack.push(keyword.construct);
+          next_is_command = keyword.next_is_command;
+          opens_in = keyword.opens_in;
+          opens_for_variable = keyword.opens_for_variable;
+          function_name_pending = keyword.sets_function_pending;
+          break;
+
+        case keyword_role::check:
+          keyword_ok =
+              !stack.is_empty() &&
+              (stack.back() == keyword.construct ||
+               (keyword.has_alt && stack.back() == keyword.construct_alt));
+          break;
+
+        case keyword_role::close:
+          keyword_ok =
+              !stack.is_empty() &&
+              (stack.back() == keyword.construct ||
+               (keyword.has_alt && stack.back() == keyword.construct_alt));
+          if (keyword_ok) stack.pop_back();
+          break;
+
+        case keyword_role::plain: break;
+
+        case keyword_role::misplaced_in:
+          keyword_ok = false;
+          next_is_command = false;
+          break;
+        }
       } else {
         is_keyword = false;
       }

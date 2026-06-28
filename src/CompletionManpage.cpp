@@ -43,12 +43,21 @@ static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
    is cached too, so a command with no manpage or no options is not retried. */
 static StringMap<ArrayList<help_entry>> MANPAGE_OPTION_CACHE{heap_allocator()};
 
-/* The shared-manpage aliases, the only commands whose options live under a
-   different page name. A general `man COMMAND` scan covers the rest. */
+constexpr StaticStringMap<const char *>::entry MANPAGE_ALIAS_ENTRIES[] = {
+    {SSK("clang++"), "clang"},
+    {SSK("c++"),     "clang"},
+    {SSK("g++"),     "gcc"  },
+};
+
+constexpr StaticStringMap<const char *> MANPAGE_ALIASES{
+    MANPAGE_ALIAS_ENTRIES, countof(MANPAGE_ALIAS_ENTRIES)};
+
 static fn manpage_name_for(StringView command) throws -> String
 {
-  if (command == "clang++" || command == "c++") return String{"clang"};
-  if (command == "g++") return String{"gcc"};
+  if (Maybe<const char *> alias = MANPAGE_ALIASES.find(command);
+      alias.has_value())
+    return String{alias.value()};
+
   return String{command};
 }
 
