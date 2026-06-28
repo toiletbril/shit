@@ -766,8 +766,8 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
 
   /* A cobra-style function truncates its description to COLUMNS, so the width
      is set wide for the run and restored after, the whole description arriving
-     for shit's own dimmed column. Only an explicit tab runs a completion
-     function, so the ghost path keeps COLUMNS untouched. */
+     for shit's own dimmed column. A completion function runs only on an
+     explicit tab. The ghost path keeps COLUMNS untouched. */
   Maybe<String> saved_columns;
   if (for_listing) {
     saved_columns = context.get_variable_value("COLUMNS");

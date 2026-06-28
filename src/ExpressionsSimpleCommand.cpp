@@ -45,7 +45,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
 
   if (!m_assignment->is_append()) {
     const WordSegment *arithmetic_segment = nullptr;
-    let arithmetic_segment_count = 0;
+    usize arithmetic_segment_count = 0;
     let has_other_segment = false;
     for (let const &segment : m_assignment->value_word().segments) {
       if (segment.kind == WordSegment::Kind::ArithmeticExpansion) {
