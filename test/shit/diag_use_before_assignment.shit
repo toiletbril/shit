@@ -1,0 +1,4 @@
+#!/bin/env shit
+echo "$count"
+count=5
+echo "$count"

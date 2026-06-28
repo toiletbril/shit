@@ -43,6 +43,43 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
 {
   ASSERT(m_assignment != nullptr);
 
+  /* An assignment whose whole value is an arithmetic expansion reads as a let,
+     the let form takes the operands without the $(( )) wrapper. The split of
+     NAME=$((...)) leaves an empty literal segment beside the expansion, so the
+     scan skips empty segments. The check runs before the fold below, which
+     rewrites the segment to its constant result. */
+  if (!m_assignment->is_append()) {
+    const WordSegment *arithmetic_segment = nullptr;
+    let arithmetic_segment_count = 0;
+    let has_other_segment = false;
+    for (let const &segment : m_assignment->value_word().segments) {
+      if (segment.kind == WordSegment::Kind::ArithmeticExpansion) {
+        arithmetic_segment = &segment;
+        arithmetic_segment_count++;
+      } else if (!segment.text.is_empty()) {
+        has_other_segment = true;
+      }
+    }
+
+    if (arithmetic_segment_count == 1 && !has_other_segment) {
+      let expression = arithmetic_segment->text.view();
+      while (!expression.is_empty() &&
+             (expression[0] == ' ' || expression[0] == '\t'))
+        expression = expression.substring(1);
+      while (!expression.is_empty() &&
+             (expression[expression.length - 1] == ' ' ||
+              expression[expression.length - 1] == '\t'))
+        expression = expression.substring_of_length(0, expression.length - 1);
+
+      if (!expression.is_empty())
+        actx.warn(source_location(),
+                  StringView{"The assignment of '"} + m_assignment->key() +
+                      "' wraps an arithmetic expansion",
+                  StringView{"Use let "} + m_assignment->key() + "=" +
+                      expression);
+    }
+  }
+
   /* A constant $((...)) on the right of x=$((2+2)) is folded once by the
      constant-arithmetic rule, so the loop body that re-runs this assignment
      reads the cached result. The rule reads the constant table, so the fold
@@ -60,13 +97,17 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
      forgotten rather than recorded under the bracketed key. */
   if (let const bracket = name.view().find_character('['); bracket.has_value())
   {
+    let const base = name.view().substring_of_length(0, *bracket);
+    actx.note_variable_assignment(base);
     LOG(All,
         "forgetting the constant for the array base '%.*s' after an element "
         "assignment",
         static_cast<int>(*bracket), name.view().data);
-    actx.constant_variables.erase(name.view().substring_of_length(0, *bracket));
+    actx.constant_variables.erase(base);
     return;
   }
+
+  actx.note_variable_assignment(name.view());
 
   /* A plain scalar assignment inside a function body with no prior local for
      the name leaks the value to the global scope, the footgun shit's own

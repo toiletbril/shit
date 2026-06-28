@@ -97,6 +97,12 @@ $ make
 $ ./shit --help
 ```
 
+Or use Zig, which only supports `dbg`/`rel`:
+```bash
+$ zig build --release=fast
+$ ./zig-out/bin/shit --help
+```
+
 `make install` builds the release binary and installs it, the man page, and the
 bash completion under `PREFIX`, default `/usr/local`. `DESTDIR` stages
 the tree under a packaging root, `PREFIX` moves the install root, and

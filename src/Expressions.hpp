@@ -72,6 +72,10 @@ public:
      warning stays quiet for it. */
   HashSet global_assigned_names{heap_allocator()};
 
+  HashSet assigned_names_so_far{heap_allocator()};
+
+  StringMap<SourceLocation> reads_before_assignment{heap_allocator()};
+
   /* The live shell, queried only when the no-local check is about to warn,
      so a name already set in the shell or the environment, such as an
      inherited PATH a function rewrites, reads as an update without the
@@ -123,6 +127,9 @@ public:
    */
   fn fail(SourceLocation location, StringView message,
           StringView suggestion = {}) throws -> void;
+  fn note_variable_assignment(StringView name) throws -> void;
+  fn note_variable_read(StringView name, SourceLocation location,
+                        bool is_top_level_unconditional) throws -> void;
   /* Prints one optimizer trace line to standard error when the trace is on, so
      a golden test sees exactly what a pass folded. A no-op otherwise. */
   fn trace_optimizer_line(StringView message) const throws -> void;

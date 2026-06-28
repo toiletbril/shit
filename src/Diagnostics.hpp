@@ -85,6 +85,14 @@ inline const strictness_warning STRICTNESS_WARNINGS[] = {
      "a pipeline reports the rightmost failing stage in the strict default" },
     {"no-local",
      "an assignment in a function without local leaks to the global scope"  },
+    {"use-before-assign",
+     "a top-level read of a variable assigned only later sees an empty "
+     "value, the read errors in the strict default and -W reports it"       },
+    {"arith-assign",
+     "an assignment whose whole value is an arithmetic expansion reads as a "
+     "let, NAME=$((...)) is suggested as let NAME=..."                       },
+    {"typeset-spelling",
+     "typeset is the ksh name of declare, the declare spelling is clearer"  },
     {"unquoted-test",
      "an unquoted variable in a test can split or vanish, quote it"         },
     {"malformed-glob",    "a pattern holds an unterminated '[' class"       },

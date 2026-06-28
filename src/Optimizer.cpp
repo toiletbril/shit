@@ -76,16 +76,6 @@ pure fn is_plain_integer_literal(StringView text) wontthrow -> bool
 
 /* True when the text is a C-style identifier with no parameter expansion
    modifier. A name carrying a modifier such as x:-y is left alone. */
-pure fn is_plain_variable_name(StringView name) wontthrow -> bool
-{
-  if (name.length == 0) return false;
-  if (!is_identifier_start(name[0])) return false;
-  for (usize i = 1; i < name.length; i++) {
-    if (!is_identifier_continuation(name[i])) return false;
-  }
-  return true;
-}
-
 /* True when a token is a bare unquoted $name reference that field-splits at run
    time. Its recorded value is not the single test argument the run sees, so the
    verdict must not fold from it. A quoted "$name" still folds. */
@@ -183,6 +173,16 @@ inline constexpr StaticStringMap<bool> ENVIRONMENT_NEUTRAL_NAMES{
     ENVIRONMENT_NEUTRAL_ENTRIES, countof(ENVIRONMENT_NEUTRAL_ENTRIES)};
 
 } // namespace
+
+pure fn is_plain_variable_name(StringView name) wontthrow -> bool
+{
+  if (name.length == 0) return false;
+  if (!is_identifier_start(name[0])) return false;
+  for (usize i = 1; i < name.length; i++) {
+    if (!is_identifier_continuation(name[i])) return false;
+  }
+  return true;
+}
 
 fn command_is_environment_neutral(StringView name) throws -> bool
 {

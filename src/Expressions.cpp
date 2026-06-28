@@ -118,6 +118,49 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
   has_fatal = true;
 }
 
+cold fn AnalysisContext::note_variable_assignment(StringView name) throws -> void
+{
+  if (name.is_empty()) return;
+
+  assigned_names_so_far.add(name);
+
+  if (const SourceLocation *read_location = reads_before_assignment.find(name);
+      read_location != nullptr)
+  {
+    fail(*read_location, StringView{"The variable '"} + name +
+                             "' is read before it is assigned");
+    reads_before_assignment.erase(name);
+  }
+}
+
+cold fn AnalysisContext::note_variable_read(StringView name,
+                                            SourceLocation location,
+                                            bool is_top_level_unconditional)
+    throws -> void
+{
+  if (!is_top_level_unconditional) return;
+  if (has_seen_runtime_definer) return;
+  if (!optimizer::is_plain_variable_name(name)) return;
+
+  if (assigned_names_so_far.contains(name)) return;
+  if (function_local_names.contains(name)) return;
+  if (global_assigned_names.contains(name)) return;
+  if (reads_before_assignment.find(name) != nullptr) return;
+
+  /* A name already set in the live shell or the environment is not a use
+     before assignment. The stored variables and the exported set are read
+     directly, since get_variable_value would seed $RANDOM and advance its
+     generator from the analysis pass. */
+  if (eval_context != nullptr &&
+      (eval_context->is_exported(name) ||
+       eval_context->lookup_shell_variable(name) != nullptr))
+  {
+    return;
+  }
+
+  reads_before_assignment.set(name, location);
+}
+
 /* A command-not-found at runtime is non-fatal. It prints a located diagnostic
    to stderr against the source the evaluator is running, so a redirection such
    as 2>/dev/null still suppresses it, and leaves the caller to report status
@@ -714,6 +757,54 @@ constexpr StaticStringMap<bool> SYSTEM_DIRECTORIES{
     SYSTEM_DIRECTORY_ENTRIES,
     sizeof(SYSTEM_DIRECTORY_ENTRIES) / sizeof(SYSTEM_DIRECTORY_ENTRIES[0])};
 
+/* The commands whose operands are a variable rather than a value read, so the
+   use-before-assignment scan leaves their operands alone. A test or [ probes a
+   maybe-unset variable on purpose, unset names a variable to drop, and let and
+   eval carry their own expression text. */
+constexpr StaticStringMap<bool>::entry VARIABLE_PROBE_COMMAND_ENTRIES[] = {
+    {SSK("["),     true},
+    {SSK("test"),  true},
+    {SSK("[["),    true},
+    {SSK("unset"), true},
+    {SSK("let"),   true},
+    {SSK("eval"),  true},
+};
+constexpr StaticStringMap<bool> VARIABLE_PROBE_COMMANDS{
+    VARIABLE_PROBE_COMMAND_ENTRIES,
+    sizeof(VARIABLE_PROBE_COMMAND_ENTRIES) /
+        sizeof(VARIABLE_PROBE_COMMAND_ENTRIES[0])};
+
+/* The commands that name a variable they assign, so the use-before-assignment
+   scan records their operands as assigned rather than read. read and getopts
+   store into the named variable, and the declaration builtins introduce it. */
+constexpr StaticStringMap<bool>::entry VARIABLE_TARGET_COMMAND_ENTRIES[] = {
+    {SSK("read"),      true},
+    {SSK("mapfile"),   true},
+    {SSK("readarray"), true},
+    {SSK("getopts"),   true},
+    {SSK("declare"),   true},
+    {SSK("typeset"),   true},
+    {SSK("export"),    true},
+    {SSK("readonly"),  true},
+    {SSK("local"),     true},
+};
+constexpr StaticStringMap<bool> VARIABLE_TARGET_COMMANDS{
+    VARIABLE_TARGET_COMMAND_ENTRIES,
+    sizeof(VARIABLE_TARGET_COMMAND_ENTRIES) /
+        sizeof(VARIABLE_TARGET_COMMAND_ENTRIES[0])};
+
+/* The leading identifier of an operand word, the name before an =value or a
+   [subscript, empty for a flag or a non-identifier. read x and declare y=1 name
+   x and y this way. */
+fn operand_target_name(StringView text) wontthrow -> StringView
+{
+  if (text.is_empty() || text[0] == '-') return StringView{};
+  usize end = 0;
+  while (end < text.length && lexer::is_variable_name(text[end]))
+    end++;
+  return text.substring_of_length(0, end);
+}
+
 cold fn SimpleCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
@@ -935,6 +1026,10 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.warn(m_args[0]->source_location(),
                 "A local outside a function has no scope to bind",
                 "Declare the variable plainly or move it into a function");
+    else if (command_literal == "typeset" && !actx.shebang_is_posix_sh)
+      actx.warn(m_args[0]->source_location(),
+                "The typeset builtin is the ksh spelling of declare",
+                "Write declare for the clearer bash name");
   }
 
   if (command_literal == "echo" && !command_is_shadowed &&
@@ -1645,6 +1740,43 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         "constants",
         command_literal.c_str());
     actx.constant_variables.clear();
+  }
+
+  /* The use-before-assignment scan. A read at the top level of a name no
+     assignment has introduced yet is recorded, and a later assignment confirms
+     and reports it. A test or probe command and a variable-target builtin name a
+     variable rather than read its value, so their operands record an assignment
+     or are skipped. The check runs only on the straight-line top level, so a
+     conditional or a function body never trips it. */
+  let const is_top_level_unconditional =
+      actx.function_scope_depth == 0 && is_unconditional;
+  if (is_top_level_unconditional && !command_is_shadowed) {
+    if (VARIABLE_TARGET_COMMANDS.find(command_literal.view()).has_value()) {
+      for (usize i = 1; i < m_args.count(); i++) {
+        let const word =
+            m_args[i]->kind() == Token::Kind::Word
+                ? static_cast<const tokens::WordToken *>(m_args[i])
+                      ->word()
+                      .to_literal_string()
+                : m_args[i]->raw_string();
+        actx.note_variable_assignment(operand_target_name(word.view()));
+      }
+    } else if (!VARIABLE_PROBE_COMMANDS.find(command_literal.view())
+                    .has_value()) {
+      for (usize i = 1; i < m_args.count(); i++) {
+        if (m_args[i]->kind() != Token::Kind::Word) continue;
+
+        let const &word =
+            static_cast<const tokens::WordToken *>(m_args[i])->word();
+        for (let const &segment : word.segments) {
+          if (segment.kind != WordSegment::Kind::VariableReference) continue;
+
+          actx.note_variable_read(segment.text.view(),
+                                  m_args[i]->source_location(),
+                                  is_top_level_unconditional);
+        }
+      }
+    }
   }
 }
 

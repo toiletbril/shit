@@ -1,0 +1,42 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign total=$((6 * 7))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$total"]
+  [CompoundListCondition, None]
+    [SimpleCommand "typeset" "name=value"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$name"]
+[Word
+  Unquoted "total="
+  ArithmeticExpansion "6 * 7"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "total"
+]
+[Word
+  Unquoted "typeset"
+]
+[Word
+  Unquoted "name=value"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "name"
+]
+shit: 2:1: warning: The assignment of 'total' wraps an arithmetic expansion.
+     2 |  total=$((6 * 7))
+       |  ^~~~~~~~~~~~~~~~ here.
+note: Use let total=6 * 7.
+shit: 4:1: warning: The typeset builtin is the ksh spelling of declare.
+     4 |  typeset name=value
+       |  ^~~~~~~ here.
+note: Write declare for the clearer bash name.
+42
+value
+[Code 0]

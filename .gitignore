@@ -21,6 +21,8 @@ perf*
 
 garbage/
 src/o
+zig-out/
+.zig-cache/
 test/failed.diff
 test/.test_history
 test/.test_directory_history

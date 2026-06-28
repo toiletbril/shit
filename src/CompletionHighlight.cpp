@@ -135,6 +135,20 @@ static pure fn is_plain_identifier(StringView word) wontthrow -> bool
   return true;
 }
 
+static pure fn word_defines_function(StringView line, usize word_end,
+                                     usize end) wontthrow -> bool
+{
+  let i = word_end;
+  while (i < end && (line[i] == ' ' || line[i] == '\t'))
+    i++;
+  if (i >= end || line[i] != '(') return false;
+
+  i++;
+  while (i < end && (line[i] == ' ' || line[i] == '\t'))
+    i++;
+  return i < end && line[i] == ')';
+}
+
 /* A byte that ends a top-level word, whitespace or an operator the scanner
    stops on. '{' and '}' are left out so a brace word such as a{1,2} stays one
    word. */
@@ -595,6 +609,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   let expecting_in = false;
   let for_variable_pending = false;
   let for_do_expected = false;
+  let function_name_pending = false;
+  let line_functions = HashSet{bump_allocator(HIGHLIGHT_ARENA)};
 
   let i = begin;
   while (i < end) {
@@ -803,6 +819,18 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       continue;
     }
 
+    if (function_name_pending) {
+      function_name_pending = false;
+      is_command_position = false;
+      if (plain && is_plain_identifier(word)) {
+        do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
+        line_functions.add(word);
+      } else {
+        do_push(word_start, word_end, colors::ansi::BOLD_RED);
+      }
+      continue;
+    }
+
     /* A for loop requires do once its word list ends, so a word other than do
        in that position is misplaced and shown red. */
     if (for_do_expected && is_command_position) {
@@ -843,6 +871,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       } else if (word == "function") {
         stack.push(highlight_construct::Function);
         next_is_command = false;
+        function_name_pending = true;
       } else if (word == "then") {
         keyword_ok =
             !stack.is_empty() && stack.back() == highlight_construct::If;
@@ -892,9 +921,13 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           word_is_terminated_by_separator(line, word_end, end);
       if (word.find_character('/').has_value()) {
         color_path_argument(word_start, word, is_word_terminated, spans);
+      } else if (word_defines_function(line, word_end, end)) {
+        do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
+        line_functions.add(word);
       } else {
         let command_color = colors::ansi::RED;
-        if (first_word_resolves(word, context)) {
+        if (first_word_resolves(word, context) || line_functions.contains(word))
+        {
           command_color = colors::ansi::BRIGHT_BLUE;
         } else if (!is_word_terminated &&
                    command_word_prefixes_any(word, context))
