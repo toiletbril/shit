@@ -12,7 +12,7 @@ for name in "$@"; do
     if diff $DIFF_FLAGS "expected/$name.out" "$out" >/dev/null 2>&1 || \
        { [ -f "expected/${name}_1.out" ] && \
          diff $DIFF_FLAGS "expected/${name}_1.out" "$out" >/dev/null 2>&1; }; then
-        printf "\t%-64s ok\r" "$name.shit"
+        printf "\t%-64s ok\033[K\r" "$name.shit"
     else
         diff $DIFF_FLAGS "expected/$name.out" "$out" >> "$FAILED_LIST"
         printf "\t%-64s FAILED :c\n" "$name.shit"

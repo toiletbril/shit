@@ -24,7 +24,7 @@ for f in $BASH_COMPAT_FILES; do
     b="$($BASH "$f" 2>/dev/null; printf X)"; b="${b%X}"
     alt="${f%.bash}_1.bash"
     if [ "$s" = "$b" ]; then
-        printf "\t%-64s ok\r" "$f"
+        printf "\t%-64s ok\033[K\r" "$f"
     elif [ -f "$alt" ] && b1="$($BASH "$alt" 2>/dev/null; printf X)" && [ "$s" = "${b1%X}" ]; then
         printf "\t%-64s ok (flaky alternative)\n" "$f"
     else

@@ -17,7 +17,7 @@ for f in "$@"; do
     out=$(mktemp)
     BIN=$BIN sh "$f" > "$out" 2>/dev/null
     if diff $DIFF_FLAGS "expected/highlight/$name.out" "$out" >/dev/null 2>&1; then
-        printf "\t%-64s ok\r" "highlight/$name.sh"
+        printf "\t%-64s ok\033[K\r" "highlight/$name.sh"
     else
         diff $DIFF_FLAGS "expected/highlight/$name.out" "$out" >> "$FAILED_LIST"
         printf "\t%-64s FAILED :c\n" "highlight/$name.sh"

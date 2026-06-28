@@ -28,7 +28,7 @@ if [ -z "$bash_skip_reason" ]; then
         b="$($BASH "$f" 2>/dev/null; printf X)"; b="${b%X}"
         alt="${f%.bash}_1.bash"
         if [ "$s" = "$b" ]; then
-            printf "\t%-64s mimic ok\r" "$f"
+            printf "\t%-64s mimic ok\033[K\r" "$f"
         elif [ -f "$alt" ] && b1="$($BASH "$alt" 2>/dev/null; printf X)" && [ "$s" = "${b1%X}" ]; then
             printf "\t%-64s mimic ok (flaky alternative)\n" "$f"
         else
@@ -47,7 +47,7 @@ if command -v $DASH >/dev/null 2>&1; then
         d="$($DASH "$f" 2>/dev/null; printf X)"; d="${d%X}"
         alt="${f%.sh}_1.sh"
         if [ "$s" = "$d" ]; then
-            printf "\t%-64s mimic ok\r" "$f"
+            printf "\t%-64s mimic ok\033[K\r" "$f"
         elif [ -f "$alt" ] && d1="$($DASH "$alt" 2>/dev/null; printf X)" && [ "$s" = "${d1%X}" ]; then
             printf "\t%-64s mimic ok (flaky alternative)\n" "$f"
         else

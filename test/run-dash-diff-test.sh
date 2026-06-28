@@ -14,7 +14,7 @@ for f in $SH_COMPAT; do
     d="$($DASH "$f" 2>/dev/null; printf X)"; d="${d%X}"
     alt="${f%.sh}_1.sh"
     if [ "$s" = "$d" ]; then
-        printf "\t%-64s ok\r" "$f"
+        printf "\t%-64s ok\033[K\r" "$f"
     elif [ -f "$alt" ] && d1="$($DASH "$alt" 2>/dev/null; printf X)" && [ "$s" = "${d1%X}" ]; then
         printf "\t%-64s ok (flaky alternative)\n" "$f"
     else

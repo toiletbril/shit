@@ -69,7 +69,7 @@ completion_%: expected/completion/%.out
 		out=$$(mktemp); \
 		BIN=$(BIN) sh completion/$*.sh > $$out 2>/dev/null; \
 		if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
-			printf "	%-64s ok\r" completion/$*.sh; \
+			printf "	%-64s ok\033[K\r" completion/$*.sh; \
 		else \
 			diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
 			printf "	%-64s FAILED :c\n" completion/$*.sh; \
