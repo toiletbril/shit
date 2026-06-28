@@ -405,9 +405,8 @@ static fn color_path_argument(usize word_start, StringView word,
 
   /* A bare word with no path shape is only treated as a path when it resolves
      on disk, so an ordinary argument keeps its default color. */
-  if (!has_slash && !has_tilde && !has_dot_prefix &&
-      !word_names_existing_path(word))
-  {
+  let const has_no_path_shape = !has_slash && !has_tilde && !has_dot_prefix;
+  if (has_no_path_shape && !word_names_existing_path(word)) {
     return false;
   }
 
@@ -417,26 +416,32 @@ static fn color_path_argument(usize word_start, StringView word,
      deeper path cannot exist when a shallower one does not, so the boundaries
      are walked from the longest down and the first that exists is the answer,
      which is one stat for a path that fully resolves rather than one per
-     segment. */
+     segment. A bare word has no internal boundary and already resolved above,
+     so its whole length is the prefix without a second stat. */
   usize existing_end = 0;
-  for (usize scan = word.length; scan >= 1; scan--) {
-    let const at_boundary = scan == word.length || word[scan] == '/';
-    if (!at_boundary) continue;
+  if (has_no_path_shape) {
+    existing_end = word.length;
+  } else {
+    for (usize scan = word.length; scan >= 1; scan--) {
+      let const at_boundary = scan == word.length || word[scan] == '/';
+      if (!at_boundary) continue;
 
-    let const typed_prefix = word.substring_of_length(0, scan);
-    let exists = false;
-    if (has_tilde) {
-      if (Maybe<String> expanded =
-              utils::expand_leading_tilde_path(typed_prefix);
-          expanded.has_value())
-        exists = Path{expanded->view()}.exists();
-    } else {
-      exists = Path{typed_prefix}.exists();
-    }
+      let const typed_prefix = word.substring_of_length(0, scan);
+      let exists = false;
+      if (has_tilde) {
+        if (Maybe<String> expanded =
+                utils::expand_leading_tilde_path(typed_prefix);
+            expanded.has_value())
+          exists = Path{expanded->view()}.exists();
+      } else {
+        exists = Path{typed_prefix}.exists();
+      }
 
-    if (exists) {
-      existing_end = scan < word.length && word[scan] == '/' ? scan + 1 : scan;
-      break;
+      if (exists) {
+        existing_end =
+            scan < word.length && word[scan] == '/' ? scan + 1 : scan;
+        break;
+      }
     }
   }
 

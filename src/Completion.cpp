@@ -292,11 +292,11 @@ static fn all_active_glob_mask(usize length) throws -> ArrayList<bool>
    glob pattern when the token holds a metacharacter, so ec* lists the commands
    it matches. */
 static fn command_name_matches(StringView name, StringView token,
-                               bool token_is_glob) throws -> bool
+                               bool token_is_glob,
+                               const ArrayList<bool> &glob_active) throws -> bool
 {
   if (!token_is_glob) return name.starts_with(token);
 
-  let const glob_active = all_active_glob_mask(token.length);
   return utils::glob_matches(token, name, glob_active, 0);
 }
 
@@ -305,9 +305,10 @@ static fn command_name_matches(StringView name, StringView token,
    aliases, and PATH at one hash lookup per insert. */
 static fn add_unique_command(ArrayList<String> &candidates, HashSet &seen,
                              StringView name, StringView token,
-                             bool token_is_glob) throws -> void
+                             bool token_is_glob,
+                             const ArrayList<bool> &glob_active) throws -> void
 {
-  if (!command_name_matches(name, token, token_is_glob)) return;
+  if (!command_name_matches(name, token, token_is_glob, glob_active)) return;
   if (seen.contains(name)) return;
   seen.add(name);
   candidates.push(String{name});
@@ -318,26 +319,27 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
     -> String
 {
   if (candidates.is_empty()) return String{};
-  let prefix = String{candidates[0].view()};
+  let const first = candidates[0].view();
+  usize prefix_length = first.length;
   for (usize i = 1; i < candidates.count(); i++) {
-    const String &candidate = candidates[i];
+    let const candidate = candidates[i].view();
     usize shared = 0;
-    while (shared < prefix.length() && shared < candidate.length() &&
-           prefix.view()[shared] == candidate.view()[shared])
+    while (shared < prefix_length && shared < candidate.length &&
+           first[shared] == candidate[shared])
     {
       shared++;
     }
     /* The byte-wise match can stop inside a multibyte codepoint, so the cut
        retracts to the codepoint start to avoid corrupting a glyph in the ghost
        text. */
-    while (shared > 0 && shared < prefix.length() &&
-           (static_cast<unsigned char>(prefix.view()[shared]) & 0xC0) == 0x80)
+    while (shared > 0 && shared < prefix_length &&
+           (static_cast<unsigned char>(first[shared]) & 0xC0) == 0x80)
     {
       shared--;
     }
-    prefix = String{prefix.view().substring_of_length(0, shared)};
+    prefix_length = shared;
   }
-  return prefix;
+  return String{first.substring_of_length(0, prefix_length)};
 }
 
 fn environment_path_changed(String &cached_path) throws -> bool
@@ -358,9 +360,12 @@ static fn complete_command(StringView token, bool token_is_glob,
   TRACELN("completing command position for token '%.*s'",
           static_cast<int>(token.length), token.data);
 
+  let const glob_active =
+      token_is_glob ? all_active_glob_mask(token.length) : ArrayList<bool>{};
+
   for (let const &builtin_name : builtin_names()) {
     add_unique_command(candidates, seen, builtin_name.view(), token,
-                       token_is_glob);
+                       token_is_glob, glob_active);
   }
 
   /* The bundled shitbox utility names resolve as commands when the shitbox
@@ -368,19 +373,22 @@ static fn complete_command(StringView token, bool token_is_glob,
   if (context.shitbox()) {
     for (const String &util_name : shitbox::util_names())
       add_unique_command(candidates, seen, util_name.view(), token,
-                         token_is_glob);
+                         token_is_glob, glob_active);
   }
 
   context.function_names().for_each([&](StringView name) {
-    add_unique_command(candidates, seen, name, token, token_is_glob);
+    add_unique_command(candidates, seen, name, token, token_is_glob,
+                       glob_active);
   });
 
   context.alias_names().for_each([&](StringView name) {
-    add_unique_command(candidates, seen, name, token, token_is_glob);
+    add_unique_command(candidates, seen, name, token, token_is_glob,
+                       glob_active);
   });
 
   for (let const &entry : utils::path_command_names())
-    add_unique_command(candidates, seen, entry.view(), token, token_is_glob);
+    add_unique_command(candidates, seen, entry.view(), token, token_is_glob,
+                       glob_active);
 
   LOG(All, "collected %zu command candidates for token '%.*s'",
       candidates.count(), static_cast<int>(token.length), token.data);
