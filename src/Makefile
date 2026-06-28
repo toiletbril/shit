@@ -215,11 +215,11 @@ endif
 else ifeq ($(MODE), prof)
 CXXFLAGS += \
 	-g3 \
+	-finstrument-functions \
 	-DNDEBUG \
-	-DSHIT_NO_TOILETLINE \
 	-fno-omit-frame-pointer \
 	-flto \
-	-O3
+	-O1
 ifneq ($(TARGET), Windows_NT)
 # TODO: windows optimization fucks up the RAM.
 CXXFLAGS += \

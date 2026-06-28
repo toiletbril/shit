@@ -1054,6 +1054,17 @@ fn enable_completion(shit::EvalContext &context) -> void { unused(context); }
 
 fn disable_completion() -> void {}
 
+fn completion_is_enabled() -> bool { return false; }
+
+fn enter_calc_history() -> void {}
+
+fn leave_calc_history() -> void {}
+
+fn enable_job_notifications(shit::EvalContext &context) -> void
+{
+  unused(context);
+}
+
 fn set_ghost_enabled(bool enabled) -> void { unused(enabled); }
 
 fn set_highlight_enabled(bool enabled) -> void { unused(enabled); }
