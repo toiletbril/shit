@@ -1,0 +1,19 @@
+#!/bin/env shit
+# vi: ft=bash
+# copies current shit shell binary to a remote server and puts it in PATH.
+set -eux -o pipefail
+HOST="${1:-}"
+test -z "${HOST-}" -o -z "${SHIT-}" && \
+  printf "%s <host>\nrun this inside shit shell" "$0" >&2 && exit 1
+scp "$(which "$SHIT")" "$HOST":shit
+ssh "$HOST" <<'EOF'
+function _find_writable_path_dir() {
+  for F in $(echo "$PATH'" | sed -E 's/:/\n/g')
+  do
+    [[ "$F" =~ *sbin* ]] && continue
+    [[ -w "$F" ]] && echo "$F" && break
+  done
+}
+WRITABLE_DIR="$(_find_writable_path_dir)"
+test -n "$WRITABLE_DIR" && mv shit "$WRITABLE_DIR"
+EOF
