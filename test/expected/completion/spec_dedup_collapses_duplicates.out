@@ -1,0 +1,7 @@
+== a repeated value collapses to one candidate:
+search
+== duplicates among distinct values are each collapsed:
+build
+flake
+profile
+search

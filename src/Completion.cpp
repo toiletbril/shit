@@ -919,6 +919,20 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   let longest_common_prefix = String{};
   if (!candidates.is_empty()) {
     candidates.sort();
+
+    /* Duplicate candidates from a source such as a completion spec are
+       collapsed, the editor decides between a unique insert and a list by
+       candidate count. */
+    let unique_candidates = ArrayList<String>{candidates.allocator()};
+    unique_candidates.reserve(candidates.count());
+
+    for (usize i = 0; i < candidates.count(); i++) {
+      if (unique_candidates.is_empty() ||
+          unique_candidates.back().view() != candidates[i].view())
+        unique_candidates.push(steal(candidates[i]));
+    }
+    candidates = steal(unique_candidates);
+
     longest_common_prefix = compute_longest_common_prefix(candidates);
   }
 

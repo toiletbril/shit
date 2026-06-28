@@ -91,6 +91,12 @@ fn EvalContext::run_completion_function(StringView function_name,
   if (!get_variable_value("COMP_WORDBREAKS").has_value())
     set_shell_variable("COMP_WORDBREAKS", StringView{" \t\n\"'><=;|&(:"});
 
+  /* bash empties COMPREPLY before each completion, so a function that appends
+     with COMPREPLY+=() starts clean. Without the reset the previous completion
+     on the same command leaks its entries into this one, so nix sear after a
+     bare nix tab lists every subcommand. */
+  set_indexed_array("COMPREPLY", ArrayList<String>{});
+
   /* bash passes the command, the current word, and the previous word as $1 $2
    * $3. */
   let call_params = ArrayList<String>{};
