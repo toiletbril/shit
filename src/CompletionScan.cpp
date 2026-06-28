@@ -286,7 +286,7 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
 
 namespace {
 
-enum class build_tool_kind : u8
+enum class tool_with_targets_kind : u8
 {
   make,
   ninja,
@@ -295,28 +295,28 @@ enum class build_tool_kind : u8
   ssh,
 };
 
-constexpr StaticStringMap<build_tool_kind>::entry BUILD_TOOL_ENTRIES[] = {
-    {SSK("make"),  build_tool_kind::make       },
-    {SSK("ninja"), build_tool_kind::ninja      },
-    {SSK("cmake"), build_tool_kind::cmake      },
-    {SSK("npm"),   build_tool_kind::node_runner},
-    {SSK("yarn"),  build_tool_kind::node_runner},
-    {SSK("pnpm"),  build_tool_kind::node_runner},
-    {SSK("bun"),   build_tool_kind::node_runner},
-    {SSK("ssh"),   build_tool_kind::ssh        },
-    {SSK("scp"),   build_tool_kind::ssh        },
+constexpr StaticStringMap<tool_with_targets_kind>::entry
+    TOOL_WITH_TARGETS_ENTRIES[] = {
+        {SSK("make"),  tool_with_targets_kind::make       },
+        {SSK("ninja"), tool_with_targets_kind::ninja      },
+        {SSK("cmake"), tool_with_targets_kind::cmake      },
+        {SSK("npm"),   tool_with_targets_kind::node_runner},
+        {SSK("yarn"),  tool_with_targets_kind::node_runner},
+        {SSK("pnpm"),  tool_with_targets_kind::node_runner},
+        {SSK("bun"),   tool_with_targets_kind::node_runner},
+        {SSK("ssh"),   tool_with_targets_kind::ssh        },
+        {SSK("scp"),   tool_with_targets_kind::ssh        },
+        {SSK("tsh"),   tool_with_targets_kind::ssh        },
 };
 
-constexpr StaticStringMap<build_tool_kind> BUILD_TOOLS{
-    BUILD_TOOL_ENTRIES, countof(BUILD_TOOL_ENTRIES)};
+constexpr StaticStringMap<tool_with_targets_kind> TOOLS_WITH_TARGETS{
+    TOOL_WITH_TARGETS_ENTRIES, countof(TOOL_WITH_TARGETS_ENTRIES)};
 
 } // namespace
 
-/* Subprocesses run only on an explicit tab, and every listing caches on the
-   source file's mtime. */
-fn complete_from_build_tools(StringView line, StringView token,
-                             usize token_start, bool for_listing,
-                             EvalContext &context) throws
+fn complete_from_tools_with_targets(StringView line, StringView token,
+                                    usize token_start, bool for_listing,
+                                    EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
   if (!for_listing) return None;
@@ -352,11 +352,11 @@ fn complete_from_build_tools(StringView line, StringView token,
   let owned_targets = ArrayList<String>{};
   const ArrayList<String> *targets = &owned_targets;
 
-  Maybe<build_tool_kind> tool_kind = BUILD_TOOLS.find(tool);
+  Maybe<tool_with_targets_kind> tool_kind = TOOLS_WITH_TARGETS.find(tool);
   if (!tool_kind.has_value()) return None;
 
   switch (tool_kind.value()) {
-  case build_tool_kind::make: {
+  case tool_with_targets_kind::make: {
     let const directory =
         settled_option_value(line, "-C").value_or(String{"."});
     let makefile_name = settled_option_value(line, "-f");
@@ -405,7 +405,7 @@ fn complete_from_build_tools(StringView line, StringView token,
     });
     break;
   }
-  case build_tool_kind::ninja: {
+  case tool_with_targets_kind::ninja: {
     let const directory =
         settled_option_value(line, "-C").value_or(String{"."});
     let build_file = Path{directory.view()};
@@ -423,7 +423,7 @@ fn complete_from_build_tools(StringView line, StringView token,
     });
     break;
   }
-  case build_tool_kind::cmake: {
+  case tool_with_targets_kind::cmake: {
     if (previous_settled_word(line, token_start) != "--target") return None;
     let const build_directory = settled_option_value(line, "--build");
     if (!build_directory.has_value()) return None;
@@ -456,7 +456,7 @@ fn complete_from_build_tools(StringView line, StringView token,
     });
     break;
   }
-  case build_tool_kind::node_runner: {
+  case tool_with_targets_kind::node_runner: {
     if (second_word_of(line) != "run") return None;
     let const package_path = Path{StringView{"package.json"}};
     targets = cached_targets_for(package_path, [&]() throws {
@@ -466,7 +466,7 @@ fn complete_from_build_tools(StringView line, StringView token,
     });
     break;
   }
-  case build_tool_kind::ssh: {
+  case tool_with_targets_kind::ssh: {
     if (token.find_character('/').has_value() ||
         token.find_character(':').has_value())
     {

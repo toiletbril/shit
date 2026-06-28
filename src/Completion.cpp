@@ -888,8 +888,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
         from_stage = complete_from_spec(line, token, cursor, for_listing,
                                         context, descriptions);
       if (!from_stage.has_value())
-        from_stage = complete_from_build_tools(line, token, token_start,
-                                               for_listing, context);
+        from_stage = complete_from_tools_with_targets(line, token, token_start,
+                                                      for_listing, context);
       if (!from_stage.has_value())
         from_stage = complete_from_man_subcommands(line, token, token_start,
                                                    for_listing, context);

@@ -76,9 +76,9 @@ fn complete_from_help_subcommands(StringView line, StringView token,
     -> Maybe<ArrayList<String>>;
 
 /* Defined in CompletionScan.cpp. */
-fn complete_from_build_tools(StringView line, StringView token,
-                             usize token_start, bool for_listing,
-                             EvalContext &context) throws
+fn complete_from_tools_with_targets(StringView line, StringView token,
+                                    usize token_start, bool for_listing,
+                                    EvalContext &context) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_builtin_flags(StringView line, StringView token,
                                usize token_start, EvalContext &context) throws

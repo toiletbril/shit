@@ -1,0 +1,10 @@
+== tsh lists ssh hosts:
+alpha
+bravo
+gamma
+== tsh by prefix:
+bravo
+== ssh agrees:
+alpha
+bravo
+gamma
