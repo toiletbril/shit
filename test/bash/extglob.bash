@@ -16,7 +16,7 @@ f=image.jpg
 echo "${f%%@(.jpg|.png)}"
 case hello in @(hi|hello)) echo case-yes;; esac
 case zzz in !(a|b)) echo case-neg;; esac
-dir=/tmp/shit_extglob_test
+dir=/tmp/shit_extglob_test_$$
 rm -rf "$dir"; mkdir -p "$dir"
 ( cd "$dir" && touch a.txt b.txt c.log foo bar )
 ( cd "$dir" && echo @(a|b).txt )

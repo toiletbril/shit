@@ -1,0 +1,31 @@
+== a bare definition colors the name and a later call resolves:
+f	\e[94m
+(	\e[1m
+)	\e[1m
+{	\e[1m
+:	\e[94m
+;	\e[1m
+}	\e[1m
+;	\e[1m
+f	\e[94m
+== a call before the definition stays unknown:
+g	\e[31m
+;	\e[1m
+g	\e[94m
+(	\e[1m
+)	\e[1m
+{	\e[1m
+:	\e[94m
+;	\e[1m
+}	\e[1m
+;	\e[1m
+g	\e[94m
+== the function keyword form colors the name:
+function	\e[32m
+h	\e[94m
+{	\e[1m
+:	\e[94m
+;	\e[1m
+}	\e[1m
+;	\e[1m
+h	\e[94m

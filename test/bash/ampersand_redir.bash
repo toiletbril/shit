@@ -2,7 +2,7 @@
 # Bash &>, &>>, and |& redirections, checked byte-for-byte against bash. The
 # &> forms write to a temp file that is read back, the |& form pipes both
 # standard streams so the result is observable on standard output.
-tmp=/tmp/shit_bashdiff_ampredir
+tmp=/tmp/shit_bashdiff_ampredir_$$
 echo hello &>"$tmp"
 cat "$tmp"
 { echo out; echo err >&2; } &>"$tmp"

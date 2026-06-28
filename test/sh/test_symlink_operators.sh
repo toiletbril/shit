@@ -1,7 +1,7 @@
 #!/bin/sh
 # -L and -h test the symlink-ness of a path without following it.
-target=/tmp/shit_symlink_target_fixed
-link=/tmp/shit_symlink_link_fixed
+target=/tmp/shit_symlink_target_fixed_$$
+link=/tmp/shit_symlink_link_fixed_$$
 rm -f "$link"
 : > "$target"
 ln -s "$target" "$link"

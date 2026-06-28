@@ -31,26 +31,22 @@ TEST_NAMES := $(INPUT_FILES:shit/%.shit=%)
 
 %: expected/%.out
 	@BIN='$(BIN)' BIN_FLAGS='$(BIN_FLAGS)' DIFF_FLAGS='$(DIFF_FLAGS)' \
-		FAILED_LIST='$(FAILED_LIST)' /bin/bash shittests.sh $*
+		FAILED_LIST='$(FAILED_LIST)' $(SHELL) run-shit-test.sh $*
 
 clean:
 	@rm -f $(FAILED_LIST) $(SHIT_HISTORY) $(SHIT_DIRECTORY_HISTORY)
 
+TEST_SUITES := shit_tests cli_tests completion_tests highlight_tests \
+		dashdiff bashdiff mimicrydiff
+
 test: $(BIN)
-	@$(MAKE) -B clean
-	@$(MAKE) -B shit_tests
-	@$(MAKE) -B cli_tests
-	@$(MAKE) -B completion_tests
-	@$(MAKE) -B dashdiff
-	@$(MAKE) -B bashdiff
-	@$(MAKE) -B mimicrydiff
+	@$(MAKE) clean
+	@$(MAKE) $(TEST_SUITES)
 	@touch $(FAILED_LIST)
 	@cat $(FAILED_LIST)
 	@test ! -s $(FAILED_LIST)
 
-shit_tests: $(BIN)
-	@BIN='$(BIN)' BIN_FLAGS='$(BIN_FLAGS)' DIFF_FLAGS='$(DIFF_FLAGS)' \
-		FAILED_LIST='$(FAILED_LIST)' /bin/bash shittests.sh $(TEST_NAMES)
+shit_tests: $(TEST_NAMES)
 
 
 CLI_INPUT := $(wildcard cli/*.sh)
@@ -58,11 +54,9 @@ CLI_NAMES := $(CLI_INPUT:cli/%.sh=cli_%)
 
 cli_%: expected/cli/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
-		/bin/bash clitests.sh cli/$*.sh
+		$(SHELL) run-cli-test.sh cli/$*.sh
 
-cli_tests: $(BIN)
-	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
-		/bin/bash clitests.sh $(CLI_INPUT)
+cli_tests: $(CLI_NAMES)
 
 
 COMPLETION_INPUT := $(wildcard completion/*.sh)
@@ -86,6 +80,16 @@ completion_%: expected/completion/%.out
 completion_tests: $(COMPLETION_NAMES)
 
 
+HIGHLIGHT_INPUT := $(wildcard highlight/*.sh)
+HIGHLIGHT_NAMES := $(HIGHLIGHT_INPUT:highlight/%.sh=highlight_%)
+
+highlight_%: expected/highlight/%.out
+	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
+		$(SHELL) run-highlight-test.sh highlight/$*.sh
+
+highlight_tests: $(HIGHLIGHT_NAMES)
+
+
 REFILL ?=
 
 refill:
@@ -103,6 +107,10 @@ refill:
 		printf "	%-64s $$f.out\n" completion/$$f.sh; \
 		BIN=$(BIN) sh completion/$$f.sh > expected/completion/$$f.out 2>/dev/null; \
 	done || true
+	for f in $(HIGHLIGHT_INPUT:highlight/%.sh=%); do \
+		printf "	%-64s $$f.out\n" highlight/$$f.sh; \
+		BIN=$(BIN) sh highlight/$$f.sh > expected/highlight/$$f.out 2>/dev/null; \
+	done || true
 
 
 ZSH ?= /bin/zsh
@@ -116,7 +124,7 @@ SH_COMPAT := $(filter-out %_1.sh,$(wildcard sh/*.sh))
 dashdiff: $(BIN)
 	@BIN='$(BIN)' DASH='$(DASH)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 		FAILED_LIST='$(FAILED_LIST)' SH_COMPAT='$(SH_COMPAT)' \
-		/bin/bash dashdiff.sh
+		$(SHELL) run-dash-diff-test.sh
 
 
 BASH_COMPAT := $(filter-out %_1.bash,$(wildcard bash/*.bash))
@@ -124,12 +132,12 @@ BASH_COMPAT := $(filter-out %_1.bash,$(wildcard bash/*.bash))
 bashdiff: $(BIN)
 	@BIN='$(BIN)' BASH='$(BASH)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 		FAILED_LIST='$(FAILED_LIST)' BASH_COMPAT_FILES='$(BASH_COMPAT)' \
-		/bin/bash bashdiff.sh
+		$(SHELL) run-bash-diff-test.sh
 
 mimicrydiff: $(BIN)
 	@BIN='$(BIN)' BASH='$(BASH)' DASH='$(DASH)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 		FAILED_LIST='$(FAILED_LIST)' SH_COMPAT='$(SH_COMPAT)' \
-		BASH_COMPAT_FILES='$(BASH_COMPAT)' /bin/bash mimicrydiff.sh
+		BASH_COMPAT_FILES='$(BASH_COMPAT)' $(SHELL) run-mimicry-diff-test.sh
 
 
 BENCH := bench/configure.sh
@@ -145,7 +153,7 @@ bench:
 	@SCALE='$(SCALE)' BIN='$(BIN)' DASH='$(DASH)' BASH='$(BASH)' ZSH='$(ZSH)' \
 		ASH='$(ASH)' YASH='$(YASH)' BENCH='$(BENCH)' BENCH_BASH='$(BENCH_BASH)' \
 		BENCH_SHIT='$(BENCH_SHIT)' PRIMES='$(PRIMES)' PRIMES_PY='$(PRIMES_PY)' \
-		PRIMES_LIMIT='$(PRIMES_LIMIT)' /bin/bash bench.sh
+		PRIMES_LIMIT='$(PRIMES_LIMIT)' $(SHELL) run-bench-test.sh
 
 .PHONY: test clean shit_tests refill dashdiff bashdiff mimicrydiff bench \
-		completion_tests completion_refill cli_tests
+		completion_tests completion_refill cli_tests highlight_tests

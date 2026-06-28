@@ -32,7 +32,7 @@ declare -iA m3
 m3[q]=5
 declare -p m3
 declare -ix q2=5
-q2+=3 env > /tmp/shit_test_q2env 2>/dev/null
-grep "^q2=" /tmp/shit_test_q2env
+q2+=3 env > /tmp/shit_test_q2env_$$ 2>/dev/null
+grep "^q2=" /tmp/shit_test_q2env_$$
 echo "prefix_restores=$q2"
-rm -f /tmp/shit_test_q2env
+rm -f /tmp/shit_test_q2env_$$

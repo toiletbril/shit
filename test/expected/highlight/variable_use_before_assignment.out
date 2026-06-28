@@ -1,0 +1,28 @@
+== use before a standalone assignment, then after:
+echo	\e[94m
+$V	\e[1;31m
+;	\e[1m
+;	\e[1m
+echo	\e[94m
+$V	\e[36m
+== a prefix assignment leaves the name unset for the same command:
+echo	\e[94m
+$V2	\e[1;31m
+== a standalone assignment sets the name for what follows:
+;	\e[1m
+echo	\e[94m
+$V3	\e[36m
+== several prefix names all stay unset:
+echo	\e[94m
+$A	\e[1;31m
+$B	\e[1;31m
+== an array element assignment binds the base name:
+echo	\e[94m
+$arr	\e[1;31m
+;	\e[1m
+;	\e[1m
+echo	\e[94m
+$arr	\e[36m
+== an exported name is set everywhere:
+echo	\e[94m
+$PATH	\e[36m
