@@ -234,12 +234,12 @@ enum class highlight_construct : u8
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
                                ArrayList<highlight_span> &spans,
-                               const HashSet &known_vars) throws -> void;
+                               HashSet &known_vars) throws -> void;
 
 static fn color_arithmetic(StringView line, usize begin, usize end,
                            EvalContext &context,
                            ArrayList<highlight_span> &spans,
-                           const HashSet &known_vars) throws -> void;
+                           HashSet &known_vars) throws -> void;
 
 static fn word_names_existing_path(StringView word) throws -> bool
 {
@@ -420,7 +420,7 @@ static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
    variable that is not set colors bold red. */
 static fn color_dollar(StringView line, usize i, usize end,
                        ArrayList<highlight_span> &spans, EvalContext &context,
-                       const HashSet &known_vars) throws -> usize
+                       HashSet &known_vars) throws -> usize
 {
   /* $(( ... )) frames an arithmetic expression, so its inside colors as bare
      names, numbers, and operators rather than as a command line. The two
@@ -487,7 +487,7 @@ static fn color_dollar(StringView line, usize i, usize end,
 static fn color_arithmetic(StringView line, usize begin, usize end,
                            EvalContext &context,
                            ArrayList<highlight_span> &spans,
-                           const HashSet &known_vars) throws -> void
+                           HashSet &known_vars) throws -> void
 {
   usize i = begin;
   while (i < end) {
@@ -596,10 +596,18 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
                                ArrayList<highlight_span> &spans,
-                               const HashSet &known_vars) throws -> void
+                               HashSet &known_vars) throws -> void
 {
   let do_push = [&](usize start, usize stop, StringView sgr) throws -> void {
     if (start < stop) spans.push(highlight_span{start, stop, sgr});
+  };
+
+  let pending_assignment_names =
+      ArrayList<StringView>{bump_allocator(HIGHLIGHT_ARENA)};
+  let commit_pending_assignments = [&]() throws -> void {
+    for (let const &name : pending_assignment_names)
+      known_vars.add(name);
+    pending_assignment_names.clear();
   };
 
   let stack = ArrayList<highlight_construct>{bump_allocator(HIGHLIGHT_ARENA)};
@@ -620,6 +628,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       /* A newline ends a command the way a ';' does, so the next word returns
          to command position and a keyword after it is recognized. */
       if (c == '\n') {
+        commit_pending_assignments();
         is_command_position = true;
         expecting_in = false;
         i++;
@@ -688,6 +697,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       let has_separator = false;
       let has_redirect = false;
       let has_opener = false;
+      let has_closer = false;
       while (i < end) {
         let const o = line[i];
         if (o == '|' || o == '&' || o == ';') {
@@ -701,6 +711,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           i++;
           break;
         } else if (o == ')' || o == '}') {
+          has_closer = true;
           i++;
           break;
         } else {
@@ -708,6 +719,10 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         }
       }
       do_push(operator_start, i, colors::ansi::BOLD);
+
+      if (has_separator || has_opener || has_closer)
+        commit_pending_assignments();
+
       if (has_opener || (has_separator && !has_redirect)) {
         is_command_position = true;
         expecting_in = false;
@@ -783,6 +798,16 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     let const plain = word_spans.is_empty();
     let const is_assignment = word_looks_like_assignment(word);
 
+    if (is_assignment && is_command_position) {
+      let assigned_name =
+          word.substring_of_length(0, word.find_character('=').value());
+      if (Maybe<usize> bracket = assigned_name.find_character('[');
+          bracket.has_value())
+        assigned_name = assigned_name.substring_of_length(0, bracket.value());
+      if (is_plain_identifier(assigned_name))
+        pending_assignment_names.push(assigned_name);
+    }
+
     /* The ]] that closes a [[ conditional reads as a keyword and pops the
        construct, the way fi closes an if and done closes a loop. */
     if (plain && word == "]]" && !stack.is_empty() &&
@@ -812,10 +837,12 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       for_variable_pending = false;
       is_command_position = false;
       /* A valid loop variable is cyan, a malformed one bold red. */
-      if (!plain || !is_plain_identifier(word))
+      if (!plain || !is_plain_identifier(word)) {
         do_push(word_start, word_end, colors::ansi::BOLD_RED);
-      else
+      } else {
         do_push(word_start, word_end, colors::ansi::CYAN);
+        known_vars.add(word);
+      }
       continue;
     }
 
@@ -843,6 +870,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     }
 
     if (is_command_position && plain && !is_assignment) {
+      pending_assignment_names.clear();
+
       let is_keyword = true;
       let keyword_ok = true;
       let next_is_command = true;
@@ -957,53 +986,13 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     }
     for (let const &inner : word_spans)
       do_push(inner.start, inner.end, inner.sgr);
-    if (is_command_position && !is_assignment) is_command_position = false;
-  }
-}
-
-/* The variable names the line itself introduces, a for or select loop variable
-   and a plain NAME= assignment, so the highlighter does not red a reference to
-   a name the same line binds. */
-static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
-    -> void
-{
-  let const is_separator = [](char c) {
-    return c == ' ' || c == '\t' || c == '\n' || c == ';' || c == '|' ||
-           c == '&' || c == '(' || c == ')';
-  };
-  let const is_identifier = [](StringView name) {
-    if (name.is_empty() || !is_highlight_name_start(name[0])) return false;
-    for (usize i = 1; i < name.length; i++)
-      if (!is_highlight_name_char(name[i])) return false;
-    return true;
-  };
-
-  let should_bind_next = false;
-  usize i = 0;
-  while (i < line.length) {
-    while (i < line.length && is_separator(line[i]))
-      i++;
-    let const start = i;
-    while (i < line.length && !is_separator(line[i]))
-      i++;
-    if (i == start) break;
-    let const token = line.substring_of_length(start, i - start);
-
-    if (should_bind_next) {
-      if (is_identifier(token)) known_vars.add(token);
-      should_bind_next = false;
-    } else if (Maybe<usize> equals = token.find_character('=');
-               equals.has_value() && equals.value() > 0)
-    {
-      let name = token.substring_of_length(0, equals.value());
-      /* An array-element assignment binds the base name, so arr[0]=1 makes arr
-         known rather than the invalid name arr[0. */
-      if (Maybe<usize> bracket = name.find_character('['); bracket.has_value())
-        name = name.substring_of_length(0, bracket.value());
-      if (is_identifier(name)) known_vars.add(name);
+    if (is_command_position && !is_assignment) {
+      pending_assignment_names.clear();
+      is_command_position = false;
     }
-    should_bind_next = token == "for" || token == "select";
   }
+
+  commit_pending_assignments();
 }
 
 fn highlight_line(StringView line, EvalContext &context) throws
@@ -1025,8 +1014,6 @@ fn highlight_line(StringView line, EvalContext &context) throws
     context.append_dynamic_variable_names(dynamic_names);
     for (let const &name : dynamic_names)
       known_vars.add(name);
-
-    add_line_bound_variables(line, known_vars);
   }
   scan_highlight_range(line, 0, line.length, context, spans, known_vars);
   return spans;

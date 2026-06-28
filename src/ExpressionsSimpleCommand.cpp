@@ -43,11 +43,6 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
 {
   ASSERT(m_assignment != nullptr);
 
-  /* An assignment whose whole value is an arithmetic expansion reads as a let,
-     the let form takes the operands without the $(( )) wrapper. The split of
-     NAME=$((...)) leaves an empty literal segment beside the expansion, so the
-     scan skips empty segments. The check runs before the fold below, which
-     rewrites the segment to its constant result. */
   if (!m_assignment->is_append()) {
     const WordSegment *arithmetic_segment = nullptr;
     let arithmetic_segment_count = 0;

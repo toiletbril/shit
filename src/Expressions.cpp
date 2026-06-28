@@ -147,10 +147,6 @@ cold fn AnalysisContext::note_variable_read(StringView name,
   if (global_assigned_names.contains(name)) return;
   if (reads_before_assignment.find(name) != nullptr) return;
 
-  /* A name already set in the live shell or the environment is not a use
-     before assignment. The stored variables and the exported set are read
-     directly, since get_variable_value would seed $RANDOM and advance its
-     generator from the analysis pass. */
   if (eval_context != nullptr &&
       (eval_context->is_exported(name) ||
        eval_context->lookup_shell_variable(name) != nullptr))
@@ -757,10 +753,6 @@ constexpr StaticStringMap<bool> SYSTEM_DIRECTORIES{
     SYSTEM_DIRECTORY_ENTRIES,
     sizeof(SYSTEM_DIRECTORY_ENTRIES) / sizeof(SYSTEM_DIRECTORY_ENTRIES[0])};
 
-/* The commands whose operands are a variable rather than a value read, so the
-   use-before-assignment scan leaves their operands alone. A test or [ probes a
-   maybe-unset variable on purpose, unset names a variable to drop, and let and
-   eval carry their own expression text. */
 constexpr StaticStringMap<bool>::entry VARIABLE_PROBE_COMMAND_ENTRIES[] = {
     {SSK("["),     true},
     {SSK("test"),  true},
@@ -774,9 +766,6 @@ constexpr StaticStringMap<bool> VARIABLE_PROBE_COMMANDS{
     sizeof(VARIABLE_PROBE_COMMAND_ENTRIES) /
         sizeof(VARIABLE_PROBE_COMMAND_ENTRIES[0])};
 
-/* The commands that name a variable they assign, so the use-before-assignment
-   scan records their operands as assigned rather than read. read and getopts
-   store into the named variable, and the declaration builtins introduce it. */
 constexpr StaticStringMap<bool>::entry VARIABLE_TARGET_COMMAND_ENTRIES[] = {
     {SSK("read"),      true},
     {SSK("mapfile"),   true},
@@ -793,9 +782,6 @@ constexpr StaticStringMap<bool> VARIABLE_TARGET_COMMANDS{
     sizeof(VARIABLE_TARGET_COMMAND_ENTRIES) /
         sizeof(VARIABLE_TARGET_COMMAND_ENTRIES[0])};
 
-/* The leading identifier of an operand word, the name before an =value or a
-   [subscript, empty for a flag or a non-identifier. read x and declare y=1 name
-   x and y this way. */
 fn operand_target_name(StringView text) wontthrow -> StringView
 {
   if (text.is_empty() || text[0] == '-') return StringView{};
@@ -1742,12 +1728,6 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     actx.constant_variables.clear();
   }
 
-  /* The use-before-assignment scan. A read at the top level of a name no
-     assignment has introduced yet is recorded, and a later assignment confirms
-     and reports it. A test or probe command and a variable-target builtin name a
-     variable rather than read its value, so their operands record an assignment
-     or are skipped. The check runs only on the straight-line top level, so a
-     conditional or a function body never trips it. */
   let const is_top_level_unconditional =
       actx.function_scope_depth == 0 && is_unconditional;
   if (is_top_level_unconditional && !command_is_shadowed) {
