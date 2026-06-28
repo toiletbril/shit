@@ -766,15 +766,21 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
 
   /* A cobra-style function truncates its description to COLUMNS, so the width
      is set wide for the run and restored after, the whole description arriving
-     for shit's own dimmed column. */
-  let const saved_columns = context.get_variable_value("COLUMNS");
-  context.set_shell_variable("COLUMNS", "100000");
+     for shit's own dimmed column. Only an explicit tab runs a completion
+     function, so the ghost path keeps COLUMNS untouched. */
+  Maybe<String> saved_columns;
+  if (for_listing) {
+    saved_columns = context.get_variable_value("COLUMNS");
+    context.set_shell_variable("COLUMNS", "100000");
+  }
   defer
   {
-    if (saved_columns.has_value())
-      context.set_shell_variable("COLUMNS", saved_columns->view());
-    else
-      context.unset_shell_variable("COLUMNS");
+    if (for_listing) {
+      if (saved_columns.has_value())
+        context.set_shell_variable("COLUMNS", saved_columns->view());
+      else
+        context.unset_shell_variable("COLUMNS");
+    }
   };
   /* The surface name wins when it has a spec of its own. Otherwise it resolves
      through an alias and a symlink, so g for a g='git' alias reads git's spec.
