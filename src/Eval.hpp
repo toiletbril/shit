@@ -331,7 +331,8 @@ public:
      args_are_transient is set the returned vector lives on the scratch arena
      so a simple command pays no per-argument heap allocation. */
   fn process_args(const ArrayList<const Token *> &args,
-                  bool args_are_transient = false) throws -> ArrayList<String>;
+                  bool args_are_transient = false,
+                  bool is_array_literal = false) throws -> ArrayList<String>;
 
   /* The allocator for transient expansion data, reclaimed whole when the
      command ends. */

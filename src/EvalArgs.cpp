@@ -318,8 +318,51 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
 
 } // namespace
 
+static pure fn segment_is_literal(const WordSegment &segment) wontthrow -> bool
+{
+  return segment.kind == WordSegment::Kind::LiteralText ||
+         segment.kind == WordSegment::Kind::UnquotedText;
+}
+
+static fn word_starts_array_subscript(const Word &word) wontthrow -> bool
+{
+  if (word.segments.is_empty()) return false;
+
+  const WordSegment &first = word.segments[0];
+  if (!segment_is_literal(first) || first.text.is_empty() ||
+      first.text.view()[0] != '[')
+    return false;
+
+  for (usize segment_position = 0; segment_position < word.segments.count();
+       segment_position++)
+  {
+    const WordSegment &segment = word.segments[segment_position];
+    if (!segment_is_literal(segment)) continue;
+
+    let const text = segment.text.view();
+    for (usize i = 0; i < text.length; i++) {
+      if (text[i] != ']') continue;
+
+      if (i + 1 < text.length) return text[i + 1] == '=';
+
+      for (usize next = segment_position + 1; next < word.segments.count();
+           next++)
+      {
+        if (!segment_is_literal(word.segments[next])) return false;
+        let const next_text = word.segments[next].text.view();
+        if (next_text.is_empty()) continue;
+        return next_text[0] == '=';
+      }
+      return false;
+    }
+  }
+
+  return false;
+}
+
 hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
-                                 bool args_are_transient) throws
+                                 bool args_are_transient,
+                                 bool is_array_literal) throws
     -> ArrayList<String>
 {
   LOG(Debug, "expanding %zu argument tokens", args.count());
@@ -463,6 +506,14 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         fallback_word.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
                                                 token->raw_string(), false});
         word = &fallback_word;
+      }
+
+      if (is_array_literal && word != nullptr &&
+          word_starts_array_subscript(*word))
+      {
+        expanded_args.push(String{expanded_args.allocator(),
+                                  expand_word_for_assignment(*word).view()});
+        continue;
       }
 
       /* The plain-literal fast path pushes a word that needs no expansion,

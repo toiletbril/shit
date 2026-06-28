@@ -193,7 +193,7 @@ fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* The elements expand the way command arguments do, with field splitting and
      globbing, so a=( $list *.txt ) builds the array bash would. */
-  ArrayList<String> values = cxt.process_args(m_elements);
+  ArrayList<String> values = cxt.process_args(m_elements, false, true);
   LOG(Debug, "assigning %zu elements to the array '%s'", values.count(),
       m_name.c_str());
   cxt.assign_indexed_array_elements(m_name.view(), steal(values), m_is_append);

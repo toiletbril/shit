@@ -1015,7 +1015,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        pvars=() of flags= pvars=() specs=(), applied after the scalars in source
        order. */
     for (let const &assignment : m_array_args) {
-      ArrayList<String> values = cxt.process_args(assignment.elements);
+      ArrayList<String> values =
+          cxt.process_args(assignment.elements, false, true);
       cxt.assign_indexed_array_elements(assignment.name, steal(values),
                                         assignment.is_append);
     }
@@ -1432,7 +1433,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       if (is_local || is_function_local) {
         cxt.declare_local(assignment.name);
       }
-      ArrayList<String> values = cxt.process_args(assignment.elements);
+      ArrayList<String> values =
+          cxt.process_args(assignment.elements, false, true);
       if (is_associative_request) {
         /* The array is keyed by string, so the declaration registers the name
            and each [key]=value element fills one entry. A bare element with no
