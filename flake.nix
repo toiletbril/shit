@@ -1,5 +1,5 @@
 {
-  description = "shit — the fastest cross-platform Bash and POSIX-compatible shell";
+  description = "shit - the fastest cross-platform Bash and POSIX-compatible shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -56,9 +56,29 @@
           meta = with pkgs.lib; {
             description = "The fastest cross-platform Bash and POSIX-compatible shell";
             homepage = "https://github.com/toiletbril/shit";
-            license = licenses.mit;
+            license = licenses.bsd3;
             mainProgram = "shit";
             platforms = platforms.unix;
+          };
+        };
+
+      mkSystemModule = { config, lib, pkgs, ... }:
+        let
+          cfg = config.programs.shit;
+        in
+        {
+          options.programs.shit = {
+            enable = lib.mkEnableOption "shit - the fastest cross-platform Bash and POSIX-compatible shell";
+            package = lib.mkOption {
+              type = lib.types.package;
+              default = mkPackage { inherit pkgs; };
+              description = "The shit package to use";
+            };
+          };
+
+          config = lib.mkIf cfg.enable {
+            environment.systemPackages = [ cfg.package ];
+            environment.shells = [ "${cfg.package}/bin/shit" ];
           };
         };
     in
@@ -95,151 +115,12 @@
       );
 
       overlays.default = final: prev: {
-        shit = final.callPackage ({ stdenv, clang, gnumake, git, lib }:
-          stdenv.mkDerivation {
-            pname = "shit";
-            version = "0.1.0";
-
-            src = self;
-
-            nativeBuildInputs = [ clang gnumake git ];
-
-            preBuild = ''
-              if [ ! -f src/toiletline/toiletline.h ]; then
-                echo "providing toiletline submodule from flake input"
-                rm -rf src/toiletline
-                cp -r ${toiletline} src/toiletline
-              fi
-            '';
-
-            buildPhase = ''
-              runHook preBuild
-              make -C src -j$NIX_BUILD_CORES MODE=rel CXX=${clang}/bin/clang++
-              runHook postBuild
-            '';
-
-            installPhase = ''
-              runHook preInstall
-              mkdir -p $out/bin
-              cp ./shit $out/bin/
-              runHook postInstall
-            '';
-
-            meta = with lib; {
-              description = "The fastest cross-platform Bash and POSIX-compatible shell";
-              homepage = "https://github.com/toiletbril/shit";
-              license = licenses.mit;
-              mainProgram = "shit";
-              platforms = platforms.unix;
-            };
-          }) { };
+        shit = mkPackage { pkgs = final; };
       };
 
-      nixosModules.default = { config, lib, pkgs, ... }:
-        let
-          cfg = config.programs.shit;
-          shitPkg = if pkgs ? shit then pkgs.shit else
-            pkgs.callPackage ({ stdenv, clang, gnumake, git }:
-              stdenv.mkDerivation {
-                pname = "shit";
-                version = "0.1.0";
-                src = self;
-                nativeBuildInputs = [ clang gnumake git ];
-                preBuild = ''
-                  if [ ! -f src/toiletline/toiletline.h ]; then
-                    echo "providing toiletline submodule from flake input"
-                    rm -rf src/toiletline
-                    cp -r ${toiletline} src/toiletline
-                  fi
-                '';
-                buildPhase = ''
-                  runHook preBuild
-                  make -C src -j$NIX_BUILD_CORES MODE=rel CXX=${clang}/bin/clang++
-                  runHook postBuild
-                '';
-                installPhase = ''
-                  runHook preInstall
-                  mkdir -p $out/bin
-                  cp ./shit $out/bin/
-                  runHook postInstall
-                '';
-                meta = with lib; {
-                  description = "The fastest cross-platform Bash and POSIX-compatible shell";
-                  homepage = "https://github.com/toiletbril/shit";
-                  license = licenses.mit;
-                  mainProgram = "shit";
-                  platforms = platforms.unix;
-                };
-              }) { };
-        in
-        {
-          options.programs.shit = {
-            enable = lib.mkEnableOption "shit — the fastest cross-platform Bash and POSIX-compatible shell";
-            package = lib.mkOption {
-              type = lib.types.package;
-              default = shitPkg;
-              description = "The shit package to use";
-            };
-          };
+      nixosModules.default = mkSystemModule;
 
-          config = lib.mkIf cfg.enable {
-            environment.systemPackages = [ cfg.package ];
-            environment.shells = [ cfg.package ];
-          };
-        };
-
-      darwinModules.default = { config, lib, pkgs, ... }:
-        let
-          cfg = config.programs.shit;
-          shitPkg = if pkgs ? shit then pkgs.shit else
-            pkgs.callPackage ({ stdenv, clang, gnumake, git }:
-              stdenv.mkDerivation {
-                pname = "shit";
-                version = "0.1.0";
-                src = self;
-                nativeBuildInputs = [ clang gnumake git ];
-                preBuild = ''
-                  if [ ! -f src/toiletline/toiletline.h ]; then
-                    echo "providing toiletline submodule from flake input"
-                    rm -rf src/toiletline
-                    cp -r ${toiletline} src/toiletline
-                  fi
-                '';
-                buildPhase = ''
-                  runHook preBuild
-                  make -C src -j$NIX_BUILD_CORES MODE=rel CXX=${clang}/bin/clang++
-                  runHook postBuild
-                '';
-                installPhase = ''
-                  runHook preInstall
-                  mkdir -p $out/bin
-                  cp ./shit $out/bin/
-                  runHook postInstall
-                '';
-                meta = with lib; {
-                  description = "The fastest cross-platform Bash and POSIX-compatible shell";
-                  homepage = "https://github.com/toiletbril/shit";
-                  license = licenses.mit;
-                  mainProgram = "shit";
-                  platforms = platforms.unix;
-                };
-              }) { };
-        in
-        {
-          options.programs.shit = {
-            enable = lib.mkEnableOption "shit — the fastest cross-platform Bash and POSIX-compatible shell";
-            package = lib.mkOption {
-              type = lib.types.package;
-              default = shitPkg;
-              description = "The shit package to use";
-            };
-          };
-
-          config = lib.mkIf cfg.enable {
-            environment.systemPackages = [ cfg.package ];
-            environment.shells = [ cfg.package ];
-          };
-        };
+      darwinModules.default = mkSystemModule;
 
       homeModules.default = { config, lib, pkgs, ... }:
         let
@@ -247,11 +128,16 @@
         in
         {
           options.programs.shit = {
-            enable = lib.mkEnableOption "shit — the fastest cross-platform Bash and POSIX-compatible shell";
+            enable = lib.mkEnableOption "shit - the fastest cross-platform Bash and POSIX-compatible shell";
+            package = lib.mkOption {
+              type = lib.types.package;
+              default = mkPackage { inherit pkgs; };
+              description = "The shit package to use";
+            };
           };
 
           config = lib.mkIf cfg.enable {
-            home.packages = [ pkgs.shit ];
+            home.packages = [ cfg.package ];
           };
         };
     };
