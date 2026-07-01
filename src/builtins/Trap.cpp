@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -76,6 +77,13 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   ASSERT(!args.is_empty());
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  if (!cxt.is_posix_mode() && args.count() == 2 &&
+      (args[1] == "-l" || args[1] == "--list"))
+  {
+    ec.print_to_stdout(shitbox::format_signal_list());
+    return 0;
+  }
 
   /* A bare trap, and the -p form, list the set traps. -p may name the
      conditions to list, so only those are printed when it carries operands. The
