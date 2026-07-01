@@ -292,9 +292,13 @@ fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
       usize j = i + 1;
       while (j < word.length && lexer::is_variable_name(word[j]))
         name += word[j++];
-      /* A nested reference obeys set -u the way a top level reference does. */
-      if (!get_variable_value(name).has_value()) report_unset_reference(name);
-      if (const String *stored = lookup_shell_variable(name); stored != nullptr)
+      /* A nested reference obeys set -u the way a top level reference does. A
+         stored name resolves without the extra dynamic-value lookup and copy.
+       */
+      const String *stored = lookup_shell_variable(name);
+      if (stored == nullptr && !get_variable_value(name).has_value())
+        report_unset_reference(name);
+      if (stored != nullptr)
         do_emit_run(stored->view(), !is_in_double_quote);
       else
         do_emit_run(expand_variable(name), !is_in_double_quote);

@@ -688,11 +688,12 @@ fn EvalContext::collect_array_elements(StringView name) const throws
 
   let out = ArrayList<String>{heap_allocator()};
   if (const ArrayList<String> *array = lookup_indexed_array(name)) {
-    out.reserve(array->count());
+    let sparse = collect_sparse_array_entries(m_sparse_array_values, name,
+                                              scratch_allocator());
+    out.reserve(array->count() + sparse.count());
     for (const String &element : *array)
       out.push_managed(element.view());
-    for (sparse_array_entry &entry : collect_sparse_array_entries(
-             m_sparse_array_values, name, scratch_allocator()))
+    for (sparse_array_entry &entry : sparse)
       out.push(steal(entry.value));
     return out;
   }

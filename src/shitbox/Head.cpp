@@ -37,10 +37,12 @@ static fn read_up_to_lines(os::descriptor fd, i64 max_lines,
     if (!read_count.has_value() || *read_count == 0) {
       break;
     }
-    for (usize i = 0; i < *read_count && line_count < max_lines; i++) {
-      out.push(buffer[i]);
-      if (buffer[i] == '\n') line_count++;
+    usize span_length = 0;
+    while (span_length < *read_count && line_count < max_lines) {
+      if (buffer[span_length] == '\n') line_count++;
+      span_length++;
     }
+    out.append(StringView{buffer, span_length});
   }
 
   return out;
