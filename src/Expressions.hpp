@@ -19,6 +19,12 @@ class ForLoop;
 class CStyleForLoop;
 } // namespace expressions
 
+enum class analyze_severity : u8
+{
+  Lenient,
+  Strict,
+};
+
 /* The prepass walks the whole tree once before any command runs. It carries the
    source for the caret, and a fatal flag that stops execution. A warning is a
    located message that does not stop execution, a failure does. */
@@ -27,12 +33,7 @@ class AnalysisContext
 public:
   StringView source;
   bool has_fatal{false};
-  /* The analysis runs by default and a found error is fatal, so a script with a
-     command that cannot resolve does not run. -W keeps the analysis but reports
-     every error as a warning and lets the run proceed, which this flag carries
-     into fail(). POSIX mode and bash mode skip the whole stage, so nothing here
-     runs at all and the file executes the way dash or bash does. */
-  bool should_treat_errors_as_warnings{false};
+  u8 warning_level{0};
   /* Set once a dot, source, or eval is seen. Those run code the prepass cannot
      see, so a later unresolved command is a warning rather than a failure. */
   bool has_seen_runtime_definer{false};
@@ -126,7 +127,8 @@ public:
      as a trailing note line, the way warn does, so the advice reads on its own.
    */
   fn fail(SourceLocation location, StringView message,
-          StringView suggestion = {}) throws -> void;
+          StringView suggestion = {},
+          analyze_severity severity = analyze_severity::Strict) throws -> void;
   fn note_variable_assignment(StringView name) throws -> void;
   fn note_variable_read(StringView name, SourceLocation location,
                         bool is_top_level_unconditional) throws -> void;
@@ -145,7 +147,7 @@ public:
    an unconditional command failed to resolve. */
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               const EvalContext *eval_context, bool errors_are_warnings,
+               const EvalContext *eval_context, u8 warning_level,
                bool silence_unresolved_commands,
                bool show_optimizer_state = false) throws -> bool;
 

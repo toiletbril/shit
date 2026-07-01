@@ -425,7 +425,7 @@ static fn run_script_contents(const String &script_contents,
     let const analysis_failed =
         run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
-                     context.alias_names(), &context, FLAG_WARNINGS.count() > 0,
+                     context.alias_names(), &context, context.warning_level(),
                      FLAG_WARNINGS.count() > 0 &&
                          context.shell_is_interactive(),
                      FLAG_SHOW_OPTIMIZER_STATE.is_enabled());

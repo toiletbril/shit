@@ -88,17 +88,25 @@ to inject its integration through the ENV file is honored.
 .SS Diagnostics
 .TP
 .B \-W[W...]
-The analysis stage is kept, but every error is reported as a warning and the run
-proceeds. A single
+The analysis stage is kept. A single
 .B \-W
-reports the runtime warnings in the strict default mood alone. A repeated
+demotes a lenient analysis error to a warning, and the run proceeds. An
+unresolved command and a variable read before it is assigned are the lenient
+errors. A strict analysis error, such as a malformed glob pattern, stays fatal
+under a single
+.BR \-W .
+A repeated
 .BR \-W ,
 written
 .BR \-WW ,
-reports them in every mood. The default mood reports them as fatal errors
-already, so it behaves as if
-.B \-WW
-were given.
+demotes every analysis error to a warning, the strict ones included, and the run
+proceeds in every case. The runtime warnings are reported in the strict default
+mood under
+.B \-W
+and in every mood under
+.BR \-WW .
+Without the flag the strict default mood reports an analysis error as fatal and
+stops the run before any command executes.
 .TP
 .B \-\-no\-diagnostics
 The analysis stage is skipped. No warning or pre-run diagnostic is reported.

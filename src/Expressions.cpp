@@ -104,14 +104,16 @@ cold fn AnalysisContext::trace_eliminated_node(SourceLocation location,
 }
 
 cold fn AnalysisContext::fail(SourceLocation location, StringView message,
-                              StringView suggestion) throws -> void
+                              StringView suggestion,
+                              analyze_severity severity) throws -> void
 {
-  /* Under -W the analysis still runs but its errors are reported as warnings
-     and the run proceeds, so the same call reports without stopping. */
-  if (should_treat_errors_as_warnings) {
+  let const demote_at_level = severity == analyze_severity::Lenient ? 1 : 2;
+
+  if (warning_level >= demote_at_level) {
     warn(location, message, suggestion);
     return;
   }
+
   ErrorWithLocation located{location, message};
   if (!suggestion.is_empty()) located.set_note(suggestion);
   show_message(located.to_string(source));
@@ -128,8 +130,10 @@ cold fn AnalysisContext::note_variable_assignment(StringView name) throws
   if (const SourceLocation *read_location = reads_before_assignment.find(name);
       read_location != nullptr)
   {
-    fail(*read_location, StringView{"The variable '"} + name +
-                             "' is read before it is assigned");
+    fail(*read_location,
+         StringView{"The variable '"} + name +
+             "' is read before it is assigned",
+         StringView{}, analyze_severity::Lenient);
     reads_before_assignment.erase(name);
   }
 }
@@ -392,14 +396,14 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               const EvalContext *eval_context, bool errors_are_warnings,
+               const EvalContext *eval_context, u8 warning_level,
                bool silence_unresolved_commands,
                bool show_optimizer_state) throws -> bool
 {
   ASSERT(root != nullptr);
 
   AnalysisContext actx{source};
-  actx.should_treat_errors_as_warnings = errors_are_warnings;
+  actx.warning_level = warning_level;
   actx.should_silence_unresolved_commands = silence_unresolved_commands;
   actx.eval_context = eval_context;
   /* One flag drives both the per-decision trace and the located eliminated-node
@@ -1683,7 +1687,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     if (actx.has_seen_runtime_definer)
       actx.warn(m_args[0]->source_location(), message, suggestion_note.view());
     else
-      actx.fail(m_args[0]->source_location(), message, suggestion_note.view());
+      actx.fail(m_args[0]->source_location(), message, suggestion_note.view(),
+                analyze_severity::Lenient);
   }
 
   /* A command may change a variable out of the prepass's static view, so a
