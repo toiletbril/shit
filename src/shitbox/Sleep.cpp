@@ -48,7 +48,7 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    let const number = String{duration};
+    let const number = String{cxt.scratch_allocator(), duration};
     let const start = number.c_str();
     char *end = nullptr;
     let const seconds_value = std::strtod(start, &end);

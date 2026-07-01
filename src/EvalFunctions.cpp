@@ -96,7 +96,7 @@ fn EvalContext::find_function_source(StringView name) const wontthrow
 
 fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
 {
-  let out = ArrayList<String>{};
+  let out = ArrayList<String>{heap_allocator()};
   out.reserve(m_functions.count());
   m_functions.for_each(
       [&](StringView name, const Expression *) { out.push_managed(name); });
@@ -289,7 +289,7 @@ fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 
 fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
-  let out = ArrayList<String>{};
+  let out = ArrayList<String>{heap_allocator()};
   out.reserve(m_readonly_names.count());
   m_readonly_names.for_each([&](StringView name) { out.push_managed(name); });
   out.sort();

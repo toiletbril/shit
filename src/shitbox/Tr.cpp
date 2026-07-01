@@ -26,9 +26,9 @@ namespace shitbox {
 /* A descending range such as c-a expands in reverse to cba the way GNU tr reads
    it. The bounds are read as unsigned bytes and the walk runs over an int, so a
    range that touches the 0 or 255 edge does not overflow a char. */
-static fn expand_set(StringView set) throws -> String
+static fn expand_set(StringView set, Allocator allocator) throws -> String
 {
-  String expanded{};
+  String expanded{allocator};
   usize i = 0;
   while (i < set.length) {
     if (i + 2 < set.length && set[i + 1] == '-') {
@@ -69,8 +69,10 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
     throw Error{"tr expects two sets unless -d is given"};
   }
 
-  let const set1 = expand_set(operands[0].view());
-  let const set2 = is_deleting ? String{} : expand_set(operands[1].view());
+  let const set1 = expand_set(operands[0].view(), cxt.scratch_allocator());
+  let const set2 =
+      is_deleting ? String{cxt.scratch_allocator()}
+                  : expand_set(operands[1].view(), cxt.scratch_allocator());
 
   /* The first occurrence of a byte in set1 wins. A byte past the end of set2
      maps to its last byte, the way tr pads the shorter set with its final
@@ -101,7 +103,7 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
   /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
   if (os::INTERRUPT_REQUESTED) return 130;
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   output.reserve(input.count());
   for (usize i = 0; i < input.count(); i++) {
     let const c = static_cast<unsigned char>(input.view()[i]);

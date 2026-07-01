@@ -308,7 +308,8 @@ fn format_human_size(u64 bytes) throws -> String;
 /* Resolve a signal spelling to its number for pkill and killall, a decimal
    number directly or a name such as TERM or SIGKILL. An empty spelling is the
    TERM default. */
-fn resolve_shitbox_signal(StringView spelled) throws -> i32;
+fn resolve_shitbox_signal(StringView spelled, Allocator allocator) throws
+    -> i32;
 
 /* The numbered signal list the kill family prints under -l, one
    "number) SIGNAME" per line. */

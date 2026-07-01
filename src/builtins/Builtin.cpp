@@ -41,18 +41,19 @@ pure fn BuiltinBuiltin::kind() const wontthrow -> Builtin::Kind
 
 /* The registered builtin names, sorted, so both listing forms read the same
    set. */
-static fn sorted_builtin_names() throws -> ArrayList<String>
+static fn sorted_builtin_names(Allocator allocator) throws -> ArrayList<String>
 {
-  let names = ArrayList<String>{};
+  let names = ArrayList<String>{allocator};
   for (let const &builtin_name : builtin_names())
     names.push_managed(builtin_name);
   names.sort();
   return names;
 }
 
-static fn print_builtin_columns(ExecContext &ec) throws -> void
+static fn print_builtin_columns(ExecContext &ec, Allocator allocator) throws
+    -> void
 {
-  let const sorted = sorted_builtin_names();
+  let const sorted = sorted_builtin_names(allocator);
 
   usize longest = 0;
   for (let const &builtin_name : sorted)
@@ -60,9 +61,9 @@ static fn print_builtin_columns(ExecContext &ec) throws -> void
   let const column_width = longest + 2;
   let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
 
-  let out = String{};
+  let out = String{allocator};
   out += "shit has ";
-  out += utils::int_to_text(static_cast<i64>(sorted.count()), heap_allocator());
+  out += utils::int_to_text(static_cast<i64>(sorted.count()), allocator);
   out += " builtins:\n\n";
   for (usize i = 0; i < sorted.count(); i++) {
     if (i % columns == 0) out += "  ";
@@ -85,7 +86,8 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* A bare builtin surveys the builtins in columns in the shit mood, and is the
      POSIX no-op success in the other moods. */
   if (ec.args().count() < 2) {
-    if (cxt.mood() == mimic_mood::Default) print_builtin_columns(ec);
+    if (cxt.mood() == mimic_mood::Default)
+      print_builtin_columns(ec, cxt.scratch_allocator());
     return 0;
   }
 
@@ -97,8 +99,8 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (name == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (name == "--list") {
-    let const sorted = sorted_builtin_names();
-    let out = String{};
+    let const sorted = sorted_builtin_names(cxt.scratch_allocator());
+    let out = String{cxt.scratch_allocator()};
     for (let const &builtin_name : sorted) {
       out += builtin_name.view();
       out += "\n";
@@ -120,7 +122,7 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* The name and its arguments are forwarded to a fresh context resolved
      directly to the target builtin, so the function table and the PATH are both
      skipped. */
-  let forwarded = ArrayList<String>{};
+  let forwarded = ArrayList<String>{heap_allocator()};
   for (usize i = 1; i < ec.args().count(); i++)
     forwarded.push_managed(ec.args()[i]);
   let sub = ExecContext::from_resolved(ec.source_location(),

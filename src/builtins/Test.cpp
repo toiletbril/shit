@@ -63,7 +63,7 @@ public:
   }
   pure bool at_end() const wontthrow { return pos >= end; }
 
-  void fail(StringView message) throws { throw Error{String{message}}; }
+  void fail(StringView message) throws { throw Error{message}; }
 
   bool evaluate_unary(const String &op, const String &operand) throws
   {
@@ -396,7 +396,7 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     expression_end = arguments.count() - 1;
   }
 
-  let operands = ArrayList<String>{};
+  let operands = ArrayList<String>{cxt.scratch_allocator()};
   operands.reserve(expression_end - 1);
   for (usize i = 1; i < expression_end; i++)
     operands.push(arguments[i]);

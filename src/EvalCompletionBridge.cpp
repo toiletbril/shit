@@ -51,7 +51,7 @@ fn EvalContext::run_completion_function(StringView function_name,
 {
   const Expression *body =
       has_functions() ? find_function(function_name) : nullptr;
-  if (body == nullptr) return ArrayList<String>{};
+  if (body == nullptr) return ArrayList<String>{heap_allocator()};
 
   LOG(Info,
       "running the completion function '%.*s' with %zu words, cursor word %zu",
@@ -78,7 +78,7 @@ fn EvalContext::run_completion_function(StringView function_name,
     m_runtime.failglob = saved_failglob;
   };
 
-  let comp_words = ArrayList<String>{};
+  let comp_words = ArrayList<String>{heap_allocator()};
   comp_words.reserve(words.count());
   for (let const &word : words)
     comp_words.push_managed(word.view());
@@ -95,19 +95,20 @@ fn EvalContext::run_completion_function(StringView function_name,
      with COMPREPLY+=() starts clean. Without the reset the previous completion
      on the same command leaks its entries into this one, so nix sear after a
      bare nix tab lists every subcommand. */
-  set_indexed_array("COMPREPLY", ArrayList<String>{});
+  set_indexed_array("COMPREPLY", ArrayList<String>{heap_allocator()});
 
   /* bash passes the command, the current word, and the previous word as $1 $2
    * $3. */
-  let call_params = ArrayList<String>{};
-  call_params.push(
-      words.is_empty() ? String{} : String{heap_allocator(), words[0].view()});
+  let call_params = ArrayList<String>{heap_allocator()};
+  call_params.push(words.is_empty()
+                       ? String{heap_allocator()}
+                       : String{heap_allocator(), words[0].view()});
   call_params.push(cword < words.count()
                        ? String{heap_allocator(), words[cword].view()}
-                       : String{});
+                       : String{heap_allocator()});
   call_params.push(cword > 0 && cword - 1 < words.count()
                        ? String{heap_allocator(), words[cword - 1].view()}
-                       : String{});
+                       : String{heap_allocator()});
 
   let saved_params = take_positional_params();
   set_positional_params(steal(call_params));
@@ -146,7 +147,7 @@ fn EvalContext::run_completion_function(StringView function_name,
   if (out_exit_status != nullptr) *out_exit_status = last_exit_status();
   if (has_pending_control_flow()) clear_control_flow();
 
-  let result = ArrayList<String>{};
+  let result = ArrayList<String>{heap_allocator()};
   if (const ArrayList<String> *reply = lookup_indexed_array("COMPREPLY");
       reply != nullptr)
   {

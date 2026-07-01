@@ -32,7 +32,7 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  ArrayList<StringView> sources{};
+  ArrayList<StringView> sources{cxt.scratch_allocator()};
   if (operands.is_empty())
     sources.push(StringView{"-"});
   else
@@ -43,9 +43,9 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
      stay valid, and the reserve keeps the elements from moving, which would
      dangle a view into a small file held in a String's inline buffer. The lines
      then sort as views with no per-line copy. */
-  ArrayList<String> contents{};
+  ArrayList<String> contents{cxt.scratch_allocator()};
   contents.reserve(sources.count());
-  ArrayList<StringView> lines{};
+  ArrayList<StringView> lines{cxt.scratch_allocator()};
   i32 status = 0;
   for (const StringView &source : sources) {
     Maybe<String> content = read_named_or_stdin(ec, source);
@@ -53,7 +53,8 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
       report_soft_shitbox_error(ec, cxt,
-                                "sort: cannot read '" + String{source} +
+                                "sort: cannot read '" +
+                                    String{cxt.scratch_allocator(), source} +
                                     "': " + os::last_system_error_message());
       status = 2;
       continue;
@@ -70,7 +71,7 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
 
   sort_stringview_list(lines);
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   if (FLAG_SORT_REVERSE.is_enabled())
     for (usize i = lines.count(); i > 0; i--) {
       output += lines[i - 1];

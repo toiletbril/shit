@@ -59,27 +59,29 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  ArrayList<StringView> targets{};
+  ArrayList<StringView> targets{cxt.scratch_allocator()};
   if (operands.is_empty())
     targets.push(StringView{"."});
   else
     for (let const &operand : operands)
       targets.push(operand.view());
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   i32 status = 0;
   for (let const &target : targets) {
     let const path = Path{target};
     if (!path.exists()) {
       report_soft_shitbox_error(ec, cxt,
-                                "du: cannot access '" + String{target} +
+                                "du: cannot access '" +
+                                    String{cxt.scratch_allocator(), target} +
                                     "': no such file or directory");
       status = 1;
       continue;
     }
     let const total = total_size(path);
-    output += FLAG_DU_HUMAN.is_enabled() ? format_human_size(total)
-                                         : utils::uint_to_text(total);
+    output += FLAG_DU_HUMAN.is_enabled()
+                  ? format_human_size(total)
+                  : utils::uint_to_text(total, cxt.scratch_allocator());
     output += '\t';
     output += target;
     output += '\n';

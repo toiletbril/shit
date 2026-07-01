@@ -43,7 +43,7 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 127;
   }
 
-  let command_args = ArrayList<String>{};
+  let command_args = ArrayList<String>{heap_allocator()};
   command_args.push_managed("newgrp");
   for (usize i = 1; i < args.count(); i++)
     command_args.push_managed(args[i]);

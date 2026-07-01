@@ -41,7 +41,7 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      so the timed command resolves the same way an eval body does. The arguments
      arrive already expanded and split, so a word that carried embedded spaces
      through a quote is re-split here, the same caveat eval carries. */
-  let command = String{};
+  let command = String{cxt.scratch_allocator()};
   for (usize i = 1; i < ec.args().count(); i++) {
     if (i > 1) command.push(' ');
     command.append(ec.args()[i].view());
@@ -79,7 +79,7 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* A set TIMEFORMAT drives the format, an empty value prints nothing, and an
      unset value keeps the pretty default, matching the time keyword. */
-  String report;
+  String report{cxt.scratch_allocator()};
   if (let const time_format = cxt.get_variable_value("TIMEFORMAT");
       time_format.has_value())
   {

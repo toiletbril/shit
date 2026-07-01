@@ -24,10 +24,10 @@ namespace shitbox {
 
 /* The cat -n prefix, the line number right-justified in six columns and a tab,
    the spacing GNU cat prints. */
-static fn number_prefix(i64 line_number) throws -> String
+static fn number_prefix(i64 line_number, Allocator allocator) throws -> String
 {
-  let const digits = utils::int_to_text(line_number, heap_allocator());
-  String prefix{};
+  let const digits = utils::int_to_text(line_number, allocator);
+  String prefix{allocator};
   for (usize i = digits.count(); i < 6; i++)
     prefix += ' ';
   prefix += digits.view();
@@ -47,14 +47,14 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  ArrayList<StringView> sources{};
+  ArrayList<StringView> sources{cxt.scratch_allocator()};
   if (operands.is_empty())
     sources.push(StringView{"-"});
   else
     for (let const &operand : operands)
       sources.push(operand.view());
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   i64 line_number = 1;
   i32 status = 0;
   for (let const &source : sources) {
@@ -62,9 +62,10 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
-      report_soft_shitbox_error(ec, cxt,
-                                "cat: " + String{source} + ": " +
-                                    os::last_system_error_message());
+      report_soft_shitbox_error(
+          ec, cxt,
+          "cat: " + String{cxt.scratch_allocator(), source} + ": " +
+              os::last_system_error_message());
       status = 1;
       continue;
     }
@@ -73,7 +74,7 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
     for (let const &line : split_keep_newlines(content->view())) {
-      output += number_prefix(line_number);
+      output += number_prefix(line_number, cxt.scratch_allocator());
       output += line;
       line_number++;
     }

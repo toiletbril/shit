@@ -5,7 +5,8 @@ set -eu -o pipefail
 HOST="${1:-}"
 test -z "${HOST-}" -o -z "${SHIT-}" && \
   printf "%s <host>\ncopies current shit shell binary to a remote server and puts it in PATH\nrun this inside shit shell\n" "$(basename "$0")" >&2 && exit 1
-scp "$(which "$SHIT")" "$HOST":shit
+set -x
+scp "$(which "$SHIT")" "$HOST":'shit'
 ssh "$HOST" <<'EOF'
 _find_writable_path_dir() {
   for F in $(echo "$PATH'" | sed -E 's/:/\n/g')

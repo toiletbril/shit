@@ -47,9 +47,10 @@ static fn is_assignment(StringView text) wontthrow -> bool
   return true;
 }
 
-static fn print_environment(const ExecContext &ec) throws -> void
+static fn print_environment(const ExecContext &ec, EvalContext &cxt) throws
+    -> void
 {
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   for (let const &name : os::environment_names()) {
     let const value = os::get_environment_variable(name.view());
     output += name.view();
@@ -75,9 +76,9 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
   /* The leading NAME=value words set the environment for the command. The
      previous value of each name is saved so it can be put back once the command
      finishes, since env changes the environment for that command alone. */
-  ArrayList<String> saved_names{};
-  ArrayList<String> saved_values{};
-  ArrayList<bool> was_present{};
+  ArrayList<String> saved_names{cxt.scratch_allocator()};
+  ArrayList<String> saved_values{cxt.scratch_allocator()};
+  ArrayList<bool> was_present{cxt.scratch_allocator()};
   usize first_command = 0;
   while (first_command < operands.count() &&
          is_assignment(operands[first_command].view()))
@@ -88,8 +89,9 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
     let const value = text.substring(equals + 1);
 
     let const previous = os::get_environment_variable(name);
-    saved_names.push(String{name});
-    saved_values.push(previous.has_value() ? previous->clone() : String{});
+    saved_names.push(String{cxt.scratch_allocator(), name});
+    saved_values.push(previous.has_value() ? previous->clone()
+                                           : String{cxt.scratch_allocator()});
     was_present.push(previous.has_value());
 
     os::set_environment_variable(name, value);
@@ -108,7 +110,7 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
   };
 
   if (first_command >= operands.count()) {
-    print_environment(ec);
+    print_environment(ec, cxt);
     return 0;
   }
 
@@ -118,7 +120,7 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
      environment, so a forked child inherits them and a builtin reads them in
      place. A name that does not resolve is reported and the status is 127, the
      way a bare command word fails, rather than aborting the shell. */
-  let env_args = ArrayList<String>{};
+  let env_args = ArrayList<String>{cxt.scratch_allocator()};
   for (usize i = first_command; i < operands.count(); i++)
     env_args.push_managed(operands[i]);
 

@@ -53,7 +53,7 @@ cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 #endif
 
-  let out = String{};
+  let out = String{cxt.scratch_allocator()};
   out += utils::format_minutes_seconds(self_user) + " " +
          utils::format_minutes_seconds(self_system) + "\n";
   out += utils::format_minutes_seconds(child_user) + " " +

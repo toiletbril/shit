@@ -43,7 +43,7 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      form dash reloads. */
   if (args.count() == 1) {
     let const is_declare_form = cxt.is_bash_compatible();
-    let out = String{};
+    let out = String{cxt.scratch_allocator()};
     for (let const &name : cxt.readonly_names()) {
       out += is_declare_form ? "declare -r " : "readonly ";
       out += name;

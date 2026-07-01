@@ -111,7 +111,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case 'n':
       case 't': break;
       default: {
-        let invalid = String{};
+        let invalid = String{heap_allocator()};
         invalid += arg[0];
         invalid += arg[c];
         throw Error{"'" + invalid + "' is not a valid declare option"};
@@ -126,7 +126,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     i32 status = 0;
     if (i >= args.count()) {
       for (let const &name : cxt.sorted_function_names()) {
-        let line = String{};
+        let line = String{cxt.scratch_allocator()};
         if (should_print_function_names_only) {
           line += "declare -f ";
           line.append(name.view());
@@ -150,14 +150,14 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         continue;
       }
       if (should_print_function_names_only) {
-        let line = String{name};
+        let line = String{cxt.scratch_allocator(), name};
         line += '\n';
         ec.print_to_stdout(line.view());
       } else if (const String *source = cxt.find_function_source(name);
                  source != nullptr)
       {
         if (!source->is_empty()) {
-          let line = String{source->view()};
+          let line = String{cxt.scratch_allocator(), source->view()};
           line += '\n';
           ec.print_to_stdout(line.view());
         }
@@ -175,7 +175,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (const ArrayList<String> *elements = cxt.lookup_indexed_array(name);
           elements != nullptr)
       {
-        let line = String{"declare -a"};
+        let line = String{cxt.scratch_allocator(), "declare -a"};
         if (cxt.is_integer_variable(name)) line += 'i';
         line += ' ';
         line.append(name);
@@ -183,7 +183,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         for (usize e = 0; e < elements->count(); e++) {
           if (e > 0) line += ' ';
           line += '[';
-          line += utils::int_to_text(static_cast<i64>(e));
+          line +=
+              utils::int_to_text(static_cast<i64>(e), cxt.scratch_allocator());
           line += "]=\"";
           line += quote_for_declare((*elements)[e].view());
           line += '"';
@@ -193,7 +194,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       } else if (cxt.is_associative_array(name)) {
         let const keys = cxt.associative_keys(name);
         let const values = cxt.associative_values(name);
-        let line = String{"declare -A"};
+        let line = String{cxt.scratch_allocator(), "declare -A"};
         if (cxt.is_integer_variable(name)) line += 'i';
         line += ' ';
         line.append(name);
@@ -210,11 +211,11 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       } else if (const Maybe<String> value = cxt.get_variable_value(name)) {
         /* The attribute letters compose the way bash prints declare -ix, and a
            scalar with no attribute prints the bare double dash. */
-        let attribute = String{"-"};
+        let attribute = String{cxt.scratch_allocator(), "-"};
         if (cxt.is_integer_variable(name)) attribute += 'i';
         if (os::get_environment_variable(name).has_value()) attribute += 'x';
         if (attribute.count() == 1) attribute += '-';
-        let line = String{"declare "};
+        let line = String{cxt.scratch_allocator(), "declare "};
         line.append(attribute.view());
         line += ' ';
         line.append(name);
@@ -225,7 +226,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       } else if (cxt.is_integer_variable(name)) {
         /* An integer-marked name with no value yet still has the attribute, so
            it prints without the =value tail the way bash does. */
-        let line = String{"declare -i"};
+        let line = String{cxt.scratch_allocator(), "declare -i"};
         if (os::get_environment_variable(name).has_value()) line += 'x';
         line += ' ';
         line.append(name);
@@ -310,7 +311,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         /* The store may have rewritten the value, an integer name stores the
            arithmetic result, so the environment receives the stored value
            rather than the raw text. */
-        let const stored = cxt.get_variable_value(name).value_or(String{});
+        let const stored =
+            cxt.get_variable_value(name).value_or(String{heap_allocator()});
         os::set_environment_variable(name, stored.view());
         cxt.mark_exported(name);
       }

@@ -84,7 +84,7 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   let should_stop = false;
 
   for (usize i = start; i < args.count() && !should_stop; i++) {

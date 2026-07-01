@@ -26,9 +26,10 @@ namespace shitbox {
 
 /* Stopping at max_lines keeps an endless producer such as yes from running
    forever, since reading to the end would never return. */
-static fn read_up_to_lines(os::descriptor fd, i64 max_lines) throws -> String
+static fn read_up_to_lines(os::descriptor fd, i64 max_lines,
+                           Allocator allocator) throws -> String
 {
-  String out{};
+  String out{allocator};
   i64 line_count = 0;
   char buffer[4096];
   while (line_count < max_lines) {
@@ -46,9 +47,10 @@ static fn read_up_to_lines(os::descriptor fd, i64 max_lines) throws -> String
 }
 
 /* The byte cap stops an endless producer the way the line cap does. */
-static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes) throws -> String
+static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes,
+                           Allocator allocator) throws -> String
 {
-  String out{};
+  String out{allocator};
   i64 byte_count = 0;
   char buffer[4096];
   while (byte_count < max_bytes) {
@@ -86,21 +88,27 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     let const parsed_value =
         utils::parse_decimal_integer(FLAG_HEAD_BYTES.value());
     if (parsed_value.is_error() || parsed_value.value() < 0) {
-      throw Error{"head: invalid byte count '" +
-                  String{FLAG_HEAD_BYTES.value()} + "'"};
+      throw Error{
+          "head: invalid byte count '" +
+          String{cxt.scratch_allocator(), FLAG_HEAD_BYTES.value()}
+          + "'"
+      };
     }
     count = parsed_value.value();
   } else if (FLAG_HEAD_LINES.is_set()) {
     let const parsed_value =
         utils::parse_decimal_integer(FLAG_HEAD_LINES.value());
     if (parsed_value.is_error() || parsed_value.value() < 0) {
-      throw Error{"head: invalid line count '" +
-                  String{FLAG_HEAD_LINES.value()} + "'"};
+      throw Error{
+          "head: invalid line count '" +
+          String{cxt.scratch_allocator(), FLAG_HEAD_LINES.value()}
+          + "'"
+      };
     }
     count = parsed_value.value();
   }
 
-  ArrayList<StringView> sources{};
+  ArrayList<StringView> sources{cxt.scratch_allocator()};
   if (operands.is_empty())
     sources.push(StringView{"-"});
   else
@@ -120,10 +128,11 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       let const opened_fd = os::open_file_descriptor(sources[source_index],
                                                      os::file_open_mode::Read);
       if (!opened_fd.has_value()) {
-        report_soft_shitbox_error(ec, cxt,
-                                  "head: cannot open '" +
-                                      String{sources[source_index]} +
-                                      "': " + os::last_system_error_message());
+        report_soft_shitbox_error(
+            ec, cxt,
+            "head: cannot open '" +
+                String{cxt.scratch_allocator(), sources[source_index]} +
+                "': " + os::last_system_error_message());
         status = 1;
         continue;
       }
@@ -131,13 +140,14 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       was_opened = true;
     }
 
-    let const text = is_byte_mode ? read_up_to_bytes(fd, count)
-                                  : read_up_to_lines(fd, count);
+    let const text = is_byte_mode
+                         ? read_up_to_bytes(fd, count, cxt.scratch_allocator())
+                         : read_up_to_lines(fd, count, cxt.scratch_allocator());
     if (was_opened) os::close_fd(fd);
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
 
-    let output = String{};
+    let output = String{cxt.scratch_allocator()};
     if (should_print_headers) {
       if (source_index > 0) output += '\n';
       output += "==> ";

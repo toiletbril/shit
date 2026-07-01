@@ -91,7 +91,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(All, "compgen expanding glob '%.*s' for prefix '%.*s'",
         static_cast<int>(glob_pattern->length), glob_pattern->data,
         static_cast<int>(word.length), word.data);
-    let out = String{};
+    let out = String{cxt.scratch_allocator()};
     let has_any_matched = false;
     for (let const &match : cxt.expand_glob_lenient(*glob_pattern)) {
       if (word.length != 0 && !match.view().starts_with(word)) continue;
@@ -114,7 +114,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* The -W list undergoes the shell expansions bash applies to it through
      the shared word-list expander, the same path complete -W reads, so the
      bash-completion idiom -W '"${options[@]}"' reaches the caller's array. */
-  let out = String{};
+  let out = String{cxt.scratch_allocator()};
   let has_any_matched = false;
   for (let const &candidate : cxt.expand_wordlist_to_fields(*wordlist)) {
     if (candidate.is_empty() || !candidate.view().starts_with(word)) continue;

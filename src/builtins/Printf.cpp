@@ -245,9 +245,9 @@ void append_q_argument(String &out, const String &arg) throws
 /* Render one conversion through the C library, so a width or a precision in the
    specification is honored. */
 fn report_invalid_number(ExecContext &ec, const String &arg, bool is_hex,
-                         i32 &exit_status) throws -> void
+                         i32 &exit_status, Allocator allocator) throws -> void
 {
-  let message = String{"shit: printf: "};
+  let message = String{allocator, "shit: printf: "};
   message += arg.view();
   message += is_hex ? ": invalid hex number\n" : ": invalid number\n";
   ec.print_to_stderr(message.view());
@@ -255,8 +255,8 @@ fn report_invalid_number(ExecContext &ec, const String &arg, bool is_hex,
 }
 
 void append_conversion(String &out, const String &spec, char conv,
-                       const String &arg, ExecContext &ec,
-                       i32 &exit_status) throws
+                       const String &arg, ExecContext &ec, i32 &exit_status,
+                       Allocator allocator) throws
 {
   char buffer[256];
 
@@ -288,7 +288,7 @@ void append_conversion(String &out, const String &spec, char conv,
   case 'i': {
     let const number = parse_printf_number(arg);
     if (!number.is_valid)
-      report_invalid_number(ec, arg, number.is_hex, exit_status);
+      report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
     let const with_ll = spec + "lld";
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
                   static_cast<long long>(number.value));
@@ -300,7 +300,7 @@ void append_conversion(String &out, const String &spec, char conv,
   case 'u': {
     let const number = parse_printf_number(arg);
     if (!number.is_valid)
-      report_invalid_number(ec, arg, number.is_hex, exit_status);
+      report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
     String with_ll = spec + "ll";
     with_ll.push(conv);
     /* The unsigned conversions share the char-code and base parsing with the
@@ -374,12 +374,12 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &fmt = args[format_index];
   let const operand_base = format_index + 1;
   let const operand_count = args.count() - operand_base;
-  let const empty_operand = String{};
+  let const empty_operand = String{cxt.scratch_allocator()};
   let do_operand_at = [&](usize index) wontthrow -> const String & {
     return index < operand_count ? args[operand_base + index] : empty_operand;
   };
 
-  let out = String{};
+  let out = String{cxt.scratch_allocator()};
   i32 exit_status = 0;
   usize operand_index = 0;
   bool consumed_a_conversion = false;
@@ -389,7 +389,8 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      append its decimal text into the spec, and advance the operand cursor. */
   let do_consume_star = [&](String &spec) throws {
     spec.append(
-        utils::int_to_text(parse_printf_integer(do_operand_at(operand_index)))
+        utils::int_to_text(parse_printf_integer(do_operand_at(operand_index)),
+                           cxt.scratch_allocator())
             .view());
     operand_index++;
     consumed_a_conversion = true;
@@ -408,7 +409,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         continue;
       }
 
-      String spec = "%";
+      String spec{cxt.scratch_allocator(), "%"};
       i++;
 
       while (i < fmt.length() && std::strchr("-+ 0#", fmt[i]) != nullptr)
@@ -451,7 +452,8 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           if (spec == "%")
             out += formatted;
           else
-            append_conversion(out, spec, 's', formatted, ec, exit_status);
+            append_conversion(out, spec, 's', formatted, ec, exit_status,
+                              cxt.scratch_allocator());
           operand_index++;
           consumed_a_conversion = true;
           i = close + 1;
@@ -487,7 +489,8 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (should_stop) break;
         continue;
       }
-      append_conversion(out, spec, conv, arg, ec, exit_status);
+      append_conversion(out, spec, conv, arg, ec, exit_status,
+                        cxt.scratch_allocator());
       operand_index++;
       consumed_a_conversion = true;
     }

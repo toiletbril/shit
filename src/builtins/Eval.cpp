@@ -34,7 +34,7 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   usize first = 1;
   if (ec.args().count() > 1 && ec.args()[1] == "--") first = 2;
 
-  let joined = String{};
+  let joined = String{cxt.scratch_allocator()};
   for (usize i = first; i < ec.args().count(); i++) {
     if (i > first) joined += ' ';
     joined.append(ec.args()[i].view());

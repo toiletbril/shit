@@ -89,7 +89,7 @@ struct control_flow
      it. */
   SourceLocation location{0, 0};
   const String *source{nullptr};
-  String origin{};
+  String origin{heap_allocator()};
 };
 
 /* One frame of the source backtrace, pushed when run_source begins. The
@@ -141,7 +141,7 @@ struct job
 
   i32 id;
   os::process pid;
-  String command;
+  String command{heap_allocator()};
   State state{State::Running};
   i32 last_status{0};
 };
@@ -205,7 +205,7 @@ struct function_definition_info
   usize body_start_position{0};
   usize header_length{0};
   usize line_offset{0};
-  String filename{};
+  String filename{heap_allocator()};
   /* The source instance the body was defined against. A call made while this
      instance is still current needs no window. */
   const String *defining_instance{nullptr};
@@ -220,7 +220,8 @@ struct function_definition_info
 
 /* Record a visit to a directory in the frecency store at
    ~/.shit_directory_history, for the z smart-cd builtin. */
-fn record_directory_access(StringView directory) throws -> void;
+fn record_directory_access(StringView directory, Allocator allocator) throws
+    -> void;
 
 /* A warning the evaluator can silence for the span of a construct.
    UnsetReference exempts an unset name entirely, so neither the warning nor the
@@ -270,8 +271,8 @@ struct eval_state_snapshot
    nothing. */
 struct completion_spec
 {
-  String function_name{};
-  String word_list{};
+  String function_name{heap_allocator()};
+  String word_list{heap_allocator()};
   bool should_use_default{false};
 };
 
@@ -319,8 +320,10 @@ class EvalContext
 public:
   EvalContext(bool should_disable_path_expansion, bool should_echo,
               bool should_echo_expanded, bool shell_is_interactive,
-              bool should_error_exit = false, String shell_name = {},
-              ArrayList<String> positional_params = {});
+              bool should_error_exit = false,
+              String shell_name = String{heap_allocator()},
+              ArrayList<String> positional_params = ArrayList<String>{
+                  heap_allocator()});
 
   fn add_expansion() wontthrow -> void;
   fn add_evaluated_expression() wontthrow -> void;
@@ -1347,12 +1350,12 @@ protected:
 
   u64 m_last_command_duration_ns{0};
 
-  String m_shell_name{};
-  String m_shell_executable_path{};
+  String m_shell_name{heap_allocator()};
+  String m_shell_executable_path{heap_allocator()};
   /* The last argument of the previous simple command, the value $_ reads. */
-  String m_last_argument{};
-  String m_execution_string{};
-  String m_current_command{};
+  String m_last_argument{heap_allocator()};
+  String m_execution_string{heap_allocator()};
+  String m_current_command{heap_allocator()};
   bool m_make_shell_suppressed{false};
   ArrayList<String> m_positional_params{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
@@ -1404,7 +1407,7 @@ protected:
   control_flow m_control_flow{};
   /* The source and name of the text being evaluated, for caret formatting. */
   const String *m_current_source{nullptr};
-  String m_current_origin{};
+  String m_current_origin{heap_allocator()};
 
   /* The location in m_current_source of the command being evaluated, read by
      $LINENO for its line and by the runtime warnings for their caret. The whole

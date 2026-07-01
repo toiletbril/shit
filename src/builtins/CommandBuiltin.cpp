@@ -94,7 +94,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (const ArrayList<Path> paths = utils::search_program_path(name);
         paths.count() != 0)
     {
-      let resolved_text = String{};
+      let resolved_text = String{cxt.scratch_allocator()};
       if (is_verbose) {
         resolved_text += name;
         resolved_text += " is ";
@@ -113,7 +113,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   /* The bare form runs the operand and its arguments as a command, which
      resolves against a builtin or the PATH and never a function. */
-  let operand_args = ArrayList<String>{};
+  let operand_args = ArrayList<String>{heap_allocator()};
   for (usize i = 1; i < args.count(); i++)
     operand_args.push_managed(args[i]);
 

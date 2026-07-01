@@ -52,7 +52,7 @@ fn Basename::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  ec.print_to_stdout(String{name} + "\n");
+  ec.print_to_stdout(String{cxt.scratch_allocator(), name} + "\n");
   return 0;
 }
 

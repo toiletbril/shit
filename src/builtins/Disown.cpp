@@ -40,7 +40,7 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_NO_HUP.is_enabled()) return 0;
 
   if (FLAG_ALL.is_enabled()) {
-    let ids = ArrayList<i32>{};
+    let ids = ArrayList<i32>{cxt.scratch_allocator()};
     for (const job &job : cxt.jobs())
       ids.push(job.id);
     for (const i32 id : ids)
@@ -52,7 +52,7 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     /* The recorded state is refreshed first, so a job stopped since the last
        poll reads as Stopped and is kept rather than dropped as running. */
     cxt.update_jobs();
-    let ids = ArrayList<i32>{};
+    let ids = ArrayList<i32>{cxt.scratch_allocator()};
     for (const job &job : cxt.jobs()) {
       if (job.state == job::State::Running) ids.push(job.id);
     }

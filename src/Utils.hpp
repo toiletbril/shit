@@ -18,7 +18,7 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
 
 inline fn merge_args_to_string(const ArrayList<String> &args) throws -> String
 {
-  let result = String{};
+  let result = String{heap_allocator()};
   for (usize i = 0; i < args.count(); i++) {
     result.append(args[i].view());
     if (i + 1 < args.count()) {

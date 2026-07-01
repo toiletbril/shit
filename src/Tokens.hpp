@@ -149,7 +149,7 @@ private:
      cache rather than rescanning the segments every evaluation. */
   mutable PlainLiteral m_cached_plain_kind{PlainLiteral::NotPlain};
   mutable bool m_has_cached_plain_kind{false};
-  mutable String m_constant_value{};
+  mutable String m_constant_value{heap_allocator()};
   mutable bool m_has_constant_value{false};
 };
 
@@ -396,8 +396,8 @@ public:
   pure fn to_file() const wontthrow -> const String &;
 
 protected:
-  String m_from_fd{};
-  String m_to_file{};
+  String m_from_fd{heap_allocator()};
+  String m_to_file{heap_allocator()};
 };
 
 class Assignment : public Token

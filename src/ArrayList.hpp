@@ -10,9 +10,6 @@ template <class T>
 class ArrayList
 {
 public:
-  /* A default list is heap-backed and empty, so it can serve as the value a
-     StringMap slot holds before a real list is placed into it. */
-  ArrayList() : m_allocator(heap_allocator()) {}
   explicit ArrayList(Allocator allocator) : m_allocator(allocator) {}
 
   /* A heap-backed list of the braced elements. The initializer_list is
@@ -216,6 +213,13 @@ public:
   }
 
 private:
+  /* A default list is heap-backed and empty, so it can serve as the value a
+     StringMap slot holds before a real list is placed into it. The friend keeps
+     it reachable to the table while every call site must name its lifetime. */
+  template <class Value>
+  friend class StringMap;
+  ArrayList() : m_allocator(heap_allocator()) {}
+
   /* The length below which the insertion sort beats the heap sort, since its
      constant factor is smaller on a short list. */
   static constexpr usize INSERTION_SORT_THRESHOLD = 16;

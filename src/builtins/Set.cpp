@@ -199,8 +199,11 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
                             bool enable) throws
 {
   if (option_is_startup_fact(option))
-    throw Error{"Unable to change '" + String{option.name} +
-                "' because it is fixed at shell startup"};
+    throw Error{
+        "Unable to change '" + String{cxt.scratch_allocator(), option.name}
+          +
+        "' because it is fixed at shell startup"
+    };
   LOG(Info, "set flipping option '%.*s' to %s",
       static_cast<int>(option.name.length), option.name.data,
       enable ? "on" : "off");
@@ -221,7 +224,7 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
    non-standard option name. set -p still lists them for discovery. */
 String list_options(const EvalContext &cxt) throws
 {
-  let out = String{};
+  let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
     if (option.name.starts_with(StringView{"show-"})) continue;
     /* A startup fact cannot be replayed through set -o, so the replay listing
@@ -262,7 +265,7 @@ String format_option_table(const EvalContext *cxt,
   /* The plain set -p column fits the bare names, while the --help column
      also holds the ", alias" spellings. */
   const usize name_field_width = include_alias_spellings ? 30 : 18;
-  let out = String{};
+  let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
     out += "  ";
     if (option.letter != '\0') {
@@ -298,7 +301,7 @@ String format_option_switches_help() throws
              "name.\n\n";
   section += format_option_table(nullptr, true);
   section += "\n  The -o long names:\n";
-  let listed_names = String{};
+  let listed_names = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
     if (!listed_names.is_empty()) listed_names += ", ";
     listed_names += option.name;
@@ -328,13 +331,13 @@ fn shell_option_names(bool include_alias_spellings) throws
   /* SET_OPTIONS is immutable and the completion engine reads these on every
      keystroke, so both spellings build once. */
   static ArrayList<StringView> canonical = [] throws {
-    let names = ArrayList<StringView>{};
+    let names = ArrayList<StringView>{heap_allocator()};
     for (let const &option : SET_OPTIONS)
       names.push(option.name);
     return names;
   }();
   static ArrayList<StringView> with_aliases = [] throws {
-    let names = ArrayList<StringView>{};
+    let names = ArrayList<StringView>{heap_allocator()};
     for (let const &option : SET_OPTIONS) {
       names.push(option.name);
       if (!option.alias.is_empty()) names.push(option.alias);
@@ -347,7 +350,7 @@ fn shell_option_names(bool include_alias_spellings) throws
 fn shell_option_letters() throws -> const String &
 {
   static String letters = [] throws {
-    let collected = String{};
+    let collected = String{heap_allocator()};
     for (let const &option : SET_OPTIONS)
       if (option.letter != '\0') collected.push(option.letter);
     return collected;
@@ -379,7 +382,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (args.count() == 1) {
-    let out = String{};
+    let out = String{cxt.scratch_allocator()};
     for (let const &assignment : cxt.sorted_variable_assignments()) {
       out += assignment.view();
       out += "\n";
@@ -423,13 +426,17 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         has_value = true;
       }
       if (!has_value) {
-        ec.print_to_stdout(String{mood_name(cxt.mood())} + "\n");
+        ec.print_to_stdout(
+            String{cxt.scratch_allocator(), mood_name(cxt.mood())} + "\n");
         continue;
       }
       let const parsed = parse_mood_name(value);
       if (!parsed.has_value())
-        throw Error{String{"Unknown --mood value '"} + value +
-                    "', expected 'shit', 'bash', or 'sh'"};
+        throw Error{
+            String{cxt.scratch_allocator(), "Unknown --mood value '"}
+            + value +
+            "', expected 'shit', 'bash', or 'sh'"
+        };
       cxt.set_mood(*parsed);
       cxt.apply_strictness_for_mood();
       cxt.note_explicit_mood();
@@ -455,7 +462,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       /* With no value the form reports the moods whose startup files have
          loaded this session, the way set --mood reports the active mood. */
       if (!has_value) {
-        let out = String{};
+        let out = String{cxt.scratch_allocator()};
         for (mimic_mood listed :
              {mimic_mood::Default, mimic_mood::Posix, mimic_mood::Bash})
         {
@@ -467,7 +474,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         ec.print_to_stdout(out);
         continue;
       }
-      let moods = ArrayList<mimic_mood>{};
+      let moods = ArrayList<mimic_mood>{cxt.scratch_allocator()};
       usize name_start = 0;
       for (usize j = 0; j <= value.length; j++) {
         if (j != value.length && value[j] != ',') continue;
@@ -476,8 +483,11 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (name.is_empty()) continue;
         let const parsed = parse_mood_name(name);
         if (!parsed.has_value())
-          throw Error{String{"Unknown --init-moods value '"} + name +
-                      "', expected 'shit', 'bash', or 'sh'"};
+          throw Error{
+              String{cxt.scratch_allocator(), "Unknown --init-moods value '"}
+              +
+              name + "', expected 'shit', 'bash', or 'sh'"
+          };
         moods.push(*parsed);
       }
       if (AST_ARENA == nullptr)
@@ -520,7 +530,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
         let const option = find_option_by_letter(letter);
         if (option == nullptr) {
-          let invalid_option = String{};
+          let invalid_option = String{heap_allocator()};
           invalid_option += arg[0];
           invalid_option += letter;
           throw Error{StringView{"Unknown option '"} + invalid_option + "'"};

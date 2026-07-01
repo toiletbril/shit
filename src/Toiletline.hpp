@@ -83,7 +83,7 @@ void exit();
 struct input_result
 {
   i32 code;
-  String text;
+  String text{shit::heap_allocator()};
 };
 
 input_result get_input(const String &prompt);

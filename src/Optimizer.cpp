@@ -191,7 +191,7 @@ fn command_is_environment_neutral(StringView name) throws -> bool
 
 fn literal_word_value(const Word &word) throws -> Maybe<String>
 {
-  let value = String{};
+  let value = String{heap_allocator()};
   for (let const &segment : word.segments) {
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
@@ -234,7 +234,7 @@ fn command_word_literal(const Token *token) throws -> Maybe<String>
   if (token->kind() != Token::Kind::Word) return None;
 
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
-  let name = String{};
+  let name = String{heap_allocator()};
   for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::LiteralText &&
         segment.kind != WordSegment::Kind::DoubleQuotedText &&
@@ -314,7 +314,7 @@ fn try_fold_arithmetic_with_constants(StringView expression,
   if (actx.constant_variables.count() == 0) return None;
 
   try {
-    let rewritten = String{};
+    let rewritten = String{heap_allocator()};
     usize i = 0;
     while (i < expression.length) {
       const char byte = expression[i];

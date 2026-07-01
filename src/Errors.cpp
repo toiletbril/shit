@@ -233,7 +233,7 @@ get_context_pointing_to(StringView source, usize byte_position,
   const usize gutter_width = line_number_padding_length +
                              line_number_digit_count + BAR_SEPARATOR_WIDTH;
 
-  let msg = String{};
+  let msg = String{heap_allocator()};
   for (usize i = 0; i < line_number_padding_length; i++) {
     msg += ' ';
   }
@@ -330,7 +330,8 @@ get_context_pointing_to(StringView source, usize byte_position,
 
 ErrorBase::ErrorBase() = default;
 
-ErrorBase::ErrorBase(StringView message) : m_is_active(true), m_message(message)
+ErrorBase::ErrorBase(StringView message)
+    : m_is_active(true), m_message(heap_allocator(), message)
 {
   LOG(Debug, "constructing an error with message '%.*s'",
       static_cast<int>(message.length), message.data);
@@ -344,7 +345,7 @@ cold fn ErrorBase::message() const throws -> String { return m_message; }
 
 cold fn ErrorBase::note_to_string() const throws -> String
 {
-  if (m_note.is_empty()) return String{};
+  if (m_note.is_empty()) return String{heap_allocator()};
 
   /* The note rides on its own line under the primary message in the note hue,
      the same shape an unlocated Note renders, so the suggestion reads as advice
@@ -456,7 +457,7 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
 
   let const color = diagnostic_colors_for(severity_word());
 
-  let result = String{};
+  let result = String{heap_allocator()};
   /* A named source prefixes its path before the line and column, so a sourced
      error reads path:line:col rather than a bare line:col. */
   result += color.location;
@@ -542,7 +543,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   /* The same out-of-source guard to_string applies, so a detail note whose
      location names another source renders nothing rather than reading past
      the end. */
-  if (byte_position > source.count()) return String{};
+  if (byte_position > source.count()) return String{heap_allocator()};
 
   LOG(Debug, "formatting the detail note at byte %zu", byte_position);
 
@@ -573,7 +574,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
 
   let const color = diagnostic_colors_for(StringView{"note"});
 
-  let result = String{};
+  let result = String{heap_allocator()};
   result += color.location;
   result += utils::uint_to_text(details_line_number + 1);
   result += ':';

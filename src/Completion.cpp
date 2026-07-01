@@ -23,10 +23,10 @@ namespace completion {
    the caller passed, with the mtime as the invalidation key. */
 struct directory_listing_cache_entry
 {
-  String directory_path{};
+  String directory_path{heap_allocator()};
   i64 modification_time{0};
   bool is_valid{false};
-  ArrayList<cached_directory_entry> entries{};
+  ArrayList<cached_directory_entry> entries{heap_allocator()};
 };
 
 static constexpr usize DIRECTORY_LISTING_CACHE_SLOT_COUNT = 4;
@@ -76,7 +76,7 @@ fn read_directory_cached(const Path &directory) throws
   if (!listing.has_value()) return nullptr;
 
   /* Only a symlink or an unknown dirent type falls back to a stat. */
-  let resolved_entries = ArrayList<cached_directory_entry>{};
+  let resolved_entries = ArrayList<cached_directory_entry>{heap_allocator()};
   resolved_entries.reserve(listing->count());
   for (let &child : *listing) {
     let is_directory = false;
@@ -281,7 +281,7 @@ static pure fn is_in_command_position(StringView line,
 
 static fn all_active_glob_mask(usize length) throws -> ArrayList<bool>
 {
-  let mask = ArrayList<bool>{};
+  let mask = ArrayList<bool>{heap_allocator()};
   mask.reserve(length);
   for (usize i = 0; i < length; i++)
     mask.push(true);
@@ -319,7 +319,7 @@ static fn
 compute_longest_common_prefix(const ArrayList<String> &candidates) throws
     -> String
 {
-  if (candidates.is_empty()) return String{};
+  if (candidates.is_empty()) return String{heap_allocator()};
   let const first = candidates[0].view();
   usize prefix_length = first.length;
   for (usize i = 1; i < candidates.count(); i++) {
@@ -355,14 +355,14 @@ fn environment_path_changed(String &cached_path) throws -> bool
 static fn complete_command(StringView token, bool token_is_glob,
                            EvalContext &context) throws -> ArrayList<String>
 {
-  let candidates = ArrayList<String>{};
+  let candidates = ArrayList<String>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
 
   TRACELN("completing command position for token '%.*s'",
           static_cast<int>(token.length), token.data);
 
-  let const glob_active =
-      token_is_glob ? all_active_glob_mask(token.length) : ArrayList<bool>{};
+  let const glob_active = token_is_glob ? all_active_glob_mask(token.length)
+                                        : ArrayList<bool>{heap_allocator()};
 
   for (let const &builtin_name : builtin_names()) {
     add_unique_command(candidates, seen, builtin_name.view(), token,
@@ -445,7 +445,7 @@ static pure fn path_candidate_needs_quoting(StringView candidate) wontthrow
    the run, emits an escaped quote, and reopens, the standard '\'' idiom. */
 static fn quote_path_candidate(StringView candidate) throws -> String
 {
-  let quoted = String{};
+  let quoted = String{heap_allocator()};
   quoted.push('\'');
   for (usize i = 0; i < candidate.length; i++) {
     if (candidate[i] == '\'') {
@@ -498,7 +498,7 @@ static fn resolve_listing_directory(StringView directory_part,
 static fn complete_filesystem(StringView token, const Path &base_directory,
                               bool inside_quote) throws -> ArrayList<String>
 {
-  let candidates = ArrayList<String>{};
+  let candidates = ArrayList<String>{heap_allocator()};
 
   path_token parts = split_path_token(token);
 
@@ -555,7 +555,7 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
 static fn complete_glob(StringView token, const Path &base_directory) throws
     -> ArrayList<String>
 {
-  let candidates = ArrayList<String>{};
+  let candidates = ArrayList<String>{heap_allocator()};
 
   path_token parts = split_path_token(token);
 
@@ -608,7 +608,7 @@ static pure fn token_is_variable(StringView token) wontthrow -> bool
 static fn complete_variable(StringView token, EvalContext &context) throws
     -> ArrayList<String>
 {
-  let candidates = ArrayList<String>{};
+  let candidates = ArrayList<String>{heap_allocator()};
 
   let has_brace = token.length >= 2 && token[1] == '{';
   usize name_start = has_brace ? 2 : 1;
@@ -625,7 +625,7 @@ static fn complete_variable(StringView token, EvalContext &context) throws
     if (seen.contains(name)) return;
     seen.add(name);
 
-    let candidate = String{};
+    let candidate = String{heap_allocator()};
     candidate += has_brace ? "${" : "$";
     candidate.append(name);
     if (has_brace) candidate.push('}');
@@ -659,11 +659,11 @@ static fn token_is_tilde_user_prefix(StringView token) wontthrow -> bool
 
 static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 {
-  let candidates = ArrayList<String>{};
+  let candidates = ArrayList<String>{heap_allocator()};
   let const prefix = token.substring(1);
   for (let const &user : os::enumerate_users()) {
     if (!user.view().starts_with(prefix)) continue;
-    let candidate = String{};
+    let candidate = String{heap_allocator()};
     candidate.push('~');
     candidate.append(user.view());
     candidate.push('/');
@@ -751,7 +751,7 @@ fn resolve_completion_command(StringView command, EvalContext &context) throws
 fn split_completion_words(StringView line, usize cursor, usize &cword) throws
     -> ArrayList<String>
 {
-  let words = ArrayList<String>{};
+  let words = ArrayList<String>{heap_allocator()};
   usize i = 0;
   let is_found = false;
   while (i < line.length) {
@@ -769,7 +769,7 @@ fn split_completion_words(StringView line, usize cursor, usize &cword) throws
   }
   if (!is_found) {
     cword = words.count();
-    words.push(String{});
+    words.push(String{heap_allocator()});
   }
   return words;
 }
@@ -837,7 +837,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      matches, even in command position. */
   let const inline_glob = token_is_glob && cursor == token_end;
 
-  let candidates = ArrayList<String>{};
+  let candidates = ArrayList<String>{heap_allocator()};
   /* Filled only by the --help option and subcommand stages, keyed by candidate
      text so it survives the sort below, empty for every other source. */
   let descriptions = StringMap<String>{heap_allocator()};
@@ -855,7 +855,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     candidates = complete_glob(token, base_directory);
     if (!candidates.is_empty()) {
       candidates.sort();
-      let joined = String{};
+      let joined = String{heap_allocator()};
       for (usize i = 0; i < candidates.count(); i++) {
         if (i > 0) joined += ' ';
         let match = candidates[i].view();
@@ -925,7 +925,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     }
   }
 
-  let longest_common_prefix = String{};
+  let longest_common_prefix = String{heap_allocator()};
   if (!candidates.is_empty()) {
     candidates.sort();
 

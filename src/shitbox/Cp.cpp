@@ -26,19 +26,26 @@ namespace shit {
 namespace shitbox {
 
 static fn copy_file(const ExecContext &ec, StringView source,
-                    StringView destination, bool is_verbose) throws -> void
+                    StringView destination, bool is_verbose,
+                    Allocator allocator) throws -> void
 {
   let const in_fd = os::open_file_descriptor(source, os::file_open_mode::Read);
   if (!in_fd.has_value())
-    throw Error{"cp: unable to open '" + String{source} + "' because " +
-                os::last_system_error_message()};
+    throw Error{
+        "cp: unable to open '" + String{allocator, source}
+          + "' because " +
+        os::last_system_error_message()
+    };
   defer { os::close_fd(*in_fd); };
 
   let const out_fd =
       os::open_file_descriptor(destination, os::file_open_mode::Truncate);
   if (!out_fd.has_value())
-    throw Error{"cp: unable to create '" + String{destination} + "' because " +
-                os::last_system_error_message()};
+    throw Error{
+        "cp: unable to create '" + String{allocator, destination}
+          +
+        "' because " + os::last_system_error_message()
+    };
   defer { os::close_fd(*out_fd); };
 
   char buffer[4096];
@@ -46,7 +53,10 @@ static fn copy_file(const ExecContext &ec, StringView source,
   {
     let const read_count = os::read_fd(*in_fd, buffer, sizeof(buffer));
     if (!read_count.has_value())
-      throw Error{"cp: a read of '" + String{source} + "' failed"};
+      throw Error{
+          "cp: a read of '" + String{allocator, source}
+            + "' failed"
+      };
     if (*read_count == 0) break;
     /* A short write continues with the remaining bytes rather than aborting the
        copy and losing them, since write_fd returns a single write's count that
@@ -56,7 +66,10 @@ static fn copy_file(const ExecContext &ec, StringView source,
       let const chunk = os::write_fd(*out_fd, buffer + written_count,
                                      *read_count - written_count);
       if (!chunk.has_value() || *chunk == 0) {
-        throw Error{"cp: a write to '" + String{destination} + "' failed"};
+        throw Error{
+            "cp: a write to '" + String{allocator, destination}
+              + "' failed"
+        };
       }
 
       written_count += *chunk;
@@ -64,13 +77,13 @@ static fn copy_file(const ExecContext &ec, StringView source,
   }
 
   if (is_verbose)
-    ec.print_to_stdout("'" + String{source} + "' -> '" + String{destination} +
-                       "'\n");
+    ec.print_to_stdout("'" + String{allocator, source} + "' -> '" +
+                       String{allocator, destination} + "'\n");
 }
 
 static fn copy_path(const ExecContext &ec, StringView source,
-                    StringView destination, bool is_recursive,
-                    bool is_verbose) throws -> void
+                    StringView destination, bool is_recursive, bool is_verbose,
+                    Allocator allocator) throws -> void
 {
   let const source_path = Path{source};
 
@@ -85,13 +98,17 @@ static fn copy_path(const ExecContext &ec, StringView source,
          works the way coreutils replaces the destination. */
       os::remove_file(destination);
       if (!os::create_symlink(target->view(), destination)) {
-        throw Error{"cp: unable to create the symlink '" + String{destination} +
-                    "' because " + os::last_system_error_message()};
+        throw Error{
+            "cp: unable to create the symlink '" +
+            String{allocator, destination}
+            + "' because " +
+            os::last_system_error_message()
+        };
       }
 
       if (is_verbose)
-        ec.print_to_stdout("'" + String{source} + "' -> '" +
-                           String{destination} + "'\n");
+        ec.print_to_stdout("'" + String{allocator, source} + "' -> '" +
+                           String{allocator, destination} + "'\n");
 
       return;
     }
@@ -101,20 +118,27 @@ static fn copy_path(const ExecContext &ec, StringView source,
      a link that points back into the tree does not drive an unbounded walk. */
   if (source_path.is_directory() && !source_path.is_symbolic_link()) {
     if (!is_recursive)
-      throw Error{"cp: '" + String{source} +
-                  "' is a directory, pass -r to copy it"};
+      throw Error{
+          "cp: '" + String{allocator, source}
+            +
+          "' is a directory, pass -r to copy it"
+      };
 
     os::make_directory(destination, 0777);
     Maybe<ArrayList<String>> names = Path::read_directory(source_path);
     if (!names.has_value())
-      throw Error{"cp: unable to read the directory '" + String{source} + "'"};
+      throw Error{
+          "cp: unable to read the directory '" + String{allocator, source}
+            +
+          "'"
+      };
 
     for (let const &name : *names) {
       let const child_source = PathBuilder{source}.append(name.view()).build();
       let const child_destination =
           PathBuilder{destination}.append(name.view()).build();
       copy_path(ec, child_source.text().view(), child_destination.text().view(),
-                is_recursive, is_verbose);
+                is_recursive, is_verbose, allocator);
     }
 
     return;
@@ -123,7 +147,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
   /* A destination that is itself a symlink is removed first, so the copy writes
      a new file rather than following the link and truncating its target. */
   if (Path{destination}.is_symbolic_link()) os::remove_file(destination);
-  copy_file(ec, source, destination, is_verbose);
+  copy_file(ec, source, destination, is_verbose, allocator);
 }
 
 Cp::Cp() = default;
@@ -133,7 +157,6 @@ pure fn Cp::kind() const wontthrow -> Utility::Kind { return Kind::Cp; }
 fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
@@ -148,8 +171,11 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
   let const destination_is_directory = Path{destination}.is_directory();
 
   if (operands.count() > 2 && !destination_is_directory) {
-    throw Error{"cp: the destination '" + String{destination} +
-                "' is not a directory, so it cannot hold several sources"};
+    throw Error{
+        "cp: the destination '" + String{cxt.scratch_allocator(), destination}
+          +
+        "' is not a directory, so it cannot hold several sources"
+    };
   }
 
   for (usize i = 0; i + 1 < operands.count(); i++) {
@@ -162,9 +188,11 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
       let const source_path = Path{source};
       let const leaf = source_path.filename();
       let const target = PathBuilder{destination}.append(leaf).build();
-      copy_path(ec, source, target.text().view(), is_recursive, is_verbose);
+      copy_path(ec, source, target.text().view(), is_recursive, is_verbose,
+                cxt.scratch_allocator());
     } else {
-      copy_path(ec, source, destination, is_recursive, is_verbose);
+      copy_path(ec, source, destination, is_recursive, is_verbose,
+                cxt.scratch_allocator());
     }
   }
 

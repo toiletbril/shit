@@ -91,7 +91,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   if (!content.has_value()) {
     LOG(Debug, "the file read substitution of '%s' failed, expanding to empty",
         filename.c_str());
-    return String{};
+    return String{heap_allocator()};
   }
   let result = steal(*content);
   while (!result.is_empty() && result.back() == '\n')

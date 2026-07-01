@@ -92,8 +92,8 @@ protected:
   bool m_is_script_fatal{false};
   bool m_was_rendered{false};
   i64 m_command_status{1};
-  String m_message;
-  String m_note;
+  String m_message{heap_allocator()};
+  String m_note{heap_allocator()};
 };
 
 class Error : public ErrorBase

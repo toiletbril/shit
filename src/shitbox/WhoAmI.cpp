@@ -37,7 +37,7 @@ fn WhoAmI::execute(const ExecContext &ec, EvalContext &cxt,
 
   LOG(Debug, "whoami printing the current user name");
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
 
   if (let const user = os::get_current_user(); user.has_value()) {
     output.append(user->view());

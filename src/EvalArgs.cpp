@@ -213,7 +213,7 @@ fn find_brace_group(StringView text, Allocator alloc) throws
           let alternatives = brace_group_alternatives(
               text.substring_of_length(open + 1, j - open - 1), alloc);
           if (alternatives.has_value()) {
-            let group = brace_group{open, j, {}};
+            let group = brace_group{open, j, ArrayList<String>{alloc}};
             group.alternatives = steal(*alternatives);
             return group;
           }
@@ -373,7 +373,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
      substitution inside one of these words reclaims only its own fields. */
   let expanded_args = args_are_transient
                           ? ArrayList<String>{scratch_allocator()}
-                          : ArrayList<String>{};
+                          : ArrayList<String>{heap_allocator()};
   expanded_args.reserve(args.count());
 
   let const fields_mark = m_scratch_arena.mark();
@@ -475,7 +475,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
                read here correctly. */
             if (assignment_token->is_append())
               assignment.append(get_variable_value(assignment_token->key())
-                                    .value_or(String{})
+                                    .value_or(String{scratch_allocator()})
                                     .view());
             let const expanded_value =
                 expand_word_for_assignment(assignment_token->value_word());
@@ -687,7 +687,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
      own trace off the terminal, and an unset or unparsable value falls back to
      standard error. */
   if (should_echo_expanded()) {
-    let trace = String{};
+    let trace = String{scratch_allocator()};
     let const ps4 = get_variable_value("PS4").value_or(String{"+ "});
     if (!ps4.is_empty()) {
       for (usize i = 0; i < m_subshell_depth; i++)

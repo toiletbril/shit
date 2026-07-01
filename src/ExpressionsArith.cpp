@@ -685,7 +685,7 @@ cold fn UnaryExpression::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_rhs != nullptr);
 
-  let s = String{};
+  let s = String{heap_allocator()};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[Unary " + to_string() + "]\n";
@@ -705,7 +705,7 @@ cold fn BinaryExpression::to_ast_string(usize layer) const throws -> String
   ASSERT(m_lhs != nullptr);
   ASSERT(m_rhs != nullptr);
 
-  let s = String{};
+  let s = String{heap_allocator()};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[Binary " + to_string() + "]\n";
@@ -729,7 +729,7 @@ fn ConstantNumber::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 cold fn ConstantNumber::to_ast_string(usize layer) const throws -> String
 {
-  let s = String{};
+  let s = String{heap_allocator()};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[Number " + to_string() + "]";
@@ -755,7 +755,7 @@ fn ConstantString::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 cold fn ConstantString::to_ast_string(usize layer) const throws -> String
 {
-  let s = String{};
+  let s = String{heap_allocator()};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[String \"" + to_string() + "\"]";

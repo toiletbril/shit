@@ -508,7 +508,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     let const value = get_variable_value(name);
     if (!value.has_value()) report_unset_reference(name);
     return String{scratch_allocator(),
-                  utils::uint_to_text(value.value_or(String{}).length())};
+                  utils::uint_to_text(
+                      value.value_or(String{scratch_allocator()}).length())};
   }
 
   ASSERT(!spec.is_empty());
@@ -693,13 +694,15 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     return String{scratch_allocator(), current->view()};
 
   case '#': {
-    return trim_value_with_modifier(*this, current.value_or(String{}).view(),
-                                    word, trim_end::Prefix, is_doubled);
+    return trim_value_with_modifier(
+        *this, current.value_or(String{scratch_allocator()}).view(), word,
+        trim_end::Prefix, is_doubled);
   }
 
   case '%': {
-    return trim_value_with_modifier(*this, current.value_or(String{}).view(),
-                                    word, trim_end::Suffix, is_doubled);
+    return trim_value_with_modifier(
+        *this, current.value_or(String{scratch_allocator()}).view(), word,
+        trim_end::Suffix, is_doubled);
   }
 
   default: return expand_variable(name);
@@ -738,7 +741,8 @@ fn EvalContext::apply_substring_expansion(StringView name,
   if (m_runtime.error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
-  return apply_substring_to_value(current.value_or(String{}).view(), body);
+  return apply_substring_to_value(
+      current.value_or(String{scratch_allocator()}).view(), body);
 }
 
 fn EvalContext::apply_substring_to_value(StringView value,
@@ -842,7 +846,8 @@ fn EvalContext::apply_pattern_replacement(StringView name,
   if (m_runtime.error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
-  return pattern_replace_value(current.value_or(String{}), spec);
+  return pattern_replace_value(current.value_or(String{scratch_allocator()}),
+                               spec);
 }
 
 /* The replacement text of ${x/pat/rep} reads & as the matched span and a
@@ -1093,8 +1098,8 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
   if (m_runtime.error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
-  return apply_case_modification_to_value(current.value_or(String{}).view(),
-                                          spec);
+  return apply_case_modification_to_value(
+      current.value_or(String{scratch_allocator()}).view(), spec);
 }
 
 /* The value-only core of the case modification, shared by the array element and
@@ -1113,7 +1118,7 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
 
   /* An omitted pattern matches every character, the bash default of ?. */
   let pattern_active = ArrayList<bool>{scratch_allocator()};
-  String pattern;
+  String pattern{scratch_allocator()};
   if (pattern_word.is_empty()) {
     pattern = String{scratch_allocator(), "?"};
     pattern_active.push(true);

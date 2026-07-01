@@ -56,12 +56,12 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  let function_name = String{};
-  let word_list = String{};
+  let function_name = String{cxt.scratch_allocator()};
+  let word_list = String{cxt.scratch_allocator()};
   bool should_use_default = false;
   bool is_default_completion = false;
   bool should_print_specs = false;
-  let commands = ArrayList<String>{};
+  let commands = ArrayList<String>{cxt.scratch_allocator()};
 
   for (usize i = 1; i < args.count();) {
     let const arg = args[i].view();
@@ -121,7 +121,7 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (should_print_specs) {
     let const do_print_one_spec = [&](StringView command,
                                       const completion_spec &spec) throws {
-      let line = String{"complete "};
+      let line = String{cxt.scratch_allocator(), "complete "};
       if (spec.should_use_default) line += "-o default ";
       if (!spec.function_name.is_empty()) {
         line += "-F ";

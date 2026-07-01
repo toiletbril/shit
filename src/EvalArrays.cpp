@@ -266,8 +266,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
       return;
     }
     if (is_append) {
-      let combined = String{
-          lookup_associative_element(name, key.view()).value_or(String{})};
+      let combined = String{lookup_associative_element(name, key.view())
+                                .value_or(String{scratch_allocator()})};
       combined += value;
       set_associative_element(name, key.view(), combined.view());
     } else {
@@ -514,7 +514,7 @@ fn EvalContext::declare_local(StringView name) throws -> void
 
 hot fn EvalContext::expand_variable(StringView name) const throws -> String
 {
-  return get_variable_value(name).value_or(String{});
+  return get_variable_value(name).value_or(String{heap_allocator()});
 }
 
 fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
@@ -628,9 +628,9 @@ fn EvalContext::apply_array_subscript(StringView name,
       return out;
     }
     const String key = expand_modifier_word(subscript);
-    return String{
-        heap_allocator(),
-        lookup_associative_element(name, key.view()).value_or(String{}).view()};
+    return String{heap_allocator(), lookup_associative_element(name, key.view())
+                                        .value_or(String{scratch_allocator()})
+                                        .view()};
   }
 
   const ArrayList<String> *array = lookup_indexed_array(name);
@@ -639,7 +639,8 @@ fn EvalContext::apply_array_subscript(StringView name,
      per-element split of a quoted "${a[@]}", the same limitation the positional
      "$@" has. */
   if (subscript == "@" || subscript == "*") {
-    if (array == nullptr) return get_variable_value(name).value_or(String{});
+    if (array == nullptr)
+      return get_variable_value(name).value_or(String{heap_allocator()});
     let separator = ' ';
     let has_separator = true;
     if (subscript == "*") {
@@ -660,7 +661,8 @@ fn EvalContext::apply_array_subscript(StringView name,
   if (array == nullptr) {
     /* A scalar reads as a one-element array, so ${name[0]} is the value and any
        other index is empty. */
-    if (index == 0) return get_variable_value(name).value_or(String{});
+    if (index == 0)
+      return get_variable_value(name).value_or(String{heap_allocator()});
     return String{scratch_allocator()};
   }
   const i64 array_count = static_cast<i64>(array->count());

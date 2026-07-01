@@ -62,7 +62,7 @@ struct conditional_evaluator
 
   fn unexpected_token() throws -> String
   {
-    return at_end() ? String{} : operand_literal(elements[pos]);
+    return at_end() ? String{heap_allocator()} : operand_literal(elements[pos]);
   }
 
   /* The literal source text of an operand, used to recognize a word operator

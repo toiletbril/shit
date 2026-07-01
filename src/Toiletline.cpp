@@ -106,11 +106,13 @@ shit::EvalContext *COMPLETION_CONTEXT = nullptr;
 /* The storage the completion callback hands back to toiletline. The C-string
    pointers must outlive the callback return, so the engine's owned strings are
    kept here until the next call replaces them. */
-shit::ArrayList<shit::String> COMPLETION_CANDIDATES{};
-shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{};
-shit::ArrayList<shit::String> COMPLETION_DESCRIPTIONS{};
-shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{};
-shit::String COMPLETION_LCP{};
+shit::ArrayList<shit::String> COMPLETION_CANDIDATES{shit::heap_allocator()};
+shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{
+    shit::heap_allocator()};
+shit::ArrayList<shit::String> COMPLETION_DESCRIPTIONS{shit::heap_allocator()};
+shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
+    shit::heap_allocator()};
+shit::String COMPLETION_LCP{shit::heap_allocator()};
 
 /* An index at or past the codepoint count returns the byte length, so a clamped
    cursor maps to the end of the buffer. */
@@ -185,7 +187,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
             found_description != nullptr)
           COMPLETION_DESCRIPTIONS.push(shit::String{found_description->view()});
         else
-          COMPLETION_DESCRIPTIONS.push(shit::String{});
+          COMPLETION_DESCRIPTIONS.push(shit::String{shit::heap_allocator()});
       }
       COMPLETION_DESCRIPTION_POINTERS.reserve(COMPLETION_DESCRIPTIONS.count());
       for (let const &description : COMPLETION_DESCRIPTIONS)
@@ -251,7 +253,7 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 }
 
 shit::EvalContext *JOB_CONTEXT = nullptr;
-shit::String WAKE_NOTIFICATION_STASH{};
+shit::String WAKE_NOTIFICATION_STASH{shit::heap_allocator()};
 
 /* The two-phase wake hook the editor's wait loop drives for set -b. Phase 0
    asks whether anything must print, reading and clearing the SIGCHLD flag
@@ -391,7 +393,7 @@ fn set_title(const String &title) -> void
 {
   let const stripped = strip_ansi_color(title.view());
   let const view = stripped.view();
-  let sanitized = String{};
+  let sanitized = String{shit::heap_allocator()};
   for (usize i = 0; i < view.length; i++) {
     let const byte = static_cast<unsigned char>(view[i]);
     if (byte >= 0x20 && byte != 0x7f) {
@@ -558,7 +560,7 @@ static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
   while (tail_start < path.length &&
          (static_cast<unsigned char>(path[tail_start]) & 0xC0) == 0x80)
     tail_start++;
-  let shortened = String{};
+  let shortened = String{shit::heap_allocator()};
   shortened += "...";
   shortened += StringView{path.data + tail_start, path.length - tail_start};
   return shortened;
@@ -569,8 +571,8 @@ static fn git_branch() throws -> String { return utils::current_git_branch(); }
 static fn format_prompt_duration(u64 nanos) throws -> String
 {
   const u64 milliseconds = nanos / 1000000ULL;
-  if (milliseconds < 5) return String{};
-  let out = String{};
+  if (milliseconds < 5) return String{shit::heap_allocator()};
+  let out = String{shit::heap_allocator()};
   if (milliseconds < 1000) {
     out.append(utils::int_to_text(static_cast<i64>(milliseconds)));
     out += "ms";
@@ -591,7 +593,7 @@ static fn prompt_strftime(const char *format) throws -> String
 {
   std::time_t now = std::time(nullptr);
   std::tm *local = std::localtime(&now);
-  if (local == nullptr) return String{};
+  if (local == nullptr) return String{shit::heap_allocator()};
   char buffer[128];
   usize written = std::strftime(buffer, sizeof(buffer), format, local);
   return String{
@@ -622,7 +624,7 @@ static fn collapse_home_prefix(StringView path) throws -> String
   if (shown.starts_with(home->text()) &&
       (shown.length() == home_length || shown.view()[home_length] == '/'))
   {
-    let collapsed = String{};
+    let collapsed = String{shit::heap_allocator()};
     collapsed += "~";
     collapsed += shown.substring(home_length);
     shown = steal(collapsed);
@@ -634,7 +636,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
                                 StringView working_directory,
                                 EvalContext &context) throws -> String
 {
-  let out = String{};
+  let out = String{shit::heap_allocator()};
   for (usize i = 0; i < prompt.length; i++) {
     if (prompt[i] != '\\' || i + 1 >= prompt.length) {
       out += prompt[i];
@@ -737,12 +739,13 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
    and expands every prompt the way bash expands PS1. */
 struct prompt_cache_input
 {
-  String name{};
+  String name{shit::heap_allocator()};
   Maybe<String> value{};
 };
-static String PROMPT_CACHE_TEMPLATE{};
-static shit::ArrayList<prompt_cache_input> PROMPT_CACHE_INPUTS{};
-static String PROMPT_CACHE_EXPANSION{};
+static String PROMPT_CACHE_TEMPLATE{shit::heap_allocator()};
+static shit::ArrayList<prompt_cache_input> PROMPT_CACHE_INPUTS{
+    shit::heap_allocator()};
+static String PROMPT_CACHE_EXPANSION{shit::heap_allocator()};
 static bool PROMPT_CACHE_VALID = false;
 
 /* Scan the template for parameter references, filling names and reporting
@@ -819,7 +822,7 @@ fn default_prompt_template() -> String
      closes up to a single space outside a repository. The branch name is
      colored cyan when color is on, and the line editor skips the escape run
      when it measures the prompt width. */
-  let template_string = String{};
+  let template_string = String{shit::heap_allocator()};
   const bool should_use_color = colors::stdout_wants_color();
 
   if (should_use_color) {
@@ -853,7 +856,7 @@ static constexpr char PROMPT_GUARD_BACKTICK = '\x03';
    and \\. The ${...} and $(...) the user wrote still expand. */
 static fn guard_prompt_backslashes(StringView template_string) throws -> String
 {
-  let out = String{};
+  let out = String{shit::heap_allocator()};
   for (usize i = 0; i < template_string.length; i++) {
     if (template_string[i] == '\\' && i + 1 < template_string.length) {
       switch (template_string[i + 1]) {
@@ -881,7 +884,7 @@ static fn guard_prompt_backslashes(StringView template_string) throws -> String
    \\ the way the user wrote them. */
 static fn unguard_prompt_backslashes(StringView expanded) throws -> String
 {
-  let out = String{};
+  let out = String{shit::heap_allocator()};
   for (usize i = 0; i < expanded.length; i++) {
     switch (expanded[i]) {
     case PROMPT_GUARD_DOLLAR: out += "\\$"; break;
@@ -900,7 +903,7 @@ static fn unguard_prompt_backslashes(StringView expanded) throws -> String
    that ends in a byte other than 'm', is left in place. */
 static fn strip_ansi_color(StringView text) throws -> String
 {
-  let out = String{};
+  let out = String{shit::heap_allocator()};
   usize i = 0;
   while (i < text.length) {
     if (text[i] == '\x1b' && i + 1 < text.length && text[i + 1] == '[') {
@@ -935,14 +938,14 @@ fn build_prompt(EvalContext &context) -> String
   /* The user is stable for the session, so it is resolved once and reused. The
      fallback path rescans /etc/passwd, which a per-prompt call would repeat on
      every draw in a bare-environment container. */
-  static String CACHED_USER{};
+  static String CACHED_USER{shit::heap_allocator()};
   static bool was_user_resolved = false;
   if (!was_user_resolved) {
     CACHED_USER = os::get_current_user().value_or("???");
     was_user_resolved = true;
   }
 
-  String ps1_template;
+  String ps1_template{shit::heap_allocator()};
   if (Maybe<String> ps1 = context.get_variable_value("PS1");
       ps1.has_value() && !ps1->is_empty())
     ps1_template = steal(*ps1);
@@ -959,7 +962,8 @@ fn build_prompt(EvalContext &context) -> String
      The exit status is restored, since a command substitution here must not
      clobber $? for the next command. */
 
-  let scanned_inputs = shit::ArrayList<prompt_cache_input>{};
+  let scanned_inputs =
+      shit::ArrayList<prompt_cache_input>{shit::heap_allocator()};
   const bool is_cacheable =
       scan_prompt_template_inputs(ps1_template.view(), scanned_inputs);
   if (is_cacheable && PROMPT_CACHE_VALID &&
@@ -988,7 +992,7 @@ fn build_prompt(EvalContext &context) -> String
 
   const i32 saved_status = context.last_exit_status();
   String guarded = guard_prompt_backslashes(ps1_template.view());
-  String expanded;
+  String expanded{shit::heap_allocator()};
   try {
     expanded = unguard_prompt_backslashes(
         context.expand_heredoc_body(guarded.view()).view());
@@ -1020,17 +1024,18 @@ fn build_prompt(EvalContext &context) -> String
 fn render_ps0(EvalContext &context) -> String
 {
   Maybe<String> ps0 = context.get_variable_value("PS0");
-  if (!ps0.has_value() || ps0->is_empty()) return String{};
+  if (!ps0.has_value() || ps0->is_empty())
+    return String{shit::heap_allocator()};
 
   const i32 saved_status = context.last_exit_status();
   String guarded = guard_prompt_backslashes(ps0->view());
-  String expanded;
+  String expanded{shit::heap_allocator()};
   try {
     expanded = unguard_prompt_backslashes(
         context.expand_heredoc_body(guarded.view()).view());
   } catch (const shit::ErrorBase &) {
     context.set_last_exit_status(saved_status);
-    return String{};
+    return String{shit::heap_allocator()};
   }
   context.set_last_exit_status(saved_status);
 

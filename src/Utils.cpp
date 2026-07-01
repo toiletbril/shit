@@ -22,7 +22,7 @@ namespace utils {
 fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
     -> String
 {
-  let result = String{};
+  let result = String{heap_allocator()};
   result.reserve(64);
   for (usize i = 0; i < tokens.count(); i++) {
     let const token = tokens[i];
@@ -176,7 +176,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
 
     let const command = (is_async || is_foreground_job)
                             ? String{ec.program().view()}
-                            : String{};
+                            : String{heap_allocator()};
 
     os::process p = SHIT_INVALID_PROCESS;
     try {
@@ -233,7 +233,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   /* Every external stage is collected so all of them are reaped, not only the
      last. Otherwise a first stage like yes is left a zombie when the last stage
      exits. */
-  let children = ArrayList<os::process>{};
+  let children = ArrayList<os::process>{heap_allocator()};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
@@ -243,11 +243,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
      status arrives from the wait below, tracked by the parallel child-to-stage
      list. */
   let const stage_count = ecs.count();
-  let stage_status = ArrayList<i32>{};
+  let stage_status = ArrayList<i32>{heap_allocator()};
   stage_status.reserve(stage_count);
   for (usize i = 0; i < stage_count; i++)
     stage_status.push(0);
-  let child_stage = ArrayList<usize>{};
+  let child_stage = ArrayList<usize>{heap_allocator()};
 
   bool is_first = true;
   usize stage_index = 0;
@@ -404,7 +404,7 @@ pure fn strip_sig_prefix(StringView name) wontthrow -> StringView
 
 fn split_lines(StringView text) throws -> ArrayList<StringView>
 {
-  let lines = ArrayList<StringView>{};
+  let lines = ArrayList<StringView>{heap_allocator()};
   /* Counting the line breaks first reserves the exact size. */
   usize line_count = 1;
   for (usize i = 0; i < text.length; i++)
@@ -426,7 +426,7 @@ fn format_unix_timestamp(i64 unix_time, const char *format) throws -> String
 {
   time_t when = static_cast<time_t>(unix_time);
   struct tm *local = ::localtime(&when);
-  if (local == nullptr) return String{};
+  if (local == nullptr) return String{heap_allocator()};
 
   char buffer[128];
   usize written = ::strftime(buffer, sizeof(buffer), format, local);
@@ -537,7 +537,7 @@ fn format_time_report_posix(double real_seconds, double user_seconds,
                             double system_seconds) throws -> String
 {
   char buffer[64];
-  let report = String{};
+  let report = String{heap_allocator()};
   std::snprintf(buffer, sizeof(buffer), "real %.2f\n",
                 real_seconds < 0.0 ? 0.0 : real_seconds);
   report += buffer;
@@ -561,7 +561,7 @@ fn format_time_report_pretty(double real_seconds, double user_seconds,
           ? (user_seconds + system_seconds) / real_seconds * 100.0
           : 0.0;
   char buffer[64];
-  let report = String{};
+  let report = String{heap_allocator()};
   report += "\n";
   report += "  real   " + format_minutes_seconds(real_seconds) + "\n";
   report += "  user   " + format_minutes_seconds(user_seconds) + "\n";
@@ -579,7 +579,7 @@ fn format_time_report_custom(StringView format, double real_seconds,
                              double user_seconds, double system_seconds) throws
     -> String
 {
-  let report = String{};
+  let report = String{heap_allocator()};
 
   for (usize i = 0; i < format.length; i++) {
     if (format[i] != '%') {
@@ -1481,7 +1481,7 @@ cold fn print_memory_report() wontthrow -> void
     if (should_goodbye && QUIT_CONTEXT != nullptr &&
         QUIT_CONTEXT->shell_is_interactive())
     {
-      let code_str = String{};
+      let code_str = String{heap_allocator()};
       if (code != 0) {
         code_str += " (Code ";
         code_str += uint_to_text(actual_code);
@@ -1517,10 +1517,10 @@ static bool PATH_CACHE_IS_STALE = false;
    there only marks the cache stale and the resolver stays lazy. */
 static bool PATH_MAP_IS_EAGER = false;
 
-static ArrayList<String> PATH_COMMAND_NAMES{};
+static ArrayList<String> PATH_COMMAND_NAMES{heap_allocator()};
 static bool PATH_COMMAND_NAMES_IS_VALID = false;
 
-static ArrayList<String> BUILT_PATH_DIRS{};
+static ArrayList<String> BUILT_PATH_DIRS{heap_allocator()};
 static bool BUILT_PATH_DIRS_IS_VALID = false;
 
 static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
@@ -1534,7 +1534,8 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>;
 static fn cache_resolved_path(StringView name, const Path &full_path) throws
     -> void
 {
-  PATH_CACHE.get_or_create(name, ArrayList<Path>{}).push(full_path);
+  PATH_CACHE.get_or_create(name, ArrayList<Path>{heap_allocator()})
+      .push(full_path);
 }
 
 /* The filenames in a directory, read from disk on the first request and kept
@@ -1547,8 +1548,9 @@ static fn directory_listing(const Path &directory) throws
   if (const ArrayList<String> *cached = DIR_LISTING_CACHE.find(key))
     return *cached;
   let entries = Path::read_directory(directory);
-  DIR_LISTING_CACHE.set(key, entries.has_value() ? steal(*entries)
-                                                 : ArrayList<String>{});
+  DIR_LISTING_CACHE.set(key, entries.has_value()
+                                 ? steal(*entries)
+                                 : ArrayList<String>{heap_allocator()});
   return *DIR_LISTING_CACHE.find(key);
 }
 
@@ -1661,8 +1663,8 @@ fn set_path_for_resolution(Maybe<String> path) throws -> void
    never searched. POSIX treats an empty component as the current directory. */
 static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
 {
-  let dirs = ArrayList<String>{};
-  let current = String{};
+  let dirs = ArrayList<String>{heap_allocator()};
+  let current = String{heap_allocator()};
 
   /* A directory that appears more than once in PATH is kept only on its first
      occurrence, so the eager scan and the per-command resolve do not read it
@@ -1692,14 +1694,14 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
    resolution reuses the directory list rather than re-splitting and re-deduping
    PATH on every miss. The cache rebuilds when PATH changes, which a value
    comparison detects. */
-static String CACHED_SPLIT_PATH_VALUE{};
-static ArrayList<String> CACHED_PATH_DIRS{};
+static String CACHED_SPLIT_PATH_VALUE{heap_allocator()};
+static ArrayList<String> CACHED_PATH_DIRS{heap_allocator()};
 static bool CACHED_PATH_DIRS_VALID = false;
 
 static fn path_dirs() throws -> const ArrayList<String> &
 {
   if (!MAYBE_PATH.has_value()) {
-    CACHED_PATH_DIRS = ArrayList<String>{};
+    CACHED_PATH_DIRS = ArrayList<String>{heap_allocator()};
     CACHED_PATH_DIRS_VALID = false;
     return CACHED_PATH_DIRS;
   }
@@ -1754,13 +1756,13 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
   /* The search reads MAYBE_PATH, which the shell keeps in step with its PATH
      variable, so a plain PATH=... assignment that the store holds but the
      environment does not still drives the order. */
-  if (!MAYBE_PATH.has_value()) return ArrayList<Path>{};
+  if (!MAYBE_PATH.has_value()) return ArrayList<Path>{heap_allocator()};
 
   LOG(Debug, "statting candidates for '%.*s' along PATH%s",
       static_cast<int>(program_name.length), program_name.data,
       find_all ? ", collecting every match" : "");
 
-  let result = ArrayList<Path>{};
+  let result = ArrayList<Path>{heap_allocator()};
 
   /* The cache key is the program name without an omitted extension, the same
      key the lookup uses. */
@@ -1838,7 +1840,7 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
             PATH_CACHE.find(program_name_without_extension.view());
         cached != nullptr && cached->count() != 0)
     {
-      let result = ArrayList<Path>{};
+      let result = ArrayList<Path>{heap_allocator()};
       result.push((*cached)[0]);
       return result;
     }
@@ -1911,7 +1913,7 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
   const usize max_distance = name.length <= 3 ? 1 : 2;
   usize best_distance = max_distance + 1;
   bool best_is_anagram = false;
-  let best = String{};
+  let best = String{heap_allocator()};
 
   /* Same length and same character multiset, so the candidate is a pure
      transposition of the typed name, the most likely typo. Used to break a tie
@@ -1962,7 +1964,7 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
 
 fn read_entire_standard_input() throws -> String
 {
-  let contents = String{};
+  let contents = String{heap_allocator()};
   char buffer[4096];
   loop
   {
@@ -1980,7 +1982,7 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
   const bool has_timeout = timeout_nanos >= 0;
   const u64 deadline_nanos =
       has_timeout ? os::monotonic_nanos() + static_cast<u64>(timeout_nanos) : 0;
-  let line = String{};
+  let line = String{heap_allocator()};
   bool has_read_any_byte = false;
   loop
   {
@@ -2068,7 +2070,7 @@ fn current_git_branch() throws -> String
     if (normalized.text() == dir.text()) break;
     dir = steal(normalized);
   }
-  return String{};
+  return String{heap_allocator()};
 }
 
 } // namespace utils

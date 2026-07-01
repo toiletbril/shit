@@ -26,19 +26,20 @@ namespace shitbox {
    per process. */
 struct uid_name_cache_entry
 {
-  u32 uid{0};
-  String name{};
+  uid_name_cache_entry(u32 uid, String name) : uid(uid), name(steal(name)) {}
+  u32 uid;
+  String name;
 };
 
-static fn owner_name_for_uid(u32 uid,
-                             ArrayList<uid_name_cache_entry> &cache) throws
-    -> String
+static fn owner_name_for_uid(u32 uid, ArrayList<uid_name_cache_entry> &cache,
+                             Allocator allocator) throws -> String
 {
   for (const uid_name_cache_entry &entry : cache)
     if (entry.uid == uid) return entry.name.clone();
 
   let const looked_up = os::uid_to_username(uid);
-  String name = looked_up.has_value() ? *looked_up : utils::uint_to_text(uid);
+  String name = looked_up.has_value() ? String{allocator, looked_up->view()}
+                                      : utils::uint_to_text(uid, allocator);
   cache.push(uid_name_cache_entry{uid, name.clone()});
   return name;
 }
@@ -63,10 +64,10 @@ static fn append_right(String &output, StringView text, usize width) throws
    need a sampling pass and a controlling-terminal map this listing does not
    gather. */
 static fn render_aux(const ArrayList<os::process_entry> &processes,
-                     String &output) throws -> void
+                     String &output, Allocator allocator) throws -> void
 {
-  ArrayList<uid_name_cache_entry> uid_cache{};
-  ArrayList<String> owners{};
+  ArrayList<uid_name_cache_entry> uid_cache{allocator};
+  ArrayList<String> owners{allocator};
   owners.reserve(processes.count());
 
   usize user_width = 4;
@@ -75,14 +76,15 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
   usize rss_width = 3;
 
   for (const os::process_entry &process : processes) {
-    String owner = owner_name_for_uid(process.owner_id, uid_cache);
+    String owner = owner_name_for_uid(process.owner_id, uid_cache, allocator);
     if (owner.count() > user_width) user_width = owner.count();
-    if (utils::int_to_text(process.pid).count() > pid_width)
-      pid_width = utils::int_to_text(process.pid).count();
-    if (utils::uint_to_text(process.virtual_kib).count() > vsz_width)
-      vsz_width = utils::uint_to_text(process.virtual_kib).count();
-    if (utils::uint_to_text(process.resident_kib).count() > rss_width)
-      rss_width = utils::uint_to_text(process.resident_kib).count();
+    if (utils::int_to_text(process.pid, allocator).count() > pid_width)
+      pid_width = utils::int_to_text(process.pid, allocator).count();
+    if (utils::uint_to_text(process.virtual_kib, allocator).count() > vsz_width)
+      vsz_width = utils::uint_to_text(process.virtual_kib, allocator).count();
+    if (utils::uint_to_text(process.resident_kib, allocator).count() >
+        rss_width)
+      rss_width = utils::uint_to_text(process.resident_kib, allocator).count();
     owners.push(steal(owner));
   }
 
@@ -99,12 +101,15 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
     const os::process_entry &process = processes[i];
     append_left(output, owners[i].view(), user_width);
     output += ' ';
-    append_right(output, utils::int_to_text(process.pid).view(), pid_width);
+    append_right(output, utils::int_to_text(process.pid, allocator).view(),
+                 pid_width);
     output += ' ';
-    append_right(output, utils::uint_to_text(process.virtual_kib).view(),
+    append_right(output,
+                 utils::uint_to_text(process.virtual_kib, allocator).view(),
                  vsz_width);
     output += ' ';
-    append_right(output, utils::uint_to_text(process.resident_kib).view(),
+    append_right(output,
+                 utils::uint_to_text(process.resident_kib, allocator).view(),
                  rss_width);
     output += ' ';
     /* The state is one letter padded to the four-wide STAT field plus a
@@ -124,12 +129,10 @@ pure fn Ps::kind() const wontthrow -> Utility::Kind { return Kind::Ps; }
 fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32
 {
-  unused(cxt);
-
   /* The -aux spelling is the classic ps form rather than a bundle of single
      letter flags, so it is recognized before flag parsing rather than rejected
      as an unknown flag. */
-  ArrayList<String> flag_args{};
+  ArrayList<String> flag_args{cxt.scratch_allocator()};
   flag_args.reserve(args.count());
   bool should_show_aux = false;
   for (usize i = 0; i < args.count(); i++) {
@@ -167,16 +170,16 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const processes = os::enumerate_processes(should_show_aux);
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   if (should_show_aux) {
-    render_aux(processes, output);
+    render_aux(processes, output, cxt.scratch_allocator());
     ec.print_to_stdout(output);
     return 0;
   }
 
   output += "  PID CMD\n";
   for (const os::process_entry &process : processes) {
-    let const pid = utils::int_to_text(process.pid);
+    let const pid = utils::int_to_text(process.pid, cxt.scratch_allocator());
     for (usize i = pid.count(); i < 5; i++)
       output += ' ';
     output += pid.view();

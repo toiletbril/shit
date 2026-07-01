@@ -44,7 +44,7 @@ cold fn CompoundList::to_string() const throws -> String
 
 cold fn CompoundList::to_ast_string(usize layer) const throws -> String
 {
-  let s = String{};
+  let s = String{heap_allocator()};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[" + to_string() + "]";
@@ -202,7 +202,7 @@ pure fn CompoundListCondition::is_negated() const wontthrow -> bool
 
 cold fn CompoundListCondition::to_string() const throws -> String
 {
-  String k;
+  String k{heap_allocator()};
   switch (kind()) {
   case Kind::None: k = "None"; break;
   case Kind::And: k = "&&"; break;
@@ -216,7 +216,7 @@ cold fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_cmd != nullptr);
 
-  let s = String{};
+  let s = String{heap_allocator()};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[" + to_string() + "]\n";
@@ -267,7 +267,7 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
        set TIMEFORMAT drives the format, an empty value prints nothing the way
        bash treats a null TIMEFORMAT, and an unset value keeps the pretty
        default so the existing reports are unchanged. */
-    String report;
+    String report{cxt.scratch_allocator()};
     if (m_cmd->time_uses_posix_format()) {
       report =
           utils::format_time_report_posix(real_seconds, user_cpu, system_cpu);
@@ -324,7 +324,7 @@ cold fn Pipeline::to_string() const throws -> String
 
 cold fn Pipeline::to_ast_string(usize layer) const throws -> String
 {
-  let s = String{};
+  let s = String{heap_allocator()};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[" + to_string() + "]";
@@ -346,7 +346,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   LOG(Debug, "forking %zu pipeline stages, one child per stage",
       m_commands.count());
 
-  let children = ArrayList<os::process>{};
+  let children = ArrayList<os::process>{cxt.scratch_allocator()};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
   let pending_pipe = Maybe<os::Pipe>{};
@@ -497,7 +497,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   /* The children are pushed in pipeline order, so their statuses are collected
      in order. pipefail reports the rightmost stage that failed, or zero when
      all succeeded, while the plain case reports the last stage alone. */
-  let stage_status = ArrayList<i32>{};
+  let stage_status = ArrayList<i32>{cxt.scratch_allocator()};
   stage_status.reserve(children.count());
   for (let const child : children)
     stage_status.push(os::wait_and_monitor_process(child));
@@ -1072,7 +1072,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
        them out of the command's captured output. The menu reprints only after
        an empty line. */
     if (should_reprint_menu) {
-      let menu = String{};
+      let menu = String{cxt.scratch_allocator()};
       for (usize i = 0; i < values.count(); i++) {
         menu += utils::int_to_text(static_cast<i64>(i + 1));
         menu += ") ";
@@ -1350,7 +1350,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
 
       let pattern_active = ArrayList<bool>{cxt.scratch_allocator()};
-      let pattern = String{};
+      let pattern = String{cxt.scratch_allocator()};
       if (pattern_token->kind() == Token::Kind::Word) {
         try {
           pattern = cxt.expand_case_pattern_masked(

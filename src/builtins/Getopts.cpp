@@ -41,7 +41,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &name = args[2];
   let const is_silent = !optstring.is_empty() && optstring[0] == ':';
 
-  let operands = ArrayList<String>{};
+  let operands = ArrayList<String>{cxt.scratch_allocator()};
   if (args.count() > 3) {
     for (usize i = 3; i < args.count(); i++)
       operands.push(args[i]);
@@ -65,7 +65,8 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let char_index = cxt.getopts_char_index();
 
   let const do_finish = [&](i32 code) -> i32 {
-    cxt.set_shell_variable("OPTIND", utils::int_to_text(optind));
+    cxt.set_shell_variable("OPTIND",
+                           utils::int_to_text(optind, cxt.scratch_allocator()));
     cxt.set_getopts_char_index(char_index);
     cxt.set_getopts_last_optind(optind);
     return code;
@@ -96,7 +97,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (char_index >= current.length()) char_index = 1;
   ASSERT(char_index < current.length());
   let const option = current[char_index];
-  let option_as_string = String{};
+  let option_as_string = String{cxt.scratch_allocator()};
   option_as_string.push(option);
   let const spec = optstring.find_character(option);
 

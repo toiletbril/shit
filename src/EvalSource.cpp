@@ -100,7 +100,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   ASSERT(ast != nullptr);
 
   let previous_shell_name = String{m_shell_name};
-  let params = ArrayList<String>{};
+  let params = ArrayList<String>{heap_allocator()};
   params.reserve(ec.args().count() - 1);
   for (usize i = 1; i < ec.args().count(); i++)
     params.push_managed(ec.args()[i].view());
@@ -113,7 +113,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
      in-process run, then put back. A standard descriptor with no staged
      redirect is backed up too, since the script itself may move it with an exec
      redirection that a fork would have contained. */
-  let saved_fds = ArrayList<os::saved_descriptor>{};
+  let saved_fds = ArrayList<os::saved_descriptor>{heap_allocator()};
   saved_fds.push(ec.in_fd.has_value()
                      ? os::save_and_replace_descriptor(0, *ec.in_fd)
                      : os::save_descriptor(0));
@@ -273,8 +273,9 @@ fn EvalContext::run_source(StringView source, StringView origin,
   m_source_frames.push(source_frame{
       String{origin},
       call_site ? *call_site : SourceLocation{0, 0},
-      parent_source, filename.has_value() ? String{*filename}
-      : String{}
+      parent_source,
+      filename.has_value() ? String{*filename}
+      : String{heap_allocator()}
   });
   /* The sourced-file counter rides the frame stack so the FUNCNAME
      classification stays a constant-time read. */

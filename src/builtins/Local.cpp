@@ -72,7 +72,7 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case 'u':
       case 'n': break;
       default: {
-        let invalid = String{};
+        let invalid = String{heap_allocator()};
         invalid += arg[c];
         throw Error{"'-" + invalid + "' is not a valid local option"};
       }
@@ -141,8 +141,9 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (should_mark_export && !should_make_indexed && !should_make_associative)
     {
       cxt.mark_exported(name);
-      cxt.set_shell_variable(
-          name, cxt.get_variable_value(name).value_or(String{}).view());
+      cxt.set_shell_variable(name, cxt.get_variable_value(name)
+                                       .value_or(String{heap_allocator()})
+                                       .view());
     }
   }
 

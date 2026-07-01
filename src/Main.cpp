@@ -179,7 +179,7 @@ static fn run_debug_completion_driver(StringView driver_line,
   let const driver_result =
       completion::complete(driver_line, driver_line.length, context,
                            Path::current_directory(), true);
-  let listing = String{};
+  let listing = String{heap_allocator()};
   for (let const &candidate : driver_result.candidates) {
     listing += candidate.view();
     listing += '\n';
@@ -196,7 +196,7 @@ static fn run_debug_highlight_driver(StringView driver_line,
                                      EvalContext &context) throws -> i32
 {
   let const spans = completion::highlight_line(driver_line, context);
-  let listing = String{};
+  let listing = String{heap_allocator()};
   for (let const &span : spans) {
     listing +=
         driver_line.substring_of_length(span.start, span.end - span.start);
@@ -254,7 +254,7 @@ pure static fn resolve_session_mood(mimic_mood invocation_mood) wontthrow
 static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 {
   if (FLAG_HELP.is_enabled()) {
-    let h = String{};
+    let h = String{heap_allocator()};
     h += "SHIT";
     h += "\n";
     h += wrap_text(
@@ -312,7 +312,7 @@ static fn report_escaped_control_flow(EvalContext &context,
   if (!context.has_pending_control_flow()) return;
 
   const control_flow &control = context.pending_control_flow();
-  let what = String{};
+  let what = String{heap_allocator()};
   switch (control.kind) {
   case control_flow::Kind::Break:
     what = "'break' used outside of a loop";
@@ -514,7 +514,7 @@ static fn run_script_contents(const String &script_contents,
    prompts so an unchanged hook parses once, in an arena the per-command reset
    never touches so the cached pointer stays valid. */
 static BumpArena PROMPT_COMMAND_ARENA{};
-static String PROMPT_COMMAND_CACHED_TEXT{};
+static String PROMPT_COMMAND_CACHED_TEXT{heap_allocator()};
 static Expression *PROMPT_COMMAND_CACHED_AST = nullptr;
 
 static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
@@ -772,7 +772,7 @@ fn main(int argc, char **argv) -> int
       let context = shit::EvalContext{false, false, false,
                                       false, false, shit::String{invocation}};
 
-      shit::ArrayList<shit::String> operands{};
+      shit::ArrayList<shit::String> operands{shit::heap_allocator()};
       operands.reserve(static_cast<usize>(argc - 1));
       for (int i = 1; i < argc; i++)
         operands.push(shit::String{shit::StringView{argv[i]}});
@@ -783,15 +783,15 @@ fn main(int argc, char **argv) -> int
   }
 
   bool is_login_shell = false;
-  let file_names = shit::ArrayList<shit::String>{};
+  let file_names = shit::ArrayList<shit::String>{shit::heap_allocator()};
 
   /* SHIT_FLAGS supplies command line options through the environment, such as
      SHIT_FLAGS='-ahmu --mood bash -I'. The whitespace-split tokens are spliced
      in right after the program name, before the real arguments, so a flag on
      the command line still has the final say. The token strings and the spliced
      pointer array outlive the parse below, so the views stay valid. */
-  shit::ArrayList<shit::String> shit_flags_tokens{};
-  shit::ArrayList<const char *> spliced_argv{};
+  shit::ArrayList<shit::String> shit_flags_tokens{shit::heap_allocator()};
+  shit::ArrayList<const char *> spliced_argv{shit::heap_allocator()};
   if (shit::Maybe<shit::String> shit_flags =
           shit::os::get_environment_variable("SHIT_FLAGS");
       shit_flags.has_value() && !shit_flags->is_empty())
@@ -860,7 +860,7 @@ fn main(int argc, char **argv) -> int
          fails. The program name is kept as the sole operand so $0 and SHELL
          stay the real name rather than the unknown-program placeholder. */
       shit::reset_flags(FLAG_LIST);
-      file_names = shit::ArrayList<shit::String>{};
+      file_names = shit::ArrayList<shit::String>{shit::heap_allocator()};
       if (argc > 0) file_names.push(shit::String{argv[0]});
     }
   };
@@ -950,7 +950,7 @@ fn main(int argc, char **argv) -> int
   }
 #endif
 
-  let program_path = shit::String{};
+  let program_path = shit::String{shit::heap_allocator()};
 
   if (file_names.count() > 0) {
     /* The program path is the first argument, moved out and dropped so the
@@ -1032,7 +1032,7 @@ fn main(int argc, char **argv) -> int
   }
   let const session_mood = shit::resolve_session_mood(invocation_mood);
 
-  let init_moods = shit::ArrayList<shit::mimic_mood>{};
+  let init_moods = shit::ArrayList<shit::mimic_mood>{shit::heap_allocator()};
   for (usize i = 0; i < FLAG_INIT_MOODS.count(); i++) {
     shit::StringView entry = FLAG_INIT_MOODS.get(i);
     /* A single --init-moods value may itself be a comma-separated list, so each
@@ -1076,7 +1076,7 @@ fn main(int argc, char **argv) -> int
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
     bool is_tty = shit::os::is_stdin_a_tty();
 
-    let s = shit::String{};
+    let s = shit::String{shit::heap_allocator()};
     s += "Both '-s' and '-i' options were specified. Falling back to ";
     s += is_tty ? "'-i'" : "'-s' because stdin is not a tty.";
     shit::show_message(s);
@@ -1146,7 +1146,7 @@ fn main(int argc, char **argv) -> int
      -s shell keeps the shell name as $0 and takes every operand as a positional
      parameter. The context owns both. */
   let shell_name = program_path.clone();
-  let positional_params = shit::ArrayList<shit::String>{};
+  let positional_params = shit::ArrayList<shit::String>{shit::heap_allocator()};
 
   usize first_param_index = 0;
   if ((should_read_files || should_execute_commands) && !file_names.is_empty())
@@ -1365,7 +1365,7 @@ fn main(int argc, char **argv) -> int
   {
     ASSERT(!shit::os::is_child_process());
 
-    let script_contents = shit::String{};
+    let script_contents = shit::String{shit::heap_allocator()};
     /* The named script file flows into the diagnostics so an error reads
        path:line:col. A -c command, standard input, or an interactive line
        carries no path, so a prompt error stays a bare line:col. */
@@ -1467,7 +1467,7 @@ fn main(int argc, char **argv) -> int
           if (shit::os::terminal_size(marker_columns, marker_rows) &&
               marker_columns > 0)
           {
-            shit::String eol_marker{};
+            shit::String eol_marker{shit::heap_allocator()};
             /* One allocation holds the glyph, the fill spaces, and the
                controls, so the fill loop never regrows the buffer. */
             eol_marker.reserve(marker_columns + 12);

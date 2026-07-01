@@ -128,7 +128,7 @@ public:
 
 private:
   bool m_is_set{false};
-  String m_value{};
+  String m_value{heap_allocator()};
 };
 
 class FlagManyStrings : public Flag
@@ -149,7 +149,7 @@ public:
   fn reset() throws -> void override;
 
 private:
-  ArrayList<String> m_values{};
+  ArrayList<String> m_values{heap_allocator()};
   usize m_value_position{0};
 };
 

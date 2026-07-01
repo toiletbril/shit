@@ -147,7 +147,7 @@ public:
   mustuse fn detect_mimic_shell() const throws -> Maybe<mimic_mood>;
 
 private:
-  String m_text{};
+  String m_text{heap_allocator()};
 };
 
 /* A small builder for assembling a path from a root and a run of components. */
@@ -166,7 +166,7 @@ public:
   mustuse fn build() const throws -> Path;
 
 private:
-  String m_text{};
+  String m_text{heap_allocator()};
 };
 
 } // namespace shit

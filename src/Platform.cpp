@@ -387,7 +387,7 @@ fn get_home_for_user(StringView username) throws -> Maybe<Path>
 
 fn enumerate_users() throws -> ArrayList<String>
 {
-  ArrayList<String> users{};
+  ArrayList<String> users{heap_allocator()};
 
   let const contents = Path{StringView{"/etc/passwd"}}.read_entire_file();
   if (!contents) return users;
@@ -439,8 +439,8 @@ fn make_fd_inheritable(descriptor fd) wontthrow -> void
  * replaced by a runtime check. */
 #if SHIT_PLATFORM_ISNT COSMO
 const ArrayList<String> OMITTED_SUFFIXES = []() {
-  ArrayList<String> suffixes{};
-  suffixes.push(String{});
+  ArrayList<String> suffixes{heap_allocator()};
+  suffixes.push(String{heap_allocator()});
   return suffixes;
 }();
 
@@ -480,7 +480,7 @@ fn unset_environment_variable(StringView key) throws -> void
 
 fn environment_names() throws -> ArrayList<String>
 {
-  ArrayList<String> names{};
+  ArrayList<String> names{heap_allocator()};
   if (environ == nullptr) return names;
   for (char **entry = environ; *entry != nullptr; entry++) {
     StringView pair{*entry};
@@ -519,7 +519,7 @@ cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
   const pid_t child_pid = check_syscall(fork());
 
   if (child_pid == 0) {
-    String msg{};
+    String msg{heap_allocator()};
     msg += program_path.text();
     msg += ": ";
     msg += String{strerror(spawn_error)};
@@ -672,7 +672,7 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
 {
   let matches = ArrayList<String>{allocator};
 
-  const String pattern_string{pattern};
+  const String pattern_string{allocator, pattern};
   glob_t glob_result{};
   if (glob(pattern_string.c_str(), 0, nullptr, &glob_result) == 0) {
     for (usize i = 0; i < glob_result.gl_pathc; i++)
@@ -1063,7 +1063,7 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   /* mkstemp rewrites the XXXXXX suffix in place, so the template lives in a
      mutable buffer with a trailing null rather than the immutable Path text. */
   const String &path_template_text = path_template_path.text();
-  ArrayList<char> path_template{};
+  ArrayList<char> path_template{heap_allocator()};
   path_template.reserve(path_template_text.count() + 1);
   for (usize i = 0; i < path_template_text.count(); i++)
     path_template.push(path_template_text.c_str()[i]);
@@ -1273,7 +1273,7 @@ fn signal_name_from_number(i32 number) throws -> Maybe<String>
 fn signal_names() throws -> const ArrayList<StringView> &
 {
   static ArrayList<StringView> names = [] throws {
-    let collected = ArrayList<StringView>{};
+    let collected = ArrayList<StringView>{heap_allocator()};
     collected.reserve(sizeof(SIGNAL_PAIRS) / sizeof(SIGNAL_PAIRS[0]));
     for (let const &pair : SIGNAL_PAIRS)
       collected.push(pair.name);
@@ -1286,7 +1286,7 @@ hot fn make_os_args(const ArrayList<String> &args) throws -> os_args
 {
   ASSERT(args.count() > 0, "argv must carry at least the program name");
 
-  os_args result{};
+  os_args result{heap_allocator()};
   result.reserve(args.count() + 1);
 
   for (let const &arg : args)
@@ -1512,7 +1512,8 @@ fn format_local_time(StringView format, i64 epoch) throws -> String
   /* localtime_r returns null and leaves the struct unspecified for an epoch
      outside the representable range, so an unchecked struct would feed strftime
      garbage. An out-of-range time renders as empty rather than a wrong date. */
-  if (localtime_r(&when, &broken_down) == nullptr) return String{};
+  if (localtime_r(&when, &broken_down) == nullptr)
+    return String{heap_allocator()};
   let const format_string = String{format};
   char buffer[512];
   let const written =
@@ -1645,7 +1646,7 @@ fn collect_perf_counts(perf_counts &out, Runner &&runner) wontthrow -> bool
 fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
                    i64 &status_out, u64 &peak_rss_out) wontthrow -> bool
 {
-  os::os_args raw_argv{};
+  os::os_args raw_argv{heap_allocator()};
   for (usize i = 0; i < argv.count(); i++)
     raw_argv.push(argv[i].c_str());
   raw_argv.push(nullptr);
@@ -1841,7 +1842,7 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
   usize capacity = 256;
   loop
   {
-    ArrayList<char> buffer{};
+    ArrayList<char> buffer{heap_allocator()};
     buffer.reserve(capacity);
     let const length =
         ::readlink(path_string.c_str(), buffer.begin(), capacity);
@@ -1914,7 +1915,7 @@ fn file_type_letter(u32 mode) wontthrow -> char
 fn format_mode_string(u32 mode) throws -> String
 {
   const mode_t bits = static_cast<mode_t>(mode);
-  String result{};
+  String result{heap_allocator()};
   result.push(file_type_letter(mode));
   result.push((bits & S_IRUSR) != 0 ? 'r' : '-');
   result.push((bits & S_IWUSR) != 0 ? 'w' : '-');
@@ -2016,7 +2017,7 @@ static fn mac_process_state_letter(char stat_value) wontthrow -> char
 fn enumerate_processes(bool include_resource_stats) throws
     -> ArrayList<process_entry>
 {
-  ArrayList<process_entry> processes{};
+  ArrayList<process_entry> processes{heap_allocator()};
 
 #if defined __APPLE__
   /* macOS exposes no /proc, so the process table is read through sysctl with
@@ -2151,7 +2152,7 @@ fn enumerate_processes(bool include_resource_stats) throws
     if (Maybe<String> cmdline = Path{cmdline_path.view()}.read_entire_file();
         cmdline.has_value() && !cmdline->is_empty())
     {
-      String command_line{};
+      String command_line{heap_allocator()};
       for (usize i = 0; i < cmdline->count(); i++) {
         let const byte = cmdline->view()[i];
         if (byte == '\0') {
@@ -2412,7 +2413,7 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
 {
   let matches = ArrayList<String>{allocator};
 
-  const String pattern_string{pattern};
+  const String pattern_string{allocator, pattern};
   WIN32_FIND_DATAA find_data;
   const HANDLE handle = FindFirstFileA(pattern_string.c_str(), &find_data);
   if (handle == INVALID_HANDLE_VALUE) return matches;
@@ -2504,7 +2505,7 @@ fn get_current_user() -> Maybe<String>
   DWORD size = 0;
   GetUserNameA(nullptr, &size);
   if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-    ArrayList<char> buffer{};
+    ArrayList<char> buffer{heap_allocator()};
     buffer.reserve(size);
     for (DWORD i = 0; i < size; i++)
       buffer.push('\0');
@@ -2542,7 +2543,10 @@ fn get_home_for_user(StringView username) throws -> Maybe<Path>
   return shit::None;
 }
 
-fn enumerate_users() throws -> ArrayList<String> { return ArrayList<String>{}; }
+fn enumerate_users() throws -> ArrayList<String>
+{
+  return ArrayList<String>{heap_allocator()};
+}
 
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 
@@ -3088,7 +3092,7 @@ fn signal_name_from_number(i32 number) -> Maybe<String>
 fn signal_names() throws -> const ArrayList<StringView> &
 {
   static ArrayList<StringView> names = [] throws {
-    let collected = ArrayList<StringView>{};
+    let collected = ArrayList<StringView>{heap_allocator()};
     static const StringView WINDOWS_SIGNAL_NAMES[] = {"HUP", "INT", "QUIT",
                                                       "KILL", "TERM"};
     for (const StringView name : WINDOWS_SIGNAL_NAMES)
@@ -3549,7 +3553,7 @@ fn format_mode_string(u32 mode) throws -> String
   const bool is_writable = (mode & 0000200u) != 0;
   const bool is_executable = (mode & 0000100u) != 0;
 
-  String result{};
+  String result{heap_allocator()};
   result.push(file_type_letter(mode));
   for (usize triplet = 0; triplet < 3; triplet++) {
     result.push(is_readable ? 'r' : '-');
@@ -3591,7 +3595,7 @@ fn enumerate_processes(bool include_resource_stats) throws
   /* The Windows snapshot carries no per-process resource stats this layer
      reads, so the flag is accepted and the BSD columns stay zero. */
   unused(include_resource_stats);
-  ArrayList<process_entry> processes{};
+  ArrayList<process_entry> processes{heap_allocator()};
   HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   if (snapshot == INVALID_HANDLE_VALUE) return processes;
   defer { CloseHandle(snapshot); };
@@ -3624,7 +3628,7 @@ namespace shit {
 namespace os {
 
 const ArrayList<String> OMITTED_SUFFIXES = []() {
-  ArrayList<String> suffixes{};
+  ArrayList<String> suffixes{heap_allocator()};
   for (const char *suffix : {"", ".exe", ".com", ".scr", ".bat"})
     suffixes.push(String{suffix});
   return suffixes;

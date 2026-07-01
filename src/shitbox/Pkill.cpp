@@ -27,14 +27,17 @@ namespace shitbox {
 
 /* Resolve the -s value to a signal number, a decimal number directly or a name
    such as TERM or SIGKILL through the platform table. Defaults to TERM. */
-fn resolve_shitbox_signal(StringView spelled) throws -> i32
+fn resolve_shitbox_signal(StringView spelled, Allocator allocator) throws -> i32
 {
   if (spelled.is_empty()) return SIGTERM;
   let const parsed = utils::parse_decimal_integer(spelled);
   if (!parsed.is_error()) return static_cast<i32>(parsed.value());
   let const named = os::signal_number_from_name(spelled);
   if (!named.has_value())
-    throw Error{"unknown signal '" + String{spelled} + "'"};
+    throw Error{
+        "unknown signal '" + String{allocator, spelled}
+          + "'"
+    };
   return *named;
 }
 
@@ -61,7 +64,8 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const pattern = operands[0].view();
   let const signal_number = resolve_shitbox_signal(
-      FLAG_PKILL_SIGNAL.is_set() ? FLAG_PKILL_SIGNAL.value() : StringView{});
+      FLAG_PKILL_SIGNAL.is_set() ? FLAG_PKILL_SIGNAL.value() : StringView{},
+      cxt.scratch_allocator());
 
   let const self_pid = os::get_shell_process_id();
   let const processes = os::enumerate_processes();

@@ -121,19 +121,18 @@ fn selected_resource() throws -> resource_entry
   return {"file(blocks)", RLIMIT_FSIZE, 512};
 }
 
-fn render_limit(const struct rlimit &limit, rlim_t divisor) throws -> String
+fn render_limit(const struct rlimit &limit, rlim_t divisor,
+                Allocator allocator) throws -> String
 {
   const rlim_t value = FLAG_HARD.is_enabled() ? limit.rlim_max : limit.rlim_cur;
-  if (value == RLIM_INFINITY) return String{"unlimited"};
-  return utils::uint_to_text(value / divisor);
+  if (value == RLIM_INFINITY) return String{allocator, "unlimited"};
+  return utils::uint_to_text(value / divisor, allocator);
 }
 
 } // namespace
 
 cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  unused(cxt);
-
   let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
@@ -143,16 +142,17 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* -a reports every resource, the label left-justified in a twenty-wide field
      and then the value, the layout dash prints. */
   if (FLAG_ALL.is_enabled()) {
-    let out = String{};
+    let out = String{cxt.scratch_allocator()};
     for (let const &entry : RESOURCE_TABLE) {
       struct rlimit limit{};
       if (getrlimit(entry.which, &limit) != 0) continue;
-      let const label = String{entry.label};
+      let const label = String{cxt.scratch_allocator(), entry.label};
       out += label;
       for (usize pad = label.count(); pad < 20; pad++)
         out.push(' ');
       out.push(' ');
-      out += render_limit(limit, entry.units_per_value);
+      out +=
+          render_limit(limit, entry.units_per_value, cxt.scratch_allocator());
       out.push('\n');
     }
     ec.print_to_stdout(out);
@@ -170,7 +170,9 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      read reports the soft limit and the set changes both. */
   if (args.count() < 2) {
     LOG(Debug, "ulimit reading the '%s' limit", resource.label);
-    ec.print_to_stdout(render_limit(limit, resource.units_per_value) + "\n");
+    ec.print_to_stdout(
+        render_limit(limit, resource.units_per_value, cxt.scratch_allocator()) +
+        "\n");
     return 0;
   }
 

@@ -40,7 +40,7 @@ fn shitbox_util_flag_list(Utility::Kind chosen) wontthrow
 fn util_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {
-    let collected = ArrayList<String>{};
+    let collected = ArrayList<String>{heap_allocator()};
     for (const StaticStringMap<Utility::Kind>::entry &entry : SHITBOX_ENTRIES)
       collected.push(entry.key.to_string());
     return collected;
@@ -67,7 +67,7 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
 
   /* The utility reads itself as the first argument, so a slice from the name
      onward is copied once and handed over, the name as the program word. */
-  ArrayList<String> shifted{};
+  ArrayList<String> shifted{heap_allocator()};
   shifted.reserve(ec.args().count() - name_index);
   for (usize i = name_index; i < ec.args().count(); i++)
     shifted.push(ec.args()[i].clone());
@@ -121,7 +121,7 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
     }
   }
 
-  ArrayList<String> args{};
+  ArrayList<String> args{heap_allocator()};
   args.reserve(operands.count() + 1);
   args.push(String{util_name});
   for (String &operand : operands)
@@ -168,7 +168,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
                    StringView description,
                    const ArrayList<Flag *> &flags) throws -> void
 {
-  let help_text = String{};
+  let help_text = String{heap_allocator()};
 
   /* A symlinked utility looks like a system program, so the help opens by
      naming the shit binary behind it, set off by a blank line on each side. */
@@ -186,7 +186,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
     help_text += wrap_text(description, HELP_INDENT, HELP_WRAP_WIDTH);
     help_text += "\n\n";
   }
-  ArrayList<StringView> synopsis_lines{};
+  ArrayList<StringView> synopsis_lines{heap_allocator()};
   synopsis_lines.push(synopsis);
   help_text += make_synopsis(name, synopsis_lines);
   help_text += '\n';
@@ -198,7 +198,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
 
 fn read_fd_to_string(os::descriptor fd) throws -> String
 {
-  String contents{};
+  String contents{heap_allocator()};
   char buffer[4096];
   loop
   {
@@ -222,7 +222,7 @@ fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
 
 fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>
 {
-  ArrayList<StringView> lines{};
+  ArrayList<StringView> lines{heap_allocator()};
   usize start = 0;
   for (usize i = 0; i < text.length; i++) {
     if (text[i] == '\n') {
@@ -256,7 +256,7 @@ fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void
 
 fn format_signal_list() throws -> String
 {
-  let out = String{};
+  let out = String{heap_allocator()};
   for (let const name : os::signal_names()) {
     if (let const number = os::signal_number_from_name(name);
         number.has_value())
@@ -293,7 +293,7 @@ fn format_human_size(u64 bytes) throws -> String
     unit++;
   }
 
-  String out{};
+  String out{heap_allocator()};
   /* A scaled value below ten keeps one decimal, while a larger value rounds to
      a whole number. A one-decimal value that rounds up to ten drops the decimal
      so it reads 10K, not 10.0K. */

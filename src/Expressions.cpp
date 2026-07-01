@@ -21,7 +21,7 @@ namespace shit {
 
 fn indent_for_layer(usize layer) throws -> String
 {
-  let pad = String{};
+  let pad = String{heap_allocator()};
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   return pad;
@@ -266,7 +266,7 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
 
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
 
-  let name = String{};
+  let name = String{heap_allocator()};
   for (let const &segment : word.segments) {
     /* Any expansion segment makes the name a runtime value, the variable,
        command, arithmetic, process, and function substitutions alike, so
@@ -513,7 +513,7 @@ cold fn IfStatement::to_ast_string(usize layer) const throws -> String
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
 
-  let s = String{};
+  let s = String{heap_allocator()};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[If]\n";
@@ -1355,7 +1355,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     let saw_stderr_to_stdout = false;
     /* The read target is held as an owned String, not a view, since the view
        of a to_literal_string() temporary would dangle past the statement. */
-    String read_target{};
+    String read_target{heap_allocator()};
     const Token *read_token = nullptr;
     for (let const &redirection : m_redirections) {
       if (redirection.kind == Redirection::Kind::DuplicateOutput &&
@@ -1448,7 +1448,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
               ? static_cast<const tokens::WordToken *>(m_args[i - 1])
                     ->word()
                     .to_literal_string()
-              : String{};
+              : String{heap_allocator()};
       /* == is a bashism in test, POSIX test compares strings with =. This is
          shellcheck SC3014, warned only when == sits in the operator slot, after
          a plain operand rather than as the first operand or the right side of
@@ -1665,12 +1665,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     /* A close function, alias, builtin, or PATH program is offered as a
        did-you-mean hint on a trailing note, so a typo points at the command it
        resembles without crowding the problem line. */
-    let local_names = ArrayList<String>{};
+    let local_names = ArrayList<String>{heap_allocator()};
     actx.defined_functions.for_each(
         [&](StringView n) throws { local_names.push(String{n}); });
     actx.known_aliases.for_each([&](StringView n)
                                     throws { local_names.push(String{n}); });
-    let suggestion_note = String{};
+    let suggestion_note = String{heap_allocator()};
     if (Maybe<String> suggestion =
             utils::suggest_command(StringView{*name}, local_names))
     {

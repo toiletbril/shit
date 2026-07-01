@@ -22,10 +22,10 @@ namespace shit {
 
 namespace shitbox {
 
-static fn count_prefix(u64 run_length) throws -> String
+static fn count_prefix(u64 run_length, Allocator allocator) throws -> String
 {
-  let const digits = utils::uint_to_text(run_length);
-  String prefix{};
+  let const digits = utils::uint_to_text(run_length, allocator);
+  String prefix{allocator};
   for (usize i = digits.count(); i < 7; i++)
     prefix += ' ';
   prefix += digits.view();
@@ -51,18 +51,22 @@ fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
   /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
   if (os::INTERRUPT_REQUESTED) return 130;
   if (!content.has_value())
-    throw Error{"uniq: cannot read '" + String{source} +
-                "': " + os::last_system_error_message()};
+    throw Error{
+        "uniq: cannot read '" + String{cxt.scratch_allocator(), source}
+          +
+        "': " + os::last_system_error_message()
+    };
 
   let const should_show_count = FLAG_UNIQ_COUNT.is_enabled();
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   bool has_previous = false;
   StringView previous{};
   u64 run_length = 0;
 
   let const do_flush = [&]() throws -> void {
     if (!has_previous) return;
-    if (should_show_count) output += count_prefix(run_length);
+    if (should_show_count)
+      output += count_prefix(run_length, cxt.scratch_allocator());
     output += previous;
     output += '\n';
   };

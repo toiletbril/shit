@@ -15,7 +15,7 @@ namespace completion {
    whether to append a trailing slash. */
 struct cached_directory_entry
 {
-  String name{};
+  String name{heap_allocator()};
   bool is_directory{false};
 };
 

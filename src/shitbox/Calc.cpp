@@ -101,9 +101,10 @@ fn try_define(EvalContext &cxt, StringView line) throws -> bool
    */
   if (value_end == value_start)
     throw ErrorWithLocation{
-        SourceLocation{name_start, name.length},
-        "Assignment to '" + String{name}
-        + "' needs a value"
+        SourceLocation{name_start,              name.length},
+        "Assignment to '" + String{cxt.scratch_allocator(), name       }
+        +
+            "' needs a value"
     };
 
   /* The right side is stored unevaluated, so the binding is a formula the next
@@ -273,7 +274,7 @@ fn Calc::execute(const ExecContext &ec, EvalContext &cxt,
   /* The arguments join into one expression so `calc 1 + 2` reads as a single
      arithmetic expression rather than three separate ones, the way a desk
      calculator and a bare $(( )) do. */
-  String expression{};
+  String expression{cxt.scratch_allocator()};
   for (usize i = 0; i < operands.count(); i++) {
     if (i > 0) expression += ' ';
     expression += operands[i].view();

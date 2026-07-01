@@ -92,7 +92,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_ignore_case = FLAG_GREP_IGNORE_CASE.is_enabled();
   let const should_invert = FLAG_GREP_INVERT.is_enabled();
 
-  ArrayList<StringView> sources{};
+  ArrayList<StringView> sources{cxt.scratch_allocator()};
   if (operands.count() == 1)
     sources.push(StringView{"-"});
   else
@@ -100,7 +100,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       sources.push(operands[i].view());
 
   let const should_print_names = sources.count() > 1;
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   bool has_any_match = false;
   i32 status = 0;
   for (let const &source : sources) {
@@ -108,9 +108,10 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
-      report_soft_shitbox_error(ec, cxt,
-                                "grep: " + String{source} + ": " +
-                                    os::last_system_error_message());
+      report_soft_shitbox_error(
+          ec, cxt,
+          "grep: " + String{cxt.scratch_allocator(), source} + ": " +
+              os::last_system_error_message());
       status = 2;
       continue;
     }

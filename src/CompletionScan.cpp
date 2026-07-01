@@ -76,7 +76,7 @@ static fn parse_make_database_targets(StringView database,
                                       const Path &directory) throws
     -> ArrayList<String>
 {
-  let targets = ArrayList<String>{};
+  let targets = ArrayList<String>{heap_allocator()};
   let in_files_section = false;
   let skip_next_rule = false;
   usize i = 0;
@@ -116,7 +116,7 @@ static fn parse_make_database_targets(StringView database,
 
 static fn parse_colon_led_names(StringView listing) throws -> ArrayList<String>
 {
-  let names = ArrayList<String>{};
+  let names = ArrayList<String>{heap_allocator()};
   usize i = 0;
   while (i < listing.length) {
     let end = i;
@@ -135,7 +135,7 @@ static fn parse_colon_led_names(StringView listing) throws -> ArrayList<String>
 
 static fn parse_tsh_node_names(StringView listing) throws -> ArrayList<String>
 {
-  let names = ArrayList<String>{};
+  let names = ArrayList<String>{heap_allocator()};
   usize i = 0;
   let has_passed_rule = false;
   while (i < listing.length) {
@@ -166,7 +166,7 @@ static fn parse_tsh_node_names(StringView listing) throws -> ArrayList<String>
 static fn parse_package_json_scripts(StringView text) throws
     -> ArrayList<String>
 {
-  let scripts = ArrayList<String>{};
+  let scripts = ArrayList<String>{heap_allocator()};
   let const section = StringView{"\"scripts\""};
   usize at = 0;
   let is_found = false;
@@ -210,7 +210,7 @@ static fn parse_package_json_scripts(StringView text) throws
    fields of known_hosts without the hashed rows. */
 static fn collect_ssh_hosts() throws -> ArrayList<String>
 {
-  let hosts = ArrayList<String>{};
+  let hosts = ArrayList<String>{heap_allocator()};
   let const home = os::get_home_directory();
   if (!home.has_value()) return hosts;
 
@@ -367,18 +367,18 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   let const probe_timeout_nanos = 2'000'000'000ULL;
   let const capture = [&](const ArrayList<String> &probe_argv)
                           throws -> String {
-    if (probe_argv.is_empty()) return String{};
+    if (probe_argv.is_empty()) return String{heap_allocator()};
     let const resolved = utils::search_program_path(probe_argv[0].view());
-    if (resolved.is_empty()) return String{};
-    let argv = ArrayList<String>{};
+    if (resolved.is_empty()) return String{heap_allocator()};
+    let argv = ArrayList<String>{heap_allocator()};
     argv.push(String{resolved[0].text().view()});
     for (usize i = 1; i < probe_argv.count(); i++)
       argv.push(String{probe_argv[i].view()});
     return os::capture_program_output(argv, probe_timeout_nanos)
-        .value_or(String{});
+        .value_or(String{heap_allocator()});
   };
 
-  let owned_targets = ArrayList<String>{};
+  let owned_targets = ArrayList<String>{heap_allocator()};
   const ArrayList<String> *targets = &owned_targets;
 
   Maybe<tool_with_targets_kind> tool_kind = TOOLS_WITH_TARGETS.find(tool);
@@ -408,7 +408,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
     if (!makefile_path.exists()) return None;
     let const make_directory = Path{directory.view()};
     targets = cached_targets_for(makefile_path, [&]() throws {
-      let probe = ArrayList<String>{};
+      let probe = ArrayList<String>{heap_allocator()};
       probe.push(String{"make"});
       probe.push(String{"-C"});
       probe.push(String{directory.view()});
@@ -421,7 +421,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
       if (!database_targets.is_empty()) return database_targets;
       let const intrinsic_targets =
           shitbox::collect_makefile_targets(context, makefile_path);
-      let filtered = ArrayList<String>{};
+      let filtered = ArrayList<String>{heap_allocator()};
       let seen = HashSet{heap_allocator()};
       for (const String &name : intrinsic_targets) {
         if (make_target_is_artifact(name.view(), make_directory) ||
@@ -442,7 +442,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
                                   .value_or(String{"build.ninja"})
                                   .view());
     targets = cached_targets_for(build_file, [&]() throws {
-      let probe = ArrayList<String>{};
+      let probe = ArrayList<String>{heap_allocator()};
       probe.push(String{"ninja"});
       probe.push(String{"-C"});
       probe.push(String{directory.view()});
@@ -459,13 +459,13 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
     let cache_file = Path{build_directory->view()};
     cache_file.push_component("CMakeCache.txt");
     targets = cached_targets_for(cache_file, [&]() throws {
-      let probe = ArrayList<String>{};
+      let probe = ArrayList<String>{heap_allocator()};
       probe.push(String{"cmake"});
       probe.push(String{"--build"});
       probe.push(String{build_directory->view()});
       probe.push(String{"--target"});
       probe.push(String{"help"});
-      let names = ArrayList<String>{};
+      let names = ArrayList<String>{heap_allocator()};
       let const help = capture(probe);
       let const text = help.view();
       usize i = 0;
@@ -491,7 +491,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
     targets = cached_targets_for(package_path, [&]() throws {
       let const contents = package_path.read_entire_file();
       return contents.has_value() ? parse_package_json_scripts(contents->view())
-                                  : ArrayList<String>{};
+                                  : ArrayList<String>{heap_allocator()};
     });
     break;
   }
@@ -506,7 +506,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   }
   case tool_with_targets_kind::teleport: {
     if (second_word_of(line) != "ssh") return None;
-    let probe = ArrayList<String>{};
+    let probe = ArrayList<String>{heap_allocator()};
     probe.push(String{"tsh"});
     probe.push(String{"ls"});
     owned_targets = parse_tsh_node_names(capture(probe).view());
@@ -515,7 +515,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   }
 
   if (targets == nullptr) return None;
-  let candidates = ArrayList<String>{};
+  let candidates = ArrayList<String>{heap_allocator()};
   for (let const &target : *targets)
     if (target.view().starts_with(token))
       candidates.push(String{target.view()});
@@ -528,9 +528,9 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
 static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
     -> const ArrayList<String> *
 {
-  static ArrayList<String> per_kind_candidates[BUILTIN_KIND_COUNT]{};
+  static Maybe<ArrayList<String>> per_kind_candidates[BUILTIN_KIND_COUNT]{};
   static bool was_per_kind_built[BUILTIN_KIND_COUNT]{};
-  static ArrayList<String> binary_candidates{};
+  static ArrayList<String> binary_candidates{heap_allocator()};
   static bool was_binary_built = false;
 
   let const do_append_flag_forms = [](const ArrayList<Flag *> &flags,
@@ -559,30 +559,31 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
 
   let const index = static_cast<usize>(*builtin_kind);
   if (!was_per_kind_built[index]) {
+    per_kind_candidates[index] = ArrayList<String>{heap_allocator()};
     if (*builtin_kind == Builtin::Kind::Kill) {
       for (let const name : os::signal_names()) {
         let with_dash = String{"-"};
         with_dash += name;
-        per_kind_candidates[index].push(steal(with_dash));
+        per_kind_candidates[index]->push(steal(with_dash));
       }
     } else {
       let const flags = builtin_flag_list(*builtin_kind);
       if (flags == nullptr) return nullptr;
-      do_append_flag_forms(*flags, per_kind_candidates[index]);
+      do_append_flag_forms(*flags, *per_kind_candidates[index]);
       if (*builtin_kind == Builtin::Kind::Set) {
         const String &letters = shell_option_letters();
         for (usize i = 0; i < letters.count(); i++) {
           let switch_form = String{"-"};
           switch_form.push(letters[i]);
-          per_kind_candidates[index].push(steal(switch_form));
+          per_kind_candidates[index]->push(steal(switch_form));
         }
-        per_kind_candidates[index].push(String{"-o"});
-        per_kind_candidates[index].push(String{"-p"});
+        per_kind_candidates[index]->push(String{"-o"});
+        per_kind_candidates[index]->push(String{"-p"});
       }
     }
     was_per_kind_built[index] = true;
   }
-  return &per_kind_candidates[index];
+  return &*per_kind_candidates[index];
 }
 
 fn complete_from_builtin_flags(StringView line, StringView token,
@@ -623,7 +624,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     }
 
     if (should_offer_util_names) {
-      let names = ArrayList<String>{};
+      let names = ArrayList<String>{heap_allocator()};
       for (const String &name : shitbox::util_names())
         if (name.view().starts_with(token)) names.push(String{name.view()});
       if (!names.is_empty()) return names;
@@ -634,7 +635,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
       if (token.is_empty() || token[0] != '-') return None;
       let const flags = shitbox::shitbox_util_flag_list(*util_for_flags);
       if (flags == nullptr) return None;
-      let forms = ArrayList<String>{};
+      let forms = ArrayList<String>{heap_allocator()};
       for (const Flag *flag : *flags) {
         if (flag->short_name() != '\0') {
           let form = String{"-"};
@@ -654,7 +655,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
 
   if (!builtin_kind.has_value() && !completes_shell_binary) return None;
 
-  let candidates = ArrayList<String>{};
+  let candidates = ArrayList<String>{heap_allocator()};
   let const do_push_matching = [&](StringView candidate) throws {
     if (candidate.starts_with(token)) candidates.push(String{candidate});
   };
@@ -823,7 +824,7 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
      through an alias and a symlink, so g for a g='git' alias reads git's spec.
    */
   const completion_spec *spec = context.lookup_completion_spec(command);
-  String resolved_command;
+  String resolved_command{heap_allocator()};
   if (spec == nullptr) {
     resolved_command = resolve_completion_command(command, context);
     if (resolved_command.view() != command)
@@ -854,7 +855,7 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
         &status);
     if (status != 124) {
       let const wants_dash_entries = !token.is_empty() && token[0] == '-';
-      let loaded = ArrayList<String>{};
+      let loaded = ArrayList<String>{heap_allocator()};
       for (let const &entry : reply) {
         if (entry_is_unrequested_dash_word(entry.view(), wants_dash_entries))
           continue;
@@ -871,7 +872,7 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
     if (spec == nullptr) return None;
   }
 
-  let candidates = ArrayList<String>{};
+  let candidates = ArrayList<String>{heap_allocator()};
 
   let const should_offer_dash_words = !token.is_empty() && token[0] == '-';
 
@@ -919,7 +920,7 @@ struct completion_sub_frame
 fn command_substitution_body_start(StringView line, usize cursor) throws
     -> usize
 {
-  let frames = ArrayList<completion_sub_frame>{};
+  let frames = ArrayList<completion_sub_frame>{heap_allocator()};
   let in_single_quote = false;
   usize i = 0;
   while (i < cursor) {

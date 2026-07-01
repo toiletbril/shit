@@ -246,7 +246,7 @@ cold fn Lexer::register_heredoc(StringView delimiter,
   /* The body lives in the same arena as the parsed nodes that point at it, so
      its lifetime matches the AST. A lexer-owned heap body freed in ~Lexer would
      dangle behind a cached Redirection whose tree outlives the lexer. */
-  let body = m_arena->create<String>();
+  let body = m_arena->create<String>(bump_allocator(*m_arena));
   ASSERT(body != nullptr);
 
   LOG(Debug, "registering a pending heredoc with delimiter '%.*s'",
@@ -263,7 +263,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
       m_pending_heredocs.count());
 
   for (heredoc_pending &pending : m_pending_heredocs) {
-    let collected = String{};
+    let collected = String{heap_allocator()};
     loop
     {
       if (m_cursor_position >= m_source.length()) break;
@@ -392,7 +392,7 @@ hot fn Lexer::lex_number() throws -> Token *
   while (lexer::is_number(chop_character(length)))
     length++;
 
-  let digits = String{};
+  let digits = String{heap_allocator()};
   digits.append(m_source.view().substring_of_length(m_cursor_position, length));
 
   Token *const num =
@@ -430,7 +430,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     {
       word.segments.back().text += ch;
     } else {
-      let single = String{};
+      let single = String{heap_allocator()};
       single.push(ch);
       word.segments.push(WordSegment{kind, steal(single), false});
     }
@@ -444,7 +444,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     {
       word.segments.back().text.append(run);
     } else {
-      let text = String{};
+      let text = String{heap_allocator()};
       text.append(run);
       word.segments.push(
           WordSegment{WordSegment::Kind::UnquotedText, steal(text), false});
@@ -584,8 +584,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     if (quote_char == '\'') {
       if (ch == '\'') {
         if (!did_quote_enclose_content)
-          word.segments.push(
-              WordSegment{WordSegment::Kind::LiteralText, String{}, false});
+          word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
+                                         String{heap_allocator()}, false});
         quote_char.reset();
       } else {
         do_append_char(WordSegment::Kind::LiteralText, ch);
@@ -621,8 +621,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
     if (is_in_double_quotes && ch == '"') {
       if (!did_quote_enclose_content)
-        word.segments.push(
-            WordSegment{WordSegment::Kind::DoubleQuotedText, String{}, false});
+        word.segments.push(WordSegment{WordSegment::Kind::DoubleQuotedText,
+                                       String{heap_allocator()}, false});
       quote_char.reset();
       byte_count++;
       continue;
@@ -799,8 +799,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         }
         /* An empty $'' still produces one empty field, the way '' and "" do. */
         if (!did_emit_any)
-          word.segments.push(
-              WordSegment{WordSegment::Kind::LiteralText, String{}, false});
+          word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
+                                         String{heap_allocator()}, false});
         continue;
       }
 
@@ -820,7 +820,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
            with a space, $( (cmd) ). */
         if (chop_character(byte_count) == '(') {
           byte_count++;
-          let arithmetic = String{};
+          let arithmetic = String{heap_allocator()};
           usize group_depth = 0;
           loop
           {
@@ -948,7 +948,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
           continue;
         }
 
-        let inner = String{};
+        let inner = String{heap_allocator()};
         usize depth = 1;
         char quote = 0;
         /* Tracks the byte before the current one so an unquoted '#' that starts
@@ -1022,7 +1022,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
                                        steal(inner), is_in_double_quotes});
       } else if (next == '{') {
         byte_count++;
-        let name = String{};
+        let name = String{heap_allocator()};
         /* A ${ followed by whitespace is the bash 5.3 funsub, a command body
            that runs in the current shell. The leading whitespace drops and the
            same balanced walk below finds the close brace. */
@@ -1170,7 +1170,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
                                      : WordSegment::Kind::VariableReference,
             steal(name), is_in_double_quotes});
       } else if (lexer::is_variable_name_start(next)) {
-        let name = String{};
+        let name = String{heap_allocator()};
         while (lexer::is_variable_name(next = chop_character(byte_count))) {
           name += next;
           byte_count++;
@@ -1181,7 +1181,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
                  lexer::is_number(next))
       {
         byte_count++;
-        let special = String{};
+        let special = String{heap_allocator()};
         special.push(next);
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
                                        steal(special), is_in_double_quotes});
@@ -1199,7 +1199,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
          a backslash before a backtick, a dollar sign, or another backslash. */
       const let relative_open_backtick_pos = byte_count;
       byte_count++;
-      let inner = String{};
+      let inner = String{heap_allocator()};
       loop
       {
         const let c = chop_character(byte_count);
@@ -1236,7 +1236,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   }
 
   if (quote_char) [[unlikely]] {
-    let expected_quote = String{};
+    let expected_quote = String{heap_allocator()};
     expected_quote += "Expected ";
     expected_quote += *quote_char;
     expected_quote += " here";
@@ -1472,7 +1472,7 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
     default: unreachable("unhandled operator of type %d", ENUM(*op));
     }
   } else {
-    let s = String{};
+    let s = String{heap_allocator()};
     s += "Unknown operator '";
     s += ch;
     s += "'";
@@ -1494,7 +1494,7 @@ hot forceinline fn Lexer::lex_process_substitution(char direction) throws
 
   /* The direction byte leads the segment text so the evaluator knows the pipe
      direction without a second field. */
-  let inner = String{};
+  let inner = String{heap_allocator()};
   inner += direction;
 
   usize depth = 1;

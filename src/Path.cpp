@@ -137,7 +137,7 @@ cold fn Path::normalized() const throws -> Path
 
   /* Each kept component is a view into the original text, valid for the life of
      this function while the result is assembled. */
-  let components = ArrayList<StringView>{};
+  let components = ArrayList<StringView>{heap_allocator()};
   usize i = 0;
   while (i < m_text.count()) {
     if (is_directory_separator(m_text[i])) {
@@ -164,7 +164,7 @@ cold fn Path::normalized() const throws -> Path
     components.push(component);
   }
 
-  let normalized_text = String{};
+  let normalized_text = String{heap_allocator()};
   if (is_absolute_path) normalized_text.push(DIRECTORY_SEPARATOR);
   for (usize i = 0; i < components.count(); i++) {
     if (i > 0) normalized_text.push(DIRECTORY_SEPARATOR);
@@ -353,7 +353,7 @@ cold fn Path::current_directory() throws -> Path
      removed working directory carries a different errno and ends the loop with
      an empty path. */
   LOG(Debug, "reading the current working directory");
-  let buffer = ArrayList<char>{};
+  let buffer = ArrayList<char>{heap_allocator()};
   usize buffer_size = 4096;
   loop
   {
@@ -382,7 +382,7 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
     return None;
   }
 
-  let names = ArrayList<String>{};
+  let names = ArrayList<String>{heap_allocator()};
   /* readdir returns NULL on both a clean end of the directory and a read error,
      so errno is cleared before each call. A NULL with a changed errno is a real
      error, which returns None rather than a truncated list the caller would
@@ -418,7 +418,7 @@ cold fn Path::read_directory_typed(const Path &dir) throws
   let const handle = ::opendir(dir.c_str());
   if (handle == nullptr) return None;
 
-  let entries = ArrayList<directory_child>{};
+  let entries = ArrayList<directory_child>{heap_allocator()};
   loop
   {
     errno = 0;
@@ -611,7 +611,7 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   let const handle = FindFirstFileA(pattern.c_str(), &data);
   if (handle == INVALID_HANDLE_VALUE) return None;
 
-  let names = ArrayList<String>{};
+  let names = ArrayList<String>{heap_allocator()};
   do {
     let const name = StringView{data.cFileName};
     if (name == StringView{"."} || name == StringView{".."}) continue;
@@ -631,7 +631,7 @@ cold fn Path::read_directory_typed(const Path &dir) throws
   Maybe<ArrayList<String>> names = read_directory(dir);
   if (!names.has_value()) return None;
 
-  let entries = ArrayList<directory_child>{};
+  let entries = ArrayList<directory_child>{heap_allocator()};
   entries.reserve(names->count());
   for (String &name : *names)
     entries.push(directory_child{steal(name), entry_kind::Unknown});
@@ -661,7 +661,7 @@ fn Path::read_entire_file() const throws -> Maybe<String>
       os::open_file_descriptor(text().view(), os::file_open_mode::Read);
   if (!file) return None;
 
-  let contents = String{};
+  let contents = String{heap_allocator()};
   char buffer[4096];
   loop
   {

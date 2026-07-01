@@ -43,7 +43,7 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
   /* -q reports only through the status, so the output is never built or
      printed and the resolution is tracked in a flag instead of the buffer. */
   let const is_quiet = FLAG_QUIET.is_enabled();
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   bool has_found_any = false;
 
   for (let const &program_name : operands) {

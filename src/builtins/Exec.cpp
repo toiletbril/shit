@@ -56,7 +56,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let should_be_login_shell = false;
   let should_use_empty_environment = false;
   let has_custom_argv0 = false;
-  let custom_argv0 = String{};
+  let custom_argv0 = String{heap_allocator()};
   usize command_index = 1;
 
   if (!cxt.is_posix_mode()) {
@@ -92,7 +92,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
           break;
         } else {
-          let option_text = String{};
+          let option_text = String{cxt.scratch_allocator()};
           option_text.push(option);
           report_soft_builtin_error(
               ec, cxt, StringView{"Invalid option -- "} + option_text);
@@ -152,7 +152,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     program_path = found[0];
   }
 
-  let command_args = ArrayList<String>{};
+  let command_args = ArrayList<String>{heap_allocator()};
   for (usize i = command_index; i < args.count(); i++)
     command_args.push_managed(args[i]);
 

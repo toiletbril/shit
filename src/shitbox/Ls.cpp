@@ -41,13 +41,17 @@ static constexpr usize COLUMN_GAP = 2;
 /* The blocks ride along so the total line sums them without a second stat. */
 struct long_entry
 {
-  String mode_string{};
-  String link_count{};
-  String owner{};
-  String group{};
-  String size{};
-  String time{};
-  String name{};
+  explicit long_entry(Allocator allocator)
+      : mode_string(allocator), link_count(allocator), owner(allocator),
+        group(allocator), size(allocator), time(allocator), name(allocator)
+  {}
+  String mode_string;
+  String link_count;
+  String owner;
+  String group;
+  String size;
+  String time;
+  String name;
   u64 blocks{0};
 };
 
@@ -56,28 +60,31 @@ struct long_entry
    distinct id rather than once per entry. */
 struct id_name_entry
 {
-  u32 id{0};
-  String name{};
+  id_name_entry(u32 id, String name) : id(id), name(steal(name)) {}
+  u32 id;
+  String name;
 };
 
-static fn cached_owner_name(u32 uid, ArrayList<id_name_entry> &cache) throws
-    -> String
+static fn cached_owner_name(u32 uid, ArrayList<id_name_entry> &cache,
+                            Allocator allocator) throws -> String
 {
   for (const id_name_entry &entry : cache)
     if (entry.id == uid) return entry.name.clone();
   let const looked_up = os::uid_to_username(uid);
-  String name = looked_up.has_value() ? *looked_up : utils::uint_to_text(uid);
+  String name = looked_up.has_value() ? String{allocator, looked_up->view()}
+                                      : utils::uint_to_text(uid, allocator);
   cache.push(id_name_entry{uid, name.clone()});
   return name;
 }
 
-static fn cached_group_name(u32 gid, ArrayList<id_name_entry> &cache) throws
-    -> String
+static fn cached_group_name(u32 gid, ArrayList<id_name_entry> &cache,
+                            Allocator allocator) throws -> String
 {
   for (const id_name_entry &entry : cache)
     if (entry.id == gid) return entry.name.clone();
   let const looked_up = os::gid_to_groupname(gid);
-  String name = looked_up.has_value() ? *looked_up : utils::uint_to_text(gid);
+  String name = looked_up.has_value() ? String{allocator, looked_up->view()}
+                                      : utils::uint_to_text(gid, allocator);
   cache.push(id_name_entry{gid, name.clone()});
   return name;
 }
@@ -98,11 +105,11 @@ static fn append_padded(String &output, StringView field, usize width,
    it. */
 static fn build_long_entry(const Path &path, StringView name,
                            ArrayList<id_name_entry> &uid_cache,
-                           ArrayList<id_name_entry> &gid_cache) throws
-    -> long_entry
+                           ArrayList<id_name_entry> &gid_cache,
+                           Allocator allocator) throws -> long_entry
 {
-  long_entry entry{};
-  entry.name = String{name};
+  long_entry entry{allocator};
+  entry.name = String{allocator, name};
 
   os::file_status status{};
   if (!os::stat_path(path.text().view(), status)) {
@@ -116,11 +123,12 @@ static fn build_long_entry(const Path &path, StringView name,
   }
 
   entry.mode_string = os::format_mode_string(status.mode);
-  entry.link_count = utils::uint_to_text(status.link_count);
-  entry.owner = cached_owner_name(status.owner_id, uid_cache);
-  entry.group = cached_group_name(status.group_id, gid_cache);
-  entry.size = FLAG_LS_HUMAN.is_enabled() ? format_human_size(status.size)
-                                          : utils::uint_to_text(status.size);
+  entry.link_count = utils::uint_to_text(status.link_count, allocator);
+  entry.owner = cached_owner_name(status.owner_id, uid_cache, allocator);
+  entry.group = cached_group_name(status.group_id, gid_cache, allocator);
+  entry.size = FLAG_LS_HUMAN.is_enabled()
+                   ? format_human_size(status.size)
+                   : utils::uint_to_text(status.size, allocator);
   entry.time =
       utils::format_unix_timestamp(status.modification_time, "%b %e %H:%M");
   entry.blocks = status.blocks;
@@ -176,8 +184,8 @@ static fn column_width(const ArrayList<usize> &widths, usize column_index,
 
 /* The grid packs column by column the way coreutils fills it down then across.
    One name per line when the output is not a terminal or -1 is given. */
-static fn render_columns(const ArrayList<StringView> &names,
-                         String &output) throws -> void
+static fn render_columns(const ArrayList<StringView> &names, String &output,
+                         Allocator allocator) throws -> void
 {
   const usize count = names.count();
   if (count == 0) return;
@@ -194,7 +202,7 @@ static fn render_columns(const ArrayList<StringView> &names,
   }
   const usize terminal_width = terminal_columns;
 
-  ArrayList<usize> widths{};
+  ArrayList<usize> widths{allocator};
   widths.reserve(count);
   for (const StringView &name : names)
     widths.push(name.length);
@@ -219,7 +227,7 @@ static fn render_columns(const ArrayList<StringView> &names,
   }
 
   const usize rows = (count + best_columns - 1) / best_columns;
-  ArrayList<usize> column_widths{};
+  ArrayList<usize> column_widths{allocator};
   column_widths.reserve(best_columns);
   for (usize c = 0; c < best_columns; c++)
     column_widths.push(column_width(widths, c, rows));
@@ -243,13 +251,13 @@ static fn render_columns(const ArrayList<StringView> &names,
 
 /* coreutils prints the total in 1K blocks, summed from the 512-byte block
    counts the entries carry, hence the divide by two. */
-static fn long_total_blocks(const ArrayList<long_entry> &entries) throws
-    -> String
+static fn long_total_blocks(const ArrayList<long_entry> &entries,
+                            Allocator allocator) throws -> String
 {
   u64 total_512_blocks = 0;
   for (const long_entry &entry : entries)
     total_512_blocks += entry.blocks;
-  return "total " + utils::uint_to_text(total_512_blocks / 2);
+  return "total " + utils::uint_to_text(total_512_blocks / 2, allocator);
 }
 
 Ls::Ls() = default;
@@ -265,26 +273,27 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  ArrayList<StringView> targets{};
+  ArrayList<StringView> targets{cxt.scratch_allocator()};
   if (operands.is_empty())
     targets.push(StringView{"."});
   else
     for (const String &operand : operands)
       targets.push(operand.view());
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   let const should_print_headers = targets.count() > 1;
   /* The owner and the group caches outlive the target loop, so a multi-target
      long listing resolves each distinct id once across every directory. */
-  ArrayList<id_name_entry> uid_cache{};
-  ArrayList<id_name_entry> gid_cache{};
+  ArrayList<id_name_entry> uid_cache{cxt.scratch_allocator()};
+  ArrayList<id_name_entry> gid_cache{cxt.scratch_allocator()};
   i32 status = 0;
   for (usize t = 0; t < targets.count(); t++) {
     let const target = targets[t];
     let const path = Path{target};
     if (!path.exists()) {
       report_soft_shitbox_error(ec, cxt,
-                                "ls: cannot access '" + String{target} +
+                                "ls: cannot access '" +
+                                    String{cxt.scratch_allocator(), target} +
                                     "': no such file or directory");
       status = 2;
       continue;
@@ -294,8 +303,9 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
        under -l and the bare name otherwise. */
     if (!path.is_directory()) {
       if (FLAG_LS_LONG.is_enabled()) {
-        ArrayList<long_entry> file_entries{};
-        file_entries.push(build_long_entry(path, target, uid_cache, gid_cache));
+        ArrayList<long_entry> file_entries{cxt.scratch_allocator()};
+        file_entries.push(build_long_entry(path, target, uid_cache, gid_cache,
+                                           cxt.scratch_allocator()));
         render_long_entries(file_entries, output);
       } else {
         output += target;
@@ -306,8 +316,10 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
 
     Maybe<ArrayList<String>> names = Path::read_directory(path);
     if (!names.has_value()) {
-      report_soft_shitbox_error(
-          ec, cxt, "ls: cannot open directory '" + String{target} + "'");
+      report_soft_shitbox_error(ec, cxt,
+                                "ls: cannot open directory '" +
+                                    String{cxt.scratch_allocator(), target} +
+                                    "'");
       status = 2;
       continue;
     }
@@ -326,7 +338,7 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
     let const is_showing_dot_names =
         is_showing_all || FLAG_LS_ALMOST_ALL.is_enabled();
 
-    ArrayList<StringView> visible_names{};
+    ArrayList<StringView> visible_names{cxt.scratch_allocator()};
     /* The dot and dot-dot entries are not in the directory read, so -a adds
        them up front the way coreutils lists them before the rest, while -A
        leaves them out. */
@@ -341,17 +353,18 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     if (FLAG_LS_LONG.is_enabled()) {
-      ArrayList<long_entry> entries{};
+      ArrayList<long_entry> entries{cxt.scratch_allocator()};
       entries.reserve(visible_names.count());
       for (const StringView &name : visible_names) {
         let const child = PathBuilder{target}.append(name).build();
-        entries.push(build_long_entry(child, name, uid_cache, gid_cache));
+        entries.push(build_long_entry(child, name, uid_cache, gid_cache,
+                                      cxt.scratch_allocator()));
       }
-      output += long_total_blocks(entries);
+      output += long_total_blocks(entries, cxt.scratch_allocator());
       output += '\n';
       render_long_entries(entries, output);
     } else {
-      render_columns(visible_names, output);
+      render_columns(visible_names, output, cxt.scratch_allocator());
     }
   }
 

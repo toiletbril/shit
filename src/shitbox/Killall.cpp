@@ -34,7 +34,6 @@ pure fn Killall::kind() const wontthrow -> Utility::Kind
 fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<String> &args) const throws -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
@@ -50,8 +49,8 @@ fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const wanted = operands[0].view();
   let const signal_number = resolve_shitbox_signal(
-      FLAG_KILLALL_SIGNAL.is_set() ? FLAG_KILLALL_SIGNAL.value()
-                                   : StringView{});
+      FLAG_KILLALL_SIGNAL.is_set() ? FLAG_KILLALL_SIGNAL.value() : StringView{},
+      cxt.scratch_allocator());
 
   let const self_pid = os::get_shell_process_id();
   let const processes = os::enumerate_processes();
@@ -66,7 +65,9 @@ fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (!any_signaled)
     report_soft_shitbox_error(
-        ec, cxt, "killall: " + String{wanted} + ": no process found");
+        ec, cxt,
+        "killall: " + String{cxt.scratch_allocator(), wanted} +
+            ": no process found");
   return any_signaled ? 0 : 1;
 }
 

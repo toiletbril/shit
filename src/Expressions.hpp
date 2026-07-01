@@ -451,7 +451,7 @@ protected:
      cache, since an expanded name from a variable may differ between runs, and
      the mood guards it too, since a mood-gated builtin such as let resolves
      differently after a set --mood switch. */
-  mutable String m_resolved_name{};
+  mutable String m_resolved_name{heap_allocator()};
   mutable Maybe<ResolvedCommand> m_resolved_kind{};
   mutable mimic_mood m_resolved_mood{};
 

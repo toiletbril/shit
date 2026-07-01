@@ -31,7 +31,6 @@ pure fn Mv::kind() const wontthrow -> Utility::Kind { return Kind::Mv; }
 fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
@@ -43,15 +42,18 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
   let const destination_is_directory = Path{destination}.is_directory();
 
   if (operands.count() > 2 && !destination_is_directory) {
-    throw Error{"mv: the destination '" + String{destination} +
-                "' is not a directory, so it cannot hold several sources"};
+    throw Error{
+        "mv: the destination '" + String{cxt.scratch_allocator(), destination}
+          +
+        "' is not a directory, so it cannot hold several sources"
+    };
   }
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   i32 status = 0;
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
-    let target = String{destination};
+    let target = String{cxt.scratch_allocator(), destination};
     if (destination_is_directory)
       target = PathBuilder{destination}
                    .append(Path{source}.filename())
@@ -60,14 +62,16 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (!os::rename_path(source, target.view())) {
       report_soft_shitbox_error(ec, cxt,
-                                "mv: unable to move '" + String{source} +
+                                "mv: unable to move '" +
+                                    String{cxt.scratch_allocator(), source} +
                                     "' to '" + target + "' because " +
                                     os::last_system_error_message());
       status = 1;
       continue;
     }
     if (FLAG_MV_VERBOSE.is_enabled())
-      output += "renamed '" + String{source} + "' -> '" + target + "'\n";
+      output += "renamed '" + String{cxt.scratch_allocator(), source} +
+                "' -> '" + target + "'\n";
   }
   ec.print_to_stdout(output);
   return status;

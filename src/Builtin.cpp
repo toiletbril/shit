@@ -17,7 +17,7 @@ cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
 {
   ASSERT(!ec.args().is_empty());
 
-  let help_text = String{};
+  let help_text = String{heap_allocator()};
   if (!description.is_empty()) {
     help_text += "DESCRIPTION\n";
     help_text += wrap_text(description, HELP_INDENT, HELP_WRAP_WIDTH);
@@ -88,7 +88,7 @@ fn is_special_builtin_name(StringView name) wontthrow -> bool
 fn builtin_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {
-    let collected = ArrayList<String>{};
+    let collected = ArrayList<String>{heap_allocator()};
     for (const StaticStringMap<Builtin::Kind>::entry &entry : BUILTIN_ENTRIES)
       collected.push(entry.key.to_string());
     return collected;
@@ -122,7 +122,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
      the terminal instead of following the standard output. */
   const bool has_dup_routing = ec.dup_err_to_out || ec.dup_out_to_err;
 
-  let saved_descriptors = ArrayList<os::saved_descriptor>{};
+  let saved_descriptors = ArrayList<os::saved_descriptor>{heap_allocator()};
   if (has_pipe_descriptors || has_dup_routing) {
     if (ec.in_fd)
       saved_descriptors.push(os::save_and_replace_descriptor(0, *ec.in_fd));
@@ -224,7 +224,7 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
 
 fn quote_for_declare(StringView value) throws -> String
 {
-  let quoted = String{};
+  let quoted = String{heap_allocator()};
   for (usize i = 0; i < value.length; i++) {
     const char c = value[i];
     if (c == '"' || c == '\\' || c == '$' || c == '`') quoted += '\\';

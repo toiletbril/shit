@@ -32,18 +32,18 @@ static fn is_blank(char c) wontthrow -> bool
 
 static fn format_counts(u64 lines, u64 words, u64 bytes, bool should_show_lines,
                         bool should_show_words, bool should_show_bytes,
-                        StringView name) throws -> String
+                        StringView name, Allocator allocator) throws -> String
 {
-  let const do_field = [](u64 value) throws -> String {
-    let const digits = utils::uint_to_text(value);
-    String padded{};
+  let const do_field = [allocator](u64 value) throws -> String {
+    let const digits = utils::uint_to_text(value, allocator);
+    String padded{allocator};
     for (usize i = digits.count(); i < 8; i++)
       padded += ' ';
     padded += digits.view();
     return padded;
   };
 
-  String line{};
+  String line{allocator};
   if (should_show_lines) line += do_field(lines);
   if (should_show_words) line += do_field(words);
   if (should_show_bytes) line += do_field(bytes);
@@ -78,14 +78,14 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
     should_show_bytes = true;
   }
 
-  ArrayList<StringView> sources{};
+  ArrayList<StringView> sources{cxt.scratch_allocator()};
   if (operands.is_empty())
     sources.push(StringView{"-"});
   else
     for (const String &operand : operands)
       sources.push(operand.view());
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   u64 total_lines = 0;
   u64 total_words = 0;
   u64 total_bytes = 0;
@@ -95,9 +95,10 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
-      report_soft_shitbox_error(ec, cxt,
-                                "wc: " + String{source} + ": " +
-                                    os::last_system_error_message());
+      report_soft_shitbox_error(
+          ec, cxt,
+          "wc: " + String{cxt.scratch_allocator(), source} + ": " +
+              os::last_system_error_message());
       status = 1;
       continue;
     }
@@ -121,14 +122,16 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
     total_bytes += bytes;
 
     let const name = source == "-" ? StringView{} : source;
-    output += format_counts(lines, words, bytes, should_show_lines,
-                            should_show_words, should_show_bytes, name);
+    output +=
+        format_counts(lines, words, bytes, should_show_lines, should_show_words,
+                      should_show_bytes, name, cxt.scratch_allocator());
   }
 
   if (sources.count() > 1)
-    output += format_counts(total_lines, total_words, total_bytes,
-                            should_show_lines, should_show_words,
-                            should_show_bytes, StringView{"total"});
+    output +=
+        format_counts(total_lines, total_words, total_bytes, should_show_lines,
+                      should_show_words, should_show_bytes, StringView{"total"},
+                      cxt.scratch_allocator());
 
   ec.print_to_stdout(output);
   return status;

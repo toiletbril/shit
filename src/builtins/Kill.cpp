@@ -50,7 +50,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() > 1 && (args[1] == "-s" || args[1] == "-n")) {
     if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
 
-    let const spec = String{args[2]};
+    let const spec = String{cxt.scratch_allocator(), args[2]};
     if (let const parsed = utils::parse_decimal_integer(spec.view());
         !parsed.is_error() && !spec.is_empty() && spec[0] >= '0' &&
         spec[0] <= '9')
@@ -69,7 +69,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     /* A leading -name or -number names the signal to send. A numeric form such
        as -9 names the number directly, while a name such as -KILL or -SIGTERM
        resolves through the platform table. */
-    let const name = String{args[1].substring(1)};
+    let const name = String{cxt.scratch_allocator(), args[1].substring(1)};
     if (let const parsed_signal = utils::parse_decimal_integer(name.view());
         !parsed_signal.is_error() && !name.is_empty() && name[0] >= '0' &&
         name[0] <= '9')

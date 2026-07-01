@@ -34,7 +34,7 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   ASSERT(!args.is_empty());
 
   if (args.count() == 1) {
-    let out = String{};
+    let out = String{cxt.scratch_allocator()};
     for (let const &definition : cxt.alias_definitions()) {
       out += "alias ";
       out += definition;
@@ -54,7 +54,7 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           static_cast<int>(parts.get_name().length), parts.get_name().data);
       cxt.set_alias(parts.get_name(), *parts.get_value());
     } else if (const Maybe<String> value = cxt.get_alias(arg)) {
-      String message = "alias ";
+      String message{cxt.scratch_allocator(), "alias "};
       message += arg;
       message += "='";
       message += *value;
@@ -64,7 +64,10 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       /* bash reports a missing alias on stderr, so a caller that captures the
          standard output of alias, as ble.sh does, does not see this line mixed
          into the captured definitions. */
-      ec.print_to_stderr("alias: " + arg + ": not found\n");
+      String not_found{cxt.scratch_allocator(), "alias: "};
+      not_found += arg;
+      not_found += ": not found\n";
+      ec.print_to_stderr(not_found);
       status = 1;
     }
   }

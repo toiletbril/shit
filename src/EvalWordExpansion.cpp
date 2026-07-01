@@ -929,7 +929,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     -> ArrayList<String>
 {
   let do_split_plain = [&]() throws -> ArrayList<String> {
-    let words = ArrayList<String>{};
+    let words = ArrayList<String>{heap_allocator()};
     usize start = 0;
     for (usize i = 0; i <= wordlist.length; i++) {
       const char character = i < wordlist.length ? wordlist[i] : ' ';
@@ -1029,7 +1029,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     m_indexed_arrays.erase("t__wordlist_fields");
     force_unset_shell_variable("t__wordlist_fields");
   };
-  let fields = ArrayList<String>{};
+  let fields = ArrayList<String>{heap_allocator()};
   try {
     let expansion_source = String{"t__wordlist_fields=("};
     expansion_source.append(wordlist);

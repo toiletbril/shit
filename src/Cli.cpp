@@ -183,7 +183,7 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const ArrayList<String> &args, usize base_position,
                    const Flag *operand_value_flag) throws -> ArrayList<String>
 {
-  let os_argv = ArrayList<const char *>{};
+  let os_argv = ArrayList<const char *>{heap_allocator()};
   os_argv.reserve(args.count());
 
   for (let const &arg : args)
@@ -195,7 +195,7 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
 
 static fn flag_name(const Flag *f, bool is_long) throws -> String
 {
-  let name = String{};
+  let name = String{heap_allocator()};
   name += "-";
   if (is_long) {
     name += "-";
@@ -212,14 +212,14 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 {
   ASSERT(argc >= 0);
 
-  if (argc == 0) return ArrayList<String>{};
+  if (argc == 0) return ArrayList<String>{heap_allocator()};
 
   ASSERT(argv != nullptr);
 
   LOG(Debug, "parsing %d command line arguments", argc);
 
   u32 position = 0;
-  let args = ArrayList<String>{};
+  let args = ArrayList<String>{heap_allocator()};
 
   Flag *prev_flag{};
   bool next_arg_is_value = false;
@@ -409,7 +409,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           throw Error{"Missing space between '-' and other options"};
         } else {
           /* The name before '=' is reported, trimming any attached value. */
-          let error_message = String{};
+          let error_message = String{heap_allocator()};
           error_message += "Unknown flag '-";
 
           if (!is_long) {
@@ -456,7 +456,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
 fn join_command_line(int argc, const char *const *argv) throws -> String
 {
-  let s = String{};
+  let s = String{heap_allocator()};
   for (int i = 0; i < argc; i++) {
     if (i > 0) s.push(' ');
     s.append(StringView{argv[i], std::strlen(argv[i])});
@@ -473,7 +473,7 @@ fn reset_flags(const ArrayList<Flag *> &flags) throws -> void
 
 cold fn show_version() throws -> void
 {
-  let s = String{};
+  let s = String{heap_allocator()};
   s += "Shit Shell ";
   s += utils::int_to_text(SHIT_VER_MAJOR);
   s += '.';
@@ -514,7 +514,7 @@ cold fn show_version() throws -> void
 
 cold fn show_short_version() throws -> void
 {
-  let s = String{};
+  let s = String{heap_allocator()};
   s += utils::int_to_text(SHIT_VER_MAJOR);
   s += '.';
   s += utils::int_to_text(SHIT_VER_MINOR);
@@ -537,7 +537,7 @@ cold fn show_short_version() throws -> void
 cold fn make_synopsis(StringView program_name,
                       const ArrayList<StringView> &lines) throws -> String
 {
-  let s = String{};
+  let s = String{heap_allocator()};
 
   s += "SYNOPSIS\n";
 
@@ -554,7 +554,7 @@ cold fn make_synopsis(StringView program_name,
 
 cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
 {
-  let out = String{};
+  let out = String{heap_allocator()};
   const usize text_width = width > indent ? width - indent : 1;
   usize line_used = 0;
   usize word_start = 0;
@@ -590,7 +590,7 @@ cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
 
 cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
 {
-  let s = String{};
+  let s = String{heap_allocator()};
 
   /* The description starts at a fixed column so every flag lines up, and a
      description longer than the line wraps with its continuation indented to
@@ -604,7 +604,7 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
 
     /* The whole left part, the short form, the long form, and the value
        placeholder, is built first so its width decides the padding. */
-    let left = String{};
+    let left = String{heap_allocator()};
     if (f->short_name() != '\0') {
       left += "  -";
       left += f->short_name();

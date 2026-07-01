@@ -60,7 +60,7 @@ inline String value_to_log_string(bool value)
 
 inline String value_to_log_string(char value)
 {
-  String out{};
+  String out{heap_allocator()};
   out.push(value);
   return out;
 }
@@ -105,7 +105,7 @@ String value_to_log_string(T value)
 template <class... Args>
 String format_named_values(StringView names, Args &&...args)
 {
-  String out{};
+  String out{heap_allocator()};
   usize index = 0;
   const usize value_count = sizeof...(Args);
 

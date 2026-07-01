@@ -47,7 +47,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const want_path = FLAG_TYPE_PATH.is_enabled();
   let const force_path = FLAG_TYPE_FORCE_PATH.is_enabled();
 
-  let out = String{};
+  let out = String{cxt.scratch_allocator()};
   bool did_find_all = true;
 
   for (usize i = 1; i < args.count(); i++) {

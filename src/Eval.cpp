@@ -147,7 +147,7 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
   if (is_bash_identity) {
     LOG(Info, "seeding the bash identity variables");
     set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
-    let versinfo = ArrayList<String>{};
+    let versinfo = ArrayList<String>{heap_allocator()};
     versinfo.push(String{"5"});
     versinfo.push(String{"2"});
     versinfo.push(String{"0"});
@@ -574,7 +574,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     case '$': return utils::int_to_text(os::get_shell_process_id());
     case '!':
       return m_last_background_pid ? utils::int_to_text(*m_last_background_pid)
-                                   : String{};
+                                   : String{heap_allocator()};
     case '-': return option_flags_string();
     case '#':
       return String{heap_allocator(),
@@ -591,7 +591,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         has_separator = !ifs.is_empty();
         if (has_separator) separator = ifs.first_character();
       }
-      let joined = String{};
+      let joined = String{heap_allocator()};
       usize joined_length = 0;
       for (usize i = 0; i < m_positional_params.count(); i++)
         joined_length += m_positional_params[i].count();
@@ -878,7 +878,7 @@ fn EvalContext::take_positional_params() wontthrow -> ArrayList<String>
 
 fn EvalContext::enter_function_scope() throws -> void
 {
-  m_local_scopes.push(ArrayList<local_binding>{});
+  m_local_scopes.push(ArrayList<local_binding>{heap_allocator()});
   LOG(Debug, "entered function scope, local scope depth now %zu",
       m_local_scopes.count());
 }
@@ -1007,7 +1007,7 @@ fn EvalContext::get_alias(StringView name) const throws -> Maybe<String>
 
 fn EvalContext::alias_definitions() const throws -> ArrayList<String>
 {
-  let out = ArrayList<String>{};
+  let out = ArrayList<String>{heap_allocator()};
   m_aliases.for_each([&out](StringView key, const String &value) {
     let definition = String{heap_allocator(), key};
     definition.append(StringView{"='", 2});
@@ -1499,7 +1499,7 @@ fn EvalContext::set_getopts_last_optind(i64 optind) wontthrow -> void
 
 fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
 {
-  let assignments = ArrayList<String>{};
+  let assignments = ArrayList<String>{heap_allocator()};
   assignments.reserve(m_shell_variables.count());
   m_shell_variables.for_each([&](StringView name, const String &value) {
     let entry = String{heap_allocator(), name};
@@ -1624,7 +1624,7 @@ fn EvalContext::option_flags_string() const throws -> String
      flag for flag. hashall and braceexpand are on by default outside the posix
      mood the way bash reports them, while dash names neither. */
   let const bash_flags_on = !is_posix_mode();
-  let flags = String{};
+  let flags = String{heap_allocator()};
   if (export_all()) flags += 'a';
   if (m_error_exit) flags += 'e';
   if (!m_enable_path_expansion) flags += 'f';
@@ -1720,7 +1720,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 
 cold fn EvalContext::make_stats_string() const throws -> String
 {
-  let stats_text = String{};
+  let stats_text = String{heap_allocator()};
 
   /* Stats print before end_command runs the rollup, so the live arena is
      sampled here. */
@@ -1946,8 +1946,8 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
       let error =
           CommandNotFound{location, "Program '" + program + "' wasn't found"};
-      if (Maybe<String> suggestion =
-              utils::suggest_command(program.view(), ArrayList<String>{}))
+      if (Maybe<String> suggestion = utils::suggest_command(
+              program.view(), ArrayList<String>{heap_allocator()}))
       {
         let const hint = "Did you mean '" + *suggestion + "'?";
         error.set_note(hint.view());
@@ -1973,8 +1973,8 @@ fn ExecContext::make_unresolved(SourceLocation location) throws -> ExecContext
 {
   /* The stage never runs, so one placeholder argument satisfies the argv[0]
      invariant. */
-  let args = ArrayList<String>{};
-  args.push(String{});
+  let args = ArrayList<String>{heap_allocator()};
+  args.push(String{heap_allocator()});
   return {location, ResolvedCommand::from_unresolved(), steal(args)};
 }
 

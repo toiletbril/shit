@@ -78,7 +78,8 @@ struct bench_sample
 
 struct command_result
 {
-  String label{};
+  explicit command_result(Allocator allocator) : label(allocator) {}
+  String label;
   usize sample_count{0};
   bool has_perf{false};
   metric_stats wall_time{};
@@ -100,8 +101,8 @@ fn colored(StringView code, bool may_color) wontthrow -> StringView
    median sorts a copy of the values, so the sample order is left intact for the
    next metric. */
 template <typename Accessor>
-fn compute_stats(const ArrayList<bench_sample> &samples,
-                 Accessor accessor) throws -> metric_stats
+fn compute_stats(const ArrayList<bench_sample> &samples, Accessor accessor,
+                 Allocator allocator) throws -> metric_stats
 {
   let stats = metric_stats{};
   if (samples.is_empty()) return stats;
@@ -131,7 +132,7 @@ fn compute_stats(const ArrayList<bench_sample> &samples,
   stats.std_dev =
       (samples.count() > 1) ? std::sqrt(variance_sum / (count - 1)) : 0.0;
 
-  let ordered = ArrayList<double>{};
+  let ordered = ArrayList<double>{allocator};
   for (usize i = 0; i < samples.count(); i++)
     ordered.push(accessor(samples[i]));
   ordered.sort();
@@ -140,7 +141,8 @@ fn compute_stats(const ArrayList<bench_sample> &samples,
   return stats;
 }
 
-cold fn format_metric(double value, metric_unit unit) throws -> String
+cold fn format_metric(double value, metric_unit unit,
+                      Allocator allocator) throws -> String
 {
   double scaled = value;
   const char *suffix = "";
@@ -192,31 +194,34 @@ cold fn format_metric(double value, metric_unit unit) throws -> String
 
   char buffer[64];
   std::snprintf(buffer, sizeof(buffer), "%.3g%s", scaled, suffix);
-  return String{buffer};
+  return String{allocator, buffer};
 }
 
 /* The color escapes are added at render time, not here, since they carry no
    display width and would corrupt the width measurement. */
 struct metric_row
 {
+  explicit metric_row(Allocator allocator)
+      : mean(allocator), std_dev(allocator), min(allocator), max(allocator)
+  {}
   StringView name{};
   metric_unit unit{metric_unit::Count};
-  String mean{};
-  String std_dev{};
-  String min{};
-  String max{};
+  String mean;
+  String std_dev;
+  String min;
+  String max;
 };
 
-fn make_metric_row(StringView name, const metric_stats &stats,
-                   metric_unit unit) throws -> metric_row
+fn make_metric_row(StringView name, const metric_stats &stats, metric_unit unit,
+                   Allocator allocator) throws -> metric_row
 {
-  let row = metric_row{};
+  let row = metric_row{allocator};
   row.name = name;
   row.unit = unit;
-  row.mean = format_metric(stats.mean, unit);
-  row.std_dev = format_metric(stats.std_dev, unit);
-  row.min = format_metric(stats.min, unit);
-  row.max = format_metric(stats.max, unit);
+  row.mean = format_metric(stats.mean, unit, allocator);
+  row.std_dev = format_metric(stats.std_dev, unit, allocator);
+  row.min = format_metric(stats.min, unit, allocator);
+  row.max = format_metric(stats.max, unit, allocator);
   return row;
 }
 
@@ -330,13 +335,14 @@ fn progress_is_enabled() throws -> bool { return colors::stderr_wants_color(); }
 /* Repaint the in-progress line on stderr, carriage-returning over itself so the
    percent updates in place. The percent is the fraction of the run count or the
    duration budget reached so far, clamped to 100. */
-fn draw_progress(StringView command, u64 percent) throws -> void
+fn draw_progress(StringView command, u64 percent, Allocator allocator) throws
+    -> void
 {
-  let line = String{};
+  let line = String{allocator};
   line += "\rBenchmarking '";
   line.append(command);
   line += "' ";
-  line += utils::uint_to_text(percent > 100 ? 100 : percent);
+  line += utils::uint_to_text(percent > 100 ? 100 : percent, allocator);
   line += "%..";
   print_error(line.view());
 }
@@ -356,25 +362,25 @@ fn clear_progress() throws -> void
    interrupt flag, and the loop tests it every iteration, so the sampling stops
    promptly and the caller learns through was_interrupted that it must abort. */
 fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
-                  bool show_progress, bool &was_interrupted) throws
-    -> command_result
+                  bool show_progress, bool &was_interrupted,
+                  Allocator allocator) throws -> command_result
 {
-  let result = command_result{};
+  let result = command_result{allocator};
   result.label = command;
 
   /* The command string is handed to the system shell so a pipeline, a
      redirection, or a shell builtin all run as one real child. */
-  let child_argv = ArrayList<String>{};
+  let child_argv = ArrayList<String>{allocator};
 #if SHIT_PLATFORM_IS WIN32
-  child_argv.push(String{"cmd"});
-  child_argv.push(String{"/c"});
+  child_argv.push(String{allocator, "cmd"});
+  child_argv.push(String{allocator, "/c"});
 #else
-  child_argv.push(String{"/bin/sh"});
-  child_argv.push(String{"-c"});
+  child_argv.push(String{allocator, "/bin/sh"});
+  child_argv.push(String{allocator, "-c"});
 #endif
-  child_argv.push(String{command});
+  child_argv.push(String{allocator, command});
 
-  let samples = ArrayList<bench_sample>{};
+  let samples = ArrayList<bench_sample>{allocator};
   const u64 duration_nanos = duration_millis * 1000000ULL;
   const u64 start_nanos = os::monotonic_nanos();
   u64 last_progress_nanos = 0;
@@ -411,7 +417,7 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
         percent = static_cast<u64>(i) * 100 / *run_limit;
       else if (duration_nanos > 0)
         percent = elapsed_nanos * 100 / duration_nanos;
-      draw_progress(command, percent);
+      draw_progress(command, percent, allocator);
     }
 
     let const measured = os::run_measured(child_argv, true);
@@ -447,49 +453,54 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
   result.sample_count = samples.count();
   result.has_perf = has_perf;
   result.wall_time = compute_stats(
-      samples, [](const bench_sample &s) { return s.wall_nanos; });
+      samples, [](const bench_sample &s) { return s.wall_nanos; }, allocator);
   result.peak_rss = compute_stats(
-      samples, [](const bench_sample &s) { return s.peak_rss_bytes; });
+      samples, [](const bench_sample &s) { return s.peak_rss_bytes; },
+      allocator);
   result.cpu_cycles = compute_stats(
-      samples, [](const bench_sample &s) { return s.cpu_cycles; });
+      samples, [](const bench_sample &s) { return s.cpu_cycles; }, allocator);
   result.instructions = compute_stats(
-      samples, [](const bench_sample &s) { return s.instructions; });
+      samples, [](const bench_sample &s) { return s.instructions; }, allocator);
   result.cache_references = compute_stats(
-      samples, [](const bench_sample &s) { return s.cache_references; });
+      samples, [](const bench_sample &s) { return s.cache_references; },
+      allocator);
   result.cache_misses = compute_stats(
-      samples, [](const bench_sample &s) { return s.cache_misses; });
+      samples, [](const bench_sample &s) { return s.cache_misses; }, allocator);
   result.branch_misses = compute_stats(
-      samples, [](const bench_sample &s) { return s.branch_misses; });
+      samples, [](const bench_sample &s) { return s.branch_misses; },
+      allocator);
 
   return result;
 }
 
-fn append_summary(String &out, const command_result &result,
-                  bool may_color) throws -> void
+fn append_summary(String &out, const command_result &result, bool may_color,
+                  Allocator allocator) throws -> void
 {
   out.append(colored(colors::ansi::BOLD, may_color));
   out += "Benchmark: ";
   out += result.label;
   out.append(colored(colors::ansi::RESET, may_color));
-  out += " (" + utils::uint_to_text(result.sample_count) + " runs)\n";
+  out +=
+      " (" + utils::uint_to_text(result.sample_count, allocator) + " runs)\n";
 
   /* The rows are formatted first so their mean and stddev widths are known
      before any line is rendered, which is what lets the value columns align. */
-  let rows = ArrayList<metric_row>{};
-  rows.push(
-      make_metric_row("wall time", result.wall_time, metric_unit::Nanoseconds));
-  rows.push(make_metric_row("peak rss", result.peak_rss, metric_unit::Bytes));
+  let rows = ArrayList<metric_row>{allocator};
+  rows.push(make_metric_row("wall time", result.wall_time,
+                            metric_unit::Nanoseconds, allocator));
+  rows.push(make_metric_row("peak rss", result.peak_rss, metric_unit::Bytes,
+                            allocator));
   if (result.has_perf) {
-    rows.push(
-        make_metric_row("cpu cycles", result.cpu_cycles, metric_unit::Count));
+    rows.push(make_metric_row("cpu cycles", result.cpu_cycles,
+                              metric_unit::Count, allocator));
     rows.push(make_metric_row("instructions", result.instructions,
-                              metric_unit::Count));
+                              metric_unit::Count, allocator));
     rows.push(make_metric_row("cache refs", result.cache_references,
-                              metric_unit::Count));
+                              metric_unit::Count, allocator));
     rows.push(make_metric_row("cache misses", result.cache_misses,
-                              metric_unit::Count));
+                              metric_unit::Count, allocator));
     rows.push(make_metric_row("branch misses", result.branch_misses,
-                              metric_unit::Count));
+                              metric_unit::Count, allocator));
   }
 
   usize mean_width = 0;
@@ -556,8 +567,6 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     duration_millis =
         parse_count_flag(FLAG_bench_duration.value(), StringView{"duration"});
 
-  unused(cxt);
-
   /* The summary table is written to stdout, so its color follows the stdout
      terminal, the same gate the diagnostics and the prompt use. */
   const bool may_color = colors::stdout_wants_color();
@@ -566,11 +575,12 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Debug, "bench sampling %zu commands for %llu ms each",
       arguments.count() - 1, static_cast<unsigned long long>(duration_millis));
 
-  let results = ArrayList<command_result>{};
+  let results = ArrayList<command_result>{cxt.scratch_allocator()};
   for (usize i = 1; i < arguments.count(); i++) {
     bool was_interrupted = false;
     results.push(sample_command(arguments[i].view(), run_limit, duration_millis,
-                                show_progress, was_interrupted));
+                                show_progress, was_interrupted,
+                                cxt.scratch_allocator()));
 
     /* A Ctrl-C aborts the whole benchmark, not just the current command. The
        interrupt flag is cleared here, the way the shell drops it after an
@@ -582,10 +592,10 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  let out = String{};
+  let out = String{cxt.scratch_allocator()};
   for (usize i = 0; i < results.count(); i++) {
     if (i > 0) out += "\n";
-    append_summary(out, results[i], may_color);
+    append_summary(out, results[i], may_color, cxt.scratch_allocator());
   }
 
   /* The relative comparison is shown only when there is a second command to

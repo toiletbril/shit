@@ -45,7 +45,7 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* The sorted utility names, shared by the --list output and the help
      listing. */
-  let sorted_names = ArrayList<String>{};
+  let sorted_names = ArrayList<String>{cxt.scratch_allocator()};
   for (const String &name : shitbox::util_names())
     sorted_names.push(name.clone());
   shitbox::sort_string_list(sorted_names);
@@ -53,7 +53,7 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* --list prints the utility names one per line and nothing else, so a script
      can read the set without parsing the help text. */
   if (ec.args().count() >= 2 && ec.args()[1] == "--list") {
-    let names_output = String{};
+    let names_output = String{cxt.scratch_allocator()};
     for (let const &name : sorted_names) {
       names_output += name.view();
       names_output += '\n';
@@ -78,10 +78,11 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     /* A missing directory is reported once here rather than as one link failure
        per utility, so the user sees the real cause instead of a flood. */
     if (!Path{ec.args()[2].view()}.is_directory()) {
-      report_soft_builtin_error(ec, cxt,
-                                "Cannot assimilate into '" +
-                                    String{ec.args()[2].view()} +
-                                    "': not a directory");
+      report_soft_builtin_error(
+          ec, cxt,
+          "Cannot assimilate into '" +
+              String{cxt.scratch_allocator(), ec.args()[2].view()} +
+              "': not a directory");
       return 1;
     }
 
@@ -107,7 +108,7 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     /* The help reads as three sections, the description, the two synopsis
        lines, and the utilities as a comma-separated block wrapped under the
        standard indent. */
-    let listing = String{};
+    let listing = String{cxt.scratch_allocator()};
     listing += "DESCRIPTION\n";
     listing += wrap_text(HELP_DESCRIPTION, HELP_INDENT, HELP_WRAP_WIDTH);
     listing += "\n\nSYNOPSIS\n";
@@ -116,7 +117,7 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     listing += "  shitbox --assimilate DIR\n";
     listing += "\nUTILITIES\n";
 
-    let joined_names = String{};
+    let joined_names = String{cxt.scratch_allocator()};
     for (let const &name : sorted_names) {
       if (!joined_names.is_empty()) joined_names += ", ";
       joined_names += name.view();

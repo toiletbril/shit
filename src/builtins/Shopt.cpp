@@ -94,17 +94,17 @@ bool is_known_shopt_option(StringView name) throws
   return false;
 }
 
-String shopt_status_line(StringView name, bool on) throws
+String shopt_status_line(StringView name, bool on, Allocator allocator) throws
 {
   constexpr usize NAME_FIELD_WIDTH = 20;
-  let line = String{name};
+  let line = String{allocator, name};
   while (line.count() < NAME_FIELD_WIDTH)
     line += ' ';
   line += on ? "\ton\n" : "\toff\n";
   return line;
 }
 
-String format_option_names_help() throws
+String format_option_names_help(Allocator allocator) throws
 {
   usize longest = 0;
   for (let const &name : SHOPT_OPTION_NAMES)
@@ -112,7 +112,7 @@ String format_option_names_help() throws
   let const column_width = longest + 2;
   let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
 
-  let section = String{"OPTION NAMES\n"};
+  let section = String{allocator, "OPTION NAMES\n"};
   let const total = sizeof(SHOPT_OPTION_NAMES) / sizeof(SHOPT_OPTION_NAMES[0]);
   for (usize i = 0; i < total; i++) {
     if (i % columns == 0) section += "  ";
@@ -132,9 +132,10 @@ String format_option_names_help() throws
    option's state. A completion script captures this through $(shopt -p name)
    and runs it later, so the line must execute, shopt -s or -u for a shopt
    name and set -o or +o for a set option behind the -o bridge. */
-String shopt_reusable_line(StringView name, bool on, bool as_set_option) throws
+String shopt_reusable_line(StringView name, bool on, bool as_set_option,
+                           Allocator allocator) throws
 {
-  let line = String{};
+  let line = String{allocator};
   if (as_set_option)
     line += on ? "set -o " : "set +o ";
   else
@@ -151,7 +152,7 @@ fn shopt_option_name_list() throws -> const ArrayList<StringView> &
   /* The table is immutable and the completion engine reads it on every
      keystroke, so the list builds once. */
   static ArrayList<StringView> names = [] throws {
-    let collected = ArrayList<StringView>{};
+    let collected = ArrayList<StringView>{heap_allocator()};
     collected.reserve(sizeof(SHOPT_OPTION_NAMES) /
                       sizeof(SHOPT_OPTION_NAMES[0]));
     for (let const &name : SHOPT_OPTION_NAMES)
@@ -171,14 +172,15 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   ASSERT(!args.is_empty());
 
   if (args.count() > 1 && args[1] == "--help")
-    SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(ec, format_option_names_help().view());
+    SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(
+        ec, format_option_names_help(cxt.scratch_allocator()).view());
 
   bool should_enable = false;
   bool should_disable = false;
   bool is_quiet = false;
   bool should_operate_on_set_options = false;
   bool should_print_reusable = false;
-  let names = ArrayList<StringView>{heap_allocator()};
+  let names = ArrayList<StringView>{cxt.scratch_allocator()};
 
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
@@ -207,8 +209,9 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      query keeps printing while the line changes shape. */
   let const do_format_status_line = [&](StringView name, bool on) throws {
     return should_print_reusable
-               ? shopt_reusable_line(name, on, should_operate_on_set_options)
-               : shopt_status_line(name, on);
+               ? shopt_reusable_line(name, on, should_operate_on_set_options,
+                                     cxt.scratch_allocator())
+               : shopt_status_line(name, on, cxt.scratch_allocator());
   };
 
   i32 status = 0;

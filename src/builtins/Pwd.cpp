@@ -32,7 +32,7 @@ fn Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   /* The physical form resolves every symlink through getcwd. The logical form,
      the POSIX default, prints PWD so the path keeps the symlinks it was reached
      through, the way bash and dash do, so cd /tmp on a system where /tmp is a

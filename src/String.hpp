@@ -20,9 +20,6 @@ public:
      next to the sixteen-byte allocator and the three size words. */
   static constexpr usize INLINE_CAPACITY = 24;
 
-  /* A default String is inline and empty, so it can serve as a container slot
-     before its real allocator and value are assigned. */
-  String() : m_allocator(heap_allocator()) { reset_to_inline(); }
   explicit String(Allocator allocator) : m_allocator(allocator)
   {
     reset_to_inline();
@@ -143,6 +140,13 @@ public:
       -> Maybe<usize>;
 
 private:
+  /* A default String is inline and empty, so it can serve as a container slot
+     before its real allocator and value are assigned. The friend keeps it
+     reachable to the table while every call site must name its lifetime. */
+  template <class Value>
+  friend class StringMap;
+  String() : m_allocator(heap_allocator()) { reset_to_inline(); }
+
   cold fn free_storage() wontthrow -> void;
 
   mustuse pure fn is_inline() const wontthrow -> bool

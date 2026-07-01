@@ -20,11 +20,14 @@ namespace shit {
 
 namespace shitbox {
 
-static fn parse_integer(StringView text) throws -> i64
+static fn parse_integer(StringView text, Allocator allocator) throws -> i64
 {
   let const parsed = utils::parse_decimal_integer(text);
   if (parsed.is_error())
-    throw Error{"seq: invalid integer argument '" + String{text} + "'"};
+    throw Error{
+        "seq: invalid integer argument '" + String{allocator, text}
+          + "'"
+    };
   return parsed.value();
 }
 
@@ -35,7 +38,6 @@ pure fn Seq::kind() const wontthrow -> Utility::Kind { return Kind::Seq; }
 fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<String> &args) const throws -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
@@ -46,34 +48,35 @@ fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
   i64 first = 1;
   i64 increment = 1;
   i64 last = 0;
+  let const allocator = cxt.scratch_allocator();
   if (operands.count() == 1) {
-    last = parse_integer(operands[0].view());
+    last = parse_integer(operands[0].view(), allocator);
   } else if (operands.count() == 2) {
-    first = parse_integer(operands[0].view());
-    last = parse_integer(operands[1].view());
+    first = parse_integer(operands[0].view(), allocator);
+    last = parse_integer(operands[1].view(), allocator);
   } else if (operands.count() == 3) {
-    first = parse_integer(operands[0].view());
-    increment = parse_integer(operands[1].view());
-    last = parse_integer(operands[2].view());
+    first = parse_integer(operands[0].view(), allocator);
+    increment = parse_integer(operands[1].view(), allocator);
+    last = parse_integer(operands[2].view(), allocator);
   } else {
     throw Error{"seq expects one to three integer operands"};
   }
 
   if (increment == 0) throw Error{"seq: the increment must not be zero"};
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   /* The step is guarded against signed overflow before it is taken, so a range
      that reaches the integer bounds, such as seq up to the maximum, ends rather
      than wrapping or tripping the sanitizer. */
   if (increment > 0)
     for (i64 value = first; value <= last; value += increment) {
-      output += utils::int_to_text(value, heap_allocator()).view();
+      output += utils::int_to_text(value, cxt.scratch_allocator()).view();
       output += '\n';
       if (value > INT64_MAX - increment) break;
     }
   else
     for (i64 value = first; value >= last; value += increment) {
-      output += utils::int_to_text(value, heap_allocator()).view();
+      output += utils::int_to_text(value, cxt.scratch_allocator()).view();
       output += '\n';
       if (value < INT64_MIN - increment) break;
     }

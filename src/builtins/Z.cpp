@@ -73,9 +73,10 @@ static fn recency_weight(i64 age_seconds) wontthrow -> double
   return 0.25;
 }
 
-static fn read_frecency_store() throws -> ArrayList<frecency_entry>
+static fn read_frecency_store(Allocator allocator) throws
+    -> ArrayList<frecency_entry>
 {
-  let entries = ArrayList<frecency_entry>{};
+  let entries = ArrayList<frecency_entry>{allocator};
   let path = frecency_store_path();
   if (!path) return entries;
   let content = path->read_entire_file();
@@ -103,25 +104,27 @@ static fn read_frecency_store() throws -> ArrayList<frecency_entry>
     let const rank = utils::parse_decimal_integer(rank_field);
     let const last = utils::parse_decimal_integer(time_field);
     if (rank.is_error() || last.is_error()) continue;
-    entries.push(
-        frecency_entry{String{path_field}, rank.value(), last.value()});
+    entries.push(frecency_entry{
+        String{allocator, path_field},
+        rank.value(), last.value()
+    });
   }
   return entries;
 }
 
-static fn write_frecency_store(const ArrayList<frecency_entry> &entries) throws
-    -> void
+static fn write_frecency_store(const ArrayList<frecency_entry> &entries,
+                               Allocator allocator) throws -> void
 {
   let path = frecency_store_path();
   if (!path) return;
 
-  let out = String{};
+  let out = String{allocator};
   for (let const &entry : entries) {
     out.append(entry.path.view());
     out += '\t';
-    out.append(utils::int_to_text(entry.rank));
+    out.append(utils::int_to_text(entry.rank, allocator));
     out += '\t';
-    out.append(utils::int_to_text(entry.last_access));
+    out.append(utils::int_to_text(entry.last_access, allocator));
     out += '\n';
   }
 
@@ -164,11 +167,12 @@ static fn contains_ignore_case(StringView haystack, StringView needle) wontthrow
 
 } // namespace
 
-fn record_directory_access(StringView directory) throws -> void
+fn record_directory_access(StringView directory, Allocator allocator) throws
+    -> void
 {
   if (directory.is_empty()) return;
 
-  let entries = read_frecency_store();
+  let entries = read_frecency_store(allocator);
   let const now = now_epoch_seconds();
   let was_found = false;
   for (let &entry : entries) {
@@ -180,7 +184,10 @@ fn record_directory_access(StringView directory) throws -> void
     }
   }
   if (!was_found) {
-    entries.push(frecency_entry{String{directory}, 1, now});
+    entries.push(frecency_entry{
+        String{allocator, directory},
+        1, now
+    });
     /* When the store overflows its bound, the least-visited of the older
        directories is dropped by overwriting it with the just-added last entry
        and shrinking, since the order of the store does not matter to the
@@ -195,7 +202,7 @@ fn record_directory_access(StringView directory) throws -> void
       entries.pop_back();
     }
   }
-  write_frecency_store(entries);
+  write_frecency_store(entries, allocator);
 }
 
 Z::Z() = default;
@@ -209,7 +216,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* The query is every operand joined by a space, so z proj src matches a path
      that holds both, the way zoxide takes several keywords. */
-  let query = String{};
+  let query = String{cxt.scratch_allocator()};
   for (usize i = 1; i < ec.args().count(); i++) {
     if (i > 1) query += ' ';
     query.append(ec.args()[i]);
@@ -217,7 +224,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   LOG(Debug, "z ranking the frecency store against query '%s'", query.c_str());
 
-  let entries = read_frecency_store();
+  let entries = read_frecency_store(cxt.scratch_allocator());
   let const now = now_epoch_seconds();
 
   const frecency_entry *best = nullptr;
@@ -253,7 +260,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (!old_directory.is_empty())
     cxt.set_shell_variable("OLDPWD", old_directory.text());
   cxt.set_shell_variable("PWD", target.text());
-  record_directory_access(target.text().view());
+  record_directory_access(target.text().view(), cxt.scratch_allocator());
 
   ec.print_to_stdout(target.text() + "\n");
   return 0;

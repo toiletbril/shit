@@ -63,12 +63,19 @@ constexpr StaticStringMap<const char *> BUILTIN_VARIABLES{
 
 struct make_variable
 {
+  make_variable(String name, String value)
+      : name(steal(name)), value(steal(value))
+  {}
   String name;
   String value;
 };
 
 struct make_rule
 {
+  explicit make_rule(Allocator allocator)
+      : target(allocator), prerequisites(allocator), recipe_lines(allocator),
+        variable_assignments(allocator)
+  {}
   String target;
   ArrayList<String> prerequisites;
   ArrayList<String> recipe_lines;
@@ -83,6 +90,10 @@ struct make_rule
    apart so an explicit rule always wins over a pattern. */
 struct makefile
 {
+  explicit makefile(Allocator allocator)
+      : variables(allocator), rules(allocator), pattern_rules(allocator),
+        default_goal(allocator), variable_index(allocator)
+  {}
   ArrayList<make_variable> variables;
   ArrayList<make_rule> rules;
   ArrayList<make_rule> pattern_rules;
@@ -94,7 +105,7 @@ struct makefile
      than a scan of every variable, which a recipe pays once per reference per
      line. The array keeps the values so a value can still be appended in
      place. */
-  StringMap<usize> variable_index{heap_allocator()};
+  StringMap<usize> variable_index;
 
   fn find_variable(StringView name) const throws -> const String *
   {
@@ -119,8 +130,8 @@ struct makefile
 };
 
 /* None when the goal does not fit the prefix and suffix around the %. */
-static fn match_pattern(StringView pattern, StringView goal) throws
-    -> Maybe<String>
+static fn match_pattern(StringView pattern, StringView goal,
+                        Allocator allocator) throws -> Maybe<String>
 {
   let const percent = pattern.find_character('%');
   if (!percent.has_value()) return None;
@@ -129,13 +140,15 @@ static fn match_pattern(StringView pattern, StringView goal) throws
   if (goal.length < prefix.length + suffix.length) return None;
   if (goal.substring_of_length(0, prefix.length) != prefix) return None;
   if (goal.substring(goal.length - suffix.length) != suffix) return None;
-  return String{goal.substring_of_length(
-      prefix.length, goal.length - prefix.length - suffix.length)};
+  return String{allocator, goal.substring_of_length(
+                               prefix.length,
+                               goal.length - prefix.length - suffix.length)};
 }
 
-static fn substitute_stem(StringView text, StringView stem) throws -> String
+static fn substitute_stem(StringView text, StringView stem,
+                          Allocator allocator) throws -> String
 {
-  String out{};
+  String out{allocator};
   for (usize i = 0; i < text.length; i++) {
     if (text[i] == '%')
       out += stem;
@@ -149,10 +162,10 @@ static fn substitute_stem(StringView text, StringView stem) throws -> String
    carried through untouched so the later expansion collapses it to a single $
    without the following byte being read as an automatic variable. */
 static fn substitute_automatic(StringView text, StringView target,
-                               StringView first_prereq,
-                               StringView all_prereqs) throws -> String
+                               StringView first_prereq, StringView all_prereqs,
+                               Allocator allocator) throws -> String
 {
-  String out{};
+  String out{allocator};
   usize i = 0;
   while (i < text.length) {
     if (text[i] == '$' && i + 1 < text.length) {
@@ -200,9 +213,10 @@ static fn trim(StringView text) wontthrow -> StringView
   return text.substring_of_length(start, end - start);
 }
 
-static fn split_words(StringView text) throws -> ArrayList<String>
+static fn split_words(StringView text, Allocator allocator) throws
+    -> ArrayList<String>
 {
-  ArrayList<String> words{};
+  ArrayList<String> words{allocator};
   usize i = 0;
   while (i < text.length) {
     while (i < text.length && is_blank(text[i]))
@@ -211,7 +225,7 @@ static fn split_words(StringView text) throws -> ArrayList<String>
     while (i < text.length && !is_blank(text[i]))
       i++;
     if (i > start)
-      words.push(String{text.substring_of_length(start, i - start)});
+      words.push(String{allocator, text.substring_of_length(start, i - start)});
   }
   return words;
 }
@@ -224,8 +238,8 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
    matches nothing contributes no words. */
 static fn make_wildcard(EvalContext &cxt, StringView patterns) throws -> String
 {
-  let result = String{};
-  for (const String &pattern : split_words(patterns)) {
+  let result = String{cxt.scratch_allocator()};
+  for (const String &pattern : split_words(patterns, cxt.scratch_allocator())) {
     for (const String &match :
          os::glob_matches(pattern.view(), cxt.scratch_allocator()))
     {
@@ -267,7 +281,7 @@ static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
   let const replacement =
       expand(cxt, mk, rest.substring(*equals + 1), depth + 1);
 
-  let value = String{};
+  let value = String{cxt.scratch_allocator()};
   if (const String *stored = mk.find_variable(variable_name); stored != nullptr)
     value = expand(cxt, mk, stored->view(), depth + 1);
   else if (Maybe<String> from_env = os::get_environment_variable(variable_name);
@@ -275,13 +289,17 @@ static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
     value = steal(*from_env);
 
   let const has_percent = pattern.view().find_character('%').has_value();
-  let out = String{};
-  for (const String &word : split_words(value.view())) {
+  let out = String{cxt.scratch_allocator()};
+  for (const String &word : split_words(value.view(), cxt.scratch_allocator()))
+  {
     if (!out.is_empty()) out += ' ';
     if (has_percent) {
-      if (let const stem = match_pattern(pattern.view(), word.view());
+      if (let const stem = match_pattern(pattern.view(), word.view(),
+                                         cxt.scratch_allocator());
           stem.has_value())
-        out += substitute_stem(replacement.view(), stem->view()).view();
+        out += substitute_stem(replacement.view(), stem->view(),
+                               cxt.scratch_allocator())
+                   .view();
       else
         out += word.view();
     } else if (word.view().length >= pattern.view().length &&
@@ -308,9 +326,9 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
      bound, and the function call, the substitution reference, and the plain
      variable all recurse, so the cap sits at the entry and leaves the text
      unexpanded once it is hit rather than guarding one branch. */
-  if (depth >= 16) return String{text};
+  if (depth >= 16) return String{cxt.scratch_allocator(), text};
 
-  String result{};
+  String result{cxt.scratch_allocator()};
   usize i = 0;
   while (i < text.length) {
     if (text[i] == '$' && i + 1 < text.length &&
@@ -452,9 +470,10 @@ static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
      to the make program name before the variable is stored rather than
      recursing on itself to the expansion-depth cap. A plain = stays lazy and
      keeps its raw text. */
-  let const value_to_store = operator_character == ':'
-                                 ? expand(cxt, mk, trimmed_value, 0)
-                                 : String{trimmed_value};
+  let const value_to_store =
+      operator_character == ':'
+          ? expand(cxt, mk, trimmed_value, 0)
+          : String{cxt.scratch_allocator(), trimmed_value};
 
   if (let const *index = mk.variable_index.find(name); index != nullptr) {
     make_variable &variable = mk.variables[*index];
@@ -463,12 +482,15 @@ static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
       variable.value += " ";
       variable.value += value_to_store.view();
     } else {
-      variable.value = String{value_to_store.view()};
+      variable.value = String{cxt.scratch_allocator(), value_to_store.view()};
     }
     return;
   }
   mk.variable_index.set(name, mk.variables.count());
-  mk.variables.push(make_variable{String{name}, String{value_to_store.view()}});
+  mk.variables.push(make_variable{
+      String{cxt.scratch_allocator(), name                 },
+      String{cxt.scratch_allocator(), value_to_store.view()}
+  });
 }
 
 /* Whether the line ends in a backslash that continues it, an odd run of
@@ -490,19 +512,21 @@ static fn ends_with_continuation(StringView line) wontthrow -> bool
    assignment or prerequisite list. The trailing newline of each physical line
    is dropped, and the splice collapses the continuation's leading blanks to one
    space. */
-static fn join_continuations(StringView source) throws -> ArrayList<String>
+static fn join_continuations(StringView source, Allocator allocator) throws
+    -> ArrayList<String>
 {
   let const physical = split_keep_newlines(source);
-  ArrayList<String> logical{};
+  ArrayList<String> logical{allocator};
   usize i = 0;
   while (i < physical.count()) {
     let raw = physical[i];
     if (!raw.is_empty() && raw[raw.length - 1] == '\n')
       raw = raw.substring_of_length(0, raw.length - 1);
-    let line = String{raw};
+    let line = String{allocator, raw};
 
     while (ends_with_continuation(line.view()) && i + 1 < physical.count()) {
-      line = String{line.view().substring_of_length(0, line.view().length - 1)};
+      line = String{allocator,
+                    line.view().substring_of_length(0, line.view().length - 1)};
       i++;
       let next = physical[i];
       if (!next.is_empty() && next[next.length - 1] == '\n')
@@ -604,9 +628,9 @@ struct conditional_state
 
 static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
 {
-  makefile mk{};
+  makefile mk{cxt.scratch_allocator()};
   make_rule *current = nullptr;
-  ArrayList<conditional_state> conditionals{};
+  ArrayList<conditional_state> conditionals{cxt.scratch_allocator()};
 
   let const do_is_active = [&]() -> bool {
     for (const conditional_state &state : conditionals)
@@ -614,7 +638,9 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
     return true;
   };
 
-  for (const String &logical : join_continuations(source)) {
+  for (const String &logical :
+       join_continuations(source, cxt.scratch_allocator()))
+  {
     StringView line = logical.view();
 
     /* A line that starts with a tab is a recipe for the rule above it, kept
@@ -623,7 +649,8 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
        time. */
     if (!line.is_empty() && line[0] == '\t') {
       if (do_is_active() && current != nullptr)
-        current->recipe_lines.push(String{line.substring(1)});
+        current->recipe_lines.push(
+            String{cxt.scratch_allocator(), line.substring(1)});
       continue;
     }
 
@@ -728,15 +755,18 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
         let const targets =
             expand(cxt, mk, trim(statement.substring_of_length(0, *colon)), 0);
         current = nullptr;
-        for (const String &target : split_words(targets.view())) {
+        for (const String &target :
+             split_words(targets.view(), cxt.scratch_allocator()))
+        {
           make_rule *rule = mk.find_mutable_rule(target.view());
           if (rule == nullptr) {
-            make_rule fresh{};
+            make_rule fresh{cxt.scratch_allocator()};
             fresh.target = target.clone();
             mk.rules.push(steal(fresh));
             rule = &mk.rules[mk.rules.count() - 1];
           }
-          rule->variable_assignments.push(String{trim(after_colon)});
+          rule->variable_assignments.push(
+              String{cxt.scratch_allocator(), trim(after_colon)});
         }
         continue;
       }
@@ -749,8 +779,11 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
       let const prerequisites =
           expand(cxt, mk, statement.substring(*colon + 1), 0);
       current = nullptr;
-      for (const String &target : split_words(targets.view())) {
-        let new_prerequisites = split_words(prerequisites.view());
+      for (const String &target :
+           split_words(targets.view(), cxt.scratch_allocator()))
+      {
+        let new_prerequisites =
+            split_words(prerequisites.view(), cxt.scratch_allocator());
         /* The first ordinary explicit target is the bare-make goal, a pattern
            rule and a target-specific assignment do not claim it. */
         if (mk.default_goal.is_empty() &&
@@ -770,7 +803,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
             continue;
           }
 
-        make_rule rule{};
+        make_rule rule{cxt.scratch_allocator()};
         rule.target = target.clone();
         rule.prerequisites = steal(new_prerequisites);
         if (target.view().find_character('%').has_value()) {
@@ -813,35 +846,42 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     if (done == goal) return;
   for (const String &active : visiting)
     if (active == goal)
-      throw Error{"The target '" + String{goal} +
-                  "' is part of a dependency cycle"};
+      throw Error{
+          "The target '" + String{cxt.scratch_allocator(), goal}
+            +
+          "' is part of a dependency cycle"
+      };
 
   /* The concrete prerequisites and the recipe come from an explicit rule when
      one names the goal, otherwise from the first pattern rule whose target
      matches and whose source prerequisite already exists or can itself be
      made. */
   const ArrayList<String> *recipe_lines = nullptr;
-  ArrayList<String> prerequisites{};
+  ArrayList<String> prerequisites{cxt.scratch_allocator()};
   const ArrayList<String> *target_assignments = nullptr;
 
   if (const make_rule *rule = mk.find_rule(goal); rule != nullptr) {
     for (const String &prerequisite : rule->prerequisites) {
       let const expanded = expand(cxt, mk, prerequisite.view(), 0);
-      for (const String &word : split_words(expanded.view()))
+      for (const String &word :
+           split_words(expanded.view(), cxt.scratch_allocator()))
         prerequisites.push(word.clone());
     }
     recipe_lines = &rule->recipe_lines;
     target_assignments = &rule->variable_assignments;
   } else {
     for (const make_rule &pattern : mk.pattern_rules) {
-      let const stem = match_pattern(pattern.target.view(), goal);
+      let const stem =
+          match_pattern(pattern.target.view(), goal, cxt.scratch_allocator());
       if (!stem.has_value()) continue;
 
-      ArrayList<String> candidate{};
+      ArrayList<String> candidate{cxt.scratch_allocator()};
       for (const String &prerequisite : pattern.prerequisites) {
-        let const substituted = substitute_stem(prerequisite.view(), *stem);
+        let const substituted = substitute_stem(prerequisite.view(), *stem,
+                                                cxt.scratch_allocator());
         let const expanded = expand(cxt, mk, substituted.view(), 0);
-        for (const String &word : split_words(expanded.view()))
+        for (const String &word :
+             split_words(expanded.view(), cxt.scratch_allocator()))
           candidate.push(word.clone());
       }
       /* make chooses a pattern rule only when its prerequisite can be supplied,
@@ -858,7 +898,11 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
 
     if (recipe_lines == nullptr) {
       if (Path{goal}.exists()) return;
-      throw Error{"There is no rule to make the target '" + String{goal} + "'"};
+      throw Error{
+          "There is no rule to make the target '" +
+          String{cxt.scratch_allocator(), goal}
+          + "'"
+      };
     }
   }
 
@@ -866,16 +910,21 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
      builds and the recipe, and restore on the way out even when a recipe
      throws. The saved values restore in reverse so a repeated += on one
      variable unwinds cleanly. */
-  let saved_variables = ArrayList<saved_make_variable>{};
+  let saved_variables = ArrayList<saved_make_variable>{cxt.scratch_allocator()};
   if (target_assignments != nullptr)
     for (const String &assignment : *target_assignments) {
       let const name = assignment_variable_name(assignment.view());
-      saved_make_variable snapshot{String{name}, false, String{}};
+      saved_make_variable snapshot{
+          String{cxt.scratch_allocator(), name},
+          false,
+          String{cxt.scratch_allocator()}
+      };
       if (const String *current_value = mk.find_variable(name);
           current_value != nullptr)
       {
         snapshot.was_present = true;
-        snapshot.old_value = String{current_value->view()};
+        snapshot.old_value =
+            String{cxt.scratch_allocator(), current_value->view()};
       }
       saved_variables.push(steal(snapshot));
       let const equals = assignment.view().find_character('=');
@@ -890,7 +939,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       if (snapshot.was_present) {
         if (let const *index = mk.variable_index.find(snapshot.name.view());
             index != nullptr)
-          mk.variables[*index].value = String{snapshot.old_value.view()};
+          mk.variables[*index].value =
+              String{cxt.scratch_allocator(), snapshot.old_value.view()};
       } else {
         /* A variable the assignment created is unset again, not left empty, so
            a later ?= still applies its default. */
@@ -899,7 +949,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     }
   };
 
-  visiting.push(String{goal});
+  visiting.push(String{cxt.scratch_allocator(), goal});
   for (const String &prerequisite : prerequisites)
     build_target(ec, cxt, mk, prerequisite.view(), visiting, built);
   visiting.pop_back();
@@ -908,7 +958,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
      whole prerequisite list joined by spaces. */
   let const first_prereq =
       prerequisites.is_empty() ? StringView{} : prerequisites[0].view();
-  String all_prereqs{};
+  String all_prereqs{cxt.scratch_allocator()};
   for (const String &prerequisite : prerequisites) {
     if (!all_prereqs.is_empty()) all_prereqs += ' ';
     all_prereqs += prerequisite.view();
@@ -929,8 +979,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     /* The automatic variables are filled on the raw recipe first, then the
        $(NAME) expansion runs, so a $$ stays an escape and a $@ that the
        expansion would not touch is resolved here. */
-    let const with_autos =
-        substitute_automatic(body, goal, first_prereq, all_prereqs.view());
+    let const with_autos = substitute_automatic(
+        body, goal, first_prereq, all_prereqs.view(), cxt.scratch_allocator());
     let const command = expand(cxt, mk, with_autos.view(), 0);
     if (command.is_empty()) continue;
     if (!is_silent) ec.print_to_stdout(command + "\n");
@@ -953,19 +1003,22 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
        external command, which would otherwise abandon the remaining recipe
        lines and targets. The newlines guard the closing paren against a
        trailing comment in the line. */
-    let subshell_command = String{"(\n"};
+    let subshell_command = String{cxt.scratch_allocator(), "(\n"};
     subshell_command += command.view();
     subshell_command += "\n)";
     let const status = cxt.run_source(subshell_command.view(), "make", true,
                                       ec.source_location(), StringView{"make"});
     if (status != 0 && !should_ignore_errors) {
-      throw Error{"The recipe for the target '" + String{goal} +
-                  "' failed with status " +
-                  utils::int_to_text(status, heap_allocator())};
+      throw Error{
+          "The recipe for the target '" +
+          String{cxt.scratch_allocator(), goal}
+          + "' failed with status " +
+          utils::int_to_text(status, cxt.scratch_allocator())
+      };
     }
   }
 
-  built.push(String{goal});
+  built.push(String{cxt.scratch_allocator(), goal});
 }
 
 } // namespace
@@ -981,7 +1034,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
      -k change nothing in this serial make, so they are accepted and dropped
      before flag parsing rather than read as a target or rejected. The -jN form
      carries an optional number. */
-  ArrayList<String> filtered{};
+  ArrayList<String> filtered{cxt.scratch_allocator()};
   for (const String &arg : args) {
     let const text = arg.view();
     bool is_ignored_flag = text == "-j" || text == "-B" ||
@@ -1016,8 +1069,11 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_MAKE_DIR.is_set()) {
     saved_directory = Path::current_directory();
     if (Path::set_current_directory(Path{FLAG_MAKE_DIR.value()}).is_error())
-      throw Error{"Unable to change to the directory '" +
-                  String{FLAG_MAKE_DIR.value()} + "'"};
+      throw Error{
+          "Unable to change to the directory '" +
+          String{cxt.scratch_allocator(), FLAG_MAKE_DIR.value()}
+          + "'"
+      };
   }
   defer
   {
@@ -1025,9 +1081,9 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
       static_cast<void>(Path::set_current_directory(*saved_directory));
   };
 
-  String makefile_path{};
+  String makefile_path{cxt.scratch_allocator()};
   if (FLAG_MAKE_FILE.is_set()) {
-    makefile_path = String{FLAG_MAKE_FILE.value()};
+    makefile_path = String{cxt.scratch_allocator(), FLAG_MAKE_FILE.value()};
   } else if (Path{"Makefile"}.exists()) {
     makefile_path = "Makefile";
   } else if (Path{"makefile"}.exists()) {
@@ -1042,7 +1098,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
 
   let mk = parse_makefile(cxt, source->view());
 
-  ArrayList<String> goals{};
+  ArrayList<String> goals{cxt.scratch_allocator()};
   if (operands.is_empty()) {
     if (mk.default_goal.is_empty())
       throw Error{"The makefile defines no targets and no default goal"};
@@ -1052,8 +1108,8 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
       goals.push(operand.clone());
   }
 
-  ArrayList<String> visiting{};
-  ArrayList<String> built{};
+  ArrayList<String> visiting{cxt.scratch_allocator()};
+  ArrayList<String> built{cxt.scratch_allocator()};
   for (const String &goal : goals)
     build_target(ec, cxt, mk, goal.view(), visiting, built);
 
@@ -1063,7 +1119,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
 fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
     -> ArrayList<String>
 {
-  let targets = ArrayList<String>{};
+  let targets = ArrayList<String>{cxt.scratch_allocator()};
   let const source = makefile.read_entire_file();
   if (!source.has_value()) return targets;
 

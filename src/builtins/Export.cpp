@@ -46,9 +46,10 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let names = os::environment_names();
     names.sort();
 
-    let out = String{};
+    let out = String{cxt.scratch_allocator()};
     for (let const &name : names) {
-      let const value = os::get_environment_variable(name).value_or(String{});
+      let const value = os::get_environment_variable(name).value_or(
+          String{cxt.scratch_allocator()});
       out += is_declare_form ? "declare -x " : "export ";
       out += name;
       if (is_declare_form) {
@@ -75,10 +76,12 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
          while a bare name keeps the value it held in the environment, the way
          bash reads export -n. */
       let const parts = NameValueArg::from(args[i]);
-      let const name = String{parts.get_name()};
-      let const value = parts.get_value().has_value()
-                            ? Maybe<String>{String{*parts.get_value()}}
-                            : os::get_environment_variable(name);
+      let const name = String{cxt.scratch_allocator(), parts.get_name()};
+      let const value =
+          parts.get_value().has_value()
+              ? Maybe<String>{String{cxt.scratch_allocator(),
+                                     *parts.get_value()}}
+              : os::get_environment_variable(name);
 
       LOG(All, "export removing '%s' from the environment", name.c_str());
       cxt.record_environment_change(name);
@@ -95,15 +98,16 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const &arg = args[i];
     let const parts = NameValueArg::from(arg);
 
-    let name = String{};
-    let value = String{};
+    let name = String{cxt.scratch_allocator()};
+    let value = String{cxt.scratch_allocator()};
     let const has_new_value = parts.get_value().has_value();
     if (!has_new_value) {
       name = arg;
-      value = cxt.get_variable_value(arg).value_or(String{});
+      value =
+          cxt.get_variable_value(arg).value_or(String{cxt.scratch_allocator()});
     } else {
-      name = String{parts.get_name()};
-      value = String{*parts.get_value()};
+      name = String{cxt.scratch_allocator(), parts.get_name()};
+      value = String{cxt.scratch_allocator(), *parts.get_value()};
     }
 
     /* A read-only variable rejects a new value the way an ordinary assignment
@@ -124,9 +128,11 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const is_integer_name = cxt.is_integer_variable(name.view());
     if (has_new_value && is_integer_name) {
       char result_text[24];
-      value = String{utils::int_to_text_into(
-          value.is_empty() ? 0 : cxt.evaluate_arithmetic(value.view()),
-          result_text, sizeof(result_text))};
+      value = String{
+          cxt.scratch_allocator(),
+          utils::int_to_text_into(
+              value.is_empty() ? 0 : cxt.evaluate_arithmetic(value.view()),
+              result_text, sizeof(result_text))};
     }
 
     /* The variable moves into the environment, so the bare shell copy is

@@ -28,7 +28,7 @@ static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
                                     StringMap<String> &descriptions) throws
     -> ArrayList<String>
 {
-  let matches = ArrayList<String>{};
+  let matches = ArrayList<String>{heap_allocator()};
   for (let const &entry : entries)
     if (entry.name.view().starts_with(token)) {
       matches.push(String{entry.name.view()});
@@ -74,7 +74,7 @@ static bool is_man_subcommand_index_built = false;
    system defaults at that position, the manpath(1) reading. */
 static fn manpage_section1_directories() throws -> ArrayList<Path>
 {
-  let directories = ArrayList<Path>{};
+  let directories = ArrayList<Path>{heap_allocator()};
   let seen_roots = HashSet{heap_allocator()};
 
   let do_push_man1_of_root = [&](StringView root) {
@@ -162,7 +162,8 @@ static fn build_man_subcommand_index() throws -> void
     let const tail = name.substring(*dash + 1);
     if (tail.is_empty() || (tail[0] >= '0' && tail[0] <= '9')) return;
     if (MAN_PAGE_FILE_PATHS.find(head) == nullptr) return;
-    MAN_SUBCOMMAND_INDEX.get_or_create(head, ArrayList<String>{})
+    MAN_SUBCOMMAND_INDEX
+        .get_or_create(head, ArrayList<String>{heap_allocator()})
         .push(String{tail});
   });
   LOG(Info, "indexed %zu section-1 pages", MAN_PAGE_FILE_PATHS.count());
@@ -171,7 +172,7 @@ static fn build_man_subcommand_index() throws -> void
 /* Empty when the page has no synopsis. */
 static fn cleaned_synopsis_of_page(StringView source) throws -> String
 {
-  let synopsis = String{};
+  let synopsis = String{heap_allocator()};
   let is_inside_synopsis = false;
   usize line_start = 0;
   for (usize i = 0; i <= source.length; i++) {
@@ -348,7 +349,7 @@ fn complete_from_man_subcommands(StringView line, StringView token,
 
   /* Only the candidates the token matches are validated, so a typo reads no
      page and a command with a hundred subcommand pages does not stall. */
-  let matches = ArrayList<String>{};
+  let matches = ArrayList<String>{heap_allocator()};
   for (let const &subcommand : *subcommands)
     if (subcommand.view().starts_with(token) &&
         man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
@@ -364,7 +365,7 @@ fn complete_from_man_subcommands(StringView line, StringView token,
 
 static fn extract_dash_flags(StringView option_part) throws -> ArrayList<String>
 {
-  let flags = ArrayList<String>{};
+  let flags = ArrayList<String>{heap_allocator()};
   usize k = 0;
   while (k < option_part.length) {
     while (k < option_part.length &&
@@ -388,7 +389,7 @@ static fn extract_dash_flags(StringView option_part) throws -> ArrayList<String>
 static fn parse_manpage_option_entries(StringView text) throws
     -> ArrayList<help_entry>
 {
-  let clean = String{};
+  let clean = String{heap_allocator()};
   clean.reserve(text.length);
   for (usize i = 0; i < text.length; i++) {
     if (text[i] == '\b') {
@@ -400,9 +401,9 @@ static fn parse_manpage_option_entries(StringView text) throws
   let const view = clean.view();
 
   let descriptions = StringMap<String>{heap_allocator()};
-  let pending_flags = ArrayList<String>{};
+  let pending_flags = ArrayList<String>{heap_allocator()};
   usize pending_indent = 0;
-  let pending_description = String{};
+  let pending_description = String{heap_allocator()};
 
   let do_finalize_pending = [&]() throws -> void {
     if (pending_flags.is_empty()) return;
@@ -455,7 +456,7 @@ static fn parse_manpage_option_entries(StringView text) throws
     let const option_part = raw.substring_of_length(indent, gap - indent);
     pending_flags = extract_dash_flags(option_part);
     pending_indent = indent;
-    pending_description = String{};
+    pending_description = String{heap_allocator()};
     if (gap < raw.length)
       pending_description.append(
           trim_blanks(raw.substring_of_length(gap, raw.length - gap)));
@@ -463,7 +464,7 @@ static fn parse_manpage_option_entries(StringView text) throws
   do_finalize_pending();
 
   /* The authoritative flag list is the word scan. */
-  let entries = ArrayList<help_entry>{};
+  let entries = ArrayList<help_entry>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
   for (usize j = 0; j < view.length; j++) {
     let const at_word_start = j == 0 || view[j - 1] == ' ' ||
@@ -486,7 +487,7 @@ static fn parse_manpage_option_entries(StringView text) throws
       let const description = descriptions.find(flag);
       entries.push(help_entry{String{flag}, description != nullptr
                                                 ? String{description->view()}
-                                                : String{}});
+                                                : String{heap_allocator()}});
     }
     j = end;
   }
@@ -730,7 +731,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   if (let const cached = MANPAGE_OPTION_CACHE.find(page_name);
       cached != nullptr)
     return *cached;
-  let parsed_options = ArrayList<help_entry>{};
+  let parsed_options = ArrayList<help_entry>{heap_allocator()};
   /* man forks only when it resolves into a trusted directory, so an alias or a
      planted man is never run. The resolved absolute path runs in place of the
      bare name so PATH cannot reresolve it. An absent or untrusted man caches
@@ -749,7 +750,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
      freezes the prompt. The helper points stdin at /dev/null and stdout at a
      pipe, so man emits plain text and a deadline kills a man that overruns. */
   unused(context);
-  let argv = ArrayList<String>{};
+  let argv = ArrayList<String>{heap_allocator()};
   argv.push(String{man_paths[0].text().view()});
   argv.push(String{page_name});
   if (Maybe<String> page =
@@ -828,7 +829,7 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
 static fn help_text_for(StringView command, StringView subcommand = {}) throws
     -> String
 {
-  let text = String{};
+  let text = String{heap_allocator()};
   /* The allowlist entry carries the help argument, so ffmpeg forks --help full
      rather than the summary-only --help. A command not on the list never
      forks. The allowlist and the trust gate read the base command, a known
@@ -842,7 +843,7 @@ static fn help_text_for(StringView command, StringView subcommand = {}) throws
        then the help argument split on spaces, so git remote add runs as path,
        remote, add, --help. The chain carries its words space-joined under one
        key. */
-    let argv = ArrayList<String>{};
+    let argv = ArrayList<String>{heap_allocator()};
     argv.push(String{paths[0].text().view()});
     {
       usize word_start = 0;
@@ -883,7 +884,7 @@ static fn help_text_for(StringView command, StringView subcommand = {}) throws
 static fn parse_help_option_entries(StringView text) throws
     -> ArrayList<help_entry>
 {
-  let entries = ArrayList<help_entry>{};
+  let entries = ArrayList<help_entry>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
   usize i = 0;
   while (i < text.length) {
@@ -1009,7 +1010,7 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
 static fn parse_help_subcommands(StringView text) throws
     -> ArrayList<help_entry>
 {
-  let subcommands = ArrayList<help_entry>{};
+  let subcommands = ArrayList<help_entry>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
   let in_section = false;
   usize i = 0;
@@ -1105,7 +1106,7 @@ static constexpr usize MAX_SUBCOMMAND_DEPTH = 4;
 static fn settled_subcommand_chain(StringView resolved_command, StringView line,
                                    usize token_start) throws -> String
 {
-  let chain = String{};
+  let chain = String{heap_allocator()};
 
   let const surface_command = command_word_of(line);
   if (surface_command.is_empty()) return chain;

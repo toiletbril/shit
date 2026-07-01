@@ -69,7 +69,8 @@ static fn find_entry_matches(char type_letter, StringView filename, usize depth,
 }
 
 static fn find_walk(const Path &path, StringView display, usize depth,
-                    const find_options &options, String &output) throws -> void
+                    const find_options &options, String &output,
+                    Allocator allocator) throws -> void
 {
   /* One stat serves both the type match and the descend decision. It reads as a
      symlink rather than its target, so the walk does not follow a symlink the
@@ -99,29 +100,37 @@ static fn find_walk(const Path &path, StringView display, usize depth,
   for (let const &child_name : *names) {
     if (os::INTERRUPT_REQUESTED) return;
 
-    String child_display{display};
+    String child_display{allocator, display};
     if (!child_display.is_empty() && child_display.back() != '/') {
       child_display += '/';
     }
     child_display += child_name.view();
     let const child_path = Path{child_display.view()};
-    find_walk(child_path, child_display.view(), depth + 1, options, output);
+    find_walk(child_path, child_display.view(), depth + 1, options, output,
+              allocator);
   }
 }
 
 static fn parse_depth_argument(const ArrayList<String> &args, usize index,
-                               StringView predicate) throws -> i64
+                               StringView predicate, Allocator allocator) throws
+    -> i64
 {
   if (index >= args.count())
-    throw Error{"find: " + String{predicate} + " expects a number"};
+    throw Error{
+        "find: " + String{allocator, predicate}
+          + " expects a number"
+    };
 
   /* A negative value is rejected rather than parsed, since max_depth carries -1
      as its no-limit sentinel, so a negative -maxdepth would otherwise read as
      an unbounded walk rather than the error find gives. */
   let const parsed_value = utils::parse_decimal_integer(args[index].view());
   if (parsed_value.is_error() || parsed_value.value() < 0) {
-    throw Error{"find: " + String{predicate} +
-                " expects a non-negative number, got '" + args[index] + "'"};
+    throw Error{
+        "find: " + String{allocator, predicate}
+          +
+        " expects a non-negative number, got '" + args[index] + "'"
+    };
   }
 
   return parsed_value.value();
@@ -136,9 +145,9 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
 {
   unused(cxt);
 
-  ArrayList<StringView> roots{};
+  ArrayList<StringView> roots{cxt.scratch_allocator()};
   find_options options{};
-  ArrayList<bool> name_glob_active{};
+  ArrayList<bool> name_glob_active{cxt.scratch_allocator()};
 
   /* The path operands lead, every token up to the first predicate, then the
      dash predicates follow the way find reads its command line. The flag parser
@@ -179,13 +188,19 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
       options.type_filter = type[0];
       index++;
     } else if (predicate == "-maxdepth") {
-      options.max_depth = parse_depth_argument(args, index + 1, predicate);
+      options.max_depth = parse_depth_argument(args, index + 1, predicate,
+                                               cxt.scratch_allocator());
       index++;
     } else if (predicate == "-mindepth") {
-      options.min_depth = parse_depth_argument(args, index + 1, predicate);
+      options.min_depth = parse_depth_argument(args, index + 1, predicate,
+                                               cxt.scratch_allocator());
       index++;
     } else {
-      throw Error{"find: unknown predicate '" + String{predicate} + "'"};
+      throw Error{
+          "find: unknown predicate '" +
+          String{cxt.scratch_allocator(), predicate}
+          + "'"
+      };
     }
   }
 
@@ -198,17 +213,19 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (roots.is_empty()) roots.push(StringView{"."});
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   i32 status = 0;
   for (let const &root : roots) {
     let const root_path = Path{root};
     if (!root_path.exists()) {
-      report_soft_shitbox_error(
-          ec, cxt, "find: '" + String{root} + "': no such file or directory");
+      report_soft_shitbox_error(ec, cxt,
+                                "find: '" +
+                                    String{cxt.scratch_allocator(), root} +
+                                    "': no such file or directory");
       status = 1;
       continue;
     }
-    find_walk(root_path, root, 0, options, output);
+    find_walk(root_path, root, 0, options, output, cxt.scratch_allocator());
   }
 
   ec.print_to_stdout(output);

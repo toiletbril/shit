@@ -383,7 +383,7 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
   if (redir.kind == Redirection::Kind::Heredoc ||
       redir.kind == Redirection::Kind::HereString)
   {
-    let body = String{};
+    let body = String{cxt.scratch_allocator()};
     if (redir.kind == Redirection::Kind::Heredoc) {
       ASSERT(redir.heredoc_body != nullptr);
       body = redir.heredoc_body->clone();
@@ -602,8 +602,8 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
     /* The alias body replaces the first word, so the split words go in front of
        the remaining arguments. ArrayList has no in-place erase, so the new list
        is built and swapped in. */
-    let rebuilt = ArrayList<String>{};
-    let current = String{};
+    let rebuilt = ArrayList<String>{heap_allocator()};
+    let current = String{cxt.scratch_allocator()};
     let const &body_value = *body;
     for (usize i = 0; i < body_value.count(); i++) {
       const char c = body_value[i];
@@ -1121,7 +1121,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     Maybe<String> previous = os::get_environment_variable(name);
     /* The value expansion throws a plain Error, an unset variable under set -u,
        so it is relocated to a caret at the command the prefix leads. */
-    let expanded_value = String{};
+    let expanded_value = String{cxt.scratch_allocator()};
     try {
       expanded_value = cxt.expand_word_for_assignment(var.value);
     } catch (const Error &e) {
@@ -1224,7 +1224,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* The command name is copied for the array-argument application below, since
      the argument vector is moved into the exec context before that point. */
-  let array_command_name = String{};
+  let array_command_name = String{cxt.scratch_allocator()};
   if (!m_array_args.is_empty())
     array_command_name = String{program_args[0].view()};
 
@@ -1249,7 +1249,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        deep copy of the list is not paid on every call. The store is empty in
        the window between, which the call-param build below does not read. */
     let saved_params = cxt.take_positional_params();
-    let call_params = ArrayList<String>{};
+    let call_params = ArrayList<String>{heap_allocator()};
     call_params.reserve(program_args.count() - 1);
     for (usize i = 1; i < program_args.count(); i++)
       call_params.push_managed(program_args[i]);
@@ -1387,8 +1387,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* $_ reads the last argument of the previous command, so it is captured here
      before the argument vector moves into the exec context and set after the
      command runs. */
-  let const last_argument =
-      program_args.is_empty() ? String{} : program_args.back();
+  let const last_argument = program_args.is_empty()
+                                ? String{cxt.scratch_allocator()}
+                                : program_args.back();
 
   Maybe<ExecContext> resolved_ec;
   try {

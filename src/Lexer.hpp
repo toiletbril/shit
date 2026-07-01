@@ -117,7 +117,7 @@ protected:
     return SourceLocation{position, length, m_filename};
   }
 
-  String m_source{};
+  String m_source{heap_allocator()};
   BumpArena *m_arena;
   /* The name of the file this source came from, or None for an unnamed source
      such as an interactive line. It travels into every SourceLocation the lexer

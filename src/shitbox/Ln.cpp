@@ -29,7 +29,6 @@ pure fn Ln::kind() const wontthrow -> Utility::Kind { return Kind::Ln; }
 fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
@@ -46,8 +45,12 @@ fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_LN_FORCE.is_enabled()) os::remove_file(link);
 
   if (!os::create_symlink(target, link)) {
-    throw Error{"ln: cannot create symbolic link '" + String{link} +
-                "': " + os::last_system_error_message()};
+    throw Error{
+        "ln: cannot create symbolic link '" +
+        String{cxt.scratch_allocator(), link}
+        +
+        "': " + os::last_system_error_message()
+    };
   }
 
   return 0;

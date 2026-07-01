@@ -50,7 +50,7 @@ pure fn Word::is_empty() const wontthrow -> bool { return segments.is_empty(); }
 
 hot fn Word::to_literal_string() const throws -> String
 {
-  let result = String{};
+  let result = String{heap_allocator()};
   for (let const &segment : segments) {
     if (segment.kind == WordSegment::Kind::CommandSubstitution) {
       result += "$(";
@@ -238,7 +238,7 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     return shit::None;
   }
 
-  let subscript = String{};
+  let subscript = String{heap_allocator()};
   /* A close bracket in the remainder of segment 0 means the = would also sit in
      segment 0, which the caller already ruled out, so this is not an
      assignment. */

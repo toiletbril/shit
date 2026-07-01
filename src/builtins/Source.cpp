@@ -54,9 +54,9 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      the sh mood ignores them the way dash does. */
   let const has_extra_args =
       !cxt.is_posix_mode() && ec.args().count() > path_index + 1;
-  let saved_params = ArrayList<String>{};
+  let saved_params = ArrayList<String>{heap_allocator()};
   if (has_extra_args) {
-    let params = ArrayList<String>{};
+    let params = ArrayList<String>{heap_allocator()};
     for (usize i = path_index + 1; i < ec.args().count(); i++)
       params.push_managed(ec.args()[i]);
 

@@ -83,7 +83,7 @@ fn EvalContext::most_recent_job() wontthrow -> job *
 
 fn EvalContext::forget_done_jobs() throws -> void
 {
-  let kept = ArrayList<job>{};
+  let kept = ArrayList<job>{heap_allocator()};
   for (job &job : m_jobs) {
     if (job.state == job::State::Done) continue;
     kept.push(steal(job));
@@ -95,7 +95,7 @@ fn EvalContext::forget_done_jobs() throws -> void
 
 fn EvalContext::remove_job(i32 id) throws -> bool
 {
-  let kept = ArrayList<job>{};
+  let kept = ArrayList<job>{heap_allocator()};
   let did_remove = false;
   for (job &job : m_jobs) {
     if (job.id == id) {
@@ -113,7 +113,7 @@ fn EvalContext::format_done_job_notifications(StringView line_ending) throws
 {
   update_jobs();
 
-  let out = String{};
+  let out = String{heap_allocator()};
   for (usize i = 0; i < m_jobs.count(); i++) {
     let const &job = m_jobs[i];
     if (job.state != job::State::Done) continue;

@@ -42,20 +42,26 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   if (is_byte_mode) {
     let const parsed = utils::parse_decimal_integer(FLAG_TAIL_BYTES.value());
     if (parsed.is_error() || parsed.value() < 0)
-      throw Error{"tail: invalid byte count '" +
-                  String{FLAG_TAIL_BYTES.value()} + "'"};
+      throw Error{
+          "tail: invalid byte count '" +
+          String{cxt.scratch_allocator(), FLAG_TAIL_BYTES.value()}
+          + "'"
+      };
 
     count = parsed.value();
   } else if (FLAG_TAIL_LINES.is_set()) {
     let const parsed = utils::parse_decimal_integer(FLAG_TAIL_LINES.value());
     if (parsed.is_error() || parsed.value() < 0)
-      throw Error{"tail: invalid line count '" +
-                  String{FLAG_TAIL_LINES.value()} + "'"};
+      throw Error{
+          "tail: invalid line count '" +
+          String{cxt.scratch_allocator(), FLAG_TAIL_LINES.value()}
+          + "'"
+      };
 
     count = parsed.value();
   }
 
-  ArrayList<StringView> sources{};
+  ArrayList<StringView> sources{cxt.scratch_allocator()};
   if (operands.is_empty())
     sources.push(StringView{"-"});
   else
@@ -63,17 +69,18 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       sources.push(operand.view());
 
   let const should_print_headers = sources.count() > 1;
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   i32 status = 0;
   for (usize source_index = 0; source_index < sources.count(); source_index++) {
     Maybe<String> content = read_named_or_stdin(ec, sources[source_index]);
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
-      report_soft_shitbox_error(ec, cxt,
-                                "tail: cannot open '" +
-                                    String{sources[source_index]} +
-                                    "': " + os::last_system_error_message());
+      report_soft_shitbox_error(
+          ec, cxt,
+          "tail: cannot open '" +
+              String{cxt.scratch_allocator(), sources[source_index]} +
+              "': " + os::last_system_error_message());
       status = 1;
       continue;
     }

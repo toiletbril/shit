@@ -120,7 +120,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* A jobspec argument restricts the listing to the named jobs, otherwise every
      job is shown. An unresolved jobspec is a no-such-job error and the exit
      status turns non-zero while the remaining specs still list. */
-  let selected = ArrayList<usize>{};
+  let selected = ArrayList<usize>{cxt.scratch_allocator()};
   i32 status = 0;
   if (names.count() > 1) {
     for (usize a = 1; a < names.count(); a++) {
@@ -139,7 +139,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       selected.push(i);
   }
 
-  let out = String{};
+  let out = String{cxt.scratch_allocator()};
   for (let index : selected) {
     let const &job = jobs[index];
 
@@ -149,17 +149,19 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
 
     if (FLAG_JOBS_PIDS.is_enabled()) {
-      out += utils::int_to_text(os::process_id_of(job.pid));
+      out += utils::int_to_text(os::process_id_of(job.pid),
+                                cxt.scratch_allocator());
       out.push('\n');
       continue;
     }
 
-    out += "[" + utils::int_to_text(job.id) + "]";
+    out += "[" + utils::int_to_text(job.id, cxt.scratch_allocator()) + "]";
     out.push(job_marker(jobs, index));
     out += " ";
 
     if (FLAG_JOBS_LONG.is_enabled()) {
-      out += utils::int_to_text(os::process_id_of(job.pid));
+      out += utils::int_to_text(os::process_id_of(job.pid),
+                                cxt.scratch_allocator());
       out += " ";
     }
 

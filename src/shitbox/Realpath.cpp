@@ -38,7 +38,7 @@ fn Realpath::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
-  let output = String{};
+  let output = String{cxt.scratch_allocator()};
   for (const String &operand : operands) {
     let const resolved = Path{operand.view()}.to_absolute().normalized();
     output += resolved.text().view();

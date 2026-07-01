@@ -70,8 +70,11 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
        error, so a sign-prefixed or oversized operand parses cleanly. The range
        check rejects it rather than truncating to an over-permissive mode. */
     if (parsed.is_error() || parsed.value() < 0 || parsed.value() > 07777)
-      throw Error{"mkdir: invalid mode '" + String{FLAG_MKDIR_MODE.value()} +
-                  "'"};
+      throw Error{
+          "mkdir: invalid mode '" +
+          String{cxt.scratch_allocator(), FLAG_MKDIR_MODE.value()}
+          + "'"
+      };
 
     named_mode = static_cast<u32>(parsed.value());
   }
@@ -94,7 +97,8 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
         if (!make_one(prefix, mode, should_set_exact_mode, true)) {
           report_soft_shitbox_error(
               ec, cxt,
-              "mkdir: cannot create directory '" + String{prefix} +
+              "mkdir: cannot create directory '" +
+                  String{cxt.scratch_allocator(), prefix} +
                   "': " + os::last_system_error_message());
           status = 1;
           break;

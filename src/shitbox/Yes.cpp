@@ -31,7 +31,7 @@ fn Yes::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  String line{};
+  String line{cxt.scratch_allocator()};
   if (operands.is_empty())
     line += "y";
   else

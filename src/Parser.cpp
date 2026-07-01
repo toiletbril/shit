@@ -709,7 +709,7 @@ mustuse fn Parser::wrap_with_stderr_to_stdout(Command *command) throws
     -> Command *
 {
   ASSERT(command != nullptr);
-  let redirections = ArrayList<expressions::Redirection>{};
+  let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
   redirections.push(stderr_to_stdout_dup());
   return m_lexer.arena().create<RedirectedCommand>(
       command->source_location(), command, steal(redirections));
@@ -909,7 +909,7 @@ mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
 {
   ASSERT(compound != nullptr);
 
-  let redirections = ArrayList<expressions::Redirection>{};
+  let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
   while (try_parse_trailing_redirection(redirections)) {
     /* A chain like done >out 2>&1 attaches every one. */
   }
@@ -942,15 +942,15 @@ static pure fn is_assignment_builtin_name(StringView name) wontthrow -> bool
 hot fn Parser::parse_simple_command() throws -> Command *
 {
   Maybe<SourceLocation> source_location;
-  ArrayList<Token *> args_accumulator{};
+  ArrayList<Token *> args_accumulator{heap_allocator()};
   let local_vars = ArrayList<prefix_assignment>{heap_allocator()};
   let array_args = ArrayList<array_builtin_assignment>{heap_allocator()};
-  let redirections = ArrayList<expressions::Redirection>{};
+  let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
 
   let do_build_command = [&]() -> Command * {
     if (!source_location) return nullptr;
 
-    ArrayList<const Token *> args{};
+    ArrayList<const Token *> args{heap_allocator()};
     args.reserve(args_accumulator.count());
     for (let t : args_accumulator)
       args.push(t);
@@ -1203,7 +1203,7 @@ hot fn Parser::parse_if() throws -> Command *
 
   LOG(Debug, "parsing an if clause at byte %zu", location.position);
 
-  let branches = ArrayList<if_branch>{};
+  let branches = ArrayList<if_branch>{heap_allocator()};
   const Expression *otherwise = nullptr;
 
   loop
@@ -1420,7 +1420,7 @@ hot fn Parser::parse_for() throws -> Command *
 
   const let variable_name = name_token->raw_string();
 
-  ArrayList<const Token *> words{};
+  ArrayList<const Token *> words{heap_allocator()};
   bool has_in_clause = false;
 
   /* An optional 'in WORDS' clause. The word 'in' is not a keyword token. */
@@ -1527,7 +1527,7 @@ hot fn Parser::parse_select() throws -> Command *
   }
   const let variable_name = name_token->raw_string();
 
-  ArrayList<const Token *> words{};
+  ArrayList<const Token *> words{heap_allocator()};
   bool has_in_clause = false;
   Token *peeked = m_lexer.peek_shell_token();
   ASSERT(peeked != nullptr);
@@ -1666,7 +1666,7 @@ hot fn Parser::parse_case() throws -> Command *
                             "Expected 'in' after the case word"};
   }
 
-  let items = ArrayList<case_item>{};
+  let items = ArrayList<case_item>{heap_allocator()};
 
   loop
   {
@@ -1994,7 +1994,7 @@ hot fn Parser::parse_conditional_command() throws -> Command *
      command parser, so a < or > inside is a string comparison and not a
      redirection. The operand words are kept for the evaluator to expand without
      field splitting. */
-  let elements = ArrayList<conditional_element>{};
+  let elements = ArrayList<conditional_element>{heap_allocator()};
   usize close_end_position =
       open->source_location().position + open->source_location().length;
   loop
@@ -2208,7 +2208,7 @@ fn Parser::consume_bash_array_assignment() throws -> ArrayList<const Token *>
      matching close. Every token inside the outermost pair is kept so bash mode
      can expand them as the array elements, while POSIX mode discards the
      list. */
-  ArrayList<const Token *> elements{};
+  ArrayList<const Token *> elements{heap_allocator()};
   usize depth = 1;
   loop
   {

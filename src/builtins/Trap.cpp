@@ -34,15 +34,15 @@ namespace {
    int, and the number 2 all name the same condition, and 0 names EXIT. A trap
    set by name and cleared or listed by number must resolve to one key, so a
    bare number maps through the os signal name table the way dash lists it. */
-String normalize_condition(StringView raw) throws
+String normalize_condition(StringView raw, Allocator allocator) throws
 {
-  let name = String{};
+  let name = String{allocator};
   for (usize i = 0; i < raw.count(); i++)
     name.push(static_cast<char>(toupper(static_cast<unsigned char>(raw[i]))));
   if (name.starts_with("SIG") && name.count() > 3) {
-    name = String{name.substring(3)};
+    name = String{allocator, name.substring(3)};
   }
-  if (name == "0") return String{"EXIT"};
+  if (name == "0") return String{allocator, "EXIT"};
 
   /* A condition written as a bare number names a signal, so it folds to the
      same name the name form yields. The number 0 already became EXIT above. */
@@ -61,12 +61,15 @@ String normalize_condition(StringView raw) throws
    prefix it strips on input, so SIGINT round-trips, while EXIT and the other
    non-signal conditions print bare. The default and sh moods keep the bare name
    the shell has always listed. */
-String format_listed_condition(StringView condition,
-                               bool with_sig_prefix) throws
+String format_listed_condition(StringView condition, bool with_sig_prefix,
+                               Allocator allocator) throws
 {
-  if (with_sig_prefix && os::signal_number_from_name(condition).has_value())
-    return StringView{"SIG"} + condition;
-  return String{condition};
+  if (with_sig_prefix && os::signal_number_from_name(condition).has_value()) {
+    let prefixed = String{allocator, "SIG"};
+    prefixed += condition;
+    return prefixed;
+  }
+  return String{allocator, condition};
 }
 
 } // namespace
@@ -95,12 +98,14 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const with_sig_prefix = cxt.is_bash_compatible();
     let const has_filter = is_print_form && args.count() > 2;
 
-    let out = String{};
+    let out = String{cxt.scratch_allocator()};
     cxt.traps().for_each([&](StringView condition, const String &action) {
       if (has_filter) {
         let was_requested = false;
         for (usize i = 2; i < args.count(); i++)
-          if (normalize_condition(args[i]).view() == condition) {
+          if (normalize_condition(args[i], cxt.scratch_allocator()).view() ==
+              condition)
+          {
             was_requested = true;
             break;
           }
@@ -110,7 +115,8 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       out += "trap -- '";
       out += action;
       out += "' ";
-      out += format_listed_condition(condition, with_sig_prefix);
+      out += format_listed_condition(condition, with_sig_prefix,
+                                     cxt.scratch_allocator());
       out += '\n';
     });
     ec.print_to_stdout(out);
@@ -124,7 +130,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      With two or more operands the first is the action and the rest are the
      conditions it applies to. */
   if (args.count() == 2) {
-    let const condition = normalize_condition(args[1]);
+    let const condition = normalize_condition(args[1], cxt.scratch_allocator());
     LOG(Info, "trap resetting condition '%s' to its default",
         condition.c_str());
     cxt.remove_trap(condition);
@@ -135,7 +141,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const is_reset = action == "-";
 
   for (usize i = 2; i < args.count(); i++) {
-    let const condition = normalize_condition(args[i]);
+    let const condition = normalize_condition(args[i], cxt.scratch_allocator());
     LOG(Info, "trap %s action for signal '%s'",
         is_reset ? "resetting the" : "setting", condition.c_str());
     if (is_reset)

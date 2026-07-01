@@ -1175,7 +1175,7 @@ static fn format_wide(wide_int value) throws -> String
     magnitude /= 10;
   } while (magnitude != 0);
 
-  String text{};
+  String text{heap_allocator()};
   if (is_negative) text.push('-');
   text.append(StringView{buffer + position, sizeof(buffer) - position});
   return text;
@@ -1239,7 +1239,7 @@ public:
   {
     ASSERT(context != nullptr);
 
-    String value;
+    String value{context->scratch_allocator()};
     bool was_found = false;
     if (let const *stored = context->lookup_shell_variable(name);
         stored != nullptr)
@@ -1545,7 +1545,7 @@ fn EvalContext::evaluate_arithmetic_wide(StringView expression,
   /* calc always evaluates through the wide parser, so the unset-variable error
      and the lazy binding apply in every mood rather than only the default. A
      $ or a ` first expands through the word expander. */
-  String expanded;
+  String expanded{scratch_allocator()};
   StringView to_parse = expression;
   if (expression.find_character('$').has_value() ||
       expression.find_character('`').has_value())

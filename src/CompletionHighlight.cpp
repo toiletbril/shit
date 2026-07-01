@@ -24,7 +24,7 @@ static BumpArena HIGHLIGHT_ARENA{};
 
 /* The PATH search verdicts first_word_resolves caches, keyed by the word and
    dropped when PATH changes. */
-static String CACHED_PATH_VERDICT_PATH{};
+static String CACHED_PATH_VERDICT_PATH{heap_allocator()};
 static StringMap<bool> PATH_SEARCH_VERDICTS{heap_allocator()};
 
 static fn first_word_resolves(StringView word, EvalContext &context) throws
@@ -347,7 +347,7 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
 
   /* The directory to scan is the resolved prefix, or the root for an absolute
      path and the cwd for a relative one when nothing resolved yet. */
-  String directory{};
+  String directory{heap_allocator()};
   if (existing_end > 0) {
     let const prefix = word.substring_of_length(0, existing_end);
     if (has_tilde) {

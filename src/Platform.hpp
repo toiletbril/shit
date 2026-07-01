@@ -204,9 +204,9 @@ fn process_from_pid(i64 pid) wontthrow -> process;
 struct process_entry
 {
   i64 pid{0};
-  String name{};
+  String name{heap_allocator()};
   u32 owner_id{0};
-  String command_line{};
+  String command_line{heap_allocator()};
   /* The BSD aux columns, filled only when resource stats are requested.
      virtual_kib and resident_kib are kibibytes, state is the single status
      letter R/S/D/Z/T, and cpu_ticks is the user plus system time in ticks. */

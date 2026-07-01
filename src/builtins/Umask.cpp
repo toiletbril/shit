@@ -47,12 +47,12 @@ pure fn group_mask(char who) wontthrow -> u32
 /* Render a mask as the symbolic form -S prints, listing for each group the
    permissions the mask leaves enabled, which is the complement of the masked
    bits. */
-fn mask_to_symbolic(u32 mask) throws -> String
+fn mask_to_symbolic(u32 mask, Allocator allocator) throws -> String
 {
   const u32 allowed = (~mask) & PERMISSION_BITS;
   const char groups[] = {'u', 'g', 'o'};
   const u32 shifts[] = {6, 3, 0};
-  let out = String{};
+  let out = String{allocator};
   for (usize g = 0; g < 3; g++) {
     if (g > 0) out.push(',');
     out.push(groups[g]);
@@ -127,7 +127,6 @@ pure fn Umask::kind() const wontthrow -> Builtin::Kind { return Kind::Umask; }
 
 cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  unused(cxt);
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
@@ -146,11 +145,12 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (!operand_index.has_value()) {
     const u32 mask = os::get_file_creation_mask();
     if (should_print_symbolic) {
-      ec.print_to_stdout(mask_to_symbolic(mask) + "\n");
+      ec.print_to_stdout(mask_to_symbolic(mask, cxt.scratch_allocator()) +
+                         "\n");
     } else {
       char buffer[8];
       std::snprintf(buffer, sizeof(buffer), "%04o", mask);
-      ec.print_to_stdout(String{buffer} + "\n");
+      ec.print_to_stdout(String{cxt.scratch_allocator(), buffer} + "\n");
     }
     return 0;
   }

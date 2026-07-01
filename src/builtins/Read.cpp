@@ -137,7 +137,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let was_timed_out = false;
   let read_line = Maybe<String>{};
   if (FLAG_READ_NCHARS.is_set()) {
-    let buffer = String{};
+    let buffer = String{cxt.scratch_allocator()};
     const u64 deadline_nanos =
         timeout_nanos > 0
             ? os::monotonic_nanos() + static_cast<u64>(timeout_nanos)
@@ -184,7 +184,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      line delimiter joins the next line and a backslash before any other byte
      makes it a literal that no longer splits on IFS. The -r and -n forms keep
      every byte. */
-  let accumulated = String{read_line->view()};
+  let accumulated = String{cxt.scratch_allocator(), read_line->view()};
   let const should_process_escapes =
       !FLAG_READ_RAW.is_enabled() && !FLAG_READ_NCHARS.is_set();
   if (should_process_escapes) {
@@ -209,8 +209,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* The de-escaped bytes pair with a mask marking which one came from a
      backslash escape, so the splitter below keeps an escaped IFS byte inside
      its field. The mask is all false in the raw forms. */
-  let line = String{};
-  let is_literal_byte = ArrayList<bool>{};
+  let line = String{cxt.scratch_allocator()};
+  let is_literal_byte = ArrayList<bool>{cxt.scratch_allocator()};
   line.reserve(accumulated.length());
   is_literal_byte.reserve(accumulated.length());
   for (usize i = 0; i < accumulated.length(); i++) {

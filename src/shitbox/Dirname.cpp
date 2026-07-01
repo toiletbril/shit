@@ -42,7 +42,7 @@ fn Dirname::execute(const ExecContext &ec, EvalContext &cxt,
   /* A path with no separator names a file in the current directory, so the
      directory is the dot the way dirname reports. */
   let const text = parent.is_empty() ? StringView{"."} : parent.text().view();
-  ec.print_to_stdout(String{text} + "\n");
+  ec.print_to_stdout(String{cxt.scratch_allocator(), text} + "\n");
 
   return 0;
 }
