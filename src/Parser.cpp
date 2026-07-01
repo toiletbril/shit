@@ -1368,13 +1368,10 @@ hot fn Parser::parse_for() throws -> Command *
       name_word.segments[0].kind == WordSegment::Kind::UnquotedText;
   if (is_name_plain) {
     const StringView name_text = name_word.segments[0].text.view();
-    let const is_name_start = [](char c) wontthrow -> bool {
-      return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
-    };
-    is_name_plain = name_text.length > 0 && is_name_start(name_text[0]);
+    is_name_plain =
+        name_text.length > 0 && lexer::is_variable_name_start(name_text[0]);
     for (usize i = 1; is_name_plain && i < name_text.length; i++)
-      is_name_plain = is_name_start(name_text[i]) ||
-                      (name_text[i] >= '0' && name_text[i] <= '9');
+      is_name_plain = lexer::is_variable_name(name_text[i]);
   }
   if (!is_name_plain) {
     ErrorWithLocation error{name_token->source_location(),

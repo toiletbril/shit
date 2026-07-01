@@ -132,15 +132,9 @@ pure fn Word::fd_allocation_name() const wontthrow -> Maybe<StringView>
     return None;
 
   let const name = text.substring_of_length(1, text.length - 2);
-  let const is_identifier_start = [](char byte) wontthrow -> bool {
-    return (byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
-           byte == '_';
-  };
-  if (!is_identifier_start(name[0])) return None;
-  for (usize i = 1; i < name.length; i++) {
-    const char byte = name[i];
-    if (!is_identifier_start(byte) && (byte < '0' || byte > '9')) return None;
-  }
+  if (!lexer::is_variable_name_start(name[0])) return None;
+  for (usize i = 1; i < name.length; i++)
+    if (!lexer::is_variable_name(name[i])) return None;
 
   return name;
 }
