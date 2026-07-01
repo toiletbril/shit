@@ -155,7 +155,8 @@ static fn parse_tsh_node_names(StringView listing) throws -> ArrayList<String>
            row[field_end] != '\t')
       field_end++;
 
-    if (field_end > 0) names.push(String{row.substring_of_length(0, field_end)});
+    if (field_end > 0)
+      names.push(String{row.substring_of_length(0, field_end)});
   }
   return names;
 }

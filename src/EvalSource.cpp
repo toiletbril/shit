@@ -228,8 +228,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
 pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
 {
-  /* The shopt names bash ships enabled. globstar stays off the way bash ships
-     it. */
   static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
       {SSK("progcomp"),             true},
       {SSK("promptvars"),           true},

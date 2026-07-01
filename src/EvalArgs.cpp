@@ -360,9 +360,9 @@ static fn word_starts_array_subscript(const Word &word) wontthrow -> bool
   return false;
 }
 
-hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
-                                 bool args_are_transient,
-                                 bool is_array_literal) throws
+hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
+                                         bool args_are_transient,
+                                         bool is_array_literal) throws
     -> ArrayList<String>
 {
   LOG(Debug, "expanding %zu argument tokens", args.count());

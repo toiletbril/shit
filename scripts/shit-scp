@@ -7,11 +7,13 @@ test -z "${HOST-}" -o -z "${SHIT-}" && \
   printf "%s <host>\ncopies current shit shell binary to a remote server and puts it in PATH\nrun this inside shit shell\n" "$(basename "$0")" >&2 && exit 1
 scp "$(which "$SHIT")" "$HOST":shit
 ssh "$HOST" <<'EOF'
-function _find_writable_path_dir() {
+_find_writable_path_dir() {
   for F in $(echo "$PATH'" | sed -E 's/:/\n/g')
   do
-    [[ "$F" =~ *sbin* ]] && continue
-    [[ -w "$F" ]] && echo "$F" && break
+    case "$F" in
+      *sbin*);;
+      *) test -w "$F" && echo "$F" && break;;
+    esac
   done
 }
 chmod +x ./shit
