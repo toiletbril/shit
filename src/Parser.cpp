@@ -543,8 +543,8 @@ static fn stderr_to_stdout_dup() wontthrow -> expressions::Redirection
 fn Parser::build_file_or_dup_redirection(
     i32 fd, Token::Kind op_kind, SourceLocation op_location,
     Maybe<SourceLocation> &first_location,
-    ArrayList<expressions::Redirection> &out, bool fd_was_explicit) throws
-    -> void
+    ArrayList<expressions::Redirection> &out, bool fd_was_explicit,
+    const Token *fd_allocation_name_token) throws -> void
 {
   if (!first_location) first_location = op_location;
 
@@ -552,6 +552,7 @@ fn Parser::build_file_or_dup_redirection(
   redir.fd = fd;
   redir.target = nullptr;
   redir.dup_fd = -1;
+  redir.fd_allocation_name_token = fd_allocation_name_token;
 
   {
     Token *after = m_lexer.peek_shell_token();
@@ -798,6 +799,18 @@ mustuse fn Parser::try_parse_descriptor_prefixed_redirection(
   {
     const let op_location = next->source_location();
     m_lexer.advance_past_last_peek();
+
+    let const allocation_name = word_token->word().fd_allocation_name();
+    if (allocation_name.has_value()) {
+      if (nk == Token::Kind::DoubleLess) {
+        throw ErrorWithLocation{word_location,
+                                "A heredoc descriptor cannot be allocated"};
+      }
+      build_file_or_dup_redirection(-1, nk, op_location, first_location, out,
+                                    /*fd_was_explicit=*/true, word_token);
+      return true;
+    }
+
     const let literal = word_token->word().to_literal_string();
     const let parsed_descriptor = utils::parse_decimal_integer(literal);
     if (parsed_descriptor.is_error()) {
@@ -868,7 +881,11 @@ mustuse fn Parser::try_parse_trailing_redirection(
   case Token::Kind::Word: {
     const tokens::WordToken *word_token =
         static_cast<tokens::WordToken *>(token);
-    if (!word_token->word().is_all_ascii_digits()) return false;
+    if (!word_token->word().is_all_ascii_digits() &&
+        !word_token->word().fd_allocation_name().has_value())
+    {
+      return false;
+    }
 
     const let word_location = token->source_location();
     if (try_parse_descriptor_prefixed_redirection(word_token, word_location,
@@ -1038,7 +1055,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
       if (token->kind() == Token::Kind::Word) {
         const tokens::WordToken *word_token =
             static_cast<tokens::WordToken *>(token);
-        if (word_token->word().is_all_ascii_digits()) {
+        if (word_token->word().is_all_ascii_digits() ||
+            word_token->word().fd_allocation_name().has_value())
+        {
           const let word_location = token->source_location();
           if (try_parse_descriptor_prefixed_redirection(
                   word_token, word_location, source_location, redirections))

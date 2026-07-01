@@ -118,6 +118,35 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
   return has_seen_digit;
 }
 
+pure fn Word::fd_allocation_name() const wontthrow -> Maybe<StringView>
+{
+  if (segments.count() != 1) return None;
+
+  let const &segment = segments[0];
+  if (segment.kind != WordSegment::Kind::UnquotedText &&
+      segment.kind != WordSegment::Kind::LiteralText)
+  {
+    return None;
+  }
+
+  let const text = segment.text.view();
+  if (text.length < 3 || text[0] != '{' || text[text.length - 1] != '}')
+    return None;
+
+  let const name = text.substring_of_length(1, text.length - 2);
+  let const is_identifier_start = [](char byte) wontthrow -> bool {
+    return (byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
+           byte == '_';
+  };
+  if (!is_identifier_start(name[0])) return None;
+  for (usize i = 1; i < name.length; i++) {
+    const char byte = name[i];
+    if (!is_identifier_start(byte) && (byte < '0' || byte > '9')) return None;
+  }
+
+  return name;
+}
+
 pure fn Word::runs_substitution() const wontthrow -> bool
 {
   for (let const &segment : segments) {

@@ -350,6 +350,8 @@ fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool;
    descriptor was not open. */
 fn close_shell_fd(i32 shell_fd) wontthrow -> bool;
 
+fn allocate_free_shell_fd(i32 floor_fd) wontthrow -> i32;
+
 fn get_environment_variable(StringView key) throws -> Maybe<String>;
 fn set_environment_variable(StringView key, StringView value) throws -> void;
 fn unset_environment_variable(StringView key) throws -> void;

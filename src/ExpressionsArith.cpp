@@ -612,7 +612,9 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   shit::flush();
 
   for (let const &redir : m_redirections) {
-    let const r = resolve_redirection(redir, cxt, source_location());
+    let r = resolve_redirection(redir, cxt, source_location());
+    r.target_fd =
+        allocate_redirection_descriptor(redir, r, cxt, source_location());
     switch (r.kind) {
     /* A staged heredoc body and an opened file both dup onto the target shell
        descriptor for the compound's duration, the opened copy closing at once

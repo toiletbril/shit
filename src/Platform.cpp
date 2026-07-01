@@ -290,6 +290,20 @@ fn close_shell_fd(i32 shell_fd) wontthrow -> bool
   return close(shell_fd) != -1;
 }
 
+fn allocate_free_shell_fd(i32 floor_fd) wontthrow -> i32
+{
+  const i32 probe_sources[] = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
+  for (let const source : probe_sources) {
+    const int allocated = fcntl(source, F_DUPFD_CLOEXEC, floor_fd);
+    if (allocated != -1) {
+      close(allocated);
+      return allocated;
+    }
+  }
+
+  return -1;
+}
+
 static fn passwd_field(StringView line, usize index) wontthrow -> StringView;
 
 fn get_current_user() throws -> Maybe<String>
@@ -2465,6 +2479,12 @@ fn close_shell_fd(i32 shell_fd) wontthrow -> bool
   SetStdHandle(*slot, INVALID_HANDLE_VALUE);
   if (handle == INVALID_HANDLE_VALUE) return false;
   return CloseHandle(handle) != FALSE;
+}
+
+fn allocate_free_shell_fd(i32 floor_fd) wontthrow -> i32
+{
+  (void) floor_fd;
+  return -1;
 }
 
 fn get_current_user() -> Maybe<String>

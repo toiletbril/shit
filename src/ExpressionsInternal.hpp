@@ -59,6 +59,12 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
                        bool allow_fd_memoization = false) throws
     -> resolved_redirection;
 
+fn allocate_redirection_descriptor(const Redirection &redir,
+                                   const resolved_redirection &resolved,
+                                   EvalContext &cxt, SourceLocation location,
+                                   bool *open_or_stage_failed = nullptr) throws
+    -> i32;
+
 /* What a loop does with the control flow pending after its body ran. */
 enum class loop_disposition
 {

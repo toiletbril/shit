@@ -451,9 +451,9 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
 
   const String &target_path = target[0];
 
-  const bool should_memoize_append = allow_fd_memoization &&
-                                     mode == os::file_open_mode::Append &&
-                                     cxt.loop_depth() > 0;
+  const bool should_memoize_append =
+      allow_fd_memoization && mode == os::file_open_mode::Append &&
+      cxt.loop_depth() > 0 && redir.fd_allocation_name_token == nullptr;
   if (should_memoize_append) {
     let cached = cxt.find_loop_redirect_fd(redir.fd, target_path, mode);
     if (cached.has_value())
@@ -479,6 +479,44 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
 
   return resolved_redirection{redirection_outcome::OpenedFile, redir.fd,
                               file_fd, -1, /*is_cached=*/false};
+}
+
+fn allocate_redirection_descriptor(const Redirection &redir,
+                                   const resolved_redirection &resolved,
+                                   EvalContext &cxt, SourceLocation location,
+                                   bool *open_or_stage_failed) throws -> i32
+{
+  if (redir.fd_allocation_name_token == nullptr) return redir.fd;
+
+  let const allocation_name =
+      static_cast<const tokens::WordToken *>(redir.fd_allocation_name_token)
+          ->word()
+          .fd_allocation_name();
+  ASSERT(allocation_name.has_value());
+
+  if (resolved.kind == redirection_outcome::Duplicate &&
+      resolved.dup_from_fd == Redirection::DUP_FD_CLOSE)
+  {
+    let const current_value = cxt.get_variable_value(*allocation_name);
+    if (current_value.has_value()) {
+      let const parsed = utils::parse_decimal_integer(current_value->view());
+      if (!parsed.is_error() && parsed.value() >= 0)
+        return static_cast<i32>(parsed.value());
+    }
+
+    if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
+    throw ErrorWithLocation{location, "'" + String{*allocation_name} +
+                                          "' does not name an open descriptor"};
+  }
+
+  const i32 allocated_fd = os::allocate_free_shell_fd(10);
+  if (allocated_fd < 0) {
+    if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
+    throw ErrorWithLocation{location, "Could not allocate a file descriptor"};
+  }
+
+  cxt.set_shell_variable(*allocation_name, utils::int_to_text(allocated_fd));
+  return allocated_fd;
 }
 
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,
@@ -735,10 +773,16 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      expansion error in a target word, which must stay fatal. */
   bool did_redirection_open_fail = false;
   try {
-    for (let const &redir : m_redirections) {
+    for (let const &original_redir : m_redirections) {
+      let redir = original_redir;
       let const r = resolve_redirection(redir, cxt, source_location(),
                                         &did_redirection_open_fail,
                                         /*allow_fd_memoization=*/!is_bare_exec);
+
+      redir.fd = allocate_redirection_descriptor(original_redir, r, cxt,
+                                                 source_location(),
+                                                 &did_redirection_open_fail);
+
       switch (r.kind) {
       case redirection_outcome::Heredoc: {
         const os::descriptor body_fd = r.opened_fd;

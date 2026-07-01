@@ -273,7 +273,9 @@ for translation, the plain double quote when no catalog is present.
 .B "Redirection and substitution"
 &> and &>> send both output streams to a file, and |& pipes both. <(cmd) and
 >(cmd) are process substitutions on a /dev/fd path, and <<< is a here\-string
-that appends one newline.
+that appends one newline. A {var}> or {var}< redirection allocates a free
+descriptor numbered ten or above, performs the redirection on it, and binds the
+number to the variable, and {var}>&\- closes the descriptor the variable names.
 .TP
 .B Globbing
 shopt \-s extglob turns on ?(), *(), +(), @(), and !(), and shopt \-s globstar

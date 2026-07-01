@@ -111,6 +111,8 @@ public:
      comes from the segments directly and allocates no literal String. */
   pure fn is_all_ascii_digits() const wontthrow -> bool;
 
+  pure fn fd_allocation_name() const wontthrow -> Maybe<StringView>;
+
   /* True when a segment of the word runs a command or a function substitution.
      The empty-command status logic and the assignment value reset both ask this
      to decide whether to reset the exit status. */
