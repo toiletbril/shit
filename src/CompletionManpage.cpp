@@ -810,7 +810,7 @@ fn complete_from_manpage(StringView line, StringView token, bool for_listing,
    HELP_PARSED records a command that ran so it never forks twice. */
 static StringMap<ArrayList<help_entry>> HELP_OPTION_CACHE{heap_allocator()};
 static StringMap<ArrayList<help_entry>> HELP_SUBCOMMAND_CACHE{heap_allocator()};
-static StringMap<bool> HELP_PARSED{heap_allocator()};
+static HashSet HELP_PARSED{heap_allocator()};
 
 /* Whether the directory the resolved binary sits in is safe to fork for its
    --help text. The check is permission-based, so a user tool directory like
@@ -936,11 +936,11 @@ static fn ensure_help_parsed(StringView command,
                              StringView subcommand = {}) throws -> void
 {
   let const key = help_cache_key(command, subcommand);
-  if (HELP_PARSED.find(key.view()) != nullptr) return;
+  if (HELP_PARSED.contains(key.view())) return;
   let const text = help_text_for(command, subcommand);
   HELP_OPTION_CACHE.set(key.view(), parse_help_option_entries(text.view()));
   HELP_SUBCOMMAND_CACHE.set(key.view(), parse_help_subcommands(text.view()));
-  HELP_PARSED.set(key.view(), true);
+  HELP_PARSED.add(key.view());
 }
 
 static fn help_options_for(StringView command,
