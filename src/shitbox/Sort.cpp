@@ -32,12 +32,8 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  ArrayList<StringView> sources{cxt.scratch_allocator()};
-  if (operands.is_empty())
-    sources.push(StringView{"-"});
-  else
-    for (const String &operand : operands)
-      sources.push(operand.view());
+  let const sources =
+      source_list_from_operands(operands, cxt.scratch_allocator());
 
   /* contents keeps each file's bytes alive for the line views, and the reserve
      stops a grow from dangling a view into a String's inline buffer. */

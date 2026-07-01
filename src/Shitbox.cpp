@@ -223,6 +223,21 @@ fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>
   return lines;
 }
 
+fn source_list_from_operands(const ArrayList<String> &operands,
+                             Allocator allocator) throws
+    -> ArrayList<StringView>
+{
+  let sources = ArrayList<StringView>{allocator};
+  if (operands.is_empty()) {
+    sources.push(StringView{"-"});
+  } else {
+    sources.reserve(operands.count());
+    for (let const &operand : operands)
+      sources.push(operand.view());
+  }
+  return sources;
+}
+
 fn sort_string_list(ArrayList<String> &items) wontthrow -> void
 {
   items.sort([](const String &a, const String &b) { return a < b; });

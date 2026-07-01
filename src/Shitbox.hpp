@@ -259,6 +259,12 @@ fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
 
 fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>;
 
+/* The operand list becomes a source list, a single "-" stdin source when no
+   operand is given, otherwise each operand as a view. */
+fn source_list_from_operands(const ArrayList<String> &operands,
+                             Allocator allocator) throws
+    -> ArrayList<StringView>;
+
 fn sort_string_list(ArrayList<String> &items) wontthrow -> void;
 fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void;
 

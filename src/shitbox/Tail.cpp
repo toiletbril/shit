@@ -60,12 +60,8 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     count = parsed.value();
   }
 
-  ArrayList<StringView> sources{cxt.scratch_allocator()};
-  if (operands.is_empty())
-    sources.push(StringView{"-"});
-  else
-    for (const String &operand : operands)
-      sources.push(operand.view());
+  let const sources =
+      source_list_from_operands(operands, cxt.scratch_allocator());
 
   let const should_print_headers = sources.count() > 1;
   let output = String{cxt.scratch_allocator()};
