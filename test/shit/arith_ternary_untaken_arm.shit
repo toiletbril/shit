@@ -1,0 +1,7 @@
+echo $(( 1 ? 5 : 1/0 ))
+echo $(( 0 ? 1/0 : 7 ))
+shitbox calc '1 ? 5 : 1/0'
+shitbox calc '0 ? 1/0 : 7'
+shitbox calc '1 ? 5 : undefined_var'
+shitbox calc '0 ? c=5 : 9'
+echo "c=[${c-unset}]"

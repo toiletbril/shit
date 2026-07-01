@@ -1,0 +1,79 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1 ? 5 : 1/0 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0 ? 1/0 : 7 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "calc" "1 ? 5 : 1/0"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "calc" "0 ? 1/0 : 7"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "calc" "1 ? 5 : undefined_var"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "calc" "0 ? c=5 : 9"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "c=[$c-unset]"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 1 ? 5 : 1/0 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0 ? 1/0 : 7 "
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "1 ? 5 : 1/0"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "0 ? 1/0 : 7"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "1 ? 5 : undefined_var"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "0 ? c=5 : 9"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "c=["
+  Variable "c-unset"
+  DoubleQuoted "]"
+]
+5
+7
+5
+7
+5
+9
+c=[unset]
+[Code 0]

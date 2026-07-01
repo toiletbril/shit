@@ -537,16 +537,34 @@ public:
           parse_binary(op.kind == 'P' ? op.precedence : op.precedence + 1);
       switch (op.kind) {
       case 'P':
-        if (rhs < 0) fail("exponent less than 0");
+        if (rhs < 0) {
+          if (m_is_skipping) {
+            lhs = 0;
+            break;
+          }
+          fail("exponent less than 0");
+        }
         lhs = arithmetic_power(lhs, rhs);
         break;
       case '*': lhs = arithmetic_multiply(lhs, rhs); break;
       case '/':
-        if (rhs == 0) fail("division by zero");
+        if (rhs == 0) {
+          if (m_is_skipping) {
+            lhs = 0;
+            break;
+          }
+          fail("division by zero");
+        }
         lhs = arithmetic_divide(lhs, rhs);
         break;
       case '%':
-        if (rhs == 0) fail("division by zero");
+        if (rhs == 0) {
+          if (m_is_skipping) {
+            lhs = 0;
+            break;
+          }
+          fail("division by zero");
+        }
         lhs = arithmetic_modulo(lhs, rhs);
         break;
       case '+': lhs = arithmetic_add(lhs, rhs); break;
@@ -1146,6 +1164,9 @@ public:
   usize depth{0};
   /* A nested parser reads a stored formula, so it reports unlocated. */
   bool is_top_level{false};
+  /* The untaken arm of a ternary parses to advance the cursor but takes no
+     side effect and raises no fault. */
+  bool m_is_skipping{false};
   static constexpr usize MAX_DEPTH = 512;
 
   [[noreturn]] cold fn fail(StringView message) throws -> void
@@ -1198,6 +1219,7 @@ public:
     }
 
     if (!was_found) {
+      if (m_is_skipping) return 0;
       /* calc treats an unset variable as an error, $((...)) reads it as zero.
        */
       let message = "The variable '" + String{name} + "' is not set";
@@ -1243,7 +1265,10 @@ public:
   }
   fn wrap_power(wide_int base, wide_int exponent) throws -> wide_int
   {
-    if (exponent < 0) fail("Exponent less than 0");
+    if (exponent < 0) {
+      if (m_is_skipping) return 0;
+      fail("Exponent less than 0");
+    }
     wide_uint result = 1;
     wide_uint factor = static_cast<wide_uint>(base);
     wide_uint remaining = static_cast<wide_uint>(exponent);
@@ -1286,8 +1311,20 @@ public:
      re-evaluates it against the current context. */
   fn write_variable(StringView name, StringView expression_text) throws -> void
   {
+    if (m_is_skipping) return;
     ASSERT(context != nullptr);
     context->set_shell_variable(name, expression_text);
+  }
+
+  /* The flag is saved and restored so a nested skip inside an already-skipped
+     region stays skipped. */
+  fn parse_skipped(wide_int (WideArithmeticParser::*parse_branch)()) throws
+      -> wide_int
+  {
+    let const was_skipping = m_is_skipping;
+    m_is_skipping = true;
+    defer { m_is_skipping = was_skipping; };
+    return (this->*parse_branch)();
   }
 
   fn parse_assignment() throws -> wide_int
@@ -1319,10 +1356,19 @@ public:
   {
     let const condition = parse_binary(1);
     if (consume("?")) {
-      let const if_true = parse_ternary();
+      if (condition != 0) {
+        let const if_true = parse_assignment();
+        if (!consume(":")) fail("Expected ':' in a conditional");
+        let const if_false =
+            parse_skipped(&WideArithmeticParser::parse_ternary);
+        unused(if_false);
+        return if_true;
+      }
+      let const if_true =
+          parse_skipped(&WideArithmeticParser::parse_assignment);
+      unused(if_true);
       if (!consume(":")) fail("Expected ':' in a conditional");
-      let const if_false = parse_ternary();
-      return condition != 0 ? if_true : if_false;
+      return parse_ternary();
     }
     return condition;
   }
@@ -1383,11 +1429,23 @@ public:
       case 'P': lhs = wrap_power(lhs, rhs); break;
       case '*': lhs = wrap_mul(lhs, rhs); break;
       case '/':
-        if (rhs == 0) fail("Division by zero");
+        if (rhs == 0) {
+          if (m_is_skipping) {
+            lhs = 0;
+            break;
+          }
+          fail("Division by zero");
+        }
         lhs = lhs / rhs;
         break;
       case '%':
-        if (rhs == 0) fail("Division by zero");
+        if (rhs == 0) {
+          if (m_is_skipping) {
+            lhs = 0;
+            break;
+          }
+          fail("Division by zero");
+        }
         lhs = lhs % rhs;
         break;
       case '+': lhs = wrap_add(lhs, rhs); break;
