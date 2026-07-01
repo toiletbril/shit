@@ -56,6 +56,7 @@ public:
   enum class Kind : u8
   {
     Bool,
+    RepeatedBool,
     String,
     ManyStrings,
   };
@@ -91,13 +92,26 @@ public:
 
   fn toggle() throws -> void;
   pure fn is_enabled() const wontthrow -> bool;
-  pure fn toggle_count() const wontthrow -> usize;
 
   fn reset() throws -> void override;
 
 private:
   bool m_value{false};
-  usize m_toggle_count{0};
+};
+
+class FlagRepeatedBool : public Flag
+{
+public:
+  FlagRepeatedBool(char short_name, StringView long_name, flag_section section,
+                   StringView description);
+
+  fn increment() throws -> void;
+  pure fn count() const wontthrow -> usize;
+
+  fn reset() throws -> void override;
+
+private:
+  usize m_count{0};
 };
 
 class FlagString : public Flag

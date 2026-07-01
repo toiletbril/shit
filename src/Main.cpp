@@ -95,9 +95,11 @@ FLAG(
 FLAG(DUMB, Bool, '\0', "dumb", Compat,
      "Makes shit extremely dumb. Equals to --mood sh -T --no-diagnostics.");
 
-FLAG(WARNINGS, Bool, 'W', "force-warnings", Shit,
-     "Keep the analysis stage but report every error as a warning and let the "
-     "run proceed, instead of stopping on the first error.");
+FLAG(
+    WARNINGS, RepeatedBool, 'W', "", Shit,
+    "Keep the analysis stage but report every error as a warning and let the "
+    "run proceed. A single -W warns in the strict default mood, and a repeated "
+    "-W warns in every mood.");
 FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Shit,
      "List the shellcheck-style checks the analysis stage reports, then exit.");
 FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Shit,
@@ -412,7 +414,7 @@ static fn run_script_contents(const String &script_contents,
         precompiled_ast == nullptr &&
         (FLAG_SHOW_OPTIMIZER_STATE.is_enabled() ||
          ((!(context.is_bash_compatible() || context.is_posix_mode()) ||
-           FLAG_WARNINGS.is_enabled()) &&
+           FLAG_WARNINGS.count() > 0) &&
           !context.diagnostics_disabled()));
     LOG(Debug, "the analysis stage %s for this chunk",
         run_analysis ? "runs" : "is skipped");
@@ -422,11 +424,11 @@ static fn run_script_contents(const String &script_contents,
        no-local check can lazily query whether a name is already a variable. */
     let const analysis_failed =
         run_analysis &&
-        !analyze_ast(
-            ast, script_contents, context.function_names(),
-            context.alias_names(), &context, FLAG_WARNINGS.is_enabled(),
-            FLAG_WARNINGS.is_enabled() && context.shell_is_interactive(),
-            FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
+        !analyze_ast(ast, script_contents, context.function_names(),
+                     context.alias_names(), &context, FLAG_WARNINGS.count() > 0,
+                     FLAG_WARNINGS.count() > 0 &&
+                         context.shell_is_interactive(),
+                     FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
     /* A tree that parses and analyzes clean is handed back so the
        PROMPT_COMMAND hook can cache it. */
     if (!analysis_failed && out_ast != nullptr) {
@@ -1194,7 +1196,7 @@ fn main(int argc, char **argv) -> int
      so the runtime checks downgrade and set -W can flip it mid-run. */
   context.set_error_unset(FLAG_NOUNSET.is_enabled());
   if (FLAG_NOUNSET.is_enabled()) context.set_error_unset_explicit(true);
-  let const warnings_specified_count = FLAG_WARNINGS.toggle_count();
+  let const warnings_specified_count = FLAG_WARNINGS.count();
   context.set_warning_level(static_cast<u8>(
       warnings_specified_count > 2 ? 2 : warnings_specified_count));
   context.set_pipefail(false);

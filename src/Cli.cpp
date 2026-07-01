@@ -39,24 +39,32 @@ FlagBool::FlagBool(char short_name, StringView long_name, flag_section section,
     : Flag(Flag::Kind::Bool, short_name, long_name, section, description)
 {}
 
-fn FlagBool::toggle() throws -> void
-{
-  m_value = !m_value;
-  m_toggle_count++;
-}
+fn FlagBool::toggle() throws -> void { m_value = !m_value; }
 
 pure fn FlagBool::is_enabled() const wontthrow -> bool { return m_value; }
-
-pure fn FlagBool::toggle_count() const wontthrow -> usize
-{
-  return m_toggle_count;
-}
 
 fn FlagBool::reset() throws -> void
 {
   m_position = 0;
   m_value = false;
-  m_toggle_count = 0;
+}
+
+FlagRepeatedBool::FlagRepeatedBool(char short_name, StringView long_name,
+                                   flag_section section, StringView description)
+    : Flag(Flag::Kind::RepeatedBool, short_name, long_name, section,
+           description)
+{
+  ASSERT(long_name.is_empty());
+}
+
+fn FlagRepeatedBool::increment() throws -> void { m_count++; }
+
+pure fn FlagRepeatedBool::count() const wontthrow -> usize { return m_count; }
+
+fn FlagRepeatedBool::reset() throws -> void
+{
+  m_position = 0;
+  m_count = 0;
 }
 
 FlagString::FlagString(char short_name, StringView long_name,
@@ -330,6 +338,21 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           }
         } break;
 
+        case Flag::Kind::RepeatedBool: {
+          let const repeated_flag = static_cast<FlagRepeatedBool *>(flag);
+
+          repeated_flag->increment();
+          repeated_flag->set_position(++position);
+          LOG(All, "incremented the flag '%s'",
+              flag_name(repeated_flag, is_long).c_str());
+
+          if (!is_long && *value_offset != '\0') {
+            ++flag_offset;
+            should_repeat = true;
+            continue;
+          }
+        } break;
+
         case Flag::Kind::String:
         case Flag::Kind::ManyStrings: {
           if (*value_offset == '\0') {
@@ -585,6 +608,11 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
     if (f->short_name() != '\0') {
       left += "  -";
       left += f->short_name();
+      if (f->kind() == shit::Flag::Kind::RepeatedBool) {
+        left += "[";
+        left += f->short_name();
+        left += "..]";
+      }
       if (!f->long_name().is_empty()) left += ", ";
     } else if (!f->long_name().is_empty()) {
       left += "      ";
@@ -598,7 +626,8 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
       switch (f->kind()) {
       case shit::Flag::Kind::String: left += "=<...>"; break;
       case shit::Flag::Kind::ManyStrings: left += "=<.., ..>"; break;
-      case shit::Flag::Kind::Bool: break;
+      case shit::Flag::Kind::Bool:
+      case shit::Flag::Kind::RepeatedBool: break;
       }
     }
 

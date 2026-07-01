@@ -35,7 +35,7 @@ _shit_complete()
     local long_flags="--version --short-version --help --interactive --stdin \
 --command --error-exit --no-glob --one-command --verbose --xtrace --export-all \
 --no-clobber --no-exec --no-unset --login --rcfile --privileged --clean --posix --mood \
---init-moods --mimicry --dumb --force-warnings --list-diagnostics \
+--init-moods --mimicry --dumb --list-diagnostics \
 --no-diagnostics --no-init-diagnostics --no-completion --no-syntax-highlighting \
 --enable-shitbox \
 --show-ast \
