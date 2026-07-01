@@ -125,6 +125,26 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
     return;
   }
 
+  /* A declare -A name keeps its associative attribute through a later name=()
+     or name=([k]=v), the way bash clears the elements without downgrading the
+     array to an indexed one. */
+  if (is_associative_array(name)) {
+    if (!is_append) {
+      clear_associative_array(name);
+      m_associative_names.add(name);
+    }
+
+    for (const String &element : elements) {
+      StringView subscript;
+      StringView value;
+      if (parse_explicit_array_index(element.view(), subscript, value))
+        set_associative_element(name, subscript, value);
+      else
+        set_associative_element(name, element.view(), "");
+    }
+    return;
+  }
+
   usize running_index = 0;
   if (is_append) {
     /* An append continues after the highest set index, the dense end or the
@@ -712,8 +732,10 @@ fn EvalContext::array_element_is_set(StringView name,
   if (subscript == "@" || subscript == "*") {
     return !collect_array_elements(name).is_empty();
   }
-  if (is_associative_array(name))
-    return lookup_associative_element(name, subscript).has_value();
+  if (is_associative_array(name)) {
+    const String key = expand_modifier_word(subscript);
+    return lookup_associative_element(name, key.view()).has_value();
+  }
   /* An indexed subscript is an arithmetic expression, so arr[1+1] resolves the
      way an indexed read would. */
   const i64 index = evaluate_arithmetic(subscript);
