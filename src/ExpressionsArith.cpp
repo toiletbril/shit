@@ -216,9 +216,12 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
 
+  let const condition_is_blank = is_blank_clause(m_condition.view());
+  let const step_is_blank = is_blank_clause(m_step.view());
+
   i64 ret = 0;
   /* An empty condition is always true, the way for ((;;)) loops forever. */
-  while (is_blank_clause(m_condition.view()) ||
+  while (condition_is_blank ||
          (m_folded_condition.has_value()
               ? (*m_folded_condition != 0)
               : cxt.evaluate_arithmetic_cached_clause(
@@ -229,7 +232,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
     /* The step runs after the body on every iteration, including one ended by a
        continue. */
-    if (!is_blank_clause(m_step.view())) {
+    if (!step_is_blank) {
       cxt.evaluate_arithmetic_cached_clause(m_step.view(), m_step_tokens,
                                             m_step_tokenized, m_step_simple);
     }

@@ -206,6 +206,11 @@ fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
 fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>
 {
   ArrayList<StringView> lines{heap_allocator()};
+  usize line_count = 1;
+  for (usize i = 0; i < text.length; i++)
+    if (text[i] == '\n') line_count++;
+  lines.reserve(line_count);
+
   usize start = 0;
   for (usize i = 0; i < text.length; i++) {
     if (text[i] == '\n') {

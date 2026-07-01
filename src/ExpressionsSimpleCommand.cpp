@@ -1077,8 +1077,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (!m_array_args.is_empty())
     array_command_name = String{program_args[0].view()};
 
-  if (const Expression *function_body =
-          cxt.has_functions() ? cxt.find_function(program_name) : nullptr;
+  if (const Expression *function_body = command_word_function;
       function_body != nullptr)
   {
     /* An input redirection on the call lands on the real fd 0 for the body's

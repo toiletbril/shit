@@ -100,8 +100,9 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   if (os::INTERRUPT_REQUESTED) return 130;
   let output = String{cxt.scratch_allocator()};
   output.reserve(input.count());
-  for (usize i = 0; i < input.count(); i++) {
-    let const c = static_cast<unsigned char>(input.view()[i]);
+  let const input_view = input.view();
+  for (usize i = 0; i < input_view.length; i++) {
+    let const c = static_cast<unsigned char>(input_view[i]);
     if (!is_in_set1[c]) {
       output.push(static_cast<char>(c));
       continue;

@@ -105,8 +105,9 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
     u64 words = 0;
     u64 bytes = content->count();
     bool is_in_word = false;
-    for (usize i = 0; i < content->count(); i++) {
-      let const c = content->view()[i];
+    let const bytes_view = content->view();
+    for (usize i = 0; i < bytes_view.length; i++) {
+      let const c = bytes_view[i];
       if (c == '\n') lines++;
       if (is_blank(c)) {
         is_in_word = false;

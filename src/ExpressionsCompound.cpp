@@ -542,7 +542,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
       if (first->kind() != Token::Kind::Word) continue;
       const Word &word = static_cast<const tokens::WordToken *>(first)->word();
       if (word.plain_literal_kind() == Word::PlainLiteral::NotPlain) continue;
-      if (cxt.find_function(word.to_literal_string().view()) != nullptr) {
+      if (cxt.find_function(word.constant_value()) != nullptr) {
         has_compound_stage = true;
         break;
       }

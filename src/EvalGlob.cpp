@@ -79,10 +79,11 @@ fn EvalContext::expand_path_once(const glob_field &field,
   for (let const &entry_name : *entries) {
     let const filename = entry_name.view();
 
-    let full_path = parent_dir;
-    full_path.push_component(filename);
-
-    if (!should_expand_files && !full_path.is_directory()) continue;
+    if (!should_expand_files) {
+      let full_path = parent_dir;
+      full_path.push_component(filename);
+      if (!full_path.is_directory()) continue;
+    }
 
     /* A leading-dot-less pattern skips a dotfile unless dotglob is on. */
     if (filename == "." || filename == "..") {

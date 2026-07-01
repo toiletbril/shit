@@ -356,9 +356,10 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool should_stop = false;
 
   let do_consume_star = [&](String &spec) throws {
-    spec.append(String::from(parse_printf_integer(do_operand_at(operand_index)),
-                             cxt.scratch_allocator())
-                    .view());
+    char number_text[24];
+    spec.append(utils::int_to_text_into(
+        parse_printf_integer(do_operand_at(operand_index)), number_text,
+        sizeof(number_text)));
     operand_index++;
     has_consumed_a_conversion = true;
   };

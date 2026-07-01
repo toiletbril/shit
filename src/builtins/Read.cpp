@@ -93,7 +93,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const usize first_operand = 1;
   let const operand_count = has_operands ? names.count() - first_operand : 1;
   const String reply_name = "REPLY";
-  let do_operand_name = [&](usize index) -> String {
+  let do_operand_name = [&](usize index) -> const String & {
     if (!has_operands) return reply_name;
     ASSERT(first_operand + index < names.count());
     return names[first_operand + index];

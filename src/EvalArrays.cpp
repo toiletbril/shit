@@ -14,7 +14,9 @@ static fn sparse_array_key(StringView name, usize index,
 {
   let key = String{allocator, name};
   key.push('\x01');
-  key.append(String::from(index, heap_allocator()).view());
+  char index_text[24];
+  key.append(utils::int_to_text_into(static_cast<i64>(index), index_text,
+                                     sizeof(index_text)));
   return key;
 }
 
