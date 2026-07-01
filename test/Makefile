@@ -16,6 +16,18 @@ else
 BIN ?= ../shit$(MODE_SUFFIX)
 endif
 
+# The test drivers run with the current directory set to test, so a BIN given
+# relative to the repo root or as a bare name is resolved to an absolute path
+# here. A path that exists as given wins, then the repo-root sibling, then a
+# PATH lookup, so the target binary is found no matter where make was launched.
+override BIN := $(shell \
+	if [ -x "$(BIN)" ]; then \
+		echo "$$(cd "$$(dirname "$(BIN)")" && pwd)/$$(basename "$(BIN)")"; \
+	elif [ -x "$(CURDIR)/../$(BIN)" ]; then \
+		echo "$$(cd "$(CURDIR)/.." && pwd)/$(BIN)"; \
+	elif command -v "$(BIN)" >/dev/null 2>&1; then command -v "$(BIN)"; \
+	else echo "$(BIN)"; fi)
+
 BIN_FLAGS := -AER
 
 export SHIT_HISTORY := $(CURDIR)/.test_history
