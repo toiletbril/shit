@@ -235,10 +235,10 @@ get_context_pointing_to(StringView source, usize byte_position,
 
   /* The bounded counter walks at most the given byte count, so it never runs
      strlen past the source end at an EOF caret. */
+  const usize caret_limit = sub_sat(line_byte_count, start_offset);
   const usize unicode_length = toiletline::utf8_strnlen(
-      source.data + byte_position, (byte_count > line_byte_count - start_offset)
-                                       ? line_byte_count - start_offset
-                                       : byte_count);
+      source.data + byte_position,
+      byte_count > caret_limit ? caret_limit : byte_count);
 
   msg += '\n';
   for (usize i = 0; i + 3 < gutter_width; i++)
