@@ -477,6 +477,8 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
     let const name = entry.name.view();
     if (!name.starts_with(parts.basename_part)) continue;
 
+    if (directories_only && !entry.is_directory) continue;
+
     /* A dotfile stays hidden unless the user typed a leading dot. */
     if (name.length > 0 && name[0] == '.' &&
         (parts.basename_part.is_empty() || parts.basename_part[0] != '.'))
@@ -505,8 +507,8 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
 }
 
 /* Only the trailing component is globbed. */
-static fn complete_glob(StringView token, const Path &base_directory) throws
-    -> ArrayList<String>
+static fn complete_glob(StringView token, const Path &base_directory,
+                        bool directories_only) throws -> ArrayList<String>
 {
   let candidates = ArrayList<String>{completion_allocator()};
 
@@ -534,6 +536,8 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
     if (!utils::glob_matches(parts.basename_part, name, glob_active, 0)) {
       continue;
     }
+
+    if (directories_only && !entry.is_directory) continue;
 
     let candidate = String{completion_allocator(), parts.directory_part};
     candidate += name;
@@ -768,6 +772,10 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      matches, even in command position. */
   let const inline_glob = token_is_glob && cursor == token_end;
 
+  /* An argument of cd names a directory, so its filesystem and glob matches
+     drop every non-directory entry. */
+  let const directories_only = !is_command && command_word_of(line) == "cd";
+
   let candidates = ArrayList<String>{arena};
   let descriptions = StringMap<String>{arena};
 
@@ -778,7 +786,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else if (token_is_tilde_user_prefix(token) && !is_posix_completion) {
     candidates = complete_tilde_user(token);
   } else if (inline_glob) {
-    candidates = complete_glob(token, base_directory);
+    candidates = complete_glob(token, base_directory, directories_only);
     if (!candidates.is_empty()) {
       candidates.sort();
       let joined = String{arena};
@@ -802,7 +810,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     if (!token.is_empty() || for_listing)
       candidates = complete_command(token, token_is_glob, context);
   } else if (token_is_glob) {
-    candidates = complete_glob(token, base_directory);
+    candidates = complete_glob(token, base_directory, directories_only);
   } else {
     /* The argument cascade runs in the bash and the default moods, the POSIX
        mood goes straight to files. The build tools answer before the man
@@ -837,8 +845,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     {
       /* A token ending in a slash has an empty basename, so the ghost listing
          runs only once a basename is typed. An explicit tab still lists. */
-      candidates =
-          complete_filesystem(token, base_directory, open_quote.has_value());
+      candidates = complete_filesystem(token, base_directory,
+                                       open_quote.has_value(), directories_only);
     }
   }
 

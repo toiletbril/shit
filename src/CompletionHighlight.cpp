@@ -325,8 +325,8 @@ static fn word_names_existing_path(StringView word) throws -> bool
 
 /* A path being typed toward a real file colors yellow rather than red. */
 static fn path_partial_prefixes_entry(StringView word, usize existing_end,
-                                      StringView partial, bool has_tilde) throws
-    -> bool
+                                      StringView partial, bool has_tilde,
+                                      bool directories_only) throws -> bool
 {
   if (partial.is_empty()) return false;
 
@@ -351,7 +351,9 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
   if (entries == nullptr) return false;
 
   for (let const &entry : *entries)
-    if (entry.name.view().starts_with(partial)) {
+    if (entry.name.view().starts_with(partial) &&
+        (!directories_only || entry.is_directory))
+    {
       return true;
     }
 
@@ -371,7 +373,7 @@ static fn word_is_terminated_by_separator(StringView line, usize word_end,
 
 /* Returns whether the word was treated as a path. */
 static fn color_path_argument(usize word_start, StringView word,
-                              bool word_is_terminated,
+                              bool word_is_terminated, bool directories_only,
                               ArrayList<highlight_span> &spans) throws -> bool
 {
   if (word.is_empty() || word[0] == '-') return false;
@@ -383,10 +385,28 @@ static fn color_path_argument(usize word_start, StringView word,
       (word[1] == '/' ||
        (word.length >= 3 && word[1] == '.' && word[2] == '/'));
 
-  /* A bare word with no path shape is treated as a path only when it resolves
-     on disk. */
+  /* A cd argument names a directory, so a valid prefix is a directory. Any
+     other argument accepts any existing path. */
+  let do_prefix_is_valid = [&](StringView prefix) throws -> bool {
+    StringView target = prefix;
+    let expanded = String{bump_allocator(HIGHLIGHT_ARENA)};
+    if (has_tilde) {
+      Maybe<String> home = utils::expand_leading_tilde_path(prefix);
+      if (!home.has_value()) return false;
+      expanded = steal(*home);
+      target = expanded.view();
+    }
+
+    return directories_only ? Path{target}.is_directory()
+                            : Path{target}.exists();
+  };
+
+  /* A cd argument is always a path, so a shapeless word is colored even when it
+     names no directory. Any other command leaves a shapeless non-path word
+     alone unless it resolves on disk. */
   let const has_no_path_shape = !has_slash && !has_tilde && !has_dot_prefix;
-  if (has_no_path_shape && !word_names_existing_path(word)) {
+  if (has_no_path_shape && !directories_only &&
+      !word_names_existing_path(word)) {
     return false;
   }
 
@@ -395,24 +415,14 @@ static fn color_path_argument(usize word_start, StringView word,
      down and the first that exists is the answer. */
   usize existing_end = 0;
   if (has_no_path_shape) {
-    existing_end = word.length;
+    existing_end = do_prefix_is_valid(word) ? word.length : 0;
   } else {
     for (usize scan = word.length; scan >= 1; scan--) {
       let const at_boundary = scan == word.length || word[scan] == '/';
       if (!at_boundary) continue;
 
       let const typed_prefix = word.substring_of_length(0, scan);
-      let exists = false;
-      if (has_tilde) {
-        if (Maybe<String> expanded =
-                utils::expand_leading_tilde_path(typed_prefix);
-            expanded.has_value())
-          exists = Path{expanded->view()}.exists();
-      } else {
-        exists = Path{typed_prefix}.exists();
-      }
-
-      if (exists) {
+      if (do_prefix_is_valid(typed_prefix)) {
         existing_end =
             scan < word.length && word[scan] == '/' ? scan + 1 : scan;
         break;
@@ -434,7 +444,8 @@ static fn color_path_argument(usize word_start, StringView word,
       word.substring_of_length(existing_end, segment_end - existing_end);
   let const tail_could_complete =
       !word_is_terminated &&
-      path_partial_prefixes_entry(word, existing_end, partial, has_tilde);
+      path_partial_prefixes_entry(word, existing_end, partial, has_tilde,
+                                  directories_only);
   let const tail_color =
       tail_could_complete ? colors::ansi::CYAN : colors::ansi::RED;
   spans.push(highlight_span{word_start + existing_end, word_start + segment_end,
@@ -668,6 +679,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   let pending_heredocs =
       ArrayList<heredoc_pending_highlight>{bump_allocator(HIGHLIGHT_ARENA)};
   let is_command_position = true;
+  let highlight_command_word = StringView{};
   let expecting_in = false;
   let for_variable_pending = false;
   let for_do_expected = false;
@@ -683,6 +695,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (c == '\n') {
         commit_pending_assignments();
         is_command_position = true;
+        highlight_command_word = StringView{};
         expecting_in = false;
         i++;
         if (!pending_heredocs.is_empty()) {
@@ -778,6 +791,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       if (has_opener || (has_separator && !has_redirect)) {
         is_command_position = true;
+        highlight_command_word = StringView{};
         expecting_in = false;
       }
       continue;
@@ -976,8 +990,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       let const is_word_terminated =
           word_is_terminated_by_separator(line, word_end, end);
+      highlight_command_word = word;
       if (word.find_character('/').has_value()) {
-        color_path_argument(word_start, word, is_word_terminated, spans);
+        color_path_argument(word_start, word, is_word_terminated, false, spans);
       } else if (word_defines_function(line, word_end, end)) {
         do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
         line_functions.add(word);
@@ -1006,7 +1021,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       } else {
         let const is_word_terminated =
             word_is_terminated_by_separator(line, word_end, end);
-        color_path_argument(word_start, word, is_word_terminated, spans);
+        color_path_argument(word_start, word, is_word_terminated,
+                            highlight_command_word == "cd", spans);
       }
     }
     for (let const &inner : word_spans)

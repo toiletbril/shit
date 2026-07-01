@@ -1,0 +1,8 @@
+== cd offers only directories:
+alpha_dir/
+== cd with no prefix lists the directories:
+alpha_dir/
+beta_dir/
+== ls still offers files and directories:
+alpha_dir/
+alpha_file

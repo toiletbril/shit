@@ -1,0 +1,9 @@
+== cd into a directory colors it as a valid path:
+cd	\e[34m
+adir	\e[96m
+== cd into a file colors it red:
+cd	\e[34m
+afile	\e[31m
+== ls of the same file stays a valid path:
+ls	\e[34m
+afile	\e[96m
