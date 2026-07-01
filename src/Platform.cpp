@@ -2373,7 +2373,7 @@ fn unset_environment_variable(StringView key) -> void
 
 fn environment_names() -> ArrayList<String>
 {
-  ArrayList<String> names{};
+  ArrayList<String> names{heap_allocator()};
   char *block = GetEnvironmentStringsA();
   if (block == nullptr) return names;
   for (char *entry = block; *entry != '\0';) {
@@ -2876,7 +2876,7 @@ fn make_os_args(const ArrayList<String> &args) -> os_args
 {
   ASSERT(args.count() > 0);
 
-  String command_line{};
+  String command_line{heap_allocator()};
   append_windows_quoted_arg(command_line, args[0].view());
   for (usize i = 1; i < args.count(); i++) {
     command_line += ' ';
@@ -2898,7 +2898,7 @@ cold fn last_system_error_message() throws -> String
       reinterpret_cast<LPSTR>(&errno_str), 0, nullptr); /* NOLINT */
 
   if (ret == 0) {
-    return String::from(win_errno) +
+    return String::from(win_errno, heap_allocator()) +
            StringView{" (Error message could not be processed due to "
                       "a FormatMessage() failure)"};
   }
@@ -2915,7 +2915,7 @@ cold fn last_system_error_message() throws -> String
     view = view.substring_of_length(0, view.length - 1);
   }
 
-  String err{};
+  String err{heap_allocator()};
   for (usize i = 0; i < view.length; i++) {
     /* A %N placeholder is replaced with a word since no argument is passed. */
     if (view[i] == '%' && i + 1 < view.length && isdigit(view[i + 1])) {
@@ -2929,7 +2929,7 @@ cold fn last_system_error_message() throws -> String
   LocalFree(errno_str);
 
   if (err.length() > 0) {
-    String capitalized{};
+    String capitalized{heap_allocator()};
     capitalized.push(static_cast<char>(toupper(err[0])));
     capitalized += err.substring(1);
     err = steal(capitalized);
@@ -3076,7 +3076,7 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
    */
   measured_result result{};
 
-  String command_line{};
+  String command_line{heap_allocator()};
   for (usize i = 0; i < argv.count(); i++) {
     if (i > 0) command_line.push(' ');
     command_line.append(argv[i].view());
