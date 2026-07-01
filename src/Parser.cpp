@@ -216,6 +216,19 @@ fn Parser::skip_newlines_after_pipe() throws -> void
     m_lexer.advance_past_last_peek();
 }
 
+fn Parser::skip_semicolons_and_newlines() throws -> void
+{
+  loop
+  {
+    Token *t = m_lexer.peek_shell_token();
+    ASSERT(t != nullptr);
+    if (t->kind() != Token::Kind::Semicolon &&
+        t->kind() != Token::Kind::Newline)
+      break;
+    m_lexer.advance_past_last_peek();
+  }
+}
+
 /* Skip to the next statement boundary so parsing resumes after a syntax error.
    At least one token is always consumed, so the offending token cannot stall
    the loop. */
@@ -1407,18 +1420,7 @@ hot fn Parser::parse_for() throws -> Command *
     }
   }
 
-  loop
-  {
-    Token *t = m_lexer.peek_shell_token();
-    ASSERT(t != nullptr);
-    if (t->kind() == Token::Kind::Semicolon ||
-        t->kind() == Token::Kind::Newline)
-    {
-      m_lexer.advance_past_last_peek();
-      continue;
-    }
-    break;
-  }
+  skip_semicolons_and_newlines();
 
   Token *do_token = m_lexer.next_shell_token();
   ASSERT(do_token != nullptr);
@@ -1505,18 +1507,7 @@ hot fn Parser::parse_select() throws -> Command *
     }
   }
 
-  loop
-  {
-    Token *t = m_lexer.peek_shell_token();
-    ASSERT(t != nullptr);
-    if (t->kind() == Token::Kind::Semicolon ||
-        t->kind() == Token::Kind::Newline)
-    {
-      m_lexer.advance_past_last_peek();
-      continue;
-    }
-    break;
-  }
+  skip_semicolons_and_newlines();
 
   Token *do_token = m_lexer.next_shell_token();
   ASSERT(do_token != nullptr);
@@ -1875,18 +1866,7 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
                                             separators[1] - separators[0] - 1)};
   let const step = String{allocator, header.substring(separators[1] + 1)};
 
-  loop
-  {
-    Token *t = m_lexer.peek_shell_token();
-    ASSERT(t != nullptr);
-    if (t->kind() == Token::Kind::Semicolon ||
-        t->kind() == Token::Kind::Newline)
-    {
-      m_lexer.advance_past_last_peek();
-      continue;
-    }
-    break;
-  }
+  skip_semicolons_and_newlines();
 
   Token *do_token = m_lexer.next_shell_token();
   ASSERT(do_token != nullptr);

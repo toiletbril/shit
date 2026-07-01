@@ -42,6 +42,7 @@ private:
   fn recover_to_next_statement() throws -> void;
 
   fn skip_newlines_after_pipe() throws -> void;
+  fn skip_semicolons_and_newlines() throws -> void;
 
   /* Build one file or descriptor-duplication redirection for descriptor fd. The
      operator is already consumed and op_location is its position. Shared by the
