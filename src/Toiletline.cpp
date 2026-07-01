@@ -165,8 +165,13 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 
     if (result.candidates.is_empty()) return 0;
 
-    COMPLETION_CANDIDATES = steal(result.candidates);
-    COMPLETION_LCP = steal(result.longest_common_prefix);
+    COMPLETION_CANDIDATES.clear();
+    COMPLETION_CANDIDATES.reserve(result.candidates.count());
+    for (let const &candidate : result.candidates)
+      COMPLETION_CANDIDATES.push(
+          shit::String{shit::heap_allocator(), candidate.view()});
+    COMPLETION_LCP = shit::String{shit::heap_allocator(),
+                                  result.longest_common_prefix.view()};
 
     COMPLETION_CANDIDATE_POINTERS.clear();
     COMPLETION_CANDIDATE_POINTERS.reserve(COMPLETION_CANDIDATES.count());

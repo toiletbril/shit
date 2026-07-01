@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Allocator.hpp"
+#include "Arena.hpp"
 #include "Completion.hpp"
 #include "Containers.hpp"
 #include "String.hpp"
@@ -8,6 +10,13 @@
 namespace shit {
 
 namespace completion {
+
+extern BumpArena COMPLETION_ARENA;
+
+inline fn completion_allocator() wontthrow -> Allocator
+{
+  return bump_allocator(COMPLETION_ARENA);
+}
 
 /* One listed child, its name and whether it is a directory. The directory flag
    is resolved once when the listing is read, from the dirent type the read
