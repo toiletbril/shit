@@ -48,10 +48,11 @@ static fn print_builtin_columns(ExecContext &ec, Allocator allocator) throws
 {
   let const sorted = sorted_builtin_names(allocator);
 
-  usize longest = 0;
+  usize longest_length = 0;
   for (let const &builtin_name : sorted)
-    if (builtin_name.length() > longest) longest = builtin_name.length();
-  let const column_width = longest + 2;
+    if (builtin_name.length() > longest_length)
+      longest_length = builtin_name.length();
+  let const column_width = longest_length + 2;
   let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
 
   let out = String{allocator};

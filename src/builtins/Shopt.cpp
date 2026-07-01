@@ -85,14 +85,15 @@ const StringView SHOPT_OPTION_NAMES[] = {
     "xpg_echo",
 };
 
-bool is_known_shopt_option(StringView name) throws
+fn is_known_shopt_option(StringView name) throws -> bool
 {
   for (let const &known : SHOPT_OPTION_NAMES)
     if (known == name) return true;
   return false;
 }
 
-String shopt_status_line(StringView name, bool on, Allocator allocator) throws
+fn shopt_status_line(StringView name, bool on, Allocator allocator) throws
+    -> String
 {
   constexpr usize NAME_FIELD_WIDTH = 20;
   let line = String{allocator, name};
@@ -102,12 +103,12 @@ String shopt_status_line(StringView name, bool on, Allocator allocator) throws
   return line;
 }
 
-String format_option_names_help(Allocator allocator) throws
+fn format_option_names_help(Allocator allocator) throws -> String
 {
-  usize longest = 0;
+  usize longest_length = 0;
   for (let const &name : SHOPT_OPTION_NAMES)
-    if (name.length > longest) longest = name.length;
-  let const column_width = longest + 2;
+    if (name.length > longest_length) longest_length = name.length;
+  let const column_width = longest_length + 2;
   let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
 
   let section = String{allocator, "OPTION NAMES\n"};
@@ -129,8 +130,8 @@ String format_option_names_help(Allocator allocator) throws
 /* The bash -p line is a command the shell replays to restore the state, so it
    must execute when a completion script captures it through $(shopt -p name).
  */
-String shopt_reusable_line(StringView name, bool on, bool as_set_option,
-                           Allocator allocator) throws
+fn shopt_reusable_line(StringView name, bool on, bool as_set_option,
+                       Allocator allocator) throws -> String
 {
   let line = String{allocator};
   if (as_set_option)

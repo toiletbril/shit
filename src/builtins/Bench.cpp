@@ -81,9 +81,9 @@ struct command_result
   metric_stats branch_misses{};
 };
 
-fn colored(StringView code, bool may_color) wontthrow -> StringView
+fn colored(StringView code, bool should_color) wontthrow -> StringView
 {
-  return may_color ? code : StringView{};
+  return should_color ? code : StringView{};
 }
 
 template <typename Accessor>
@@ -218,37 +218,37 @@ fn append_padding(String &out, usize count) throws -> void
 }
 
 fn append_metric_line(String &out, const metric_row &row, usize mean_width,
-                      usize std_dev_width, bool may_color) throws -> void
+                      usize std_dev_width, bool should_color) throws -> void
 {
   out += "  ";
   out.append(row.name);
   for (usize pad = row.name.length; pad < 18; pad++)
     out.push(' ');
 
-  out.append(colored(colors::ansi::BOLD_GREEN, may_color));
+  out.append(colored(colors::ansi::BOLD_GREEN, should_color));
   out.append(row.mean.view());
-  out.append(colored(colors::ansi::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, should_color));
   append_padding(out, mean_width - row.mean.length());
 
   out += " +/- ";
-  out.append(colored(colors::ansi::BOLD_GREEN, may_color));
+  out.append(colored(colors::ansi::BOLD_GREEN, should_color));
   out.append(row.std_dev.view());
-  out.append(colored(colors::ansi::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, should_color));
   append_padding(out, std_dev_width - row.std_dev.length());
 
   out += "  (";
-  out.append(colored(colors::ansi::BOLD_CYAN, may_color));
+  out.append(colored(colors::ansi::BOLD_CYAN, should_color));
   out.append(row.min.view());
-  out.append(colored(colors::ansi::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, should_color));
   out += " ... ";
-  out.append(colored(colors::ansi::BOLD_MAGENTA, may_color));
+  out.append(colored(colors::ansi::BOLD_MAGENTA, should_color));
   out.append(row.max.view());
-  out.append(colored(colors::ansi::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, should_color));
   out += ")\n";
 }
 
 fn append_relative_line(String &out, StringView name, const metric_stats &first,
-                        const metric_stats &other, bool may_color) throws
+                        const metric_stats &other, bool should_color) throws
     -> void
 {
   out += "  ";
@@ -275,14 +275,14 @@ fn append_relative_line(String &out, StringView name, const metric_stats &first,
   if (ratio > 1.0) {
     std::snprintf(buffer, sizeof(buffer), "%.2fx slower +/- %.2f", ratio,
                   ratio_uncertainty);
-    out.append(colored(colors::ansi::BOLD_RED, may_color));
+    out.append(colored(colors::ansi::BOLD_RED, should_color));
   } else {
     std::snprintf(buffer, sizeof(buffer), "%.2fx faster +/- %.2f", 1.0 / ratio,
                   ratio_uncertainty / (ratio * ratio));
-    out.append(colored(colors::ansi::BOLD_GREEN, may_color));
+    out.append(colored(colors::ansi::BOLD_GREEN, should_color));
   }
   out += StringView{buffer};
-  out.append(colored(colors::ansi::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, should_color));
   out += "\n";
 }
 
@@ -430,13 +430,13 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
   return result;
 }
 
-fn append_summary(String &out, const command_result &result, bool may_color,
+fn append_summary(String &out, const command_result &result, bool should_color,
                   Allocator allocator) throws -> void
 {
-  out.append(colored(colors::ansi::BOLD, may_color));
+  out.append(colored(colors::ansi::BOLD, should_color));
   out += "Benchmark: ";
   out += result.label;
-  out.append(colored(colors::ansi::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, should_color));
   out += " (" + String::from(result.sample_count, allocator) + " runs)\n";
 
   let rows = ArrayList<metric_row>{allocator};
@@ -466,31 +466,32 @@ fn append_summary(String &out, const command_result &result, bool may_color,
   }
 
   for (usize i = 0; i < rows.count(); i++)
-    append_metric_line(out, rows[i], mean_width, std_dev_width, may_color);
+    append_metric_line(out, rows[i], mean_width, std_dev_width, should_color);
 }
 
 fn append_comparison(String &out, const command_result &first,
-                     const command_result &other, bool may_color) throws -> void
+                     const command_result &other, bool should_color) throws
+    -> void
 {
-  out.append(colored(colors::ansi::BOLD, may_color));
+  out.append(colored(colors::ansi::BOLD, should_color));
   out += "Relative to: ";
   out += first.label;
-  out.append(colored(colors::ansi::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, should_color));
   out += "\n  ";
-  out.append(colored(colors::ansi::BOLD, may_color));
+  out.append(colored(colors::ansi::BOLD, should_color));
   out += other.label;
-  out.append(colored(colors::ansi::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, should_color));
   out += "\n";
 
   append_relative_line(out, "wall time", first.wall_time, other.wall_time,
-                       may_color);
+                       should_color);
   append_relative_line(out, "peak rss", first.peak_rss, other.peak_rss,
-                       may_color);
+                       should_color);
   if (first.has_perf && other.has_perf) {
     append_relative_line(out, "cpu cycles", first.cpu_cycles, other.cpu_cycles,
-                         may_color);
+                         should_color);
     append_relative_line(out, "instructions", first.instructions,
-                         other.instructions, may_color);
+                         other.instructions, should_color);
   }
 }
 
@@ -520,7 +521,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     duration_millis =
         parse_count_flag(FLAG_bench_duration.value(), StringView{"duration"});
 
-  const bool may_color = colors::stdout_wants_color();
+  const bool should_color = colors::stdout_wants_color();
   const bool show_progress = progress_is_enabled();
 
   LOG(Debug, "bench sampling %zu commands for %llu ms each",
@@ -543,13 +544,13 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let out = String{cxt.scratch_allocator()};
   for (usize i = 0; i < results.count(); i++) {
     if (i > 0) out += "\n";
-    append_summary(out, results[i], may_color, cxt.scratch_allocator());
+    append_summary(out, results[i], should_color, cxt.scratch_allocator());
   }
 
   if (results.count() > 1) {
     out += "\n";
     for (usize i = 1; i < results.count(); i++)
-      append_comparison(out, results[0], results[i], may_color);
+      append_comparison(out, results[0], results[i], should_color);
   }
 
   ec.print_to_stdout(out);

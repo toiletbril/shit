@@ -198,20 +198,21 @@ static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
       i++;
     }
     if (i < word.length && word[i] == '=') return true;
-    if (i + 1 < word.length && word[i] == '+' && word[i + 1] == '=')
+    if (i + 1 < word.length && word[i] == '+' && word[i + 1] == '=') {
       return true;
+    }
   }
   return false;
 }
 
 enum class highlight_construct : u8
 {
-  If,
-  WhileUntil,
-  For,
-  Case,
-  Function,
-  Conditional,
+  if_,
+  while_until,
+  for_,
+  case_,
+  function,
+  conditional,
 };
 
 namespace {
@@ -228,8 +229,8 @@ enum class keyword_role : u8
 struct keyword_spec
 {
   keyword_role role;
-  highlight_construct construct = highlight_construct::If;
-  highlight_construct construct_alt = highlight_construct::If;
+  highlight_construct construct = highlight_construct::if_;
+  highlight_construct construct_alt = highlight_construct::if_;
   bool has_alt = false;
   bool next_is_command = false;
   bool opens_in = false;
@@ -241,56 +242,56 @@ struct keyword_spec
 constexpr StaticStringMap<keyword_spec>::entry HIGHLIGHT_KEYWORD_ENTRIES[] = {
     {SSK("if"),
      {.role = keyword_role::open,
-      .construct = highlight_construct::If,
-      .next_is_command = true}                                            },
+      .construct = highlight_construct::if_,
+      .next_is_command = true}                                             },
     {SSK("while"),
      {.role = keyword_role::open,
-      .construct = highlight_construct::WhileUntil,
-      .next_is_command = true}                                            },
+      .construct = highlight_construct::while_until,
+      .next_is_command = true}                                             },
     {SSK("until"),
      {.role = keyword_role::open,
-      .construct = highlight_construct::WhileUntil,
-      .next_is_command = true}                                            },
+      .construct = highlight_construct::while_until,
+      .next_is_command = true}                                             },
     {SSK("for"),
      {.role = keyword_role::open,
-      .construct = highlight_construct::For,
+      .construct = highlight_construct::for_,
       .opens_in = true,
-      .opens_for_variable = true}                                         },
+      .opens_for_variable = true}                                          },
     {SSK("case"),
      {.role = keyword_role::open,
-      .construct = highlight_construct::Case,
-      .opens_in = true}                                                   },
+      .construct = highlight_construct::case_,
+      .opens_in = true}                                                    },
     {SSK("[["),
      {.role = keyword_role::open,
-      .construct = highlight_construct::Conditional,
-      .requires_non_posix = true}                                         },
+      .construct = highlight_construct::conditional,
+      .requires_non_posix = true}                                          },
     {SSK("function"),
      {.role = keyword_role::open,
-      .construct = highlight_construct::Function,
-      .sets_function_pending = true}                                      },
+      .construct = highlight_construct::function,
+      .sets_function_pending = true}                                       },
     {SSK("then"),
-     {.role = keyword_role::check, .construct = highlight_construct::If}  },
+     {.role = keyword_role::check, .construct = highlight_construct::if_}  },
     {SSK("else"),
-     {.role = keyword_role::check, .construct = highlight_construct::If}  },
+     {.role = keyword_role::check, .construct = highlight_construct::if_}  },
     {SSK("elif"),
-     {.role = keyword_role::check, .construct = highlight_construct::If}  },
+     {.role = keyword_role::check, .construct = highlight_construct::if_}  },
     {SSK("do"),
      {.role = keyword_role::check,
-      .construct = highlight_construct::WhileUntil,
-      .construct_alt = highlight_construct::For,
-      .has_alt = true}                                                    },
+      .construct = highlight_construct::while_until,
+      .construct_alt = highlight_construct::for_,
+      .has_alt = true}                                                     },
     {SSK("fi"),
-     {.role = keyword_role::close, .construct = highlight_construct::If}  },
+     {.role = keyword_role::close, .construct = highlight_construct::if_}  },
     {SSK("done"),
      {.role = keyword_role::close,
-      .construct = highlight_construct::WhileUntil,
-      .construct_alt = highlight_construct::For,
-      .has_alt = true}                                                    },
+      .construct = highlight_construct::while_until,
+      .construct_alt = highlight_construct::for_,
+      .has_alt = true}                                                     },
     {SSK("esac"),
-     {.role = keyword_role::close, .construct = highlight_construct::Case}},
-    {SSK("time"),     {.role = keyword_role::plain}                       },
-    {SSK("when"),     {.role = keyword_role::plain}                       },
-    {SSK("in"),       {.role = keyword_role::misplaced_in}                },
+     {.role = keyword_role::close, .construct = highlight_construct::case_}},
+    {SSK("time"),     {.role = keyword_role::plain}                        },
+    {SSK("when"),     {.role = keyword_role::plain}                        },
+    {SSK("in"),       {.role = keyword_role::misplaced_in}                 },
 };
 
 constexpr StaticStringMap<keyword_spec> HIGHLIGHT_KEYWORDS{
@@ -860,7 +861,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     }
 
     if (plain && word == "]]" && !stack.is_empty() &&
-        stack.back() == highlight_construct::Conditional)
+        stack.back() == highlight_construct::conditional)
     {
       do_push(word_start, word_end, colors::ansi::GREEN);
       stack.pop_back();
@@ -874,7 +875,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       for_variable_pending = false;
       is_command_position = false;
       /* A case takes patterns, so this only arms for a for. */
-      if (!stack.is_empty() && stack.back() == highlight_construct::For)
+      if (!stack.is_empty() && stack.back() == highlight_construct::for_)
         for_do_expected = true;
       continue;
     }

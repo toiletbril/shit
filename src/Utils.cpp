@@ -901,8 +901,9 @@ fn extglob_opens_group(StringView glob, usize index) wontthrow -> bool
 {
   if (index + 1 >= glob.count()) return false;
   const char op = glob[index];
-  if (op != '?' && op != '*' && op != '+' && op != '@' && op != '!')
+  if (op != '?' && op != '*' && op != '+' && op != '@' && op != '!') {
     return false;
+  }
   return glob[index + 1] == '(';
 }
 

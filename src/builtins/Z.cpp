@@ -143,14 +143,14 @@ static fn contains_ignore_case(StringView haystack, StringView needle) wontthrow
     return c >= 'A' && c <= 'Z' ? static_cast<char>(c + 32) : c;
   };
   for (usize i = 0; i + needle.length <= haystack.length; i++) {
-    bool matched = true;
+    let is_matched = true;
     for (usize j = 0; j < needle.length; j++) {
       if (do_lower(haystack[i + j]) != do_lower(needle[j])) {
-        matched = false;
+        is_matched = false;
         break;
       }
     }
-    if (matched) return true;
+    if (is_matched) return true;
   }
   return false;
 }

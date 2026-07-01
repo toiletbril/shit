@@ -326,8 +326,9 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       visible_names.push(StringView{".."});
     }
     for (const String &name : *names) {
-      if (!is_showing_dot_names && !name.is_empty() && name.view()[0] == '.')
+      if (!is_showing_dot_names && !name.is_empty() && name.view()[0] == '.') {
         continue;
+      }
       visible_names.push(name.view());
     }
 

@@ -30,7 +30,7 @@ pure fn Trap::kind() const wontthrow -> Builtin::Kind { return Kind::Trap; }
 
 namespace {
 
-String normalize_condition(StringView raw, Allocator allocator) throws
+fn normalize_condition(StringView raw, Allocator allocator) throws -> String
 {
   let name = String{allocator};
   for (usize i = 0; i < raw.count(); i++)
@@ -51,8 +51,8 @@ String normalize_condition(StringView raw, Allocator allocator) throws
   return name;
 }
 
-String format_listed_condition(StringView condition, bool with_sig_prefix,
-                               Allocator allocator) throws
+fn format_listed_condition(StringView condition, bool with_sig_prefix,
+                           Allocator allocator) throws -> String
 {
   if (with_sig_prefix && os::signal_number_from_name(condition).has_value()) {
     let prefixed = String{allocator, "SIG"};

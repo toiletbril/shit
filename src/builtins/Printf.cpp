@@ -78,7 +78,7 @@ fn parse_printf_number(const String &arg) throws -> printf_number
           has_digits && number_end == arg.count(), is_hexadecimal};
 }
 
-i64 parse_printf_integer(const String &arg) throws
+fn parse_printf_integer(const String &arg) throws -> i64
 {
   return parse_printf_number(arg).value;
 }
@@ -96,7 +96,7 @@ pure fn hex_digit_value(char c) wontthrow -> i32
   return c - 'A' + 10;
 }
 
-void append_escape(String &out, const String &fmt, usize &i) throws
+fn append_escape(String &out, const String &fmt, usize &i) throws -> void
 {
   ASSERT(i < fmt.length());
 
@@ -148,7 +148,7 @@ void append_escape(String &out, const String &fmt, usize &i) throws
 }
 
 /* Returns true when a \c was seen so the caller can abort the whole printf. */
-bool append_b_argument(String &out, const String &arg) throws
+fn append_b_argument(String &out, const String &arg) throws -> bool
 {
   for (usize i = 0; i < arg.length(); i++) {
     if (arg[i] != '\\' || i + 1 >= arg.length()) {
@@ -208,14 +208,14 @@ bool append_b_argument(String &out, const String &arg) throws
   return false;
 }
 
-bool is_q_safe_byte(char c)
+fn is_q_safe_byte(char c) throws -> bool
 {
   return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
          (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' ||
          c == '/' || c == ':' || c == '%' || c == '+' || c == '@' || c == '=';
 }
 
-void append_q_argument(String &out, const String &arg) throws
+fn append_q_argument(String &out, const String &arg) throws -> void
 {
   if (utils::append_ansi_c_quote_if_needed(out, arg.view())) return;
 
@@ -236,9 +236,9 @@ fn report_invalid_number(ExecContext &ec, const String &arg, bool is_hex,
   exit_status = 1;
 }
 
-void append_conversion(String &out, const String &spec, char conv,
-                       const String &arg, ExecContext &ec, i32 &exit_status,
-                       Allocator allocator) throws
+fn append_conversion(String &out, const String &spec, char conv,
+                     const String &arg, ExecContext &ec, i32 &exit_status,
+                     Allocator allocator) throws -> void
 {
   char buffer[256];
 
@@ -350,7 +350,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let out = String{cxt.scratch_allocator()};
   i32 exit_status = 0;
   usize operand_index = 0;
-  bool consumed_a_conversion = false;
+  bool has_consumed_a_conversion = false;
   bool should_stop = false;
 
   let do_consume_star = [&](String &spec) throws {
@@ -358,11 +358,11 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                              cxt.scratch_allocator())
                     .view());
     operand_index++;
-    consumed_a_conversion = true;
+    has_consumed_a_conversion = true;
   };
 
   do {
-    consumed_a_conversion = false;
+    has_consumed_a_conversion = false;
     for (usize i = 0; i < fmt.length(); i++) {
       if (fmt[i] == '\\' && i + 1 < fmt.length()) {
         i++;
@@ -418,7 +418,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             append_conversion(out, spec, 's', formatted, ec, exit_status,
                               cxt.scratch_allocator());
           operand_index++;
-          consumed_a_conversion = true;
+          has_consumed_a_conversion = true;
           i = close + 1;
           continue;
         }
@@ -445,17 +445,17 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (conv == 'b') {
         should_stop = append_b_argument(out, arg);
         operand_index++;
-        consumed_a_conversion = true;
+        has_consumed_a_conversion = true;
         if (should_stop) break;
         continue;
       }
       append_conversion(out, spec, conv, arg, ec, exit_status,
                         cxt.scratch_allocator());
       operand_index++;
-      consumed_a_conversion = true;
+      has_consumed_a_conversion = true;
     }
   } while (!should_stop && operand_index < operand_count &&
-           consumed_a_conversion);
+           has_consumed_a_conversion);
 
   if (store_variable.has_value()) {
     let const target = store_variable->view();

@@ -132,15 +132,15 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
     /* A dashed bundle of only a, u, x, and w is the classic ps spelling, the
        a, u, and x select the aux view. */
     if (i > 0 && argument.length > 1 && argument[0] == '-') {
-      bool only_ps_options = true;
+      let is_only_ps_options = true;
       for (usize k = 1; k < argument.length; k++)
         if (argument[k] != 'a' && argument[k] != 'u' && argument[k] != 'x' &&
             argument[k] != 'w')
         {
-          only_ps_options = false;
+          is_only_ps_options = false;
           break;
         }
-      if (only_ps_options) {
+      if (is_only_ps_options) {
         for (usize k = 1; k < argument.length; k++)
           if (argument[k] == 'a' || argument[k] == 'u' || argument[k] == 'x')
             should_show_aux = true;

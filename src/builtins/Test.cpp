@@ -33,7 +33,7 @@ namespace shit {
 
 namespace {
 
-bool parse_integer(StringView text, i64 &out) throws
+fn parse_integer(StringView text, i64 &out) throws -> bool
 {
   let const parsed = text.to<i64>();
   if (parsed.is_error()) return false;

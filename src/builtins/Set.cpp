@@ -163,18 +163,18 @@ const SetOption *find_option_by_name(StringView name) throws
   return nullptr;
 }
 
-bool option_is_on(const EvalContext &cxt, const SetOption &option) throws
+fn option_is_on(const EvalContext &cxt, const SetOption &option) throws -> bool
 {
   return option.get != nullptr ? (cxt.*(option.get))() : false;
 }
 
-bool option_is_startup_fact(const SetOption &option) throws
+fn option_is_startup_fact(const SetOption &option) throws -> bool
 {
   return option.set == nullptr && option.get != nullptr;
 }
 
-void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
-                            bool enable) throws
+fn apply_or_reject_option(EvalContext &cxt, const SetOption &option,
+                          bool enable) throws -> void
 {
   if (option_is_startup_fact(option))
     throw Error{
@@ -197,7 +197,7 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
 }
 
 /* The show-* names are excluded from set -o but kept by set -p. */
-String list_options(const EvalContext &cxt) throws
+fn list_options(const EvalContext &cxt) throws -> String
 {
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
@@ -210,9 +210,9 @@ String list_options(const EvalContext &cxt) throws
   return out;
 }
 
-void apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
-                               const ArrayList<String> &args, usize &i,
-                               bool enable) throws
+fn apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
+                             const ArrayList<String> &args, usize &i,
+                             bool enable) throws -> void
 {
   if (i + 1 >= args.count()) {
     ec.print_to_stdout(list_options(cxt));
@@ -225,8 +225,8 @@ void apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
   apply_or_reject_option(cxt, *option, enable);
 }
 
-String format_option_table(const EvalContext *cxt,
-                           bool include_alias_spellings) throws
+fn format_option_table(const EvalContext *cxt,
+                       bool include_alias_spellings) throws -> String
 {
   const usize name_field_width = include_alias_spellings ? 30 : 18;
   let out = String{heap_allocator()};
@@ -254,7 +254,7 @@ String format_option_table(const EvalContext *cxt,
   return out;
 }
 
-String format_option_switches_help() throws
+fn format_option_switches_help() throws -> String
 {
   let section = String{"OPTION SWITCHES\n"};
   section += "  A letter after a minus enables the option and after a plus "
