@@ -943,7 +943,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     RuntimeState recipe_runtime = saved_runtime;
     recipe_runtime.failglob = false;
     recipe_runtime.error_unset = false;
-    recipe_runtime.are_warnings_enabled = false;
+    recipe_runtime.warning_level = 0;
     recipe_runtime.restore(cxt);
     defer { saved_runtime.restore(cxt); };
 

@@ -754,25 +754,27 @@ public:
      runtime checks below read this mirror so set -W flips it mid-run. */
   fn set_warnings_enabled(bool enabled) wontthrow -> void
   {
-    m_runtime.are_warnings_enabled = enabled;
     if (!enabled)
-      m_warning_level = 0;
-    else if (m_warning_level < 2)
-      m_warning_level++;
+      m_runtime.warning_level = 0;
+    else if (m_runtime.warning_level < 2)
+      m_runtime.warning_level++;
   }
   pure fn warnings_enabled() const wontthrow -> bool
   {
-    return m_runtime.are_warnings_enabled;
+    return m_runtime.warning_level > 0;
   }
-  pure fn warning_level() const wontthrow -> u8 { return m_warning_level; }
+  pure fn warning_level() const wontthrow -> u8
+  {
+    return m_runtime.warning_level;
+  }
   fn set_warning_level(u8 level) wontthrow -> void
   {
-    m_warning_level = level;
-    m_runtime.are_warnings_enabled = level > 0;
+    m_runtime.warning_level = level;
   }
   pure fn warnings_reach_every_mood() const wontthrow -> bool
   {
-    return m_warning_level >= 2 || m_runtime.mood == mimic_mood::Default;
+    return m_runtime.warning_level >= 2 ||
+           m_runtime.mood == mimic_mood::Default;
   }
   /* A reference to an unset variable, fatal under set -u, downgraded to a
      warning under -W unless the set -u was explicit, else expanded to empty. */
@@ -1428,7 +1430,6 @@ protected:
      state so a scope that swaps them saves and restores the whole set with one
      RuntimeState copy. failglob defaults on, the other toggles default off. */
   RuntimeState m_runtime{.failglob = true};
-  u8 m_warning_level{0};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   bool m_mood_set_explicitly{false};

@@ -14,7 +14,7 @@ class RuntimeState
 {
 public:
   mimic_mood mood{mimic_mood::Default};
-  bool are_warnings_enabled{false};
+  u8 warning_level{0};
   bool are_diagnostics_disabled{false};
   bool error_unset{false};
   bool pipefail{false};

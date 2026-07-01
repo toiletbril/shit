@@ -436,7 +436,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
       "Replace it with ${" + String{name} + "-} if empty expansion is desired";
 
   if (m_runtime.error_unset &&
-      (m_runtime.error_unset_explicit || !m_runtime.are_warnings_enabled))
+      (m_runtime.error_unset_explicit || !warnings_enabled()))
   {
     throw_script_fatal("Unable to expand '" + String{name} +
                            "' because the parameter is not set",
@@ -447,7 +447,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   if (is_warning_suppressed(suppressible_warning::UnsetTestOperand)) return;
 
   if (m_runtime.error_unset ||
-      (m_runtime.are_warnings_enabled && warnings_reach_every_mood()))
+      (warnings_enabled() && warnings_reach_every_mood()))
   {
     show_runtime_warning_at(locate_variable_reference(name),
                             "The variable '" + String{name} +
@@ -460,12 +460,12 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
                               SourceLocation location, StringView message,
                               StringView note) throws -> void
 {
-  if (fatal && (explicitly_requested || !m_runtime.are_warnings_enabled)) {
+  if (fatal && (explicitly_requested || !warnings_enabled())) {
     let error = ErrorWithLocation{location, message};
     if (!note.is_empty()) error.set_note(note);
     throw error;
   }
-  if ((fatal || (m_runtime.are_warnings_enabled && warnings_reach_every_mood())) &&
+  if ((fatal || (warnings_enabled() && warnings_reach_every_mood())) &&
       !diagnostics_disabled() && m_current_source != nullptr)
   {
     try {
