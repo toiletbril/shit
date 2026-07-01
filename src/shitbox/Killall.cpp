@@ -54,21 +54,21 @@ fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const self_pid = os::get_shell_process_id();
   let const processes = os::enumerate_processes();
-  bool any_signaled = false;
+  bool has_signaled_any = false;
   for (const os::process_entry &process : processes) {
     if (process.pid == self_pid) continue;
     if (process.name == wanted) {
       if (os::signal_process(os::process_from_pid(process.pid), signal_number))
-        any_signaled = true;
+        has_signaled_any = true;
     }
   }
 
-  if (!any_signaled)
+  if (!has_signaled_any)
     report_soft_shitbox_error(
         ec, cxt,
         "killall: " + String{cxt.scratch_allocator(), wanted} +
             ": no process found");
-  return any_signaled ? 0 : 1;
+  return has_signaled_any ? 0 : 1;
 }
 
 } // namespace shitbox

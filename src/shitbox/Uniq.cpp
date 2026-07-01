@@ -47,7 +47,7 @@ fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   let const source = operands.is_empty() ? StringView{"-"} : operands[0].view();
-  Maybe<String> content = read_named_or_stdin(ec, source);
+  let const content = read_named_or_stdin(ec, source);
   if (os::INTERRUPT_REQUESTED) return 130;
   if (!content.has_value())
     throw Error{

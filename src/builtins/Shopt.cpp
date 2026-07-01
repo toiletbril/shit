@@ -274,9 +274,10 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   for (let const &name : names) {
     if (do_reject_unknown(name)) continue;
-    const bool on = cxt.is_shopt_enabled(name);
-    if (!on) status = 1;
-    if (!is_quiet) ec.print_to_stdout(do_format_status_line(name, on).view());
+    let const is_on = cxt.is_shopt_enabled(name);
+    if (!is_on) status = 1;
+    if (!is_quiet)
+      ec.print_to_stdout(do_format_status_line(name, is_on).view());
   }
   return status;
 }

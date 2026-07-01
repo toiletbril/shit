@@ -71,7 +71,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   i32 status = 0;
   for (usize source_index = 0; source_index < sources.count(); source_index++) {
-    Maybe<String> content = read_named_or_stdin(ec, sources[source_index]);
+    let const content = read_named_or_stdin(ec, sources[source_index]);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
       report_soft_shitbox_error(

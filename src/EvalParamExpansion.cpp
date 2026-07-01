@@ -431,10 +431,11 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   if (spec.length > 1 && spec[0] == '#') {
     let const name = spec.substring(1);
-    if (name == "@" || name == "*")
+    if (name == "@" || name == "*") {
       return String{
           scratch_allocator(),
           String::from(m_positional_params.count(), heap_allocator())};
+    }
 
     /* ${#a[@]} is the element count, ${#a[i]} the length of one element. */
     if (let const bracket = name.find_character('[');
@@ -874,9 +875,10 @@ fn EvalContext::pattern_replace_value(const String &value,
   usize i = 0;
   while (i < value.length()) {
     Maybe<usize> matched;
-    if (!has_replaced || should_replace_all)
+    if (!has_replaced || should_replace_all) {
       matched = longest_pattern_match_at(pattern.view(), pattern_active,
                                          value.view(), i, extglob_enabled());
+    }
     if (matched.has_value()) {
       append_pattern_replacement(out, replacement.view(),
                                  value.view().substring_of_length(i, *matched));

@@ -99,7 +99,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   bool has_any_match = false;
   i32 status = 0;
   for (let const &source : sources) {
-    Maybe<String> content = read_named_or_stdin(ec, source);
+    let const content = read_named_or_stdin(ec, source);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
       report_soft_shitbox_error(

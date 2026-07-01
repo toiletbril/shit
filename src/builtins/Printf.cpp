@@ -38,9 +38,10 @@ struct printf_number
    that opens with a quote yields the next byte's code. */
 fn parse_printf_number(const String &arg) throws -> printf_number
 {
-  if (!arg.is_empty() && (arg[0] == '\'' || arg[0] == '"'))
+  if (!arg.is_empty() && (arg[0] == '\'' || arg[0] == '"')) {
     return {arg.count() > 1 ? static_cast<unsigned char>(arg[1]) : 0, true,
             false};
+  }
 
   usize i = 0;
   while (i < arg.count() && (arg[i] == ' ' || arg[i] == '\t'))
@@ -333,8 +334,9 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     format_index = 3;
   }
 
-  if (format_index < ec.args().count() && ec.args()[format_index] == "--")
+  if (format_index < ec.args().count() && ec.args()[format_index] == "--") {
     format_index++;
+  }
 
   if (format_index >= ec.args().count()) return 0;
 

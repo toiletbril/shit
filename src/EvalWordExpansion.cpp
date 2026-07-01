@@ -857,24 +857,24 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     char quote = 0;
     usize paren_depth = 0;
     usize brace_depth = 0;
-    bool in_backtick = false;
-    bool at_word_start = true;
+    let is_in_backtick = false;
+    let is_at_word_start = true;
     for (usize i = 0; i < wordlist.length; i++) {
       const char character = wordlist[i];
       if (quote != 0) {
         if (character == quote) quote = 0;
-        at_word_start = false;
+        is_at_word_start = false;
         continue;
       }
       if (character == '\\') {
         i++;
-        at_word_start = false;
+        is_at_word_start = false;
         continue;
       }
       if (character == '\'' || character == '"') {
         quote = character;
       } else if (character == '`') {
-        in_backtick = !in_backtick;
+        is_in_backtick = !is_in_backtick;
       } else if (character == '$' && i + 1 < wordlist.length &&
                  wordlist[i + 1] == '(')
       {
@@ -894,18 +894,19 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
         paren_depth--;
       } else if (character == '}' && brace_depth > 0) {
         brace_depth--;
-      } else if (!in_backtick && paren_depth == 0 && brace_depth == 0) {
+      } else if (!is_in_backtick && paren_depth == 0 && brace_depth == 0) {
         if (character == ')' || character == '(' || character == ';' ||
             character == '|' || character == '&' || character == '<' ||
             character == '>' || character == '\n')
         {
           return false;
         }
-        if (character == '#' && at_word_start) return false;
+        if (character == '#' && is_at_word_start) return false;
       }
-      at_word_start = character == ' ' || character == '\t';
+      is_at_word_start = character == ' ' || character == '\t';
     }
-    return quote == 0 && !in_backtick && paren_depth == 0 && brace_depth == 0;
+    return quote == 0 && !is_in_backtick && paren_depth == 0 &&
+           brace_depth == 0;
   };
   if (!is_array_literal_safe()) {
     LOG(Debug, "-W list is not array-literal safe, splitting plain");

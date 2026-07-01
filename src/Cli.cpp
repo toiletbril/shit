@@ -537,8 +537,8 @@ cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
   usize word_start = 0;
   bool is_line_started = false;
   for (usize i = 0; i <= text.length; i++) {
-    const bool at_end = i == text.length;
-    if (!at_end && text[i] != ' ') continue;
+    let const is_at_end = i == text.length;
+    if (!is_at_end && text[i] != ' ') continue;
     const usize word_length = i - word_start;
     if (word_length > 0) {
       if (is_line_started && line_used + 1 + word_length > text_width) {
@@ -614,8 +614,8 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
     usize line_used = 0;
     usize word_start = 0;
     for (usize i = 0; i <= description.length; i++) {
-      const bool at_end = i == description.length;
-      if (!at_end && description[i] != ' ') continue;
+      let const is_at_end = i == description.length;
+      if (!is_at_end && description[i] != ' ') continue;
 
       const usize word_length = i - word_start;
       if (word_length > 0) {

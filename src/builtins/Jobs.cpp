@@ -127,10 +127,12 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   for (let index : selected) {
     let const &job = jobs[index];
 
-    if (FLAG_JOBS_RUNNING.is_enabled() && job.state != job::State::Running)
+    if (FLAG_JOBS_RUNNING.is_enabled() && job.state != job::State::Running) {
       continue;
-    if (FLAG_JOBS_STOPPED.is_enabled() && job.state != job::State::Stopped)
+    }
+    if (FLAG_JOBS_STOPPED.is_enabled() && job.state != job::State::Stopped) {
       continue;
+    }
 
     if (FLAG_JOBS_PIDS.is_enabled()) {
       out += String::from(os::process_id_of(job.pid), cxt.scratch_allocator());

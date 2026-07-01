@@ -91,7 +91,7 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   u64 total_bytes = 0;
   i32 status = 0;
   for (const StringView &source : sources) {
-    Maybe<String> content = read_named_or_stdin(ec, source);
+    let const content = read_named_or_stdin(ec, source);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
       report_soft_shitbox_error(

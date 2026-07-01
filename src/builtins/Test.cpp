@@ -278,24 +278,24 @@ public:
 
   bool parse_term() throws
   {
-    bool result = parse_factor();
+    let is_true = parse_factor();
     while (!at_end() && current() == "-a") {
       pos++;
       let const right = parse_factor();
-      result = result && right;
+      is_true = is_true && right;
     }
-    return result;
+    return is_true;
   }
 
   bool parse_expression() throws
   {
-    bool result = parse_term();
+    let is_true = parse_term();
     while (!at_end() && current() == "-o") {
       pos++;
       let const right = parse_term();
-      result = result || right;
+      is_true = is_true || right;
     }
-    return result;
+    return is_true;
   }
 
   /* The POSIX argument-count rules disambiguate the short forms before the

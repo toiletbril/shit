@@ -74,7 +74,9 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     let const parsed = spec.to<i64>();
     if (parsed.is_error() || !cxt.remove_job(static_cast<i32>(parsed.value())))
+    {
       throw Error{"'" + names[i] + "' is not a valid job"};
+    }
   }
 
   return 0;

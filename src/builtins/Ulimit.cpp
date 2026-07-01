@@ -99,8 +99,9 @@ fn selected_resource() throws -> resource_entry
     return {"locked memory(kbytes)", RLIMIT_MEMLOCK, 1024};
 #endif
 #ifdef RLIMIT_NPROC
-  if (FLAG_PROCESSES.is_enabled() || FLAG_PROCESSES_P.is_enabled())
+  if (FLAG_PROCESSES.is_enabled() || FLAG_PROCESSES_P.is_enabled()) {
     return {"process", RLIMIT_NPROC, 1};
+  }
 #endif
 #ifdef RLIMIT_AS
   if (FLAG_VIRTUAL_MEMORY.is_enabled())

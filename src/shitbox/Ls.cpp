@@ -85,13 +85,13 @@ static fn cached_group_name(u32 gid, ArrayList<id_name_entry> &cache,
 }
 
 static fn append_padded(String &output, StringView field, usize width,
-                        bool pad_on_left) throws -> void
+                        bool should_pad_on_left) throws -> void
 {
-  if (pad_on_left)
+  if (should_pad_on_left)
     for (usize i = field.length; i < width; i++)
       output += ' ';
   output += field;
-  if (!pad_on_left)
+  if (!should_pad_on_left)
     for (usize i = field.length; i < width; i++)
       output += ' ';
 }

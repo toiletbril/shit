@@ -28,17 +28,19 @@ namespace shit {
 
 namespace shitbox {
 
-static fn make_one(StringView path, u32 mode, bool set_exact_mode,
-                   bool ignore_existing) throws -> bool
+static fn make_one(StringView path, u32 mode, bool should_set_exact_mode,
+                   bool should_ignore_existing) throws -> bool
 {
   if (os::make_directory(path, mode)) {
     /* The create narrows the bits by the umask, so an explicit -m re-applies
        the exact mode. */
-    if (set_exact_mode && !os::set_file_mode(path, mode)) return false;
+    if (should_set_exact_mode && !os::set_file_mode(path, mode)) {
+      return false;
+    }
     return true;
   }
 
-  if (ignore_existing && Path{path}.is_directory()) return true;
+  if (should_ignore_existing && Path{path}.is_directory()) return true;
   return false;
 }
 

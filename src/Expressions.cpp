@@ -1583,9 +1583,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   /* A recorded constant survives only across an environment-neutral command
      that writes no variable and runs no unseen code. Every other command
      forgets the whole table. */
-  bool clears_constants =
+  let should_clear_constants =
       !optimizer::command_is_environment_neutral(command_literal.view());
-  if (!clears_constants) {
+  if (!should_clear_constants) {
     /* A command substitution runs arbitrary code, so even a neutral builtin
        carrying one forgets the table. */
     for (let const t : m_args) {
@@ -1593,24 +1593,24 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       let const &word = static_cast<const tokens::WordToken *>(t)->word();
       for (let const &segment : word.segments) {
         if (segment.kind == WordSegment::Kind::CommandSubstitution) {
-          clears_constants = true;
+          should_clear_constants = true;
           break;
         }
       }
-      if (clears_constants) break;
+      if (should_clear_constants) break;
     }
   }
 
   /* A neutral builtin shadowed by a function or alias is really a call into
      user code, so it forgets the table too. */
-  if (!clears_constants &&
+  if (!should_clear_constants &&
       (actx.defined_functions.contains(command_literal.view()) ||
        actx.known_aliases.contains(command_literal.view())))
   {
-    clears_constants = true;
+    should_clear_constants = true;
   }
 
-  if (clears_constants) {
+  if (should_clear_constants) {
     LOG(Debug,
         "the command '%s' may write variables, forgetting the recorded "
         "constants",

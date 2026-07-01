@@ -292,9 +292,10 @@ fn parse_count_flag(StringView text, StringView flag_name) throws -> u64
   bool has_seen_digit = false;
   for (usize i = 0; i < text.length; i++) {
     const char c = text[i];
-    if (c < '0' || c > '9')
+    if (c < '0' || c > '9') {
       throw Error{StringView{"--"} + flag_name + " expects a number, got '" +
                   text + "'"};
+    }
     value = value * 10 + static_cast<u64>(c - '0');
     has_seen_digit = true;
   }
@@ -327,7 +328,7 @@ fn clear_progress() throws -> void
 }
 
 fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
-                  bool show_progress, bool &was_interrupted,
+                  bool should_show_progress, bool &was_interrupted,
                   Allocator allocator) throws -> command_result
 {
   let result = command_result{allocator};
@@ -363,19 +364,21 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
     const bool has_reached_duration =
         !run_limit.has_value() && elapsed_nanos >= duration_nanos;
 
-    if (has_reached_min && (has_reached_run_limit || has_reached_duration))
+    if (has_reached_min && (has_reached_run_limit || has_reached_duration)) {
       break;
+    }
     if (i >= MAX_SAMPLES) break;
 
-    if (show_progress &&
+    if (should_show_progress &&
         (elapsed_nanos - last_progress_nanos) >= PROGRESS_INTERVAL_NANOS)
     {
       last_progress_nanos = elapsed_nanos;
       u64 percent = 0;
-      if (run_limit.has_value() && *run_limit > 0)
+      if (run_limit.has_value() && *run_limit > 0) {
         percent = static_cast<u64>(i) * 100 / *run_limit;
-      else if (duration_nanos > 0)
+      } else if (duration_nanos > 0) {
         percent = elapsed_nanos * 100 / duration_nanos;
+      }
       draw_progress(command, percent, allocator);
     }
 
@@ -405,7 +408,7 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
     samples.push(sample);
   }
 
-  if (show_progress) clear_progress();
+  if (should_show_progress) clear_progress();
 
   result.sample_count = samples.count();
   result.has_perf = has_perf;
@@ -522,7 +525,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         parse_count_flag(FLAG_bench_duration.value(), StringView{"duration"});
 
   const bool should_color = colors::stdout_wants_color();
-  const bool show_progress = progress_is_enabled();
+  let const should_show_progress = progress_is_enabled();
 
   LOG(Debug, "bench sampling %zu commands for %llu ms each",
       arguments.count() - 1, static_cast<unsigned long long>(duration_millis));
@@ -531,7 +534,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   for (usize i = 1; i < arguments.count(); i++) {
     bool was_interrupted = false;
     results.push(sample_command(arguments[i].view(), run_limit, duration_millis,
-                                show_progress, was_interrupted,
+                                should_show_progress, was_interrupted,
                                 cxt.scratch_allocator()));
 
     /* A Ctrl-C clears the interrupt flag and returns 130. */

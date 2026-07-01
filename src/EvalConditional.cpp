@@ -348,8 +348,9 @@ struct conditional_evaluator
     if (pos + 1 < elements.count()) {
       const Kind next = kind_at(pos + 1);
       if (next == Kind::Less || next == Kind::Greater) {
-        if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
+        if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand) {
           fail_conditional("An operand is missing after a comparison");
+        }
         pos += 3;
         if (is_skipping) return false;
         const String left = operand_value(elements[pos - 3]);
@@ -360,7 +361,9 @@ struct conditional_evaluator
         const String op = operand_literal(elements[pos + 1]);
         if (is_binary_word_op(op.view())) {
           if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
+          {
             throw Error{"Expected an operand after '" + op + "'"};
+          }
           pos += 3;
           if (is_skipping) return false;
           const String left = operand_value(elements[pos - 3]);

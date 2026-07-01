@@ -189,14 +189,16 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
     }
     child_relative.append(name);
 
-    if (!directories_only || is_dir)
+    if (!directories_only || is_dir) {
       out.push(String{allocator, child_relative.view()});
+    }
     /* A directory symlink is a match but is not descended into, so a self or
        parent symlink does not spin the walk to the depth cap. */
-    if (is_dir && !is_link)
+    if (is_dir && !is_link) {
       collect_globstar_paths(child_dir, child_relative.view(), directories_only,
                              should_match_dotfiles, false, depth + 1, allocator,
                              out);
+    }
   }
 }
 
