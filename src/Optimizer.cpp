@@ -46,17 +46,6 @@ pure fn is_constant_arithmetic_byte(char byte) wontthrow -> bool
   }
 }
 
-pure fn is_identifier_start(char byte) wontthrow -> bool
-{
-  return (byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
-         byte == '_';
-}
-
-pure fn is_identifier_continuation(char byte) wontthrow -> bool
-{
-  return is_identifier_start(byte) || (byte >= '0' && byte <= '9');
-}
-
 /* A recorded constant is only substituted into arithmetic when its value is a
    plain integer, so it cannot inject an operator or another name. */
 pure fn is_plain_integer_literal(StringView text) wontthrow -> bool
@@ -171,9 +160,9 @@ inline constexpr StaticStringMap<bool> ENVIRONMENT_NEUTRAL_NAMES{
 pure fn is_plain_variable_name(StringView name) wontthrow -> bool
 {
   if (name.length == 0) return false;
-  if (!is_identifier_start(name[0])) return false;
+  if (!lexer::is_variable_name_start(name[0])) return false;
   for (usize i = 1; i < name.length; i++) {
-    if (!is_identifier_continuation(name[i])) return false;
+    if (!lexer::is_variable_name(name[i])) return false;
   }
   return true;
 }
@@ -308,14 +297,14 @@ fn try_fold_arithmetic_with_constants(StringView expression,
     usize i = 0;
     while (i < expression.length) {
       const char byte = expression[i];
-      if (!is_identifier_start(byte)) {
+      if (!lexer::is_variable_name_start(byte)) {
         rewritten.append(StringView{&expression.data[i], 1});
         i++;
         continue;
       }
 
       usize start_position = i;
-      while (i < expression.length && is_identifier_continuation(expression[i]))
+      while (i < expression.length && lexer::is_variable_name(expression[i]))
         i++;
       let const name =
           StringView{&expression.data[start_position], i - start_position};
@@ -405,7 +394,7 @@ static fn try_algebraic_simplify(StringView expression,
      plain name or integer qualifies. */
   let const operand_is_plain = [](StringView operand) wontthrow -> bool {
     for (usize i = 0; i < operand.length; i++) {
-      if (!is_identifier_continuation(operand[i])) return false;
+      if (!lexer::is_variable_name(operand[i])) return false;
     }
     return true;
   };
@@ -414,7 +403,7 @@ static fn try_algebraic_simplify(StringView expression,
   let const nounset_is_off =
       actx.eval_context != nullptr && !actx.eval_context->error_unset();
   let const operand_reads_variable = [](StringView operand) wontthrow -> bool {
-    return operand.length > 0 && is_identifier_start(operand[0]);
+    return operand.length > 0 && lexer::is_variable_name_start(operand[0]);
   };
   if (!nounset_is_off &&
       (operand_reads_variable(lhs) || operand_reads_variable(rhs)))
@@ -755,7 +744,7 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
      freeze the loop at its first verdict, so only an identifier-free condition
      folds. */
   for (usize i = 0; i < trimmed.length; i++) {
-    if (is_identifier_start(trimmed[i])) {
+    if (lexer::is_variable_name_start(trimmed[i])) {
       LOG(All, "the c-style-for fold declines, the condition reads a variable");
       return false;
     }

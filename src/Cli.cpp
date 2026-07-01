@@ -450,17 +450,22 @@ fn reset_flags(const ArrayList<Flag *> &flags) throws -> void
   }
 }
 
+cold fn append_version_triple(String &out) throws -> void
+{
+  out += String::from(SHIT_VER_MAJOR, heap_allocator());
+  out += '.';
+  out += String::from(SHIT_VER_MINOR, heap_allocator());
+  out += '.';
+  out += String::from(SHIT_VER_PATCH, heap_allocator());
+  out += '-';
+  out += SHIT_VER_EXTRA;
+}
+
 cold fn show_version() throws -> void
 {
   let s = String{heap_allocator()};
   s += "Shit Shell ";
-  s += String::from(SHIT_VER_MAJOR, heap_allocator());
-  s += '.';
-  s += String::from(SHIT_VER_MINOR, heap_allocator());
-  s += '.';
-  s += String::from(SHIT_VER_PATCH, heap_allocator());
-  s += '-';
-  s += SHIT_VER_EXTRA;
+  append_version_triple(s);
   s += '\n';
   s += "Built on ";
   s += SHIT_BUILD_DATE;
@@ -494,13 +499,7 @@ cold fn show_version() throws -> void
 cold fn show_short_version() throws -> void
 {
   let s = String{heap_allocator()};
-  s += String::from(SHIT_VER_MAJOR, heap_allocator());
-  s += '.';
-  s += String::from(SHIT_VER_MINOR, heap_allocator());
-  s += '.';
-  s += String::from(SHIT_VER_PATCH, heap_allocator());
-  s += '-';
-  s += SHIT_VER_EXTRA;
+  append_version_triple(s);
   s += '-';
   s += SHIT_BUILD_MODE;
   s += '-';

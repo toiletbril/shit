@@ -517,29 +517,26 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory);
 
-  let entries = Path::read_directory(listing_directory);
-  if (!entries.has_value()) return candidates;
+  let const entries = read_directory_cached(listing_directory);
+  if (entries == nullptr) return candidates;
 
   let const glob_active = all_active_glob_mask(parts.basename_part.length);
 
   for (let const &entry : *entries) {
-    if (entry.length() > 0 && entry.view()[0] == '.' &&
+    let const name = entry.name.view();
+    if (!name.is_empty() && name[0] == '.' &&
         (parts.basename_part.is_empty() || parts.basename_part[0] != '.'))
     {
       continue;
     }
 
-    if (!utils::glob_matches(parts.basename_part, entry.view(), glob_active, 0))
-    {
+    if (!utils::glob_matches(parts.basename_part, name, glob_active, 0)) {
       continue;
     }
 
     let candidate = String{completion_allocator(), parts.directory_part};
-    candidate += entry.view();
-
-    let full = listing_directory.clone();
-    full.push_component(entry.view());
-    if (full.is_directory()) candidate += '/';
+    candidate += name;
+    if (entry.is_directory) candidate += '/';
 
     candidates.push(steal(candidate));
   }
