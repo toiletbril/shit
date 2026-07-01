@@ -37,10 +37,6 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(!args.is_empty());
 
-  /* A bare export, and the -p form, list every exported variable. The bash mood
-     prints the declare -x form bash reloads, while the default and sh moods
-     print the POSIX export form dash reloads. The names are sorted so the
-     listing is stable. */
   if (FLAG_EXPORT_PRINT.is_enabled() || args.count() == 1) {
     let const is_declare_form = cxt.is_bash_compatible();
     let names = os::environment_names();
@@ -67,14 +63,8 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  /* -n removes the export attribute and keeps the variable as a plain shell
-     variable holding the value it had in the environment, the reverse of the
-     move export makes below. */
   if (FLAG_EXPORT_UNMARK.is_enabled()) {
     for (usize i = 1; i < args.count(); i++) {
-      /* A NAME=VALUE operand assigns the new value and then unexports NAME,
-         while a bare name keeps the value it held in the environment, the way
-         bash reads export -n. */
       let const parts = NameValueArg::from(args[i]);
       let const name = String{cxt.scratch_allocator(), parts.get_name()};
       let const value =
@@ -110,9 +100,6 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       value = String{cxt.scratch_allocator(), *parts.get_value()};
     }
 
-    /* A read-only variable rejects a new value the way an ordinary assignment
-       does, and a bare re-export of a read-only variable leaves its value
-       untouched. */
     if (cxt.is_readonly(name)) {
       if (has_new_value) {
         report_soft_builtin_error(ec, cxt,
@@ -122,9 +109,8 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    /* An integer name evaluates its new value as arithmetic the way the
-       variable store does, so the environment receives the decimal result
-       rather than the raw expression text. */
+    /* An integer name evaluates its new value as arithmetic, so the environment
+       receives the decimal result. */
     let const is_integer_name = cxt.is_integer_variable(name.view());
     if (has_new_value && is_integer_name) {
       char result_text[24];
@@ -135,9 +121,8 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
               result_text, sizeof(result_text))};
     }
 
-    /* The variable moves into the environment, so the bare shell copy is
-       removed and child processes inherit it. The unset is this move, not a
-       user unset, so the integer mark it clears is put back. */
+    /* The unset here is this move, not a user unset, so the integer mark it
+       clears is put back. */
     LOG(All, "export moving '%s' into the environment", name.c_str());
     cxt.unset_shell_variable(name);
     if (is_integer_name) cxt.mark_integer(name.view());

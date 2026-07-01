@@ -11,11 +11,6 @@ namespace shit {
 
 class BumpArena;
 
-/* A heredoc whose body is collected when the line that introduced it ends. The
-   body buffer has a stable address, so a parsed redirection points at it and
-   reads it once the lexer fills it. The body is a String allocated in the
-   lexer's arena, so it outlives the lexer and matches the lifetime of the
-   parsed nodes that point at it. */
 struct heredoc_pending
 {
   String delimiter;
@@ -52,13 +47,8 @@ public:
         mimic_mood mood = mimic_mood::Default);
   ~Lexer();
 
-  /* The mood the source is lexed in, the same three-way mimic_mood the mimicry
-     feature picks from a shebang. Handed in at construction from the
-     EvalContext mode. */
   pure fn mood() const wontthrow -> mimic_mood { return m_mood; }
 
-  /* Whether bash-compatible lexing is active, which the $'...' ANSI-C quoting
-     reads. */
   pure fn is_bash_compatible() const wontthrow -> bool
   {
     return m_mood == mimic_mood::Bash;
@@ -80,9 +70,6 @@ public:
     return m_mood != mimic_mood::Posix;
   }
 
-  /* A lexer holds the pending-heredoc state and the source, so a copy would
-     duplicate that state. Moving transfers it and leaves the source empty, and
-     the copy is deleted so an accidental copy fails to compile. */
   Lexer(Lexer &&) = default;
   Lexer &operator=(Lexer &&) = default;
   Lexer(const Lexer &) = delete;
@@ -96,21 +83,13 @@ public:
   pure fn source() const wontthrow -> StringView;
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
   pure fn arena() const wontthrow -> BumpArena &;
-  /* Redirect node allocation to another arena, so a function body can be parsed
-     into the persistent function arena and restored afterward. */
   fn set_arena(BumpArena &arena) wontthrow -> void;
   fn advance_past_last_peek() throws -> usize;
 
-  /* Reserve a heredoc body for the given delimiter, returning the stable buffer
-     the lexer fills when the current line ends. The buffer is an arena String
-     the Eval layer reads through the parsed Redirection field that points at
-     it. */
   fn register_heredoc(StringView delimiter, bool should_strip_tabs) throws
       -> const String *;
 
 protected:
-  /* Stamp a location in the source being lexed with this lexer's filename, so
-     every token and error the lexer makes points a caret at the named file. */
   pure forceinline fn here(usize position, usize length) const wontthrow
       -> SourceLocation
   {
@@ -137,16 +116,10 @@ protected:
   usize m_peek_cache_position{0};
   bool m_peek_cache_is_shell{false};
 
-  /* The lexer keeps a copy of every word it produces only when the segment
-     dump is requested, so the common path stays allocation free. A word is
-     recorded by its start position, so peeking the same token twice, which the
-     parser does to look ahead, records it only once. */
   bool m_should_collect_debug_words{false};
   ArrayList<Word> m_debug_words{heap_allocator()};
   usize m_last_collected_word_position{static_cast<usize>(-1)};
 
-  /* Heredoc bodies are filled once the line ends, so the last shell token kind
-     is tracked to detect that the consumed token was a newline. */
   bool m_last_shell_token_was_newline{false};
   /* Each body is allocated in the arena, so its address is stable and it
      outlives the lexer. A parsed redirection holds a pointer into one, and the
@@ -164,8 +137,6 @@ protected:
   fn lex_number() throws -> Token *;
   fn lex_identifier() throws -> Token *;
   fn lex_sentinel() throws -> Token *;
-  /* Capture a <(...) or >(...) process substitution as one word whose single
-     segment carries the direction byte and the inner command source. */
   fn lex_process_substitution(char direction) throws -> Token *;
 };
 

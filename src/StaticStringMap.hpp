@@ -7,10 +7,6 @@
 
 namespace shit {
 
-/* A frozen map from a short byte string to a value, stored in static storage as
-   a flat array of packed-key entries. A lookup packs the query into two words
-   and scans, so a tiny table resolves in a handful of integer compares with no
-   hashing and no allocation. */
 template <class Value>
 class StaticStringMap
 {

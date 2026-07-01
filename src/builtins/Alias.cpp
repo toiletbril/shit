@@ -61,9 +61,8 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       message += "'\n";
       ec.print_to_stdout(message);
     } else {
-      /* bash reports a missing alias on stderr, so a caller that captures the
-         standard output of alias, as ble.sh does, does not see this line mixed
-         into the captured definitions. */
+      /* A missing alias reports on stderr so it does not mix into a captured
+         alias listing. */
       String not_found{cxt.scratch_allocator(), "alias: "};
       not_found += arg;
       not_found += ": not found\n";

@@ -30,8 +30,7 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   let const level = parse_optional_integer_arg(ec, 1);
-  /* A non-positive count is rejected the way dash rejects an illegal number,
-     rather than clamped, so break 0 aborts instead of breaking one loop. */
+  /* A non-positive count is rejected, not clamped, so break 0 aborts. */
   if (level < 1)
     throw Error{"Unable to break because '" + ec.args()[1] +
                 "' is not a valid loop count"};

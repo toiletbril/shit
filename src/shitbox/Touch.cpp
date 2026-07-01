@@ -39,8 +39,6 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
   for (const String &operand : operands) {
-    /* An existing file has its access and modification times set to now, the
-       touch update path, rather than being passed over. */
     if (Path{operand.view()}.exists()) {
       if (!os::touch_file_times(operand.view())) {
         report_soft_shitbox_error(ec, cxt,
@@ -65,9 +63,6 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
 
     os::close_fd(*fd);
 
-    /* The create leaves the times at now, but the stamp is asserted through the
-       same touch_file_times the existing-file path uses, so both paths set the
-       times one way rather than relying on the open's side effect. */
     if (!os::touch_file_times(operand.view())) {
       report_soft_shitbox_error(ec, cxt,
                                 "touch: cannot touch '" + operand +

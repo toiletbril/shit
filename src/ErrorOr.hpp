@@ -1,10 +1,5 @@
 #pragma once
 
-/* A value or an Error, returned by a function that can fail instead of
-   throwing. The error path carries the same Error the throwing code built. The
-   active member is read through is_error and then value or error, so the
-   no-exceptions build never reaches a throwing path. */
-
 #include "Allocator.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
@@ -12,8 +7,6 @@
 
 namespace shit {
 
-/* The success payload of a fallible function that returns no value. A caller
-   writes ErrorOr<Ok> and returns Success on success. */
 class Ok
 {};
 
@@ -101,7 +94,6 @@ public:
     return error_reference();
   }
 
-  /* Move the value out, called once the caller has checked is_error. */
   hot mustuse fn take() throws -> T
   {
     ASSERT(!m_is_error);

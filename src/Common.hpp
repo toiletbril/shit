@@ -42,8 +42,6 @@
 
 #define SHIT_COMPILER SHIT_COMPILER_COMMAND " (" __VERSION__ ", " SHIT_LIBC ")"
 
-/* Constants for --help and --version. */
-
 #define SHIT_VER_MAJOR 0
 #define SHIT_VER_MINOR 1
 #define SHIT_VER_PATCH 0
@@ -80,8 +78,6 @@
 #include <exception>
 /* clang-format on */
 
-/* Crablang types. */
-
 using u8 = uint8_t;
 using u16 = uint16_t;
 using u32 = uint32_t;
@@ -98,8 +94,7 @@ using ichar = i8;
 using usize = size_t;
 using uintptr = uintptr_t;
 
-/* void is ambiguous. opaque is an alias for it, for clarity. opaque * is void
- *, so casts and C interfaces are unchanged. */
+/* void is ambiguous, this is an alias for clarity. */
 using opaque = void;
 
 #if defined __GNUC__ || defined __clang__ || defined __COSMOCC__
@@ -149,7 +144,6 @@ public:
   const auto &concat_literal(defer__, __LINE__) =                              \
       t__exit_scope_help() + [&]() -> void
 
-/* Silence enum warnings. */
 #define ENUM(e) static_cast<int>(e)
 
 #define sub_sat(a, b) ((a) > (b) ? (a) - (b) : 0)

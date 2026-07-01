@@ -32,8 +32,7 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (ec.args().count() < 2) return report_usage_error(ec, cxt, ec.program());
 
-  /* A leading -- ends option parsing, the form source -- file that ble.sh uses,
-     so it is skipped before the filename is read rather than taken as one. */
+  /* A leading -- ends option parsing, the source -- file form ble.sh uses. */
   usize path_index = 1;
   if (ec.args()[1] == "--") path_index = 2;
   if (path_index >= ec.args().count())
@@ -47,11 +46,8 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                             "Unable to source the file '" + path +
                                 "': " + os::last_system_error_message()};
 
-  /* Operands after the file become the positional parameters the sourced file
-     reads as $1 upward, restored to the caller's afterward. With no extra
-     operand the caller's parameters carry through unchanged, the way bash
-     leaves them. Passing operands to the dot command is a bash extension, so
-     the sh mood ignores them the way dash does. */
+  /* Operands after the file set the sourced $1 upward, a bash extension the
+     sh mood ignores. */
   let const has_extra_args =
       !cxt.is_posix_mode() && ec.args().count() > path_index + 1;
   let saved_params = ArrayList<String>{heap_allocator()};

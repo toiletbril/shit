@@ -18,9 +18,6 @@ namespace shit {
 
 namespace completion {
 
-/* A most-recently-used cache of directory listings, so the highlighter and TAB
-   do not re-readdir the same directory on every keystroke. Keyed by the path
-   the caller passed, with the mtime as the invalidation key. */
 struct directory_listing_cache_entry
 {
   String directory_path{heap_allocator()};
@@ -35,17 +32,12 @@ static directory_listing_cache_entry
 
 BumpArena COMPLETION_ARENA{};
 
-/* The cached listing of a directory. A hit whose recorded mtime still matches
-   returns the stored entries, otherwise the directory is read fresh into the
-   most-recently-used slot. Returns nullptr when it cannot be read or stat'd.
-   The returned pointer stays valid until the next call. */
+/* The returned pointer stays valid until the next call. */
 fn read_directory_cached(const Path &directory) throws
     -> const ArrayList<cached_directory_entry> *
 {
   let const path_view = directory.text().view();
 
-  /* A directory whose mtime cannot be read is not cached, the invalidation key
-     is missing. */
   os::file_status status{};
   let const has_status = os::stat_path(path_view, status);
 
@@ -69,7 +61,6 @@ fn read_directory_cached(const Path &directory) throws
       return &entry.entries;
     }
 
-    /* The directory changed on disk, the stale slot is dropped. */
     entry.is_valid = false;
     break;
   }
@@ -77,7 +68,6 @@ fn read_directory_cached(const Path &directory) throws
   let listing = Path::read_directory_typed(directory);
   if (!listing.has_value()) return nullptr;
 
-  /* Only a symlink or an unknown dirent type falls back to a stat. */
   let resolved_entries = ArrayList<cached_directory_entry>{heap_allocator()};
   resolved_entries.reserve(listing->count());
   for (let &child : *listing) {
@@ -112,15 +102,11 @@ fn read_directory_cached(const Path &directory) throws
       static_cast<int>(path_view.length), path_view.data,
       DIRECTORY_LISTING_CACHE[0].entries.count());
 
-  /* A directory with no readable mtime is read but left invalid, a later
-     keystroke re-reads rather than trust an unkeyed slot. */
+  /* A directory with no readable mtime is left invalid so a later keystroke
+     re-reads rather than trust an unkeyed slot. */
   return &DIRECTORY_LISTING_CACHE[0].entries;
 }
 
-/* True for a byte that separates one shell word from the next at the top level.
-   The completion tokenizer is deliberately coarse, it does not parse quotes or
-   operators, since a prefix completion only needs the run of bytes the cursor
-   sits in. */
 static pure fn is_word_separator(char c) wontthrow -> bool
 {
   return lexer::is_whitespace(c) || c == '\n';
@@ -131,9 +117,6 @@ static pure fn is_command_separator(char c) wontthrow -> bool
   return c == ';' || c == '|' || c == '&' || c == '(' || c == '\n';
 }
 
-/* Whether the closing paren at position matches no opener earlier on the line,
-   the shape of a case pattern's closing paren. A matched paren closes a
-   subshell or a substitution instead. */
 static pure fn is_unmatched_closing_paren(StringView line,
                                           usize position) wontthrow -> bool
 {
@@ -148,8 +131,6 @@ static pure fn is_unmatched_closing_paren(StringView line,
   return depth == 0;
 }
 
-/* True when an unquoted glob metacharacter appears in the token, so TAB
-   resolves the glob rather than listing a directory. */
 pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool
 {
   for (usize i = 0; i < token.length; i++) {
@@ -181,19 +162,12 @@ static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
   return end;
 }
 
-/* The byte just past an opening quote the cursor sits inside, and the quote
-   byte itself. A single quote takes everything literally and a double quote
-   only closes on another double quote, so a quote of the other kind inside does
-   not end the span. */
 struct open_quote_span
 {
   usize content_start;
   char quote_character;
 };
 
-/* When the cursor sits inside an unclosed quote, completion treats the quoted
-   content as one token, so a path holding a space completes inside the quote
-   rather than splitting on the space. */
 static pure fn find_open_quote(StringView line, usize cursor) wontthrow
     -> Maybe<open_quote_span>
 {
@@ -217,10 +191,7 @@ static pure fn find_open_quote(StringView line, usize cursor) wontthrow
   return open_quote_span{content_start, quote_character};
 }
 
-/* The leading words a command word can follow, the ! and time keywords, the
-   compound keywords whose body opens with a command, and the wrapper commands
-   whose argument is itself a command the way fish skips sudo. for, case, and in
-   stay opaque since a subject word or patterns follow them. */
+/* for, case, and in stay opaque since a subject word or patterns follow them. */
 static constexpr StaticStringMap<bool>::entry TRANSPARENT_PREFIX_ENTRIES[] = {
     {SSK("!"),       true},
     {SSK("time"),    true},
@@ -264,12 +235,10 @@ static pure fn is_in_command_position(StringView line,
       i--;
     if (i == 0) return true;
     if (is_command_separator(line[i - 1])) return true;
-    /* A case pattern's closing paren opens the arm's body. */
     if (line[i - 1] == ')' && is_unmatched_closing_paren(line, i - 1)) {
       return true;
     }
-    /* A transparent keyword prefix is stepped over, the word after time or ! is
-       still a command word. */
+
     let word_start = i;
     while (word_start > 0 && !is_word_separator(line[word_start - 1]) &&
            !is_command_separator(line[word_start - 1]))
@@ -290,9 +259,6 @@ static fn all_active_glob_mask(usize length) throws -> Bitset
   return mask;
 }
 
-/* A command-position token matches a command name as a plain prefix, or as a
-   glob pattern when the token holds a metacharacter, so ec* lists the commands
-   it matches. */
 static fn command_name_matches(StringView name, StringView token,
                                bool token_is_glob,
                                const Bitset &glob_active) throws
@@ -303,9 +269,6 @@ static fn command_name_matches(StringView name, StringView token,
   return utils::glob_matches(token, name, glob_active, 0);
 }
 
-/* Append name to candidates when it matches the token and the seen set has not
-   recorded it, keeping the merged list deduped across builtins, functions,
-   aliases, and PATH at one hash lookup per insert. */
 static fn add_unique_command(ArrayList<String> &candidates, HashSet &seen,
                              StringView name, StringView token,
                              bool token_is_glob,
@@ -333,8 +296,7 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
       shared++;
     }
     /* The byte-wise match can stop inside a multibyte codepoint, so the cut
-       retracts to the codepoint start to avoid corrupting a glyph in the ghost
-       text. */
+       retracts to the codepoint start. */
     while (shared > 0 && shared < prefix_length &&
            (static_cast<unsigned char>(first[shared]) & 0xC0) == 0x80)
     {
@@ -372,8 +334,6 @@ static fn complete_command(StringView token, bool token_is_glob,
                        token_is_glob, glob_active);
   }
 
-  /* The bundled shitbox utility names resolve as commands when the shitbox
-     option is on. */
   if (context.shitbox()) {
     for (const String &util_name : shitbox::util_names())
       add_unique_command(candidates, seen, util_name.view(), token,
@@ -423,10 +383,7 @@ static pure fn split_path_token(StringView token) wontthrow -> path_token
   };
 }
 
-/* Whether a completion candidate carries a byte that the shell would parse
-   rather than read as a literal path, so the candidate must be quoted. The set
-   is whitespace, the glob metacharacters, and the operator and expansion bytes,
-   the leading tilde excluded since it expands a home the user wants. */
+/* The tilde is excluded since it expands a home the user wants. */
 static pure fn path_candidate_needs_quoting(StringView candidate) wontthrow
     -> bool
 {
@@ -443,9 +400,8 @@ static pure fn path_candidate_needs_quoting(StringView candidate) wontthrow
   return false;
 }
 
-/* Wrap a candidate in single quotes, the way the user should type a path with a
-   special byte rather than backslash-escaping it. An embedded single quote ends
-   the run, emits an escaped quote, and reopens, the standard '\'' idiom. */
+/* An embedded single quote ends the run, emits an escaped quote, and reopens,
+   the standard '\'' idiom. */
 static fn quote_path_candidate(StringView candidate) throws -> String
 {
   let quoted = String{completion_allocator()};
@@ -466,8 +422,7 @@ static fn resolve_listing_directory(StringView directory_part,
 {
   if (directory_part.is_empty()) return base_directory;
 
-  /* A leading tilde expands to a home directory, the current user's for ~ or
-     the named user's for ~user. An unknown name leaves the tilde literal. */
+  /* An unknown name leaves the tilde literal. */
   if (directory_part[0] == '~') {
     usize name_end = 1;
     while (name_end < directory_part.length && directory_part[name_end] != '/')
@@ -514,7 +469,6 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory);
 
-  /* The listing reuses the directory cache the highlighter just filled. */
   let const entries = read_directory_cached(listing_directory);
   if (entries == nullptr) return candidates;
 
@@ -532,12 +486,9 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
     let candidate = String{completion_allocator(), parts.directory_part};
     candidate += name;
 
-    /* The cached directory flag spares a stat for the trailing slash. */
     if (entry.is_directory) candidate += '/';
 
-    /* An unquoted token whose match needs a special byte is wrapped in quotes
-       rather than backslash-escaped. A token already inside a quote completes
-       the bare path within it and is not quoted again. */
+    /* A token already inside a quote is not quoted again. */
     if (!inside_quote && path_candidate_needs_quoting(candidate.view())) {
       candidate = quote_path_candidate(candidate.view());
     }
@@ -552,9 +503,7 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
   return candidates;
 }
 
-/* Resolve a glob token into its matches by listing the directory the fixed
-   prefix names and keeping every entry the pattern matches. Only the trailing
-   component is globbed. */
+/* Only the trailing component is globbed. */
 static fn complete_glob(StringView token, const Path &base_directory) throws
     -> ArrayList<String>
 {
@@ -571,8 +520,6 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
   let entries = Path::read_directory(listing_directory);
   if (!entries.has_value()) return candidates;
 
-  /* Every byte of the basename pattern is an active glob position, since the
-     completion token is unquoted. */
   let const glob_active = all_active_glob_mask(parts.basename_part.length);
 
   for (let const &entry : *entries) {
@@ -652,8 +599,6 @@ static fn complete_variable(StringView token, EvalContext &context) throws
   return candidates;
 }
 
-/* A leading ~ with no / yet completes against the system user names. Once a /
-   appears the filesystem handler takes over. */
 static fn token_is_tilde_user_prefix(StringView token) wontthrow -> bool
 {
   return token.length >= 1 && token[0] == '~' &&
@@ -677,9 +622,6 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
   return candidates;
 }
 
-/* The command word of the line's last segment, past any transparent keyword
-   prefix, so echo hi; git - completes against git. The separator scan is
-   unquoted. */
 fn command_word_of(StringView line) wontthrow -> StringView
 {
   usize i = 0;
@@ -689,8 +631,7 @@ fn command_word_of(StringView line) wontthrow -> StringView
     if (c == '(') {
       open_parens++;
     } else if (c == ')') {
-      /* A matched paren closes a substitution or a subshell mid-word, while
-         an unmatched one closes a case pattern and starts the arm's body. */
+      /* An unmatched paren closes a case pattern and starts the arm's body. */
       if (open_parens > 0)
         open_parens--;
       else
@@ -711,10 +652,8 @@ fn command_word_of(StringView line) wontthrow -> StringView
   }
 }
 
-/* Expand a command name through alias definitions only, the first word of each
-   expansion, bounded against a cyclic alias. Symlinks are left alone so a name
-   that dispatches on its argv[0], such as a busybox or rustup link, keeps the
-   surface name the user typed. */
+/* Symlinks are left alone so a name that dispatches on its argv[0], such as a
+   busybox or rustup link, keeps the surface name the user typed. */
 fn resolve_completion_alias(StringView command, EvalContext &context) throws
     -> String
 {
@@ -740,8 +679,6 @@ fn resolve_completion_command(StringView command, EvalContext &context) throws
     -> String
 {
   let name = resolve_completion_alias(command, context);
-  /* A name holding a slash is a path already, otherwise it is searched on
-     PATH, then the located file's symlinks are followed to the real target. */
   let const located = utils::search_program_path(name.view());
   if (!located.is_empty()) {
     if (let const canonical = os::canonical_path(located.front());
@@ -788,26 +725,19 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   if (cursor > line.length) cursor = line.length;
 
   /* When the cursor sits inside a command substitution, completion re-roots to
-     the substitution's own command line, so echo $(git che and `git che and
-     for x in $(git che all offer git's subcommands rather than the outer
-     command's arguments. The offset maps the replaced token span back to the
-     full line for the caller. */
+     the substitution's own command line. The offset maps the replaced token
+     span back to the full line for the caller. */
   let const completion_offset = command_substitution_body_start(line, cursor);
   line = line.substring(completion_offset);
   cursor -= completion_offset;
 
-  /* The replaced span covers the whole word the cursor sits inside, from the
-     token start to the token end, so a cursor in the middle of a word replaces
-     the word cleanly rather than keeping the bytes to its right. */
   let token_start = find_token_start(line, cursor);
   let token_end = find_token_end(line, cursor);
   let token = line.substring_of_length(token_start, token_end - token_start);
   let const is_command = is_in_command_position(line, token_start);
 
-  /* A cursor inside an open quote completes the bare path within it, so a match
-     holding a space lands inside the quote and is not re-quoted. The span runs
-     from just past the opening quote to the cursor, leaving any closing quote
-     to the right of the cursor untouched. */
+  /* A cursor inside an open quote completes the bare path within it and is not
+     re-quoted. The span leaves any closing quote to the right untouched. */
   let const open_quote = find_open_quote(line, cursor);
   if (open_quote.has_value()) {
     token_start = open_quote->content_start;
@@ -816,12 +746,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   }
 
   /* An option-value word such as --exit-node=host completes only the value
-     after the equals sign, so the candidate replaces the value and keeps the
-     flag rather than overwriting the whole --flag= prefix. The value opens
-     with no dash, so the option-name stages defer and the word reaches the
-     spec and the filesystem, the way bash splits on the equals through
-     COMP_WORDBREAKS. A command-position word is left whole, since an
-     assignment such as name=value is its own token there. */
+     after the equals sign, the way bash splits on the equals through
+     COMP_WORDBREAKS. A command-position word is left whole, since an assignment
+     such as name=value is its own token there. */
   if (!open_quote.has_value() && !is_command && token.length >= 2 &&
       token[0] == '-')
     if (let const equals = token.find_character('='); equals.has_value()) {
@@ -831,9 +758,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
 
   let const token_is_glob = token_has_glob_metacharacter(token);
 
-  /* A command-position token holding a path separator is a program given by
-     path, so it completes against the filesystem rather than the command sets.
-   */
+  /* A command-position token holding a path separator completes against the
+     filesystem rather than the command sets. */
   let const token_has_path_separator = token.find_character('/').has_value();
 
   TRACELN("complete line '%.*s' cursor %zu token '%.*s' command %d",
@@ -845,13 +771,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   let const inline_glob = token_is_glob && cursor == token_end;
 
   let candidates = ArrayList<String>{arena};
-  /* Filled only by the --help option and subcommand stages, keyed by candidate
-     text so it survives the sort below, empty for every other source. */
   let descriptions = StringMap<String>{arena};
 
-  /* The POSIX mood keeps completion plain like dash, command names in command
-     position and the filesystem elsewhere, with no variable, tilde, manpage, or
-     spec stage. */
   let const is_posix_completion = context.mood() == mimic_mood::Posix;
 
   if (token_is_variable(token) && !is_posix_completion) {
@@ -874,28 +795,21 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       candidates.clear();
       candidates.push(steal(joined));
     } else if (is_command && !token_has_path_separator) {
-      /* A command-position glob that matches no file falls back to matching
-         command names, so ec* still finds echo. */
       candidates = complete_command(token, token_is_glob, context);
     }
   } else if (is_command && !token_has_path_separator) {
     /* An empty command token would enumerate every PATH command on each
-       keystroke for the ghost, freezing a large PATH, so command completion
-       runs only once a prefix is typed. An explicit tab still lists them all.
-     */
+       keystroke for the ghost, so command completion runs only once a prefix
+       is typed. An explicit tab still lists them all. */
     if (!token.is_empty() || for_listing)
       candidates = complete_command(token, token_is_glob, context);
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);
   } else {
     /* The argument cascade runs in the bash and the default moods, the POSIX
-       mood goes straight to files. The builtin flag tables answer first, then
-       the registered specs, then the build tools, then the man sources, and the
-       --help fork is the last resort. The build tools answer before the man
+       mood goes straight to files. The build tools answer before the man
        sources, so a recognized build tool in the current directory offers its
-       targets even when a like-named subcommand man page exists. The build-tool
-       stage gates itself to a known tool with a build file present, so it
-       returns nothing for any other command. */
+       targets even when a like-named subcommand man page exists. */
     Maybe<ArrayList<String>> from_stage = None;
     if (!is_posix_completion) {
       from_stage =
@@ -923,10 +837,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       candidates = steal(*from_stage);
     } else if (for_listing || !split_path_token(token).basename_part.is_empty())
     {
-      /* A token ending in a slash has an empty basename, so the ghost would
-         list a whole directory to suggest nothing. The listing runs for the
-         ghost only once a basename is typed, while an explicit tab still lists.
-       */
+      /* A token ending in a slash has an empty basename, so the ghost listing
+         runs only once a basename is typed. An explicit tab still lists. */
       candidates =
           complete_filesystem(token, base_directory, open_quote.has_value());
     }
@@ -936,9 +848,6 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   if (!candidates.is_empty()) {
     candidates.sort();
 
-    /* Duplicate candidates from a source such as a completion spec are
-       collapsed, the editor decides between a unique insert and a list by
-       candidate count. */
     let unique_candidates = ArrayList<String>{candidates.allocator()};
     unique_candidates.reserve(candidates.count());
 

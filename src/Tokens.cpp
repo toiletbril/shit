@@ -100,8 +100,6 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
   if (segments.is_empty()) return false;
   bool has_seen_digit = false;
   for (let const &segment : segments) {
-    /* An expansion segment contributes a $ wrapper, so a word holding one is
-       never all digits. */
     if (segment.kind == WordSegment::Kind::VariableReference ||
         segment.kind == WordSegment::Kind::CommandSubstitution ||
         segment.kind == WordSegment::Kind::ArithmeticExpansion ||
@@ -190,10 +188,6 @@ cold fn Word::to_pretty_string() const throws -> String
   return result;
 }
 
-/* Rebuild an expansion segment back into source form so a subscript that
-   carries one, the $k of v[$k]=1, survives as text the evaluator expands again.
-   A form the subscript never takes returns false so the caller abandons the
-   split. */
 static fn append_subscript_segment_source(const WordSegment &segment,
                                           String &out) throws -> bool
 {
@@ -219,8 +213,7 @@ static fn append_subscript_segment_source(const WordSegment &segment,
 
 /* An array element assignment whose subscript holds an expansion, the $k in
    v[$k]=1, splits across segments since the = lands after the ] in a later
-   segment. The subscript is rebuilt into source form and folded back into the
-   key. None when the word is not this shape. */
+   segment. */
 static fn
 array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     -> Maybe<word_assignment_split>
@@ -239,9 +232,8 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
   }
 
   let subscript = String{heap_allocator()};
-  /* A close bracket in the remainder of segment 0 means the = would also sit in
-     segment 0, which the caller already ruled out, so this is not an
-     assignment. */
+  /* A ] in the rest of segment 0 means the = sits in segment 0 too, already
+     ruled out, so this is not an assignment. */
   const StringView head = first.text.substring(name_end + 1);
   if (head.find_character(']').has_value()) return shit::None;
   subscript.append(head);
@@ -305,9 +297,6 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 
   let const equals_position = first.text.find_character('=');
   if (!equals_position.has_value()) {
-    /* Only a NAME[ word can be an element assignment whose subscript pushed the
-       = into a later segment, so the open bracket gates the array-element
-       scan. */
     if (first.text.find_character('[').has_value())
       return array_element_assignment_split(segments);
     return shit::None;
@@ -316,8 +305,6 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 
   ASSERT(*equals_position <= first.text.count());
 
-  /* The append form NAME+=VALUE carries a trailing plus before the equals sign.
-     The plus is not part of the name. */
   const bool is_append = first.text[*equals_position - 1] == '+';
   const usize name_length = is_append ? *equals_position - 1 : *equals_position;
   if (name_length == 0) return shit::None;
@@ -327,9 +314,6 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   while (name_cursor < name_length &&
          lexer::is_variable_name(first.text[name_cursor]))
     name_cursor++;
-  /* A name may carry a [subscript] for a bash array element assignment, such as
-     the a[1] in a[1]=x, running to the closing bracket at the end of the
-     name. */
   if (name_cursor < name_length && first.text[name_cursor] == '[') {
     if (first.text[name_length - 1] != ']' || name_length - name_cursor < 3) {
       return shit::None;
@@ -377,8 +361,6 @@ KEYWORD_TOKEN_DECLS(Esac, "esac");
 KEYWORD_TOKEN_DECLS(Time, "time");
 KEYWORD_TOKEN_DECLS(Function, "function");
 
-/* The raw string is the literal symbol, so an error shows ')' rather than the
-   internal token name. */
 #define SENTINEL_TOKEN_DECLS_COMPOUND(t, s)                                    \
   t::t(SourceLocation location) : Token(location) {}                           \
   Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
@@ -466,10 +448,8 @@ pure fn Assignment::value_word() const wontthrow -> const Word &
 WordToken::WordToken(SourceLocation location, Word word)
     : Value(location, ""), m_word(steal(word))
 {
-  /* The segment list over-reserves while the word is lexed, so the slack is
-     handed back once the word is final. The token may live in the function
-     arena that never resets, where the reserved slots would otherwise stay
-     allocated for the whole session. */
+  /* The token may live in the function arena that never resets, so the lexer's
+     over-reserved segment slack is returned. */
   m_word.segments.shrink_to_fit();
   m_value = m_word.to_literal_string();
 }

@@ -72,11 +72,8 @@ static fn find_walk(const Path &path, StringView display, usize depth,
                     const find_options &options, String &output,
                     Allocator allocator) throws -> void
 {
-  /* One stat serves both the type match and the descend decision. It reads as a
-     symlink rather than its target, so the walk does not follow a symlink the
-     way the default find does not. A stat that fails yields the unknown marker
-     0, which matches no -type filter and is not descended, so a broken entry is
-     never miscounted as a regular file. */
+  /* The stat reads the symlink, not its target, and a failed stat yields the
+     marker '\0' that matches no -type filter and is not descended. */
   os::file_status status{};
   const char type_letter = os::stat_path(path.text().view(), status)
                                ? os::file_type_letter(status.mode)
@@ -149,10 +146,8 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   find_options options{};
   Bitset name_glob_active{cxt.scratch_allocator()};
 
-  /* The path operands lead, every token up to the first predicate, then the
-     dash predicates follow the way find reads its command line. The flag parser
-     is bypassed, since a predicate such as -name is not a single-letter flag
-     bundle. */
+  /* The flag parser is bypassed, a predicate such as -name is not a
+     single-letter flag bundle. */
   usize index = 1;
   while (index < args.count() && !args[index].view().is_empty() &&
          args[index].view()[0] != '-')

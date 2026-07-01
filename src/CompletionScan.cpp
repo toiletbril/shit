@@ -17,8 +17,6 @@ namespace shit {
 
 namespace completion {
 
-/* The settled word right before the token, so set -o NAME completion sees the
-   -o. */
 static fn previous_settled_word(StringView line, usize token_start) wontthrow
     -> StringView
 {
@@ -31,8 +29,7 @@ static fn previous_settled_word(StringView line, usize token_start) wontthrow
   return line.substring_of_length(start, end - start);
 }
 
-/* One tool's cached target list, keyed by its source file's absolute path and
-   refreshed when the mtime moves, so a second tab pays no fork. */
+/* Keyed by the source file's absolute path and refreshed when the mtime moves. */
 struct cached_target_list
 {
   i64 mtime;
@@ -55,8 +52,6 @@ static fn settled_option_value(StringView line, StringView option) throws
   return None;
 }
 
-/* A name that carries a slash, repeats a makefile name, or names a path in the
-   make directory is a build artifact rather than a target, so it is dropped. */
 static fn make_target_is_artifact(StringView name, const Path &directory) throws
     -> bool
 {
@@ -98,8 +93,7 @@ static fn parse_make_database_targets(StringView database,
       continue;
     }
     if (text.is_empty() || text[0] == '#') continue;
-    /* The disowned rule follows its comment immediately, so the first
-       non-comment line consumes the flag whatever its shape. */
+    /* The disowned rule follows its "# Not a target" comment immediately. */
     if (skip_next_rule) {
       skip_next_rule = false;
       continue;
@@ -161,8 +155,8 @@ static fn parse_tsh_node_names(StringView listing) throws -> ArrayList<String>
   return names;
 }
 
-/* The script names of a package.json "scripts" table, a tolerant scan that
-   tracks only strings, escapes, and brace nesting, no JSON machinery. */
+/* A tolerant scan that tracks only strings, escapes, and brace nesting, no
+   JSON machinery. */
 static fn parse_package_json_scripts(StringView text) throws
     -> ArrayList<String>
 {
@@ -214,8 +208,6 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
   let const home = os::get_home_directory();
   if (!home.has_value()) return hosts;
 
-  /* known_hosts repeats a host once per key type, so the dedup set keeps the
-     scan linear over hundreds of rows. */
   let seen = HashSet{heap_allocator()};
   let const do_push_unique = [&](StringView host) throws {
     if (host.is_empty() || seen.contains(host)) return;
@@ -241,8 +233,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
             row.starts_with(StringView{"Host\t"})))
         continue;
       row = row.substring(5);
-      /* The Host line lists names separated by blanks, and a name that
-         carries a pattern byte is a rule rather than a reachable host. */
+      /* A name carrying a pattern byte is a rule, not a reachable host. */
       usize k = 0;
       while (k < row.length) {
         while (k < row.length && (row[k] == ' ' || row[k] == '\t'))
@@ -353,17 +344,13 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   let const command = command_word_of(line);
   if (command.is_empty()) return None;
 
-  /* A `shitbox make` invocation routes the make utility through the multicall
-     dispatcher, so the build tool is the second word when the front-end shitbox
-     is the command word. */
+  /* A `shitbox make` routes make through the multicall dispatcher, so the build
+     tool is the second word when shitbox is the command word. */
   let const tool =
       (command == "shitbox") ? second_word_of(line).value_or(command) : command;
 
-  /* A build-tool probe forks the tool through the bounded helper, so a slow or
-     stdin-reading tool, such as a make whose $(shell ...) blocks, never freezes
-     the prompt. The name resolves to a path first, since the helper runs the
-     path directly with no PATH search, and the helper points stdin at /dev/null
-     and kills a probe that overruns the deadline. */
+  /* The name resolves to a path first, since the helper runs the path directly
+     with no PATH search, and a probe that overruns the deadline is killed. */
   let const probe_timeout_nanos = 2'000'000'000ULL;
   let const capture = [&](const ArrayList<String> &probe_argv)
                           throws -> String {
@@ -523,8 +510,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   return candidates;
 }
 
-/* Built once per kind since every source table is immutable and the ghost reads
-   these on each keystroke. Null means the kind registered no flags. */
+/* Null means the kind registered no flags. */
 static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
     -> const ArrayList<String> *
 {
@@ -594,8 +580,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
   if (command.is_empty()) return None;
 
   let const builtin_kind = search_builtin(command);
-  /* The shell's own invocation completes from its FLAG list, matched by the
-     basename so both shit and a path to it answer. */
+  /* Matched by basename so both shit and a path to it answer. */
   let shell_binary_name = command;
   for (usize i = command.length; i > 0; i--)
     if (command[i - 1] == '/') {
@@ -617,9 +602,8 @@ fn complete_from_builtin_flags(StringView line, StringView token,
         util_for_flags = shitbox::find_util(*second);
       }
     } else if (!completes_shell_binary && context.shitbox()) {
-      /* A bare utility name completes its own flags only when the shitbox
-         option resolves it as a command, so a plain ls keeps the system ls
-         completion when the option is off. */
+      /* A plain ls keeps the system ls completion when the shitbox option is
+         off. */
       util_for_flags = shitbox::find_util(command);
     }
 
@@ -669,8 +653,6 @@ fn complete_from_builtin_flags(StringView line, StringView token,
       if (!candidates.is_empty()) return candidates;
       return None;
     }
-    /* set --mood and set --init-moods take mood names as their value, so the
-       operand after either spelling completes the three mood names. */
     if (previous == "--mood" || previous == "-M" ||
         previous == "--init-moods" || previous == "-L")
     {
@@ -705,13 +687,11 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     return None;
   }
 
-  /* A bare unset operand is a variable name with no leading $, completing
-     against the same shell and environment names as a $-prefixed reference. */
+  /* A bare unset operand is a variable name with no leading $. */
   if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Unset &&
       (token.is_empty() || token[0] != '-'))
   {
-    /* unset -f removes a function, the plain and -v forms a variable. The flag
-       is read from the words typed before this operand. */
+    /* unset -f removes a function, the plain and -v forms a variable. */
     let unsets_function = false;
     let const prefix = line.substring_of_length(0, token_start);
     usize scan_position = 0;
@@ -771,8 +751,8 @@ static pure fn entry_is_unrequested_dash_word(
   return !token_asks_for_dash && !entry.is_empty() && entry[0] == '-';
 }
 
-/* The description opens after a space, so a value that itself holds a
-   parenthesis, such as a filename, is left whole. */
+/* The description opens after a space, so a value holding a parenthesis such as
+   a filename is left whole. */
 static fn push_spec_candidate(StringView entry, ArrayList<String> &candidates,
                               StringMap<String> &descriptions) throws -> void
 {
@@ -803,9 +783,8 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
   if (command.is_empty()) return None;
 
   /* A cobra-style function truncates its description to COLUMNS, so the width
-     is set wide for the run and restored after, the whole description arriving
-     for shit's own dimmed column. A completion function runs only on an
-     explicit tab. The ghost path keeps COLUMNS untouched. */
+     is set wide for the run and restored after. The ghost path keeps COLUMNS
+     untouched. */
   Maybe<String> saved_columns;
   if (for_listing) {
     saved_columns = context.get_variable_value("COLUMNS");
@@ -820,9 +799,8 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
         context.unset_shell_variable("COLUMNS");
     }
   };
-  /* The surface name wins when it has a spec of its own. Otherwise it resolves
-     through an alias and a symlink, so g for a g='git' alias reads git's spec.
-   */
+  /* The surface name wins when it has a spec of its own, otherwise it resolves
+     through an alias and a symlink. */
   const completion_spec *spec = context.lookup_completion_spec(command);
   String resolved_command{heap_allocator()};
   if (spec == nullptr) {
@@ -838,10 +816,9 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
       spec != nullptr ? spec->function_name.c_str() : "",
       spec != nullptr ? spec->word_list.length() : 0);
 
-  /* No command-specific spec. On an explicit tab, consult the default the way
-     bash-completion's complete -D loader does. It sources the per-command file
-     and returns 124 to ask for a retry, otherwise it produced the candidates
-     itself. The ghost path never runs this. */
+  /* No command-specific spec. The default -D loader sources the per-command
+     file and returns 124 to ask for a retry, otherwise it produced the
+     candidates itself. */
   if (spec == nullptr) {
     if (!for_listing) return None;
     const completion_spec *def = context.default_completion_spec();
@@ -861,10 +838,8 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
           continue;
         push_spec_candidate(entry.view(), loaded, descriptions);
       }
-      /* An empty reply never claims the completion, so the cascade falls to
-         the filesystem the way bash-completion's -o default behaves, and a
-         cp whose loaded spec offers nothing for an operand still completes
-         paths. */
+      /* An empty reply never claims the completion, so the cascade falls to the
+         filesystem the way bash-completion's -o default behaves. */
       if (loaded.is_empty()) return None;
       return loaded;
     }
@@ -877,9 +852,7 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
   let const should_offer_dash_words = !token.is_empty() && token[0] == '-';
 
   if (!spec->word_list.is_empty()) {
-    /* The -W list expands the way bash expands it, through the same shared
-       path compgen -W reads. The ghost runs on every keystroke and so keeps
-       the plain split for a list that would need a parse. */
+    /* The -W list expands through the same shared path compgen -W reads. */
     for (let const &word :
          context.expand_wordlist_to_fields(spec->word_list.view(), for_listing))
     {
@@ -889,9 +862,8 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
     }
   }
 
-  /* The function returns the final candidate list in COMPREPLY, already
-     filtered to the current word, so its entries are taken as they are, under
-     the same dash gate the word list passes through. */
+  /* COMPREPLY is already filtered to the current word, so its entries are taken
+     as they are under the same dash gate. */
   if (for_listing && !spec->function_name.is_empty()) {
     usize cword = 0;
     let const words = split_completion_words(line, cursor, cword);
@@ -914,8 +886,7 @@ struct completion_sub_frame
   bool is_backtick;
 };
 
-/* Completion inside echo $(git che re-roots to the inner git line. An
-   arithmetic $(( carries no command, so its body never re-roots, and a
+/* An arithmetic $(( carries no command, so its body never re-roots, and a
    single-quoted run is literal, so its contents open nothing. */
 fn command_substitution_body_start(StringView line, usize cursor) throws
     -> usize

@@ -35,8 +35,7 @@
 
 namespace shit {
 
-/* The --help section a flag renders under. NoSection flags print first with
-   no heading. The order here is the order the sections print in. */
+/* The order here is the order the sections print in. */
 enum class flag_section : u8
 {
   NoSection,
@@ -69,7 +68,6 @@ public:
   pure fn section() const wontthrow -> flag_section;
   pure fn description() const wontthrow -> StringView;
 
-  /* Reset the flag state, mainly for builtins. */
   virtual fn reset() throws -> void = 0;
 
 protected:
@@ -167,8 +165,6 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const Flag *operand_value_flag = nullptr) throws
     -> ArrayList<String>;
 
-/* Join the arguments into one space-separated line, the source a located flag
-   error renders its caret against. */
 fn join_command_line(int argc, const char *const *argv) throws -> String;
 
 fn reset_flags(const ArrayList<Flag *> &flags) throws -> void;
@@ -180,9 +176,6 @@ fn make_synopsis(StringView program_name,
                  const ArrayList<StringView> &lines) throws -> String;
 fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String;
 
-/* Word-wrap text so no line exceeds width columns, with every line indented by
-   indent spaces. The text breaks only at a space, and a single word longer than
-   the available room is emitted whole. The result has no trailing newline. */
 fn wrap_text(StringView text, usize indent, usize width) throws -> String;
 
 fn show_message(StringView err) throws -> void;
@@ -192,8 +185,6 @@ fn show_message(StringView err) throws -> void;
    joining the prompt. The first message consumes the arming. */
 fn arm_message_leading_newline(bool armed) wontthrow -> void;
 
-/* Write bytes to the standard streams without going through the iostream layer,
-   so the binary does not pull in the stream machinery. */
 fn print(StringView text) throws -> void;
 fn print_error(StringView text) throws -> void;
 fn flush() throws -> void;

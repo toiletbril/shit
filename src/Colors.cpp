@@ -7,8 +7,6 @@ namespace shit {
 
 namespace colors {
 
-/* NO_COLOR set and non-empty, or TERM equal to dumb, turns color off for every
-   stream regardless of the terminal. */
 static fn color_is_suppressed_by_environment() throws -> bool
 {
   if (let const no_color = os::get_environment_variable("NO_COLOR");

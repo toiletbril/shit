@@ -17,13 +17,10 @@ namespace shit {
 
 namespace completion {
 
-/* The highlighter rebuilds its spans and known-variable set every keystroke on
-   this arena, reset at the top of highlight_line so the previous render stays
-   valid until the editor drains it. */
+/* Reset at the top of highlight_line so the previous render stays valid until
+   the editor drains it. */
 static BumpArena HIGHLIGHT_ARENA{};
 
-/* The PATH search verdicts first_word_resolves caches, keyed by the word and
-   dropped when PATH changes. */
 static String CACHED_PATH_VERDICT_PATH{heap_allocator()};
 static StringMap<bool> PATH_SEARCH_VERDICTS{heap_allocator()};
 
@@ -33,8 +30,8 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   if (word == "!") return true;
   if (KEYWORDS.find(word).has_value()) return true;
 
-  /* A path word resolves against the filesystem, not the command-name sets, a
-     leading tilde expanded first. */
+  /* A path word resolves against the filesystem with a leading tilde expanded
+     first. */
   if (word.find_character('/').has_value()) {
     let expanded = String{word};
     if (!word.is_empty() && word[0] == '~') {
@@ -43,8 +40,8 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
       else
         return false;
     }
-    /* An existing regular file resolves even when not executable, the name is
-       found rather than missing and permission is a runtime matter. */
+    /* An existing regular file resolves even when not executable, permission
+       is a runtime matter. */
     if (Maybe<Path> canonical = Path::canonicalize(expanded.view());
         canonical.has_value())
     {
@@ -56,14 +53,11 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   if (search_builtin(word).has_value()) return true;
   if (context.find_function(word) != nullptr) return true;
   if (context.get_alias(word).has_value()) return true;
-  /* A bare coreutil with no PATH binary still runs through the shitbox
-     fallback when the toggle is on, so it resolves here the way the runtime
-     resolver gates it rather than reading as a dead command. */
+  /* A bare coreutil with no PATH binary still runs through the shitbox fallback
+     when the toggle is on. */
   if (context.shitbox() && shitbox::find_util(word).has_value()) return true;
 
-  /* Only the PATH search verdict caches, paying the directory stats once per
-     distinct word, dropped when PATH changes. A function or alias is seen live
-     above. */
+  /* Only the PATH search verdict caches, dropped when PATH changes. */
   if (environment_path_changed(CACHED_PATH_VERDICT_PATH))
     PATH_SEARCH_VERDICTS.clear();
   if (const bool *verdict = PATH_SEARCH_VERDICTS.find(word); verdict != nullptr)
@@ -75,9 +69,6 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   return resolves;
 }
 
-/* Whether the word is a strict prefix of some command name, a builtin, a
-   function, an alias, or a PATH program, so an unfinished command colors yellow
-   while it could still complete rather than red. */
 static fn command_word_prefixes_any(StringView word,
                                     EvalContext &context) throws -> bool
 {
@@ -124,7 +115,6 @@ static pure fn is_highlight_name_char(char c) wontthrow -> bool
   return lexer::is_variable_name(c);
 }
 
-/* The form a for loop variable must take. */
 static pure fn is_plain_identifier(StringView word) wontthrow -> bool
 {
   if (word.length == 0 || !is_highlight_name_start(word[0])) return false;
@@ -147,9 +137,7 @@ static pure fn word_defines_function(StringView line, usize word_end,
   return i < end && line[i] == ')';
 }
 
-/* A byte that ends a top-level word, whitespace or an operator the scanner
-   stops on. '{' and '}' are left out so a brace word such as a{1,2} stays one
-   word. */
+/* '{' and '}' are left out so a brace word such as a{1,2} stays one word. */
 static pure fn is_highlight_word_break(char c) wontthrow -> bool
 {
   return lexer::is_whitespace(c) || c == '\n' || c == '|' || c == '&' ||
@@ -191,8 +179,6 @@ static pure fn scan_dollar_expansion(StringView line, usize dollar,
   return i;
 }
 
-/* A word of the form NAME=... that the parser reads as an assignment prefix
-   rather than a command, so it leaves the next word in command position. */
 static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
 {
   if (word.length == 0 || !is_highlight_name_start(word[0])) return false;
@@ -200,8 +186,7 @@ static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
   while (i < word.length && is_highlight_name_char(word[i]))
     i++;
   if (i < word.length && word[i] == '=') return true;
-  /* The array-element form NAME[subscript]= is also an assignment, the way the
-     lexer keeps arr[i]=v one word. */
+  /* The array-element form NAME[subscript]= is also an assignment. */
   if (i < word.length && word[i] == '[') {
     usize depth = 1;
     i++;
@@ -326,8 +311,7 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
 static fn word_names_existing_path(StringView word) throws -> bool
 {
   if (word.is_empty()) return false;
-  /* A dash word is an option, never a path, sparing a stat per option each
-     keystroke. */
+  /* A dash word is an option, never a path. */
   if (word[0] == '-') return false;
   if (word[0] == '~') {
     if (Maybe<String> expanded = utils::expand_leading_tilde_path(word);
@@ -345,8 +329,6 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
 {
   if (partial.is_empty()) return false;
 
-  /* The directory to scan is the resolved prefix, or the root for an absolute
-     path and the cwd for a relative one when nothing resolved yet. */
   String directory{heap_allocator()};
   if (existing_end > 0) {
     let const prefix = word.substring_of_length(0, existing_end);
@@ -375,8 +357,7 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
   return false;
 }
 
-/* True when the byte after a word finishes it, so no keystroke can grow it and
-   an unresolved word is a dead end rather than a prefix still typed. */
+/* True when the byte after a word finishes it, so no keystroke can grow it. */
 static fn word_is_terminated_by_separator(StringView line, usize word_end,
                                           usize line_length) wontthrow -> bool
 {
@@ -387,9 +368,7 @@ static fn word_is_terminated_by_separator(StringView line, usize word_end,
          next_byte == ';' || next_byte == '|' || next_byte == '&';
 }
 
-/* The resolved on-disk prefix is cyan, the first unresolved segment cyan while
-   it prefixes a real entry and is still being typed, red once finished or
-   unmatched. Returns whether the word was treated as a path. */
+/* Returns whether the word was treated as a path. */
 static fn color_path_argument(usize word_start, StringView word,
                               bool word_is_terminated,
                               ArrayList<highlight_span> &spans) throws -> bool
@@ -403,21 +382,16 @@ static fn color_path_argument(usize word_start, StringView word,
       (word[1] == '/' ||
        (word.length >= 3 && word[1] == '.' && word[2] == '/'));
 
-  /* A bare word with no path shape is only treated as a path when it resolves
-     on disk, so an ordinary argument keeps its default color. */
+  /* A bare word with no path shape is treated as a path only when it resolves
+     on disk. */
   let const has_no_path_shape = !has_slash && !has_tilde && !has_dot_prefix;
   if (has_no_path_shape && !word_names_existing_path(word)) {
     return false;
   }
 
-  /* The longest leading run of segments whose joined prefix exists on disk
-     bounds the cyan span. The trailing slash rides with the prefix, so src/
-     colors through the separator. The prefix is monotonic on the filesystem, a
-     deeper path cannot exist when a shallower one does not, so the boundaries
-     are walked from the longest down and the first that exists is the answer,
-     which is one stat for a path that fully resolves rather than one per
-     segment. A bare word has no internal boundary and already resolved above,
-     so its whole length is the prefix without a second stat. */
+  /* The prefix is monotonic on the filesystem, a deeper path cannot exist when
+     a shallower one does not, so the boundaries are walked from the longest
+     down and the first that exists is the answer. */
   usize existing_end = 0;
   if (has_no_path_shape) {
     existing_end = word.length;
@@ -471,8 +445,8 @@ static fn color_path_argument(usize word_start, StringView word,
   return true;
 }
 
-/* The plain variable name a simple $name or ${name} references, None when the
-   expansion carries an operator such as ${x:-y} or a form like ${#x}. */
+/* None when the expansion carries an operator such as ${x:-y} or a form like
+   ${#x}. */
 static fn simple_dollar_name(StringView line, usize i,
                              usize expansion_end) wontthrow -> Maybe<StringView>
 {
@@ -489,8 +463,8 @@ static fn simple_dollar_name(StringView line, usize i,
   return line.substring_of_length(i + 1, expansion_end - (i + 1));
 }
 
-/* Whether a $ reference names something set, read without side effect so the
-   highlighter never advances RANDOM or reads the clock. */
+/* Read without side effect so the highlighter never advances RANDOM or reads
+   the clock. */
 static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
     -> bool
 {
@@ -503,16 +477,12 @@ static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
   return os::get_environment_variable(name).has_value();
 }
 
-/* A $(...) recurses so its inner command line colors like any other. A named
-   variable that is not set colors bold red. */
 static fn color_dollar(StringView line, usize i, usize end,
                        ArrayList<highlight_span> &spans, EvalContext &context,
                        HashSet &known_vars) throws -> usize
 {
   /* $(( ... )) frames an arithmetic expression, so its inside colors as bare
-     names, numbers, and operators rather than as a command line. The two
-     opening and two closing parens frame the bytes the arithmetic colorer
-     reads. */
+     names, numbers, and operators. */
   if (i + 2 < end && line[i + 1] == '(' && line[i + 2] == '(') {
     usize depth = 0;
     let close = end;
@@ -530,8 +500,7 @@ static fn color_dollar(StringView line, usize i, usize end,
       }
     }
     let const inner_begin = i + 3 < end ? i + 3 : end;
-    /* A terminated $(( )) stops before its two closing parens, an unterminated
-       one colors through to the end. */
+    /* An unterminated $(( )) colors through to the end. */
     let inner_end = close < end && close >= 1 ? close - 1 : end;
     if (inner_end < inner_begin) inner_end = inner_begin;
     color_arithmetic(line, inner_begin, inner_end, context, spans, known_vars);
@@ -586,7 +555,6 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
       continue;
     }
 
-    /* A bare name is a variable read in arithmetic, no leading dollar. */
     if (is_highlight_name_start(c)) {
       let const name_start = i;
       while (i < end && is_highlight_name_char(line[i]))
@@ -625,9 +593,8 @@ struct heredoc_pending_highlight
   bool should_strip_tabs;
 };
 
-/* The queued heredoc bodies are colored as a here-string, so the body lines are
-   not mis-colored as commands. A <<- delimiter is matched once its leading tabs
-   are skipped, the way the lexer strips them. */
+/* A <<- delimiter is matched once its leading tabs are skipped, the way the
+   lexer strips them. */
 static fn
 scan_heredoc_bodies(StringView line, usize position, usize end,
                     const ArrayList<heredoc_pending_highlight> &pending,
@@ -677,8 +644,7 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
   return i;
 }
 
-/* Color one command line, the window [begin, end). A command substitution
-   recurses through color_dollar with its own command-position and construct
+/* A command substitution recurses with its own command-position and construct
    state, so a nested command line colors on its own. */
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
@@ -712,8 +678,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     let const c = line[i];
 
     if (c == ' ' || c == '\t' || c == '\n') {
-      /* A newline ends a command the way a ';' does, so the next word returns
-         to command position and a keyword after it is recognized. */
+      /* A newline ends a command the way a ';' does. */
       if (c == '\n') {
         commit_pending_assignments();
         is_command_position = true;
@@ -734,8 +699,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       break;
     }
 
-    /* A << queues a heredoc body that the closing delimiter ends, while <<< is
-       a one-line here-string and falls through to the operator scan. */
+    /* <<< is a one-line here-string and falls through to the operator scan. */
     if (c == '<' && i + 1 < end && line[i + 1] == '<' &&
         !(i + 2 < end && line[i + 2] == '<'))
     {
@@ -778,6 +742,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     /* A separator or an opener moves the next word back to command position, a
        redirection does not. */
     if (c == '|' || c == '&' || c == ';' || c == '<' || c == '>' || c == '(' ||
+
         c == ')' || c == '{' || c == '}')
     {
       let const operator_start = i;
@@ -829,8 +794,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         if (i < end) i++;
         word_spans.push(highlight_span{string_start, i, colors::ansi::YELLOW});
       } else if (d == '"') {
-        /* literal_start tracks the start of the current yellow run, which
-           begins at the opening quote and resumes after every expansion. */
+        /* literal_start tracks the current yellow run, which resumes after
+           every expansion. */
         i++;
         let literal_start = i - 1;
         while (i < end && line[i] != '"') {
@@ -853,8 +818,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           word_spans.push(
               highlight_span{literal_start, i, colors::ansi::YELLOW});
       } else if (d == '`') {
-        /* A backtick substitution recurses like $(...). The close is the first
-           unescaped backtick, a backslash escaping only a backtick, dollar, or
+        /* Inside a backtick a backslash escapes only a backtick, dollar, or
            backslash. */
         let const inner_begin = i + 1;
         i++;
@@ -895,8 +859,6 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         pending_assignment_names.push(assigned_name);
     }
 
-    /* The ]] that closes a [[ conditional reads as a keyword and pops the
-       construct, the way fi closes an if and done closes a loop. */
     if (plain && word == "]]" && !stack.is_empty() &&
         stack.back() == highlight_construct::Conditional)
     {
@@ -911,8 +873,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       expecting_in = false;
       for_variable_pending = false;
       is_command_position = false;
-      /* A for loop requires do once its word list ends, a case takes patterns,
-         so this only arms for a for. */
+      /* A case takes patterns, so this only arms for a for. */
       if (!stack.is_empty() && stack.back() == highlight_construct::For)
         for_do_expected = true;
       continue;
@@ -923,7 +884,6 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (for_variable_pending) {
       for_variable_pending = false;
       is_command_position = false;
-      /* A valid loop variable is cyan, a malformed one bold red. */
       if (!plain || !is_plain_identifier(word)) {
         do_push(word_start, word_end, colors::ansi::BOLD_RED);
       } else {
@@ -945,8 +905,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       continue;
     }
 
-    /* A for loop requires do once its word list ends, so a word other than do
-       in that position is misplaced and shown red. */
+    /* A word other than do once the for word list ends is misplaced, shown
+       red. */
     if (for_do_expected && is_command_position) {
       for_do_expected = false;
       if (word != "do") {
@@ -1013,11 +973,6 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         continue;
       }
 
-      /* A command name. A path-shaped command colors per segment like a path
-         argument, the existing prefix bright cyan and the part being typed cyan
-         or red. A plain command name is blue once it resolves, bright blue
-         while it still prefixes some command name so it could complete, and red
-         once it prefixes nothing. */
       let const is_word_terminated =
           word_is_terminated_by_separator(line, word_end, end);
       if (word.find_character('/').has_value()) {
@@ -1041,14 +996,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       continue;
     }
 
-    /* An assignment prefix keeps the next word in command position, an
-       expansion-built command moves past it. */
     if (!is_command_position && plain && !is_assignment) {
       if (!word.is_empty() && word[0] == '-') {
         do_push(word_start, word_end, colors::ansi::GRAY);
       } else if (token_has_glob_metacharacter(word)) {
-        /* An unquoted glob argument reads yellow, the word is plain here so the
-           metacharacter is live rather than a quoted literal. */
+        /* The word is plain here so the metacharacter is live. */
         do_push(word_start, word_end, colors::ansi::YELLOW);
       } else {
         let const is_word_terminated =
@@ -1070,14 +1022,10 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 fn highlight_line(StringView line, EvalContext &context) throws
     -> ArrayList<highlight_span>
 {
-  /* Reclaim the previous keystroke's highlight allocations. The spans it
-     returned have been drained into the line editor's own buffer by now. */
   HIGHLIGHT_ARENA.reset();
   let const arena = bump_allocator(HIGHLIGHT_ARENA);
   let spans = ArrayList<highlight_span>{arena};
-  /* The set of named variables is read once per line so the per-expansion check
-     does no allocation and triggers no dynamic-variable side effect. A line
-     with no $ never references a variable, so the whole walk over the variable
+  /* A line with no $ never references a variable, so the walk over the variable
      store is skipped on the common plain-command keystroke. */
   let known_vars = HashSet{arena};
   if (line.find_character('$').has_value()) {

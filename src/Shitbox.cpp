@@ -19,9 +19,8 @@ flatten fn find_util(StringView name) throws -> Maybe<Utility::Kind>
   return SHITBOX_UTILS.find(name);
 }
 
-/* The per-utility flag lists, a zero-initialized table immune to static-init
-   order, filled by each utility file's registrar after its FLAG_LIST is
-   built. */
+/* Zero-initialized so it is immune to static-init order, filled by each
+   utility's registrar. */
 static const ArrayList<Flag *> *SHITBOX_UTIL_FLAG_LISTS[SHITBOX_UTIL_COUNT] =
     {};
 
@@ -65,33 +64,24 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   ASSERT(name_index < ec.args().count());
   let const name = ec.args()[name_index].view();
 
-  /* The utility reads itself as the first argument, so a slice from the name
-     onward is copied once and handed over, the name as the program word. */
   ArrayList<String> shifted{heap_allocator()};
   shifted.reserve(ec.args().count() - name_index);
   for (usize i = name_index; i < ec.args().count(); i++)
     shifted.push(ec.args()[i].clone());
 
   if (let const chosen = find_util(name); chosen.has_value()) {
-    /* A utility error is rendered as a located error in every mood, so the bash
-       mood shows the same caret the default mood does rather than the soft line
-       the builtin dispatch would print. */
     try {
       return run_util(*chosen, ec, cxt, shifted);
     } catch (const ErrorWithLocation &error) {
-      /* A flag-parse error carries a caret offset into the utility's own
-         argument vector, which does not line up with the whole command, so the
-         caret would land on the wrong token. relocate_error re-points it at the
-         command location and carries the mark, the status, and the note. */
+      /* The caret offsets into the utility's own argument vector, so it is
+         re-pointed at the command location. */
       throw relocate_error(error, ec.source_location());
     } catch (const Error &error) {
       throw relocate_error(error, ec.source_location());
     }
   }
 
-  /* A name that is not a shitbox utility but is a shell builtin routes to that
-     builtin, so `shitbox echo hi` runs the echo builtin. The routed context
-     carries the same descriptors the outer command was placed on. */
+  /* A name that is not a utility but is a shell builtin routes to that builtin. */
   if (let const builtin_kind = search_builtin(name); builtin_kind.has_value()) {
     let routed = ExecContext::from_resolved(
         ec.source_location(), ResolvedCommand::from_builtin(*builtin_kind),
@@ -110,9 +100,7 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   let const chosen = find_util(util_name);
   ASSERT(chosen.has_value());
 
-  /* A symlinked utility reports the shit version on --version, so a user who
-     ran what looks like a system program sees the binary behind it. The scan
-     stops at --, where a later --version is an operand. */
+  /* The scan stops at --, where a later --version is an operand. */
   for (const String &operand : operands) {
     if (operand == "--") break;
     if (operand == "--version") {
@@ -135,16 +123,12 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   try {
     return run_util(*chosen, ec, cxt, ec.args());
   } catch (const ErrorWithLocation &e) {
-    /* An unknown flag carries a caret into the joined argument vector, so the
-       reader sees which argument the utility rejected. */
     show_message(e.to_string(utils::merge_args_to_string(ec.args())));
     return 1;
   } catch (const Error &e) {
     show_message(e.to_string());
     return 1;
   } catch (const std::exception &e) {
-    /* A standard exception such as an out-of-memory throw would otherwise
-       escape to terminate, the way the shell guards its own top level. */
     show_message("shit: " + String{util_name} + ": " + e.what());
     return 1;
   } catch (...) {
@@ -158,8 +142,7 @@ fn parse_util_operands(const ArrayList<Flag *> &flags,
     -> ArrayList<String>
 {
   ArrayList<String> operands = parse_flags_vec(flags, args, 0);
-  /* The first operand is the utility name, the program word parse_flags_vec
-     never reads as a flag, so it is dropped to leave the real arguments. */
+  /* The first operand is the utility name, dropped to leave the real arguments. */
   if (!operands.is_empty()) operands.remove(0);
   return operands;
 }
@@ -170,8 +153,6 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
 {
   let help_text = String{heap_allocator()};
 
-  /* A symlinked utility looks like a system program, so the help opens by
-     naming the shit binary behind it, set off by a blank line on each side. */
   if (ec.is_multicall) {
     help_text += "\n";
     help_text += wrap_text("This utility is bundled with the shit shell and "
@@ -242,8 +223,6 @@ fn sort_string_list(ArrayList<String> &items) wontthrow -> void
 
 fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void
 {
-  /* The bytes compare as unsigned the way a byte-order sort orders them, so the
-     views sort without copying each line into an owned String first. */
   items.sort([](StringView a, StringView b) {
     let const min_length = a.length < b.length ? a.length : b.length;
     for (usize i = 0; i < min_length; i++)
@@ -272,31 +251,25 @@ fn format_signal_list() throws -> String
 
 fn format_human_size(u64 bytes) throws -> String
 {
-  /* A value below 1024 prints as the plain byte count with no suffix, the way
-     ls -h and du -h show a small size. */
   if (bytes < 1024) return String::from(bytes, heap_allocator());
 
   static const char units[] = {'K', 'M', 'G', 'T', 'P'};
   double value = static_cast<double>(bytes);
   usize unit = 0;
-  /* The condition reads unit, not unit + 1, so the last unit P is reachable
-     rather than the scan stopping a unit early. */
+  /* The condition reads unit, so the last unit P stays reachable. */
   while (value >= 1024.0 && unit < sizeof(units)) {
     value /= 1024.0;
     unit++;
   }
 
-  /* Rounding the scaled value can reach 1024, which belongs in the next unit,
-     so a value that would render as 1024K crosses over to 1.0M. */
+  /* A value that rounds up to 1024 crosses over to the next unit. */
   if (value >= 1023.5 && unit < sizeof(units)) {
     value /= 1024.0;
     unit++;
   }
 
   String out{heap_allocator()};
-  /* A scaled value below ten keeps one decimal, while a larger value rounds to
-     a whole number. A one-decimal value that rounds up to ten drops the decimal
-     so it reads 10K, not 10.0K. */
+  /* A scaled value below ten keeps one decimal, otherwise it rounds whole. */
   let const tenths = static_cast<u64>(value * 10.0 + 0.5);
   if (value < 10.0 && tenths < 100) {
     out += String::from(tenths / 10, heap_allocator());
@@ -312,9 +285,7 @@ fn format_human_size(u64 bytes) throws -> String
 fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void
 {
-  /* A keep-going utility error renders the located caret in every mood, the
-     same form a thrown utility error gets. The fallback line is for the rare
-     case with no source to caret against, such as the multicall entry. */
+  /* The fallback line covers the rare case with no source to caret against. */
   const ErrorWithLocation located{ec.source_location(), message};
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view()));

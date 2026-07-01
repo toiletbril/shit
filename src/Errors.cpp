@@ -11,10 +11,8 @@
 
 namespace shit {
 
-/* The SGR codes wrapping one diagnostic. Each field is empty when color is off,
-   so the same render code appends them unconditionally and emits nothing on the
-   plain path. The severity code follows clang, where an error is red, a warning
-   is magenta, and a note or trace is cyan. */
+/* Each field is empty when color is off, so the render code appends them
+   unconditionally and emits nothing on the plain path. */
 struct diagnostic_color
 {
   StringView severity{};
@@ -24,10 +22,6 @@ struct diagnostic_color
   StringView reset{};
 };
 
-/* The color codes for a diagnostic of this severity, or all empty StringViews
-   when color is off. The severity word selects the severity hue, since the
-   reporting code reads the word from the object rather than its concrete type.
- */
 cold static fn diagnostic_colors_for(StringView severity_word) throws
     -> diagnostic_color
 {
@@ -43,10 +37,8 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
                           colors::ansi::BOLD_GREEN, colors::ansi::RESET};
 }
 
-/* The line a byte falls on and the offset of the newline that starts it. The
-   has_preceding_newline flag tells the two apart from a byte on the first line,
-   since a newline at offset zero starts line two yet shares the zero offset
-   with the no-newline case. */
+/* has_preceding_newline distinguishes a byte on the first line from one whose
+   newline sits at offset zero, since both carry a zero last_newline_location. */
 struct precise_location
 {
   usize line_number;
@@ -54,10 +46,8 @@ struct precise_location
   bool has_preceding_newline;
 };
 
-/* A per-source index that turns the line and column lookup from a prefix scan
-   into a binary search, since otherwise N warnings cost N squared. One source
-   serves a whole analysis pass, so a single cached entry keyed on the source
-   pointer and length serves every located message. */
+/* A per-source index that turns the line and column lookup into a binary
+   search, since otherwise N warnings cost N squared. */
 class SourceLineIndex
 {
 public:
@@ -66,9 +56,6 @@ public:
         m_codepoints_before_newline(heap_allocator())
   {}
 
-  /* Build the index for this source when it differs from the cached one. The
-     entry holds, for each newline, its byte offset and the code point count of
-     the bytes before it. */
   fn ensure_built_for(StringView source) throws -> void
   {
     if (m_source_data == source.data && m_source_length == source.count())
@@ -81,7 +68,6 @@ public:
 
     usize codepoints = 0;
     for (usize i = 0; i < source.count(); i++) {
-      /* A byte that is not a UTF-8 continuation byte starts a code point. */
       if ((static_cast<u8>(source[i]) & 0xC0) != 0x80) codepoints++;
       if (source[i] == '\n') {
         m_newline_offsets.push(i);
@@ -90,10 +76,9 @@ public:
     }
   }
 
-  /* Forget the cached source, so the next ensure_built_for rebuilds rather than
-     trusting the pointer and length. A retained source freed by the host can be
-     replaced by a fresh allocation at the same address with the same length,
-     which the pointer-and-length key alone cannot tell apart. */
+  /* A freed source can be replaced by a fresh allocation at the same address
+     and length, which the pointer-and-length key cannot tell apart, so the
+     next ensure_built_for must rebuild. */
   fn invalidate() wontthrow -> void
   {
     m_source_data = nullptr;
@@ -102,10 +87,6 @@ public:
     m_codepoints_before_newline.clear();
   }
 
-  /* The line number and the offset of the newline that starts it, matching the
-     prefix scan it replaces. The line number counts newlines strictly before
-     the byte, and the newline offset is the last such newline, or zero when the
-     byte is on the first line. */
   pure fn locate(usize byte_position) const wontthrow -> precise_location
   {
     const usize newlines_before = count_newlines_before(byte_position);
@@ -116,9 +97,6 @@ public:
                             has_preceding_newline};
   }
 
-  /* The code point count of the bytes in the half open range before the byte,
-     the value the prefix utf8 scan produced. It sums the code points up to the
-     line start and the code points within the line up to the byte. */
   pure fn codepoints_before(StringView source,
                             usize byte_position) const wontthrow -> usize
   {
@@ -135,8 +113,6 @@ public:
   }
 
 private:
-  /* The count of newlines at a byte offset strictly less than the position,
-     found by binary search over the sorted newline offsets. */
   pure fn count_newlines_before(usize byte_position) const wontthrow -> usize
   {
     usize low = 0;
@@ -157,8 +133,6 @@ private:
   ArrayList<usize> m_codepoints_before_newline;
 };
 
-/* One index reused across every located message in a pass, since the pass works
-   over a single source at a time. */
 static SourceLineIndex SOURCE_LINE_INDEX{};
 
 fn invalidate_source_line_index() wontthrow -> void
@@ -202,8 +176,7 @@ get_context_pointing_to(StringView source, usize byte_position,
   usize start_offset = byte_position - last_newline_location;
 
   /* A preceding newline puts start_offset on that newline, so it steps one past
-     to the first byte of the line. The flag captures a newline at offset zero,
-     which starts line two and must step too. */
+     to the first byte of the line. */
   if (has_preceding_newline && start_offset > 0) {
     start_offset--;
   }
@@ -219,13 +192,7 @@ get_context_pointing_to(StringView source, usize byte_position,
   ASSERT(byte_position - start_offset + line_byte_count == source.count() ||
          source[byte_position - start_offset + line_byte_count] == '\n');
 
-  /* The line number is padded to a minimum field so short numbers still align,
-     and a wider number widens the field rather than overflowing it. The bar and
-     its two trailing spaces follow, so the same width measures both the context
-     gutter here and the underline gutter below. */
   static constexpr usize LINE_NUMBER_FIELD_WIDTH = 6;
-  /* The bar separator and its two trailing spaces, the " |  " literal printed
-     after the line number. */
   static constexpr usize BAR_SEPARATOR_WIDTH = 4;
   const usize line_number_digit_count = number_string_length(line_number + 1);
   const usize line_number_padding_length =
@@ -243,16 +210,12 @@ get_context_pointing_to(StringView source, usize byte_position,
   let const context =
       source.substring_of_length(byte_position - start_offset, line_byte_count);
 
-  /* The context is a single line, so a newline inside it would misplace the
-     caret below. */
   ASSERT(!context.find_character('\n').has_value(),
          "'%s', start: %zu, end: %zu", context.data, start_offset,
          line_byte_count);
 
-  /* A tab is one byte but renders wide, so the caret below, padded by character
-     count, would land short of the token. Each tab is expanded to a fixed width
-     here, and the padding adds the same width per tab, so the caret lines up.
-   */
+  /* A tab renders wider than one byte, so it is expanded to a fixed width here
+     and the caret padding below adds the same width per tab to stay aligned. */
   static constexpr usize TAB_WIDTH = 4;
   for (usize i = 0; i < context.count(); i++) {
     if (context[i] == '\t')
@@ -262,8 +225,6 @@ get_context_pointing_to(StringView source, usize byte_position,
       msg += context[i];
   }
 
-  /* The tabs before the error widen the displayed prefix, so the caret padding
-     gains the extra columns each one renders beyond a single character. */
   usize tabs_before_error = 0;
   for (usize i = byte_position - start_offset; i < byte_position; i++)
     if (source[i] == '\t') tabs_before_error++;
@@ -271,29 +232,19 @@ get_context_pointing_to(StringView source, usize byte_position,
   const usize unicode_start_offset_position =
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position - start_offset);
 
-  /* Does token length go beyond that line? The bounded counter walks at most
-     the given byte count over the interior pointer, so it never runs strlen
-     past the source end at an EOF caret. */
+  /* The bounded counter walks at most the given byte count, so it never runs
+     strlen past the source end at an EOF caret. */
   const usize unicode_length = toiletline::utf8_strnlen(
       source.data + byte_position, (byte_count > line_byte_count - start_offset)
                                        ? line_byte_count - start_offset
                                        : byte_count);
 
-  /* The underline gutter mirrors the context gutter so the two bars line up.
-     The bar sits one column before its two trailing spaces, so the spaces run
-     up to the bar, the bar prints, then the two trailing spaces close the
-     gutter.
-   */
   msg += '\n';
   for (usize i = 0; i + 3 < gutter_width; i++)
     msg += ' ';
 
   msg += "|  ";
 
-  /* The caret pads past the gutter by the token's column within the line, in
-     display columns. The code point distance from the line start gives the
-     count, and each tab before the caret adds the extra columns it renders
-     beyond the single column already counted. */
   const usize underline_padding_length =
       (unicode_position - unicode_start_offset_position) +
       tabs_before_error * (TAB_WIDTH - 1);
@@ -301,9 +252,6 @@ get_context_pointing_to(StringView source, usize byte_position,
   for (usize i = 0; i < underline_padding_length; i++)
     msg += ' ';
 
-  /* The underline itself of this token's length. The caret and its trailing
-     message share clang's caret hue, so the span opens here and closes after
-     the message. */
   msg += color.caret;
   msg += "^~";
   if (unicode_length > 2) {
@@ -315,8 +263,6 @@ get_context_pointing_to(StringView source, usize byte_position,
     msg += ' ';
     msg += *message;
 
-    /* The trailing caret label keeps its own terminal punctuation rather than
-       gaining a second mark, matching the located note path. */
     let const view = *message;
     if (let const last_char =
             view.is_empty() ? '\0' : view.data[view.length - 1];
@@ -347,14 +293,8 @@ cold fn ErrorBase::note_to_string() const throws -> String
 {
   if (m_note.is_empty()) return String{heap_allocator()};
 
-  /* The note rides on its own line under the primary message in the note hue,
-     the same shape an unlocated Note renders, so the suggestion reads as advice
-     rather than as part of the problem statement. Each note literal is written
-     capitalized at its source. */
   let const color = diagnostic_colors_for(StringView{"note"});
 
-  /* A note that already ends in terminal punctuation, such as a "Did you
-     mean ...?" suggestion, keeps its own mark rather than gaining a second. */
   let const note_period =
       (m_note.back() == '.' || m_note.back() == '?' || m_note.back() == '!')
           ? ""
@@ -378,8 +318,6 @@ cold fn ErrorBase::to_string(StringView source) const throws -> String
 
 fn Error::to_string() const throws -> String
 {
-  /* An unlocated Error renders the same line the base builds, which ignores the
-     source, so it delegates rather than keeping a second copy of the format. */
   return ErrorBase::to_string(StringView{});
 }
 
@@ -412,20 +350,15 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   usize byte_position = m_location.position;
   const usize byte_count = m_location.length;
 
-  /* The location can name a byte in a source other than the one being
-     rendered, a command-not-found thrown from a function body that a sourced
-     file defined while the interactive prompt's source is the empty line. The
-     caret would read out of bounds there, so the message renders unlocated
-     instead. */
+  /* The location can name a byte in a source other than the one rendered, so
+     the caret would read out of bounds and the message renders unlocated. */
   if (byte_position > source.count()) return ErrorBase::to_string(source);
 
   LOG_VARS(Debug, byte_position, byte_count);
   LOG(Debug, "formatting located %s", severity_word().c_str());
 
-  /* A position that lands on a line continuation or a bare newline points at
-     the join rather than at the next real byte, so the caret is nudged past the
-     backslash-newline pair or the lone newline to the start of the following
-     line where the reader expects it. */
+  /* A position on a line continuation or a bare newline is nudged past the
+     backslash-newline pair or the lone newline to the next line. */
   if (byte_position + 2 < source.count() && source[byte_position] == '\\' &&
       source[byte_position + 1] == '\n')
   {
@@ -442,12 +375,9 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   const usize unicode_position =
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position);
 
-  /* The column counts code points from the line start to the caret. Both terms
-     must be code point counts, since subtracting a byte offset from a code
-     point count underflows once a preceding line holds a multibyte byte. The
-     first line has no newline and counts from the source start plus one. A
-     newline at offset zero still starts line two, so the flag rather than the
-     offset decides whether a line precedes. */
+  /* Both terms must be code point counts, since subtracting a byte offset from
+     a code point count underflows once a preceding line holds a multibyte byte.
+     A newline at offset zero still starts line two, so the flag decides. */
   const usize codepoints_before_line =
       has_preceding_newline ? SOURCE_LINE_INDEX.codepoints_before(
                                   source, last_newline_location + 1)
@@ -458,8 +388,6 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   let const color = diagnostic_colors_for(severity_word());
 
   let result = String{heap_allocator()};
-  /* A named source prefixes its path before the line and column, so a sourced
-     error reads path:line:col rather than a bare line:col. */
   result += color.location;
   if (let const name = m_location.filename; name.has_value()) {
     result += *name;
@@ -474,24 +402,17 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   result += color.severity;
   result += severity_word();
   result += color.reset;
-  /* A located note with no message, such as a backtrace trace frame, ends at
-     the severity word, so nothing follows the colon. */
   if (!m_message.is_empty()) {
     result += ": ";
     result += color.message;
     result += m_message;
 
-    /* A message that already ends in terminal punctuation, such as a "Did you
-       mean ...?" suggestion, keeps its own mark rather than gaining a second.
-     */
     if (let const last_char = m_message.back();
         last_char != '.' && last_char != '?' && last_char != '!')
       result += '.';
 
     result += color.reset;
   } else {
-    /* A trace frame carries no message, so the location alone follows the
-       severity word. */
     result += " location:";
   }
   result += '\n';
@@ -540,9 +461,8 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   usize byte_position = m_details_location.position;
   const usize byte_count = m_details_location.length;
 
-  /* The same out-of-source guard to_string applies, so a detail note whose
-     location names another source renders nothing rather than reading past
-     the end. */
+  /* The out-of-source guard renders nothing when the location names another
+     source, so the caret never reads past the end. */
   if (byte_position > source.count()) return String{heap_allocator()};
 
   LOG(Debug, "formatting the detail note at byte %zu", byte_position);
@@ -560,10 +480,8 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   const usize unicode_details_position =
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position);
 
-  /* The column counts code points from the line start to the caret, so both
-     terms stay in code points. See ErrorWithLocation::to_string for why a byte
-     offset here would underflow on a multibyte preceding line, and why a
-     newline at offset zero needs the flag rather than the bare offset. */
+  /* Both terms stay in code points. See ErrorWithLocation::to_string for why a
+     byte offset here would underflow on a multibyte preceding line. */
   const usize codepoints_before_details_line =
       details_has_preceding_newline
           ? SOURCE_LINE_INDEX.codepoints_before(

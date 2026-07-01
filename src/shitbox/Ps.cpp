@@ -21,9 +21,6 @@ namespace shit {
 
 namespace shitbox {
 
-/* One uid resolved to its name once, so a listing with many processes owned by
-   the same user reads the passwd file once per distinct uid rather than once
-   per process. */
 struct uid_name_cache_entry
 {
   uid_name_cache_entry(u32 uid, String name) : uid(uid), name(steal(name)) {}
@@ -112,8 +109,7 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
                  String::from(process.resident_kib, allocator).view(),
                  rss_width);
     output += ' ';
-    /* The state is one letter padded to the four-wide STAT field plus a
-       trailing separator space. */
+    /* The state is padded to the four-wide STAT field plus a separator space. */
     output += process.state;
     output += "    ";
     output += process.command_line.is_empty() ? process.name.view()
@@ -129,18 +125,14 @@ pure fn Ps::kind() const wontthrow -> Utility::Kind { return Kind::Ps; }
 fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32
 {
-  /* The -aux spelling is the classic ps form rather than a bundle of single
-     letter flags, so it is recognized before flag parsing rather than rejected
-     as an unknown flag. */
+  /* The -aux spelling is recognized before flag parsing. */
   ArrayList<String> flag_args{cxt.scratch_allocator()};
   flag_args.reserve(args.count());
   bool should_show_aux = false;
   for (usize i = 0; i < args.count(); i++) {
     let const argument = args[i].view();
-    /* A dashed bundle of only a, u, x, and w is the classic ps spelling rather
-       than this shell's single-letter flags, so it is recognized here. The a,
-       u, and x select the aux view, and the w widths are accepted since the
-       command line already prints in full. */
+    /* A dashed bundle of only a, u, x, and w is the classic ps spelling, the
+       a, u, and x select the aux view. */
     if (i > 0 && argument.length > 1 && argument[0] == '-') {
       bool only_ps_options = true;
       for (usize k = 1; k < argument.length; k++)

@@ -34,8 +34,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* A leading -l or --list prints the signal names and exits, checked before
-     the signal parsing below so the -l is not read as a signal named l. */
+  /* Checked before the signal parsing so -l is not read as a signal named l. */
   if (args.count() > 1 && (args[1] == "-l" || args[1] == "--list")) {
     ec.print_to_stdout(shitbox::format_signal_list());
     return 0;
@@ -44,9 +43,6 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
-  /* -s names the signal by name and -n by number, the option forms that name
-     the signal apart from the -SIGNAL shorthand. Both also accept the other
-     spelling, so kill -s 9 and kill -n KILL resolve the same as kill -9. */
   if (args.count() > 1 && (args[1] == "-s" || args[1] == "-n")) {
     if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
 
@@ -66,9 +62,6 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     first_target = 3;
   } else if (args.count() > 1 && args[1].length() > 1 && args[1][0] == '-') {
-    /* A leading -name or -number names the signal to send. A numeric form such
-       as -9 names the number directly, while a name such as -KILL or -SIGTERM
-       resolves through the platform table. */
     let const name = String{cxt.scratch_allocator(), args[1].substring(1)};
     if (let const parsed_signal = name.view().to<i64>();
         !parsed_signal.is_error() && !name.is_empty() && name[0] >= '0' &&

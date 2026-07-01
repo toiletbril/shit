@@ -19,9 +19,6 @@ fn EvalContext::register_function(StringView name, const Expression *body,
   m_functions.set(name, body);
   m_function_sources.set(name, definition_text);
 
-  /* The copy is the "name () " header line then the body span verbatim. The
-     body sits on line two of the copy, and the printed line adds the offset so
-     it matches the defining file. */
   let info = function_definition_info{};
   info.body_start_position = body_start_position;
   info.header_length = name.length + StringView{" () \n"}.length;
@@ -33,9 +30,8 @@ fn EvalContext::register_function(StringView name, const Expression *body,
   if (definition_location.filename.has_value())
     info.filename = String{*definition_location.filename};
   info.defining_instance = m_current_source;
-  /* The mood and the diagnostics state are captured so a function defined in
-     bash mood runs bash after a later set --mood, and one defined while
-     diagnostics were off skips its checks. */
+  /* The mood is captured so a function defined in bash mood runs bash after a
+     later set --mood. */
   info.defining_mood = static_cast<u8>(m_runtime.mood);
   info.warning_level_at_definition = m_runtime.warning_level;
   info.were_diagnostics_disabled_at_definition =
@@ -55,16 +51,12 @@ pure fn EvalContext::resolve_render_source(
   let resolved_source = resolved_render_source{};
   resolved_source.text = m_current_source;
 
-  /* Inside a function call the body's positions index the file that defined it,
-     which may already be freed. When the position falls inside the innermost
-     function's recorded body span, the stored definition copy renders it with
-     the defining file's name and numbering. */
   if (m_function_call_names.is_empty()) return resolved_source;
   let const innermost = funcname_frame_at(0);
   let const *info = m_function_definition_infos.find(innermost);
   /* The body span check below decides whether to window, not the defining
      source pointer. A freed defining source can have its address reused by the
-     current source, so a pointer compare here would falsely read the body as
+     current source, so a pointer compare would falsely read the body as
      belonging to the current source and drop the function's filename. */
   if (info == nullptr) return resolved_source;
   let const *copy = m_function_sources.find(innermost);
@@ -144,7 +136,7 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
     names.add(name);
   });
   /* An indexed or associative array is a set variable too, so its name joins
-     the scalar names and the unset-variable highlight treats it as present. */
+     the scalar names. */
   m_indexed_arrays.for_each(
       [&](StringView name, const ArrayList<String> &value) {
         unused(value);
@@ -159,9 +151,8 @@ fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
   LOG(Info, "setting a trap for '%.*s' with a %zu byte action",
       static_cast<int>(condition.length), condition.data, action.length);
   m_traps.set(condition, action);
-  /* EXIT runs at the shell's end and needs no OS handler. A signal condition
-     installs the shell's handler, or the ignore disposition when the action is
-     the empty string the way trap "" SIG asks. */
+  /* EXIT runs at the shell's end and needs no OS handler. An empty action
+     installs the ignore disposition the way trap "" SIG asks. */
   if (condition == "EXIT") return;
   if (let const number = os::signal_number_from_name(condition)) {
     if (action.is_empty())
@@ -197,8 +188,6 @@ fn EvalContext::install_trap_dispositions() throws -> void
 
 fn EvalContext::run_pending_traps() throws -> void
 {
-  /* A signal delivered while a trap action runs must not nest a second drain,
-     so the guard returns early and the new flag waits for the next boundary. */
   if (m_running_traps) return;
   m_running_traps = true;
   defer { m_running_traps = false; };
@@ -208,8 +197,6 @@ fn EvalContext::run_pending_traps() throws -> void
      drains again rather than dropping the arrival. */
   os::SIGNAL_PENDING = 0;
 
-  /* A trap action must not change the $? the interrupted code goes on to read,
-     so the status is saved here and restored after the actions run. */
   const i32 saved_exit_status = m_last_exit_status;
 
   for (i32 number = os::take_pending_signal(); number != 0;
@@ -238,7 +225,7 @@ cold fn EvalContext::run_exit_trap() throws -> void
   m_exit_trap_ran = true;
 
   /* A Ctrl-C that ended the last command leaves the interrupt flag set, so it
-     is dropped before the action evaluates and cannot abort the exit trap. */
+     is dropped before the action evaluates. */
   os::INTERRUPT_REQUESTED = 0;
 
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
@@ -263,8 +250,8 @@ fn EvalContext::clear_inherited_exit_trap() throws -> void
 cold fn EvalContext::run_subshell_exit_trap() throws -> void
 {
   /* Only an EXIT action the subshell itself set is present, since the boundary
-     cleared the inherited one on entry. It runs in the subshell's still-current
-     state, before restore_state returns the parent's traps. */
+     cleared the inherited one on entry. It runs before restore_state returns
+     the parent's traps. */
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action the subshell set at its end");

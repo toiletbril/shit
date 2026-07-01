@@ -25,8 +25,6 @@ namespace shit {
 
 namespace shitbox {
 
-/* Resolve the -s value to a signal number, a decimal number directly or a name
-   such as TERM or SIGKILL through the platform table. Defaults to TERM. */
 fn resolve_shitbox_signal(StringView spelled, Allocator allocator) throws -> i32
 {
   if (spelled.is_empty()) return SIGTERM;

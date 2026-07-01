@@ -11,10 +11,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-/* The parameter expansion of the evaluator, the ${...} modifier dispatch
-   with its default, alternate, trim, substring, replacement, and case
-   forms, and the modifier-word expansion they share. */
-
 namespace shit {
 
 namespace {
@@ -25,9 +21,8 @@ enum class trim_end
   Suffix,
 };
 
-/* Remove the shortest or longest prefix or suffix of value that matches pattern
-   as a glob. The active mask marks which pattern bytes may act as glob
-   metacharacters, so a quoted or escaped * or ? matches itself. */
+/* The active mask marks which pattern bytes may act as glob metacharacters, so
+   a quoted or escaped * or ? matches itself. */
 fn trim_matching(Allocator result_allocator, StringView value,
                  StringView pattern, const Bitset &active,
                  trim_end end, bool longest, bool extglob_enabled) throws
@@ -36,8 +31,6 @@ fn trim_matching(Allocator result_allocator, StringView value,
   ASSERT(active.count() == pattern.length);
 
   if (end == trim_end::Prefix) {
-    /* The longest match scans down from the whole string and the shortest up
-       from the empty prefix, so the first hit is the wanted length. */
     if (longest) {
       for (usize length = value.length;; length--) {
         if (utils::glob_matches(pattern, value.substring_of_length(0, length),
@@ -54,8 +47,6 @@ fn trim_matching(Allocator result_allocator, StringView value,
     }
 
   } else {
-    /* The longest match scans the suffix start up from byte zero and the
-       shortest down from the end, so the first hit is the wanted start. */
     if (longest) {
       for (usize start = 0; start <= value.length; start++) {
         if (utils::glob_matches(pattern, value.substring(start), active, 0,
@@ -74,9 +65,6 @@ fn trim_matching(Allocator result_allocator, StringView value,
   return String{result_allocator, value};
 }
 
-/* The shared core of the # and % prefix and suffix trims, so the scalar and the
-   array-element path expand the pattern with its glob mask through one place.
- */
 static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
                                    StringView word, trim_end end,
                                    bool longest) throws -> String
@@ -95,8 +83,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
     -> String
 {
   /* The default, assign, alternate, error, and arithmetic forms never glob, so
-     the mask the worker fills is discarded. The default word keeps a backslash
-     before an ordinary character, so the pattern-only unescape stays off. */
+     the mask is discarded and the pattern-only unescape stays off. */
   let discarded_mask = Bitset{scratch_allocator()};
   return expand_modifier_word_worker(word, discarded_mask, remove_quotes,
                                      false);
@@ -106,7 +93,6 @@ fn EvalContext::expand_modifier_word_masked(StringView word,
                                             Bitset &active_out,
                                             bool remove_quotes) throws -> String
 {
-  /* A # or % pattern word has every backslash quote the next byte. */
   return expand_modifier_word_worker(word, active_out, remove_quotes, true);
 }
 
@@ -119,7 +105,6 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
   LOG(All, "expanding a modifier word of %zu bytes", word.length);
   let out = String{scratch_allocator()};
 
-  /* The mask stays parallel to out. */
   let const do_emit_byte = [&](char byte, bool is_active) {
     out += byte;
     active_out.push(is_active);
@@ -134,9 +119,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
   let is_in_single_quote = false;
   let is_in_double_quote = false;
   for (usize i = 0; i < word.length; i++) {
-    /* In a default or a pattern word the quotes are removed, so ${x%"$suffix"}
-       matches the value of suffix literally. A heredoc body passes
-       remove_quotes as false. */
+    /* A heredoc body passes remove_quotes as false, so its quotes stay. */
     if (remove_quotes && !is_in_single_quote && word[i] == '"') {
       is_in_double_quote = !is_in_double_quote;
       continue;
@@ -150,14 +133,9 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       continue;
     }
 
-    /* A backslash escapes the next byte from expansion before a dollar,
-       backtick, backslash, or a double quote in a quote-stripping word, and is
-       a line continuation before a newline. Any other backslash is kept
-       literally. */
     if (word[i] == '\\') {
-      /* In a # or % pattern word a backslash quotes the next byte, emitted
-         literally and inactive with the backslash dropped, so a quoted glob
-         character such as \* matches itself. */
+      /* In a # or % pattern word a backslash quotes the next byte so a quoted
+         glob character such as \* matches itself. */
       if (is_pattern_word && i + 1 < word.length) {
         do_emit_byte(word[i + 1], false);
         i++;
@@ -182,9 +160,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
     }
 
     if (word[i] == '`') {
-      /* Old-style backtick command substitution, run to the next unescaped
-         backtick. The POSIX backquote unescaping strips a backslash that
-         precedes a backtick, a dollar sign, or another backslash. */
+      /* The POSIX backquote unescaping strips a backslash before a backtick, a
+         dollar sign, or another backslash. */
       let inner = String{scratch_allocator()};
       usize j = i + 1;
       for (; j < word.length; j++) {
@@ -214,11 +191,9 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
 
     let const next = word[i + 1];
     if (next == '{') {
-      /* Scan the ${...} body to the matching } at brace depth one. A nested
-         ${...} bumps the depth, a nested $(...) is copied by quote-aware paren
-         balance, and a quote run or a backslash escape keeps its bytes literal
-         so a } inside is never counted. The structure mirrors the Lexer brace
-         scanner. */
+      /* Scan the ${...} body to the matching } at brace depth one. A quote run
+         or a backslash escape keeps its bytes literal so a } inside is never
+         counted. */
       let inner = String{scratch_allocator()};
       usize j = i + 2;
       i32 depth = 1;
@@ -320,20 +295,16 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       usize j = i + 1;
       while (j < word.length && lexer::is_variable_name(word[j]))
         name += word[j++];
-      /* A nested reference obeys set -u the way a top level reference does, so
-         an unset name here aborts rather than expanding to nothing, or warns
-         under -W. */
+      /* A nested reference obeys set -u the way a top level reference does. */
       if (!get_variable_value(name).has_value()) report_unset_reference(name);
-      /* An ordinary name appends its stored value with no temporary String. */
       if (const String *stored = lookup_shell_variable(name); stored != nullptr)
         do_emit_run(stored->view(), !is_in_double_quote);
       else
         do_emit_run(expand_variable(name), !is_in_double_quote);
       i = j - 1;
     } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
-      /* Arithmetic $((...)), scanned to the matching )). A quote run or a
-         backslash escape keeps its bytes literal so a ) inside a string does
-         not count toward the depth. */
+      /* Arithmetic $((...)), scanned to the matching )). A quote run keeps its
+         bytes literal so a ) inside a string does not count. */
       let inner = String{scratch_allocator()};
       usize j = i + 3;
       usize depth = 0;
@@ -366,13 +337,11 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
         }
         inner += ch;
       }
-      /* An arithmetic result cannot glob, so the bytes are emitted inactive. */
       do_emit_run(String::from(evaluate_arithmetic(inner), heap_allocator()), false);
       i = j - 1;
     } else if (next == '(') {
-      /* Command substitution $(...), scanned to the matching ). A quote run or
-         a backslash escape keeps its bytes literal so a ) inside a string does
-         not close the substitution early. */
+      /* Command substitution $(...), scanned to the matching ). A quote run
+         keeps its bytes literal so a ) inside a string does not close early. */
       let inner = String{scratch_allocator()};
       usize j = i + 2;
       usize depth = 1;
@@ -433,14 +402,11 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   if (spec.is_empty()) return String{scratch_allocator()};
 
-  /* ${!name} reads the value of the variable that name names, or lists the
-     variable names that start with a prefix when it ends with * or @. */
+  /* ${!name} indirection, or a prefix listing when it ends with * or @. */
   if (spec.length > 1 && spec[0] == '!') {
     let const body = spec.substring(1);
-    /* A modifier after the name applies to the indirected value, so the name
-       splits off and the rewritten spec runs through this same dispatch. The
-       bare trailing * and @ stay with the body as the prefix-listing forms, and
-       a [subscript] stays glued to the name. */
+    /* A modifier after the name applies to the indirected value, the bare
+       trailing * and @ stay with the body as the prefix-listing forms. */
     usize name_end = 0;
     while (name_end < body.length && lexer::is_variable_name(body[name_end]))
       name_end++;
@@ -456,10 +422,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       let const target = get_variable_value(name);
       let rewritten = String{scratch_allocator()};
       rewritten.reserve(body.length + name.length);
-      /* bash makes an unset indirection name with a modifier an "invalid
-         indirect expansion" failure. A fatal error here would be harsher than
-         bash, so the unset name stands in for the target and the modifier sees
-         the unset state. */
+      /* An unset indirection name stands in for the target so the modifier sees
+         the unset state, a fatal error would be harsher than bash. */
       rewritten.append(target.has_value() ? StringView{target->view()} : name);
       rewritten.append(body.substring(name_end));
       return apply_parameter_expansion(rewritten.view());
@@ -467,7 +431,6 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     return apply_indirect_or_name_listing(body);
   }
 
-  /* ${#name} is the value length, distinct from $# the positional count. */
   if (spec.length > 1 && spec[0] == '#') {
     let const name = spec.substring(1);
     if (name == "@" || name == "*")
@@ -530,8 +493,6 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   let const name = spec.substring_of_length(0, name_end);
   let const rest = spec.substring(name_end);
 
-  /* ${name[subscript]} reads one indexed-array element, or every element when
-     the subscript is @ or *. */
   if (!rest.is_empty() && rest[0] == '[' && !name.is_empty() &&
       lexer::is_variable_name_start(name[0]))
   {
@@ -539,9 +500,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       const StringView subscript = rest.substring_of_length(1, *close - 1);
       if (*close + 1 == rest.length)
         return apply_array_subscript(name, subscript);
-      /* A value-transform modifier after the ], the / replacement, the # and %
-         trims, or the ^ and , case changes, modifies the one element. A
-         different modifier such as :- falls through to the general path. */
+      /* The / # % ^ , modifiers after the ] modify the one element, a different
+         modifier such as :- falls through to the general path. */
       const StringView modifier = rest.substring(*close + 1);
       const char modifier_op = modifier.is_empty() ? '\0' : modifier[0];
       if (subscript != "@" && subscript != "*" &&
@@ -551,8 +511,6 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
         return apply_value_modifier(
             apply_array_subscript(name, subscript).view(), modifier);
       }
-      /* The = form assigns the element back, the others test its own setness.
-       */
       if (subscript != "@" && subscript != "*" && !modifier.is_empty()) {
         let const is_colon = modifier_op == ':';
         let const after =
@@ -602,8 +560,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   }
 
   if (rest.is_empty()) {
-    /* Under set -u a plain reference to an unset variable is an error, while a
-       form with a modifier such as ${x:-w} handles the unset case itself. */
+    /* A plain reference reports under set -u, a modifier form such as ${x:-w}
+       handles the unset case itself. */
     if (!get_variable_value(name).has_value()) report_unset_reference(name);
     return expand_variable(name);
   }
@@ -613,9 +571,6 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   const usize op_index = is_colon_form ? 1 : 0;
   if (op_index >= rest.length) return expand_variable(name);
 
-  /* ${name:offset:length} is bash substring expansion, the colon form whose
-     character after the colon is not a - = + ? modifier. A name of @ or * is a
-     positional slice. */
   if (is_colon_form) {
     const char after_colon = rest[op_index];
     if (after_colon != '-' && after_colon != '=' && after_colon != '+' &&
@@ -625,22 +580,16 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     }
   }
 
-  /* ${name/pat/rep} and its // # % variants are bash pattern replacement, the
-     non-colon form whose operator is a slash. A name of @ or * applies per
-     element. */
   if (!is_colon_form && rest[0] == '/' && name != "@" && name != "*") {
     return apply_pattern_replacement(name, rest);
   }
 
-  /* ${name^}, ${name,}, and the doubled and tilde forms are bash case
-     modification, the non-colon caret, comma, or tilde operator. */
   if (!is_colon_form && (rest[0] == '^' || rest[0] == ',' || rest[0] == '~') &&
       name != "@" && name != "*")
   {
     return apply_case_modification(name, rest);
   }
 
-  /* ${name@op} is a bash parameter transform absent from the sh mood. */
   if (!is_colon_form && rest[0] == '@' && rest.length >= 2 &&
       mood() != mimic_mood::Posix && name != "@" && name != "*")
   {
@@ -652,8 +601,6 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
                           rest[op_index + 1] == op && (op == '#' || op == '%'));
   let const word = rest.substring(op_index + (is_doubled ? 2 : 1));
 
-  /* A subscripted name tests and reads its element, while a bare name reads
-     element zero through the ordinary lookup. */
   let current = Maybe<String>{};
   if (let const bracket = name.find_character('[');
       bracket.has_value() && name[name.length - 1] == ']')
@@ -760,9 +707,6 @@ fn EvalContext::apply_substring_to_value(StringView value,
   const i64 offset =
       offset_text.is_empty() ? 0 : evaluate_arithmetic(offset_text);
 
-  /* A negative offset counts from the end. An offset still before the start
-     yields nothing, the way bash returns empty rather than clamping to the
-     whole value. A positive offset past the end clamps to the end. */
   i64 start = offset < 0 ? value_length + offset : offset;
   if (start < 0) return String{scratch_allocator()};
   if (start > value_length) start = value_length;
@@ -772,19 +716,15 @@ fn EvalContext::apply_substring_to_value(StringView value,
     let const length_text = body.substring(separator + 1);
     i64 length = length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
     if (length < 0) {
-      /* A negative length names a position counted back from the end, so the
-         substring runs up to that point. */
       end = value_length + length;
     } else {
-      /* The length is clamped first to keep the start-plus-length sum from
-         overflowing i64. */
+      /* The length is clamped first to keep start + length from overflowing
+         i64. */
       if (length > value_length) length = value_length;
       end = start + length;
     }
   }
   if (end > value_length) end = value_length;
-  /* A length that resolves to a point before the offset is the bash
-     "substring expression < 0" error, fatal. */
   if (end < start)
     throw Error{"Unable to take the substring because the length names "
                 "a point before the offset"};
@@ -794,10 +734,8 @@ fn EvalContext::apply_substring_to_value(StringView value,
                                           static_cast<usize>(end - start))};
 }
 
-/* The index of the unescaped slash that separates the pattern from the
-   replacement, or the body length when there is none. A slash inside a quote
-   run or behind a backslash belongs to the pattern, the way bash reads
-   ${var/#"a/b"/c}, so the scan tracks the quote state. */
+/* A slash inside a quote run or behind a backslash belongs to the pattern, the
+   way bash reads ${var/#"a/b"/c}, so the scan tracks the quote state. */
 static fn find_replacement_separator(StringView body) wontthrow -> usize
 {
   char quote = 0;
@@ -824,9 +762,6 @@ static fn find_replacement_separator(StringView body) wontthrow -> usize
   return body.length;
 }
 
-/* The length of the longest match the pattern makes starting at the given
-   position, or None when it matches nothing there. The end shrinks from the
-   value end so a greedy star takes the most it can. */
 static fn longest_pattern_match_at(StringView pattern,
                                    const Bitset &pattern_active,
                                    StringView value, usize start,
@@ -853,9 +788,8 @@ fn EvalContext::apply_pattern_replacement(StringView name,
                                spec);
 }
 
-/* The replacement text of ${x/pat/rep} reads & as the matched span and a
-   backslash as an escape, so \& is a literal & and a backslash before any other
-   byte is dropped, the way bash splices a match. */
+/* & reads as the matched span, \& is a literal &, and a backslash before any
+   other byte is dropped. */
 static fn append_pattern_replacement(String &out, StringView replacement,
                                      StringView matched) throws -> void
 {
@@ -876,8 +810,6 @@ fn EvalContext::pattern_replace_value(const String &value,
 {
   LOG(All, "applying the pattern replacement '%.*s' to a value of %zu bytes",
       static_cast<int>(spec.length), spec.data, value.count());
-  /* A doubled slash replaces every match, and a # or % after the first slash
-     anchors the pattern to the start or the end. */
   StringView remainder = spec.substring(1);
   bool should_replace_all = false;
   bool is_anchored_at_start = false;
@@ -897,7 +829,6 @@ fn EvalContext::pattern_replace_value(const String &value,
   let pattern_active = Bitset{scratch_allocator()};
   let const pattern = expand_modifier_word_masked(
       remainder.substring_of_length(0, separator), pattern_active);
-  /* No separator means the replacement is empty, so the matches are deleted. */
   let const replacement =
       separator < remainder.length
           ? expand_modifier_word(remainder.substring(separator + 1))
@@ -911,8 +842,6 @@ fn EvalContext::pattern_replace_value(const String &value,
 
   let out = String{scratch_allocator()};
 
-  /* The start anchor matches a prefix, so a single longest match at the front
-     is replaced and the rest kept. */
   if (is_anchored_at_start) {
     if (let const matched = longest_pattern_match_at(
             pattern.view(), pattern_active, value.view(), 0, extglob_enabled()))
@@ -926,8 +855,6 @@ fn EvalContext::pattern_replace_value(const String &value,
     return out;
   }
 
-  /* The end anchor matches a suffix, so the leftmost start whose remainder
-     fully matches names the longest matching suffix to replace. */
   if (is_anchored_at_end) {
     for (usize start = 0; start <= value.length(); start++) {
       if (utils::glob_matches(pattern.view(), value.view().substring(start),
@@ -943,9 +870,7 @@ fn EvalContext::pattern_replace_value(const String &value,
     return out;
   }
 
-  /* The unanchored form replaces the first match for the single slash and every
-     non-overlapping match for the doubled slash. A zero-length match advances
-     one byte so the scan cannot loop. */
+  /* A zero-length match advances one byte so the scan cannot loop. */
   bool has_replaced = false;
   usize i = 0;
   while (i < value.length()) {
@@ -975,10 +900,6 @@ fn EvalContext::pattern_replace_value(const String &value,
   return out;
 }
 
-/* Quote a value so it reads back as one shell word, the way the bash ${var@Q}
-   transform does. An empty value becomes '', a control byte forces the $'...'
-   form, and anything else is single-quoted with an embedded quote written as
-   the '\'' break-out. */
 static fn append_shell_quoted(String &out, StringView arg) throws -> void
 {
   if (utils::append_ansi_c_quote_if_needed(out, arg)) return;
@@ -993,10 +914,8 @@ static fn append_shell_quoted(String &out, StringView arg) throws -> void
   out.push('\'');
 }
 
-/* The ${var@op} transform, a bash 5.3 family. Q quotes for reuse, U u L change
-   the case, E expands backslash escapes, A prints a recreating assignment, and
-   a lists the attribute letters. An operator with no handler yields the plain
-   expansion. */
+/* Q quotes for reuse, U u L change the case, E expands backslash escapes, A
+   prints a recreating assignment, and a lists the attribute letters. */
 fn EvalContext::apply_parameter_transform(StringView name, char op) throws
     -> String
 {
@@ -1005,16 +924,11 @@ fn EvalContext::apply_parameter_transform(StringView name, char op) throws
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
 
-  /* An unset variable transforms to empty, so ${unset@Q} is empty rather than
-     the '' an empty-but-set value yields. */
   if (!value.has_value()) return String{scratch_allocator()};
 
   return apply_parameter_transform_to_value(value->view(), op, name);
 }
 
-/* The value-only core, shared by the scalar name path and the per-element array
-   field mapping in "${a[@]@op}". The name backs the A assignment form and the a
-   attribute listing. */
 fn EvalContext::apply_parameter_transform_to_value(StringView text, char op,
                                                    StringView name) throws
     -> String
@@ -1044,13 +958,11 @@ fn EvalContext::apply_parameter_transform_to_value(StringView text, char op,
   case 'Q':
   case 'K':
   case 'k':
-    /* On a bare name K and k quote the value the way Q does, matching bash. The
-       key-and-value listing is the ${a[@]@K} array-field form on the element
-       path. */
+    /* On a bare name K and k quote the value the way Q does, the key-and-value
+       listing is the ${a[@]@K} array-field form on the element path. */
     append_shell_quoted(out, text);
     return out;
   case 'P':
-    /* Expand the value as a prompt string with the PS1 backslash escapes. */
     return toiletline::expand_prompt_template(text, *this);
   case 'A':
     out.append(name);
@@ -1105,8 +1017,6 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
       current.value_or(String{scratch_allocator()}).view(), spec);
 }
 
-/* The value-only core of the case modification, shared by the array element and
-   the scalar name path. */
 fn EvalContext::apply_case_modification_to_value(StringView value,
                                                  StringView spec) throws
     -> String
@@ -1114,12 +1024,9 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
   LOG(All, "applying the case modification '%.*s' to a value of %zu bytes",
       static_cast<int>(spec.length), spec.data, value.length);
   const char op = spec[0];
-  /* A doubled operator touches every matching character, a single one only the
-     first. */
   const bool should_modify_all = spec.length > 1 && spec[1] == op;
   const StringView pattern_word = spec.substring(should_modify_all ? 2 : 1);
 
-  /* An omitted pattern matches every character, the bash default of ?. */
   let pattern_active = Bitset{scratch_allocator()};
   String pattern{scratch_allocator()};
   if (pattern_word.is_empty()) {
@@ -1144,7 +1051,6 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
       } else if (op == ',') {
         character = static_cast<char>(std::tolower(byte));
       } else {
-        /* The tilde toggles the case and leaves a non-letter alone. */
         if (std::islower(byte) != 0)
           character = static_cast<char>(std::toupper(byte));
         else if (std::isupper(byte) != 0)
@@ -1156,10 +1062,6 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
   return out;
 }
 
-/* Apply a trailing parameter-expansion modifier to a single value, the /
-   replacement, the # and % trims, and the ^ and , case changes, so each maps
-   over an array element the way bash does. A modifier byte that is not a value
-   transform leaves the value unchanged. */
 fn EvalContext::apply_value_modifier(StringView value,
                                      StringView modifier) throws -> String
 {

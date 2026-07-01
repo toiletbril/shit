@@ -34,8 +34,6 @@ namespace shit {
 
 namespace shitbox {
 
-/* The gap between two columns in the default grid, the two trailing spaces
-   coreutils leaves after each name. */
 static constexpr usize COLUMN_GAP = 2;
 
 /* The blocks ride along so the total line sums them without a second stat. */
@@ -55,9 +53,6 @@ struct long_entry
   u64 blocks{0};
 };
 
-/* One numeric id resolved to its name once, so a listing with many entries
-   owned by the same user or group reads the passwd or group file once per
-   distinct id rather than once per entry. */
 struct id_name_entry
 {
   id_name_entry(u32 id, String name) : id(id), name(steal(name)) {}
@@ -135,8 +130,6 @@ static fn build_long_entry(const Path &path, StringView name,
   return entry;
 }
 
-/* The widths are computed across the whole set first, so every row lines up the
-   way the coreutils long listing does. */
 static fn render_long_entries(const ArrayList<long_entry> &entries,
                               String &output) throws -> void
 {
@@ -182,8 +175,7 @@ static fn column_width(const ArrayList<usize> &widths, usize column_index,
   return widest;
 }
 
-/* The grid packs column by column the way coreutils fills it down then across.
-   One name per line when the output is not a terminal or -1 is given. */
+/* The grid packs column by column, the entry sits at column*rows+row. */
 static fn render_columns(const ArrayList<StringView> &names, String &output,
                          Allocator allocator) throws -> void
 {
@@ -207,9 +199,7 @@ static fn render_columns(const ArrayList<StringView> &names, String &output,
   for (const StringView &name : names)
     widths.push(name.length);
 
-  /* The largest column count whose total width still fits wins, found by trying
-     each count from many down to one. A column-major grid puts the entry at
-     column*rows+row, so the search reads the widths in that order. */
+  /* A column-major grid puts the entry at column*rows+row. */
   const usize max_columns = count < terminal_width ? count : terminal_width;
   usize best_columns = 1;
   for (usize columns = max_columns; columns >= 1; columns--) {
@@ -237,8 +227,6 @@ static fn render_columns(const ArrayList<StringView> &names, String &output,
       const usize index = c * rows + r;
       if (index >= count) continue;
       output += names[index];
-      /* The last filled column on the row needs no trailing pad, so the
-         padding is added only when a further column holds an entry. */
       const bool has_next =
           (c + 1 < best_columns) && ((c + 1) * rows + r < count);
       if (has_next)
@@ -282,8 +270,6 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
 
   let output = String{cxt.scratch_allocator()};
   let const should_print_headers = targets.count() > 1;
-  /* The owner and the group caches outlive the target loop, so a multi-target
-     long listing resolves each distinct id once across every directory. */
   ArrayList<id_name_entry> uid_cache{cxt.scratch_allocator()};
   ArrayList<id_name_entry> gid_cache{cxt.scratch_allocator()};
   i32 status = 0;
@@ -299,8 +285,6 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    /* A file operand prints its own row rather than its contents, the long row
-       under -l and the bare name otherwise. */
     if (!path.is_directory()) {
       if (FLAG_LS_LONG.is_enabled()) {
         ArrayList<long_entry> file_entries{cxt.scratch_allocator()};
@@ -331,17 +315,12 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       output += ":\n";
     }
 
-    /* -a shows every entry including the dot files, -A shows the dot files but
-       not the . and .. directory entries, and the plain listing hides any dot
-       name. */
     let const is_showing_all = FLAG_LS_ALL.is_enabled();
     let const is_showing_dot_names =
         is_showing_all || FLAG_LS_ALMOST_ALL.is_enabled();
 
     ArrayList<StringView> visible_names{cxt.scratch_allocator()};
-    /* The dot and dot-dot entries are not in the directory read, so -a adds
-       them up front the way coreutils lists them before the rest, while -A
-       leaves them out. */
+    /* The dot and dot-dot entries are not in the directory read. */
     if (is_showing_all) {
       visible_names.push(StringView{"."});
       visible_names.push(StringView{".."});

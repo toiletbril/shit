@@ -41,8 +41,6 @@ pure fn Read::kind() const wontthrow -> Builtin::Kind { return Kind::Read; }
 
 fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  /* The first returned element is the command name, so the operand names begin
-     at index 1. */
   let const names = PARSE_BUILTIN_ARGS(ec);
 
   ASSERT(!names.is_empty());
@@ -50,8 +48,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* The array, count, timeout, silent, delimiter, descriptor, and editor
-     options are bash extensions, so the sh mood rejects them the way dash
-     rejects an illegal read option, while -r and -p stay portable. */
+     options are bash extensions the sh mood rejects. */
   if (cxt.is_posix_mode() &&
       (FLAG_READ_ARRAY.is_set() || FLAG_READ_TIMEOUT.is_set() ||
        FLAG_READ_NCHARS.is_set() || FLAG_READ_SILENT.is_enabled() ||
@@ -62,8 +59,6 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 2;
   }
 
-  /* -u reads from the named descriptor rather than the read's own input, which
-     is the command's redirected descriptor or the shell's standard input. */
   let read_fd = ec.in_fd.value_or(SHIT_STDIN);
   if (FLAG_READ_FD.is_set()) {
     if (let const parsed = FLAG_READ_FD.value().to<i64>();
@@ -85,17 +80,14 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (timeout_nanos == 0)
     return os::wait_for_fd_readable(read_fd, 0) == 1 ? 0 : 1;
 
-  /* A -p prompt prints to standard error, and only when the read's own input is
-     a terminal, the way bash stays quiet for a read whose descriptor is
-     redirected from a file or a pipe even at an interactive prompt. */
+  /* A -p prompt prints only when the read's own input is a terminal, matching
+     bash for a redirected descriptor. */
   if (FLAG_READ_PROMPT.is_set() &&
       os::is_fd_a_tty(ec.in_fd.value_or(SHIT_STDIN)))
   {
     shit::print_error(FLAG_READ_PROMPT.value());
   }
 
-  /* With no operand the line goes to REPLY, otherwise to the operands in
-     order. The operand names are addressed by an offset into names. */
   let const has_operands = names.count() > 1;
   LOG(Debug, "read reading into '%s'",
       has_operands ? names[1].c_str() : "REPLY");
@@ -108,23 +100,15 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return names[first_operand + index];
   };
 
-  /* read -d reads until the first byte of its argument rather than a newline,
-     and an empty argument reads until a NUL byte, which has no occurrence in
-     ordinary text so the whole input is slurped. A bash-completion script reads
-     a compgen run this way, with read -d '' and IFS set to a newline, to load
-     every candidate into one array. */
+  /* An empty -d argument reads until a NUL byte, so the whole input is slurped. */
   let const delimiter =
       FLAG_READ_DELIM.is_set()
           ? (FLAG_READ_DELIM.value().is_empty() ? '\0'
                                                 : FLAG_READ_DELIM.value()[0])
           : '\n';
 
-  /* read -n reads at most the given number of bytes, stopping early on the
-     delimiter, so it never consumes more of a pipe than asked. Reaching the
-     count is a success the way the delimiter is, while end of input before the
-     count yields the short-read status below. With no -n the whole line is
-     read.
-   */
+  /* Reaching the -n count is a success the way the delimiter is, while end of
+     input before the count yields the short-read status below. */
   i64 max_bytes = 0;
   if (FLAG_READ_NCHARS.is_set()) {
     if (let const parsed = FLAG_READ_NCHARS.value().to<i64>();
@@ -179,10 +163,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_shell_variable(do_operand_name(i), "");
     return was_timed_out ? 142 : 1;
   }
-  /* Without -r a backslash escapes the next byte, so a backslash before the
-     line delimiter joins the next line and a backslash before any other byte
-     makes it a literal that no longer splits on IFS. The -r and -n forms keep
-     every byte. */
+  /* Without -r a backslash escapes the next byte, joining the next line at the
+     delimiter and making any other byte a literal that no longer splits on IFS. */
   let accumulated = String{cxt.scratch_allocator(), read_line->view()};
   let const should_process_escapes =
       !FLAG_READ_RAW.is_enabled() && !FLAG_READ_NCHARS.is_set();
@@ -242,8 +224,6 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return do_is_separator(i) && !do_is_ifs_whitespace(i);
   };
 
-  /* read -a NAME splits the line into every field and stores them in the named
-     indexed array rather than into separate scalar variables. */
   if (FLAG_READ_ARRAY.is_set()) {
     let words = ArrayList<String>{heap_allocator()};
     usize cursor = 0;
@@ -267,8 +247,6 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   usize cursor = 0;
-  /* Leading IFS whitespace before the first field is skipped and produces no
-     empty field. */
   while (cursor < line.length() && do_is_ifs_whitespace(cursor))
     cursor++;
 
@@ -293,9 +271,6 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     cxt.set_shell_variable(do_operand_name(i),
                            line.substring_of_length(start, cursor - start));
 
-    /* Consume one delimiter. A run of IFS whitespace folds to one, then an
-       optional single non-whitespace IFS character, then trailing whitespace,
-       so 'x : y' and 'x:y' both split into the same fields. */
     while (cursor < line.length() && do_is_ifs_whitespace(cursor))
       cursor++;
     if (cursor < line.length() && do_is_ifs_nonwhitespace(cursor)) {
@@ -305,9 +280,6 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  /* A final line that end of input ended rather than a newline yields a
-     non-zero status, while the variables above are still assigned, the way dash
-     reports a short read. */
   return was_newline_terminated ? 0 : 1;
 }
 

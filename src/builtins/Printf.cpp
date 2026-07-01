@@ -34,11 +34,8 @@ struct printf_number
   bool is_hex;
 };
 
-/* Parse the leading numeric prefix of a printf integer argument the way bash
-   does, so '12abc' yields 12 while a base-zero 0x or a leading 0 still selects
-   the base. is_valid is false when no digit is present or a byte follows the
-   number, a trailing space included, the case bash reports as an invalid
-   number. An argument that opens with a quote yields the next byte's code. */
+/* is_valid is false when a byte follows the number, matching bash. An argument
+   that opens with a quote yields the next byte's code. */
 fn parse_printf_number(const String &arg) throws -> printf_number
 {
   if (!arg.is_empty() && (arg[0] == '\'' || arg[0] == '"'))
@@ -106,10 +103,7 @@ void append_escape(String &out, const String &fmt, usize &i) throws
 
   let const e = fmt[i];
 
-  /* A format-string octal escape is the byte for up to three octal digits, so
-     \0 is a NUL and \101 is an A, the way bash and POSIX printf read it. The
-     index is left on the last digit consumed since the caller advances past it.
-   */
+  /* The index is left on the last digit consumed, the caller advances past it. */
   if (e >= '0' && e <= '7') {
     i32 value = e - '0';
     usize digit_count = 1;
@@ -124,8 +118,6 @@ void append_escape(String &out, const String &fmt, usize &i) throws
     return;
   }
 
-  /* A \xHH escape is the byte for up to two hexadecimal digits, the bash
-     extension over POSIX. */
   if (e == 'x' && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1])) {
     i32 value = 0;
     usize digit_count = 0;
@@ -155,11 +147,7 @@ void append_escape(String &out, const String &fmt, usize &i) throws
   }
 }
 
-/* Expand the backslash escapes in a %b argument, the same set the format string
-   itself takes plus a \c that stops all further output. The octal form here
-   allows an optional leading zero that does not count toward the three digits.
-   Returns true when a \c was seen so the caller can abort the whole printf,
-   matching the POSIX utility. */
+/* Returns true when a \c was seen so the caller can abort the whole printf. */
 bool append_b_argument(String &out, const String &arg) throws
 {
   for (usize i = 0; i < arg.length(); i++) {
@@ -185,8 +173,7 @@ bool append_b_argument(String &out, const String &arg) throws
       continue;
     }
     if (e == '0' || (e >= '1' && e <= '7')) {
-      /* An octal escape takes up to three octal digits, after an optional
-         leading zero that does not count toward the three. */
+      /* A leading zero does not count toward the three octal digits. */
       usize digit_index = i + 1;
       if (arg[digit_index] == '0') digit_index++;
       i32 value = 0;
@@ -228,10 +215,6 @@ bool is_q_safe_byte(char c)
          c == '/' || c == ':' || c == '%' || c == '+' || c == '@' || c == '=';
 }
 
-/* Quote the argument so it reads back as one shell word, the way bash %q does.
-   An empty argument becomes '', a string with a control byte becomes the
-   $'...' form so the byte survives, and any other special byte is
-   backslash-escaped. */
 void append_q_argument(String &out, const String &arg) throws
 {
   if (utils::append_ansi_c_quote_if_needed(out, arg.view())) return;
@@ -243,8 +226,6 @@ void append_q_argument(String &out, const String &arg) throws
   }
 }
 
-/* Render one conversion through the C library, so a width or a precision in the
-   specification is honored. */
 fn report_invalid_number(ExecContext &ec, const String &arg, bool is_hex,
                          i32 &exit_status, Allocator allocator) throws -> void
 {
@@ -266,10 +247,8 @@ void append_conversion(String &out, const String &spec, char conv,
   case 's': {
     String with_s = spec.clone();
     with_s.push('s');
-    /* A %s argument can be arbitrarily long, so a fixed buffer would truncate
-       it. The first write into the stack buffer serves the common short string,
-       and snprintf reports the length it needed, so a longer one writes into a
-       heap buffer sized to fit. */
+    /* A string too long for the stack buffer is rewritten into a heap buffer
+       sized from the length snprintf reports. */
     const int needed =
         std::snprintf(buffer, sizeof(buffer), with_s.c_str(), arg.c_str());
     if (needed >= 0 && static_cast<usize>(needed) < sizeof(buffer)) {
@@ -304,8 +283,6 @@ void append_conversion(String &out, const String &spec, char conv,
       report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
     String with_ll = spec + "ll";
     with_ll.push(conv);
-    /* The unsigned conversions share the char-code and base parsing with the
-       signed ones, so printf '%x' "'A" yields the char code the same way. */
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
                   static_cast<unsigned long long>(number.value));
     out += buffer;
@@ -315,9 +292,6 @@ void append_conversion(String &out, const String &spec, char conv,
   case 'E':
   case 'g':
   case 'G': {
-    /* The float conversions parse the argument as a double through strtod, the
-       way the C printf renders it, so the width and the precision in the spec
-       are honored. A malformed argument parses as zero. */
     String with_conv = spec.clone();
     with_conv.push(conv);
     const double value = std::strtod(arg.c_str(), nullptr);
@@ -348,10 +322,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   LOG(All, "printf formatting %zu arguments", ec.args().count() - 1);
 
-  /* bash printf -v NAME stores the result in the named variable instead of
-     printing it, so the format and operands shift two places past -v NAME.
-     The form is a pure addition, so it rides every mood but POSIX the way
-     the other bash extensions do. */
+  /* bash printf -v NAME stores the result in NAME, riding every mood but POSIX. */
   usize format_index = 1;
   Maybe<String> store_variable;
   if (cxt.bash_additions_enabled() && ec.args()[1] == "-v" &&
@@ -361,16 +332,11 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     format_index = 3;
   }
 
-  /* A -- ends the option scan, so a format that begins with a dash still reads
-     as the format the way the POSIX printf -- "%s" does. */
   if (format_index < ec.args().count() && ec.args()[format_index] == "--")
     format_index++;
 
   if (format_index >= ec.args().count()) return 0;
 
-  /* The operands are read in place from the argument list, so no copy of the
-     argument strings is made. A missing operand reads as the shared empty
-     string, like an absent argument elsewhere. */
   let const &args = ec.args();
   let const &fmt = args[format_index];
   let const operand_base = format_index + 1;
@@ -386,8 +352,6 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool consumed_a_conversion = false;
   bool should_stop = false;
 
-  /* Read the next operand as the integer value of a * field width or precision,
-     append its decimal text into the spec, and advance the operand cursor. */
   let do_consume_star = [&](String &spec) throws {
     spec.append(
         String::from(parse_printf_integer(do_operand_at(operand_index)),
@@ -433,11 +397,9 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         }
       }
 
-      /* bash %(datefmt)T formats a time through strftime. The format sits in
-         parentheses where the conversion letter would be, followed by T, and
-         the operand is the epoch seconds, -1 for now and -2 for the shell
-         start. A field width sits before the ( the way bash reads it, so the
-         scanned spec pads the formatted time as a string. */
+      /* bash %(datefmt)T formats a time. The format sits in parentheses where
+         the conversion letter would be, followed by T, and the operand is the
+         epoch seconds, -1 for now and -2 for the shell start. */
       if (cxt.bash_additions_enabled() && i < fmt.length() && fmt[i] == '(') {
         usize close = i + 1;
         while (close < fmt.length() && fmt[close] != ')')
@@ -471,9 +433,8 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         out += '%';
         continue;
       }
-      /* A '(' that did not open a valid %(fmt)T time conversion, a missing or
-         misplaced ) or trailing T, is emitted literally so a malformed format
-         consumes no operand the way a real conversion would. */
+      /* A '(' that did not open a valid %(fmt)T is emitted literally and
+         consumes no operand. */
       if (conv == '(') {
         out += spec;
         out += '(';
@@ -482,8 +443,6 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
       let const &arg = do_operand_at(operand_index);
       if (conv == 'b') {
-        /* %b prints the argument with its backslash escapes expanded, and a \c
-           inside it stops the whole printf. */
         should_stop = append_b_argument(out, arg);
         operand_index++;
         consumed_a_conversion = true;
@@ -499,9 +458,6 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
            consumed_a_conversion);
 
   if (store_variable.has_value()) {
-    /* A name[subscript] target writes one array element, the form the
-       bash-completion word reassembly stores through, while a plain name
-       writes the scalar. */
     let const target = store_variable->view();
     let const open_bracket = target.find_character('[');
     if (open_bracket.has_value() && *open_bracket > 0 &&

@@ -30,10 +30,6 @@ pure fn Trap::kind() const wontthrow -> Builtin::Kind { return Kind::Trap; }
 
 namespace {
 
-/* Normalize a condition name to its bare upper-case form, so SIGINT, sigint,
-   int, and the number 2 all name the same condition, and 0 names EXIT. A trap
-   set by name and cleared or listed by number must resolve to one key, so a
-   bare number maps through the os signal name table the way dash lists it. */
 String normalize_condition(StringView raw, Allocator allocator) throws
 {
   let name = String{allocator};
@@ -44,8 +40,6 @@ String normalize_condition(StringView raw, Allocator allocator) throws
   }
   if (name == "0") return String{allocator, "EXIT"};
 
-  /* A condition written as a bare number names a signal, so it folds to the
-     same name the name form yields. The number 0 already became EXIT above. */
   if (name.view().is_all_decimal_digits()) {
     let const parsed = name.view().to<i64>();
     if (!parsed.is_error()) {
@@ -57,10 +51,6 @@ String normalize_condition(StringView raw, Allocator allocator) throws
   return name;
 }
 
-/* Render a stored condition for the listing. bash prints a signal with the SIG
-   prefix it strips on input, so SIGINT round-trips, while EXIT and the other
-   non-signal conditions print bare. The default and sh moods keep the bare name
-   the shell has always listed. */
 String format_listed_condition(StringView condition, bool with_sig_prefix,
                                Allocator allocator) throws
 {
@@ -88,10 +78,6 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  /* A bare trap, and the -p form, list the set traps. -p may name the
-     conditions to list, so only those are printed when it carries operands. The
-     -p flag is a bash extension, so the sh mood takes -p as an ordinary action
-     the way dash does. */
   let const is_print_form =
       !cxt.is_posix_mode() && args.count() >= 2 && args[1] == "-p";
   if (args.count() == 1 || is_print_form) {
@@ -125,10 +111,6 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(args.count() > 1);
 
-  /* With a single operand there is no action, so the operand names a condition
-     to reset to its default, as POSIX specifies for 'trap SIG' and 'trap NUM'.
-     With two or more operands the first is the action and the rest are the
-     conditions it applies to. */
   if (args.count() == 2) {
     let const condition = normalize_condition(args[1], cxt.scratch_allocator());
     LOG(Info, "trap resetting condition '%s' to its default",

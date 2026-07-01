@@ -5,10 +5,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-/* The completion bridge of the evaluator, the spec registry the complete
-   builtin fills and the COMP_WORDS function runner the interactive engine calls
-   on tab. */
-
 namespace shit {
 
 fn EvalContext::register_completion_spec(StringView command,
@@ -66,8 +62,8 @@ fn EvalContext::run_completion_function(StringView function_name,
   defer { m_runtime.mood = saved_mood; };
 
   /* bash-completion reads unset names such as SHELLOPTS freely, so the
-     mood-seeded strictness relaxes for the function run. An explicit set -u or
-     set -o failglob is the user's own ask and stays fatal. */
+     mood-seeded strictness relaxes for the function run. An explicit set -u
+     stays fatal. */
   let const saved_error_unset = m_runtime.error_unset;
   let const saved_failglob = m_runtime.failglob;
   if (!m_runtime.error_unset_explicit) m_runtime.error_unset = false;
@@ -92,13 +88,10 @@ fn EvalContext::run_completion_function(StringView function_name,
     set_shell_variable("COMP_WORDBREAKS", StringView{" \t\n\"'><=;|&(:"});
 
   /* bash empties COMPREPLY before each completion, so a function that appends
-     with COMPREPLY+=() starts clean. Without the reset the previous completion
-     on the same command leaks its entries into this one, so nix sear after a
-     bare nix tab lists every subcommand. */
+     with COMPREPLY+=() starts clean, and the previous completion on the same
+     command does not leak its entries into this one. */
   set_indexed_array("COMPREPLY", ArrayList<String>{heap_allocator()});
 
-  /* bash passes the command, the current word, and the previous word as $1 $2
-   * $3. */
   let call_params = ArrayList<String>{heap_allocator()};
   call_params.push(words.is_empty()
                        ? String{heap_allocator()}
@@ -133,8 +126,7 @@ fn EvalContext::run_completion_function(StringView function_name,
   defer { set_completion_function_running(false); };
 
   /* A completion function that errors must not abort the prompt, so any error
-     is swallowed and a stray break or return is consumed. The swallow logs the
-     error to keep a silent no-candidate result debuggable. */
+     is swallowed and a stray break or return is consumed. */
   try {
     body->evaluate(*this);
   } catch (const ErrorBase &error) {

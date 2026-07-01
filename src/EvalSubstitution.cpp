@@ -11,20 +11,14 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-/* The substitution captures of the evaluator, the $(...) and backtick pipe
-   capture with its drain thread, the bare $(< file) read, and the <(cmd)
-   process substitutions with their cleanup. */
-
 namespace shit {
 
 static constexpr usize DRAIN_CHUNK_LENGTH = 4096;
 
 /* The drain thread reads the pipe into its own libc buffer while the inner
    command writes the other end, so output larger than the pipe buffer cannot
-   deadlock. The buffer is grown with libc realloc because the inner command
-   runs on the main thread against the shared heap pool, whose free list is
-   single threaded. The captured bytes copy into the result String on the main
-   thread once the drain has joined. */
+   deadlock. The buffer is grown with libc realloc because the shared heap
+   pool's free list is single threaded. */
 struct command_substitution_drain_context
 {
   char *data;
@@ -74,8 +68,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
                     *AST_ARENA, false, None, mood()};
   Token *name = lexer.next_shell_token();
   if (name == nullptr || name->kind() != Token::Kind::Word) return None;
-  /* Anything after the single filename means this is not the bare read form, so
-     the normal parse-and-run path handles it. */
+  /* Anything after the single filename means this is not the bare read form. */
   Token *after = lexer.next_shell_token();
   if (after != nullptr && after->kind() != Token::Kind::EndOfFile &&
       after->kind() != Token::Kind::Newline)
@@ -87,7 +80,6 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
       static_cast<const tokens::WordToken *>(name)->word());
   LOG(Debug, "the substitution is a bare file read of '%s'", filename.c_str());
   let content = Path{filename.view()}.read_entire_file();
-  /* An unreadable file yields an empty substitution rather than aborting. */
   if (!content.has_value()) {
     LOG(Debug, "the file read substitution of '%s' failed, expanding to empty",
         filename.c_str());
@@ -108,10 +100,8 @@ fn EvalContext::capture_command_substitution(const String &source,
       file.has_value())
     return steal(*file);
 
-  /* Parse the inner command into the active parse arena. It coexists with the
-     outer tree and is reclaimed when the arena resets. A caller such as the
-     make $(shell) names a filename, so an error inside the command carets that
-     source rather than a bare unnamed line. */
+  /* A caller such as the make $(shell) names a filename, so an error inside the
+     command carets that source rather than a bare unnamed line. */
   if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
 
@@ -142,8 +132,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
 #if SHIT_PLATFORM_IS WIN32
   /* Windows has no fork, so the substitution runs in a fresh shell that writes
      its output to a temp file the consuming command reads by path. The >(cmd)
-     form would need the inner shell to run after the outer command writes the
-     file, an ordering the synchronous spawn here cannot provide. */
+     form's ordering the synchronous spawn here cannot provide. */
   if (!command_writes_the_pipe)
     throw Error{"Unable to run a >(cmd) process substitution because it is not "
                 "supported on this platform"};
@@ -151,8 +140,6 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
           os::run_substitution_to_temp(text.substring(1), is_bash_compatible());
       substitution_path.has_value())
   {
-    /* The temp file is read by the consuming command after this returns, so it
-       is tracked for deletion once that command finishes. */
     m_substitution_temp_files.track(Path{substitution_path->view()});
     return steal(*substitution_path);
   }
@@ -241,9 +228,7 @@ fn EvalContext::cleanup_process_substitutions(
     } catch (const Error &e) {
       LOG(Debug, "a process substitution reap failed and was swallowed: %s",
           e.message().c_str());
-      /* A wait failure is swallowed rather than propagated out of this no-throw
-         cleanup. bash stays silent here, so the warning is suppressed in bash
-         mode. */
+      /* bash stays silent here, so the warning is suppressed in bash mode. */
       if (!is_bash_compatible()) {
         try {
           let const text =
@@ -291,8 +276,6 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
 
-  /* A nested $(...) reparses and re-evaluates its inner command at each level,
-     so the depth is capped here before the native stack is exhausted. */
   enter_substitution();
   defer { leave_substitution(); };
 
@@ -327,16 +310,12 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   /* A cd or an assignment inside the substitution must not leak. */
   let snapshot = snapshot_state();
 
-  /* The inner evaluation's transient scratch is reclaimed at the substitution
-     boundary, so a $(...) inside a loop does not grow the arena across
-     iterations. The captured output is heap and escapes, and restore_state
-     reverts every inner side effect, so nothing the release frees is still
-     read. */
+  /* The inner scratch is reclaimed at the substitution boundary, so a $(...)
+     inside a loop does not grow the arena across iterations. The captured
+     output is heap and escapes. */
   let const substitution_mark = m_scratch_arena.mark();
   defer { m_scratch_arena.release(substitution_mark); };
 
-  /* The substitution body is its own source, so a located error inside it
-     carries an offset into that text rather than into the enclosing line. */
   let const previous_source = m_current_source;
   let const previous_origin = m_current_origin;
   let const previous_location = m_current_location;
@@ -364,18 +343,12 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   shit::flush();
   let const saved = os::redirect_stdout(pipe->out);
 
-  /* The inner commands write to the pipe, not the terminal, so suppress the
-     interactive title updates while the substitution runs. */
   let const was_interactive = m_shell_is_interactive;
   m_shell_is_interactive = false;
 
-  /* Run the inner command, then always tear down, even on an error. A break,
-     continue, return, or exit inside a substitution acts only within it and
-     must not escape into the enclosing loop, function, or shell. */
+  /* A break, continue, return, or exit inside a substitution acts only within
+     it and must not escape into the enclosing loop, function, or shell. */
   enter_subshell();
-  /* The inherited EXIT action belongs to the parent and must not fire at the
-     substitution's end. An action the inner code sets survives and fires
-     below. */
   clear_inherited_exit_trap();
   std::exception_ptr error;
   try {
@@ -383,8 +356,6 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   } catch (...) {
     error = std::current_exception();
   }
-  /* An exit inside the substitution supplies the status before the jump is
-     consumed. */
   if (has_pending_control_flow()) {
     if (pending_control_flow().kind == control_flow::Kind::Exit)
       set_last_exit_status(static_cast<i32>(pending_control_flow().value));
@@ -409,8 +380,6 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   os::join_thread(*reader);
   os::close_fd(pipe->in);
 
-  /* The drain has joined, so the captured bytes copy into the pool-backed
-     result on this thread alone. */
   if (drain_context.data != nullptr) {
     captured.append(StringView{drain_context.data, drain_context.length});
     std::free(drain_context.data);
@@ -420,8 +389,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
 
   if (error) {
     /* A throw inside the substitution is contained to its subshell the way bash
-       holds a fatal expansion error such as ${x?} to the command substitution
-       rather than aborting the parent. */
+       holds a fatal expansion error to the command substitution. */
     LOG(Debug,
         "the command substitution failed, containing the error with status 1");
     try {
@@ -527,15 +495,12 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   os::join_thread(*reader);
   os::close_fd(pipe->in);
 
-  /* The drain has joined, so the captured bytes copy into the pool-backed
-     result on this thread alone. */
   if (drain_context.data != nullptr) {
     captured.append(StringView{drain_context.data, drain_context.length});
     std::free(drain_context.data);
   }
 
   if (error) {
-    /* The same containment the $(...) capture applies. */
     LOG(Debug,
         "the function substitution failed, containing the error with status 1");
     try {

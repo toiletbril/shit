@@ -41,19 +41,14 @@ bool parse_integer(StringView text, i64 &out) throws
   return true;
 }
 
-/* A recursive-descent evaluator over the test arguments, following the POSIX
-   test grammar so -a binds tighter than -o and ! and parentheses nest. The
-   window is [pos, end), so the argument-count rules can strip a wrapping paren
-   pair by narrowing end and pos before the grammar runs. */
+/* The window is [pos, end), so the argument-count rules can strip a wrapping
+   paren pair by narrowing pos and end before the grammar runs. */
 class TestEvaluator
 {
 public:
   const ArrayList<String> &args;
   usize pos;
   usize end;
-  /* bash accepts == as a synonym for = in test, while dash and POSIX reject it,
-     so the operator is accepted only in the bash mood and rejected otherwise to
-     keep the default mood matching dash. */
   bool is_bash_compatible;
 
   pure const String &current() const wontthrow
@@ -90,9 +85,6 @@ public:
     if (op == "-k") return operand_path.has_sticky_bit();
     if (op == "-O") return operand_path.is_owned_by_effective_user();
     if (op == "-G") return operand_path.is_owned_by_effective_group();
-    /* -t takes a file-descriptor number rather than a path and is true when
-       that descriptor is a terminal. The common 0, 1, and 2 map to the standard
-       streams, and any other descriptor reads as not a terminal. */
     if (op == "-t") {
       i64 file_descriptor = 0;
       if (!parse_integer(operand.view(), file_descriptor)) return false;
@@ -126,14 +118,9 @@ public:
       return false;
     }
     if (op == "!=") return left != right;
-    /* < and > compare the two operands byte by byte, the locale-byte order
-       POSIX specifies, so the same memcmp order String::operator< gives. */
     if (op == "<") return left < right;
     if (op == ">") return right < left;
 
-    /* -ef, -nt, and -ot compare two files on disk rather than their names, so
-       the operands are taken as paths and the result reads false when either
-       path is missing, matching dash. */
     if (op == "-ef") return Path{left}.is_same_file_as(Path{right});
     if (op == "-nt") return Path{left}.is_newer_than(Path{right});
     if (op == "-ot") return Path{left}.is_older_than(Path{right});
@@ -194,8 +181,6 @@ public:
 
   pure fn is_binary_operator(const String &s) const wontthrow -> bool
   {
-    /* -ef, -nt, and -ot are the file-compare operators evaluate_binary resolves
-       against the two paths. */
     static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
         {SSK("="),   true},
         {SSK("=="),  true},
@@ -273,8 +258,6 @@ public:
       pos += 2;
       return evaluate_unary(op, operand);
     }
-    /* A binary test needs the operator in the next position, otherwise a single
-       argument is true when it is non-empty. */
     if (pos + 1 < end && is_binary_operator(args[pos + 1])) {
       if (pos + 2 >= end) {
         fail(StringView{"An argument is expected after '"} + args[pos + 1] +
@@ -331,11 +314,6 @@ public:
       let const count = end - pos;
       if (count < 1) return !should_negate;
 
-      /* A three-argument form whose middle operand is a binary primary is the
-         binary test, so the first and third operands are plain strings rather
-         than a grouping paren or a unary primary. dash evaluates it directly
-         with the first token forced to an operand, so the binary is evaluated
-         here without entering the paren-aware grammar. */
       if (count == 3 && is_binary_operator(args[pos + 1])) {
         let const result =
             evaluate_binary(args[pos], args[pos + 1], args[pos + 2]);
@@ -343,9 +321,6 @@ public:
         return should_negate ? !result : result;
       }
 
-      /* A three or four argument form wrapped in a paren pair strips the pair,
-         and one led by ! strips the bang and flips the verdict, then rechecks
-         the shorter window. */
       if (count == 3 || count == 4) {
         if (args[pos] == "(" && args[end - 1] == ")") {
           pos++;
@@ -374,9 +349,6 @@ pure fn Test::kind() const wontthrow -> Builtin::Kind { return Kind::Test; }
 
 fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  /* Strip the program name, and for the [ form the required trailing ]. The
-     last operand index ends the expression, one before the trailing ] in the
-     bracket form. */
   let const &arguments = ec.args();
   ASSERT(!arguments.is_empty());
 
@@ -401,8 +373,6 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   for (usize i = 1; i < expression_end; i++)
     operands.push(arguments[i]);
 
-  /* An empty expression is false, as POSIX specifies for test with no
-     arguments. */
   if (operands.is_empty()) return 1;
 
   LOG(All, "test evaluating %zu operands", operands.count());

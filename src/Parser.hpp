@@ -17,12 +17,6 @@ public:
 
   fn construct_ast() throws -> Expression *;
 
-  /* Parse the whole input, recovering from each syntax error by resynchronizing
-     to the next statement boundary and continuing, so one pass collects every
-     error rather than stopping at the first. Each error is appended as a fully
-     rendered message, the primary line and any detail note, so a detail hint is
-     not lost the way storing the base ErrorWithLocation by value would slice it
-     off. The returned tree is meant to run only when errors stays empty. */
   fn construct_ast(ArrayList<String> &errors) throws -> Expression *;
 
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
@@ -45,13 +39,8 @@ private:
 
   mustuse fn parse_simple_command() throws -> Command *;
 
-  /* Skip tokens until the next statement boundary or the end of input, so a
-     recovering parse can resume after a syntax error. Always consumes at least
-     one token to guarantee forward progress. */
   fn recover_to_next_statement() throws -> void;
 
-  /* Consume newlines that follow a pipe operator, so a pipeline written across
-     several lines with a trailing '|' continues onto the next command. */
   fn skip_newlines_after_pipe() throws -> void;
 
   /* Build one file or descriptor-duplication redirection for descriptor fd. The
@@ -66,19 +55,13 @@ private:
       ArrayList<expressions::Redirection> &out, bool fd_was_explicit,
       const Token *fd_allocation_name_token = nullptr) throws -> void;
 
-  /* Build the &> and &>> both-streams redirection, fd 1 to the file followed by
-     fd 2 duplicating fd 1, the way bash expands &>file into >file 2>&1. */
   fn build_both_streams_redirection(
       bool is_append, SourceLocation op_location,
       Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out) throws -> void;
 
-  /* Wrap a command in a 2>&1 redirection, the stderr-to-stdout dup a |& pipe
-     stage applies to the command on its left. */
   mustuse fn wrap_with_stderr_to_stdout(Command *command) throws -> Command *;
 
-  /* Build the <<< here-string redirection, fd 0 fed by the expanded word that
-     follows the operator. */
   fn build_here_string_redirection(
       SourceLocation op_location, Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out) throws -> void;
@@ -102,22 +85,12 @@ private:
       Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out) throws -> bool;
 
-  /* Peek the next token and, when it begins a redirection, consume the whole
-     redirection and append it to out. Returns true when one was parsed, false
-     when the next token does not begin a redirection. Used to attach trailing
-     redirects to a compound command. */
   mustuse fn try_parse_trailing_redirection(
       ArrayList<expressions::Redirection> &out) throws -> bool;
 
-  /* Parse any trailing redirects that follow a compound command and, when there
-     are any, wrap it in a RedirectedCommand. Returns the command unchanged when
-     no redirect follows. */
   mustuse fn attach_trailing_redirections(Command *compound) throws
       -> Command *;
 
-  /* Build a command list until a terminator keyword is peeked, leaving it for
-     the caller. The control-structure parsers call this for their inner lists.
-   */
   mustuse fn parse_command_list(
       std::initializer_list<Token::Kind> terminators) throws -> Expression *;
 
@@ -141,9 +114,6 @@ private:
   mustuse fn parse_conditional_command() throws -> Command *;
   mustuse fn parse_function_definition(Token *name_token) throws -> Command *;
 
-  /* Parse the bash 'function NAME [()] body' form after the function keyword
-     was consumed. The parentheses are optional in this form, unlike the POSIX
-     'NAME()' form parse_function_definition handles. */
   mustuse fn parse_keyword_function_definition() throws -> Command *;
 
   /* Consume a bash array assignment group NAME=(...) or NAME+=(...) and return

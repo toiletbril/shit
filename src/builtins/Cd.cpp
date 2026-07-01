@@ -27,10 +27,7 @@ Cd::Cd() = default;
 
 pure fn Cd::kind() const wontthrow -> Builtin::Kind { return Kind::Cd; }
 
-/* CDPATH resolves a relative operand against a list of directories. An operand
-   that is absolute, or whose first component is dot or dot-dot, is taken
-   relative to the current directory and skips the search, the way POSIX
-   specifies. */
+/* An absolute operand, or one led by dot or dot-dot, skips the CDPATH search. */
 static fn cdpath_search_applies(const String &operand) throws -> bool
 {
   if (operand.is_empty() || operand[0] == '/') return false;
@@ -46,9 +43,6 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* -L keeps the logical path, the default, and -P resolves the symlinks to the
-     physical directory. The options combine and stop at the first operand, a --
-     terminator, or a lone dash that names the previous directory. */
   let is_physical = false;
   usize operand_index = 1;
   while (operand_index < ec.args().count()) {
@@ -75,8 +69,6 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const operand_count = ec.args().count() - operand_index;
   let arg_path = String{cxt.scratch_allocator()};
 
-  /* A lone dash operand names the previous directory, so cd - moves to OLDPWD
-     and prints the directory it lands in, the way POSIX and dash do. */
   let const is_to_previous =
       operand_count == 1 && ec.args()[operand_index] == "-";
 
@@ -106,11 +98,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let target = Path{arg_path};
 
-  /* The first CDPATH entry that yields an existing directory resolves the
-     operand. An empty entry, including the one a leading, trailing, or doubled
-     colon makes, names the current directory. A move reached through a nonempty
-     entry prints the directory it landed in, the way dash announces a CDPATH
-     move. */
+  /* An empty CDPATH entry, including one a leading, trailing, or doubled colon
+     makes, names the current directory. */
   bool was_reached_through_cdpath = false;
   if (!is_to_previous && operand_count > 0 && cdpath_search_applies(arg_path)) {
     if (let const cdpath = cxt.get_variable_value("CDPATH")) {
@@ -141,7 +130,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* A relative operand joins onto the logical PWD when that names a directory,
      the bash -L default, so cd .. out of a symlinked directory returns to the
-     symlink's parent. The physical getcwd resolution stays as the fallback. */
+     symlink's parent. */
   if (target.is_absolute()) {
     target = target.normalized();
   } else {
@@ -159,10 +148,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       target = steal(logical_target);
     } else {
       target = target.to_absolute().normalized();
-      /* to_absolute anchors a relative operand against getcwd. getcwd yields an
-         empty path when the current directory was removed, so the result stays
-         relative. The throw then names that failure instead of a missing
-         directory. */
+      /* getcwd yields an empty path when the current directory was removed, so
+         the result stays relative and the throw names that failure. */
       if (!target.is_absolute())
         throw ErrorWithLocation{
             ec.source_location(),
@@ -171,45 +158,32 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  /* -P resolves the symlinks so PWD names the physical directory, while the
-     default -L keeps the logical path the operand spelled. A path that does not
-     resolve is left as it stands, so the existence check below reports it. */
   if (is_physical) {
     if (let resolved = os::canonical_path(target)) target = resolved.take();
   }
 
   if (target.exists()) {
-    /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. OLDPWD
-       takes the logical PWD the shell tracked, so a later cd - returns through
-       the same symlinks the path was reached by, the way bash does. An unset or
-       relative PWD falls back to the physical directory, and an unreadable
-       current directory yields an empty path, so OLDPWD stays as it was. */
+    /* OLDPWD takes the logical PWD so a later cd - returns through the same
+       symlinks. An unset or relative PWD falls back to the physical directory. */
     let const logical_pwd = cxt.get_variable_value("PWD");
     let const old_directory =
         (logical_pwd.has_value() && !logical_pwd->is_empty() &&
          logical_pwd->view()[0] == '/')
             ? Path{logical_pwd->view()}
             : Path::current_directory();
-    /* A path that exists can still refuse the move, a regular file or a
-       directory without execute permission among them. dash reports the
-       failure, exits non-zero, and leaves PWD and OLDPWD untouched, so the
-       chdir result drives an early throw before either variable is rewritten.
-     */
+    /* A path that exists can still refuse the move, so the chdir failure throws
+       before PWD and OLDPWD are rewritten, leaving them untouched like dash. */
     if (Path::set_current_directory(target).is_error())
       throw ErrorWithLocation{
           ec.source_location(),
           StringView{"Unable to change to the directory '"} + arg_path + "'"};
-    /* A relative PATH entry, or the current directory as an empty entry, now
-       names a different directory, so a cached resolution may point at the old
-       cwd. The cache is marked stale so the next command re-resolves, the way
-       dash rehashes after a cd. */
+    /* A relative or empty PATH entry now names a different directory, so a
+       cached resolution is marked stale for the next command to re-resolve. */
     utils::invalidate_path_cache();
     if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());
     record_directory_access(target.text().view(), cxt.scratch_allocator());
-    /* cd - and a move through a nonempty CDPATH entry report the directory they
-       moved to, so a script sees where it landed. A plain cd stays silent. */
     if (is_to_previous || was_reached_through_cdpath) {
       ec.print_to_stdout(target.text() + "\n");
     }

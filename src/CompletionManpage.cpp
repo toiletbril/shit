@@ -38,9 +38,7 @@ static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
   return matches;
 }
 
-/* The options parsed out of a manpage with their descriptions, cached per
-   command so a second tab on the same command pays no man fork. An empty list
-   is cached too, so a command with no manpage or no options is not retried. */
+/* An empty list is cached too, so a command with no manpage is not retried. */
 static StringMap<ArrayList<help_entry>> MANPAGE_OPTION_CACHE{heap_allocator()};
 
 constexpr StaticStringMap<const char *>::entry MANPAGE_ALIAS_ENTRIES[] = {
@@ -63,15 +61,13 @@ static fn manpage_name_for(StringView command) throws -> String
 
 static StringMap<ArrayList<String>> MAN_SUBCOMMAND_INDEX{heap_allocator()};
 /* Every stripped section-1 page name mapped to its full file path, the
-   existence gate for the subcommand split and the source the synopsis
-   validation reads directly rather than forking man per candidate. */
+   existence gate for the subcommand split. */
 static StringMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
 static StringMap<bool> MAN_SUBCOMMAND_PAGE_VALID{heap_allocator()};
 static bool is_man_subcommand_index_built = false;
 
-/* The man1 directories of the host, the $MANPATH entries when set and the stock
-   /usr/local and /usr trees otherwise. An empty $MANPATH segment stands for the
-   system defaults at that position, the manpath(1) reading. */
+/* An empty $MANPATH segment stands for the system defaults at that position,
+   the manpath(1) reading. */
 static fn manpage_section1_directories() throws -> ArrayList<Path>
 {
   let directories = ArrayList<Path>{heap_allocator()};
@@ -142,9 +138,6 @@ static fn build_man_subcommand_index() throws -> void
           directory.text().c_str());
       continue;
     }
-    /* A man1 tree holds thousands of pages, so the page map grows to hold this
-       directory's entries up front rather than climbing a rehash chain from
-       sixteen slots as each page inserts. */
     MAN_PAGE_FILE_PATHS.reserve(MAN_PAGE_FILE_PATHS.count() + entries->count());
     for (let const &entry : *entries) {
       let const stripped = strip_man1_suffix(entry.view());
@@ -205,9 +198,7 @@ static fn cleaned_synopsis_of_page(StringView source) throws -> String
         }
         continue;
       }
-      /* A CR at a CRLF line end folds like whitespace, so a page with DOS
-         line endings does not leave a stray byte between the words the space
-         form needs to match. */
+      /* A CR at a CRLF line end folds like whitespace. */
       if (byte == ' ' || byte == '\t' || byte == '\r') {
         if (!synopsis.is_empty() &&
             synopsis.view()[synopsis.length() - 1] != ' ')
@@ -221,9 +212,8 @@ static fn cleaned_synopsis_of_page(StringView source) throws -> String
   return synopsis;
 }
 
-/* An unreadable or compressed page keeps its candidate on the head-page rule
-   alone. may_read is false on the ghost path, which trusts a cached verdict
-   rather than scan a page on a keystroke. */
+/* may_read is false on the ghost path, which trusts a cached verdict rather
+   than scan a page on a keystroke. */
 static fn man_subcommand_page_is_valid(StringView command,
                                        StringView subcommand,
                                        bool may_read) throws -> bool
@@ -242,8 +232,7 @@ static fn man_subcommand_page_is_valid(StringView command,
     return false;
   }
 
-  /* A compressed page cannot be scanned without a decompressor, so the
-     candidate stays on the head-page rule alone, with no read at all. */
+  /* A compressed page cannot be scanned without a decompressor. */
   let const path_view = file_path->view();
   for (let const tail : {StringView{".gz"}, StringView{".xz"},
                          StringView{".zst"}, StringView{".bz2"}})
@@ -259,8 +248,8 @@ static fn man_subcommand_page_is_valid(StringView command,
     MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), true);
     return true;
   }
-  /* A page that is one .so redirect reads its target once, relative to the man
-     root above the section directory. */
+  /* A page that is one .so redirect reads its target relative to the man root
+     above the section directory. */
   if (source->view().starts_with(".so ")) {
     let const rest = source->view().substring(4);
     usize target_end = 0;
@@ -309,17 +298,16 @@ fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
   let const start = i;
   while (i < line.length && line[i] != ' ' && line[i] != '\t')
     i++;
-  /* A word the cursor still sits in has no separator after it, so it is the
-     token under completion rather than a settled subcommand. */
+  /* A word the cursor still sits in is the token under completion, not a
+     settled subcommand. */
   if (i >= line.length) return None;
   let const word = line.substring_of_length(start, i - start);
   if (word.is_empty() || word[0] == '-') return None;
   return word;
 }
 
-/* The index builds once per launch on an explicit tab. The ghost path reads
-   only an already built and validated entry, so a keystroke never scans a
-   directory or reads a page. */
+/* The ghost path reads only an already built and validated entry, so a
+   keystroke never scans a directory or reads a page. */
 fn complete_from_man_subcommands(StringView line, StringView token,
                                  usize token_start, bool for_listing,
                                  EvalContext &context) throws
@@ -333,8 +321,7 @@ fn complete_from_man_subcommands(StringView line, StringView token,
   if (surface_command.is_empty() ||
       surface_command.find_character('/').has_value())
     return None;
-  /* The subcommands are the resolved target's, so g for a g='git' alias
-     lists git's subcommands. */
+
   let const resolved_name =
       resolve_completion_command(surface_command, context);
   let const command = resolved_name.view();
@@ -347,8 +334,7 @@ fn complete_from_man_subcommands(StringView line, StringView token,
   let const subcommands = MAN_SUBCOMMAND_INDEX.find(command);
   if (subcommands == nullptr || subcommands->is_empty()) return None;
 
-  /* Only the candidates the token matches are validated, so a typo reads no
-     page and a command with a hundred subcommand pages does not stall. */
+  /* Only the token matches are validated, so a typo reads no page. */
   let matches = ArrayList<String>{heap_allocator()};
   for (let const &subcommand : *subcommands)
     if (subcommand.view().starts_with(token) &&
@@ -387,6 +373,7 @@ static fn extract_dash_flags(StringView option_part) throws -> ArrayList<String>
 /* man's overstrike formatting, a byte backspace byte for bold and an underscore
    backspace char for an underline, is stripped first. */
 static fn parse_manpage_option_entries(StringView text) throws
+
     -> ArrayList<help_entry>
 {
   let clean = String{heap_allocator()};
@@ -430,7 +417,7 @@ static fn parse_manpage_option_entries(StringView text) throws
       continue;
     }
 
-    /* A dashless line at the option's indent or deeper continues the wrapped
+    /* A dashless line at or below the option's indent continues the wrapped
        description. */
     if (!pending_flags.is_empty() && raw[indent] != '-' &&
         indent >= pending_indent)
@@ -463,7 +450,6 @@ static fn parse_manpage_option_entries(StringView text) throws
   }
   do_finalize_pending();
 
-  /* The authoritative flag list is the word scan. */
   let entries = ArrayList<help_entry>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
   for (usize j = 0; j < view.length; j++) {
@@ -495,12 +481,10 @@ static fn parse_manpage_option_entries(StringView text) throws
   return entries;
 }
 
-/* The commands shit may fork for their --help text, each mapped to the help
-   argument that prints the full list, the allowlist half of the gate. A command
-   must appear here and resolve into a trusted directory before its --help runs.
-   The value is almost always --help, ffmpeg the exception with --help full. A
-   non-plain argument also makes the command read options from --help over a
-   manpage. A name longer than sixteen bytes cannot key the packed map. */
+/* A command must appear here and resolve into a trusted directory before its
+   --help runs, the allowlist half of the gate. A non-plain argument also makes
+   the command read options from --help over a manpage. A name longer than
+   sixteen bytes cannot key the packed map. */
 static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
     {
         {SSK("ffmpeg"),            "--help full"},
@@ -552,7 +536,6 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("gofmt"),             "--help"     },
         {SSK("magick"),            "--help"     },
         {SSK("convert"),           "--help"     },
-        /* Compilers and binary tools. */
         {SSK("clang"),             "--help"     },
         {SSK("clang++"),           "--help"     },
         {SSK("gcc"),               "--help"     },
@@ -576,7 +559,6 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("adb"),               "--help"     },
         {SSK("fastboot"),          "--help"     },
         {SSK("waydroid"),          "--help"     },
-        /* Language runtimes and their toolchains. */
         {SSK("python"),            "--help"     },
         {SSK("python3"),           "--help"     },
         {SSK("ruby"),              "--help"     },
@@ -619,7 +601,6 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("ansible-test"),      "--help"     },
         {SSK("ansible-vault"),     "--help"     },
         {SSK("typst"),             "--help"     },
-        /* Package managers. */
         {SSK("apt"),               "--help"     },
         {SSK("apt-get"),           "--help"     },
         {SSK("dnf"),               "--help"     },
@@ -643,12 +624,10 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("mamba"),             "--help"     },
         {SSK("gem"),               "--help"     },
         {SSK("composer"),          "--help"     },
-        /* Version control. */
         {SSK("hg"),                "--help"     },
         {SSK("svn"),               "--help"     },
         {SSK("jj"),                "--help"     },
         {SSK("fossil"),            "--help"     },
-        /* Modern command-line tools. */
         {SSK("eza"),               "--help"     },
         {SSK("lsd"),               "--help"     },
         {SSK("procs"),             "--help"     },
@@ -670,7 +649,6 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("kustomize"),         "--help"     },
         {SSK("skaffold"),          "--help"     },
         {SSK("flamegraph"),        "--help"     },
-        /* Cloud and infrastructure. */
         {SSK("doctl"),             "--help"     },
         {SSK("flyctl"),            "--help"     },
         {SSK("pulumi"),            "--help"     },
@@ -679,7 +657,6 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("consul"),            "--help"     },
         {SSK("nomad"),             "--help"     },
         {SSK("vercel"),            "--help"     },
-        /* Network and transfer. */
         {SSK("curl"),              "--help"     },
         {SSK("wget"),              "--help"     },
         {SSK("httpie"),            "--help"     },
@@ -688,13 +665,11 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("rsync"),             "--help"     },
         {SSK("rclone"),            "--help"     },
         {SSK("openvpn"),           "--help"     },
-        /* Text and data. */
         {SSK("mlr"),               "--help"     },
         {SSK("dasel"),             "--help"     },
         {SSK("gron"),              "--help"     },
         {SSK("fx"),                "--help"     },
         {SSK("xsv"),               "--help"     },
-        /* System. */
         {SSK("systemctl"),         "--help"     },
         {SSK("journalctl"),        "--help"     },
         {SSK("nmcli"),             "--help"     },
@@ -709,22 +684,18 @@ static constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
    ffmpeg family, whose manpage carries the options in a form the flag scanner
    does not read. */
 static fn command_prefers_help_over_manpage(StringView command) throws -> bool
+
 {
   let argument = HELP_ALLOWLIST.find(command);
   return argument.has_value() && StringView{*argument} != StringView{"--help"};
 }
 
-/* Defined below, declared here so the man fork can reuse the same trusted
-   directory gate the --help fork uses. */
 static fn command_directory_is_trusted(StringView absolute_path) throws -> bool;
 
-/* The wall-clock budget a single man or --help fork is allowed. A command whose
-   probe runs longer is killed and caches the empty string, so the prompt never
-   freezes on it and it is never forked again this session. */
+/* A fork that runs past this budget is killed and caches the empty string, so
+   the prompt never freezes and the command is not forked again this session. */
 static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
 
-/* The man invocation is the general path that works for any command on the
-   host, so the completer is not limited to a hardcoded set of tools. */
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<help_entry> &
 {
@@ -734,8 +705,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   let parsed_options = ArrayList<help_entry>{heap_allocator()};
   /* man forks only when it resolves into a trusted directory, so an alias or a
      planted man is never run. The resolved absolute path runs in place of the
-     bare name so PATH cannot reresolve it. An absent or untrusted man caches
-     the empty list so the page never forks twice. */
+     bare name so PATH cannot reresolve it. */
   let const man_paths = utils::search_program_path("man");
   if (man_paths.is_empty() ||
       !command_directory_is_trusted(man_paths[0].text().view()))
@@ -746,9 +716,6 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
     return *MANPAGE_OPTION_CACHE.find(page_name);
   }
-  /* man runs through the bounded fork helper, so a slow or paging man never
-     freezes the prompt. The helper points stdin at /dev/null and stdout at a
-     pipe, so man emits plain text and a deadline kills a man that overruns. */
   unused(context);
   let argv = ArrayList<String>{heap_allocator()};
   argv.push(String{man_paths[0].text().view()});
@@ -761,10 +728,8 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   return *MANPAGE_OPTION_CACHE.find(page_name);
 }
 
-/* Completes an option token from the command's manpage. Runs only on an
-   explicit tab and a dash token, so the ghost never forks man and a plain
-   argument completes as a filename. None falls through to the spec and files.
- */
+/* Runs only on an explicit tab and a dash token, so the ghost never forks man.
+   None falls through to the spec and files. */
 fn complete_from_manpage(StringView line, StringView token, bool for_listing,
                          EvalContext &context,
                          StringMap<String> &descriptions) throws
@@ -783,8 +748,8 @@ fn complete_from_manpage(StringView line, StringView token, bool for_listing,
 
   if (command_prefers_help_over_manpage(command)) return None;
 
-  /* git commit -<tab> reads the git-commit subcommand page over the umbrella
-     one when the index knows it. */
+  /* git commit -<tab> reads the git-commit subcommand page when the index
+     knows it. */
   let page_name = manpage_name_for(command);
   if (let const subcommand_word = second_word_of(line);
       subcommand_word.has_value())
@@ -805,35 +770,26 @@ fn complete_from_manpage(StringView line, StringView token, bool for_listing,
   return matches;
 }
 
-/* The option flags and subcommands a command's --help lists, cached under the
-   resolved command name. One fork parses both so the raw text frees after.
-   HELP_PARSED records a command that ran so it never forks twice. */
+/* One fork parses both the option and the subcommand caches so the raw text
+   frees after. HELP_PARSED records a command that ran so it never forks twice. */
 static StringMap<ArrayList<help_entry>> HELP_OPTION_CACHE{heap_allocator()};
 static StringMap<ArrayList<help_entry>> HELP_SUBCOMMAND_CACHE{heap_allocator()};
 static HashSet HELP_PARSED{heap_allocator()};
 
-/* Whether the directory the resolved binary sits in is safe to fork for its
-   --help text. The check is permission-based, so a user tool directory like
-   ~/.cargo/bin is trusted while a world-writable one like /tmp is not. */
+/* The check is permission-based, so a user tool directory like ~/.cargo/bin is
+   trusted while a world-writable one like /tmp is not. */
 static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
 {
   return os::directory_is_trusted_for_exec(Path{absolute_path}.parent());
 }
 
-/* A command's raw --help text, captured once. The fork passes two gates, the
-   command is on the allowlist and resolves into a trusted directory. The
-   resolved absolute path runs as the only argv entry, not through a shell, so
-   no alias shadows it, and stdin is the null device. The capture is bounded by
-   the timeout, and any failure caches the empty string so it never forks
-   twice. */
+/* The fork passes two gates, the command is on the allowlist and resolves into
+   a trusted directory. The resolved absolute path runs as the only argv entry,
+   not through a shell, so no alias shadows it. */
 static fn help_text_for(StringView command, StringView subcommand = {}) throws
     -> String
 {
   let text = String{heap_allocator()};
-  /* The allowlist entry carries the help argument, so ffmpeg forks --help full
-     rather than the summary-only --help. A command not on the list never
-     forks. The allowlist and the trust gate read the base command, a known
-     subcommand of an allowlisted command is forked too. */
   let help_argument = HELP_ALLOWLIST.find(command);
   let const paths = utils::search_program_path(command);
   if (help_argument.has_value() && !paths.is_empty() &&
@@ -841,8 +797,7 @@ static fn help_text_for(StringView command, StringView subcommand = {}) throws
   {
     /* argv is the absolute path, then the subcommand chain split on spaces,
        then the help argument split on spaces, so git remote add runs as path,
-       remote, add, --help. The chain carries its words space-joined under one
-       key. */
+       remote, add, --help. */
     let argv = ArrayList<String>{heap_allocator()};
     argv.push(String{paths[0].text().view()});
     {
@@ -968,10 +923,8 @@ static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
   return true;
 }
 
-/* Whether a header line opens a subcommand section, matched case-insensitively
-   on a "commands:" or "subcommands:" tail. A bare all-caps header with no
-   colon, such as tailscale's "SUBCOMMANDS", also opens one, only when the whole
-   line is the single word. */
+/* A bare all-caps header with no colon, such as tailscale's "SUBCOMMANDS",
+   opens a section only when the whole line is the single word. */
 static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
 {
   if (trimmed.is_empty()) return false;
@@ -990,8 +943,7 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
   if (trimmed[trimmed.length - 1] == ':')
     return ends_with_ignoring_case(StringView{"commands:"}) ||
            ends_with_ignoring_case(StringView{"subcommands:"});
-  /* A colon-less header opens a section only when the whole line is upper-case,
-     so a lowercase body line reading "commands" opens none. */
+
   let const is_all_uppercase = [&]() {
     for (usize i = 0; i < trimmed.length; i++)
       if (trimmed[i] >= 'a' && trimmed[i] <= 'z') return false;
@@ -1034,7 +986,7 @@ static fn parse_help_subcommands(StringView text) throws
       continue;
     }
     /* A line that returns to the left margin ends the section, and may open a
-       new one of its own. */
+       new one. */
     if (trim_start == 0) {
       in_section = line_opens_subcommand_section(trimmed);
       continue;
@@ -1052,9 +1004,8 @@ static fn parse_help_subcommands(StringView text) throws
       description = trim_blanks(
           trimmed.substring_of_length(column_end, trimmed.length - column_end));
 
-    /* The column lists one or more comma-separated aliases such as `ft, fetch`,
-       each a usable subcommand the user may type, so every alias becomes its
-       own candidate under the shared description. */
+    /* Each comma-separated alias such as `ft, fetch` becomes its own candidate
+       under the shared description. */
     let const column = trimmed.substring_of_length(0, column_end);
     usize alias_start = 0;
     while (alias_start < column.length) {
@@ -1084,8 +1035,6 @@ static fn help_subcommands_for(StringView command,
       help_cache_key(command, subcommand).view());
 }
 
-/* A deeper fork is reserved for a parsed subcommand rather than an arbitrary
-   word. */
 static fn is_known_help_subcommand(StringView command,
                                    StringView subcommand_prefix,
                                    StringView word) throws -> bool
@@ -1095,14 +1044,9 @@ static fn is_known_help_subcommand(StringView command,
   return false;
 }
 
-/* The depth a subcommand chain forks to, the command plus this many settled
-   subcommand words. A line past it stops forking, so a deep command line cannot
-   fork without bound. */
+/* A line past this depth stops forking, so the fork count is bounded. */
 static constexpr usize MAX_SUBCOMMAND_DEPTH = 4;
 
-/* The walk stops at the first word that names no known subcommand, at a
-   dash-led word, at the token under the cursor, or at MAX_SUBCOMMAND_DEPTH, so
-   the fork count is bounded. */
 static fn settled_subcommand_chain(StringView resolved_command, StringView line,
                                    usize token_start) throws -> String
 {
@@ -1122,8 +1066,8 @@ static fn settled_subcommand_chain(StringView resolved_command, StringView line,
     while (i < line.length && line[i] != ' ' && line[i] != '\t')
       i++;
 
-    /* A word that reaches the token under the cursor is the token itself rather
-       than a settled subcommand, so the chain ends before it. */
+    /* A word that reaches the token under the cursor is the token itself, so
+       the chain ends before it. */
     if (start >= token_start || i > token_start) {
       break;
     }
@@ -1180,21 +1124,16 @@ fn complete_from_help_subcommands(StringView line, StringView token,
       surface_command.find_character('/').has_value())
     return None;
 
-  /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
-     surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved_name = resolve_completion_alias(surface_command, context);
 
-  /* The settled subcommand chain forks "command sub1 sub2 --help" for its
-     sub-subcommands, so docker compose <tab> lists the compose subcommands. An
-     empty chain at the first-argument position lists the base subcommands. */
+  /* An empty chain at the first-argument position lists the base subcommands. */
   let const chain =
       settled_subcommand_chain(resolved_name.view(), line, token_start);
   if (chain.is_empty()) {
     if (!is_first_argument_token(line, token_start)) return None;
 
     /* A command the man index already lists never forks --help to relist them,
-       the man stage is authoritative, the fork is reserved for a tool like
-       cargo with no man pages. */
+       the fork is reserved for a tool like cargo with no man pages. */
     if (is_man_subcommand_index_built) {
       let const man_subcommands =
           MAN_SUBCOMMAND_INDEX.find(resolved_name.view());

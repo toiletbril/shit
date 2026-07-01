@@ -6,10 +6,6 @@
 
 namespace shit {
 
-/* A command name resolved to what runs it, either a builtin chosen by its Kind
-   or an external program at a Path. The unused payload of the inactive case
-   stays default-constructed, which is cheap for both a Kind and an empty
-   Path. */
 class ResolvedCommand
 {
 public:

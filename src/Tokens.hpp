@@ -9,14 +9,8 @@ namespace shit {
 
 class Expression;
 
-/* The name and right hand side of an assignment word. The struct is defined
-   below Word, since its value field holds a Word by value and a Word is not yet
-   complete at this point. */
 struct word_assignment_split;
 
-/* One lexed token of an arithmetic expression. The expression text never
-   changes, so a $((...)) segment lexes its tokens once and re-evaluates from
-   them rather than re-scanning the bytes on every expansion in a loop body. */
 struct arith_token
 {
   enum class kind : u8
@@ -34,10 +28,6 @@ struct arith_token
 class WordSegment
 {
 public:
-  /* The kind records how the evaluator may expand this segment. UnquotedText
-     expands a leading tilde, splits on IFS after variable expansion, and globs.
-     DoubleQuotedText expands variables but never splits or globs.
-     VariableReference holds a variable name resolved at run time. */
   enum class Kind : u8
   {
     LiteralText,
@@ -46,8 +36,6 @@ public:
     VariableReference,
     CommandSubstitution,
     ArithmeticExpansion,
-    /* The text is a direction byte, < or >, then the source inside <(...) or
-       >(...). */
     ProcessSubstitution,
     /* The bash 5.3 funsub runs in the current shell, so its assignments and cd
        persist. */
@@ -58,45 +46,25 @@ public:
   String text;
   bool is_in_double_quotes{false};
 
-  /* The constant decimal result of an ArithmeticExpansion segment whose source
-     holds no parameter and no command substitution, computed once at analyze
-     time. The evaluator reads it instead of re-parsing the arithmetic on every
-     expansion. None on any non-constant segment. */
   mutable Maybe<i64> folded_arithmetic_result{};
 
-  /* The parsed inner command of a CommandSubstitution segment, reused on every
-     later expansion. The tree lives in AST_ARENA, which resets between
-     top-level commands, yet a function-body segment lives in FUNCTION_ARENA and
-     outlives that reset, so the cache records the arena generation it was
-     filled in and a hit from an earlier generation is treated as stale and
-     reparsed. */
+  /* The tree lives in AST_ARENA and a function-body segment in FUNCTION_ARENA,
+     so the cache records the arena generation it was filled in and a hit from
+     an earlier generation is treated as stale and reparsed. */
   mutable const Expression *cached_substitution_ast{nullptr};
   mutable usize cached_substitution_generation{0};
 
-  /* The lexed tokens of an ArithmeticExpansion segment, filled once and reused.
-     The expression text is immutable, so the tokens stay valid for the
-     segment's life and need no generation guard, unlike the substitution tree.
-   */
   mutable ArrayList<arith_token> cached_arith_tokens{heap_allocator()};
   mutable bool arith_tokenized{false};
-  /* Whether the cached tokens hold a simple expression the token evaluator can
-     run. A complex expression falls back to the char parser. */
   mutable bool arith_simple{false};
 
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
   pure fn is_tilde_candidate() const wontthrow -> bool;
 
-  /* True when the segment text holds an unquoted glob metacharacter, one of
-     '*',
-     '?', or '['. The plain-literal fast path consults this to decide whether a
-     word may skip pathname expansion. */
   pure fn has_glob_metacharacter() const wontthrow -> bool;
 };
 
-/* A lexed word carries its quoting structure as ordered segments, expanded in
-   place rather than against a source-position escape map, so the byte offsets
-   never drift apart from the produced text. */
 class Word
 {
 public:
@@ -106,28 +74,14 @@ public:
   fn to_literal_string() const throws -> String;
   fn to_pretty_string() const throws -> String;
 
-  /* True when the literal text of the word is a non-empty run of ASCII digits,
-     the shape a descriptor prefix such as the 2 in 2>file takes. The answer
-     comes from the segments directly and allocates no literal String. */
   pure fn is_all_ascii_digits() const wontthrow -> bool;
 
   pure fn fd_allocation_name() const wontthrow -> Maybe<StringView>;
 
-  /* True when a segment of the word runs a command or a function substitution.
-     The empty-command status logic and the assignment value reset both ask this
-     to decide whether to reset the exit status. */
   pure fn runs_substitution() const wontthrow -> bool;
 
-  /* A word is an assignment when its first segment is unquoted text holding an
-     unescaped NAME= prefix. The returned word is the right hand side. */
   fn get_assignment_split() const throws -> Maybe<word_assignment_split>;
 
-  /* How a word may take the evaluator's plain-literal fast path. NotPlain words
-     run the full expansion machine. PlainNoSplit words concatenate their
-     segments into one field with no expansion, splitting, or globbing.
-     PlainUnquotedOneSegment is a single unquoted segment free of glob
-     metacharacters whose only remaining question is whether it holds an IFS
-     byte. */
   enum class PlainLiteral : u8
   {
     NotPlain,
@@ -137,16 +91,9 @@ public:
 
   pure fn plain_literal_kind() const wontthrow -> PlainLiteral;
 
-  /* The constant value of a PlainNoSplit word, the concatenation of its segment
-     texts. It is built once and reused, since the segments never change after
-     the parse, so a loop body that names the same literal pays the
-     concatenation once rather than once per turn. */
   fn constant_value() const throws -> StringView;
 
 private:
-  /* The plain-literal class and the constant value are pure functions of the
-     fixed segments, so they are memoized on the word and a tight loop reads the
-     cache rather than rescanning the segments every evaluation. */
   mutable PlainLiteral m_cached_plain_kind{PlainLiteral::NotPlain};
   mutable bool m_has_cached_plain_kind{false};
   mutable String m_constant_value{heap_allocator()};
@@ -157,8 +104,6 @@ struct word_assignment_split
 {
   String name;
   Word value;
-  /* The word had the form NAME+=VALUE, so evaluation appends to the current
-     value of NAME instead of replacing it. */
   bool is_append;
 };
 
@@ -273,9 +218,7 @@ public:
 
   pure fn source_location() const wontthrow -> SourceLocation;
 
-  /* A token lives in the parse arena, so its storage is reclaimed in bulk. This
-     no-ops for arena storage and frees an ordinary heap token otherwise. The
-     destructor still runs through the normal delete. */
+  /* This no-ops for arena storage and frees an ordinary heap token otherwise. */
   static fn operator delete(opaque *pointer) wontthrow->void;
 
 protected:
@@ -307,9 +250,6 @@ inline constexpr StaticStringMap<Token::Kind> KEYWORDS{
     KEYWORD_ENTRIES, countof(KEYWORD_ENTRIES)};
 
 /* clang-format off */
-/* The location goes through the lexer's here() so the keyword token carries the
-   stamped filename, and a warning anchored at a for or case keyword names its
-   file. */
 #define KW_CASE(k)                                                             \
   case Token::Kind::k:                                                         \
     t = m_arena->create<tokens::k>(here(actual_cursor_position, byte_count));  \
@@ -414,8 +354,6 @@ public:
   pure fn key() const wontthrow -> const String &;
   pure fn value_word() const wontthrow -> const Word &;
 
-  /* The source spelled NAME+=VALUE, so the evaluator appends instead of
-     replacing. */
   pure fn is_append() const wontthrow -> bool;
 
 protected:

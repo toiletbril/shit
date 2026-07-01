@@ -6,13 +6,6 @@
 #include "../Shitbox.hpp"
 #include "../Utils.hpp"
 
-/* A deliberately small make. It reads a Makefile, holds the variables and the
-   target rules, expands $(NAME) and ${NAME}, applies single-level pattern
-   rules, and runs each recipe line through the shell. It has no automatic
-   variables, and it accepts the -j, -B, and -k flags while always building
-   serially. The subset is enough to drive a configure-then-make build on a bare
-   system. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-f file] [target ...]");
@@ -79,15 +72,10 @@ struct make_rule
   String target;
   ArrayList<String> prerequisites;
   ArrayList<String> recipe_lines;
-  /* The target-specific variable assignments, the GNU make `target: VAR =
-     value` form, applied while the target and its prerequisites build and
-     restored after. Each entry is the raw `NAME op= value` text. */
+  /* Each entry is the raw `NAME op= value` text. */
   ArrayList<String> variable_assignments;
 };
 
-/* The parsed Makefile, the variables and the rules in source order so the first
-   rule is the default goal. A target that holds a % is a pattern rule, kept
-   apart so an explicit rule always wins over a pattern. */
 struct makefile
 {
   explicit makefile(Allocator allocator)
@@ -101,10 +89,6 @@ struct makefile
      variable line does not set it, the way GNU make picks the first real rule.
    */
   String default_goal;
-  /* A name to array-index map, so a $(NAME) lookup is one hash probe rather
-     than a scan of every variable, which a recipe pays once per reference per
-     line. The array keeps the values so a value can still be appended in
-     place. */
   StringMap<usize> variable_index;
 
   fn find_variable(StringView name) const throws -> const String *
@@ -129,7 +113,6 @@ struct makefile
   }
 };
 
-/* None when the goal does not fit the prefix and suffix around the %. */
 static fn match_pattern(StringView pattern, StringView goal,
                         Allocator allocator) throws -> Maybe<String>
 {
@@ -233,9 +216,6 @@ static fn split_words(StringView text, Allocator allocator) throws
 static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
                  usize depth) throws -> String;
 
-/* The files each space-separated glob in the argument matches, joined by single
-   spaces, the way GNU make $(wildcard *.cc) lists sources. A pattern that
-   matches nothing contributes no words. */
 static fn make_wildcard(EvalContext &cxt, StringView patterns) throws -> String
 {
   let result = String{cxt.scratch_allocator()};
@@ -250,12 +230,7 @@ static fn make_wildcard(EvalContext &cxt, StringView patterns) throws -> String
   return result;
 }
 
-/* A substitution reference $(VAR:pattern=replacement), so $(SRC:%.cc=o/%.o)
-   maps each word of VAR through the pattern. A pattern holding a % matches a
-   stem the replacement % then carries, and a pattern without one replaces a
-   trailing suffix, the $(SRC:.cc=.o) form. None means the name is not a
-   substitution reference, since a variable name carries no blank and a function
-   argument that holds a colon is read elsewhere. */
+/* None means the name is not a substitution reference. */
 static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
                                      StringView name, usize depth) throws
     -> Maybe<String>
@@ -316,9 +291,6 @@ static fn try_substitution_reference(EvalContext &cxt, const makefile &mk,
   return out;
 }
 
-/* Expand $(NAME) and ${NAME} against the makefile variables and the process
-   environment, repeating until no reference remains or the depth cap is hit, so
-   a variable whose value names another variable resolves too. */
 static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
                  usize depth) throws -> String
 {
@@ -350,11 +322,8 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
       }
       let const name = text.substring_of_length(i + 2, j - (i + 2));
       if (name.length > 6 && name.substring_of_length(0, 6) == "shell ") {
-        /* The $(shell cmd) function runs the command and substitutes its
-           output, the way GNU make reads $(shell uname) or $(shell nproc). The
-           argument is expanded first so an inner $(VAR) reaches the command.
-           Completion suppresses the run, so listing targets never forks the
-           makefile's commands and never blocks on a slow one. */
+        /* Completion suppresses the run so listing targets never forks the
+           makefile's commands. */
         if (!cxt.make_shell_suppressed()) {
           let const command = expand(cxt, mk, name.substring(6), depth + 1);
           result +=
@@ -368,8 +337,6 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
         result += make_wildcard(cxt, patterns.view()).view();
       } else if (name.length > 6 && name.substring_of_length(0, 6) == "error ")
       {
-        /* $(error text) aborts the build with the message, the way GNU make
-           stops on a misconfiguration. */
         throw Error{"The makefile stopped the build with the message '" +
                     expand(cxt, mk, name.substring(6), depth + 1) + "'"};
       } else if (name.length > 8 &&
@@ -405,8 +372,7 @@ static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
   return result;
 }
 
-/* The first ':' that opens a rule, a colon not immediately followed by '=', so
-   a ':=' assignment is not mistaken for a rule. None when the line has none. */
+/* The first colon not immediately followed by '=' opens the rule. */
 static fn rule_colon(StringView line) wontthrow -> Maybe<usize>
 {
   for (usize i = 0; i < line.length; i++)
@@ -430,9 +396,6 @@ static fn assignment_variable_name(StringView assignment) wontthrow
   return trim(name);
 }
 
-/* Whether the text after a rule colon is a target-specific variable assignment,
-   the GNU make `target: NAME = value` form, a single variable name then an
-   assignment operator, rather than a prerequisite list. */
 static fn is_target_variable_assignment(StringView after_colon) wontthrow
     -> bool
 {
@@ -444,8 +407,6 @@ static fn is_target_variable_assignment(StringView after_colon) wontthrow
   return true;
 }
 
-/* Parse one assignment, classifying the operator so := and = set the value, +=
-   appends to the existing value, and ?= sets only when the name is unset. */
 static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
                            StringView operator_and_value) throws -> void
 {
@@ -493,9 +454,8 @@ static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
   });
 }
 
-/* Whether the line ends in a backslash that continues it, an odd run of
-   trailing backslashes, so a doubled \\ is a literal backslash rather than a
-   splice. */
+/* An odd run of trailing backslashes continues the line, a doubled \\ is a
+   literal backslash. */
 static fn ends_with_continuation(StringView line) wontthrow -> bool
 {
   usize backslash_count = 0;
@@ -507,11 +467,6 @@ static fn ends_with_continuation(StringView line) wontthrow -> bool
   return (backslash_count % 2) == 1;
 }
 
-/* The source split into logical lines, with a trailing-backslash continuation
-   spliced onto the line it continues, the way GNU make joins a multi-line
-   assignment or prerequisite list. The trailing newline of each physical line
-   is dropped, and the splice collapses the continuation's leading blanks to one
-   space. */
 static fn join_continuations(StringView source, Allocator allocator) throws
     -> ArrayList<String>
 {
@@ -541,8 +496,6 @@ static fn join_continuations(StringView source, Allocator allocator) throws
   return logical;
 }
 
-/* The first whitespace-delimited word, so a directive such as ifeq is read off
-   the front of a line. */
 static fn leading_word(StringView text) wontthrow -> StringView
 {
   usize start = 0;
@@ -554,10 +507,7 @@ static fn leading_word(StringView text) wontthrow -> StringView
   return text.substring_of_length(start, end - start);
 }
 
-/* The two operands of an ifeq or ifneq, the (a,b) form. The comma split honors
-   nested parentheses, and each operand is trimmed, so ifeq ($(MODE), dbg) reads
-   the second operand as dbg. False when the line is not the parenthesized form.
- */
+/* The comma split honors nested parentheses. */
 static fn split_conditional_arguments(StringView rest, StringView &first,
                                       StringView &second) wontthrow -> bool
 {
@@ -589,9 +539,6 @@ static fn split_conditional_arguments(StringView rest, StringView &first,
   return true;
 }
 
-/* Evaluate one conditional directive. ifeq and ifneq compare two expanded
-   operands, while ifdef and ifndef test whether a variable holds a non-empty
-   value. */
 static fn evaluate_conditional(EvalContext &cxt, const makefile &mk,
                                StringView directive, StringView rest) throws
     -> bool
@@ -617,8 +564,6 @@ static fn evaluate_conditional(EvalContext &cxt, const makefile &mk,
   return directive == "ifeq" ? is_equal : !is_equal;
 }
 
-/* The conditional nesting state, one entry per open ifeq/ifdef. A line is read
-   only when every open conditional is in its active branch. */
 struct conditional_state
 {
   bool is_branch_active;
@@ -643,10 +588,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
   {
     StringView line = logical.view();
 
-    /* A line that starts with a tab is a recipe for the rule above it, kept
-       only inside an active conditional branch. The tab is dropped and the rest
-       is kept verbatim, since a recipe is shell text expanded only at build
-       time. */
+    /* A recipe line is kept verbatim and expanded only at build time. */
     if (!line.is_empty() && line[0] == '\t') {
       if (do_is_active() && current != nullptr)
         current->recipe_lines.push(
@@ -666,9 +608,8 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
 
     let const directive = leading_word(trimmed);
 
-    /* The conditional directives gate the lines between them. An inactive
-       branch still tracks nested directives so the matching endif pops the
-       right one. */
+    /* An inactive branch still tracks nested directives so the matching endif
+       pops the right one. */
     if (directive == "ifeq" || directive == "ifneq" || directive == "ifdef" ||
         directive == "ifndef")
     {
@@ -711,7 +652,6 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
       continue;
     }
 
-    /* A line inside an inactive branch is dropped entirely. */
     if (!do_is_active()) {
       current = nullptr;
       continue;
@@ -747,9 +687,6 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
         colon.has_value() && (!equals.has_value() || *colon < *equals);
 
     if (is_rule) {
-      /* A `target: NAME = value` line is a target-specific variable assignment,
-         scoped to the target rather than a prerequisite list, so the assignment
-         attaches to the target's rule for the build to apply and restore. */
       let const after_colon = statement.substring(*colon + 1);
       if (is_target_variable_assignment(after_colon)) {
         let const targets =
@@ -771,9 +708,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
         continue;
       }
 
-      /* The targets and prerequisites expand when the rule is read, so
-         $(OUT): $(OBJECTS) names the resolved files the way GNU make does. A
-         target holding a % is a pattern rule and goes in the pattern list. */
+      /* The targets and prerequisites expand when the rule is read. */
       let const targets =
           expand(cxt, mk, trim(statement.substring_of_length(0, *colon)), 0);
       let const prerequisites =
@@ -784,8 +719,6 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
       {
         let new_prerequisites =
             split_words(prerequisites.view(), cxt.scratch_allocator());
-        /* The first ordinary explicit target is the bare-make goal, a pattern
-           rule and a target-specific assignment do not claim it. */
         if (mk.default_goal.is_empty() &&
             !target.view().find_character('%').has_value())
           mk.default_goal = target.clone();
@@ -826,11 +759,6 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
   return mk;
 }
 
-/* Build one target, its prerequisites first, then its recipe lines through the
-   shell. visiting guards against a dependency cycle and built skips a target
-   already made. */
-/* One variable's value before a target-specific assignment overwrote it, so the
-   build restores it when the target's scope ends. */
 struct saved_make_variable
 {
   String name;
@@ -852,10 +780,6 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
           "' is part of a dependency cycle"
       };
 
-  /* The concrete prerequisites and the recipe come from an explicit rule when
-     one names the goal, otherwise from the first pattern rule whose target
-     matches and whose source prerequisite already exists or can itself be
-     made. */
   const ArrayList<String> *recipe_lines = nullptr;
   ArrayList<String> prerequisites{cxt.scratch_allocator()};
   const ArrayList<String> *target_assignments = nullptr;
@@ -906,10 +830,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     }
   }
 
-  /* The target-specific assignments apply now, in effect for the prerequisite
-     builds and the recipe, and restore on the way out even when a recipe
-     throws. The saved values restore in reverse so a repeated += on one
-     variable unwinds cleanly. */
+  /* The saved values restore in reverse so a repeated += unwinds cleanly. */
   let saved_variables = ArrayList<saved_make_variable>{cxt.scratch_allocator()};
   if (target_assignments != nullptr)
     for (const String &assignment : *target_assignments) {
@@ -954,8 +875,6 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     build_target(ec, cxt, mk, prerequisite.view(), visiting, built);
   visiting.pop_back();
 
-  /* The automatic variables read the goal, the first prerequisite, and the
-     whole prerequisite list joined by spaces. */
   let const first_prereq =
       prerequisites.is_empty() ? StringView{} : prerequisites[0].view();
   String all_prereqs{cxt.scratch_allocator()};
@@ -968,8 +887,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     StringView body = recipe.view();
     bool is_silent = false;
     bool should_ignore_errors = false;
-    /* A leading @ silences the echo and a leading - ignores a failure, in
-       either order, the way make reads the recipe prefixes. */
+    /* A leading @ or - applies in either order. */
     while (!body.is_empty() && (body[0] == '@' || body[0] == '-')) {
       if (body[0] == '@') is_silent = true;
       if (body[0] == '-') should_ignore_errors = true;
@@ -985,10 +903,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     if (command.is_empty()) continue;
     if (!is_silent) ec.print_to_stdout(command + "\n");
 
-    /* A recipe runs the way GNU make runs it under /bin/sh, with the strict
-       toggles off, so an unmatched glob or an unset variable in a recipe does
-       not abort the build the way the default mood would. The prior runtime is
-       restored on the way out, including an unwinding throw. */
+    /* A recipe runs with the strict toggles off so an unmatched glob or an
+       unset variable does not abort the build. */
     let const saved_runtime = RuntimeState::capture(cxt);
     RuntimeState recipe_runtime = saved_runtime;
     recipe_runtime.failglob = false;
@@ -1030,10 +946,7 @@ pure fn Make::kind() const wontthrow -> Utility::Kind { return Kind::Make; }
 fn Make::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32
 {
-  /* The parallelism flag -j, the always-make flag -B, and the keep-going flag
-     -k change nothing in this serial make, so they are accepted and dropped
-     before flag parsing rather than read as a target or rejected. The -jN form
-     carries an optional number. */
+  /* The -j, -B, and -k flags are accepted and dropped before flag parsing. */
   ArrayList<String> filtered{cxt.scratch_allocator()};
   for (const String &arg : args) {
     let const text = arg.view();
@@ -1062,9 +975,6 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  /* -C changes to the directory before the Makefile is read, restored when the
-     util returns so a recursive make from a recipe leaves the parent cwd
-     unchanged. */
   Maybe<Path> saved_directory;
   if (FLAG_MAKE_DIR.is_set()) {
     saved_directory = Path::current_directory();
@@ -1123,17 +1033,11 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
   let const source = makefile.read_entire_file();
   if (!source.has_value()) return targets;
 
-  /* Completion lists target names only, so the makefile's $(shell ...)
-     functions are left unrun while it parses, both to keep a tab from forking
-     the makefile's commands and to never block on a slow one. */
+  /* Completion leaves the makefile's $(shell ...) functions unrun. */
   let const saved_suppressed = cxt.make_shell_suppressed();
   cxt.set_make_shell_suppressed(true);
   defer { cxt.set_make_shell_suppressed(saved_suppressed); };
 
-  /* The parser expands variables and runs the := and conditional assignments,
-     so a $(VAR) target name resolves to its real text the way make reads it. A
-     pattern rule lives in its own list, so mk.rules holds only explicit
-     targets. A dot-special such as .PHONY and an empty name are excluded. */
   let const mk = parse_makefile(cxt, source->view());
   for (const make_rule &rule : mk.rules) {
     let const name = rule.target.view();

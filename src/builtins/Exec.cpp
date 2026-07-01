@@ -45,14 +45,6 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* exec reads its options before the command name and stops at the first
-     non-option word or at a -- terminator, the way bash does. -l prefixes the
-     command's zeroth argument with a dash so the program reads itself as a
-     login shell, -a names that zeroth argument, and -c hands the program an
-     empty environment. The flags combine in a cluster, while -a takes the rest
-     of its cluster or the next word as its value. The sh mood skips this scan,
-     since the dash exec parses no options and runs the first word as the
-     command. */
   let should_be_login_shell = false;
   let should_use_empty_environment = false;
   let has_custom_argv0 = false;
@@ -105,10 +97,8 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  /* exec with only redirections changes the shell's own descriptors and
-     returns, so the rest of the session inherits them. Inside an in-process
-     subshell each touched descriptor is backed up first, so the change stays
-     contained at the subshell's end. */
+  /* Inside an in-process subshell each touched descriptor is backed up first,
+     so the change stays contained at the subshell's end. */
   if (command_index >= args.count()) {
     LOG(Debug, "exec applying redirections to the shell's own descriptors");
     if (ec.in_fd.has_value()) cxt.snapshot_subshell_descriptor(0);
@@ -156,10 +146,6 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   for (usize i = command_index; i < args.count(); i++)
     command_args.push_managed(args[i]);
 
-  /* The zeroth argument the program reads is the -a name when given, otherwise
-     the command word, and -l prepends a dash so the program reads itself as a
-     login shell. The resolved program path is untouched, only argv[0] changes.
-   */
   if (has_custom_argv0) command_args[0] = custom_argv0;
 
   if (should_be_login_shell) {
@@ -200,8 +186,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   } catch (const ErrorBase &error) {
     /* replace_process throws ErrorWithLocation for a found-but-unexecutable
        file, a sibling of Error under ErrorBase, so the catch spans the base to
-       reach it rather than letting it propagate as a generic exit-1 command
-       error. */
+       reach it. */
     show_message(error.message());
     utils::quit(126, true);
   }

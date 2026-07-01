@@ -18,10 +18,6 @@ inline fn completion_allocator() wontthrow -> Allocator
   return bump_allocator(COMPLETION_ARENA);
 }
 
-/* One listed child, its name and whether it is a directory. The directory flag
-   is resolved once when the listing is read, from the dirent type the read
-   already knew, so the per-keystroke completion never stats an entry to learn
-   whether to append a trailing slash. */
 struct cached_directory_entry
 {
   String name{heap_allocator()};

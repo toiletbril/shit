@@ -28,15 +28,12 @@ namespace shit {
 
 namespace shitbox {
 
-/* Create one directory, with the -p case treating an already-present directory
-   as success the way mkdir -p does. */
 static fn make_one(StringView path, u32 mode, bool set_exact_mode,
                    bool ignore_existing) throws -> bool
 {
   if (os::make_directory(path, mode)) {
     /* The create narrows the bits by the umask, so an explicit -m re-applies
-       the exact mode the way POSIX mkdir sets it. A failed chmod leaves the
-       directory at the wrong mode, so it reports rather than passing. */
+       the exact mode. */
     if (set_exact_mode && !os::set_file_mode(path, mode)) return false;
     return true;
   }
@@ -61,8 +58,8 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const should_make_parents = FLAG_MKDIR_PARENTS.is_enabled();
 
-  /* The named directory takes the -m mode, the -p parents keep the default
-     0777 masked by the umask the way GNU mkdir applies the mode. */
+  /* The named directory takes the -m mode, the -p parents keep 0777 masked by
+     the umask. */
   u32 named_mode = 0777;
   if (FLAG_MKDIR_MODE.is_set()) {
     let const parsed =
@@ -83,9 +80,6 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
   i32 status = 0;
   for (const String &operand : operands) {
     if (should_make_parents) {
-      /* Each prefix of the path is created in turn, so a/b/c builds a, then
-         a/b, then a/b/c, with an existing prefix passed over. The named
-         directory at the full length takes the -m mode. */
       let const text = operand.view();
       for (usize i = 1; i <= text.length; i++) {
         if (i < text.length && text[i] != '/') continue;

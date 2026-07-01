@@ -118,8 +118,6 @@ fn EvalContext::format_done_job_notifications(StringView line_ending) throws
     let const &job = m_jobs[i];
     if (job.state != job::State::Done) continue;
 
-    /* The bash current-job marker, '+' for the last entry and '-' for the one
-       before it, otherwise a space. */
     char marker = ' ';
     if (i == m_jobs.count() - 1) {
       marker = '+';
@@ -131,8 +129,6 @@ fn EvalContext::format_done_job_notifications(StringView line_ending) throws
     out.push(marker);
     out += " Done  ";
     out += job.command.c_str();
-    /* The caller picks the ending, \n at the prompt boundary and \r\n when
-       the terminal sits in raw mode under the editor. */
     out += line_ending;
   }
 

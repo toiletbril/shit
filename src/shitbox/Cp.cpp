@@ -58,9 +58,8 @@ static fn copy_file(const ExecContext &ec, StringView source,
             + "' failed"
       };
     if (*read_count == 0) break;
-    /* A short write continues with the remaining bytes rather than aborting the
-       copy and losing them, since write_fd returns a single write's count that
-       can fall short of the request. */
+    /* write_fd returns a single write's count that can fall short, so the
+       remaining bytes are written in the loop. */
     usize written_count = 0;
     while (written_count < *read_count) {
       let const chunk = os::write_fd(*out_fd, buffer + written_count,
@@ -87,15 +86,12 @@ static fn copy_path(const ExecContext &ec, StringView source,
 {
   let const source_path = Path{source};
 
-  /* A symlink is recreated at the destination rather than having its target
-     copied, so cp -r preserves the link and a dangling link does not fail the
-     copy the way reading its target would. A platform that cannot read the link
-     falls through and copies the target contents instead. */
+  /* A symlink is recreated at the destination. A platform that cannot read the
+     link falls through and copies the target contents. */
   if (source_path.is_symbolic_link()) {
     if (let const target = os::read_symlink(source)) {
-      /* An existing destination is removed first, since symlink creation fails
-         when the path is already present, so overwriting a stale link or a file
-         works the way coreutils replaces the destination. */
+      /* Symlink creation fails when the path is already present, so an existing
+         destination is removed first. */
       os::remove_file(destination);
       if (!os::create_symlink(target->view(), destination)) {
         throw Error{
@@ -114,8 +110,8 @@ static fn copy_path(const ExecContext &ec, StringView source,
     }
   }
 
-  /* A real directory is descended into under -r. A symlink is excluded here so
-     a link that points back into the tree does not drive an unbounded walk. */
+  /* A symlink is excluded so a link back into the tree does not drive an
+     unbounded walk. */
   if (source_path.is_directory() && !source_path.is_symbolic_link()) {
     if (!is_recursive)
       throw Error{
@@ -144,8 +140,8 @@ static fn copy_path(const ExecContext &ec, StringView source,
     return;
   }
 
-  /* A destination that is itself a symlink is removed first, so the copy writes
-     a new file rather than following the link and truncating its target. */
+  /* A destination symlink is removed so the copy does not follow the link and
+     truncate its target. */
   if (Path{destination}.is_symbolic_link()) os::remove_file(destination);
   copy_file(ec, source, destination, is_verbose, allocator);
 }
@@ -180,11 +176,9 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
-    /* A copy into a directory keeps the source basename, so cp a b dir/ writes
-       dir/a and dir/b. */
     if (destination_is_directory) {
       /* The Path is held in a named local so the basename view does not dangle
-         into a destroyed temporary while the builder reads it. */
+         into a destroyed temporary. */
       let const source_path = Path{source};
       let const leaf = source_path.filename();
       let const target = PathBuilder{destination}.append(leaf).build();

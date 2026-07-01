@@ -51,14 +51,10 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   LOG(Debug, "command resolving '%s' past shell functions", name.c_str());
 
-  /* -v and -V resolve the name without running it, against a builtin and the
-     PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     let const is_verbose = FLAG_SHOW_VERBOSE.is_enabled();
-    /* A name that carries a slash is a pathname, not a command name, so it
-       resolves against the filesystem directly and never a keyword, alias, or
-       builtin, the way bash treats it. It resolves when it is an executable
-       regular file, and the path is printed as typed. */
+    /* A name that carries a slash is a pathname, so it resolves against the
+       filesystem directly and never a keyword, alias, or builtin. */
     if (name.find_character('/').has_value()) {
       let const candidate = Path{name.view()};
       if (candidate.exists() && !candidate.is_directory() &&
@@ -71,14 +67,11 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (is_verbose) ec.print_to_stdout(name + ": not found\n");
       return 1;
     }
-    /* A reserved word resolves first, terse to the bare word and verbose to a
-       keyword note, matching dash. */
     if (utils::is_posix_reserved_word(name.view())) {
       ec.print_to_stdout(is_verbose ? name + " is a shell keyword\n"
                                     : name + "\n");
       return 0;
     }
-    /* An alias resolves next, terse to its definition and verbose to a note. */
     if (let const alias = cxt.get_alias(name.view()); alias.has_value()) {
       if (is_verbose)
         ec.print_to_stdout(name + " is an alias for " + *alias + "\n");
@@ -111,16 +104,12 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     return 1;
   }
 
-  /* The bare form runs the operand and its arguments as a command, which
-     resolves against a builtin or the PATH and never a function. */
   let operand_args = ArrayList<String>{heap_allocator()};
   for (usize i = 1; i < args.count(); i++)
     operand_args.push_managed(args[i]);
 
-  /* -p resolves against a default PATH that finds the standard utilities even
-     when the caller's PATH is unset or stripped, the POSIX behavior. The
-     default is in force only while make_from resolves the program, then the
-     resolver reverts to the environment PATH. */
+  /* The default PATH is in force only while make_from resolves the program,
+     then the resolver reverts to the environment PATH. */
   let const should_use_default_path = FLAG_COMMAND_DEFAULT_PATH.is_enabled();
   if (should_use_default_path)
     utils::set_path_for_resolution(String{"/usr/bin:/bin"});
@@ -129,8 +118,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (should_use_default_path) utils::set_path_for_resolution(shit::None);
   };
 
-  /* An operand that does not resolve is non-fatal, the same as a bare command
-     word. Report it to stderr and return 127 rather than letting the not-found
+  /* An unresolved operand returns 127 here rather than letting the not-found
      error unwind and abort the shell. */
   Maybe<ExecContext> sub;
   try {

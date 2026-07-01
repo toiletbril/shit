@@ -275,12 +275,8 @@ Maybe<Builtin::Kind> search_builtin(StringView builtin_name) throws;
    special while true is not. */
 fn is_special_builtin_name(StringView name) wontthrow -> bool;
 
-/* The builtin command names, recovered once from BUILTIN_ENTRIES, for command
-   completion. */
 const ArrayList<String> &builtin_names() throws;
 
-/* The number of Builtin::Kind values, the bound of the per-kind flag-list
-   table below. */
 inline constexpr usize BUILTIN_KIND_COUNT =
     static_cast<usize>(Builtin::Kind::Compopt) + 1;
 
@@ -308,8 +304,6 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
     return 0;                                                                  \
   } while (false)
 
-/* The same help with a trailing per-builtin generated section, the set
-   OPTION SWITCHES table and kin. */
 #define SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(ec, extra)                          \
   do {                                                                         \
     show_builtin_help_impl(ec, HELP_DESCRIPTION, HELP_SYNOPSIS, FLAG_LIST,     \
@@ -331,18 +325,12 @@ fn query_shell_option(const EvalContext &cxt, StringView name) throws
 fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
     -> bool;
 
-/* The long names of every set -o option, canonical spellings first and the
-   --help alias spellings after them when asked. shell_option_letters carries
-   every single-letter switch. */
 fn shell_option_names(bool include_alias_spellings) throws
     -> const ArrayList<StringView> &;
 fn shell_option_letters() throws -> const String &;
 
-/* The shopt option names, defined in Shopt.cpp, for shopt name completion. */
 fn shopt_option_name_list() throws -> const ArrayList<StringView> &;
 
-/* The main binary's own FLAG list, defined in Main.cpp, so the completion
-   engine offers the shell's flags for the command word shit. */
 fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &;
 
 /* Report a builtin error that must not abort the run, with the same located
@@ -351,9 +339,6 @@ fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &;
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void;
 
-/* The located missing-argument error a builtin or a utility prints when a
-   required operand is absent, with a note that names the help. The program_name
-   is the builtin or utility name. Returns the usage status 2. */
 fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
                       StringView program_name) throws -> i32;
 

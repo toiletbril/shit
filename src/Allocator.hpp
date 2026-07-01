@@ -11,15 +11,10 @@
 
 namespace shit {
 
-/* Forward declared, so the allocator header does not include the arena header,
-   which would close the ArrayList -> Allocator -> Arena include cycle. */
 class BumpArena;
 fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment) throws
     -> opaque *;
 
-/* An allocator value. It carries a context and a table of operations, so a data
-   structure is handed the allocator it must use and frees through the same one.
-   It is sixteen bytes and passed by value. */
 class Allocator
 {
 public:
@@ -76,8 +71,6 @@ public:
 
 namespace allocators {
 
-/* The bump adapter over a BumpArena. A free is a no-op and a resize never grows
-   in place, since the arena reclaims everything at once on reset. */
 hot inline fn bump_alloc(opaque *context, usize length, usize alignment) throws
     -> opaque *
 {
@@ -131,10 +124,6 @@ struct heap_pool
   node *bins[CLASS_COUNT] = {};
   u32 counts[CLASS_COUNT] = {};
 
-  /* The class shift is the ceiling of the base two logarithm of the length, so
-     a block always covers the request, never below the smallest class. A length
-     above the largest class yields a shift past MAX_CLASS_SHIFT, which take and
-     give read as the uncached path. */
   hot static fn class_shift_for(usize length) wontthrow -> usize
   {
     let const size = length <= (usize{1} << MIN_CLASS_SHIFT)
@@ -196,8 +185,6 @@ hot inline fn heap_pool_instance() wontthrow -> heap_pool &
   return pool;
 }
 
-/* The heap adapter over the C allocator. It frees on demand, so it backs the
-   long-lived mutable data the bump model would leak. */
 hot inline fn heap_alloc(opaque *context, usize length,
                          usize alignment) wontthrow -> opaque *
 {

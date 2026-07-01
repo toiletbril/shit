@@ -12,8 +12,6 @@ class ArrayList
 public:
   explicit ArrayList(Allocator allocator) : m_allocator(allocator) {}
 
-  /* A heap-backed list of the braced elements. The initializer_list is
-     header-only and adds no standard-library link dependency. */
   ArrayList(std::initializer_list<T> elements) : m_allocator(heap_allocator())
   {
     reserve(elements.size());
@@ -110,13 +108,8 @@ public:
     m_length++;
   }
 
-  /* The allocator the list owns, handed to an element so a transient pushed
-     onto a scratch-arena list lives on the arena rather than the heap. */
   pure fn allocator() const wontthrow -> Allocator { return m_allocator; }
 
-  /* Build the element with the list's own allocator and push it, so a call site
-     never spells out the allocator and a scratch list stops minting heap
-     values. */
   template <typename... Args>
   hot fn push_managed(Args &&...args) throws -> void
   {
@@ -131,8 +124,7 @@ public:
     m_data[m_length].~T();
   }
 
-  /* Remove the element at index, shifting every later element down by one so
-     the order is kept. The caller guarantees index is in range. */
+  /* The caller guarantees index is in range. */
   fn remove(usize index) wontthrow -> void
   {
     ASSERT(index < m_length, "remove past the end of the list");
@@ -142,8 +134,6 @@ public:
     m_data[m_length].~T();
   }
 
-  /* Destroy the elements but keep the storage, so a reused list does not
-     reallocate. */
   fn clear() wontthrow -> void
   {
     for (usize i = 0; i < m_length; i++)
@@ -175,9 +165,6 @@ public:
   cold fn reserve(usize needed) throws -> void
   {
     if (needed <= m_capacity) return;
-    /* A small list quadruples so a list grown one push at a time reaches a
-       useful size in fewer reallocations, while a large list doubles to keep
-       the overshoot bounded. */
     usize new_capacity = m_capacity == 0   ? 16
                          : m_capacity < 64 ? m_capacity * 4
                                            : m_capacity * 2;
@@ -193,8 +180,6 @@ public:
     m_capacity = new_capacity;
   }
 
-  /* Release the reserved slots past the current length, so a one-time builder
-     hands the growth overshoot back rather than pinning it for its lifetime. */
   cold fn shrink_to_fit() throws -> void
   {
     if (m_length == m_capacity) return;
@@ -214,9 +199,6 @@ public:
     m_capacity = m_length;
   }
 
-  /* Sort the list in place into ascending order by the comparator. A short list
-     uses an insertion sort and a long list a heap sort, so a large input stays
-     O(n log n). */
   template <typename Compare>
   fn sort(Compare is_less) throws -> void
   {
@@ -241,8 +223,6 @@ private:
   friend class StringMap;
   ArrayList() : m_allocator(heap_allocator()) {}
 
-  /* The length below which the insertion sort beats the heap sort, since its
-     constant factor is smaller on a short list. */
   static constexpr usize INSERTION_SORT_THRESHOLD = 16;
 
   fn swap_elements(usize a, usize b) wontthrow -> void
@@ -252,7 +232,6 @@ private:
     m_data[b] = steal(temporary);
   }
 
-  /* A stable insertion sort, so a nearly ordered list does almost no work. */
   template <typename Compare>
   fn insertion_sort(Compare is_less) throws -> void
   {
@@ -292,8 +271,6 @@ private:
     }
   }
 
-  /* An in-place heap sort. It builds a max-heap, then swaps the largest element
-     to the end and shrinks the heap, leaving the list ascending. */
   template <typename Compare>
   fn heap_sort(Compare is_less) throws -> void
   {

@@ -9,13 +9,6 @@
 
 namespace shit {
 
-/* An open-addressing hash table from a string key to a Value over an explicit
-   allocator. The value defaults to String for the variable store and the traps,
-   and takes a pointer for the function table. Each slot caches a
-   PackedStringKey of the key's first sixteen bytes, so a probe rejects a
-   mismatch with a two-word compare before the full byte compare. Linear
-   probing, power-of-two capacity, grows past a load of three quarters, and
-   counts tombstones toward the load so an insert is never dropped. */
 template <class Value = String>
 class StringMap
 {
@@ -24,8 +17,6 @@ public:
 
   cold StringMap(const StringMap &other) : m_allocator(other.m_allocator)
   {
-    /* An empty source allocates no bucket array, so copying an unused table
-       costs nothing until the first insert grows it lazily. */
     if (other.m_count == 0) return;
     rehash(other.m_capacity);
     for (usize i = 0; i < other.m_capacity; i++) {
@@ -75,9 +66,6 @@ public:
 
   mustuse pure fn count() const wontthrow -> usize { return m_count; }
 
-  /* Grow the table up front to hold at least expected_count entries without a
-     later rehash. The table rehashes at three quarters full, so the capacity is
-     sized for that load and rounded up to a power of two. */
   cold fn reserve(usize expected_count) throws -> void
   {
     let const needed = (expected_count * 4 / 3) + 1;
@@ -88,8 +76,6 @@ public:
     if (new_capacity > m_capacity) rehash(new_capacity);
   }
 
-  /* The value for the key, or nullptr when absent. The pointer is stable until
-     the next set that grows the table. */
   hot mustuse pure fn find(StringView key) const wontthrow -> const Value *
   {
     if (m_capacity == 0) return nullptr;
@@ -115,14 +101,11 @@ public:
     return nullptr;
   }
 
-  /* The mutable value for the key, or nullptr when absent. The pointer is
-     stable until the next set that grows the table. */
   hot flatten mustuse fn find(StringView key) wontthrow -> Value *
   {
     return const_cast<Value *>(static_cast<const StringMap *>(this)->find(key));
   }
 
-  /* The allocator the table owns, handed to a value built for it. */
   pure fn allocator() const wontthrow -> Allocator { return m_allocator; }
 
   hot fn set(StringView key, Value value) throws -> void
@@ -130,9 +113,6 @@ public:
     set_value(key, steal(value));
   }
 
-  /* The value for a key, inserting the supplied default when the key is absent,
-     then returning a mutable reference. The reference is valid until the next
-     set that grows the table. */
   hot fn get_or_create(StringView key, Value default_value) throws -> Value &
   {
     if (const Value *existing = find(key))
@@ -170,9 +150,6 @@ public:
     for (usize probe = 0; probe < m_capacity; probe++) {
       let &slot = m_slots[i];
       if (slot.state == slot::Empty) return;
-      /* The packed compare with the length check skips the byte compare for a
-         key of sixteen bytes or fewer, the same fast path find and set_value
-         use. */
       if (slot.state == slot::Occupied && slot.packed == wanted &&
           (key.count() <= PackedStringKey::BYTE_CAPACITY
                ? slot.key.count() == key.count()
@@ -261,8 +238,6 @@ private:
     unreachable();
   }
 
-  /* The caller already computed the packed key for its probe, so it is passed
-     in rather than recomputed from the key bytes here. */
   fn place(usize index, StringView key, const PackedStringKey &packed,
            Value value) throws -> Value *
   {

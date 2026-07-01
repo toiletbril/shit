@@ -59,8 +59,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Debug, "getopts parsing into '%s' at OPTIND %lld of %zu operands",
       name.c_str(), static_cast<long long>(optind), operands.count());
 
-  /* A script that resets OPTIND starts a fresh scan, so the per-argument index
-     returns to the first letter. */
+  /* A script that resets OPTIND starts a fresh scan at the first letter. */
   if (optind != cxt.getopts_last_optind()) cxt.set_getopts_char_index(1);
   let char_index = cxt.getopts_char_index();
 
@@ -89,11 +88,8 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return do_finish(1);
   }
 
-  /* The per-argument index is persisted across calls, so a stale index can run
-     past a current operand that the caller rebound to a shorter word while
-     OPTIND stayed put. An index at or past the operand length is treated as a
-     fresh operand, returning to the first letter rather than reading past the
-     end. */
+  /* An index at or past the operand length reads a fresh operand at the first
+     letter, guarding against a stale index reading past the end. */
   if (char_index >= current.length()) char_index = 1;
   ASSERT(char_index < current.length());
   let const option = current[char_index];

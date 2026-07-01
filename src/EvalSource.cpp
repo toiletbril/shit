@@ -15,14 +15,10 @@
 
 namespace shit {
 
-/* A cap on nested mimicked scripts, so a script that mimics another that mimics
-   it cannot recurse without limit. */
 static constexpr usize MAX_MIMICRY_DEPTH = 400;
 
-/* A Ctrl-C inside a mimicked script arrives as an InterruptError thrown from
-   the next AST node. It is recognized here so the caller can re-throw it past
-   the mimic boundary, since the catch-all below would otherwise absorb it into
-   a status and let the invoking script keep running. */
+/* An InterruptError is re-thrown past the mimic boundary, so the catch-all
+   below does not absorb it into a status. */
 static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
     -> bool
 {
@@ -51,10 +47,9 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     throw Error{"Unable to mimic '" + ec.program() +
                 "' because the script could not be read"};
 
-  /* A NUL byte in the leading bytes marks a binary file rather than a text
-     script, reported with status 126 the way bash does. Only the head is
-     sampled, so a script carrying a NUL on a later line still runs, and a
-     binary's header NUL sits well inside this window. */
+  /* A NUL byte in the leading bytes marks a binary file, reported with status
+     126. Only the head is sampled, so a script carrying a NUL on a later line
+     still runs. */
   const usize binary_scan_limit = 128;
   let const head = contents->view();
   let const scan_length =
@@ -70,20 +65,15 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   let const previous_runtime = m_runtime;
 
-  /* The mimic mode decides the lexing and the evaluation, so it is set before
-     the parse. The terminal run leaves it since the shell exits next. */
   m_runtime.mood = mode;
   LOG(Debug, "mimicking the script '%s'%s", ec.program().c_str(),
       isolated ? " in an isolated subshell" : "");
-  /* A mimicked script is a script-file run, so its FUNCNAME bottoms out at
-     "main". */
   let const previous_script_run = m_is_script_run;
   m_is_script_run = true;
 
   /* A mimicked script runs with the strictness of the mood it mimics, so a bash
      or sh script clears nounset, pipefail, and failglob while a shit script
-     keeps the strict default. A mimicked declare -A literal then does not abort
-     on the unmatched [k]=v glob, and an unset parameter expands empty. */
+     keeps the strict default. */
   let const is_mimic_strict = mode == mimic_mood::Default;
   set_error_unset(is_mimic_strict);
   set_pipefail(is_mimic_strict);
@@ -107,10 +97,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const previous_origin = m_current_origin;
   let const previous_location = m_current_location;
 
-  /* The spawn's redirections are applied to the standard descriptors for the
-     in-process run, then put back. A standard descriptor with no staged
-     redirect is backed up too, since the script itself may move it with an exec
-     redirection that a fork would have contained. */
+  /* A standard descriptor with no staged redirect is backed up too, since the
+     script may move it with an exec redirection that a fork would contain. */
   let saved_fds = ArrayList<os::saved_descriptor>{heap_allocator()};
   saved_fds.push(ec.in_fd.has_value()
                      ? os::save_and_replace_descriptor(0, *ec.in_fd)
@@ -126,9 +114,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       os::restore_descriptor(saved_fds[i - 1]);
   };
   /* The context descriptors were dup'd onto the standard fds above, so the
-     originals are closed when this run ends. This path replaces the
-     fork-and-exec that would otherwise have closed them, and close_fds resets
-     each Maybe so a later close is a no-op. */
+     originals are closed when this run ends, the way the replaced fork-and-exec
+     would have. */
   defer { ec.close_fds(); };
 
   let const render_error = [&](std::exception_ptr error) {
@@ -144,17 +131,14 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   };
 
   /* The kernel hands a shebang interpreter the resolved script path, so $0 and
-     BASH_SOURCE read that path rather than the word as typed, and realpath "$0"
-     finds the script's true directory for a PATH-found command. */
+     BASH_SOURCE read that path rather than the word as typed. */
   m_shell_name = String{heap_allocator(), ec.program_path().text().view()};
   set_current_source(&*contents, String{ec.program().view()});
   m_current_location = SourceLocation{};
   m_mimicry_depth++;
 
   /* The terminal command the shell exits with needs no isolation, so the script
-     runs against the current state with no snapshot. A mimicked bash advertises
-     BASH_VERSION, with the set landing after the isolated snapshot so the
-     restore drops it. */
+     runs against the current state with no snapshot. */
   if (!isolated) {
     set_positional_params(steal(params));
     seed_shell_identity_variables(mode == mimic_mood::Bash);
@@ -247,8 +231,6 @@ fn EvalContext::run_source(StringView source, StringView origin,
                            bool consume_return, Maybe<SourceLocation> call_site,
                            Maybe<StringView> filename) throws -> i32
 {
-  /* The control-flow exceptions are not caught here, so a return or a break
-     inside the evaluated source reaches the caller. */
   if (AST_ARENA == nullptr) throw Error{"Cannot run source outside of a parse"};
 
   LOG(Debug, "running source '%.*s' of %zu bytes at depth %zu",
@@ -256,13 +238,10 @@ fn EvalContext::run_source(StringView source, StringView origin,
       m_source_depth);
 
   /* Bound the source and eval nesting so a file that sources itself errors here
-     rather than exhausting memory. The cap is checked against the call site so
-     the caret points at the dot or eval. */
+     rather than exhausting memory. */
   enter_source(call_site ? *call_site : SourceLocation{0, 0});
   defer { leave_source(); };
 
-  /* Captured before set_current_source below changes it, so a backtrace caret
-     renders the dot or eval against the parent text. */
   let const parent_source = call_site ? m_current_source : nullptr;
 
   m_source_frames.push(source_frame{
@@ -272,8 +251,6 @@ fn EvalContext::run_source(StringView source, StringView origin,
       filename.has_value() ? String{*filename}
       : String{heap_allocator()}
   });
-  /* The sourced-file counter rides the frame stack so the FUNCNAME
-     classification stays a constant-time read. */
   let const frame_is_sourced_file =
       filename.has_value() && !filename->is_empty();
   if (frame_is_sourced_file) m_sourced_file_frames++;
@@ -284,10 +261,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
   };
 
   /* Retain an owned copy of the filename, so the views the lexer stamps onto
-     every location stay valid after this call returns. A control-flow jump can
-     carry a stamped location out to the top level where the caller's transient
-     storage is already gone. The copy is freed at the next top-level command.
-   */
+     every location stay valid after a control-flow jump carries a stamped
+     location out to the top level. */
   Maybe<StringView> stable_filename = None;
   if (filename.has_value()) {
     let const retained_filename = new String{*filename};
@@ -295,8 +270,6 @@ fn EvalContext::run_source(StringView source, StringView origin,
     stable_filename = retained_filename->view();
   }
 
-  /* A located error from the sourced text carries an offset into that text, not
-     into the caller's command, so it is formatted here against the source. */
   try {
     let parser = Parser{
         Lexer{String{source}, *AST_ARENA, false, stable_filename, mood()}
@@ -310,7 +283,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
     /* Keep a copy of the source alive for as long as the AST, so a control-flow
        jump made inside it can point a caret at the right text after this call
-       returns. The buffer survives until clear_retained_sources runs. */
+       returns. */
     let const retained_source = new String{source};
     m_retained_sources.push(retained_source);
 
@@ -318,8 +291,6 @@ fn EvalContext::run_source(StringView source, StringView origin,
     let const previous_origin = m_current_origin;
     let const previous_location = m_current_location;
     set_current_source(retained_source, String{origin});
-    /* The sourced text has its own line numbering, so $LINENO inside it counts
-       from its first line. */
     m_current_location = SourceLocation{};
     defer
     {
@@ -359,43 +330,29 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
 {
   LOG(All, "dropping %zu retained sources and %zu retained asts",
       m_retained_sources.count(), m_retained_source_asts.count());
-  /* The arena runs every node's destructor on the reset that follows, so this
-     only drops the references. */
   m_retained_source_asts.clear();
 
-  /* A pending process substitution stashed a source view and location that may
-     index a buffer freed just below, so both drop to the unlocated rendering.
-   */
+  /* A stashed source view or location may index a buffer freed just below, so
+     both drop to the unlocated rendering. */
   for (process_substitution &sub : m_pending_process_substitutions) {
     sub.source = StringView{};
     sub.location = SourceLocation{};
   }
 
-  /* A break or continue that escaped to the top level holds a source pointer
-     and a location whose filename view both index a buffer freed just below, so
-     both drop to the unlocated rendering. */
   if (has_pending_control_flow()) {
     pending_control_flow().source = nullptr;
     pending_control_flow().location = SourceLocation{};
   }
 
-  /* The retained source buffers and filenames are heap String copies owned
-     here, so they are freed explicitly. */
   for (String *source : m_retained_sources)
     delete source;
   m_retained_sources.clear();
 
-  /* The located-error formatter caches a line index keyed on the source address
-     and length. A just-freed buffer can be reissued at the same address and
-     length, so the cache is dropped to keep it from serving a stale index. */
+  /* A just-freed buffer can be reissued at the same address and length, so the
+     caches keyed on that are dropped to keep them from serving a stale index. */
   invalidate_source_line_index();
-
-  /* The $LINENO line lookup caches a newline table keyed the same way, so it is
-     dropped here for the same reason. */
   utils::invalidate_line_number_cache();
 
-  /* The current source frame may point at a retained copy just freed, so reset
-     it to None until the next run sets it. */
   m_current_source = nullptr;
   m_current_origin.clear();
 }

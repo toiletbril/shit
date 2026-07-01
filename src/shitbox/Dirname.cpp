@@ -39,8 +39,6 @@ fn Dirname::execute(const ExecContext &ec, EvalContext &cxt,
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   let const parent = Path{operands[0].view()}.parent();
-  /* A path with no separator names a file in the current directory, so the
-     directory is the dot the way dirname reports. */
   let const text = parent.is_empty() ? StringView{"."} : parent.text().view();
   ec.print_to_stdout(String{cxt.scratch_allocator(), text} + "\n");
 

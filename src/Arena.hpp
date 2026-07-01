@@ -7,12 +7,6 @@
 
 namespace shit {
 
-/* A bump arena hands out node storage from large blocks and frees every block
-   at once on reset. The AST and its tokens live here for one command, so their
-   many small allocations collapse into a handful of block allocations. An
-   object with a non-trivial destructor has its destructor registered at create
-   and run on reset or release, since the block reclaim alone would leak those
-   owned members. */
 class BumpArena
 {
 public:
@@ -36,8 +30,6 @@ public:
 
   fn bytes_used() const wontthrow -> usize;
 
-  /* The number of blocks the arena holds and the total bytes they reserve, read
-     by the memory report. */
   fn block_count() const wontthrow -> usize { return m_blocks.count(); }
   fn bytes_capacity() const wontthrow -> usize
   {
@@ -63,8 +55,6 @@ public:
   {
     let const storage = allocate(sizeof(T), alignof(T));
     let const object = new (storage) T(std::forward<Args>(args)...);
-    /* A trivially destructible object needs no teardown, so the registration is
-       skipped and only the genuinely-owning ones cost a slot. */
     if constexpr (!std::is_trivially_destructible_v<T>)
       m_destructors.push(pending_destructor{
           object, [](opaque *p) { static_cast<T *>(p)->~T(); }});
@@ -79,8 +69,6 @@ private:
     usize used;
   };
 
-  /* One registered teardown, the object and a thunk that calls its destructor,
-     run when the storage above it is reclaimed. */
   struct pending_destructor
   {
     opaque *object;

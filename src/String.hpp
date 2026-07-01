@@ -9,10 +9,6 @@
 
 namespace shit {
 
-/* An owned, growable byte string over an explicit allocator. A short string
-   lives in the inline buffer with no allocation, a longer string in a heap or
-   arena buffer. Either way m_data is the access pointer and the buffer keeps a
-   trailing null so c_str is free. */
 class String
 {
 public:
@@ -26,8 +22,6 @@ public:
     reset_to_inline();
   }
   String(Allocator allocator, StringView initial) throws;
-  /* Heap-backed conversions from a literal or a view. The literal form wins
-     over the view form for a const char*, since it is a single conversion. */
   String(const char *cstr) throws;
   String(StringView initial) throws;
 
@@ -86,15 +80,11 @@ public:
 
   template <class T> mustuse fn to() const throws -> ErrorOr<T>;
 
-  /* An inline string owns no external buffer, so the common destruction skips
-     the cold free path with one pointer compare and never leaves this header.
-   */
   ~String()
   {
     if (m_data != m_inline) free_storage();
   }
 
-  /* The allocator this string was built with. */
   mustuse pure fn allocator() const wontthrow -> Allocator
   {
     return m_allocator;
@@ -113,7 +103,6 @@ public:
   {
     return StringView{m_data, m_length};
   }
-  /* A String reads as a view wherever one is expected. */
   operator StringView() const wontthrow { return StringView{m_data, m_length}; }
   hot mustuse pure fn c_str() const wontthrow -> const char *
   {
@@ -219,9 +208,6 @@ private:
   char m_inline[INLINE_CAPACITY];
 };
 
-/* Concatenate two byte ranges into a fresh heap String. A String and a literal
-   both read as a view, so str + "x", "x" + str, and str + str all resolve
-   here. */
 fn operator+(StringView left, StringView right) throws->String;
 
 } // namespace shit

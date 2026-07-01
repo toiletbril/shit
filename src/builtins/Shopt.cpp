@@ -34,8 +34,6 @@ namespace shit {
 
 namespace {
 
-/* The bash shell option names shopt accepts. An unknown name is an error, the
-   way bash rejects one rather than silently treating it as off. */
 const StringView SHOPT_OPTION_NAMES[] = {
     "autocd",
     "assoc_expand_once",
@@ -128,10 +126,8 @@ String format_option_names_help(Allocator allocator) throws
   return section;
 }
 
-/* The bash -p display line, a command the shell replays to restore the
-   option's state. A completion script captures this through $(shopt -p name)
-   and runs it later, so the line must execute, shopt -s or -u for a shopt
-   name and set -o or +o for a set option behind the -o bridge. */
+/* The bash -p line is a command the shell replays to restore the state, so it
+   must execute when a completion script captures it through $(shopt -p name). */
 String shopt_reusable_line(StringView name, bool on, bool as_set_option,
                            Allocator allocator) throws
 {
@@ -149,8 +145,6 @@ String shopt_reusable_line(StringView name, bool on, bool as_set_option,
 
 fn shopt_option_name_list() throws -> const ArrayList<StringView> &
 {
-  /* The table is immutable and the completion engine reads it on every
-     keystroke, so the list builds once. */
   static ArrayList<StringView> names = [] throws {
     let collected = ArrayList<StringView>{heap_allocator()};
     collected.reserve(sizeof(SHOPT_OPTION_NAMES) /
@@ -184,9 +178,8 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
-    /* The options combine into one argument, such as the -qo of shopt -qo
-       posix, so each letter is read in turn. Any other letter is accepted
-       without effect. */
+    /* The options combine into one argument, such as the -qo of shopt -qo posix.
+       Any other letter is accepted without effect. */
     if (arg.length >= 2 && arg[0] == '-') {
       for (usize k = 1; k < arg.length; k++) {
         if (arg[k] == 's')
@@ -205,8 +198,6 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  /* -p prints in the replayable command form rather than the status form, so a
-     query keeps printing while the line changes shape. */
   let const do_format_status_line = [&](StringView name, bool on) throws {
     return should_print_reusable
                ? shopt_reusable_line(name, on, should_operate_on_set_options,
@@ -217,10 +208,7 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i32 status = 0;
   let do_reject_unknown = [&](StringView name) throws -> bool {
     if (is_known_shopt_option(name)) return false;
-    /* A -q probe wants the status without the message, so it stays silent. Any
-       other invocation throws a located error the dispatch renders with a caret
-       at the command, kept short rather than the long Unable-to-because form.
-     */
+    /* A -q probe stays silent and reports only through the status. */
     if (is_quiet) {
       status = 1;
       return true;
@@ -228,9 +216,8 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw Error{StringView{"Unknown shopt option '"} + name + "'"};
   };
 
-  /* shopt -o operates on the set -o options rather than the shopt names, the
-     bridge bash provides so the same options answer either builtin. A config
-     probes shopt -qo posix to detect the POSIX mode. */
+  /* shopt -o operates on the set -o options, the bridge bash provides so the
+     same options answer either builtin. A config probes shopt -qo posix. */
   if (should_operate_on_set_options) {
     if (names.is_empty()) {
       if (!is_quiet)
@@ -272,10 +259,8 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return status;
   }
 
-  /* A query with no names lists every known option through the same read a
-     named query uses, so the bash default-on rows show without ever being
-     set. A named query prints each option and reports a non-zero status when
-     any is off, which the -q form relies on. */
+  /* A named query reports a non-zero status when any option is off, which the
+     -q form relies on. */
   if (names.is_empty()) {
     if (!is_quiet) {
       for (let const &name : SHOPT_OPTION_NAMES)

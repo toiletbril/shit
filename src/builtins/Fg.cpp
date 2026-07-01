@@ -48,8 +48,8 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   LOG(Info, "fg bringing job %d to the foreground", job->id);
 
-  /* A job already reaped by a prior poll has its status recorded, so report it
-     instead of waiting on a pid that no longer exists. */
+  /* A job reaped by a prior poll has its status recorded, so it is reported
+     without waiting on a pid that no longer exists. */
   if (job->state == job::State::Done) {
     let const done_status = job->last_status;
     cxt.forget_done_jobs();

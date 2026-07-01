@@ -8,10 +8,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-/* A forked pipeline stage that never execs would run the address-sanitizer leak
-   check at its own exit, which warns or hangs under a seccomp sandbox that
-   blocks ptrace. The parent process reports the real leaks, so the forked child
-   turns the check off. The interface is only present in a sanitizer build. */
 #if defined __SANITIZE_ADDRESS__
 #include <sanitizer/lsan_interface.h>
 #define SHIT_HAS_ADDRESS_SANITIZER 1
@@ -49,15 +45,9 @@
 #include <sys/sysctl.h>
 #endif
 
-/* posix_spawn takes the child environment as an envp argument. The shell passes
-   its own process environment, which prefix assignments mutate before the spawn
-   and restore after, so the declaration of environ is needed here. */
 extern char **environ;
 #endif
 
-/* The async-signal flag machinery is identical on every platform, so it lives
-   in one block the POSIX and the Windows sections below both share rather than
-   defining it twice. */
 namespace shit {
 namespace os {
 
@@ -65,23 +55,14 @@ volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
 volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
 volatile sig_atomic_t SIGNAL_PENDING = 0;
 
-/* One pending flag per signal number, set by the trap handler and cleared by
-   the drain. The size covers every real-time and standard signal the platform
-   defines, with a fixed bound so the array stays a flat block the handler may
-   touch async-safely. */
 static constexpr i32 SIGNAL_FLAG_COUNT = 128;
 static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
 
-/* Whether the signal number indexes the pending-flag array, so a trap call on
-   an out-of-range number is a no-op rather than an out-of-bounds write. */
 static fn is_trappable_signal(i32 signal_number) wontthrow -> bool
 {
   return signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT;
 }
 
-/* Report and clear the lowest pending per-signal flag, or zero when none is
-   set. The fast SIGNAL_PENDING flag is owned by the drain, which clears it
-   before consuming, so this only reports the per-signal flags. */
 fn take_pending_signal() wontthrow -> i32
 {
   for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
@@ -96,8 +77,6 @@ fn take_pending_signal() wontthrow -> i32
 } // namespace os
 } // namespace shit
 
-/* The file creation mask call differs only by name and argument type across
-   platforms. One macro bridges the shared mask functions to it. */
 #if SHIT_PLATFORM_IS WIN32
 #define SHIT_UMASK(mask) _umask(static_cast<int>(mask))
 #else
@@ -116,8 +95,6 @@ hot fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
   loop
   {
     ssize_t w = write(fd, buf, size);
-    /* A signal that lands mid-write interrupts the call before any byte is
-       transferred. Retry instead of reporting a spurious write failure. */
     if (w == -1 && errno == EINTR) continue;
     if (w == -1) return shit::None;
     return static_cast<usize>(w);
@@ -136,9 +113,7 @@ hot fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
   loop
   {
     ssize_t r = read(fd, buf, size);
-    /* A SIGINT sets INTERRUPT_REQUESTED and returns to the caller rather than
-       retrying and freezing on a Ctrl-C. Any other interrupting signal retries
-       so the reader does not mistake the interruption for end of input. */
+    /* A Ctrl-C returns to the caller, any other interrupting signal retries. */
     if (r == -1 && errno == EINTR) {
       if (INTERRUPT_REQUESTED) return shit::None;
       continue;
@@ -190,8 +165,6 @@ fn TempFileSet::cleanup_from(usize mark) wontthrow -> void { unused(mark); }
 
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
 {
-  /* The saved copy of the real stdout is close-on-exec so a forked command does
-     not inherit it and hold the shell's own output open. */
   const os::descriptor saved = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
   dup2(target, STDOUT_FILENO);
 
@@ -207,9 +180,7 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void
   close(saved);
 }
 
-/* Shell-internal descriptor backups live at or above this number so a script
-   addressing the single-digit descriptors never sees the shell's bookkeeping.
- */
+/* Backups live at or above this number so a script never sees them. */
 constexpr int SHELL_BACKUP_FD_FLOOR = 10;
 
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
@@ -218,16 +189,11 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   saved_descriptor result{};
   result.shell_fd = shell_fd;
 
-  /* The backup is close-on-exec so a command spawned by the redirected child
-     does not inherit the shell's own original descriptor and hold it open. */
   const os::descriptor backup =
       fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
   result.was_open = backup != -1;
   result.saved = backup;
 
-  /* A dup2 from a closed or invalid target descriptor fails, as in >&5 with fd
-     5 closed. The caller reports the failure so the command fails rather than
-     writing to the original descriptor. */
   result.is_dup2_ok = dup2(target, shell_fd) != -1;
   return result;
 }
@@ -246,9 +212,6 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
 {
   saved_descriptor result{};
   result.shell_fd = shell_fd;
-  /* The backup carries close-on-exec the same way save_and_replace_descriptor
-     takes its backup, so a spawned command never inherits it, and it lands
-     above the user range so an in-process script never sees it. */
   const os::descriptor backup =
       fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
   result.was_open = backup != -1;
@@ -279,8 +242,6 @@ fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
 
 fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
 {
-  /* A self copy such as exec 1>&1 skips the dup2 onto itself to avoid clearing
-     the close-on-exec the caller may rely on. */
   if (target == shell_fd) return true;
   return dup2(target, shell_fd) != -1;
 }
@@ -308,16 +269,13 @@ static fn passwd_field(StringView line, usize index) wontthrow -> StringView;
 
 fn get_current_user() throws -> Maybe<String>
 {
-  /* The name comes from the environment rather than getpwuid, which a static
-     build cannot call without pulling in the runtime glibc NSS modules. */
+  /* getpwuid is avoided so the static build does not pull in the glibc NSS
+     modules. */
   if (const char *name = std::getenv("LOGNAME"); name != nullptr)
     return String{name};
   if (const char *name = std::getenv("USER"); name != nullptr)
     return String{name};
 
-  /* A container that exports neither leaves the environment bare, so the name
-     is read from /etc/passwd by the current uid. getuid is a plain syscall, so
-     the static build avoids the NSS modules getpwuid would pull in. */
   let const contents = Path{StringView{"/etc/passwd"}}.read_entire_file();
   if (!contents) return shit::None;
   let const wanted_uid = String::from(static_cast<u64>(getuid()), heap_allocator());
@@ -332,8 +290,6 @@ fn get_current_user() throws -> Maybe<String>
 
 fn get_hostname() throws -> Maybe<String>
 {
-  /* HOST_NAME_MAX is not portable, so a fixed buffer holds the name and a
-     trailing NUL guards a truncated result some libcs leave unterminated. */
   char buffer[256];
   if (gethostname(buffer, sizeof(buffer)) != 0) return shit::None;
   buffer[sizeof(buffer) - 1] = '\0';
@@ -435,8 +391,7 @@ fn make_fd_inheritable(descriptor fd) wontthrow -> void
   if (flags != -1) fcntl(fd, F_SETFD, flags & ~FD_CLOEXEC);
 }
 
-/* Cosmopolitan binaries can be run on both Linux and Windows. This will be
- * replaced by a runtime check. */
+/* TODO replace with a runtime check, Cosmopolitan runs on Linux and Windows. */
 #if SHIT_PLATFORM_ISNT COSMO
 const ArrayList<String> OMITTED_SUFFIXES = []() {
   ArrayList<String> suffixes{heap_allocator()};
@@ -485,7 +440,6 @@ fn environment_names() throws -> ArrayList<String>
   for (char **entry = environ; *entry != nullptr; entry++) {
     StringView pair{*entry};
     let const equals = pair.find_character('=');
-    /* An entry with no '=' is kept whole, since the name is the entry. */
     let const name =
         equals.has_value() ? pair.substring_of_length(0, *equals) : pair;
     names.push(String{name});
@@ -505,11 +459,8 @@ fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 
 #define check_syscall(call) check_syscall_impl(call, #call)
 
-/* posix_spawn reports an exec failure through its return value, so there is no
-   spawned process to wait on. A trivial child is forked that only reports the
-   error and exits, giving the caller the same waitable pid and status the fork
-   path produced. The error came from posix_spawn rather than errno, so it is
-   passed in. */
+/* posix_spawn reports an exec failure through its return value with no waitable
+   pid, so a child is forked to give the caller the same pid and status. */
 cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
     -> process
 {
@@ -525,9 +476,7 @@ cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
     msg += String{strerror(spawn_error)};
     msg += '\n';
     (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
-    /* The program was resolved but could not be executed, so bash exits 126,
-       reserving 127 for a missing file, as when a shebang names an interpreter
-       that does not exist. */
+    /* 127 for a missing file, 126 for a resolved but unexecutable program. */
     _exit(spawn_error == ENOENT ? 127 : 126);
   }
 
@@ -542,9 +491,6 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
       ec.args().count());
 
-  /* On the ENOEXEC fallback the context's descriptors are handed to the script
-     run, which reapplies the command's redirections, so they are not closed
-     here. */
   bool was_fds_handed_to_fallback = false;
   defer
   {
@@ -553,18 +499,12 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
 
   let const child_args = make_os_args(ec.args());
 
-  /* glibc backs posix_spawn with clone(CLONE_VM | CLONE_VFORK), so the child
-     shares the parent address space until exec and pays no page-table copy. The
-     redirections become file actions and the signal reset becomes spawn
-     attributes, so the parent never enters a duplicated evaluator. */
   posix_spawn_file_actions_t file_actions;
   posix_spawn_file_actions_init(&file_actions);
   defer { posix_spawn_file_actions_destroy(&file_actions); };
 
-  /* Each redirect is placed onto its standard descriptor and the original is
-     closed. A descriptor already on its target slot is left in place, since the
-     dup2 onto itself is a no-op and the close would shut the live descriptor.
-   */
+  /* A descriptor already on its target slot is left in place, the close would
+     shut the live descriptor. */
   if (ec.in_fd && *ec.in_fd != STDIN_FILENO) {
     posix_spawn_file_actions_adddup2(&file_actions, *ec.in_fd, STDIN_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, *ec.in_fd);
@@ -577,9 +517,7 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
     posix_spawn_file_actions_adddup2(&file_actions, *ec.err_fd, STDERR_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, *ec.err_fd);
   }
-  /* The descriptor duplications come after the files are placed, so 2>&1 sees
-     the final standard output. Each dup reads the current target of its source,
-     so the source order decides the result of a mixed 2>&1 1>&2. */
+  /* The dups come after the files are placed, so 2>&1 sees the final stdout. */
   ec.apply_dup_routing(
       [&]() {
         posix_spawn_file_actions_adddup2(&file_actions, STDOUT_FILENO,
@@ -594,10 +532,6 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   posix_spawnattr_init(&attr);
   defer { posix_spawnattr_destroy(&attr); };
 
-  /* Without a reset the exec'd program would inherit the parent's blocked set
-     and dispositions. An empty mask unblocks everything the parent blocked and
-     the default set restores SIG_DFL, so a foreground command still dies on
-     Ctrl-C and a pipe producer still dies on SIGPIPE. */
   sigset_t empty_mask;
   sigemptyset(&empty_mask);
   posix_spawnattr_setsigmask(&attr, &empty_mask);
@@ -606,16 +540,12 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   sigemptyset(&default_signals);
   sigaddset(&default_signals, SIGINT);
   sigaddset(&default_signals, SIGCHLD);
-  /* posix_spawn keeps the parent disposition for a signal absent from the
-     default set. SIGPIPE is added so an external pipe producer dies on a closed
-     reader rather than inheriting the shell's ignore. */
+  /* SIGPIPE is reset so a pipe producer dies rather than inheriting the shell's
+     ignore. */
   sigaddset(&default_signals, SIGPIPE);
   posix_spawnattr_setsigdefault(&attr, &default_signals);
 
   short spawn_flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
-  /* A foreground interactive command runs in its own process group so it can
-     own the controlling terminal. pgid zero makes the child its own group
-     leader. */
   if (new_process_group) {
     posix_spawnattr_setpgroup(&attr, 0);
     spawn_flags |= POSIX_SPAWN_SETPGROUP;
@@ -623,9 +553,6 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   posix_spawnattr_setflags(&attr, spawn_flags);
 
   pid_t child_pid = 0;
-  /* The shell environment is passed as envp, so a prefix assignment the parent
-     committed before this call reaches the child. An exec -c in a subshell or a
-     pipeline stage instead passes a single null, so the child starts empty. */
   char *const empty_environment[] = {nullptr};
   const int spawn_error =
       posix_spawn(&child_pid, ec.program_path().c_str(), &file_actions, &attr,
@@ -634,10 +561,8 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
                       ? const_cast<char *const *>(empty_environment)
                       : environ);
 
-  /* An ENOEXEC file is executable but carries no shebang and is not a binary.
-     It runs as a shell script in place, the POSIX behavior, rather than failing
-     127. The check runs before the descriptors are closed, so the script run
-     still sees the command's redirections. */
+  /* An ENOEXEC file with no shebang runs as a shell script in place, the POSIX
+     behavior. The check runs before the fds close so the script keeps them. */
   if (spawn_error == ENOEXEC && allow_script_fallback) {
     was_fds_handed_to_fallback = true;
     throw shit::ExecFormatError{};
@@ -658,8 +583,6 @@ fn shell_has_controlling_terminal() wontthrow -> bool
 
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
 {
-  /* A null buffer makes realpath allocate one of the right size, freed here
-     after the view is copied into the returned Path. */
   char *resolved_path = realpath(path.c_str(), nullptr);
   if (resolved_path == nullptr) return None;
   Path result{StringView{resolved_path}};
@@ -687,12 +610,10 @@ fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
 {
   struct stat directory_stat;
   if (stat(directory.c_str(), &directory_stat) != 0) return false;
-  /* Only a directory the current user or root owns is trusted, since another
-     user could swap a binary into a directory they own. */
+  /* Trusted means owned by root or the user and not group- or world-writable,
+     so no one else can drop a binary in. */
   const bool owner_is_trusted =
       directory_stat.st_uid == 0 || directory_stat.st_uid == geteuid();
-  /* A directory writable by group or other lets someone other than the owner
-     drop a binary in, so it is rejected even when the owner is trusted. */
   const bool others_cannot_write =
       (directory_stat.st_mode & (S_IWGRP | S_IWOTH)) == 0;
   return owner_is_trusted && others_cannot_write;
@@ -724,8 +645,6 @@ fn capture_program_output(const ArrayList<String> &argv,
   posix_spawn_file_actions_addclose(&file_actions, write_end);
   posix_spawn_file_actions_addclose(&file_actions, devnull_fd);
 
-  /* The argv strings outlive the spawn, so the NUL-terminated array points at
-     their storage rather than copying. */
   ArrayList<char *> raw_args{heap_allocator()};
   for (let const &argument : argv)
     raw_args.push(const_cast<char *>(argument.c_str()));
@@ -754,8 +673,6 @@ fn capture_program_output(const ArrayList<String> &argv,
     return None;
   }
 
-  /* A child that stalls is cut at the deadline rather than blocking the prompt.
-   */
   let captured = String{heap_allocator()};
   const u64 deadline_nanos = monotonic_nanos() + timeout_nanos;
   bool was_timed_out = false;
@@ -795,8 +712,6 @@ fn capture_program_output(const ArrayList<String> &argv,
   }
   close(read_end);
 
-  /* A child still running at the deadline is killed so it leaves no zombie, and
-     either way it is reaped. */
   if (was_timed_out) signal_process(child_pid, SIGKILL);
   int wait_status = 0;
   waitpid(child_pid, &wait_status, 0);
@@ -808,9 +723,7 @@ fn capture_program_output(const ArrayList<String> &argv,
 fn give_controlling_terminal_to(process p) wontthrow -> void
 {
   if (!shell_has_controlling_terminal()) return;
-  /* Handing the terminal away would raise SIGTTOU on this write, so it is
-     ignored across the change and the previous disposition restored. A failed
-     tcsetpgrp is left alone since the shell reclaims next. */
+  /* The handoff itself raises SIGTTOU, so it is ignored across the change. */
   void (*const previous)(int) = signal(SIGTTOU, SIG_IGN);
   tcsetpgrp(STDIN_FILENO, p);
   signal(SIGTTOU, previous);
@@ -832,10 +745,8 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   const pid_t child_pid = check_syscall(fork());
 
   if (child_pid == 0) {
-    /* A throw here would unwind into the parent's evaluator inside the
-       duplicated process and run its cleanup. The child must terminate
-       directly, so a descriptor-setup failure is caught, reported, and exits.
-     */
+    /* A throw would unwind into the parent's evaluator, the child must exit
+       directly. */
     try {
       if (in_fd) {
         check_syscall(dup2(*in_fd, STDIN_FILENO));
@@ -853,8 +764,6 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
       reset_signal_handlers();
 
 #if defined SHIT_HAS_ADDRESS_SANITIZER
-      /* The forked stage exits through _exit, so the leak check should not run
-         here, and a sandbox may trap the sanitizer's tracer regardless. */
       __lsan_disable();
 #endif
     } catch (const shit::Error &e) {
@@ -910,9 +819,6 @@ fn replace_process(ExecContext &&ec) throws -> void
 
   let const child_args = make_os_args(ec.args());
 
-  /* Place each redirected file and close the original descriptor, the way the
-     forked child does, so the opened file does not leak into the exec'd
-     program. */
   if (ec.in_fd) {
     check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
     if (*ec.in_fd != STDIN_FILENO) check_syscall(close(*ec.in_fd));
@@ -941,14 +847,9 @@ fn replace_process(ExecContext &&ec) throws -> void
              ? const_cast<char *const *>(empty_environment)
              : environ);
 
-  /* execv returns only on failure. ENOEXEC means the file carries no shebang
-     and is not a binary, so it runs as a shell script instead, signalled by
-     ExecFormatError. */
   if (errno == ENOEXEC) throw shit::ExecFormatError{};
-  /* The error carries the command's location for a caret and the caller exits
-     126 the way bash does. The reason is read before the String concatenation,
-     since building the message allocates and could clobber the errno that
-     last_system_error_message reads. */
+  /* The reason is read before the concatenation, which allocates and could
+     clobber errno. */
   let const reason = last_system_error_message();
   throw shit::ErrorWithLocation{
       ec.source_location(),
@@ -972,9 +873,6 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
     return shit::None;
   }
 
-  /* Close the pipe ends on exec, so a stage that dups one end does not inherit
-     the other and a producer never sees the pipe close. The dup2 onto a
-     standard descriptor clears the flag there, so the redirection survives. */
   for (descriptor end : p) {
     const int flags = fcntl(end, F_GETFD);
     if (flags != -1) fcntl(end, F_SETFD, flags | FD_CLOEXEC);
@@ -983,9 +881,6 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
   return Pipe{p[0], p[1]};
 }
 
-/* pthread_create wants a void *(*)(void *) entry, so this trampoline carries
-   the C-style entry and its context across that signature and returns nullptr.
- */
 struct thread_start_context
 {
   void (*entry)(opaque *);
@@ -1021,16 +916,12 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
 {
   LOG(Debug, "opening '%.*s'", static_cast<int>(path.length), path.data);
 
-  /* The descriptor is left inheritable rather than O_CLOEXEC, since a
-     redirection such as exec 3>file keeps the descriptor open across an exec
-     for a later command to write, and the high-descriptor redirection suite
-     relies on it. */
+  /* Left inheritable on purpose, exec 3>file keeps the fd open across an exec. */
   int flags = 0;
   switch (mode) {
   case file_open_mode::Truncate: flags = O_WRONLY | O_CREAT | O_TRUNC; break;
   case file_open_mode::TruncateNoClobber:
-    /* O_EXCL makes the create fail atomically when the file already exists, the
-       way noclobber requires. */
+    /* O_EXCL fails atomically when the file exists, the way noclobber requires. */
     flags = O_WRONLY | O_CREAT | O_EXCL;
     break;
   case file_open_mode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
@@ -1038,11 +929,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
   case file_open_mode::ReadWrite: flags = O_RDWR | O_CREAT; break;
   }
 
-  /* ::open needs a null-terminated path, so the view is copied into a String
-     that owns a trailing null. */
   const String path_string{path};
-  /* 0666 lets the umask decide the final permissions, as a shell redirection
-     does. */
   const int fd = ::open(path_string.c_str(), flags, 0666);
   if (fd < 0) return shit::None;
   return fd;
@@ -1052,16 +939,12 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
 {
   LOG(Debug, "writing %zu bytes into an anonymous temp file", content.count());
 
-  /* The temp directory is resolved at runtime rather than hardcoded to /tmp,
-     so a cosmo binary running on Windows writes to the Windows temp directory
-     where /tmp does not exist. */
   let const temp_dir = Path::temp_directory();
 
   let const path_template_path =
       PathBuilder{temp_dir.text()}.append("shit_heredoc_XXXXXX").build();
 
-  /* mkstemp rewrites the XXXXXX suffix in place, so the template lives in a
-     mutable buffer with a trailing null rather than the immutable Path text. */
+  /* mkstemp rewrites the XXXXXX suffix in place, so the template is mutable. */
   const String &path_template_text = path_template_path.text();
   ArrayList<char> path_template{heap_allocator()};
   path_template.reserve(path_template_text.count() + 1);
@@ -1072,17 +955,12 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   const int fd = mkstemp(path_template.begin());
   if (fd < 0) return shit::None;
 
-  /* Unlink at once, so the file is anonymous and is freed when closed. */
   unlink(path_template.begin());
 
   usize offset = 0;
   while (offset < content.count()) {
     ssize_t written =
         ::write(fd, content.data + offset, content.count() - offset);
-    /* A signal interrupted the write before any byte landed. Retry instead of
-       dropping the heredoc, matching the EINTR loops in read_fd and write_fd.
-       The handlers carry no SA_RESTART, so a SIGCHLD or a SIGINT mid-write can
-       surface here. */
     if (written < 0 && errno == EINTR) continue;
     if (written < 0) {
       close(fd);
@@ -1091,9 +969,6 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
     offset += static_cast<usize>(written);
   }
 
-  /* The descriptor is rewound so the caller reads the bytes just written. A
-     failed rewind would leave it at the end, so it closes and reports None
-     rather than handing back an fd positioned past the data. */
   if (lseek(fd, 0, SEEK_SET) < 0) {
     close(fd);
     return shit::None;
@@ -1129,12 +1004,9 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
     const String sig_desc =
         (sig_str != nullptr) ? String{sig_str} : String{"Unknown"};
 
-    /* A broken pipe is the normal way a producer ends once its consumer stops
-       reading, such as seq into head, so it is reaped silently the way bash and
-       dash do rather than reported as a job event. Ctrl-C prints a bare
-       newline, and every other signal prints the located process message. */
+    /* SIGPIPE is reaped silently the way bash and dash do, Ctrl-C prints a bare
+       newline, every other signal prints the located process message. */
     if (sig == SIGPIPE) {
-      /* Reaped silently, see above. */
     } else if (sig != SIGINT) {
       shit::print("[Process " + String::from(pid, heap_allocator()) + ": " + sig_desc +
                   ", signal " + String::from(sig, heap_allocator()) + "]\n");
@@ -1144,8 +1016,6 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
 
     return 128 + sig;
   } else if (!WIFEXITED(status)) {
-    /* The process neither exited nor was signalled, so its status is unknown.
-     */
     throw shit::Error{"???: " + last_system_error_message()};
   } else {
     return WEXITSTATUS(status);
@@ -1163,9 +1033,7 @@ fn reap_process_quietly(process pid) throws -> i32
   {
     const pid_t w = waitpid(pid, &status, 0);
     if (w == -1 && errno == EINTR) continue;
-    /* The shell reaps a child through its SIGCHLD handling, so the child may be
-       gone by the time this runs. A missing child is the goal, not a failure.
-     */
+    /* The SIGCHLD handler may already have reaped it, a missing child is fine. */
     if (w == -1 && errno == ECHILD) return 0;
     if (check_syscall(w) == pid) break;
   }
@@ -1180,8 +1048,6 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
   i32 status = 0;
   const pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
-  /* No new transition since the last poll, so the caller keeps the recorded
-     state, which preserves a stop the foreground wait already consumed. */
   if (result == 0) return process_state::Unchanged;
   if (result == -1) {
     status_out = 0;
@@ -1238,10 +1104,6 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
   return NAMES.find(bare);
 }
 
-/* The number-name pairs mirror signal_number_from_name's table, so a number
-   and the name it carries round-trip through the helpers, and the completion
-   engine offers exactly the accepted spellings. The list is short, so a
-   linear scan beats a second map. */
 struct signal_pair
 {
   i32 number;
@@ -1325,9 +1187,6 @@ static fn sigchild_handler(int n, siginfo_t *siginfo, opaque *ctx) wontthrow
   unused(n);
   unused(ctx);
   unused(siginfo);
-  /* The flag store is the only async-signal-safe action. The handlers carry
-     no SA_RESTART, so the editor's poll wakes with EINTR and its wake hook
-     reads this for the set -b notification. */
   CHILD_STATE_CHANGED = 1;
 }
 
@@ -1343,24 +1202,17 @@ fn reset_signal_handlers() throws -> void
   sa.sa_handler = SIG_DFL;
   check_syscall(sigaction(SIGCHLD, &sa, nullptr));
 
-  /* A forked command or pipeline producer must die on a broken pipe rather than
-     see its write fail with EPIPE, so it exits with the SIGPIPE status the way
-     bash and the coreutils do. The shell itself ignores SIGPIPE, so the default
-     disposition is restored here in the child before it runs the command. */
+  /* The shell ignores SIGPIPE, the child restores the default so a producer
+     dies on a broken pipe. */
   check_syscall(sigaction(SIGPIPE, &sa, nullptr));
 
-  /* A forked compound-pipeline child inherits the flag value at fork. A stale
-     one would make the evaluator throw Interrupted before the child runs, so it
-     is cleared here alongside the handler reset. */
+  /* A stale inherited flag would throw Interrupted before the child runs. */
   INTERRUPT_REQUESTED = 0;
 }
 
 static fn handle_interrupt(int s) wontthrow -> void
 {
   unused(s);
-  /* Setting the flag is the only async-signal-safe action. The evaluator polls
-     it and aborts the running command, so a shell-internal loop is stoppable.
-   */
   INTERRUPT_REQUESTED = 1;
 }
 
@@ -1369,16 +1221,8 @@ fn set_default_signal_handlers(bool is_interactive) throws -> void
   LOG(Info, "installing the shell signal handlers, interactive %d",
       is_interactive ? 1 : 0);
 
-  /* The interactive shell blocks the terminal-generated signals that would kill
-     or stop it at the prompt, so a Ctrl-C, a SIGTERM, or a Ctrl-Z does not take
-     the shell down. SIGHUP stays at its default disposition so a hangup ends
-     the shell rather than leaving it reparented to init and spinning on a loop
-     whose output was redirected off the dead terminal. A non-interactive script
-     leaves them all at their default disposition the way dash and bash scripts
-     behave, and a Ctrl-Z still suspends the job. SIGINT gets the polled handler
-     in both modes, so a Ctrl-C in a shell loop sets the flag the evaluator
-     polls rather than spinning forever, and an external command resets the
-     handler to the default through execv and so still dies on Ctrl-C. */
+  /* SIGHUP stays default on purpose so a hangup ends the shell rather than
+     leaving it reparented to init and spinning on a redirected loop. */
   if (is_interactive) {
     sigset_t sm = make_sigset(SIGTERM, SIGQUIT, SIGSTOP, SIGTSTP);
     check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
@@ -1393,10 +1237,6 @@ fn set_default_signal_handlers(bool is_interactive) throws -> void
   si.sa_handler = handle_interrupt;
   check_syscall(sigaction(SIGINT, &si, nullptr));
 
-  /* The shell ignores SIGPIPE so a write to a reader that closed returns EPIPE
-     for the shell to handle rather than killing the shell. A forked child
-     restores the default disposition in reset_signal_handlers, so a pipeline
-     producer still dies on the signal. */
   struct sigaction sp = {};
   sp.sa_handler = SIG_IGN;
   check_syscall(sigaction(SIGPIPE, &sp, nullptr));
@@ -1404,8 +1244,6 @@ fn set_default_signal_handlers(bool is_interactive) throws -> void
 
 static fn handle_trapped_signal(int signal_number) wontthrow -> void
 {
-  /* Recording the arrival is the only async-safe action. The evaluator drains
-     the flag at the next command boundary and runs the trap action there. */
   if (is_trappable_signal(signal_number))
     PENDING_SIGNAL_FLAGS[signal_number] = 1;
   SIGNAL_PENDING = 1;
@@ -1417,8 +1255,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
 
   LOG(Info, "installing the trap handler for signal %d", signal_number);
 
-  /* A signal the startup blocked, such as SIGTERM, must be unblocked so the
-     handler runs while the shell waits at the prompt or in a loop. */
+  /* A signal the startup blocked must be unblocked so the handler runs. */
   sigset_t sm;
   sigemptyset(&sm);
   sigaddset(&sm, signal_number);
@@ -1443,9 +1280,7 @@ fn clear_trap_handler(i32 signal_number) throws -> void
   if (!is_trappable_signal(signal_number)) return;
   LOG(Info, "clearing the trap for signal %d", signal_number);
   struct sigaction sa = {};
-  /* SIGINT returns to the shell's own interrupt handler so a Ctrl-C still
-     aborts a shell-internal loop. Every other signal returns to its default
-     action. */
+  /* SIGINT returns to the shell's handler so a Ctrl-C still aborts a loop. */
   if (signal_number == SIGINT)
     sa.sa_handler = handle_interrupt;
   else
@@ -1482,9 +1317,6 @@ fn child_max() wontthrow -> i64
 
 fn machine_type() throws -> String
 {
-  /* The machine name does not change during a process lifetime, so the uname
-     call runs once and every later $MACHTYPE or $HOSTTYPE read copies the
-     cached value rather than issuing the syscall again. */
   static const String cached = []() -> String {
     struct utsname info{};
     if (uname(&info) != 0) return String{"unknown"};
@@ -1554,9 +1386,6 @@ namespace {
 
 #if defined __linux__
 
-/* One hardware counter the measured run opens through perf_event_open. The
-   first event of the group is the group leader and the rest are its members, so
-   enabling and reading the leader sweeps the whole group at once. */
 struct perf_event_request
 {
   u32 type;
@@ -1564,9 +1393,7 @@ struct perf_event_request
   u64 *destination;
 };
 
-/* perf_event_open has no libc wrapper, so the raw syscall is issued here. The
-   child inherits the group through inherit and enable_on_exec, so the counts
-   cover the exec'd program and not the fork bookkeeping. */
+/* perf_event_open has no libc wrapper. */
 fn open_perf_event(const struct perf_event_attr &attr, int group_fd) wontthrow
     -> int
 {
@@ -1574,11 +1401,8 @@ fn open_perf_event(const struct perf_event_attr &attr, int group_fd) wontthrow
                                   PERF_FLAG_FD_CLOEXEC));
 }
 
-/* Open the counter group, run runner while the group counts, and write the
-   five counts into out. Returns false when the kernel denies perf_event_open,
-   such as a restrictive perf_event_paranoid, so the caller falls back to wall
-   time and resident set alone. The runner forks and waits for the child, since
-   enable_on_exec ties the counting window to the exec inside it. */
+/* Returns false when the kernel denies perf_event_open, the caller then falls
+   back to wall time and resident set alone. */
 template <typename Runner>
 fn collect_perf_counts(perf_counts &out, Runner &&runner) wontthrow -> bool
 {
@@ -1637,12 +1461,8 @@ fn collect_perf_counts(perf_counts &out, Runner &&runner) wontthrow -> bool
 
 #endif /* __linux__ */
 
-/* Fork the child, point its output at the null device when asked, exec argv,
-   and wait4 for it so the rusage is captured. The decoded wait status goes into
-   status_out and the peak resident set into peak_rss_out. Returns false when
-   the fork itself failed, since an exec failure surfaces as the child's exit
-   127 the way the shell reports a missing command. ru_maxrss is kilobytes on
-   Linux and bytes on macOS and the BSDs, so it is scaled per platform. */
+/* Returns false only when the fork itself failed, an exec failure surfaces as
+   the child's exit 127. */
 fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
                    i64 &status_out, u64 &peak_rss_out) wontthrow -> bool
 {
@@ -1655,9 +1475,7 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
   if (child_pid == -1) return false;
 
   if (child_pid == 0) {
-    /* The shell ignores SIGPIPE and execve keeps an ignored disposition. The
-       default is restored here before the exec, so the measured program dies on
-       a broken pipe rather than inheriting the ignore. */
+    /* The default is restored so the measured program dies on a broken pipe. */
     signal(SIGPIPE, SIG_DFL);
     if (suppress_output) {
       const int null_fd = open("/dev/null", O_WRONLY);
@@ -1733,10 +1551,8 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
   return result;
 }
 
-/* The path String frees its heap buffer when its scope ends, and a free may
-   clobber errno before the caller reads last_system_error_message, so each
-   helper saves the syscall errno across the String destructor. The inner scope
-   ends the String first, then errno is restored. */
+/* The String destructor may clobber errno, so each helper saves it across the
+   inner scope that ends the String first. */
 fn make_directory(StringView path, u32 mode) wontthrow -> bool
 {
   bool did_succeed;
@@ -1769,8 +1585,6 @@ fn touch_file_times(StringView path) wontthrow -> bool
   int saved_errno;
   {
     const String path_string{path};
-    /* A null times array sets both the access and the modification time to the
-       current time, the touch update for an existing file. */
     did_succeed = ::utimensat(AT_FDCWD, path_string.c_str(), nullptr, 0) == 0;
     saved_errno = errno;
   }
@@ -1835,10 +1649,8 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
 fn read_symlink(StringView path) wontthrow -> Maybe<String>
 {
   const String path_string{path};
-  /* A target longer than the buffer cannot be told apart from an exact fit, so
-     the buffer grows until readlink no longer fills it, which is the signal the
-     result is complete rather than truncated. The cap bounds a pathological
-     filesystem. */
+  /* readlink cannot flag truncation, so the buffer grows until it stops
+     filling. */
   usize capacity = 256;
   loop
   {
@@ -1860,9 +1672,7 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
 fn current_executable_path() wontthrow -> Maybe<String>
 {
 #if defined __APPLE__
-  /* macOS exposes no /proc/self/exe, so the running binary is read through
-     _NSGetExecutablePath. The first call sizes the buffer, and the result is
-     canonicalized since it may carry .. or pass through a symlink. */
+  /* macOS has no /proc/self/exe, the first call sizes the buffer. */
   u32 capacity = 0;
   _NSGetExecutablePath(nullptr, &capacity);
   if (capacity == 0) return shit::None;
@@ -1877,8 +1687,6 @@ fn current_executable_path() wontthrow -> Maybe<String>
 
   return String{raw_path};
 #else
-  /* /proc/self/exe resolves to the running binary on Linux. A platform without
-     it reports None, so the assimilate caller falls back to an error. */
   return read_symlink("/proc/self/exe");
 #endif
 }
@@ -1887,8 +1695,7 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
 {
   const String path_string{path};
   struct stat info{};
-  /* lstat reports a symlink as itself rather than following it, so the ls long
-     format shows the l type the way coreutils does without -L. */
+  /* lstat does not follow the symlink, so ls shows the l type without -L. */
   if (::lstat(path_string.c_str(), &info) != 0) return false;
   status.mode = static_cast<u32>(info.st_mode);
   status.link_count = static_cast<u64>(info.st_nlink);
@@ -1933,9 +1740,7 @@ fn format_mode_string(u32 mode) throws -> String
 }
 
 /* The field 0 name of the first colon line whose field at id_field_index equals
-   the wanted id, read from the named database. The passwd and group files share
-   the colon layout, with the id in field 2 of each, so one reader serves both.
- */
+   the wanted id. One reader serves both /etc/passwd and /etc/group. */
 static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
                             usize id_field_index) throws -> Maybe<String>
 {
@@ -1968,9 +1773,7 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
   requested.tv_sec = static_cast<time_t>(seconds);
   requested.tv_nsec = static_cast<long>(
       (seconds - static_cast<double>(requested.tv_sec)) * 1000000000.0);
-  /* A signal can cut the sleep short, so the remaining time is slept again
-     until the whole interval has passed, unless the shell's interrupt fired, in
-     which case the sleep returns at once so a Ctrl-C reaches the caller. */
+  /* A Ctrl-C returns at once, any other signal sleeps the remaining time. */
   struct timespec remaining;
   while (nanosleep(&requested, &remaining) == -1 && errno == EINTR) {
     if (INTERRUPT_REQUESTED) break;
@@ -1978,8 +1781,6 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
   }
 }
 
-/* The index-th whitespace-separated field of a line, empty when the line has
-   too few fields, for reading the space-delimited /proc stat files. */
 static donteliminate fn nth_space_field(StringView text, usize index) wontthrow
     -> StringView
 {
@@ -1999,8 +1800,6 @@ static donteliminate fn nth_space_field(StringView text, usize index) wontthrow
 }
 
 #if defined __APPLE__
-/* The single status letter ps shows for a macOS process, mapped from the kinfo
-   p_stat field the way the BSD ps reads it. */
 static fn mac_process_state_letter(char stat_value) wontthrow -> char
 {
   switch (stat_value) {
@@ -2020,9 +1819,7 @@ fn enumerate_processes(bool include_resource_stats) throws
   ArrayList<process_entry> processes{heap_allocator()};
 
 #if defined __APPLE__
-  /* macOS exposes no /proc, so the process table is read through sysctl with
-     KERN_PROC_ALL. The first call sizes the kinfo_proc array, and the resource
-     columns are filled per pid through the libproc calls when asked. */
+  /* macOS has no /proc, the first sysctl sizes the kinfo_proc array. */
   int name_mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0};
   usize byte_length = 0;
   if (::sysctl(name_mib, 4, nullptr, &byte_length, nullptr, 0) != 0)
@@ -2070,10 +1867,7 @@ fn enumerate_processes(bool include_resource_stats) throws
   }
   return processes;
 #else
-  /* The process list is read from /proc, the Linux and Cosmopolitan way. A
-     directory whose name is all digits is one process, and its comm file holds
-     the command name the way ps reads it. A platform without /proc opens
-     nothing and reports an empty list. */
+  /* Each all-digit /proc entry is one process. */
   DIR *proc_dir = ::opendir("/proc");
   if (proc_dir == nullptr) return processes;
   defer { ::closedir(proc_dir); };
@@ -2094,15 +1888,10 @@ fn enumerate_processes(bool include_resource_stats) throws
     let const parsed = name.to<i64>();
     if (parsed.is_error()) continue;
 
-    /* The three /proc files share the same per-pid prefix, built once here
-       rather than reconcatenated for each. comm names the process for ps, for
-       killall, and for pkill, so it is read for every process rather than only
-       the kernel-thread fallback. */
     const String proc_pid = "/proc/" + name;
     const String comm_path = proc_pid + "/comm";
     Maybe<String> comm = Path{comm_path.view()}.read_entire_file();
     if (!comm.has_value()) continue;
-    /* The comm file ends with a newline the listing does not want. */
     String command_name = steal(*comm);
     while (!command_name.is_empty() && command_name.back() == '\n')
       command_name.pop_back();
@@ -2111,9 +1900,6 @@ fn enumerate_processes(bool include_resource_stats) throws
     process.pid = parsed.value();
     process.name = steal(command_name);
 
-    /* The status file names the owner on its Uid line, the real uid first, so
-       ps can render the owner the way it does. A process that has gone since
-       the directory scan leaves the owner at zero. */
     const String status_path = proc_pid + "/status";
     if (Maybe<String> status = Path{status_path.view()}.read_entire_file();
         status.has_value())
@@ -2125,8 +1911,7 @@ fn enumerate_processes(bool include_resource_stats) throws
         let const line =
             text.substring_of_length(status_line_start, i - status_line_start);
         status_line_start = i + 1;
-        /* The Uid line reads "Uid:\t<real>\t<effective>...", so the first run
-           of digits after the tab is the real uid. */
+        /* "Uid:\t<real>\t<effective>...", the first digits are the real uid. */
         if (line.length < 5 ||
             line.substring_of_length(0, 5) != StringView{"Uid:\t"})
           continue;
@@ -2144,10 +1929,7 @@ fn enumerate_processes(bool include_resource_stats) throws
       }
     }
 
-    /* The cmdline file holds the full argument vector with a NUL after each
-       argument, so the separators become spaces for the listing. A kernel
-       thread exposes an empty cmdline, so the bracketed command name stands in
-       the way ps shows it. */
+    /* cmdline separates arguments with NUL, an empty one is a kernel thread. */
     const String cmdline_path = proc_pid + "/cmdline";
     if (Maybe<String> cmdline = Path{cmdline_path.view()}.read_entire_file();
         cmdline.has_value() && !cmdline->is_empty())
@@ -2167,10 +1949,8 @@ fn enumerate_processes(bool include_resource_stats) throws
     }
 
     if (include_resource_stats) {
-      /* /proc/<pid>/stat holds the state and the cpu time. The comm field is
-         parenthesized and may contain spaces and parens, so the fields are read
-         after the last ')', where the state is first and the user and system
-         times are the twelfth and thirteenth. */
+      /* The comm field may contain spaces and parens, so the fields are read
+         after the last ')', state first then user and system times at 11 and 12. */
       if (Maybe<String> stat =
               Path{(proc_pid + "/stat").view()}.read_entire_file();
           stat.has_value())
@@ -2194,8 +1974,7 @@ fn enumerate_processes(bool include_resource_stats) throws
             process.cpu_ticks += static_cast<u64>(stime.value());
         }
       }
-      /* /proc/<pid>/statm gives the sizes in pages, the first the virtual size
-         and the second the resident set. */
+      /* statm gives pages, field 0 virtual and field 1 resident. */
       if (Maybe<String> statm =
               Path{(proc_pid + "/statm").view()}.read_entire_file();
           statm.has_value())
@@ -2273,10 +2052,7 @@ fn TempFileSet::track(Path path) throws -> void { m_paths.push(steal(path)); }
 fn TempFileSet::count() const wontthrow -> usize { return m_paths.count(); }
 fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
 {
-  /* A file the consuming command still holds open cannot be deleted yet, as
-     when a while loop reads it across iterations, so a failed delete keeps the
-     path and retries on the next cleanup once that descriptor closes, rather
-     than dropping it and leaking the file. */
+  /* A failed delete keeps the path and retries once the descriptor closes. */
   usize kept = mark;
   for (usize i = mark; i < m_paths.count(); i++) {
     if (DeleteFileA(m_paths[i].c_str()) != FALSE) continue;
@@ -2287,10 +2063,7 @@ fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
     m_paths.remove(m_paths.count() - 1);
 }
 
-/* A Windows handle is inherited per CreateProcess through the bInheritHandles
-   flag and the handle's own inherit bit set at creation, not per descriptor the
-   way the POSIX close-on-exec bit is cleared, so this is a no-op that keeps the
-   one call site in the expansion path portable. */
+/* Windows inherits handles per CreateProcess, so this is a no-op. */
 fn make_fd_inheritable(os::descriptor fd) wontthrow -> void { unused(fd); }
 
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
@@ -2305,9 +2078,7 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void
   SetStdHandle(STD_OUTPUT_HANDLE, saved);
 }
 
-/* Map a shell descriptor number to the Windows standard handle slot. Windows
-   has no general numbered descriptor table, so only the three standard streams
-   are addressable. */
+/* Windows addresses only the three standard streams. */
 static fn std_handle_slot_for_shell_fd(i32 shell_fd) -> Maybe<DWORD>
 {
   switch (shell_fd) {
@@ -2330,9 +2101,6 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     return result;
   }
 
-  /* An invalid target handle, as from a duplication onto a closed descriptor,
-     is reported so the caller fails the command rather than redirecting onto a
-     dead handle. */
   if (target == INVALID_HANDLE_VALUE) {
     result.is_dup2_ok = false;
     return result;
@@ -2341,10 +2109,8 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   result.saved = GetStdHandle(*slot);
   result.was_open = result.saved != INVALID_HANDLE_VALUE;
 
-  /* SetStdHandle only stores the handle, it does not make an independent copy
-     the way the POSIX dup2 makes a new descriptor, so the target is duplicated
-     here. The caller closes the original target after this returns, and the
-     duplicate stays valid in the slot until restore_descriptor closes it. */
+  /* SetStdHandle does not copy, so the target is duplicated here and the dup
+     stays valid until restore_descriptor closes it. */
   HANDLE duplicate = INVALID_HANDLE_VALUE;
   if (DuplicateHandle(GetCurrentProcess(), target, GetCurrentProcess(),
                       &duplicate, 0, TRUE, DUPLICATE_SAME_ACCESS) == 0)
@@ -2362,10 +2128,8 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
   if (!slot.has_value()) return;
-  /* Close the exact duplicate this redirection installed, not whatever the slot
-     holds now, since a later redirection inside the run may have replaced it.
-     The saved original then returns to the slot, the way the POSIX restore
-     closes the backup descriptor it kept. */
+  /* Close the exact dup this redirection installed, not whatever the slot holds
+     now, a later redirection may have replaced it. */
   if (saved.is_dup2_ok && saved.replacement != INVALID_HANDLE_VALUE)
     CloseHandle(saved.replacement);
   if (saved.was_open) SetStdHandle(*slot, saved.saved);
@@ -2387,13 +2151,10 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
   return result;
 }
 
-/* Windows has no /dev/tty rebind for the console, so the recovery reports
-   failure and the caller keeps its error path. */
+/* Windows has no /dev/tty rebind. */
 fn reopen_terminal_as_stdin() wontthrow -> bool { return false; }
 
-/* Windows has no POSIX process groups, so the terminal handoff that names the
-   tmux window after the running program is a no-op and the console keeps its
-   own job tracking. */
+/* Windows has no POSIX process groups, so the terminal handoff is a no-op. */
 fn shell_has_controlling_terminal() wontthrow -> bool { return false; }
 fn give_controlling_terminal_to(process p) wontthrow -> void { unused(p); }
 fn reclaim_controlling_terminal() wontthrow -> void {}
@@ -2415,9 +2176,8 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
   if (handle == INVALID_HANDLE_VALUE) return matches;
   defer { FindClose(handle); };
 
-  /* FindFirstFile yields bare names and matches only the last component, so the
-     pattern's directory prefix is kept to rebuild a path the way the POSIX glob
-     returns it. */
+  /* FindFirstFile yields bare names, so the directory prefix is kept to rebuild
+     the path. */
   usize prefix_length = 0;
   for (usize i = 0; i < pattern.length; i++)
     if (pattern[i] == '/' || pattern[i] == '\\') prefix_length = i + 1;
@@ -2463,16 +2223,12 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 
 fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
 {
-  /* A Windows descriptor is a HANDLE, so the shell fd number is mapped to its C
-     runtime handle the way the -t test maps one. */
   return reinterpret_cast<os::descriptor>(
       _get_osfhandle(static_cast<int>(fd_number)));
 }
 
 fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
 {
-  /* Windows addresses only the three standard streams, so a higher descriptor
-     number has no slot to point at target. */
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) return false;
   if (target == INVALID_HANDLE_VALUE) return false;
@@ -2531,8 +2287,7 @@ fn get_home_directory() -> Maybe<Path>
   return shit::None;
 }
 
-/* Windows has no /etc/passwd, so a named user does not resolve and ~user stays
-   literal. A bare ~ still expands through USERPROFILE above. */
+/* Windows has no /etc/passwd, so ~user stays literal. */
 fn get_home_for_user(StringView username) throws -> Maybe<Path>
 {
   unused(username);
@@ -2551,8 +2306,7 @@ fn is_child_process() wontthrow -> bool
   return GetCurrentProcessId() != PARENT_SHELL_PID;
 }
 
-/* Windows has no setuid or setgid notion, so the shell is never privileged in
-   this sense and always reads its config. */
+/* Windows has no setuid or setgid notion. */
 fn is_running_setuid() wontthrow -> bool { return false; }
 
 fn process_id_of(process p) wontthrow -> i64
@@ -2566,8 +2320,6 @@ fn is_stdout_a_tty() wontthrow -> bool { return _isatty(_fileno(stdout)) != 0; }
 
 fn is_stderr_a_tty() wontthrow -> bool { return _isatty(_fileno(stderr)) != 0; }
 
-/* A Windows descriptor is a HANDLE, so the C runtime descriptor number that
-   _isatty wants is recovered from it before the tty check. */
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool
 {
   const int crt_fd = _open_osfhandle(reinterpret_cast<intptr_t>(fd), 0);
@@ -2621,8 +2373,7 @@ fn environment_names() -> ArrayList<String>
   for (char *entry = block; *entry != '\0';) {
     StringView pair{entry};
     let const equals = pair.find_character('=');
-    /* The drive entries such as =C: begin with '=', so a leading '=' is kept as
-       part of the name rather than splitting on it. */
+    /* Drive entries such as =C: keep their leading '=' as part of the name. */
     let const split = (equals.has_value() && *equals > 0)
                           ? pair.substring_of_length(0, *equals)
                           : pair;
@@ -2636,9 +2387,7 @@ fn environment_names() -> ArrayList<String>
 fn execute_program(ExecContext &&ec, bool allow_script_fallback,
                    bool new_process_group) -> process
 {
-  /* Windows has no ENOEXEC interpreter convention, so the script fallback the
-     POSIX path offers does not apply here, and no POSIX process groups, so the
-     terminal handoff is a no-op below. */
+  /* Windows has no ENOEXEC fallback and no POSIX process groups. */
   unused(allow_script_fallback);
   unused(new_process_group);
 
@@ -2661,9 +2410,8 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   startup_info.hStdOutput = ec.out_fd.value_or(GetStdHandle(STD_OUTPUT_HANDLE));
   startup_info.hStdError = ec.err_fd.value_or(GetStdHandle(STD_ERROR_HANDLE));
 
-  /* Each duplication reads the current target of its source handle, so when
-     both are present the source order decides the result, the same way the
-     POSIX path applies the earlier dup first. */
+  /* Each dup reads the current target of its source, so the source order
+     decides a mixed 2>&1 1>&2. */
   ec.apply_dup_routing(
       [&]() { startup_info.hStdError = startup_info.hStdOutput; },
       [&]() { startup_info.hStdOutput = startup_info.hStdError; });
@@ -2675,10 +2423,8 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
     if (ec.err_fd) CloseHandle(*ec.err_fd);
   };
 
-  /* Pipe and file handles are created non-inheritable, so a capture pipe the
-     parent keeps does not leak into the child and hang the read. Only the
-     handles the child actually receives are made inheritable here, mirroring
-     how the POSIX path clears close-on-exec on just the dup targets. */
+  /* Handles are non-inheritable by default, only the ones the child receives
+     are made inheritable so a parent-kept capture pipe does not leak in. */
   if (should_inherit_handles) {
     SetHandleInformation(startup_info.hStdInput, HANDLE_FLAG_INHERIT,
                          HANDLE_FLAG_INHERIT);
@@ -2688,16 +2434,13 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
                          HANDLE_FLAG_INHERIT);
   }
 
-  /* exec -c starts the child with an empty environment. An empty CreateProcess
-     environment block is two null bytes, a single empty string closed by the
-     block terminator, while a null pointer means the child inherits the shell's
-     environment. */
+  /* An empty CreateProcess environment block is two nulls, a null pointer would
+     inherit the shell's environment. */
   char empty_environment_block[] = {'\0', '\0'};
   LPVOID environment_block =
       ec.should_use_empty_environment ? empty_environment_block : nullptr;
 
-  /* CreateProcessA may rewrite lpCommandLine in place, so the owned buffer is
-     handed over as a mutable pointer rather than a const view. */
+  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable. */
   if (CreateProcessA(ec.program_path().c_str(),
                      const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
                      should_inherit_handles, 0, environment_block, nullptr,
@@ -2712,14 +2455,9 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
 fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
     -> Maybe<String>
 {
-  /* Windows has no fork, so a <(cmd) substitution spawns a fresh shell that
-     re-parses the inner command and writes its standard output into a temporary
-     file. The consuming command then reads that file by path, the way it reads
-     /dev/fd on POSIX. The whole output is written before the path returns, so a
-     reader such as diff that wants its complete input sees all of it. The fresh
-     shell inherits the environment but not the parent's functions or unexported
-     variables, the unavoidable cost of running a separate process with no fork
-     to clone the in-memory state. */
+  /* Windows has no fork, so <(cmd) spawns a fresh shell that writes its output
+     into a temp file the consumer reads by path. The whole output is written
+     before the path returns. */
   char module_path[MAX_PATH];
   if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
     return shit::None;
@@ -2769,10 +2507,8 @@ fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
   CloseHandle(process_info.hThread);
   CloseHandle(temp_file);
 
-  /* The shell hands this path back as a literal field, but a backslash in it
-     would read as an escape when the redirection target word is processed, so
-     the separators are returned as forward slashes, which CreateFile accepts
-     the same as backslashes. */
+  /* A backslash would read as an escape in the target word, so slashes are
+     returned, which CreateFile accepts the same. */
   let result = String{heap_allocator()};
   for (const char *byte = temp_path; *byte != '\0'; byte++)
     result += *byte == '\\' ? '/' : *byte;
@@ -2783,12 +2519,8 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
                         Maybe<descriptor> out_fd, bool bash_compatible) throws
     -> Maybe<process>
 {
-  /* A compound stage of a pipeline, such as the brace group in { a; b; } | c,
-     runs in a fresh shell that re-parses the stage's source, since Windows has
-     no fork to clone the in-memory state. The pipe ends are wired as the new
-     shell's standard input and output. The process is returned unwaited so the
-     pipeline reaps it the way it reaps a forked stage. The fresh shell inherits
-     the environment but not the parent's functions or unexported variables. */
+  /* Windows has no fork, so a compound pipeline stage re-parses its source in a
+     fresh shell, returned unwaited for the pipeline to reap. */
   char module_path[MAX_PATH];
   if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
     return shit::None;
@@ -2831,10 +2563,7 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   unused(in_fd);
   unused(out_fd);
   unused(err_fd);
-  /* Windows has no fork. A compound stage whose source span is known re-execs
-     through spawn_subshell_stage, so this throw is reached only for a stage
-     type whose end position the parser does not yet record, such as an if or
-     case used as a pipeline stage. */
+  /* Reached only for a stage whose end position the parser does not yet record. */
   throw shit::Error{
       "A compound command in a pipeline is not supported on this platform"};
 }
@@ -2852,9 +2581,8 @@ fn fork_job_process() -> process
 
 fn replace_process(ExecContext &&ec) -> void
 {
-  /* Windows cannot replace a process in place, so the program runs to
-     completion and the shell exits with its status, which behaves like exec for
-     a launched script. */
+  /* Windows cannot exec in place, so the program runs to completion and the
+     shell exits with its status. */
   LOG(Debug, "running '%s' to completion in place of an exec",
       ec.program_path().c_str());
   process child = execute_program(steal(ec));
@@ -2886,8 +2614,8 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
   SECURITY_ATTRIBUTES attributes{};
 
   attributes.nLength = sizeof(SECURITY_ATTRIBUTES);
-  /* Both ends are non-inheritable, so a child only receives the end execute
-     handles explicitly through STARTF_USESTDHANDLES, like close-on-exec. */
+  /* Both ends non-inheritable, the child receives only what STARTF_USESTDHANDLES
+     names. */
   attributes.bInheritHandle = FALSE;
   attributes.lpSecurityDescriptor = nullptr; /* NOLINT */
 
@@ -2904,8 +2632,6 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
   return Pipe{in, out};
 }
 
-/* CreateThread wants a DWORD(*)(LPVOID) entry, so this trampoline carries the
-   C-style entry and its context across that signature and returns zero. */
 struct thread_start_context
 {
   void (*entry)(opaque *);
@@ -2955,15 +2681,12 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
   case file_open_mode::ReadWrite: disposition = OPEN_ALWAYS; break;
   }
 
-  /* The handle is created non-inheritable. execute_program marks it inheritable
-     only while it spawns the child that the redirection feeds. */
+  /* Non-inheritable, execute_program flips it only while spawning the child. */
   SECURITY_ATTRIBUTES att{};
   att.nLength = sizeof(SECURITY_ATTRIBUTES);
   att.bInheritHandle = FALSE;
   att.lpSecurityDescriptor = nullptr; /* NOLINT */
 
-  /* CreateFileA needs a null-terminated path, so the view is copied into a
-     String that owns a trailing null. */
   String path_string{path};
   HANDLE handle = CreateFileA(path_string.c_str(), access,
                               FILE_SHARE_READ | FILE_SHARE_WRITE, &att,
@@ -3028,7 +2751,7 @@ fn reap_process_quietly(process p) -> i32
 
 fn poll_process(process p, i32 &status_out) wontthrow -> process_state
 {
-  /* Windows has no stopped state, so a process is either alive or finished. */
+  /* Windows has no stopped state. */
   DWORD code = 0;
   if (GetExitCodeProcess(p, &code) == 0) {
     status_out = 0;
@@ -3041,8 +2764,7 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
 
 fn signal_process(process p, i32 signal_number) wontthrow -> bool
 {
-  /* Windows cannot deliver a POSIX signal, so only a terminate is honored and a
-     resume or a stop is a no-op the caller treats as unsupported. */
+  /* Windows honors only a terminate, a resume or stop is unsupported. */
   if (signal_number == 9 || signal_number == 15) {
     return TerminateProcess(p, 1) != 0;
   }
@@ -3074,9 +2796,6 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
 
 fn signal_name_from_number(i32 number) -> Maybe<String>
 {
-  /* The numbers mirror the Windows signal_number_from_name above, so a trap set
-     or listed by number on Windows reports the same name a trap set by name
-     reports. */
   if (number == 1) return String{"HUP"};
   if (number == 2) return String{"INT"};
   if (number == 3) return String{"QUIT"};
@@ -3098,13 +2817,9 @@ fn signal_names() throws -> const ArrayList<StringView> &
   return names;
 }
 
-/* Append one argument to a Windows command line, quoted and escaped the way
-   CommandLineToArgvW parses it back, so an argument that carries a space, a
-   tab, or a quote cannot break out of its slot and inject further arguments.
-   The rules are the Microsoft ones, a run of backslashes is doubled only when
-   it precedes a quote or the closing quote, and an embedded quote is escaped
-   with a backslash. An argument with no space, tab, or quote is emitted bare,
-   and an empty argument is quoted so it is not dropped. */
+/* Quotes and escapes the way CommandLineToArgvW parses back, so an argument
+   with a space, tab, or quote cannot inject further arguments. A backslash run
+   is doubled only before a quote, an empty argument is quoted so it is kept. */
 static fn append_windows_quoted_arg(String &out, StringView arg) -> void
 {
   bool should_quote_arg = arg.count() == 0;
@@ -3181,9 +2896,7 @@ cold fn last_system_error_message() throws -> String
   }
 
   StringView view{static_cast<char *>(errno_str)};
-  /* FormatMessage ends the text with a trailing period, spacing, and a CRLF, so
-     the trailing run of those bytes is trimmed to leave a bare message rather
-     than a fixed count that a shorter message would over-cut. */
+  /* FormatMessage ends with a period, spacing, and a CRLF, trimmed here. */
   while (view.length > 0) {
     let const last_byte = view[view.length - 1];
     if (last_byte != '.' && last_byte != ' ' && last_byte != '\r' &&
@@ -3196,8 +2909,7 @@ cold fn last_system_error_message() throws -> String
 
   String err{};
   for (usize i = 0; i < view.length; i++) {
-    /* FormatMessage leaves a %N placeholder where an argument would go, which
-       this call passes none of, so the placeholder is replaced with a word. */
+    /* A %N placeholder is replaced with a word since no argument is passed. */
     if (view[i] == '%' && i + 1 < view.length && isdigit(view[i + 1])) {
       err += StringView{"input"};
       i++;
@@ -3221,9 +2933,6 @@ cold fn last_system_error_message() throws -> String
 static fn handle_interrupt(int s) -> void
 {
   unused(s);
-  /* Only set the flag, since printing or any non-async-signal-safe work inside
-     a handler is undefined. The evaluator polls the flag and aborts the running
-     command, so an infinite loop can be stopped from the keyboard. */
   INTERRUPT_REQUESTED = 1;
   signal(SIGINT, handle_interrupt);
 }
@@ -3231,8 +2940,7 @@ static fn handle_interrupt(int s) -> void
 fn set_default_signal_handlers(bool is_interactive) -> void
 {
   /* The interactive shell ignores SIGTERM so a stray terminate does not close
-     the prompt, while a non-interactive script leaves it at the default so it
-     terminates as usual. SIGINT routes to the polled handler in both modes. */
+     the prompt. */
   if (is_interactive && signal(SIGTERM, SIG_IGN) == SIG_ERR) {
     throw Error{"Could not install the signal handlers: " +
                 last_system_error_message()};
@@ -3252,9 +2960,7 @@ fn reset_signal_handlers() -> void
                 last_system_error_message()};
   }
 
-  /* A child started for a compound pipeline stage inherits the flag value at
-     spawn. A stale one would make the evaluator throw Interrupted before the
-     child runs, so it is cleared here alongside the handler reset. */
+  /* A stale inherited flag would throw Interrupted before the child runs. */
   INTERRUPT_REQUESTED = 0;
 }
 
@@ -3263,9 +2969,7 @@ static fn handle_trapped_signal(int signal_number) -> void
   if (is_trappable_signal(signal_number))
     PENDING_SIGNAL_FLAGS[signal_number] = 1;
   SIGNAL_PENDING = 1;
-  /* The C runtime resets the disposition to default before the handler runs, so
-     it is reinstalled here for the next arrival, the way the interrupt handler
-     reinstalls itself. */
+  /* The C runtime resets the disposition, so it is reinstalled for the next. */
   signal(signal_number, handle_trapped_signal);
 }
 
@@ -3324,9 +3028,7 @@ fn realtime_microseconds() wontthrow -> u64
   ULARGE_INTEGER ticks;
   ticks.LowPart = file_time.dwLowDateTime;
   ticks.HighPart = file_time.dwHighDateTime;
-  /* The FILETIME counts 100-nanosecond intervals since 1601, so the offset to
-     1970 is removed and the rest scaled from 100ns units down to microseconds.
-   */
+  /* FILETIME counts 100ns intervals since 1601, so the 1970 offset is removed. */
   const u64 epoch_offset_100ns = 116444736000000000ULL;
   if (ticks.QuadPart < epoch_offset_100ns) return 0;
   return (ticks.QuadPart - epoch_offset_100ns) / 10ULL;
@@ -3349,9 +3051,7 @@ fn format_local_time(StringView format, i64 epoch) throws -> String
 fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
     -> void
 {
-  /* Windows carries no RUSAGE_CHILDREN equivalent here, so the cpu split is
-     reported as zero and only the wall time of the timed command is meaningful.
-   */
+  /* Windows has no RUSAGE_CHILDREN, only the wall time is meaningful. */
   user_seconds = 0;
   system_seconds = 0;
 }
@@ -3363,10 +3063,7 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
 {
   if (argv.is_empty()) return None;
 
-  /* Windows carries no hardware perf counters here, so a measured run reports
-     wall time, the peak working set, and the user and system process times. The
-     child output is pointed at the null device when suppressed, the same as the
-     POSIX path. */
+  /* Windows has no hardware perf counters, only wall time and peak working set. */
   measured_result result{};
 
   String command_line{};
@@ -3402,8 +3099,7 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
 
   const u64 start_nanos = monotonic_nanos();
 
-  /* CreateProcessA may rewrite lpCommandLine in place, so the owned buffer is
-     handed over as a mutable pointer rather than a const view. */
+  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable. */
   if (CreateProcessA(nullptr, const_cast<LPSTR>(mutable_command_line.data()),
                      nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup,
                      &process_info) == 0)
@@ -3439,8 +3135,7 @@ fn make_directory(StringView path, u32 mode) wontthrow -> bool
 
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
 {
-  /* Windows carries no POSIX permission bits on the create path, so the exact
-     mode is accepted and ignored the way make_directory ignores it. */
+  /* Windows has no POSIX permission bits, so the mode is accepted and ignored. */
   unused(path);
   unused(mode);
   return true;
@@ -3485,17 +3180,15 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
 {
   const String target_string{target};
   const String link_string{link_path};
-/* An older mingw SDK omits these CreateSymbolicLink flags, so each is defined
-   here when the toolchain header does not provide it. */
+/* An older mingw SDK omits these flags, defined here when absent. */
 #ifndef SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
 #define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
 #endif
 #ifndef SYMBOLIC_LINK_FLAG_DIRECTORY
 #define SYMBOLIC_LINK_FLAG_DIRECTORY 0x1
 #endif
-  /* A symlink to a directory needs the directory flag, so the target is probed
-     once. The unprivileged-create flag lets the call succeed without elevation
-     on a developer-mode Windows. */
+  /* A directory target needs the directory flag, the unprivileged flag avoids
+     elevation on developer-mode Windows. */
   DWORD flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
   const DWORD attributes = GetFileAttributesA(target_string.c_str());
   if (attributes != INVALID_FILE_ATTRIBUTES &&
@@ -3525,8 +3218,7 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
 {
   const String path_string{path};
   struct stat info{};
-  /* Windows has no lstat, so a symlink reports the target it resolves to, the
-     closest the platform comes to the POSIX behavior. */
+  /* Windows has no lstat, so a symlink reports its resolved target. */
   if (::stat(path_string.c_str(), &info) != 0) return false;
   status.mode = static_cast<u32>(info.st_mode);
   status.link_count = static_cast<u64>(info.st_nlink);
@@ -3534,17 +3226,14 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   status.group_id = static_cast<u32>(info.st_gid);
   status.size = static_cast<u64>(info.st_size);
   status.modification_time = static_cast<i64>(info.st_mtime);
-  /* Windows stat carries no block count, so the 512-byte blocks are derived
-     from the size for the ls total line. */
+  /* Windows stat has no block count, so 512-byte blocks are derived from size. */
   status.blocks = (static_cast<u64>(info.st_size) + 511) / 512;
   return true;
 }
 
 fn format_mode_string(u32 mode) throws -> String
 {
-  /* Windows stat exposes only the read, write, and execute bits for the owner,
-     mirrored across the group and other triplets so the column keeps its width.
-     The directory bit gives the type letter. */
+  /* Windows stat exposes only the owner bits, mirrored across all three triplets. */
   const bool is_readable = (mode & 0000400u) != 0;
   const bool is_writable = (mode & 0000200u) != 0;
   const bool is_executable = (mode & 0000100u) != 0;
@@ -3567,8 +3256,7 @@ fn file_type_letter(u32 mode) wontthrow -> char
 
 fn uid_to_username(u32 uid) throws -> Maybe<String>
 {
-  /* Windows names users through the security database rather than a passwd
-     file, so ls falls back to the numeric id. */
+  /* Windows names users through the security database, so ls uses the numeric id. */
   unused(uid);
   return shit::None;
 }
@@ -3588,8 +3276,7 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
 fn enumerate_processes(bool include_resource_stats) throws
     -> ArrayList<process_entry>
 {
-  /* The Windows snapshot carries no per-process resource stats this layer
-     reads, so the flag is accepted and the BSD columns stay zero. */
+  /* The snapshot has no per-process resource stats, so the BSD columns stay zero. */
   unused(include_resource_stats);
   ArrayList<process_entry> processes{heap_allocator()};
   HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -3603,8 +3290,7 @@ fn enumerate_processes(bool include_resource_stats) throws
     process_entry process{};
     process.pid = static_cast<i64>(entry.th32ProcessID);
     process.name = String{entry.szExeFile};
-    /* The snapshot exposes the executable name rather than the full argument
-       vector, so the command line stands in as that name. */
+    /* The snapshot exposes only the executable name, used as the command line. */
     process.command_line = process.name.clone();
     processes.push(steal(process));
   } while (Process32Next(snapshot, &entry) != 0);
@@ -3665,9 +3351,6 @@ fn erase_extension_and_get_its_index(String &program_name) -> ext_index
 
 #endif /* COSMO || WIN32 */
 
-/* The platform blocks above set PARENT_SHELL_PID and pull in the headers each
-   platform needs. These functions read the same way on every platform, so they
-   live once here rather than once per block. */
 namespace shit {
 namespace os {
 
@@ -3678,8 +3361,7 @@ fn get_shell_process_id() wontthrow -> i64
 
 fn get_file_creation_mask() wontthrow -> u32
 {
-  /* umask only reads through a set, so the previous value is read and put back.
-     The macro casts to the platform type, so the value passes through as is. */
+  /* umask reads only through a set, so it is read and put back. */
   let const previous_mask = SHIT_UMASK(0);
   SHIT_UMASK(previous_mask);
 

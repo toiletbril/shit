@@ -1,10 +1,5 @@
 #pragma once
 
-/* Declarations shared across the Expressions translation units. The node method
-   definitions split into ExpressionsSimpleCommand.cpp, ExpressionsCompound.cpp,
-   and ExpressionsArith.cpp, while the free helpers and the redirection and loop
-   types they share live here. The class definitions stay in Expressions.hpp. */
-
 #include "Common.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -19,19 +14,14 @@ fn indent_for_layer(usize layer) throws -> String;
 fn report_command_not_found(EvalContext &cxt, const CommandNotFound &e) throws
     -> void;
 
-/* Rebases a function-body error onto the stored definition copy when the error
-   sits inside a live function call, so an error from an eval-defined or a
-   sourced-file function renders against the body and the defining filename
-   rather than the caller's line. The returned view is the windowed source, or
-   None when no window applies and the caller renders against the current
-   source. */
+/* The returned view is the windowed source, or None when no window applies and
+   the caller renders against the current source. */
 fn window_function_body_error(EvalContext &cxt,
                               ErrorWithLocation &error) wontthrow
     -> Maybe<StringView>;
 
 namespace expressions {
 
-/* What a single redirection resolves to before any descriptor is placed. */
 enum class redirection_outcome
 {
   Heredoc,     /* opened_fd holds a staged temp body for target_fd */
@@ -40,10 +30,7 @@ enum class redirection_outcome
   Duplicate,   /* dup_from_fd names the source, or DUP_FD_CLOSE for the close */
 };
 
-/* The unplaced result of one redirection, the opened descriptor or the
-   duplication source, with the target fd. opened_fd is owned by the caller,
-   which places it and closes it. dup_from_fd is the duplication source, the
-   close marker, or the target itself for a self copy. */
+/* opened_fd is owned by the caller, which places it and closes it. */
 struct resolved_redirection
 {
   redirection_outcome kind{};
@@ -65,7 +52,6 @@ fn allocate_redirection_descriptor(const Redirection &redir,
                                    bool *open_or_stage_failed = nullptr) throws
     -> i32;
 
-/* What a loop does with the control flow pending after its body ran. */
 enum class loop_disposition
 {
   /* No jump, or a continue aimed here, so run the next iteration. */

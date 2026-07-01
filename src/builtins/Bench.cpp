@@ -9,14 +9,6 @@
 #include <cmath>
 #include <cstdio>
 
-/* bench is a poop-style comparator. It samples each command repeatedly as a
-   measured child, collects wall time, peak resident set, and the Linux perf
-   counters per sample, then prints a per-command summary of mean, standard
-   deviation, minimum, maximum, and median. With more than one command it prints
-   each later command against the first as a relative speedup with an
-   uncertainty. The child output is suppressed during sampling so the report
-   stays clean. */
-
 FLAG_LIST_DECL();
 
 FLAG(bench_runs, String, '\0', "runs",
@@ -42,8 +34,6 @@ namespace shit {
 
 namespace {
 
-/* The hard ceiling on samples a single command collects, so a fast command with
-   a generous duration cannot grow the buffer without bound. */
 constexpr usize MAX_SAMPLES = 100000;
 constexpr usize MIN_SAMPLES = 3;
 constexpr u64 DEFAULT_DURATION_MILLIS = 3000;
@@ -96,10 +86,6 @@ fn colored(StringView code, bool may_color) wontthrow -> StringView
   return may_color ? code : StringView{};
 }
 
-/* Compute the mean, standard deviation, minimum, maximum, and median of one
-   metric, reading the field selected by the accessor out of every sample. The
-   median sorts a copy of the values, so the sample order is left intact for the
-   next metric. */
 template <typename Accessor>
 fn compute_stats(const ArrayList<bench_sample> &samples, Accessor accessor,
                  Allocator allocator) throws -> metric_stats
@@ -231,8 +217,6 @@ fn append_padding(String &out, usize count) throws -> void
     out.push(' ');
 }
 
-/* The padding counts the visible characters of the value, never the zero-width
-   color escapes that wrap the number, so the "+/-" and the "(" line up. */
 fn append_metric_line(String &out, const metric_row &row, usize mean_width,
                       usize std_dev_width, bool may_color) throws -> void
 {
@@ -263,8 +247,6 @@ fn append_metric_line(String &out, const metric_row &row, usize mean_width,
   out += ")\n";
 }
 
-/* The ratio compares the means, and the uncertainty propagates the two standard
-   deviations through the ratio. */
 fn append_relative_line(String &out, StringView name, const metric_stats &first,
                         const metric_stats &other, bool may_color) throws
     -> void
@@ -323,18 +305,10 @@ fn parse_count_flag(StringView text, StringView flag_name) throws -> u64
   return value;
 }
 
-/* The progress redraw interval in nanoseconds, so a fast command does not
-   repaint the line every sample and flicker the terminal. */
 constexpr u64 PROGRESS_INTERVAL_NANOS = 16ULL * 1000000ULL;
 
-/* Whether bench may draw an in-progress line. It draws only when stderr is a
-   terminal, so a piped or redirected run stays silent and never pollutes the
-   captured result. */
 fn progress_is_enabled() throws -> bool { return colors::stderr_wants_color(); }
 
-/* Repaint the in-progress line on stderr, carriage-returning over itself so the
-   percent updates in place. The percent is the fraction of the run count or the
-   duration budget reached so far, clamped to 100. */
 fn draw_progress(StringView command, u64 percent, Allocator allocator) throws
     -> void
 {
@@ -347,20 +321,11 @@ fn draw_progress(StringView command, u64 percent, Allocator allocator) throws
   print_error(line.view());
 }
 
-/* Erase the in-progress line so the final result starts on a clean row. The
-   carriage return rewinds, the spaces blank the old text, and a second return
-   parks the cursor at the start of the line. */
 fn clear_progress() throws -> void
 {
   print_error(StringView{"\r                                        \r"});
 }
 
-/* Sample one command until either the run count is reached or the duration
-   budget elapses, never below the minimum and never above the ceiling. Each
-   sample is a measured child with its output suppressed. The first failed spawn
-   throws so the user learns the command is wrong. A Ctrl-C sets the shared
-   interrupt flag, and the loop tests it every iteration, so the sampling stops
-   promptly and the caller learns through was_interrupted that it must abort. */
 fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
                   bool show_progress, bool &was_interrupted,
                   Allocator allocator) throws -> command_result
@@ -387,8 +352,6 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
   bool has_perf = false;
 
   for (usize i = 0;; i++) {
-    /* A Ctrl-C delivered between samples stops the loop before the next child
-       runs, mirroring the check Expression::evaluate makes per node. */
     if (os::INTERRUPT_REQUESTED) {
       was_interrupted = true;
       break;
@@ -404,10 +367,6 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
       break;
     if (i >= MAX_SAMPLES) break;
 
-    /* The progress repaints on its own interval rather than every sample, so a
-       fast command does not flicker the line. The percent tracks the sample
-       count toward an explicit run limit, otherwise the elapsed fraction of the
-       duration budget. */
     if (show_progress &&
         (elapsed_nanos - last_progress_nanos) >= PROGRESS_INTERVAL_NANOS)
     {
@@ -446,8 +405,6 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
     samples.push(sample);
   }
 
-  /* The progress line is erased once sampling ends, whether it ended at the
-     budget or at a Ctrl-C, so the summary or the next prompt starts clean. */
   if (show_progress) clear_progress();
 
   result.sample_count = samples.count();
@@ -483,8 +440,6 @@ fn append_summary(String &out, const command_result &result, bool may_color,
   out +=
       " (" + String::from(result.sample_count, allocator) + " runs)\n";
 
-  /* The rows are formatted first so their mean and stddev widths are known
-     before any line is rendered, which is what lets the value columns align. */
   let rows = ArrayList<metric_row>{allocator};
   rows.push(make_metric_row("wall time", result.wall_time,
                             metric_unit::Nanoseconds, allocator));
@@ -548,8 +503,7 @@ pure fn Bench::kind() const wontthrow -> Builtin::Kind { return Kind::Bench; }
 
 cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  /* The flag parser returns the builtin name as the first operand the way the
-     shell parser keeps argv[0], so the commands start at the second operand. */
+  /* The flag parser keeps argv[0], so the commands start at index 1. */
   let const arguments = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
@@ -567,8 +521,6 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     duration_millis =
         parse_count_flag(FLAG_bench_duration.value(), StringView{"duration"});
 
-  /* The summary table is written to stdout, so its color follows the stdout
-     terminal, the same gate the diagnostics and the prompt use. */
   const bool may_color = colors::stdout_wants_color();
   const bool show_progress = progress_is_enabled();
 
@@ -582,10 +534,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                 show_progress, was_interrupted,
                                 cxt.scratch_allocator()));
 
-    /* A Ctrl-C aborts the whole benchmark, not just the current command. The
-       interrupt flag is cleared here, the way the shell drops it after an
-       interrupted command, so the next prompt is clean, the half-built table is
-       discarded, and bench returns the 130 an interrupted command returns. */
+    /* A Ctrl-C clears the interrupt flag and returns 130. */
     if (was_interrupted) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
@@ -598,8 +547,6 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     append_summary(out, results[i], may_color, cxt.scratch_allocator());
   }
 
-  /* The relative comparison is shown only when there is a second command to
-     compare against the first. */
   if (results.count() > 1) {
     out += "\n";
     for (usize i = 1; i < results.count(); i++)

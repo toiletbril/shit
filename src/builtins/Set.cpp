@@ -4,11 +4,6 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* set toggles the shell options and rebinds the positional parameters. An
-   option is named by a single letter after a minus to enable it or a plus to
-   disable it, or by its long name after -o or +o. The letters and names that
-   have no backing behavior yet are accepted without effect. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-aAbBCeEfGhIkmMnSTuvWx] [+aAbBCeEfGhIkmMnSTuvWx] "
@@ -38,11 +33,7 @@ namespace shit {
 
 namespace {
 
-/* One shell option, named by its letter and its long name, with the command
-   line's --help spelling as an accepted alias where the two differ. set and
-   get are the accessors on EvalContext. Both null marks an option accepted
-   without effect, while a null set with a live get marks a startup fact that
-   set -o reports read-only and refuses to change. */
+/* A null set with a live get is a startup fact set -o refuses to change. */
 class SetOption
 {
 public:
@@ -51,8 +42,6 @@ public:
   void (EvalContext::*set)(bool);
   bool (EvalContext::*get)() const;
   StringView help;
-  /* The default keeps the rows without a second spelling free of a trailing
-     empty initializer. */
   StringView alias{};
 };
 
@@ -78,8 +67,6 @@ const SetOption SET_OPTIONS[] = {
      "Resolve the bundled shitbox utility names directly as commands."},
     {'m', "monitor", &EvalContext::set_monitor, &EvalContext::monitor,
      "Run background jobs in their own process group with notifications."},
-    /* failglob has no short letter, so '\0' keeps find_option_by_letter from
-       ever matching a parsed option character. */
     {'\0', "failglob", &EvalContext::set_failglob, &EvalContext::failglob,
      "Fail a command whose glob matches nothing."},
     {'b', "notify", &EvalContext::set_notify, &EvalContext::notify,
@@ -99,8 +86,6 @@ const SetOption SET_OPTIONS[] = {
     {'k', "keyword", nullptr, nullptr, "Accepted without effect."},
     {'T', "functrace", nullptr, nullptr, "Accepted without effect."},
     {'B', "braceexpand", nullptr, nullptr, "Accepted without effect."},
-    /* The shell's own debug toggles, so set -A turns the AST dump on at runtime
-       the same way the -A flag does at startup. */
     {'A', "show-ast", &EvalContext::set_show_ast, &EvalContext::show_ast,
      "Print the AST before each command runs."},
     {'R', "show-lexed-words", &EvalContext::set_show_lexed_words,
@@ -127,19 +112,12 @@ const SetOption SET_OPTIONS[] = {
     {'G', "show-memory", &EvalContext::set_memory_stats_enabled,
      &EvalContext::memory_stats_enabled,
      "Print a granular memory report at exit, the --show-memory flag."},
-    /* The startup facts. A null set with a live get reports the state in the
-       listings while set -o refuses to change it, since the choice happened at
-       invocation. */
     {'\0', "login", nullptr, &EvalContext::is_login_shell,
      "Whether the shell started as a login shell, fixed at startup."},
     {'\0', "rcfile", nullptr, &EvalContext::has_custom_rcfile,
      "Whether a custom rc file was named at startup, fixed at startup."},
 };
 
-/* Parse a set --mood value, with 'shit' the strict default, 'bash' the bash
-   extensions, and 'sh' or 'posix' the dash semantics. An unknown spelling
-   returns None so the caller reports the usage error the same way --mood does
-   at startup. */
 fn parse_mood_name(StringView name) throws -> Maybe<mimic_mood>
 {
   static constexpr StaticStringMap<mimic_mood>::entry ENTRIES[] = {
@@ -218,17 +196,12 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
     cxt.set_pipefail_explicit(enable);
 }
 
-/* The reusable command form that set -o and set +o print, one line each. The
-   shell's own debug toggles, named show-*, are left out so set -o lists only
-   the standard options a portable script expects, the way bash never prints a
-   non-standard option name. set -p still lists them for discovery. */
+/* The show-* names are excluded from set -o but kept by set -p. */
 String list_options(const EvalContext &cxt) throws
 {
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
     if (option.name.starts_with(StringView{"show-"})) continue;
-    /* A startup fact cannot be replayed through set -o, so the replay listing
-       leaves it out and set -p stays the place that shows it. */
     if (option_is_startup_fact(option)) continue;
     out += option_is_on(cxt, option) ? "set -o " : "set +o ";
     out += option.name;
@@ -237,9 +210,6 @@ String list_options(const EvalContext &cxt) throws
   return out;
 }
 
-/* Apply the -o name long option, the form the standalone -o and the trailing o
-   of a bundle share. The index advances past the consumed name, and a missing
-   name lists the options. */
 void apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
                                const ArrayList<String> &args, usize &i,
                                bool enable) throws
@@ -255,15 +225,9 @@ void apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
   apply_or_reject_option(cxt, *option, enable);
 }
 
-/* The full option table, one row per option with its letter, its long name,
-   and its description. set -p passes the context and gains a state column,
-   while set --help passes null and gains the alias spellings, so both
-   listings read from the one table. */
 String format_option_table(const EvalContext *cxt,
                            bool include_alias_spellings) throws
 {
-  /* The plain set -p column fits the bare names, while the --help column
-     also holds the ", alias" spellings. */
   const usize name_field_width = include_alias_spellings ? 30 : 18;
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
@@ -290,9 +254,6 @@ String format_option_table(const EvalContext *cxt,
   return out;
 }
 
-/* The OPTION SWITCHES help section, the intro line, the full table with the
-   alias spellings, and the long names -o accepts on one wrapped list, so set
-   --help describes every switch. */
 String format_option_switches_help() throws
 {
   let section = String{"OPTION SWITCHES\n"};
@@ -328,8 +289,6 @@ fn query_shell_option(const EvalContext &cxt, StringView name) throws
 fn shell_option_names(bool include_alias_spellings) throws
     -> const ArrayList<StringView> &
 {
-  /* SET_OPTIONS is immutable and the completion engine reads these on every
-     keystroke, so both spellings build once. */
   static ArrayList<StringView> canonical = [] throws {
     let names = ArrayList<StringView>{heap_allocator()};
     for (let const &option : SET_OPTIONS)
@@ -409,9 +368,6 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    /* set --mood [VALUE] changes the runtime mood, or prints the active mood
-       when no value follows. The mood drives strictness, so the nounset,
-       pipefail, and failglob defaults are reseeded from the new mood. */
     if (arg == "--mood" || arg == "-M" ||
         arg.view().starts_with(StringView{"--mood="}) ||
         arg.view().starts_with(StringView{"-M="}))
@@ -443,9 +399,6 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    /* set --init-moods=LIST re-runs the startup files for each listed flavor in
-       the live session, the way the --init-moods flag does at startup, so a
-       bash rc or a shit rc reloads on demand. */
     if (arg == "--init-moods" || arg == "-L" ||
         arg.view().starts_with(StringView{"--init-moods="}) ||
         arg.view().starts_with(StringView{"-L="}))
@@ -459,8 +412,6 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         value = args[++i].view();
         has_value = true;
       }
-      /* With no value the form reports the moods whose startup files have
-         loaded this session, the way set --mood reports the active mood. */
       if (!has_value) {
         let out = String{cxt.scratch_allocator()};
         for (mimic_mood listed :
@@ -500,8 +451,6 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    /* The long form -o name and +o name names one option, or lists them all
-       when no name follows. */
     if (arg == "-o" || arg == "+o") {
       apply_long_option_by_name(ec, cxt, args, i, arg[0] == '-');
       continue;
@@ -540,8 +489,6 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    /* The first non-option argument and everything after it rebinds the
-       positional parameters. */
     is_collecting_operands = true;
     should_rebind = true;
     operands.push_managed(arg);

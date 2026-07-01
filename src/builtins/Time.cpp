@@ -33,14 +33,8 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* time with no command prints nothing and succeeds, the way an empty timed
-     command would. */
   if (ec.args().count() < 2) return 0;
 
-  /* The arguments past the builtin name are joined and run through the shell,
-     so the timed command resolves the same way an eval body does. The arguments
-     arrive already expanded and split, so a word that carried embedded spaces
-     through a quote is re-split here, the same caveat eval carries. */
   let command = String{cxt.scratch_allocator()};
   for (usize i = 1; i < ec.args().count(); i++) {
     if (i > 1) command.push(' ');
@@ -53,10 +47,9 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   os::children_cpu_seconds(user_before, system_before);
   let const rss_before = os::children_peak_rss_bytes();
 
-  /* The timed command must run to completion and return here so the report can
-     print. When time is the shell's final command the tail-exec optimization
-     would replace the shell process with the command and the report would never
-     run, so the flag is cleared around the run and restored after. */
+  /* The tail-exec optimization would replace the shell process on the final
+     command, so the report would never print. The flag is cleared around the
+     run and restored after. */
   let const saved_terminal_exec = cxt.terminal_exec_allowed();
   cxt.set_terminal_exec_allowed(false);
   defer { cxt.set_terminal_exec_allowed(saved_terminal_exec); };
@@ -77,8 +70,8 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const double system_cpu = system_after - system_before;
   let const peak_rss_bytes = rss_after > rss_before ? rss_after : 0;
 
-  /* A set TIMEFORMAT drives the format, an empty value prints nothing, and an
-     unset value keeps the pretty default, matching the time keyword. */
+  /* An empty TIMEFORMAT prints nothing, an unset value keeps the pretty
+     default. */
   String report{cxt.scratch_allocator()};
   if (let const time_format = cxt.get_variable_value("TIMEFORMAT");
       time_format.has_value())

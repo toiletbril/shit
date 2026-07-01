@@ -77,8 +77,6 @@ StringView::StringView(const char *cstr) wontthrow
 fn StringView::find_character(char wanted) const wontthrow -> Maybe<usize>
 {
   if (length == 0) return None;
-  /* memchr is vectorized in libc, so a single-byte scan beats a per-byte loop
-     on a long line, and the guard keeps a null data pointer out of it. */
   let const found =
       std::memchr(data, static_cast<unsigned char>(wanted), length);
   if (found == nullptr) return None;
@@ -104,8 +102,7 @@ fn StringView::substring_of_length(usize start, usize count) const wontthrow
 fn StringView::starts_with(StringView prefix) const wontthrow -> bool
 {
   if (prefix.length > length) return false;
-  /* An empty prefix matches, and the guard keeps a null data pointer out of
-     memcmp, which is undefined even for a zero length. */
+  /* The length guard keeps a null data pointer out of memcmp. */
   return prefix.length == 0 ||
          std::memcmp(data, prefix.data, prefix.length) == 0;
 }

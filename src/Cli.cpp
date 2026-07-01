@@ -157,13 +157,10 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
       }
     } else {
       if (!flags[i]->long_name().is_empty()) {
-        /* There might be flags that are prefixes of other flags. Go
-           through all flags first and pick the longest match. */
         let const flag_length = flags[i]->long_name().length;
 
         /* strncmp stops at the argument's NUL, so a short argument such as --f
-           against the flag --foobar does not read past the argument the way a
-           fixed-length memcmp would. */
+           against the flag --foobar does not read past it. */
         if (flag_length > longest_length &&
             std::strncmp(flags[i]->long_name().data, flag_start, flag_length) ==
                 0)
@@ -230,13 +227,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     ASSERT(argv[i] != nullptr);
 
     if (next_arg_is_value) {
-      /* The command flag reads its value from the first non-option operand the
-         way the shell's -c does, so a recognized boolean flag that follows it
-         is parsed as a flag rather than swallowed, and `-c -l command` runs
-         command under -l. This applies to the command flag alone. Every other
-         flag, and every builtin such as read, takes the next argument verbatim,
-         so a delimiter or filename that begins with a dash is kept as the
-         value. */
+      /* operand_value_flag alone lets a recognized boolean flag after it parse
+         as a flag, so `-c -l command` runs command under -l. Every other flag
+         takes the next argument verbatim, keeping a dash-led value intact. */
       bool next_is_known_bool_flag = false;
       if (prev_flag == operand_value_flag && operand_value_flag != nullptr &&
           argv[i][0] == '-' && argv[i][1] != '\0')
@@ -269,19 +262,13 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
         continue;
       }
-
-      /* The pending value flag is kept while the recognized boolean flag below
-         is parsed, so the next non-flag operand still becomes its value. */
     }
 
-    /* The first argument is the invocation name even when it opens with a
-       dash, the login convention that spawns a shell as -bash, so it is
-       never read as a flag bundle. */
+    /* argv[0] is the invocation name even when it opens with a dash, the login
+       convention that spawns a shell as -bash, so it is never a flag bundle. */
     if (should_ignore_rest || argv[i][0] != '-' || i == 0) {
-      /* The program name is the first operand and does not end option parsing.
-         The next operand is the script, after which every argument belongs to
-         the script as a positional parameter, not to the shell, the way
-         `sh script -x` passes -x to the script. */
+      /* The next operand is the script, after which every argument is a
+         positional parameter for the script, the way `sh script -x` does. */
       const bool is_program_name = args.is_empty();
       LOG(Debug, "taking '%s' as an operand", argv[i]);
       args.push_managed(StringView{argv[i]});
@@ -359,15 +346,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
             LOG(All, "the flag '%s' expects the next argument as its value",
                 flag_name(flag, is_long).c_str());
             next_arg_is_value = true;
-            /* The flag awaiting its value is remembered here rather than at the
-               end of the loop, so a recognized boolean flag parsed before the
-               value arrives does not overwrite it. */
             prev_flag = flag;
             prev_is_long = is_long;
           } else {
-            /* A short flag attaches its value with no separator, a long flag
-               requires '=' or a space, and a long flag with a missing separator
-               is an error. */
             if (*value_offset == '=') {
               value_offset++;
 
@@ -408,7 +389,6 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
         if (*flag_offset == '-') {
           throw Error{"Missing space between '-' and other options"};
         } else {
-          /* The name before '=' is reported, trimming any attached value. */
           let error_message = String{heap_allocator()};
           error_message += "Unknown flag '-";
 
@@ -429,9 +409,8 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
           LOG(Debug, "rejecting the unknown flag in '%s'", argv[i]);
 
-          /* The caret points at the whole offending argument in the joined
-             command line, so its offset is the length of every earlier argument
-             plus one space each. */
+          /* The caret offset is every earlier argument's length plus one space
+             each, pointing at the whole offending argument. */
           usize caret_offset = 0;
           for (int k = 0; k < i; k++)
             caret_offset += std::strlen(argv[k]) + 1;
@@ -522,8 +501,6 @@ cold fn show_short_version() throws -> void
   s += String::from(SHIT_VER_PATCH, heap_allocator());
   s += '-';
   s += SHIT_VER_EXTRA;
-  /* The build mode and the short commit hash trail the version so a reported
-     binary names exactly which build and revision it is. */
   s += '-';
   s += SHIT_BUILD_MODE;
   s += '-';
@@ -559,9 +536,6 @@ cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
   usize line_used = 0;
   usize word_start = 0;
   bool is_line_started = false;
-  /* Each space, and the end of the text, closes a word. A word is placed on the
-     current line when it still fits, otherwise a new indented line begins. A
-     word wider than the line is emitted whole rather than split. */
   for (usize i = 0; i <= text.length; i++) {
     const bool at_end = i == text.length;
     if (!at_end && text[i] != ' ') continue;
@@ -592,18 +566,12 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
 {
   let s = String{heap_allocator()};
 
-  /* The description starts at a fixed column so every flag lines up, and a
-     description longer than the line wraps with its continuation indented to
-     the same column. A flag whose names reach the column gets its description
-     on the next line. */
   static constexpr usize DESCRIPTION_COLUMN = 26;
   static constexpr usize TEXT_WIDTH = HELP_WRAP_WIDTH - DESCRIPTION_COLUMN;
 
   let const do_render_flag = [&](const shit::Flag *f) throws {
     s += "\n";
 
-    /* The whole left part, the short form, the long form, and the value
-       placeholder, is built first so its width decides the padding. */
     let left = String{heap_allocator()};
     if (f->short_name() != '\0') {
       left += "  -";
@@ -633,9 +601,6 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
 
     s += left;
 
-    /* A left part that reaches the column, leaving no room for a two-space gap,
-       takes the description on the next line. Otherwise it is padded to the
-       column. */
     if (left.length() + 2 > DESCRIPTION_COLUMN) {
       s += '\n';
       for (usize i = 0; i < DESCRIPTION_COLUMN; i++)
@@ -645,9 +610,6 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
         s += ' ';
     }
 
-    /* Word-wrap the description so no line exceeds the wrap width, each
-       continuation indented back to the description column. A single word
-       longer than the text width is emitted whole rather than split. */
     let const description = f->description();
     usize line_used = 0;
     usize word_start = 0;
@@ -674,8 +636,6 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
     }
   };
 
-  /* Each flag renders under the section its definition names, in enum order,
-     the NoSection flags first under the plain OPTIONS heading. */
   static const StringView SECTION_HEADERS[] = {
       "OPTIONS",      "POSIX OPTIONS", "BASH OPTIONS", "COMPATIBILITY OPTIONS",
       "SHIT OPTIONS", "DEBUG OPTIONS"};
@@ -697,8 +657,8 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
 
 fn print(StringView text) throws -> void
 {
-  /* The output is flushed at once so it interleaves with the unbuffered
-     write_fd path the builtins use, keeping the order a reader sees correct. */
+  /* Flushed at once so it interleaves with the unbuffered write_fd path the
+     builtins use. */
   std::fwrite(text.data, 1, text.count(), stdout);
   std::fflush(stdout);
 }
@@ -711,9 +671,8 @@ fn print_error(StringView text) throws -> void
 
 fn flush() throws -> void { std::fflush(stdout); }
 
-/* Set while the editor sits mid-line and a diagnostic must break to its own
-   line first. The first show_message consumes it, so only the leading message
-   of a completion run is pushed down, not every message after it. */
+/* The first show_message consumes it, so only the leading message of a
+   completion run breaks to its own line, not every message after it. */
 static thread_local bool MESSAGE_LEADING_NEWLINE_ARMED = false;
 
 fn arm_message_leading_newline(bool armed) wontthrow -> void

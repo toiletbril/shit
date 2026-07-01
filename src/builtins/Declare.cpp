@@ -6,10 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* -A makes a name an associative array and -a makes it indexed, so a later
-   subscript assignment routes to the right store. -i marks a name an integer
-   so every assignment to it evaluates as arithmetic. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-aAfFgilnprtux] [+i] [name[=value] ...]");
@@ -78,8 +74,6 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       i++;
       break;
     }
-    /* A leading plus removes an attribute the way bash spells declare +i, so
-       the sign decides whether a letter marks or unmarks. */
     let const is_remove_form = arg[0] == '+';
     for (usize c = 1; c < arg.length; c++) {
       switch (arg[c]) {
@@ -166,8 +160,6 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return status;
   }
 
-  /* declare -p prints in the bash syntax so a script can reload the state. An
-     unknown name is an error. */
   if (should_print) {
     i32 status = 0;
     for (; i < args.count(); i++) {
@@ -209,8 +201,6 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         line += ")\n";
         ec.print_to_stdout(line.view());
       } else if (const Maybe<String> value = cxt.get_variable_value(name)) {
-        /* The attribute letters compose the way bash prints declare -ix, and a
-           scalar with no attribute prints the bare double dash. */
         let attribute = String{cxt.scratch_allocator(), "-"};
         if (cxt.is_integer_variable(name)) attribute += 'i';
         if (os::get_environment_variable(name).has_value()) attribute += 'x';
@@ -224,8 +214,6 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         line += "\"\n";
         ec.print_to_stdout(line.view());
       } else if (cxt.is_integer_variable(name)) {
-        /* An integer-marked name with no value yet still has the attribute, so
-           it prints without the =value tail the way bash does. */
         let line = String{cxt.scratch_allocator(), "declare -i"};
         if (os::get_environment_variable(name).has_value()) line += 'x';
         line += ' ';
@@ -289,10 +277,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         cxt.set_indexed_array(name, ArrayList<String>{heap_allocator()});
     } else if (equals.has_value()) {
       if (is_append) {
-        /* The appended value is transient, copied into the variable store by
-           set_shell_variable, so it lives on the per-command scratch arena. An
-           integer name joins the appended expression for the arithmetic in
-           the store rather than concatenating it. */
+        /* An integer name joins the appended expression as arithmetic. */
         let appended = String{cxt.scratch_allocator()};
         if (let const existing = cxt.get_variable_value(name))
           appended.append(existing->view());

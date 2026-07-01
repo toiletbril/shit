@@ -26,9 +26,8 @@ namespace shit {
 
 namespace shitbox {
 
-/* The total byte size of a path, a file's own size or the sum of a directory's
-   files reached recursively. A symlink is counted as its own small size and
-   not followed, so a cycle cannot run forever. */
+/* A symlink is counted as its own size and not followed, so a cycle cannot
+   run forever. */
 static fn total_size(const Path &path) throws -> u64
 {
   if (path.is_directory() && !path.is_symbolic_link()) {

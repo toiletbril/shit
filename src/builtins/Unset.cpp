@@ -44,8 +44,6 @@ fn Unset::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                bracket.has_value() && name.count() > 0 &&
                name.view()[name.count() - 1] == ']')
     {
-      /* A name[subscript] operand removes one array element or key rather than
-         the whole variable. */
       const StringView array_name =
           name.view().substring_of_length(0, *bracket);
       const StringView subscript = name.view().substring_of_length(
@@ -60,9 +58,7 @@ fn Unset::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         has_error = true;
       }
     } else {
-      /* A read-only variable makes unset_shell_variable throw. The remaining
-         names are still unset and the builtin reports a non-zero status, the
-         way dash continues past a read-only name. */
+      /* A read-only name throws, the rest are still unset, matching dash. */
       LOG(All, "unset removing variable '%s'", name.c_str());
       try {
         cxt.unset_shell_variable(name);

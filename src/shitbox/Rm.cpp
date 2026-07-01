@@ -39,10 +39,7 @@ fn remove_path(StringView path, bool is_recursive) throws -> bool
   return os::remove_file(path);
 }
 
-/* Whether the operand names the . or .. directory entry, its basename after any
-   trailing slashes. POSIX requires rm to refuse such an operand so a recursive
-   remove cannot delete the working or the parent directory entry, and the -f
-   flag does not waive the refusal. */
+/* POSIX requires rm to refuse a . or .. operand even under -f. */
 static fn names_dot_or_dotdot(StringView operand) wontthrow -> bool
 {
   usize end = operand.length;
@@ -57,10 +54,7 @@ static fn names_dot_or_dotdot(StringView operand) wontthrow -> bool
   return base == StringView{"."} || base == StringView{".."};
 }
 
-/* Whether the operand names the root directory, every byte a slash. A recursive
-   remove of / would walk the whole filesystem, so rm refuses it the way GNU rm
-   does under its default preserve-root, and the -f flag does not waive it. The
-   dot guard already covers /. and /.. through their basename. */
+/* rm refuses / even under -f, matching GNU preserve-root. */
 static fn names_root_directory(StringView operand) wontthrow -> bool
 {
   if (operand.length == 0) return false;

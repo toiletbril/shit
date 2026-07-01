@@ -7,10 +7,6 @@
 
 #include <cstdio>
 
-/* umask prints the current file-creation mask with no argument, octal by
-   default and symbolic under -S, and sets it from an octal or a symbolic
-   argument such as u=rwx,g=rx,o=. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-S] [mask]");
@@ -44,9 +40,6 @@ pure fn group_mask(char who) wontthrow -> u32
   }
 }
 
-/* Render a mask as the symbolic form -S prints, listing for each group the
-   permissions the mask leaves enabled, which is the complement of the masked
-   bits. */
 fn mask_to_symbolic(u32 mask, Allocator allocator) throws -> String
 {
   const u32 allowed = (~mask) & PERMISSION_BITS;
@@ -65,10 +58,8 @@ fn mask_to_symbolic(u32 mask, Allocator allocator) throws -> String
   return out;
 }
 
-/* Apply a symbolic mask specification to the current mask, returning the new
-   mask, or None when the spec is malformed. The clauses operate on the enabled
-   permissions, the complement of the mask, the way chmod-style symbols do, then
-   the result is complemented back into a mask. */
+/* The clauses operate on the complement of the mask, then the result is
+   complemented back into a mask. */
 fn apply_symbolic_mask(StringView spec, u32 current_mask) throws -> Maybe<u32>
 {
   u32 allowed = (~current_mask) & PERMISSION_BITS;
@@ -81,7 +72,6 @@ fn apply_symbolic_mask(StringView spec, u32 current_mask) throws -> Maybe<u32>
       who |= group_mask(spec[i]);
       i++;
     }
-    /* An omitted who names every group, the way POSIX treats it. */
     if (who == 0) who = PERMISSION_BITS;
 
     if (i >= spec.length) return None;
@@ -160,8 +150,6 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   LOG(Debug, "umask setting the file creation mask from '%s'",
       requested.c_str());
 
-  /* A leading digit names an octal mask, anything else a symbolic spec, the way
-     POSIX distinguishes the two operand forms. */
   if (!requested.is_empty() && requested[0] >= '0' && requested[0] <= '7') {
     let const parsed = utils::parse_integer_in_base(requested, int_base::octal);
     if (parsed.is_error())

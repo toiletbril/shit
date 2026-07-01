@@ -1,5 +1,5 @@
 /* The toiletline configuration macros are defined here, so Toiletline.hpp is
- * not included. */
+   not included. */
 
 #include "Arena.hpp"
 #include "Cli.hpp"
@@ -17,15 +17,9 @@
 
 namespace {
 
-/* The line editor allocates its history and line buffers through these hooks,
-   which draw from one arena that lives for the whole interactive session, since
-   the history persists across lines. A non-interactive run never starts the
-   editor, so it pays None. The bump arena cannot resize or free a single
-   block, so a free or a grown realloc returns the old block to a free list that
-   the next allocation reuses. That bounds memory to the working set rather than
-   growing it on every keystroke. A header before each block records the block's
-   capacity, used both to copy the right bytes on realloc and to size a reused
-   block. Each free block links to the next through its own payload. */
+/* The bump arena cannot free a single block, so a free returns the block to a
+   free list the next allocation reuses. A header before each block records its
+   capacity for realloc and for sizing a reused block. */
 shit::BumpArena TOILETLINE_ARENA{};
 
 constexpr usize TL_ALLOC_HEADER = 16;
@@ -89,9 +83,7 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 #define TL_HISTORY_MAX_SIZE (1024 * 4)
 
 #define TOILETLINE_IMPLEMENTATION
-/* A release build makes TL_ASSERT a no-op, which leaves a few of the vendored
-   helpers unused. The dependency is not ours to edit, so the warning is
-   silenced only around its include. */
+/* A release build makes TL_ASSERT a no-op, leaving some vendored helpers unused. */
 #if defined __clang__ || defined __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -103,9 +95,8 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 
 shit::EvalContext *COMPLETION_CONTEXT = nullptr;
 
-/* The storage the completion callback hands back to toiletline. The C-string
-   pointers must outlive the callback return, so the engine's owned strings are
-   kept here until the next call replaces them. */
+/* The C-string pointers handed back to toiletline must outlive the callback
+   return, so the owned strings are kept here until the next call. */
 shit::ArrayList<shit::String> COMPLETION_CANDIDATES{shit::heap_allocator()};
 shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{
     shit::heap_allocator()};
@@ -114,8 +105,6 @@ shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
     shit::heap_allocator()};
 shit::String COMPLETION_LCP{shit::heap_allocator()};
 
-/* An index at or past the codepoint count returns the byte length, so a clamped
-   cursor maps to the end of the buffer. */
 fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
                             usize codepoint_index) -> usize
 {
@@ -126,26 +115,22 @@ fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
       seen_codepoints += 1;
     byte_offset += 1;
   }
-  /* A continuation byte that trails the last counted codepoint is not the start
-     of the next one, so step over the rest of that codepoint. */
+  /* Step over the trailing continuation bytes of the last counted codepoint. */
   while (byte_offset < byte_length &&
          (static_cast<unsigned char>(bytes[byte_offset]) & 0xC0) == 0x80)
     byte_offset += 1;
   return byte_offset;
 }
 
-/* Toiletline edits in codepoints, so the cursor arrives as a codepoint index
-   and the token bounds must go back as codepoint indices, while the completion
-   engine works in bytes. */
+/* Toiletline edits in codepoints while the completion engine works in bytes. */
 fn shit_completion_callback(const char *buffer, size_t cursor,
                             tl_completion *out, int for_listing) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
 
-  /* Toiletline calls this through a C function pointer, so a C++ exception that
-     unwound past this frame would tear through C stack frames, which is
-     undefined behavior. The whole body is guarded and any throw is swallowed
-     into a no-completion result that leaves the line unchanged. */
+  /* Toiletline calls this through a C function pointer, so a throw unwinding
+     past this frame is undefined behavior. The body is guarded and any throw is
+     swallowed. */
   try {
     const usize byte_length = std::strlen(buffer);
     let line = shit::StringView{buffer, byte_length};
@@ -154,10 +139,8 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     const usize byte_cursor =
         byte_offset_of_codepoint(buffer, byte_length, cursor);
 
-    /* A completion run can raise a diagnostic, such as a bash-completion
-       function tripping a warning, while the editor sits on the prompt line. It
-       is armed to break onto its own line first, then disarmed whether or not
-       it printed, so a later command's message is unaffected. */
+    /* A completion diagnostic is armed to break onto its own line, then
+       disarmed so a later command's message is unaffected. */
     shit::arm_message_leading_newline(true);
     shit::completion::completion_result result = shit::completion::complete(
         line, byte_cursor, *COMPLETION_CONTEXT, base, for_listing != 0);
@@ -178,9 +161,8 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     for (let const &candidate : COMPLETION_CANDIDATES)
       COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
 
-    /* The candidate text keys the lookup since the engine keyed the map that
-       way to survive the sort. The build is skipped when no description was
-       produced, so a per-keystroke completion pays nothing for it. */
+    /* The candidate text keys the description lookup, and the build is skipped
+       when none was produced. */
     COMPLETION_DESCRIPTIONS.clear();
     COMPLETION_DESCRIPTION_POINTERS.clear();
     out->descriptions = nullptr;
@@ -203,15 +185,13 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     out->candidates = COMPLETION_CANDIDATE_POINTERS.begin();
     out->count = COMPLETION_CANDIDATE_POINTERS.count();
     out->longest_common_prefix = COMPLETION_LCP.c_str();
-    /* The engine reports the token span in bytes, so convert each boundary to a
-       codepoint index for toiletline, which replaces the span in codepoints. */
+    /* The engine reports the span in bytes, converted to codepoint indices. */
     out->token_start = ::tl_utf8_strnlen(buffer, result.token_start);
     out->token_end = ::tl_utf8_strnlen(buffer, result.token_end);
 
     return 1;
   } catch (shit::ErrorBase &error) {
-    /* A throw skips the disarm above, so it runs here too, since the flag is
-       process-wide and would otherwise push the next command's message down. */
+    /* A throw skips the disarm above, so it runs here too. */
     shit::arm_message_leading_newline(false);
     LOG(Debug, "completion swallowed an error: %s", error.message().c_str());
     return 0;
@@ -222,17 +202,11 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
   }
 }
 
-/* The conversion from byte spans to codepoint indices is monotonic, so the
-   spans stay sorted and non-overlapping. The body is guarded because toiletline
-   calls it through a C function pointer, so a throw must not unwind through the
-   C frames. */
+/* The body is guarded since toiletline calls through a C function pointer. */
 fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
-  /* NO_COLOR is honored live, so a runtime export NO_COLOR=1 draws the line
-     plain on the next keystroke. The callback is registered unconditionally and
-     gated here rather than at startup, so the decision follows the environment
-     for the whole session. */
+  /* NO_COLOR is honored live, gated here rather than at startup. */
   if (!shit::colors::stdout_wants_color()) return 0;
 
   try {
@@ -260,21 +234,15 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 shit::EvalContext *JOB_CONTEXT = nullptr;
 shit::String WAKE_NOTIFICATION_STASH{shit::heap_allocator()};
 
-/* The two-phase wake hook the editor's wait loop drives for set -b. Phase 0
-   asks whether anything must print, reading and clearing the SIGCHLD flag
-   and formatting the Done rows with \r\n endings for the raw-mode screen.
-   Phase 1 prints the stash after the editor cleared its render block, and
-   the editor redraws the prompt below the rows. The split keeps toiletline
-   ignorant of jobs and the shell ignorant of render-row geometry. The body
-   is guarded since toiletline calls through a C function pointer. */
+/* The two-phase wake hook for set -b. Phase 0 formats the Done rows, phase 1
+   prints them after the editor cleared its render block. The body is guarded
+   since toiletline calls through a C function pointer. */
 fn shit_wake_callback(int phase) -> int
 {
   try {
     if (phase == 0) {
       if (shit::os::CHILD_STATE_CHANGED == 0) return 0;
-      /* The flag clears only when this hook consumes it, so a completion
-         that lands before set -b turns notify on still reports once the
-         option flips. */
+      /* The flag clears only when this hook consumes it. */
       if (JOB_CONTEXT == nullptr || !JOB_CONTEXT->notify()) return 0;
       shit::os::CHILD_STATE_CHANGED = 0;
       WAKE_NOTIFICATION_STASH =
@@ -290,10 +258,8 @@ fn shit_wake_callback(int phase) -> int
   }
 }
 
-/* Bridge toiletline's ghost history validation onto the shell, the fish
-   autosuggestion rule. An entry whose command word no longer resolves is
-   rejected so the scan keeps looking for a live one. A throw accepts the
-   entry, since a suggestion is better than none when the resolver hiccups. */
+/* An entry whose command word no longer resolves is rejected. A throw accepts
+   the entry. */
 fn shit_ghost_validate_callback(const char *entry) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 1;
@@ -331,9 +297,6 @@ static char TL_BUFFER[ITL_STRING_MAX_LEN];
 
 static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
 
-/* The command history file, ~/.shit_history by default. A test or a one-off
-   session redirects it through the SHIT_HISTORY environment variable so it does
-   not clobber the real history. None when there is no home and no override. */
 static fn history_file_path() -> shit::Maybe<shit::Path>
 {
   if (let const override_path =
@@ -351,10 +314,6 @@ static fn history_file_path() -> shit::Maybe<shit::Path>
 
 static constexpr char SHIT_CALC_HISTORY_FILE[] = ".shit_calc_history";
 
-/* The calc REPL keeps its expression history in ~/.shit_calc_history, apart
-   from the shell command history. The SHIT_CALC_HISTORY environment variable
-   redirects it for a test or a one-off session. None when there is no home and
-   no override. */
 static fn calc_history_file_path() -> shit::Maybe<shit::Path>
 {
   if (let const override_path =
@@ -370,10 +329,8 @@ static fn calc_history_file_path() -> shit::Maybe<shit::Path>
   return path;
 }
 
-/* The in-memory history is swapped to the calc file on entry and back to the
-   shell file on leave, so a recalled calc expression never lands in the shell
-   command history and a shell command never appears in the calc REPL. The shell
-   history is dumped first so a later reload restores it whole. */
+/* The history is swapped to the calc file on entry and back on leave, so the
+   two histories never mix. The shell history is dumped first for a later reload. */
 fn enter_calc_history() -> void
 {
   if (shit::Maybe<shit::Path> shell = history_file_path(); shell.has_value())
@@ -406,8 +363,6 @@ fn set_title(const String &title) -> void
     }
   }
 
-  /* A terminal that rejects the title escape is cosmetic, not an error worth
-     surfacing, so a failure is ignored rather than thrown into the run. */
   ::tl_set_title(sanitized.c_str());
 }
 
@@ -427,16 +382,11 @@ fn disable_completion() -> void
   ::tl_set_ghost_validate_callback(nullptr);
 }
 
-/* True while the shell completion and highlighter are registered, so the calc
-   REPL restores them on leave only when they were on, leaving a -T shell
-   completion-free. */
 fn completion_is_enabled() -> bool { return COMPLETION_CONTEXT != nullptr; }
 
 fn enable_job_notifications(shit::EvalContext &context) -> void
 {
-  /* Registered whenever the editor runs, even under -T, since set -b is job
-     reporting rather than completion. The callback gates itself on the live
-     notify option. */
+  /* Registered even under -T, since set -b is job reporting, not completion. */
   JOB_CONTEXT = &context;
   ::tl_set_wake_callback(shit_wake_callback);
 }
@@ -474,9 +424,6 @@ fn initialize() -> void
   if (shit::Maybe<shit::Path> shit_history = history_file_path();
       shit_history.has_value())
   {
-    /* A history that cannot be loaded is cosmetic, a missing file on the first
-       run above all, so the failure is ignored rather than printed at startup.
-       The session simply starts with no recalled history. */
     ::tl_history_load(shit_history->c_str());
   }
 
@@ -523,10 +470,8 @@ fn set_input(const String &input) -> void
 fn enter_raw_mode() -> void
 {
   if (::tl_enter_raw_mode() == TL_SUCCESS) return;
-  /* A script run can leave fd 0 pointing away from the terminal, the
-     configure-style exec redirection performed in-process, so the controlling
-     tty is reopened onto fd 0 and raw mode retried before the prompt gives
-     up on the session. */
+  /* An in-process exec redirection can leave fd 0 off the terminal, so the tty
+     is reopened onto fd 0 and raw mode retried. */
   if (shit::os::reopen_terminal_as_stdin() &&
       ::tl_enter_raw_mode() == TL_SUCCESS)
   {
@@ -555,12 +500,8 @@ static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
     -> String
 {
   if (path.length <= max_length) return String{path};
-  /* The ellipsis is three bytes, so a max below it cannot leave a tail and the
-     whole path is returned rather than read past its end. */
   if (max_length < 3) return String{path};
-  /* The byte cut can land in the middle of a multibyte codepoint, so it
-     advances to the next codepoint boundary, the first byte that is not a UTF-8
-     continuation byte, before the tail is taken. */
+  /* The byte cut is advanced to the next codepoint boundary. */
   usize tail_start = path.length - max_length + 3;
   while (tail_start < path.length &&
          (static_cast<unsigned char>(path[tail_start]) & 0xC0) == 0x80)
@@ -591,9 +532,8 @@ static fn format_prompt_duration(u64 nanos) throws -> String
   return out;
 }
 
-/* The current local time formatted with strftime into a fixed buffer, used by
-   the clock prompt escapes. localtime is read on the single interactive thread,
-   so the shared static tm it returns is not a race. */
+/* localtime runs on the single interactive thread, so its shared static tm is
+   not a race. */
 static fn prompt_strftime(const char *format) throws -> String
 {
   std::time_t now = std::time(nullptr);
@@ -616,9 +556,8 @@ static fn prompt_hostname(bool need_full) throws -> String
       host.view().substring_of_length(0, dot.value_or(host.length()))};
 }
 
-/* Collapse a leading home directory to ~ the way bash does, only when the home
-   prefix ends on a path boundary so HOME=/home/sd and cwd=/home/sderp keeps the
-   full path rather than rendering ~erp. */
+/* The home prefix collapses to ~ only when it ends on a path boundary, so
+   HOME=/home/sd with cwd=/home/sderp keeps the full path. */
 static fn collapse_home_prefix(StringView path) throws -> String
 {
   let shown = String{path};
@@ -674,22 +613,16 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       out += shorten_path_with_ellipsis(
           collapse_home_prefix(working_directory).view(), PROMPT_PWD_LENGTH);
       break;
-    /* Any wrapping belongs to the PS1 text, the default template spaces it
-       through ${SHIT_GIT_BRANCH:+...}. */
     case 'g': out += git_branch(); break;
     case '$': out += (user == "root") ? '#' : '$'; break;
     case 'n': out += '\n'; break;
     case 'r': out += '\r'; break;
     case 'e': out += '\x1b'; break;
     case 'a': out += '\a'; break;
-    /* \[ and \] wrap non-printing bytes in bash so the width count skips them.
-       The line editor already skips ANSI runs when it measures the prompt, so
-       the markers are dropped and the bytes between them are emitted plainly.
-     */
+    /* The editor skips ANSI runs already, so the markers are dropped and the
+       bytes between them emitted plainly. */
     case '[': break;
     case ']': break;
-    /* The clock escapes match bash, so \t is the 24-hour time rather than a
-       literal tab, and the date and 12-hour forms follow strftime. */
     case 't': out += prompt_strftime("%H:%M:%S"); break;
     case 'T': out += prompt_strftime("%I:%M:%S"); break;
     case '@': out += prompt_strftime("%I:%M %p"); break;
@@ -720,8 +653,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case 'D':
       out += format_prompt_duration(context.last_command_duration_ns());
       break;
-    /* \! and \# are the history and command numbers, which this shell does not
-       track, so they expand to nothing rather than printing the escape raw. */
+    /* \! and \# are untracked here, so they expand to nothing. */
     case '!': break;
     case '#': break;
     case '\\': out += '\\'; break;
@@ -734,14 +666,9 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
   return out;
 }
 
-/* The PS1 expansion from the previous prompt, reusable only while every value
-   it read is unchanged. The scanner below collects every name a pure
-   parameter-only template references, the cache stores those names with the
-   values they had at expansion time, and a later prompt compares each
-   name's current value before reusing the result. A template holding a
-   command, process, or arithmetic substitution, a funsub, or an assigning
-   parameter form has inputs the names cannot capture, so it never caches
-   and expands every prompt the way bash expands PS1. */
+/* The previous PS1 expansion, reusable only while every parameter it read is
+   unchanged. A template holding a substitution, funsub, or assigning parameter
+   form has inputs the names cannot capture, so it never caches. */
 struct prompt_cache_input
 {
   String name{shit::heap_allocator()};
@@ -753,12 +680,8 @@ static shit::ArrayList<prompt_cache_input> PROMPT_CACHE_INPUTS{
 static String PROMPT_CACHE_EXPANSION{shit::heap_allocator()};
 static bool PROMPT_CACHE_VALID = false;
 
-/* Scan the template for parameter references, filling names and reporting
-   whether the template is pure enough to cache. The walk is conservative, a
-   $ that opens anything other than a plain name or a non-assigning braced
-   parameter form marks the template impure. Names inside a braced form's
-   word, the :+ alternate, are collected by the same linear walk when their
-   own $ comes by. */
+/* A $ that opens anything but a plain name or a non-assigning braced parameter
+   form marks the template impure. */
 static fn scan_prompt_template_inputs(
     StringView text, shit::ArrayList<prompt_cache_input> &names) throws -> bool
 {
@@ -783,8 +706,7 @@ static fn scan_prompt_template_inputs(
     if (next == '(') return false;
     if (next == '{') {
       usize j = i + 2;
-      /* A brace followed by whitespace or a pipe is the funsub, a command
-         with unknowable inputs. */
+      /* A brace followed by whitespace or a pipe is a funsub. */
       if (j < text.length && (text[j] == ' ' || text[j] == '\t' ||
                               text[j] == '\n' || text[j] == '|'))
       {
@@ -796,8 +718,7 @@ static fn scan_prompt_template_inputs(
         j++;
       if (j == name_start) return false;
       do_add_name(text.substring_of_length(name_start, j - name_start));
-      /* An = directly or after a colon assigns at expansion time, an input
-         the cache cannot key. The other operators only read. */
+      /* An assigning form has an input the cache cannot key. */
       if (j < text.length && text[j] == '=') return false;
       if (j + 1 < text.length && text[j] == ':' && text[j + 1] == '=')
         return false;
@@ -812,8 +733,7 @@ static fn scan_prompt_template_inputs(
       i = j - 1;
       continue;
     }
-    /* A special parameter such as $? or $$ reads one byte, keyed like a
-       name so a status change misses the cache. */
+    /* A special parameter such as $? reads one byte, keyed like a name. */
     do_add_name(text.substring_of_length(i + 1, 1));
     i++;
   }
@@ -822,11 +742,6 @@ static fn scan_prompt_template_inputs(
 
 fn default_prompt_template() -> String
 {
-  /* The branch renders space-wrapped only when one exists, the bash :+
-     alternate around the SHIT_GIT_BRANCH dynamic variable, so the prompt
-     closes up to a single space outside a repository. The branch name is
-     colored cyan when color is on, and the line editor skips the escape run
-     when it measures the prompt width. */
   let template_string = String{shit::heap_allocator()};
   const bool should_use_color = colors::stdout_wants_color();
 
@@ -846,19 +761,12 @@ fn default_prompt_template() -> String
   return template_string;
 }
 
-/* The backslash escapes the parameter pass would otherwise unescape, mapped to
-   a control-byte marker so they survive expansion and reach the escape pass
-   intact. A realistic prompt holds none of these control bytes, so the round
-   trip is lossless in practice. A PS1 that embeds a literal 0x01 to 0x03, which
-   no normal prompt does, sees that byte rewritten to its escape, an accepted
-   cosmetic edge rather than a crash. */
+/* The prompt backslash escapes are mapped to control-byte markers so the
+   parameter pass does not unescape them before the escape pass runs. */
 static constexpr char PROMPT_GUARD_DOLLAR = '\x01';
 static constexpr char PROMPT_GUARD_BACKSLASH = '\x02';
 static constexpr char PROMPT_GUARD_BACKTICK = '\x03';
 
-/* Replace \$, \\, and \` with markers so expand_heredoc_body, which has heredoc
-   backslash semantics, does not consume them before the escape pass decodes \$
-   and \\. The ${...} and $(...) the user wrote still expand. */
 static fn guard_prompt_backslashes(StringView template_string) throws -> String
 {
   let out = String{shit::heap_allocator()};
@@ -885,8 +793,6 @@ static fn guard_prompt_backslashes(StringView template_string) throws -> String
   return out;
 }
 
-/* Restore the guarded escapes after expansion, so the escape pass sees \$ and
-   \\ the way the user wrote them. */
 static fn unguard_prompt_backslashes(StringView expanded) throws -> String
 {
   let out = String{shit::heap_allocator()};
@@ -901,11 +807,7 @@ static fn unguard_prompt_backslashes(StringView expanded) throws -> String
   return out;
 }
 
-/* Remove the ANSI SGR color sequences, an escape followed by '[' then the
-   parameters then 'm', from the rendered prompt. NO_COLOR is honored live by
-   running this on the finished prompt when color is off, so the baked default
-   color and a user PS1's color both fall away. A non-color CSI sequence, one
-   that ends in a byte other than 'm', is left in place. */
+/* Only an SGR sequence ending in 'm' is stripped, a non-color CSI is left. */
 static fn strip_ansi_color(StringView text) throws -> String
 {
   let out = String{shit::heap_allocator()};
@@ -940,9 +842,7 @@ fn build_prompt(EvalContext &context) -> String
   let const full_pwd = Path::current_directory().text().clone();
   set_title("shit @ " + full_pwd);
 
-  /* The user is stable for the session, so it is resolved once and reused. The
-     fallback path rescans /etc/passwd, which a per-prompt call would repeat on
-     every draw in a bare-environment container. */
+  /* The user is stable for the session, so it is resolved once and reused. */
   static String CACHED_USER{shit::heap_allocator()};
   static bool was_user_resolved = false;
   if (!was_user_resolved) {
@@ -957,15 +857,9 @@ fn build_prompt(EvalContext &context) -> String
   else
     ps1_template = default_prompt_template();
 
-  /* The raw template takes parameter expansion, command substitution, and
-     arithmetic first, so ${debian_chroot:+...} and $(...) render fresh on
-     every prompt the way bash expands PS1, and the default template's
-     ${SHIT_GIT_BRANCH:+...} follows a checkout or a cd. This runs before
-     the backslash escapes are decoded, so the cwd, the user, and the other
-     escape-inserted text below are literal and never re-expanded. A
-     directory named $(...) therefore cannot run a command at the prompt.
-     The exit status is restored, since a command substitution here must not
-     clobber $? for the next command. */
+  /* The raw template expands before the backslash escapes are decoded, so the
+     escape-inserted cwd and user are literal and never re-expanded. A directory
+     named $(...) therefore cannot run a command at the prompt. */
 
   let scanned_inputs =
       shit::ArrayList<prompt_cache_input>{shit::heap_allocator()};
@@ -1002,10 +896,8 @@ fn build_prompt(EvalContext &context) -> String
     expanded = unguard_prompt_backslashes(
         context.expand_heredoc_body(guarded.view()).view());
   } catch (const shit::ErrorBase &) {
-    /* A located error such as a command-not-found in a $(...) or an unset
-       variable under set -u derives from ErrorBase rather than Error, so the
-       broad base is caught. The template stands rather than letting the prompt
-       draw take down the whole interactive shell. */
+    /* A prompt draw error leaves the template standing rather than taking down
+       the shell. */
     expanded = ps1_template;
   }
   context.set_last_exit_status(saved_status);
@@ -1056,9 +948,7 @@ fn render_ps0(EvalContext &context) -> String
 
 #else /* SHIT_NO_TOILETLINE */
 
-/* The line editor is compiled out, so interactive input is unavailable. These
-   stubs keep the rest of the shell linking for profiling and debugging, where
-   the raw terminal handling would otherwise perturb the run. */
+/* The line editor is compiled out, so these stubs keep the shell linking. */
 namespace toiletline {
 
 using shit::String;
@@ -1156,8 +1046,6 @@ fn build_prompt(shit::EvalContext &context) -> String
   throw shit::Error{"This build has no line editor"};
 }
 
-/* A profiling build renders no prompt, so the template passes through
-   unexpanded rather than walking the escape grammar. */
 fn expand_prompt_template(StringView prompt, shit::EvalContext &context)
     -> String
 {

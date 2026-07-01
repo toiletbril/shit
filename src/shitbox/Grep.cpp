@@ -29,17 +29,12 @@ static fn lower(char character) wontthrow -> char
              : character;
 }
 
-/* Whether haystack contains needle as a substring, optionally folding letter
-   case, the fixed-string match grep does without a regex engine. */
 static fn contains(StringView haystack, StringView needle,
                    bool should_ignore_case) wontthrow -> bool
 {
   if (needle.length == 0) return true;
   if (needle.length > haystack.length) return false;
 
-  /* The case-sensitive path skips to each candidate start with a vectorized
-     first-byte search rather than testing every position, so a long line scans
-     close to linearly instead of O(line * pattern). */
   if (!should_ignore_case) {
     usize start = 0;
     while (start + needle.length <= haystack.length) {
@@ -105,7 +100,6 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   i32 status = 0;
   for (let const &source : sources) {
     Maybe<String> content = read_named_or_stdin(ec, source);
-    /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
       report_soft_shitbox_error(
@@ -116,8 +110,6 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
     for (let const &line : split_keep_newlines(content->view())) {
-      /* The newline is excluded from the match so a pattern does not have to
-         account for it, but it is kept on the printed line. */
       let const has_newline = !line.is_empty() && line[line.length - 1] == '\n';
       let const body =
           has_newline ? line.substring_of_length(0, line.length - 1) : line;

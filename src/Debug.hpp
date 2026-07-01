@@ -47,9 +47,6 @@ donteliminate void t__strprintf(StringT &s, const char *fmt, ...)
   va_end(ac);
   va_end(a);
 }
-/* The string type is a template parameter so the return type is dependent and
-   its completeness is checked at the call site, where ::shit::String is whole,
-   rather than here where it is only forward-declared. */
 template <class StringT, class T>
 StringT t__string_from_struct(const T &x)
 {
@@ -71,7 +68,6 @@ StringT t__string_from_struct(const T &x)
 
 #define t__va_are_empty(...) (sizeof((char[]) {#__VA_ARGS__}) == 1)
 
-/* True if __VA_ARGS__ passed as an argument is empty. */
 #define VA_ARE_EMPTY(...) t__va_are_empty(__VA_ARGS__)
 
 #if !defined NDEBUG

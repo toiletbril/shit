@@ -71,8 +71,6 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
     if (argument.length >= 2 && argument[0] == '-') {
-      /* These options carry a value, so the value argument is skipped too. The
-         action-letter options such as -c or -f carry none. */
       if (argument == "-A" || argument == "-P" || argument == "-S" ||
           argument == "-X" || argument == "-F" || argument == "-C")
         i++;
@@ -83,10 +81,6 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     i++;
   }
 
-  /* compgen -G expands the pattern against the filesystem with failglob
-     suppressed, the probe the strict mood's unmatched-glob error points at.
-     The matches print one per line and the status reports whether any matched,
-     so 'if compgen -G pat >/dev/null' reads as an existence test. */
   if (glob_pattern.has_value()) {
     LOG(All, "compgen expanding glob '%.*s' for prefix '%.*s'",
         static_cast<int>(glob_pattern->length), glob_pattern->data,
@@ -104,16 +98,11 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return has_any_matched ? 0 : 1;
   }
 
-  /* An unsupported action produces nothing rather than an error, so a
-     completion script that asks for one keeps running with an empty result. */
   if (!wordlist.has_value()) return 1;
 
   LOG(Debug, "compgen filtering word list for prefix '%.*s'",
       static_cast<int>(word.length), word.data);
 
-  /* The -W list undergoes the shell expansions bash applies to it through
-     the shared word-list expander, the same path complete -W reads, so the
-     bash-completion idiom -W '"${options[@]}"' reaches the caller's array. */
   let out = String{cxt.scratch_allocator()};
   let has_any_matched = false;
   for (let const &candidate : cxt.expand_wordlist_to_fields(*wordlist)) {

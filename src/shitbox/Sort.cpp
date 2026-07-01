@@ -39,17 +39,14 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
     for (const String &operand : operands)
       sources.push(operand.view());
 
-  /* Each file's bytes are kept alive in contents so the line views into them
-     stay valid, and the reserve keeps the elements from moving, which would
-     dangle a view into a small file held in a String's inline buffer. The lines
-     then sort as views with no per-line copy. */
+  /* contents keeps each file's bytes alive for the line views, and the reserve
+     stops a grow from dangling a view into a String's inline buffer. */
   ArrayList<String> contents{cxt.scratch_allocator()};
   contents.reserve(sources.count());
   ArrayList<StringView> lines{cxt.scratch_allocator()};
   i32 status = 0;
   for (const StringView &source : sources) {
     Maybe<String> content = read_named_or_stdin(ec, source);
-    /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
       report_soft_shitbox_error(ec, cxt,

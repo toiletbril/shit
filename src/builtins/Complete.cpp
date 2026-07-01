@@ -4,10 +4,6 @@
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* The -F function and the -W word list drive the candidates, and -o default
-   falls back to filename completion when the spec yields nothing. The remaining
-   options are accepted so a config sources cleanly. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-abcdefgjksuv] [-o option] [-A action] [-G globpat] "
@@ -75,8 +71,6 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       i++;
       continue;
     }
-    /* -D registers the default completion, used for a command with no spec of
-       its own, the way bash-completion attaches its dynamic loader. */
     if (arg == "-D") {
       is_default_completion = true;
       i++;
@@ -114,10 +108,8 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     i++;
   }
 
-  /* -p prints the named specs, or every spec with no names, in a form the
-     shell can replay, and reports failure when a named command has no spec.
-     The bash-completion loader probes exactly that, a successful print means
-     sourcing the completion file registered something. */
+  /* -p reports failure when a named command has no spec, since the
+     bash-completion loader reads a successful print as a registered spec. */
   if (should_print_specs) {
     let const do_print_one_spec = [&](StringView command,
                                       const completion_spec &spec) throws {
@@ -129,9 +121,8 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         line += ' ';
       }
       if (!spec.word_list.is_empty()) {
-        /* The word list single-quotes, with each embedded quote written as the
-           '\'' escape, so a list carrying an apostrophe replays as valid
-           shell rather than an unbalanced quote. */
+        /* Each embedded quote is written as the '\'' escape so a list carrying
+           an apostrophe replays as valid shell. */
         line += "-W '";
         const StringView list = spec.word_list.view();
         for (usize i = 0; i < list.length; i++) {
@@ -166,8 +157,6 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return print_status;
   }
 
-  /* The one spec the parsed options describe, built by a single maker so the
-     default registration and the per-command ones cannot diverge. */
   let const do_make_spec = [&]() throws -> completion_spec {
     let spec = completion_spec{};
     spec.function_name = String{heap_allocator(), function_name};

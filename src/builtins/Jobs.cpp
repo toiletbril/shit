@@ -42,9 +42,6 @@ pure fn state_word(job::State state) wontthrow -> const char *
   return "Unknown";
 }
 
-/* The bash current-job marker, '+' for the most recent job, '-' for the one
-   before it, and a space otherwise. The two markers track the last and the
-   second-to-last entries in the table, the order register_job appends them. */
 pure fn job_marker(const ArrayList<job> &jobs, usize index) wontthrow -> char
 {
   if (jobs.is_empty()) return ' ';
@@ -53,10 +50,6 @@ pure fn job_marker(const ArrayList<job> &jobs, usize index) wontthrow -> char
   return ' ';
 }
 
-/* The SGR escape coloring a state word, or an empty view when color is off. The
-   completion-style gate keeps a pipe or a script plain, since color is on only
-   at an interactive prompt whose stdout is a terminal with NO_COLOR unset and
-   TERM not dumb. */
 fn state_color(job::State state, bool may_color) throws -> StringView
 {
   if (!may_color) return StringView{};
@@ -68,10 +61,6 @@ fn state_color(job::State state, bool may_color) throws -> StringView
   return StringView{};
 }
 
-/* Whether the jobs listing may carry color. The shell colors only at an
-   interactive prompt whose stdout is a terminal, with NO_COLOR unset or empty
-   and TERM not dumb, so a script or a pipe gets plain text and stays
-   sh-compatible. */
 fn may_color_jobs(EvalContext &cxt) throws -> bool
 {
   return cxt.shell_is_interactive() && colors::stdout_wants_color();
@@ -117,9 +106,6 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   LOG(Debug, "jobs listing %zu registered jobs", jobs.count());
 
-  /* A jobspec argument restricts the listing to the named jobs, otherwise every
-     job is shown. An unresolved jobspec is a no-such-job error and the exit
-     status turns non-zero while the remaining specs still list. */
   let selected = ArrayList<usize>{cxt.scratch_allocator()};
   i32 status = 0;
   if (names.count() > 1) {
@@ -166,8 +152,6 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     out.append(state_color(job.state, may_color));
-    /* The state word is padded to the width of the longest word so the command
-       column lines up the way bash aligns the listing. */
     StringView state = StringView{state_word(job.state)};
     out.append(state);
     for (usize pad = state.length; pad < 7; pad++)

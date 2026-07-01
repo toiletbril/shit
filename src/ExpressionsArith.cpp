@@ -39,11 +39,6 @@ cold fn ConditionalCommand::to_ast_string(usize layer) const throws -> String
 
 fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  /* The [[ ]] evaluator reports a malformed expression as a plain error,
-     relocated to the whole [[ ]] span so the caret covers the construct. An
-     already-located diagnostic passes through untouched. The current location
-     moves here first so a runtime warning from the operand expansion carets
-     this [[ rather than the statement before it. */
   cxt.set_current_location(source_location());
   i64 status;
   try {
@@ -77,9 +72,6 @@ cold fn ArithmeticCommand::to_ast_string(usize layer) const throws -> String
          m_expression.view() + "\"]";
 }
 
-/* A clause that holds only spaces or tabs is treated as omitted, the way bash
-   reads for (( ; ; )) as an empty header rather than three blank expressions.
- */
 static pure fn is_blank_clause(StringView text) wontthrow -> bool
 {
   for (usize i = 0; i < text.length; i++)
@@ -93,18 +85,13 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_current_location(source_location());
 
-  /* An empty (( )) is a failure with no evaluation, the way bash reads it as a
-     null expression that yields status 1 rather than a parse error. */
   if (is_blank_clause(m_expression.view())) {
     cxt.set_last_exit_status(1);
     return 1;
   }
 
-  /* A non-zero arithmetic value is success, a zero value is failure, the
-     opposite of the value-to-status convention of the rest of the shell. The
-     arithmetic evaluator reports a malformed expression or a division by zero
-     as a plain error, so it is relocated to this command's position to carry a
-     caret at the (( in the source, including the source an eval runs. */
+  /* A non-zero value is success and zero is failure, the opposite of the
+     value-to-status convention elsewhere. */
   i64 value;
   try {
     value = cxt.evaluate_arithmetic(m_expression.view());
@@ -120,9 +107,8 @@ cold fn ArithmeticCommand::analyze(AnalysisContext &actx,
                                    bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
-  /* The expression may assign any name, as in (( i = 10 )), and the prepass
-     does not parse it, so every recorded constant is forgotten rather than risk
-     folding a later read to a value this command overwrote. */
+  /* The prepass does not parse the expression, which may assign any name, so
+     every recorded constant is forgotten. */
   actx.constant_variables.clear();
 }
 
@@ -131,8 +117,6 @@ cold fn SelectLoop::analyze(AnalysisContext &actx,
 {
   ASSERT(m_body != nullptr);
   unused(is_unconditional);
-  /* The body runs repeatedly and may reassign a name, so a value recorded
-     before the loop does not hold inside it. */
   actx.constant_variables.clear();
   m_body->analyze(actx, false);
 }
@@ -191,8 +175,6 @@ fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   cxt.set_current_location(source_location());
 
-  /* The elements expand the way command arguments do, with field splitting and
-     globbing, so a=( $list *.txt ) builds the array bash would. */
   ArrayList<String> values = cxt.process_args(m_elements, false, true);
   LOG(Debug, "assigning %zu elements to the array '%s'", values.count(),
       m_name.c_str());
@@ -205,9 +187,7 @@ cold fn ArrayAssignCommand::analyze(AnalysisContext &actx,
                                     bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
-  /* An array assignment makes the name no longer a scalar literal, so the
-     constant table forgets it rather than letting a prior scalar constant fold
-     a later $name or $((name)) to a stale value. */
+  /* The name is no longer a scalar literal, so the constant table forgets it. */
   actx.constant_variables.erase(m_name.view());
 }
 
@@ -217,9 +197,6 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_terminal_exec_allowed(false);
 
-  /* The analyze pass proved the body never runs, the condition folds to a
-     constant zero, so the loop yields 0 without evaluating the init or the
-     condition. */
   if (m_is_fully_eliminated) {
     LOG(Debug, "running the fully eliminated c-style for as a no-op");
     cxt.set_last_exit_status(0);
@@ -239,9 +216,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.leave_loop(); };
 
   i64 ret = 0;
-  /* An empty condition is always true, the way for ((;;)) loops forever. A
-     condition the folding rule proved constant reads its cached value rather
-     than re-parsing the clause on every pass. */
+  /* An empty condition is always true, the way for ((;;)) loops forever. */
   while (is_blank_clause(m_condition.view()) ||
          (m_folded_condition.has_value()
               ? (*m_folded_condition != 0)
@@ -252,7 +227,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     ret = m_body->evaluate(cxt);
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
     /* The step runs after the body on every iteration, including one ended by a
-       continue, the way bash advances the counter. */
+       continue. */
     if (!is_blank_clause(m_step.view())) {
       cxt.evaluate_arithmetic_cached_clause(m_step.view(), m_step_tokens,
                                             m_step_tokenized, m_step_simple);
@@ -268,13 +243,10 @@ cold fn CStyleForLoop::analyze(AnalysisContext &actx,
   ASSERT(m_body != nullptr);
   unused(is_unconditional);
 
-  /* The C-style-for folding rule reads the three clauses while they are still
-     unchanged, so the optimizer runs before the constant table is cleared for
-     the body. */
+  /* The folding rule reads the three clauses while unchanged, so the optimizer
+     runs before the constant table is cleared for the body. */
   optimizer::optimize_node(this, actx);
 
-  /* The header and body reassign the counter on every iteration, so a constant
-     recorded before the loop does not hold inside or after it. */
   actx.constant_variables.clear();
   m_body->analyze(actx, false);
 }
@@ -332,16 +304,11 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
-  /* A subshell isolates its commands, so none of them may replace the shell
-     process. The in_subshell guard already blocks the terminal exec, and the
-     flag is cleared here as well so the intent reads at the boundary. */
   cxt.set_terminal_exec_allowed(false);
 
-  /* This shell has no process-level subshell, so isolate by snapshot. A cd or
-     an assignment inside does not leak, but the exit status propagates. An exit
-     inside ends only the subshell. */
-  /* A loop in the parent is not the subshell's to break, so the body runs with
-     a fresh loop count and the parent's count returns afterward. */
+  /* This shell has no process-level subshell, so isolation is by snapshot. A
+     loop in the parent is not the subshell's to break, so the body runs with a
+     fresh loop count. */
   let const saved_loop_depth = cxt.loop_depth();
   cxt.set_loop_depth(0);
   defer { cxt.set_loop_depth(saved_loop_depth); };
@@ -350,32 +317,20 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   let snapshot = cxt.snapshot_state();
 
-  /* The subshell body's transient scratch is reclaimed at the boundary, so a
-     ( ... ) inside a loop does not grow the arena across iterations. The status
-     is an integer and restore_state reverts the inner state, so nothing the
-     release frees is still read. The defer runs after restore_state on both the
-     normal and the thrown path. */
+  /* The defer runs after restore_state on both the normal and the thrown
+     path. */
   let const subshell_mark = cxt.scratch_mark();
   defer { cxt.scratch_release(subshell_mark); };
   cxt.enter_subshell();
-  /* The inherited EXIT action belongs to the parent, so it does not fire at the
-     subshell's end. An EXIT action the body sets survives this clear and fires
-     below. */
+  /* The inherited EXIT action belongs to the parent and must not fire at the
+     subshell's end. An EXIT action the body sets survives this clear. */
   cxt.clear_inherited_exit_trap();
   i64 ret = 0;
-  /* A diagnostic thrown by the body, such as a readonly violation or a missing
-     command, must still restore the snapshot and leave the subshell, otherwise
-     the parent stays stuck in subshell mode with the inner state leaked. In
-     bash mood a script-fatal error, the set -u read and the ${name:?} report,
-     ends only the subshell the way bash confines the abort to the child
-     process, reported here as status 1 the way bash answers it. */
   try {
     ret = m_body->evaluate(cxt);
   } catch (const ErrorBase &error) {
-    /* A forked subshell would confine the abort to the child, so the snapshot
-       subshell confines a script-fatal error the same way in every mood,
-       status 1 the way bash answers it and 2 the way dash does, which the
-       default mood follows. */
+    /* A script-fatal error is confined to the subshell in every mood, status 1
+       the way bash answers it and 2 the way dash does. */
     if (error.is_script_fatal()) {
       LOG(Debug, "the subshell confined a script-fatal error: %s",
           error.message().c_str());
@@ -398,10 +353,9 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
     throw;
   }
 
-  /* An exit inside the subshell ends only the subshell and supplies its status.
-     A break or a continue is scoped to a loop inside the subshell, so it does
-     not escape into the parent's loop and is consumed here. A return stays
-     pending and propagates after the state is restored. */
+  /* An exit ends only the subshell. A break or continue is scoped to a loop
+     inside it and is consumed here. A return stays pending and propagates after
+     the state is restored. */
   if (cxt.has_pending_control_flow()) {
     const control_flow::Kind kind = cxt.pending_control_flow().kind;
     if (kind == control_flow::Kind::Exit) {
@@ -414,8 +368,6 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   }
 
-  /* The subshell ends here, so its own EXIT action runs now, in the subshell's
-     state and before the parent's traps return. */
   cxt.run_subshell_exit_trap();
   cxt.leave_subshell();
   cxt.restore_state(steal(snapshot));
@@ -428,10 +380,8 @@ cold fn Subshell::analyze(AnalysisContext &actx,
 {
   ASSERT(m_body != nullptr);
 
-  /* A subshell runs in a forked child, so an assignment in its body never
-     changes a parent variable. The outer constants are saved and restored
-     around the body, and the body itself starts from an empty table so it does
-     not carry a propagation across the subshell boundary. */
+  /* An assignment in the body never changes a parent variable, so the body
+     starts from an empty table and the outer constants are restored after. */
   let saved_constants = actx.constant_variables.clone();
   actx.constant_variables.clear();
   m_body->analyze(actx, is_unconditional);
@@ -443,8 +393,7 @@ FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
     : CompoundCommand(location), m_name(name), m_body(body)
 {}
 
-/* The body is owned by the function table rather than this node, so it is not
-   deleted here. */
+/* The body is owned by the function table, not this node. */
 FunctionDefinition::~FunctionDefinition() = default;
 
 pure fn FunctionDefinition::name() const wontthrow -> const String &
@@ -480,10 +429,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* The recorded definition is a "name () " line then the body's source span,
      the shape bash prints from declare -f. ble.sh clones a function by
-     replacing the leading name in this text and greps the "name ()" line, so
-     both matter. The source string dies with its frame while the function lives
-     on, so the store keeps its own copy. An unrecorded body span stores empty
-     text. */
+     replacing the leading name and greps the "name ()" line, so both matter. */
   let definition_text = String{cxt.scratch_allocator()};
   if (const String *source = cxt.current_source();
       source != nullptr &&
@@ -512,11 +458,8 @@ cold fn FunctionDefinition::analyze(AnalysisContext &actx,
   unused(is_unconditional);
   actx.defined_functions.add(m_name);
 
-  /* The body runs later when the function is called, not where it is defined,
-     so a constant recorded before the definition does not prove a value inside
-     the body, and an assignment in the body does not reach the straight-line
-     block around the definition. The outer constants are saved and restored
-     around the body, and the body starts from an empty table. */
+  /* The body runs later when the function is called, so it is analyzed from an
+     empty constant table with the outer constants restored after. */
   let saved_constants = actx.constant_variables.clone();
   actx.constant_variables.clear();
   let saved_locals = steal(actx.function_local_names);
@@ -583,24 +526,16 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_current_location(source_location());
 
-  /* A <(...) or >(...) in a redirection target, as in done < <(cmd), opens a
-     pipe and forks a child or leaves a temp file during the expansion below.
-     The mark is taken before it so this command reaps only the substitution its
-     own redirection opens, reaped and its temp file deleted once the redirected
-     command returns. Registered first so it runs last, after the descriptor
-     backups restore. */
+  /* The mark is taken before the expansion below so this command reaps only the
+     process substitution its own redirection opens. Registered first so it runs
+     last, after the descriptor backups restore. */
   let const substitution_mark = cxt.mark_process_substitutions();
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
 
-  /* The child runs around saved descriptor backups that restore afterward, so
-     it forks rather than replacing the shell. */
   cxt.set_terminal_exec_allowed(false);
 
-  /* The child runs in the shell process, so each redirection points one of the
-     shell's own descriptors at the target and the saved backups put them back.
-     The backups restore in reverse on every exit path, a normal return, a
-     thrown diagnostic, or a pending break, continue, return, or exit that
-     propagates through the child. */
+  /* The backups restore in reverse on every exit path, a normal return, a
+     thrown diagnostic, or a pending break, continue, return, or exit. */
   ArrayList<os::saved_descriptor> saved_descriptors{cxt.scratch_allocator()};
   defer
   {
@@ -616,17 +551,12 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     r.target_fd =
         allocate_redirection_descriptor(redir, r, cxt, source_location());
     switch (r.kind) {
-    /* A staged heredoc body and an opened file both dup onto the target shell
-       descriptor for the compound's duration, the opened copy closing at once
-       since the dup keeps a live one. */
     case redirection_outcome::Heredoc:
     case redirection_outcome::OpenedFile:
       saved_descriptors.push(
           os::save_and_replace_descriptor(r.target_fd, r.opened_fd));
       os::close_fd(r.opened_fd);
       break;
-    /* The both-streams file points fd 1 at it and fd 2 follows for the
-       compound's duration. */
     case redirection_outcome::BothStreams: {
       const os::saved_descriptor saved_out =
           os::save_and_replace_descriptor(1, r.opened_fd);
@@ -642,8 +572,6 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       break;
     }
     case redirection_outcome::Duplicate: {
-      /* The close form backs the descriptor up, then closes it. The backup is
-         saved so restore reopens it when the compound command finishes. */
       if (r.dup_from_fd == Redirection::DUP_FD_CLOSE) {
         saved_descriptors.push(os::save_and_replace_descriptor(
             r.target_fd, os::descriptor_for_shell_fd(r.target_fd)));
@@ -655,10 +583,6 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       const os::saved_descriptor saved =
           os::save_and_replace_descriptor(r.target_fd, source);
       saved_descriptors.push(saved);
-      /* A duplication onto a closed or invalid descriptor, as in { echo hi; }
-         >&7 with fd 7 closed, fails the dup2. The compound command fails with a
-         located error rather than writing to the original descriptor, matching
-         dash. */
       if (!saved.is_dup2_ok) {
         const SourceLocation location = redir.target != nullptr
                                             ? redir.target->source_location()

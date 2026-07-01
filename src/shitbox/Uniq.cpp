@@ -48,7 +48,6 @@ fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const source = operands.is_empty() ? StringView{"-"} : operands[0].view();
   Maybe<String> content = read_named_or_stdin(ec, source);
-  /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
   if (os::INTERRUPT_REQUESTED) return 130;
   if (!content.has_value())
     throw Error{

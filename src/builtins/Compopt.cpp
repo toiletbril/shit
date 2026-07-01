@@ -33,8 +33,6 @@ fn Compopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* The options are accepted and ignored, so a completion function that adjusts
-     its options keeps running. */
   LOG(Debug, "compopt accepting %zu arguments without effect",
       args.count() - 1);
   return 0;

@@ -5,11 +5,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* mapfile, also named readarray, reads every line of standard input into an
-   indexed array, one line per element. Without -t each element keeps its
-   trailing newline, with -t the newline is stripped. The default array name is
-   MAPFILE when no name operand is given. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-t] [-n count] [array]");
@@ -46,12 +41,8 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   bool should_strip_newline = false;
   StringView array_name = "MAPFILE";
-  /* The maximum number of lines to read, where zero is bash's unlimited. */
+  /* Zero is bash's unlimited. */
   i64 max_lines = 0;
-  /* -s skips this many leading lines, -O begins assigning at this index into
-     the existing array, -d sets the line delimiter, and -u reads from a
-     descriptor.
-   */
   i64 skip_count = 0;
   i64 origin = 0;
   let has_origin = false;
@@ -69,8 +60,6 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    /* A value option carries its value as the rest of the cluster or the next
-       operand, the -nN and -n N forms both. */
     let const letter = arg[1];
     let value = StringView{};
     let has_value = false;
@@ -114,7 +103,7 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       static_cast<int>(array_name.length), array_name.data);
 
   /* The skipped lines are read and dropped before any line is stored, so -s
-     advances past them without counting against -n. */
+     does not count against -n. */
   for (i64 skipped = 0; skipped < skip_count; skipped++) {
     bool was_terminated = false;
     if (!utils::read_line_from_fd(read_fd, was_terminated, delimiter)) break;
@@ -138,10 +127,6 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   LOG(Debug, "mapfile stored %zu lines", lines.count());
 
-  /* -O assigns into the existing array from the origin index, keeping the
-     elements outside the written range, while the plain form replaces the
-     array.
-   */
   if (has_origin) {
     for (usize element_index = 0; element_index < lines.count();
          element_index++)

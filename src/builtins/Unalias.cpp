@@ -51,9 +51,6 @@ fn Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const &name = args[i];
     LOG(All, "unalias removing alias '%s'", name.c_str());
     if (!cxt.remove_alias(name)) {
-      /* The diagnostic goes to stderr the way bash reports it, so a caller that
-         strips aliases off a list of names, as ble.sh does, neither floods the
-         terminal nor pollutes a captured standard output. */
       ec.print_to_stderr("unalias: " + name + ": not found\n");
       status = 1;
     }

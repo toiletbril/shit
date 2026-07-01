@@ -40,8 +40,6 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  /* -q reports only through the status, so the output is never built or
-     printed and the resolution is tracked in a flag instead of the buffer. */
   let const is_quiet = FLAG_QUIET.is_enabled();
   let output = String{cxt.scratch_allocator()};
   bool has_found_any = false;
@@ -53,8 +51,6 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
       has_found_any = true;
       if (!is_quiet) {
         output += program_name;
-        /* The descriptive suffix is for a human at a terminal. A pipe gets just
-           the name, which stays machine readable. */
         if (os::is_stdout_a_tty()) output += ": Shell builtin";
         output += '\n';
       }

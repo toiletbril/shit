@@ -55,9 +55,6 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     LOG(Debug, "type classifying '%s' in resolution order", name.c_str());
 
-    /* -P forces a PATH lookup and ignores the keyword, alias, function, and
-       builtin classes, so it reports the disk file even when the name also
-       names a builtin. */
     if (force_path) {
       if (let const paths = utils::search_program_path(name);
           paths.count() != 0)
@@ -73,13 +70,8 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    /* The classification follows the shell's own resolution order. The word the
-       -t form prints names each class, while the default form spells it out. */
     StringView word{};
     Maybe<String> alias_value;
-    /* The POSIX reserved words plus the bash reserved words shit recognizes,
-       the [[ ]] conditional brackets and the time and function keywords, all
-       classify as a keyword the way bash reports them. */
     if (utils::is_posix_reserved_word(name.view()) || name.view() == "[[" ||
         name.view() == "]]" || name.view() == "function" ||
         name.view() == "time")
@@ -95,8 +87,6 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       word = "builtin";
     }
 
-    /* -a prints every location, the class word followed by each PATH match,
-       which is what type -at does to enumerate a name's resolutions. */
     if (FLAG_TYPE_ALL.is_enabled()) {
       bool has_any = false;
       if (!word.is_empty()) {
@@ -144,8 +134,6 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     if (!word.is_empty()) {
-      /* A keyword, alias, function, or builtin is not a disk file, so -p prints
-         nothing for it. */
       if (want_word) {
         out += word;
         out += "\n";
@@ -180,8 +168,6 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         out += "\n";
       }
     } else {
-      /* -t and -p stay silent for a name that resolves to nothing, only the
-         status reports it. */
       if (!want_word && !want_path) {
         out += name;
         out += ": not found\n";

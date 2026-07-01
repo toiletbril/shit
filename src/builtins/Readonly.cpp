@@ -37,10 +37,8 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(!args.is_empty());
 
-  /* A bare readonly, and the -p form which strips to the same bare argument
-     vector, list every read-only variable. The bash mood prints the declare -r
-     form bash reloads, while the default and sh moods print the POSIX readonly
-     form dash reloads. */
+  /* A bare readonly lists every read-only variable, in the declare -r form
+     under the bash mood and the POSIX readonly form otherwise. */
   if (args.count() == 1) {
     let const is_declare_form = cxt.is_bash_compatible();
     let out = String{cxt.scratch_allocator()};
@@ -71,8 +69,6 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(All, "readonly marking '%.*s' against later assignment",
         static_cast<int>(parts.get_name().length), parts.get_name().data);
 
-    /* An operand with an equals sign assigns the value first, then marks the
-       name. A bare name marks whatever it currently holds. */
     if (parts.get_value().has_value()) {
       cxt.set_shell_variable(parts.get_name(), *parts.get_value());
       cxt.mark_readonly(parts.get_name());

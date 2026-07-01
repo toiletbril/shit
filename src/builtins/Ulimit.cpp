@@ -10,10 +10,6 @@
 #include <sys/resource.h>
 #endif
 
-/* ulimit reads or sets a resource limit of the shell, choosing the resource by
-   flag. Only the operating system enforces these, so a platform without
-   resource limits reports them as unlimited and ignores a set. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-HSacdflmnpstuvw] [limit]");
@@ -51,9 +47,7 @@ namespace shit {
 
 namespace {
 
-/* One resource ulimit reports, with the label -a prints, the rlimit selector,
-   and the divisor the value is scaled by. The order matches dash so -a prints
-   the same table. */
+/* The order matches dash so -a prints the same table. */
 struct resource_entry
 {
   const char *label;
@@ -88,9 +82,6 @@ constexpr resource_entry RESOURCE_TABLE[] = {
 #endif
 };
 
-/* The resource the flags select, or None when none of the resource flags is
-   set so the file-size default applies. -u and dash's -p both name the process
-   limit. */
 fn selected_resource() throws -> resource_entry
 {
   if (FLAG_CPU_TIME.is_enabled()) return {"time(seconds)", RLIMIT_CPU, 1};
@@ -139,8 +130,6 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(!args.is_empty());
 
-  /* -a reports every resource, the label left-justified in a twenty-wide field
-     and then the value, the layout dash prints. */
   if (FLAG_ALL.is_enabled()) {
     let out = String{cxt.scratch_allocator()};
     for (let const &entry : RESOURCE_TABLE) {
@@ -166,8 +155,6 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw Error{"Unable to read the resource limit because " +
                 os::last_system_error_message()};
 
-  /* A bare flag reads the limit, an operand sets it. With neither -H nor -S the
-     read reports the soft limit and the set changes both. */
   if (args.count() < 2) {
     LOG(Debug, "ulimit reading the '%s' limit", resource.label);
     ec.print_to_stdout(
@@ -186,8 +173,7 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             resource.units_per_value;
   }
 
-  /* -H sets the hard limit, -S the soft, and naming neither, or both together,
-     sets both, the way dash does. */
+  /* Naming neither -H nor -S, or both together, sets both, the way dash does. */
   if (FLAG_HARD.is_enabled() || !FLAG_SOFT.is_enabled()) limit.rlim_max = value;
   if (FLAG_SOFT.is_enabled() || !FLAG_HARD.is_enabled()) limit.rlim_cur = value;
 

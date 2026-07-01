@@ -49,8 +49,8 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (FLAG_RUNNING.is_enabled()) {
-    /* The recorded state is refreshed first, so a job stopped since the last
-       poll reads as Stopped and is kept rather than dropped as running. */
+    /* The state is refreshed first, so a job stopped since the last poll reads
+       as Stopped and is kept, not dropped as running. */
     cxt.update_jobs();
     let ids = ArrayList<i32>{cxt.scratch_allocator()};
     for (const job &job : cxt.jobs()) {

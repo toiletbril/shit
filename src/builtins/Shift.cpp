@@ -34,8 +34,6 @@ fn Shift::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const &params = cxt.positional_params();
   if (shift_count < 0 || static_cast<usize>(shift_count) > params.count()) {
-    /* shift_verbose makes an over-range count print a diagnostic, the way bash
-       does under the option, while a plain run stays quiet and only fails. */
     if (cxt.is_shopt_enabled("shift_verbose"))
       report_soft_builtin_error(ec, cxt, "shift count out of range");
     return 1;
@@ -44,8 +42,6 @@ fn Shift::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(All, "shift dropping %lld of %zu positional parameters",
       static_cast<long long>(shift_count), params.count());
 
-  /* ArrayList has no erase, so the kept tail is copied into a fresh list from
-     index shift_count onward. */
   let shifted = ArrayList<String>{heap_allocator()};
   shifted.reserve(params.count() - static_cast<usize>(shift_count));
   for (usize i = static_cast<usize>(shift_count); i < params.count(); i++)

@@ -33,9 +33,7 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* The group change must outlive this command, which only a re-exec achieves,
-     so the system newgrp program is resolved on PATH and the shell hands off to
-     it with the same arguments. */
+  /* The group change must outlive this command, so it re-execs system newgrp. */
   let const found = utils::search_program_path("newgrp");
   if (found.count() == 0) {
     show_message(
@@ -54,8 +52,6 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   LOG(Info, "newgrp handing the shell off to '%s'", found[0].text().c_str());
 
-  /* replace_process returns only by throwing, when the program is present but
-     cannot run, which leaves the shell with 126. */
   try {
     os::replace_process(steal(command));
   } catch (const Error &error) {

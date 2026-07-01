@@ -5,8 +5,6 @@
 
 namespace shit {
 
-/* The empty state of a Maybe. A function returns None to say it produced no
-   value, and the caller decides what that means. */
 class Nothing
 {};
 
@@ -90,7 +88,6 @@ public:
     return &reference();
   }
 
-  /* Move the value out, leaving the Maybe empty. */
   mustuse fn take() throws -> T
   {
     ASSERT(m_has_value);
@@ -99,13 +96,11 @@ public:
     return taken_value;
   }
 
-  /* The value when present, otherwise the fallback. */
   mustuse fn value_or(T fallback) const throws -> T
   {
     return m_has_value ? value() : steal(fallback);
   }
 
-  /* Equal to a bare value only when present and that value matches. */
   mustuse fn operator==(const T &other) const throws->bool
   {
     return m_has_value && reference() == other;
@@ -115,7 +110,6 @@ public:
     return !(*this == other);
   }
 
-  /* Drop the value, leaving the Maybe empty. */
   fn reset() wontthrow -> void
   {
     if (m_has_value) {

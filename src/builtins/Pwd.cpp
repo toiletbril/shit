@@ -33,12 +33,8 @@ fn Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   let output = String{cxt.scratch_allocator()};
-  /* The physical form resolves every symlink through getcwd. The logical form,
-     the POSIX default, prints PWD so the path keeps the symlinks it was reached
-     through, the way bash and dash do, so cd /tmp on a system where /tmp is a
-     symlink still reports /tmp. PWD is used only when it names an absolute
-     path, otherwise an unset or relative value falls back to the physical
-     directory so a path is always printed. */
+  /* The logical form prints PWD, used only when it names an absolute path, so
+     an unset or relative value falls back to the physical directory. */
   let const want_physical = FLAG_PWD_PHYSICAL.is_enabled();
   let const logical_pwd = cxt.get_variable_value("PWD");
   if (!want_physical && logical_pwd.has_value() && !logical_pwd->is_empty() &&

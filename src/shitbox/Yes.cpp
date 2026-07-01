@@ -41,19 +41,14 @@ fn Yes::execute(const ExecContext &ec, EvalContext &cxt,
     }
   line += '\n';
 
-  /* The bytes go straight to the command's output, so a reader such as head
-     that closes its end breaks the write and ends the loop rather than the
-     utility spinning forever. */
   let const out_fd = ec.out_fd.value_or(SHIT_STDOUT);
   loop
   {
-    /* A Ctrl-C at the terminal sets the shell's interrupt flag, so the loop
-       checks it each pass and stops rather than spinning forever. */
     if (os::INTERRUPT_REQUESTED) return 130;
 
-    /* A short write advances through the line rather than re-emitting the whole
-       line next pass, which would corrupt the stream with a partial then a full
-       copy. */
+    /* written_count accumulates across passes, so a short write advances
+       through the line rather than re-emitting the whole line and corrupting
+       the stream. */
     usize written_count = 0;
     while (written_count < line.count()) {
       let const chunk = os::write_fd(out_fd, line.view().data + written_count,

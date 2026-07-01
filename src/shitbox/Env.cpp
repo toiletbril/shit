@@ -22,9 +22,6 @@ namespace shit {
 
 namespace shitbox {
 
-/* Whether the operand is a NAME=value assignment, a valid identifier left of an
-   '=' sign. A leading word without one ends the assignment run and starts the
-   command. */
 static fn is_assignment(StringView text) wontthrow -> bool
 {
   let const equals = text.find_character('=');
@@ -73,9 +70,6 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  /* The leading NAME=value words set the environment for the command. The
-     previous value of each name is saved so it can be put back once the command
-     finishes, since env changes the environment for that command alone. */
   ArrayList<String> saved_names{cxt.scratch_allocator()};
   ArrayList<String> saved_values{cxt.scratch_allocator()};
   ArrayList<bool> was_present{cxt.scratch_allocator()};
@@ -114,12 +108,6 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
     return 0;
   }
 
-  /* The remaining operands are the utility and its arguments, already split, so
-     they run directly through the command resolution rather than being
-     re-quoted into one line and re-parsed. The assignments are live on the
-     environment, so a forked child inherits them and a builtin reads them in
-     place. A name that does not resolve is reported and the status is 127, the
-     way a bare command word fails, rather than aborting the shell. */
   let env_args = ArrayList<String>{cxt.scratch_allocator()};
   for (usize i = first_command; i < operands.count(); i++)
     env_args.push_managed(operands[i]);

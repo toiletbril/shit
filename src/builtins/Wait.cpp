@@ -22,7 +22,6 @@ namespace shit {
 
 namespace {
 
-/* Wait for one job to finish, reusing a status already collected. */
 i32 wait_for_job(job &job) throws
 {
   if (job.state == job::State::Done || job.state == job::State::Stopped)
@@ -73,10 +72,8 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     } else {
       let const parsed = target.to<i64>();
       if (!parsed.is_error()) {
-        /* wait only waits for this shell's own children. A pid that names no
-           tracked job is not a child, so the status is 127 and waitpid is never
-           called, matching dash. Waiting the raw pid would throw on ECHILD and
-           abort the command. */
+        /* An untracked pid returns 127 with no waitpid, since waiting the raw
+           pid would throw on ECHILD and abort the command. */
         job *matched = nullptr;
         for (job &job : cxt.jobs()) {
 #if SHIT_PLATFORM_IS WIN32
@@ -93,8 +90,8 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         status = matched != nullptr ? wait_for_job(*matched) : 127;
       }
     }
-    /* A non-numeric operand is ignored rather than waiting on waitpid(0), which
-       would block on the whole process group. */
+    /* A non-numeric operand is ignored, since waitpid(0) would block on the
+       whole process group. */
   }
 
   cxt.forget_done_jobs();

@@ -23,8 +23,7 @@ namespace shit {
 
 namespace shitbox {
 
-/* A descending range such as c-a expands in reverse to cba the way GNU tr reads
-   it. The bounds are read as unsigned bytes and the walk runs over an int, so a
+/* The bounds are read as unsigned bytes and the walk runs over an int, so a
    range that touches the 0 or 255 edge does not overflow a char. */
 static fn expand_set(StringView set, Allocator allocator) throws -> String
 {
@@ -74,9 +73,6 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
       is_deleting ? String{cxt.scratch_allocator()}
                   : expand_set(operands[1].view(), cxt.scratch_allocator());
 
-  /* The first occurrence of a byte in set1 wins. A byte past the end of set2
-     maps to its last byte, the way tr pads the shorter set with its final
-     character. */
   static constexpr usize BYTE_VALUE_COUNT = 256;
   bool is_in_set1[BYTE_VALUE_COUNT] = {};
   unsigned char translation[BYTE_VALUE_COUNT];
@@ -101,7 +97,6 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
-  /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
   if (os::INTERRUPT_REQUESTED) return 130;
   let output = String{cxt.scratch_allocator()};
   output.reserve(input.count());

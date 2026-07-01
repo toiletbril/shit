@@ -7,11 +7,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-/* builtin runs the named shell builtin with its arguments, bypassing a shell
-   function of the same name and the PATH. A bare builtin in the shit mood
-   surveys every builtin in columns, and a name that is not a registered builtin
-   is an error. */
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[--list] [name [argument ...]]");
@@ -39,8 +34,6 @@ pure fn BuiltinBuiltin::kind() const wontthrow -> Builtin::Kind
   return Kind::BuiltinBuiltin;
 }
 
-/* The registered builtin names, sorted, so both listing forms read the same
-   set. */
 static fn sorted_builtin_names(Allocator allocator) throws -> ArrayList<String>
 {
   let names = ArrayList<String>{allocator};
@@ -83,8 +76,6 @@ static fn print_builtin_columns(ExecContext &ec, Allocator allocator) throws
 fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     -> i32
 {
-  /* A bare builtin surveys the builtins in columns in the shit mood, and is the
-     POSIX no-op success in the other moods. */
   if (ec.args().count() < 2) {
     if (cxt.mood() == mimic_mood::Default)
       print_builtin_columns(ec, cxt.scratch_allocator());
@@ -92,9 +83,7 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   /* The flags are not parsed generically, since every argument after the name
-     belongs to the target builtin and must pass through untouched. Only the
-     bare
-     --help and --list on the builtin word itself are intercepted. */
+     belongs to the target builtin and passes through untouched. */
   let const &name = ec.args()[1];
   if (name == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -119,9 +108,6 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     return 1;
   }
 
-  /* The name and its arguments are forwarded to a fresh context resolved
-     directly to the target builtin, so the function table and the PATH are both
-     skipped. */
   let forwarded = ArrayList<String>{heap_allocator()};
   for (usize i = 1; i < ec.args().count(); i++)
     forwarded.push_managed(ec.args()[i]);

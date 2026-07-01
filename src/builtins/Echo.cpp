@@ -35,9 +35,8 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  /* Only the shit default mood answers --help, and only as the sole
-     argument, since bash and dash both print the literal text and a script
-     may depend on that. */
+  /* Only the shit default mood answers --help, since bash and dash print the
+     literal text a script may depend on. */
   if (args.count() == 2 && args[1] == "--help" && !cxt.is_posix_mode() &&
       !cxt.is_bash_compatible())
   {
@@ -48,12 +47,8 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   usize start = 1;
   let should_suppress_newline = false;
-  /* dash always interprets the backslash escapes and treats only a leading -n
-     as an option, the POSIX behavior. bash leaves the escapes literal unless -e
-     is given. The shit-native default interprets the escapes the way dash does,
-     yet still reads -e, -E, and -n the way bash does, so a bash config that
-     runs echo -e in the snapped session prints the way it expects rather than
-     leaving a literal -e. The options combine, such as -ne. */
+  /* The shit default interprets the escapes the way dash does, yet still reads
+     -e, -E, and -n the way bash does. */
   let should_interpret_escapes = !cxt.is_bash_compatible();
 
   if (!cxt.is_posix_mode()) {
@@ -108,8 +103,6 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case 'r': output += '\r'; break;
       case 't': output += '\t'; break;
       case 'v': output += '\v'; break;
-      /* \e and \E are the escape character, a bash extension the shit default
-         reads too. dash does not, so POSIX mode leaves them literal. */
       case 'e':
       case 'E':
         if (cxt.is_posix_mode()) {
@@ -120,9 +113,7 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         }
         break;
       case '\\': output += '\\'; break;
-      /* \c stops all output and drops the trailing newline. */
       case 'c': should_stop = true; break;
-      /* \0NNN reads up to three octal digits after the leading zero. */
       case '0': {
         i32 value = 0;
         usize digit_count = 0;
@@ -135,11 +126,6 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         }
         output += static_cast<char>(value);
       } break;
-      /* The bare \NNN form is one to three octal digits with no leading zero,
-         so \101 is the byte A the way dash's XSI echo reads it. bash reads
-         octal only in the \0NNN form, so in bash mode a bare \NNN stays
-         literal. The first digit is already in hand, so up to two more follow.
-       */
       case '1':
       case '2':
       case '3':

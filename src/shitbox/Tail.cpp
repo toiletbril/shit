@@ -35,8 +35,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  /* The -c byte count takes precedence over -n when both are given, the way GNU
-     tail reads the last of the two. */
+  /* -c takes precedence over -n when both are given, matching GNU tail. */
   let const is_byte_mode = FLAG_TAIL_BYTES.is_set();
   i64 count = 10;
   if (is_byte_mode) {
@@ -73,7 +72,6 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   i32 status = 0;
   for (usize source_index = 0; source_index < sources.count(); source_index++) {
     Maybe<String> content = read_named_or_stdin(ec, sources[source_index]);
-    /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
       report_soft_shitbox_error(

@@ -66,8 +66,7 @@ fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
 
   let output = String{cxt.scratch_allocator()};
   /* The step is guarded against signed overflow before it is taken, so a range
-     that reaches the integer bounds, such as seq up to the maximum, ends rather
-     than wrapping or tripping the sanitizer. */
+     reaching the integer bounds ends rather than wrapping. */
   if (increment > 0)
     for (i64 value = first; value <= last; value += increment) {
       output += String::from(value, cxt.scratch_allocator()).view();

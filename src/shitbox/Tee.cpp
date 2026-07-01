@@ -34,7 +34,6 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
-  /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
   if (os::INTERRUPT_REQUESTED) return 130;
 
   ec.print_to_stdout(input.view());
@@ -50,12 +49,8 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
-    /* write_fd returns a single write's count, which can fall short of the
-       request, so the loop writes the rest until the file holds the whole input
-       or a write fails. A failure reports rather than dropping the data
-       silently, so a full disk or a permission loss is not mistaken for
-       success.
-     */
+    /* write_fd returns one write's count, which can fall short, so the loop
+       writes the rest until the whole input lands or a write fails. */
     usize written_count = 0;
     bool did_write_fail = false;
     while (written_count < input.count()) {

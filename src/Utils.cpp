@@ -39,9 +39,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     -> i32
 {
   if (!ec.is_builtin()) {
-    /* Mimicry runs a shell script in-process in the matching mode instead of
-       launching the shell. A background command keeps its fork, since an
-       in-process subshell cannot run in the background. */
+    /* Mimicry runs the script in-process, a background command keeps its fork. */
     if (cxt.mimicry() && !is_async) {
       if (Maybe<mimic_mood> mode = ec.program_path().detect_mimic_shell();
           mode.has_value())
@@ -53,20 +51,16 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
         {
           let const command = String{ec.program().view()};
 
-          /* A pipe synchronizes the terminal handoff. The child blocks on it
-             until the parent has called give_controlling_terminal_to, so the
-             child never touches the terminal before the handoff and stops under
-             TOSTOP. A failed pipe falls back to the unsynchronized handoff,
-             which is benign while TOSTOP stays off. */
+          /* The child blocks on this pipe until the parent hands off the
+             terminal, so it never touches the terminal before the handoff. */
           let const sync_pipe = os::make_pipe();
 
           shit::flush();
           let const child = os::fork_job_process();
           if (os::process_id_of(child) == 0) {
             if (sync_pipe.has_value()) {
-              /* The child drops its write end first, so the read sees end of
-                 file and unblocks if the parent dies before the handoff rather
-                 than waiting forever. */
+              /* The child drops its write end so the read unblocks on EOF if
+                 the parent dies before the handoff. */
               os::close_fd(sync_pipe->out);
               char handoff_byte = 0;
               (void) os::read_fd(sync_pipe->in, &handoff_byte, 1);
@@ -102,45 +96,29 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
           return status;
         }
 #endif
-        /* The terminal command the shell exits with needs no isolation, the
-           same condition the replace path below uses, so its run skips the
-           snapshot. */
         let const isolated = !(cxt.terminal_exec_allowed() &&
                                !cxt.in_subshell() && !cxt.has_exit_trap());
         return cxt.run_mimicked_script(ec, *mode, isolated);
       }
     }
 
-    /* The shell is about to exit with this command's status and it is the
-       terminal external command of the run, so replace the shell process in
-       place rather than fork, exec, and wait, the way dash execs the last
-       command under EV_EXIT. A subshell or a background command keeps the fork,
-       since its status does not become the shell's, and replace_process returns
-       only when the exec itself fails, where it throws a located error. */
-    /* An EXIT trap set earlier in this same chunk must still run, so the trap
-       is rechecked here at run time rather than only when the chunk began. */
+    /* The terminal external command replaces the shell in place, the way dash
+       execs the last command under EV_EXIT. The EXIT trap is rechecked at run
+       time here, since one set earlier in this chunk must still run. */
     if (!is_async && cxt.terminal_exec_allowed() && !cxt.in_subshell() &&
         !cxt.has_exit_trap())
     {
       LOG(Debug,
           "execute_context replacing the shell with the terminal command '%s'",
           ec.program().c_str());
-      /* The shell's buffered output lands before the descriptors move and the
-         process is replaced. replace_process returns only by throwing, when the
-         program resolved but could not be executed. The forked spawn this path
-         replaces reports that case as a bare path and message on stderr and
-         exits 127, so the in-place failure matches it rather than printing a
-         located error or a goodbye. */
       flush();
       try {
         os::replace_process(steal(ec));
       } catch (const ExecFormatError &) {
         LOG(Debug, "swallowed an exec format error, running the "
                    "file as a shell script in place");
-        /* The file has no shebang and is not a binary, so it runs as a shell
-           script in place, the POSIX fallback. replace_process already placed
-           the redirections, so the context's descriptors are cleared to avoid
-           reapplying the now-closed ones. */
+        /* replace_process already placed the redirections, so the descriptors
+           are cleared to avoid reapplying the now-closed ones. */
         ec.in_fd.reset();
         ec.out_fd.reset();
         ec.err_fd.reset();
@@ -149,9 +127,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
                                 !cxt.in_subshell() && !cxt.has_exit_trap());
         quit(cxt.run_mimicked_script(ec, mode, isolated), false);
       } catch (const ErrorWithLocation &error) {
-        /* The program resolved but could not be executed, so the caret points
-           at the command and the shell exits 126, the way bash distinguishes a
-           file it found but could not run from one it never found. */
+        /* Resolved but unexecutable exits 126, missing exits 127. */
         const String *source = cxt.current_source();
         show_message(
             error.to_string(source != nullptr ? source->view() : StringView{}));
@@ -166,11 +142,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     LOG(Debug, "spawning the external command '%s'%s", ec.program().c_str(),
         is_async ? " in the background" : "");
 
-    /* An interactive foreground command runs in its own process group and is
-       handed the controlling terminal, so it dies on its own Ctrl-C and tmux
-       names the window after it rather than after the shell. A background
-       command, a non-interactive run, or a pipeline keeps the shell's group.
-     */
+    /* An interactive foreground command runs in its own process group and holds
+       the terminal, so it dies on its own Ctrl-C. */
     const bool is_foreground_job = !is_async && cxt.shell_is_interactive() &&
                                    os::shell_has_controlling_terminal();
 
@@ -185,9 +158,6 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     } catch (const ExecFormatError &) {
       LOG(Debug, "swallowed an exec format error, running the "
                  "file as a shell script in this process");
-      /* The file has no shebang and is not a binary, so a foreground command
-         runs it as a shell script in this process instead of as a child, the
-         POSIX fallback. */
       const mimic_mood mode = cxt.mood();
       const bool isolated = !(cxt.terminal_exec_allowed() &&
                               !cxt.in_subshell() && !cxt.has_exit_trap());
@@ -263,8 +233,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       if (!pipe) {
         throw ErrorWithLocation{ec.source_location(), "Could not open a pipe"};
       }
-      /* An explicit > redirect on the stage takes its standard output, so the
-         pipe end goes unused and closes at once. */
+      /* An explicit > takes the stage's stdout, so the pipe end closes unused. */
       if (!ec.out_fd)
         ec.out_fd = pipe->out;
       else
@@ -282,10 +251,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     }
 
     if (ec.is_unresolved()) {
-      /* The stage's command did not resolve, already reported. It runs nothing
-         and closes its descriptors, so the pipe it owns gives the next stage
-         EOF, and its slot carries 127 for pipefail while the last stage still
-         governs the plain pipeline status. */
+      /* Unresolved runs nothing, its slot carries 127 for pipefail. */
       stage_status[stage_index] = 127;
       ec.close_fds();
     } else if (!ec.is_builtin()) {
@@ -295,22 +261,18 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       last_child = child;
     } else if (!is_last) {
 #if SHIT_PLATFORM_IS POSIX
-      /* A non-last builtin stage is bash's own subshell, so it forks. An
-         in-process run deadlocked when the builtin filled the pipe buffer
-         before its consumer started, as in seq into head. The forked child runs
-         concurrently and ends through SIGPIPE on a write to a closed pipe. */
+      /* A non-last builtin stage forks, an in-process run deadlocks when it
+         fills the pipe buffer before its consumer starts. */
       const os::process child =
           os::fork_compound_stage(ec.in_fd, ec.out_fd, ec.err_fd);
       if (child == 0) {
-        /* fork_compound_stage already placed the pipe ends on the standard
-           descriptors, so the context's own descriptors are cleared and the
-           builtin writes through the inherited standard output. */
+        /* fork_compound_stage already placed the pipe ends, so the context's
+           descriptors are cleared. */
         ec.in_fd = shit::None;
         ec.out_fd = shit::None;
         ec.err_fd = shit::None;
-        /* make_pipe marks both ends close-on-exec, which an external stage
-           drops at exec. A forked builtin never execs, so the child closes that
-           read end by hand, otherwise a write never sees the reader leave. */
+        /* A forked builtin never execs, so it closes the read end by hand or a
+           write never sees the reader leave. */
         if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
         cxt.set_in_pipeline_stage(true);
         cxt.enter_subshell();
@@ -331,25 +293,23 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
         shit::flush();
         os::exit_process_immediately(child_status);
       }
-      /* The parent keeps no copy of the stage's pipe ends, otherwise the reader
-         never sees the writer close. */
+      /* The parent keeps no copy of the pipe ends, or the reader never sees the
+         writer close. */
       ec.close_fds();
       children.push(child);
       child_stage.push(stage_index);
       last_child = child;
 #else
-      /* Windows has no fork, so a non-last builtin stage runs in process as
-         before. A producer larger than the pipe buffer can block there. */
+      /* Windows has no fork, a non-last builtin stage runs in process and can
+         block when it fills the pipe buffer. */
       cxt.set_in_pipeline_stage(true);
       defer { cxt.set_in_pipeline_stage(false); };
       ret = execute_builtin(steal(ec), cxt);
       stage_status[stage_index] = ret;
 #endif
     } else {
-      /* The last builtin stage runs in this process, so a read or a cd in it
-         affects the shell and its status stands in for the stage. The
-         pipeline-stage flag makes exec spawn a child rather than replace the
-         shell, and the defer clears it even on a throw. */
+      /* The last builtin stage runs in this process so a cd affects the shell.
+         The flag makes exec spawn a child rather than replace the shell. */
       cxt.set_in_pipeline_stage(true);
       defer { cxt.set_in_pipeline_stage(false); };
       ret = execute_builtin(steal(ec), cxt);
@@ -374,21 +334,16 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     return ret;
   }
 
-  /* Wait for every stage so none lingers as a zombie, recording each external
-     stage's status against its position. */
   for (usize i = 0; i < children.count(); i++)
     stage_status[child_stage[i]] = os::wait_and_monitor_process(children[i]);
 
-  /* PIPESTATUS exposes each stage's status by position, so a script reads a
-     non-last stage's status the way bash publishes it after a pipeline. */
   let pipe_status = ArrayList<String>{heap_allocator()};
   pipe_status.reserve(stage_count);
   for (usize i = 0; i < stage_count; i++)
     pipe_status.push(String::from(stage_status[i], heap_allocator()));
   cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
 
-  /* pipefail reports the rightmost stage that failed, or zero when every stage
-     succeeded. Otherwise the pipeline reports the last stage alone. */
+  /* pipefail reports the rightmost failing stage, otherwise the last stage. */
   if (cxt.pipefail()) {
     for (usize i = stage_count; i > 0; i--)
       if (stage_status[i - 1] != 0) return stage_status[i - 1];
@@ -407,7 +362,6 @@ pure fn strip_sig_prefix(StringView name) wontthrow -> StringView
 fn split_lines(StringView text) throws -> ArrayList<StringView>
 {
   let lines = ArrayList<StringView>{heap_allocator()};
-  /* Counting the line breaks first reserves the exact size. */
   usize line_count = 1;
   for (usize i = 0; i < text.length; i++)
     if (text[i] == '\n') line_count++;
@@ -495,11 +449,8 @@ fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
 
 fn format_minutes_seconds(double seconds) throws -> String
 {
-  /* A time report subtracts two child rusage samples, so a sample that goes
-     backwards yields a small negative duration. bash never prints a negative
-     time, so a negative input clamps to zero rather than printing a doubled
-     sign like -0m-0.001s, which the separate minutes and remainder would
-     otherwise produce. */
+  /* An rusage subtraction can go backwards, a negative clamps to zero to avoid
+     a doubled sign like -0m-0.001s. */
   if (seconds < 0.0) seconds = 0.0;
   const i64 minutes = static_cast<i64>(seconds) / 60;
   const double remainder = seconds - static_cast<double>(minutes * 60);
@@ -530,8 +481,6 @@ fn format_time_report_pretty(double real_seconds, double user_seconds,
                              double system_seconds, u64 peak_rss_bytes) throws
     -> String
 {
-  /* The cpu busy percent, the share of the wall time the user and system cpu
-     together account for, the way the bench summary reports it. */
   const double cpu_percent =
       real_seconds > 0.0
           ? (user_seconds + system_seconds) / real_seconds * 100.0
@@ -573,9 +522,8 @@ fn format_time_report_custom(StringView format, double real_seconds,
       continue;
     }
 
-    /* A precision digit and the long-format flag may precede a time conversion,
-       so %3lR is three fractional digits in the minutes form. The precision is
-       clamped to six, the way bash caps it. */
+    /* A precision digit and the l flag may precede the conversion, %3lR is three
+       digits in minutes form, precision clamped to six. */
     usize precision = 3;
     if (format[i] >= '0' && format[i] <= '9') {
       precision = static_cast<usize>(format[i] - '0');
@@ -604,8 +552,6 @@ fn format_time_report_custom(StringView format, double real_seconds,
     case 'S': value = system_seconds; break;
 
     case 'P': {
-      /* The cpu busy percent prints with two decimals, the bash default, and
-         takes no precision. */
       const double cpu_percent =
           real_seconds > 0.0
               ? (user_seconds + system_seconds) / real_seconds * 100.0
@@ -616,7 +562,6 @@ fn format_time_report_custom(StringView format, double real_seconds,
     }
 
     default:
-      /* An unrecognized conversion emits the percent and the letter. */
       report.push('%');
       report.push(code);
       continue;
@@ -641,17 +586,13 @@ fn format_time_report_custom(StringView format, double real_seconds,
   return report;
 }
 
-/* A newline offset table cached on one source, so the line lookup is a binary
-   search over the newlines rather than a scan of the prefix. The shell reads
-   $LINENO against a single script source at a time, so one cached entry keyed
-   on the source pointer and length serves every read in that script. */
+/* A newline offset table cached on one source, keyed on the source pointer and
+   length, so a $LINENO lookup is a binary search over the newlines. */
 class LineNumberCache
 {
 public:
   LineNumberCache() : m_newline_offsets(heap_allocator()) {}
 
-  /* Build the newline table for this source when it differs from the cached
-     one, so a repeated read against the same script reuses the table. */
   fn ensure_built_for(StringView source) throws -> void
   {
     if (m_source_data == source.data && m_source_length == source.count())

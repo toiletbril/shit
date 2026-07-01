@@ -36,8 +36,6 @@ pure fn Local::kind() const wontthrow -> Builtin::Kind { return Kind::Local; }
 
 fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  /* The bash attribute letters are read straight off the arguments. The shared
-     flag parser rejects an unknown letter. */
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
@@ -46,9 +44,6 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (!cxt.in_function_scope())
     throw Error{"Unable to declare a local variable outside a function"};
 
-  /* Leading flags carry the bash attributes. -a declares an indexed array and
-     -A an associative one, the rest are accepted without backing behavior so a
-     script that sets them keeps running. */
   bool should_make_indexed = false;
   bool should_make_associative = false;
   bool should_mark_integer = false;
@@ -84,10 +79,9 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const &arg = args[i];
     let const equals_position = arg.find_character('=');
 
-    /* Record the shadowed binding before overwriting it, so leaving the
-       function restores it. A bare name declares the local without touching the
-       value, so the currently-visible binding from the caller stays readable
-       until the body assigns the name, matching dash. */
+    /* A bare name declares the local without touching the value, so the
+       caller's binding stays readable until the body assigns it, matching
+       dash. */
     let name = equals_position.has_value()
                    ? arg.substring_of_length(0, *equals_position)
                    : arg.view();
@@ -98,14 +92,12 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     /* The append reads the name's own value only when it is already local in
        this scope, so a first local += starts from empty the way bash localizes
-       it fresh, not from the outer value the new local shadows. */
+       it fresh. */
     let const was_already_local =
         is_append && cxt.is_local_in_current_scope(name);
     LOG(All, "local declaring '%.*s' in the function scope",
         static_cast<int>(name.length), name.data);
     cxt.declare_local(name);
-    /* declare_local dropped any inherited integer mark, so -i marks the fresh
-       local here and leaving the scope removes it with the binding. */
     if (should_mark_integer) cxt.mark_integer(name);
 
     if (should_make_associative) {
@@ -116,10 +108,6 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     } else if (equals_position.has_value()) {
       let const value = arg.substring(*equals_position + 1);
       if (is_append) {
-        /* The appended value is transient, copied into the variable store by
-           set_shell_variable, so it lives on the per-command scratch arena. An
-           integer name joins the appended expression for the arithmetic in
-           the store rather than concatenating it. */
         let appended = String{cxt.scratch_allocator()};
         if (was_already_local)
           if (let const existing = cxt.get_variable_value(name))
@@ -134,10 +122,6 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
     }
 
-    /* -x moves the local into the environment, so a child process sees it for
-       the life of the function. The name is marked before the value is stored
-       again, so set_shell_variable routes it through to the environment, and
-       the saved binding restores the caller's export state on return. */
     if (should_mark_export && !should_make_indexed && !should_make_associative)
     {
       cxt.mark_exported(name);

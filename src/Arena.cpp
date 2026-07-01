@@ -80,8 +80,6 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
 hot fn BumpArena::owns(const opaque *pointer) const wontthrow -> bool
 {
   let const candidate = static_cast<const u8 *>(pointer);
-  /* The live tree allocates from the most recent block, so the scan runs back
-     to front and the common hit returns on the first compare. */
   for (usize i = m_blocks.count(); i > 0; i--) {
     const block &block = m_blocks[i - 1];
     if (candidate >= block.base && candidate < block.base + block.size) {
@@ -112,8 +110,6 @@ fn BumpArena::release(Mark saved) wontthrow -> void
 
   run_destructors_down_to(saved.destructor_count);
 
-  /* Reset the bump pointer to the marked position, keeping the blocks so a loop
-     body reuses the same storage each turn. */
   for (usize i = saved.block_count; i < m_blocks.count(); i++)
     m_blocks[i].used = 0;
 
@@ -130,12 +126,9 @@ cold fn BumpArena::reset() wontthrow -> void
 
   run_destructors_down_to(0);
 
-  /* Every reset reclaims the storage a cached pointer may hold, so bump the
-     generation to invalidate any cache that recorded an earlier one. */
+  /* Bumping the generation invalidates any cache keyed on an earlier one. */
   m_reset_generation++;
 
-  /* Keep the first block and drop the rest, so a typical command reuses one
-     block without asking the system for memory again. */
   for (usize i = 1; i < m_blocks.count(); i++)
     std::free(m_blocks[i].base);
   while (m_blocks.count() > 1)

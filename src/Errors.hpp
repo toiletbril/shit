@@ -9,12 +9,6 @@ namespace shit {
 
 static constexpr usize ERROR_CONTEXT_SIZE = 24;
 
-/* A byte range in some source, trivially copyable, so it is a plain struct
-   passed and stored by value with no accessors. The position and length are
-   byte offsets and do not account for unicode. The filename is the name of the
-   file the offset indexes, or None when the source has no name, such as an
-   interactive line, and a backtrace frame reads it to prefix the caret header
-   with a path. */
 struct SourceLocation
 {
   usize position{0};
@@ -22,9 +16,8 @@ struct SourceLocation
   Maybe<StringView> filename{};
 };
 
-/* Drop the cached source-line index that the located-error formatter keeps. The
-   host calls this when it frees a retained source, so a later source allocated
-   at the same address with the same length does not read a stale index. */
+/* Called when a retained source is freed, so a later source allocated at the
+   same address with the same length does not read a stale index. */
 fn invalidate_source_line_index() wontthrow -> void;
 
 class ErrorBase
@@ -38,22 +31,13 @@ public:
 
   fn message() const throws -> String;
 
-  /* The word printed before the message, Error by default. A warning subclass
-     overrides it to Warning, so the reporting code reads the severity from the
-     object rather than taking it as an argument. */
   virtual fn severity_word() const wontthrow -> String;
 
-  /* Renders the formatted message against the source the location indexes. The
-     base render ignores the source since a plain error carries no location, and
-     the located branch overrides it with the caret form, so a handler that
-     caught any ErrorBase prints the right shape without RTTI. */
   virtual fn to_string(StringView source) const throws -> String;
 
-  /* bash fails the current command and goes on after most evaluation errors,
-     while a set -u read and a ${name:?} keep aborting the whole run. The flag
-     marks the aborting kind, and the status is what the failed command
-     reports, 1 for most errors and 2 for a [[ ]] operand error. A relocation
-     that rewraps an error must carry both over. */
+  /* The command status is 1 for most errors and 2 for a [[ ]] operand error. A
+     relocation that rewraps an error must carry both the fatal mark and the
+     status over. */
   fn set_script_fatal() wontthrow -> void { m_is_script_fatal = true; }
   pure fn is_script_fatal() const wontthrow -> bool
   {
@@ -65,27 +49,14 @@ public:
   }
   pure fn command_status() const wontthrow -> i64 { return m_command_status; }
 
-  /* A located error thrown from a function body is rendered at the call
-     boundary while the call name stack still names the defining file, since the
-     top-level handler renders against the typed line and cannot reach that
-     file once the frame unwinds. The flag marks an error already shown there,
-     so the top-level handler keeps the exit status but does not print it
-     twice. */
   fn set_rendered() wontthrow -> void { m_was_rendered = true; }
   pure fn was_rendered() const wontthrow -> bool { return m_was_rendered; }
 
-  /* The suggestion that accompanies the diagnostic, rendered as a trailing note
-     line under the primary message rather than appended to it. The main message
-     states the problem, and the note carries the advice, so a reader sees the
-     fix on its own line. A relocation that rewraps an error carries it over. */
   fn set_note(StringView note) throws -> void { m_note = note; }
   pure fn has_note() const wontthrow -> bool { return !m_note.is_empty(); }
   fn note() const throws -> String { return m_note; }
 
 protected:
-  /* The "note: <suggestion>." trailing line in the note severity hue, or an
-     empty string when no note is attached, so a caller appends it
-     unconditionally and emits nothing on the no-note path. */
   fn note_to_string() const throws -> String;
 
   bool m_is_active{false};
@@ -105,12 +76,9 @@ public:
   fn to_string() const throws -> String;
   using ErrorBase::to_string;
 
-  /* Convert to the formatted message, so a call site passes an Error where a
-     string is expected without spelling out to_string. */
   operator String() const throws;
 };
 
-/* An Error that prints as a warning and is shown rather than thrown. */
 class Warning : public Error
 {
 public:
@@ -119,18 +87,14 @@ public:
   fn severity_word() const wontthrow -> String override;
 };
 
-/* A Ctrl-C raised mid-run. The mimic boundary tests this type rather than the
-   message text, so the interrupt survives a reworded message and a
-   program-thrown Error that happens to read "Interrupted" is not mistaken for
-   it. */
+/* The mimic boundary tests this type, never the message text, so a
+   program-thrown Error reading "Interrupted" is not mistaken for it. */
 class InterruptError : public Error
 {
 public:
   InterruptError();
 };
 
-/* An Error that prints as a note and is shown rather than thrown. It carries no
-   location, so it adds plain context under a primary error. */
 class Note : public Error
 {
 public:
@@ -139,18 +103,14 @@ public:
   fn severity_word() const wontthrow -> String override;
 };
 
-/* Thrown when an exec fails with ENOEXEC, where the file is executable but is
-   not a valid binary and carries no shebang. It signals the runtime to run the
-   file as a shell script, the POSIX fallback, rather than reporting a failure,
-   so it is always caught and never shown. */
+/* Thrown when an exec fails with ENOEXEC, so the runtime runs the file as a
+   shell script, the POSIX fallback. It is always caught and never shown. */
 class ExecFormatError : public Error
 {
 public:
   ExecFormatError();
 };
 
-/* An error with location in the source code. The source must be supplied to
-   resolve context. */
 class ErrorWithLocation : public ErrorBase
 {
 public:
@@ -158,18 +118,12 @@ public:
 
   ErrorWithLocation(SourceLocation location, StringView message);
 
-  /* The severity word comes from severity_word, so a warning subclass prints
-     Warning over the same caret without passing the word in. */
   virtual fn to_string(StringView source) const throws -> String;
 
-  /* The line numbering starts this many lines past one, for a source that is
-     a window into a larger file, the stored function definition text whose
-     first line sits deep inside the defining file. */
+  /* The line numbering starts this many lines past one, for a source that is a
+     window into a larger file. */
   fn set_line_offset(usize offset) wontthrow -> void { m_line_offset = offset; }
 
-  /* The stored location, read at the call boundary so a function-body error
-     rebases its absolute position onto the definition copy before it renders.
-   */
   pure fn location() const wontthrow -> SourceLocation { return m_location; }
   fn set_location(SourceLocation location) wontthrow -> void
   {
@@ -181,19 +135,14 @@ protected:
   usize m_line_offset{0};
 };
 
-/* An ErrorWithLocation raised when a command word resolves to neither a
-   builtin, a program on PATH, nor an existing path at runtime. The simple
-   command boundary catches it, prints it to stderr, and yields exit status 127
-   so evaluation continues the way a normal failing command does, rather than
-   aborting the shell. */
+/* The simple command boundary catches it, prints it, and yields status 127 so
+   evaluation continues instead of aborting the shell. */
 class CommandNotFound : public ErrorWithLocation
 {
 public:
   CommandNotFound(SourceLocation location, StringView message);
 };
 
-/* An ErrorWithLocation that prints as a warning and is shown rather than
-   thrown. The prepass builds it to point a caret at a non-fatal issue. */
 class WarningWithLocation : public ErrorWithLocation
 {
 public:
@@ -202,9 +151,6 @@ public:
   fn severity_word() const wontthrow -> String override;
 };
 
-/* An ErrorWithLocation that prints as a trace and is shown rather than thrown.
-   A source backtrace frame builds it so a call site reads as context under the
-   primary error rather than as an error of its own. */
 class TraceWithLocation : public ErrorWithLocation
 {
 public:
@@ -213,9 +159,6 @@ public:
   fn severity_word() const wontthrow -> String override;
 };
 
-/* Rewraps a plain error at a source location, carrying the script-fatal mark
-   and the command status over, so a relocated set -u read still aborts and a
-   relocated [[ ]] operand error still reports its status. */
 inline fn relocate_error(const ErrorBase &error, SourceLocation location) throws
     -> ErrorWithLocation
 {

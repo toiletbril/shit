@@ -43,15 +43,11 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (shitbox::find_util(ec.args()[0].view()).has_value())
     return shitbox::dispatch(ec, cxt, 0);
 
-  /* The sorted utility names, shared by the --list output and the help
-     listing. */
   let sorted_names = ArrayList<String>{cxt.scratch_allocator()};
   for (const String &name : shitbox::util_names())
     sorted_names.push(name.clone());
   shitbox::sort_string_list(sorted_names);
 
-  /* --list prints the utility names one per line and nothing else, so a script
-     can read the set without parsing the help text. */
   if (ec.args().count() >= 2 && ec.args()[1] == "--list") {
     let names_output = String{cxt.scratch_allocator()};
     for (let const &name : sorted_names) {
@@ -62,9 +58,6 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  /* --assimilate DIR installs a symlink to this binary named for each utility
-     into DIR, the busybox-style install, so the utilities run with no shitbox
-     prefix once DIR is on PATH. */
   if (ec.args().count() >= 2 && ec.args()[1] == "--assimilate") {
     if (ec.args().count() < 3) return report_usage_error(ec, cxt, ec.program());
 
@@ -75,8 +68,6 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return 1;
     }
 
-    /* A missing directory is reported once here rather than as one link failure
-       per utility, so the user sees the real cause instead of a flood. */
     if (!Path{ec.args()[2].view()}.is_directory()) {
       report_soft_builtin_error(
           ec, cxt,
@@ -90,9 +81,8 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     for (let const &name : sorted_names) {
       let link = Path{ec.args()[2].view()};
       link.push_component(name.view());
-      /* A re-run refreshes the install, so an existing symlink is removed
-         before the create rather than failing with EEXIST. A real file at the
-         path is left alone so assimilate never clobbers a user's binary. */
+      /* A real file at the path is left alone so assimilate never clobbers a
+         user's binary. */
       if (link.is_symbolic_link()) os::remove_file(link.text().view());
       if (!os::create_symlink(target->view(), link.text().view())) {
         report_soft_builtin_error(ec, cxt,
@@ -105,9 +95,6 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (ec.args().count() < 2 || ec.args()[1] == "--help") {
-    /* The help reads as three sections, the description, the two synopsis
-       lines, and the utilities as a comma-separated block wrapped under the
-       standard indent. */
     let listing = String{cxt.scratch_allocator()};
     listing += "DESCRIPTION\n";
     listing += wrap_text(HELP_DESCRIPTION, HELP_INDENT, HELP_WRAP_WIDTH);

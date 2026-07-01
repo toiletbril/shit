@@ -21,8 +21,7 @@
 namespace shit {
 
 /* A candidate argument after variable expansion and field splitting. The
-   parallel mask marks which characters may act as glob metacharacters. The text
-   lives on the scratch arena, the mask stays a heap bit vector. */
+   parallel mask marks which characters may act as glob metacharacters. */
 struct glob_field
 {
   explicit glob_field(Allocator allocator)
@@ -46,9 +45,6 @@ class WordSegment;
 class Expression;
 struct arith_token;
 
-/* One element of a [[ ]] conditional. An operand carries a word expanded
-   without field splitting, the rest are the grammar operators. A word operator
-   such as == or -f arrives as an operand and is classified by its text. */
 struct conditional_element
 {
   enum class Kind : u8
@@ -81,18 +77,12 @@ struct control_flow
   };
 
   Kind kind{Kind::Normal};
-  /* The loop level for break and continue, or the status for return and exit.
-   */
   i64 value{0};
-  /* Where the requesting builtin sits, so an escaped jump points a caret at
-     it. */
   SourceLocation location{0, 0};
   const String *source{nullptr};
   String origin{heap_allocator()};
 };
 
-/* One frame of the source backtrace, pushed when run_source begins. The
-   call_site is where the dot or eval sits in its parent_source. */
 struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
@@ -104,7 +94,6 @@ struct source_frame
   String origin;
   SourceLocation call_site;
   const String *parent_source;
-  /* The bare path of a sourced file, the value BASH_SOURCE reports. */
   String source_path;
 };
 
@@ -127,8 +116,6 @@ struct local_binding
   bool previous_was_exported{false};
 };
 
-/* A background job, one entry in the job table. The id is the number jobs and
-   fg name with a percent, such as %1. The pid is the process group leader. */
 struct job
 {
   enum class State : u8
@@ -145,30 +132,20 @@ struct job
   i32 last_status{0};
 };
 
-/* One reverted process-environment write, the prior value of an exported name
-   changed inside a subshell, absent when the name was unset before the write.
- */
 struct environment_undo_entry
 {
   String name;
   Maybe<String> previous_value;
 };
 
-/* A live process substitution. The shell keeps one pipe end open as the /dev/fd
-   path the consuming command uses, the forked child runs the inner command on
-   the other end. */
 struct process_substitution
 {
   os::descriptor shell_fd;
   os::process child;
-  /* Where the command that opened the substitution sits, for a reap warning
-     caret. A view is held rather than the owning String. */
   SourceLocation location;
   StringView source;
 };
 
-/* A mark a command takes at entry, the count of pending substitutions and temp
-   files before it ran, so its cleanup reaps only the ones it opened. */
 struct process_substitution_mark
 {
   usize pending{0};
@@ -188,8 +165,6 @@ struct loop_redirect_fd_mark
   usize count{0};
 };
 
-/* A shell descriptor a bare exec moved inside an in-process subshell, backed up
-   so leave_subshell puts it back. The depth names the owning subshell. */
 struct subshell_saved_descriptor
 {
   usize depth;
@@ -205,8 +180,6 @@ struct function_definition_info
   usize header_length{0};
   usize line_offset{0};
   String filename{heap_allocator()};
-  /* The source instance the body was defined against. A call made while this
-     instance is still current needs no window. */
   const String *defining_instance{nullptr};
   /* The mood and diagnostics state when the function was defined, so the body
      runs in its defining mood regardless of the mood at the call. The mood
@@ -217,8 +190,6 @@ struct function_definition_info
   bool were_diagnostics_disabled_at_definition{false};
 };
 
-/* Record a visit to a directory in the frecency store at
-   ~/.shit_directory_history, for the z smart-cd builtin. */
 fn record_directory_access(StringView directory, Allocator allocator) throws
     -> void;
 
@@ -264,10 +235,6 @@ struct eval_state_snapshot
   bool export_all;
 };
 
-/* A programmable-completion spec the complete builtin registers for a command.
-   function_name is the -F function, word_list is the -W word list, and
-   should_use_default falls back to filename completion when the spec yields
-   nothing. */
 struct completion_spec
 {
   String function_name{heap_allocator()};
@@ -329,15 +296,11 @@ public:
 
   fn end_command() wontthrow -> void;
 
-  /* Variable expand, tilde expand, field split, and glob each token. When
-     args_are_transient is set the returned vector lives on the scratch arena
-     so a simple command pays no per-argument heap allocation. */
+  /* Variable expand, tilde expand, field split, and glob each token. */
   fn process_args(const ArrayList<const Token *> &args,
                   bool args_are_transient = false,
                   bool is_array_literal = false) throws -> ArrayList<String>;
 
-  /* The allocator for transient expansion data, reclaimed whole when the
-     command ends. */
   fn scratch_allocator() const wontthrow -> Allocator
   {
     return bump_allocator(m_scratch_arena);
@@ -354,14 +317,8 @@ public:
 
   fn set_shell_variable(StringView name, StringView value) throws -> void;
 
-  /* Seed the shell-identity variables a script probes to find its host shell. A
-     bash identity advertises BASH_VERSION and BASH, every other mode the sh and
-     dash version names. */
   fn seed_shell_identity_variables(bool bash_identity) throws -> void;
 
-  /* The pathname used to invoke this shell, the symlink spelling such as
-     /usr/local/bin/bash when shit is symlinked to bash, recorded so BASH names
-     the invocation path the way bash records its own. */
   fn set_shell_executable_path(StringView path) throws -> void
   {
     m_shell_executable_path = String{heap_allocator(), path};
@@ -369,17 +326,10 @@ public:
 
   fn unset_shell_variable(StringView name) throws -> void;
 
-  /* Remove a single array element or associative key, backing unset name[sub].
-   */
   fn unset_array_element(StringView name, StringView subscript) throws -> void;
 
-  /* The bash indexed arrays, a name to an ordered list of element strings. A
-     scalar read of an array name yields element zero the way bash treats $a as
-     ${a[0]}. */
   fn set_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
-  /* Publish a one-element PIPESTATUS for a simple command, the way bash
-     refreshes it after every foreground command. */
   fn publish_single_pipe_status(i32 status) throws -> void;
   fn append_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
@@ -391,8 +341,6 @@ public:
      concatenates onto the current element. */
   fn assign_array_element(StringView name, StringView subscript,
                           StringView value, bool is_append) throws -> void;
-  /* Read one array element as an arithmetic integer from a raw subscript, the
-     read counterpart of assign_array_element. */
   fn read_array_element_integer(StringView name, StringView subscript) throws
       -> i64;
   pure fn lookup_indexed_array(StringView name) const wontthrow
@@ -414,16 +362,10 @@ public:
       -> Maybe<String>;
   fn associative_keys(StringView name) const throws -> ArrayList<String>;
   fn associative_values(StringView name) const throws -> ArrayList<String>;
-  /* Forget every element of an associative array and the name's membership. */
   fn clear_associative_array(StringView name) throws -> void;
 
-  /* Every element of an array name as a list, the indexed elements in order,
-     the associative values in store order, or a one-element list for a scalar.
-     An unset name yields an empty list. */
   fn collect_array_elements(StringView name) const throws -> ArrayList<String>;
 
-  /* Whether an array element or key is set, backing [[ -v name[subscript] ]].
-   */
   fn array_element_is_set(StringView name, StringView subscript) throws -> bool;
 
 #if SHIT_PLATFORM_IS POSIX
@@ -432,12 +374,9 @@ public:
   fn cached_compiled_regex(StringView pattern) throws -> regex_t *;
 #endif
 
-  /* The subscripts of an array as a list, the indices of an indexed array or
-     the keys of an associative one. */
   fn collect_array_subscripts(StringView name) const throws
       -> ArrayList<String>;
 
-  /* Drop every sparsely-held element of an indexed array. */
   fn clear_sparse_array(StringView name) throws -> void;
 
   /* Assign an array literal, honoring an explicit [index]=value element with a
@@ -447,17 +386,12 @@ public:
                                    const ArrayList<String> &elements,
                                    bool is_append) throws -> void;
 
-  /* Log a name's environment value before a write that outlives the statement,
-     so a subshell restore can revert it. */
   fn record_environment_change(StringView name) throws -> void;
 
-  /* The exported names, mirrored so an assignment tests an O(1) set rather than
-     scanning the environment on every write. */
   fn mark_exported(StringView name) throws -> void;
   fn unmark_exported(StringView name) throws -> void;
   pure fn is_exported(StringView name) const wontthrow -> bool;
 
-  /* Re-point the exported set after an environment value is restored. */
   fn sync_exported_after_restore(StringView name, bool has_value) throws
       -> void;
 
@@ -469,15 +403,12 @@ public:
   fn append_dynamic_variable_names(ArrayList<StringView> &out) const throws
       -> void;
 
-  /* The stored value of a plain shell variable, or nullptr when unset or a
-     special parameter. */
   hot fn lookup_shell_variable(StringView name) const wontthrow
       -> const String *
   {
     return m_shell_variables.find(name);
   }
 
-  /* The positional parameters, $1 upward, $0 separate as the shell name. */
   pure fn positional_params() const wontthrow -> const ArrayList<String> &;
   fn set_positional_params(ArrayList<String> params) wontthrow -> void;
 
@@ -488,18 +419,14 @@ public:
   fn set_last_exit_status(i32 status) wontthrow -> void;
   pure fn last_exit_status() const wontthrow -> i32;
 
-  /* The last argument of the previous simple command, the value $_ reads. */
   fn set_last_argument(StringView value) throws -> void
   {
     m_last_argument = String{value};
   }
 
-  /* The wall-clock nanoseconds the last top-level command took, for the \D
-     prompt segment. */
   fn set_last_command_duration_ns(u64 nanos) wontthrow -> void;
   pure fn last_command_duration_ns() const wontthrow -> u64;
 
-  /* The process id of the most recent background command, for $!. */
   fn set_last_background_pid(i64 pid) wontthrow -> void;
 
   /* The job table tracks the background commands started with the & operator.
@@ -516,10 +443,7 @@ public:
   fn forget_done_jobs() throws -> void;
   fn remove_job(i32 id) throws -> bool;
 
-  /* Poll the jobs, print a bash-style done line for each just-finished one,
-     then forget those entries. Gated on an interactive shell. */
   fn notify_done_jobs() throws -> void;
-  /* The Done lines notify_done_jobs prints, with the caller's line ending. */
   fn format_done_job_notifications(StringView line_ending) throws -> String;
 
   /* monitor mode is set -m, on by default in an interactive shell. It gates the
@@ -537,18 +461,12 @@ public:
   fn set_emacs_mode(bool enabled) wontthrow -> void { m_vi_mode = !enabled; }
   pure fn emacs_mode() const wontthrow -> bool { return !m_vi_mode; }
 
-  /* Registers a function and keeps the definition text declare -f prints back,
-     with a stamp mapping its absolute positions onto that copy. */
   fn register_function(StringView name, const Expression *body,
                        StringView definition_text, usize body_start_position,
                        SourceLocation definition_location) throws -> void;
-  /* The recorded definition text of a function, or null when unrecorded. */
   fn find_function_source(StringView name) const wontthrow -> const String *;
   fn function_definition_info_of(StringView name) const wontthrow
       -> const function_definition_info *;
-  /* The text and mapping a location renders against. The current source with
-     identity numbering when the location indexes it, otherwise the innermost
-     function's definition copy with its window. */
   struct resolved_render_source
   {
     const String *text{nullptr};
@@ -560,7 +478,6 @@ public:
   };
   pure fn resolve_render_source(SourceLocation location) const wontthrow
       -> resolved_render_source;
-  /* The list declare -F prints, sorted. */
   mustuse fn sorted_function_names() const throws -> ArrayList<String>;
   fn find_function(StringView name) const wontthrow -> const Expression *;
   pure fn has_functions() const wontthrow -> bool;
@@ -568,45 +485,35 @@ public:
   fn unset_function(StringView name) throws -> void;
   fn clear_functions() wontthrow -> void;
 
-  /* The names of every defined function, for the prepass. */
   fn function_names() const throws -> HashSet;
 
-  /* Programmable completion. register records what complete sets for a command,
-     and run_completion_function calls a -F function and returns its COMPREPLY.
-   */
   fn register_completion_spec(StringView command, completion_spec spec) throws
       -> void;
   pure fn lookup_completion_spec(StringView command) const wontthrow
       -> const completion_spec *;
-  /* The default completion complete -D registers, used when no command-specific
-     spec exists. */
   fn register_default_completion_spec(completion_spec spec) throws -> void;
   pure fn default_completion_spec() const wontthrow -> const completion_spec *;
-  /* The whole spec table, read by complete -p to replay the registrations. */
   pure fn completion_specs() const wontthrow
       -> const StringMap<completion_spec> &
   {
     return m_completion_specs;
   }
-  /* out_exit_status, when given, receives the function's return status, so the
-     engine can see the 124 a dynamic loader returns to request a retry. */
+  /* out_exit_status receives the function's return status, so the engine sees
+     the 124 a dynamic loader returns to request a retry. */
   fn run_completion_function(StringView function_name,
                              const ArrayList<String> &words, usize cword,
                              StringView line, usize point,
                              i32 *out_exit_status = nullptr) throws
       -> ArrayList<String>;
-  /* The bash -W word list semantics. The list undergoes shell expansion and
-     splits into fields. allow_expansion off keeps the plain split. */
+  /* allow_expansion off keeps the plain split with no shell expansion. */
   fn expand_wordlist_to_fields(StringView wordlist,
                                bool allow_expansion = true) throws
       -> ArrayList<String>;
 
-  /* The names of every shell variable, for variable completion after a '$'. */
   fn variable_names(Allocator result_allocator = heap_allocator()) const throws
       -> HashSet;
 
-  /* trap stores an action to run for a condition, keyed by the condition name
-     such as EXIT or INT. A signal condition installs the shell's handler. */
+  /* A signal condition installs the shell's handler. */
   fn set_trap(StringView condition, StringView action) throws -> void;
   fn remove_trap(StringView condition) throws -> void;
   pure fn traps() const wontthrow -> const StringMap<String> &;
@@ -615,7 +522,6 @@ public:
   /* Run the action of every signal whose flag the handler set, at the command
      boundary. A re-entrancy guard keeps a triggered signal from nesting. */
   fn run_pending_traps() throws -> void;
-  /* True when an EXIT trap action is set. */
   fn has_exit_trap() const wontthrow -> bool;
 
   /* A subshell clears the inherited EXIT action on entry and fires its own on
@@ -623,44 +529,31 @@ public:
   fn clear_inherited_exit_trap() throws -> void;
   fn run_subshell_exit_trap() throws -> void;
 
-  /* readonly marks a variable so a later assignment to it fails. */
   fn mark_readonly(StringView name) throws -> void;
-  /* Drop a name's read-only mark, when a local shadows a read-only caller
-     name. */
   fn unmark_readonly(StringView name) throws -> void;
   fn is_readonly(StringView name) const wontthrow -> bool;
   fn readonly_names() const throws -> ArrayList<String>;
 
-  /* declare -i marks a variable so every assignment evaluates the value as
-     arithmetic and stores the decimal result. */
   fn mark_integer(StringView name) throws -> void;
   fn unmark_integer(StringView name) throws -> void;
   fn is_integer_variable(StringView name) const wontthrow -> bool;
-  /* Joins an appended arithmetic expression onto the prior value in joined,
-     parenthesized so its precedence stays self-contained. */
+  /* The appended expression is parenthesized so its precedence stays
+     self-contained. */
   fn append_integer_expression(String &joined,
                                StringView expression) const throws -> void;
 
-  /* A function call pushes a local scope so a local builtin can shadow a
-     variable and restore it on return. */
   fn enter_function_scope() throws -> void;
   fn leave_function_scope() throws -> void;
-  /* The function-call name stack behind FUNCNAME, innermost last. */
   fn push_function_call_name(StringView name) throws -> void;
   fn pop_function_call_name() wontthrow -> void;
   /* The FUNCNAME frame list bash exposes, the function calls innermost first,
      one "source" per sourced file, and "main" at the bottom of a script run. */
   mustuse fn funcname_frame_count() const wontthrow -> usize;
   mustuse fn funcname_frame_at(usize index) const wontthrow -> StringView;
-  /* The call-site line of frame index, the value BASH_LINENO exposes. A frame
-     past the function calls reports zero. */
+  /* A frame past the function calls reports zero. */
   mustuse fn funcname_line_at(usize index) const throws -> usize;
-  /* The 1-based line a source location falls on, shared by $LINENO and
-     BASH_LINENO. */
   mustuse fn
   line_number_at_location(const SourceLocation &location) const throws -> usize;
-  /* Marks the run as a script file, the invocation whose FUNCNAME bottoms out
-     at "main". */
   fn set_script_run(bool is_script_run) wontthrow -> void
   {
     m_is_script_run = is_script_run;
@@ -670,25 +563,17 @@ public:
      a sourced file to return from even outside a function. */
   pure fn is_sourcing() const wontthrow -> bool { return m_source_depth > 0; }
   fn declare_local(StringView name) throws -> void;
-  /* True when the name already has a local binding in the innermost scope. */
   mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;
 
-  /* alias maps a command word to its replacement text, consulted by the parser
-     before a simple command. */
   fn set_alias(StringView name, StringView value) throws -> void;
   fn remove_alias(StringView name) throws -> bool;
   fn get_alias(StringView name) const throws -> Maybe<String>;
   fn alias_definitions() const throws -> ArrayList<String>;
-  /* The defined alias names, for the prepass. */
   fn alias_names() const throws -> HashSet;
 
-  /* Save and restore the mutable state around a subshell or a command
-     substitution, so changes inside do not leak to the parent. */
   fn snapshot_state() const throws -> eval_state_snapshot;
   fn restore_state(eval_state_snapshot snapshot) throws -> void;
 
-  /* Track whether evaluation is inside a subshell or a command substitution, so
-     the exit builtin ends only that scope. */
   fn enter_subshell() wontthrow -> void;
   fn leave_subshell() wontthrow -> void;
   pure fn in_subshell() const wontthrow -> bool;
@@ -697,8 +582,6 @@ public:
      wins. */
   fn snapshot_subshell_descriptor(i32 shell_fd) throws -> void;
 
-  /* The control-flow channel break, continue, return, and exit write instead of
-     throwing, consumed at the matching loop, function, or subshell boundary. */
   fn request_break(i64 level, SourceLocation location) throws -> void;
   fn request_continue(i64 level, SourceLocation location) throws -> void;
   fn request_return(i64 status, SourceLocation location) throws -> void;
@@ -708,24 +591,15 @@ public:
   pure fn pending_control_flow() const wontthrow -> const control_flow &;
   fn clear_control_flow() wontthrow -> void;
 
-  /* The source currently being evaluated and its name, so a deferred report
-     formats a caret against the right text. Set around a top-level and a
-     sourced run, restoring the previous frame after. */
   fn set_current_source(const String *source, String origin) wontthrow -> void;
   pure fn current_source() const wontthrow -> const String *;
   pure fn current_origin() const wontthrow -> const String &;
-  /* Print the source backtrace, every dot or eval call site from the innermost
-     out, as context under a diagnostic. A frame at error_location is dropped.
-   */
+  /* A frame at error_location is dropped. */
   fn print_source_backtrace(
       Maybe<SourceLocation> error_location = None) const throws -> void;
 
-  /* The byte offset of the command being evaluated, the position $LINENO
-     reports the line of. */
   fn set_current_location(SourceLocation location) wontthrow -> void;
 
-  /* The set builtin toggles these options at run time. error_exit is set -e,
-     echo_expanded is set -x, and error_unset is set -u. */
   fn set_error_exit(bool enabled) wontthrow -> void;
   pure fn error_exit() const wontthrow -> bool;
   fn set_echo_expanded(bool enabled) wontthrow -> void;
@@ -796,8 +670,6 @@ public:
   pure fn locate_variable_reference(StringView name) const wontthrow
       -> SourceLocation;
 
-  /* pipefail makes a pipeline report the status of the rightmost stage that
-     failed rather than the last stage alone. */
   fn set_pipefail(bool enabled) wontthrow -> void;
   pure fn pipefail() const wontthrow -> bool;
   /* Marks the pipeline strictness as the script's own set -o pipefail rather
@@ -807,27 +679,16 @@ public:
     m_runtime.pipefail_explicit = enabled;
   }
 
-  /* noclobber rejects an overwrite of an existing file through a plain >, set
-     by -C and set -o noclobber. */
   fn set_no_clobber(bool enabled) wontthrow -> void;
   pure fn no_clobber() const wontthrow -> bool;
-  /* allexport marks every later assignment for the environment, set by -a and
-     set -o allexport. */
   fn set_export_all(bool enabled) wontthrow -> void;
   pure fn export_all() const wontthrow -> bool;
-  /* noglob disables pathname expansion, set by -f and set -o noglob. */
   fn set_no_glob(bool enabled) wontthrow -> void;
   pure fn no_glob() const wontthrow -> bool;
-  /* noexec parses without running, set by -n and set -o noexec. */
   fn set_no_exec(bool enabled) wontthrow -> void;
   pure fn no_exec() const wontthrow -> bool;
-  /* shitbox makes the bundled coreutility names resolve directly as commands,
-     set by --enable-shitbox at startup and set -o shitbox at run time. */
   fn set_shitbox(bool enabled) wontthrow -> void;
   pure fn shitbox() const wontthrow -> bool;
-  /* failglob makes a glob that matches no path a hard error. With it off the
-     unmatched glob expands to its literal pattern, set by --no-fail-glob and
-     set -o failglob. */
   fn set_failglob(bool enabled) wontthrow -> void;
   pure fn failglob() const wontthrow -> bool;
   /* Marks the glob strictness as the script's own set -o failglob rather than
@@ -851,8 +712,6 @@ public:
      name reported only when the file exists. */
   fn expand_glob_lenient(StringView pattern) throws -> ArrayList<String>;
 
-  /* Bash mood enables the bash extensions that change the meaning of valid
-     POSIX syntax, such as the (( )) arithmetic command and brace expansion. */
   pure fn is_bash_compatible() const wontthrow -> bool
   {
     return m_runtime.mood == mimic_mood::Bash;
@@ -872,15 +731,11 @@ public:
   fn set_mood(mimic_mood mood) wontthrow -> void { m_runtime.mood = mood; }
   pure fn mood() const wontthrow -> mimic_mood { return m_runtime.mood; }
 
-  /* The -c command string, the source of BASH_EXECUTION_STRING. */
   fn set_execution_string(StringView text) throws -> void
   {
     m_execution_string = String{heap_allocator(), text};
   }
 
-  /* The source text of the command running now, the value BASH_COMMAND reads.
-     It is recorded only in the moods that expose the bash dynamic variables, so
-     the posix mood pays nothing for it. */
   fn set_current_command(String text) throws -> void
   {
     m_current_command = steal(text);
@@ -962,8 +817,6 @@ public:
     return (m_initialized_moods & (1U << static_cast<u8>(mood))) != 0;
   }
 
-  /* Mimicry runs a shell script in-process in the matching mode rather than
-     launching the shell. */
   fn set_mimicry(bool enabled) wontthrow -> void { m_mimicry = enabled; }
   pure fn mimicry() const wontthrow -> bool { return m_mimicry; }
 
@@ -982,21 +835,16 @@ public:
      when false the snapshot is skipped. */
   fn run_mimicked_script(ExecContext &ec, mimic_mood mode, bool isolated) throws
       -> i32;
-  /* The extended globs are on everywhere except POSIX mode. */
   pure fn extglob_enabled() const wontthrow -> bool
   {
     return m_runtime.mood != mimic_mood::Posix;
   }
 
-  /* The bash dynamic variables, FUNCNAME and RANDOM and their kin, exist
-     everywhere except POSIX mode. */
   pure fn bash_dynamic_variables_enabled() const wontthrow -> bool
   {
     return m_runtime.mood != mimic_mood::Posix;
   }
 
-  /* The pure bash additions that POSIX rejects outright, brace expansion and
-     printf -v, ride every mood but POSIX. */
   pure fn bash_additions_enabled() const wontthrow -> bool
   {
     return m_runtime.mood != mimic_mood::Posix;
@@ -1019,8 +867,6 @@ public:
      is_shopt_enabled. */
   static pure fn shopt_default_is_on(StringView name) wontthrow -> bool;
 
-  /* A condition, such as an if test or an && operand, suppresses set -e while
-     it runs, since its failure is expected. */
   fn enter_condition() wontthrow -> void;
   fn leave_condition() wontthrow -> void;
   pure fn in_condition() const wontthrow -> bool;
@@ -1069,15 +915,10 @@ public:
   }
   pure fn terminal_exec_allowed() const wontthrow -> bool;
 
-  /* The name=value lines that set with no argument prints, sorted. */
   fn sorted_variable_assignments() const throws -> ArrayList<String>;
 
-  /* Expand a word in assignment context, with variable, tilde, and command
-     substitution but no field splitting and no globbing. */
   fn expand_word_for_assignment(const Word &word) throws -> String;
 
-  /* Compute the integer value of a $((...)) or (( )) expression, resolving
-     shell variables and applying any assignments inside it. */
   fn evaluate_arithmetic(StringView expression) throws -> i64;
 
   /* Evaluate an expression for the calc builtin and return its decimal text,
@@ -1157,25 +998,19 @@ public:
                                      os::file_open_mode mode,
                                      os::descriptor fd) throws -> bool;
 
-  /* Run a parsed inner command under the substitution machinery, capturing its
-     stdout and snapshotting state so a cd or an assignment inside does not
-     leak. Both capture overloads share this once they hold an AST. */
   fn run_captured_substitution(const Expression *ast,
                                const String &source) throws -> String;
 
   /* Lex, parse, and evaluate a chunk of source in this context, without
      capturing output or snapshotting state. A dot-source consumes a return at
-     the top of the chunk and ends there, while an eval leaves it pending, which
-     is why consume_return is false for eval. call_site names where the dot or
-     eval sits in its parent, and filename is the source's bare path. */
+     the top of the chunk and ends there, an eval leaves it pending, so
+     consume_return is false for eval. */
   fn run_source(StringView source, StringView origin = "a sourced command",
                 bool consume_return = true,
                 Maybe<SourceLocation> call_site = None,
                 Maybe<StringView> filename = None) throws -> i32;
 
-  /* A guard around a nested dot-source, eval run, function call, or command
-     substitution. Each throws a located error past the recursion cap rather
-     than exhausting memory. */
+  /* Each throws a located error past the recursion cap. */
   fn enter_source(SourceLocation location) throws -> void;
   fn leave_source() wontthrow -> void;
   fn enter_function_call(SourceLocation location) throws -> void;
@@ -1192,34 +1027,29 @@ public:
   pure fn getopts_last_optind() const wontthrow -> i64;
   fn set_getopts_last_optind(i64 optind) wontthrow -> void;
 
-  /* Destroy the ASTs retained from eval and dot, before the parse arena is
-     reset, so a function those sources defined stays valid for the command. */
   fn clear_retained_sources() wontthrow -> void;
 
-  /* Keep a top-level command's tree alive past its run, so a function it
+  /* Keeps a top-level command's tree alive past its run, so a function it
      defined stays callable on the next command. */
   fn retain_ast(Expression *ast) throws -> void;
 
-  /* Expand a heredoc body, its $name and ${...} references, keeping the literal
-     text and newlines. */
   fn expand_heredoc_body(StringView body) throws -> String;
 
   fn expand_modifier_word(StringView word, bool remove_quotes = true) throws
       -> String;
 
-  /* The same expansion, plus a parallel mask of which output bytes may act as
-     glob metacharacters, so the ${x#pat} and ${x%pat} forms match literally. */
+  /* active_out marks which output bytes may act as glob metacharacters, so
+     ${x#pat} and ${x%pat} match literally. */
   fn expand_modifier_word_masked(StringView word, Bitset &active_out,
                                  bool remove_quotes = true) throws -> String;
 
-  /* The shared body behind the two public forms. is_pattern_word makes a
-     backslash quote the following byte, the # and % rule. */
+  /* is_pattern_word makes a backslash quote the following byte, the # and %
+     rule. */
   fn expand_modifier_word_worker(StringView word, Bitset &active_out,
                                  bool remove_quotes,
                                  bool is_pattern_word) throws -> String;
 
   pure fn should_echo() const wontthrow -> bool;
-  /* The -v input echo, settable at runtime through set -o verbose. */
   fn set_echo(bool enabled) wontthrow -> void { m_enable_echo = enabled; }
   pure fn should_echo_expanded() const wontthrow -> bool;
   pure fn shell_is_interactive() const wontthrow -> bool;
@@ -1234,13 +1064,9 @@ public:
 
   fn make_stats_string() const throws -> String;
 
-  /* Stats counting is off unless -S asked for the report, so the per-node
-     bookkeeping never runs when nobody reads it. */
   fn set_stats_enabled(bool enabled) wontthrow -> void;
   pure fn stats_enabled() const wontthrow -> bool;
 
-  /* The shell's own debug toggles, seeded from the -A, -M, and -E flags and
-     flipped at runtime by set. */
   fn set_show_ast(bool enabled) wontthrow -> void { m_show_ast = enabled; }
   pure fn show_ast() const wontthrow -> bool { return m_show_ast; }
   fn set_show_lexed_words(bool enabled) wontthrow -> void
@@ -1351,7 +1177,6 @@ protected:
 
   String m_shell_name{heap_allocator()};
   String m_shell_executable_path{heap_allocator()};
-  /* The last argument of the previous simple command, the value $_ reads. */
   String m_last_argument{heap_allocator()};
   String m_execution_string{heap_allocator()};
   String m_current_command{heap_allocator()};
@@ -1446,10 +1271,7 @@ protected:
   usize m_mimicry_depth{0};
   /* The base $SECONDS counts from. */
   i64 m_shell_start_time{0};
-  /* Whether the $RANDOM generator has been seeded, set on the first read. */
   mutable bool m_random_seeded{false};
-  /* True while a test or [ command expands its arguments, so an unmatched
-     glob stays a silent literal and the probe answers false. */
   bool m_glob_exempt_for_test{false};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
@@ -1462,8 +1284,6 @@ protected:
   bool m_is_completion_function_running{false};
   bool m_is_in_pipeline_stage{false};
 
-  /* Install the OS signal disposition for each signal in the trap table, after
-     a subshell restore brings the parent's table back. */
   fn install_trap_dispositions() throws -> void;
 
   HashSet m_readonly_names{heap_allocator()};
@@ -1493,7 +1313,6 @@ protected:
   bool m_shell_is_interactive;
   bool m_error_exit;
 
-  /* The single-letter option flags for $-, built from the flags above. */
   fn option_flags_string() const throws -> String;
 
   fn expand_variable(StringView name) const throws -> String;
@@ -1515,8 +1334,6 @@ protected:
      the integer mark, shared by the scope pop and the unset peel. */
   fn restore_local_binding(local_binding &binding) throws -> void;
 
-  /* Expand a ${...} body, which is a plain name or a name with a length, a
-     default, an alternate, an assign, an error, or a prefix or suffix trim. */
   fn apply_parameter_expansion(StringView spec) throws -> String;
 
   /* Expand the bash substring form ${name:offset:length}, an arithmetic offset
@@ -1547,7 +1364,6 @@ protected:
   fn apply_parameter_transform(StringView name, char op) throws -> String;
   fn apply_parameter_transform_to_value(StringView value, char op,
                                         StringView name) throws -> String;
-  /* The value-only core of the case modification. */
   fn apply_case_modification_to_value(StringView value, StringView spec) throws
       -> String;
   /* Apply one trailing value-transform modifier, the / replacement, the # and %
@@ -1567,8 +1383,6 @@ protected:
      variable names that start with the prefix, otherwise it is indirect. */
   fn apply_indirect_or_name_listing(StringView body) throws -> String;
 
-  /* The set variable names that start with the prefix, from the shell store and
-     the environment, deduplicated and sorted. */
   fn matching_prefix_names(StringView prefix) const throws -> ArrayList<String>;
 
   /* Turn a word into fields, applying tilde, variable expansion, command
@@ -1584,9 +1398,6 @@ protected:
 
   fn expand_tilde(WordSegment &leading_segment,
                   bool word_continues) const throws -> void;
-  /* The directory a tilde prefix names, the home for an empty or user name
-     and PWD or OLDPWD for + and -, or None when the name resolves to
-     nothing and the word stays literal. */
   fn resolve_tilde_prefix(StringView name) const throws -> Maybe<String>;
   /* Expands a tilde after each unquoted colon inside one segment, the
      assignment-only rule bash applies to PATH=~/bin:~/tmp. */
@@ -1594,8 +1405,6 @@ protected:
       -> void;
 };
 
-/* Lower-level execution context. The program path is expanded from the program,
-   the non-altered first argument. */
 class ExecContext
 {
 public:
@@ -1693,12 +1502,10 @@ private:
    throws. */
 fn evaluate_constant_arithmetic(StringView expression) throws -> i64;
 
-/* The index of the colon that separates the offset from the length in a
-   substring body, or the body length when there is none. */
 fn find_substring_length_separator(StringView body) wontthrow -> usize;
 
-/* Throw an error carrying the script-fatal mark, the abort the set -u read
-   and the ${name:?} report perform even in the bash mood. */
+/* The abort the set -u read and the ${name:?} report perform even in the bash
+   mood. */
 [[noreturn]] fn throw_script_fatal(String message, StringView note = {}) throws
     -> void;
 

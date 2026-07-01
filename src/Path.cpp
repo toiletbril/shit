@@ -27,8 +27,6 @@ static constexpr char DIRECTORY_SEPARATOR = '\\';
 static constexpr char DIRECTORY_SEPARATOR = '/';
 #endif
 
-/* A forward slash is always a separator so a POSIX-style path keeps working
-   everywhere, and a backslash is one on Windows too. */
 static pure fn is_directory_separator(char c) wontthrow -> bool
 {
 #if SHIT_PLATFORM_IS WIN32
@@ -53,7 +51,6 @@ fn Path::is_absolute() const wontthrow -> bool
   if (m_text.is_empty()) return false;
 #if SHIT_PLATFORM_IS WIN32
   if (is_directory_separator(m_text[0])) return true;
-  /* A drive-qualified path such as C:\ is absolute. */
   return m_text.count() >= 2 && m_text[1] == ':';
 #else
   return is_directory_separator(m_text[0]);
@@ -62,8 +59,6 @@ fn Path::is_absolute() const wontthrow -> bool
 
 fn Path::is_relative() const wontthrow -> bool { return !is_absolute(); }
 
-/* The offset just past the last separator, so the filename starts there. Zero
-   when there is no separator. */
 static pure fn filename_offset(const String &text) wontthrow -> usize
 {
   for (usize i = text.count(); i > 0; i--)
@@ -81,12 +76,9 @@ fn Path::filename() const wontthrow -> StringView
 fn Path::extension() const wontthrow -> StringView
 {
   let const name = filename();
-  /* The . and .. directory entries have no extension, matching std::filesystem,
-     so the trailing dot in .. is not read as one. */
   if (name == StringView{"."} || name == StringView{".."})
     return StringView{name.data + name.length, 0};
-  /* A dot at the start names a hidden file rather than an extension, so the
-     scan stops before the first byte. */
+  /* A leading dot names a hidden file, so the scan stops before the first byte. */
   for (usize i = name.length; i > 1; i--)
     if (name.data[i - 1] == '.') return name.substring(i - 1);
   return StringView{name.data + name.length, 0};
@@ -96,7 +88,6 @@ fn Path::parent() const throws -> Path
 {
   let const end = filename_offset(m_text);
   if (end == 0) return Path{};
-  /* Keep a lone root separator, otherwise drop the trailing one. */
   if (end == 1) return Path{m_text.substring_of_length(0, 1)};
   return Path{m_text.substring_of_length(0, end - 1)};
 }
@@ -135,8 +126,6 @@ cold fn Path::normalized() const throws -> Path
 
   let const is_absolute_path = is_absolute();
 
-  /* Each kept component is a view into the original text, valid for the life of
-     this function while the result is assembled. */
   let components = ArrayList<StringView>{heap_allocator()};
   usize i = 0;
   while (i < m_text.count()) {
@@ -151,9 +140,8 @@ cold fn Path::normalized() const throws -> Path
         m_text.substring_of_length(component_start, i - component_start);
     if (component == StringView{"."}) continue;
     if (component == StringView{".."}) {
-      /* A .. pops the last real component, unless none remains or the last was
-         itself a .. kept because the path is relative and cannot climb past its
-         own start. */
+      /* A relative path keeps a leading .. because it cannot climb past its own
+         start. */
       if (components.count() > 0 && !(components.back() == StringView{".."})) {
         components.pop_back();
       } else if (!is_absolute_path) {
@@ -198,9 +186,7 @@ cold fn Path::exists() const wontthrow -> bool
   return ::stat(m_text.c_str(), &info) == 0;
 }
 
-/* The stat-and-check the type predicates share. A failed stat reads as the type
-   not matching rather than an error, matching every caller. The lstat-based
-   symbolic-link test keeps its own body since it must not follow the link. */
+/* A failed stat reads as the type not matching. */
 static fn stat_matches_type(const char *path, mode_t expected_type) wontthrow
     -> bool
 {
@@ -246,9 +232,6 @@ fn Path::is_socket() const wontthrow -> bool
   return stat_matches_type(m_text.c_str(), S_IFSOCK);
 }
 
-/* The mode-bit test the setuid, setgid, and sticky predicates share. A failed
-   stat reads as the bit absent rather than an error, the way the type
-   predicates treat a missing path. */
 static fn stat_mode_has_bits(const char *path, mode_t bits) wontthrow -> bool
 {
   struct stat info{};
@@ -312,9 +295,7 @@ fn Path::is_newer_than(const Path &other) const wontthrow -> bool
   struct stat a{}, b{};
   if (::stat(m_text.c_str(), &a) != 0) return false;
   if (::stat(other.m_text.c_str(), &b) != 0) return false;
-  /* The seconds are compared first and the nanoseconds break a tie, the same
-     st_mtim ordering dash compares so two files written in the same second
-     still order by their finer timestamp. */
+  /* The nanoseconds break a same-second tie. */
   if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
     return a.st_mtim.tv_sec > b.st_mtim.tv_sec;
   return a.st_mtim.tv_nsec > b.st_mtim.tv_nsec;
@@ -347,11 +328,8 @@ fn Path::is_executable() const wontthrow -> bool
 
 cold fn Path::current_directory() throws -> Path
 {
-  /* getcwd fails with ERANGE when the working directory does not fit the
-     buffer, so the buffer doubles until the path fits rather than silently
-     returning an empty path for a deep directory. A real failure such as a
-     removed working directory carries a different errno and ends the loop with
-     an empty path. */
+  /* ERANGE means the buffer is too small, so it doubles. Any other errno ends
+     the loop with an empty path. */
   LOG(Debug, "reading the current working directory");
   let buffer = ArrayList<char>{heap_allocator()};
   usize buffer_size = 4096;
@@ -383,10 +361,8 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   }
 
   let names = ArrayList<String>{heap_allocator()};
-  /* readdir returns NULL on both a clean end of the directory and a read error,
-     so errno is cleared before each call. A NULL with a changed errno is a real
-     error, which returns None rather than a truncated list the caller would
-     mistake for the whole directory. */
+  /* readdir returns NULL for both EOF and error, so errno is cleared first and a
+     changed errno means a real error. */
   loop
   {
     errno = 0;
@@ -434,10 +410,6 @@ cold fn Path::read_directory_typed(const Path &dir) throws
     let const name = StringView{entry->d_name};
     if (name == StringView{"."} || name == StringView{".."}) continue;
 
-    /* readdir carries the type on most filesystems, so a directory or a regular
-       file is known without a stat. A symlink and an unknown type still need a
-       stat from the caller, the latter on a filesystem that does not fill
-       d_type. */
     entry_kind kind = entry_kind::Unknown;
     switch (entry->d_type) {
     case DT_DIR: kind = entry_kind::Directory; break;
@@ -482,15 +454,13 @@ fn Path::is_symbolic_link() const wontthrow -> bool
          (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
 
-/* Windows has no POSIX block, character, FIFO, or socket file type, so these
-   primaries are always false there. */
+/* Windows has no POSIX block, character, FIFO, or socket file type. */
 fn Path::is_block_device() const wontthrow -> bool { return false; }
 fn Path::is_character_device() const wontthrow -> bool { return false; }
 fn Path::is_fifo() const wontthrow -> bool { return false; }
 fn Path::is_socket() const wontthrow -> bool { return false; }
 
-/* Windows carries no setuid, setgid, sticky, or POSIX ownership bit, so these
-   primaries are always false there. */
+/* Windows carries no setuid, setgid, sticky, or POSIX ownership bit. */
 fn Path::has_setuid_bit() const wontthrow -> bool { return false; }
 fn Path::has_setgid_bit() const wontthrow -> bool { return false; }
 fn Path::has_sticky_bit() const wontthrow -> bool { return false; }
@@ -511,8 +481,6 @@ fn Path::modification_time() const wontthrow -> Maybe<i64>
   WIN32_FILE_ATTRIBUTE_DATA data{};
   if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &data) == 0)
     return None;
-  /* The write time packs as a 64-bit count of 100ns ticks, enough for the
-     staleness compare without converting to the POSIX epoch. */
   return static_cast<i64>(
       (static_cast<u64>(data.ftLastWriteTime.dwHighDateTime) << 32) |
       data.ftLastWriteTime.dwLowDateTime);
@@ -520,10 +488,7 @@ fn Path::modification_time() const wontthrow -> Maybe<i64>
 
 fn Path::is_same_file_as(const Path &other) const wontthrow -> bool
 {
-  /* The volume serial and the file index together name one file the way a
-     device and an inode do on POSIX, read from an opened handle. The backup
-     semantics flag lets a directory open too, so a directory compares like any
-     other path. */
+  /* FILE_FLAG_BACKUP_SEMANTICS lets a directory open too. */
   let const first = CreateFileA(
       m_text.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
       nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
@@ -581,8 +546,7 @@ fn Path::is_writable() const wontthrow -> bool
 
 fn Path::is_executable() const wontthrow -> bool
 {
-  /* Windows has no execute permission bit, so an existing file is treated as
-     runnable, matching how the shell resolves a program there. */
+  /* Windows has no execute permission bit, so an existing file is runnable. */
   return exists();
 }
 
@@ -626,8 +590,7 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 cold fn Path::read_directory_typed(const Path &dir) throws
     -> Maybe<ArrayList<directory_child>>
 {
-  /* Windows carries no readdir type, so the names are read the plain way and
-     each child is left Unknown for the caller to stat. */
+  /* Windows carries no readdir type, so each child is left Unknown. */
   Maybe<ArrayList<String>> names = read_directory(dir);
   if (!names.has_value()) return None;
 
@@ -688,9 +651,7 @@ fn Path::canonicalize(StringView path) throws -> Maybe<Path>
 
   candidate = candidate.normalized();
 
-  /* A name with no extension may need one of the omitted suffixes added. The
-     ending dot is stripped by the path normalization, so a name written with a
-     trailing dot is left as typed. */
+  /* A name written with a trailing dot gets no suffix added. */
   const bool ends_with_dot =
       path.length > 0 && path.data[path.length - 1] == '.';
   if (candidate.extension().is_empty() && !ends_with_dot) {
@@ -721,21 +682,17 @@ fn Path::detect_mimic_shell() const throws -> Maybe<mimic_mood>
   let const head = StringView{buffer, *read_count};
   if (!head.starts_with("#!")) return None;
 
-  /* The shebang ends at the first newline, and only its first line is read. */
   usize line_end = 2;
   while (line_end < head.length && head[line_end] != '\n')
     line_end++;
   let const line = head.substring_of_length(2, line_end - 2);
 
-  /* The basename of a whitespace-delimited token, dropping any directory path.
-   */
   let const do_basename_of = [](StringView token) -> StringView {
     usize last_slash = token.length;
     for (usize i = 0; i < token.length; i++)
       if (token[i] == '/') last_slash = i;
     return last_slash == token.length ? token : token.substring(last_slash + 1);
   };
-  /* Walk the line token by token, splitting on spaces and tabs. */
   usize i = 0;
   let const do_next_token = [&]() -> StringView {
     while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
@@ -747,8 +704,7 @@ fn Path::detect_mimic_shell() const throws -> Maybe<mimic_mood>
   };
 
   StringView shell = do_basename_of(do_next_token());
-  /* The /usr/bin/env form names the shell as the next token, after any env
-     options, so the first non-option token is taken. */
+  /* The env form names the shell as the first non-option token after env. */
   if (shell == "env") {
     loop
     {

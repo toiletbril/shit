@@ -1,10 +1,5 @@
 #pragma once
 
-/* A runtime-gated logger, separate from the compile-time TRACE in
-   Debug.hpp. TRACE compiles out in a release build, while LOG stays
-   in and checks the level against a global, so a helper can trace the runtime
-   in any build when the user raises the verbosity. */
-
 #include "Common.hpp"
 #include "Containers.hpp"
 
@@ -18,14 +13,9 @@ enum class verbosity : u8
   All,
 };
 
-/* The active log level. A message prints when its level is at or below this.
-   Main sets it from the -X flag, so a release build that leaves the Nothing
-   default pays one comparison per call and prints nothing. */
+/* A message prints when its level is at or below this. */
 inline verbosity LOGGER_VERBOSITY = verbosity::Nothing;
 
-/* The log sink, stderr unless --debug-output-file pointed it at a file opened
-   for append, so an interactive session logs without painting over the
-   prompt. Main owns the lifetime, the file stays open for the whole run. */
 inline std::FILE *LOGGER_OUTPUT = nullptr;
 
 inline std::FILE *log_output_stream()
@@ -99,9 +89,6 @@ String value_to_log_string(T value)
   return String{buffer};
 }
 
-/* Pair each comma-separated name in names with its value and build
-   "a = 1, b = 2". The names come from the stringized argument list, so the
-   output reads like the source that called it. */
 template <class... Args>
 String format_named_values(StringView names, Args &&...args)
 {
@@ -145,10 +132,6 @@ String format_named_values(StringView names, Args &&...args)
 #define T__LOG_STRINGIZE2(x) #x
 #define T__LOG_STRINGIZE(x)  T__LOG_STRINGIZE2(x)
 
-/* A release build carries no logging at all, neither the format strings nor
-   the call sites, so the binary stays lean and the hot paths lose even the
-   level comparison. The -X flag disappears with it, a debug build is the one
-   that traces. */
 #if defined NDEBUG
 
 #define LOG(level, ...)                                                        \
@@ -160,10 +143,6 @@ String format_named_values(StringView names, Args &&...args)
 
 #else /* NDEBUG */
 
-/* Print a printf-style message at the given level when the level is active.
-   The file:line and the function render right-aligned in fixed columns so a
-   tailed log reads as a table. The flush after each message keeps a tailed
-   --debug-logging-file current while the TUI is still alive. */
 /* The level is named unqualified, such as Debug, and the macro prepends
    ::shit::verbosity the way the FLAG macro prepends the section, so a call site
    spells neither the namespace nor the enum. */
@@ -181,8 +160,6 @@ String format_named_values(StringView names, Args &&...args)
     }                                                                          \
   } while (0)
 
-/* Print the named values of the listed variables, such as
-   LOG_VARS(Debug, argument_count, name). */
 #define LOG_VARS(level, ...)                                                   \
   do {                                                                         \
     constexpr ::shit::verbosity t__log_level = ::shit::verbosity::level;       \

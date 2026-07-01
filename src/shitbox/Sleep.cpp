@@ -53,10 +53,8 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
     char *end = nullptr;
     let const seconds_value = std::strtod(start, &end);
 
-    /* strtod also accepts a hex float, a nan, and an inf, none of which GNU
-       sleep takes, so a duration is rejected unless it parsed a finite,
-       non-negative decimal number. A nan compares false against zero, so it
-       needs the explicit finite check rather than the sign test alone. */
+    /* A nan compares false against zero, so the explicit finite check is
+       needed, not the sign test alone. */
     let digits = start;
     if (*digits == '+' || *digits == '-') digits++;
     const bool is_hex_prefix =
@@ -65,8 +63,6 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
         seconds_value < 0.0)
       throw Error{"sleep: invalid duration '" + number + "'"};
 
-    /* A single trailing unit suffix scales the value the way GNU sleep reads
-       1h or 40s, with no suffix meaning seconds. */
     double unit_multiplier = 1.0;
     if (*end != '\0' && *(end + 1) == '\0') {
       switch (*end) {
@@ -83,8 +79,6 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
     total_seconds += seconds_value * unit_multiplier;
   }
 
-  /* An infinite sleep pauses until a signal arrives, so it loops on a day-long
-     interval rather than computing a finite total. */
   if (should_sleep_forever) {
     while (!os::INTERRUPT_REQUESTED)
       os::sleep_for_seconds(60.0 * 60.0 * 24.0);
@@ -93,8 +87,6 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
 
   os::sleep_for_seconds(total_seconds);
 
-  /* A Ctrl-C that cut the sleep short reports the interrupted status the way
-     bash does, 128 plus SIGINT. */
   return os::INTERRUPT_REQUESTED ? 130 : 0;
 }
 

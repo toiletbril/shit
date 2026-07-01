@@ -7,8 +7,6 @@ namespace shit {
 
 template <class T> class ErrorOr;
 
-/* A non-owning view of bytes, the form a function takes when it does not own
-   the characters. It points into a String, a literal, or a slice. */
 class StringView
 {
 public:
@@ -59,17 +57,11 @@ public:
 
   template <class T> mustuse fn to() const throws -> ErrorOr<T>;
 
-  /* The index of the first occurrence of a byte, or None when it is absent.
-     A Maybe keeps the absent case out of band rather than using a sentinel
-     index. */
   hot mustuse pure fn find_character(char wanted) const wontthrow
       -> Maybe<usize>;
 
-  /* The view from start to the end. A start past the end yields an empty view.
-   */
   mustuse pure fn substring(usize start) const wontthrow -> StringView;
 
-  /* The view of count bytes from start, clamped to what remains. */
   mustuse pure fn substring_of_length(usize start, usize count) const wontthrow
       -> StringView;
 

@@ -32,7 +32,6 @@ fn Unlink::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  /* unlink takes exactly one operand, the way GNU unlink does. */
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   if (operands.count() > 1) {
     report_soft_shitbox_error(ec, cxt,
@@ -40,9 +39,8 @@ fn Unlink::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  /* unlink removes the link itself, so a symlink to a directory is fine and
-     only a real directory is refused, the way unlink(2) and GNU unlink behave.
-   */
+  /* unlink(2) removes the link itself, so a symlink to a directory passes and
+     only a real directory is refused. */
   let const &target = operands[0];
   let const target_path = Path{target.view()};
   if (target_path.is_directory() && !target_path.is_symbolic_link()) {
@@ -51,7 +49,6 @@ fn Unlink::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  /* The single-file removal is the shared rm path with recursion off. */
   if (!remove_path(target.view(), false)) {
     report_soft_shitbox_error(ec, cxt,
                               "unlink: cannot unlink '" + target +

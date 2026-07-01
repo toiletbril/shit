@@ -27,9 +27,6 @@ namespace shit {
 
 namespace {
 
-/* The store keeps at most this many directories, so a long-lived shell does not
-   grow ~/.shit_directory_history without bound and the per-cd rewrite stays
-   cheap. */
 constexpr usize Z_FRECENCY_MAX = 500;
 
 struct frecency_entry
@@ -39,10 +36,6 @@ struct frecency_entry
   i64 last_access;
 };
 
-/* The store lives at ~/.shit_directory_history by default. A test or a one-off
-   session redirects it through the SHIT_DIRECTORY_HISTORY environment variable
-   so it does not clobber the real store. None when there is no home and no
-   override. */
 static fn frecency_store_path() throws -> Maybe<Path>
 {
   if (let const override_path =
@@ -63,8 +56,6 @@ static fn now_epoch_seconds() wontthrow -> i64
   return static_cast<i64>(std::time(nullptr));
 }
 
-/* The frecency weight zoxide uses, a recent visit counts for much more than an
-   old one, so a directory seen this hour outranks one seen last month. */
 static fn recency_weight(i64 age_seconds) wontthrow -> double
 {
   if (age_seconds < 3600) return 4.0;
@@ -90,8 +81,7 @@ static fn read_frecency_store(Allocator allocator) throws
     line_start = i + 1;
     if (line.is_empty()) continue;
 
-    /* Each line is path, rank, and last-access, tab separated. A malformed line
-       is skipped rather than failing the whole read. */
+    /* Each line is path, rank, and last-access, tab separated. */
     let const first_tab = line.find_character('\t');
     if (!first_tab) continue;
     let const after_path = line.substring(*first_tab + 1);
@@ -188,11 +178,9 @@ fn record_directory_access(StringView directory, Allocator allocator) throws
         String{allocator, directory},
         1, now
     });
-    /* When the store overflows its bound, the least-visited of the older
-       directories is dropped by overwriting it with the just-added last entry
-       and shrinking, since the order of the store does not matter to the
-       ranking. The search excludes the new entry, so a brand-new directory that
-       is the rank minimum is kept rather than evicting itself. */
+    /* The weakest older entry is overwritten with the just-added last entry.
+       The search excludes the new entry, so a brand-new directory that is the
+       rank minimum is kept rather than evicting itself. */
     if (entries.count() > Z_FRECENCY_MAX) {
       let const newest = entries.count() - 1;
       usize weakest = 0;
@@ -214,8 +202,6 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* The query is every operand joined by a space, so z proj src matches a path
-     that holds both, the way zoxide takes several keywords. */
   let query = String{cxt.scratch_allocator()};
   for (usize i = 1; i < ec.args().count(); i++) {
     if (i > 1) query += ' ';
@@ -233,8 +219,6 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!query.is_empty() &&
         !contains_ignore_case(entry.path.view(), query.view()))
       continue;
-    /* A stale entry whose directory was removed is skipped, so z falls through
-       to the next live match rather than erroring on a dead top rank. */
     if (!Path{entry.path.view()}.to_absolute().normalized().is_directory())
       continue;
     let const score = static_cast<double>(entry.rank) *

@@ -6,11 +6,6 @@
 
 namespace shit {
 
-/* A short byte string packed into a fixed sixty-four-byte block held in eight
-   machine words, one cache line that the compiler compares with a couple of
-   vector instructions rather than walking bytes. A key longer than sixty-four
-   bytes keeps only its first sixty-four bytes here and relies on a full compare
-   to disambiguate. */
 class PackedStringKey
 {
 public:
@@ -33,7 +28,6 @@ public:
     return key;
   }
 
-  /* Pack the first sixty-four bytes of a view at lookup time. */
   hot static fn from_view(StringView text) wontthrow -> PackedStringKey
   {
     PackedStringKey key{};
@@ -48,9 +42,6 @@ public:
   hot mustuse pure fn
   operator==(const PackedStringKey &other) const wontthrow->bool
   {
-    /* The bytewise difference is reduced with no branch so the loop lowers to a
-       vector xor and an or reduction over the whole cache line rather than a
-       chain of word compares. */
     u64 difference = 0;
     for (usize i = 0; i < WORD_COUNT; i++)
       difference |= words[i] ^ other.words[i];
@@ -89,6 +80,4 @@ public:
 
 } // namespace shit
 
-/* Build a PackedStringKey from a string literal at compile time, so a static
-   StaticStringMap entry reads as SSK("name") rather than the full call. */
 #define SSK(literal) shit::PackedStringKey::from_literal(literal)

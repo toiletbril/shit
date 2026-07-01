@@ -46,7 +46,6 @@ static fn read_up_to_lines(os::descriptor fd, i64 max_lines,
   return out;
 }
 
-/* The byte cap stops an endless producer the way the line cap does. */
 static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes,
                            Allocator allocator) throws -> String
 {
@@ -80,8 +79,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  /* The -c byte count takes precedence over -n when both are given, the way GNU
-     head reads the last of the two. */
+  /* The -c byte count takes precedence over -n when both are given. */
   let const is_byte_mode = FLAG_HEAD_BYTES.is_set();
   i64 count = 10;
   if (is_byte_mode) {
@@ -116,8 +114,6 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_print_headers = sources.count() > 1;
   i32 status = 0;
   for (usize source_index = 0; source_index < sources.count(); source_index++) {
-    /* The input descriptor is read directly so a regular file or a pipe is read
-       only as far as the requested lines, rather than slurped whole. */
     os::descriptor fd;
     bool was_opened = false;
     if (sources[source_index] == "-") {
