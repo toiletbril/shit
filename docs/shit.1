@@ -15,13 +15,13 @@ shit \- a fast POSIX and bash compatible shell
 .B shit
 is a fast POSIX and bash compatible shell. An interactive prompt is run when
 standard input is a terminal and no script is given. A script file named on the
-command line is run instead, or a command string is run when it is given with
+command line is run, or a command string is run when it is given with
 .BR \-c .
 .SH MOODS
 The shell runs under one of three moods. The mood sets how strict the run is.
 The default
 .B shit
-mood is the strictest bash superset, and a questionable construct is warned on
+mood is the strict bash superset, and a questionable construct is warned on
 through the analysis stage. The
 .B bash
 mood runs the bash extensions with the analysis stage off. The
@@ -196,7 +196,7 @@ The escape bitmap is printed after each parsed command.
 .B \-\-show\-optimizer\-state
 The analysis prepass decisions are traced, and a located line is printed to
 standard error for every node the analysis stage eliminated, then a final
-summary.
+summary is printed.
 .TP
 .B \-\-show\-stats
 Per-command statistics are printed.
@@ -239,16 +239,16 @@ A read of ${a[@]} under set \-u raises an error when a is unset.
 The test command takes ==, !=, the numeric \-eq family, the file tests including
 \-nt and \-ot, && and ||, and =~ for a POSIX regex that fills BASH_REMATCH. The
 right side of == is a glob when it is bare and a literal when it is quoted, and
-=~ splits the same way. && and || short\-circuit, so a dead branch that holds a
+=~ splits the same way. && and || short\-circuit. A dead branch that holds a
 malformed regex is never compiled.
 .TP
 .B "(( ... )) and $(( ... ))"
 Arithmetic takes the C operators, ++ and \-\-, **, the ternary, the comma, the
 assignment operators, a 0x hexadecimal, a 0 octal, a 0b binary, and a based
-literal such as 16#ff. The 0b binary prefix is an extension over bash, which
-writes the same value as 2#. A name is re\-evaluated as an expression, so
-a[b[c]] resolves c, then b, then a. An empty (( )) exits 1, while $(( )) yields
-its value.
+literal such as 16#ff. The 0b binary prefix is an extension over bash. Bash
+writes the same value as 2#. A name is re\-evaluated as an expression, and
+a[b[c]] resolves c, then b, then a. An empty (( )) exits 1, and an empty $(( ))
+yields its value.
 .SS Parameter expansion
 .TP
 .B Substring
@@ -262,9 +262,9 @@ ${v/pat/rep} replaces the first match and ${v//pat/rep} every match, anchored by
 matched text, and \\& is a literal &.
 .TP
 .B "Case and transform"
-${v^^} and ${v,,} change the case of every character, ${v^} and ${v,} the first,
-each with an optional pattern. The ${v@Q}, @E, @A, @P, and @a transforms quote,
-expand, render, and report the value.
+${v^^} and ${v,,} change the case of every character, and ${v^} and ${v,} change
+the first, each with an optional pattern. The ${v@Q}, @E, @A, @P, and @a
+transforms quote, expand, render, and report the value.
 .TP
 .B Indirection
 ${!ref} reads the variable that ref names. ${!pre*} and ${!pre@} list the names
@@ -278,7 +278,7 @@ literal.
 .TP
 .B Quoting
 $'...' reads the C escapes \\n, \\t, \\xHH, and \\OOO. $"..." marks a string
-for translation, the plain double quote when no catalog is present.
+for translation, and it is the plain double quote when no catalog is present.
 .TP
 .B "Redirection and substitution"
 &> and &>> send both output streams to a file, and |& pipes both. <(cmd) and
@@ -354,8 +354,8 @@ in command mode, a column rectangle across several lines. The keys
 .BR d " and " x
 delete the rectangle, and
 .BR I ", " c ", or " C
-insert the typed text at the left column of every selected line, so several
-lines are indented at once. The arrows and
+insert the typed text at the left column of every selected line. Several lines
+are indented at once. The arrows and
 .B h j k l
 move within the rectangle.
 .PP
@@ -408,8 +408,8 @@ The path to the shell, set from the environment, or to the running binary when
 it is unset.
 .TP
 .B SHLVL
-The shell nesting depth, read from the environment, incremented, and set back so
-a child shell counts one deeper.
+The shell nesting depth, read from the environment, incremented, and set back. A
+child shell counts one deeper.
 .TP
 .B CDPATH
 The colon\-separated search path cd consults for a relative operand.
@@ -470,8 +470,7 @@ error when the variable is unset or holds no valid descriptor.
 .TP
 .B SHIT
 The path this shell was invoked through, the shit identity mate of BASH. The
-value is present in every mood, where BASH is seeded only under the bash
-identity.
+value is present in every mood. BASH is seeded only under the bash identity.
 .TP
 .B SHIT_VERSION
 The shell version, in the major.minor.patch\-extra form such as 0.0.8\-beta.
@@ -494,13 +493,13 @@ repository. A stored assignment wins.
 Color is turned off in the prompt and the diagnostics when the variable is set.
 .TP
 .B SHIT_ANSI_*
-A color escape is provided under each of these names so a prompt template
-carries an attribute without an escape byte. The recognized colors are BLACK,
+A color escape is provided under each of these names. A prompt template carries
+an attribute without an escape byte. The recognized colors are BLACK,
 RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, and WHITE, each also with a BRIGHT_
 prefixed high\-intensity form, along with the attributes BOLD, DIM, and RESET.
 The names resolve in every mood. A recognized name reads back empty when color
-is off, the way NO_COLOR and a redirected prompt turn the escapes off, so the
-prompt stays plain. A stored assignment to one of the names wins over the
+is off. NO_COLOR and a redirected prompt turn the escapes off, and the prompt
+stays plain. A stored assignment to one of the names wins over the
 provided escape.
 .TP
 .B "RANDOM, SRANDOM, SECONDS, LINENO, EPOCHSECONDS, EPOCHREALTIME"
@@ -559,11 +558,11 @@ The default history file for the interactive calc REPL.
 .SH SHITBOX
 The
 .B shitbox
-builtin hosts a set of small bundled coreutilities, so a system with only a
+builtin hosts a set of small bundled coreutilities. A system with only a
 compiler can run a configure and a make under shit.
 .B "shitbox ls"
 runs the bundled ls. A bundled utility is tried first, and a name with no
-matching utility falls back to a shell builtin of that name, so
+matching utility falls back to a shell builtin of that name.
 .B "shitbox echo"
 runs the echo builtin. With the
 .B \-\-enable\-shitbox
@@ -573,20 +572,20 @@ the utility names resolve directly as commands without the prefix. A builtin
 still wins over a utility, and a utility wins over a program on PATH. A binary
 whose name is a utility, such as a symlink named ls, acts as that utility, and
 the utility's own flags reach its parser. A symlinked
-utility prints the shit version on \-\-version, so the binary behind the name is
+utility prints the shit version on \-\-version. The binary behind the name is
 visible, and its help names the shit shell.
 .B "shitbox \-\-assimilate DIR"
 installs one such symlink per utility into DIR. In the default shit mood a bare
 utility name also falls back to the bundled utility when PATH holds no binary of
-that name, so a missing system coreutil is filled in. A PATH binary still takes
+that name. A missing system coreutil is filled in. A PATH binary still takes
 precedence.
 .TP
 .B calc
 The bundled calc utility evaluates each argument as an arithmetic expression and
 prints the value of the last one, with the same operators and located errors the
-shell arithmetic uses. In the default mood the value is computed in 128 bits, so
-a result wider than a signed 64-bit integer prints in full, while the Bash and
-POSIX moods keep the 64-bit wrap. With no expression on a terminal, or with
+shell arithmetic uses. In the default mood the value is computed in 128 bits. A
+result wider than a signed 64-bit integer prints in full. The Bash and POSIX
+moods keep the 64-bit wrap. With no expression on a terminal, or with
 .BR \-i ,
 expressions are read and evaluated interactively through the line editor, with
 the shell completion and the highlighter turned off and the history kept in
@@ -594,8 +593,8 @@ the shell completion and the highlighter turned off and the history kept in
 variable to its right-side expression unevaluated, recomputed lazily on each
 later read, and an assignment inside an expression, such as
 .BR "(x = 5) + 1" ,
-returns its value. A calc binary on PATH is preferred, so the bundled utility
-runs only when PATH holds none, unless the shitbox applet mode is on.
+returns its value. A calc binary on PATH is preferred. The bundled utility runs
+only when PATH holds none, unless the shitbox applet mode is on.
 .SH SHIT BUILTINS
 These builtins are unique to shit and have no counterpart in bash or dash.
 .TP

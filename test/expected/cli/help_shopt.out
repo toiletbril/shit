@@ -14,8 +14,7 @@ OPTIONS
   -q                      Suppress the status output, the scripted probe form.
   -p                      Print in the replayable form, shopt -s or -u per line,
                           and set -o or +o behind -o.
-  -o                      Operate on the set -o option names instead of the
-                          shopt names.
+  -o                      Operate on the set -o option names.
 OPTION NAMES
   autocd                   assoc_expand_once        cdable_vars
   cdspell                  checkhash                checkjobs

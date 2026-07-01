@@ -13,8 +13,7 @@ HELP_DESCRIPTION_DECL(
     "such as a-z, or a descending one such as z-a, expands to every byte "
     "between its ends.");
 
-FLAG(TR_DELETE, Bool, 'd', "",
-     "Delete the bytes in set1 instead of translating.");
+FLAG(TR_DELETE, Bool, 'd', "", "Delete the bytes in set1.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Tr);

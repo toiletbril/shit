@@ -87,19 +87,22 @@ FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods", Compat,
      "of --mood.");
 FLAG(
     MIMICRY, Bool, 'I', "mimicry", Compat,
-    "Mimic the shell a script's shebang names, for speed. A program whose "
+    "Mimic the shell a script's shebang names. A program whose "
     "shebang is a shell shit can emulate runs in-process in the matching mode. "
     "sh and dash run in POSIX mode, bash in bash mode, and shit in the default "
     "mode. A zsh, ksh, fish, or non-shell shebang still launches the real "
     "program.");
 FLAG(DUMB, Bool, '\0', "dumb", Compat,
-     "Makes shit extremely dumb. Equals to --mood sh -T --no-diagnostics.");
+     "Make shit extremely dumb. Equivalent to --mood sh -T --no-diagnostics.");
 
 FLAG(
     WARNINGS, RepeatedBool, 'W', "", Shit,
-    "Keep the analysis stage but report every error as a warning and let the "
-    "run proceed. A single -W warns in the strict default mood, and a repeated "
-    "-W warns in every mood.");
+    "Keep the analysis stage but demote a lenient analysis error to a warning "
+    "and let the run proceed. A single -W demotes an unresolved command and a "
+    "variable read before it is assigned. A strict error such as a malformed "
+    "glob stays fatal under a single -W. A repeated -WW demotes every analysis "
+    "error, the strict ones included. The runtime warnings are reported in the "
+    "strict default mood under -W and in every mood under -WW.");
 FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Shit,
      "List the shellcheck-style checks the analysis stage reports, then exit.");
 FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Shit,
@@ -143,23 +146,24 @@ FLAG(LOG, String, 'X', "debug-logging", Debug,
      "Enable internal logging at the given level, one of 'info', 'debug', or "
      "'all'. An unknown spelling is an error.");
 FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file", Debug,
-     "Create the named file when missing and append the debug log to it "
-     "instead of stderr, keeping an interactive session's log off the prompt.");
+     "Create the named file when missing and append the debug log to it, "
+     "keeping an interactive session's log off the prompt. The default target "
+     "is stderr.");
 FLAG(DEBUG_COMPLETE_AT, String, '\0', "debug-complete-at", Debug,
      "Print the completion candidates for the given line with the cursor at "
      "its end, one per line the way an explicit tab lists them, after every "
-     "-c chunk has run, then exit. The completion test driver.");
+     "-c chunk has run, then exit. This is the completion test driver.");
 FLAG(DEBUG_HIGHLIGHT_AT, String, '\0', "debug-highlight-at", Debug,
      "Print the syntax-highlight spans for the given line, one per line as the "
      "span text and the escape that colors it with the escape byte shown as "
-     "\\e, then exit. The highlighter test driver.");
+     "\\e, then exit. This is the highlighter test driver.");
 #endif
 
 #if SHIT_PLATFORM_IS COSMO
 FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", Debug,
-     "Cosmopolitan: Trace functions.");
+     "Trace functions under Cosmopolitan.");
 FLAG(COSMO_STRACE, Bool, '\0', "strace", Debug,
-     "Cosmopolitan: Trace system calls.");
+     "Trace system calls under Cosmopolitan.");
 #endif
 
 namespace shit {
@@ -249,8 +253,8 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     h += "SHIT";
     h += "\n";
     h += wrap_text(
-        "Shit, a pedantic, super-fast and awesome POSIX-compatible command "
-        "line interpreter, or a friendly interactive shell for gigachads.\n\n",
+        "Shit is a pedantic, POSIX-compatible command line interpreter and a "
+        "friendly interactive shell.\n\n",
         HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';

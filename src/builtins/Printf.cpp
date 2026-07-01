@@ -15,7 +15,7 @@ HELP_DESCRIPTION_DECL(
     "The printf builtin writes the arguments under the control of a format "
     "string with the common conversions and backslash escapes, recycling the "
     "format over any remaining arguments. The -v flag stores the result in the "
-    "named shell variable instead of writing it to the standard output.");
+    "named shell variable. The result is not written to the standard output.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

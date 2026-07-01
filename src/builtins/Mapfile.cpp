@@ -19,7 +19,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
    help text. */
 FLAG(MAPFILE_TRIM, Bool, 't', "", "Strip the trailing newline from each line.");
 FLAG(MAPFILE_COUNT, String, 'n', "",
-     "Read at most count lines, zero for all of them.");
+     "Read at most count lines, or all of them when count is zero.");
 
 REGISTER_BUILTIN_FLAGS(Mapfile);
 

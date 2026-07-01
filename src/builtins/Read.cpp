@@ -11,8 +11,8 @@ HELP_SYNOPSIS_DECL("[-r] [name ...]");
 HELP_DESCRIPTION_DECL(
     "The read builtin reads one line from standard input and splits it on IFS "
     "into the named variables, with the last variable taking the remainder. "
-    "With no name the line goes to REPLY, and a line ended by end of input "
-    "rather than a newline yields a non-zero status.");
+    "With no name the line goes to REPLY, and a line that ends at end of input "
+    "without a newline yields a non-zero status.");
 
 FLAG(READ_RAW, Bool, 'r', "", "Do not treat a backslash as an escape.");
 FLAG(READ_ARRAY, String, 'a', "",
@@ -23,11 +23,11 @@ FLAG(READ_TIMEOUT, String, 't', "", "Time out after the given seconds.");
 FLAG(READ_NCHARS, String, 'n', "", "Read at most the given number of bytes.");
 FLAG(READ_SILENT, Bool, 's', "", "Do not echo the input from a terminal.");
 FLAG(READ_DELIM, String, 'd', "",
-     "Read until the first byte of the given delimiter instead of a newline, "
-     "or until a NUL byte when the delimiter is empty.");
+     "Read until the first byte of the given delimiter, or until a NUL byte "
+     "when the delimiter is empty.");
 FLAG(READ_FD, String, 'u', "", "Read from the given file descriptor.");
 FLAG(READ_EDIT, Bool, 'e', "",
-     "Accepted for compatibility, the line editor is always used at a "
+     "Accepted for compatibility. The line editor is always used at a "
      "terminal.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

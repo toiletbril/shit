@@ -13,8 +13,8 @@ HELP_DESCRIPTION_DECL(
     "The getopts builtin parses the positional parameters, or the explicit "
     "arguments, against optstring one option at a time, storing the option "
     "letter in name and tracking progress through OPTIND. A leading colon in "
-    "optstring selects the silent error mode where a bad option is reported "
-    "through name and OPTARG rather than a message.");
+    "optstring selects the silent error mode. In that mode a bad option is "
+    "reported through name and OPTARG, and no message is printed.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

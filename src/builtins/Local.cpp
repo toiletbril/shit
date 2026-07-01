@@ -24,7 +24,7 @@ FLAG(LOCAL_NAMEREF, Bool, 'n', "", "Accepted without effect.");
 FLAG(LOCAL_READONLY, Bool, 'r', "", "Accepted without effect.");
 FLAG(LOCAL_UPPERCASE, Bool, 'u', "", "Accepted without effect.");
 FLAG(LOCAL_EXPORT, Bool, 'x', "",
-     "Export the local into the environment so a child process sees it.");
+     "Export the local into the environment, visible to a child process.");
 
 REGISTER_BUILTIN_FLAGS(Local);
 

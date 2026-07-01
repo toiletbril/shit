@@ -1,7 +1,7 @@
 DESCRIPTION
   The declare builtin, also spelled typeset, declares variables and sets their
-  attributes. A plus before a letter removes the attribute where the removal is
-  backed, the +i form. In bash mode it backs the array and associative types.
+  attributes. A plus before a letter removes a backed attribute, as in the +i
+  form. In bash mode it backs the array and associative types.
 
 SYNOPSIS
   declare [-aAfFgilnprtux] [+i] [name[=value] ...]
@@ -12,11 +12,11 @@ OPTIONS
   -A                      Declare an associative array.
   -f                      Restrict to functions and print their recorded
                           definitions.
-  -F                      Print only the names of defined functions, existence
-                          by status.
+  -F                      Print only the names of defined functions and report
+                          their existence through the exit status.
   -g                      Accepted without effect.
   -i                      Mark an integer whose every assignment evaluates as
-                          arithmetic, removed by +i.
+                          arithmetic. The +i form removes the mark.
   -l                      Accepted without effect.
   -n                      Accepted without effect.
   -p                      Print the matching declarations.

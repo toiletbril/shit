@@ -10,8 +10,8 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-a] [-r] [-h] [%job ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The disown builtin removes a job from the job table so the shell stops "
-    "tracking it, and the removed job keeps running detached. With a %job "
+    "The disown builtin removes a job from the job table and the shell stops "
+    "tracking it. The removed job keeps running detached. With a %job "
     "operand it removes that job, with no operand it removes the most recent "
     "job, -a removes every job, and -r removes only the running jobs.");
 
@@ -19,7 +19,8 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(ALL, Bool, 'a', "all", "Remove every job.");
 FLAG(RUNNING, Bool, 'r', "running", "Remove only the running jobs.");
 FLAG(NO_HUP, Bool, 'h', "nohup",
-     "Mark the job to skip a hangup on shell exit rather than remove it.");
+     "Mark the job to skip a hangup on shell exit and keep it in the job "
+     "table.");
 
 REGISTER_BUILTIN_FLAGS(Disown);
 

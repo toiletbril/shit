@@ -12,9 +12,8 @@ HELP_SYNOPSIS_DECL("[-aAfFgilnprtux] [+i] [name[=value] ...]");
 
 HELP_DESCRIPTION_DECL(
     "The declare builtin, also spelled typeset, declares variables and sets "
-    "their attributes. A plus before a letter removes the attribute where "
-    "the removal is backed, the +i form. In bash mode it backs the array and "
-    "associative types.");
+    "their attributes. A plus before a letter removes a backed attribute, as "
+    "in the +i form. In bash mode it backs the array and associative types.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 /* The FLAG rows feed only the help text. The attribute letters are hand-parsed
@@ -24,11 +23,12 @@ FLAG(DECLARE_ASSOCIATIVE, Bool, 'A', "", "Declare an associative array.");
 FLAG(DECLARE_FUNCTIONS, Bool, 'f', "",
      "Restrict to functions and print their recorded definitions.");
 FLAG(DECLARE_FUNCTION_NAMES, Bool, 'F', "",
-     "Print only the names of defined functions, existence by status.");
+     "Print only the names of defined functions and report their existence "
+     "through the exit status.");
 FLAG(DECLARE_GLOBAL, Bool, 'g', "", "Accepted without effect.");
 FLAG(DECLARE_INTEGER, Bool, 'i', "",
-     "Mark an integer whose every assignment evaluates as arithmetic, "
-     "removed by +i.");
+     "Mark an integer whose every assignment evaluates as arithmetic. The +i "
+     "form removes the mark.");
 FLAG(DECLARE_LOWERCASE, Bool, 'l', "", "Accepted without effect.");
 FLAG(DECLARE_NAMEREF, Bool, 'n', "", "Accepted without effect.");
 FLAG(DECLARE_PRINT, Bool, 'p', "", "Print the matching declarations.");

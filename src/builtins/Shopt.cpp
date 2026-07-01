@@ -25,8 +25,7 @@ FLAG(SHOPT_QUIET, Bool, 'q', "",
 FLAG(SHOPT_PRINT, Bool, 'p', "",
      "Print in the replayable form, shopt -s or -u per line, and set -o or "
      "+o behind -o.");
-FLAG(SHOPT_SET_OPTIONS, Bool, 'o', "",
-     "Operate on the set -o option names instead of the shopt names.");
+FLAG(SHOPT_SET_OPTIONS, Bool, 'o', "", "Operate on the set -o option names.");
 
 REGISTER_BUILTIN_FLAGS(Shopt);
 

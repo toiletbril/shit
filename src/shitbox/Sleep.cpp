@@ -13,8 +13,9 @@ HELP_SYNOPSIS_DECL("duration ...");
 HELP_DESCRIPTION_DECL(
     "The sleep utility pauses for the sum of the given durations. A duration "
     "is "
-    "a number with an optional fractional part and an optional unit suffix, s "
-    "for seconds and the default, m for minutes, h for hours, and d for days. "
+    "a number with an optional fractional part and an optional unit suffix. "
+    "The suffix s selects seconds and is the default, m selects minutes, h "
+    "selects hours, and d selects days. "
     "The word inf or infinity pauses until a signal arrives.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");

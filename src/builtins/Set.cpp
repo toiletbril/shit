@@ -70,8 +70,7 @@ const SetOption SET_OPTIONS[] = {
     {'\0', "failglob", &EvalContext::set_failglob, &EvalContext::failglob,
      "Fail a command whose glob matches nothing."},
     {'b', "notify", &EvalContext::set_notify, &EvalContext::notify,
-     "Report a background job's completion immediately instead of before the "
-     "next prompt."},
+     "Report a background job's completion immediately when it finishes."},
     {'\0', "vi", &EvalContext::set_vi_mode, &EvalContext::vi_mode,
      "Use vi-style command-line editing."},
     {'\0', "emacs", &EvalContext::set_emacs_mode, &EvalContext::emacs_mode,

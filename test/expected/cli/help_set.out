@@ -31,7 +31,7 @@ OPTION SWITCHES
       shitbox                       Resolve the bundled shitbox utility names directly as commands.
   -m  monitor                       Run background jobs in their own process group with notifications.
       failglob                      Fail a command whose glob matches nothing.
-  -b  notify                        Report a background job's completion immediately instead of before the next prompt.
+  -b  notify                        Report a background job's completion immediately when it finishes.
       vi                            Use vi-style command-line editing.
       emacs                         Use emacs-style command-line editing, the default.
   -h  hashall                       Accepted without effect.

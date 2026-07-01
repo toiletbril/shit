@@ -10,9 +10,9 @@ HELP_SYNOPSIS_DECL("[-a] [file ...]");
 HELP_DESCRIPTION_DECL(
     "The tee utility copies standard input to standard output and to each "
     "named "
-    "file. With -a it appends to the files instead of truncating them.");
+    "file. With -a it appends to the files. The default truncates them.");
 
-FLAG(TEE_APPEND, Bool, 'a', "", "Append to the files instead of truncating.");
+FLAG(TEE_APPEND, Bool, 'a', "", "Append to the files.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Tee);

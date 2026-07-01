@@ -11,7 +11,8 @@ HELP_SYNOPSIS_DECL("expression ...");
 HELP_DESCRIPTION_DECL(
     "The let builtin evaluates each argument as an arithmetic expression. The "
     "status is zero when the last expression evaluates to a non-zero value and "
-    "one when it evaluates to zero, the result ((...)) reports.");
+    "one when it evaluates to zero. This matches the status the ((...)) form "
+    "reports.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

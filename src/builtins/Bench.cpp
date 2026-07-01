@@ -12,9 +12,9 @@
 FLAG_LIST_DECL();
 
 FLAG(bench_runs, String, '\0', "runs",
-     "the exact number of samples per command");
+     "The exact number of samples per command.");
 FLAG(bench_duration, String, '\0', "duration",
-     "the sampling budget per command in milliseconds");
+     "The sampling budget per command in milliseconds.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 HELP_SYNOPSIS_DECL("[--runs n] [--duration ms] command [command ...]");

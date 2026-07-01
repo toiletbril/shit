@@ -12,10 +12,8 @@ HELP_SYNOPSIS_DECL("[-lnprs] [jobspec ...]");
 HELP_DESCRIPTION_DECL(
     "The jobs builtin lists the background jobs and the state each one is in, "
     "then forgets the jobs that have finished. A jobspec argument restricts "
-    "the "
-    "listing to that job, where %N or N names job N, %+ the current job, and "
-    "%- "
-    "the previous one.");
+    "the listing to that job. The forms %N and N name job N, %+ names the "
+    "current job, and %- names the previous one.");
 
 FLAG(JOBS_LONG, Bool, 'l', "",
      "List the process id in addition to the normal information.");
