@@ -68,9 +68,10 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     return 126;
   }
 
+  let const previous_runtime = m_runtime;
+
   /* The mimic mode decides the lexing and the evaluation, so it is set before
      the parse. The terminal run leaves it since the shell exits next. */
-  let const previous_mood = m_runtime.mood;
   m_runtime.mood = mode;
   LOG(Debug, "mimicking the script '%s'%s", ec.program().c_str(),
       isolated ? " in an isolated subshell" : "");
@@ -83,9 +84,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
      or sh script clears nounset, pipefail, and failglob while a shit script
      keeps the strict default. A mimicked declare -A literal then does not abort
      on the unmatched [k]=v glob, and an unset parameter expands empty. */
-  let const previous_error_unset = error_unset();
-  let const previous_pipefail = pipefail();
-  let const previous_failglob = failglob();
   let const is_mimic_strict = mode == mimic_mood::Default;
   set_error_unset(is_mimic_strict);
   set_pipefail(is_mimic_strict);
@@ -210,11 +208,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   restore_state(steal(snapshot));
   set_current_source(previous_source, previous_origin);
   m_current_location = previous_location;
-  m_runtime.mood = previous_mood;
+  previous_runtime.restore(*this);
   m_is_script_run = previous_script_run;
-  set_error_unset(previous_error_unset);
-  set_pipefail(previous_pipefail);
-  set_failglob(previous_failglob);
   m_shell_name = steal(previous_shell_name);
 
   if (error) {
