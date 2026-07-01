@@ -144,7 +144,8 @@ pure fn arithmetic_shift_right(i64 lhs, i64 rhs) wontthrow -> i64
 
 static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize;
 
-/* A recursive-descent evaluator for $((...)) following C operator precedence. */
+/* A recursive-descent evaluator for $((...)) following C operator precedence.
+ */
 class ArithmeticParser
 {
 public:
@@ -236,7 +237,8 @@ public:
     Maybe<StringView> subscript;
   };
 
-  /* Nested brackets are balanced so a[b[0]] reads the whole inner expression. */
+  /* Nested brackets are balanced so a[b[0]] reads the whole inner expression.
+   */
   fn read_optional_subscript() throws -> Maybe<StringView>
   {
     if (pos >= source.length || source[pos] != '[') return None;
@@ -1096,7 +1098,8 @@ static fn lex_wide_number(StringView from, wide_int *out_value) throws -> usize
   usize consumed;
   if (from.length >= 2 && from[0] == '0' && (from[1] == 'x' || from[1] == 'X'))
     consumed = 2 + count_leading_digits(from.substring(2), 16);
-  else if (from.length >= 2 && from[0] == '0' && (from[1] == 'b' || from[1] == 'B'))
+  else if (from.length >= 2 && from[0] == '0' &&
+           (from[1] == 'b' || from[1] == 'B'))
     consumed = 2 + count_leading_digits(from.substring(2), 2);
   else if (from.length >= 1 && from[0] == '0')
     consumed = count_leading_digits(from, 8);
@@ -1195,7 +1198,8 @@ public:
     }
 
     if (!was_found) {
-      /* calc treats an unset variable as an error, $((...)) reads it as zero. */
+      /* calc treats an unset variable as an error, $((...)) reads it as zero.
+       */
       let message = "The variable '" + String{name} + "' is not set";
       if (is_top_level)
         throw ErrorWithLocation{

@@ -637,8 +637,9 @@ fn rule_dead_branch_elimination(const Expression *node,
       clause->set_folded_branch(i);
       actx.optimizer_folded_branches++;
       if (actx.should_trace_optimizer)
-        actx.trace_optimizer_line(String{"folded if to branch "} +
-                                  String::from(static_cast<i64>(i), heap_allocator()));
+        actx.trace_optimizer_line(
+            String{"folded if to branch "} +
+            String::from(static_cast<i64>(i), heap_allocator()));
       return true;
     }
   }
@@ -798,8 +799,8 @@ OptimizationRule *const OPTIMIZATION_RULES[] = {
     rule_eliminate_empty_for,      rule_fold_cstyle_for,
 };
 
-/* The pass cap bounds the fixpoint loop, so a rule that reports a change without
-   progress cannot loop the driver forever. */
+/* The pass cap bounds the fixpoint loop, so a rule that reports a change
+   without progress cannot loop the driver forever. */
 constexpr usize MAX_OPTIMIZATION_PASSES = 8;
 
 } // namespace

@@ -545,8 +545,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                  : String{heap_allocator()};
     case '-': return option_flags_string();
     case '#':
-      return String{heap_allocator(),
-                    String::from(m_positional_params.count(), heap_allocator())};
+      return String{heap_allocator(), String::from(m_positional_params.count(),
+                                                   heap_allocator())};
     case '0': return String{heap_allocator(), m_shell_name};
     case '_': return String{heap_allocator(), m_last_argument.view()};
 
@@ -580,8 +580,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (first_byte >= '0' && first_byte <= '9') {
     if (name.is_all_decimal_digits()) {
-      /* A positional beyond the count is unset rather than empty, so ${1-default}
-         takes its default. */
+      /* A positional beyond the count is unset rather than empty, so
+         ${1-default} takes its default. */
       if (name.count() > 9) return None;
       let const parsed_index = name.to<i64>();
       if (parsed_index.is_error()) return None;
@@ -672,7 +672,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return joined;
     }
     if (first_byte == 'E' && name == "EPOCHSECONDS") {
-      return String::from(static_cast<i64>(std::time(nullptr)), heap_allocator());
+      return String::from(static_cast<i64>(std::time(nullptr)),
+                          heap_allocator());
     }
     if (first_byte == 'E' && name == "EPOCHREALTIME") {
       const u64 microseconds = os::realtime_microseconds();
@@ -700,8 +701,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return String{heap_allocator()};
     }
     if (first_byte == 'B' && name == "BASH_MONOSECONDS") {
-      return String::from(
-          static_cast<i64>(os::monotonic_nanos() / 1000000ULL), heap_allocator());
+      return String::from(static_cast<i64>(os::monotonic_nanos() / 1000000ULL),
+                          heap_allocator());
     }
     if (first_byte == 'B' && name == "BASH_ARGV0") {
       return String{heap_allocator(), m_shell_name.view()};
@@ -732,9 +733,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return String{heap_allocator(), os::ostype_name()};
     }
     if (first_byte == 'B' && name == "BASH_SUBSHELL") {
-      return String{heap_allocator(),
-                    String::from(static_cast<i64>(m_subshell_depth),
-                                 heap_allocator())};
+      return String{
+          heap_allocator(),
+          String::from(static_cast<i64>(m_subshell_depth), heap_allocator())};
     }
     if (first_byte == 'F' && name == "FUNCNAME") {
       if (funcname_frame_count() > 0)
@@ -1610,7 +1611,8 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
   const char last = body[body.length - 1];
   if (last == '*' || last == '@') {
     /* The quoted "${!prefix@}" per-name field form is produced in the
-       field-expansion path, this string return cannot carry field boundaries. */
+       field-expansion path, this string return cannot carry field boundaries.
+     */
     const StringView prefix = body.substring_of_length(0, body.length - 1);
     let const names = matching_prefix_names(prefix);
     let out = String{scratch_allocator()};
@@ -1658,31 +1660,32 @@ cold fn EvalContext::make_stats_string() const throws -> String
   stats_text += "[Stats\n";
 
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
-  stats_text +=
-      "Commands evaluated: " +
-      String::from(m_commands_evaluated + 1, heap_allocator());
-  stats_text += '\n';
-  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
-  stats_text += "Expansions: " + String::from(last_expansion_count(), heap_allocator());
+  stats_text += "Commands evaluated: " +
+                String::from(m_commands_evaluated + 1, heap_allocator());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
   stats_text +=
-      "Nodes evaluated: " + String::from(last_expressions_executed(), heap_allocator());
+      "Expansions: " + String::from(last_expansion_count(), heap_allocator());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
-  stats_text +=
-      "Total expansions: " + String::from(total_expansion_count(), heap_allocator());
+  stats_text += "Nodes evaluated: " +
+                String::from(last_expressions_executed(), heap_allocator());
+  stats_text += '\n';
+  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
+  stats_text += "Total expansions: " +
+                String::from(total_expansion_count(), heap_allocator());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
   stats_text += "Total nodes evaluated: " +
                 String::from(total_expressions_executed(), heap_allocator());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
-  stats_text += "AST arena bytes: " + String::from(live_ast_arena_bytes, heap_allocator());
+  stats_text += "AST arena bytes: " +
+                String::from(live_ast_arena_bytes, heap_allocator());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
-  stats_text +=
-      "Peak AST arena bytes: " + String::from(peak_ast_arena_bytes, heap_allocator());
+  stats_text += "Peak AST arena bytes: " +
+                String::from(peak_ast_arena_bytes, heap_allocator());
   stats_text += '\n';
 
   stats_text += "]";

@@ -78,7 +78,8 @@ fn Path::extension() const wontthrow -> StringView
   let const name = filename();
   if (name == StringView{"."} || name == StringView{".."})
     return StringView{name.data + name.length, 0};
-  /* A leading dot names a hidden file, so the scan stops before the first byte. */
+  /* A leading dot names a hidden file, so the scan stops before the first byte.
+   */
   for (usize i = name.length; i > 1; i--)
     if (name.data[i - 1] == '.') return name.substring(i - 1);
   return StringView{name.data + name.length, 0};
@@ -361,8 +362,8 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   }
 
   let names = ArrayList<String>{heap_allocator()};
-  /* readdir returns NULL for both EOF and error, so errno is cleared first and a
-     changed errno means a real error. */
+  /* readdir returns NULL for both EOF and error, so errno is cleared first and
+     a changed errno means a real error. */
   loop
   {
     errno = 0;

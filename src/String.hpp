@@ -49,8 +49,9 @@ public:
 
     if (is_negative) buffer[--position] = '-';
 
-    return String{allocator,
-                  StringView{buffer + position, sizeof(buffer) - position}};
+    return String{
+        allocator, StringView{buffer + position, sizeof(buffer) - position}
+    };
   }
 
   template <class T>
@@ -66,19 +67,21 @@ public:
 
   template <class U>
   mustuse static fn from_signed_or_unsigned(U value, int_base base,
-                                            Allocator allocator) throws -> String
+                                            Allocator allocator) throws
+      -> String
   {
     if constexpr (std::is_signed_v<U>) {
       let const is_negative = value < 0;
-      let const magnitude = is_negative ? ~static_cast<u64>(value) + 1u
-                                        : static_cast<u64>(value);
+      let const magnitude =
+          is_negative ? ~static_cast<u64>(value) + 1u : static_cast<u64>(value);
       return from_in_base(magnitude, is_negative, base, allocator);
     } else {
       return from_in_base(static_cast<u64>(value), false, base, allocator);
     }
   }
 
-  template <class T> mustuse fn to() const throws -> ErrorOr<T>;
+  template <class T>
+  mustuse fn to() const throws -> ErrorOr<T>;
 
   ~String()
   {

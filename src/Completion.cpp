@@ -191,7 +191,8 @@ static pure fn find_open_quote(StringView line, usize cursor) wontthrow
   return open_quote_span{content_start, quote_character};
 }
 
-/* for, case, and in stay opaque since a subject word or patterns follow them. */
+/* for, case, and in stay opaque since a subject word or patterns follow them.
+ */
 static constexpr StaticStringMap<bool>::entry TRANSPARENT_PREFIX_ENTRIES[] = {
     {SSK("!"),       true},
     {SSK("time"),    true},
@@ -261,8 +262,7 @@ static fn all_active_glob_mask(usize length) throws -> Bitset
 
 static fn command_name_matches(StringView name, StringView token,
                                bool token_is_glob,
-                               const Bitset &glob_active) throws
-    -> bool
+                               const Bitset &glob_active) throws -> bool
 {
   if (!token_is_glob) return name.starts_with(token);
 
@@ -705,8 +705,8 @@ fn split_completion_words(StringView line, usize cursor, usize &cword) throws
       cword = words.count();
       is_found = true;
     }
-    words.push(
-        String{completion_allocator(), line.substring_of_length(start, i - start)});
+    words.push(String{completion_allocator(),
+                      line.substring_of_length(start, i - start)});
   }
   if (!is_found) {
     cword = words.count();

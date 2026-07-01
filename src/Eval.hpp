@@ -950,8 +950,8 @@ public:
   /* Expand a case pattern word the same way assignment context expands, plus a
      parallel mask of which output bytes may act as glob metacharacters, so a
      quoted metacharacter in the pattern matches literally. */
-  fn expand_case_pattern_masked(const Word &word,
-                                Bitset &active_out) throws -> String;
+  fn expand_case_pattern_masked(const Word &word, Bitset &active_out) throws
+      -> String;
 
   /* Run the source of a $(...) and return its standard output with trailing
      newlines stripped. The inner command runs in-process with state

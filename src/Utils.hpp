@@ -125,9 +125,8 @@ fn path_command_names() throws -> const ArrayList<String> &;
 /* glob_active reads which bytes act as metacharacters. With extglob set the
    bash extended-glob groups ?(..), *(..), +(..), @(..), and !(..) are
    recognized, otherwise they are plain bytes. */
-fn glob_matches(StringView glob, StringView str,
-                const Bitset &glob_active, usize mask_offset,
-                bool extglob = false) throws -> bool;
+fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
+                usize mask_offset, bool extglob = false) throws -> bool;
 
 fn set_quit_context(const EvalContext *context) wontthrow -> void;
 

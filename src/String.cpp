@@ -189,7 +189,8 @@ fn operator+(StringView left, StringView right) throws->String
   return result;
 }
 
-template <class T> fn String::to() const throws -> ErrorOr<T>
+template <class T>
+fn String::to() const throws -> ErrorOr<T>
 {
   return view().to<T>();
 }

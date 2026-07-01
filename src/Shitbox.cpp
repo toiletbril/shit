@@ -81,7 +81,8 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
     }
   }
 
-  /* A name that is not a utility but is a shell builtin routes to that builtin. */
+  /* A name that is not a utility but is a shell builtin routes to that builtin.
+   */
   if (let const builtin_kind = search_builtin(name); builtin_kind.has_value()) {
     let routed = ExecContext::from_resolved(
         ec.source_location(), ResolvedCommand::from_builtin(*builtin_kind),
@@ -142,7 +143,8 @@ fn parse_util_operands(const ArrayList<Flag *> &flags,
     -> ArrayList<String>
 {
   ArrayList<String> operands = parse_flags_vec(flags, args, 0);
-  /* The first operand is the utility name, dropped to leave the real arguments. */
+  /* The first operand is the utility name, dropped to leave the real arguments.
+   */
   if (!operands.is_empty()) operands.remove(0);
   return operands;
 }

@@ -70,8 +70,7 @@ fn parse_printf_number(const String &arg) throws -> printf_number
   let const number_text =
       arg.view().substring_of_length(number_start, number_end - number_start);
   let const parsed =
-      is_hexadecimal
-          ? utils::parse_integer_in_base(number_text, int_base::hex)
+      is_hexadecimal ? utils::parse_integer_in_base(number_text, int_base::hex)
       : is_octal ? utils::parse_integer_in_base(number_text, int_base::octal)
                  : number_text.to<i64>();
   let const has_digits = number_end > digit_start;
@@ -103,7 +102,8 @@ void append_escape(String &out, const String &fmt, usize &i) throws
 
   let const e = fmt[i];
 
-  /* The index is left on the last digit consumed, the caller advances past it. */
+  /* The index is left on the last digit consumed, the caller advances past it.
+   */
   if (e >= '0' && e <= '7') {
     i32 value = e - '0';
     usize digit_count = 1;
@@ -322,7 +322,8 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   LOG(All, "printf formatting %zu arguments", ec.args().count() - 1);
 
-  /* bash printf -v NAME stores the result in NAME, riding every mood but POSIX. */
+  /* bash printf -v NAME stores the result in NAME, riding every mood but POSIX.
+   */
   usize format_index = 1;
   Maybe<String> store_variable;
   if (cxt.bash_additions_enabled() && ec.args()[1] == "-v" &&
@@ -353,10 +354,9 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool should_stop = false;
 
   let do_consume_star = [&](String &spec) throws {
-    spec.append(
-        String::from(parse_printf_integer(do_operand_at(operand_index)),
-                           cxt.scratch_allocator())
-            .view());
+    spec.append(String::from(parse_printf_integer(do_operand_at(operand_index)),
+                             cxt.scratch_allocator())
+                    .view());
     operand_index++;
     consumed_a_conversion = true;
   };

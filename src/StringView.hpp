@@ -5,7 +5,8 @@
 
 namespace shit {
 
-template <class T> class ErrorOr;
+template <class T>
+class ErrorOr;
 
 class StringView
 {
@@ -55,7 +56,8 @@ public:
     return !(*this == other);
   }
 
-  template <class T> mustuse fn to() const throws -> ErrorOr<T>;
+  template <class T>
+  mustuse fn to() const throws -> ErrorOr<T>;
 
   hot mustuse pure fn find_character(char wanted) const wontthrow
       -> Maybe<usize>;

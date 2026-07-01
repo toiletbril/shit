@@ -278,7 +278,8 @@ fn get_current_user() throws -> Maybe<String>
 
   let const contents = Path{StringView{"/etc/passwd"}}.read_entire_file();
   if (!contents) return shit::None;
-  let const wanted_uid = String::from(static_cast<u64>(getuid()), heap_allocator());
+  let const wanted_uid =
+      String::from(static_cast<u64>(getuid()), heap_allocator());
   let const text = contents->view();
   for (let const &line : utils::split_lines(text)) {
     if (passwd_field(line, 2) != wanted_uid.view()) continue;
@@ -916,12 +917,14 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
 {
   LOG(Debug, "opening '%.*s'", static_cast<int>(path.length), path.data);
 
-  /* Left inheritable on purpose, exec 3>file keeps the fd open across an exec. */
+  /* Left inheritable on purpose, exec 3>file keeps the fd open across an exec.
+   */
   int flags = 0;
   switch (mode) {
   case file_open_mode::Truncate: flags = O_WRONLY | O_CREAT | O_TRUNC; break;
   case file_open_mode::TruncateNoClobber:
-    /* O_EXCL fails atomically when the file exists, the way noclobber requires. */
+    /* O_EXCL fails atomically when the file exists, the way noclobber requires.
+     */
     flags = O_WRONLY | O_CREAT | O_EXCL;
     break;
   case file_open_mode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
@@ -1008,8 +1011,9 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
        newline, every other signal prints the located process message. */
     if (sig == SIGPIPE) {
     } else if (sig != SIGINT) {
-      shit::print("[Process " + String::from(pid, heap_allocator()) + ": " + sig_desc +
-                  ", signal " + String::from(sig, heap_allocator()) + "]\n");
+      shit::print("[Process " + String::from(pid, heap_allocator()) + ": " +
+                  sig_desc + ", signal " + String::from(sig, heap_allocator()) +
+                  "]\n");
     } else {
       shit::print("\n");
     }
@@ -1033,7 +1037,8 @@ fn reap_process_quietly(process pid) throws -> i32
   {
     const pid_t w = waitpid(pid, &status, 0);
     if (w == -1 && errno == EINTR) continue;
-    /* The SIGCHLD handler may already have reaped it, a missing child is fine. */
+    /* The SIGCHLD handler may already have reaped it, a missing child is fine.
+     */
     if (w == -1 && errno == ECHILD) return 0;
     if (check_syscall(w) == pid) break;
   }
@@ -1746,7 +1751,8 @@ static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
 {
   let const contents = Path{database_path}.read_entire_file();
   if (!contents) return shit::None;
-  let const wanted = String::from(static_cast<u64>(wanted_id), heap_allocator());
+  let const wanted =
+      String::from(static_cast<u64>(wanted_id), heap_allocator());
   let const text = contents->view();
   for (let const &line : utils::split_lines(text)) {
     if (passwd_field(line, id_field_index) != wanted.view()) continue;
@@ -1922,8 +1928,7 @@ fn enumerate_processes(bool include_resource_stats) throws
           digit_end++;
         let const uid_text =
             line.substring_of_length(cursor, digit_end - cursor);
-        if (let const uid = uid_text.to<i64>();
-            !uid.is_error())
+        if (let const uid = uid_text.to<i64>(); !uid.is_error())
           process.owner_id = static_cast<u32>(uid.value());
         break;
       }
@@ -1950,7 +1955,8 @@ fn enumerate_processes(bool include_resource_stats) throws
 
     if (include_resource_stats) {
       /* The comm field may contain spaces and parens, so the fields are read
-         after the last ')', state first then user and system times at 11 and 12. */
+         after the last ')', state first then user and system times at 11
+         and 12. */
       if (Maybe<String> stat =
               Path{(proc_pid + "/stat").view()}.read_entire_file();
           stat.has_value())
@@ -2440,7 +2446,8 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   LPVOID environment_block =
       ec.should_use_empty_environment ? empty_environment_block : nullptr;
 
-  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable. */
+  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
+   */
   if (CreateProcessA(ec.program_path().c_str(),
                      const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
                      should_inherit_handles, 0, environment_block, nullptr,
@@ -2563,7 +2570,8 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   unused(in_fd);
   unused(out_fd);
   unused(err_fd);
-  /* Reached only for a stage whose end position the parser does not yet record. */
+  /* Reached only for a stage whose end position the parser does not yet record.
+   */
   throw shit::Error{
       "A compound command in a pipeline is not supported on this platform"};
 }
@@ -2614,8 +2622,8 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
   SECURITY_ATTRIBUTES attributes{};
 
   attributes.nLength = sizeof(SECURITY_ATTRIBUTES);
-  /* Both ends non-inheritable, the child receives only what STARTF_USESTDHANDLES
-     names. */
+  /* Both ends non-inheritable, the child receives only what
+     STARTF_USESTDHANDLES names. */
   attributes.bInheritHandle = FALSE;
   attributes.lpSecurityDescriptor = nullptr; /* NOLINT */
 
@@ -3028,7 +3036,8 @@ fn realtime_microseconds() wontthrow -> u64
   ULARGE_INTEGER ticks;
   ticks.LowPart = file_time.dwLowDateTime;
   ticks.HighPart = file_time.dwHighDateTime;
-  /* FILETIME counts 100ns intervals since 1601, so the 1970 offset is removed. */
+  /* FILETIME counts 100ns intervals since 1601, so the 1970 offset is removed.
+   */
   const u64 epoch_offset_100ns = 116444736000000000ULL;
   if (ticks.QuadPart < epoch_offset_100ns) return 0;
   return (ticks.QuadPart - epoch_offset_100ns) / 10ULL;
@@ -3063,7 +3072,8 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
 {
   if (argv.is_empty()) return None;
 
-  /* Windows has no hardware perf counters, only wall time and peak working set. */
+  /* Windows has no hardware perf counters, only wall time and peak working set.
+   */
   measured_result result{};
 
   String command_line{};
@@ -3099,7 +3109,8 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
 
   const u64 start_nanos = monotonic_nanos();
 
-  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable. */
+  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
+   */
   if (CreateProcessA(nullptr, const_cast<LPSTR>(mutable_command_line.data()),
                      nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup,
                      &process_info) == 0)
@@ -3135,7 +3146,8 @@ fn make_directory(StringView path, u32 mode) wontthrow -> bool
 
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
 {
-  /* Windows has no POSIX permission bits, so the mode is accepted and ignored. */
+  /* Windows has no POSIX permission bits, so the mode is accepted and ignored.
+   */
   unused(path);
   unused(mode);
   return true;
@@ -3226,14 +3238,16 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   status.group_id = static_cast<u32>(info.st_gid);
   status.size = static_cast<u64>(info.st_size);
   status.modification_time = static_cast<i64>(info.st_mtime);
-  /* Windows stat has no block count, so 512-byte blocks are derived from size. */
+  /* Windows stat has no block count, so 512-byte blocks are derived from size.
+   */
   status.blocks = (static_cast<u64>(info.st_size) + 511) / 512;
   return true;
 }
 
 fn format_mode_string(u32 mode) throws -> String
 {
-  /* Windows stat exposes only the owner bits, mirrored across all three triplets. */
+  /* Windows stat exposes only the owner bits, mirrored across all three
+   * triplets. */
   const bool is_readable = (mode & 0000400u) != 0;
   const bool is_writable = (mode & 0000200u) != 0;
   const bool is_executable = (mode & 0000100u) != 0;
@@ -3256,7 +3270,8 @@ fn file_type_letter(u32 mode) wontthrow -> char
 
 fn uid_to_username(u32 uid) throws -> Maybe<String>
 {
-  /* Windows names users through the security database, so ls uses the numeric id. */
+  /* Windows names users through the security database, so ls uses the numeric
+   * id. */
   unused(uid);
   return shit::None;
 }
@@ -3276,7 +3291,8 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
 fn enumerate_processes(bool include_resource_stats) throws
     -> ArrayList<process_entry>
 {
-  /* The snapshot has no per-process resource stats, so the BSD columns stay zero. */
+  /* The snapshot has no per-process resource stats, so the BSD columns stay
+   * zero. */
   unused(include_resource_stats);
   ArrayList<process_entry> processes{heap_allocator()};
   HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -3290,7 +3306,8 @@ fn enumerate_processes(bool include_resource_stats) throws
     process_entry process{};
     process.pid = static_cast<i64>(entry.th32ProcessID);
     process.name = String{entry.szExeFile};
-    /* The snapshot exposes only the executable name, used as the command line. */
+    /* The snapshot exposes only the executable name, used as the command line.
+     */
     process.command_line = process.name.clone();
     processes.push(steal(process));
   } while (Process32Next(snapshot, &entry) != 0);

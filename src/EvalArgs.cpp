@@ -17,7 +17,8 @@ namespace shit {
 namespace {
 
 /* The stand-in byte for an opaque segment in the brace template, followed by
-   the segment's index. Its braces and commas must not act as brace structure. */
+   the segment's index. Its braces and commas must not act as brace structure.
+ */
 constexpr char BRACE_OPAQUE_MARKER = '\x01';
 
 pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
@@ -510,8 +511,8 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
           }
         }
 
-        /* A lone "$@" copies each positional parameter straight into the vector,
-           the hot path of a set -- "$@" extra growth loop. */
+        /* A lone "$@" copies each positional parameter straight into the
+           vector, the hot path of a set -- "$@" extra growth loop. */
         if (!did_take_fast_path && expandable.segments.count() == 1) {
           const WordSegment &only = expandable.segments[0];
           if (only.kind == WordSegment::Kind::VariableReference &&

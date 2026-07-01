@@ -34,8 +34,7 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   job *job = nullptr;
   if (args.count() > 1 && !args[1].is_empty() && args[1][0] == '%') {
-    let const parsed_value =
-        StringView{args[1]}.substring(1).to<i64>();
+    let const parsed_value = StringView{args[1]}.substring(1).to<i64>();
     if (parsed_value.is_error())
       throw Error{"'" + args[1] + "' is not a valid job"};
     job = cxt.find_job(static_cast<int>(parsed_value.value()));

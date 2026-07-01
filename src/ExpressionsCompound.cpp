@@ -464,11 +464,11 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       cxt.set_last_background_pid(os::process_id_of(last_child));
       const i32 id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
-        shit::print_error("[" + String::from(id, heap_allocator()) + "] " +
-                          String::from(
-                              static_cast<u64>(os::process_id_of(last_child)),
-                              heap_allocator()) +
-                          "\n");
+        shit::print_error(
+            "[" + String::from(id, heap_allocator()) + "] " +
+            String::from(static_cast<u64>(os::process_id_of(last_child)),
+                         heap_allocator()) +
+            "\n");
     }
     return 0;
   }

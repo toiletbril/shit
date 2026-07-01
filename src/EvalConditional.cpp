@@ -83,8 +83,8 @@ struct conditional_evaluator
 
   /* The mask marks which *, ?, and [ stay active. A quoted or escaped
      metacharacter is masked off and matches literally. */
-  fn operand_pattern_masked(const conditional_element &e,
-                            Bitset &active) throws -> String
+  fn operand_pattern_masked(const conditional_element &e, Bitset &active) throws
+      -> String
   {
     if (e.word != nullptr && e.word->kind() == Token::Kind::Word) {
       try {
@@ -250,8 +250,7 @@ struct conditional_evaluator
       return size.has_value() && size.value() > 0;
     }
     if (op == "-t") {
-      if (ErrorOr<i64> descriptor = operand.to<i64>();
-          !descriptor.is_error())
+      if (ErrorOr<i64> descriptor = operand.to<i64>(); !descriptor.is_error())
 #if SHIT_PLATFORM_IS WIN32
         return os::is_fd_a_tty(reinterpret_cast<os::descriptor>(
             _get_osfhandle(static_cast<int>(descriptor.value()))));

@@ -19,11 +19,10 @@ public:
     m_length++;
     let const word_index = bit_position / BITS_PER_WORD;
     if (word_index >= m_words.count()) m_words.push(0);
-    if (value)
-      m_words[word_index] |= u64{1} << (bit_position % BITS_PER_WORD);
+    if (value) m_words[word_index] |= u64{1} << (bit_position % BITS_PER_WORD);
   }
 
-  hot mustuse pure fn operator[](usize index) const wontthrow -> bool
+  hot mustuse pure fn operator[](usize index) const wontthrow->bool
   {
     if (index >= m_length) return false;
     return ((m_words[index / BITS_PER_WORD] >> (index % BITS_PER_WORD)) & 1u) !=

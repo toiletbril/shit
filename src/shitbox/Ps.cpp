@@ -79,8 +79,7 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
       pid_width = String::from(process.pid, allocator).count();
     if (String::from(process.virtual_kib, allocator).count() > vsz_width)
       vsz_width = String::from(process.virtual_kib, allocator).count();
-    if (String::from(process.resident_kib, allocator).count() >
-        rss_width)
+    if (String::from(process.resident_kib, allocator).count() > rss_width)
       rss_width = String::from(process.resident_kib, allocator).count();
     owners.push(steal(owner));
   }
@@ -101,15 +100,14 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
     append_right(output, String::from(process.pid, allocator).view(),
                  pid_width);
     output += ' ';
-    append_right(output,
-                 String::from(process.virtual_kib, allocator).view(),
+    append_right(output, String::from(process.virtual_kib, allocator).view(),
                  vsz_width);
     output += ' ';
-    append_right(output,
-                 String::from(process.resident_kib, allocator).view(),
+    append_right(output, String::from(process.resident_kib, allocator).view(),
                  rss_width);
     output += ' ';
-    /* The state is padded to the four-wide STAT field plus a separator space. */
+    /* The state is padded to the four-wide STAT field plus a separator space.
+     */
     output += process.state;
     output += "    ";
     output += process.command_line.is_empty() ? process.name.view()

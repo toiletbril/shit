@@ -262,8 +262,8 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
                              relatives);
 
       /* The base directory is the zero-level match, emitted as the bare prefix,
-         skipped when the prefix is empty so a bare ** does not yield the current
-         directory. */
+         skipped when the prefix is empty so a bare ** does not yield the
+         current directory. */
       if (!directory_position) {
         if (!prefix.is_empty()) {
           let base_field = glob_field{scratch};

@@ -12,7 +12,8 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 fn parse_integer_in_base(StringView text, int_base base) throws -> ErrorOr<i64>;
 } // namespace utils
 
-template <class T> static fn narrow_integer(i64 value) throws -> ErrorOr<T>
+template <class T>
+static fn narrow_integer(i64 value) throws -> ErrorOr<T>
 {
   static_assert(std::is_integral_v<T>, "narrow_integer targets an integer");
   if constexpr (std::is_same_v<T, i64>) {
@@ -30,7 +31,8 @@ template <class T> static fn narrow_integer(i64 value) throws -> ErrorOr<T>
   }
 }
 
-template <class T> fn StringView::to() const throws -> ErrorOr<T>
+template <class T>
+fn StringView::to() const throws -> ErrorOr<T>
 {
   if constexpr (is_tagged_int_v<T>) {
     using U = typename T::underlying;

@@ -61,8 +61,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let read_fd = ec.in_fd.value_or(SHIT_STDIN);
   if (FLAG_READ_FD.is_set()) {
-    if (let const parsed = FLAG_READ_FD.value().to<i64>();
-        !parsed.is_error())
+    if (let const parsed = FLAG_READ_FD.value().to<i64>(); !parsed.is_error())
       read_fd = os::descriptor_from_fd_number(parsed.value());
   }
 
@@ -100,7 +99,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return names[first_operand + index];
   };
 
-  /* An empty -d argument reads until a NUL byte, so the whole input is slurped. */
+  /* An empty -d argument reads until a NUL byte, so the whole input is slurped.
+   */
   let const delimiter =
       FLAG_READ_DELIM.is_set()
           ? (FLAG_READ_DELIM.value().is_empty() ? '\0'
@@ -164,7 +164,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return was_timed_out ? 142 : 1;
   }
   /* Without -r a backslash escapes the next byte, joining the next line at the
-     delimiter and making any other byte a literal that no longer splits on IFS. */
+     delimiter and making any other byte a literal that no longer splits on IFS.
+   */
   let accumulated = String{cxt.scratch_allocator(), read_line->view()};
   let const should_process_escapes =
       !FLAG_READ_RAW.is_enabled() && !FLAG_READ_NCHARS.is_set();

@@ -127,7 +127,8 @@ String format_option_names_help(Allocator allocator) throws
 }
 
 /* The bash -p line is a command the shell replays to restore the state, so it
-   must execute when a completion script captures it through $(shopt -p name). */
+   must execute when a completion script captures it through $(shopt -p name).
+ */
 String shopt_reusable_line(StringView name, bool on, bool as_set_option,
                            Allocator allocator) throws
 {
@@ -178,8 +179,8 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
-    /* The options combine into one argument, such as the -qo of shopt -qo posix.
-       Any other letter is accepted without effect. */
+    /* The options combine into one argument, such as the -qo of shopt -qo
+       posix. Any other letter is accepted without effect. */
     if (arg.length >= 2 && arg[0] == '-') {
       for (usize k = 1; k < arg.length; k++) {
         if (arg[k] == 's')

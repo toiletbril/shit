@@ -187,7 +187,8 @@ cold fn ArrayAssignCommand::analyze(AnalysisContext &actx,
                                     bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
-  /* The name is no longer a scalar literal, so the constant table forgets it. */
+  /* The name is no longer a scalar literal, so the constant table forgets it.
+   */
   actx.constant_variables.erase(m_name.view());
 }
 
@@ -587,8 +588,9 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         const SourceLocation location = redir.target != nullptr
                                             ? redir.target->source_location()
                                             : source_location();
-        throw ErrorWithLocation{location, String::from(r.dup_from_fd, heap_allocator()) +
-                                              ": Bad file descriptor"};
+        throw ErrorWithLocation{location,
+                                String::from(r.dup_from_fd, heap_allocator()) +
+                                    ": Bad file descriptor"};
       }
       break;
     }

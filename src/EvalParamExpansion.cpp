@@ -24,9 +24,8 @@ enum class trim_end
 /* The active mask marks which pattern bytes may act as glob metacharacters, so
    a quoted or escaped * or ? matches itself. */
 fn trim_matching(Allocator result_allocator, StringView value,
-                 StringView pattern, const Bitset &active,
-                 trim_end end, bool longest, bool extglob_enabled) throws
-    -> String
+                 StringView pattern, const Bitset &active, trim_end end,
+                 bool longest, bool extglob_enabled) throws -> String
 {
   ASSERT(active.count() == pattern.length);
 
@@ -89,15 +88,13 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
                                      false);
 }
 
-fn EvalContext::expand_modifier_word_masked(StringView word,
-                                            Bitset &active_out,
+fn EvalContext::expand_modifier_word_masked(StringView word, Bitset &active_out,
                                             bool remove_quotes) throws -> String
 {
   return expand_modifier_word_worker(word, active_out, remove_quotes, true);
 }
 
-fn EvalContext::expand_modifier_word_worker(StringView word,
-                                            Bitset &active_out,
+fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
                                             bool remove_quotes,
                                             bool is_pattern_word) throws
     -> String
@@ -337,7 +334,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
         }
         inner += ch;
       }
-      do_emit_run(String::from(evaluate_arithmetic(inner), heap_allocator()), false);
+      do_emit_run(String::from(evaluate_arithmetic(inner), heap_allocator()),
+                  false);
       i = j - 1;
     } else if (next == '(') {
       /* Command substitution $(...), scanned to the matching ). A quote run
@@ -434,8 +432,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   if (spec.length > 1 && spec[0] == '#') {
     let const name = spec.substring(1);
     if (name == "@" || name == "*")
-      return String{scratch_allocator(),
-                    String::from(m_positional_params.count(), heap_allocator())};
+      return String{
+          scratch_allocator(),
+          String::from(m_positional_params.count(), heap_allocator())};
 
     /* ${#a[@]} is the element count, ${#a[i]} the length of one element. */
     if (let const bracket = name.find_character('[');
@@ -453,29 +452,29 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
                         String::from(funcname_frame_count(), heap_allocator())};
         }
         if (is_associative_array(array_name))
-          return String{
-              heap_allocator(),
-              String::from(associative_keys(array_name).count(), heap_allocator())};
+          return String{heap_allocator(),
+                        String::from(associative_keys(array_name).count(),
+                                     heap_allocator())};
         if (lookup_indexed_array(array_name) != nullptr)
-          return String::from(
-              collect_array_elements(array_name).count(), heap_allocator());
-        return String{scratch_allocator(),
-                      String::from(
-                          get_variable_value(array_name).has_value() ? 1 : 0,
-                          heap_allocator())};
+          return String::from(collect_array_elements(array_name).count(),
+                              heap_allocator());
+        return String{
+            scratch_allocator(),
+            String::from(get_variable_value(array_name).has_value() ? 1 : 0,
+                         heap_allocator())};
       }
-      return String{scratch_allocator(),
-                    String::from(
-                        apply_array_subscript(array_name, subscript).length(),
-                        heap_allocator())};
+      return String{
+          scratch_allocator(),
+          String::from(apply_array_subscript(array_name, subscript).length(),
+                       heap_allocator())};
     }
 
     let const value = get_variable_value(name);
     if (!value.has_value()) report_unset_reference(name);
-    return String{scratch_allocator(),
-                  String::from(
-                      value.value_or(String{scratch_allocator()}).length(),
-                      heap_allocator())};
+    return String{
+        scratch_allocator(),
+        String::from(value.value_or(String{scratch_allocator()}).length(),
+                     heap_allocator())};
   }
 
   ASSERT(!spec.is_empty());
@@ -962,8 +961,7 @@ fn EvalContext::apply_parameter_transform_to_value(StringView text, char op,
        listing is the ${a[@]@K} array-field form on the element path. */
     append_shell_quoted(out, text);
     return out;
-  case 'P':
-    return toiletline::expand_prompt_template(text, *this);
+  case 'P': return toiletline::expand_prompt_template(text, *this);
   case 'A':
     out.append(name);
     out += '=';

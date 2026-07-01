@@ -1139,8 +1139,7 @@ fn main(int argc, char **argv) -> int
           shit::os::get_environment_variable("SHLVL");
       inherited.has_value())
   {
-    if (shit::ErrorOr<i64> parsed_level =
-            inherited->view().to<i64>();
+    if (shit::ErrorOr<i64> parsed_level = inherited->view().to<i64>();
         !parsed_level.is_error() && parsed_level.value() > 0)
       shell_level = parsed_level.value();
   }
@@ -1148,8 +1147,8 @@ fn main(int argc, char **argv) -> int
      the way bash bounds SHLVL. */
   constexpr i64 MAX_SHLVL = 999;
   if (shell_level > MAX_SHLVL) shell_level = 0;
-  shit::os::set_environment_variable("SHLVL",
-                                     shit::String::from(shell_level + 1, shit::heap_allocator()));
+  shit::os::set_environment_variable(
+      "SHLVL", shit::String::from(shell_level + 1, shit::heap_allocator()));
   /* The exported set must know SHLVL even on a first shell that did not inherit
      one. */
   context.mark_exported("SHLVL");
@@ -1166,13 +1165,15 @@ fn main(int argc, char **argv) -> int
     context.set_shell_variable("PS4", "+ ");
 
   /* COLUMNS and LINES carry the terminal size so a config that divides by
-     COLUMNS, such as ble.sh, sees a non-zero width. They are seeded once and not
-     tracked across a later resize. */
+     COLUMNS, such as ble.sh, sees a non-zero width. They are seeded once and
+     not tracked across a later resize. */
   if (should_be_interactive) {
     u32 columns = 0, rows = 0;
     if (shit::os::terminal_size(columns, rows)) {
-      context.set_shell_variable("COLUMNS", shit::String::from(columns, shit::heap_allocator()));
-      context.set_shell_variable("LINES", shit::String::from(rows, shit::heap_allocator()));
+      context.set_shell_variable(
+          "COLUMNS", shit::String::from(columns, shit::heap_allocator()));
+      context.set_shell_variable(
+          "LINES", shit::String::from(rows, shit::heap_allocator()));
     }
   }
 
@@ -1190,8 +1191,8 @@ fn main(int argc, char **argv) -> int
   let ast_arena = shit::BumpArena{};
   shit::AST_ARENA = &ast_arena;
 
-  /* Function bodies outlive the command that defined them, so the function arena
-     is never reset during the run. */
+  /* Function bodies outlive the command that defined them, so the function
+     arena is never reset during the run. */
   let function_arena = shit::BumpArena{};
   shit::FUNCTION_ARENA = &function_arena;
 
@@ -1276,8 +1277,8 @@ fn main(int argc, char **argv) -> int
           }
           script_contents = steal(*contents);
           source_filename = file_name.view();
-          /* A script-file run bottoms FUNCNAME out at "main", while -c and stdin
-             runs leave it off. */
+          /* A script-file run bottoms FUNCNAME out at "main", while -c and
+             stdin runs leave it off. */
           context.set_script_run(true);
         }
 
@@ -1321,8 +1322,8 @@ fn main(int argc, char **argv) -> int
 
         /* A command whose output did not end in a newline leaves the cursor off
            the first column. A marker, spaces to the line width, and a carriage
-           return push the prompt to a fresh line, and on a clean line the prompt
-           overwrites the marker so nothing shows. */
+           return push the prompt to a fresh line, and on a clean line the
+           prompt overwrites the marker so nothing shows. */
         if (should_be_interactive) {
           u32 marker_columns = 0, marker_rows = 0;
           if (shit::os::terminal_size(marker_columns, marker_rows) &&

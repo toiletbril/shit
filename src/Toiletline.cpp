@@ -83,7 +83,8 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 #define TL_HISTORY_MAX_SIZE (1024 * 4)
 
 #define TOILETLINE_IMPLEMENTATION
-/* A release build makes TL_ASSERT a no-op, leaving some vendored helpers unused. */
+/* A release build makes TL_ASSERT a no-op, leaving some vendored helpers
+ * unused. */
 #if defined __clang__ || defined __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -330,7 +331,8 @@ static fn calc_history_file_path() -> shit::Maybe<shit::Path>
 }
 
 /* The history is swapped to the calc file on entry and back on leave, so the
-   two histories never mix. The shell history is dumped first for a later reload. */
+   two histories never mix. The shell history is dumped first for a later
+   reload. */
 fn enter_calc_history() -> void
 {
   if (shit::Maybe<shit::Path> shell = history_file_path(); shell.has_value())
@@ -520,14 +522,17 @@ static fn format_prompt_duration(u64 nanos) throws -> String
   if (milliseconds < 5) return String{shit::heap_allocator()};
   let out = String{shit::heap_allocator()};
   if (milliseconds < 1000) {
-    out.append(String::from(static_cast<i64>(milliseconds), shit::heap_allocator()));
+    out.append(
+        String::from(static_cast<i64>(milliseconds), shit::heap_allocator()));
     out += "ms";
     return out;
   }
   const u64 tenths = nanos / 100000000ULL;
-  out.append(String::from(static_cast<i64>(tenths / 10), shit::heap_allocator()));
+  out.append(
+      String::from(static_cast<i64>(tenths / 10), shit::heap_allocator()));
   out += '.';
-  out.append(String::from(static_cast<i64>(tenths % 10), shit::heap_allocator()));
+  out.append(
+      String::from(static_cast<i64>(tenths % 10), shit::heap_allocator()));
   out += 's';
   return out;
 }
@@ -648,7 +653,8 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       if (should_use_color) out += colors::ansi::RESET;
     } break;
     case 'j':
-      out += String::from(static_cast<i64>(context.jobs().count()), shit::heap_allocator());
+      out += String::from(static_cast<i64>(context.jobs().count()),
+                          shit::heap_allocator());
       break;
     case 'D':
       out += format_prompt_duration(context.last_command_duration_ns());

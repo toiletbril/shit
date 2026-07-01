@@ -33,7 +33,8 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* The group change must outlive this command, so it re-execs system newgrp. */
+  /* The group change must outlive this command, so it re-execs system newgrp.
+   */
   let const found = utils::search_program_path("newgrp");
   if (found.count() == 0) {
     show_message(

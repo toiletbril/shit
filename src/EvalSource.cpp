@@ -349,7 +349,8 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
   m_retained_sources.clear();
 
   /* A just-freed buffer can be reissued at the same address and length, so the
-     caches keyed on that are dropped to keep them from serving a stale index. */
+     caches keyed on that are dropped to keep them from serving a stale index.
+   */
   invalidate_source_line_index();
   utils::invalidate_line_number_cache();
 

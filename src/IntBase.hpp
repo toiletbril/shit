@@ -4,9 +4,16 @@
 
 namespace shit {
 
-enum class int_base : u8 { binary = 2, octal = 8, decimal = 10, hex = 16 };
+enum class int_base : u8
+{
+  binary = 2,
+  octal = 8,
+  decimal = 10,
+  hex = 16
+};
 
-template <int_base TagBase, class T> struct tagged_int
+template <int_base TagBase, class T>
+struct tagged_int
 {
   using underlying = T;
   static constexpr int_base base = TagBase;
@@ -18,7 +25,8 @@ template <int_base TagBase, class T> struct tagged_int
   constexpr operator T() const wontthrow { return value; }
 };
 
-template <class T> struct is_tagged_int : std::false_type
+template <class T>
+struct is_tagged_int : std::false_type
 {};
 template <int_base TagBase, class T>
 struct is_tagged_int<tagged_int<TagBase, T>> : std::true_type

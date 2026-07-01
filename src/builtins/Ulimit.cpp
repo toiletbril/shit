@@ -173,7 +173,8 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             resource.units_per_value;
   }
 
-  /* Naming neither -H nor -S, or both together, sets both, the way dash does. */
+  /* Naming neither -H nor -S, or both together, sets both, the way dash does.
+   */
   if (FLAG_HARD.is_enabled() || !FLAG_SOFT.is_enabled()) limit.rlim_max = value;
   if (FLAG_SOFT.is_enabled() || !FLAG_HARD.is_enabled()) limit.rlim_cur = value;
 

@@ -771,7 +771,8 @@ fn complete_from_manpage(StringView line, StringView token, bool for_listing,
 }
 
 /* One fork parses both the option and the subcommand caches so the raw text
-   frees after. HELP_PARSED records a command that ran so it never forks twice. */
+   frees after. HELP_PARSED records a command that ran so it never forks twice.
+ */
 static StringMap<ArrayList<help_entry>> HELP_OPTION_CACHE{heap_allocator()};
 static StringMap<ArrayList<help_entry>> HELP_SUBCOMMAND_CACHE{heap_allocator()};
 static HashSet HELP_PARSED{heap_allocator()};
@@ -1126,7 +1127,8 @@ fn complete_from_help_subcommands(StringView line, StringView token,
 
   let const resolved_name = resolve_completion_alias(surface_command, context);
 
-  /* An empty chain at the first-argument position lists the base subcommands. */
+  /* An empty chain at the first-argument position lists the base subcommands.
+   */
   let const chain =
       settled_subcommand_chain(resolved_name.view(), line, token_start);
   if (chain.is_empty()) {

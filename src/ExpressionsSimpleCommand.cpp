@@ -252,7 +252,8 @@ using expressions::Redirection;
 
 /* Route an opened descriptor into one of the three standard slots a stage
    carries, fd 0 to input, 2 to error, any other to output. The last
-   redirection of a descriptor wins, so a descriptor in the slot closes first. */
+   redirection of a descriptor wins, so a descriptor in the slot closes first.
+ */
 fn assign_standard_fd(Maybe<os::descriptor> &in_fd,
                       Maybe<os::descriptor> &out_fd,
                       Maybe<os::descriptor> &err_fd, i32 fd,
@@ -1031,8 +1032,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     saved_env.push(saved_env_var{String{name}, steal(previous)});
     os::set_environment_variable(name, expanded_value.view());
     cxt.mark_exported(name);
-    /* The resolver reads its own MAYBE_PATH, so a prefix PATH=... must update it
-       for the environment write to change the search order. */
+    /* The resolver reads its own MAYBE_PATH, so a prefix PATH=... must update
+       it for the environment write to change the search order. */
     if (name == "PATH")
       utils::set_path_for_resolution(String{expanded_value.view()});
     /* The value before the first IFS prefix is saved once, so a name repeated
@@ -1256,7 +1257,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* An assignment builtin with NAME=(...) array arguments applies them after it
      runs, in the scope the builtin selects. The builtin ran first, so a local
-     outside a function has already errored and the elements never reach here. */
+     outside a function has already errored and the elements never reach here.
+   */
   if (!m_array_args.is_empty()) {
     let const is_local = array_command_name == "local";
     let const is_declare =

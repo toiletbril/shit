@@ -760,8 +760,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
 }
 
 fn EvalContext::expand_case_pattern_masked(const Word &word,
-                                           Bitset &active_out) throws
-    -> String
+                                           Bitset &active_out) throws -> String
 {
   let const *segments = &word.segments;
   let tilde_expanded_segments = ArrayList<WordSegment>{scratch_allocator()};

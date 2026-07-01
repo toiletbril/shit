@@ -78,9 +78,7 @@ fn resolve_jobspec(const ArrayList<job> &jobs, StringView spec) throws
   if (body == "-")
     return jobs.count() >= 2 ? jobs.count() - 2 : jobs.count() - 1;
 
-  if (let const parsed_value = body.to<i64>();
-      !parsed_value.is_error())
-  {
+  if (let const parsed_value = body.to<i64>(); !parsed_value.is_error()) {
     for (usize i = 0; i < jobs.count(); i++)
       if (static_cast<i64>(jobs[i].id) == parsed_value.value()) return i;
   }
@@ -135,8 +133,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
 
     if (FLAG_JOBS_PIDS.is_enabled()) {
-      out += String::from(os::process_id_of(job.pid),
-                                cxt.scratch_allocator());
+      out += String::from(os::process_id_of(job.pid), cxt.scratch_allocator());
       out.push('\n');
       continue;
     }
@@ -146,8 +143,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     out += " ";
 
     if (FLAG_JOBS_LONG.is_enabled()) {
-      out += String::from(os::process_id_of(job.pid),
-                                cxt.scratch_allocator());
+      out += String::from(os::process_id_of(job.pid), cxt.scratch_allocator());
       out += " ";
     }
 

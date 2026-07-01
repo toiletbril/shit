@@ -437,8 +437,7 @@ fn append_summary(String &out, const command_result &result, bool may_color,
   out += "Benchmark: ";
   out += result.label;
   out.append(colored(colors::ansi::RESET, may_color));
-  out +=
-      " (" + String::from(result.sample_count, allocator) + " runs)\n";
+  out += " (" + String::from(result.sample_count, allocator) + " runs)\n";
 
   let rows = ArrayList<metric_row>{allocator};
   rows.push(make_metric_row("wall time", result.wall_time,

@@ -217,7 +217,8 @@ fn Calc::execute(const ExecContext &ec, EvalContext &cxt,
   cxt.set_diagnostics_disabled(true);
   defer { cxt.set_diagnostics_disabled(were_diagnostics_disabled); };
 
-  /* A piped run with no expression keeps the usage error so it does not hang. */
+  /* A piped run with no expression keeps the usage error so it does not hang.
+   */
   let const has_expression = !operands.is_empty();
   let const is_interactive =
       FLAG_CALC_INTERACTIVE.is_enabled() ||

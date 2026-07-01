@@ -79,9 +79,11 @@ fn EvalContext::run_completion_function(StringView function_name,
   for (let const &word : words)
     comp_words.push_managed(word.view());
   set_indexed_array("COMP_WORDS", steal(comp_words));
-  set_shell_variable("COMP_CWORD", String::from(static_cast<i64>(cword), heap_allocator()));
+  set_shell_variable("COMP_CWORD",
+                     String::from(static_cast<i64>(cword), heap_allocator()));
   set_shell_variable("COMP_LINE", line);
-  set_shell_variable("COMP_POINT", String::from(static_cast<i64>(point), heap_allocator()));
+  set_shell_variable("COMP_POINT",
+                     String::from(static_cast<i64>(point), heap_allocator()));
   /* bash-completion reassembles the words against COMP_WORDBREAKS, so it is set
      for the function run when a non-bash session left it unset. */
   if (!get_variable_value("COMP_WORDBREAKS").has_value())

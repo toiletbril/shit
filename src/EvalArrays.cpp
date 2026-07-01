@@ -568,11 +568,10 @@ fn EvalContext::apply_array_subscript(StringView name,
 
     let const index = evaluate_arithmetic(subscript);
     if (index >= 0 && static_cast<usize>(index) < depth) {
-      return String{
-          scratch_allocator(),
-          String::from(funcname_line_at(static_cast<usize>(index)),
-                       heap_allocator())
-              .view()};
+      return String{scratch_allocator(),
+                    String::from(funcname_line_at(static_cast<usize>(index)),
+                                 heap_allocator())
+                        .view()};
     }
     return String{scratch_allocator()};
   }
@@ -638,7 +637,8 @@ fn EvalContext::apply_array_subscript(StringView name,
     if (index >= 0) {
       let probe = String{scratch_allocator(), name};
       probe.push('\x01');
-      probe.append(String::from(static_cast<usize>(index), heap_allocator()).view());
+      probe.append(
+          String::from(static_cast<usize>(index), heap_allocator()).view());
       if (let const *sparse = m_sparse_array_values.find(probe.view()))
         return String{scratch_allocator(), sparse->view()};
     }
@@ -669,7 +669,8 @@ fn EvalContext::collect_array_elements(StringView name) const throws
     let lines = ArrayList<String>{heap_allocator()};
     lines.reserve(depth);
     for (usize i = 0; i < depth; i++)
-      lines.push_managed(String::from(funcname_line_at(i), heap_allocator()).view());
+      lines.push_managed(
+          String::from(funcname_line_at(i), heap_allocator()).view());
     return lines;
   }
 

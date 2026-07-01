@@ -27,7 +27,8 @@ Cd::Cd() = default;
 
 pure fn Cd::kind() const wontthrow -> Builtin::Kind { return Kind::Cd; }
 
-/* An absolute operand, or one led by dot or dot-dot, skips the CDPATH search. */
+/* An absolute operand, or one led by dot or dot-dot, skips the CDPATH search.
+ */
 static fn cdpath_search_applies(const String &operand) throws -> bool
 {
   if (operand.is_empty() || operand[0] == '/') return false;
@@ -164,7 +165,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (target.exists()) {
     /* OLDPWD takes the logical PWD so a later cd - returns through the same
-       symlinks. An unset or relative PWD falls back to the physical directory. */
+       symlinks. An unset or relative PWD falls back to the physical directory.
+     */
     let const logical_pwd = cxt.get_variable_value("PWD");
     let const old_directory =
         (logical_pwd.has_value() && !logical_pwd->is_empty() &&

@@ -96,7 +96,8 @@ is_list_terminator(const Token *token,
 }
 
 /* The byte location of the keyword as a whole word in the source, so a missing
-   terminator can point the caret straight at the keyword read as an argument. */
+   terminator can point the caret straight at the keyword read as an argument.
+ */
 cold pure static fn find_standalone_keyword(StringView source,
                                             StringView keyword) wontthrow
     -> Maybe<SourceLocation>
@@ -306,7 +307,8 @@ hot fn Parser::parse_command_list(
     throw shit::ErrorWithLocation{
         token->source_location(),
         "Compound command nested deeper than " +
-            String::from(static_cast<i64>(MAX_COMMAND_DEPTH), heap_allocator())};
+            String::from(static_cast<i64>(MAX_COMMAND_DEPTH),
+                         heap_allocator())};
   }
 
   Command *lhs = nullptr;
@@ -555,8 +557,8 @@ fn Parser::build_file_or_dup_redirection(
 
       let const literal = from_word.to_literal_string();
 
-      /* The close form >&- and <&- closes fd outright, the dash arriving as part
-         of the following word. */
+      /* The close form >&- and <&- closes fd outright, the dash arriving as
+         part of the following word. */
       if (literal == "-") {
         redir.dup_fd = expressions::Redirection::DUP_FD_CLOSE;
         out.push(redir);
@@ -882,8 +884,7 @@ mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
   ASSERT(compound != nullptr);
 
   let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
-  while (try_parse_trailing_redirection(redirections)) {
-  }
+  while (try_parse_trailing_redirection(redirections)) {}
 
   if (redirections.is_empty()) return compound;
 
@@ -968,8 +969,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
         return attach_trailing_redirections(parse_conditional_command());
       }
 
-      /* select is not a reserved word in the lexer, so it is matched on the text
-         in bash mode. */
+      /* select is not a reserved word in the lexer, so it is matched on the
+         text in bash mode. */
       if (m_lexer.is_bash_compatible() && is_unquoted_word(token, "select")) {
         return attach_trailing_redirections(parse_select());
       }
@@ -1075,8 +1076,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
               a->source_location().position + a->source_location().length;
 
       /* Once a command word is present, an assignment-looking token is an
-         ordinary argument, except an array assignment given to a builtin such as
-         local. */
+         ordinary argument, except an array assignment given to a builtin such
+         as local. */
       if (!args_accumulator.is_empty()) {
         if (is_array_assignment) {
           let const command_name = args_accumulator[0]->raw_string();
@@ -1301,8 +1302,8 @@ hot fn Parser::parse_for() throws -> Command *
 
   LOG(Debug, "parsing a for loop at byte %zu", location.position);
 
-  /* A for header opening with (( is the bash C-style loop, riding every mood but
-     POSIX where the bare-name reading holds. */
+  /* A for header opening with (( is the bash C-style loop, riding every mood
+     but POSIX where the bare-name reading holds. */
   if (!m_lexer.is_posix_mode()) {
     Token *peeked = m_lexer.peek_shell_token();
     ASSERT(peeked != nullptr);
@@ -1728,9 +1729,9 @@ hot fn Parser::parse_paren_command() throws -> Command *
   ASSERT(open->kind() == Token::Kind::LeftParen);
 
   /* Two opening parens are a nested subshell in POSIX, so POSIX keeps that
-     reading while bash and default take the arithmetic command. A (( that closes
-     with a lone ) at depth zero, such as ((cmd; cmd); cmd), is a subshell whose
-     first child is a subshell, decided by a quote-aware scan. */
+     reading while bash and default take the arithmetic command. A (( that
+     closes with a lone ) at depth zero, such as ((cmd; cmd); cmd), is a
+     subshell whose first child is a subshell, decided by a quote-aware scan. */
   Token *next = m_lexer.peek_shell_token();
   ASSERT(next != nullptr);
   if (!m_lexer.is_posix_mode() && next->kind() == Token::Kind::LeftParen &&
@@ -1770,8 +1771,9 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
   return subshell;
 }
 
-/* Read the body of a (( )) construct, returning a view of the source between the
-   two pairs. Shared by the arithmetic command and the C-style for header. */
+/* Read the body of a (( )) construct, returning a view of the source between
+   the two pairs. Shared by the arithmetic command and the C-style for header.
+ */
 hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
 {
   ASSERT(open != nullptr);
@@ -2010,9 +2012,7 @@ hot fn Parser::parse_conditional_command() throws -> Command *
       }
       break;
     }
-    default:
-      elements.push({Kind::Operand, t});
-      break;
+    default: elements.push({Kind::Operand, t}); break;
     }
   }
 
@@ -2164,7 +2164,8 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     throw ErrorWithLocation{
         t->source_location(),
         "Expression nesting level exceeded maximum of " +
-            String::from(static_cast<i64>(MAX_RECURSION_DEPTH), heap_allocator())};
+            String::from(static_cast<i64>(MAX_RECURSION_DEPTH),
+                         heap_allocator())};
   }
 
   Expression *lhs = nullptr;
@@ -2227,7 +2228,8 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
       throw ErrorWithLocation{
           t->source_location(),
           "Bracket nesting level exceeded maximum of " +
-              String::from(static_cast<i64>(MAX_RECURSION_DEPTH), heap_allocator())};
+              String::from(static_cast<i64>(MAX_RECURSION_DEPTH),
+                           heap_allocator())};
     }
 
     m_parentheses_depth++;

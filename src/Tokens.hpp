@@ -218,7 +218,8 @@ public:
 
   pure fn source_location() const wontthrow -> SourceLocation;
 
-  /* This no-ops for arena storage and frees an ordinary heap token otherwise. */
+  /* This no-ops for arena storage and frees an ordinary heap token otherwise.
+   */
   static fn operator delete(opaque *pointer) wontthrow->void;
 
 protected:

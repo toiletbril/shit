@@ -37,8 +37,8 @@ fn EvalContext::register_stopped_job(os::process pid, StringView command,
 
 fn EvalContext::notify_stopped_job(i32 id, StringView command) throws -> void
 {
-  print_error("[" + String::from(id, heap_allocator()) + "]+ Stopped  " + String{command} +
-              "\n");
+  print_error("[" + String::from(id, heap_allocator()) + "]+ Stopped  " +
+              String{command} + "\n");
 }
 
 fn EvalContext::update_jobs() throws -> void

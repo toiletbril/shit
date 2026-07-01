@@ -29,7 +29,8 @@ static fn previous_settled_word(StringView line, usize token_start) wontthrow
   return line.substring_of_length(start, end - start);
 }
 
-/* Keyed by the source file's absolute path and refreshed when the mtime moves. */
+/* Keyed by the source file's absolute path and refreshed when the mtime moves.
+ */
 struct cached_target_list
 {
   i64 mtime;

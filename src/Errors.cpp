@@ -38,7 +38,8 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
 }
 
 /* has_preceding_newline distinguishes a byte on the first line from one whose
-   newline sits at offset zero, since both carry a zero last_newline_location. */
+   newline sits at offset zero, since both carry a zero last_newline_location.
+ */
 struct precise_location
 {
   usize line_number;

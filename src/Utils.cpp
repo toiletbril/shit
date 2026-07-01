@@ -39,7 +39,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     -> i32
 {
   if (!ec.is_builtin()) {
-    /* Mimicry runs the script in-process, a background command keeps its fork. */
+    /* Mimicry runs the script in-process, a background command keeps its fork.
+     */
     if (cxt.mimicry() && !is_async) {
       if (Maybe<mimic_mood> mode = ec.program_path().detect_mimic_shell();
           mode.has_value())
@@ -233,7 +234,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       if (!pipe) {
         throw ErrorWithLocation{ec.source_location(), "Could not open a pipe"};
       }
-      /* An explicit > takes the stage's stdout, so the pipe end closes unused. */
+      /* An explicit > takes the stage's stdout, so the pipe end closes unused.
+       */
       if (!ec.out_fd)
         ec.out_fd = pipe->out;
       else
@@ -522,8 +524,8 @@ fn format_time_report_custom(StringView format, double real_seconds,
       continue;
     }
 
-    /* A precision digit and the l flag may precede the conversion, %3lR is three
-       digits in minutes form, precision clamped to six. */
+    /* A precision digit and the l flag may precede the conversion, %3lR is
+       three digits in minutes form, precision clamped to six. */
     usize precision = 3;
     if (format[i] >= '0' && format[i] <= '9') {
       precision = static_cast<usize>(format[i] - '0');
@@ -886,8 +888,7 @@ struct extglob_alternative
   usize mask_offset;
 };
 
-hot fn extglob_active(const Bitset &mask, usize index) wontthrow
-    -> bool
+hot fn extglob_active(const Bitset &mask, usize index) wontthrow -> bool
 {
   return index < mask.count() ? mask[index] : true;
 }
@@ -921,9 +922,8 @@ fn extglob_group_close(StringView glob) wontthrow -> usize
   return glob.count();
 }
 
-fn extglob_full_match(StringView glob, StringView str,
-                      const Bitset &mask, usize mask_offset) throws
-    -> bool;
+fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
+                      usize mask_offset) throws -> bool;
 
 /* Match min_reps or more repetitions of one of the alternatives against the
    front of str, then the suffix against the rest. The min drops to zero after
@@ -950,9 +950,8 @@ fn extglob_match_repetition(const ArrayList<extglob_alternative> &alternatives,
   return false;
 }
 
-fn extglob_full_match(StringView glob, StringView str,
-                      const Bitset &mask, usize mask_offset) throws
-    -> bool
+fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
+                      usize mask_offset) throws -> bool
 {
   if (glob.is_empty()) return str.is_empty();
 
@@ -1112,9 +1111,8 @@ fn byte_is_in_posix_class(StringView class_name, u8 byte) throws -> bool
 
 } // namespace
 
-fn glob_matches(StringView glob, StringView str,
-                const Bitset &glob_active, usize mask_offset,
-                bool extglob) throws -> bool
+fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
+                usize mask_offset, bool extglob) throws -> bool
 {
   /* The extended-glob grammar needs backtracking over alternatives and
      repetition, so it runs in a separate recursive matcher. It is taken only

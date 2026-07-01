@@ -404,7 +404,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
   Maybe<char> quote_char;
 
-  /* When the close quote arrives still clear, an empty segment is synthesized so
+  /* When the close quote arrives still clear, an empty segment is synthesized
+     so
      "" and '' each keep one empty field. */
   bool did_quote_enclose_content = false;
 
@@ -792,7 +793,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
                   here(m_cursor_position + byte_count, 1), "Expected )) here"};
             }
             /* A backslash escape, a quoted span, a backtick run, and a nested
-               $(...) are copied as balanced units so a ) inside them is text. */
+               $(...) are copied as balanced units so a ) inside them is text.
+             */
             if (c == '\\') {
               arithmetic += c;
               byte_count++;
@@ -1340,7 +1342,8 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
       TOKEN_CASE_TWO(RightSquareBracket, ']', DoubleRightSquareBracket);
       TOKEN_CASE_TWO(LeftSquareBracket, '[', DoubleLeftSquareBracket);
       TOKEN_CASE_TWO(ExclamationMark, '=', ExclamationEquals);
-    /* &> and &>> redirect both streams to a file, riding every mood but POSIX. */
+    /* &> and &>> redirect both streams to a file, riding every mood but POSIX.
+     */
     case Token::Kind::Ampersand: {
       if (bash_additions_enabled() && chop_character(1) == '>') {
         if (chop_character(2) == '>') {

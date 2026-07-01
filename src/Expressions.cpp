@@ -328,8 +328,8 @@ fn collect_glob_scan_bytes(const Word &word) throws -> ArrayList<glob_scan_byte>
 }
 
 /* The scan mirrors the matcher in utils::glob_matches, where an active '[' with
-   no closing ']' is a literal, so only a '[' that opens a class and never closes
-   is malformed. Returns true when malformed. */
+   no closing ']' is a literal, so only a '[' that opens a class and never
+   closes is malformed. Returns true when malformed. */
 fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 {
   const ArrayList<glob_scan_byte> bytes = collect_glob_scan_bytes(word);
@@ -426,15 +426,19 @@ fn analyze_ast(const Expression *root, StringView source,
 
   if (actx.should_trace_optimizer) {
     let summary = String{"summary: "};
-    summary.append(String::from(actx.optimizer_folded_arithmetic, heap_allocator()));
+    summary.append(
+        String::from(actx.optimizer_folded_arithmetic, heap_allocator()));
     summary.append(" arithmetic folded, ");
-    summary.append(String::from(actx.optimizer_recorded_constants, heap_allocator()));
+    summary.append(
+        String::from(actx.optimizer_recorded_constants, heap_allocator()));
     summary.append(" constants recorded, ");
-    summary.append(String::from(actx.optimizer_folded_branches, heap_allocator()));
+    summary.append(
+        String::from(actx.optimizer_folded_branches, heap_allocator()));
     summary.append(" branches folded, ");
     summary.append(String::from(actx.optimizer_folded_loops, heap_allocator()));
     summary.append(" loops folded, ");
-    summary.append(String::from(actx.optimizer_eliminated_compounds, heap_allocator()));
+    summary.append(
+        String::from(actx.optimizer_eliminated_compounds, heap_allocator()));
     summary.append(" compounds eliminated");
     actx.trace_optimizer_line(summary.view());
   }
@@ -1399,8 +1403,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   }
 
   /* A single-operand test with no operator is the nonempty-string test,
-     shellcheck SC2244. A flag-shaped operand is left alone so [ -n ] is not told
-     to use -n. */
+     shellcheck SC2244. A flag-shaped operand is left alone so [ -n ] is not
+     told to use -n. */
   if ((command_literal == "[" || command_literal == "test" ||
        command_literal == "[[") &&
       !command_is_shadowed)
@@ -1597,8 +1601,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  /* A neutral builtin shadowed by a function or alias is really a call into user
-     code, so it forgets the table too. */
+  /* A neutral builtin shadowed by a function or alias is really a call into
+     user code, so it forgets the table too. */
   if (!clears_constants &&
       (actx.defined_functions.contains(command_literal.view()) ||
        actx.known_aliases.contains(command_literal.view())))
