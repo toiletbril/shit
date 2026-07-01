@@ -148,6 +148,40 @@ hot fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
   }
 }
 
+hot fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow
+    -> i32
+{
+  const bool has_deadline = timeout_nanos > 0;
+  const u64 deadline_nanos =
+      has_deadline ? monotonic_nanos() + static_cast<u64>(timeout_nanos) : 0;
+  loop
+  {
+    int timeout_millis = -1;
+    if (timeout_nanos == 0) {
+      timeout_millis = 0;
+    } else if (has_deadline) {
+      const u64 now_nanos = monotonic_nanos();
+      if (now_nanos >= deadline_nanos) return 0;
+      timeout_millis =
+          static_cast<int>((deadline_nanos - now_nanos) / 1'000'000);
+    }
+
+    struct pollfd watch;
+    watch.fd = fd;
+    watch.events = POLLIN;
+    watch.revents = 0;
+    const int ready = poll(&watch, 1, timeout_millis);
+    if (ready < 0) {
+      if (errno == EINTR) {
+        if (INTERRUPT_REQUESTED) return -1;
+        continue;
+      }
+      return -1;
+    }
+    return ready > 0 ? 1 : 0;
+  }
+}
+
 fn close_fd(os::descriptor fd) wontthrow -> bool { return close(fd) != -1; }
 
 fn TempFileSet::track(Path path) throws -> void { unused(path); }
@@ -2198,6 +2232,13 @@ fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
   if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
     return shit::None;
   return static_cast<usize>(r);
+}
+
+fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32
+{
+  unused(fd);
+  unused(timeout_nanos);
+  return 1;
 }
 
 fn close_fd(os::descriptor fd) wontthrow -> bool

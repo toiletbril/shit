@@ -73,6 +73,20 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       read_fd = os::descriptor_from_fd_number(parsed.value());
   }
 
+  i64 timeout_nanos = -1;
+  if (FLAG_READ_TIMEOUT.is_set()) {
+    let const parsed =
+        utils::parse_timeout_seconds_to_nanos(FLAG_READ_TIMEOUT.value());
+    if (parsed.is_error()) {
+      report_soft_builtin_error(ec, cxt, "Invalid timeout specification");
+      return 1;
+    }
+    timeout_nanos = parsed.value();
+  }
+
+  if (timeout_nanos == 0)
+    return os::wait_for_fd_readable(read_fd, 0) == 1 ? 0 : 1;
+
   /* A -p prompt prints to standard error, and only when the read's own input is
      a terminal, the way bash stays quiet for a read whose descriptor is
      redirected from a file or a pipe even at an interactive prompt. */
@@ -122,11 +136,27 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let was_newline_terminated = false;
+  let was_timed_out = false;
   let read_line = Maybe<String>{};
   if (FLAG_READ_NCHARS.is_set()) {
     let buffer = String{};
+    const u64 deadline_nanos =
+        timeout_nanos > 0
+            ? os::monotonic_nanos() + static_cast<u64>(timeout_nanos)
+            : 0;
     i64 bytes_read = 0;
     while (bytes_read < max_bytes) {
+      if (timeout_nanos > 0) {
+        i64 remaining_nanos =
+            static_cast<i64>(deadline_nanos - os::monotonic_nanos());
+        if (remaining_nanos < 0) remaining_nanos = 0;
+        let const readable = os::wait_for_fd_readable(read_fd, remaining_nanos);
+        if (readable != 1) {
+          if (readable == 0) was_timed_out = true;
+          break;
+        }
+      }
+
       char byte = 0;
       let const got = os::read_fd(read_fd, &byte, 1);
       if (!got.has_value() || *got == 0) break;
@@ -143,13 +173,14 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (bytes_read >= max_bytes) was_newline_terminated = true;
     if (bytes_read > 0 || was_newline_terminated) read_line = steal(buffer);
   } else {
-    read_line =
-        utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter);
+    read_line = utils::read_line_from_fd(read_fd, was_newline_terminated,
+                                         delimiter, timeout_nanos,
+                                         &was_timed_out);
   }
   if (!read_line) {
     for (usize i = 0; i < operand_count; i++)
       cxt.set_shell_variable(do_operand_name(i), "");
-    return 1;
+    return was_timed_out ? 142 : 1;
   }
   /* Without -r a backslash escapes the next byte, so a backslash before the
      line delimiter joins the next line and a backslash before any other byte

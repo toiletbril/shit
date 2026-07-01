@@ -775,6 +775,42 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
+fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>
+{
+  usize offset = 0;
+  skip_ascii_whitespace(text, offset);
+
+  i64 whole_seconds = 0;
+  bool has_digits = false;
+  while (offset < text.length && text.data[offset] >= '0' &&
+         text.data[offset] <= '9')
+  {
+    whole_seconds = whole_seconds * 10 + (text.data[offset] - '0');
+    has_digits = true;
+    offset++;
+  }
+
+  i64 fractional_nanos = 0;
+  if (offset < text.length && text.data[offset] == '.') {
+    offset++;
+    i64 digit_scale = 100'000'000;
+    while (offset < text.length && text.data[offset] >= '0' &&
+           text.data[offset] <= '9')
+    {
+      fractional_nanos += (text.data[offset] - '0') * digit_scale;
+      digit_scale /= 10;
+      has_digits = true;
+      offset++;
+    }
+  }
+
+  skip_ascii_whitespace(text, offset);
+  if (!has_digits || offset != text.length)
+    return Error{"'" + text + "' is not a valid timeout"};
+
+  return whole_seconds * 1'000'000'000 + fractional_nanos;
+}
+
 fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;
@@ -1932,12 +1968,27 @@ fn read_entire_standard_input() throws -> String
 }
 
 fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
-                     char delimiter) throws -> Maybe<String>
+                     char delimiter, i64 timeout_nanos, bool *was_timed_out)
+    throws -> Maybe<String>
 {
+  const bool has_timeout = timeout_nanos >= 0;
+  const u64 deadline_nanos =
+      has_timeout ? os::monotonic_nanos() + static_cast<u64>(timeout_nanos) : 0;
   let line = String{};
   bool has_read_any_byte = false;
   loop
   {
+    if (has_timeout) {
+      i64 remaining_nanos =
+          static_cast<i64>(deadline_nanos - os::monotonic_nanos());
+      if (remaining_nanos < 0) remaining_nanos = 0;
+      let const readable = os::wait_for_fd_readable(fd, remaining_nanos);
+      if (readable != 1) {
+        if (readable == 0 && was_timed_out != nullptr) *was_timed_out = true;
+        break;
+      }
+    }
+
     u8 one_byte = 0;
     Maybe<usize> read_count = os::read_fd(fd, &one_byte, 1);
     if (!read_count || *read_count == 0) break;

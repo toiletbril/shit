@@ -289,6 +289,8 @@ fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
 fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
 
+fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32;
+
 fn close_fd(os::descriptor fd) wontthrow -> bool;
 
 /* Point the process standard output at target and return a handle to the

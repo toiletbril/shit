@@ -71,6 +71,8 @@ pure fn is_posix_reserved_word(StringView word) wontthrow -> bool;
    overflow, and any other content yields an Error. */
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 
+fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>;
+
 /* The unsigned form is for ids and sizes that exceed the i64 range. */
 fn int_to_text(i64 value, Allocator allocator) throws -> String;
 fn uint_to_text(u64 value, Allocator allocator = heap_allocator()) throws
@@ -135,7 +137,8 @@ fn read_entire_standard_input() throws -> String;
    the delimiter ended the line. The delimiter defaults to a newline, and read
    -d passes the first byte of its argument, or a NUL for an empty argument. */
 fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
-                     char delimiter = '\n') throws -> Maybe<String>;
+                     char delimiter = '\n', i64 timeout_nanos = -1,
+                     bool *was_timed_out = nullptr) throws -> Maybe<String>;
 
 fn initialize_path_map() throws -> void;
 
