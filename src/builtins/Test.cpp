@@ -368,24 +368,19 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     expression_end = arguments.count() - 1;
   }
 
-  let operands = ArrayList<String>{cxt.scratch_allocator()};
-  operands.reserve(expression_end - 1);
-  for (usize i = 1; i < expression_end; i++)
-    operands.push(arguments[i]);
+  if (expression_end <= 1) return 1;
 
-  if (operands.is_empty()) return 1;
-
-  LOG(All, "test evaluating %zu operands", operands.count());
+  LOG(All, "test evaluating %zu operands", expression_end - 1);
 
   let evaluator =
-      TestEvaluator{operands, 0, operands.count(), cxt.is_bash_compatible()};
+      TestEvaluator{arguments, 1, expression_end, cxt.is_bash_compatible()};
   let const result = evaluator.evaluate_top();
   /* A paren pair the argument-count rules stripped narrowed end past the
      closing paren, so the leftover check runs against the narrowed window
      rather than the original operand count. */
   if (evaluator.pos != evaluator.end) {
     ASSERT(evaluator.pos < evaluator.end);
-    throw Error{StringView{"'"} + operands[evaluator.pos] +
+    throw Error{StringView{"'"} + arguments[evaluator.pos] +
                 "' is an unexpected argument"};
   }
   return result ? 0 : 1;
