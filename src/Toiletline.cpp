@@ -385,11 +385,23 @@ fn leave_calc_history() -> void
     ::tl_history_load(shell->c_str());
 }
 
+static fn strip_ansi_color(StringView text) throws -> String;
+
 fn set_title(const String &title) -> void
 {
+  let const stripped = strip_ansi_color(title.view());
+  let const view = stripped.view();
+  let sanitized = String{};
+  for (usize i = 0; i < view.length; i++) {
+    let const byte = static_cast<unsigned char>(view[i]);
+    if (byte >= 0x20 && byte != 0x7f) {
+      sanitized.push(view[i]);
+    }
+  }
+
   /* A terminal that rejects the title escape is cosmetic, not an error worth
      surfacing, so a failure is ignored rather than thrown into the run. */
-  ::tl_set_title(title.c_str());
+  ::tl_set_title(sanitized.c_str());
 }
 
 fn enable_completion(shit::EvalContext &context) -> void
