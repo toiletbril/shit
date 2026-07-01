@@ -65,8 +65,9 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
      0777 masked by the umask the way GNU mkdir applies the mode. */
   u32 named_mode = 0777;
   if (FLAG_MKDIR_MODE.is_set()) {
-    let const parsed = utils::parse_octal_integer(FLAG_MKDIR_MODE.value());
-    /* parse_octal_integer accepts a sign and saturates on overflow without an
+    let const parsed =
+        utils::parse_integer_in_base(FLAG_MKDIR_MODE.value(), int_base::octal);
+    /* parse_integer_in_base accepts a sign and saturates on overflow without an
        error, so a sign-prefixed or oversized operand parses cleanly. The range
        check rejects it rather than truncating to an over-permissive mode. */
     if (parsed.is_error() || parsed.value() < 0 || parsed.value() > 07777)

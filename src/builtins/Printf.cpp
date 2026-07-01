@@ -72,10 +72,11 @@ fn parse_printf_number(const String &arg) throws -> printf_number
 
   let const number_text =
       arg.view().substring_of_length(number_start, number_end - number_start);
-  let const parsed = is_hexadecimal
-                         ? utils::parse_hexadecimal_integer(number_text)
-                     : is_octal ? utils::parse_octal_integer(number_text)
-                                : number_text.to<i64>();
+  let const parsed =
+      is_hexadecimal
+          ? utils::parse_integer_in_base(number_text, int_base::hex)
+      : is_octal ? utils::parse_integer_in_base(number_text, int_base::octal)
+                 : number_text.to<i64>();
   let const has_digits = number_end > digit_start;
   return {parsed.is_error() ? 0 : parsed.value(),
           has_digits && number_end == arg.count(), is_hexadecimal};

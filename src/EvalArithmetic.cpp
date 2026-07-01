@@ -56,8 +56,9 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
         (body[1] == 'x' || body[1] == 'X'))
     {
       let const digits = body.substring(2);
-      return utils::parse_hexadecimal_integer(
-          digits.substring_of_length(0, count_leading_digits(digits, 16)));
+      return utils::parse_integer_in_base(
+          digits.substring_of_length(0, count_leading_digits(digits, 16)),
+          int_base::hex);
     }
     if (body.length >= 2 && body[0] == '0' &&
         (body[1] == 'b' || body[1] == 'B'))
@@ -68,8 +69,9 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
           int_base::binary);
     }
     if (body.length >= 1 && body[0] == '0') {
-      return utils::parse_octal_integer(
-          body.substring_of_length(0, count_leading_digits(body, 8)));
+      return utils::parse_integer_in_base(
+          body.substring_of_length(0, count_leading_digits(body, 8)),
+          int_base::octal);
     }
     return body.substring_of_length(0, count_leading_digits(body, 10))
         .to<i64>();

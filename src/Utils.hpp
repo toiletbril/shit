@@ -112,8 +112,6 @@ fn line_number_at(StringView source, usize position) throws -> usize;
    a retained source, so a later source at the same address with the same length
    does not read a stale table. */
 fn invalidate_line_number_cache() wontthrow -> void;
-fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>;
-fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>;
 fn parse_integer_in_base(StringView text, int_base base) throws -> ErrorOr<i64>;
 
 /* The command name closest to name among the local names passed in, the

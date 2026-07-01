@@ -793,87 +793,6 @@ fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>
   return whole_seconds * 1'000'000'000 + fractional_nanos;
 }
 
-fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>
-{
-  usize offset = 0;
-  skip_ascii_whitespace(text, offset);
-
-  bool is_negative = false;
-  if (offset < text.length &&
-      (text.data[offset] == '+' || text.data[offset] == '-'))
-  {
-    is_negative = text.data[offset] == '-';
-    offset++;
-  }
-
-  u64 magnitude = 0;
-  bool has_digits = false;
-  bool has_overflowed = false;
-  while (offset < text.length && text.data[offset] >= '0' &&
-         text.data[offset] <= '7')
-  {
-    const u64 digit = static_cast<u64>(text.data[offset] - '0');
-    has_digits = true;
-    if (magnitude > (UINT64_MAX - digit) / 8)
-      has_overflowed = true;
-    else
-      magnitude = magnitude * 8 + digit;
-    offset++;
-  }
-
-  skip_ascii_whitespace(text, offset);
-  if (!has_digits || offset != text.length) return not_an_integer_error(text);
-  return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
-}
-
-fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>
-{
-  usize offset = 0;
-  skip_ascii_whitespace(text, offset);
-
-  bool is_negative = false;
-  if (offset < text.length &&
-      (text.data[offset] == '+' || text.data[offset] == '-'))
-  {
-    is_negative = text.data[offset] == '-';
-    offset++;
-  }
-
-  /* A leading 0x is the conventional hexadecimal marker and is consumed before
-     the digits, as std::stoll with base 16 accepts it. */
-  if (offset + 1 < text.length && text.data[offset] == '0' &&
-      (text.data[offset + 1] == 'x' || text.data[offset + 1] == 'X'))
-  {
-    offset += 2;
-  }
-
-  u64 magnitude = 0;
-  bool has_digits = false;
-  bool has_overflowed = false;
-  for (; offset < text.length; offset++) {
-    const char current = text.data[offset];
-    u64 digit = 0;
-    if (current >= '0' && current <= '9')
-      digit = static_cast<u64>(current - '0');
-    else if (current >= 'a' && current <= 'f')
-      digit = static_cast<u64>(current - 'a' + 10);
-    else if (current >= 'A' && current <= 'F')
-      digit = static_cast<u64>(current - 'A' + 10);
-    else
-      break;
-
-    has_digits = true;
-    if (magnitude > (UINT64_MAX - digit) / 16)
-      has_overflowed = true;
-    else
-      magnitude = magnitude * 16 + digit;
-  }
-
-  skip_ascii_whitespace(text, offset);
-  if (!has_digits || offset != text.length) return not_an_integer_error(text);
-  return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
-}
-
 static pure fn digit_value_in_base(char c, u32 radix) wontthrow -> i32
 {
   u32 value;
@@ -901,6 +820,18 @@ fn parse_integer_in_base(StringView text, int_base base) throws -> ErrorOr<i64>
   {
     is_negative = text.data[offset] == '-';
     offset++;
+  }
+
+  if (base == int_base::hex && offset + 1 < text.length &&
+      text.data[offset] == '0' &&
+      (text.data[offset + 1] == 'x' || text.data[offset + 1] == 'X'))
+  {
+    offset += 2;
+  } else if (base == int_base::binary && offset + 1 < text.length &&
+             text.data[offset] == '0' &&
+             (text.data[offset + 1] == 'b' || text.data[offset + 1] == 'B'))
+  {
+    offset += 2;
   }
 
   u64 magnitude = 0;

@@ -163,7 +163,7 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* A leading digit names an octal mask, anything else a symbolic spec, the way
      POSIX distinguishes the two operand forms. */
   if (!requested.is_empty() && requested[0] >= '0' && requested[0] <= '7') {
-    let const parsed = utils::parse_octal_integer(requested);
+    let const parsed = utils::parse_integer_in_base(requested, int_base::octal);
     if (parsed.is_error())
       throw Error{"Unable to set the file creation mask because '" + requested +
                   "' is not a valid octal mask"};
