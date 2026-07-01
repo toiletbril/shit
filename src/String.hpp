@@ -39,8 +39,7 @@ public:
   mustuse fn clone() const throws -> String { return String{*this}; }
 
   template <class T>
-  mustuse static fn from(T value, Allocator allocator = heap_allocator()) throws
-      -> String
+  mustuse static fn from(T value, Allocator allocator) throws -> String
   {
     static_assert(std::is_integral_v<T>, "String::from takes an integer");
     char buffer[24];

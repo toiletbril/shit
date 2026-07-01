@@ -274,7 +274,7 @@ fn format_human_size(u64 bytes) throws -> String
 {
   /* A value below 1024 prints as the plain byte count with no suffix, the way
      ls -h and du -h show a small size. */
-  if (bytes < 1024) return String::from(bytes);
+  if (bytes < 1024) return String::from(bytes, heap_allocator());
 
   static const char units[] = {'K', 'M', 'G', 'T', 'P'};
   double value = static_cast<double>(bytes);
@@ -299,11 +299,11 @@ fn format_human_size(u64 bytes) throws -> String
      so it reads 10K, not 10.0K. */
   let const tenths = static_cast<u64>(value * 10.0 + 0.5);
   if (value < 10.0 && tenths < 100) {
-    out += String::from(tenths / 10);
+    out += String::from(tenths / 10, heap_allocator());
     out += '.';
-    out += String::from(tenths % 10);
+    out += String::from(tenths % 10, heap_allocator());
   } else {
-    out += String::from(static_cast<u64>(value + 0.5));
+    out += String::from(static_cast<u64>(value + 0.5), heap_allocator());
   }
   out.push(units[unit - 1]);
   return out;

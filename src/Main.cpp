@@ -460,7 +460,7 @@ static fn run_script_contents(const String &script_contents,
     context.set_last_exit_status(static_cast<i32>(exit_code));
 
     if (context.show_exit_code())
-      print("[Code " + String::from(exit_code) + "]\n");
+      print("[Code " + String::from(exit_code, heap_allocator()) + "]\n");
 
     if (context.stats_enabled()) {
       print(context.make_stats_string());
@@ -1260,7 +1260,7 @@ fn main(int argc, char **argv) -> int
   constexpr i64 MAX_SHLVL = 999;
   if (shell_level > MAX_SHLVL) shell_level = 0;
   shit::os::set_environment_variable("SHLVL",
-                                     shit::String::from(shell_level + 1));
+                                     shit::String::from(shell_level + 1, shit::heap_allocator()));
   /* SHLVL lives in the environment, so the exported set must know it even on a
      first shell that did not inherit one. */
   context.mark_exported("SHLVL");
@@ -1285,8 +1285,8 @@ fn main(int argc, char **argv) -> int
   if (should_be_interactive) {
     u32 columns = 0, rows = 0;
     if (shit::os::terminal_size(columns, rows)) {
-      context.set_shell_variable("COLUMNS", shit::String::from(columns));
-      context.set_shell_variable("LINES", shit::String::from(rows));
+      context.set_shell_variable("COLUMNS", shit::String::from(columns, shit::heap_allocator()));
+      context.set_shell_variable("LINES", shit::String::from(rows, shit::heap_allocator()));
     }
   }
 

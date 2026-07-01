@@ -475,11 +475,11 @@ cold fn show_version() throws -> void
 {
   let s = String{heap_allocator()};
   s += "Shit Shell ";
-  s += String::from(SHIT_VER_MAJOR);
+  s += String::from(SHIT_VER_MAJOR, heap_allocator());
   s += '.';
-  s += String::from(SHIT_VER_MINOR);
+  s += String::from(SHIT_VER_MINOR, heap_allocator());
   s += '.';
-  s += String::from(SHIT_VER_PATCH);
+  s += String::from(SHIT_VER_PATCH, heap_allocator());
   s += '-';
   s += SHIT_VER_EXTRA;
   s += '\n';
@@ -515,11 +515,11 @@ cold fn show_version() throws -> void
 cold fn show_short_version() throws -> void
 {
   let s = String{heap_allocator()};
-  s += String::from(SHIT_VER_MAJOR);
+  s += String::from(SHIT_VER_MAJOR, heap_allocator());
   s += '.';
-  s += String::from(SHIT_VER_MINOR);
+  s += String::from(SHIT_VER_MINOR, heap_allocator());
   s += '.';
-  s += String::from(SHIT_VER_PATCH);
+  s += String::from(SHIT_VER_PATCH, heap_allocator());
   s += '-';
   s += SHIT_VER_EXTRA;
   /* The build mode and the short commit hash trail the version so a reported

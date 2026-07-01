@@ -9,6 +9,8 @@
 #include "Platform.hpp"
 #include "Tokens.hpp"
 
+#include <limits>
+
 namespace shit {
 
 namespace utils {
@@ -176,5 +178,25 @@ fn set_quit_context(const EvalContext *context) wontthrow -> void;
 [[noreturn]] fn quit(i32 code, bool should_goodbye = false) throws -> void;
 
 } // namespace utils
+
+template <class T> fn StringView::to() const throws -> ErrorOr<T>
+{
+  static_assert(std::is_integral_v<T>, "StringView::to parses an integer");
+  let const value = TRY(utils::parse_decimal_integer(*this));
+
+  if constexpr (std::is_same_v<T, i64>) {
+    return value;
+  } else if constexpr (std::is_signed_v<T>) {
+    if (value < static_cast<i64>(std::numeric_limits<T>::min()) ||
+        value > static_cast<i64>(std::numeric_limits<T>::max()))
+      return Error{"integer value out of range"};
+    return static_cast<T>(value);
+  } else {
+    if (value < 0 || static_cast<u64>(value) >
+                         static_cast<u64>(std::numeric_limits<T>::max()))
+      return Error{"integer value out of range"};
+    return static_cast<T>(value);
+  }
+}
 
 } // namespace shit

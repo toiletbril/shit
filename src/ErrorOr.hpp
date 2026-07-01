@@ -158,6 +158,7 @@ private:
 #define MAKE_ERROR(msg)                                                        \
   ::shit::Error                                                                \
   {                                                                            \
-    ::shit::String{__FILE__ ":"} + ::shit::String::from(__LINE__) +            \
-        ": " + (msg)                                                           \
+    ::shit::String{__FILE__ ":"} +                                             \
+        ::shit::String::from(__LINE__, ::shit::heap_allocator()) + ": " +      \
+        (msg)                                                                  \
   }

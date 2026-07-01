@@ -14,7 +14,7 @@ static fn sparse_array_key(StringView name, usize index,
 {
   let key = String{allocator, name};
   key.push('\x01');
-  key.append(String::from(index).view());
+  key.append(String::from(index, heap_allocator()).view());
   return key;
 }
 
@@ -592,7 +592,7 @@ fn EvalContext::apply_array_subscript(StringView name,
         if (i > 0 && has_separator) {
           out.push(separator);
         }
-        out.append(String::from(funcname_line_at(i)).view());
+        out.append(String::from(funcname_line_at(i), heap_allocator()).view());
       }
       return out;
     }
@@ -601,7 +601,8 @@ fn EvalContext::apply_array_subscript(StringView name,
     if (index >= 0 && static_cast<usize>(index) < depth) {
       return String{
           scratch_allocator(),
-          String::from(funcname_line_at(static_cast<usize>(index)))
+          String::from(funcname_line_at(static_cast<usize>(index)),
+                       heap_allocator())
               .view()};
     }
     return String{scratch_allocator()};
@@ -671,7 +672,7 @@ fn EvalContext::apply_array_subscript(StringView name,
     if (index >= 0) {
       let probe = String{scratch_allocator(), name};
       probe.push('\x01');
-      probe.append(String::from(static_cast<usize>(index)).view());
+      probe.append(String::from(static_cast<usize>(index), heap_allocator()).view());
       if (let const *sparse = m_sparse_array_values.find(probe.view()))
         return String{scratch_allocator(), sparse->view()};
     }
@@ -704,7 +705,7 @@ fn EvalContext::collect_array_elements(StringView name) const throws
     let lines = ArrayList<String>{heap_allocator()};
     lines.reserve(depth);
     for (usize i = 0; i < depth; i++)
-      lines.push_managed(String::from(funcname_line_at(i)).view());
+      lines.push_managed(String::from(funcname_line_at(i), heap_allocator()).view());
     return lines;
   }
 
@@ -790,10 +791,10 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
   }
   if (let const *array = lookup_indexed_array(name)) {
     for (usize i = 0; i < array->count(); i++)
-      out.push(String::from(i));
+      out.push(String::from(i, heap_allocator()));
     for (const sparse_array_entry &entry : collect_sparse_array_entries(
              m_sparse_array_values, name, scratch_allocator()))
-      out.push(String::from(entry.index));
+      out.push(String::from(entry.index, heap_allocator()));
     return out;
   }
   if (get_variable_value(name).has_value())

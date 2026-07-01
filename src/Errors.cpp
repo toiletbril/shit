@@ -238,7 +238,7 @@ get_context_pointing_to(StringView source, usize byte_position,
     msg += ' ';
   }
 
-  msg += String::from(line_number + 1) + " |  ";
+  msg += String::from(line_number + 1, heap_allocator()) + " |  ";
 
   let const context =
       source.substring_of_length(byte_position - start_offset, line_byte_count);
@@ -465,9 +465,9 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
     result += *name;
     result += ':';
   }
-  result += String::from(line_number + 1 + m_line_offset);
+  result += String::from(line_number + 1 + m_line_offset, heap_allocator());
   result += ':';
-  result += String::from(line_byte_position);
+  result += String::from(line_byte_position, heap_allocator());
   result += ':';
   result += color.reset;
   result += ' ';
@@ -576,9 +576,9 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
 
   let result = String{heap_allocator()};
   result += color.location;
-  result += String::from(details_line_number + 1);
+  result += String::from(details_line_number + 1, heap_allocator());
   result += ':';
-  result += String::from(details_line_byte_position);
+  result += String::from(details_line_byte_position, heap_allocator());
   result += ':';
   result += color.reset;
   result += ' ';

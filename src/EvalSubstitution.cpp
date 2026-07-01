@@ -212,7 +212,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
       process_substitution{shell_fd, child, location, source});
 
   let path = String{"/dev/fd/"};
-  path += String::from(static_cast<i64>(shell_fd));
+  path += String::from(static_cast<i64>(shell_fd), heap_allocator());
   LOG(Debug, "the process substitution is reachable at '%s'", path.c_str());
   return path;
 #endif

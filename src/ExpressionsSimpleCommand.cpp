@@ -515,7 +515,8 @@ fn allocate_redirection_descriptor(const Redirection &redir,
     throw ErrorWithLocation{location, "Could not allocate a file descriptor"};
   }
 
-  cxt.set_shell_variable(*allocation_name, String::from(allocated_fd));
+  cxt.set_shell_variable(*allocation_name,
+                         String::from(allocated_fd, heap_allocator()));
   return allocated_fd;
 }
 
@@ -901,8 +902,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                 redir.target != nullptr ? redir.target->source_location()
                                         : source_location();
             did_redirection_open_fail = true;
-            throw ErrorWithLocation{location, String::from(from_fd) +
-                                                  ": Bad file descriptor"};
+            throw ErrorWithLocation{location,
+                                    String::from(from_fd, heap_allocator()) +
+                                        ": Bad file descriptor"};
           }
           break;
         }
@@ -939,8 +941,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                                               ? redir.target->source_location()
                                               : source_location();
           did_redirection_open_fail = true;
-          throw ErrorWithLocation{location, String::from(from_fd) +
-                                                ": Bad file descriptor"};
+          throw ErrorWithLocation{location,
+                                  String::from(from_fd, heap_allocator()) +
+                                      ": Bad file descriptor"};
         }
         break;
       }
@@ -966,7 +969,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           if (!was_replaced) {
             did_redirection_open_fail = true;
             throw ErrorWithLocation{redir.target->source_location(),
-                                    String::from(redir.fd) +
+                                    String::from(redir.fd, heap_allocator()) +
                                         ": Bad file descriptor"};
           }
           break;

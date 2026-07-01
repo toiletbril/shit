@@ -5,6 +5,8 @@
 
 namespace shit {
 
+template <class T> class ErrorOr;
+
 /* A non-owning view of bytes, the form a function takes when it does not own
    the characters. It points into a String, a literal, or a slice. */
 class StringView
@@ -29,6 +31,8 @@ public:
   {
     return !(*this == other);
   }
+
+  template <class T> mustuse fn to() const throws -> ErrorOr<T>;
 
   /* The index of the first occurrence of a byte, or None when it is absent.
      A Maybe keeps the absent case out of band rather than using a sentinel

@@ -663,7 +663,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         const SourceLocation location = redir.target != nullptr
                                             ? redir.target->source_location()
                                             : source_location();
-        throw ErrorWithLocation{location, String::from(r.dup_from_fd) +
+        throw ErrorWithLocation{location, String::from(r.dup_from_fd, heap_allocator()) +
                                               ": Bad file descriptor"};
       }
       break;
@@ -738,7 +738,7 @@ cold fn ConstantNumber::to_ast_string(usize layer) const throws -> String
 
 cold fn ConstantNumber::to_string() const throws -> String
 {
-  return String::from(m_value);
+  return String::from(m_value, heap_allocator());
 }
 
 ConstantString::ConstantString(SourceLocation location, StringView value)

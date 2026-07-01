@@ -320,7 +320,7 @@ fn get_current_user() throws -> Maybe<String>
      the static build avoids the NSS modules getpwuid would pull in. */
   let const contents = Path{StringView{"/etc/passwd"}}.read_entire_file();
   if (!contents) return shit::None;
-  let const wanted_uid = String::from(static_cast<u64>(getuid()));
+  let const wanted_uid = String::from(static_cast<u64>(getuid()), heap_allocator());
   let const text = contents->view();
   for (let const &line : utils::split_lines(text)) {
     if (passwd_field(line, 2) != wanted_uid.view()) continue;
@@ -1136,8 +1136,8 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
     if (sig == SIGPIPE) {
       /* Reaped silently, see above. */
     } else if (sig != SIGINT) {
-      shit::print("[Process " + String::from(pid) + ": " + sig_desc +
-                  ", signal " + String::from(sig) + "]\n");
+      shit::print("[Process " + String::from(pid, heap_allocator()) + ": " + sig_desc +
+                  ", signal " + String::from(sig, heap_allocator()) + "]\n");
     } else {
       shit::print("\n");
     }
@@ -1941,7 +1941,7 @@ static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
 {
   let const contents = Path{database_path}.read_entire_file();
   if (!contents) return shit::None;
-  let const wanted = String::from(static_cast<u64>(wanted_id));
+  let const wanted = String::from(static_cast<u64>(wanted_id), heap_allocator());
   let const text = contents->view();
   for (let const &line : utils::split_lines(text)) {
     if (passwd_field(line, id_field_index) != wanted.view()) continue;

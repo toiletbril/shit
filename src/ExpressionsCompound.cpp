@@ -486,9 +486,10 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       cxt.set_last_background_pid(os::process_id_of(last_child));
       const i32 id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
-        shit::print_error("[" + String::from(id) + "] " +
+        shit::print_error("[" + String::from(id, heap_allocator()) + "] " +
                           String::from(
-                              static_cast<u64>(os::process_id_of(last_child))) +
+                              static_cast<u64>(os::process_id_of(last_child)),
+                              heap_allocator()) +
                           "\n");
     }
     return 0;
@@ -1074,7 +1075,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (should_reprint_menu) {
       let menu = String{cxt.scratch_allocator()};
       for (usize i = 0; i < values.count(); i++) {
-        menu += String::from(static_cast<i64>(i + 1));
+        menu += String::from(static_cast<i64>(i + 1), heap_allocator());
         menu += ") ";
         menu.append(values[i].view());
         menu += '\n';
