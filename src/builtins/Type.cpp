@@ -87,6 +87,21 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       word = "builtin";
     }
 
+    let const do_describe_resolution = [&](StringView type_word) throws {
+      out += name;
+      if (type_word == "alias") {
+        out += " is an alias for ";
+        out += *alias_value;
+      } else if (type_word == "keyword") {
+        out += " is a shell keyword";
+      } else if (type_word == "function") {
+        out += " is a shell function";
+      } else {
+        out += " is a shell builtin";
+      }
+      out += "\n";
+    };
+
     if (FLAG_TYPE_ALL.is_enabled()) {
       bool has_any = false;
       if (!word.is_empty()) {
@@ -95,18 +110,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           out += word;
           out += "\n";
         } else if (!want_path) {
-          out += name;
-          if (word == "alias") {
-            out += " is an alias for ";
-            out += *alias_value;
-          } else if (word == "keyword") {
-            out += " is a shell keyword";
-          } else if (word == "function") {
-            out += " is a shell function";
-          } else {
-            out += " is a shell builtin";
-          }
-          out += "\n";
+          do_describe_resolution(word);
         }
       }
       for (let const &path : utils::search_program_path(name)) {
@@ -138,18 +142,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         out += word;
         out += "\n";
       } else if (!want_path) {
-        out += name;
-        if (word == "alias") {
-          out += " is an alias for ";
-          out += *alias_value;
-        } else if (word == "keyword") {
-          out += " is a shell keyword";
-        } else if (word == "function") {
-          out += " is a shell function";
-        } else {
-          out += " is a shell builtin";
-        }
-        out += "\n";
+        do_describe_resolution(word);
       }
       continue;
     }

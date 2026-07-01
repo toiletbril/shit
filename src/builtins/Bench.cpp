@@ -51,7 +51,6 @@ struct metric_stats
   double std_dev{0};
   double min{0};
   double max{0};
-  double median{0};
 };
 
 /* The perf fields stay zero on a platform without hardware counters. */
@@ -87,8 +86,8 @@ fn colored(StringView code, bool should_color) wontthrow -> StringView
 }
 
 template <typename Accessor>
-fn compute_stats(const ArrayList<bench_sample> &samples, Accessor accessor,
-                 Allocator allocator) throws -> metric_stats
+fn compute_stats(const ArrayList<bench_sample> &samples,
+                 Accessor accessor) throws -> metric_stats
 {
   let stats = metric_stats{};
   if (samples.is_empty()) return stats;
@@ -117,12 +116,6 @@ fn compute_stats(const ArrayList<bench_sample> &samples, Accessor accessor,
      uses, and degrades to zero for a single sample. */
   stats.std_dev =
       (samples.count() > 1) ? std::sqrt(variance_sum / (count - 1)) : 0.0;
-
-  let ordered = ArrayList<double>{allocator};
-  for (usize i = 0; i < samples.count(); i++)
-    ordered.push(accessor(samples[i]));
-  ordered.sort();
-  stats.median = ordered[ordered.count() / 2];
 
   return stats;
 }
@@ -413,22 +406,19 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
   result.sample_count = samples.count();
   result.has_perf = has_perf;
   result.wall_time = compute_stats(
-      samples, [](const bench_sample &s) { return s.wall_nanos; }, allocator);
+      samples, [](const bench_sample &s) { return s.wall_nanos; });
   result.peak_rss = compute_stats(
-      samples, [](const bench_sample &s) { return s.peak_rss_bytes; },
-      allocator);
+      samples, [](const bench_sample &s) { return s.peak_rss_bytes; });
   result.cpu_cycles = compute_stats(
-      samples, [](const bench_sample &s) { return s.cpu_cycles; }, allocator);
+      samples, [](const bench_sample &s) { return s.cpu_cycles; });
   result.instructions = compute_stats(
-      samples, [](const bench_sample &s) { return s.instructions; }, allocator);
+      samples, [](const bench_sample &s) { return s.instructions; });
   result.cache_references = compute_stats(
-      samples, [](const bench_sample &s) { return s.cache_references; },
-      allocator);
+      samples, [](const bench_sample &s) { return s.cache_references; });
   result.cache_misses = compute_stats(
-      samples, [](const bench_sample &s) { return s.cache_misses; }, allocator);
+      samples, [](const bench_sample &s) { return s.cache_misses; });
   result.branch_misses = compute_stats(
-      samples, [](const bench_sample &s) { return s.branch_misses; },
-      allocator);
+      samples, [](const bench_sample &s) { return s.branch_misses; });
 
   return result;
 }
