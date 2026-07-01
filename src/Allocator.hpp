@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "Debug.hpp"
 
 #include <new>
 
@@ -250,6 +251,37 @@ hot inline fn heap_free(opaque *context, opaque *pointer, usize length,
 inline constexpr Allocator::VTable HEAP_VTABLE{heap_alloc, heap_resize,
                                                heap_free};
 
+inline fn fake_alloc(opaque *context, usize length, usize alignment) wontthrow
+    -> opaque *
+{
+  unused(context);
+  unused(length);
+  unused(alignment);
+  ASSERT(false, "a fake_allocator container tried to allocate");
+  return nullptr;
+}
+inline fn fake_resize(opaque *context, opaque *pointer, usize old_length,
+                      usize new_length, usize alignment) wontthrow -> bool
+{
+  unused(context);
+  unused(pointer);
+  unused(old_length);
+  unused(new_length);
+  unused(alignment);
+  return false;
+}
+inline fn fake_free(opaque *context, opaque *pointer, usize length,
+                    usize alignment) wontthrow -> void
+{
+  unused(context);
+  unused(pointer);
+  unused(length);
+  unused(alignment);
+}
+
+inline constexpr Allocator::VTable FAKE_VTABLE{fake_alloc, fake_resize,
+                                               fake_free};
+
 } // namespace allocators
 
 inline fn bump_allocator(BumpArena &arena) wontthrow -> Allocator
@@ -260,6 +292,11 @@ inline fn bump_allocator(BumpArena &arena) wontthrow -> Allocator
 inline fn heap_allocator() wontthrow -> Allocator
 {
   return Allocator{nullptr, &allocators::HEAP_VTABLE};
+}
+
+inline fn fake_allocator() wontthrow -> Allocator
+{
+  return Allocator{nullptr, &allocators::FAKE_VTABLE};
 }
 
 } // namespace shit
