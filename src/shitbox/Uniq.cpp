@@ -24,7 +24,7 @@ namespace shitbox {
 
 static fn count_prefix(u64 run_length, Allocator allocator) throws -> String
 {
-  let const digits = utils::uint_to_text(run_length, allocator);
+  let const digits = String::from(run_length, allocator);
   String prefix{allocator};
   for (usize i = digits.count(); i < 7; i++)
     prefix += ' ';

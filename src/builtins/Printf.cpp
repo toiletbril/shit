@@ -389,7 +389,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      append its decimal text into the spec, and advance the operand cursor. */
   let do_consume_star = [&](String &spec) throws {
     spec.append(
-        utils::int_to_text(parse_printf_integer(do_operand_at(operand_index)),
+        String::from(parse_printf_integer(do_operand_at(operand_index)),
                            cxt.scratch_allocator())
             .view());
     operand_index++;

@@ -272,7 +272,7 @@ fn EvalContext::set_indexed_array(StringView name,
 fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 {
   let single = ArrayList<String>{heap_allocator()};
-  single.push(utils::int_to_text(status, heap_allocator()));
+  single.push(String::from(status, heap_allocator()));
   set_indexed_array("PIPESTATUS", steal(single));
 }
 
@@ -570,15 +570,15 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (name.count() == 1) {
     switch (first_byte) {
-    case '?': return utils::int_to_text(m_last_exit_status);
-    case '$': return utils::int_to_text(os::get_shell_process_id());
+    case '?': return String::from(m_last_exit_status);
+    case '$': return String::from(os::get_shell_process_id());
     case '!':
-      return m_last_background_pid ? utils::int_to_text(*m_last_background_pid)
+      return m_last_background_pid ? String::from(*m_last_background_pid)
                                    : String{heap_allocator()};
     case '-': return option_flags_string();
     case '#':
       return String{heap_allocator(),
-                    utils::uint_to_text(m_positional_params.count())};
+                    String::from(m_positional_params.count())};
     case '0': return String{heap_allocator(), m_shell_name};
     case '_': return String{heap_allocator(), m_last_argument.view()};
 
@@ -658,7 +658,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   /* $LINENO reports the line of the command currently evaluating, a stored
      value above winning so a script that assigns LINENO reads it back. */
   if (first_byte == 'L' && name == "LINENO") {
-    return utils::uint_to_text(line_number_at_location(m_current_location));
+    return String::from(line_number_at_location(m_current_location));
   }
 
   /* The bash dynamic variables are computed on each read in every mood but
@@ -670,10 +670,10 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                    static_cast<unsigned>(os::get_shell_process_id()));
         m_random_seeded = true;
       }
-      return utils::uint_to_text(static_cast<usize>(std::rand() % 32768));
+      return String::from(static_cast<usize>(std::rand() % 32768));
     }
     if (first_byte == 'S' && name == "SECONDS") {
-      return utils::int_to_text(static_cast<i64>(std::time(nullptr)) -
+      return String::from(static_cast<i64>(std::time(nullptr)) -
                                 m_shell_start_time);
     }
     /* SHELLOPTS is the colon list of enabled set -o options, which
@@ -707,7 +707,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return joined;
     }
     if (first_byte == 'E' && name == "EPOCHSECONDS") {
-      return utils::int_to_text(static_cast<i64>(std::time(nullptr)));
+      return String::from(static_cast<i64>(std::time(nullptr)));
     }
     /* The fraction is always six digits so a reader can slice it by a fixed
        width. */
@@ -716,20 +716,20 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       char fraction[8];
       std::snprintf(fraction, sizeof(fraction), "%06llu",
                     static_cast<unsigned long long>(microseconds % 1000000ULL));
-      return utils::int_to_text(static_cast<i64>(microseconds / 1000000ULL)) +
+      return String::from(static_cast<i64>(microseconds / 1000000ULL)) +
              "." + StringView{fraction};
     }
     if (first_byte == 'B' && name == "BASHPID") {
-      return utils::int_to_text(os::get_shell_process_id());
+      return String::from(os::get_shell_process_id());
     }
     if (first_byte == 'P' && name == "PPID") {
-      return utils::int_to_text(os::get_parent_process_id());
+      return String::from(os::get_parent_process_id());
     }
     if (first_byte == 'U' && name == "UID") {
-      return utils::int_to_text(os::get_real_user_id());
+      return String::from(os::get_real_user_id());
     }
     if (first_byte == 'E' && name == "EUID") {
-      return utils::int_to_text(os::get_effective_user_id());
+      return String::from(os::get_effective_user_id());
     }
     if (first_byte == 'H' && name == "HOSTNAME") {
       if (let host = os::get_hostname(); host.has_value()) return steal(*host);
@@ -737,7 +737,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
     /* A monotonic millisecond count, immune to a wall-clock jump. */
     if (first_byte == 'B' && name == "BASH_MONOSECONDS") {
-      return utils::int_to_text(
+      return String::from(
           static_cast<i64>(os::monotonic_nanos() / 1000000ULL));
     }
     if (first_byte == 'B' && name == "BASH_ARGV0") {
@@ -751,7 +751,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
     /* The array form ${GROUPS[@]} is not modelled. */
     if (first_byte == 'G' && name == "GROUPS") {
-      return utils::int_to_text(os::get_real_group_id());
+      return String::from(os::get_real_group_id());
     }
     if (first_byte == 'H' && name == "HOSTTYPE") {
       return os::machine_type();
@@ -765,14 +765,14 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       let const value = static_cast<u32>(os::realtime_microseconds()) ^
                         (static_cast<u32>(std::rand()) << 16) ^
                         static_cast<u32>(std::rand());
-      return utils::int_to_text(static_cast<i64>(value));
+      return String::from(static_cast<i64>(value));
     }
     if (first_byte == 'O' && name == "OSTYPE") {
       return String{heap_allocator(), os::ostype_name()};
     }
     if (first_byte == 'B' && name == "BASH_SUBSHELL") {
       return String{heap_allocator(),
-                    utils::int_to_text(static_cast<i64>(m_subshell_depth))};
+                    String::from(static_cast<i64>(m_subshell_depth))};
     }
     if (first_byte == 'F' && name == "FUNCNAME") {
       if (funcname_frame_count() > 0)
@@ -802,7 +802,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
     if (first_byte == 'B' && name == "BASH_LINENO") {
       if (funcname_frame_count() > 0)
-        return utils::uint_to_text(funcname_line_at(0));
+        return String::from(funcname_line_at(0));
       return shit::None;
     }
 
@@ -1734,29 +1734,29 @@ cold fn EvalContext::make_stats_string() const throws -> String
 
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
   stats_text +=
-      "Commands evaluated: " + utils::uint_to_text(m_commands_evaluated + 1);
+      "Commands evaluated: " + String::from(m_commands_evaluated + 1);
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
-  stats_text += "Expansions: " + utils::uint_to_text(last_expansion_count());
-  stats_text += '\n';
-  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
-  stats_text +=
-      "Nodes evaluated: " + utils::uint_to_text(last_expressions_executed());
+  stats_text += "Expansions: " + String::from(last_expansion_count());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
   stats_text +=
-      "Total expansions: " + utils::uint_to_text(total_expansion_count());
+      "Nodes evaluated: " + String::from(last_expressions_executed());
+  stats_text += '\n';
+  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
+  stats_text +=
+      "Total expansions: " + String::from(total_expansion_count());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
   stats_text += "Total nodes evaluated: " +
-                utils::uint_to_text(total_expressions_executed());
+                String::from(total_expressions_executed());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
-  stats_text += "AST arena bytes: " + utils::uint_to_text(live_ast_arena_bytes);
+  stats_text += "AST arena bytes: " + String::from(live_ast_arena_bytes);
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
   stats_text +=
-      "Peak AST arena bytes: " + utils::uint_to_text(peak_ast_arena_bytes);
+      "Peak AST arena bytes: " + String::from(peak_ast_arena_bytes);
   stats_text += '\n';
 
   stats_text += "]";

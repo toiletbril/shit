@@ -1563,7 +1563,7 @@ fn EvalContext::evaluate_arithmetic_wide(StringView expression,
   if (mood() != mimic_mood::Default) {
     let const wrapped = static_cast<i64>(value);
     out_nonzero = wrapped != 0;
-    return utils::int_to_text(wrapped, heap_allocator());
+    return String::from(wrapped, heap_allocator());
   }
 
   out_nonzero = value != 0;

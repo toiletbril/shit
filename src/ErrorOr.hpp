@@ -12,13 +12,6 @@
 
 namespace shit {
 
-namespace utils {
-/* Declared here rather than included from Utils.hpp, since the include would
-   close a cycle. */
-fn int_to_text(i64 value, Allocator allocator = heap_allocator()) throws
-    -> String;
-} // namespace utils
-
 /* The success payload of a fallible function that returns no value. A caller
    writes ErrorOr<Ok> and returns Success on success. */
 class Ok
@@ -165,6 +158,6 @@ private:
 #define MAKE_ERROR(msg)                                                        \
   ::shit::Error                                                                \
   {                                                                            \
-    ::shit::String{__FILE__ ":"} + ::shit::utils::int_to_text(__LINE__) +      \
+    ::shit::String{__FILE__ ":"} + ::shit::String::from(__LINE__) +            \
         ": " + (msg)                                                           \
   }

@@ -608,7 +608,7 @@ fn fold_constant_arithmetic_in_word(const Word &word,
       if (actx.should_trace_optimizer)
         actx.trace_optimizer_line(String{"folded constant arithmetic: "} +
                                   String{segment.text.view()} + " = " +
-                                  utils::int_to_text(*result));
+                                  String::from(*result));
     }
   }
   return did_fold;
@@ -676,7 +676,7 @@ fn rule_dead_branch_elimination(const Expression *node,
       actx.optimizer_folded_branches++;
       if (actx.should_trace_optimizer)
         actx.trace_optimizer_line(String{"folded if to branch "} +
-                                  utils::int_to_text(static_cast<i64>(i)));
+                                  String::from(static_cast<i64>(i)));
       return true;
     }
   }
@@ -820,7 +820,7 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
   if (actx.should_trace_optimizer)
     actx.trace_optimizer_line(String{"folded c-style for condition: "} +
                               String{trimmed} + " = " +
-                              utils::int_to_text(*value));
+                              String::from(*value));
 
   /* A constant zero condition means the body never runs. The init clause still
      runs once before the condition the way C semantics require, so a non-blank

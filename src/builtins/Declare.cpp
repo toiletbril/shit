@@ -184,7 +184,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           if (e > 0) line += ' ';
           line += '[';
           line +=
-              utils::int_to_text(static_cast<i64>(e), cxt.scratch_allocator());
+              String::from(static_cast<i64>(e), cxt.scratch_allocator());
           line += "]=\"";
           line += quote_for_declare((*elements)[e].view());
           line += '"';

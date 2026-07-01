@@ -149,18 +149,18 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
 
     if (FLAG_JOBS_PIDS.is_enabled()) {
-      out += utils::int_to_text(os::process_id_of(job.pid),
+      out += String::from(os::process_id_of(job.pid),
                                 cxt.scratch_allocator());
       out.push('\n');
       continue;
     }
 
-    out += "[" + utils::int_to_text(job.id, cxt.scratch_allocator()) + "]";
+    out += "[" + String::from(job.id, cxt.scratch_allocator()) + "]";
     out.push(job_marker(jobs, index));
     out += " ";
 
     if (FLAG_JOBS_LONG.is_enabled()) {
-      out += utils::int_to_text(os::process_id_of(job.pid),
+      out += String::from(os::process_id_of(job.pid),
                                 cxt.scratch_allocator());
       out += " ";
     }

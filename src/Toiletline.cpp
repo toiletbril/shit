@@ -579,14 +579,14 @@ static fn format_prompt_duration(u64 nanos) throws -> String
   if (milliseconds < 5) return String{shit::heap_allocator()};
   let out = String{shit::heap_allocator()};
   if (milliseconds < 1000) {
-    out.append(utils::int_to_text(static_cast<i64>(milliseconds)));
+    out.append(String::from(static_cast<i64>(milliseconds)));
     out += "ms";
     return out;
   }
   const u64 tenths = nanos / 100000000ULL;
-  out.append(utils::int_to_text(static_cast<i64>(tenths / 10)));
+  out.append(String::from(static_cast<i64>(tenths / 10)));
   out += '.';
-  out.append(utils::int_to_text(static_cast<i64>(tenths % 10)));
+  out.append(String::from(static_cast<i64>(tenths % 10)));
   out += 's';
   return out;
 }
@@ -711,11 +711,11 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       const bool should_use_color = colors::stdout_wants_color();
       if (should_use_color)
         out += status == 0 ? colors::ansi::GREEN : colors::ansi::RED;
-      out += utils::int_to_text(status);
+      out += String::from(status);
       if (should_use_color) out += colors::ansi::RESET;
     } break;
     case 'j':
-      out += utils::int_to_text(static_cast<i64>(context.jobs().count()));
+      out += String::from(static_cast<i64>(context.jobs().count()));
       break;
     case 'D':
       out += format_prompt_duration(context.last_command_duration_ns());

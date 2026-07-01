@@ -1013,7 +1013,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
           "The recipe for the target '" +
           String{cxt.scratch_allocator(), goal}
           + "' failed with status " +
-          utils::int_to_text(status, cxt.scratch_allocator())
+          String::from(status, cxt.scratch_allocator())
       };
     }
   }

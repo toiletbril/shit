@@ -342,7 +342,7 @@ fn draw_progress(StringView command, u64 percent, Allocator allocator) throws
   line += "\rBenchmarking '";
   line.append(command);
   line += "' ";
-  line += utils::uint_to_text(percent > 100 ? 100 : percent, allocator);
+  line += String::from(percent > 100 ? 100 : percent, allocator);
   line += "%..";
   print_error(line.view());
 }
@@ -481,7 +481,7 @@ fn append_summary(String &out, const command_result &result, bool may_color,
   out += result.label;
   out.append(colored(colors::ansi::RESET, may_color));
   out +=
-      " (" + utils::uint_to_text(result.sample_count, allocator) + " runs)\n";
+      " (" + String::from(result.sample_count, allocator) + " runs)\n";
 
   /* The rows are formatted first so their mean and stddev widths are known
      before any line is rendered, which is what lets the value columns align. */

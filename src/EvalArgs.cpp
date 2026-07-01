@@ -119,7 +119,7 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
                             : 0;
     let elements = ArrayList<String>{alloc};
     for (i64 v = from; increment > 0 ? v <= to : v >= to; v += increment) {
-      String number = utils::int_to_text(v);
+      String number = String::from(v);
       if (pad) {
         const bool negative = !number.is_empty() && number.view()[0] == '-';
         const StringView digits = number.view().substring(negative ? 1 : 0);

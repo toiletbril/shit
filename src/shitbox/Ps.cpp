@@ -39,7 +39,7 @@ static fn owner_name_for_uid(u32 uid, ArrayList<uid_name_cache_entry> &cache,
 
   let const looked_up = os::uid_to_username(uid);
   String name = looked_up.has_value() ? String{allocator, looked_up->view()}
-                                      : utils::uint_to_text(uid, allocator);
+                                      : String::from(uid, allocator);
   cache.push(uid_name_cache_entry{uid, name.clone()});
   return name;
 }
@@ -78,13 +78,13 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
   for (const os::process_entry &process : processes) {
     String owner = owner_name_for_uid(process.owner_id, uid_cache, allocator);
     if (owner.count() > user_width) user_width = owner.count();
-    if (utils::int_to_text(process.pid, allocator).count() > pid_width)
-      pid_width = utils::int_to_text(process.pid, allocator).count();
-    if (utils::uint_to_text(process.virtual_kib, allocator).count() > vsz_width)
-      vsz_width = utils::uint_to_text(process.virtual_kib, allocator).count();
-    if (utils::uint_to_text(process.resident_kib, allocator).count() >
+    if (String::from(process.pid, allocator).count() > pid_width)
+      pid_width = String::from(process.pid, allocator).count();
+    if (String::from(process.virtual_kib, allocator).count() > vsz_width)
+      vsz_width = String::from(process.virtual_kib, allocator).count();
+    if (String::from(process.resident_kib, allocator).count() >
         rss_width)
-      rss_width = utils::uint_to_text(process.resident_kib, allocator).count();
+      rss_width = String::from(process.resident_kib, allocator).count();
     owners.push(steal(owner));
   }
 
@@ -101,15 +101,15 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
     const os::process_entry &process = processes[i];
     append_left(output, owners[i].view(), user_width);
     output += ' ';
-    append_right(output, utils::int_to_text(process.pid, allocator).view(),
+    append_right(output, String::from(process.pid, allocator).view(),
                  pid_width);
     output += ' ';
     append_right(output,
-                 utils::uint_to_text(process.virtual_kib, allocator).view(),
+                 String::from(process.virtual_kib, allocator).view(),
                  vsz_width);
     output += ' ';
     append_right(output,
-                 utils::uint_to_text(process.resident_kib, allocator).view(),
+                 String::from(process.resident_kib, allocator).view(),
                  rss_width);
     output += ' ';
     /* The state is one letter padded to the four-wide STAT field plus a
@@ -179,7 +179,7 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
 
   output += "  PID CMD\n";
   for (const os::process_entry &process : processes) {
-    let const pid = utils::int_to_text(process.pid, cxt.scratch_allocator());
+    let const pid = String::from(process.pid, cxt.scratch_allocator());
     for (usize i = pid.count(); i < 5; i++)
       output += ' ';
     output += pid.view();

@@ -457,15 +457,15 @@ fn analyze_ast(const Expression *root, StringView source,
 
   if (actx.should_trace_optimizer) {
     let summary = String{"summary: "};
-    summary.append(utils::uint_to_text(actx.optimizer_folded_arithmetic));
+    summary.append(String::from(actx.optimizer_folded_arithmetic));
     summary.append(" arithmetic folded, ");
-    summary.append(utils::uint_to_text(actx.optimizer_recorded_constants));
+    summary.append(String::from(actx.optimizer_recorded_constants));
     summary.append(" constants recorded, ");
-    summary.append(utils::uint_to_text(actx.optimizer_folded_branches));
+    summary.append(String::from(actx.optimizer_folded_branches));
     summary.append(" branches folded, ");
-    summary.append(utils::uint_to_text(actx.optimizer_folded_loops));
+    summary.append(String::from(actx.optimizer_folded_loops));
     summary.append(" loops folded, ");
-    summary.append(utils::uint_to_text(actx.optimizer_eliminated_compounds));
+    summary.append(String::from(actx.optimizer_eliminated_compounds));
     summary.append(" compounds eliminated");
     actx.trace_optimizer_line(summary.view());
   }

@@ -26,7 +26,7 @@ namespace shitbox {
    the spacing GNU cat prints. */
 static fn number_prefix(i64 line_number, Allocator allocator) throws -> String
 {
-  let const digits = utils::int_to_text(line_number, allocator);
+  let const digits = String::from(line_number, allocator);
   String prefix{allocator};
   for (usize i = digits.count(); i < 6; i++)
     prefix += ' ';

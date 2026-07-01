@@ -122,9 +122,9 @@ static fn write_frecency_store(const ArrayList<frecency_entry> &entries,
   for (let const &entry : entries) {
     out.append(entry.path.view());
     out += '\t';
-    out.append(utils::int_to_text(entry.rank, allocator));
+    out.append(String::from(entry.rank, allocator));
     out += '\t';
-    out.append(utils::int_to_text(entry.last_access, allocator));
+    out.append(String::from(entry.last_access, allocator));
     out += '\n';
   }
 

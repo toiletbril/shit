@@ -197,8 +197,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       cxt.set_last_background_pid(os::process_id_of(p));
       const i32 id = cxt.register_job(p, command);
       if (cxt.shell_is_interactive())
-        shit::print_error("[" + int_to_text(id) + "] " +
-                          uint_to_text(static_cast<u64>(os::process_id_of(p))) +
+        shit::print_error("[" + String::from(id) + "] " +
+                          String::from(static_cast<u64>(os::process_id_of(p))) +
                           "\n");
       return 0;
     }
@@ -365,8 +365,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       const i32 id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
         shit::print_error(
-            "[" + int_to_text(id) + "] " +
-            uint_to_text(static_cast<u64>(os::process_id_of(last_child))) +
+            "[" + String::from(id) + "] " +
+            String::from(static_cast<u64>(os::process_id_of(last_child))) +
             "\n");
     }
     return ret;
@@ -382,7 +382,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   let pipe_status = ArrayList<String>{heap_allocator()};
   pipe_status.reserve(stage_count);
   for (usize i = 0; i < stage_count; i++)
-    pipe_status.push(int_to_text(stage_status[i], heap_allocator()));
+    pipe_status.push(String::from(stage_status[i], heap_allocator()));
   cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
 
   /* pipefail reports the rightmost stage that failed, or zero when every stage
@@ -472,21 +472,11 @@ static fn not_an_integer_error(StringView text) throws -> Error
   return Error{"'" + text + "' is not a valid integer"};
 }
 
-fn uint_to_text(u64 value, Allocator allocator) throws -> String
-{
-  return String::from(value, allocator);
-}
-
-fn int_to_text(i64 value, Allocator allocator) throws -> String
-{
-  return String::from(value, allocator);
-}
-
 fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
     -> StringView
 {
   /* The digits are written from the least significant end of the buffer, the
-     same scheme uint_to_text uses, then a leading minus is prepended. A u64
+     same scheme String::from uses, then a leading minus is prepended. A u64
      never needs more than twenty digits, so twenty-one bytes hold any i64. */
   ASSERT(buffer_size >= 21, "the buffer must hold a sign and twenty digits");
   const bool is_negative = value < 0;
@@ -1468,7 +1458,7 @@ cold fn print_memory_report() wontthrow -> void
       let code_str = String{heap_allocator()};
       if (code != 0) {
         code_str += " (Code ";
-        code_str += uint_to_text(actual_code);
+        code_str += String::from(actual_code);
         code_str += ')';
       }
       show_message("Goodbye :c" + code_str);

@@ -126,7 +126,7 @@ fn render_limit(const struct rlimit &limit, rlim_t divisor,
 {
   const rlim_t value = FLAG_HARD.is_enabled() ? limit.rlim_max : limit.rlim_cur;
   if (value == RLIM_INFINITY) return String{allocator, "unlimited"};
-  return utils::uint_to_text(value / divisor, allocator);
+  return String::from(value / divisor, allocator);
 }
 
 } // namespace

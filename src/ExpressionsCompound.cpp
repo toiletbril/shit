@@ -486,8 +486,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       cxt.set_last_background_pid(os::process_id_of(last_child));
       const i32 id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
-        shit::print_error("[" + utils::int_to_text(id) + "] " +
-                          utils::uint_to_text(
+        shit::print_error("[" + String::from(id) + "] " +
+                          String::from(
                               static_cast<u64>(os::process_id_of(last_child))) +
                           "\n");
     }
@@ -508,7 +508,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   let pipe_status = ArrayList<String>{heap_allocator()};
   pipe_status.reserve(stage_status.count());
   for (usize i = 0; i < stage_status.count(); i++)
-    pipe_status.push(utils::int_to_text(stage_status[i], heap_allocator()));
+    pipe_status.push(String::from(stage_status[i], heap_allocator()));
   cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
 
   i32 ret = stage_status.is_empty() ? 0 : stage_status.back();
@@ -1074,7 +1074,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (should_reprint_menu) {
       let menu = String{cxt.scratch_allocator()};
       for (usize i = 0; i < values.count(); i++) {
-        menu += utils::int_to_text(static_cast<i64>(i + 1));
+        menu += String::from(static_cast<i64>(i + 1));
         menu += ") ";
         menu.append(values[i].view());
         menu += '\n';

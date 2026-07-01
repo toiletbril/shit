@@ -367,7 +367,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
         inner += ch;
       }
       /* An arithmetic result cannot glob, so the bytes are emitted inactive. */
-      do_emit_run(utils::int_to_text(evaluate_arithmetic(inner)), false);
+      do_emit_run(String::from(evaluate_arithmetic(inner)), false);
       i = j - 1;
     } else if (next == '(') {
       /* Command substitution $(...), scanned to the matching ). A quote run or
@@ -472,7 +472,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     let const name = spec.substring(1);
     if (name == "@" || name == "*")
       return String{scratch_allocator(),
-                    utils::uint_to_text(m_positional_params.count())};
+                    String::from(m_positional_params.count())};
 
     /* ${#a[@]} is the element count, ${#a[i]} the length of one element. */
     if (let const bracket = name.find_character('[');
@@ -487,28 +487,28 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
             bash_dynamic_variables_enabled()) [[unlikely]]
         {
           return String{scratch_allocator(),
-                        utils::uint_to_text(funcname_frame_count())};
+                        String::from(funcname_frame_count())};
         }
         if (is_associative_array(array_name))
           return String{
               heap_allocator(),
-              utils::uint_to_text(associative_keys(array_name).count())};
+              String::from(associative_keys(array_name).count())};
         if (lookup_indexed_array(array_name) != nullptr)
-          return utils::uint_to_text(
+          return String::from(
               collect_array_elements(array_name).count());
         return String{scratch_allocator(),
-                      utils::uint_to_text(
+                      String::from(
                           get_variable_value(array_name).has_value() ? 1 : 0)};
       }
       return String{scratch_allocator(),
-                    utils::uint_to_text(
+                    String::from(
                         apply_array_subscript(array_name, subscript).length())};
     }
 
     let const value = get_variable_value(name);
     if (!value.has_value()) report_unset_reference(name);
     return String{scratch_allocator(),
-                  utils::uint_to_text(
+                  String::from(
                       value.value_or(String{scratch_allocator()}).length())};
   }
 

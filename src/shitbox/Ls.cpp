@@ -72,7 +72,7 @@ static fn cached_owner_name(u32 uid, ArrayList<id_name_entry> &cache,
     if (entry.id == uid) return entry.name.clone();
   let const looked_up = os::uid_to_username(uid);
   String name = looked_up.has_value() ? String{allocator, looked_up->view()}
-                                      : utils::uint_to_text(uid, allocator);
+                                      : String::from(uid, allocator);
   cache.push(id_name_entry{uid, name.clone()});
   return name;
 }
@@ -84,7 +84,7 @@ static fn cached_group_name(u32 gid, ArrayList<id_name_entry> &cache,
     if (entry.id == gid) return entry.name.clone();
   let const looked_up = os::gid_to_groupname(gid);
   String name = looked_up.has_value() ? String{allocator, looked_up->view()}
-                                      : utils::uint_to_text(gid, allocator);
+                                      : String::from(gid, allocator);
   cache.push(id_name_entry{gid, name.clone()});
   return name;
 }
@@ -123,12 +123,12 @@ static fn build_long_entry(const Path &path, StringView name,
   }
 
   entry.mode_string = os::format_mode_string(status.mode);
-  entry.link_count = utils::uint_to_text(status.link_count, allocator);
+  entry.link_count = String::from(status.link_count, allocator);
   entry.owner = cached_owner_name(status.owner_id, uid_cache, allocator);
   entry.group = cached_group_name(status.group_id, gid_cache, allocator);
   entry.size = FLAG_LS_HUMAN.is_enabled()
                    ? format_human_size(status.size)
-                   : utils::uint_to_text(status.size, allocator);
+                   : String::from(status.size, allocator);
   entry.time =
       utils::format_unix_timestamp(status.modification_time, "%b %e %H:%M");
   entry.blocks = status.blocks;
@@ -257,7 +257,7 @@ static fn long_total_blocks(const ArrayList<long_entry> &entries,
   u64 total_512_blocks = 0;
   for (const long_entry &entry : entries)
     total_512_blocks += entry.blocks;
-  return "total " + utils::uint_to_text(total_512_blocks / 2, allocator);
+  return "total " + String::from(total_512_blocks / 2, allocator);
 }
 
 Ls::Ls() = default;

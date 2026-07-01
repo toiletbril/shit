@@ -37,7 +37,7 @@ fn EvalContext::register_stopped_job(os::process pid, StringView command,
 
 fn EvalContext::notify_stopped_job(i32 id, StringView command) throws -> void
 {
-  print_error("[" + utils::int_to_text(id) + "]+ Stopped  " + String{command} +
+  print_error("[" + String::from(id) + "]+ Stopped  " + String{command} +
               "\n");
 }
 
@@ -127,7 +127,7 @@ fn EvalContext::format_done_job_notifications(StringView line_ending) throws
       marker = '-';
     }
 
-    out += "[" + utils::int_to_text(job.id) + "]";
+    out += "[" + String::from(job.id) + "]";
     out.push(marker);
     out += " Done  ";
     out += job.command.c_str();

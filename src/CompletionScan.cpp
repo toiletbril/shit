@@ -698,7 +698,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
   {
     for (let const &background_job : context.jobs()) {
       let job_id = String{"%"};
-      job_id += utils::int_to_text(background_job.id, heap_allocator());
+      job_id += String::from(background_job.id, heap_allocator());
       do_push_matching(job_id.view());
     }
     if (!candidates.is_empty()) return candidates;

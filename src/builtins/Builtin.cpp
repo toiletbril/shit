@@ -63,7 +63,7 @@ static fn print_builtin_columns(ExecContext &ec, Allocator allocator) throws
 
   let out = String{allocator};
   out += "shit has ";
-  out += utils::int_to_text(static_cast<i64>(sorted.count()), allocator);
+  out += String::from(static_cast<i64>(sorted.count()), allocator);
   out += " builtins:\n\n";
   for (usize i = 0; i < sorted.count(); i++) {
     if (i % columns == 0) out += "  ";

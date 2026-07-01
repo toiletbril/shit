@@ -35,7 +35,7 @@ static fn format_counts(u64 lines, u64 words, u64 bytes, bool should_show_lines,
                         StringView name, Allocator allocator) throws -> String
 {
   let const do_field = [allocator](u64 value) throws -> String {
-    let const digits = utils::uint_to_text(value, allocator);
+    let const digits = String::from(value, allocator);
     String padded{allocator};
     for (usize i = digits.count(); i < 8; i++)
       padded += ' ';

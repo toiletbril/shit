@@ -319,7 +319,7 @@ hot fn Parser::parse_command_list(
     throw shit::ErrorWithLocation{
         token->source_location(),
         "Compound command nested deeper than " +
-            utils::int_to_text(static_cast<i64>(MAX_COMMAND_DEPTH))};
+            String::from(static_cast<i64>(MAX_COMMAND_DEPTH))};
   }
 
   Command *lhs = nullptr;
@@ -2244,7 +2244,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     throw ErrorWithLocation{
         t->source_location(),
         "Expression nesting level exceeded maximum of " +
-            utils::int_to_text(static_cast<i64>(MAX_RECURSION_DEPTH))};
+            String::from(static_cast<i64>(MAX_RECURSION_DEPTH))};
   }
 
   Expression *lhs = nullptr;
@@ -2307,7 +2307,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
       throw ErrorWithLocation{
           t->source_location(),
           "Bracket nesting level exceeded maximum of " +
-              utils::int_to_text(static_cast<i64>(MAX_RECURSION_DEPTH))};
+              String::from(static_cast<i64>(MAX_RECURSION_DEPTH))};
     }
 
     m_parentheses_depth++;

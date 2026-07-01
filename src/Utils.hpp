@@ -73,11 +73,6 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 
 fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>;
 
-/* The unsigned form is for ids and sizes that exceed the i64 range. */
-fn int_to_text(i64 value, Allocator allocator) throws -> String;
-fn uint_to_text(u64 value, Allocator allocator = heap_allocator()) throws
-    -> String;
-
 /* Write the decimal text of value into the caller's buffer, which must hold at
    least twenty-one bytes, and return a view of the written span. No allocation
    happens, so a hot conversion never touches the heap. */

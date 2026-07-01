@@ -70,13 +70,13 @@ fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
      than wrapping or tripping the sanitizer. */
   if (increment > 0)
     for (i64 value = first; value <= last; value += increment) {
-      output += utils::int_to_text(value, cxt.scratch_allocator()).view();
+      output += String::from(value, cxt.scratch_allocator()).view();
       output += '\n';
       if (value > INT64_MAX - increment) break;
     }
   else
     for (i64 value = first; value >= last; value += increment) {
-      output += utils::int_to_text(value, cxt.scratch_allocator()).view();
+      output += String::from(value, cxt.scratch_allocator()).view();
       output += '\n';
       if (value < INT64_MIN - increment) break;
     }

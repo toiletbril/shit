@@ -54,7 +54,7 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   job->state = job::State::Running;
 
   ec.print_to_stdout("[" +
-                     utils::int_to_text(job->id, cxt.scratch_allocator()) +
+                     String::from(job->id, cxt.scratch_allocator()) +
                      "] " + job->command + " &\n");
 
   return 0;
