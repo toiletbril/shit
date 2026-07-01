@@ -156,7 +156,15 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
     StringView value;
     let index = running_index;
     if (parse_explicit_array_index(element.view(), subscript, value)) {
-      index = static_cast<usize>(evaluate_arithmetic(subscript));
+      i64 raw_index = evaluate_arithmetic(subscript);
+      if (raw_index < 0) {
+        if (let const *array = lookup_indexed_array(name))
+          raw_index += static_cast<i64>(array->count());
+      }
+      if (raw_index < 0)
+        throw Error{"Unable to index '" + name +
+                    "' because the array subscript is invalid"};
+      index = static_cast<usize>(raw_index);
       set_array_element(name, index, value);
     } else {
       set_array_element(name, index, element.view());

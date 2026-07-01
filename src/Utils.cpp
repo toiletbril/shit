@@ -707,12 +707,17 @@ fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>
   usize offset = 0;
   skip_ascii_whitespace(text, offset);
 
-  i64 whole_seconds = 0;
+  u64 whole_seconds = 0;
+  bool has_overflowed = false;
   bool has_digits = false;
   while (offset < text.length && text.data[offset] >= '0' &&
          text.data[offset] <= '9')
   {
-    whole_seconds = whole_seconds * 10 + (text.data[offset] - '0');
+    let const digit = static_cast<u64>(text.data[offset] - '0');
+    if (whole_seconds > (UINT64_MAX - digit) / 10)
+      has_overflowed = true;
+    else
+      whole_seconds = whole_seconds * 10 + digit;
     has_digits = true;
     offset++;
   }
@@ -735,7 +740,13 @@ fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>
   if (!has_digits || offset != text.length)
     return Error{"'" + text + "' is not a valid timeout"};
 
-  return whole_seconds * 1'000'000'000 + fractional_nanos;
+  /* A whole-seconds part too large for the signed nanosecond result saturates
+     to the maximum rather than overflowing. */
+  constexpr u64 max_whole_seconds = INT64_MAX / 1'000'000'000;
+  if (has_overflowed || whole_seconds >= max_whole_seconds)
+    return static_cast<i64>(INT64_MAX);
+
+  return static_cast<i64>(whole_seconds) * 1'000'000'000 + fractional_nanos;
 }
 
 static pure fn digit_value_in_base(char c, u32 radix) wontthrow -> i32

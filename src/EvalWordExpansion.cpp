@@ -293,11 +293,12 @@ hot fn EvalContext::expand_word(const Word &word) throws
         i64 end = total;
         if (sep < slice.length) {
           const StringView length_text = slice.substring(sep + 1);
-          const i64 length =
+          i64 length =
               length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
           if (length < 0)
             throw Error{"Unable to take the substring because the length names "
                         "a point before the offset"};
+          if (length > total) length = total;
           end = start + length;
         }
         if (end > total) end = total;
@@ -400,12 +401,13 @@ hot fn EvalContext::expand_word(const Word &word) throws
           i64 end = total;
           if (sep < slice.length) {
             const StringView length_text = slice.substring(sep + 1);
-            const i64 length =
+            i64 length =
                 length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
             if (length < 0)
               throw Error{
                   "Unable to take the substring because the length names "
                   "a point before the offset"};
+            if (length > total) length = total;
             end = start + length;
           }
           if (end > total) end = total;

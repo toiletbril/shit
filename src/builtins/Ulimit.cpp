@@ -170,8 +170,16 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &requested = args[1];
   rlim_t value = RLIM_INFINITY;
   if (requested != "unlimited") {
-    value = static_cast<rlim_t>(std::strtoull(requested.c_str(), nullptr, 10)) *
-            resource.units_per_value;
+    let const parsed =
+        static_cast<rlim_t>(std::strtoull(requested.c_str(), nullptr, 10));
+    /* A scaled resource multiplies the operand by its unit, so an operand that
+       would overflow the multiply saturates to unlimited the way bash reports
+       it. */
+    if (resource.units_per_value != 0 &&
+        parsed > RLIM_INFINITY / resource.units_per_value)
+      value = RLIM_INFINITY;
+    else
+      value = parsed * resource.units_per_value;
   }
 
   /* Naming neither -H nor -S, or both together, sets both, the way dash does.

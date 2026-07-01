@@ -243,26 +243,29 @@ fn append_conversion(String &out, const String &spec, char conv,
 {
   char buffer[256];
 
-  switch (conv) {
-  case 'q': append_q_argument(out, arg); break;
-  case 's': {
-    String with_s = spec.clone();
-    with_s.push('s');
-    /* A string too long for the stack buffer is rewritten into a heap buffer
-       sized from the length snprintf reports. */
-    const int needed =
-        std::snprintf(buffer, sizeof(buffer), with_s.c_str(), arg.c_str());
+  /* A conversion whose result is wider than the stack buffer is rewritten into
+     a heap buffer sized from the length snprintf reports. */
+  let append_formatted = [&](const char *format, auto value) throws {
+    const int needed = std::snprintf(buffer, sizeof(buffer), format, value);
     if (needed >= 0 && static_cast<usize>(needed) < sizeof(buffer)) {
       out += buffer;
     } else if (needed > 0) {
       const usize size = static_cast<usize>(needed) + 1;
       char *const big = static_cast<char *>(std::malloc(size));
       if (big != nullptr) {
-        std::snprintf(big, size, with_s.c_str(), arg.c_str());
+        std::snprintf(big, size, format, value);
         out += StringView{big, static_cast<usize>(needed)};
         std::free(big);
       }
     }
+  };
+
+  switch (conv) {
+  case 'q': append_q_argument(out, arg); break;
+  case 's': {
+    String with_s = spec.clone();
+    with_s.push('s');
+    append_formatted(with_s.c_str(), arg.c_str());
   } break;
   case 'c': out += arg.is_empty() ? '\0' : arg[0]; break;
   case 'd':
@@ -271,9 +274,7 @@ fn append_conversion(String &out, const String &spec, char conv,
     if (!number.is_valid)
       report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
     let const with_ll = spec + "lld";
-    std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
-                  static_cast<long long>(number.value));
-    out += buffer;
+    append_formatted(with_ll.c_str(), static_cast<long long>(number.value));
   } break;
   case 'x':
   case 'X':
@@ -284,9 +285,8 @@ fn append_conversion(String &out, const String &spec, char conv,
       report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
     String with_ll = spec + "ll";
     with_ll.push(conv);
-    std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
-                  static_cast<unsigned long long>(number.value));
-    out += buffer;
+    append_formatted(with_ll.c_str(),
+                     static_cast<unsigned long long>(number.value));
   } break;
   case 'f':
   case 'e':
@@ -296,8 +296,7 @@ fn append_conversion(String &out, const String &spec, char conv,
     String with_conv = spec.clone();
     with_conv.push(conv);
     const double value = std::strtod(arg.c_str(), nullptr);
-    std::snprintf(buffer, sizeof(buffer), with_conv.c_str(), value);
-    out += buffer;
+    append_formatted(with_conv.c_str(), value);
   } break;
   default:
     out += spec;

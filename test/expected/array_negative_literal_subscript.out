@@ -1,0 +1,73 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-p" "a"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-p" "b"]
+[Word
+  Unquoted "a="
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "a+="
+]
+[Word
+  Unquoted "[-1]=9"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b="
+]
+[Word
+  Unquoted "10"
+]
+[Word
+  Unquoted "20"
+]
+[Word
+  Unquoted "30"
+]
+[Word
+  Unquoted "40"
+]
+[Word
+  Unquoted "b+="
+]
+[Word
+  Unquoted "[-2]=99"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "b"
+]
+declare -a a=([0]="1" [1]="2" [2]="9")
+declare -a b=([0]="10" [1]="20" [2]="99" [3]="40")
+[Code 0]

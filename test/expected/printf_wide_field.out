@@ -1,0 +1,26 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%300d\n" "5"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%.290f\n" "1"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%300d\n"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%.290f\n"
+]
+[Word
+  Unquoted "1"
+]
+                                                                                                                                                                                                                                                                                                           5
+1.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+[Code 0]
