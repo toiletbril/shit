@@ -280,7 +280,7 @@ struct conditional_evaluator
        checked, not only the standard three, since a config such as ble.sh dups
        the controlling terminal onto a higher descriptor and tests that. */
     if (op == "-t") {
-      if (ErrorOr<i64> descriptor = utils::parse_decimal_integer(operand);
+      if (ErrorOr<i64> descriptor = operand.to<i64>();
           !descriptor.is_error())
 #if SHIT_PLATFORM_IS WIN32
         /* A Windows descriptor is a HANDLE, so the shell fd number is mapped to

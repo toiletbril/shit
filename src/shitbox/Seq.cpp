@@ -22,7 +22,7 @@ namespace shitbox {
 
 static fn parse_integer(StringView text, Allocator allocator) throws -> i64
 {
-  let const parsed = utils::parse_decimal_integer(text);
+  let const parsed = text.to<i64>();
   if (parsed.is_error())
     throw Error{
         "seq: invalid integer argument '" + String{allocator, text}

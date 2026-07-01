@@ -1274,7 +1274,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       let const view = literal.view();
       let is_in_range = view_is_integer_literal(view) && view[0] != '-';
       if (is_in_range) {
-        let const parsed_code = utils::parse_decimal_integer(view);
+        let const parsed_code = view.to<i64>();
         is_in_range = !parsed_code.is_error() && parsed_code.value() <= 255;
       }
       if (!is_in_range)

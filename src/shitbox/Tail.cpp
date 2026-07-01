@@ -40,7 +40,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   let const is_byte_mode = FLAG_TAIL_BYTES.is_set();
   i64 count = 10;
   if (is_byte_mode) {
-    let const parsed = utils::parse_decimal_integer(FLAG_TAIL_BYTES.value());
+    let const parsed = FLAG_TAIL_BYTES.value().to<i64>();
     if (parsed.is_error() || parsed.value() < 0)
       throw Error{
           "tail: invalid byte count '" +
@@ -50,7 +50,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
 
     count = parsed.value();
   } else if (FLAG_TAIL_LINES.is_set()) {
-    let const parsed = utils::parse_decimal_integer(FLAG_TAIL_LINES.value());
+    let const parsed = FLAG_TAIL_LINES.value().to<i64>();
     if (parsed.is_error() || parsed.value() < 0)
       throw Error{
           "tail: invalid line count '" +

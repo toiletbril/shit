@@ -1251,7 +1251,7 @@ fn main(int argc, char **argv) -> int
       inherited.has_value())
   {
     if (shit::ErrorOr<i64> parsed_level =
-            shit::utils::parse_decimal_integer(inherited->view());
+            inherited->view().to<i64>();
         !parsed_level.is_error() && parsed_level.value() > 0)
       shell_level = parsed_level.value();
   }

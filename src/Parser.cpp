@@ -587,7 +587,7 @@ fn Parser::build_file_or_dup_redirection(
          Anything else, such as $4 or ${fd}, is a dynamic descriptor resolved
          when the redirection runs. */
       if (literal.view().is_all_decimal_digits()) {
-        const let parsed_descriptor = utils::parse_decimal_integer(literal);
+        const let parsed_descriptor = literal.to<i64>();
         if (parsed_descriptor.is_error()) {
           throw ErrorWithLocation{from->source_location(),
                                   parsed_descriptor.error().message()};
@@ -812,7 +812,7 @@ mustuse fn Parser::try_parse_descriptor_prefixed_redirection(
     }
 
     const let literal = word_token->word().to_literal_string();
-    const let parsed_descriptor = utils::parse_decimal_integer(literal);
+    const let parsed_descriptor = literal.to<i64>();
     if (parsed_descriptor.is_error()) {
       throw ErrorWithLocation{word_location,
                               parsed_descriptor.error().message()};
@@ -2251,7 +2251,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
 
   switch (t->kind()) {
   case Token::Kind::Number: {
-    const let parsed_number = utils::parse_decimal_integer(t->raw_string());
+    const let parsed_number = t->raw_string().to<i64>();
     if (parsed_number.is_error())
       throw ErrorWithLocation{t->source_location(),
                               parsed_number.error().message()};

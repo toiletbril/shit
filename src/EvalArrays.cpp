@@ -44,7 +44,7 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
       return;
     }
     let const index_text = key.substring(name_prefix.length);
-    if (let const parsed = utils::parse_decimal_integer(index_text);
+    if (let const parsed = index_text.to<i64>();
         !parsed.is_error() && parsed.value() >= 0)
     {
       out.push(sparse_array_entry{
@@ -79,8 +79,7 @@ fn EvalContext::clear_sparse_array(StringView name) throws -> void
         {
           return;
         }
-        if (let const parsed =
-                utils::parse_decimal_integer(key.substring(name_prefix.length));
+        if (let const parsed = key.substring(name_prefix.length).to<i64>();
             !parsed.is_error() && parsed.value() >= 0)
         {
           indices.push(static_cast<usize>(parsed.value()));
@@ -535,8 +534,7 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
         {
           return;
         }
-        if (let const parsed =
-                utils::parse_decimal_integer(key.substring(name_prefix.length));
+        if (let const parsed = key.substring(name_prefix.length).to<i64>();
             !parsed.is_error() && parsed.value() >= 0)
         {
           let const past_index = static_cast<i64>(parsed.value()) + 1;

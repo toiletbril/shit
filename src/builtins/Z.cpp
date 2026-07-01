@@ -101,8 +101,8 @@ static fn read_frecency_store(Allocator allocator) throws
     let const path_field = line.substring_of_length(0, *first_tab);
     let const rank_field = after_path.substring_of_length(0, *second_tab);
     let const time_field = after_path.substring(*second_tab + 1);
-    let const rank = utils::parse_decimal_integer(rank_field);
-    let const last = utils::parse_decimal_integer(time_field);
+    let const rank = rank_field.to<i64>();
+    let const last = time_field.to<i64>();
     if (rank.is_error() || last.is_error()) continue;
     entries.push(frecency_entry{
         String{allocator, path_field},

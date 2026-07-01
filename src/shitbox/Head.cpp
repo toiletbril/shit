@@ -85,8 +85,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
   let const is_byte_mode = FLAG_HEAD_BYTES.is_set();
   i64 count = 10;
   if (is_byte_mode) {
-    let const parsed_value =
-        utils::parse_decimal_integer(FLAG_HEAD_BYTES.value());
+    let const parsed_value = FLAG_HEAD_BYTES.value().to<i64>();
     if (parsed_value.is_error() || parsed_value.value() < 0) {
       throw Error{
           "head: invalid byte count '" +
@@ -96,8 +95,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     }
     count = parsed_value.value();
   } else if (FLAG_HEAD_LINES.is_set()) {
-    let const parsed_value =
-        utils::parse_decimal_integer(FLAG_HEAD_LINES.value());
+    let const parsed_value = FLAG_HEAD_LINES.value().to<i64>();
     if (parsed_value.is_error() || parsed_value.value() < 0) {
       throw Error{
           "head: invalid line count '" +

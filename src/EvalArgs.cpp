@@ -701,7 +701,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
     if (Maybe<String> xtrace_fd_value = get_variable_value("BASH_XTRACEFD");
         xtrace_fd_value.has_value())
     {
-      let const parsed = utils::parse_decimal_integer(xtrace_fd_value->view());
+      let const parsed = xtrace_fd_value->view().to<i64>();
       if (!parsed.is_error() && parsed.value() >= 0) xtrace_fd = parsed.value();
     }
 

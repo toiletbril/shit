@@ -64,15 +64,14 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(Debug, "wait blocking on target '%s'", target.c_str());
 
     if (!target.is_empty() && target[0] == '%') {
-      let const parsed =
-          utils::parse_decimal_integer(StringView{target}.substring(1));
+      let const parsed = StringView{target}.substring(1).to<i64>();
       if (!parsed.is_error()) {
         if (job *const job = cxt.find_job(static_cast<int>(parsed.value()));
             job != nullptr)
           status = wait_for_job(*job);
       }
     } else {
-      let const parsed = utils::parse_decimal_integer(target);
+      let const parsed = target.to<i64>();
       if (!parsed.is_error()) {
         /* wait only waits for this shell's own children. A pid that names no
            tracked job is not a child, so the status is 127 and waitpid is never

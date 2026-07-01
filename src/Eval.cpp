@@ -616,7 +616,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       /* A positional beyond the count is unset rather than empty, so the strict
          unset report fires and ${1-default} takes its default. */
       if (name.count() > 9) return None;
-      let const parsed_index = utils::parse_decimal_integer(name);
+      let const parsed_index = name.to<i64>();
       if (parsed_index.is_error()) return None;
       let const index = static_cast<usize>(parsed_index.value());
       if (index >= 1 && index <= m_positional_params.count()) {

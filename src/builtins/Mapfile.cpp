@@ -93,12 +93,12 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!has_value) continue;
 
     if (letter == 'u') {
-      if (let const fd = utils::parse_decimal_integer(value); !fd.is_error())
+      if (let const fd = value.to<i64>(); !fd.is_error())
         read_fd = os::descriptor_from_fd_number(fd.value());
       continue;
     }
 
-    let const number = utils::parse_decimal_integer(value);
+    let const number = value.to<i64>();
     if (number.is_error() || number.value() < 0) continue;
     if (letter == 'n') {
       max_lines = number.value();

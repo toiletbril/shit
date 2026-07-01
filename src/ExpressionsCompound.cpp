@@ -1107,7 +1107,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* A line that is a valid menu number binds the name to that word, any other
        input binds the name to the empty string, the way bash reports a bad
        choice. */
-    let const choice = utils::parse_decimal_integer(reply.view());
+    let const choice = reply.view().to<i64>();
     if (!choice.is_error() && choice.value() >= 1 &&
         static_cast<usize>(choice.value()) <= values.count())
     {

@@ -89,7 +89,7 @@ fn resolve_jobspec(const ArrayList<job> &jobs, StringView spec) throws
   if (body == "-")
     return jobs.count() >= 2 ? jobs.count() - 2 : jobs.count() - 1;
 
-  if (let const parsed_value = utils::parse_decimal_integer(body);
+  if (let const parsed_value = body.to<i64>();
       !parsed_value.is_error())
   {
     for (usize i = 0; i < jobs.count(); i++)

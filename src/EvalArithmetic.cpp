@@ -63,8 +63,8 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
       return utils::parse_octal_integer(
           body.substring_of_length(0, count_leading_digits(body, 8)));
     }
-    return utils::parse_decimal_integer(
-        body.substring_of_length(0, count_leading_digits(body, 10)));
+    return body.substring_of_length(0, count_leading_digits(body, 10))
+        .to<i64>();
   }();
 
   if (parsed_value.is_error()) return 0;

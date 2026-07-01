@@ -72,7 +72,7 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     StringView spec = StringView{names[i]};
     if (!spec.is_empty() && spec[0] == '%') spec = spec.substring(1);
 
-    let const parsed = utils::parse_decimal_integer(spec);
+    let const parsed = spec.to<i64>();
     if (parsed.is_error() || !cxt.remove_job(static_cast<i32>(parsed.value())))
       throw Error{"'" + names[i] + "' is not a valid job"};
   }

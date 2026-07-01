@@ -47,7 +47,7 @@ String normalize_condition(StringView raw, Allocator allocator) throws
   /* A condition written as a bare number names a signal, so it folds to the
      same name the name form yields. The number 0 already became EXIT above. */
   if (name.view().is_all_decimal_digits()) {
-    let const parsed = utils::parse_decimal_integer(name.view());
+    let const parsed = name.view().to<i64>();
     if (!parsed.is_error()) {
       if (let const signal_name =
               os::signal_name_from_number(static_cast<i32>(parsed.value())))

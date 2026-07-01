@@ -237,7 +237,7 @@ fn parse_optional_integer_arg(const ExecContext &ec, i64 default_value) throws
     -> i64
 {
   if (ec.args().count() <= 1) return default_value;
-  let const parsed_value = utils::parse_decimal_integer(ec.args()[1]);
+  let const parsed_value = ec.args()[1].to<i64>();
   if (parsed_value.is_error()) throw parsed_value.error();
   return parsed_value.value();
 }

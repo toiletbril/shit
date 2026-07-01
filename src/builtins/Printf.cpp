@@ -75,7 +75,7 @@ fn parse_printf_number(const String &arg) throws -> printf_number
   let const parsed = is_hexadecimal
                          ? utils::parse_hexadecimal_integer(number_text)
                      : is_octal ? utils::parse_octal_integer(number_text)
-                                : utils::parse_decimal_integer(number_text);
+                                : number_text.to<i64>();
   let const has_digits = number_end > digit_start;
   return {parsed.is_error() ? 0 : parsed.value(),
           has_digits && number_end == arg.count(), is_hexadecimal};

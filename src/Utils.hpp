@@ -199,4 +199,9 @@ template <class T> fn StringView::to() const throws -> ErrorOr<T>
   }
 }
 
+template <class T> fn String::to() const throws -> ErrorOr<T>
+{
+  return view().to<T>();
+}
+
 } // namespace shit

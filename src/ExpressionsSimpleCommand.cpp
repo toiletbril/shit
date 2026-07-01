@@ -335,7 +335,7 @@ fn resolve_duplication(const Redirection &redir, EvalContext &cxt) throws
   if (field == "-")
     return resolved_duplication{Redirection::DUP_FD_CLOSE, shit::None};
 
-  let const parsed_descriptor = utils::parse_decimal_integer(field.view());
+  let const parsed_descriptor = field.view().to<i64>();
   if (parsed_descriptor.is_error() || parsed_descriptor.value() < 0) {
     if (redir.can_dup_be_filename)
       return resolved_duplication{-1, steal(field)};
@@ -499,7 +499,7 @@ fn allocate_redirection_descriptor(const Redirection &redir,
   {
     let const current_value = cxt.get_variable_value(*allocation_name);
     if (current_value.has_value()) {
-      let const parsed = utils::parse_decimal_integer(current_value->view());
+      let const parsed = current_value->view().to<i64>();
       if (!parsed.is_error() && parsed.value() >= 0)
         return static_cast<i32>(parsed.value());
     }

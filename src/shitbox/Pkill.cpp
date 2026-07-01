@@ -30,7 +30,7 @@ namespace shitbox {
 fn resolve_shitbox_signal(StringView spelled, Allocator allocator) throws -> i32
 {
   if (spelled.is_empty()) return SIGTERM;
-  let const parsed = utils::parse_decimal_integer(spelled);
+  let const parsed = spelled.to<i64>();
   if (!parsed.is_error()) return static_cast<i32>(parsed.value());
   let const named = os::signal_number_from_name(spelled);
   if (!named.has_value())

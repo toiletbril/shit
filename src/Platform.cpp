@@ -1211,7 +1211,7 @@ fn process_from_pid(i64 pid) wontthrow -> process
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 {
   if (name.is_all_decimal_digits()) {
-    const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(name);
+    const ErrorOr<i64> parsed_value = name.to<i64>();
     if (parsed_value.is_error()) return shit::None;
     return static_cast<i32>(parsed_value.value());
   }
@@ -2091,7 +2091,7 @@ fn enumerate_processes(bool include_resource_stats) throws
       }
     if (!is_all_digits) continue;
 
-    let const parsed = utils::parse_decimal_integer(name);
+    let const parsed = name.to<i64>();
     if (parsed.is_error()) continue;
 
     /* The three /proc files share the same per-pid prefix, built once here
@@ -2137,7 +2137,7 @@ fn enumerate_processes(bool include_resource_stats) throws
           digit_end++;
         let const uid_text =
             line.substring_of_length(cursor, digit_end - cursor);
-        if (let const uid = utils::parse_decimal_integer(uid_text);
+        if (let const uid = uid_text.to<i64>();
             !uid.is_error())
           process.owner_id = static_cast<u32>(uid.value());
         break;
@@ -2186,12 +2186,10 @@ fn enumerate_processes(bool include_resource_stats) throws
           let const fields = text.substring(after_comm);
           let const state = nth_space_field(fields, 0);
           if (!state.is_empty()) process.state = state[0];
-          if (let const utime =
-                  utils::parse_decimal_integer(nth_space_field(fields, 11));
+          if (let const utime = nth_space_field(fields, 11).to<i64>();
               !utime.is_error())
             process.cpu_ticks += static_cast<u64>(utime.value());
-          if (let const stime =
-                  utils::parse_decimal_integer(nth_space_field(fields, 12));
+          if (let const stime = nth_space_field(fields, 12).to<i64>();
               !stime.is_error())
             process.cpu_ticks += static_cast<u64>(stime.value());
         }
@@ -2203,12 +2201,10 @@ fn enumerate_processes(bool include_resource_stats) throws
           statm.has_value())
       {
         let const page_kib = static_cast<u64>(sysconf(_SC_PAGESIZE)) / 1024;
-        if (let const size =
-                utils::parse_decimal_integer(nth_space_field(statm->view(), 0));
+        if (let const size = nth_space_field(statm->view(), 0).to<i64>();
             !size.is_error())
           process.virtual_kib = static_cast<u64>(size.value()) * page_kib;
-        if (let const resident =
-                utils::parse_decimal_integer(nth_space_field(statm->view(), 1));
+        if (let const resident = nth_space_field(statm->view(), 1).to<i64>();
             !resident.is_error())
           process.resident_kib = static_cast<u64>(resident.value()) * page_kib;
       }
@@ -3064,7 +3060,7 @@ fn process_from_pid(i64 pid) wontthrow -> process
 fn signal_number_from_name(StringView name) -> Maybe<i32>
 {
   if (name.is_all_decimal_digits()) {
-    const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(name);
+    const ErrorOr<i64> parsed_value = name.to<i64>();
     if (parsed_value.is_error()) return shit::None;
     return static_cast<i32>(parsed_value.value());
   }

@@ -35,7 +35,7 @@ namespace {
 
 bool parse_integer(StringView text, i64 &out) throws
 {
-  let const parsed = utils::parse_decimal_integer(text);
+  let const parsed = text.to<i64>();
   if (parsed.is_error()) return false;
   out = parsed.value();
   return true;

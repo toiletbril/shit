@@ -66,6 +66,8 @@ public:
                   StringView{buffer + position, sizeof(buffer) - position}};
   }
 
+  template <class T> mustuse fn to() const throws -> ErrorOr<T>;
+
   /* An inline string owns no external buffer, so the common destruction skips
      the cold free path with one pointer compare and never leaves this header.
    */

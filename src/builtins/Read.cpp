@@ -66,7 +66,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      is the command's redirected descriptor or the shell's standard input. */
   let read_fd = ec.in_fd.value_or(SHIT_STDIN);
   if (FLAG_READ_FD.is_set()) {
-    if (let const parsed = utils::parse_decimal_integer(FLAG_READ_FD.value());
+    if (let const parsed = FLAG_READ_FD.value().to<i64>();
         !parsed.is_error())
       read_fd = os::descriptor_from_fd_number(parsed.value());
   }
@@ -127,8 +127,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
    */
   i64 max_bytes = 0;
   if (FLAG_READ_NCHARS.is_set()) {
-    if (let const parsed =
-            utils::parse_decimal_integer(FLAG_READ_NCHARS.value());
+    if (let const parsed = FLAG_READ_NCHARS.value().to<i64>();
         !parsed.is_error())
       max_bytes = parsed.value();
   }

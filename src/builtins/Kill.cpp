@@ -51,7 +51,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
 
     let const spec = String{cxt.scratch_allocator(), args[2]};
-    if (let const parsed = utils::parse_decimal_integer(spec.view());
+    if (let const parsed = spec.view().to<i64>();
         !parsed.is_error() && !spec.is_empty() && spec[0] >= '0' &&
         spec[0] <= '9')
     {
@@ -70,7 +70,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        as -9 names the number directly, while a name such as -KILL or -SIGTERM
        resolves through the platform table. */
     let const name = String{cxt.scratch_allocator(), args[1].substring(1)};
-    if (let const parsed_signal = utils::parse_decimal_integer(name.view());
+    if (let const parsed_signal = name.view().to<i64>();
         !parsed_signal.is_error() && !name.is_empty() && name[0] >= '0' &&
         name[0] <= '9')
     {
@@ -101,7 +101,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let pid = os::process{};
     if (!target.is_empty() && target[0] == '%') {
       const ErrorOr<i64> parsed_value =
-          utils::parse_decimal_integer(StringView{target}.substring(1));
+          StringView{target}.substring(1).to<i64>();
       if (parsed_value.is_error()) {
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + target_text +
@@ -119,7 +119,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       ASSERT(job != nullptr);
       pid = job->pid;
     } else {
-      const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(target);
+      const ErrorOr<i64> parsed_value = target.to<i64>();
       if (parsed_value.is_error()) {
         /* A non-numeric target must not fall through to kill(0), which would
            signal the whole process group including this shell. */

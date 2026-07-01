@@ -52,7 +52,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i64 optind = 1;
   if (Maybe<String> value = cxt.get_variable_value("OPTIND"); value.has_value())
   {
-    let const parsed_value = utils::parse_decimal_integer(*value);
+    let const parsed_value = (*value).to<i64>();
     optind = parsed_value.is_error() ? 1 : parsed_value.value();
   }
 
