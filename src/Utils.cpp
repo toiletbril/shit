@@ -929,7 +929,7 @@ fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool
 
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
-static pure fn is_glob_char_active(const ArrayList<bool> &glob_active,
+static pure fn is_glob_char_active(const Bitset &glob_active,
                                    usize index) wontthrow -> bool
 {
   return index < glob_active.count() && glob_active[index];
@@ -945,7 +945,7 @@ struct extglob_alternative
   usize mask_offset;
 };
 
-hot fn extglob_active(const ArrayList<bool> &mask, usize index) wontthrow
+hot fn extglob_active(const Bitset &mask, usize index) wontthrow
     -> bool
 {
   return index < mask.count() ? mask[index] : true;
@@ -981,7 +981,7 @@ fn extglob_group_close(StringView glob) wontthrow -> usize
 }
 
 fn extglob_full_match(StringView glob, StringView str,
-                      const ArrayList<bool> &mask, usize mask_offset) throws
+                      const Bitset &mask, usize mask_offset) throws
     -> bool;
 
 /* Match min_reps or more repetitions of one of the alternatives against the
@@ -989,7 +989,7 @@ fn extglob_full_match(StringView glob, StringView str,
    the first repetition, so a + needs one and a * needs none. */
 fn extglob_match_repetition(const ArrayList<extglob_alternative> &alternatives,
                             StringView suffix, usize suffix_offset,
-                            StringView str, const ArrayList<bool> &mask,
+                            StringView str, const Bitset &mask,
                             usize min_reps) throws -> bool
 {
   if (min_reps == 0 && extglob_full_match(suffix, str, mask, suffix_offset))
@@ -1010,7 +1010,7 @@ fn extglob_match_repetition(const ArrayList<extglob_alternative> &alternatives,
 }
 
 fn extglob_full_match(StringView glob, StringView str,
-                      const ArrayList<bool> &mask, usize mask_offset) throws
+                      const Bitset &mask, usize mask_offset) throws
     -> bool
 {
   if (glob.is_empty()) return str.is_empty();
@@ -1172,7 +1172,7 @@ fn byte_is_in_posix_class(StringView class_name, u8 byte) throws -> bool
 } // namespace
 
 fn glob_matches(StringView glob, StringView str,
-                const ArrayList<bool> &glob_active, usize mask_offset,
+                const Bitset &glob_active, usize mask_offset,
                 bool extglob) throws -> bool
 {
   /* The extended-glob grammar needs backtracking over alternatives and

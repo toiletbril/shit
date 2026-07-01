@@ -99,7 +99,7 @@ struct conditional_evaluator
      marking which *, ?, and [ stay active. A quoted or escaped metacharacter is
      masked off and matches literally. */
   fn operand_pattern_masked(const conditional_element &e,
-                            ArrayList<bool> &active) throws -> String
+                            Bitset &active) throws -> String
   {
     if (e.word != nullptr && e.word->kind() == Token::Kind::Word) {
       try {
@@ -181,7 +181,7 @@ struct conditional_evaluator
      match at index 0 and each capture group after it, an unmatched group
      reading as an empty string. */
   fn regex_match(StringView value, StringView pattern,
-                 const ArrayList<bool> &active) throws -> bool
+                 const Bitset &active) throws -> bool
   {
 #if SHIT_PLATFORM_IS POSIX
     /* A byte the mask marks inactive came from a quoted or escaped part of the
@@ -404,7 +404,7 @@ struct conditional_evaluator
              quoted metacharacter of the right operand matches literally. The
              other binary operators read a plain string right operand. */
           if (op == "==" || op == "=" || op == "!=") {
-            let active = ArrayList<bool>{cxt.scratch_allocator()};
+            let active = Bitset{cxt.scratch_allocator()};
             const String pattern =
                 operand_pattern_masked(elements[pos - 1], active);
             const bool is_matched = utils::glob_matches(
@@ -412,7 +412,7 @@ struct conditional_evaluator
             return op == "!=" ? !is_matched : is_matched;
           }
           if (op == "=~") {
-            let active = ArrayList<bool>{cxt.scratch_allocator()};
+            let active = Bitset{cxt.scratch_allocator()};
             const String pattern =
                 operand_pattern_masked(elements[pos - 1], active);
             /* A malformed regex throws without a location, so the caret is

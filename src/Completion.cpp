@@ -281,9 +281,9 @@ static pure fn is_in_command_position(StringView line,
   }
 }
 
-static fn all_active_glob_mask(usize length) throws -> ArrayList<bool>
+static fn all_active_glob_mask(usize length) throws -> Bitset
 {
-  let mask = ArrayList<bool>{completion_allocator()};
+  let mask = Bitset{completion_allocator()};
   mask.reserve(length);
   for (usize i = 0; i < length; i++)
     mask.push(true);
@@ -295,7 +295,7 @@ static fn all_active_glob_mask(usize length) throws -> ArrayList<bool>
    it matches. */
 static fn command_name_matches(StringView name, StringView token,
                                bool token_is_glob,
-                               const ArrayList<bool> &glob_active) throws
+                               const Bitset &glob_active) throws
     -> bool
 {
   if (!token_is_glob) return name.starts_with(token);
@@ -309,7 +309,7 @@ static fn command_name_matches(StringView name, StringView token,
 static fn add_unique_command(ArrayList<String> &candidates, HashSet &seen,
                              StringView name, StringView token,
                              bool token_is_glob,
-                             const ArrayList<bool> &glob_active) throws -> void
+                             const Bitset &glob_active) throws -> void
 {
   if (!command_name_matches(name, token, token_is_glob, glob_active)) return;
   if (seen.contains(name)) return;
@@ -365,7 +365,7 @@ static fn complete_command(StringView token, bool token_is_glob,
           static_cast<int>(token.length), token.data);
 
   let const glob_active = token_is_glob ? all_active_glob_mask(token.length)
-                                        : ArrayList<bool>{completion_allocator()};
+                                        : Bitset{completion_allocator()};
 
   for (let const &builtin_name : builtin_names()) {
     add_unique_command(candidates, seen, builtin_name.view(), token,

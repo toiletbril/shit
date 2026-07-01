@@ -858,7 +858,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
 }
 
 fn EvalContext::expand_case_pattern_masked(const Word &word,
-                                           ArrayList<bool> &active_out) throws
+                                           Bitset &active_out) throws
     -> String
 {
   /* Only copy the segments when a leading tilde must be rewritten. */

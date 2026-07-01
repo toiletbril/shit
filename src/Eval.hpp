@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Arena.hpp"
+#include "Bitset.hpp"
 #include "Builtin.hpp"
 #include "Common.hpp"
 #include "Containers.hpp"
@@ -29,16 +30,14 @@ struct glob_field
   {}
 
   String text;
-  /* The mask grows by push, so it stays on the heap allocator where a grow
-     frees the old buffer, since the bump arena would leak every grow. */
-  ArrayList<bool> glob_active;
+  Bitset glob_active;
 };
 
 /* The index of the first active glob metacharacter in a field, or None when the
    field is all literal. The argument expander reads it to push a glob-free
    field straight through, skipping the directory scan that expand_path would
    run. */
-hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask,
+hot pure fn first_active_glob(StringView text, const Bitset &mask,
                               bool extglob) wontthrow -> Maybe<usize>;
 
 class Token;
@@ -1111,7 +1110,7 @@ public:
      parallel mask of which output bytes may act as glob metacharacters, so a
      quoted metacharacter in the pattern matches literally. */
   fn expand_case_pattern_masked(const Word &word,
-                                ArrayList<bool> &active_out) throws -> String;
+                                Bitset &active_out) throws -> String;
 
   /* Run the source of a $(...) and return its standard output with trailing
      newlines stripped. The inner command runs in-process with state
@@ -1210,12 +1209,12 @@ public:
 
   /* The same expansion, plus a parallel mask of which output bytes may act as
      glob metacharacters, so the ${x#pat} and ${x%pat} forms match literally. */
-  fn expand_modifier_word_masked(StringView word, ArrayList<bool> &active_out,
+  fn expand_modifier_word_masked(StringView word, Bitset &active_out,
                                  bool remove_quotes = true) throws -> String;
 
   /* The shared body behind the two public forms. is_pattern_word makes a
      backslash quote the following byte, the # and % rule. */
-  fn expand_modifier_word_worker(StringView word, ArrayList<bool> &active_out,
+  fn expand_modifier_word_worker(StringView word, Bitset &active_out,
                                  bool remove_quotes,
                                  bool is_pattern_word) throws -> String;
 

@@ -29,7 +29,7 @@ enum class trim_end
    as a glob. The active mask marks which pattern bytes may act as glob
    metacharacters, so a quoted or escaped * or ? matches itself. */
 fn trim_matching(Allocator result_allocator, StringView value,
-                 StringView pattern, const ArrayList<bool> &active,
+                 StringView pattern, const Bitset &active,
                  trim_end end, bool longest, bool extglob_enabled) throws
     -> String
 {
@@ -83,7 +83,7 @@ static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
 {
   LOG(All, "trimming a value of %zu bytes with the pattern word '%.*s'",
       value.length, static_cast<int>(word.length), word.data);
-  let active = ArrayList<bool>{cxt.scratch_allocator()};
+  let active = Bitset{cxt.scratch_allocator()};
   let const pattern = cxt.expand_modifier_word_masked(word, active);
   return trim_matching(cxt.scratch_allocator(), value, pattern.view(), active,
                        end, longest, cxt.extglob_enabled());
@@ -97,13 +97,13 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
   /* The default, assign, alternate, error, and arithmetic forms never glob, so
      the mask the worker fills is discarded. The default word keeps a backslash
      before an ordinary character, so the pattern-only unescape stays off. */
-  let discarded_mask = ArrayList<bool>{scratch_allocator()};
+  let discarded_mask = Bitset{scratch_allocator()};
   return expand_modifier_word_worker(word, discarded_mask, remove_quotes,
                                      false);
 }
 
 fn EvalContext::expand_modifier_word_masked(StringView word,
-                                            ArrayList<bool> &active_out,
+                                            Bitset &active_out,
                                             bool remove_quotes) throws -> String
 {
   /* A # or % pattern word has every backslash quote the next byte. */
@@ -111,7 +111,7 @@ fn EvalContext::expand_modifier_word_masked(StringView word,
 }
 
 fn EvalContext::expand_modifier_word_worker(StringView word,
-                                            ArrayList<bool> &active_out,
+                                            Bitset &active_out,
                                             bool remove_quotes,
                                             bool is_pattern_word) throws
     -> String
@@ -828,7 +828,7 @@ static fn find_replacement_separator(StringView body) wontthrow -> usize
    position, or None when it matches nothing there. The end shrinks from the
    value end so a greedy star takes the most it can. */
 static fn longest_pattern_match_at(StringView pattern,
-                                   const ArrayList<bool> &pattern_active,
+                                   const Bitset &pattern_active,
                                    StringView value, usize start,
                                    bool extglob) throws -> Maybe<usize>
 {
@@ -894,7 +894,7 @@ fn EvalContext::pattern_replace_value(const String &value,
   }
 
   const usize separator = find_replacement_separator(remainder);
-  let pattern_active = ArrayList<bool>{scratch_allocator()};
+  let pattern_active = Bitset{scratch_allocator()};
   let const pattern = expand_modifier_word_masked(
       remainder.substring_of_length(0, separator), pattern_active);
   /* No separator means the replacement is empty, so the matches are deleted. */
@@ -1120,7 +1120,7 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
   const StringView pattern_word = spec.substring(should_modify_all ? 2 : 1);
 
   /* An omitted pattern matches every character, the bash default of ?. */
-  let pattern_active = ArrayList<bool>{scratch_allocator()};
+  let pattern_active = Bitset{scratch_allocator()};
   String pattern{scratch_allocator()};
   if (pattern_word.is_empty()) {
     pattern = String{scratch_allocator(), "?"};

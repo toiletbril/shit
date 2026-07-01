@@ -32,7 +32,7 @@ struct find_options
 {
   bool has_name{false};
   StringView name_pattern{};
-  const ArrayList<bool> *glob_active{nullptr};
+  const Bitset *glob_active{nullptr};
   char type_filter{0};
   i64 max_depth{-1};
   i64 min_depth{0};
@@ -147,7 +147,7 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
 
   ArrayList<StringView> roots{cxt.scratch_allocator()};
   find_options options{};
-  ArrayList<bool> name_glob_active{cxt.scratch_allocator()};
+  Bitset name_glob_active{cxt.scratch_allocator()};
 
   /* The path operands lead, every token up to the first predicate, then the
      dash predicates follow the way find reads its command line. The flag parser

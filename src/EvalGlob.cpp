@@ -123,7 +123,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
    directory scan. None when the field is all literal. The argument expander
    reads it to push a glob-free field without the directory scan, so it lives in
    the shit namespace rather than this file. */
-hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask,
+hot pure fn first_active_glob(StringView text, const Bitset &mask,
                               bool extglob) wontthrow -> Maybe<usize>
 {
   let open_bracket = Maybe<usize>{};

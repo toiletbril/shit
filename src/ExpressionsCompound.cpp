@@ -1350,7 +1350,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
         }
       }
 
-      let pattern_active = ArrayList<bool>{cxt.scratch_allocator()};
+      let pattern_active = Bitset{cxt.scratch_allocator()};
       let pattern = String{cxt.scratch_allocator()};
       if (pattern_token->kind() == Token::Kind::Word) {
         try {

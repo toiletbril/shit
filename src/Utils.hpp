@@ -163,7 +163,7 @@ fn path_command_names() throws -> const ArrayList<String> &;
    metacharacters. With extglob set the bash extended-glob groups ?(..), *(..),
    +(..), @(..), and !(..) are recognized, otherwise they are plain bytes. */
 fn glob_matches(StringView glob, StringView str,
-                const ArrayList<bool> &glob_active, usize mask_offset,
+                const Bitset &glob_active, usize mask_offset,
                 bool extglob = false) throws -> bool;
 
 /* Hand quit the one context it reads the interactive state and the memory
