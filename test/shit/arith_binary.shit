@@ -1,0 +1,11 @@
+#!/bin/env shit
+echo $(( 0b101 ))
+echo $(( 0b1010 * 2 ))
+echo $(( 0x10 + 0b10 ))
+echo $(( 0b11111111 ))
+echo $(( 0xff * 0b10 ))
+echo $(( -0b101 ))
+echo $(( 0b0 ))
+echo $(( 0b100 << 2 ))
+echo $(( 2#101 + 0b11 ))
+echo $(( 0B1 + 0b1 ))

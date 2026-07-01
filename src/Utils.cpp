@@ -874,6 +874,54 @@ fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
+static pure fn digit_value_in_base(char c, u32 radix) wontthrow -> i32
+{
+  u32 value;
+  if (c >= '0' && c <= '9')
+    value = static_cast<u32>(c - '0');
+  else if (c >= 'a' && c <= 'z')
+    value = static_cast<u32>(c - 'a') + 10;
+  else if (c >= 'A' && c <= 'Z')
+    value = static_cast<u32>(c - 'A') + 10;
+  else
+    return -1;
+
+  return value < radix ? static_cast<i32>(value) : -1;
+}
+
+fn parse_integer_in_base(StringView text, int_base base) throws -> ErrorOr<i64>
+{
+  let const radix = static_cast<u32>(base);
+  usize offset = 0;
+  skip_ascii_whitespace(text, offset);
+
+  bool is_negative = false;
+  if (offset < text.length &&
+      (text.data[offset] == '+' || text.data[offset] == '-'))
+  {
+    is_negative = text.data[offset] == '-';
+    offset++;
+  }
+
+  u64 magnitude = 0;
+  bool has_digits = false;
+  bool has_overflowed = false;
+  while (offset < text.length) {
+    let const digit = digit_value_in_base(text.data[offset], radix);
+    if (digit < 0) break;
+    has_digits = true;
+    if (magnitude > (UINT64_MAX - static_cast<u64>(digit)) / radix)
+      has_overflowed = true;
+    else
+      magnitude = magnitude * radix + static_cast<u64>(digit);
+    offset++;
+  }
+
+  skip_ascii_whitespace(text, offset);
+  if (!has_digits || offset != text.length) return not_an_integer_error(text);
+  return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
+}
+
 fn find_pos_in_vec(const ArrayList<String> &suffixes,
                    StringView wanted) wontthrow -> Maybe<usize>
 {

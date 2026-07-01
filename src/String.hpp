@@ -3,6 +3,7 @@
 #include "Allocator.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
+#include "IntBase.hpp"
 #include "Maybe.hpp"
 #include "StringView.hpp"
 
@@ -38,32 +39,49 @@ public:
 
   mustuse fn clone() const throws -> String { return String{*this}; }
 
-  template <class T>
-  mustuse static fn from(T value, Allocator allocator) throws -> String
+  static fn from_in_base(u64 magnitude, bool is_negative, int_base base,
+                         Allocator allocator) throws -> String
   {
-    static_assert(std::is_integral_v<T>, "String::from takes an integer");
-    char buffer[24];
+    char buffer[72];
     usize position = sizeof(buffer);
-    u64 magnitude;
-    bool is_negative = false;
-
-    if constexpr (std::is_signed_v<T>) {
-      is_negative = value < 0;
-      magnitude = is_negative ? ~static_cast<u64>(value) + 1u
-                              : static_cast<u64>(value);
-    } else {
-      magnitude = static_cast<u64>(value);
-    }
+    let const radix = static_cast<u64>(base);
 
     do {
-      buffer[--position] = static_cast<char>('0' + magnitude % 10);
-      magnitude /= 10;
+      let const digit = static_cast<u32>(magnitude % radix);
+      buffer[--position] = digit < 10 ? static_cast<char>('0' + digit)
+                                      : static_cast<char>('a' + digit - 10);
+      magnitude /= radix;
     } while (magnitude != 0);
 
     if (is_negative) buffer[--position] = '-';
 
     return String{allocator,
                   StringView{buffer + position, sizeof(buffer) - position}};
+  }
+
+  template <class T>
+  mustuse static fn from(T value, Allocator allocator) throws -> String
+  {
+    if constexpr (is_tagged_int_v<T>) {
+      return from_signed_or_unsigned(value.value, T::base, allocator);
+    } else {
+      static_assert(std::is_integral_v<T>, "String::from takes an integer");
+      return from_signed_or_unsigned(value, int_base::decimal, allocator);
+    }
+  }
+
+  template <class U>
+  mustuse static fn from_signed_or_unsigned(U value, int_base base,
+                                            Allocator allocator) throws -> String
+  {
+    if constexpr (std::is_signed_v<U>) {
+      let const is_negative = value < 0;
+      let const magnitude = is_negative ? ~static_cast<u64>(value) + 1u
+                                        : static_cast<u64>(value);
+      return from_in_base(magnitude, is_negative, base, allocator);
+    } else {
+      return from_in_base(static_cast<u64>(value), false, base, allocator);
+    }
   }
 
   template <class T> mustuse fn to() const throws -> ErrorOr<T>;

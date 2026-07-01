@@ -1,5 +1,8 @@
 #include "String.hpp"
 
+#include "ErrorOr.hpp"
+#include "IntBase.hpp"
+
 namespace shit {
 
 String::String(Allocator allocator, StringView initial) throws
@@ -197,5 +200,37 @@ fn operator+(StringView left, StringView right) throws->String
   result.append(right);
   return result;
 }
+
+template <class T> fn String::to() const throws -> ErrorOr<T>
+{
+  return view().to<T>();
+}
+
+#define SHIT_STRING_TO(T) template ErrorOr<T> String::to<T>() const;
+SHIT_STRING_TO(i16)
+SHIT_STRING_TO(u16)
+SHIT_STRING_TO(i32)
+SHIT_STRING_TO(u32)
+SHIT_STRING_TO(i64)
+SHIT_STRING_TO(u64)
+SHIT_STRING_TO(bi16)
+SHIT_STRING_TO(bi32)
+SHIT_STRING_TO(bi64)
+SHIT_STRING_TO(bu16)
+SHIT_STRING_TO(bu32)
+SHIT_STRING_TO(bu64)
+SHIT_STRING_TO(oi16)
+SHIT_STRING_TO(oi32)
+SHIT_STRING_TO(oi64)
+SHIT_STRING_TO(ou16)
+SHIT_STRING_TO(ou32)
+SHIT_STRING_TO(ou64)
+SHIT_STRING_TO(hi16)
+SHIT_STRING_TO(hi32)
+SHIT_STRING_TO(hi64)
+SHIT_STRING_TO(hu16)
+SHIT_STRING_TO(hu32)
+SHIT_STRING_TO(hu64)
+#undef SHIT_STRING_TO
 
 } // namespace shit

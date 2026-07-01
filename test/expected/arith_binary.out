@@ -1,0 +1,92 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0b101 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0b1010 * 2 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0x10 + 0b10 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0b11111111 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0xff * 0b10 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( -0b101 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0b0 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0b100 << 2 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 2#101 + 0b11 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0B1 + 0b1 ))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0b101 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0b1010 * 2 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0x10 + 0b10 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0b11111111 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0xff * 0b10 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " -0b101 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0b0 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0b100 << 2 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 2#101 + 0b11 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0B1 + 0b1 "
+]
+5
+20
+18
+255
+510
+-5
+0
+16
+8
+2
+[Code 0]

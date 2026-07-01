@@ -59,6 +59,14 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
       return utils::parse_hexadecimal_integer(
           digits.substring_of_length(0, count_leading_digits(digits, 16)));
     }
+    if (body.length >= 2 && body[0] == '0' &&
+        (body[1] == 'b' || body[1] == 'B'))
+    {
+      let const digits = body.substring(2);
+      return utils::parse_integer_in_base(
+          digits.substring_of_length(0, count_leading_digits(digits, 2)),
+          int_base::binary);
+    }
     if (body.length >= 1 && body[0] == '0') {
       return utils::parse_octal_integer(
           body.substring_of_length(0, count_leading_digits(body, 8)));
@@ -694,6 +702,10 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
   if (from.length >= 2 && from[0] == '0' && (from[1] == 'x' || from[1] == 'X'))
   {
     consumed = 2 + count_leading_digits(from.substring(2), 16);
+  } else if (from.length >= 2 && from[0] == '0' &&
+             (from[1] == 'b' || from[1] == 'B'))
+  {
+    consumed = 2 + count_leading_digits(from.substring(2), 2);
   } else if (from.length >= 1 && from[0] == '0') {
     consumed = count_leading_digits(from, 8);
   } else {
@@ -1119,6 +1131,11 @@ static pure fn parse_wide_operand(StringView text) wontthrow -> wide_int
   {
     radix = 16;
     i = 2;
+  } else if (body.length >= 2 && body[0] == '0' &&
+             (body[1] == 'b' || body[1] == 'B'))
+  {
+    radix = 2;
+    i = 2;
   } else if (body.length >= 1 && body[0] == '0') {
     radix = 8;
   }
@@ -1150,6 +1167,8 @@ static fn lex_wide_number(StringView from, wide_int *out_value) throws -> usize
   usize consumed;
   if (from.length >= 2 && from[0] == '0' && (from[1] == 'x' || from[1] == 'X'))
     consumed = 2 + count_leading_digits(from.substring(2), 16);
+  else if (from.length >= 2 && from[0] == '0' && (from[1] == 'b' || from[1] == 'B'))
+    consumed = 2 + count_leading_digits(from.substring(2), 2);
   else if (from.length >= 1 && from[0] == '0')
     consumed = count_leading_digits(from, 8);
   else

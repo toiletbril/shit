@@ -9,8 +9,6 @@
 #include "Platform.hpp"
 #include "Tokens.hpp"
 
-#include <limits>
-
 namespace shit {
 
 namespace utils {
@@ -116,6 +114,7 @@ fn line_number_at(StringView source, usize position) throws -> usize;
 fn invalidate_line_number_cache() wontthrow -> void;
 fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>;
 fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>;
+fn parse_integer_in_base(StringView text, int_base base) throws -> ErrorOr<i64>;
 
 /* The command name closest to name among the local names passed in, the
    builtins, and the PATH programs, within a couple of edits, for a did-you-mean
@@ -178,30 +177,5 @@ fn set_quit_context(const EvalContext *context) wontthrow -> void;
 [[noreturn]] fn quit(i32 code, bool should_goodbye = false) throws -> void;
 
 } // namespace utils
-
-template <class T> fn StringView::to() const throws -> ErrorOr<T>
-{
-  static_assert(std::is_integral_v<T>, "StringView::to parses an integer");
-  let const value = TRY(utils::parse_decimal_integer(*this));
-
-  if constexpr (std::is_same_v<T, i64>) {
-    return value;
-  } else if constexpr (std::is_signed_v<T>) {
-    if (value < static_cast<i64>(std::numeric_limits<T>::min()) ||
-        value > static_cast<i64>(std::numeric_limits<T>::max()))
-      return Error{"integer value out of range"};
-    return static_cast<T>(value);
-  } else {
-    if (value < 0 || static_cast<u64>(value) >
-                         static_cast<u64>(std::numeric_limits<T>::max()))
-      return Error{"integer value out of range"};
-    return static_cast<T>(value);
-  }
-}
-
-template <class T> fn String::to() const throws -> ErrorOr<T>
-{
-  return view().to<T>();
-}
 
 } // namespace shit
