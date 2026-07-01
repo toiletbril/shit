@@ -251,9 +251,9 @@ fn format_signal_list() throws -> String
   return out;
 }
 
-fn format_human_size(u64 bytes) throws -> String
+fn format_human_size(u64 bytes, Allocator allocator) throws -> String
 {
-  if (bytes < 1024) return String::from(bytes, heap_allocator());
+  if (bytes < 1024) return String::from(bytes, allocator);
 
   static const char units[] = {'K', 'M', 'G', 'T', 'P'};
   double value = static_cast<double>(bytes);
@@ -270,15 +270,15 @@ fn format_human_size(u64 bytes) throws -> String
     unit++;
   }
 
-  String out{heap_allocator()};
+  String out{allocator};
   /* A scaled value below ten keeps one decimal, otherwise it rounds whole. */
   let const tenths = static_cast<u64>(value * 10.0 + 0.5);
   if (value < 10.0 && tenths < 100) {
-    out += String::from(tenths / 10, heap_allocator());
+    out += String::from(tenths / 10, allocator);
     out += '.';
-    out += String::from(tenths % 10, heap_allocator());
+    out += String::from(tenths % 10, allocator);
   } else {
-    out += String::from(static_cast<u64>(value + 0.5), heap_allocator());
+    out += String::from(static_cast<u64>(value + 0.5), allocator);
   }
   out.push(units[unit - 1]);
   return out;

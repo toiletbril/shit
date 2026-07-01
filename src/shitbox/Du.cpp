@@ -79,7 +79,7 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
     }
     let const total = total_size(path);
     output += FLAG_DU_HUMAN.is_enabled()
-                  ? format_human_size(total)
+                  ? format_human_size(total, cxt.scratch_allocator())
                   : String::from(total, cxt.scratch_allocator());
     output += '\t';
     output += target;

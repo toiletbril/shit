@@ -33,7 +33,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   /* A path word resolves against the filesystem with a leading tilde expanded
      first. */
   if (word.find_character('/').has_value()) {
-    let expanded = String{word};
+    let expanded = String{bump_allocator(HIGHLIGHT_ARENA), word};
     if (!word.is_empty() && word[0] == '~') {
       if (Maybe<String> home_expanded = utils::expand_leading_tilde_path(word))
         expanded = steal(*home_expanded);
@@ -330,7 +330,7 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
 {
   if (partial.is_empty()) return false;
 
-  String directory{heap_allocator()};
+  String directory{bump_allocator(HIGHLIGHT_ARENA)};
   if (existing_end > 0) {
     let const prefix = word.substring_of_length(0, existing_end);
     if (has_tilde) {
@@ -339,12 +339,12 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
       else
         return false;
     } else {
-      directory = String{prefix};
+      directory = String{bump_allocator(HIGHLIGHT_ARENA), prefix};
     }
   } else if (word[0] == '/') {
-    directory = String{"/"};
+    directory = String{bump_allocator(HIGHLIGHT_ARENA), "/"};
   } else {
-    directory = String{"."};
+    directory = String{bump_allocator(HIGHLIGHT_ARENA), "."};
   }
 
   let const entries = read_directory_cached(Path{directory.view()});

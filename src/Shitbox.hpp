@@ -262,7 +262,7 @@ fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>;
 fn sort_string_list(ArrayList<String> &items) wontthrow -> void;
 fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void;
 
-fn format_human_size(u64 bytes) throws -> String;
+fn format_human_size(u64 bytes, Allocator allocator) throws -> String;
 
 fn resolve_shitbox_signal(StringView spelled, Allocator allocator) throws
     -> i32;

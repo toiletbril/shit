@@ -497,7 +497,9 @@ fn format_time_report_pretty(double real_seconds, double user_seconds,
   report += buffer;
 
   if (peak_rss_bytes > 0)
-    report += "  rss    " + shitbox::format_human_size(peak_rss_bytes) + "\n";
+    report += "  rss    " +
+              shitbox::format_human_size(peak_rss_bytes, heap_allocator()) +
+              "\n";
 
   return report;
 }

@@ -122,7 +122,7 @@ static fn build_long_entry(const Path &path, StringView name,
   entry.owner = cached_owner_name(status.owner_id, uid_cache, allocator);
   entry.group = cached_group_name(status.group_id, gid_cache, allocator);
   entry.size = FLAG_LS_HUMAN.is_enabled()
-                   ? format_human_size(status.size)
+                   ? format_human_size(status.size, allocator)
                    : String::from(status.size, allocator);
   entry.time =
       utils::format_unix_timestamp(status.modification_time, "%b %e %H:%M");
