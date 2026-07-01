@@ -68,6 +68,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool should_mark_readonly = false;
   bool should_restrict_to_functions = false;
   bool should_print_function_names_only = false;
+  bool should_be_global = false;
 
   usize i = 1;
   for (; i < args.count(); i++) {
@@ -102,9 +103,9 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
            as a silent no-op rather than unmarking. */
         if (!is_remove_form) should_mark_readonly = true;
         break;
+      case 'g': should_be_global = true; break;
       /* The remaining attribute letters carry no backing behavior yet and are
          accepted so a script that sets them keeps running. */
-      case 'g':
       case 'l':
       case 'u':
       case 'n':
@@ -265,6 +266,12 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                                  name.count() - *bracket - 2)
                       : StringView{};
     if (has_subscript) name = name.substring_of_length(0, *bracket);
+
+    /* A declare in a function body names a local the way bash does, so the
+       caller's binding returns on the scope pop, while declare -g and a
+       top-level declare stay global. declare_local is a no-op outside a
+       function and for a name already local in this scope. */
+    if (!should_be_global) cxt.declare_local(name);
 
     /* The attribute applies before the assignment, so declare -i x+=3 already
        adds on this command the way bash applies the integer mark first. */
