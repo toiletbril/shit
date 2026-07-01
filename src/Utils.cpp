@@ -7,6 +7,7 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
+#include "Shitbox.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 
@@ -550,7 +551,8 @@ fn format_time_report_posix(double real_seconds, double user_seconds,
 }
 
 fn format_time_report_pretty(double real_seconds, double user_seconds,
-                             double system_seconds) throws -> String
+                             double system_seconds, u64 peak_rss_bytes) throws
+    -> String
 {
   /* The cpu busy percent, the share of the wall time the user and system cpu
      together account for, the way the bench summary reports it. */
@@ -566,6 +568,10 @@ fn format_time_report_pretty(double real_seconds, double user_seconds,
   report += "  sys    " + format_minutes_seconds(system_seconds) + "\n";
   std::snprintf(buffer, sizeof(buffer), "  cpu    %.0f%%\n", cpu_percent);
   report += buffer;
+
+  if (peak_rss_bytes > 0)
+    report += "  rss    " + shitbox::format_human_size(peak_rss_bytes) + "\n";
+
   return report;
 }
 
@@ -1968,8 +1974,8 @@ fn read_entire_standard_input() throws -> String
 }
 
 fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
-                     char delimiter, i64 timeout_nanos, bool *was_timed_out)
-    throws -> Maybe<String>
+                     char delimiter, i64 timeout_nanos,
+                     bool *was_timed_out) throws -> Maybe<String>
 {
   const bool has_timeout = timeout_nanos >= 0;
   const u64 deadline_nanos =

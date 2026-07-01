@@ -1537,6 +1537,18 @@ fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
                    static_cast<double>(usage.ru_stime.tv_usec) / 1000000.0;
 }
 
+fn children_peak_rss_bytes() wontthrow -> u64
+{
+  struct rusage usage{};
+  if (getrusage(RUSAGE_CHILDREN, &usage) != 0) return 0;
+
+#if defined __linux__
+  return static_cast<u64>(usage.ru_maxrss) * 1024ULL;
+#else
+  return static_cast<u64>(usage.ru_maxrss);
+#endif
+}
+
 namespace {
 
 #if defined __linux__
@@ -3343,6 +3355,8 @@ fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
   user_seconds = 0;
   system_seconds = 0;
 }
+
+fn children_peak_rss_bytes() wontthrow -> u64 { return 0; }
 
 fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
     -> Maybe<measured_result>

@@ -493,6 +493,8 @@ fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool;
 fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
     -> void;
 
+fn children_peak_rss_bytes() wontthrow -> u64;
+
 /* The Linux hardware performance counters a measured run collects. The counts
    are valid only when measured_result::has_perf is true. */
 struct perf_counts

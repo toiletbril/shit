@@ -90,11 +90,13 @@ fn format_minutes_seconds(double seconds) throws -> String;
 
 /* The two reports the time keyword prints. The POSIX form matches bash time -p.
    The pretty form is an aligned block of the wall time, the user and system
-   cpu, and the cpu busy percent. */
+   cpu, the cpu busy percent, and the peak resident set when peak_rss_bytes is
+   non-zero. */
 fn format_time_report_posix(double real_seconds, double user_seconds,
                             double system_seconds) throws -> String;
 fn format_time_report_pretty(double real_seconds, double user_seconds,
-                             double system_seconds) throws -> String;
+                             double system_seconds, u64 peak_rss_bytes) throws
+    -> String;
 
 /* The report a set TIMEFORMAT renders. The bash conversions are honored, %%, a
    literal percent, %[p][l]R, %[p][l]U, and %[p][l]S for the real, user, and

@@ -12,7 +12,9 @@ HELP_SYNOPSIS_DECL("command [argument ...]");
 HELP_DESCRIPTION_DECL(
     "The time builtin runs the given command once and prints to standard error "
     "how long it took, the real elapsed time plus the user and system time its "
-    "children consumed. It returns the status of the timed command.");
+    "children consumed. The pretty report also prints the peak resident set "
+    "when "
+    "a child raised it. It returns the status of the timed command.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -49,6 +51,7 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   double user_before = 0, system_before = 0;
   os::children_cpu_seconds(user_before, system_before);
+  let const rss_before = os::children_peak_rss_bytes();
 
   /* The timed command must run to completion and return here so the report can
      print. When time is the shell's final command the tail-exec optimization
@@ -67,10 +70,12 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   double user_after = 0, system_after = 0;
   os::children_cpu_seconds(user_after, system_after);
+  let const rss_after = os::children_peak_rss_bytes();
 
   let const real_seconds = static_cast<double>(elapsed_nanos) / 1000000000.0;
   const double user_cpu = user_after - user_before;
   const double system_cpu = system_after - system_before;
+  let const peak_rss_bytes = rss_after > rss_before ? rss_after : 0;
 
   /* A set TIMEFORMAT drives the format, an empty value prints nothing, and an
      unset value keeps the pretty default, matching the time keyword. */
@@ -82,8 +87,8 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       report = utils::format_time_report_custom(
           time_format->view(), real_seconds, user_cpu, system_cpu);
   } else {
-    report =
-        utils::format_time_report_pretty(real_seconds, user_cpu, system_cpu);
+    report = utils::format_time_report_pretty(real_seconds, user_cpu,
+                                              system_cpu, peak_rss_bytes);
   }
 
   if (!report.is_empty()) {
