@@ -446,7 +446,10 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
      there, while the fatal set -u abort above still fires. */
   if (is_warning_suppressed(suppressible_warning::UnsetTestOperand)) return;
 
-  if (m_runtime.error_unset || m_runtime.are_warnings_enabled) {
+  if (m_runtime.error_unset ||
+      (m_runtime.are_warnings_enabled &&
+       m_runtime.mood == mimic_mood::Default))
+  {
     show_runtime_warning_at(locate_variable_reference(name),
                             "The variable '" + String{name} +
                                 "' is not set, it expands to empty",
@@ -463,8 +466,9 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
     if (!note.is_empty()) error.set_note(note);
     throw error;
   }
-  if ((fatal || m_runtime.are_warnings_enabled) && !diagnostics_disabled() &&
-      m_current_source != nullptr)
+  if ((fatal || (m_runtime.are_warnings_enabled &&
+                 m_runtime.mood == mimic_mood::Default)) &&
+      !diagnostics_disabled() && m_current_source != nullptr)
   {
     try {
       let warning = WarningWithLocation{location, message};
