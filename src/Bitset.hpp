@@ -13,6 +13,31 @@ public:
 
   explicit Bitset(Allocator allocator) : m_words(allocator) {}
 
+  Bitset(const Bitset &other) : m_words(other.m_words), m_length(other.m_length)
+  {}
+  Bitset(Bitset &&other) noexcept
+      : m_words(steal(other.m_words)), m_length(other.m_length)
+  {
+    other.m_length = 0;
+  }
+  fn operator=(const Bitset &other) throws->Bitset &
+  {
+    if (this != &other) {
+      m_words = other.m_words;
+      m_length = other.m_length;
+    }
+    return *this;
+  }
+  fn operator=(Bitset &&other) wontthrow->Bitset &
+  {
+    if (this != &other) {
+      m_words = steal(other.m_words);
+      m_length = other.m_length;
+      other.m_length = 0;
+    }
+    return *this;
+  }
+
   hot fn push(bool value) throws -> void
   {
     let const bit_position = m_length;
@@ -27,16 +52,6 @@ public:
     if (index >= m_length) return false;
     return ((m_words[index / BITS_PER_WORD] >> (index % BITS_PER_WORD)) & 1u) !=
            0;
-  }
-
-  fn set(usize index, bool value) wontthrow -> void
-  {
-    let const word_index = index / BITS_PER_WORD;
-    let const bit = u64{1} << (index % BITS_PER_WORD);
-    if (value)
-      m_words[word_index] |= bit;
-    else
-      m_words[word_index] &= ~bit;
   }
 
   mustuse pure fn count() const wontthrow -> usize { return m_length; }
