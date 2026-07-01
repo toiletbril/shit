@@ -1194,7 +1194,9 @@ fn main(int argc, char **argv) -> int
      so the runtime checks downgrade and set -W can flip it mid-run. */
   context.set_error_unset(FLAG_NOUNSET.is_enabled());
   if (FLAG_NOUNSET.is_enabled()) context.set_error_unset_explicit(true);
-  context.set_warnings_enabled(FLAG_WARNINGS.is_enabled());
+  let const warnings_specified_count = FLAG_WARNINGS.toggle_count();
+  context.set_warning_level(static_cast<u8>(
+      warnings_specified_count > 2 ? 2 : warnings_specified_count));
   context.set_pipefail(false);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
@@ -1321,16 +1323,16 @@ fn main(int argc, char **argv) -> int
        defined while this is off captures the quiet state. The state returns
        afterward, restoring -W for the session. */
     let const saved_diagnostics_disabled = context.diagnostics_disabled();
-    let const saved_warnings = context.warnings_enabled();
+    let const saved_warning_level = context.warning_level();
     if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled()) {
       context.set_diagnostics_disabled(true);
-      context.set_warnings_enabled(false);
+      context.set_warning_level(0);
     }
     shit::source_init_moods(context, ast_arena, init_moods, is_login_shell,
                             should_be_interactive);
     if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled()) {
       context.set_diagnostics_disabled(saved_diagnostics_disabled);
-      context.set_warnings_enabled(saved_warnings);
+      context.set_warning_level(saved_warning_level);
     }
   }
 

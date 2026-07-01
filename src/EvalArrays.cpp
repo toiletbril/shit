@@ -125,9 +125,6 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
     return;
   }
 
-  /* A declare -A name keeps its associative attribute through a later name=()
-     or name=([k]=v), the way bash clears the elements without downgrading the
-     array to an indexed one. */
   if (is_associative_array(name)) {
     if (!is_append) {
       clear_associative_array(name);

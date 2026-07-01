@@ -91,11 +91,13 @@ public:
 
   fn toggle() throws -> void;
   pure fn is_enabled() const wontthrow -> bool;
+  pure fn toggle_count() const wontthrow -> usize;
 
   fn reset() throws -> void override;
 
 private:
   bool m_value{false};
+  usize m_toggle_count{0};
 };
 
 class FlagString : public Flag

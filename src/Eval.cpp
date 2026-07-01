@@ -447,8 +447,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   if (is_warning_suppressed(suppressible_warning::UnsetTestOperand)) return;
 
   if (m_runtime.error_unset ||
-      (m_runtime.are_warnings_enabled &&
-       m_runtime.mood == mimic_mood::Default))
+      (m_runtime.are_warnings_enabled && warnings_reach_every_mood()))
   {
     show_runtime_warning_at(locate_variable_reference(name),
                             "The variable '" + String{name} +
@@ -466,8 +465,7 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
     if (!note.is_empty()) error.set_note(note);
     throw error;
   }
-  if ((fatal || (m_runtime.are_warnings_enabled &&
-                 m_runtime.mood == mimic_mood::Default)) &&
+  if ((fatal || (m_runtime.are_warnings_enabled && warnings_reach_every_mood())) &&
       !diagnostics_disabled() && m_current_source != nullptr)
   {
     try {

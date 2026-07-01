@@ -1264,8 +1264,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         definition_info != nullptr &&
         (static_cast<mimic_mood>(definition_info->defining_mood) !=
              cxt.mood() ||
-         definition_info->were_warnings_enabled_at_definition !=
-             cxt.warnings_enabled() ||
+         definition_info->warning_level_at_definition != cxt.warning_level() ||
          definition_info->were_diagnostics_disabled_at_definition !=
              cxt.diagnostics_disabled());
     Maybe<RuntimeState> saved_runtime_state = None;

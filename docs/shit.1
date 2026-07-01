@@ -89,7 +89,16 @@ to inject its integration through the ENV file is honored.
 .TP
 .BR \-W ", " \-\-force\-warnings
 The analysis stage is kept, but every error is reported as a warning and the run
-proceeds.
+proceeds. A single
+.B \-W
+reports the runtime warnings in the strict default mood alone. A repeated
+.BR \-W ,
+written
+.BR \-WW ,
+reports them in every mood. The default mood reports them as fatal errors
+already, so it behaves as if
+.B \-WW
+were given.
 .TP
 .B \-\-no\-diagnostics
 The analysis stage is skipped. No warning or pre-run diagnostic is reported.

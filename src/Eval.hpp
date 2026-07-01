@@ -214,7 +214,7 @@ struct function_definition_info
      rides as a byte so this struct need not order the mimic_mood enum before
      it. */
   u8 defining_mood{0};
-  bool were_warnings_enabled_at_definition{false};
+  u8 warning_level_at_definition{0};
   bool were_diagnostics_disabled_at_definition{false};
 };
 
@@ -755,10 +755,24 @@ public:
   fn set_warnings_enabled(bool enabled) wontthrow -> void
   {
     m_runtime.are_warnings_enabled = enabled;
+    if (!enabled)
+      m_warning_level = 0;
+    else if (m_warning_level < 2)
+      m_warning_level++;
   }
   pure fn warnings_enabled() const wontthrow -> bool
   {
     return m_runtime.are_warnings_enabled;
+  }
+  pure fn warning_level() const wontthrow -> u8 { return m_warning_level; }
+  fn set_warning_level(u8 level) wontthrow -> void
+  {
+    m_warning_level = level;
+    m_runtime.are_warnings_enabled = level > 0;
+  }
+  pure fn warnings_reach_every_mood() const wontthrow -> bool
+  {
+    return m_warning_level >= 2 || m_runtime.mood == mimic_mood::Default;
   }
   /* A reference to an unset variable, fatal under set -u, downgraded to a
      warning under -W unless the set -u was explicit, else expanded to empty. */
@@ -901,7 +915,7 @@ public:
   {
     let const previous = RuntimeState::capture(*this);
     m_runtime.mood = static_cast<mimic_mood>(info.defining_mood);
-    m_runtime.are_warnings_enabled = info.were_warnings_enabled_at_definition;
+    set_warning_level(info.warning_level_at_definition);
     m_runtime.are_diagnostics_disabled =
         info.were_diagnostics_disabled_at_definition;
     apply_strictness_for_mood();
@@ -1414,6 +1428,7 @@ protected:
      state so a scope that swaps them saves and restores the whole set with one
      RuntimeState copy. failglob defaults on, the other toggles default off. */
   RuntimeState m_runtime{.failglob = true};
+  u8 m_warning_level{0};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   bool m_mood_set_explicitly{false};

@@ -267,10 +267,6 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                       : StringView{};
     if (has_subscript) name = name.substring_of_length(0, *bracket);
 
-    /* A declare in a function body names a local the way bash does, so the
-       caller's binding returns on the scope pop, while declare -g and a
-       top-level declare stay global. declare_local is a no-op outside a
-       function and for a name already local in this scope. */
     if (!should_be_global) cxt.declare_local(name);
 
     /* The attribute applies before the assignment, so declare -i x+=3 already

@@ -39,14 +39,24 @@ FlagBool::FlagBool(char short_name, StringView long_name, flag_section section,
     : Flag(Flag::Kind::Bool, short_name, long_name, section, description)
 {}
 
-fn FlagBool::toggle() throws -> void { m_value = !m_value; }
+fn FlagBool::toggle() throws -> void
+{
+  m_value = !m_value;
+  m_toggle_count++;
+}
 
 pure fn FlagBool::is_enabled() const wontthrow -> bool { return m_value; }
+
+pure fn FlagBool::toggle_count() const wontthrow -> usize
+{
+  return m_toggle_count;
+}
 
 fn FlagBool::reset() throws -> void
 {
   m_position = 0;
   m_value = false;
+  m_toggle_count = 0;
 }
 
 FlagString::FlagString(char short_name, StringView long_name,
