@@ -106,9 +106,7 @@ pure fn Jobs::kind() const wontthrow -> Builtin::Kind { return Kind::Jobs; }
 
 fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const names =
-      parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);
-  defer { reset_flags(FLAG_LIST); };
+  let const names = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 

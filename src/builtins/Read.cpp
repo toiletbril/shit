@@ -43,9 +43,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   /* The first returned element is the command name, so the operand names begin
      at index 1. */
-  let const names =
-      parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);
-  defer { reset_flags(FLAG_LIST); };
+  let const names = PARSE_BUILTIN_ARGS(ec);
 
   ASSERT(!names.is_empty());
 
@@ -173,9 +171,9 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (bytes_read >= max_bytes) was_newline_terminated = true;
     if (bytes_read > 0 || was_newline_terminated) read_line = steal(buffer);
   } else {
-    read_line = utils::read_line_from_fd(read_fd, was_newline_terminated,
-                                         delimiter, timeout_nanos,
-                                         &was_timed_out);
+    read_line =
+        utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter,
+                                 timeout_nanos, &was_timed_out);
   }
   if (!read_line) {
     for (usize i = 0; i < operand_count; i++)

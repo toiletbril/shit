@@ -31,9 +31,7 @@ pure fn Export::kind() const wontthrow -> Builtin::Kind { return Kind::Export; }
 
 fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const args =
-      parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);
-  defer { reset_flags(FLAG_LIST); };
+  let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
