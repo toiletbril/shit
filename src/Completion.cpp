@@ -454,7 +454,8 @@ static fn resolve_listing_directory(StringView directory_part,
 }
 
 static fn complete_filesystem(StringView token, const Path &base_directory,
-                              bool inside_quote) throws -> ArrayList<String>
+                              bool inside_quote, bool directories_only) throws
+    -> ArrayList<String>
 {
   let candidates = ArrayList<String>{completion_allocator()};
 

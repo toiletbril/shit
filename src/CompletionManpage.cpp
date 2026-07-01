@@ -863,7 +863,8 @@ static fn parse_help_option_entries(StringView text) throws
 
     let description = StringView{};
     if (gap < raw.length)
-      description = raw.substring_of_length(gap, raw.length - gap).trim_blanks();
+      description =
+          raw.substring_of_length(gap, raw.length - gap).trim_blanks();
 
     for (let const &flag : extract_dash_flags(option_part))
       if (!seen.contains(flag.view())) {

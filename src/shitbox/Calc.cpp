@@ -77,8 +77,9 @@ fn try_define(EvalContext &cxt, StringView line) throws -> bool
      zero and defeat the unset error. */
   if (value.is_empty())
     throw ErrorWithLocation{
-        SourceLocation{name_start, name.length},
-        "Assignment to '" + String{cxt.scratch_allocator(), name} +
+        SourceLocation{name_start,              name.length},
+        "Assignment to '" + String{cxt.scratch_allocator(), name       }
+        +
             "' needs a value"
     };
 
