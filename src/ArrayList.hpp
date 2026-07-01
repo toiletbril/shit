@@ -73,6 +73,27 @@ public:
   {
     return m_data[i];
   }
+
+  hot flatten mustuse pure fn operator==(const ArrayList &other) const wontthrow
+      -> bool
+  {
+    if (m_length != other.m_length) return false;
+    if constexpr (std::is_integral_v<T> || std::is_enum_v<T> ||
+                  std::is_pointer_v<T>) {
+      return m_length == 0 ||
+             __builtin_memcmp(m_data, other.m_data, m_length * sizeof(T)) == 0;
+    } else {
+      for (usize i = 0; i < m_length; i++)
+        if (!(m_data[i] == other.m_data[i])) return false;
+      return true;
+    }
+  }
+  hot flatten mustuse pure fn operator!=(const ArrayList &other) const wontthrow
+      -> bool
+  {
+    return !(*this == other);
+  }
+
   hot mustuse pure fn begin() wontthrow -> T * { return m_data; }
   hot mustuse pure fn end() wontthrow -> T * { return m_data + m_length; }
   hot mustuse pure fn begin() const wontthrow -> const T * { return m_data; }

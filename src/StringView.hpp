@@ -26,7 +26,32 @@ public:
     return data[i];
   }
 
-  hot mustuse pure fn operator==(StringView other) const wontthrow->bool;
+  hot flatten mustuse pure fn operator==(StringView other) const wontthrow->bool
+  {
+    if (length != other.length) return false;
+    if (length == 0) return true;
+
+    if (length <= 8) {
+      u64 left = 0;
+      u64 right = 0;
+      __builtin_memcpy(&left, data, length);
+      __builtin_memcpy(&right, other.data, length);
+      return left == right;
+    }
+    if (length <= 16) {
+      u64 left_head = 0;
+      u64 right_head = 0;
+      u64 left_tail = 0;
+      u64 right_tail = 0;
+      __builtin_memcpy(&left_head, data, 8);
+      __builtin_memcpy(&right_head, other.data, 8);
+      __builtin_memcpy(&left_tail, data + length - 8, 8);
+      __builtin_memcpy(&right_tail, other.data + length - 8, 8);
+      return left_head == right_head && left_tail == right_tail;
+    }
+
+    return __builtin_memcmp(data, other.data, length) == 0;
+  }
   hot flatten mustuse pure fn operator!=(StringView other) const wontthrow->bool
   {
     return !(*this == other);

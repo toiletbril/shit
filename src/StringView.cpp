@@ -7,12 +7,6 @@ StringView::StringView(const char *cstr) wontthrow
       length(cstr != nullptr ? std::strlen(cstr) : 0)
 {}
 
-flatten hot fn StringView::operator==(StringView other) const wontthrow -> bool
-{
-  return length == other.length &&
-         (length == 0 || std::memcmp(data, other.data, length) == 0);
-}
-
 fn StringView::find_character(char wanted) const wontthrow -> Maybe<usize>
 {
   if (length == 0) return None;
