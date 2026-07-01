@@ -236,7 +236,8 @@ fn report_invalid_number(ExecContext &ec, const String &arg, bool is_hex,
 }
 
 fn append_conversion(String &out, const String &spec, char conv,
-                     const String &arg, ExecContext &ec, i32 &exit_status,
+                     const String &arg, bool is_missing_argument,
+                     ExecContext &ec, i32 &exit_status,
                      Allocator allocator) throws -> void
 {
   char buffer[256];
@@ -269,7 +270,7 @@ fn append_conversion(String &out, const String &spec, char conv,
   case 'd':
   case 'i': {
     let const number = parse_printf_number(arg);
-    if (!number.is_valid)
+    if (!number.is_valid && !is_missing_argument)
       report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
     let const with_ll = spec + "lld";
     append_formatted(with_ll.c_str(), static_cast<long long>(number.value));
@@ -279,7 +280,7 @@ fn append_conversion(String &out, const String &spec, char conv,
   case 'o':
   case 'u': {
     let const number = parse_printf_number(arg);
-    if (!number.is_valid)
+    if (!number.is_valid && !is_missing_argument)
       report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
     String with_ll = spec + "ll";
     with_ll.push(conv);
@@ -415,7 +416,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           if (spec == "%")
             out += formatted;
           else
-            append_conversion(out, spec, 's', formatted, ec, exit_status,
+            append_conversion(out, spec, 's', formatted, false, ec, exit_status,
                               cxt.scratch_allocator());
           operand_index++;
           has_consumed_a_conversion = true;
@@ -441,6 +442,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         continue;
       }
 
+      let const is_missing_argument = operand_index >= operand_count;
       let const &arg = do_operand_at(operand_index);
       if (conv == 'b') {
         should_stop = append_b_argument(out, arg);
@@ -449,8 +451,8 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (should_stop) break;
         continue;
       }
-      append_conversion(out, spec, conv, arg, ec, exit_status,
-                        cxt.scratch_allocator());
+      append_conversion(out, spec, conv, arg, is_missing_argument, ec,
+                        exit_status, cxt.scratch_allocator());
       operand_index++;
       has_consumed_a_conversion = true;
     }
