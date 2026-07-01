@@ -10,9 +10,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-n count] [-c count] [file ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The head utility writes the first count lines of each file, ten by "
-    "default, reading standard input when no file is given. It stops once it "
-    "has the lines it needs.");
+    "The head utility writes the first lines of each file.");
 
 FLAG(HEAD_LINES, String, 'n', "", "Write the first count lines.");
 FLAG(HEAD_BYTES, String, 'c', "", "Write the first count bytes.");

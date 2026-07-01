@@ -11,11 +11,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[dir]");
 
 HELP_DESCRIPTION_DECL(
-    "The cd builtin changes the working directory to dir, or to the home "
-    "directory when no operand is given. A lone dash operand moves to the "
-    "previous directory named by OLDPWD and prints where it lands, and a "
-    "relative operand is searched against the directories in CDPATH. The "
-    "builtin updates PWD and OLDPWD on a successful move.");
+    "The cd builtin changes the working directory.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

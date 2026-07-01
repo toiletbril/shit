@@ -9,10 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-fv] source ... destination");
 
 HELP_DESCRIPTION_DECL(
-    "The mv utility renames each source to the destination. When more than one "
-    "source is given the destination must be a directory. With -v it names "
-    "each "
-    "move as it happens.");
+    "The mv utility renames each source to the destination.");
 
 FLAG(MV_FORCE, Bool, 'f', "", "Overwrite an existing destination.");
 FLAG(MV_VERBOSE, Bool, 'v', "", "Print the name of each move as it happens.");

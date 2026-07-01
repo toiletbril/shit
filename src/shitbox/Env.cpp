@@ -9,10 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[NAME=value ...] [command [argument ...]]");
 
 HELP_DESCRIPTION_DECL(
-    "The env utility prints the environment when given no command. With "
-    "leading "
-    "NAME=value assignments and a command it runs the command with those "
-    "variables added, then restores the previous values.");
+    "The env utility runs a command in a modified environment.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

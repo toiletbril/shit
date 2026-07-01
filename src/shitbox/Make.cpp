@@ -11,18 +11,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-f file] [target ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The make utility reads a Makefile, expands its variables, and runs the "
-    "recipe of each requested target after its prerequisites, and each recipe "
-    "line runs in its own subshell. With no target it builds the first one. It "
-    "supports "
-    "recursive and := simple variables, += and ?= assignments, explicit rules, "
-    "single-level pattern rules such as %.o: %.c with the automatic variables "
-    "$@, $<, and $^, the ifeq, ifneq, ifdef, and ifndef conditionals, "
-    "backslash "
-    "line continuations, and the $(wildcard), $(shell), and $(VAR:a=b) "
-    "functions. The -B and -k flags and the -j parallelism flag are accepted "
-    "and "
-    "ignored. The build runs serially. It has no chained implicit rules.");
+    "The make utility runs the recipe of each requested target.");
 
 FLAG(MAKE_FILE, String, 'f', "file",
      "Read the named file instead of Makefile.");

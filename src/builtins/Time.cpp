@@ -10,11 +10,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("command [argument ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The time builtin runs the given command once and prints to standard error "
-    "how long it took, the real elapsed time plus the user and system time its "
-    "children consumed. The pretty report also prints the peak resident set "
-    "when "
-    "a child raised it. It returns the status of the timed command.");
+    "The time builtin runs a command and reports how long it took.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

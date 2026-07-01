@@ -8,10 +8,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[n]");
 
 HELP_DESCRIPTION_DECL(
-    "The exit builtin ends the shell with status n, or with the status of the "
-    "last command when no operand is given. The builtin runs the exit trap "
-    "before it leaves, and inside a subshell or a command substitution it ends "
-    "only that scope.");
+    "The exit builtin ends the shell with a status.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

@@ -9,7 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("path");
 
 HELP_DESCRIPTION_DECL(
-    "The dirname utility prints the path with its final component removed.");
+    "The dirname utility prints the directory part of a path.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

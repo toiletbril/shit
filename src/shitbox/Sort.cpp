@@ -8,8 +8,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-r] [file ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The sort utility writes the lines of its input in byte order, reading "
-    "standard input when no file is given. With -r the order is reversed.");
+    "The sort utility writes the lines of its input in byte order.");
 
 FLAG(SORT_REVERSE, Bool, 'r', "", "Reverse the order of the output.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

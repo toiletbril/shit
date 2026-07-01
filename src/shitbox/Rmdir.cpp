@@ -8,8 +8,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("directory ...");
 
 HELP_DESCRIPTION_DECL(
-    "The rmdir utility removes each named directory. The directory must be "
-    "empty.");
+    "The rmdir utility removes each empty directory.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

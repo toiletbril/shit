@@ -16,8 +16,7 @@ HELP_SYNOPSIS_DECL("");
 
 HELP_DESCRIPTION_DECL(
     "The times builtin prints the user and system time the shell and its "
-    "children have used, one line for the shell and one for its children. A "
-    "platform without process accounting prints zeros.");
+    "children have used.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

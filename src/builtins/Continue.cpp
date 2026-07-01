@@ -8,10 +8,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[n]");
 
 HELP_DESCRIPTION_DECL(
-    "The continue builtin skips to the next iteration of an enclosing for, "
-    "while, or until loop. The optional count n names how many enclosing loops "
-    "to skip and defaults to one, and a count below one is rejected as an "
-    "illegal number.");
+    "The continue builtin skips to the next iteration of an enclosing loop.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

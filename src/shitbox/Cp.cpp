@@ -9,10 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-rRv] source ... destination");
 
 HELP_DESCRIPTION_DECL(
-    "The cp utility copies each source to the destination. With -r it copies a "
-    "directory and its contents. When more than one source is given the "
-    "destination must be a directory. With -v it names each copy as it "
-    "happens.");
+    "The cp utility copies each source to the destination.");
 
 FLAG(CP_RECURSIVE_R, Bool, 'r', "", "Copy directories and their contents.");
 FLAG(CP_RECURSIVE_UPPER, Bool, 'R', "", "Copy directories and their contents.");

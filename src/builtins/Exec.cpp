@@ -12,17 +12,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[command [argument ...]]");
 
 HELP_DESCRIPTION_DECL(
-    "The exec builtin replaces the shell with the named command and does not "
-    "fork a child. Control does not return on success. The command names an "
-    "executable file. A shell builtin is not a valid target. The -l option "
-    "prefixes the command's zeroth argument with a dash. The program then "
-    "reads "
-    "itself as a login shell the way login does. The -a option names that "
-    "zeroth argument, and the -c "
-    "option runs the command with an empty environment. With no command the "
-    "builtin applies its redirections to the shell itself and returns. The "
-    "options are read in the default and bash moods, while the sh mood passes "
-    "them through as the dash exec does.");
+    "The exec builtin replaces the shell with the named command.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(EXEC_LOGIN, Bool, 'l', "",

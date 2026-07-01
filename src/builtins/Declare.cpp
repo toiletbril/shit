@@ -11,9 +11,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-aAfFgilnprtux] [+i] [name[=value] ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The declare builtin, also spelled typeset, declares variables and sets "
-    "their attributes. A plus before a letter removes a backed attribute, as "
-    "in the +i form. In bash mode it backs the array and associative types.");
+    "The declare builtin declares variables and sets their attributes.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 /* The FLAG rows feed only the help text. The attribute letters are hand-parsed

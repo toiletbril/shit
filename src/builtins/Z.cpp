@@ -13,12 +13,8 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[query ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The z builtin changes to a frequently visited directory ranked by a "
-    "frecency store at ~/.shit_directory_history. The store weights each "
-    "directory by its visit count and how recently it was seen. The operands "
-    "join into one query that matches a directory by case-insensitive "
-    "substring, and z "
-    "prints the path it jumps to.");
+    "The z builtin changes to a frequently visited directory ranked by "
+    "frecency.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

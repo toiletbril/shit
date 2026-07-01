@@ -9,9 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-lwc] [file ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The wc utility counts the lines, words, and bytes of each file, reading "
-    "standard input when no file is given. With no flag it prints all three "
-    "counts.");
+    "The wc utility counts the lines, words, and bytes of each file.");
 
 FLAG(WC_LINES, Bool, 'l', "", "Print the newline count.");
 FLAG(WC_WORDS, Bool, 'w', "", "Print the word count.");

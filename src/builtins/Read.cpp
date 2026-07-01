@@ -9,10 +9,8 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-r] [name ...]");
 HELP_DESCRIPTION_DECL(
-    "The read builtin reads one line from standard input and splits it on IFS "
-    "into the named variables, with the last variable taking the remainder. "
-    "With no name the line goes to REPLY, and a line that ends at end of input "
-    "without a newline yields a non-zero status.");
+    "The read builtin reads one line from standard input into the named "
+    "variables.");
 
 FLAG(READ_RAW, Bool, 'r', "", "Do not treat a backslash as an escape.");
 FLAG(READ_ARRAY, String, 'a', "",

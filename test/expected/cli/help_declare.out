@@ -1,7 +1,5 @@
 DESCRIPTION
-  The declare builtin, also spelled typeset, declares variables and sets their
-  attributes. A plus before a letter removes a backed attribute, as in the +i
-  form. In bash mode it backs the array and associative types.
+  The declare builtin declares variables and sets their attributes.
 
 SYNOPSIS
   declare [-aAfFgilnprtux] [+i] [name[=value] ...]

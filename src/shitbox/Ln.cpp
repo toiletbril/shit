@@ -9,8 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-sf] target link");
 
 HELP_DESCRIPTION_DECL(
-    "The ln utility creates a link named link to the target. Only symbolic "
-    "links are supported, through the -s flag.");
+    "The ln utility creates a symbolic link to the target.");
 
 FLAG(LN_SYMBOLIC, Bool, 's', "", "Create a symbolic link.");
 FLAG(LN_FORCE, Bool, 'f', "", "Remove an existing destination first.");

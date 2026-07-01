@@ -12,11 +12,7 @@ HELP_SYNOPSIS_DECL(
     "[path ...] [-name glob] [-type fdl] [-maxdepth n] [-mindepth n]");
 
 HELP_DESCRIPTION_DECL(
-    "The find utility walks each path operand, or the current directory when "
-    "none is given, and prints every entry under it. The -name predicate keeps "
-    "the entries whose final component matches a glob, -type keeps a file, a "
-    "directory, or a symlink, and -maxdepth and -mindepth bound the walk "
-    "depth.");
+    "The find utility walks each path and prints every entry under it.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

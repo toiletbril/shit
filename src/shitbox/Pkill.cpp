@@ -9,10 +9,8 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-l] [-s signal] pattern");
 
 HELP_DESCRIPTION_DECL(
-    "The pkill utility sends a signal to every process whose name contains the "
-    "pattern. The signal defaults to TERM and may be a name or a number. The "
-    "status is zero when a process matched and one when none did. With -l it "
-    "lists the signal names and exits.");
+    "The pkill utility sends a signal to each process whose name matches a "
+    "pattern.");
 
 FLAG(PKILL_SIGNAL, String, 's', "signal",
      "The signal to send, a name such as TERM or a number such as 15.");

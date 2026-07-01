@@ -9,8 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[first [increment]] last");
 
 HELP_DESCRIPTION_DECL(
-    "The seq utility prints a sequence of integers from first to last, one per "
-    "line. first defaults to one and increment defaults to one.");
+    "The seq utility prints a sequence of integers from first to last.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

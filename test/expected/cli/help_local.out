@@ -4,8 +4,6 @@ shit: 1:1: warning: A local outside a function has no scope to bind.
 note: Declare the variable plainly or move it into a function.
 DESCRIPTION
   The local builtin declares each named variable local to the current function.
-  The caller's value returns when the function ends, and name=value assigns a
-  value. It is an error outside a function.
 
 SYNOPSIS
   local [-aAilnrux] name[=value] ...

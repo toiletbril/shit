@@ -9,9 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[aux]");
 
 HELP_DESCRIPTION_DECL(
-    "The ps utility lists the running processes. The plain form prints the "
-    "process id and the command name. The aux or -aux form prints the owner, "
-    "the process id, and the full command line of every process.");
+    "The ps utility lists the running processes.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

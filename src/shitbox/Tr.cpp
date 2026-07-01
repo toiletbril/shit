@@ -8,10 +8,8 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-d] set1 [set2]");
 
 HELP_DESCRIPTION_DECL(
-    "The tr utility reads standard input and translates the bytes in set1 to "
-    "the matching bytes in set2, or with -d deletes the bytes in set1. A range "
-    "such as a-z, or a descending one such as z-a, expands to every byte "
-    "between its ends.");
+    "The tr utility translates the bytes in set1 to the matching bytes in "
+    "set2.");
 
 FLAG(TR_DELETE, Bool, 'd', "", "Delete the bytes in set1.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

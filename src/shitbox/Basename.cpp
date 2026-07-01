@@ -9,8 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("path [suffix]");
 
 HELP_DESCRIPTION_DECL(
-    "The basename utility prints the final component of the path, with a "
-    "trailing suffix removed when one is given.");
+    "The basename utility prints the final component of a path.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

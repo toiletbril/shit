@@ -9,8 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("file");
 
 HELP_DESCRIPTION_DECL(
-    "The unlink utility removes the single named file through one unlink call. "
-    "It does not remove a directory.");
+    "The unlink utility removes the single named file.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

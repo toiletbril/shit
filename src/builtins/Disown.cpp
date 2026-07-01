@@ -10,10 +10,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-a] [-r] [-h] [%job ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The disown builtin removes a job from the job table and the shell stops "
-    "tracking it. The removed job keeps running detached. With a %job "
-    "operand it removes that job, with no operand it removes the most recent "
-    "job, -a removes every job, and -r removes only the running jobs.");
+    "The disown builtin removes a job from the job table.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(ALL, Bool, 'a', "all", "Remove every job.");

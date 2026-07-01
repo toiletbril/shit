@@ -8,9 +8,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[n]");
 
 HELP_DESCRIPTION_DECL(
-    "The break builtin exits an enclosing for, while, or until loop. The "
-    "optional count n names how many enclosing loops to break and defaults to "
-    "one, and a count below one is rejected as an illegal number.");
+    "The break builtin exits an enclosing loop.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

@@ -9,10 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-c] file ...");
 
 HELP_DESCRIPTION_DECL("The touch utility sets the access and the modification "
-                      "times of each named "
-                      "file to the current time, creating the file when it is "
-                      "missing. With -c it "
-                      "does not create a missing file.");
+                      "times of each named file.");
 
 FLAG(TOUCH_NO_CREATE, Bool, 'c', "", "Do not create a file that is missing.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

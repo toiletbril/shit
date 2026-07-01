@@ -12,10 +12,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-aA1lh] [path ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The ls utility lists the names in each directory operand, or the current "
-    "directory when none is given. By default the names are laid out in "
-    "columns sized to the terminal, and one name per line is printed when the "
-    "output is not a terminal.");
+    "The ls utility lists the names in each directory.");
 
 FLAG(LS_ALL, Bool, 'a', "", "List entries whose name starts with a dot.");
 FLAG(LS_ALMOST_ALL, Bool, 'A', "",

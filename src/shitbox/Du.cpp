@@ -10,9 +10,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-sh] [path ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The du utility prints the total byte size of each path, descending into a "
-    "directory and summing its files. The -s summary is the only mode and is "
-    "the default. With -h the size is printed in a human-readable form.");
+    "The du utility prints the total byte size of each path.");
 
 FLAG(DU_SUMMARY, Bool, 's', "",
      "Print only the total for each path, the default.");

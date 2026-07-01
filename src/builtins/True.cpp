@@ -7,8 +7,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("");
 
 HELP_DESCRIPTION_DECL(
-    "The true builtin does nothing and always returns a success status. It "
-    "ignores any arguments it is given.");
+    "The true builtin does nothing and always returns a success status.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

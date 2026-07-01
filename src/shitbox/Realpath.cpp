@@ -9,8 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("path ...");
 
 HELP_DESCRIPTION_DECL(
-    "The realpath utility prints the absolute, normalized form of each path, "
-    "resolving the . and .. components against the current directory.");
+    "The realpath utility prints the absolute, normalized form of each path.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

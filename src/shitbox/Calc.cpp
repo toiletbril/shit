@@ -13,10 +13,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-i] [expression ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The calc utility evaluates each argument as an arithmetic expression and "
-    "prints the value of the last one. In the default mood it computes in 128 "
-    "bits. With no expression on a terminal, or with -i, it reads expressions "
-    "interactively.");
+    "The calc utility evaluates each argument as an arithmetic expression.");
 
 FLAG(CALC_INTERACTIVE, Bool, 'i', "interactive",
      "Read and evaluate expressions interactively.");

@@ -9,11 +9,8 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[%job]");
-HELP_DESCRIPTION_DECL("The fg builtin brings a background job to the "
-                      "foreground and waits for it, "
-                      "resuming the job first when it was stopped. With no "
-                      "operand it acts on the "
-                      "most recent job.");
+HELP_DESCRIPTION_DECL(
+    "The fg builtin brings a job to the foreground and waits for it.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

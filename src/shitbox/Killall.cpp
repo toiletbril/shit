@@ -8,10 +8,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-l] [-s signal] name");
 
 HELP_DESCRIPTION_DECL(
-    "The killall utility sends a signal to every process whose name matches "
-    "the operand exactly. The signal defaults to TERM and may be a name or a "
-    "number. The status is zero when a process matched and one when none did. "
-    "With -l it lists the signal names and exits.");
+    "The killall utility sends a signal to each process by exact name.");
 
 FLAG(KILLALL_SIGNAL, String, 's', "signal",
      "The signal to send, a name such as TERM or a number such as 15.");

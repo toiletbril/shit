@@ -15,15 +15,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("expression", "[ expression ]");
 
 HELP_DESCRIPTION_DECL(
-    "The test builtin evaluates the expression and reports 0 for true and 1 "
-    "for false. The unary file tests -e -f -d -r -w -x -s -L -h -p -S -b -c "
-    "-g -u -k -t check the named file, -n and -z check a string's length, "
-    "and a bare string is true when nonempty. The binary operators = and != "
-    "compare strings, == only in the bash mood, and -eq -ne -gt -ge -lt -le "
-    "compare integers. ! negates, -a binds tighter than -o, and parentheses "
-    "group. The [ form requires a closing ]. This help shows only in the "
-    "default mood with --help as the sole argument, since a POSIX or bash "
-    "test treats the word as a nonempty string.");
+    "The test builtin evaluates an expression and reports true or false.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

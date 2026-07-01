@@ -11,10 +11,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-aq] program [program ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The which utility prints how each named program resolves, naming it a "
-    "shell builtin or printing its PATH location. With -a it prints every PATH "
-    "match. The default prints the first match. With -q it prints nothing and "
-    "only sets the status. The status is non-zero when no name resolves.");
+    "The which utility prints how each named program resolves.");
 
 FLAG(ALL, Bool, 'a', "all", "Show all matches.");
 FLAG(QUIET, Bool, 'q', "quiet", "Print nothing, only set the status.");

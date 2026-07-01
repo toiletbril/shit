@@ -8,8 +8,8 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("");
 HELP_DESCRIPTION_DECL(
-    "The pwd builtin prints the absolute path of the current working directory "
-    "to standard output.");
+    "The pwd builtin prints the absolute path of the current working "
+    "directory.");
 
 FLAG(PWD_LOGICAL, Bool, 'L', "",
      "Print the logical directory, keeping the symlinks the path was reached "

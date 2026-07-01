@@ -12,13 +12,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[--list] [name [argument ...]]");
 
 HELP_DESCRIPTION_DECL(
-    "The builtin builtin runs name with its arguments as a shell builtin, "
-    "ignoring a shell function of the same name and never searching the PATH. "
-    "With --list it prints every builtin one per line. A bare builtin in the "
-    "shit mood prints the builtins in columns, and in the other moods it "
-    "succeeds without running anything. A name that is not a shell builtin is "
-    "an "
-    "error.");
+    "The builtin builtin runs a shell builtin past a same-named function.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(BUILTIN_LIST, Bool, '\0', "list", "List every builtin one per line.");

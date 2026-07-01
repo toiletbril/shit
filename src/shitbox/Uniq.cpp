@@ -9,9 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-c] [file]");
 
 HELP_DESCRIPTION_DECL(
-    "The uniq utility collapses each run of adjacent equal lines into one, "
-    "reading standard input when no file is given. With -c it prefixes the "
-    "count of each run.");
+    "The uniq utility collapses each run of adjacent equal lines into one.");
 
 FLAG(UNIQ_COUNT, Bool, 'c', "", "Prefix each line with the count of its run.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

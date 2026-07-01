@@ -7,8 +7,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[string ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The yes utility writes the given string, or y by default, on its own line "
-    "over and over until its output is closed.");
+    "The yes utility writes the given string on its own line over and over.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

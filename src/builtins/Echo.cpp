@@ -9,13 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-neE] [arg ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The echo builtin prints its arguments separated by spaces and ends with "
-    "a newline. -n drops the trailing newline. -e interprets the backslash "
-    "escapes and -E leaves them literal. The shit default interprets escapes "
-    "the way dash does while still reading the three options, the bash mood "
-    "leaves escapes literal unless -e asks, and the POSIX mood reads only a "
-    "leading -n. This help shows only in the default mood with --help as the "
-    "sole argument, since a POSIX or bash echo prints the literal text.");
+    "The echo builtin prints its arguments followed by a newline.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(ECHO_NO_NEWLINE, Bool, 'n', "", "Do not print the trailing newline.");

@@ -8,9 +8,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[arg ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The eval builtin joins its arguments with spaces and runs the result as a "
-    "command in the current shell. A return or an exit left pending by the "
-    "evaluated text propagates to the enclosing function or the shell.");
+    "The eval builtin runs its arguments as a command in the current shell.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

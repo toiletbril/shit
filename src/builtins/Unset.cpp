@@ -8,10 +8,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-f] [-v] name ...");
 
 HELP_DESCRIPTION_DECL(
-    "The unset builtin removes each named shell variable, or with -f removes "
-    "each named shell function. A read-only variable is left in place and the "
-    "builtin reports a non-zero status while still unsetting the remaining "
-    "names.");
+    "The unset builtin removes each named shell variable or function.");
 
 FLAG(UNSET_FUNCTION, Bool, 'f', "", "Remove each named shell function.");
 FLAG(UNSET_VARIABLE, Bool, 'v', "", "Remove variables, the default.");

@@ -9,9 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-n count] [-c count] [file ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The tail utility writes the last count lines of each file, ten by "
-    "default, reading standard input when no file is given. With -c it writes "
-    "the last count bytes.");
+    "The tail utility writes the last lines of each file.");
 
 FLAG(TAIL_LINES, String, 'n', "", "Write the last count lines.");
 FLAG(TAIL_BYTES, String, 'c', "", "Write the last count bytes.");

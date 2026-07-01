@@ -9,8 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-aAilnrux] name[=value] ...");
 HELP_DESCRIPTION_DECL(
     "The local builtin declares each named variable local to the current "
-    "function. The caller's value returns when the function ends, and "
-    "name=value assigns a value. It is an error outside a function.");
+    "function.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 /* The attribute letters are hand-parsed in execute, so these FLAG rows only

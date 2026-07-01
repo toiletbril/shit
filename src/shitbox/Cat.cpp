@@ -9,9 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-n] [file ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The cat utility writes each file to standard output, or standard input "
-    "when no file is given or a file is named '-'. With -n it numbers every "
-    "output line.");
+    "The cat utility writes each file to standard output.");
 
 FLAG(CAT_NUMBER, Bool, 'n', "", "Number every output line, starting at one.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

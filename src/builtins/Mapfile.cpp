@@ -10,9 +10,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-t] [-n count] [array]");
 
 HELP_DESCRIPTION_DECL(
-    "The mapfile builtin, also named readarray, reads lines from the standard "
-    "input into an indexed array, one line per element. The default array "
-    "name is MAPFILE when no name operand is given.");
+    "The mapfile builtin reads standard input lines into an indexed array.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 /* The letters are hand-parsed in execute, so these FLAG rows only feed the

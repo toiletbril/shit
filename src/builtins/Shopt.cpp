@@ -10,10 +10,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-supqo] [optname ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The shopt builtin sets, unsets, and queries the bash shell options such "
-    "as extglob, globstar, nullglob, and dotglob. With no flag a named "
-    "option is queried, and with no name every option is listed with its "
-    "state. The OPTION NAMES section below lists every name shopt accepts.");
+    "The shopt builtin sets, unsets, and queries the bash shell options.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 /* The letters are hand-parsed in execute since they combine bash-style, so

@@ -8,9 +8,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-iv] pattern [file ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The grep utility prints the lines of each file that contain the fixed "
-    "string pattern, reading standard input when no file is given. The status "
-    "is zero when a line matched and one when none did.");
+    "The grep utility prints the lines of each file that match a pattern.");
 
 FLAG(GREP_IGNORE_CASE, Bool, 'i', "", "Match without regard to letter case.");
 FLAG(GREP_INVERT, Bool, 'v', "", "Print the lines that do not match.");

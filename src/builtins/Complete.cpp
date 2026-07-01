@@ -10,13 +10,7 @@ HELP_SYNOPSIS_DECL("[-abcdefgjksuv] [-o option] [-A action] [-G globpat] "
                    "[-W wordlist] [-F function] [-C command] [-X filterpat] "
                    "[-P prefix] [-S suffix] [-pr] [name ...]");
 HELP_DESCRIPTION_DECL(
-    "The complete builtin registers a programmable-completion spec for each "
-    "named command, the way a bash completion script does. The interactive "
-    "engine consults the spec when an argument of that command completes. "
-    "The -W word list filters on every keystroke, the -F function runs on an "
-    "explicit tab, -o default falls back to filename completion when the "
-    "spec yields nothing, and a -D default spec drives the bash-completion "
-    "dynamic loader with its 124 retry protocol.");
+    "The complete builtin registers a completion spec for a command.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 /* The options are hand-parsed in execute since several only skip their

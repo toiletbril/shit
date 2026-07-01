@@ -8,10 +8,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-o option] [-DEI] [+o option] [name ...]");
 HELP_DESCRIPTION_DECL(
-    "The compopt builtin accepts a request to change the completion options of "
-    "each named command. The interactive completion engine does not yet "
-    "consult "
-    "these options. The call has no effect.");
+    "The compopt builtin accepts completion option changes with no effect.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

@@ -9,8 +9,7 @@ HELP_SYNOPSIS_DECL("[-W wordlist] [-G glob] [-A action] [-P prefix] "
                    "[-S suffix] [-X filterpat] [-F function] [-C command] "
                    "[word]");
 HELP_DESCRIPTION_DECL(
-    "The compgen builtin writes the completion candidates for the given "
-    "options and word to standard output, each on its own line.");
+    "The compgen builtin writes the completion candidates for a word.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 /* The value-carrying options are hand-parsed in execute, so these FLAG rows
