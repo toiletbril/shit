@@ -107,43 +107,19 @@ inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
    a steady working set. The cache is bounded per class so a burst does not pin
    memory. The pool is single threaded, since the evaluator never shares an
    allocator across threads, and it is audited in docs/globals-audit.md. */
-struct heap_pool
+class HeapPool
 {
-  static constexpr usize MIN_CLASS_SHIFT =
-      4; /* the smallest class is 16 bytes */
-  static constexpr usize MAX_CLASS_SHIFT =
-      16; /* the largest pooled block is 64 KiB */
-  static constexpr usize CLASS_COUNT = MAX_CLASS_SHIFT - MIN_CLASS_SHIFT + 1;
-  static constexpr usize MAX_BLOCKS_PER_CLASS = 512;
-
-  struct node
-  {
-    node *next;
-  };
-
-  node *bins[CLASS_COUNT] = {};
-  u32 counts[CLASS_COUNT] = {};
-
-  hot static fn class_shift_for(usize length) wontthrow -> usize
-  {
-    let const size = length <= (usize{1} << MIN_CLASS_SHIFT)
-                         ? (usize{1} << MIN_CLASS_SHIFT)
-                         : length;
-    let shift = static_cast<usize>(64 - __builtin_clzll(size - 1));
-    if (shift < MIN_CLASS_SHIFT) shift = MIN_CLASS_SHIFT;
-    return shift;
-  }
-
+public:
   hot fn take(usize length) wontthrow -> opaque *
   {
     let const shift = class_shift_for(length);
     if (shift > MAX_CLASS_SHIFT) return std::malloc(length);
 
     let const class_index = shift - MIN_CLASS_SHIFT;
-    if (bins[class_index] != nullptr) {
-      let const reused = bins[class_index];
-      bins[class_index] = reused->next;
-      counts[class_index]--;
+    if (m_bins[class_index] != nullptr) {
+      let const reused = m_bins[class_index];
+      m_bins[class_index] = reused->next;
+      m_counts[class_index]--;
       return reused;
     }
 
@@ -161,15 +137,41 @@ struct heap_pool
     }
 
     let const class_index = shift - MIN_CLASS_SHIFT;
-    if (counts[class_index] >= MAX_BLOCKS_PER_CLASS) {
+    if (m_counts[class_index] >= MAX_BLOCKS_PER_CLASS) {
       std::free(pointer);
       return;
     }
 
     let const recycled = static_cast<node *>(pointer);
-    recycled->next = bins[class_index];
-    bins[class_index] = recycled;
-    counts[class_index]++;
+    recycled->next = m_bins[class_index];
+    m_bins[class_index] = recycled;
+    m_counts[class_index]++;
+  }
+
+private:
+  static constexpr usize MIN_CLASS_SHIFT =
+      4; /* the smallest class is 16 bytes */
+  static constexpr usize MAX_CLASS_SHIFT =
+      16; /* the largest pooled block is 64 KiB */
+  static constexpr usize CLASS_COUNT = MAX_CLASS_SHIFT - MIN_CLASS_SHIFT + 1;
+  static constexpr usize MAX_BLOCKS_PER_CLASS = 512;
+
+  struct node
+  {
+    node *next;
+  };
+
+  node *m_bins[CLASS_COUNT] = {};
+  u32 m_counts[CLASS_COUNT] = {};
+
+  hot static fn class_shift_for(usize length) wontthrow -> usize
+  {
+    let const size = length <= (usize{1} << MIN_CLASS_SHIFT)
+                         ? (usize{1} << MIN_CLASS_SHIFT)
+                         : length;
+    let shift = static_cast<usize>(64 - __builtin_clzll(size - 1));
+    if (shift < MIN_CLASS_SHIFT) shift = MIN_CLASS_SHIFT;
+    return shift;
   }
 };
 
@@ -179,9 +181,9 @@ struct heap_pool
    process teardown. A heap free from a file-scope cache destructor at process
    exit then reaches live storage whatever the static destruction order names.
  */
-hot inline fn heap_pool_instance() wontthrow -> heap_pool &
+hot inline fn heap_pool_instance() wontthrow -> HeapPool &
 {
-  static heap_pool pool;
+  static HeapPool pool;
   return pool;
 }
 
