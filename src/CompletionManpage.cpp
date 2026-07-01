@@ -394,7 +394,7 @@ static fn parse_manpage_option_entries(StringView text) throws
 
   let do_finalize_pending = [&]() throws -> void {
     if (pending_flags.is_empty()) return;
-    let const desc = trim_blanks(pending_description.view());
+    let const desc = pending_description.view().trim_blanks();
     for (let const &flag : pending_flags)
       if (!desc.is_empty() && descriptions.find(flag.view()) == nullptr) {
         descriptions.set(flag.view(), String{desc});
@@ -423,7 +423,7 @@ static fn parse_manpage_option_entries(StringView text) throws
         indent >= pending_indent)
     {
       let const piece =
-          trim_blanks(raw.substring_of_length(indent, raw.length - indent));
+          raw.substring_of_length(indent, raw.length - indent).trim_blanks();
       if (!piece.is_empty()) {
         if (!pending_description.is_empty()) pending_description += ' ';
         pending_description.append(piece);
@@ -446,7 +446,7 @@ static fn parse_manpage_option_entries(StringView text) throws
     pending_description = String{heap_allocator()};
     if (gap < raw.length)
       pending_description.append(
-          trim_blanks(raw.substring_of_length(gap, raw.length - gap)));
+          raw.substring_of_length(gap, raw.length - gap).trim_blanks());
   }
   do_finalize_pending();
 
@@ -863,7 +863,7 @@ static fn parse_help_option_entries(StringView text) throws
 
     let description = StringView{};
     if (gap < raw.length)
-      description = trim_blanks(raw.substring_of_length(gap, raw.length - gap));
+      description = raw.substring_of_length(gap, raw.length - gap).trim_blanks();
 
     for (let const &flag : extract_dash_flags(option_part))
       if (!seen.contains(flag.view())) {
@@ -975,7 +975,7 @@ static fn parse_help_subcommands(StringView text) throws
     i = line_end + 1;
 
     let const trim_start = skip_blanks(raw, 0);
-    let const trimmed = trim_blanks(raw);
+    let const trimmed = raw.trim_blanks();
 
     if (line_opens_subcommand_section(trimmed)) {
       in_section = true;
@@ -1002,8 +1002,9 @@ static fn parse_help_subcommands(StringView text) throws
 
     let description = StringView{};
     if (column_end < trimmed.length)
-      description = trim_blanks(
-          trimmed.substring_of_length(column_end, trimmed.length - column_end));
+      description =
+          trimmed.substring_of_length(column_end, trimmed.length - column_end)
+              .trim_blanks();
 
     /* Each comma-separated alias such as `ft, fetch` becomes its own candidate
        under the shared description. */
@@ -1013,8 +1014,9 @@ static fn parse_help_subcommands(StringView text) throws
       let alias_end = alias_start;
       while (alias_end < column.length && column[alias_end] != ',')
         alias_end++;
-      let const alias = trim_blanks(
-          column.substring_of_length(alias_start, alias_end - alias_start));
+      let const alias =
+          column.substring_of_length(alias_start, alias_end - alias_start)
+              .trim_blanks();
       alias_start = alias_end + 1;
 
       if (!is_plausible_subcommand_name(alias)) continue;

@@ -37,15 +37,6 @@ static pure forceinline fn skip_blanks(StringView text, usize from) wontthrow
   return from;
 }
 
-static pure forceinline fn trim_blanks(StringView text) wontthrow -> StringView
-{
-  let const start = skip_blanks(text, 0);
-  let end = text.length;
-  while (end > start && is_blank(text[end - 1]))
-    end--;
-  return text.substring_of_length(start, end - start);
-}
-
 /* Primitives defined in Completion.cpp and reached from the cascade stages and
    the highlighter. */
 fn read_directory_cached(const Path &directory) throws

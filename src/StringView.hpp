@@ -82,6 +82,20 @@ public:
     }
     return true;
   }
+
+  /* The view with leading and trailing spaces and tabs removed. A carriage
+     return is left in place, since a Makefile line keeps its own \r trim. */
+  mustuse pure fn trim_blanks() const wontthrow -> StringView
+  {
+    usize start = 0;
+    usize end = length;
+    while (start < end && (data[start] == ' ' || data[start] == '\t'))
+      start++;
+    while (end > start && (data[end - 1] == ' ' || data[end - 1] == '\t'))
+      end--;
+
+    return substring_of_length(start, end - start);
+  }
 };
 
 /* FNV-1a over the view's bytes, inline since the hash sits inside every map

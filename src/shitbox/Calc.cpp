@@ -70,27 +70,19 @@ fn try_define(EvalContext &cxt, StringView line) throws -> bool
   if (i >= line.length || line[i] != '=') return false;
   if (i + 1 < line.length && line[i + 1] == '=') return false;
 
-  usize value_start = i + 1;
-  while (value_start < line.length &&
-         (line[value_start] == ' ' || line[value_start] == '\t'))
-    value_start++;
-  usize value_end = line.length;
-  while (value_end > value_start &&
-         (line[value_end - 1] == ' ' || line[value_end - 1] == '\t'))
-    value_end--;
+  let const value =
+      line.substring_of_length(i + 1, line.length - (i + 1)).trim_blanks();
 
   /* An empty right side reports rather than binding a name that would read as
      zero and defeat the unset error. */
-  if (value_end == value_start)
+  if (value.is_empty())
     throw ErrorWithLocation{
-        SourceLocation{name_start,              name.length},
-        "Assignment to '" + String{cxt.scratch_allocator(), name       }
-        +
+        SourceLocation{name_start, name.length},
+        "Assignment to '" + String{cxt.scratch_allocator(), name} +
             "' needs a value"
     };
 
-  cxt.set_shell_variable(
-      name, line.substring_of_length(value_start, value_end - value_start));
+  cxt.set_shell_variable(name, value);
   return true;
 }
 
