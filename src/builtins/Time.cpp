@@ -66,8 +66,8 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const rss_after = os::children_peak_rss_bytes();
 
   let const real_seconds = static_cast<double>(elapsed_nanos) / 1000000000.0;
-  const double user_cpu = user_after - user_before;
-  const double system_cpu = system_after - system_before;
+  let const user_cpu = user_after - user_before;
+  let const system_cpu = system_after - system_before;
   let const peak_rss_bytes = rss_after > rss_before ? rss_after : 0;
 
   /* An empty TIMEFORMAT prints nothing, an unset value keeps the pretty

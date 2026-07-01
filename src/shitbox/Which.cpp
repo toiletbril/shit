@@ -60,13 +60,8 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
     {
       has_found_any = true;
       if (!is_quiet) {
-        if (FLAG_ALL.is_enabled()) {
-          for (let const &path : paths) {
-            output += path.text();
-            output += '\n';
-          }
-        } else {
-          output += paths[0].text();
+        for (let const &path : paths) {
+          output += path.text();
           output += '\n';
         }
       }

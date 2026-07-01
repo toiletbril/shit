@@ -75,12 +75,12 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
   for (const os::process_entry &process : processes) {
     String owner = owner_name_for_uid(process.owner_id, uid_cache, allocator);
     if (owner.count() > user_width) user_width = owner.count();
-    if (String::from(process.pid, allocator).count() > pid_width)
-      pid_width = String::from(process.pid, allocator).count();
-    if (String::from(process.virtual_kib, allocator).count() > vsz_width)
-      vsz_width = String::from(process.virtual_kib, allocator).count();
-    if (String::from(process.resident_kib, allocator).count() > rss_width)
-      rss_width = String::from(process.resident_kib, allocator).count();
+    let const pid_text = String::from(process.pid, allocator);
+    if (pid_text.count() > pid_width) pid_width = pid_text.count();
+    let const vsz_text = String::from(process.virtual_kib, allocator);
+    if (vsz_text.count() > vsz_width) vsz_width = vsz_text.count();
+    let const rss_text = String::from(process.resident_kib, allocator);
+    if (rss_text.count() > rss_width) rss_width = rss_text.count();
     owners.push(steal(owner));
   }
 

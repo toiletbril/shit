@@ -919,12 +919,11 @@ fn main(int argc, char **argv) -> int
                                    : shit::mimic_mood::Default;
   LOG(Info, "invocation basename is '%.*s'",
       static_cast<int>(program_basename.length), program_basename.data);
+  let const session_mood = shit::resolve_session_mood(invocation_mood);
   LOG(Info, "selecting the %s mood",
-      shit::resolve_session_mood(invocation_mood) == shit::mimic_mood::Posix
-          ? "posix"
-      : shit::resolve_session_mood(invocation_mood) == shit::mimic_mood::Bash
-          ? "bash"
-          : "default");
+      session_mood == shit::mimic_mood::Posix  ? "posix"
+      : session_mood == shit::mimic_mood::Bash ? "bash"
+                                               : "default");
 
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
@@ -947,7 +946,6 @@ fn main(int argc, char **argv) -> int
                            .to_string(source.view()));
     return 2;
   }
-  let const session_mood = shit::resolve_session_mood(invocation_mood);
 
   let init_moods = shit::ArrayList<shit::mimic_mood>{shit::heap_allocator()};
   for (usize i = 0; i < FLAG_INIT_MOODS.count(); i++) {

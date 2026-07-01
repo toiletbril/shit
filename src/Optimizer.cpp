@@ -50,16 +50,10 @@ pure fn is_constant_arithmetic_byte(char byte) wontthrow -> bool
    plain integer, so it cannot inject an operator or another name. */
 pure fn is_plain_integer_literal(StringView text) wontthrow -> bool
 {
-  if (text.length == 0) return false;
-  usize start_position = 0;
-  if (text[0] == '-') {
-    if (text.length == 1) return false;
-    start_position = 1;
-  }
-  for (usize i = start_position; i < text.length; i++) {
-    if (!lexer::is_number(text[i])) return false;
-  }
-  return true;
+  if (text.is_empty()) return false;
+  let const start_position = text[0] == '-' ? usize{1} : usize{0};
+  return start_position < text.length &&
+         text.substring(start_position).is_all_decimal_digits();
 }
 
 /* True when a token is a bare unquoted $name reference that field-splits at run
