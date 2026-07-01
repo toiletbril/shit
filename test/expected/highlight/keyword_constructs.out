@@ -1,34 +1,34 @@
 == if then elif else fi:
 if	\e[32m
-true	\e[94m
+true	\e[34m
 ;	\e[1m
 then	\e[32m
-echo	\e[94m
+echo	\e[34m
 ;	\e[1m
 elif	\e[32m
-false	\e[94m
+false	\e[34m
 ;	\e[1m
 then	\e[32m
-echo	\e[94m
+echo	\e[34m
 ;	\e[1m
 else	\e[32m
-echo	\e[94m
+echo	\e[34m
 ;	\e[1m
 fi	\e[32m
 == while do done:
 while	\e[32m
-true	\e[94m
+true	\e[34m
 ;	\e[1m
 do	\e[32m
-echo	\e[94m
+echo	\e[34m
 ;	\e[1m
 done	\e[32m
 == until do done:
 until	\e[32m
-false	\e[94m
+false	\e[34m
 ;	\e[1m
 do	\e[32m
-echo	\e[94m
+echo	\e[34m
 ;	\e[1m
 done	\e[32m
 == for in do done:
@@ -37,7 +37,7 @@ q	\e[36m
 in	\e[32m
 ;	\e[1m
 do	\e[32m
-echo	\e[94m
+echo	\e[34m
 $q	\e[36m
 ;	\e[1m
 done	\e[32m
@@ -52,26 +52,26 @@ esac	\e[32m
 -n	\e[38;5;250m
 ]]	\e[32m
 &&	\e[1m
-echo	\e[94m
+echo	\e[34m
 == function keyword:
 function	\e[32m
 f	\e[94m
 {	\e[1m
-:	\e[94m
+:	\e[34m
 ;	\e[1m
 }	\e[1m
 ;	\e[1m
-f	\e[94m
+f	\e[34m
 == time keyword:
 time	\e[32m
-echo	\e[94m
+echo	\e[34m
 == misplaced then done fi esac do as a command:
 then	\e[1;31m
-echo	\e[94m
+echo	\e[34m
 done	\e[1;31m
 fi	\e[1;31m
 esac	\e[1;31m
 do	\e[1;31m
-echo	\e[94m
+echo	\e[34m
 == misplaced in as a command:
 in	\e[1;31m

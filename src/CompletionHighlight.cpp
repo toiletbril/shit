@@ -1015,7 +1015,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       /* A command name. A path-shaped command colors per segment like a path
          argument, the existing prefix bright cyan and the part being typed cyan
-         or red. A plain command name is bright blue when it resolves, blue
+         or red. A plain command name is blue once it resolves, bright blue
          while it still prefixes some command name so it could complete, and red
          once it prefixes nothing. */
       let const is_word_terminated =
@@ -1029,11 +1029,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         let command_color = colors::ansi::RED;
         if (first_word_resolves(word, context) || line_functions.contains(word))
         {
-          command_color = colors::ansi::BRIGHT_BLUE;
+          command_color = colors::ansi::BLUE;
         } else if (!is_word_terminated &&
                    command_word_prefixes_any(word, context))
         {
-          command_color = colors::ansi::BLUE;
+          command_color = colors::ansi::BRIGHT_BLUE;
         }
         do_push(word_start, word_end, command_color);
       }
