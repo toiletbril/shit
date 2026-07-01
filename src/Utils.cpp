@@ -460,7 +460,7 @@ static pure fn saturate_signed_magnitude(u64 magnitude, bool is_negative,
   if (is_negative) {
     if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX) + 1)
       return INT64_MIN;
-    return -static_cast<i64>(magnitude);
+    return static_cast<i64>(~magnitude + 1u);
   }
   if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX))
     return INT64_MAX;
@@ -474,28 +474,12 @@ static fn not_an_integer_error(StringView text) throws -> Error
 
 fn uint_to_text(u64 value, Allocator allocator) throws -> String
 {
-  /* The digits are written into a fixed buffer from the least significant end,
-     since a u64 never needs more than twenty decimal digits, then copied out in
-     order. The result String draws from the caller's allocator, so a transient
-     conversion comes from the scratch arena rather than the heap. */
-  char buffer[20];
-  usize offset = sizeof(buffer);
-  do {
-    ASSERT(offset > 0, "decimal digits cannot exceed the buffer");
-    buffer[--offset] = static_cast<char>('0' + value % 10);
-    value /= 10;
-  } while (value > 0);
-  return String{
-      allocator, StringView{buffer + offset, sizeof(buffer) - offset}
-  };
+  return String::from(value, allocator);
 }
 
 fn int_to_text(i64 value, Allocator allocator) throws -> String
 {
-  /* The digits are written into a stack buffer and the result is built from the
-     view in one allocation. */
-  char buffer[21];
-  return String{allocator, int_to_text_into(value, buffer, sizeof(buffer))};
+  return String::from(value, allocator);
 }
 
 fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow

@@ -38,6 +38,35 @@ public:
 
   mustuse fn clone() const throws -> String { return String{*this}; }
 
+  template <class T>
+  mustuse static fn from(T value, Allocator allocator = heap_allocator()) throws
+      -> String
+  {
+    static_assert(std::is_integral_v<T>, "String::from takes an integer");
+    char buffer[24];
+    usize position = sizeof(buffer);
+    u64 magnitude;
+    bool is_negative = false;
+
+    if constexpr (std::is_signed_v<T>) {
+      is_negative = value < 0;
+      magnitude = is_negative ? ~static_cast<u64>(value) + 1u
+                              : static_cast<u64>(value);
+    } else {
+      magnitude = static_cast<u64>(value);
+    }
+
+    do {
+      buffer[--position] = static_cast<char>('0' + magnitude % 10);
+      magnitude /= 10;
+    } while (magnitude != 0);
+
+    if (is_negative) buffer[--position] = '-';
+
+    return String{allocator,
+                  StringView{buffer + position, sizeof(buffer) - position}};
+  }
+
   /* An inline string owns no external buffer, so the common destruction skips
      the cold free path with one pointer compare and never leaves this header.
    */
