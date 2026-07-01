@@ -244,9 +244,11 @@ malformed regex is never compiled.
 .TP
 .B "(( ... )) and $(( ... ))"
 Arithmetic takes the C operators, ++ and \-\-, **, the ternary, the comma, the
-assignment operators, and a based literal such as 16#ff. A name is re\-evaluated
-as an expression, so a[b[c]] resolves c, then b, then a. An empty (( )) exits 1,
-while $(( )) yields its value.
+assignment operators, a 0x hexadecimal, a 0 octal, a 0b binary, and a based
+literal such as 16#ff. The 0b binary prefix is an extension over bash, which
+writes the same value as 2#. A name is re\-evaluated as an expression, so
+a[b[c]] resolves c, then b, then a. An empty (( )) exits 1, while $(( )) yields
+its value.
 .SS Parameter expansion
 .TP
 .B Substring
