@@ -133,6 +133,33 @@ static fn parse_colon_led_names(StringView listing) throws -> ArrayList<String>
   return names;
 }
 
+static fn parse_tsh_node_names(StringView listing) throws -> ArrayList<String>
+{
+  let names = ArrayList<String>{};
+  usize i = 0;
+  let has_passed_rule = false;
+  while (i < listing.length) {
+    let end = i;
+    while (end < listing.length && listing[end] != '\n')
+      end++;
+    let const row = listing.substring_of_length(i, end - i);
+    i = end + 1;
+
+    if (!has_passed_rule) {
+      if (!row.is_empty() && row[0] == '-') has_passed_rule = true;
+      continue;
+    }
+
+    usize field_end = 0;
+    while (field_end < row.length && row[field_end] != ' ' &&
+           row[field_end] != '\t')
+      field_end++;
+
+    if (field_end > 0) names.push(String{row.substring_of_length(0, field_end)});
+  }
+  return names;
+}
+
 /* The script names of a package.json "scripts" table, a tolerant scan that
    tracks only strings, escapes, and brace nesting, no JSON machinery. */
 static fn parse_package_json_scripts(StringView text) throws
@@ -293,6 +320,7 @@ enum class tool_with_targets_kind : u8
   cmake,
   node_runner,
   ssh,
+  teleport,
 };
 
 constexpr StaticStringMap<tool_with_targets_kind>::entry
@@ -306,7 +334,7 @@ constexpr StaticStringMap<tool_with_targets_kind>::entry
         {SSK("bun"),   tool_with_targets_kind::node_runner},
         {SSK("ssh"),   tool_with_targets_kind::ssh        },
         {SSK("scp"),   tool_with_targets_kind::ssh        },
-        {SSK("tsh"),   tool_with_targets_kind::ssh        },
+        {SSK("tsh"),   tool_with_targets_kind::teleport   },
 };
 
 constexpr StaticStringMap<tool_with_targets_kind> TOOLS_WITH_TARGETS{
@@ -473,6 +501,14 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
       return None;
     }
     owned_targets = collect_ssh_hosts();
+    break;
+  }
+  case tool_with_targets_kind::teleport: {
+    if (second_word_of(line) != "ssh") return None;
+    let probe = ArrayList<String>{};
+    probe.push(String{"tsh"});
+    probe.push(String{"ls"});
+    owned_targets = parse_tsh_node_names(capture(probe).view());
     break;
   }
   }

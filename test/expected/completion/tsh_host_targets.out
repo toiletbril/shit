@@ -1,10 +1,4 @@
-== tsh lists ssh hosts:
-alpha
+== tsh does not complete an ssh host by prefix, it is the Teleport client:
+== tsh ssh does not complete an ssh host either:
+== ssh still completes its host by prefix:
 bravo
-gamma
-== tsh by prefix:
-bravo
-== ssh agrees:
-alpha
-bravo
-gamma
