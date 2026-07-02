@@ -606,167 +606,193 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   /* The store lookup above wins, so IFS= reads back empty while the unset
      default reads back space-tab-newline, keeping the IFS save/restore idiom
      round-trip. */
-  if (first_byte == 'I' && name == "IFS") {
-    return String{heap_allocator(), m_field_separators.view()};
-  }
-
-  if (first_byte == 'S' && name == "SHIT_GIT_BRANCH") {
-    return utils::current_git_branch();
-  }
-
-  if (first_byte == 'S' && name.starts_with("SHIT_ANSI_")) {
-    if (let const escape = ansi_escape_for_color(name)) {
-      if (!colors::stdout_wants_color()) return String{heap_allocator()};
-      return String{heap_allocator(), *escape};
+  switch (first_byte) {
+  case 'I':
+    if (name == "IFS")
+      return String{heap_allocator(), m_field_separators.view()};
+    break;
+  case 'S':
+    if (name == "SHIT_GIT_BRANCH") return utils::current_git_branch();
+    if (name.starts_with("SHIT_ANSI_")) {
+      if (let const escape = ansi_escape_for_color(name)) {
+        if (!colors::stdout_wants_color()) return String{heap_allocator()};
+        return String{heap_allocator(), *escape};
+      }
     }
-  }
-
-  if (first_byte == 'L' && name == "LINENO") {
-    return String::from(line_number_at_location(m_current_location),
-                        heap_allocator());
+    break;
+  case 'L':
+    if (name == "LINENO")
+      return String::from(line_number_at_location(m_current_location),
+                          heap_allocator());
+    break;
+  default: break;
   }
 
   /* A stored assignment above wins, so RANDOM=5 reads back 5. */
   if (bash_dynamic_variables_enabled()) {
-    if (first_byte == 'R' && name == "RANDOM") {
-      if (!m_random_seeded) {
-        std::srand(static_cast<unsigned>(m_shell_start_time) ^
-                   static_cast<unsigned>(os::get_shell_process_id()));
-        m_random_seeded = true;
-      }
-      return String::from(static_cast<usize>(std::rand() % 32768),
-                          heap_allocator());
-    }
-    if (first_byte == 'S' && name == "SECONDS") {
-      return String::from(static_cast<i64>(std::time(nullptr)) -
-                              m_shell_start_time,
-                          heap_allocator());
-    }
-    if (first_byte == 'S' && name == "SHELLOPTS") {
-      struct shellopts_row
-      {
-        const char *option_name;
-        bool (EvalContext::*get)() const;
-      };
-      static const shellopts_row SHELLOPTS_ROWS[] = {
-          {"allexport", &EvalContext::export_all          },
-          {"errexit",   &EvalContext::error_exit          },
-          {"failglob",  &EvalContext::failglob            },
-          {"monitor",   &EvalContext::monitor             },
-          {"noclobber", &EvalContext::no_clobber          },
-          {"noexec",    &EvalContext::no_exec             },
-          {"noglob",    &EvalContext::no_glob             },
-          {"nounset",   &EvalContext::error_unset         },
-          {"pipefail",  &EvalContext::pipefail            },
-          {"posix",     &EvalContext::is_posix_mode       },
-          {"verbose",   &EvalContext::should_echo         },
-          {"xtrace",    &EvalContext::should_echo_expanded},
-      };
-      let joined = String{heap_allocator()};
-      for (let const &row : SHELLOPTS_ROWS) {
-        if (!(this->*(row.get))()) continue;
-        if (!joined.is_empty()) joined.push(':');
-        joined.append(StringView{row.option_name});
-      }
-      return joined;
-    }
-    if (first_byte == 'E' && name == "EPOCHSECONDS") {
-      return String::from(static_cast<i64>(std::time(nullptr)),
-                          heap_allocator());
-    }
-    if (first_byte == 'E' && name == "EPOCHREALTIME") {
-      const u64 microseconds = os::realtime_microseconds();
-      char fraction[8];
-      std::snprintf(fraction, sizeof(fraction), "%06llu",
-                    static_cast<unsigned long long>(microseconds % 1000000ULL));
-      return String::from(static_cast<i64>(microseconds / 1000000ULL),
-                          heap_allocator()) +
-             "." + StringView{fraction};
-    }
-    if (first_byte == 'B' && name == "BASHPID") {
-      return String::from(os::get_shell_process_id(), heap_allocator());
-    }
-    if (first_byte == 'P' && name == "PPID") {
-      return String::from(os::get_parent_process_id(), heap_allocator());
-    }
-    if (first_byte == 'U' && name == "UID") {
-      return String::from(os::get_real_user_id(), heap_allocator());
-    }
-    if (first_byte == 'E' && name == "EUID") {
-      return String::from(os::get_effective_user_id(), heap_allocator());
-    }
-    if (first_byte == 'H' && name == "HOSTNAME") {
-      if (let host = os::get_hostname(); host.has_value()) return steal(*host);
-      return String{heap_allocator()};
-    }
-    if (first_byte == 'B' && name == "BASH_MONOSECONDS") {
-      return String::from(static_cast<i64>(os::monotonic_nanos() / 1000000ULL),
-                          heap_allocator());
-    }
-    if (first_byte == 'B' && name == "BASH_ARGV0") {
-      return String{heap_allocator(), m_shell_name.view()};
-    }
-    /* BASH_EXECUTION_STRING is set only on the -c path. */
-    if (first_byte == 'B' && name == "BASH_EXECUTION_STRING" &&
-        !m_execution_string.is_empty())
-    {
-      return String{heap_allocator(), m_execution_string.view()};
-    }
-    /* The array form ${GROUPS[@]} is not modelled. */
-    if (first_byte == 'G' && name == "GROUPS") {
-      return String::from(os::get_real_group_id(), heap_allocator());
-    }
-    if (first_byte == 'H' && name == "HOSTTYPE") {
-      return os::machine_type();
-    }
-    if (first_byte == 'M' && name == "MACHTYPE") {
-      return os::machine_type() + "-unknown-linux-gnu";
-    }
-    if (first_byte == 'S' && name == "SRANDOM") {
-      let const value = static_cast<u32>(os::realtime_microseconds()) ^
-                        (static_cast<u32>(std::rand()) << 16) ^
-                        static_cast<u32>(std::rand());
-      return String::from(static_cast<i64>(value), heap_allocator());
-    }
-    if (first_byte == 'O' && name == "OSTYPE") {
-      return String{heap_allocator(), os::ostype_name()};
-    }
-    if (first_byte == 'B' && name == "BASH_SUBSHELL") {
-      return String::from(static_cast<i64>(m_subshell_depth), heap_allocator());
-    }
-    if (first_byte == 'F' && name == "FUNCNAME") {
-      if (funcname_frame_count() > 0)
-        return String{heap_allocator(), funcname_frame_at(0)};
-      return shit::None;
-    }
-    if (first_byte == 'B' && name == "BASH_SOURCE") {
-      if (!m_source_frames.is_empty())
-        return String{
-            heap_allocator(),
-            m_source_frames[m_source_frames.count() - 1].source_path.view()};
-      /* Inside a function BASH_SOURCE[0] is the file the function was defined
-         in. */
-      if (funcname_frame_count() > 0) {
-        let const *info =
-            m_function_definition_infos.find(funcname_frame_at(0));
-        if (info != nullptr && !info->filename.is_empty()) {
-          return String{heap_allocator(), info->filename.view()};
+    switch (first_byte) {
+    case 'R':
+      if (name == "RANDOM") {
+        if (!m_random_seeded) {
+          std::srand(static_cast<unsigned>(m_shell_start_time) ^
+                     static_cast<unsigned>(os::get_shell_process_id()));
+          m_random_seeded = true;
         }
+        return String::from(static_cast<usize>(std::rand() % 32768),
+                            heap_allocator());
       }
-      if (m_is_script_run) return String{heap_allocator(), m_shell_name.view()};
-      return String{heap_allocator()};
-    }
-
-    if (first_byte == 'B' && name == "BASH_LINENO") {
-      if (funcname_frame_count() > 0)
-        return String::from(funcname_line_at(0), heap_allocator());
-      return shit::None;
-    }
-
-    if (first_byte == 'B' && name == "BASH_COMMAND" &&
-        !m_current_command.is_empty())
-    {
-      return String{heap_allocator(), m_current_command.view()};
+      break;
+    case 'S':
+      if (name == "SECONDS") {
+        return String::from(static_cast<i64>(std::time(nullptr)) -
+                                m_shell_start_time,
+                            heap_allocator());
+      }
+      if (name == "SHELLOPTS") {
+        struct shellopts_row
+        {
+          const char *option_name;
+          bool (EvalContext::*get)() const;
+        };
+        static const shellopts_row SHELLOPTS_ROWS[] = {
+            {"allexport", &EvalContext::export_all          },
+            {"errexit",   &EvalContext::error_exit          },
+            {"failglob",  &EvalContext::failglob            },
+            {"monitor",   &EvalContext::monitor             },
+            {"noclobber", &EvalContext::no_clobber          },
+            {"noexec",    &EvalContext::no_exec             },
+            {"noglob",    &EvalContext::no_glob             },
+            {"nounset",   &EvalContext::error_unset         },
+            {"pipefail",  &EvalContext::pipefail            },
+            {"posix",     &EvalContext::is_posix_mode       },
+            {"verbose",   &EvalContext::should_echo         },
+            {"xtrace",    &EvalContext::should_echo_expanded},
+        };
+        let joined = String{heap_allocator()};
+        for (let const &row : SHELLOPTS_ROWS) {
+          if (!(this->*(row.get))()) continue;
+          if (!joined.is_empty()) joined.push(':');
+          joined.append(StringView{row.option_name});
+        }
+        return joined;
+      }
+      if (name == "SRANDOM") {
+        let const value = static_cast<u32>(os::realtime_microseconds()) ^
+                          (static_cast<u32>(std::rand()) << 16) ^
+                          static_cast<u32>(std::rand());
+        return String::from(static_cast<i64>(value), heap_allocator());
+      }
+      break;
+    case 'E':
+      if (name == "EPOCHSECONDS") {
+        return String::from(static_cast<i64>(std::time(nullptr)),
+                            heap_allocator());
+      }
+      if (name == "EPOCHREALTIME") {
+        const u64 microseconds = os::realtime_microseconds();
+        char fraction[8];
+        std::snprintf(
+            fraction, sizeof(fraction), "%06llu",
+            static_cast<unsigned long long>(microseconds % 1000000ULL));
+        return String::from(static_cast<i64>(microseconds / 1000000ULL),
+                            heap_allocator()) +
+               "." + StringView{fraction};
+      }
+      if (name == "EUID") {
+        return String::from(os::get_effective_user_id(), heap_allocator());
+      }
+      break;
+    case 'B':
+      if (name == "BASHPID") {
+        return String::from(os::get_shell_process_id(), heap_allocator());
+      }
+      if (name == "BASH_MONOSECONDS") {
+        return String::from(
+            static_cast<i64>(os::monotonic_nanos() / 1000000ULL),
+            heap_allocator());
+      }
+      if (name == "BASH_ARGV0") {
+        return String{heap_allocator(), m_shell_name.view()};
+      }
+      /* BASH_EXECUTION_STRING is set only on the -c path. */
+      if (name == "BASH_EXECUTION_STRING" && !m_execution_string.is_empty()) {
+        return String{heap_allocator(), m_execution_string.view()};
+      }
+      if (name == "BASH_SUBSHELL") {
+        return String::from(static_cast<i64>(m_subshell_depth),
+                            heap_allocator());
+      }
+      if (name == "BASH_SOURCE") {
+        if (!m_source_frames.is_empty())
+          return String{
+              heap_allocator(),
+              m_source_frames[m_source_frames.count() - 1].source_path.view()};
+        /* Inside a function BASH_SOURCE[0] is the file the function was defined
+           in. */
+        if (funcname_frame_count() > 0) {
+          let const *info =
+              m_function_definition_infos.find(funcname_frame_at(0));
+          if (info != nullptr && !info->filename.is_empty()) {
+            return String{heap_allocator(), info->filename.view()};
+          }
+        }
+        if (m_is_script_run)
+          return String{heap_allocator(), m_shell_name.view()};
+        return String{heap_allocator()};
+      }
+      if (name == "BASH_LINENO") {
+        if (funcname_frame_count() > 0)
+          return String::from(funcname_line_at(0), heap_allocator());
+        return shit::None;
+      }
+      if (name == "BASH_COMMAND" && !m_current_command.is_empty()) {
+        return String{heap_allocator(), m_current_command.view()};
+      }
+      break;
+    case 'P':
+      if (name == "PPID") {
+        return String::from(os::get_parent_process_id(), heap_allocator());
+      }
+      break;
+    case 'U':
+      if (name == "UID") {
+        return String::from(os::get_real_user_id(), heap_allocator());
+      }
+      break;
+    case 'H':
+      if (name == "HOSTNAME") {
+        if (let host = os::get_hostname(); host.has_value())
+          return steal(*host);
+        return String{heap_allocator()};
+      }
+      if (name == "HOSTTYPE") {
+        return os::machine_type();
+      }
+      break;
+    case 'G':
+      /* The array form ${GROUPS[@]} is not modelled. */
+      if (name == "GROUPS") {
+        return String::from(os::get_real_group_id(), heap_allocator());
+      }
+      break;
+    case 'M':
+      if (name == "MACHTYPE") {
+        return os::machine_type() + "-unknown-linux-gnu";
+      }
+      break;
+    case 'O':
+      if (name == "OSTYPE") {
+        return String{heap_allocator(), os::ostype_name()};
+      }
+      break;
+    case 'F':
+      if (name == "FUNCNAME") {
+        if (funcname_frame_count() > 0)
+          return String{heap_allocator(), funcname_frame_at(0)};
+        return shit::None;
+      }
+      break;
+    default: break;
     }
   }
 
