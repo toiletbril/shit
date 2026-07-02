@@ -1,0 +1,19 @@
+== bash mood aborts on an arithmetic error, the way a non-interactive bash does:
+shit: 1:6: error: Arithmetic: division by zero.
+     1 |  echo $((1/0)); echo after
+       |       ^~~~~~~~ here.
+rc=127
+== the strict default mood also aborts:
+shit: 1:6: error: Arithmetic: division by zero.
+     1 |  echo $((1/0)); echo after
+       |       ^~~~~~~~ here.
+rc=1
+== bash mood still continues past an ordinary command failure:
+after
+rc=0
+== bash mood still continues past a readonly reassignment, matching bash:
+shit: 1:15: error: Unable to assign 'r' because it is read only.
+     1 |  readonly r=1; r=2; echo after
+       |                ^~~ here.
+after
+rc=0

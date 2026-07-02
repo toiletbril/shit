@@ -1043,21 +1043,33 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
 {
   LOG(All, "evaluating the arithmetic expression of %zu bytes",
       expression.length);
+
+  /* An arithmetic evaluation error aborts the run in the bash mood, the way a
+     non-interactive bash exits on a division by zero or a malformed expression,
+     so the parse error is marked script-fatal before it relocates. */
+  let do_parse = [&](StringView text) throws -> i64 {
+    try {
+      let parser = ArithmeticParser{this, text, 0};
+      return parser.parse();
+    } catch (Error &error) {
+      if (is_bash_compatible()) error.set_script_fatal();
+      throw;
+    }
+  };
+
   /* A source with no parameter to expand, the d=$((d+1)) hot loop case, skips
      the expansion copy and parses directly. */
   if (!expression.find_character('$').has_value() &&
       !expression.find_character('`').has_value())
   {
-    let parser = ArithmeticParser{this, expression, 0};
-    return parser.parse();
+    return do_parse(expression);
   }
 
   /* The expanded word owns the bytes the parser views, so it outlives the
      parser. */
   LOG(All, "expanding parameters inside the arithmetic before the parse");
   let const expanded_word = expand_modifier_word(expression);
-  let parser = ArithmeticParser{this, expanded_word.view(), 0};
-  return parser.parse();
+  return do_parse(expanded_word.view());
 }
 
 fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
@@ -1097,7 +1109,12 @@ fn EvalContext::evaluate_arithmetic_cached_clause(
   if (!is_simple) return evaluate_arithmetic(expression);
 
   ArithmeticTokenEvaluator evaluator{this, tokens};
-  return evaluator.run();
+  try {
+    return evaluator.run();
+  } catch (Error &error) {
+    if (is_bash_compatible()) error.set_script_fatal();
+    throw;
+  }
 }
 
 fn evaluate_constant_arithmetic(StringView expression) throws -> i64
