@@ -385,8 +385,6 @@ static fn color_path_argument(usize word_start, StringView word,
       (word[1] == '/' ||
        (word.length >= 3 && word[1] == '.' && word[2] == '/'));
 
-  /* A cd argument names a directory, so a valid prefix is a directory. Any
-     other argument accepts any existing path. */
   let do_prefix_is_valid = [&](StringView prefix) throws -> bool {
     StringView target = prefix;
     let expanded = String{bump_allocator(HIGHLIGHT_ARENA)};
@@ -401,9 +399,6 @@ static fn color_path_argument(usize word_start, StringView word,
                             : Path{target}.exists();
   };
 
-  /* A cd argument is always a path, so a shapeless word is colored even when it
-     names no directory. Any other command leaves a shapeless non-path word
-     alone unless it resolves on disk. */
   let const has_no_path_shape = !has_slash && !has_tilde && !has_dot_prefix;
   if (has_no_path_shape && !directories_only &&
       !word_names_existing_path(word)) {

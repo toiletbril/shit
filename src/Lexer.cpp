@@ -628,8 +628,6 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
           byte_count++;
           if (c == '\'') break;
           ansi_body.push(c);
-          /* A backslash shields the next byte, so an escaped quote does not
-             close the string, and the escape itself is decoded below. */
           if (c == '\\') {
             const char escaped = chop_character(byte_count);
             if (escaped == lexer::CEOF) break;

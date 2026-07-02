@@ -772,8 +772,6 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      matches, even in command position. */
   let const inline_glob = token_is_glob && cursor == token_end;
 
-  /* An argument of cd names a directory, so its filesystem and glob matches
-     drop every non-directory entry. */
   let const directories_only = !is_command && command_word_of(line) == "cd";
 
   let candidates = ArrayList<String>{arena};

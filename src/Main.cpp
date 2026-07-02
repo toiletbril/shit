@@ -1223,10 +1223,6 @@ fn main(int argc, char **argv) -> int
     }
   }
 
-  /* An rc that unsets PS1 to fall back on the built-in prompt would otherwise
-     leave a PROMPT_COMMAND wrapper such as the VTE or the WezTerm integration to
-     wrap an empty value into a blank prompt. The default is re-seeded when the
-     config left PS1 unset, so the wrapper wraps a real prompt. */
   if (should_be_interactive && !context.get_variable_value("PS1").has_value())
     context.set_shell_variable("PS1", toiletline::default_prompt_template());
 

@@ -83,8 +83,6 @@ public:
     return true;
   }
 
-  /* The view with leading and trailing spaces and tabs removed. A carriage
-     return is left in place, since a Makefile line keeps its own \r trim. */
   mustuse pure fn trim_blanks() const wontthrow -> StringView
   {
     usize start = 0;

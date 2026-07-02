@@ -358,10 +358,6 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment, bool word_continues,
   let &text = leading_segment.text;
   if (text.is_empty() || text[0] != '~') return;
 
-  /* The tilde prefix ends at the first slash, and in an assignment or the bash
-     mood a colon ends it too, so a bare ~ before a colon expands the way bash
-     reads ~:x and a PATH-style value. The sh mood keeps the dash behavior and
-     ends the prefix only at a slash. */
   usize name_end = 1;
   while (name_end < text.length() && text[name_end] != '/' &&
          !(stop_at_colon && text[name_end] == ':'))

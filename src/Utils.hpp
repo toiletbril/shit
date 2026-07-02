@@ -37,7 +37,6 @@ fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>;
    own non-control quoting. */
 fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool;
 
-/* Appends the decoded bytes of a $'...' body, without the surrounding quotes. */
 fn decode_ansi_c_escapes(String &out, StringView body) throws -> void;
 
 fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws

@@ -146,10 +146,6 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
   return names;
 }
 
-/* Runs a pseudo-signal trap such as DEBUG, ERR, or RETURN. The prior command's
-   status is restored after the action, so the trap does not clobber $? for the
-   command the shell runs next. A running trap does not re-enter, so a DEBUG
-   action's own commands do not recurse. */
 fn EvalContext::run_named_trap(StringView condition) throws -> void
 {
   if (m_running_traps) return;

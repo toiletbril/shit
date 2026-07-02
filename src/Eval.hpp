@@ -519,9 +519,6 @@ public:
   pure fn traps() const wontthrow -> const StringMap<String> &;
   fn run_exit_trap() throws -> void;
 
-  /* The DEBUG, ERR, and RETURN pseudo-signal traps. has_debug_trap is the
-     per-command fast gate so the hot path pays nothing when no DEBUG trap is
-     set. */
   fn run_named_trap(StringView condition) throws -> void;
   pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
 

@@ -77,9 +77,6 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
   return is_negative ? -parsed_value.value() : parsed_value.value();
 }
 
-/* Whether the whole text is one integer literal with no surrounding space and
-   nothing after it, the written-back value a hot d=$((d+1)) loop stores. A
-   value that is anything else is re-evaluated as an expression. */
 pure fn is_single_integer_literal(StringView text) wontthrow -> bool
 {
   usize i = 0;
@@ -235,10 +232,6 @@ public:
     return evaluate_operand_value(value->view());
   }
 
-  /* A variable's value is re-evaluated as an arithmetic expression, the way
-     bash re-reads a name, so " 5 ", "1+1", and an indirect name all resolve. A
-     plain integer literal keeps the direct parse for the hot loop, and the
-     recursion depth is bounded for a self-referential value such as a=a. */
   fn evaluate_operand_value(StringView value) throws -> i64
   {
     if (value.is_empty()) return 0;
@@ -910,10 +903,6 @@ static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
   }
 }
 
-/* A variable's value is re-evaluated as an arithmetic expression through a
-   nested parser, the way bash re-reads a name. A plain integer literal keeps
-   the direct parse, and the nested parser's own depth guard bounds a
-   self-reference such as a=a. */
 static fn evaluate_named_value_operand(EvalContext *context,
                                        StringView value) throws -> i64
 {
@@ -1044,9 +1033,6 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
   LOG(All, "evaluating the arithmetic expression of %zu bytes",
       expression.length);
 
-  /* An arithmetic evaluation error aborts the run in the bash mood, the way a
-     non-interactive bash exits on a division by zero or a malformed expression,
-     so the parse error is marked script-fatal before it relocates. */
   let do_parse = [&](StringView text) throws -> i64 {
     try {
       let parser = ArithmeticParser{this, text, 0};

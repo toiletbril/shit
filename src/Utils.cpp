@@ -848,10 +848,6 @@ fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>
   return String{expanded.text().view()};
 }
 
-/* The bytes of a $'...' body, decoded from the ANSI-C backslash escapes bash
-   reads. The body excludes the surrounding quotes, and a \' inside it is already
-   a literal quote. The lexer and the parameter-expansion word path share this
-   one decoder. */
 fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
 {
   let const do_hex_value = [](char h) -> i32 {
