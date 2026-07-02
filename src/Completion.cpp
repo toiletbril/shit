@@ -671,6 +671,32 @@ fn command_word_of(StringView line) wontthrow -> StringView
   }
 }
 
+/* The byte after the last command boundary at or before the cursor, so a
+   command on a later line of a multi-line buffer is completed as its own
+   command. Mirrors the boundary set of command_word_of with the newline added.
+ */
+static pure fn command_segment_start(StringView line, usize cursor) wontthrow
+    -> usize
+{
+  usize start = 0;
+  usize open_parens = 0;
+  const usize limit = cursor < line.length ? cursor : line.length;
+  for (usize k = 0; k < limit; k++) {
+    let const c = line[k];
+    if (c == '(') {
+      open_parens++;
+    } else if (c == ')') {
+      if (open_parens > 0)
+        open_parens--;
+      else
+        start = k + 1;
+    } else if (c == ';' || c == '|' || c == '&' || c == '\n') {
+      start = k + 1;
+    }
+  }
+  return start;
+}
+
 /* Symlinks are left alone so a name that dispatches on its argv[0], such as a
    busybox or rustup link, keeps the surface name the user typed. */
 fn resolve_completion_alias(StringView command, EvalContext &context) throws
@@ -744,9 +770,17 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   /* When the cursor sits inside a command substitution, completion re-roots to
      the substitution's own command line. The offset maps the replaced token
      span back to the full line for the caller. */
-  let const completion_offset = command_substitution_body_start(line, cursor);
+  let completion_offset = command_substitution_body_start(line, cursor);
   line = line.substring(completion_offset);
   cursor -= completion_offset;
+
+  /* Completion runs on the command segment holding the cursor, so a command on
+     a later line of a multi-line buffer is identified as its own command rather
+     than the buffer's first command. */
+  let const segment_start = command_segment_start(line, cursor);
+  completion_offset += segment_start;
+  line = line.substring(segment_start);
+  cursor -= segment_start;
 
   let token_start = find_token_start(line, cursor);
   let token_end = find_token_end(line, cursor);

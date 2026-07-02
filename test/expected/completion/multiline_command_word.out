@@ -1,0 +1,18 @@
+== spec command on the first line:
+restart
+start
+stop
+== spec command after a newline:
+restart
+start
+stop
+== spec command after '&&' then a newline:
+restart
+start
+stop
+== spec command in a loop body on the next line:
+restart
+start
+stop
+== cd offers only directories on the next line:
+adir/
