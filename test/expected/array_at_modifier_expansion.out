@@ -1,0 +1,130 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "empty default, set: [$a[@]:-]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "default, set: [$a[@]:-fallback]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "default, unset: [$b[@]:-fallback]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "alternate, set: [$a[@]:+present]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "star empty default: [$a[*]:-z]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "slice still works: [$a[@]:1:1]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "no-colon dash, set: [$a[@]-nc]"]
+  [CompoundListCondition, None]
+    [ForLoop "c"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "loop c=$c"]
+[Word
+  Unquoted "a="
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "empty default, set: ["
+  Variable "a[@]:-"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "default, set: ["
+  Variable "a[@]:-fallback"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "default, unset: ["
+  Variable "b[@]:-fallback"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "alternate, set: ["
+  Variable "a[@]:+present"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "star empty default: ["
+  Variable "a[*]:-z"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "slice still works: ["
+  Variable "a[@]:1:1"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "no-colon dash, set: ["
+  Variable "a[@]-nc"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "a[@]:-"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "loop c="
+  Variable "c"
+]
+[Word
+  Unquoted "done"
+]
+empty default, set: [x y]
+default, set: [x y]
+default, unset: [fallback]
+alternate, set: [present]
+star empty default: [x y]
+slice still works: [y]
+no-colon dash, set: [x y]
+loop c=x
+loop c=y
+[Code 0]

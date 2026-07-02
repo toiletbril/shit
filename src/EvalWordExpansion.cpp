@@ -339,13 +339,22 @@ hot fn EvalContext::expand_word(const Word &word) throws
         while (name_end < segment_text.length &&
                lexer::is_variable_name(segment_text[name_end]))
           name_end++;
+        /* A colon straight before a - + = or ? opens the test modifiers
+           ${a[@]:-word} and friends, not a substring, so the slice form leaves
+           those to the modifier handler below and never treats the operator as
+           an arithmetic offset. */
+        const char after_array_colon = name_end + 4 < segment_text.length
+                                           ? segment_text[name_end + 4]
+                                           : '\0';
         if (name_end + 4 <= segment_text.length &&
             segment_text[name_end] == '[' &&
             (segment_text[name_end + 1] == '@' ||
              segment_text[name_end + 1] == '*') &&
             segment_text[name_end + 2] == ']' &&
             name_end + 3 < segment_text.length &&
-            segment_text[name_end + 3] == ':')
+            segment_text[name_end + 3] == ':' && after_array_colon != '-' &&
+            after_array_colon != '+' && after_array_colon != '=' &&
+            after_array_colon != '?')
         {
           let const array_name = segment_text.substring_of_length(0, name_end);
           let const is_star = segment_text[name_end + 1] == '*';

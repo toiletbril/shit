@@ -1,0 +1,15 @@
+# The ${name[@]:-word} test modifiers on a whole array were misread as a
+# ${name[@]:offset} substring, so the operator after the colon was fed to the
+# arithmetic evaluator. An empty default such as ${a[@]:-} errored with
+# "unexpected character" and an unset array dropped its default. The colon before
+# a - + = or ? now opens the modifier form, while a real slice still works.
+a=(x y)
+echo "empty default, set: [${a[@]:-}]"
+echo "default, set: [${a[@]:-fallback}]"
+unset b
+echo "default, unset: [${b[@]:-fallback}]"
+echo "alternate, set: [${a[@]:+present}]"
+echo "star empty default: [${a[*]:-z}]"
+echo "slice still works: [${a[@]:1:1}]"
+echo "no-colon dash, set: [${a[@]-nc}]"
+for c in "${a[@]:-}"; do echo "loop c=$c"; done
