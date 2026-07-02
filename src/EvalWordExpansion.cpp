@@ -230,6 +230,69 @@ hot fn EvalContext::expand_word(const Word &word) throws
           break;
         }
       }
+      let const is_positional_word =
+          !segment_text.is_empty() &&
+          (segment_text[0] == '@' || segment_text[0] == '*');
+      let const positional_test_has_colon = is_positional_word &&
+                                            segment_text.length > 1 &&
+                                            segment_text[1] == ':';
+      const usize positional_test_op_position =
+          positional_test_has_colon ? 2 : 1;
+      if (is_positional_word &&
+          segment_text.length > positional_test_op_position &&
+          is_colon_modifier_operator(segment_text[positional_test_op_position]))
+      {
+        let const is_star = segment_text[0] == '*';
+        let const op = segment_text[positional_test_op_position];
+        let const word = segment_text.substring(positional_test_op_position + 1);
+        let const param_count = m_positional_params.count();
+        let const positional_is_null =
+            param_count == 0 ||
+            (param_count == 1 && m_positional_params[0].view().is_empty());
+        let const treat_as_unset =
+            positional_test_has_colon ? positional_is_null : param_count == 0;
+
+        let do_emit_positional = [&]() throws {
+          do_emit_elements(m_positional_params, segment.is_in_double_quotes,
+                           is_star);
+        };
+        let do_emit_word = [&]() throws {
+          let const expanded = expand_modifier_word(word);
+          if (segment.is_in_double_quotes)
+            do_append_run(expanded.view(), false);
+          else
+            do_append_split_run(expanded.view(), true);
+        };
+
+        switch (op) {
+        case '-':
+          if (treat_as_unset)
+            do_emit_word();
+          else
+            do_emit_positional();
+          break;
+        case '+':
+          if (!treat_as_unset) do_emit_word();
+          break;
+        case '=':
+          if (treat_as_unset)
+            throw_script_fatal(
+                "Unable to assign to the positional parameters this way");
+          do_emit_positional();
+          break;
+        case '?':
+          if (treat_as_unset) {
+            if (word.is_empty())
+              throw_script_fatal("Unable to expand the positional parameters "
+                                 "because they are not set or are empty");
+            throw_script_fatal(String{expand_modifier_word(word)});
+          }
+          do_emit_positional();
+          break;
+        default: break;
+        }
+        break;
+      }
       /* Index zero names the shell itself, the way bash counts $0 into the
          positional slice. */
       if (!segment_text.is_empty() &&
@@ -339,10 +402,6 @@ hot fn EvalContext::expand_word(const Word &word) throws
         while (name_end < segment_text.length &&
                lexer::is_variable_name(segment_text[name_end]))
           name_end++;
-        /* A colon straight before a - + = or ? opens the test modifiers
-           ${a[@]:-word} and friends, not a substring, so the slice form leaves
-           those to the modifier handler below and never treats the operator as
-           an arithmetic offset. */
         const char after_array_colon = name_end + 4 < segment_text.length
                                            ? segment_text[name_end + 4]
                                            : '\0';
@@ -351,10 +410,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
             (segment_text[name_end + 1] == '@' ||
              segment_text[name_end + 1] == '*') &&
             segment_text[name_end + 2] == ']' &&
-            name_end + 3 < segment_text.length &&
-            segment_text[name_end + 3] == ':' && after_array_colon != '-' &&
-            after_array_colon != '+' && after_array_colon != '=' &&
-            after_array_colon != '?')
+            segment_text[name_end + 3] == ':' &&
+            !is_colon_modifier_operator(after_array_colon))
         {
           let const array_name = segment_text.substring_of_length(0, name_end);
           let const is_star = segment_text[name_end + 1] == '*';

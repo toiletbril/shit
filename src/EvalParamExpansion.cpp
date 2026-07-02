@@ -536,8 +536,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
         let const is_colon = modifier_op == ':';
         let const after =
             is_colon && modifier.length > 1 ? modifier[1] : modifier_op;
-        let const is_test_form =
-            after == '-' || after == '+' || after == '=' || after == '?';
+        let const is_test_form = is_colon_modifier_operator(after);
         if (is_colon && !is_test_form) {
           return apply_substring_to_value(
               apply_array_subscript(name, subscript).view(),
@@ -594,8 +593,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   if (is_colon_form) {
     const char after_colon = rest[op_index];
-    if (after_colon != '-' && after_colon != '=' && after_colon != '+' &&
-        after_colon != '?' && name != "@" && name != "*")
+    if (!is_colon_modifier_operator(after_colon) && name != "@" && name != "*")
     {
       return apply_substring_expansion(name, rest.substring(1));
     }

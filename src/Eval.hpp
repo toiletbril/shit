@@ -39,6 +39,11 @@ struct glob_field
 hot pure fn first_active_glob(StringView text, const Bitset &mask,
                               bool extglob) wontthrow -> Maybe<usize>;
 
+inline pure fn is_colon_modifier_operator(char c) wontthrow -> bool
+{
+  return c == '-' || c == '+' || c == '=' || c == '?';
+}
+
 class Token;
 class Word;
 class WordSegment;
