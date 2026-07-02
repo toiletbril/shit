@@ -15,3 +15,9 @@ mimic_terminal_handoff.py
     has TOSTOP enabled, and checks that the job completes and the prompt returns.
     It guards the fork synchronization in src/Utils.cpp, where the child blocks on
     a pipe until the parent hands over the controlling terminal.
+
+long_warning_window.py
+    Renders an error on a source line wider than an 80-column terminal, and checks
+    that the printed line is trimmed to a window with ellipses and stays under the
+    width, with the caret aligned under the offending token. It guards the
+    windowing in src/Errors.cpp, which is skipped when stderr is not a terminal.

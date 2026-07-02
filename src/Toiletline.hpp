@@ -49,6 +49,9 @@ usize utf8_strlen(const String &s, usize byte_count = static_cast<usize>(-1));
 
 usize utf8_strnlen(const char *bytes, usize byte_count);
 
+usize byte_offset_of_codepoint(const char *bytes, usize byte_length,
+                               usize codepoint_index);
+
 bool is_active();
 
 void initialize();

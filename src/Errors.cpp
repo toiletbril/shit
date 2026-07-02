@@ -218,12 +218,13 @@ get_context_pointing_to(StringView source, usize byte_position,
   /* A tab renders wider than one byte, so it is expanded to a fixed width here
      and the caret padding below adds the same width per tab to stay aligned. */
   static constexpr usize TAB_WIDTH = 4;
+  let display_line = String{heap_allocator()};
   for (usize i = 0; i < context.count(); i++) {
     if (context[i] == '\t')
       for (usize t = 0; t < TAB_WIDTH; t++)
-        msg += ' ';
+        display_line += ' ';
     else
-      msg += context[i];
+      display_line += context[i];
   }
 
   usize tabs_before_error = 0;
@@ -240,23 +241,81 @@ get_context_pointing_to(StringView source, usize byte_position,
       source.data + byte_position,
       byte_count > caret_limit ? caret_limit : byte_count);
 
+  const usize caret_column =
+      (unicode_position - unicode_start_offset_position) +
+      tabs_before_error * (TAB_WIDTH - 1);
+
+  const char *const line_bytes = display_line.view().data;
+  const usize line_byte_length = display_line.count();
+  const usize display_cells =
+      toiletline::utf8_strnlen(line_bytes, line_byte_length);
+
+  usize window_start = 0;
+  usize window_end = display_cells;
+  bool has_left_ellipsis = false;
+  bool has_right_ellipsis = false;
+
+  u32 terminal_columns = 0;
+  u32 terminal_rows = 0;
+  if (os::is_fd_a_tty(SHIT_STDERR) &&
+      os::terminal_size(terminal_columns, terminal_rows) &&
+      terminal_columns > gutter_width + 24 &&
+      display_cells > terminal_columns - gutter_width)
+  {
+    const usize available = terminal_columns - gutter_width;
+    const usize span = unicode_length < 1 ? 1 : unicode_length;
+    const usize half = available / 2;
+    const usize center = caret_column + span / 2;
+    window_start = center > half ? center - half : 0;
+    if (window_start + available > display_cells)
+      window_start = display_cells - available;
+    window_end = window_start + available;
+    has_left_ellipsis = window_start > 0;
+    has_right_ellipsis = window_end < display_cells;
+    window_end = sub_sat(window_end, (has_left_ellipsis ? 3u : 0u) +
+                                         (has_right_ellipsis ? 3u : 0u));
+    if (window_start > caret_column) window_start = caret_column;
+    if (caret_column + span > window_end && window_end < display_cells) {
+      const usize shift = caret_column + span - window_end;
+      window_start = window_start + shift > caret_column ? caret_column
+                                                         : window_start + shift;
+      window_end += shift;
+    }
+    if (window_end > display_cells) window_end = display_cells;
+    if (window_end <= window_start) window_end = display_cells;
+    has_left_ellipsis = window_start > 0;
+    has_right_ellipsis = window_end < display_cells;
+  }
+
+  const usize window_start_byte = toiletline::byte_offset_of_codepoint(
+      line_bytes, line_byte_length, window_start);
+  const usize window_end_byte = toiletline::byte_offset_of_codepoint(
+      line_bytes, line_byte_length, window_end);
+
+  if (has_left_ellipsis) msg += "...";
+  msg += display_line.view().substring_of_length(
+      window_start_byte, window_end_byte - window_start_byte);
+  if (has_right_ellipsis) msg += "...";
+
+  const usize caret_pad =
+      (has_left_ellipsis ? 3u : 0u) + sub_sat(caret_column, window_start);
+  const usize caret_end = caret_column + unicode_length;
+  const usize visible_caret =
+      sub_sat(caret_end < window_end ? caret_end : window_end, caret_column);
+
   msg += '\n';
   for (usize i = 0; i + 3 < gutter_width; i++)
     msg += ' ';
 
   msg += "|  ";
 
-  const usize underline_padding_length =
-      (unicode_position - unicode_start_offset_position) +
-      tabs_before_error * (TAB_WIDTH - 1);
-
-  for (usize i = 0; i < underline_padding_length; i++)
+  for (usize i = 0; i < caret_pad; i++)
     msg += ' ';
 
   msg += color.caret;
   msg += "^~";
-  if (unicode_length > 2) {
-    for (usize i = 0; i < unicode_length - 2; i++)
+  if (visible_caret > 2) {
+    for (usize i = 0; i < visible_caret - 2; i++)
       msg += '~';
   }
 

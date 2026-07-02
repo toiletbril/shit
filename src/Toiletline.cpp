@@ -13,6 +13,27 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
+namespace toiletline {
+
+fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
+                            usize codepoint_index) -> usize
+{
+  usize byte_offset = 0;
+  usize seen_codepoints = 0;
+  while (byte_offset < byte_length && seen_codepoints < codepoint_index) {
+    if ((static_cast<unsigned char>(bytes[byte_offset]) & 0xC0) != 0x80)
+      seen_codepoints += 1;
+    byte_offset += 1;
+  }
+  /* Step over the trailing continuation bytes of the last counted codepoint. */
+  while (byte_offset < byte_length &&
+         (static_cast<unsigned char>(bytes[byte_offset]) & 0xC0) == 0x80)
+    byte_offset += 1;
+  return byte_offset;
+}
+
+} /* namespace toiletline */
+
 #if !defined SHIT_NO_TOILETLINE
 
 namespace {
@@ -106,23 +127,6 @@ shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
     shit::heap_allocator()};
 shit::String COMPLETION_LCP{shit::heap_allocator()};
 
-fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
-                            usize codepoint_index) -> usize
-{
-  usize byte_offset = 0;
-  usize seen_codepoints = 0;
-  while (byte_offset < byte_length && seen_codepoints < codepoint_index) {
-    if ((static_cast<unsigned char>(bytes[byte_offset]) & 0xC0) != 0x80)
-      seen_codepoints += 1;
-    byte_offset += 1;
-  }
-  /* Step over the trailing continuation bytes of the last counted codepoint. */
-  while (byte_offset < byte_length &&
-         (static_cast<unsigned char>(bytes[byte_offset]) & 0xC0) == 0x80)
-    byte_offset += 1;
-  return byte_offset;
-}
-
 /* Toiletline edits in codepoints while the completion engine works in bytes. */
 fn shit_completion_callback(const char *buffer, size_t cursor,
                             tl_completion *out, int for_listing) -> int
@@ -138,7 +142,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     shit::Path base = shit::Path::current_directory();
 
     const usize byte_cursor =
-        byte_offset_of_codepoint(buffer, byte_length, cursor);
+        toiletline::byte_offset_of_codepoint(buffer, byte_length, cursor);
 
     /* A completion diagnostic is armed to break onto its own line, then
        disarmed so a later command's message is unaffected. */
