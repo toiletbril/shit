@@ -126,7 +126,7 @@ fn parse_mood_name(StringView name) throws -> Maybe<mimic_mood>
   return MOOD_NAMES.find(name);
 }
 
-StringView mood_name(mimic_mood mood) throws
+fn mood_name(mimic_mood mood) throws -> StringView
 {
   switch (mood) {
   case mimic_mood::Bash: return "bash";
@@ -136,14 +136,14 @@ StringView mood_name(mimic_mood mood) throws
   return "shit";
 }
 
-const SetOption *find_option_by_letter(char letter) throws
+fn find_option_by_letter(char letter) throws -> const SetOption *
 {
   for (let const &option : SET_OPTIONS)
     if (option.letter == letter) return &option;
   return nullptr;
 }
 
-const SetOption *find_option_by_name(StringView name) throws
+fn find_option_by_name(StringView name) throws -> const SetOption *
 {
   /* The alias is the command line's --help spelling, so set -o accepts both
      'noglob' and 'no-glob' while the listings print the canonical name a

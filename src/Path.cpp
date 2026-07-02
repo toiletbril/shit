@@ -607,11 +607,11 @@ cold fn Path::read_directory_typed(const Path &dir) throws
 fn Path::temp_directory() throws -> Path
 {
 #if SHIT_PLATFORM_IS WIN32
-  if (const char *from_env = std::getenv("TEMP"))
+  if (const char *from_env = std::getenv("TEMP"); from_env != nullptr)
     return Path{StringView{from_env}};
   return Path{StringView{"C:\\Windows\\Temp"}};
 #else
-  if (const char *from_env = std::getenv("TMPDIR"))
+  if (const char *from_env = std::getenv("TMPDIR"); from_env != nullptr)
     return Path{StringView{from_env}};
   return Path{StringView{"/tmp"}};
 #endif

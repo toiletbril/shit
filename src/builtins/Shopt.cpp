@@ -112,8 +112,8 @@ fn format_option_names_help(Allocator allocator) throws -> String
   for (usize i = 0; i < total; i++) {
     if (i % columns == 0) section += "  ";
     section += SHOPT_OPTION_NAMES[i];
-    let const last_in_row = i % columns == columns - 1 || i + 1 == total;
-    if (last_in_row) {
+    let const is_last_in_row = i % columns == columns - 1 || i + 1 == total;
+    if (is_last_in_row) {
       section += "\n";
     } else {
       for (usize pad = SHOPT_OPTION_NAMES[i].length; pad < column_width; pad++)

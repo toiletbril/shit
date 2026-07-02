@@ -9,8 +9,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[%job|pid ...]");
 
-HELP_DESCRIPTION_DECL(
-    "The wait builtin blocks until the named jobs finish.");
+HELP_DESCRIPTION_DECL("The wait builtin blocks until the named jobs finish.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -20,7 +19,7 @@ namespace shit {
 
 namespace {
 
-i32 wait_for_job(job &job) throws
+fn wait_for_job(job &job) throws -> i32
 {
   if (job.state == job::State::Done || job.state == job::State::Stopped) {
     return job.last_status;
