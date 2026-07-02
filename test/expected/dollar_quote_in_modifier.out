@@ -1,0 +1,64 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$x:-$'a\tb'"]
+  [CompoundListCondition, None]
+    [Assign y=a	b]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$y#$'a\t'"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$y/$'\t'/-"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$x:-$'\x41é'"]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "x:-$'a\tb'"
+]
+[Word
+  Unquoted "y="
+  Literal "a	b"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "y#$'a\t'"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "y/$'\t'/-"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "x:-$'\x41é'"
+]
+[a	b]
+[b]
+[a-b]
+[Aé]
+[Code 0]

@@ -615,35 +615,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
          quotes the $' is literal, so bash leaves "$'x'" as the three bytes. */
       if (next == '\'' && bash_additions_enabled() && !is_in_double_quotes) {
         byte_count++;
-        bool did_emit_any = false;
-        let do_emit_literal = [&](char byte) {
-          do_append_char(WordSegment::Kind::LiteralText, byte);
-          did_emit_any = true;
-        };
-        let do_hex_value = [](char h) -> i32 {
-          if (h >= '0' && h <= '9') return h - '0';
-          if (h >= 'a' && h <= 'f') return h - 'a' + 10;
-          if (h >= 'A' && h <= 'F') return h - 'A' + 10;
-          return -1;
-        };
-        let do_emit_codepoint = [&](u32 cp) {
-          if (cp < 0x80) {
-            do_emit_literal(static_cast<char>(cp));
-          } else if (cp < 0x800) {
-            do_emit_literal(static_cast<char>(0xC0 | (cp >> 6)));
-            do_emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
-          } else if (cp < 0x10000) {
-            do_emit_literal(static_cast<char>(0xE0 | (cp >> 12)));
-            do_emit_literal(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-            do_emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
-          } else {
-            do_emit_literal(static_cast<char>(0xF0 | (cp >> 18)));
-            do_emit_literal(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
-            do_emit_literal(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-            do_emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
-          }
-        };
-
+        let ansi_body = String{heap_allocator()};
         loop
         {
           const char c = chop_character(byte_count);
@@ -655,115 +627,28 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
           }
           byte_count++;
           if (c == '\'') break;
-          if (c != '\\') {
-            do_emit_literal(c);
-            continue;
-          }
-          const char e = chop_character(byte_count);
-          if (e == lexer::CEOF) {
-            do_emit_literal('\\');
-            break;
-          }
-          byte_count++;
-          switch (e) {
-          case 'n': do_emit_literal('\n'); break;
-          case 't': do_emit_literal('\t'); break;
-          case 'r': do_emit_literal('\r'); break;
-          case 'a': do_emit_literal('\a'); break;
-          case 'b': do_emit_literal('\b'); break;
-          case 'f': do_emit_literal('\f'); break;
-          case 'v': do_emit_literal('\v'); break;
-          case 'e':
-          case 'E': do_emit_literal('\x1b'); break;
-          case '\\': do_emit_literal('\\'); break;
-          case '\'': do_emit_literal('\''); break;
-          case '"': do_emit_literal('"'); break;
-          case '?': do_emit_literal('?'); break;
-          case 'x': {
-            i32 value = 0;
-            i32 digit_count = 0;
-            while (digit_count < 2) {
-              let const digit = do_hex_value(chop_character(byte_count));
-              if (digit < 0) break;
-
-              value = value * 16 + digit;
-              byte_count++;
-              digit_count++;
-            }
-            if (digit_count == 0) {
-              do_emit_literal('\\');
-              do_emit_literal('x');
-            } else {
-              do_emit_literal(static_cast<char>(value));
-            }
-          } break;
-          case 'c': {
-            /* bash uppercases the letter then takes the low five bits, so \cA
-               is 0x01, \c[ is 0x1b, and \c? is 0x7f. */
-            const char k = chop_character(byte_count);
-            if (k == lexer::CEOF) {
-              do_emit_literal('\\');
-              do_emit_literal('c');
-              break;
-            }
+          ansi_body.push(c);
+          /* A backslash shields the next byte, so an escaped quote does not
+             close the string, and the escape itself is decoded below. */
+          if (c == '\\') {
+            const char escaped = chop_character(byte_count);
+            if (escaped == lexer::CEOF) break;
             byte_count++;
-            const char target = k;
-            if (k == '\\' && chop_character(byte_count) == '\\') {
-              byte_count++;
-            }
-            const char upper = (target >= 'a' && target <= 'z')
-                                   ? static_cast<char>(target - 'a' + 'A')
-                                   : target;
-            const u8 control =
-                upper == '?' ? static_cast<u8>(0x7fu)
-                             : static_cast<u8>(static_cast<u8>(upper) & 0x1fu);
-            do_emit_literal(static_cast<char>(control));
-          } break;
-          case 'u':
-          case 'U': {
-            const i32 max_digit_count = e == 'u' ? 4 : 8;
-            u32 codepoint = 0;
-            i32 digit_count = 0;
-            while (digit_count < max_digit_count) {
-              let const digit = do_hex_value(chop_character(byte_count));
-              if (digit < 0) break;
-
-              codepoint = codepoint * 16 + static_cast<u32>(digit);
-              byte_count++;
-              digit_count++;
-            }
-            if (digit_count == 0) {
-              do_emit_literal('\\');
-              do_emit_literal(e);
-            } else {
-              do_emit_codepoint(codepoint);
-            }
-          } break;
-          default:
-            if (e >= '0' && e <= '7') {
-              i32 value = e - '0';
-              i32 digit_count = 1;
-              while (digit_count < 3) {
-                const char o = chop_character(byte_count);
-                if (o < '0' || o > '7') {
-                  break;
-                }
-                value = value * 8 + (o - '0');
-                byte_count++;
-                digit_count++;
-              }
-              do_emit_literal(static_cast<char>(value));
-            } else {
-              do_emit_literal('\\');
-              do_emit_literal(e);
-            }
-            break;
+            ansi_body.push(escaped);
           }
         }
+
+        let decoded = String{heap_allocator()};
+        utils::decode_ansi_c_escapes(decoded, ansi_body.view());
+
         /* An empty $'' still produces one empty field, the way '' and "" do. */
-        if (!did_emit_any)
+        if (decoded.is_empty()) {
           word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
                                          String{heap_allocator()}, false});
+        } else {
+          for (usize k = 0; k < decoded.count(); k++)
+            do_append_char(WordSegment::Kind::LiteralText, decoded[k]);
+        }
         continue;
       }
 

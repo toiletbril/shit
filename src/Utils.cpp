@@ -848,6 +848,141 @@ fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>
   return String{expanded.text().view()};
 }
 
+/* The bytes of a $'...' body, decoded from the ANSI-C backslash escapes bash
+   reads. The body excludes the surrounding quotes, and a \' inside it is already
+   a literal quote. The lexer and the parameter-expansion word path share this
+   one decoder. */
+fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
+{
+  let const do_hex_value = [](char h) -> i32 {
+    if (h >= '0' && h <= '9') return h - '0';
+    if (h >= 'a' && h <= 'f') return h - 'a' + 10;
+    if (h >= 'A' && h <= 'F') return h - 'A' + 10;
+    return -1;
+  };
+
+  let do_emit_codepoint = [&](u32 cp) throws {
+    if (cp < 0x80) {
+      out.push(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+      out.push(static_cast<char>(0xC0 | (cp >> 6)));
+      out.push(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+      out.push(static_cast<char>(0xE0 | (cp >> 12)));
+      out.push(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+      out.push(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+      out.push(static_cast<char>(0xF0 | (cp >> 18)));
+      out.push(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+      out.push(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+      out.push(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+  };
+
+  usize i = 0;
+  while (i < body.length) {
+    const char c = body[i];
+    i++;
+
+    if (c != '\\') {
+      out.push(c);
+      continue;
+    }
+    if (i >= body.length) {
+      out.push('\\');
+      break;
+    }
+
+    const char e = body[i];
+    i++;
+    switch (e) {
+    case 'n': out.push('\n'); break;
+    case 't': out.push('\t'); break;
+    case 'r': out.push('\r'); break;
+    case 'a': out.push('\a'); break;
+    case 'b': out.push('\b'); break;
+    case 'f': out.push('\f'); break;
+    case 'v': out.push('\v'); break;
+    case 'e':
+    case 'E': out.push('\x1b'); break;
+    case '\\': out.push('\\'); break;
+    case '\'': out.push('\''); break;
+    case '"': out.push('"'); break;
+    case '?': out.push('?'); break;
+    case 'x': {
+      i32 value = 0;
+      i32 digit_count = 0;
+      while (digit_count < 2 && i < body.length) {
+        let const digit = do_hex_value(body[i]);
+        if (digit < 0) break;
+        value = value * 16 + digit;
+        i++;
+        digit_count++;
+      }
+      if (digit_count == 0) {
+        out.push('\\');
+        out.push('x');
+      } else {
+        out.push(static_cast<char>(value));
+      }
+    } break;
+    case 'c': {
+      if (i >= body.length) {
+        out.push('\\');
+        out.push('c');
+        break;
+      }
+      const char target = body[i];
+      i++;
+      if (target == '\\' && i < body.length && body[i] == '\\') i++;
+      const char upper = (target >= 'a' && target <= 'z')
+                             ? static_cast<char>(target - 'a' + 'A')
+                             : target;
+      const u8 control = upper == '?'
+                             ? static_cast<u8>(0x7fu)
+                             : static_cast<u8>(static_cast<u8>(upper) & 0x1fu);
+      out.push(static_cast<char>(control));
+    } break;
+    case 'u':
+    case 'U': {
+      const i32 max_digit_count = e == 'u' ? 4 : 8;
+      u32 codepoint = 0;
+      i32 digit_count = 0;
+      while (digit_count < max_digit_count && i < body.length) {
+        let const digit = do_hex_value(body[i]);
+        if (digit < 0) break;
+        codepoint = codepoint * 16 + static_cast<u32>(digit);
+        i++;
+        digit_count++;
+      }
+      if (digit_count == 0) {
+        out.push('\\');
+        out.push(e);
+      } else {
+        do_emit_codepoint(codepoint);
+      }
+    } break;
+    default:
+      if (e >= '0' && e <= '7') {
+        i32 value = e - '0';
+        i32 digit_count = 1;
+        while (digit_count < 3 && i < body.length && body[i] >= '0' &&
+               body[i] <= '7')
+        {
+          value = value * 8 + (body[i] - '0');
+          i++;
+          digit_count++;
+        }
+        out.push(static_cast<char>(value));
+      } else {
+        out.push('\\');
+        out.push(e);
+      }
+      break;
+    }
+  }
+}
+
 fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool
 {
   if (arg.is_empty()) {

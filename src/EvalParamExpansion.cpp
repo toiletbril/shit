@@ -187,6 +187,26 @@ fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
     }
 
     let const next = word[i + 1];
+    /* $'...' ANSI-C quoting stays active in a modifier word, so ${x:-$'\t'}
+       yields a tab. It rides every mood but POSIX and is inert in double
+       quotes, matching the lexer. */
+    if (next == '\'' && !is_in_double_quote && !is_posix_mode()) {
+      let body = String{scratch_allocator()};
+      usize j = i + 2;
+      while (j < word.length && word[j] != '\'') {
+        body.push(word[j]);
+        if (word[j] == '\\' && j + 1 < word.length) {
+          body.push(word[j + 1]);
+          j++;
+        }
+        j++;
+      }
+      let decoded = String{scratch_allocator()};
+      utils::decode_ansi_c_escapes(decoded, body.view());
+      do_emit_run(decoded.view(), false);
+      i = j;
+      continue;
+    }
     if (next == '{') {
       /* Scan the ${...} body to the matching } at brace depth one. A quote run
          or a backslash escape keeps its bytes literal so a } inside is never
