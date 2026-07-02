@@ -326,6 +326,8 @@ constexpr StaticStringMap<tool_with_targets_kind>::entry
         {SSK("bun"),   tool_with_targets_kind::node_runner},
         {SSK("ssh"),   tool_with_targets_kind::ssh        },
         {SSK("scp"),   tool_with_targets_kind::ssh        },
+        {SSK("sftp"),  tool_with_targets_kind::ssh        },
+        {SSK("rsync"), tool_with_targets_kind::ssh        },
         {SSK("tsh"),   tool_with_targets_kind::teleport   },
 };
 
@@ -333,6 +335,51 @@ constexpr StaticStringMap<tool_with_targets_kind> TOOLS_WITH_TARGETS{
     TOOL_WITH_TARGETS_ENTRIES, countof(TOOL_WITH_TARGETS_ENTRIES)};
 
 } // namespace
+
+fn complete_from_process_arguments(StringView line, StringView token) throws
+    -> Maybe<ArrayList<String>>
+{
+  let const command = command_word_of(line);
+  const bool is_by_pid = command == "kill" || command == "wait";
+  const bool is_by_name = command == "pkill" || command == "killall";
+  if (!is_by_pid && !is_by_name) return None;
+
+  /* kill -SIG completes the signal names. */
+  if (command == "kill" && !token.is_empty() && token[0] == '-') {
+    let const signal_prefix = token.substring(1);
+    let candidates = ArrayList<String>{completion_allocator()};
+    for (let const &name : os::signal_names()) {
+      if (!name.starts_with(signal_prefix)) continue;
+      let candidate = String{completion_allocator(), "-"};
+      candidate.append(name);
+      candidates.push(steal(candidate));
+    }
+    if (candidates.is_empty()) return None;
+    return candidates;
+  }
+
+  if (!token.is_empty() && token[0] == '-') return None;
+
+  let const processes = os::enumerate_processes();
+  let candidates = ArrayList<String>{completion_allocator()};
+  let seen = HashSet{completion_allocator()};
+  for (const os::process_entry &process : processes) {
+    if (is_by_name) {
+      let const name = process.name.view();
+      if (name.is_empty() || !name.starts_with(token) || seen.contains(name))
+        continue;
+      seen.add(name);
+      candidates.push(String{completion_allocator(), name});
+    } else {
+      let pid_text = String::from(process.pid, completion_allocator());
+      if (!pid_text.view().starts_with(token)) continue;
+      candidates.push(steal(pid_text));
+    }
+  }
+
+  if (candidates.is_empty()) return None;
+  return candidates;
+}
 
 fn complete_from_tools_with_targets(StringView line, StringView token,
                                     usize token_start, bool for_listing,

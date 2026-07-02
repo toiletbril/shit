@@ -1,0 +1,12 @@
+== ssh completes a config host by prefix:
+alpha-box
+== scp completes the same hosts:
+beta-box
+== sftp and rsync complete hosts too:
+alpha-box
+beta-box
+== a wildcard Host pattern is not offered:
+== kill completes a signal name for a dashed token:
+-TERM
+== and another signal prefix:
+-HUP
