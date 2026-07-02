@@ -1,0 +1,112 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign HOME=/testhome]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "E=~/a:~/b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$E"]
+  [CompoundListCondition, None]
+    [SimpleCommand "readonly" "R=~/r"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$R"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "L=~/z"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$L"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "D=~/d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$D"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$a $b"]
+[Word
+  Unquoted "HOME=/testhome"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "E=~/a:~/b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "E"
+]
+[Word
+  Unquoted "readonly"
+]
+[Word
+  Unquoted "R=~/r"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "R"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "L=~/z"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "L"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "D=~/d"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "D"
+]
+[Word
+  Unquoted "a=~/x"
+]
+[Word
+  Unquoted "b=~/y"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "a"
+  DoubleQuoted " "
+  Variable "b"
+]
+/testhome/a:/testhome/b
+/testhome/r
+/testhome/z
+/testhome/d
+/testhome/x /testhome/y
+[Code 0]
