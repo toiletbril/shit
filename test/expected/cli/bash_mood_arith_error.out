@@ -1,12 +1,12 @@
 == bash mood reports an arithmetic error and goes on to the next line, matching bash:
 before
-shit: 2:6: error: Arithmetic: division by zero.
+shit: 2:6: error: Division by zero.
      2 |  echo $((1/0))
        |       ^~~~~~~~ here.
 after
 rc=0
 == the strict default mood aborts the run on an arithmetic error:
-shit: 1:6: error: Arithmetic: division by zero.
+shit: 1:6: error: Division by zero.
      1 |  echo $((1/0)); echo after
        |       ^~~~~~~~ here.
 rc=1

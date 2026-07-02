@@ -7,6 +7,6 @@
 [Word
   ArithmeticExpansion "1%0"
 ]
-shit: 2:6: error: Arithmetic: division by zero.
+shit: 2:6: error: Division by zero.
      2 |  echo $((1%0))
        |       ^~~~~~~~ here.

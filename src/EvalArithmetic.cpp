@@ -191,7 +191,7 @@ public:
 
   [[noreturn]] cold fn fail(StringView message) throws -> void
   {
-    throw Error{"Arithmetic: " + message};
+    throw Error{String{message}};
   }
 
   fn skip_spaces() wontthrow -> void
@@ -240,7 +240,7 @@ public:
     if (is_single_integer_literal(value))
       return parse_arithmetic_operand(value);
 
-    if (depth >= MAX_DEPTH) fail("the variable value recurses too deeply");
+    if (depth >= MAX_DEPTH) fail("The variable value recurses too deeply");
 
     ArithmeticParser nested{context, value, 0, depth + 1, m_is_skipping};
     return nested.parse();
@@ -288,7 +288,7 @@ public:
         break;
       pos++;
     }
-    if (depth != 0) fail("expected ']' after an array subscript");
+    if (depth != 0) fail("Expected ']' after an array subscript");
     let const subscript =
         source.substring_of_length(inner_start, pos - inner_start);
     pos++;
@@ -329,7 +329,7 @@ public:
   fn prefix_step(i64 delta) throws -> i64
   {
     const lvalue target = read_lvalue();
-    if (target.name.is_empty()) fail("expected a variable after '++' or '--'");
+    if (target.name.is_empty()) fail("Expected a variable after '++' or '--'");
     const i64 updated = arithmetic_add(read_lvalue_value(target), delta);
     write_lvalue(target, updated);
     return updated;
@@ -349,7 +349,7 @@ public:
     let const result = parse_comma();
     skip_spaces();
     if (pos != source.length) {
-      Error error{"Arithmetic: unexpected '" + String{source.substring(pos)} +
+      Error error{"Unexpected '" + String{source.substring(pos)} +
                   "' after the expression"};
       error.set_note("An operator is missing between two values");
       throw error;
@@ -439,14 +439,14 @@ public:
     if (consume("?")) {
       if (condition != 0) {
         let const if_true = parse_assignment();
-        if (!consume(":")) fail("expected ':' in a conditional");
+        if (!consume(":")) fail("Expected ':' in a conditional");
         let const if_false = parse_skipped(&ArithmeticParser::parse_ternary);
         unused(if_false);
         return if_true;
       }
       let const if_true = parse_skipped(&ArithmeticParser::parse_assignment);
       unused(if_true);
-      if (!consume(":")) fail("expected ':' in a conditional");
+      if (!consume(":")) fail("Expected ':' in a conditional");
       return parse_ternary();
     }
     return condition;
@@ -557,7 +557,7 @@ public:
             lhs = 0;
             break;
           }
-          fail("exponent less than 0");
+          fail("Exponent less than 0");
         }
         lhs = arithmetic_power(lhs, rhs);
         break;
@@ -568,7 +568,7 @@ public:
             lhs = 0;
             break;
           }
-          fail("division by zero");
+          fail("Division by zero");
         }
         lhs = arithmetic_divide(lhs, rhs);
         break;
@@ -578,7 +578,7 @@ public:
             lhs = 0;
             break;
           }
-          fail("division by zero");
+          fail("Division by zero");
         }
         lhs = arithmetic_modulo(lhs, rhs);
         break;
@@ -631,12 +631,12 @@ public:
   {
     depth++;
     defer { depth--; };
-    if (depth > MAX_DEPTH) fail("expression nested too deeply");
+    if (depth > MAX_DEPTH) fail("Expression nested too deeply");
 
     skip_spaces();
     if (consume("(")) {
       let const value = parse_comma();
-      if (!consume(")")) fail("expected ')'");
+      if (!consume(")")) fail("Expected ')'");
       return value;
     }
     if (pos < source.length && lexer::is_number(source[pos])) {
@@ -650,7 +650,7 @@ public:
       if (consume("--")) return postfix_step(target, -1);
       return read_lvalue_value(target);
     }
-    fail("unexpected character");
+    fail("Unexpected character in the arithmetic expression");
   }
 };
 
@@ -662,7 +662,7 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
     let const base =
         parse_arithmetic_operand(from.substring_of_length(0, base_length));
     if (base < 2 || base > 64) {
-      throw Error{"Arithmetic: an arithmetic base must be between 2 and 64"};
+      throw Error{"The arithmetic base must be between 2 and 64"};
     }
     let const do_digit_value = [base](char c) -> i64 {
       if (c >= '0' && c <= '9') return c - '0';
@@ -754,7 +754,7 @@ static fn tokenize_arithmetic(StringView src,
           i++;
         }
         if (depth != 0)
-          throw Error{"Arithmetic: expected ']' after an array subscript"};
+          throw Error{"Expected ']' after an array subscript"};
         out.push(
             arith_token{arith_token::kind::subscript, 0,
                         src.substring_of_length(inner_start, i - inner_start)});
@@ -863,14 +863,14 @@ static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
 {
   switch (kind) {
   case 'P':
-    if (rhs < 0) throw Error{"Arithmetic: exponent less than 0"};
+    if (rhs < 0) throw Error{"Exponent less than 0"};
     return arithmetic_power(lhs, rhs);
   case '*': return arithmetic_multiply(lhs, rhs);
   case '/':
-    if (rhs == 0) throw Error{"Arithmetic: division by zero"};
+    if (rhs == 0) throw Error{"Division by zero"};
     return arithmetic_divide(lhs, rhs);
   case '%':
-    if (rhs == 0) throw Error{"Arithmetic: division by zero"};
+    if (rhs == 0) throw Error{"Division by zero"};
     return arithmetic_modulo(lhs, rhs);
   case '+': return arithmetic_add(lhs, rhs);
   case '-': return arithmetic_subtract(lhs, rhs);
@@ -936,7 +936,7 @@ public:
     depth++;
     defer { depth--; };
     if (depth > MAX_DEPTH)
-      throw Error{"Arithmetic: expression nested too deeply"};
+      throw Error{"Expression nested too deeply"};
 
     if (at_op("+")) {
       ti++;
@@ -957,7 +957,7 @@ public:
     if (at_op("(")) {
       ti++;
       let const value = parse_binary(1);
-      if (!at_op(")")) throw Error{"Arithmetic: expected ')'"};
+      if (!at_op(")")) throw Error{"Expected ')'"};
       ti++;
       return value;
     }
@@ -971,7 +971,7 @@ public:
       ti++;
       return arith_read_variable(context, name);
     }
-    throw Error{"Arithmetic: unexpected character"};
+    throw Error{"Unexpected character in the arithmetic expression"};
   }
 
   fn parse_binary(u8 min_precedence) throws -> i64
@@ -996,7 +996,7 @@ public:
     if (toks.is_empty()) return 0;
     let const result = parse_binary(1);
     if (ti != toks.count()) {
-      Error error{"Arithmetic: unexpected '" + String{toks[ti].text} +
+      Error error{"Unexpected '" + String{toks[ti].text} +
                   "' after the expression"};
       error.set_note("An operator is missing between two values");
       throw error;
@@ -1547,7 +1547,7 @@ public:
       return read_variable(
           source.substring_of_length(name_start, pos - name_start), name_start);
     }
-    fail("Unexpected character");
+    fail("Unexpected character in the arithmetic expression");
   }
 };
 

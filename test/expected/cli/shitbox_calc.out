@@ -7,7 +7,7 @@
 === variable read ===
 42
 === located parse error ===
-shit: 1:4: error: Unexpected character.
+shit: 1:4: error: Unexpected character in the arithmetic expression.
      1 |  1 +
        |     ^~ here.
 === located division by zero ===

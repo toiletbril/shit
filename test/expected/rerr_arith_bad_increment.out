@@ -7,6 +7,6 @@
 [Word
   ArithmeticExpansion "++"
 ]
-shit: 2:6: error: Arithmetic: expected a variable after '++' or '--'.
+shit: 2:6: error: Expected a variable after '++' or '--'.
      2 |  echo $((++))
        |       ^~~~~~~ here.

@@ -3,12 +3,12 @@ shit: 1:32: warning: Command 'f' was not found.
      1 |  eval "f(){ echo \$((1/0)); }"; f
        |                                 ^~ here.
 note: Did you mean ':'?
-shit: eval:2:8: error: Arithmetic: division by zero.
+shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
 rc=1
 == bash mood, literal eval argument ==
-shit: eval:2:8: error: Arithmetic: division by zero.
+shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
 rc=1
@@ -17,14 +17,14 @@ shit: 1:61: warning: Command 'h' was not found.
      1 |  code=$(printf "%s" "h(){ echo \$((1/0)); }"); eval "$code"; h
        |                                                              ^~ here.
 note: Did you mean ':'?
-shit: eval:2:8: error: Arithmetic: division by zero.
+shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
 rc=1
 == bash mood, function keyword form ==
-shit: eval:2:8: error: Arithmetic: division by zero.
+shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
 rc=1
 == function defined in default mood, called from bash, renders once ==
-1
+0
