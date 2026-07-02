@@ -40,7 +40,7 @@ fn util_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {
     let collected = ArrayList<String>{heap_allocator()};
-    for (const StaticStringMap<Utility::Kind>::entry &entry : SHITBOX_ENTRIES)
+    for (const static_string_entry<Utility::Kind> &entry : SHITBOX_ENTRIES)
       collected.push(entry.key.to_string());
     return collected;
   }();

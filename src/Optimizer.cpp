@@ -123,30 +123,15 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
 /* The names of commands proven not to mutate the shell environment. A command
    outside the table is assumed to write a variable, so the constant table is
    forgotten across it. */
-inline constexpr StaticStringMap<bool>::entry ENVIRONMENT_NEUTRAL_ENTRIES[] = {
-    {SSK("echo"),     true},
-    {SSK("true"),     true},
-    {SSK("false"),    true},
-    {SSK(":"),        true},
-    {SSK("test"),     true},
-    {SSK("["),        true},
-    {SSK("pwd"),      true},
-    {SSK("which"),    true},
-    {SSK("whoami"),   true},
-    {SSK("basename"), true},
-    {SSK("dirname"),  true},
-    {SSK("seq"),      true},
-    {SSK("expr"),     true},
-    {SSK("id"),       true},
-    {SSK("hostname"), true},
-    {SSK("uname"),    true},
-    {SSK("date"),     true},
-    {SSK("arch"),     true},
-    {SSK("tty"),      true},
+inline constexpr PackedStringKey ENVIRONMENT_NEUTRAL_KEYS[] = {
+    SSK("echo"),   SSK("true"),  SSK("false"),   SSK(":"),       SSK("test"),
+    SSK("["),      SSK("pwd"),   SSK("which"),   SSK("whoami"),  SSK("basename"),
+    SSK("dirname"), SSK("seq"),  SSK("expr"),    SSK("id"),      SSK("hostname"),
+    SSK("uname"),  SSK("date"),  SSK("arch"),    SSK("tty"),
 };
 
-inline constexpr StaticStringMap<bool> ENVIRONMENT_NEUTRAL_NAMES{
-    ENVIRONMENT_NEUTRAL_ENTRIES, countof(ENVIRONMENT_NEUTRAL_ENTRIES)};
+inline constexpr StaticStringSet ENVIRONMENT_NEUTRAL_NAMES{
+    ENVIRONMENT_NEUTRAL_KEYS};
 
 } // namespace
 
@@ -162,7 +147,7 @@ pure fn is_plain_variable_name(StringView name) wontthrow -> bool
 
 fn command_is_environment_neutral(StringView name) throws -> bool
 {
-  return ENVIRONMENT_NEUTRAL_NAMES.find(name).has_value();
+  return ENVIRONMENT_NEUTRAL_NAMES.contains(name);
 }
 
 fn literal_word_value(const Word &word) throws -> Maybe<String>

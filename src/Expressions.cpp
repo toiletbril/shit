@@ -676,79 +676,34 @@ cold fn args_have_short_flag(const ArrayList<const Token *> &args,
 
 /* The commands that never read stdin, so a pipe or input redirect into one
    silently discards the upstream data, shellcheck SC2216 and SC2217. */
-constexpr StaticStringMap<bool>::entry NON_STDIN_READER_ENTRIES[] = {
-    {SSK("rm"),       true},
-    {SSK("echo"),     true},
-    {SSK("printf"),   true},
-    {SSK("true"),     true},
-    {SSK("false"),    true},
-    {SSK("mkdir"),    true},
-    {SSK("rmdir"),    true},
-    {SSK("touch"),    true},
-    {SSK("chmod"),    true},
-    {SSK("chown"),    true},
-    {SSK("cp"),       true},
-    {SSK("mv"),       true},
-    {SSK("ln"),       true},
-    {SSK("kill"),     true},
-    {SSK("basename"), true},
-    {SSK("dirname"),  true},
-    {SSK("sleep"),    true},
-    {SSK("unlink"),   true},
+constexpr PackedStringKey NON_STDIN_READER_KEYS[] = {
+    SSK("rm"),       SSK("echo"),   SSK("printf"), SSK("true"),  SSK("false"),
+    SSK("mkdir"),    SSK("rmdir"),  SSK("touch"),  SSK("chmod"), SSK("chown"),
+    SSK("cp"),       SSK("mv"),     SSK("ln"),     SSK("kill"),  SSK("basename"),
+    SSK("dirname"),  SSK("sleep"),  SSK("unlink"),
 };
-constexpr StaticStringMap<bool> NON_STDIN_READERS{
-    NON_STDIN_READER_ENTRIES,
-    sizeof(NON_STDIN_READER_ENTRIES) / sizeof(NON_STDIN_READER_ENTRIES[0])};
+constexpr StaticStringSet NON_STDIN_READERS{NON_STDIN_READER_KEYS};
 
 /* The top-level system directories rm -r must never aim at, the SC2114
    table. */
-constexpr StaticStringMap<bool>::entry SYSTEM_DIRECTORY_ENTRIES[] = {
-    {SSK("/"),     true},
-    {SSK("/bin"),  true},
-    {SSK("/boot"), true},
-    {SSK("/dev"),  true},
-    {SSK("/etc"),  true},
-    {SSK("/home"), true},
-    {SSK("/lib"),  true},
-    {SSK("/proc"), true},
-    {SSK("/root"), true},
-    {SSK("/sbin"), true},
-    {SSK("/sys"),  true},
-    {SSK("/usr"),  true},
-    {SSK("/var"),  true},
+constexpr PackedStringKey SYSTEM_DIRECTORY_KEYS[] = {
+    SSK("/"),     SSK("/bin"),  SSK("/boot"), SSK("/dev"),  SSK("/etc"),
+    SSK("/home"), SSK("/lib"),  SSK("/proc"), SSK("/root"), SSK("/sbin"),
+    SSK("/sys"),  SSK("/usr"),  SSK("/var"),
 };
-constexpr StaticStringMap<bool> SYSTEM_DIRECTORIES{
-    SYSTEM_DIRECTORY_ENTRIES,
-    sizeof(SYSTEM_DIRECTORY_ENTRIES) / sizeof(SYSTEM_DIRECTORY_ENTRIES[0])};
+constexpr StaticStringSet SYSTEM_DIRECTORIES{SYSTEM_DIRECTORY_KEYS};
 
-constexpr StaticStringMap<bool>::entry VARIABLE_PROBE_COMMAND_ENTRIES[] = {
-    {SSK("["),     true},
-    {SSK("test"),  true},
-    {SSK("[["),    true},
-    {SSK("unset"), true},
-    {SSK("let"),   true},
-    {SSK("eval"),  true},
+constexpr PackedStringKey VARIABLE_PROBE_COMMAND_KEYS[] = {
+    SSK("["), SSK("test"), SSK("[["), SSK("unset"), SSK("let"), SSK("eval"),
 };
-constexpr StaticStringMap<bool> VARIABLE_PROBE_COMMANDS{
-    VARIABLE_PROBE_COMMAND_ENTRIES,
-    sizeof(VARIABLE_PROBE_COMMAND_ENTRIES) /
-        sizeof(VARIABLE_PROBE_COMMAND_ENTRIES[0])};
+constexpr StaticStringSet VARIABLE_PROBE_COMMANDS{VARIABLE_PROBE_COMMAND_KEYS};
 
-constexpr StaticStringMap<bool>::entry VARIABLE_TARGET_COMMAND_ENTRIES[] = {
-    {SSK("read"),      true},
-    {SSK("mapfile"),   true},
-    {SSK("readarray"), true},
-    {SSK("getopts"),   true},
-    {SSK("declare"),   true},
-    {SSK("typeset"),   true},
-    {SSK("export"),    true},
-    {SSK("readonly"),  true},
-    {SSK("local"),     true},
+constexpr PackedStringKey VARIABLE_TARGET_COMMAND_KEYS[] = {
+    SSK("read"),    SSK("mapfile"),  SSK("readarray"), SSK("getopts"),
+    SSK("declare"), SSK("typeset"),  SSK("export"),    SSK("readonly"),
+    SSK("local"),
 };
-constexpr StaticStringMap<bool> VARIABLE_TARGET_COMMANDS{
-    VARIABLE_TARGET_COMMAND_ENTRIES,
-    sizeof(VARIABLE_TARGET_COMMAND_ENTRIES) /
-        sizeof(VARIABLE_TARGET_COMMAND_ENTRIES[0])};
+constexpr StaticStringSet VARIABLE_TARGET_COMMANDS{VARIABLE_TARGET_COMMAND_KEYS};
 
 fn operand_target_name(StringView text) wontthrow -> StringView
 {
@@ -1125,7 +1080,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       }
       if (word_is_fully_literal(word)) {
         let const literal = word.to_literal_string();
-        if (SYSTEM_DIRECTORIES.find(literal.view()).has_value())
+        if (SYSTEM_DIRECTORIES.contains(literal.view()))
           actx.warn(m_args[i]->source_location(),
                     "A rm -r targets the system directory '" + literal.view() +
                         "'",
@@ -1314,7 +1269,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
 
     if (!m_redirections.is_empty() && !command_is_shadowed &&
-        NON_STDIN_READERS.find(command_literal.view()).has_value())
+        NON_STDIN_READERS.contains(command_literal.view()))
     {
       if (!args_have_stdin_operand(m_args))
         for (let const &redirection : m_redirections)
@@ -1616,7 +1571,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   let const is_top_level_unconditional =
       actx.function_scope_depth == 0 && is_unconditional;
   if (is_top_level_unconditional && !command_is_shadowed) {
-    if (VARIABLE_TARGET_COMMANDS.find(command_literal.view()).has_value()) {
+    if (VARIABLE_TARGET_COMMANDS.contains(command_literal.view())) {
       for (usize i = 1; i < m_args.count(); i++) {
         let const word = m_args[i]->kind() == Token::Kind::Word
                              ? static_cast<const tokens::WordToken *>(m_args[i])
@@ -1625,9 +1580,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                              : m_args[i]->raw_string();
         actx.note_variable_assignment(operand_target_name(word.view()));
       }
-    } else if (!VARIABLE_PROBE_COMMANDS.find(command_literal.view())
-                    .has_value())
-    {
+    } else if (!VARIABLE_PROBE_COMMANDS.contains(command_literal.view())) {
       for (usize i = 1; i < m_args.count(); i++) {
         if (m_args[i]->kind() != Token::Kind::Word) continue;
 
@@ -1729,7 +1682,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
                   "Pair find -print0 with xargs -0 or use find -exec");
     }
 
-    if (!next_is_user && NON_STDIN_READERS.find(next_name->view()).has_value())
+    if (!next_is_user && NON_STDIN_READERS.contains(next_name->view()))
     {
       if (!args_have_stdin_operand(next->args()))
         actx.warn(next->args()[0]->source_location(),

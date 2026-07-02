@@ -39,13 +39,21 @@ public:
     return key;
   }
 
-  hot mustuse pure fn
+  hot mustuse constexpr fn
   operator==(const PackedStringKey &other) const wontthrow->bool
   {
     u64 difference = 0;
     for (usize i = 0; i < WORD_COUNT; i++)
       difference |= words[i] ^ other.words[i];
     return difference == 0;
+  }
+
+  hot mustuse constexpr fn
+  operator<(const PackedStringKey &other) const wontthrow->bool
+  {
+    for (usize i = 0; i < WORD_COUNT; i++)
+      if (words[i] != other.words[i]) return words[i] < other.words[i];
+    return false;
   }
 
   /* The byte length of a key with no embedded NUL, read as the position of the

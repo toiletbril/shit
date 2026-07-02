@@ -30,7 +30,7 @@ namespace {
 /* The variables make predefines, so a makefile that reads one without assigning
    it still finds a sane default. These sit at the lowest precedence, below a
    makefile assignment and the environment, which the expander checks first. */
-constexpr StaticStringMap<const char *>::entry BUILTIN_VARIABLE_ENTRIES[] = {
+constexpr static_string_entry<const char *> BUILTIN_VARIABLE_ENTRIES[] = {
     {SSK("MAKE"),    "shitbox make"},
     {SSK("CC"),      "cc"          },
     {SSK("CXX"),     "c++"         },
@@ -39,9 +39,7 @@ constexpr StaticStringMap<const char *>::entry BUILTIN_VARIABLE_ENTRIES[] = {
     {SSK("ARFLAGS"), "rv"          },
     {SSK("RM"),      "rm -f"       },
 };
-constexpr StaticStringMap<const char *> BUILTIN_VARIABLES{
-    BUILTIN_VARIABLE_ENTRIES,
-    sizeof(BUILTIN_VARIABLE_ENTRIES) / sizeof(BUILTIN_VARIABLE_ENTRIES[0])};
+constexpr StaticStringMap BUILTIN_VARIABLES{BUILTIN_VARIABLE_ENTRIES};
 
 struct make_variable
 {

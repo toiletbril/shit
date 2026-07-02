@@ -207,24 +207,15 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
 pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
 {
-  static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
-      {SSK("progcomp"),             true},
-      {SSK("promptvars"),           true},
-      {SSK("sourcepath"),           true},
-      {SSK("extquote"),             true},
-      {SSK("complete_fullquote"),   true},
-      {SSK("hostcomplete"),         true},
-      {SSK("cmdhist"),              true},
-      {SSK("checkwinsize"),         true},
-      {SSK("force_fignore"),        true},
-      {SSK("globasciiranges"),      true},
-      {SSK("globskipdots"),         true},
-      {SSK("expand_aliases"),       true},
-      {SSK("interactive_comments"), true},
+  static constexpr PackedStringKey KEYS[] = {
+      SSK("progcomp"),           SSK("promptvars"),      SSK("sourcepath"),
+      SSK("extquote"),           SSK("complete_fullquote"), SSK("hostcomplete"),
+      SSK("cmdhist"),            SSK("checkwinsize"),    SSK("force_fignore"),
+      SSK("globasciiranges"),    SSK("globskipdots"),    SSK("expand_aliases"),
+      SSK("interactive_comments"),
   };
-  static constexpr StaticStringMap<bool> DEFAULT_ON_SHOPT_NAMES{
-      ENTRIES, countof(ENTRIES)};
-  return DEFAULT_ON_SHOPT_NAMES.find(name).has_value();
+  static constexpr StaticStringSet DEFAULT_ON_SHOPT_NAMES{KEYS};
+  return DEFAULT_ON_SHOPT_NAMES.contains(name);
 }
 
 fn EvalContext::run_source(StringView source, StringView origin,

@@ -64,7 +64,7 @@ public:
       return size.has_value() && size.value() > 0;
     }
     using file_predicate = bool (Path::*)() const;
-    static constexpr StaticStringMap<file_predicate>::entry ENTRIES[] = {
+    static constexpr static_string_entry<file_predicate> ENTRIES[] = {
         {SSK("-e"), &Path::exists                     },
         {SSK("-f"), &Path::is_regular_file            },
         {SSK("-d"), &Path::is_directory               },
@@ -83,8 +83,7 @@ public:
         {SSK("-O"), &Path::is_owned_by_effective_user },
         {SSK("-G"), &Path::is_owned_by_effective_group},
     };
-    static constexpr StaticStringMap<file_predicate> FILE_TESTS{
-        ENTRIES, countof(ENTRIES)};
+    static constexpr StaticStringMap FILE_TESTS{ENTRIES};
 
     if (let const predicate = FILE_TESTS.find(op.view()); predicate.has_value())
       return (operand_path.*(*predicate))();
@@ -156,54 +155,25 @@ public:
 
   pure fn is_unary_operator(const String &s) const wontthrow -> bool
   {
-    static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
-        {SSK("-z"), true},
-        {SSK("-n"), true},
-        {SSK("-e"), true},
-        {SSK("-f"), true},
-        {SSK("-d"), true},
-        {SSK("-s"), true},
-        {SSK("-r"), true},
-        {SSK("-w"), true},
-        {SSK("-x"), true},
-        {SSK("-L"), true},
-        {SSK("-h"), true},
-        {SSK("-b"), true},
-        {SSK("-c"), true},
-        {SSK("-p"), true},
-        {SSK("-S"), true},
-        {SSK("-g"), true},
-        {SSK("-u"), true},
-        {SSK("-k"), true},
-        {SSK("-O"), true},
-        {SSK("-G"), true},
-        {SSK("-t"), true},
+    static constexpr PackedStringKey KEYS[] = {
+        SSK("-z"), SSK("-n"), SSK("-e"), SSK("-f"), SSK("-d"), SSK("-s"),
+        SSK("-r"), SSK("-w"), SSK("-x"), SSK("-L"), SSK("-h"), SSK("-b"),
+        SSK("-c"), SSK("-p"), SSK("-S"), SSK("-g"), SSK("-u"), SSK("-k"),
+        SSK("-O"), SSK("-G"), SSK("-t"),
     };
-    static constexpr StaticStringMap<bool> UNARY_OPS{ENTRIES, countof(ENTRIES)};
-    return UNARY_OPS.find(s.view()).has_value();
+    static constexpr StaticStringSet UNARY_OPS{KEYS};
+    return UNARY_OPS.contains(s.view());
   }
 
   pure fn is_binary_operator(const String &s) const wontthrow -> bool
   {
-    static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
-        {SSK("="),   true},
-        {SSK("=="),  true},
-        {SSK("!="),  true},
-        {SSK("<"),   true},
-        {SSK(">"),   true},
-        {SSK("-eq"), true},
-        {SSK("-ne"), true},
-        {SSK("-lt"), true},
-        {SSK("-le"), true},
-        {SSK("-gt"), true},
-        {SSK("-ge"), true},
-        {SSK("-ef"), true},
-        {SSK("-nt"), true},
-        {SSK("-ot"), true},
+    static constexpr PackedStringKey KEYS[] = {
+        SSK("="),   SSK("=="),  SSK("!="),  SSK("<"),   SSK(">"),
+        SSK("-eq"), SSK("-ne"), SSK("-lt"), SSK("-le"), SSK("-gt"),
+        SSK("-ge"), SSK("-ef"), SSK("-nt"), SSK("-ot"),
     };
-    static constexpr StaticStringMap<bool> BINARY_OPS{ENTRIES,
-                                                      countof(ENTRIES)};
-    return BINARY_OPS.find(s.view()).has_value();
+    static constexpr StaticStringSet BINARY_OPS{KEYS};
+    return BINARY_OPS.contains(s.view());
   }
 
   /* A unary operator at index reads as a plain operand rather than an operator

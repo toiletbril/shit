@@ -1233,7 +1233,7 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
    unsigned char, the only argument range the ctype functions define. */
 using posix_class_test = bool (*)(u8 byte);
 
-constexpr StaticStringMap<posix_class_test>::entry POSIX_CLASS_ENTRIES[] = {
+constexpr static_string_entry<posix_class_test> POSIX_CLASS_ENTRIES[] = {
     {SSK("alnum"),  [](u8 byte) { return std::isalnum(byte) != 0; } },
     {SSK("alpha"),  [](u8 byte) { return std::isalpha(byte) != 0; } },
     {SSK("blank"),  [](u8 byte) { return std::isblank(byte) != 0; } },
@@ -1248,9 +1248,7 @@ constexpr StaticStringMap<posix_class_test>::entry POSIX_CLASS_ENTRIES[] = {
     {SSK("xdigit"), [](u8 byte) { return std::isxdigit(byte) != 0; }},
 };
 
-constexpr StaticStringMap<posix_class_test> POSIX_CLASSES{
-    POSIX_CLASS_ENTRIES,
-    sizeof(POSIX_CLASS_ENTRIES) / sizeof(POSIX_CLASS_ENTRIES[0])};
+constexpr StaticStringMap POSIX_CLASSES{POSIX_CLASS_ENTRIES};
 
 /* Whether the byte belongs to the named class. An unknown name matches
    nothing, the way bash treats a class it does not know. */

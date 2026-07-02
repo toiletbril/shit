@@ -242,7 +242,7 @@ struct keyword_spec
   bool requires_non_posix = false;
 };
 
-constexpr StaticStringMap<keyword_spec>::entry HIGHLIGHT_KEYWORD_ENTRIES[] = {
+constexpr static_string_entry<keyword_spec> HIGHLIGHT_KEYWORD_ENTRIES[] = {
     {SSK("if"),
      {.role = keyword_role::open,
       .construct = highlight_construct::if_,
@@ -297,8 +297,7 @@ constexpr StaticStringMap<keyword_spec>::entry HIGHLIGHT_KEYWORD_ENTRIES[] = {
     {SSK("in"),       {.role = keyword_role::misplaced_in}                 },
 };
 
-constexpr StaticStringMap<keyword_spec> HIGHLIGHT_KEYWORDS{
-    HIGHLIGHT_KEYWORD_ENTRIES, countof(HIGHLIGHT_KEYWORD_ENTRIES)};
+constexpr StaticStringMap HIGHLIGHT_KEYWORDS{HIGHLIGHT_KEYWORD_ENTRIES};
 
 } // namespace
 

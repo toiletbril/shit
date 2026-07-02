@@ -1089,7 +1089,7 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 
   let const bare = utils::strip_sig_prefix(name);
 
-  static constexpr StaticStringMap<i32>::entry NAME_ENTRIES[] = {
+  static constexpr static_string_entry<i32> NAME_ENTRIES[] = {
       {SSK("HUP"),  SIGHUP },
       {SSK("INT"),  SIGINT },
       {SSK("QUIT"), SIGQUIT},
@@ -1104,8 +1104,7 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
       {SSK("ALRM"), SIGALRM},
       {SSK("PIPE"), SIGPIPE},
   };
-  static constexpr StaticStringMap<i32> NAMES{
-      NAME_ENTRIES, sizeof(NAME_ENTRIES) / sizeof(NAME_ENTRIES[0])};
+  static constexpr StaticStringMap NAMES{NAME_ENTRIES};
   return NAMES.find(bare);
 }
 

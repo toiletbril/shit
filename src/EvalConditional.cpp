@@ -103,55 +103,25 @@ struct conditional_evaluator
 
   static pure fn is_unary_op(StringView s) wontthrow -> bool
   {
-    static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
-        {SSK("-z"), true},
-        {SSK("-n"), true},
-        {SSK("-e"), true},
-        {SSK("-f"), true},
-        {SSK("-d"), true},
-        {SSK("-r"), true},
-        {SSK("-w"), true},
-        {SSK("-x"), true},
-        {SSK("-s"), true},
-        {SSK("-h"), true},
-        {SSK("-L"), true},
-        {SSK("-b"), true},
-        {SSK("-c"), true},
-        {SSK("-p"), true},
-        {SSK("-S"), true},
-        {SSK("-g"), true},
-        {SSK("-u"), true},
-        {SSK("-k"), true},
-        {SSK("-O"), true},
-        {SSK("-G"), true},
-        {SSK("-v"), true},
-        {SSK("-t"), true},
-        {SSK("-o"), true},
+    static constexpr PackedStringKey KEYS[] = {
+        SSK("-z"), SSK("-n"), SSK("-e"), SSK("-f"), SSK("-d"), SSK("-r"),
+        SSK("-w"), SSK("-x"), SSK("-s"), SSK("-h"), SSK("-L"), SSK("-b"),
+        SSK("-c"), SSK("-p"), SSK("-S"), SSK("-g"), SSK("-u"), SSK("-k"),
+        SSK("-O"), SSK("-G"), SSK("-v"), SSK("-t"), SSK("-o"),
     };
-    static constexpr StaticStringMap<bool> UNARY_OPS{ENTRIES, countof(ENTRIES)};
-    return UNARY_OPS.find(s).has_value();
+    static constexpr StaticStringSet UNARY_OPS{KEYS};
+    return UNARY_OPS.contains(s);
   }
 
   static pure fn is_binary_word_op(StringView s) wontthrow -> bool
   {
-    static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
-        {SSK("="),   true},
-        {SSK("=="),  true},
-        {SSK("!="),  true},
-        {SSK("=~"),  true},
-        {SSK("-eq"), true},
-        {SSK("-ne"), true},
-        {SSK("-lt"), true},
-        {SSK("-le"), true},
-        {SSK("-gt"), true},
-        {SSK("-ge"), true},
-        {SSK("-ef"), true},
-        {SSK("-nt"), true},
-        {SSK("-ot"), true},
+    static constexpr PackedStringKey KEYS[] = {
+        SSK("="),   SSK("=="),  SSK("!="),  SSK("=~"),  SSK("-eq"),
+        SSK("-ne"), SSK("-lt"), SSK("-le"), SSK("-gt"), SSK("-ge"),
+        SSK("-ef"), SSK("-nt"), SSK("-ot"),
     };
-    static constexpr StaticStringMap<bool> BINARY_WORD_OPS{ENTRIES,
-                                                           countof(ENTRIES)};
-    return BINARY_WORD_OPS.find(s).has_value();
+    static constexpr StaticStringSet BINARY_WORD_OPS{KEYS};
+    return BINARY_WORD_OPS.contains(s);
   }
 
   static pure fn is_regex_metacharacter(char c) wontthrow -> bool

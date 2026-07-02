@@ -785,28 +785,13 @@ static fn tokenize_arithmetic(StringView src,
    char parser, the token fast path keeps no side-effect ordering. */
 static pure fn arith_op_is_complex(StringView t) wontthrow -> bool
 {
-  static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
-      {SSK("="),   true},
-      {SSK("+="),  true},
-      {SSK("-="),  true},
-      {SSK("*="),  true},
-      {SSK("/="),  true},
-      {SSK("%="),  true},
-      {SSK("&="),  true},
-      {SSK("|="),  true},
-      {SSK("^="),  true},
-      {SSK("<<="), true},
-      {SSK(">>="), true},
-      {SSK("?"),   true},
-      {SSK(":"),   true},
-      {SSK(","),   true},
-      {SSK("++"),  true},
-      {SSK("--"),  true},
-      {SSK("&&"),  true},
-      {SSK("||"),  true},
+  static constexpr PackedStringKey KEYS[] = {
+      SSK("="),  SSK("+="), SSK("-="), SSK("*="), SSK("/="), SSK("%="),
+      SSK("&="), SSK("|="), SSK("^="), SSK("<<="), SSK(">>="), SSK("?"),
+      SSK(":"),  SSK(","),  SSK("++"), SSK("--"), SSK("&&"), SSK("||"),
   };
-  static constexpr StaticStringMap<bool> COMPLEX_OPS{ENTRIES, countof(ENTRIES)};
-  return COMPLEX_OPS.find(t).has_value();
+  static constexpr StaticStringSet COMPLEX_OPS{KEYS};
+  return COMPLEX_OPS.contains(t);
 }
 
 static pure fn
@@ -831,7 +816,7 @@ struct arith_binop
    expression never holds it. */
 static pure fn arith_classify_binop(StringView t) wontthrow -> arith_binop
 {
-  static constexpr StaticStringMap<arith_binop>::entry ENTRIES[] = {
+  static constexpr static_string_entry<arith_binop> ENTRIES[] = {
       {SSK("**"), {'P', 11}},
       {SSK("*"),  {'*', 10}},
       {SSK("/"),  {'/', 10}},
@@ -850,8 +835,7 @@ static pure fn arith_classify_binop(StringView t) wontthrow -> arith_binop
       {SSK("^"),  {'^', 4} },
       {SSK("|"),  {'|', 3} },
   };
-  static constexpr StaticStringMap<arith_binop> BINOPS{ENTRIES,
-                                                       countof(ENTRIES)};
+  static constexpr StaticStringMap BINOPS{ENTRIES};
   if (let const found = BINOPS.find(t); found.has_value()) return *found;
   return {0, 0};
 }

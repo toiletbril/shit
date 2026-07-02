@@ -80,7 +80,7 @@ protected:
   Builtin();
 };
 
-inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
+inline constexpr static_string_entry<Builtin::Kind> BUILTIN_ENTRIES[] = {
     {SSK("echo"),      Builtin::Kind::Echo          },
     {SSK("exit"),      Builtin::Kind::Exit          },
     {SSK("cd"),        Builtin::Kind::Cd            },
@@ -139,8 +139,7 @@ inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
     {SSK("history"),   Builtin::Kind::History       },
 };
 
-inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
-    BUILTIN_ENTRIES, sizeof(BUILTIN_ENTRIES) / sizeof(BUILTIN_ENTRIES[0])};
+inline constexpr StaticStringMap BUILTINS{BUILTIN_ENTRIES};
 
 #define B_CASE(btin)                                                           \
   case Builtin::Kind::btin: {                                                  \

@@ -113,7 +113,7 @@ const SetOption SET_OPTIONS[] = {
 
 fn parse_mood_name(StringView name) throws -> Maybe<mimic_mood>
 {
-  static constexpr StaticStringMap<mimic_mood>::entry ENTRIES[] = {
+  static constexpr static_string_entry<mimic_mood> ENTRIES[] = {
       {SSK("shit"),    mimic_mood::Default},
       {SSK("default"), mimic_mood::Default},
       {SSK("bash"),    mimic_mood::Bash   },
@@ -121,8 +121,7 @@ fn parse_mood_name(StringView name) throws -> Maybe<mimic_mood>
       {SSK("posix"),   mimic_mood::Posix  },
       {SSK("dash"),    mimic_mood::Posix  },
   };
-  static constexpr StaticStringMap<mimic_mood> MOOD_NAMES{ENTRIES,
-                                                          countof(ENTRIES)};
+  static constexpr StaticStringMap MOOD_NAMES{ENTRIES};
   return MOOD_NAMES.find(name);
 }
 

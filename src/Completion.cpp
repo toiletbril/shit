@@ -217,7 +217,7 @@ static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
   {
     return true;
   }
-  return TRANSPARENT_PREFIXES.find(word).has_value();
+  return TRANSPARENT_PREFIXES.contains(word);
 }
 
 static pure fn is_in_command_position(StringView line,

@@ -63,33 +63,21 @@ fn is_special_builtin_name(StringView name) wontthrow -> bool
   /* The POSIX special builtin set, matched by name. The colon and the dot are
      special while their plain-word siblings true and source-as-a-program are
      not, so the kind cannot decide this. */
-  static constexpr StaticStringMap<bool>::entry SPECIAL_BUILTIN_ENTRIES[] = {
-      {SSK(":"),        true},
-      {SSK("."),        true},
-      {SSK("break"),    true},
-      {SSK("continue"), true},
-      {SSK("eval"),     true},
-      {SSK("exec"),     true},
-      {SSK("exit"),     true},
-      {SSK("export"),   true},
-      {SSK("readonly"), true},
-      {SSK("return"),   true},
-      {SSK("set"),      true},
-      {SSK("shift"),    true},
-      {SSK("times"),    true},
-      {SSK("trap"),     true},
-      {SSK("unset"),    true},
+  static constexpr PackedStringKey SPECIAL_BUILTIN_KEYS[] = {
+      SSK(":"),        SSK("."),      SSK("break"),  SSK("continue"),
+      SSK("eval"),     SSK("exec"),   SSK("exit"),   SSK("export"),
+      SSK("readonly"), SSK("return"), SSK("set"),    SSK("shift"),
+      SSK("times"),    SSK("trap"),   SSK("unset"),
   };
-  static constexpr StaticStringMap<bool> SPECIAL_BUILTINS{
-      SPECIAL_BUILTIN_ENTRIES, countof(SPECIAL_BUILTIN_ENTRIES)};
-  return SPECIAL_BUILTINS.find(name).has_value();
+  static constexpr StaticStringSet SPECIAL_BUILTINS{SPECIAL_BUILTIN_KEYS};
+  return SPECIAL_BUILTINS.contains(name);
 }
 
 fn builtin_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {
     let collected = ArrayList<String>{heap_allocator()};
-    for (const StaticStringMap<Builtin::Kind>::entry &entry : BUILTIN_ENTRIES)
+    for (const static_string_entry<Builtin::Kind> &entry : BUILTIN_ENTRIES)
       collected.push(entry.key.to_string());
     return collected;
   }();

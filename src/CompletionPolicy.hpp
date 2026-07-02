@@ -3,46 +3,20 @@
 #include "Common.hpp"
 #include "StaticStringMap.hpp"
 
-/* The per-program completion policy lists, gathered so the cascade reads which
-   programs fork their --help, which take a custom completer, and which sort a
-   file type first from one place. A program absent from every list falls
-   through to the manpage and the filesystem, which is how a fish-specific or
-   irrelevant name is left out. */
-
 namespace shit {
 
 namespace completion {
 
-/* for, case, and in stay opaque since a subject word or patterns follow them.
- */
-inline constexpr StaticStringMap<bool>::entry TRANSPARENT_PREFIX_ENTRIES[] = {
-    {SSK("!"),       true},
-    {SSK("time"),    true},
-    {SSK("if"),      true},
-    {SSK("then"),    true},
-    {SSK("else"),    true},
-    {SSK("elif"),    true},
-    {SSK("while"),   true},
-    {SSK("until"),   true},
-    {SSK("do"),      true},
-    {SSK("{"),       true},
-    {SSK("sudo"),    true},
-    {SSK("doas"),    true},
-    {SSK("env"),     true},
-    {SSK("nice"),    true},
-    {SSK("command"), true},
-    {SSK("builtin"), true},
+inline constexpr PackedStringKey TRANSPARENT_PREFIX_KEYS[] = {
+    SSK("!"),    SSK("time"), SSK("if"),   SSK("then"),    SSK("else"),
+    SSK("elif"), SSK("while"), SSK("until"), SSK("do"),    SSK("{"),
+    SSK("sudo"), SSK("doas"), SSK("env"),  SSK("nice"),    SSK("command"),
+    SSK("builtin"),
 };
-inline constexpr StaticStringMap<bool> TRANSPARENT_PREFIXES{
-    TRANSPARENT_PREFIX_ENTRIES, countof(TRANSPARENT_PREFIX_ENTRIES)};
+inline constexpr StaticStringSet TRANSPARENT_PREFIXES{TRANSPARENT_PREFIX_KEYS};
 
-/* A tool with an unambiguous file type lists the extensions it operates on,
-   space separated and without the dot. A file argument that carries one of
-   these sorts ahead of the rest, the way fish orders type-relevant files first.
-   A compressor is left out since it takes any file, while a decompressor and a
-   viewer name the type they open. */
-inline constexpr StaticStringMap<
-    const char *>::entry FILE_EXTENSION_HINT_ENTRIES[] = {
+inline constexpr static_string_entry<const char *> FILE_EXTENSION_HINT_ENTRIES[] =
+    {
     {SSK("unzip"),    "zip"                                                   },
     {SSK("gunzip"),   "gz"                                                    },
     {SSK("zcat"),     "gz"                                                    },
@@ -80,22 +54,16 @@ inline constexpr StaticStringMap<
     {SSK("okular"),   "pdf ps epub djvu cbz"                                  },
     {SSK("xpdf"),     "pdf"                                                   },
 };
-inline constexpr StaticStringMap<const char *> FILE_EXTENSION_HINTS{
-    FILE_EXTENSION_HINT_ENTRIES, countof(FILE_EXTENSION_HINT_ENTRIES)};
+inline constexpr StaticStringMap FILE_EXTENSION_HINTS{FILE_EXTENSION_HINT_ENTRIES};
 
-/* A command completes options from the manpage of the aliased name, so a driver
-   and its C++ front read the same page. */
-inline constexpr StaticStringMap<const char *>::entry MANPAGE_ALIAS_ENTRIES[] =
+inline constexpr static_string_entry<const char *> MANPAGE_ALIAS_ENTRIES[] =
     {
         {SSK("clang++"), "clang"},
         {SSK("c++"),     "clang"},
         {SSK("g++"),     "gcc"  },
 };
-inline constexpr StaticStringMap<const char *> MANPAGE_ALIASES{
-    MANPAGE_ALIAS_ENTRIES, countof(MANPAGE_ALIAS_ENTRIES)};
+inline constexpr StaticStringMap MANPAGE_ALIASES{MANPAGE_ALIAS_ENTRIES};
 
-/* The custom completer a tool reaches for its non-flag argument, a build
-   target, an ssh host, or a package script. */
 enum class tool_with_targets_kind : u8
 {
   make,
@@ -106,7 +74,7 @@ enum class tool_with_targets_kind : u8
   teleport,
 };
 
-inline constexpr StaticStringMap<tool_with_targets_kind>::entry
+inline constexpr static_string_entry<tool_with_targets_kind>
     TOOL_WITH_TARGETS_ENTRIES[] = {
         {SSK("make"),        tool_with_targets_kind::make       },
         {SSK("ninja"),       tool_with_targets_kind::ninja      },
@@ -126,16 +94,9 @@ inline constexpr StaticStringMap<tool_with_targets_kind>::entry
         {SSK("autossh"),     tool_with_targets_kind::ssh        },
         {SSK("tsh"),         tool_with_targets_kind::teleport   },
 };
-inline constexpr StaticStringMap<tool_with_targets_kind> TOOLS_WITH_TARGETS{
-    TOOL_WITH_TARGETS_ENTRIES, countof(TOOL_WITH_TARGETS_ENTRIES)};
+inline constexpr StaticStringMap TOOLS_WITH_TARGETS{TOOL_WITH_TARGETS_ENTRIES};
 
-/* A command must appear here and resolve into a trusted directory before its
-   --help runs, the allowlist half of the gate. A non-plain argument also makes
-   the command read options from --help over a manpage. A name longer than the
-   packed-key capacity cannot key the map. A program absent here is not
-   --help-forked, the way a fish-specific or a shell-builtin name is left out.
- */
-inline constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
+inline constexpr static_string_entry<const char *> HELP_ALLOWLIST_ENTRIES[] =
     {
         {SSK("ffmpeg"),              "--help full"},
         {SSK("ffprobe"),             "--help full"},
@@ -404,8 +365,7 @@ inline constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("upower"),              "--help"     },
         {SSK("powertop"),            "--help"     },
 };
-inline constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
-    HELP_ALLOWLIST_ENTRIES, countof(HELP_ALLOWLIST_ENTRIES)};
+inline constexpr StaticStringMap HELP_ALLOWLIST{HELP_ALLOWLIST_ENTRIES};
 
 } // namespace completion
 

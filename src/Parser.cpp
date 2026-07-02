@@ -873,16 +873,12 @@ mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
    assignment. */
 static pure fn is_assignment_builtin_name(StringView name) wontthrow -> bool
 {
-  static constexpr StaticStringMap<bool>::entry ENTRIES[] = {
-      {SSK("local"),    true},
-      {SSK("declare"),  true},
-      {SSK("typeset"),  true},
-      {SSK("readonly"), true},
-      {SSK("export"),   true},
+  static constexpr PackedStringKey KEYS[] = {
+      SSK("local"), SSK("declare"), SSK("typeset"), SSK("readonly"),
+      SSK("export"),
   };
-  static constexpr StaticStringMap<bool> ASSIGNMENT_BUILTINS{ENTRIES,
-                                                             countof(ENTRIES)};
-  return ASSIGNMENT_BUILTINS.find(name).has_value();
+  static constexpr StaticStringSet ASSIGNMENT_BUILTINS{KEYS};
+  return ASSIGNMENT_BUILTINS.contains(name);
 }
 
 /* Returns a command, a compound command, or nullptr when a list terminator is

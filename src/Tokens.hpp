@@ -229,7 +229,7 @@ private:
   SourceLocation m_location;
 };
 
-inline constexpr StaticStringMap<Token::Kind>::entry KEYWORD_ENTRIES[] = {
+inline constexpr static_string_entry<Token::Kind> KEYWORD_ENTRIES[] = {
     {SSK("if"),       Token::Kind::If      },
     {SSK("then"),     Token::Kind::Then    },
     {SSK("else"),     Token::Kind::Else    },
@@ -247,8 +247,7 @@ inline constexpr StaticStringMap<Token::Kind>::entry KEYWORD_ENTRIES[] = {
     {SSK("function"), Token::Kind::Function},
 };
 
-inline constexpr StaticStringMap<Token::Kind> KEYWORDS{
-    KEYWORD_ENTRIES, countof(KEYWORD_ENTRIES)};
+inline constexpr StaticStringMap KEYWORDS{KEYWORD_ENTRIES};
 
 /* clang-format off */
 #define KW_CASE(k)                                                             \

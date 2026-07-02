@@ -68,7 +68,7 @@ protected:
   Utility();
 };
 
-inline constexpr StaticStringMap<Utility::Kind>::entry SHITBOX_ENTRIES[] = {
+inline constexpr static_string_entry<Utility::Kind> SHITBOX_ENTRIES[] = {
     {SSK("ls"),       Utility::Kind::Ls      },
     {SSK("ln"),       Utility::Kind::Ln      },
     {SSK("rm"),       Utility::Kind::Rm      },
@@ -105,8 +105,7 @@ inline constexpr StaticStringMap<Utility::Kind>::entry SHITBOX_ENTRIES[] = {
     {SSK("calc"),     Utility::Kind::Calc    },
 };
 
-inline constexpr StaticStringMap<Utility::Kind> SHITBOX_UTILS{
-    SHITBOX_ENTRIES, sizeof(SHITBOX_ENTRIES) / sizeof(SHITBOX_ENTRIES[0])};
+inline constexpr StaticStringMap SHITBOX_UTILS{SHITBOX_ENTRIES};
 
 inline constexpr usize SHITBOX_UTIL_COUNT =
     static_cast<usize>(Utility::Kind::Calc) + 1;
