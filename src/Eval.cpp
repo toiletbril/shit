@@ -1517,6 +1517,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   } else {
     m_traps = steal(snapshot.traps);
   }
+  m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
 
   if (Path::set_current_directory(snapshot.working_directory).is_error())
     LOG(Debug, "the subshell could not restore the working directory");

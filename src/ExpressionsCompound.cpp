@@ -158,10 +158,18 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     const bool ends_and_or_chain =
         index + 1 >= m_nodes.count() ||
         m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
-    if (cxt.error_exit() && !cxt.in_condition() && did_execute &&
-        !n->is_negated() && ends_and_or_chain && ret != 0 &&
-        ret != NOTHING_WAS_EXECUTED)
-    {
+    const bool command_failed_uncaught =
+        !cxt.in_condition() && did_execute && !n->is_negated() &&
+        ends_and_or_chain && ret != 0 && ret != NOTHING_WAS_EXECUTED;
+
+    /* The ERR trap fires when a command fails under the same conditions the
+       errexit test uses, whether or not errexit is on, the way bash runs it. */
+    if (command_failed_uncaught && !cxt.is_posix_mode()) {
+      cxt.set_last_exit_status(static_cast<i32>(ret));
+      cxt.run_named_trap(StringView{"ERR", 3});
+    }
+
+    if (cxt.error_exit() && command_failed_uncaught) {
       cxt.set_last_exit_status(static_cast<i32>(ret));
       if (cxt.in_subshell()) {
         cxt.request_exit(ret, source_location());

@@ -519,6 +519,12 @@ public:
   pure fn traps() const wontthrow -> const StringMap<String> &;
   fn run_exit_trap() throws -> void;
 
+  /* The DEBUG, ERR, and RETURN pseudo-signal traps. has_debug_trap is the
+     per-command fast gate so the hot path pays nothing when no DEBUG trap is
+     set. */
+  fn run_named_trap(StringView condition) throws -> void;
+  pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
+
   /* Run the action of every signal whose flag the handler set, at the command
      boundary. A re-entrancy guard keeps a triggered signal from nesting. */
   fn run_pending_traps() throws -> void;
@@ -1276,6 +1282,7 @@ protected:
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
   StringMap<String> m_traps{heap_allocator()};
+  bool m_has_debug_trap{false};
   bool m_exit_trap_ran{false};
   /* True while run_pending_traps is draining, so a signal delivered during a
      trap action does not nest a second drain. */

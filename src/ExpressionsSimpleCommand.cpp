@@ -602,6 +602,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_current_location(source_location());
 
+  /* The DEBUG trap runs before each simple command the way bash fires it. The
+     fast flag keeps the hot path free when no DEBUG trap is set. */
+  if (cxt.has_debug_trap() && !cxt.is_posix_mode())
+    cxt.run_named_trap(StringView{"DEBUG", 5});
+
   if (cxt.bash_dynamic_variables_enabled())
     cxt.set_current_command(utils::merge_tokens_to_string(m_args));
 
@@ -1159,6 +1164,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     i64 function_ret = 0;
     try {
       function_ret = function_body->evaluate(cxt);
+      /* The RETURN trap fires as the function frame unwinds, the way bash runs
+         it when a function or a sourced file finishes. */
+      if (!cxt.is_posix_mode()) cxt.run_named_trap(StringView{"RETURN", 6});
     } catch (ErrorWithLocationAndDetails &error) {
       if (!error.was_rendered())
         if (let const windowed = window_function_body_error(cxt, error);

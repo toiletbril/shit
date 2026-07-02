@@ -1,0 +1,173 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== DEBUG =="]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo D" "DEBUG"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "one"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "two"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-" "DEBUG"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== ERR =="]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo E" "ERR"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-" "ERR"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== RETURN =="]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "body"]
+          [CompoundListCondition, None]
+            [SimpleCommand "return" "7"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo R" "RETURN"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-" "RETURN"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== DEBUG =="
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "echo D"
+]
+[Word
+  Unquoted "DEBUG"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "DEBUG"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== ERR =="
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "echo E"
+]
+[Word
+  Unquoted "ERR"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "ERR"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== RETURN =="
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "body"
+]
+[Word
+  Unquoted "return"
+]
+[Word
+  Unquoted "7"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "echo R"
+]
+[Word
+  Unquoted "RETURN"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "RETURN"
+]
+== DEBUG ==
+D
+one
+D
+two
+D
+== ERR ==
+E
+== RETURN ==
+body
+R
+rc=7
+[Code 0]

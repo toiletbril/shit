@@ -146,11 +146,31 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
   return names;
 }
 
+/* Runs a pseudo-signal trap such as DEBUG, ERR, or RETURN. The prior command's
+   status is restored after the action, so the trap does not clobber $? for the
+   command the shell runs next. A running trap does not re-enter, so a DEBUG
+   action's own commands do not recurse. */
+fn EvalContext::run_named_trap(StringView condition) throws -> void
+{
+  if (m_running_traps) return;
+  const String *action = m_traps.find(condition);
+  if (action == nullptr || action->count() == 0) return;
+
+  m_running_traps = true;
+  defer { m_running_traps = false; };
+
+  const i32 saved_exit_status = m_last_exit_status;
+  run_source(action->view(),
+             "the " + String{heap_allocator(), condition} + " trap");
+  m_last_exit_status = saved_exit_status;
+}
+
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 {
   LOG(Info, "setting a trap for '%.*s' with a %zu byte action",
       static_cast<int>(condition.length), condition.data, action.length);
   m_traps.set(condition, action);
+  m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
   /* EXIT runs at the shell's end and needs no OS handler. An empty action
      installs the ignore disposition the way trap "" SIG asks. */
   if (condition == "EXIT") return;
@@ -167,6 +187,7 @@ fn EvalContext::remove_trap(StringView condition) throws -> void
   LOG(Info, "removing the trap for '%.*s'", static_cast<int>(condition.length),
       condition.data);
   m_traps.erase(condition);
+  m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
   if (condition == "EXIT") return;
   if (let const number = os::signal_number_from_name(condition))
     os::clear_trap_handler(*number);
