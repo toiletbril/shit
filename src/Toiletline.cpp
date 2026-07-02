@@ -302,10 +302,10 @@ static char TL_BUFFER[ITL_STRING_MAX_LEN];
 
 static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
 
-static fn history_file_path() -> shit::Maybe<shit::Path>
+static fn resolve_history_path(StringView env_name, StringView default_file)
+    -> shit::Maybe<shit::Path>
 {
-  if (let const override_path =
-          shit::os::get_environment_variable("SHIT_HISTORY");
+  if (let const override_path = shit::os::get_environment_variable(env_name);
       override_path.has_value() && !override_path->is_empty())
   {
     return shit::Path{override_path->view()};
@@ -313,25 +313,20 @@ static fn history_file_path() -> shit::Maybe<shit::Path>
   let home = shit::os::get_home_directory();
   if (!home.has_value()) return shit::None;
   let path = home->clone();
-  path.push_component(SHIT_HISTORY_FILE);
+  path.push_component(default_file);
   return path;
 }
 
 static constexpr char SHIT_CALC_HISTORY_FILE[] = ".shit_calc_history";
 
+static fn history_file_path() -> shit::Maybe<shit::Path>
+{
+  return resolve_history_path("SHIT_HISTORY", SHIT_HISTORY_FILE);
+}
+
 static fn calc_history_file_path() -> shit::Maybe<shit::Path>
 {
-  if (let const override_path =
-          shit::os::get_environment_variable("SHIT_CALC_HISTORY");
-      override_path.has_value() && !override_path->is_empty())
-  {
-    return shit::Path{override_path->view()};
-  }
-  let home = shit::os::get_home_directory();
-  if (!home.has_value()) return shit::None;
-  let path = home->clone();
-  path.push_component(SHIT_CALC_HISTORY_FILE);
-  return path;
+  return resolve_history_path("SHIT_CALC_HISTORY", SHIT_CALC_HISTORY_FILE);
 }
 
 /* The history is swapped to the calc file on entry and back on leave, so the
@@ -357,9 +352,6 @@ fn leave_calc_history() -> void
 
 fn history_path() -> shit::Maybe<shit::Path> { return history_file_path(); }
 
-/* The in-memory ring is dumped to the history file. The editor appends every
-   accepted line to the file already, so a dump with no active editor has
-   nothing to add and reports success. */
 fn history_write() -> bool
 {
   if (!::itl_g_is_active) return true;
@@ -376,8 +368,6 @@ fn history_read() -> bool
   return ::tl_history_load(path->c_str()) == TL_SUCCESS;
 }
 
-/* The history file is truncated and reloaded, so both the file and the ring
-   end empty. */
 fn history_clear() -> bool
 {
   let const path = history_file_path();

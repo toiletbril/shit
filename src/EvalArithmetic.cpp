@@ -786,9 +786,9 @@ static fn tokenize_arithmetic(StringView src,
 static pure fn arith_op_is_complex(StringView t) wontthrow -> bool
 {
   static constexpr PackedStringKey KEYS[] = {
-      SSK("="),  SSK("+="), SSK("-="), SSK("*="), SSK("/="), SSK("%="),
+      SSK("="),  SSK("+="), SSK("-="), SSK("*="),  SSK("/="),  SSK("%="),
       SSK("&="), SSK("|="), SSK("^="), SSK("<<="), SSK(">>="), SSK("?"),
-      SSK(":"),  SSK(","),  SSK("++"), SSK("--"), SSK("&&"), SSK("||"),
+      SSK(":"),  SSK(","),  SSK("++"), SSK("--"),  SSK("&&"),  SSK("||"),
   };
   static constexpr StaticStringSet COMPLEX_OPS{KEYS};
   return COMPLEX_OPS.contains(t);

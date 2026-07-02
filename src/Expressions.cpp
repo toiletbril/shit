@@ -677,19 +677,19 @@ cold fn args_have_short_flag(const ArrayList<const Token *> &args,
 /* The commands that never read stdin, so a pipe or input redirect into one
    silently discards the upstream data, shellcheck SC2216 and SC2217. */
 constexpr PackedStringKey NON_STDIN_READER_KEYS[] = {
-    SSK("rm"),       SSK("echo"),   SSK("printf"), SSK("true"),  SSK("false"),
-    SSK("mkdir"),    SSK("rmdir"),  SSK("touch"),  SSK("chmod"), SSK("chown"),
-    SSK("cp"),       SSK("mv"),     SSK("ln"),     SSK("kill"),  SSK("basename"),
-    SSK("dirname"),  SSK("sleep"),  SSK("unlink"),
+    SSK("rm"),      SSK("echo"),  SSK("printf"), SSK("true"),  SSK("false"),
+    SSK("mkdir"),   SSK("rmdir"), SSK("touch"),  SSK("chmod"), SSK("chown"),
+    SSK("cp"),      SSK("mv"),    SSK("ln"),     SSK("kill"),  SSK("basename"),
+    SSK("dirname"), SSK("sleep"), SSK("unlink"),
 };
 constexpr StaticStringSet NON_STDIN_READERS{NON_STDIN_READER_KEYS};
 
 /* The top-level system directories rm -r must never aim at, the SC2114
    table. */
 constexpr PackedStringKey SYSTEM_DIRECTORY_KEYS[] = {
-    SSK("/"),     SSK("/bin"),  SSK("/boot"), SSK("/dev"),  SSK("/etc"),
-    SSK("/home"), SSK("/lib"),  SSK("/proc"), SSK("/root"), SSK("/sbin"),
-    SSK("/sys"),  SSK("/usr"),  SSK("/var"),
+    SSK("/"),     SSK("/bin"), SSK("/boot"), SSK("/dev"),  SSK("/etc"),
+    SSK("/home"), SSK("/lib"), SSK("/proc"), SSK("/root"), SSK("/sbin"),
+    SSK("/sys"),  SSK("/usr"), SSK("/var"),
 };
 constexpr StaticStringSet SYSTEM_DIRECTORIES{SYSTEM_DIRECTORY_KEYS};
 
@@ -699,11 +699,12 @@ constexpr PackedStringKey VARIABLE_PROBE_COMMAND_KEYS[] = {
 constexpr StaticStringSet VARIABLE_PROBE_COMMANDS{VARIABLE_PROBE_COMMAND_KEYS};
 
 constexpr PackedStringKey VARIABLE_TARGET_COMMAND_KEYS[] = {
-    SSK("read"),    SSK("mapfile"),  SSK("readarray"), SSK("getopts"),
-    SSK("declare"), SSK("typeset"),  SSK("export"),    SSK("readonly"),
-    SSK("local"),
+    SSK("read"),    SSK("mapfile"),  SSK("readarray"),
+    SSK("getopts"), SSK("declare"),  SSK("typeset"),
+    SSK("export"),  SSK("readonly"), SSK("local"),
 };
-constexpr StaticStringSet VARIABLE_TARGET_COMMANDS{VARIABLE_TARGET_COMMAND_KEYS};
+constexpr StaticStringSet VARIABLE_TARGET_COMMANDS{
+    VARIABLE_TARGET_COMMAND_KEYS};
 
 fn operand_target_name(StringView text) wontthrow -> StringView
 {
@@ -1682,8 +1683,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
                   "Pair find -print0 with xargs -0 or use find -exec");
     }
 
-    if (!next_is_user && NON_STDIN_READERS.contains(next_name->view()))
-    {
+    if (!next_is_user && NON_STDIN_READERS.contains(next_name->view())) {
       if (!args_have_stdin_operand(next->args()))
         actx.warn(next->args()[0]->source_location(),
                   "The pipe feeds '" + next_name->view() +

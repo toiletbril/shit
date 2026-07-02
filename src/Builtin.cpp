@@ -64,10 +64,9 @@ fn is_special_builtin_name(StringView name) wontthrow -> bool
      special while their plain-word siblings true and source-as-a-program are
      not, so the kind cannot decide this. */
   static constexpr PackedStringKey SPECIAL_BUILTIN_KEYS[] = {
-      SSK(":"),        SSK("."),      SSK("break"),  SSK("continue"),
-      SSK("eval"),     SSK("exec"),   SSK("exit"),   SSK("export"),
-      SSK("readonly"), SSK("return"), SSK("set"),    SSK("shift"),
-      SSK("times"),    SSK("trap"),   SSK("unset"),
+      SSK(":"),    SSK("."),     SSK("break"),  SSK("continue"), SSK("eval"),
+      SSK("exec"), SSK("exit"),  SSK("export"), SSK("readonly"), SSK("return"),
+      SSK("set"),  SSK("shift"), SSK("times"),  SSK("trap"),     SSK("unset"),
   };
   static constexpr StaticStringSet SPECIAL_BUILTINS{SPECIAL_BUILTIN_KEYS};
   return SPECIAL_BUILTINS.contains(name);
@@ -151,23 +150,13 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
       unreachable("Unhandled builtin of kind %d", ENUM(ec.builtin_kind()));
     }
   } catch (const Error &e) {
-    const ErrorWithLocation located{ec.source_location(),
-                                    StringView{"Builtin '"} + ec.program() +
-                                        "': " + e.message()};
-    /* The bash-compatible mood reports a builtin error as a soft located
-       failure and keeps the surrounding list running through the non-zero
-       status, the stderr of which a 2>... on the command still redirects since
-       fd 2 is replaced above this try. The default and posix moods let the
-       located error abort the run up front. */
     if (cxt.is_bash_compatible()) {
-      if (const String *source = cxt.current_source(); source != nullptr)
-        show_message(located.to_string(source->view()));
-      else
-        print_error(StringView{"shit: Builtin '"} + ec.program() +
-                    "': " + e.message() + "\n");
+      report_soft_builtin_error(ec, cxt, e.message());
       return 1;
     }
-    throw located;
+    throw ErrorWithLocation{ec.source_location(), StringView{"Builtin '"} +
+                                                      ec.program() +
+                                                      "': " + e.message()};
   }
   unreachable("execute_builtin reached the end without dispatching");
 }
@@ -175,9 +164,6 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void
 {
-  /* The located caret renders in place in every mood rather than throwing, so
-     the loop that called this keeps processing the rest of its names. The
-     fallback line is for the rare case with no source to caret against. */
   const ErrorWithLocation located{ec.source_location(),
                                   StringView{"Builtin '"} + ec.program() +
                                       "': " + message};

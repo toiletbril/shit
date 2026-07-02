@@ -3,15 +3,13 @@
 #include "../Path.hpp"
 #include "../Toiletline.hpp"
 #include "../Trace.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-c] [-r|-n|-a|-w] [-p arg ...] [count]");
 HELP_DESCRIPTION_DECL(
-    "The history builtin lists and maintains the interactive command history "
-    "kept in the file named by SHIT_HISTORY, or ~/.shit_history by default. A "
-    "bare history prints the numbered list, and a trailing count prints only "
-    "that many of the most recent entries.");
+    "The history builtin lists and maintains the interactive command history.");
 
 FLAG(HISTORY_CLEAR, Bool, 'c', "", "Clear the history list.");
 FLAG(HISTORY_DELETE, Bool, 'd', "",
@@ -57,15 +55,18 @@ static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
   if (line_start < text.length) lines.push(text.substring(line_start));
 
   usize first_index = 0;
-  if (wanted_count != 0 && wanted_count < lines.count())
+  if (wanted_count != 0 && wanted_count < lines.count()) {
     first_index = lines.count() - wanted_count;
+  }
 
   let out = String{cxt.scratch_allocator()};
   for (usize i = first_index; i < lines.count(); i++) {
-    let const number = String::from(i + 1, cxt.scratch_allocator());
-    for (usize pad = number.count(); pad < 5; pad++)
+    char number_buffer[24];
+    let const number = utils::int_to_text_into(
+        static_cast<i64>(i + 1), number_buffer, sizeof(number_buffer));
+    for (usize pad = number.length; pad < 5; pad++)
       out += ' ';
-    out.append(number.view());
+    out.append(number);
     out += "  ";
     out.append(lines[i]);
     out += '\n';
@@ -109,16 +110,22 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     did_maintain_list = true;
   }
 
-  if (FLAG_HISTORY_DELETE.is_enabled() || FLAG_HISTORY_STORE.is_enabled())
+  if (FLAG_HISTORY_DELETE.is_enabled() || FLAG_HISTORY_STORE.is_enabled()) {
     did_maintain_list = true;
+  }
 
   if (did_maintain_list) return 0;
 
   usize wanted_count = 0;
-  if (args.count() > 1 && args[1].view().is_all_decimal_digits()) {
-    let const digits = args[1].view();
-    for (usize i = 0; i < digits.length; i++)
-      wanted_count = (wanted_count * 10) + static_cast<usize>(digits[i] - '0');
+  if (args.count() > 1) {
+    let const parsed = utils::parse_decimal_integer(args[1].view());
+    if (parsed.is_error()) {
+      report_soft_builtin_error(
+          ec, cxt, StringView{"'"} + args[1].view() + "' is not a valid count");
+      return 2;
+    }
+
+    if (parsed.value() > 0) wanted_count = static_cast<usize>(parsed.value());
   }
 
   print_history_list(ec, cxt, wanted_count);

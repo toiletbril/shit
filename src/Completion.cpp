@@ -907,8 +907,9 @@ static pure fn candidate_extension_is_hinted(
   return false;
 }
 
-static fn split_hint_extensions(StringView hint_list, Allocator allocator)
-    throws -> ArrayList<StringView>
+static fn split_hint_extensions(StringView hint_list,
+                                Allocator allocator) throws
+    -> ArrayList<StringView>
 {
   let extensions = ArrayList<StringView>{allocator};
   usize start = 0;

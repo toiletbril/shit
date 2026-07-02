@@ -6,6 +6,16 @@
 == a trailing count prints only the most recent entries ==
     3  cd /tmp
     4  git status
+== a non-numeric count is rejected without printing the list ==
+shit: 1:1: error: Builtin 'history': 'foo' is not a valid count.
+     1 |  history foo; echo "rc=$?"
+       |  ^~~~~~~~~~~ here.
+rc=2
+== a count past the list size still prints every entry, no overflow ==
+    1  echo one
+    2  ls
+    3  cd /tmp
+    4  git status
 == the print flag echoes its operands and stores nothing ==
 alpha
 beta

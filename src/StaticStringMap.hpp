@@ -20,8 +20,8 @@ class StaticStringMap
 public:
   static_string_entry<Value> entries[Count]{};
 
-  consteval StaticStringMap(const static_string_entry<Value> (&table)[Count])
-      wontthrow
+  consteval StaticStringMap(
+      const static_string_entry<Value> (&table)[Count]) wontthrow
   {
     for (usize i = 0; i < Count; i++)
       entries[i] = table[i];

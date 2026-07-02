@@ -310,9 +310,13 @@ fn complete_from_process_arguments(StringView line, StringView token) throws
   let const command = command_word_of(line);
   let const is_by_pid = command == "kill" || command == "wait";
   let const is_by_name = command == "pkill" || command == "killall";
-  if (!is_by_pid && !is_by_name) return None;
+  if (!is_by_pid && !is_by_name) {
+    return None;
+  }
 
-  if (!token.is_empty() && token[0] == '-') return None;
+  if (!token.is_empty() && token[0] == '-') {
+    return None;
+  }
 
   let const processes = os::enumerate_processes();
   let candidates = ArrayList<String>{completion_allocator()};
@@ -320,8 +324,9 @@ fn complete_from_process_arguments(StringView line, StringView token) throws
   for (const os::process_entry &process : processes) {
     if (is_by_name) {
       let const name = process.name.view();
-      if (name.is_empty() || !name.starts_with(token) || seen.contains(name))
+      if (name.is_empty() || !name.starts_with(token) || seen.contains(name)) {
         continue;
+      }
       seen.add(name);
       candidates.push(String{completion_allocator(), name});
     } else {

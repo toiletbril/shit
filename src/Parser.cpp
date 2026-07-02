@@ -874,8 +874,8 @@ mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
 static pure fn is_assignment_builtin_name(StringView name) wontthrow -> bool
 {
   static constexpr PackedStringKey KEYS[] = {
-      SSK("local"), SSK("declare"), SSK("typeset"), SSK("readonly"),
-      SSK("export"),
+      SSK("local"),    SSK("declare"), SSK("typeset"),
+      SSK("readonly"), SSK("export"),
   };
   static constexpr StaticStringSet ASSIGNMENT_BUILTINS{KEYS};
   return ASSIGNMENT_BUILTINS.contains(name);

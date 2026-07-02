@@ -124,10 +124,10 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
    outside the table is assumed to write a variable, so the constant table is
    forgotten across it. */
 inline constexpr PackedStringKey ENVIRONMENT_NEUTRAL_KEYS[] = {
-    SSK("echo"),   SSK("true"),  SSK("false"),   SSK(":"),       SSK("test"),
-    SSK("["),      SSK("pwd"),   SSK("which"),   SSK("whoami"),  SSK("basename"),
-    SSK("dirname"), SSK("seq"),  SSK("expr"),    SSK("id"),      SSK("hostname"),
-    SSK("uname"),  SSK("date"),  SSK("arch"),    SSK("tty"),
+    SSK("echo"),    SSK("true"), SSK("false"), SSK(":"),      SSK("test"),
+    SSK("["),       SSK("pwd"),  SSK("which"), SSK("whoami"), SSK("basename"),
+    SSK("dirname"), SSK("seq"),  SSK("expr"),  SSK("id"),     SSK("hostname"),
+    SSK("uname"),   SSK("date"), SSK("arch"),  SSK("tty"),
 };
 
 inline constexpr StaticStringSet ENVIRONMENT_NEUTRAL_NAMES{
