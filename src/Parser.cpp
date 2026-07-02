@@ -75,11 +75,7 @@ hot pure static fn is_unquoted_word(const Token *token,
   if (word.segments.count() != 1 ||
       word.segments[0].kind != WordSegment::Kind::UnquotedText)
     return false;
-  let const &segment_text = word.segments[0].text;
-  if (segment_text.count() != text.length) return false;
-  for (usize i = 0; i < text.length; i++)
-    if (segment_text[i] != text[i]) return false;
-  return true;
+  return word.segments[0].text == text;
 }
 
 /* RightBracket in the terminator set stands for a standalone '}' word, the
@@ -595,7 +591,6 @@ fn Parser::build_file_or_dup_redirection(
          spelling, cmd >&/dev/null, decided after the expansion. An explicit
          descriptor as in 2>&word keeps the strict error. */
       redir.target = from;
-      redir.dup_fd = -1;
       redir.can_dup_be_filename = op_kind == Token::Kind::Greater &&
                                   !fd_was_explicit && !m_lexer.is_posix_mode();
       out.push(redir);

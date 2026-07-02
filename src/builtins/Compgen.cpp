@@ -87,7 +87,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let out = String{cxt.scratch_allocator()};
     let has_any_matched = false;
     for (let const &match : cxt.expand_glob_lenient(*glob_pattern)) {
-      if (word.length != 0 && !match.view().starts_with(word)) continue;
+      if (!match.view().starts_with(word)) continue;
       out.append(match.view());
       out.push('\n');
       has_any_matched = true;

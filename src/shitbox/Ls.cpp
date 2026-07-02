@@ -11,8 +11,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-aA1lh] [path ...]");
 
-HELP_DESCRIPTION_DECL(
-    "The ls utility lists the names in each directory.");
+HELP_DESCRIPTION_DECL("The ls utility lists the names in each directory.");
 
 FLAG(LS_ALL, Bool, 'a', "", "List entries whose name starts with a dot.");
 FLAG(LS_ALMOST_ALL, Bool, 'A', "",
@@ -322,7 +321,7 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       visible_names.push(StringView{".."});
     }
     for (const String &name : *names) {
-      if (!is_showing_dot_names && !name.is_empty() && name.view()[0] == '.') {
+      if (!is_showing_dot_names && name.starts_with(StringView{"."})) {
         continue;
       }
       visible_names.push(name.view());

@@ -215,9 +215,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      non-whitespace character delimits one field on its own, so an empty field
      can sit between two non-whitespace delimiters. */
   let do_is_ifs_whitespace = [&](usize i) {
-    return !is_literal_byte[i] &&
-           (line[i] == ' ' || line[i] == '\t' || line[i] == '\n') &&
-           field_separators.find_character(line[i]).has_value();
+    return (line[i] == ' ' || line[i] == '\t' || line[i] == '\n') &&
+           do_is_separator(i);
   };
   let do_is_ifs_nonwhitespace = [&](usize i) {
     return do_is_separator(i) && !do_is_ifs_whitespace(i);

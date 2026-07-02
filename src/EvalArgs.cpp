@@ -25,8 +25,7 @@ pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
 {
   for (const WordSegment &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::UnquotedText) continue;
-    for (usize i = 0; i < segment.text.count(); i++)
-      if (segment.text[i] == '{') return true;
+    if (segment.text.find_character('{').has_value()) return true;
   }
   return false;
 }
@@ -47,9 +46,7 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
     i++;
   }
   const usize digit_start = i;
-  for (; i < text.length; i++)
-    if (text[i] < '0' || text[i] > '9') return None;
-  if (i == digit_start) return None;
+  if (!text.substring(digit_start).is_all_decimal_digits()) return None;
 
   i64 magnitude = 0;
   for (usize j = digit_start; j < text.length; j++) {

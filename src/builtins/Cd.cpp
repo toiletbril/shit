@@ -10,8 +10,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[dir]");
 
-HELP_DESCRIPTION_DECL(
-    "The cd builtin changes the working directory.");
+HELP_DESCRIPTION_DECL("The cd builtin changes the working directory.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -58,8 +57,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
     if (!is_options) break;
 
-    for (usize k = 1; k < option.length; k++)
-      is_physical = option[k] == 'P';
+    is_physical = option[option.length - 1] == 'P';
     operand_index++;
   }
 

@@ -328,8 +328,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         break;
       }
       const char positional_at_op =
-          !segment_text.is_empty() && segment_text.length > 2 &&
-                  segment_text[1] == '@' &&
+          segment_text.length > 2 && segment_text[1] == '@' &&
                   (segment_text[2] == 'Q' || segment_text[2] == 'E' ||
                    segment_text[2] == 'U' || segment_text[2] == 'L' ||
                    segment_text[2] == 'u' || segment_text[2] == 'P')
@@ -715,13 +714,10 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
   let has_colon_tilde = false;
   for (const WordSegment &segment : word.segments) {
     if (!segment.is_tilde_candidate()) continue;
-    let const view = segment.text.view();
-    for (usize i = 0; i + 1 < view.length; i++)
-      if (view[i] == ':' && view[i + 1] == '~') {
-        has_colon_tilde = true;
-        break;
-      }
-    if (has_colon_tilde) break;
+    if (segment.text.find_substring(":~").has_value()) {
+      has_colon_tilde = true;
+      break;
+    }
   }
   if (has_leading_tilde || has_colon_tilde) {
     tilde_expanded_segments = word.segments;

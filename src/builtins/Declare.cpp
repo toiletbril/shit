@@ -247,8 +247,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        assigns the element, the way bash treats declare a[i]=v, so the
        attribute marks land on the base name rather than the bracketed text. */
     let const bracket = name.find_character('[');
-    let const has_subscript = bracket.has_value() && !name.is_empty() &&
-                              name[name.count() - 1] == ']';
+    let const has_subscript =
+        bracket.has_value() && name[name.count() - 1] == ']';
     const StringView subscript =
         has_subscript ? name.substring_of_length(*bracket + 1,
                                                  name.count() - *bracket - 2)

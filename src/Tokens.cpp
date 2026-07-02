@@ -253,10 +253,10 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     const StringView after = segment.text.substring(*close + 1);
     bool is_append = false;
     usize value_start = 0;
-    if (after.length >= 2 && after[0] == '+' && after[1] == '=') {
+    if (after.starts_with("+=")) {
       is_append = true;
       value_start = 2;
-    } else if (after.length >= 1 && after[0] == '=') {
+    } else if (after.starts_with("=")) {
       value_start = 1;
     } else {
       return shit::None;

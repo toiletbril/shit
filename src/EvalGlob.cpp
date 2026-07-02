@@ -21,12 +21,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
   LOG(All, "scanning a directory for the glob component '%.*s'",
       static_cast<int>(path.length), path.data);
 
-  let last_slash = Maybe<usize>{};
-  for (usize i = path.length; i > 0; i--)
-    if (path[i - 1] == '/') {
-      last_slash = i - 1;
-      break;
-    }
+  let const last_slash = field.text.find_last_character('/');
   let const has_slashes = last_slash.has_value();
 
   let parent_dir = Path{};

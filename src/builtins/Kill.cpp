@@ -10,8 +10,7 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-l] [-signal] %job|pid [...]");
-HELP_DESCRIPTION_DECL(
-    "The kill builtin sends a signal to a job or process.");
+HELP_DESCRIPTION_DECL("The kill builtin sends a signal to a job or process.");
 
 FLAG(KILL_LIST, Bool, 'l', "list", "List the signal names and exit.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -45,8 +44,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     let const spec = String{cxt.scratch_allocator(), args[2]};
     if (let const parsed = spec.view().to<i64>();
-        !parsed.is_error() && !spec.is_empty() && spec[0] >= '0' &&
-        spec[0] <= '9')
+        !parsed.is_error() && spec[0] >= '0' && spec[0] <= '9')
     {
       signal_number = static_cast<i32>(parsed.value());
     } else if (let const resolved = os::signal_number_from_name(spec);
@@ -61,8 +59,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   } else if (args.count() > 1 && args[1].length() > 1 && args[1][0] == '-') {
     let const name = String{cxt.scratch_allocator(), args[1].substring(1)};
     if (let const parsed_signal = name.view().to<i64>();
-        !parsed_signal.is_error() && !name.is_empty() && name[0] >= '0' &&
-        name[0] <= '9')
+        !parsed_signal.is_error() && name[0] >= '0' && name[0] <= '9')
     {
       /* The all-digits guard rejects a doubled minus such as --9, which would
          otherwise parse as the negative signal -9 and reach kill with an

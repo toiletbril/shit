@@ -121,7 +121,7 @@ fn EvalContext::format_done_job_notifications(StringView line_ending) throws
     char marker = ' ';
     if (i == m_jobs.count() - 1) {
       marker = '+';
-    } else if (m_jobs.count() >= 2 && i == m_jobs.count() - 2) {
+    } else if (i == m_jobs.count() - 2) {
       marker = '-';
     }
 

@@ -343,11 +343,8 @@ fn EvalContext::associative_keys(StringView name) const throws
       associative_composite_key(name, "", scratch_allocator());
   m_associative_values.for_each([&](StringView composite, const String &value) {
     unused(value);
-    if (composite.length >= prefix.count() &&
-        composite.substring_of_length(0, prefix.count()) == prefix.view())
-    {
+    if (composite.starts_with(prefix.view()))
       keys.push_managed(composite.substring(prefix.count()));
-    }
   });
   return keys;
 }
@@ -359,11 +356,7 @@ fn EvalContext::associative_values(StringView name) const throws
   const String prefix =
       associative_composite_key(name, "", scratch_allocator());
   m_associative_values.for_each([&](StringView composite, const String &value) {
-    if (composite.length >= prefix.count() &&
-        composite.substring_of_length(0, prefix.count()) == prefix.view())
-    {
-      values.push_managed(value.view());
-    }
+    if (composite.starts_with(prefix.view())) values.push_managed(value.view());
   });
   return values;
 }
@@ -377,11 +370,7 @@ fn EvalContext::clear_associative_array(StringView name) throws -> void
       associative_composite_key(name, "", scratch_allocator());
   let to_erase = ArrayList<String>{heap_allocator()};
   m_associative_values.for_each([&](StringView composite, const String &) {
-    if (composite.length >= prefix.count() &&
-        composite.substring_of_length(0, prefix.count()) == prefix.view())
-    {
-      to_erase.push_managed(composite);
-    }
+    if (composite.starts_with(prefix.view())) to_erase.push_managed(composite);
   });
   for (const String &composite : to_erase)
     m_associative_values.erase(composite.view());

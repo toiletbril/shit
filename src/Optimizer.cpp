@@ -52,8 +52,7 @@ pure fn is_plain_integer_literal(StringView text) wontthrow -> bool
 {
   if (text.is_empty()) return false;
   let const start_position = text[0] == '-' ? usize{1} : usize{0};
-  return start_position < text.length &&
-         text.substring(start_position).is_all_decimal_digits();
+  return text.substring(start_position).is_all_decimal_digits();
 }
 
 /* True when a token is a bare unquoted $name reference that field-splits at run
@@ -292,7 +291,7 @@ fn try_fold_arithmetic_with_constants(StringView expression,
     while (i < expression.length) {
       const char byte = expression[i];
       if (!lexer::is_variable_name_start(byte)) {
-        rewritten.append(StringView{&expression.data[i], 1});
+        rewritten += byte;
         i++;
         continue;
       }
@@ -335,16 +334,7 @@ fn try_fold_arithmetic_with_constants(StringView expression,
 static pure fn trim_arithmetic_whitespace(StringView text) wontthrow
     -> StringView
 {
-  usize start_position = 0;
-  while (start_position < text.length &&
-         (text[start_position] == ' ' || text[start_position] == '\t'))
-    start_position++;
-  usize end_position = text.length;
-  while (end_position > start_position &&
-         (text[end_position - 1] == ' ' || text[end_position - 1] == '\t'))
-    end_position--;
-  return text.substring(start_position)
-      .substring_of_length(0, end_position - start_position);
+  return text.trim_blanks();
 }
 
 /* The constant result of an algebraic identity on a single binary operator,

@@ -110,7 +110,7 @@ static fn match_pattern(StringView pattern, StringView goal,
   let const prefix = pattern.substring_of_length(0, *percent);
   let const suffix = pattern.substring(*percent + 1);
   if (goal.length < prefix.length + suffix.length) return None;
-  if (goal.substring_of_length(0, prefix.length) != prefix) return None;
+  if (!goal.starts_with(prefix)) return None;
   if (goal.substring(goal.length - suffix.length) != suffix) return None;
   return String{allocator, goal.substring_of_length(
                                prefix.length,
@@ -759,15 +759,14 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
                        StringView goal, ArrayList<String> &visiting,
                        ArrayList<String> &built) throws -> void
 {
-  for (const String &done : built)
-    if (done == goal) return;
-  for (const String &active : visiting)
-    if (active == goal)
-      throw Error{
-          "The target '" + String{cxt.scratch_allocator(), goal}
-            +
-          "' is part of a dependency cycle"
-      };
+  if (utils::find_pos_in_vec(built, goal).has_value()) return;
+
+  if (utils::find_pos_in_vec(visiting, goal).has_value())
+    throw Error{
+        "The target '" + String{cxt.scratch_allocator(), goal}
+          +
+        "' is part of a dependency cycle"
+    };
 
   const ArrayList<String> *recipe_lines = nullptr;
   ArrayList<String> prerequisites{cxt.scratch_allocator()};

@@ -545,8 +545,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                  : String{heap_allocator()};
     case '-': return option_flags_string();
     case '#':
-      return String{heap_allocator(), String::from(m_positional_params.count(),
-                                                   heap_allocator())};
+      return String::from(m_positional_params.count(), heap_allocator());
     case '0': return String{heap_allocator(), m_shell_name};
     case '_': return String{heap_allocator(), m_last_argument.view()};
 
@@ -733,9 +732,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return String{heap_allocator(), os::ostype_name()};
     }
     if (first_byte == 'B' && name == "BASH_SUBSHELL") {
-      return String{
-          heap_allocator(),
-          String::from(static_cast<i64>(m_subshell_depth), heap_allocator())};
+      return String::from(static_cast<i64>(m_subshell_depth), heap_allocator());
     }
     if (first_byte == 'F' && name == "FUNCNAME") {
       if (funcname_frame_count() > 0)
@@ -1633,8 +1630,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
   }
   let const target_view = target->view();
   if (let const bracket = target_view.find_character('[');
-      bracket.has_value() && !target_view.is_empty() &&
-      target_view[target_view.length - 1] == ']')
+      bracket.has_value() && target_view[target_view.length - 1] == ']')
   {
     return apply_array_subscript(
         target_view.substring_of_length(0, *bracket),

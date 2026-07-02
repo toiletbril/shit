@@ -228,8 +228,7 @@ struct conditional_evaluator
     if (op == "-n") return !operand.is_empty();
     if (op == "-v") {
       if (let const bracket = operand.find_character('[');
-          bracket.has_value() && operand.length > 0 &&
-          operand[operand.length - 1] == ']')
+          bracket.has_value() && operand[operand.length - 1] == ']')
       {
         const StringView name = operand.substring_of_length(0, *bracket);
         const StringView subscript = operand.substring_of_length(

@@ -38,8 +38,7 @@ fn Unset::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       LOG(All, "unset removing function '%s'", name.c_str());
       cxt.unset_function(name);
     } else if (let const bracket = name.view().find_character('[');
-               bracket.has_value() && name.count() > 0 &&
-               name.view()[name.count() - 1] == ']')
+               bracket.has_value() && name.view()[name.count() - 1] == ']')
     {
       const StringView array_name =
           name.view().substring_of_length(0, *bracket);

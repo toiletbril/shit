@@ -58,8 +58,6 @@ fn Yes::execute(const ExecContext &ec, EvalContext &cxt,
       written_count += *chunk;
     }
   }
-
-  return 0;
 }
 
 } // namespace shitbox

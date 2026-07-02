@@ -8,8 +8,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-n count] [-c count] [file ...]");
 
-HELP_DESCRIPTION_DECL(
-    "The tail utility writes the last lines of each file.");
+HELP_DESCRIPTION_DECL("The tail utility writes the last lines of each file.");
 
 FLAG(TAIL_LINES, String, 'n', "", "Write the last count lines.");
 FLAG(TAIL_BYTES, String, 'c', "", "Write the last count bytes.");
@@ -87,16 +86,14 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     if (is_byte_mode) {
       let const wanted_count = static_cast<usize>(count);
       let const text = content->view();
-      let const start =
-          text.length > wanted_count ? text.length - wanted_count : 0;
+      let const start = sub_sat(text.length, wanted_count);
       output += text.substring(start);
       continue;
     }
 
     let const lines = split_keep_newlines(content->view());
     let const wanted_count = static_cast<usize>(count);
-    let const start =
-        lines.count() > wanted_count ? lines.count() - wanted_count : 0;
+    let const start = sub_sat(lines.count(), wanted_count);
     for (usize i = start; i < lines.count(); i++)
       output += lines[i];
   }
