@@ -75,9 +75,9 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
     } catch (const ErrorWithLocation &error) {
       /* The caret offsets into the utility's own argument vector, so it is
          re-pointed at the command location. */
-      throw relocate_error(error, ec.source_location());
+      relocate_error(error, ec.source_location());
     } catch (const Error &error) {
-      throw relocate_error(error, ec.source_location());
+      relocate_error(error, ec.source_location());
     }
   }
 

@@ -41,7 +41,9 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (!cxt.in_function_scope())
-    throw Error{"Unable to declare a local variable outside a function"};
+    throw ErrorWithDetails{
+        "Unable to declare a local variable outside a function",
+        "`local` only works inside a function body"};
 
   bool should_make_indexed = false;
   bool should_make_associative = false;

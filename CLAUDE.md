@@ -122,7 +122,13 @@ debug-only test driver gated behind NDEBUG like `--debug-complete-at`, prints th
 highlight spans for a line so the highlighter is testable without the editor.
 
 src/Errors.cpp renders the located caret and the trailing note, capitalized on
-its own line, with the shellcheck-style messages in src/Diagnostics.hpp. The
+its own line, with the shellcheck-style messages in src/Diagnostics.hpp. A note
+is baked in at construction through the four detail-carrying classes,
+ErrorWithDetails, WarningWithDetails, ErrorWithLocationAndDetails, and
+WarningWithLocationAndDetails, so the ordinary Error and ErrorWithLocation hold
+none and there is no set_note setter. The relocate_error bridge rewraps an
+unlocated error onto a span, rethrows it, and preserves the note by choosing the
+located-and-details form. The
 shell normalizes SIGPIPE, SIG_IGN for the main shell and SIG_DFL in a forked
 child so a producer dies with status 141. The cd builtin resolves a relative
 operand against the logical PWD, the bash -L mode, and cd .. lexically pops the

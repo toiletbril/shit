@@ -56,6 +56,6 @@
 [Word
   Unquoted "/tmp/zz_cd_target_xyz"
 ]
-shit: 4:1: error: Unable to change to the directory 'zz_cd_target_xyz'.
+shit: 4:1: error: Unable to change to the directory 'zz_cd_target_xyz': Not a directory.
      4 |  cd zz_cd_target_xyz
        |  ^~~~~~~~~~~~~~~~~~~ here.

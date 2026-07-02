@@ -459,8 +459,10 @@ fn initialize() -> void
   }
 
   if (::tl_init() != TL_SUCCESS) {
-    throw shit::Error{"Toiletline: Could not initialize the terminal. If you "
-                      "meant use stdin, provide '-' as an argument"};
+    throw shit::ErrorWithDetails{
+        "Toiletline: could not initialize the terminal: " +
+            shit::os::last_system_error_message(),
+        "The input is not a terminal, pass `-` to read stdin or `-c`/`-s`"};
   }
 }
 
@@ -479,7 +481,10 @@ fn exit() -> void
   }
 
   if (::tl_exit() != TL_SUCCESS) {
-    throw shit::Error{"Toiletline: Error while exiting"};
+    throw shit::ErrorWithDetails{
+        "Toiletline: could not exit the line editor: " +
+            shit::os::last_system_error_message(),
+        "The terminal may be left in raw mode, run `reset` to recover"};
   }
 }
 
@@ -487,8 +492,9 @@ fn get_input(const String &prompt) -> input_result
 {
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   if (code == TL_ERROR) {
-    throw shit::Error{
-        "Toiletline: Unexpected internal error while getting the input"};
+    throw shit::ErrorWithDetails{"Toiletline: could not read the input: " +
+                                     shit::os::last_system_error_message(),
+                                 "Pass `-s` to read stdin without the editor"};
   }
   return input_result{code, String{TL_BUFFER}};
 }
@@ -508,21 +514,26 @@ fn enter_raw_mode() -> void
   {
     return;
   }
-  throw shit::Error{"Toiletline: Couldn't force the terminal into raw mode"};
+  throw shit::ErrorWithDetails{"Toiletline: could not enter raw mode: " +
+                                   shit::os::last_system_error_message(),
+                               "The input is not an interactive terminal"};
 }
 
 fn exit_raw_mode() -> void
 {
   if (::tl_exit_raw_mode() != TL_SUCCESS) {
-    throw shit::Error{
-        "Toiletline: Couldn't force the terminal to exit raw mode"};
+    throw shit::ErrorWithDetails{
+        "Toiletline: could not leave raw mode: " +
+            shit::os::last_system_error_message(),
+        "The terminal may be left in raw mode, run `reset` to recover"};
   }
 }
 
 fn emit_newlines(StringView buffer) -> void
 {
   if (::tl_emit_newlines(buffer.data) != TL_SUCCESS)
-    throw shit::Error{"Toiletline: Couldn't emit newlines"};
+    throw shit::Error{"Toiletline: could not write to the terminal: " +
+                      shit::os::last_system_error_message()};
 }
 
 static constexpr usize PROMPT_PWD_LENGTH = 24;

@@ -58,10 +58,14 @@ fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
     increment = parse_integer(operands[1].view(), allocator);
     last = parse_integer(operands[2].view(), allocator);
   } else {
-    throw Error{"seq expects one to three integer operands"};
+    throw ErrorWithDetails{
+        "seq expects one to three integer operands",
+        "Use `seq LAST`, `seq FIRST LAST`, or `seq FIRST STEP LAST`"};
   }
 
-  if (increment == 0) throw Error{"seq: the increment must not be zero"};
+  if (increment == 0)
+    throw ErrorWithDetails{"seq: the increment must not be zero",
+                           "Give a non-zero step, e.g. `seq 1 2 10`"};
 
   let output = String{cxt.scratch_allocator()};
   /* The step is guarded against signed overflow before it is taken, so a range

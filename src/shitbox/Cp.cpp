@@ -29,8 +29,8 @@ static fn copy_file(const ExecContext &ec, StringView source,
   if (!in_fd.has_value())
     throw Error{
         "cp: unable to open '" + String{allocator, source}
-          + "' because " +
-        os::last_system_error_message()
+          +
+        "': " + os::last_system_error_message()
     };
   defer { os::close_fd(*in_fd); };
 
@@ -40,7 +40,7 @@ static fn copy_file(const ExecContext &ec, StringView source,
     throw Error{
         "cp: unable to create '" + String{allocator, destination}
           +
-        "' because " + os::last_system_error_message()
+        "': " + os::last_system_error_message()
     };
   defer { os::close_fd(*out_fd); };
 
@@ -51,7 +51,8 @@ static fn copy_file(const ExecContext &ec, StringView source,
     if (!read_count.has_value())
       throw Error{
           "cp: a read of '" + String{allocator, source}
-            + "' failed"
+            +
+          "' failed: " + os::last_system_error_message()
       };
     if (*read_count == 0) break;
     /* write_fd returns a single write's count that can fall short, so the
@@ -63,7 +64,8 @@ static fn copy_file(const ExecContext &ec, StringView source,
       if (!chunk.has_value() || *chunk == 0) {
         throw Error{
             "cp: a write to '" + String{allocator, destination}
-              + "' failed"
+              +
+            "' failed: " + os::last_system_error_message()
         };
       }
 
@@ -93,8 +95,8 @@ static fn copy_path(const ExecContext &ec, StringView source,
         throw Error{
             "cp: unable to create the symlink '" +
             String{allocator, destination}
-            + "' because " +
-            os::last_system_error_message()
+            +
+            "': " + os::last_system_error_message()
         };
       }
 
@@ -122,7 +124,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
       throw Error{
           "cp: unable to read the directory '" + String{allocator, source}
             +
-          "'"
+          "': " + os::last_system_error_message()
       };
 
     for (let const &name : *names) {

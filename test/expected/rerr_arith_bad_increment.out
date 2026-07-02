@@ -10,3 +10,4 @@
 shit: 2:6: error: Expected a variable after '++' or '--'.
      2 |  echo $((++))
        |       ^~~~~~~ here.
+note: '++' and '--' step a variable, not a value.

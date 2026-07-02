@@ -15,7 +15,7 @@
 [Word
   Variable "undefined_var"
 ]
-shit: 3:6: error: Unable to expand 'undefined_var' because the parameter is not set.
+shit: 3:7: error: Unable to expand 'undefined_var' because the parameter is not set.
      3 |  echo "$undefined_var"
-       |       ^~~~~~~~~~~~~~~~ here.
+       |        ^~~~~~~~~~~~~~ here.
 note: Replace it with ${undefined_var-} if empty expansion is desired.

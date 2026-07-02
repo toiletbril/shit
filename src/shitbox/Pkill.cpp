@@ -56,7 +56,9 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
-  if (operands.count() != 1) throw Error{"pkill expects one pattern"};
+  if (operands.count() != 1)
+    throw ErrorWithDetails{"pkill expects one pattern",
+                           "Pass one pattern, e.g. `pkill ssh`"};
 
   let const pattern = operands[0].view();
   let const signal_number = resolve_shitbox_signal(

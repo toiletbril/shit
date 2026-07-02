@@ -1,0 +1,16 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [ArithmeticCommand " 1 / 0 "]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "0"
+]
+shit: 2:4: error: Division by zero.
+     2 |  (( 1 / 0 ))
+       |     ^~~~~ here.
+note: The right operand evaluated to 0.

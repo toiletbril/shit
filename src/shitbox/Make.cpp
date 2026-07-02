@@ -965,10 +965,12 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_MAKE_DIR.is_set()) {
     saved_directory = Path::current_directory();
     if (Path::set_current_directory(Path{FLAG_MAKE_DIR.value()}).is_error())
-      throw Error{
+      throw ErrorWithDetails{
           "Unable to change to the directory '" +
-          String{cxt.scratch_allocator(), FLAG_MAKE_DIR.value()}
-          + "'"
+              String{cxt.scratch_allocator(), FLAG_MAKE_DIR.value()}
+              +
+              "': " + os::last_system_error_message(),
+          "Verify the `-C` path exists and is a directory"
       };
   }
   defer
@@ -985,19 +987,24 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   } else if (Path{"makefile"}.exists()) {
     makefile_path = "makefile";
   } else {
-    throw Error{"Unable to find a Makefile in the current directory"};
+    throw ErrorWithDetails{"Unable to find a Makefile in the current directory",
+                           "Create a `Makefile` or pass `-f <file>`"};
   }
 
   Maybe<String> source = Path{makefile_path.view()}.read_entire_file();
   if (!source.has_value())
-    throw Error{"Unable to read the makefile '" + makefile_path + "'"};
+    throw ErrorWithDetails{"Unable to read the makefile '" + makefile_path +
+                               "': " + os::last_system_error_message(),
+                           "Check the path passed to `-f`"};
 
   let mk = parse_makefile(cxt, source->view());
 
   ArrayList<String> goals{cxt.scratch_allocator()};
   if (operands.is_empty()) {
     if (mk.default_goal.is_empty())
-      throw Error{"The makefile defines no targets and no default goal"};
+      throw ErrorWithDetails{
+          "The makefile defines no targets and no default goal",
+          "Add a rule or name a target on the command line"};
     goals.push(mk.default_goal.clone());
   } else {
     for (const String &operand : operands)

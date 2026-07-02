@@ -52,7 +52,6 @@ public:
   fn set_rendered() wontthrow -> void { m_was_rendered = true; }
   pure fn was_rendered() const wontthrow -> bool { return m_was_rendered; }
 
-  fn set_note(StringView note) throws -> void { m_note = note; }
   pure fn has_note() const wontthrow -> bool { return !m_note.is_empty(); }
   fn note() const throws -> String { return m_note; }
 
@@ -79,12 +78,26 @@ public:
   operator String() const throws;
 };
 
+/* An Error paired with a note, the trailing hint line under the message. The
+   note is set once at construction, the ordinary Error carries none. */
+class ErrorWithDetails : public Error
+{
+public:
+  ErrorWithDetails(StringView message, StringView note);
+};
+
 class Warning : public Error
 {
 public:
   Warning(StringView message);
 
   fn severity_word() const wontthrow -> String override;
+};
+
+class WarningWithDetails : public Warning
+{
+public:
+  WarningWithDetails(StringView message, StringView note);
 };
 
 /* The mimic boundary tests this type, never the message text, so a
@@ -141,6 +154,7 @@ class CommandNotFound : public ErrorWithLocation
 {
 public:
   CommandNotFound(SourceLocation location, StringView message);
+  CommandNotFound(SourceLocation location, StringView message, StringView note);
 };
 
 class WarningWithLocation : public ErrorWithLocation
@@ -151,6 +165,13 @@ public:
   fn severity_word() const wontthrow -> String override;
 };
 
+class WarningWithLocationAndDetails : public WarningWithLocation
+{
+public:
+  WarningWithLocationAndDetails(SourceLocation location, StringView message,
+                                StringView note);
+};
+
 class TraceWithLocation : public ErrorWithLocation
 {
 public:
@@ -158,16 +179,6 @@ public:
 
   fn severity_word() const wontthrow -> String override;
 };
-
-inline fn relocate_error(const ErrorBase &error, SourceLocation location) throws
-    -> ErrorWithLocation
-{
-  let relocated = ErrorWithLocation{location, error.message().view()};
-  if (error.is_script_fatal()) relocated.set_script_fatal();
-  relocated.set_command_status(error.command_status());
-  if (error.has_note()) relocated.set_note(error.note().view());
-  return relocated;
-}
 
 class ErrorWithLocationAndDetails : public ErrorWithLocation
 {
@@ -178,11 +189,36 @@ public:
                               SourceLocation details_location,
                               StringView details_message);
 
+  /* A located error carrying a note, the trailing hint line, without a second
+     caret. */
+  ErrorWithLocationAndDetails(SourceLocation location, StringView message,
+                              StringView note);
+
   fn details_to_string(StringView source) const throws -> String;
 
 protected:
   SourceLocation m_details_location;
   String m_details_message;
 };
+
+/* The relocation rewraps an unlocated error onto a span and rethrows it,
+   carrying the fatal mark, the status, and the note over. A noted error becomes
+   the located-and-details form so the note survives. */
+[[noreturn]] inline fn relocate_error(const ErrorBase &error,
+                                      SourceLocation location) throws -> void
+{
+  if (error.has_note()) {
+    let relocated = ErrorWithLocationAndDetails{
+        location, error.message().view(), error.note().view()};
+    if (error.is_script_fatal()) relocated.set_script_fatal();
+    relocated.set_command_status(error.command_status());
+    throw relocated;
+  }
+
+  let relocated = ErrorWithLocation{location, error.message().view()};
+  if (error.is_script_fatal()) relocated.set_script_fatal();
+  relocated.set_command_status(error.command_status());
+  throw relocated;
+}
 
 } /* namespace shit */

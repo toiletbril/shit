@@ -1,7 +1,7 @@
 == a bash-mood set -u abort exits 1 like a bash script, not 127 ==
-shit: setu.sh:2:6: error: Unable to expand 'undefined_variable' because the parameter is not set.
+shit: setu.sh:2:7: error: Unable to expand 'undefined_variable' because the parameter is not set.
      2 |  echo "$undefined_variable"
-       |       ^~~~~~~~~~~~~~~~~~~~~ here.
+       |        ^~~~~~~~~~~~~~~~~~~ here.
 note: Replace it with ${undefined_variable-} if empty expansion is desired.
 rc=1
 == a bash-mood ${name:?} abort exits 1 like a bash script ==

@@ -24,5 +24,6 @@ shit: 1:1: error: Assignment to 'z' needs a value.
 shit: 1:6: error: Division by zero.
      1 |  1 / 0
        |       ^~ here.
+note: The right operand evaluated to 0.
 == an unset name inside a stored formula errors when the formula reads:
 shit: error: The variable 'base' is not set.

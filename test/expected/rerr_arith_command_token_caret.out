@@ -1,0 +1,16 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [ArithmeticCommand " 1 @ 2 "]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "@"
+]
+[Word
+  Unquoted "2"
+]
+shit: 2:6: error: Unexpected '@ 2 ' after the expression.
+     2 |  (( 1 @ 2 ))
+       |       ^~ here.
+note: An operator is missing between two values.

@@ -3,12 +3,14 @@ before
 shit: 2:6: error: Division by zero.
      2 |  echo $((1/0))
        |       ^~~~~~~~ here.
+note: The right operand evaluated to 0.
 after
 rc=0
 == the strict default mood aborts the run on an arithmetic error:
 shit: 1:6: error: Division by zero.
      1 |  echo $((1/0)); echo after
        |       ^~~~~~~~ here.
+note: The right operand evaluated to 0.
 rc=1
 == bash mood still continues past an ordinary command failure:
 after

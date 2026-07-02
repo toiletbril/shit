@@ -33,3 +33,4 @@ shit: 1:1: error: find: unknown predicate '-bogus'.
 shit: 1:1: error: find: -name expects a pattern.
      1 |  shitbox find . -name
        |  ^~~~~~~~~~~~~~~~~~~~ here.
+note: Pass a glob after `-name`, e.g. `-name '*.c'`.

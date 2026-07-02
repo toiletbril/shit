@@ -62,7 +62,8 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   if (!is_deleting && operands.count() < 2) {
-    throw Error{"tr expects two sets unless -d is given"};
+    throw ErrorWithDetails{"tr expects two sets unless -d is given",
+                           "Supply SET1 and SET2, or use `-d` with one set"};
   }
 
   let const set1 = expand_set(operands[0].view(), cxt.scratch_allocator());

@@ -84,20 +84,22 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
   if (is_byte_mode) {
     let const parsed_value = FLAG_HEAD_BYTES.value().to<i64>();
     if (parsed_value.is_error() || parsed_value.value() < 0) {
-      throw Error{
+      throw ErrorWithDetails{
           "head: invalid byte count '" +
-          String{cxt.scratch_allocator(), FLAG_HEAD_BYTES.value()}
-          + "'"
+              String{cxt.scratch_allocator(), FLAG_HEAD_BYTES.value()}
+              + "'",
+          "The count must be a non-negative integer"
       };
     }
     count = parsed_value.value();
   } else if (FLAG_HEAD_LINES.is_set()) {
     let const parsed_value = FLAG_HEAD_LINES.value().to<i64>();
     if (parsed_value.is_error() || parsed_value.value() < 0) {
-      throw Error{
+      throw ErrorWithDetails{
           "head: invalid line count '" +
-          String{cxt.scratch_allocator(), FLAG_HEAD_LINES.value()}
-          + "'"
+              String{cxt.scratch_allocator(), FLAG_HEAD_LINES.value()}
+              + "'",
+          "The count must be a non-negative integer"
       };
     }
     count = parsed_value.value();

@@ -10,3 +10,4 @@
 shit: 2:6: error: Division by zero.
      2 |  echo $((1%0))
        |       ^~~~~~~~ here.
+note: The right operand evaluated to 0.

@@ -75,8 +75,8 @@ fn Expression::operator delete(opaque *pointer) wontthrow -> void
 cold fn AnalysisContext::warn(SourceLocation location, StringView message,
                               StringView suggestion) throws -> void
 {
-  WarningWithLocation located{location, message};
-  if (!suggestion.is_empty()) located.set_note(suggestion);
+  let const located =
+      WarningWithLocationAndDetails{location, message, suggestion};
   show_message(located.to_string(source));
 }
 
@@ -111,8 +111,8 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
     return;
   }
 
-  ErrorWithLocation located{location, message};
-  if (!suggestion.is_empty()) located.set_note(suggestion);
+  let const located =
+      ErrorWithLocationAndDetails{location, message, suggestion};
   show_message(located.to_string(source));
   has_fatal = true;
 }

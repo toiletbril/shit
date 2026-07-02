@@ -57,7 +57,10 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
         digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X');
     if (end == start || is_hex_prefix || !std::isfinite(seconds_value) ||
         seconds_value < 0.0)
-      throw Error{"sleep: invalid duration '" + number + "'"};
+      throw ErrorWithDetails{
+          "sleep: invalid duration '" + number + "'",
+          "Use a non-negative number with an optional `s`, `m`, `h`, or `d` "
+          "suffix, e.g. `sleep 5`"};
 
     double unit_multiplier = 1.0;
     if (*end != '\0' && *(end + 1) == '\0') {
@@ -66,10 +69,17 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
       case 'm': unit_multiplier = 60.0; break;
       case 'h': unit_multiplier = 60.0 * 60.0; break;
       case 'd': unit_multiplier = 60.0 * 60.0 * 24.0; break;
-      default: throw Error{"sleep: invalid duration '" + number + "'"};
+      default:
+        throw ErrorWithDetails{
+            "sleep: invalid duration '" + number + "'",
+            "Use a non-negative number with an optional `s`, `m`, `h`, or `d` "
+            "suffix, e.g. `sleep 5`"};
       }
     } else if (*end != '\0') {
-      throw Error{"sleep: invalid duration '" + number + "'"};
+      throw ErrorWithDetails{
+          "sleep: invalid duration '" + number + "'",
+          "Use a non-negative number with an optional `s`, `m`, `h`, or `d` "
+          "suffix, e.g. `sleep 5`"};
     }
 
     total_seconds += seconds_value * unit_multiplier;

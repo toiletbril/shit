@@ -189,9 +189,49 @@ public:
      the store. */
   bool m_is_skipping{false};
 
-  [[noreturn]] cold fn fail(StringView message) throws -> void
+  /* Set for the direct (( )) parse whose source maps onto the script byte for
+     byte. The fail underlines the offending token. An expanded expression or a
+     variable value leaves it unset, and the byte mapping is lost. */
+  Maybe<SourceLocation> precise_base{};
+
+  [[noreturn]] cold fn fail(StringView message, StringView note = {}) throws
+      -> void
   {
-    throw Error{String{message}};
+    if (precise_base.has_value()) {
+      const SourceLocation location{precise_base->position + pos, 1,
+                                    precise_base->filename};
+      if (note.is_empty()) throw ErrorWithLocation{location, message};
+      throw ErrorWithLocationAndDetails{location, message, note};
+    }
+
+    if (note.is_empty()) throw Error{String{message}};
+    throw ErrorWithDetails{message, note};
+  }
+
+  /* Underline a whole sub-expression, the left operand through the right, for a
+     binary operation that failed after both operands were parsed. */
+  [[noreturn]] cold fn fail_span(usize start_position, usize end_position,
+                                 StringView message,
+                                 StringView note = {}) throws -> void
+  {
+    while (end_position > start_position && (source[end_position - 1] == ' ' ||
+                                             source[end_position - 1] == '\t' ||
+                                             source[end_position - 1] == '\n' ||
+                                             source[end_position - 1] == '\r'))
+    {
+      end_position--;
+    }
+
+    if (precise_base.has_value()) {
+      const SourceLocation location{precise_base->position + start_position,
+                                    end_position - start_position,
+                                    precise_base->filename};
+      if (note.is_empty()) throw ErrorWithLocation{location, message};
+      throw ErrorWithLocationAndDetails{location, message, note};
+    }
+
+    if (note.is_empty()) throw Error{String{message}};
+    throw ErrorWithDetails{message, note};
   }
 
   fn skip_spaces() wontthrow -> void
@@ -240,7 +280,9 @@ public:
     if (is_single_integer_literal(value))
       return parse_arithmetic_operand(value);
 
-    if (depth >= MAX_DEPTH) fail("The variable value recurses too deeply");
+    if (depth >= MAX_DEPTH)
+      fail("The variable value recurses too deeply",
+           "A variable value refers back to itself");
 
     ArithmeticParser nested{context, value, 0, depth + 1, m_is_skipping};
     return nested.parse();
@@ -288,7 +330,10 @@ public:
         break;
       pos++;
     }
-    if (depth != 0) fail("Expected ']' after an array subscript");
+    if (depth != 0)
+      fail("Expected ']' after an array subscript",
+           "The subscript '[' was never closed");
+
     let const subscript =
         source.substring_of_length(inner_start, pos - inner_start);
     pos++;
@@ -329,7 +374,9 @@ public:
   fn prefix_step(i64 delta) throws -> i64
   {
     const lvalue target = read_lvalue();
-    if (target.name.is_empty()) fail("Expected a variable after '++' or '--'");
+    if (target.name.is_empty())
+      fail("Expected a variable after '++' or '--'",
+           "'++' and '--' step a variable, not a value");
     const i64 updated = arithmetic_add(read_lvalue_value(target), delta);
     write_lvalue(target, updated);
     return updated;
@@ -349,10 +396,9 @@ public:
     let const result = parse_comma();
     skip_spaces();
     if (pos != source.length) {
-      Error error{"Unexpected '" + String{source.substring(pos)} +
-                  "' after the expression"};
-      error.set_note("An operator is missing between two values");
-      throw error;
+      fail("Unexpected '" + String{source.substring(pos)} +
+               "' after the expression",
+           "An operator is missing between two values");
     }
     return result;
   }
@@ -439,14 +485,16 @@ public:
     if (consume("?")) {
       if (condition != 0) {
         let const if_true = parse_assignment();
-        if (!consume(":")) fail("Expected ':' in a conditional");
+        if (!consume(":"))
+          fail("Expected ':' in a conditional", "A '?' needs a matching ':'");
         let const if_false = parse_skipped(&ArithmeticParser::parse_ternary);
         unused(if_false);
         return if_true;
       }
       let const if_true = parse_skipped(&ArithmeticParser::parse_assignment);
       unused(if_true);
-      if (!consume(":")) fail("Expected ':' in a conditional");
+      if (!consume(":"))
+        fail("Expected ':' in a conditional", "A '?' needs a matching ':'");
       return parse_ternary();
     }
     return condition;
@@ -524,6 +572,8 @@ public:
      nine cascade levels showed up whole in the profile. */
   fn parse_binary(u8 min_precedence) throws -> i64
   {
+    skip_spaces();
+    let const lhs_start = pos;
     let lhs = parse_unary();
     loop
     {
@@ -557,7 +607,8 @@ public:
             lhs = 0;
             break;
           }
-          fail("Exponent less than 0");
+          fail_span(lhs_start, pos, "Exponent less than 0",
+                    "'**' requires a non-negative exponent");
         }
         lhs = arithmetic_power(lhs, rhs);
         break;
@@ -568,7 +619,8 @@ public:
             lhs = 0;
             break;
           }
-          fail("Division by zero");
+          fail_span(lhs_start, pos, "Division by zero",
+                    "The right operand evaluated to 0");
         }
         lhs = arithmetic_divide(lhs, rhs);
         break;
@@ -578,7 +630,8 @@ public:
             lhs = 0;
             break;
           }
-          fail("Division by zero");
+          fail_span(lhs_start, pos, "Division by zero",
+                    "The right operand evaluated to 0");
         }
         lhs = arithmetic_modulo(lhs, rhs);
         break;
@@ -631,12 +684,14 @@ public:
   {
     depth++;
     defer { depth--; };
-    if (depth > MAX_DEPTH) fail("Expression nested too deeply");
+    if (depth > MAX_DEPTH)
+      fail("Expression nested too deeply",
+           "A variable may reference itself, like `x=x`");
 
     skip_spaces();
     if (consume("(")) {
       let const value = parse_comma();
-      if (!consume(")")) fail("Expected ')'");
+      if (!consume(")")) fail("Expected ')'", "An opening '(' is unmatched");
       return value;
     }
     if (pos < source.length && lexer::is_number(source[pos])) {
@@ -650,7 +705,8 @@ public:
       if (consume("--")) return postfix_step(target, -1);
       return read_lvalue_value(target);
     }
-    fail("Unexpected character in the arithmetic expression");
+    fail("Unexpected character in the arithmetic expression",
+         "This is not a valid operator or operand");
   }
 };
 
@@ -662,7 +718,8 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
     let const base =
         parse_arithmetic_operand(from.substring_of_length(0, base_length));
     if (base < 2 || base > 64) {
-      throw Error{"The arithmetic base must be between 2 and 64"};
+      throw ErrorWithDetails{"The arithmetic base must be between 2 and 64",
+                             "Use `base#digits` with a base from 2 to 64"};
     }
     let const do_digit_value = [base](char c) -> i64 {
       if (c >= '0' && c <= '9') return c - '0';
@@ -753,7 +810,10 @@ static fn tokenize_arithmetic(StringView src,
             break;
           i++;
         }
-        if (depth != 0) throw Error{"Expected ']' after an array subscript"};
+        if (depth != 0) {
+          throw ErrorWithDetails{"Expected ']' after an array subscript",
+                                 "The subscript '[' was never closed"};
+        }
         out.push(
             arith_token{arith_token::kind::subscript, 0,
                         src.substring_of_length(inner_start, i - inner_start)});
@@ -846,14 +906,23 @@ static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
 {
   switch (kind) {
   case 'P':
-    if (rhs < 0) throw Error{"Exponent less than 0"};
+    if (rhs < 0) {
+      throw ErrorWithDetails{"Exponent less than 0",
+                             "'**' requires a non-negative exponent"};
+    }
     return arithmetic_power(lhs, rhs);
   case '*': return arithmetic_multiply(lhs, rhs);
   case '/':
-    if (rhs == 0) throw Error{"Division by zero"};
+    if (rhs == 0) {
+      throw ErrorWithDetails{"Division by zero",
+                             "The right operand evaluated to 0"};
+    }
     return arithmetic_divide(lhs, rhs);
   case '%':
-    if (rhs == 0) throw Error{"Division by zero"};
+    if (rhs == 0) {
+      throw ErrorWithDetails{"Division by zero",
+                             "The right operand evaluated to 0"};
+    }
     return arithmetic_modulo(lhs, rhs);
   case '+': return arithmetic_add(lhs, rhs);
   case '-': return arithmetic_subtract(lhs, rhs);
@@ -918,7 +987,10 @@ public:
   {
     depth++;
     defer { depth--; };
-    if (depth > MAX_DEPTH) throw Error{"Expression nested too deeply"};
+    if (depth > MAX_DEPTH) {
+      throw ErrorWithDetails{"Expression nested too deeply",
+                             "A variable may reference itself, like `x=x`"};
+    }
 
     if (at_op("+")) {
       ti++;
@@ -939,7 +1011,9 @@ public:
     if (at_op("(")) {
       ti++;
       let const value = parse_binary(1);
-      if (!at_op(")")) throw Error{"Expected ')'"};
+      if (!at_op(")")) {
+        throw ErrorWithDetails{"Expected ')'", "An opening '(' is unmatched"};
+      }
       ti++;
       return value;
     }
@@ -953,7 +1027,8 @@ public:
       ti++;
       return arith_read_variable(context, name);
     }
-    throw Error{"Unexpected character in the arithmetic expression"};
+    throw ErrorWithDetails{"Unexpected character in the arithmetic expression",
+                           "This is not a valid operator or operand"};
   }
 
   fn parse_binary(u8 min_precedence) throws -> i64
@@ -978,10 +1053,9 @@ public:
     if (toks.is_empty()) return 0;
     let const result = parse_binary(1);
     if (ti != toks.count()) {
-      Error error{"Unexpected '" + String{toks[ti].text} +
-                  "' after the expression"};
-      error.set_note("An operator is missing between two values");
-      throw error;
+      throw ErrorWithDetails{"Unexpected '" + String{toks[ti].text} +
+                                 "' after the expression",
+                             "An operator is missing between two values"};
     }
     return result;
   }
@@ -996,22 +1070,25 @@ fn EvalContext::read_array_element_integer(StringView name,
       apply_array_subscript(name, subscript).view());
 }
 
-fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
+fn EvalContext::evaluate_arithmetic(
+    StringView expression, Maybe<SourceLocation> expression_base) throws -> i64
 {
   LOG(All, "evaluating the arithmetic expression of %zu bytes",
       expression.length);
 
   /* A source with no parameter to expand, the d=$((d+1)) hot loop case, skips
-     the expansion copy and parses directly. */
+     the expansion copy and parses directly. The base maps the parser offset
+     back onto the script for a precise caret. */
   if (!expression.find_character('$').has_value() &&
       !expression.find_character('`').has_value())
   {
     let parser = ArithmeticParser{this, expression, 0};
+    parser.precise_base = expression_base;
     return parser.parse();
   }
 
   /* The expanded word owns the bytes the parser views, so it outlives the
-     parser. */
+     parser. The expansion shifts every offset, so no precise base survives. */
   LOG(All, "expanding parameters inside the arithmetic before the parse");
   let const expanded_word = expand_modifier_word(expression);
   let parser = ArithmeticParser{this, expanded_word.view(), 0};
@@ -1180,12 +1257,12 @@ public:
   bool m_is_skipping{false};
   static constexpr usize MAX_DEPTH = 512;
 
-  [[noreturn]] cold fn fail(StringView message) throws -> void
+  [[noreturn]] cold fn fail(StringView message, StringView note = {}) throws
+      -> void
   {
-    throw ErrorWithLocation{
-        SourceLocation{pos, 1},
-        message
-    };
+    const SourceLocation location{pos, 1};
+    if (note.is_empty()) throw ErrorWithLocation{location, message};
+    throw ErrorWithLocationAndDetails{location, message, note};
   }
 
   fn skip_spaces() wontthrow -> void
@@ -1278,7 +1355,7 @@ public:
   {
     if (exponent < 0) {
       if (m_is_skipping) return 0;
-      fail("Exponent less than 0");
+      fail("Exponent less than 0", "'**' requires a non-negative exponent");
     }
     wide_uint result = 1;
     wide_uint factor = static_cast<wide_uint>(base);
@@ -1298,14 +1375,13 @@ public:
     let const result = parse_comma();
     skip_spaces();
     if (pos != source.length) {
-      ErrorWithLocation error{
+      throw ErrorWithLocationAndDetails{
           SourceLocation{pos, source.length - pos},
           "Unexpected '" + String{source.substring(pos)}
           +
-              "' after the expression"
+              "' after the expression",
+          "An operator is missing between two values"
       };
-      error.set_note("An operator is missing between two values");
-      throw error;
     }
     return result;
   }
@@ -1369,7 +1445,8 @@ public:
     if (consume("?")) {
       if (condition != 0) {
         let const if_true = parse_assignment();
-        if (!consume(":")) fail("Expected ':' in a conditional");
+        if (!consume(":"))
+          fail("Expected ':' in a conditional", "A '?' needs a matching ':'");
         let const if_false =
             parse_skipped(&WideArithmeticParser::parse_ternary);
         unused(if_false);
@@ -1378,7 +1455,8 @@ public:
       let const if_true =
           parse_skipped(&WideArithmeticParser::parse_assignment);
       unused(if_true);
-      if (!consume(":")) fail("Expected ':' in a conditional");
+      if (!consume(":"))
+        fail("Expected ':' in a conditional", "A '?' needs a matching ':'");
       return parse_ternary();
     }
     return condition;
@@ -1445,7 +1523,7 @@ public:
             lhs = 0;
             break;
           }
-          fail("Division by zero");
+          fail("Division by zero", "The right operand evaluated to 0");
         }
         lhs = lhs / rhs;
         break;
@@ -1455,7 +1533,7 @@ public:
             lhs = 0;
             break;
           }
-          fail("Division by zero");
+          fail("Division by zero", "The right operand evaluated to 0");
         }
         lhs = lhs % rhs;
         break;
@@ -1509,12 +1587,14 @@ public:
   {
     depth++;
     defer { depth--; };
-    if (depth > MAX_DEPTH) fail("Expression nested too deeply");
+    if (depth > MAX_DEPTH)
+      fail("Expression nested too deeply",
+           "A variable may reference itself, like `x=x`");
 
     skip_spaces();
     if (consume("(")) {
       let const value = parse_comma();
-      if (!consume(")")) fail("Expected ')'");
+      if (!consume(")")) fail("Expected ')'", "An opening '(' is unmatched");
       return value;
     }
     if (pos < source.length && lexer::is_number(source[pos])) {
@@ -1529,7 +1609,8 @@ public:
       return read_variable(
           source.substring_of_length(name_start, pos - name_start), name_start);
     }
-    fail("Unexpected character in the arithmetic expression");
+    fail("Unexpected character in the arithmetic expression",
+         "This is not a valid operator or operand");
   }
 };
 

@@ -6,11 +6,13 @@ note: Did you mean ':'?
 shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
+note: The right operand evaluated to 0.
 rc=1
 == bash mood, literal eval argument ==
 shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
+note: The right operand evaluated to 0.
 rc=1
 == default mood, eval of a variable ==
 shit: 1:61: warning: Command 'h' was not found.
@@ -20,11 +22,13 @@ note: Did you mean ':'?
 shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
+note: The right operand evaluated to 0.
 rc=1
 == bash mood, function keyword form ==
 shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
+note: The right operand evaluated to 0.
 rc=1
 == function defined in default mood, called from bash, renders once ==
 0

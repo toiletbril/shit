@@ -38,7 +38,8 @@ fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
   let const link = operands[1].view();
 
   if (!FLAG_LN_SYMBOLIC.is_enabled())
-    throw Error{"ln supports only symbolic links, pass -s"};
+    throw ErrorWithDetails{"ln supports only symbolic links",
+                           "Re-run with `-s` to make a symlink"};
 
   if (FLAG_LN_FORCE.is_enabled()) os::remove_file(link);
 

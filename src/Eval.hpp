@@ -927,7 +927,9 @@ public:
 
   fn expand_word_for_assignment(const Word &word) throws -> String;
 
-  fn evaluate_arithmetic(StringView expression) throws -> i64;
+  fn evaluate_arithmetic(StringView expression,
+                         Maybe<SourceLocation> expression_base = {}) throws
+      -> i64;
 
   /* Evaluate an expression for the calc builtin and return its decimal text,
      setting out_nonzero for the exit status. In the default mood the value is

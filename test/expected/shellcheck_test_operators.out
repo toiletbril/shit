@@ -90,7 +90,7 @@ shit: 4:3: warning: A negated -n is just -z.
      4 |  [ ! -n "$y" ]
        |    ^~ here.
 note: Test with -z instead.
-shit: 3:8: error: Unable to expand 'x' because the parameter is not set.
+shit: 3:9: error: Unable to expand 'x' because the parameter is not set.
      3 |  [ ! -z "$x" ]
-       |         ^~~~ here.
+       |          ^~ here.
 note: Replace it with ${x-} if empty expansion is desired.

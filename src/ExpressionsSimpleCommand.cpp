@@ -203,7 +203,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (!value_ran_substitution) cxt.set_last_exit_status(0);
     return cxt.last_exit_status();
   } catch (const Error &e) {
-    throw relocate_error(e, source_location());
+    relocate_error(e, source_location());
   }
 }
 
@@ -624,11 +624,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       let const note =
           StringView{"Quote it to run a literal name, or list the matches with "
                      "compgen -G"};
-      if (cxt.mood() == mimic_mood::Default) {
-        let error = ErrorWithLocation{location, message};
-        error.set_note(note);
-        throw error;
-      }
+      if (cxt.mood() == mimic_mood::Default)
+        throw ErrorWithLocationAndDetails{location, message, note};
       cxt.show_runtime_warning_at(location, message, note);
     }
   }
@@ -998,7 +995,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     try {
       expanded_value = cxt.expand_word_for_assignment(var.value);
     } catch (const Error &e) {
-      throw relocate_error(e, source_location());
+      relocate_error(e, source_location());
     }
     /* The append form reads the current value from the shell store first so a
        non-exported shell variable still contributes. An integer name evaluates

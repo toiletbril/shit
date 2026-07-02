@@ -163,18 +163,21 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
          and needs no action. */
     } else if (predicate == "-name") {
       if (index + 1 >= args.count())
-        throw Error{"find: -name expects a pattern"};
+        throw ErrorWithDetails{"find: -name expects a pattern",
+                               "Pass a glob after `-name`, e.g. `-name '*.c'`"};
       options.has_name = true;
       options.name_pattern = args[index + 1].view();
       index++;
     } else if (predicate == "-type") {
       if (index + 1 >= args.count())
-        throw Error{"find: -type expects one of f, d, or l"};
+        throw ErrorWithDetails{"find: -type expects one of f, d, or l",
+                               "Pass `f`, `d`, or `l` after `-type`"};
       let const type = args[index + 1].view();
       if (type.length != 1 ||
           (type[0] != 'f' && type[0] != 'd' && type[0] != 'l'))
       {
-        throw Error{"find: -type expects one of f, d, or l"};
+        throw ErrorWithDetails{"find: -type expects one of f, d, or l",
+                               "Pass `f`, `d`, or `l` after `-type`"};
       }
       options.type_filter = type[0];
       index++;

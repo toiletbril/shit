@@ -58,61 +58,38 @@ FLAG(IGNORED1, Bool, 'h', "\0", Posix, "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", Posix, "Ignored, left for compatibility.");
 
 FLAG(RCFILE, String, '\0', "rcfile", Bash,
-     "Source FILE as the interactive rc. In the shit mood it replaces "
-     "/etc/shitrc "
-     "and ~/.shitrc, and in the bash mood it replaces ~/.bashrc. A "
-     "non-interactive "
-     "run reads no rc.");
+     "Source FILE as the interactive rc in place of the mood default.");
 FLAG(PRIVILEGED, Bool, 'p', "privileged", Bash,
-     "Run in privileged mode and skip every startup config file. Turned on "
-     "automatically when the effective and the real user or group id differ.");
-FLAG(
-    CLEAN, Bool, '\0', "clean", Shit,
-    "Start a clean shell. No startup file is read in any mood, and PATH is set "
-    "to a minimal default.");
+     "Run privileged and skip every startup file, on automatically when the "
+     "effective and real ids differ.");
+FLAG(CLEAN, Bool, '\0', "clean", Shit,
+     "Start clean, reading no startup file and setting a minimal PATH.");
 FLAG(POSIX_COMPAT, Bool, '\0', "posix", Bash,
      "Run in POSIX mode, equivalent to --mood sh.");
 
 FLAG(MOOD, String, 'M', "mood", Compat,
-     "Select the runtime mood, one of 'shit', 'bash', or 'sh'. The default "
-     "'shit' mood is the strict bash superset with the analysis stage on, "
-     "'bash' runs the bash extensions with the analysis stage off, and 'sh' "
-     "behaves like dash. The mood drives strictness, the analysis stage, and "
-     "the parser features, and set --mood changes it at runtime.");
+     "Select the runtime mood, 'shit' is strict with the analysis stage on, "
+     "'bash' runs the extensions with it off, and 'sh' behaves like dash.");
 FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods", Compat,
-     "Source the startup files for each listed mood, in order, given comma "
-     "separated or by repeating the flag. 'shit' reads /etc/shitrc and "
-     "~/.shitrc, 'bash' reads the bash rc and completion, and 'sh' reads the "
-     "ENV file, with the login profiles added under -l. Defaults to the value "
-     "of --mood.");
-FLAG(
-    MIMICRY, Bool, 'I', "mimicry", Compat,
-    "Mimic the shell a script's shebang names. A program whose "
-    "shebang is a shell shit can emulate runs in-process in the matching mode. "
-    "sh and dash run in POSIX mode, bash in bash mode, and shit in the default "
-    "mode. A zsh, ksh, fish, or non-shell shebang still launches the real "
-    "program.");
+     "Source the startup files for each listed mood, in order, comma separated "
+     "or by repeating the flag. Defaults to --mood.");
+FLAG(MIMICRY, Bool, 'I', "mimicry", Compat,
+     "Mimic the shell a script's shebang names, running a known shell shebang "
+     "in-process in the matching mode.");
 FLAG(DUMB, Bool, '\0', "dumb", Compat,
      "Make shit extremely dumb. Equivalent to --mood sh -T --no-diagnostics.");
 
-FLAG(
-    WARNINGS, RepeatedBool, 'W', "", Shit,
-    "Keep the analysis stage but demote a lenient analysis error to a warning "
-    "and let the run proceed. A single -W demotes an unresolved command and a "
-    "variable read before it is assigned. A strict error such as a malformed "
-    "glob stays fatal under a single -W. A repeated -WW demotes every analysis "
-    "error, the strict ones included. The runtime warnings are reported in the "
-    "strict default mood under -W and in every mood under -WW.");
+FLAG(WARNINGS, RepeatedBool, 'W', "", Shit,
+     "Demote a lenient analysis error to a warning and proceed, a repeated -WW "
+     "demotes the strict ones too.");
 FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Shit,
      "List the shellcheck-style checks the analysis stage reports, then exit.");
 FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Shit,
      "Skip the analysis stage. No warnings or pre-run diagnostics are "
      "reported.");
 FLAG(SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
-     "Suppress diagnostics and warnings only while the startup profiles and rc "
-     "files source, then restore them for the prompt. Pairs with -W to load a "
-     "lax "
-     "bash config quietly yet keep the checks afterward.");
+     "Suppress diagnostics only while the startup files source, then restore "
+     "them for the prompt.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
      "Disable interactive tab completion and ghost-text.");
 FLAG(NO_SYNTAX_HIGHLIGHTING, Bool, '\0', "no-syntax-highlighting", Shit,
@@ -124,39 +101,36 @@ FLAG(ENABLE_SHITBOX, Bool, '\0', "enable-shitbox", Shit,
 
 FLAG(AST, Bool, 'A', "show-ast", Debug,
      "Print AST before executing each command.");
-FLAG(SHOW_OPTIMIZER_STATE, Bool, '\0', "show-optimizer-state", Debug,
-     "Trace the optimizer prepass decisions and print a located line for every "
-     "node the analysis stage eliminated to standard error, then a final "
-     "summary.");
+FLAG(
+    SHOW_OPTIMIZER_STATE, Bool, '\0', "show-optimizer-state", Debug,
+    "Trace the optimizer prepass and print a located line for every eliminated "
+    "node.");
 FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", Debug,
      "Print exit code after each executed command.");
 FLAG(ESCAPE_MAP, Bool, 'R', "show-lexed-words", Debug,
      "Print escape bitmap after each parsed command.");
-FLAG(STATS, Bool, '\0', "show-stats", Debug,
-     "Print statistics after each executed command, including commands "
-     "evaluated, expansions, nodes evaluated, and AST arena bytes with the run "
-     "peak.");
+FLAG(
+    STATS, Bool, '\0', "show-stats", Debug,
+    "Print run statistics after each command, commands, expansions, nodes, and "
+    "arena bytes.");
 FLAG(MEMORY, Bool, '\0', "show-memory", Debug,
-     "Print a granular memory report at exit, the AST and function arena bytes "
-     "with their reserved capacity and the malloc heap in use.");
+     "Print a memory report at exit, the arena bytes and the heap in use.");
 /* A release binary rejects these flags as unknown, since its LOG calls compile
    out. */
 #if !defined NDEBUG
 FLAG(LOG, String, 'X', "debug-logging", Debug,
      "Enable internal logging at the given level, one of 'info', 'debug', or "
      "'all'. An unknown spelling is an error.");
-FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file", Debug,
-     "Create the named file when missing and append the debug log to it, "
-     "keeping an interactive session's log off the prompt. The default target "
-     "is stderr.");
+FLAG(
+    DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file", Debug,
+    "Append the debug log to the named file, created when missing. The default "
+    "is stderr.");
 FLAG(DEBUG_COMPLETE_AT, String, '\0', "debug-complete-at", Debug,
-     "Print the completion candidates for the given line with the cursor at "
-     "its end, one per line the way an explicit tab lists them, after every "
-     "-c chunk has run, then exit. This is the completion test driver.");
+     "Print the completion candidates for the given line, then exit. The "
+     "completion test driver.");
 FLAG(DEBUG_HIGHLIGHT_AT, String, '\0', "debug-highlight-at", Debug,
-     "Print the syntax-highlight spans for the given line, one per line as the "
-     "span text and the escape that colors it with the escape byte shown as "
-     "\\e, then exit. This is the highlighter test driver.");
+     "Print the highlight spans for the given line, then exit. The highlighter "
+     "test driver.");
 #endif
 
 #if SHIT_PLATFORM_IS COSMO
@@ -853,10 +827,11 @@ fn main(int argc, char **argv) -> int
         break;
       }
     if (!is_known_level) {
-      shit::show_message(shit::Error{"Unknown debug logging level '" +
-                                     shit::String{FLAG_LOG.value()} +
-                                     "', expected 'info', 'debug', or 'all'"}
-                             .to_string());
+      shit::show_message(
+          shit::ErrorWithDetails{"Unknown debug logging level '" +
+                                     shit::String{FLAG_LOG.value()} + "'",
+                                 "Pass `info`, `debug`, or `all` to `-X`"}
+              .to_string());
       return 2;
     }
   }

@@ -397,6 +397,18 @@ ExecFormatError::ExecFormatError()
     : Error("the file is not an executable and has no interpreter")
 {}
 
+ErrorWithDetails::ErrorWithDetails(StringView message, StringView note)
+    : Error(message)
+{
+  m_note = note;
+}
+
+WarningWithDetails::WarningWithDetails(StringView message, StringView note)
+    : Warning(message)
+{
+  m_note = note;
+}
+
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
     : ErrorBase(message), m_location(steal(location))
@@ -488,6 +500,13 @@ CommandNotFound::CommandNotFound(SourceLocation location, StringView message)
     : ErrorWithLocation(steal(location), message)
 {}
 
+CommandNotFound::CommandNotFound(SourceLocation location, StringView message,
+                                 StringView note)
+    : ErrorWithLocation(steal(location), message)
+{
+  m_note = note;
+}
+
 WarningWithLocation::WarningWithLocation(SourceLocation location,
                                          StringView message)
     : ErrorWithLocation(steal(location), message)
@@ -496,6 +515,13 @@ WarningWithLocation::WarningWithLocation(SourceLocation location,
 cold fn WarningWithLocation::severity_word() const wontthrow -> String
 {
   return "warning";
+}
+
+WarningWithLocationAndDetails::WarningWithLocationAndDetails(
+    SourceLocation location, StringView message, StringView note)
+    : WarningWithLocation(steal(location), message)
+{
+  m_note = note;
 }
 
 TraceWithLocation::TraceWithLocation(SourceLocation location)
@@ -515,9 +541,20 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
       m_details_message(details_message)
 {}
 
+ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
+    SourceLocation location, StringView message, StringView note)
+    : ErrorWithLocation(steal(location), message),
+      m_details_message(heap_allocator())
+{
+  m_note = note;
+}
+
 cold fn ErrorWithLocationAndDetails::details_to_string(
     StringView source) const throws -> String
 {
+  /* The note-only form carries no second caret, so nothing is drawn. */
+  if (m_details_message.is_empty()) return String{heap_allocator()};
+
   usize byte_position = m_details_location.position;
   const usize byte_count = m_details_location.length;
 

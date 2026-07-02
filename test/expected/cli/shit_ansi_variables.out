@@ -20,8 +20,8 @@ SHIT_ANSI_RESET  []
 SHIT_ANSI_BOGUS  [MISSING]
 stored=[stored]
 sh_green=[]
-shit: 1:14: error: Unable to expand 'SHIT_ANSI_NOPE' because the parameter is not set.
+shit: 1:15: error: Unable to expand 'SHIT_ANSI_NOPE' because the parameter is not set.
      1 |  set -u; echo "${SHIT_ANSI_NOPE}"
-       |               ^~~~~~~~~~~~~~~~~~~ here.
+       |                ^~~~~~~~~~~~~~~~~ here.
 note: Replace it with ${SHIT_ANSI_NOPE-} if empty expansion is desired.
 rc=1

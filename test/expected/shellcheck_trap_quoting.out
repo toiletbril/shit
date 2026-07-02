@@ -34,7 +34,7 @@ shit: 5:6: warning: The double-quoted trap action expands now, when the trap is 
      5 |  trap "echo $unset_at_set_time" EXIT
        |       ^~~~~~~~~~~~~~~~~~~~~~~~~ here.
 note: Single-quote it so it expands as the signal arrives.
-shit: 5:6: error: Unable to expand 'unset_at_set_time' because the parameter is not set.
+shit: 5:12: error: Unable to expand 'unset_at_set_time' because the parameter is not set.
      5 |  trap "echo $unset_at_set_time" EXIT
-       |       ^~~~~~~~~~~~~~~~~~~~~~~~~ here.
+       |             ^~~~~~~~~~~~~~~~~~ here.
 note: Replace it with ${unset_at_set_time-} if empty expansion is desired.

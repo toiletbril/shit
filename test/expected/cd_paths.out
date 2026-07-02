@@ -97,3 +97,4 @@ cdpath=0
 shit: 6:1: error: The directory '/nonexistent-xyz-dir' does not exist.
      6 |  cd /nonexistent-xyz-dir 2>&1; echo "miss=$?"
        |  ^~~~~~~~~~~~~~~~~~~~~~~ here.
+note: Check the spelling or create it with `mkdir -p`.

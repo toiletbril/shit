@@ -278,9 +278,14 @@ fn EvalContext::append_indexed_array(StringView name,
 [[noreturn]] fn throw_script_fatal(String message, StringView note) throws
     -> void
 {
-  let error = Error{message.view()};
+  if (note.is_empty()) {
+    Error error{message.view()};
+    error.set_script_fatal();
+    throw error;
+  }
+
+  ErrorWithDetails error{message.view(), note};
   error.set_script_fatal();
-  if (!note.is_empty()) error.set_note(note);
   throw error;
 }
 
@@ -312,14 +317,11 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     if (resolved_source.text == nullptr ||
         location.position > resolved_source.text->count())
     {
-      let fallback = Warning{message};
-      if (!note.is_empty()) fallback.set_note(note);
-      show_message(fallback.to_string());
+      show_message(WarningWithDetails{message, note}.to_string());
       return;
     }
-    let warning = WarningWithLocation{location, message};
+    let warning = WarningWithLocationAndDetails{location, message, note};
     warning.set_line_offset(line_offset);
-    if (!note.is_empty()) warning.set_note(note);
     show_message(warning.to_string(resolved_source.text->view()));
     if (!m_source_frames.is_empty()) print_source_backtrace();
   } catch (...) {
@@ -411,9 +413,23 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   if (m_runtime.error_unset &&
       (m_runtime.error_unset_explicit || !warnings_enabled()))
   {
-    throw_script_fatal("Unable to expand '" + String{name} +
-                           "' because the parameter is not set",
-                       empty_expansion_note.view());
+    let const message = "Unable to expand '" + String{name} +
+                        "' because the parameter is not set";
+
+    /* An indirect target has no literal spelling in the source. The precise
+       locate falls back to the command, and the word relocation reads tighter.
+     */
+    let const reference = locate_variable_reference(name);
+    if (reference.position == m_current_location.position &&
+        reference.length == m_current_location.length)
+    {
+      throw_script_fatal(String{message}, empty_expansion_note.view());
+    }
+
+    ErrorWithLocationAndDetails error{reference, message,
+                                      empty_expansion_note.view()};
+    error.set_script_fatal();
+    throw error;
   }
   if (is_warning_suppressed(suppressible_warning::UnsetTestOperand)) return;
 
@@ -432,16 +448,14 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
                               StringView note) throws -> void
 {
   if (fatal && (explicitly_requested || !warnings_enabled())) {
-    let error = ErrorWithLocation{location, message};
-    if (!note.is_empty()) error.set_note(note);
-    throw error;
+    if (note.is_empty()) throw ErrorWithLocation{location, message};
+    throw ErrorWithLocationAndDetails{location, message, note};
   }
   if ((fatal || (warnings_enabled() && warnings_reach_every_mood())) &&
       !diagnostics_disabled() && m_current_source != nullptr)
   {
     try {
-      let warning = WarningWithLocation{location, message};
-      if (!note.is_empty()) warning.set_note(note);
+      let warning = WarningWithLocationAndDetails{location, message, note};
       show_message(warning.to_string(m_current_source->view()));
     } catch (...) {
       LOG(Debug, "showing a located warning failed, the error is swallowed");
@@ -1892,15 +1906,14 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
       kind = ResolvedCommand::from_builtin(Builtin::Kind::Shitbox);
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
-      let error =
-          CommandNotFound{location, "Program '" + program + "' wasn't found"};
+      let const message = "Program '" + program + "' wasn't found";
       if (Maybe<String> suggestion = utils::suggest_command(
               program.view(), ArrayList<String>{heap_allocator()}))
       {
         let const hint = "Did you mean '" + *suggestion + "'?";
-        error.set_note(hint.view());
+        throw CommandNotFound{location, message.view(), hint.view()};
       }
-      throw error;
+      throw CommandNotFound{location, message.view()};
     }
   } else {
     LOG(Debug, "resolved '%s' to a builtin", program.c_str());

@@ -562,7 +562,8 @@ cold fn Path::current_directory() throws -> Path
 fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 {
   if (_chdir(path.c_str()) != 0)
-    return Error{"Could not change directory to '" + path.text() + "'"};
+    return Error{"Could not change directory to '" + path.text() +
+                 "': " + os::last_system_error_message()};
   return Success;
 }
 

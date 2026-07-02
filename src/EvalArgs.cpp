@@ -623,7 +623,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
         do_expand_one_word(*word);
       }
     } catch (const Error &e) {
-      throw relocate_error(e, location);
+      relocate_error(e, location);
     }
   }
 

@@ -29,7 +29,7 @@
   Unquoted "not-reached"
 ]
 before
-shit: 4:6: error: Unable to expand 'nope' because the parameter is not set.
+shit: 4:12: error: Unable to expand 'nope' because the parameter is not set.
      4 |  echo "${x:+$nope}"
-       |       ^~~~~~~~~~~~~ here.
+       |             ^~~~~ here.
 note: Replace it with ${nope-} if empty expansion is desired.

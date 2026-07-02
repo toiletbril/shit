@@ -47,7 +47,7 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     SourceLocation span = source_location();
     if (source_end_position() > span.position)
       span.length = source_end_position() - span.position;
-    throw relocate_error(e, span);
+    relocate_error(e, span);
   }
   LOG(Debug, "the [[ ]] conditional yielded status %lld",
       static_cast<long long>(status));
@@ -94,9 +94,13 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      value-to-status convention elsewhere. */
   i64 value;
   try {
-    value = cxt.evaluate_arithmetic(m_expression.view());
+    const SourceLocation body_base{source_location().position + 2, 0,
+                                   source_location().filename};
+    value = cxt.evaluate_arithmetic(m_expression.view(), body_base);
+  } catch (const ErrorWithLocation &) {
+    throw;
   } catch (const Error &e) {
-    throw relocate_error(e, source_location());
+    relocate_error(e, source_location());
   }
   const i64 status = value != 0 ? 0 : 1;
   cxt.set_last_exit_status(static_cast<i32>(status));

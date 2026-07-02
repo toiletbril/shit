@@ -24,9 +24,7 @@ namespace shit {
 cold [[noreturn]] static fn fail_conditional(StringView message,
                                              StringView reason) throws -> void
 {
-  let error = Error{message};
-  error.set_note(reason);
-  throw error;
+  throw ErrorWithDetails{message, reason};
 }
 
 cold [[noreturn]] static fn fail_conditional(StringView reason) throws -> void
@@ -74,7 +72,7 @@ struct conditional_evaluator
         return cxt.expand_word_for_assignment(
             static_cast<const tokens::WordToken *>(e.word)->word());
       } catch (const Error &err) {
-        throw relocate_error(err, e.word->source_location());
+        relocate_error(err, e.word->source_location());
       }
     }
     if (e.word != nullptr) return e.word->raw_string();
@@ -91,7 +89,7 @@ struct conditional_evaluator
         return cxt.expand_case_pattern_masked(
             static_cast<const tokens::WordToken *>(e.word)->word(), active);
       } catch (const Error &err) {
-        throw relocate_error(err, e.word->source_location());
+        relocate_error(err, e.word->source_location());
       }
     }
     let raw =
@@ -227,8 +225,8 @@ struct conditional_evaluator
         return os::is_fd_a_tty(static_cast<os::descriptor>(descriptor.value()));
 #endif
       /* bash reports a non-integer -t operand with status 2. */
-      let error = Error{"Unable to test '-t " + operand + "'"};
-      error.set_note("The operand is not an integer");
+      ErrorWithDetails error{"Unable to test '-t " + operand + "'",
+                             "The operand is not an integer"};
       error.set_command_status(2);
       throw error;
     }
@@ -355,7 +353,7 @@ struct conditional_evaluator
             } catch (const Error &err) {
               const conditional_element &operand = elements[pos - 1];
               if (operand.word != nullptr)
-                throw relocate_error(err, operand.word->source_location());
+                relocate_error(err, operand.word->source_location());
               throw;
             }
           }

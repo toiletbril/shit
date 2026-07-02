@@ -70,9 +70,11 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (is_to_previous) {
     let const old_directory = cxt.get_variable_value("OLDPWD");
     if (!old_directory.has_value() || old_directory->is_empty()) {
-      throw ErrorWithLocation{ec.source_location(),
-                              "Unable to return to the previous directory "
-                              "because OLDPWD is not set"};
+      throw ErrorWithLocationAndDetails{
+          ec.source_location(),
+          "Unable to return to the previous directory because OLDPWD is not "
+          "set",
+          "Change directory at least once before `cd -`"};
     }
     arg_path.append(old_directory->view());
   } else if (operand_count > 0) {
@@ -84,8 +86,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   } else {
     let const home_directory = os::get_home_directory();
     if (!home_directory.has_value())
-      throw ErrorWithLocation{ec.source_location(),
-                              "Unable to determine the home directory"};
+      throw ErrorWithLocationAndDetails{
+          ec.source_location(), "Unable to determine the home directory",
+          "Set `HOME` to a valid path"};
     arg_path.append(home_directory->text());
   }
 
@@ -169,10 +172,12 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             : Path::current_directory();
     /* A path that exists can still refuse the move, so the chdir failure throws
        before PWD and OLDPWD are rewritten, leaving them untouched like dash. */
-    if (Path::set_current_directory(target).is_error())
+    if (Path::set_current_directory(target).is_error()) {
       throw ErrorWithLocation{
           ec.source_location(),
-          StringView{"Unable to change to the directory '"} + arg_path + "'"};
+          StringView{"Unable to change to the directory '"} + arg_path +
+              "': " + os::last_system_error_message()};
+    }
     /* A relative or empty PATH entry now names a different directory, so a
        cached resolution is marked stale for the next command to re-resolve. */
     utils::invalidate_path_cache();
@@ -186,9 +191,10 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  throw ErrorWithLocation{ec.source_location(), StringView{"The directory '"} +
-                                                    arg_path +
-                                                    "' does not exist"};
+  throw ErrorWithLocationAndDetails{
+      ec.source_location(),
+      StringView{"The directory '"} + arg_path + "' does not exist",
+      "Check the spelling or create it with `mkdir -p`"};
 }
 
 } // namespace shit

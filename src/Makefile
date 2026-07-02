@@ -146,7 +146,7 @@ CXXFLAGS := \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
-ifneq ($(TARGET), Darwin)
+ifeq ($(TARGET), Linux)
 CXXFLAGS += -Wl,-Bsymbolic
 endif
 

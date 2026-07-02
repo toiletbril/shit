@@ -28,7 +28,7 @@ shit: 2:3: warning: A one-operand test is the nonempty-string test.
      2 |  [ "$x" ]
        |    ^~~~ here.
 note: Write it with -n to read clearer.
-shit: 2:3: error: Unable to expand 'x' because the parameter is not set.
+shit: 2:4: error: Unable to expand 'x' because the parameter is not set.
      2 |  [ "$x" ]
-       |    ^~~~ here.
+       |     ^~ here.
 note: Replace it with ${x-} if empty expansion is desired.

@@ -10,10 +10,12 @@
 shit: 1:4: error: Unexpected character in the arithmetic expression.
      1 |  1 +
        |     ^~ here.
+note: This is not a valid operator or operand.
 === located division by zero ===
 shit: 1:6: error: Division by zero.
      1 |  5 / 0
        |       ^~ here.
+note: The right operand evaluated to 0.
 === no expression ===
 shit: 1:1: error: calc: Not enough arguments.
      1 |  shitbox calc

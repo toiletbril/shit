@@ -677,6 +677,8 @@ fn arm_message_leading_newline(bool armed) wontthrow -> void
 
 cold fn show_message(StringView err) throws -> void
 {
+  if (err.is_empty()) return;
+
   if (MESSAGE_LEADING_NEWLINE_ARMED) {
     print_error("\n");
     MESSAGE_LEADING_NEWLINE_ARMED = false;
