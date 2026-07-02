@@ -1,0 +1,7 @@
+== command position offers the executable and the directory, not the data file:
+./run
+./sub/
+== argument position still offers every file:
+./data.txt
+./run
+./sub/
