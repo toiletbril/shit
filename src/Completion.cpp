@@ -260,24 +260,115 @@ static fn all_active_glob_mask(usize length) throws -> Bitset
   return mask;
 }
 
-static fn command_name_matches(StringView name, StringView token,
-                               bool token_is_glob,
-                               const Bitset &glob_active) throws -> bool
+static pure fn ascii_lower(char c) wontthrow -> char
 {
-  if (!token_is_glob) return name.starts_with(token);
-
-  return utils::glob_matches(token, name, glob_active, 0);
+  return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
 }
 
-static fn add_unique_command(ArrayList<String> &candidates, HashSet &seen,
+static pure fn token_has_uppercase(StringView token) wontthrow -> bool
+{
+  for (usize i = 0; i < token.length; i++)
+    if (token[i] >= 'A' && token[i] <= 'Z') return true;
+  return false;
+}
+
+/* The three match strengths a typed token has against a candidate, best first.
+   An exact prefix always wins, then a smart-case prefix, then a subsequence
+   such as fbb inside foo_bar_baz. */
+enum class match_tier : u8
+{
+  exact_prefix = 0,
+  prefix = 1,
+  subsequence = 2,
+};
+
+/* Smart case means a token with an uppercase byte matches case sensitively,
+   while an all-lowercase token matches either case. The caller passes the smart
+   verdict so it is computed once per token, not once per candidate. */
+static pure fn candidate_match(StringView token, StringView candidate,
+                               bool is_case_sensitive) wontthrow
+    -> Maybe<match_tier>
+{
+  if (candidate.starts_with(token)) return match_tier::exact_prefix;
+
+  if (!is_case_sensitive && candidate.length >= token.length) {
+    bool is_prefix = true;
+    for (usize i = 0; i < token.length; i++)
+      if (ascii_lower(candidate[i]) != ascii_lower(token[i])) {
+        is_prefix = false;
+        break;
+      }
+    if (is_prefix) return match_tier::prefix;
+  }
+
+  /* A subsequence match is far looser than a prefix, so it is limited to a
+     name-like token of at least two bytes. A single byte or an option dash
+     would otherwise match almost every entry. */
+  if (token.length < 2 || !lexer::is_variable_name(token[0])) return None;
+
+  usize matched_count = 0;
+  for (usize i = 0; i < candidate.length && matched_count < token.length; i++) {
+    const bool is_equal =
+        is_case_sensitive
+            ? candidate[i] == token[matched_count]
+            : ascii_lower(candidate[i]) == ascii_lower(token[matched_count]);
+    if (is_equal) matched_count++;
+  }
+  if (matched_count == token.length) return match_tier::subsequence;
+
+  return None;
+}
+
+/* Candidates are bucketed by match strength, and only the strongest non-empty
+   bucket is offered, so a fuzzy subsequence never dilutes a real prefix match
+   and the auto-fill prefix stays computed over one homogeneous tier. */
+struct tiered_candidates
+{
+  ArrayList<String> by_tier[3];
+
+  tiered_candidates()
+      : by_tier{ArrayList<String>{completion_allocator()},
+                ArrayList<String>{completion_allocator()},
+                ArrayList<String>{completion_allocator()}}
+  {}
+
+  fn add(match_tier tier, String candidate) throws -> void
+  {
+    by_tier[static_cast<usize>(tier)].push(steal(candidate));
+  }
+
+  mustuse fn best() throws -> ArrayList<String>
+  {
+    for (usize tier = 0; tier < 3; tier++)
+      if (!by_tier[tier].is_empty()) return steal(by_tier[tier]);
+    return ArrayList<String>{completion_allocator()};
+  }
+};
+
+static fn command_name_match(StringView name, StringView token,
+                             bool token_is_glob, bool is_case_sensitive,
+                             const Bitset &glob_active) throws
+    -> Maybe<match_tier>
+{
+  if (token_is_glob) {
+    if (utils::glob_matches(token, name, glob_active, 0))
+      return match_tier::exact_prefix;
+    return None;
+  }
+  return candidate_match(token, name, is_case_sensitive);
+}
+
+static fn add_unique_command(tiered_candidates &candidates, HashSet &seen,
                              StringView name, StringView token,
-                             bool token_is_glob,
+                             bool token_is_glob, bool is_case_sensitive,
                              const Bitset &glob_active) throws -> void
 {
-  if (!command_name_matches(name, token, token_is_glob, glob_active)) return;
+  let const tier = command_name_match(name, token, token_is_glob,
+                                      is_case_sensitive, glob_active);
+  if (!tier.has_value()) return;
   if (seen.contains(name)) return;
   seen.add(name);
-  candidates.push(String{completion_allocator(), name});
+  candidates.add(*tier, String{completion_allocator(), name});
 }
 
 static fn
@@ -320,44 +411,42 @@ fn environment_path_changed(String &cached_path) throws -> bool
 static fn complete_command(StringView token, bool token_is_glob,
                            EvalContext &context) throws -> ArrayList<String>
 {
-  let candidates = ArrayList<String>{completion_allocator()};
+  let candidates = tiered_candidates{};
   let seen = HashSet{completion_allocator()};
 
   TRACELN("completing command position for token '%.*s'",
           static_cast<int>(token.length), token.data);
 
+  let const is_case_sensitive = token_has_uppercase(token);
   let const glob_active = token_is_glob ? all_active_glob_mask(token.length)
                                         : Bitset{completion_allocator()};
 
   for (let const &builtin_name : builtin_names()) {
     add_unique_command(candidates, seen, builtin_name.view(), token,
-                       token_is_glob, glob_active);
+                       token_is_glob, is_case_sensitive, glob_active);
   }
 
   if (context.shitbox()) {
     for (const String &util_name : shitbox::util_names())
       add_unique_command(candidates, seen, util_name.view(), token,
-                         token_is_glob, glob_active);
+                         token_is_glob, is_case_sensitive, glob_active);
   }
 
   context.function_names().for_each([&](StringView name) {
     add_unique_command(candidates, seen, name, token, token_is_glob,
-                       glob_active);
+                       is_case_sensitive, glob_active);
   });
 
   context.alias_names().for_each([&](StringView name) {
     add_unique_command(candidates, seen, name, token, token_is_glob,
-                       glob_active);
+                       is_case_sensitive, glob_active);
   });
 
   for (let const &entry : utils::path_command_names())
     add_unique_command(candidates, seen, entry.view(), token, token_is_glob,
-                       glob_active);
+                       is_case_sensitive, glob_active);
 
-  LOG(All, "collected %zu command candidates for token '%.*s'",
-      candidates.count(), static_cast<int>(token.length), token.data);
-
-  return candidates;
+  return candidates.best();
 }
 
 /* The directory part keeps its trailing separator so the basename joins back
@@ -483,9 +572,10 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
                               bool inside_quote, bool directories_only,
                               bool executables_only) throws -> ArrayList<String>
 {
-  let candidates = ArrayList<String>{completion_allocator()};
+  let candidates = tiered_candidates{};
 
   path_token parts = split_path_token(token);
+  const bool is_case_sensitive = token_has_uppercase(parts.basename_part);
 
   TRACELN(
       "completing filesystem token '%.*s', dir '%.*s', base '%.*s'",
@@ -497,11 +587,13 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
       resolve_listing_directory(parts.directory_part, base_directory);
 
   let const entries = read_directory_cached(listing_directory);
-  if (entries == nullptr) return candidates;
+  if (entries == nullptr) return candidates.best();
 
   for (let const &entry : *entries) {
     let const name = entry.name.view();
-    if (!name.starts_with(parts.basename_part)) continue;
+    let const tier =
+        candidate_match(parts.basename_part, name, is_case_sensitive);
+    if (!tier.has_value()) continue;
 
     if (directories_only && !entry.is_directory) continue;
 
@@ -530,14 +622,10 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
       candidate = quote_path_candidate(candidate.view());
     }
 
-    candidates.push(steal(candidate));
+    candidates.add(*tier, steal(candidate));
   }
 
-  LOG(All, "%zu entries of '%s' match basename '%.*s'", candidates.count(),
-      listing_directory.text().c_str(),
-      static_cast<int>(parts.basename_part.length), parts.basename_part.data);
-
-  return candidates;
+  return candidates.best();
 }
 
 /* Only the trailing component is globbed. */
@@ -817,11 +905,6 @@ static pure fn file_extension_hint(StringView command) wontthrow -> const char *
   if (let const hint = FILE_EXTENSION_HINTS.find(command); hint.has_value())
     return *hint;
   return nullptr;
-}
-
-static pure fn ascii_lower(char c) wontthrow -> char
-{
-  return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
 }
 
 /* The candidate's trailing extension, taken after the last dot of the basename,

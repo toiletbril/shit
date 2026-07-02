@@ -1,0 +1,10 @@
+== an exact prefix hides the case-insensitive match:
+makefile.bak
+== a lowercase token corrects to the uppercase name when nothing prefixes exactly:
+README
+== an uppercase byte forces a case-sensitive match:
+README
+== a subsequence matches a name-like token of two or more bytes:
+foo_bar_baz
+== a single byte does not fuzzy match, only its exact prefixes:
+plain.txt
