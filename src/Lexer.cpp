@@ -611,8 +611,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
       char next = chop_character(byte_count);
 
       /* $'...' is bash ANSI-C quoting, decoded here into a literal segment that
-         neither expands nor globs. It rides every mood but POSIX. */
-      if (next == '\'' && bash_additions_enabled()) {
+         neither expands nor globs. It rides every mood but POSIX. Inside double
+         quotes the $' is literal, so bash leaves "$'x'" as the three bytes. */
+      if (next == '\'' && bash_additions_enabled() && !is_in_double_quotes) {
         byte_count++;
         bool did_emit_any = false;
         let do_emit_literal = [&](char byte) {
