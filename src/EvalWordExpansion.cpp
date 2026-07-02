@@ -128,6 +128,29 @@ hot fn EvalContext::expand_word(const Word &word) throws
     }
   };
 
+  let do_emit_elements = [&](const ArrayList<String> &values, bool quoted,
+                             bool star) throws {
+    if (quoted && star) {
+      let const ifs = m_field_separators.view();
+      let joined = String{scratch_allocator()};
+      for (usize i = 0; i < values.count(); i++) {
+        if (i > 0 && !ifs.is_empty()) {
+          joined.push(ifs[0]);
+        }
+        joined.append(values[i].view());
+      }
+      do_append_run(joined, false);
+      return;
+    }
+    for (usize i = 0; i < values.count(); i++) {
+      if (i > 0) do_flush();
+      if (quoted)
+        do_append_run(values[i].view(), false);
+      else
+        do_append_split_run(values[i].view(), true);
+    }
+  };
+
   for (const WordSegment &segment : *segments) {
     let const segment_text =
         StringView{segment.text.data(), segment.text.count()};
@@ -168,27 +191,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
             segment_text.substring_of_length(1, segment_text.length - 2);
         let const is_star = segment_text[segment_text.length - 1] == '*';
         let const names = matching_prefix_names(prefix);
-        if (segment.is_in_double_quotes && is_star) {
-          let const ifs = m_field_separators.view();
-          let joined = String{scratch_allocator()};
-          for (usize i = 0; i < names.count(); i++) {
-            if (i > 0 && !ifs.is_empty()) {
-              joined.push(ifs[0]);
-            }
-            joined.append(names[i].view());
-          }
-          do_append_run(joined, false);
-        } else if (segment.is_in_double_quotes) {
-          for (usize i = 0; i < names.count(); i++) {
-            if (i > 0) do_flush();
-            do_append_run(names[i].view(), false);
-          }
-        } else {
-          for (usize i = 0; i < names.count(); i++) {
-            if (i > 0) do_flush();
-            do_append_split_run(names[i].view(), true);
-          }
-        }
+        do_emit_elements(names, segment.is_in_double_quotes, is_star);
         break;
       }
       if (segment_text.length >= 5 && segment_text[0] == '!' &&
@@ -202,27 +205,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
             segment_text.substring_of_length(1, segment_text.length - 4);
         let const is_star = segment_text[segment_text.length - 2] == '*';
         let const subscripts = collect_array_subscripts(array_name);
-        if (segment.is_in_double_quotes && is_star) {
-          let const ifs = m_field_separators.view();
-          let joined = String{scratch_allocator()};
-          for (usize i = 0; i < subscripts.count(); i++) {
-            if (i > 0 && !ifs.is_empty()) {
-              joined.push(ifs[0]);
-            }
-            joined.append(subscripts[i].view());
-          }
-          do_append_run(joined, false);
-        } else if (segment.is_in_double_quotes) {
-          for (usize i = 0; i < subscripts.count(); i++) {
-            if (i > 0) do_flush();
-            do_append_run(subscripts[i].view(), false);
-          }
-        } else {
-          for (usize i = 0; i < subscripts.count(); i++) {
-            if (i > 0) do_flush();
-            do_append_split_run(subscripts[i].view(), true);
-          }
-        }
+        do_emit_elements(subscripts, segment.is_in_double_quotes, is_star);
         break;
       }
       if (segment_text.length >= 4 &&
@@ -243,27 +226,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         if (is_plain_array_name) {
           let const is_star = segment_text[segment_text.length - 2] == '*';
           let const elements = collect_array_elements(array_name);
-          if (segment.is_in_double_quotes && is_star) {
-            let const ifs = m_field_separators.view();
-            let joined = String{scratch_allocator()};
-            for (usize i = 0; i < elements.count(); i++) {
-              if (i > 0 && !ifs.is_empty()) {
-                joined.push(ifs[0]);
-              }
-              joined.append(elements[i].view());
-            }
-            do_append_run(joined, false);
-          } else if (segment.is_in_double_quotes) {
-            for (usize i = 0; i < elements.count(); i++) {
-              if (i > 0) do_flush();
-              do_append_run(elements[i].view(), false);
-            }
-          } else {
-            for (usize i = 0; i < elements.count(); i++) {
-              if (i > 0) do_flush();
-              do_append_split_run(elements[i].view(), true);
-            }
-          }
+          do_emit_elements(elements, segment.is_in_double_quotes, is_star);
           break;
         }
       }
@@ -529,29 +492,6 @@ hot fn EvalContext::expand_word(const Word &word) throws
             let const should_expand_word =
                 modifier_op == '+' ? !treat_as_unset : treat_as_unset;
 
-            let do_emit_elements = [&](const ArrayList<String> &values,
-                                       bool quoted, bool star) throws {
-              if (quoted && star) {
-                let const ifs = m_field_separators.view();
-                let joined = String{scratch_allocator()};
-                for (usize i = 0; i < values.count(); i++) {
-                  if (i > 0 && !ifs.is_empty()) {
-                    joined.push(ifs[0]);
-                  }
-                  joined.append(values[i].view());
-                }
-                do_append_run(joined, false);
-                return;
-              }
-              for (usize i = 0; i < values.count(); i++) {
-                if (i > 0) do_flush();
-                if (quoted)
-                  do_append_run(values[i].view(), false);
-                else
-                  do_append_split_run(values[i].view(), true);
-              }
-            };
-
             if (!should_expand_word) {
               if (modifier_op == '-')
                 do_emit_elements(elements, segment.is_in_double_quotes,
@@ -608,25 +548,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
               let const values = collect_array_elements(array_word->array_name);
               let const emit_quoted =
                   array_word->is_quoted || segment.is_in_double_quotes;
-              if (emit_quoted && array_word->is_star) {
-                let const ifs = m_field_separators.view();
-                let joined = String{scratch_allocator()};
-                for (usize i = 0; i < values.count(); i++) {
-                  if (i > 0 && !ifs.is_empty()) {
-                    joined.push(ifs[0]);
-                  }
-                  joined.append(values[i].view());
-                }
-                do_append_run(joined, false);
-              } else {
-                for (usize i = 0; i < values.count(); i++) {
-                  if (i > 0) do_flush();
-                  if (emit_quoted)
-                    do_append_run(values[i].view(), false);
-                  else
-                    do_append_split_run(values[i].view(), true);
-                }
-              }
+              do_emit_elements(values, emit_quoted, array_word->is_star);
               break;
             }
             if (modifier_op == '+') break;
