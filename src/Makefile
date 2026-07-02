@@ -172,9 +172,11 @@ CXXFLAGS += \
 	-s \
 	-DNDEBUG \
 	-O3 \
-	-flto \
 	-U_FORTIFY_SOURCE \
 	-D_FORTIFY_SOURCE=2
+ifneq ($(TARGET), Windows_NT)
+CXXFLAGS += -flto
+endif
 ifeq ($(TARGET), Linux)
 # macOS ld64 has no fully static link, so static-pie stays Linux-only.
 CXXFLAGS += \
