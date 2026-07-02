@@ -1124,33 +1124,6 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   return t;
 }
 
-hot pure static fn lookup_operator(char ch) wontthrow -> Maybe<Token::Kind>
-{
-  switch (ch) {
-  case ')': return Token::Kind::RightParen;
-  case '(': return Token::Kind::LeftParen;
-  case ']': return Token::Kind::RightSquareBracket;
-  case '[': return Token::Kind::LeftSquareBracket;
-  case ';': return Token::Kind::Semicolon;
-  case '.': return Token::Kind::Dot;
-  case '\n': return Token::Kind::Newline;
-  case '+': return Token::Kind::Plus;
-  case '-': return Token::Kind::Minus;
-  case '*': return Token::Kind::Asterisk;
-  case '/': return Token::Kind::Slash;
-  case '%': return Token::Kind::Percent;
-  case '~': return Token::Kind::Tilde;
-  case '^': return Token::Kind::Cap;
-  case '!': return Token::Kind::ExclamationMark;
-  case '&': return Token::Kind::Ampersand;
-  case '>': return Token::Kind::Greater;
-  case '<': return Token::Kind::Less;
-  case '|': return Token::Kind::Pipe;
-  case '=': return Token::Kind::Equals;
-  default: return None;
-  }
-}
-
 hot forceinline fn Lexer::lex_sentinel() throws -> Token *
 {
   const let ch = chop_character();
@@ -1160,14 +1133,13 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
 
   Token *tok{};
 
-  /* clang-format off */
-#define TOKEN_CASE_ONE(t)                                                      \
-  case Token::Kind::t:                                                         \
+#define TOKEN_CASE_ONE(byte, t)                                                \
+  case byte:                                                                   \
     tok = m_arena->create<tokens::t>(here(m_cursor_position, 1));              \
     break;
 
-#define TOKEN_CASE_TWO(t, ch, t2)                                              \
-  case Token::Kind::t: {                                                       \
+#define TOKEN_CASE_TWO(byte, t, ch, t2)                                        \
+  case byte: {                                                                 \
     if (chop_character(1) == ch) {                                             \
       tok = m_arena->create<tokens::t2>(here(m_cursor_position, 2));           \
       extra_length++;                                                          \
@@ -1176,8 +1148,8 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
     }                                                                          \
   } break;
 
-#define TOKEN_CASE_THREE(t, ch2, t2, ch3, t3)                                  \
-  case Token::Kind::t: {                                                       \
+#define TOKEN_CASE_THREE(byte, t, ch2, t2, ch3, t3)                            \
+  case byte: {                                                                 \
     if (chop_character(1) == ch2) {                                            \
       tok = m_arena->create<tokens::t2>(here(m_cursor_position, 2));           \
       extra_length++;                                                          \
@@ -1188,110 +1160,106 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
       tok = m_arena->create<tokens::t>(here(m_cursor_position, 1));            \
     }                                                                          \
   } break;
-  /* clang-format on */
 
-  if (const let op = lookup_operator(ch); op.has_value()) {
-    switch (*op) {
-      TOKEN_CASE_ONE(RightParen);
-      TOKEN_CASE_ONE(LeftParen);
-    case Token::Kind::Semicolon: {
-      if (chop_character(1) == ';') {
-        if (chop_character(2) == '&') {
-          tok = m_arena->create<tokens::DoubleSemicolonAmpersand>(
-              here(m_cursor_position, 3));
-          extra_length += 2;
-        } else {
-          tok = m_arena->create<tokens::DoubleSemicolon>(
-              here(m_cursor_position, 2));
-          extra_length++;
-        }
-      } else if (chop_character(1) == '&') {
-        tok = m_arena->create<tokens::SemicolonAmpersand>(
+  switch (ch) {
+    TOKEN_CASE_ONE(')', RightParen);
+    TOKEN_CASE_ONE('(', LeftParen);
+  case ';': {
+    if (chop_character(1) == ';') {
+      if (chop_character(2) == '&') {
+        tok = m_arena->create<tokens::DoubleSemicolonAmpersand>(
+            here(m_cursor_position, 3));
+        extra_length += 2;
+      } else {
+        tok = m_arena->create<tokens::DoubleSemicolon>(
             here(m_cursor_position, 2));
         extra_length++;
-      } else {
-        tok = m_arena->create<tokens::Semicolon>(here(m_cursor_position, 1));
       }
-    } break;
-      TOKEN_CASE_ONE(Dot);
-      TOKEN_CASE_ONE(Newline);
-      TOKEN_CASE_ONE(Plus);
-      TOKEN_CASE_ONE(Minus);
-      TOKEN_CASE_ONE(Asterisk);
-      TOKEN_CASE_ONE(Slash);
-      TOKEN_CASE_ONE(Percent);
-      TOKEN_CASE_ONE(Tilde);
-      TOKEN_CASE_ONE(Cap);
-
-      TOKEN_CASE_TWO(RightSquareBracket, ']', DoubleRightSquareBracket);
-      TOKEN_CASE_TWO(LeftSquareBracket, '[', DoubleLeftSquareBracket);
-      TOKEN_CASE_TWO(ExclamationMark, '=', ExclamationEquals);
-    /* &> and &>> redirect both streams to a file, riding every mood but POSIX.
-     */
-    case Token::Kind::Ampersand: {
-      if (bash_additions_enabled() && chop_character(1) == '>') {
-        if (chop_character(2) == '>') {
-          tok = m_arena->create<tokens::AmpersandDoubleGreater>(
-              here(m_cursor_position, 3));
-          extra_length += 2;
-        } else {
-          tok = m_arena->create<tokens::AmpersandGreater>(
-              here(m_cursor_position, 2));
-          extra_length++;
-        }
-      } else if (chop_character(1) == '&') {
-        tok = m_arena->create<tokens::DoubleAmpersand>(
-            here(m_cursor_position, 2));
-        extra_length++;
-      } else {
-        tok = m_arena->create<tokens::Ampersand>(here(m_cursor_position, 1));
-      }
-    } break;
-
-    /* |& is the shorthand for 2>&1 |, riding every mood but POSIX. */
-    case Token::Kind::Pipe: {
-      if (chop_character(1) == '|') {
-        tok = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
-        extra_length++;
-      } else if (bash_additions_enabled() && chop_character(1) == '&') {
-        tok =
-            m_arena->create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
-        extra_length++;
-      } else {
-        tok = m_arena->create<tokens::Pipe>(here(m_cursor_position, 1));
-      }
-    } break;
-      TOKEN_CASE_TWO(Equals, '=', DoubleEquals);
-
-      TOKEN_CASE_THREE(Greater, '>', DoubleGreater, '=', GreaterEquals);
-
-    /* <<< is the bash here-string, riding every mood but POSIX where it stays
-       << then <. */
-    case Token::Kind::Less: {
-      if (chop_character(1) == '<') {
-        if (chop_character(2) == '<' && bash_additions_enabled()) {
-          tok = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
-          extra_length += 2;
-        } else {
-          tok = m_arena->create<tokens::DoubleLess>(here(m_cursor_position, 2));
-          extra_length++;
-        }
-      } else if (chop_character(1) == '=') {
-        tok = m_arena->create<tokens::LessEquals>(here(m_cursor_position, 2));
-        extra_length++;
-      } else {
-        tok = m_arena->create<tokens::Less>(here(m_cursor_position, 1));
-      }
-    } break;
-
-    default: unreachable("unhandled operator of type %d", ENUM(*op));
+    } else if (chop_character(1) == '&') {
+      tok = m_arena->create<tokens::SemicolonAmpersand>(
+          here(m_cursor_position, 2));
+      extra_length++;
+    } else {
+      tok = m_arena->create<tokens::Semicolon>(here(m_cursor_position, 1));
     }
-  } else {
+  } break;
+    TOKEN_CASE_ONE('.', Dot);
+    TOKEN_CASE_ONE('\n', Newline);
+    TOKEN_CASE_ONE('+', Plus);
+    TOKEN_CASE_ONE('-', Minus);
+    TOKEN_CASE_ONE('*', Asterisk);
+    TOKEN_CASE_ONE('/', Slash);
+    TOKEN_CASE_ONE('%', Percent);
+    TOKEN_CASE_ONE('~', Tilde);
+    TOKEN_CASE_ONE('^', Cap);
+
+    TOKEN_CASE_TWO(']', RightSquareBracket, ']', DoubleRightSquareBracket);
+    TOKEN_CASE_TWO('[', LeftSquareBracket, '[', DoubleLeftSquareBracket);
+    TOKEN_CASE_TWO('!', ExclamationMark, '=', ExclamationEquals);
+  /* &> and &>> redirect both streams to a file, riding every mood but POSIX.
+   */
+  case '&': {
+    if (bash_additions_enabled() && chop_character(1) == '>') {
+      if (chop_character(2) == '>') {
+        tok = m_arena->create<tokens::AmpersandDoubleGreater>(
+            here(m_cursor_position, 3));
+        extra_length += 2;
+      } else {
+        tok = m_arena->create<tokens::AmpersandGreater>(
+            here(m_cursor_position, 2));
+        extra_length++;
+      }
+    } else if (chop_character(1) == '&') {
+      tok =
+          m_arena->create<tokens::DoubleAmpersand>(here(m_cursor_position, 2));
+      extra_length++;
+    } else {
+      tok = m_arena->create<tokens::Ampersand>(here(m_cursor_position, 1));
+    }
+  } break;
+
+  /* |& is the shorthand for 2>&1 |, riding every mood but POSIX. */
+  case '|': {
+    if (chop_character(1) == '|') {
+      tok = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
+      extra_length++;
+    } else if (bash_additions_enabled() && chop_character(1) == '&') {
+      tok = m_arena->create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
+      extra_length++;
+    } else {
+      tok = m_arena->create<tokens::Pipe>(here(m_cursor_position, 1));
+    }
+  } break;
+    TOKEN_CASE_TWO('=', Equals, '=', DoubleEquals);
+
+    TOKEN_CASE_THREE('>', Greater, '>', DoubleGreater, '=', GreaterEquals);
+
+  /* <<< is the bash here-string, riding every mood but POSIX where it stays
+     << then <. */
+  case '<': {
+    if (chop_character(1) == '<') {
+      if (chop_character(2) == '<' && bash_additions_enabled()) {
+        tok = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
+        extra_length += 2;
+      } else {
+        tok = m_arena->create<tokens::DoubleLess>(here(m_cursor_position, 2));
+        extra_length++;
+      }
+    } else if (chop_character(1) == '=') {
+      tok = m_arena->create<tokens::LessEquals>(here(m_cursor_position, 2));
+      extra_length++;
+    } else {
+      tok = m_arena->create<tokens::Less>(here(m_cursor_position, 1));
+    }
+  } break;
+
+  default: {
     let s = String{heap_allocator()};
     s += "Unknown operator '";
     s += ch;
     s += "'";
     throw ErrorWithLocation{here(m_cursor_position, 1), s};
+  }
   }
 
   ASSERT(tok != nullptr);
