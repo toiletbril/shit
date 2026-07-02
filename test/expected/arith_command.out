@@ -74,7 +74,7 @@
 shit: 2:6: warning: The assignment of 'x' wraps an arithmetic expansion.
      2 |  x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
        |       ^~~~~~~~~~~~~~ here.
-note: Use let x=x + 3.
+note: Use `let x='x + 3'`.
 8
 8
 9

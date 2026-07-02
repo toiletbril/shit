@@ -70,8 +70,8 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
         actx.warn(source_location(),
                   StringView{"The assignment of '"} + m_assignment->key() +
                       "' wraps an arithmetic expansion",
-                  StringView{"Use let "} + m_assignment->key() + "=" +
-                      expression);
+                  StringView{"Use `let "} + m_assignment->key() + "='" +
+                      expression + "'`");
     }
   }
 

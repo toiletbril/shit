@@ -118,19 +118,19 @@
 shit: 2:11: warning: The assignment of 'r' wraps an arithmetic expansion.
      2 |  c=1; x=9; r=$((c ? 5 : (x=99))); echo $r $x
        |            ^~~~~~~~~~~~~~~~~~~~~ here.
-note: Use let r=c ? 5 : (x=99).
+note: Use `let r='c ? 5 : (x=99)'`.
 shit: 3:11: warning: The assignment of 'r' wraps an arithmetic expansion.
      3 |  c=0; x=9; r=$((c ? (x=77) : 5)); echo $r $x
        |            ^~~~~~~~~~~~~~~~~~~~~ here.
-note: Use let r=c ? (x=77) : 5.
+note: Use `let r='c ? (x=77) : 5'`.
 shit: 4:11: warning: The assignment of 'r' wraps an arithmetic expansion.
      4 |  c=1; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
        |            ^~~~~~~~~~~~~~~~~~~~~~~~~~ here.
-note: Use let r=c ? (x=77) : (x=88).
+note: Use `let r='c ? (x=77) : (x=88)'`.
 shit: 5:11: warning: The assignment of 'r' wraps an arithmetic expansion.
      5 |  c=0; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
        |            ^~~~~~~~~~~~~~~~~~~~~~~~~~ here.
-note: Use let r=c ? (x=77) : (x=88).
+note: Use `let r='c ? (x=77) : (x=88)'`.
 5 9
 5 9
 77 77
