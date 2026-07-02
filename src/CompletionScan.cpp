@@ -237,8 +237,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
       /* A name carrying a pattern byte is a rule, not a reachable host. */
       usize k = 0;
       while (k < row.length) {
-        while (k < row.length && (row[k] == ' ' || row[k] == '\t'))
-          k++;
+        k = skip_blanks(row, k);
         let const start = k;
         while (k < row.length && row[k] != ' ' && row[k] != '\t')
           k++;
@@ -697,9 +696,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     let const prefix = line.substring_of_length(0, token_start);
     usize scan_position = 0;
     while (scan_position < prefix.length) {
-      while (scan_position < prefix.length &&
-             (prefix[scan_position] == ' ' || prefix[scan_position] == '\t'))
-        scan_position++;
+      scan_position = skip_blanks(prefix, scan_position);
       let const word_begin = scan_position;
       while (scan_position < prefix.length && prefix[scan_position] != ' ' &&
              prefix[scan_position] != '\t')

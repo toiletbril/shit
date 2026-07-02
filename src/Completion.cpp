@@ -388,13 +388,31 @@ static pure fn path_candidate_needs_quoting(StringView candidate) wontthrow
     -> bool
 {
   for (usize i = 0; i < candidate.length; i++) {
-    let const c = candidate[i];
-    if (c == ' ' || c == '\t' || c == '\n' || c == '*' || c == '?' ||
-        c == '[' || c == ']' || c == '(' || c == ')' || c == '{' || c == '}' ||
-        c == '\'' || c == '"' || c == '`' || c == '$' || c == '&' || c == '|' ||
-        c == ';' || c == '<' || c == '>' || c == '\\' || c == '!' || c == '#')
-    {
-      return true;
+    switch (candidate[i]) {
+    case ' ':
+    case '\t':
+    case '\n':
+    case '*':
+    case '?':
+    case '[':
+    case ']':
+    case '(':
+    case ')':
+    case '{':
+    case '}':
+    case '\'':
+    case '"':
+    case '`':
+    case '$':
+    case '&':
+    case '|':
+    case ';':
+    case '<':
+    case '>':
+    case '\\':
+    case '!':
+    case '#': return true;
+    default: break;
     }
   }
   return false;
@@ -644,8 +662,7 @@ fn command_word_of(StringView line) wontthrow -> StringView
   }
   loop
   {
-    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
-      i++;
+    i = skip_blanks(line, i);
     let const start = i;
     while (i < line.length && line[i] != ' ' && line[i] != '\t')
       i++;
@@ -665,8 +682,7 @@ fn resolve_completion_alias(StringView command, EvalContext &context) throws
     if (!expansion.has_value()) break;
     let const expanded = expansion->view();
     usize i = 0;
-    while (i < expanded.length && (expanded[i] == ' ' || expanded[i] == '\t'))
-      i++;
+    i = skip_blanks(expanded, i);
     let const start = i;
     while (i < expanded.length && expanded[i] != ' ' && expanded[i] != '\t')
       i++;
@@ -697,8 +713,7 @@ fn split_completion_words(StringView line, usize cursor, usize &cword) throws
   usize i = 0;
   let is_found = false;
   while (i < line.length) {
-    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
-      i++;
+    i = skip_blanks(line, i);
     if (i >= line.length) break;
     let const start = i;
     while (i < line.length && line[i] != ' ' && line[i] != '\t')
