@@ -481,13 +481,13 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
 
   let stage_status = ArrayList<i32>{cxt.scratch_allocator()};
   stage_status.reserve(children.count());
-  for (let const child : children)
-    stage_status.push(os::wait_and_monitor_process(child));
-
   let pipe_status = ArrayList<String>{heap_allocator()};
-  pipe_status.reserve(stage_status.count());
-  for (usize i = 0; i < stage_status.count(); i++)
-    pipe_status.push(String::from(stage_status[i], heap_allocator()));
+  pipe_status.reserve(children.count());
+  for (let const child : children) {
+    const i32 status = os::wait_and_monitor_process(child);
+    stage_status.push(status);
+    pipe_status.push(String::from(status, heap_allocator()));
+  }
   cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
 
   i32 ret = stage_status.is_empty() ? 0 : stage_status.back();

@@ -38,158 +38,154 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
 fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     -> i32
 {
-  if (!ec.is_builtin()) {
-    /* Mimicry runs the script in-process, a background command keeps its fork.
-     */
-    if (cxt.mimicry() && !is_async) {
-      if (Maybe<mimic_mood> mode = ec.program_path().detect_mimic_shell();
-          mode.has_value())
-      {
-        LOG(Debug, "execute_context mimicking the shell for '%s'",
-            ec.program().c_str());
-#if SHIT_PLATFORM_IS POSIX
-        if (cxt.shell_is_interactive() && os::shell_has_controlling_terminal())
-        {
-          let const command = String{ec.program().view()};
-
-          /* The child blocks on this pipe until the parent hands off the
-             terminal, so it never touches the terminal before the handoff. */
-          let const sync_pipe = os::make_pipe();
-
-          shit::flush();
-          let const child = os::fork_job_process();
-          if (os::process_id_of(child) == 0) {
-            if (sync_pipe.has_value()) {
-              /* The child drops its write end so the read unblocks on EOF if
-                 the parent dies before the handoff. */
-              os::close_fd(sync_pipe->out);
-              char handoff_byte = 0;
-              (void) os::read_fd(sync_pipe->in, &handoff_byte, 1);
-              os::close_fd(sync_pipe->in);
-            }
-            i32 status = 1;
-            try {
-              status = cxt.run_mimicked_script(ec, *mode, false);
-            } catch (const ErrorBase &error) {
-              const String *source = cxt.current_source();
-              show_message(error.to_string(source != nullptr ? source->view()
-                                                             : StringView{}));
-              status = static_cast<i32>(error.command_status());
-            } catch (...) {}
-            os::exit_process_immediately(status);
-          }
-
-          if (sync_pipe.has_value()) os::close_fd(sync_pipe->in);
-          os::give_controlling_terminal_to(child);
-          if (sync_pipe.has_value()) {
-            (void) os::write_fd(sync_pipe->out, "x", 1);
-            os::close_fd(sync_pipe->out);
-          }
-
-          let was_stopped = false;
-          const i32 status = os::wait_and_monitor_process(child, &was_stopped);
-          os::reclaim_controlling_terminal();
-
-          if (was_stopped) {
-            const i32 id = cxt.register_stopped_job(child, command, status);
-            cxt.notify_stopped_job(id, command.view());
-          }
-          return status;
-        }
-#endif
-        let const isolated = !(cxt.terminal_exec_allowed() &&
-                               !cxt.in_subshell() && !cxt.has_exit_trap());
-        return cxt.run_mimicked_script(ec, *mode, isolated);
-      }
-    }
-
-    /* The terminal external command replaces the shell in place, the way dash
-       execs the last command under EV_EXIT. The EXIT trap is rechecked at run
-       time here, since one set earlier in this chunk must still run. */
-    if (!is_async && cxt.terminal_exec_allowed() && !cxt.in_subshell() &&
-        !cxt.has_exit_trap())
-    {
-      LOG(Debug,
-          "execute_context replacing the shell with the terminal command '%s'",
-          ec.program().c_str());
-      flush();
-      try {
-        os::replace_process(steal(ec));
-      } catch (const ExecFormatError &) {
-        LOG(Debug, "swallowed an exec format error, running the "
-                   "file as a shell script in place");
-        /* replace_process already placed the redirections, so the descriptors
-           are cleared to avoid reapplying the now-closed ones. */
-        ec.in_fd.reset();
-        ec.out_fd.reset();
-        ec.err_fd.reset();
-        const mimic_mood mode = cxt.mood();
-        const bool isolated = !(cxt.terminal_exec_allowed() &&
-                                !cxt.in_subshell() && !cxt.has_exit_trap());
-        quit(cxt.run_mimicked_script(ec, mode, isolated), false);
-      } catch (const ErrorWithLocation &error) {
-        /* Resolved but unexecutable exits 126, missing exits 127. */
-        const String *source = cxt.current_source();
-        show_message(
-            error.to_string(source != nullptr ? source->view() : StringView{}));
-        quit(126, false);
-      } catch (const Error &error) {
-        print_error(error.message() + "\n");
-        quit(127, false);
-      }
-      unreachable();
-    }
-
-    LOG(Debug, "spawning the external command '%s'%s", ec.program().c_str(),
-        is_async ? " in the background" : "");
-
-    /* An interactive foreground command runs in its own process group and holds
-       the terminal, so it dies on its own Ctrl-C. */
-    const bool is_foreground_job = !is_async && cxt.shell_is_interactive() &&
-                                   os::shell_has_controlling_terminal();
-
-    let const command = (is_async || is_foreground_job)
-                            ? String{ec.program().view()}
-                            : String{heap_allocator()};
-
-    os::process p = SHIT_INVALID_PROCESS;
-    try {
-      p = os::execute_program(steal(ec), !is_async,
-                              /*new_process_group=*/is_foreground_job);
-    } catch (const ExecFormatError &) {
-      LOG(Debug, "swallowed an exec format error, running the "
-                 "file as a shell script in this process");
-      const mimic_mood mode = cxt.mood();
-      const bool isolated = !(cxt.terminal_exec_allowed() &&
-                              !cxt.in_subshell() && !cxt.has_exit_trap());
-      return cxt.run_mimicked_script(ec, mode, isolated);
-    }
-    if (is_async) {
-      cxt.set_last_background_pid(os::process_id_of(p));
-      const i32 id = cxt.register_job(p, command);
-      if (cxt.shell_is_interactive())
-        shit::print_error("[" + String::from(id, heap_allocator()) + "] " +
-                          String::from(static_cast<u64>(os::process_id_of(p)),
-                                       heap_allocator()) +
-                          "\n");
-      return 0;
-    }
-
-    LOG(Debug, "waiting for the foreground child to finish");
-    if (is_foreground_job) os::give_controlling_terminal_to(p);
-    let was_stopped = false;
-    const i32 foreground_status = os::wait_and_monitor_process(
-        p, is_foreground_job ? &was_stopped : nullptr);
-    if (is_foreground_job) os::reclaim_controlling_terminal();
-    if (was_stopped) {
-      const i32 id = cxt.register_stopped_job(p, command, foreground_status);
-      cxt.notify_stopped_job(id, command.view());
-    }
-    return foreground_status;
+  if (ec.is_builtin()) {
+    LOG(Debug, "dispatching the builtin '%s'", ec.program().c_str());
+    return execute_builtin(steal(ec), cxt);
   }
 
-  LOG(Debug, "dispatching the builtin '%s'", ec.program().c_str());
-  return execute_builtin(steal(ec), cxt);
+  /* The terminal external command may replace the shell in place when it is the
+     last command, not in a subshell, and no EXIT trap is pending. */
+  let const can_replace_shell =
+      cxt.terminal_exec_allowed() && !cxt.in_subshell() && !cxt.has_exit_trap();
+
+  /* Mimicry runs the script in-process, a background command keeps its fork.
+   */
+  if (cxt.mimicry() && !is_async) {
+    if (Maybe<mimic_mood> mode = ec.program_path().detect_mimic_shell();
+        mode.has_value())
+    {
+      LOG(Debug, "execute_context mimicking the shell for '%s'",
+          ec.program().c_str());
+#if SHIT_PLATFORM_IS POSIX
+      if (cxt.shell_is_interactive() && os::shell_has_controlling_terminal()) {
+        let const command = String{ec.program().view()};
+
+        /* The child blocks on this pipe until the parent hands off the
+           terminal, so it never touches the terminal before the handoff. */
+        let const sync_pipe = os::make_pipe();
+
+        shit::flush();
+        let const child = os::fork_job_process();
+        if (os::process_id_of(child) == 0) {
+          if (sync_pipe.has_value()) {
+            /* The child drops its write end so the read unblocks on EOF if
+               the parent dies before the handoff. */
+            os::close_fd(sync_pipe->out);
+            char handoff_byte = 0;
+            (void) os::read_fd(sync_pipe->in, &handoff_byte, 1);
+            os::close_fd(sync_pipe->in);
+          }
+          i32 status = 1;
+          try {
+            status = cxt.run_mimicked_script(ec, *mode, false);
+          } catch (const ErrorBase &error) {
+            const String *source = cxt.current_source();
+            show_message(error.to_string(source != nullptr ? source->view()
+                                                           : StringView{}));
+            status = static_cast<i32>(error.command_status());
+          } catch (...) {}
+          os::exit_process_immediately(status);
+        }
+
+        if (sync_pipe.has_value()) os::close_fd(sync_pipe->in);
+        os::give_controlling_terminal_to(child);
+        if (sync_pipe.has_value()) {
+          (void) os::write_fd(sync_pipe->out, "x", 1);
+          os::close_fd(sync_pipe->out);
+        }
+
+        let was_stopped = false;
+        const i32 status = os::wait_and_monitor_process(child, &was_stopped);
+        os::reclaim_controlling_terminal();
+
+        if (was_stopped) {
+          const i32 id = cxt.register_stopped_job(child, command, status);
+          cxt.notify_stopped_job(id, command.view());
+        }
+        return status;
+      }
+#endif
+      return cxt.run_mimicked_script(ec, *mode, !can_replace_shell);
+    }
+  }
+
+  /* The terminal external command replaces the shell in place, the way dash
+     execs the last command under EV_EXIT. The EXIT trap is rechecked at run
+     time here, since one set earlier in this chunk must still run. */
+  if (!is_async && can_replace_shell) {
+    LOG(Debug,
+        "execute_context replacing the shell with the terminal command '%s'",
+        ec.program().c_str());
+    flush();
+    try {
+      os::replace_process(steal(ec));
+    } catch (const ExecFormatError &) {
+      LOG(Debug, "swallowed an exec format error, running the "
+                 "file as a shell script in place");
+      /* replace_process already placed the redirections, so the descriptors
+         are cleared to avoid reapplying the now-closed ones. */
+      ec.in_fd.reset();
+      ec.out_fd.reset();
+      ec.err_fd.reset();
+      const mimic_mood mode = cxt.mood();
+      quit(cxt.run_mimicked_script(ec, mode, !can_replace_shell), false);
+    } catch (const ErrorWithLocation &error) {
+      /* Resolved but unexecutable exits 126, missing exits 127. */
+      const String *source = cxt.current_source();
+      show_message(
+          error.to_string(source != nullptr ? source->view() : StringView{}));
+      quit(126, false);
+    } catch (const Error &error) {
+      print_error(error.message() + "\n");
+      quit(127, false);
+    }
+    unreachable();
+  }
+
+  LOG(Debug, "spawning the external command '%s'%s", ec.program().c_str(),
+      is_async ? " in the background" : "");
+
+  /* An interactive foreground command runs in its own process group and holds
+     the terminal, so it dies on its own Ctrl-C. */
+  const bool is_foreground_job = !is_async && cxt.shell_is_interactive() &&
+                                 os::shell_has_controlling_terminal();
+
+  let const command = (is_async || is_foreground_job)
+                          ? String{ec.program().view()}
+                          : String{heap_allocator()};
+
+  os::process p = SHIT_INVALID_PROCESS;
+  try {
+    p = os::execute_program(steal(ec), !is_async,
+                            /*new_process_group=*/is_foreground_job);
+  } catch (const ExecFormatError &) {
+    LOG(Debug, "swallowed an exec format error, running the "
+               "file as a shell script in this process");
+    const mimic_mood mode = cxt.mood();
+    return cxt.run_mimicked_script(ec, mode, !can_replace_shell);
+  }
+  if (is_async) {
+    cxt.set_last_background_pid(os::process_id_of(p));
+    const i32 id = cxt.register_job(p, command);
+    if (cxt.shell_is_interactive())
+      shit::print_error("[" + String::from(id, heap_allocator()) + "] " +
+                        String::from(static_cast<u64>(os::process_id_of(p)),
+                                     heap_allocator()) +
+                        "\n");
+    return 0;
+  }
+
+  LOG(Debug, "waiting for the foreground child to finish");
+  if (is_foreground_job) os::give_controlling_terminal_to(p);
+  let was_stopped = false;
+  const i32 foreground_status = os::wait_and_monitor_process(
+      p, is_foreground_job ? &was_stopped : nullptr);
+  if (is_foreground_job) os::reclaim_controlling_terminal();
+  if (was_stopped) {
+    const i32 id = cxt.register_stopped_job(p, command, foreground_status);
+    cxt.notify_stopped_job(id, command.view());
+  }
+  return foreground_status;
 }
 
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
