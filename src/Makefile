@@ -152,9 +152,9 @@ endif
 
 LINK_LIBS := # nothing
 
-ifneq ($(shell which mold > $(DEVNULL) 2>&1),)
+ifneq ($(shell command -v mold 2>$(DEVNULL)),)
 USE_LD := -fuse-ld=mold
-else ifneq ($(shell which lld > $(DEVNULL) 2>&1),)
+else ifneq ($(shell command -v ld.lld 2>$(DEVNULL))$(shell command -v lld 2>$(DEVNULL)),)
 USE_LD := -fuse-ld=lld
 else
 USE_LD :=
