@@ -454,7 +454,6 @@ class CompoundCommand : public Command
 public:
   CompoundCommand(SourceLocation location);
 
-  fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 
   fn set_fully_eliminated() const wontthrow -> void;

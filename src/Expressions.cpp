@@ -783,13 +783,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                                  ->word()
                                  .to_literal_string()
                            : m_args[i]->raw_string();
-      const StringView text = word.view();
-      if (text.is_empty() || text[0] == '-') continue;
-      usize end = 0;
-      while (end < text.length && lexer::is_variable_name(text[end]))
-        end++;
-      if (end > 0)
-        actx.function_local_names.add(text.substring_of_length(0, end));
+      let const target_name = operand_target_name(word.view());
+      if (!target_name.is_empty()) actx.function_local_names.add(target_name);
     }
   }
 

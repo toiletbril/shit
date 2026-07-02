@@ -637,15 +637,6 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
 
-fn CompoundCommand::append_to(usize d, String &f, bool duplicate) throws -> void
-{
-  unused(d);
-  unused(f);
-  unused(duplicate);
-  throw ErrorWithLocation{source_location(),
-                          "Redirection on a compound command is not supported"};
-}
-
 fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) throws
     -> void
 {

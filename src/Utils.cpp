@@ -702,9 +702,8 @@ fn parse_decimal_integer(StringView text, bool *out_of_range) throws
   if (!has_digits || offset != text.length) return not_an_integer_error(text);
 
   if (out_of_range != nullptr)
-    *out_of_range =
-        has_overflowed ||
-        magnitude > static_cast<u64>(INT64_MAX) + (is_negative ? 1u : 0u);
+    *out_of_range = has_overflowed || magnitude > static_cast<u64>(INT64_MAX) +
+                                                      (is_negative ? 1u : 0u);
 
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
@@ -771,8 +770,8 @@ static pure fn digit_value_in_base(char c, u32 radix) wontthrow -> i32
   return value < radix ? static_cast<i32>(value) : -1;
 }
 
-fn parse_integer_in_base(StringView text, int_base base, bool *out_of_range)
-    throws -> ErrorOr<i64>
+fn parse_integer_in_base(StringView text, int_base base,
+                         bool *out_of_range) throws -> ErrorOr<i64>
 {
   let const radix = static_cast<u32>(base);
   usize offset = 0;
@@ -816,9 +815,8 @@ fn parse_integer_in_base(StringView text, int_base base, bool *out_of_range)
   if (!has_digits || offset != text.length) return not_an_integer_error(text);
 
   if (out_of_range != nullptr)
-    *out_of_range =
-        has_overflowed ||
-        magnitude > static_cast<u64>(INT64_MAX) + (is_negative ? 1u : 0u);
+    *out_of_range = has_overflowed || magnitude > static_cast<u64>(INT64_MAX) +
+                                                      (is_negative ? 1u : 0u);
 
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
@@ -1611,15 +1609,6 @@ static fn directory_listing(const Path &directory) throws
    directory's copy of a name wins. A directory whose listing is already cached
    is not read again, so a PATH change that only adds a directory reads just
    that one from disk. */
-static fn path_dir_lists_equal(const ArrayList<String> &a,
-                               const ArrayList<String> &b) wontthrow -> bool
-{
-  if (a.count() != b.count()) return false;
-  for (usize i = 0; i < a.count(); i++)
-    if (a[i].view() != b[i].view()) return false;
-  return true;
-}
-
 static fn rebuild_path_cache() throws -> void
 {
   PATH_CACHE.clear();
@@ -1702,7 +1691,7 @@ fn set_path_for_resolution(Maybe<String> path) throws -> void
       !PATH_CACHE_IS_STALE)
   {
     let const new_dirs = split_path_dirs(*MAYBE_PATH);
-    if (path_dir_lists_equal(new_dirs, BUILT_PATH_DIRS)) return;
+    if (new_dirs == BUILT_PATH_DIRS) return;
   }
 
   /* The listing cache survives a PATH change, so the rebuild reads from disk
