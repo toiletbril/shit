@@ -1,0 +1,49 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign HOME=/testhome]
+  [CompoundListCondition, None]
+    [Assign p=~/a:~/b:~]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$p"]
+  [CompoundListCondition, None]
+    [Assign q=~/only]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$q"]
+  [CompoundListCondition, None]
+    [Assign r=~/x:~/y]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$r"]
+[Word
+  Unquoted "HOME=/testhome"
+]
+[Word
+  Unquoted "p=~/a:~/b:~"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "p"
+]
+[Word
+  Unquoted "q=~/only"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "q"
+]
+[Word
+  Unquoted "r=~/x:~/y"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "r"
+]
+/testhome/a:/testhome/b:/testhome
+/testhome/only
+/testhome/x:/testhome/y
+[Code 0]
