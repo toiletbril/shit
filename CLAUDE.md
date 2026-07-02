@@ -96,12 +96,19 @@ busybox-style coreutils live under src/shitbox.
 src/Platform.cpp wraps the operating system behind an os namespace, with the
 POSIX block and the Windows block defining the same API twice on purpose.
 
-src/Completion.cpp drives zero config completion. The cascade tries builtin
-flags, the registered specs, man subcommands, manpage options, build tool
-targets, help subcommands, help options, and finally the filesystem. A command
-forks its `--help` at most once per cache key, behind an allowlist and a trusted
-directory gate, and the subcommand walk stops at a dash-led word, an unknown
-subcommand, or MAX_SUBCOMMAND_DEPTH of four. The cascade splits across
+src/Completion.cpp drives zero config completion. Completion first slices the
+buffer to the command segment holding the cursor, and the slice is quote aware,
+so a `;`, `|`, `&`, or newline inside quotes does not start a new segment. The
+cascade tries the process arguments of kill and its kin, the builtin flags, the
+registered specs, the build tool targets, the man subcommands, the manpage
+options, the help subcommands, the help options, and finally the filesystem. A
+candidate is matched by smart case and then by subsequence, so an all lowercase
+token matches either case and `fbb` matches `foo_bar_baz`, while an exact prefix
+always ranks first. A command-position path offers only runnable files and the
+directories, and a known utility floats the files whose extension it operates on
+ahead of the rest. A command forks its `--help` at most once per cache key,
+behind an allowlist and a trusted directory gate, and the subcommand walk stops
+at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The cascade splits across
 src/Completion.cpp, src/CompletionManpage.cpp, src/CompletionScan.cpp, and the
 per-keystroke highlighter in src/CompletionHighlight.cpp, with shared helpers in
 src/CompletionInternal.hpp. The highlighter and TAB completion share one

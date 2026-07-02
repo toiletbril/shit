@@ -131,6 +131,21 @@ static pure fn is_unmatched_closing_paren(StringView line,
   return depth == 0;
 }
 
+static pure fn quoted_run_end(StringView line, usize position) wontthrow -> usize
+{
+  let const opener = line[position];
+  if (opener == '\\')
+    return position + 1 < line.length ? position + 1 : position;
+  if (opener != '\'' && opener != '"') return position;
+
+  usize k = position + 1;
+  while (k < line.length && line[k] != opener) {
+    if (opener == '"' && line[k] == '\\' && k + 1 < line.length) k++;
+    k++;
+  }
+  return k < line.length ? k : line.length - 1;
+}
+
 pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool
 {
   for (usize i = 0; i < token.length; i++) {
@@ -282,6 +297,8 @@ enum class match_tier : u8
   subsequence = 2,
 };
 
+static constexpr usize MATCH_TIER_COUNT = 3;
+
 /* Smart case means a token with an uppercase byte matches case sensitively,
    while an all-lowercase token matches either case. The caller passes the smart
    verdict so it is computed once per token, not once per candidate. */
@@ -324,7 +341,7 @@ static pure fn candidate_match(StringView token, StringView candidate,
    and the auto-fill prefix stays computed over one homogeneous tier. */
 struct tiered_candidates
 {
-  ArrayList<String> by_tier[3];
+  ArrayList<String> by_tier[MATCH_TIER_COUNT];
 
   tiered_candidates()
       : by_tier{ArrayList<String>{completion_allocator()},
@@ -339,7 +356,7 @@ struct tiered_candidates
 
   mustuse fn best() throws -> ArrayList<String>
   {
-    for (usize tier = 0; tier < 3; tier++)
+    for (usize tier = 0; tier < MATCH_TIER_COUNT; tier++)
       if (!by_tier[tier].is_empty()) return steal(by_tier[tier]);
     return ArrayList<String>{completion_allocator()};
   }
@@ -756,15 +773,20 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 fn command_word_of(StringView line) wontthrow -> StringView
 {
   usize i = 0;
-  usize open_parens = 0;
+  usize open_paren_depth = 0;
   for (usize k = 0; k < line.length; k++) {
     let const c = line[k];
+    if (c == '\'' || c == '"' || c == '\\') {
+      k = quoted_run_end(line, k);
+      continue;
+    }
+
     if (c == '(') {
-      open_parens++;
+      open_paren_depth++;
     } else if (c == ')') {
       /* An unmatched paren closes a case pattern and starts the arm's body. */
-      if (open_parens > 0)
-        open_parens--;
+      if (open_paren_depth > 0)
+        open_paren_depth--;
       else
         i = k + 1;
     } else if (c == ';' || c == '|' || c == '&') {
@@ -790,15 +812,20 @@ static pure fn command_segment_start(StringView line, usize cursor) wontthrow
     -> usize
 {
   usize start = 0;
-  usize open_parens = 0;
+  usize open_paren_depth = 0;
   const usize limit = cursor < line.length ? cursor : line.length;
   for (usize k = 0; k < limit; k++) {
     let const c = line[k];
+    if (c == '\'' || c == '"' || c == '\\') {
+      k = quoted_run_end(line, k);
+      continue;
+    }
+
     if (c == '(') {
-      open_parens++;
+      open_paren_depth++;
     } else if (c == ')') {
-      if (open_parens > 0)
-        open_parens--;
+      if (open_paren_depth > 0)
+        open_paren_depth--;
       else
         start = k + 1;
     } else if (c == ';' || c == '|' || c == '&' || c == '\n') {
@@ -908,10 +935,10 @@ static pure fn file_extension_hint(StringView command) wontthrow -> const char *
 }
 
 /* The candidate's trailing extension, taken after the last dot of the basename,
-   appears in the space-separated hint list, matched case insensitively. */
-static pure fn candidate_extension_is_hinted(StringView candidate,
-                                             StringView hint_list) wontthrow
-    -> bool
+   appears among the hinted extensions, matched case insensitively. */
+static pure fn candidate_extension_is_hinted(
+    StringView candidate,
+    const ArrayList<StringView> &hinted_extensions) wontthrow -> bool
 {
   if (!candidate.is_empty() && candidate[candidate.length - 1] == '/')
     return false;
@@ -927,23 +954,16 @@ static pure fn candidate_extension_is_hinted(StringView candidate,
   if (dot >= candidate.length) return false;
 
   let const extension = candidate.substring(dot + 1);
-  usize start = 0;
-  while (start < hint_list.length) {
-    usize end = start;
-    while (end < hint_list.length && hint_list[end] != ' ')
-      end++;
-    if (let const wanted = hint_list.substring_of_length(start, end - start);
-        wanted.length == extension.length)
-    {
-      bool is_equal = true;
-      for (usize i = 0; i < wanted.length; i++)
-        if (ascii_lower(extension[i]) != ascii_lower(wanted[i])) {
-          is_equal = false;
-          break;
-        }
-      if (is_equal) return true;
-    }
-    start = end + 1;
+  for (let const wanted : hinted_extensions) {
+    if (wanted.length != extension.length) continue;
+
+    bool is_equal = true;
+    for (usize i = 0; i < wanted.length; i++)
+      if (ascii_lower(extension[i]) != ascii_lower(wanted[i])) {
+        is_equal = false;
+        break;
+      }
+    if (is_equal) return true;
   }
   return false;
 }
@@ -954,12 +974,23 @@ static fn partition_by_extension(ArrayList<String> candidates,
                                  StringView hint_list) throws
     -> ArrayList<String>
 {
+  let hinted_extensions = ArrayList<StringView>{candidates.allocator()};
+  usize start = 0;
+  while (start < hint_list.length) {
+    usize end = start;
+    while (end < hint_list.length && hint_list[end] != ' ')
+      end++;
+    if (end > start)
+      hinted_extensions.push(hint_list.substring_of_length(start, end - start));
+    start = end + 1;
+  }
+
   let ordered = ArrayList<String>{candidates.allocator()};
   ordered.reserve(candidates.count());
   let rest = ArrayList<String>{candidates.allocator()};
 
   for (usize i = 0; i < candidates.count(); i++) {
-    if (candidate_extension_is_hinted(candidates[i].view(), hint_list))
+    if (candidate_extension_is_hinted(candidates[i].view(), hinted_extensions))
       ordered.push(steal(candidates[i]));
     else
       rest.push(steal(candidates[i]));
@@ -988,8 +1019,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   cursor -= completion_offset;
 
   /* Completion runs on the command segment holding the cursor, so a command on
-     a later line of a multi-line buffer is identified as its own command rather
-     than the buffer's first command. */
+     a later line of a multi-line buffer is identified as its own command. */
   let const segment_start = command_segment_start(line, cursor);
   completion_offset += segment_start;
   line = line.substring(segment_start);

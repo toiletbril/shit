@@ -292,9 +292,9 @@ fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
 {
   let const command = command_word_of(line);
   if (command.is_empty()) return None;
-  let i = static_cast<usize>(command.data - line.data) + command.length;
-  while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
-    i++;
+  let const command_end =
+      static_cast<usize>(command.data - line.data) + command.length;
+  let i = skip_blanks(line, command_end);
   let const start = i;
   while (i < line.length && line[i] != ' ' && line[i] != '\t')
     i++;

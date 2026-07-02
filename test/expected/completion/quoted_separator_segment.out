@@ -1,0 +1,15 @@
+== plain argument lists both markers:
+ZQdir_marker/
+ZQmarker_file
+== a quoted semicolon does not split the segment:
+ZQdir_marker/
+ZQmarker_file
+== a quoted pipe does not split the segment:
+ZQdir_marker/
+ZQmarker_file
+== a quoted ampersand does not split the segment:
+ZQdir_marker/
+ZQmarker_file
+== a real separator still starts a new command segment:
+ZQdir_marker/
+ZQmarker_file
