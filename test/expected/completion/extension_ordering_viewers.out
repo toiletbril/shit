@@ -1,18 +1,11 @@
-== mupdf floats the pdf first, the rest still listed:
+== mupdf with an empty argument shows only the pdf and directories:
 book.pdf
-data.csv
-notes.txt
+sub/
+== evince with an empty argument shows only the pdf and directories:
+book.pdf
+sub/
+== feh with an empty argument shows only the image and directories:
 photo.png
 sub/
-== evince floats the pdf first:
-book.pdf
-data.csv
+== a typed prefix keeps a non-matching file too:
 notes.txt
-photo.png
-sub/
-== feh floats the image first:
-photo.png
-book.pdf
-data.csv
-notes.txt
-sub/

@@ -1,16 +1,9 @@
-== unzip floats .zip files first (case insensitive), rest still listed:
+== unzip with an empty argument shows only .zip files and directories:
 ARCHIVE.ZIP
 archive.zip
-backup.tar.gz
-data.csv
-notes.txt
 sub/
-== tar floats the archive, .zip stays in the rest:
+== tar with an empty argument shows only its archive types:
 backup.tar.gz
-ARCHIVE.ZIP
-archive.zip
-data.csv
-notes.txt
 sub/
 == a program with no table entry keeps plain alphabetical order:
 ARCHIVE.ZIP

@@ -315,9 +315,6 @@ static pure fn candidate_match(StringView token, StringView candidate,
   return None;
 }
 
-/* Candidates are bucketed by match strength, and only the strongest non-empty
-   bucket is offered, so a fuzzy subsequence never dilutes a real prefix match
-   and the auto-fill prefix stays computed over one homogeneous tier. */
 struct tiered_candidates
 {
   ArrayList<String> by_tier[MATCH_TIER_COUNT];
@@ -783,16 +780,12 @@ fn command_word_of(StringView line) wontthrow -> StringView
   }
 }
 
-/* The byte after the last command boundary at or before the cursor, so a
-   command on a later line of a multi-line buffer is completed as its own
-   command. Mirrors the boundary set of command_word_of with the newline added.
- */
 static pure fn command_segment_start(StringView line, usize cursor) wontthrow
     -> usize
 {
   usize start = 0;
   usize open_paren_depth = 0;
-  const usize limit = cursor < line.length ? cursor : line.length;
+  let const limit = cursor < line.length ? cursor : line.length;
   for (usize k = 0; k < limit; k++) {
     let const c = line[k];
     if (c == '\'' || c == '"' || c == '\\') {
@@ -882,8 +875,6 @@ static pure fn file_extension_hint(StringView command) wontthrow -> const char *
   return nullptr;
 }
 
-/* The candidate's trailing extension, taken after the last dot of the basename,
-   appears among the hinted extensions, matched case insensitively. */
 static pure fn candidate_extension_is_hinted(
     StringView candidate,
     const ArrayList<StringView> &hinted_extensions) wontthrow -> bool
@@ -916,22 +907,28 @@ static pure fn candidate_extension_is_hinted(
   return false;
 }
 
-/* Extension-matching files move to the front, both groups keeping the incoming
-   sorted order, so nothing is hidden. */
-static fn partition_by_extension(ArrayList<String> candidates,
-                                 StringView hint_list) throws
-    -> ArrayList<String>
+static fn split_hint_extensions(StringView hint_list, Allocator allocator)
+    throws -> ArrayList<StringView>
 {
-  let hinted_extensions = ArrayList<StringView>{candidates.allocator()};
+  let extensions = ArrayList<StringView>{allocator};
   usize start = 0;
   while (start < hint_list.length) {
     usize end = start;
     while (end < hint_list.length && hint_list[end] != ' ')
       end++;
     if (end > start)
-      hinted_extensions.push(hint_list.substring_of_length(start, end - start));
+      extensions.push(hint_list.substring_of_length(start, end - start));
     start = end + 1;
   }
+  return extensions;
+}
+
+static fn partition_by_extension(ArrayList<String> candidates,
+                                 StringView hint_list) throws
+    -> ArrayList<String>
+{
+  let const hinted_extensions =
+      split_hint_extensions(hint_list, candidates.allocator());
 
   let ordered = ArrayList<String>{candidates.allocator()};
   ordered.reserve(candidates.count());
@@ -950,6 +947,27 @@ static fn partition_by_extension(ArrayList<String> candidates,
   return ordered;
 }
 
+static fn keep_hinted_extension(ArrayList<String> candidates,
+                                StringView hint_list) throws
+    -> ArrayList<String>
+{
+  let const hinted_extensions =
+      split_hint_extensions(hint_list, candidates.allocator());
+
+  let kept = ArrayList<String>{candidates.allocator()};
+  for (usize i = 0; i < candidates.count(); i++) {
+    let const candidate = candidates[i].view();
+    let const is_directory =
+        !candidate.is_empty() && candidate[candidate.length - 1] == '/';
+    if (is_directory ||
+        candidate_extension_is_hinted(candidate, hinted_extensions))
+    {
+      kept.push(steal(candidates[i]));
+    }
+  }
+  return kept;
+}
+
 flatten fn complete(StringView line, usize cursor, EvalContext &context,
                     const Path &base_directory, bool for_listing) throws
     -> completion_result
@@ -966,8 +984,6 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   line = line.substring(completion_offset);
   cursor -= completion_offset;
 
-  /* Completion runs on the command segment holding the cursor, so a command on
-     a later line of a multi-line buffer is identified as its own command. */
   let const segment_start = command_segment_start(line, cursor);
   completion_offset += segment_start;
   line = line.substring(segment_start);
@@ -1111,9 +1127,13 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     }
     candidates = steal(unique_candidates);
 
+    if (extension_hint != nullptr && token.is_empty())
+      candidates =
+          keep_hinted_extension(steal(candidates), StringView{extension_hint});
+
     longest_common_prefix = compute_longest_common_prefix(candidates);
 
-    if (extension_hint != nullptr)
+    if (extension_hint != nullptr && !token.is_empty())
       candidates =
           partition_by_extension(steal(candidates), StringView{extension_hint});
   }

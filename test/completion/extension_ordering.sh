@@ -1,7 +1,7 @@
-# A known utility floats the files it operates on to the top of its argument
-# completion, matched by extension case insensitively, while everything else
-# follows in the normal sorted order. Nothing is hidden, so a file the table did
-# not anticipate is still offered. A program with no table entry is unaffected.
+# For a known utility, an empty argument suggests only the file types it opens
+# plus directories, a hard filter that keeps the listing short. A typed prefix
+# keeps every match, floating the matching extension to the front while hiding
+# nothing. A program with no table entry is unaffected.
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 : > "$dir/archive.zip"
@@ -12,9 +12,9 @@ trap 'rm -rf "$dir"' EXIT
 mkdir "$dir/sub"
 export PATH="$dir"
 cd "$dir"
-echo "== unzip floats .zip files first (case insensitive), rest still listed:"
+echo "== unzip with an empty argument shows only .zip files and directories:"
 "$BIN" --debug-complete-at 'unzip ' </dev/null
-echo "== tar floats the archive, .zip stays in the rest:"
+echo "== tar with an empty argument shows only its archive types:"
 "$BIN" --debug-complete-at 'tar ' </dev/null
 echo "== a program with no table entry keeps plain alphabetical order:"
 "$BIN" --debug-complete-at 'cat ' </dev/null
