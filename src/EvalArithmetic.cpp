@@ -168,6 +168,8 @@ pure fn arithmetic_shift_right(i64 lhs, i64 rhs) wontthrow -> i64
 
 static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize;
 
+static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64;
+
 /* A recursive-descent evaluator for $((...)) following C operator precedence.
  */
 class ArithmeticParser
@@ -363,27 +365,6 @@ public:
     return result;
   }
 
-  fn apply_compound(i64 lhs, i64 rhs, char kind) throws -> i64
-  {
-    switch (kind) {
-    case '+': return arithmetic_add(lhs, rhs);
-    case '-': return arithmetic_subtract(lhs, rhs);
-    case '*': return arithmetic_multiply(lhs, rhs);
-    case '/':
-      if (rhs == 0) fail("division by zero");
-      return arithmetic_divide(lhs, rhs);
-    case '%':
-      if (rhs == 0) fail("division by zero");
-      return arithmetic_modulo(lhs, rhs);
-    case '&': return lhs & rhs;
-    case '|': return lhs | rhs;
-    case '^': return lhs ^ rhs;
-    case 'L': return arithmetic_shift_left(lhs, rhs);
-    case 'R': return arithmetic_shift_right(lhs, rhs);
-    default: return rhs;
-    }
-  }
-
   fn parse_assignment() throws -> i64
   {
     /* Try a bare name on the left and rewind when no assignment operator
@@ -400,7 +381,7 @@ public:
       struct compound_operator
       {
         StringView token;
-        u8 kind;
+        char kind;
       };
       static const compound_operator compound_operators[] = {
           {"<<=", 'L'},
@@ -425,7 +406,7 @@ public:
           if (consume(op)) {
             let const rhs = parse_assignment();
             let const result =
-                apply_compound(read_lvalue_value(target), rhs, kind);
+                arith_apply_binop(kind, read_lvalue_value(target), rhs);
             write_lvalue(target, result);
             return result;
           }
@@ -851,23 +832,28 @@ struct arith_binop
    expression never holds it. */
 static pure fn arith_classify_binop(StringView t) wontthrow -> arith_binop
 {
-  if (t == "**") return {'P', 11};
-  if (t == "*") return {'*', 10};
-  if (t == "/") return {'/', 10};
-  if (t == "%") return {'%', 10};
-  if (t == "+") return {'+', 9};
-  if (t == "-") return {'-', 9};
-  if (t == "<<") return {'L', 8};
-  if (t == ">>") return {'R', 8};
-  if (t == "<") return {'<', 7};
-  if (t == "<=") return {'l', 7};
-  if (t == ">") return {'>', 7};
-  if (t == ">=") return {'g', 7};
-  if (t == "==") return {'e', 6};
-  if (t == "!=") return {'n', 6};
-  if (t == "&") return {'&', 5};
-  if (t == "^") return {'^', 4};
-  if (t == "|") return {'|', 3};
+  static constexpr StaticStringMap<arith_binop>::entry ENTRIES[] = {
+      {SSK("**"), {'P', 11}},
+      {SSK("*"),  {'*', 10}},
+      {SSK("/"),  {'/', 10}},
+      {SSK("%"),  {'%', 10}},
+      {SSK("+"),  {'+', 9} },
+      {SSK("-"),  {'-', 9} },
+      {SSK("<<"), {'L', 8} },
+      {SSK(">>"), {'R', 8} },
+      {SSK("<"),  {'<', 7} },
+      {SSK("<="), {'l', 7} },
+      {SSK(">"),  {'>', 7} },
+      {SSK(">="), {'g', 7} },
+      {SSK("=="), {'e', 6} },
+      {SSK("!="), {'n', 6} },
+      {SSK("&"),  {'&', 5} },
+      {SSK("^"),  {'^', 4} },
+      {SSK("|"),  {'|', 3} },
+  };
+  static constexpr StaticStringMap<arith_binop> BINOPS{ENTRIES,
+                                                       countof(ENTRIES)};
+  if (let const found = BINOPS.find(t); found.has_value()) return *found;
   return {0, 0};
 }
 
