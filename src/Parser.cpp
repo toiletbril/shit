@@ -52,18 +52,6 @@ hot pure static fn kind_in(Token::Kind kind,
 
 /* A brace is a reserved word only when a token is exactly '{' or '}' as a
    single unquoted segment, so a quoted or escaped brace is rejected. */
-hot pure static fn is_brace_word(const Token *token, char brace) wontthrow
-    -> bool
-{
-  ASSERT(token != nullptr);
-  if (token->kind() != Token::Kind::Word) return false;
-  const Word &word = static_cast<const tokens::WordToken *>(token)->word();
-  return word.segments.count() == 1 &&
-         word.segments[0].kind == WordSegment::Kind::UnquotedText &&
-         word.segments[0].text.count() == 1 &&
-         word.segments[0].text[0] == brace;
-}
-
 /* [[ and ]] arrive from the lexer as ordinary single unquoted words. */
 hot pure static fn is_unquoted_word(const Token *token,
                                     StringView text) wontthrow -> bool
@@ -88,7 +76,7 @@ is_list_terminator(const Token *token,
   ASSERT(token != nullptr);
   return kind_in(token->kind(), terminators) ||
          (kind_in(Token::Kind::RightBracket, terminators) &&
-          is_brace_word(token, '}'));
+          is_unquoted_word(token, "}"));
 }
 
 /* The byte location of the keyword as a whole word in the source, so a missing
@@ -134,30 +122,11 @@ throw_unterminated(SourceLocation opener, StringView what, StringView source,
                                     "Expected '" + keyword + "'"};
 }
 
-cold pure static fn is_empty_list(const Expression *expression) wontthrow
-    -> bool
-{
-  ASSERT(expression != nullptr);
-  return expression->is_dummy();
-}
-
-/* The reserved word ! is a single unquoted exclamation mark, distinct from a !=
-   comparison. */
-hot pure static fn is_negation_token(const Token *token) wontthrow -> bool
-{
-  ASSERT(token != nullptr);
-  if (token->kind() != Token::Kind::Word) return false;
-  const Word &word = static_cast<const tokens::WordToken *>(token)->word();
-  return word.segments.count() == 1 &&
-         word.segments[0].kind == WordSegment::Kind::UnquotedText &&
-         word.segments[0].text == "!";
-}
-
 cold static fn unexpected_command_token_message(const Token *token) throws
     -> String
 {
   ASSERT(token != nullptr);
-  if (is_brace_word(token, '}')) return "'}' has no matching '{'";
+  if (is_unquoted_word(token, "}")) return "'}' has no matching '{'";
   switch (token->kind()) {
   case Token::Kind::Then:
   case Token::Kind::Else:
@@ -351,7 +320,7 @@ hot fn Parser::parse_command_list(
       }
       Token *maybe_negation = m_lexer.peek_shell_token();
       ASSERT(maybe_negation != nullptr);
-      if (is_negation_token(maybe_negation)) {
+      if (is_unquoted_word(maybe_negation, "!")) {
         m_lexer.advance_past_last_peek();
         should_negate_pending = true;
       }
@@ -960,10 +929,10 @@ hot fn Parser::parse_simple_command() throws -> Command *
     {
       /* A standalone '{' opens a brace group, a standalone '}' closes one, both
          arriving as words. A '}' with no open group is left for the caller. */
-      if (is_brace_word(token, '{')) {
+      if (is_unquoted_word(token, "{")) {
         return attach_trailing_redirections(parse_brace_group());
       }
-      if (is_brace_word(token, '}')) return nullptr;
+      if (is_unquoted_word(token, "}")) return nullptr;
 
       /* The sh mood is POSIX, where [[ is not a keyword, so the conditional is
          rejected there. */
@@ -1180,7 +1149,7 @@ hot fn Parser::parse_if() throws -> Command *
     Token *then_token = m_lexer.next_shell_token();
     ASSERT(then_token != nullptr);
     if (then_token->kind() != Token::Kind::Then) {
-      const let detail = is_empty_list(condition)
+      const let detail = condition->is_dummy()
                              ? "Expected a command for the condition"
                              : "Expected 'then' after the condition";
       throw ErrorWithLocationAndDetails{location, "Unterminated if",
@@ -1228,7 +1197,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   Token *do_token = m_lexer.next_shell_token();
   ASSERT(do_token != nullptr);
   if (do_token->kind() != Token::Kind::Do) {
-    const let detail = is_empty_list(condition)
+    const let detail = condition->is_dummy()
                            ? "Expected a command for the loop condition"
                            : "Expected 'do'";
     throw ErrorWithLocationAndDetails{location, "Unterminated loop",
@@ -1681,7 +1650,7 @@ hot fn Parser::parse_brace_group() throws -> Command *
 {
   Token *open = m_lexer.next_shell_token();
   ASSERT(open != nullptr);
-  ASSERT(is_brace_word(open, '{'));
+  ASSERT(is_unquoted_word(open, "{"));
 
   LOG(Debug, "parsing a brace group at byte %zu",
       open->source_location().position);
@@ -1690,7 +1659,7 @@ hot fn Parser::parse_brace_group() throws -> Command *
 
   Token *close = m_lexer.next_shell_token();
   ASSERT(close != nullptr);
-  if (!is_brace_word(close, '}')) {
+  if (!is_unquoted_word(close, "}")) {
     /* The closing '}' is a reserved word only at the start of a command, so
        without a ';' or newline before it the group never closes. */
     throw_unterminated(open->source_location(), "Unterminated brace group",
@@ -2010,13 +1979,7 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
                             "Expected ')' in a function definition"};
   }
 
-  loop
-  {
-    Token *t = m_lexer.peek_shell_token();
-    ASSERT(t != nullptr);
-    if (t->kind() != Token::Kind::Newline) break;
-    m_lexer.advance_past_last_peek();
-  }
+  skip_newlines_after_pipe();
 
   /* The body is parsed into the persistent function arena so it outlives the
      per-command arena reset. */
@@ -2064,13 +2027,7 @@ fn Parser::parse_keyword_function_definition() throws -> Command *
     }
   }
 
-  loop
-  {
-    Token *t = m_lexer.peek_shell_token();
-    ASSERT(t != nullptr);
-    if (t->kind() != Token::Kind::Newline) break;
-    m_lexer.advance_past_last_peek();
-  }
+  skip_newlines_after_pipe();
 
   /* The body is parsed into the persistent function arena so it outlives the
      per-command arena reset. */

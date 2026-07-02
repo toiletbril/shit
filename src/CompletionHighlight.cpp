@@ -120,7 +120,7 @@ static pure fn is_highlight_name_char(char c) wontthrow -> bool
 
 static pure fn is_plain_identifier(StringView word) wontthrow -> bool
 {
-  if (word.length == 0 || !is_highlight_name_start(word[0])) return false;
+  if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
   for (usize i = 1; i < word.length; i++)
     if (!is_highlight_name_char(word[i])) return false;
   return true;
@@ -184,7 +184,7 @@ static pure fn scan_dollar_expansion(StringView line, usize dollar,
 
 static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
 {
-  if (word.length == 0 || !is_highlight_name_start(word[0])) return false;
+  if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
   usize i = 1;
   while (i < word.length && is_highlight_name_char(word[i]))
     i++;

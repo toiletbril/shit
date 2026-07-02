@@ -554,7 +554,7 @@ static fn complete_glob(StringView token, const Path &base_directory,
 
 static pure fn token_is_variable(StringView token) wontthrow -> bool
 {
-  return token.length >= 1 && token[0] == '$';
+  return !token.is_empty() && token[0] == '$';
 }
 
 static fn complete_variable(StringView token, EvalContext &context) throws
@@ -603,7 +603,7 @@ static fn complete_variable(StringView token, EvalContext &context) throws
 
 static fn token_is_tilde_user_prefix(StringView token) wontthrow -> bool
 {
-  return token.length >= 1 && token[0] == '~' &&
+  return !token.is_empty() && token[0] == '~' &&
          !token.find_character('/').has_value();
 }
 
@@ -843,8 +843,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     {
       /* A token ending in a slash has an empty basename, so the ghost listing
          runs only once a basename is typed. An explicit tab still lists. */
-      candidates = complete_filesystem(token, base_directory,
-                                       open_quote.has_value(), directories_only);
+      candidates = complete_filesystem(
+          token, base_directory, open_quote.has_value(), directories_only);
     }
   }
 

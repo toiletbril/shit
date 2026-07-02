@@ -1809,21 +1809,17 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
   /* The cache key is the program name without an omitted extension, the same
      key the lookup uses. */
   let key = String{program_name};
-  os::erase_extension_and_get_its_index(key);
+  let const explicit_ext = os::erase_extension_and_get_its_index(key);
 
   for (let const &dir_string : path_dirs()) {
     let const directory = Path{dir_string.view()};
 
     let full_path = directory.clone();
     full_path.push_component(program_name);
-    let full_path_str = full_path.text().clone();
 
     /* A name with an explicit extension is tried as is, while a bare name tries
        each omitted suffix in turn. */
-    if (os::ext_index explicit_ext =
-            os::erase_extension_and_get_its_index(full_path_str);
-        explicit_ext == 0)
-    {
+    if (explicit_ext == 0) {
       for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.count();
            ext_index++)
       {
@@ -1863,14 +1859,14 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
     PATH_CACHE_IS_STALE = false;
   }
 
+  /* which -a wants every match, so it skips the cache and scans PATH in full.
+   */
+  if (find_all) return resolve_along_path(program_name, true);
+
   let program_name_without_extension = String{program_name};
 
   const os::ext_index typed_extension =
       os::erase_extension_and_get_its_index(program_name_without_extension);
-
-  /* which -a wants every match, so it skips the cache and scans PATH in full.
-   */
-  if (find_all) return resolve_along_path(program_name, true);
 
   /* A name typed with an explicit extension is matched exactly by the search,
      so the extension-stripped cache key would resolve the wrong file. The cache

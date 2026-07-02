@@ -148,9 +148,7 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
 
   for (usize i = 0; i < flags.count(); ++i) {
     if (!is_long) {
-      if (flags[i]->short_name() != '\0' &&
-          flags[i]->short_name() == *flag_start)
-      {
+      if (flags[i]->short_name() == *flag_start) {
         *result_flag = flags[i];
         *value_start = flag_start + 1;
         return true;
@@ -383,9 +381,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           }
         } break;
         }
-      }
-
-      if (!found) {
+      } else {
         if (*flag_offset == '-') {
           throw Error{"Missing space between '-' and other options"};
         } else {
