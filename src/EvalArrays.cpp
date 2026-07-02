@@ -748,11 +748,14 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
 {
   let out = ArrayList<String>{heap_allocator()};
   if (is_associative_array(name)) {
-    for (const String &key : associative_keys(name))
+    let const keys = associative_keys(name);
+    out.reserve(keys.count());
+    for (const String &key : keys)
       out.push(String{heap_allocator(), key.view()});
     return out;
   }
   if (let const *array = lookup_indexed_array(name)) {
+    out.reserve(array->count());
     for (usize i = 0; i < array->count(); i++)
       out.push(String::from(i, heap_allocator()));
     for (const sparse_array_entry &entry : collect_sparse_array_entries(

@@ -983,6 +983,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     Maybe<String> previous_value;
   };
   ArrayList<saved_env_var> saved_env{cxt.scratch_allocator()};
+  saved_env.reserve(m_local_vars.count());
   /* A prefix IFS=... drives the shell's own word splitting for this command
      through the live separator cache. The effective separators are saved before
      the first such prefix and restored on exit. */

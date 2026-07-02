@@ -71,6 +71,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
     entries->push(String{".."});
   }
 
+  let const dotglob_is_on = is_shopt_enabled("dotglob");
   for (let const &entry_name : *entries) {
     let const filename = entry_name.view();
 
@@ -84,7 +85,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
     if (filename == "." || filename == "..") {
       if (!pattern_leads_with_dot) continue;
     } else if (!pattern_leads_with_dot && !filename.is_empty() &&
-               filename[0] == '.' && !is_shopt_enabled("dotglob"))
+               filename[0] == '.' && !dotglob_is_on)
     {
       continue;
     }
@@ -179,6 +180,7 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
     }
 
     let child_relative = String{allocator};
+    child_relative.reserve(relative.length + name.length + 1);
     if (!relative.is_empty()) {
       child_relative.append(relative);
       child_relative += '/';

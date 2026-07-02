@@ -107,6 +107,9 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
                                    : end_int->digit_width)
                             : 0;
     let elements = ArrayList<String>{alloc};
+    elements.reserve(
+        static_cast<usize>((from <= to ? to - from : from - to) / magnitude) +
+        1);
     for (i64 v = from; increment > 0 ? v <= to : v >= to; v += increment) {
       String number = String::from(v, heap_allocator());
       if (pad) {
@@ -164,6 +167,7 @@ fn brace_group_alternatives(StringView content, Allocator alloc) throws
 
   if (!comma_positions.is_empty()) {
     let alternatives = ArrayList<String>{alloc};
+    alternatives.reserve(comma_positions.count() + 1);
     usize start = 0;
     for (const usize comma : comma_positions) {
       alternatives.push(
@@ -263,6 +267,7 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
   let const expanded = brace_expand_text(word_template.view(), alloc);
 
   let words = ArrayList<Word>{alloc};
+  words.reserve(expanded.count());
   for (const String &produced : expanded) {
     let out = Word{};
     let run = String{alloc};

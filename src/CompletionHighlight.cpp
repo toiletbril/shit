@@ -33,16 +33,19 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   /* A path word resolves against the filesystem with a leading tilde expanded
      first. */
   if (word.find_character('/').has_value()) {
-    let expanded = String{bump_allocator(HIGHLIGHT_ARENA), word};
+    let target = word;
+    Maybe<String> expanded;
     if (!word.is_empty() && word[0] == '~') {
       if (Maybe<String> home_expanded = utils::expand_leading_tilde_path(word))
+      {
         expanded = steal(*home_expanded);
-      else
+        target = expanded->view();
+      } else
         return false;
     }
     /* An existing regular file resolves even when not executable, permission
        is a runtime matter. */
-    if (Maybe<Path> canonical = Path::canonicalize(expanded.view());
+    if (Maybe<Path> canonical = Path::canonicalize(target);
         canonical.has_value())
     {
       return canonical->is_regular_file() || canonical->is_directory();
@@ -400,8 +403,8 @@ static fn color_path_argument(usize word_start, StringView word,
   };
 
   let const has_no_path_shape = !has_slash && !has_tilde && !has_dot_prefix;
-  if (has_no_path_shape && !directories_only &&
-      !word_names_existing_path(word)) {
+  if (has_no_path_shape && !directories_only && !word_names_existing_path(word))
+  {
     return false;
   }
 
