@@ -60,7 +60,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
   {
     tilde_expanded_segments = word.segments;
     expand_tilde(tilde_expanded_segments.front(),
-                 tilde_expanded_segments.count() > 1);
+                 tilde_expanded_segments.count() > 1, !is_posix_mode());
     segments = &tilde_expanded_segments;
   }
 
@@ -727,7 +727,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     tilde_expanded_segments = word.segments;
     if (has_leading_tilde)
       expand_tilde(tilde_expanded_segments.front(),
-                   tilde_expanded_segments.count() > 1);
+                   tilde_expanded_segments.count() > 1, true);
     if (has_colon_tilde)
       for (usize i = 0; i < tilde_expanded_segments.count(); i++)
         expand_colon_tildes(tilde_expanded_segments[i],
@@ -772,7 +772,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
   {
     tilde_expanded_segments = word.segments;
     expand_tilde(tilde_expanded_segments.front(),
-                 tilde_expanded_segments.count() > 1);
+                 tilde_expanded_segments.count() > 1, !is_posix_mode());
     segments = &tilde_expanded_segments;
   }
 

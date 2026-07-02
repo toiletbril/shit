@@ -1,5 +1,11 @@
 #!/bin/env shit
 command -v echo
 command -v set
-ls() { echo function_ls; }
-command -v ls
+d=/tmp/shit-command-v-fixture
+mkdir -p "$d"
+: > "$d/probe"
+chmod 755 "$d/probe"
+PATH=$d
+probe() { echo function_probe; }
+command -v probe
+rm -rf "$d"

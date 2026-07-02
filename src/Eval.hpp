@@ -1396,8 +1396,8 @@ protected:
   fn expand_path(glob_field field, SourceLocation location) throws
       -> ArrayList<String>;
 
-  fn expand_tilde(WordSegment &leading_segment,
-                  bool word_continues) const throws -> void;
+  fn expand_tilde(WordSegment &leading_segment, bool word_continues,
+                  bool stop_at_colon) const throws -> void;
   fn resolve_tilde_prefix(StringView name) const throws -> Maybe<String>;
   /* Expands a tilde after each unquoted colon inside one segment, the
      assignment-only rule bash applies to PATH=~/bin:~/tmp. */

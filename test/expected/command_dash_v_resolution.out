@@ -4,13 +4,25 @@
   [CompoundListCondition, None]
     [SimpleCommand "command" "-v" "set"]
   [CompoundListCondition, None]
-    [FunctionDefinition "ls"]
+    [Assign d=/tmp/shit-command-v-fixture]
+  [CompoundListCondition, None]
+    [SimpleCommand "mkdir" "-p" "$d"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "chmod" "755" "$d/probe"]
+  [CompoundListCondition, None]
+    [Assign PATH=$d]
+  [CompoundListCondition, None]
+    [FunctionDefinition "probe"]
       [BraceGroup]
         [CompoundList]
           [CompoundListCondition, None]
-            [SimpleCommand "echo" "function_ls"]
+            [SimpleCommand "echo" "function_probe"]
   [CompoundListCondition, None]
-    [SimpleCommand "command" "-v" "ls"]
+    [SimpleCommand "command" "-v" "probe"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-rf" "$d"]
 [Word
   Unquoted "command"
 ]
@@ -30,7 +42,40 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "ls"
+  Unquoted "d=/tmp/shit-command-v-fixture"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "d"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "d"
+  DoubleQuoted "/probe"
+]
+[Word
+  Unquoted "chmod"
+]
+[Word
+  Unquoted "755"
+]
+[Word
+  Variable "d"
+  DoubleQuoted "/probe"
+]
+[Word
+  Unquoted "PATH="
+  Variable "d"
+]
+[Word
+  Unquoted "probe"
 ]
 [Word
   Unquoted "{"
@@ -39,7 +84,7 @@
   Unquoted "echo"
 ]
 [Word
-  Unquoted "function_ls"
+  Unquoted "function_probe"
 ]
 [Word
   Unquoted "}"
@@ -51,9 +96,18 @@
   Unquoted "-v"
 ]
 [Word
-  Unquoted "ls"
+  Unquoted "probe"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-rf"
+]
+[Word
+  Variable "d"
 ]
 echo
 set
-/usr/bin/ls
+/tmp/shit-command-v-fixture/probe
 [Code 0]

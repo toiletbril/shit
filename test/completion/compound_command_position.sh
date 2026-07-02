@@ -2,7 +2,12 @@
 # an if, while, until, then, else, elif, do, or brace group completes
 # commands, and their argument stages ride through to the inner command. A
 # case pattern's unmatched closing paren opens the arm's body the same way,
-# while a matched paren closes a substitution and stays an argument.
+# while a matched paren closes a substitution and stays an argument. PATH is
+# pinned to an empty directory so a host binary such as exportfs cannot join the
+# command candidates.
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+export PATH="$dir"
 echo "== if body:"
 "$BIN" --debug-complete-at 'if expor' </dev/null
 echo "== then body:"

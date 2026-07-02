@@ -350,16 +350,21 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
   return result;
 }
 
-fn EvalContext::expand_tilde(WordSegment &leading_segment,
-                             bool word_continues) const throws -> void
+fn EvalContext::expand_tilde(WordSegment &leading_segment, bool word_continues,
+                             bool stop_at_colon) const throws -> void
 {
   if (!leading_segment.is_tilde_candidate()) return;
 
   let &text = leading_segment.text;
   if (text.is_empty() || text[0] != '~') return;
 
+  /* The tilde prefix ends at the first slash, and in an assignment or the bash
+     mood a colon ends it too, so a bare ~ before a colon expands the way bash
+     reads ~:x and a PATH-style value. The sh mood keeps the dash behavior and
+     ends the prefix only at a slash. */
   usize name_end = 1;
-  while (name_end < text.length() && text[name_end] != '/')
+  while (name_end < text.length() && text[name_end] != '/' &&
+         !(stop_at_colon && text[name_end] == ':'))
     name_end++;
   let const name = text.view().substring_of_length(1, name_end - 1);
 
