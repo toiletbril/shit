@@ -11,7 +11,7 @@ rc=1
 shit: eval:2:8: error: Arithmetic: division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
-rc=127
+rc=1
 == default mood, eval of a variable ==
 shit: 1:61: warning: Command 'h' was not found.
      1 |  code=$(printf "%s" "h(){ echo \$((1/0)); }"); eval "$code"; h
@@ -25,6 +25,6 @@ rc=1
 shit: eval:2:8: error: Arithmetic: division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
-rc=127
+rc=1
 == function defined in default mood, called from bash, renders once ==
 1

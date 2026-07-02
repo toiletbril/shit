@@ -1,9 +1,11 @@
-== bash mood aborts on an arithmetic error, the way a non-interactive bash does:
-shit: 1:6: error: Arithmetic: division by zero.
-     1 |  echo $((1/0)); echo after
+== bash mood reports an arithmetic error and goes on to the next line, matching bash:
+before
+shit: 2:6: error: Arithmetic: division by zero.
+     2 |  echo $((1/0))
        |       ^~~~~~~~ here.
-rc=127
-== the strict default mood also aborts:
+after
+rc=0
+== the strict default mood aborts the run on an arithmetic error:
 shit: 1:6: error: Arithmetic: division by zero.
      1 |  echo $((1/0)); echo after
        |       ^~~~~~~~ here.

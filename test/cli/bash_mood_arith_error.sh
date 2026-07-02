@@ -1,8 +1,10 @@
 unset SHIT_FLAGS
-echo "== bash mood aborts on an arithmetic error, the way a non-interactive bash does:"
-"$BIN" --mood bash -c 'echo $((1/0)); echo after'
+echo "== bash mood reports an arithmetic error and goes on to the next line, matching bash:"
+"$BIN" --mood bash -c 'echo before
+echo $((1/0))
+echo after'
 echo "rc=$?"
-echo "== the strict default mood also aborts:"
+echo "== the strict default mood aborts the run on an arithmetic error:"
 "$BIN" -c 'echo $((1/0)); echo after'
 echo "rc=$?"
 echo "== bash mood still continues past an ordinary command failure:"
