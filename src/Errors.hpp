@@ -78,8 +78,6 @@ public:
   operator String() const throws;
 };
 
-/* An Error paired with a note, the trailing hint line under the message. The
-   note is set once at construction, the ordinary Error carries none. */
 class ErrorWithDetails : public Error
 {
 public:
@@ -189,8 +187,6 @@ public:
                               SourceLocation details_location,
                               StringView details_message);
 
-  /* A located error carrying a note, the trailing hint line, without a second
-     caret. */
   ErrorWithLocationAndDetails(SourceLocation location, StringView message,
                               StringView note);
 
@@ -201,9 +197,6 @@ protected:
   String m_details_message;
 };
 
-/* The relocation rewraps an unlocated error onto a span and rethrows it,
-   carrying the fatal mark, the status, and the note over. A noted error becomes
-   the located-and-details form so the note survives. */
 [[noreturn]] inline fn relocate_error(const ErrorBase &error,
                                       SourceLocation location) throws -> void
 {

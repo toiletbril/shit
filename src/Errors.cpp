@@ -552,7 +552,6 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
 cold fn ErrorWithLocationAndDetails::details_to_string(
     StringView source) const throws -> String
 {
-  /* The note-only form carries no second caret, so nothing is drawn. */
   if (m_details_message.is_empty()) return String{heap_allocator()};
 
   usize byte_position = m_details_location.position;

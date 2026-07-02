@@ -152,7 +152,13 @@ endif
 
 LINK_LIBS := # nothing
 
-ifneq ($(shell command -v mold 2>$(DEVNULL)),)
+ifeq ($(TARGET), Windows_NT)
+ifneq ($(shell command -v ld.lld 2>$(DEVNULL))$(shell command -v lld 2>$(DEVNULL)),)
+USE_LD := -fuse-ld=lld
+else
+USE_LD :=
+endif
+else ifneq ($(shell command -v mold 2>$(DEVNULL)),)
 USE_LD := -fuse-ld=mold
 else ifneq ($(shell command -v ld.lld 2>$(DEVNULL))$(shell command -v lld 2>$(DEVNULL)),)
 USE_LD := -fuse-ld=lld
@@ -267,6 +273,7 @@ endif
 ifeq ($(TARGET), Windows_NT)
 CXXFLAGS += \
 	-Wno-unknown-pragmas \
+	-mconsole \
 	-static \
 	-static-libgcc \
 	-static-libstdc++

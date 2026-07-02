@@ -416,9 +416,6 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
     let const message = "Unable to expand '" + String{name} +
                         "' because the parameter is not set";
 
-    /* An indirect target has no literal spelling in the source. The precise
-       locate falls back to the command, and the word relocation reads tighter.
-     */
     let const reference = locate_variable_reference(name);
     if (reference.position == m_current_location.position &&
         reference.length == m_current_location.length)

@@ -189,9 +189,6 @@ public:
      the store. */
   bool m_is_skipping{false};
 
-  /* Set for the direct (( )) parse whose source maps onto the script byte for
-     byte. The fail underlines the offending token. An expanded expression or a
-     variable value leaves it unset, and the byte mapping is lost. */
   Maybe<SourceLocation> precise_base{};
 
   [[noreturn]] cold fn fail(StringView message, StringView note = {}) throws
@@ -208,8 +205,6 @@ public:
     throw ErrorWithDetails{message, note};
   }
 
-  /* Underline a whole sub-expression, the left operand through the right, for a
-     binary operation that failed after both operands were parsed. */
   [[noreturn]] cold fn fail_span(usize start_position, usize end_position,
                                  StringView message,
                                  StringView note = {}) throws -> void
@@ -1077,8 +1072,7 @@ fn EvalContext::evaluate_arithmetic(
       expression.length);
 
   /* A source with no parameter to expand, the d=$((d+1)) hot loop case, skips
-     the expansion copy and parses directly. The base maps the parser offset
-     back onto the script for a precise caret. */
+     the expansion copy and parses directly. */
   if (!expression.find_character('$').has_value() &&
       !expression.find_character('`').has_value())
   {
@@ -1088,7 +1082,7 @@ fn EvalContext::evaluate_arithmetic(
   }
 
   /* The expanded word owns the bytes the parser views, so it outlives the
-     parser. The expansion shifts every offset, so no precise base survives. */
+     parser. */
   LOG(All, "expanding parameters inside the arithmetic before the parse");
   let const expanded_word = expand_modifier_word(expression);
   let parser = ArithmeticParser{this, expanded_word.view(), 0};
