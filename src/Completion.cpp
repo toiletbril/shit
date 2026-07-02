@@ -4,6 +4,7 @@
 #include "Builtin.hpp"
 #include "Colors.hpp"
 #include "CompletionInternal.hpp"
+#include "CompletionPolicy.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
 #include "Lexer.hpp"
@@ -205,29 +206,6 @@ static pure fn find_open_quote(StringView line, usize cursor) wontthrow
 
   return open_quote_span{content_start, quote_character};
 }
-
-/* for, case, and in stay opaque since a subject word or patterns follow them.
- */
-static constexpr StaticStringMap<bool>::entry TRANSPARENT_PREFIX_ENTRIES[] = {
-    {SSK("!"),       true},
-    {SSK("time"),    true},
-    {SSK("if"),      true},
-    {SSK("then"),    true},
-    {SSK("else"),    true},
-    {SSK("elif"),    true},
-    {SSK("while"),   true},
-    {SSK("until"),   true},
-    {SSK("do"),      true},
-    {SSK("{"),       true},
-    {SSK("sudo"),    true},
-    {SSK("doas"),    true},
-    {SSK("env"),     true},
-    {SSK("nice"),    true},
-    {SSK("command"), true},
-    {SSK("builtin"), true},
-};
-static constexpr StaticStringMap<bool> TRANSPARENT_PREFIXES{
-    TRANSPARENT_PREFIX_ENTRIES, countof(TRANSPARENT_PREFIX_ENTRIES)};
 
 static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
 {
@@ -895,37 +873,6 @@ fn split_completion_words(StringView line, usize cursor, usize &cword) throws
   }
   return words;
 }
-
-/* A tool with an unambiguous file type lists the extensions it operates on,
-   space separated and without the dot. A file argument that carries one of
-   these sorts ahead of the rest, the way fish orders type-relevant files first.
- */
-static constexpr StaticStringMap<const char *>::entry
-    FILE_EXTENSION_HINT_ENTRIES[] = {
-        {SSK("unzip"),   "zip"                                                   },
-        {SSK("gunzip"),  "gz"                                                    },
-        {SSK("zcat"),    "gz"                                                    },
-        {SSK("bunzip2"), "bz2"                                                   },
-        {SSK("bzcat"),   "bz2"                                                   },
-        {SSK("unxz"),    "xz"                                                    },
-        {SSK("xzcat"),   "xz"                                                    },
-        {SSK("unzstd"),  "zst zstd"                                              },
-        {SSK("zstdcat"), "zst zstd"                                              },
-        {SSK("unlzma"),  "lzma"                                                  },
-        {SSK("unrar"),   "rar"                                                   },
-        {SSK("7z"),      "7z"                                                    },
-        {SSK("7za"),     "7z"                                                    },
-        {SSK("tar"),     "tar tgz tbz2 txz tzst gz bz2 xz zst"                   },
-        {SSK("feh"),     "png jpg jpeg gif bmp webp tiff svg ico"                },
-        {SSK("sxiv"),    "png jpg jpeg gif bmp webp tiff svg ico"                },
-        {SSK("imv"),     "png jpg jpeg gif bmp webp tiff svg ico"                },
-        {SSK("display"), "png jpg jpeg gif bmp webp tiff svg ico"                },
-        {SSK("eog"),     "png jpg jpeg gif bmp webp tiff svg ico"                },
-        {SSK("mpv"),     "mp4 mkv webm avi mov flv mp3 flac wav ogg opus m4a aac"},
-        {SSK("vlc"),     "mp4 mkv webm avi mov flv mp3 flac wav ogg opus m4a aac"},
-};
-static constexpr StaticStringMap<const char *> FILE_EXTENSION_HINTS{
-    FILE_EXTENSION_HINT_ENTRIES, countof(FILE_EXTENSION_HINT_ENTRIES)};
 
 static pure fn file_extension_hint(StringView command) wontthrow -> const char *
 {

@@ -3,6 +3,7 @@
 #include "Colors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
+#include "CompletionPolicy.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
 #include "Lexer.hpp"
@@ -302,39 +303,6 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
   BUILD_TARGET_CACHE.set(key, cached_target_list{*mtime, collect()});
   return &BUILD_TARGET_CACHE.find(key)->targets;
 }
-
-namespace {
-
-enum class tool_with_targets_kind : u8
-{
-  make,
-  ninja,
-  cmake,
-  node_runner,
-  ssh,
-  teleport,
-};
-
-constexpr StaticStringMap<tool_with_targets_kind>::entry
-    TOOL_WITH_TARGETS_ENTRIES[] = {
-        {SSK("make"),  tool_with_targets_kind::make       },
-        {SSK("ninja"), tool_with_targets_kind::ninja      },
-        {SSK("cmake"), tool_with_targets_kind::cmake      },
-        {SSK("npm"),   tool_with_targets_kind::node_runner},
-        {SSK("yarn"),  tool_with_targets_kind::node_runner},
-        {SSK("pnpm"),  tool_with_targets_kind::node_runner},
-        {SSK("bun"),   tool_with_targets_kind::node_runner},
-        {SSK("ssh"),   tool_with_targets_kind::ssh        },
-        {SSK("scp"),   tool_with_targets_kind::ssh        },
-        {SSK("sftp"),  tool_with_targets_kind::ssh        },
-        {SSK("rsync"), tool_with_targets_kind::ssh        },
-        {SSK("tsh"),   tool_with_targets_kind::teleport   },
-};
-
-constexpr StaticStringMap<tool_with_targets_kind> TOOLS_WITH_TARGETS{
-    TOOL_WITH_TARGETS_ENTRIES, countof(TOOL_WITH_TARGETS_ENTRIES)};
-
-} // namespace
 
 fn complete_from_process_arguments(StringView line, StringView token) throws
     -> Maybe<ArrayList<String>>

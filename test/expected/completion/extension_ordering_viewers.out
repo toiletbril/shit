@@ -1,0 +1,18 @@
+== mupdf floats the pdf first, the rest still listed:
+book.pdf
+data.csv
+notes.txt
+photo.png
+sub/
+== evince floats the pdf first:
+book.pdf
+data.csv
+notes.txt
+photo.png
+sub/
+== feh floats the image first:
+photo.png
+book.pdf
+data.csv
+notes.txt
+sub/

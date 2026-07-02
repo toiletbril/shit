@@ -111,7 +111,10 @@ behind an allowlist and a trusted directory gate, and the subcommand walk stops
 at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The cascade splits across
 src/Completion.cpp, src/CompletionManpage.cpp, src/CompletionScan.cpp, and the
 per-keystroke highlighter in src/CompletionHighlight.cpp, with shared helpers in
-src/CompletionInternal.hpp. The highlighter and TAB completion share one
+src/CompletionInternal.hpp. The per-program policy tables, the --help allowlist,
+the extension hints, the custom-completer routing, and the transparent prefixes,
+live in src/CompletionPolicy.hpp, so a program absent from every table falls
+through to the manpage and the filesystem. The highlighter and TAB completion share one
 most-recently-used cache of directory listings keyed by path and invalidated by
 mtime. src/Toiletline.cpp bridges the editor to the evaluator, and
 src/toiletline/toiletline.h is the editor. The `--debug-highlight-at` flag, a
