@@ -30,6 +30,7 @@ struct printf_number
   i64 value;
   bool is_valid;
   bool is_hex;
+  bool out_of_range;
 };
 
 /* is_valid is false when a byte follows the number, matching bash. An argument
@@ -38,7 +39,7 @@ fn parse_printf_number(const String &arg) throws -> printf_number
 {
   if (!arg.is_empty() && (arg[0] == '\'' || arg[0] == '"')) {
     return {arg.count() > 1 ? static_cast<unsigned char>(arg[1]) : 0, true,
-            false};
+            false, false};
   }
 
   usize i = 0;
@@ -68,13 +69,18 @@ fn parse_printf_number(const String &arg) throws -> printf_number
 
   let const number_text =
       arg.view().substring_of_length(number_start, number_end - number_start);
+  bool out_of_range = false;
   let const parsed =
-      is_hexadecimal ? utils::parse_integer_in_base(number_text, int_base::hex)
-      : is_octal ? utils::parse_integer_in_base(number_text, int_base::octal)
-                 : number_text.to<i64>();
+      is_hexadecimal
+          ? utils::parse_integer_in_base(number_text, int_base::hex,
+                                         &out_of_range)
+      : is_octal ? utils::parse_integer_in_base(number_text, int_base::octal,
+                                                &out_of_range)
+                 : utils::parse_decimal_integer(number_text, &out_of_range);
   let const has_digits = number_end > digit_start;
   return {parsed.is_error() ? 0 : parsed.value(),
-          has_digits && number_end == arg.count(), is_hexadecimal};
+          has_digits && number_end == arg.count(), is_hexadecimal,
+          out_of_range};
 }
 
 fn parse_printf_integer(const String &arg) throws -> i64
@@ -235,6 +241,16 @@ fn report_invalid_number(ExecContext &ec, const String &arg, bool is_hex,
   exit_status = 1;
 }
 
+fn report_out_of_range(ExecContext &ec, const String &arg, i32 &exit_status,
+                       Allocator allocator) throws -> void
+{
+  let message = String{allocator, "shit: printf: "};
+  message += arg.view();
+  message += ": Numerical result out of range\n";
+  ec.print_to_stderr(message.view());
+  exit_status = 1;
+}
+
 fn append_conversion(String &out, const String &spec, char conv,
                      const String &arg, bool is_missing_argument,
                      ExecContext &ec, i32 &exit_status,
@@ -272,6 +288,8 @@ fn append_conversion(String &out, const String &spec, char conv,
     let const number = parse_printf_number(arg);
     if (!number.is_valid && !is_missing_argument)
       report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
+    else if (number.out_of_range && !is_missing_argument)
+      report_out_of_range(ec, arg, exit_status, allocator);
     let const with_ll = spec + "lld";
     append_formatted(with_ll.c_str(), static_cast<long long>(number.value));
   } break;
@@ -282,6 +300,8 @@ fn append_conversion(String &out, const String &spec, char conv,
     let const number = parse_printf_number(arg);
     if (!number.is_valid && !is_missing_argument)
       report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
+    else if (number.out_of_range && !is_missing_argument)
+      report_out_of_range(ec, arg, exit_status, allocator);
     String with_ll = spec + "ll";
     with_ll.push(conv);
     append_formatted(with_ll.c_str(),

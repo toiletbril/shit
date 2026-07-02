@@ -660,7 +660,8 @@ static fn skip_ascii_whitespace(StringView text, usize &offset) wontthrow
     offset++;
 }
 
-fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
+fn parse_decimal_integer(StringView text, bool *out_of_range) throws
+    -> ErrorOr<i64>
 {
   usize offset = 0;
   skip_ascii_whitespace(text, offset);
@@ -699,6 +700,12 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
 
   skip_ascii_whitespace(text, offset);
   if (!has_digits || offset != text.length) return not_an_integer_error(text);
+
+  if (out_of_range != nullptr)
+    *out_of_range =
+        has_overflowed ||
+        magnitude > static_cast<u64>(INT64_MAX) + (is_negative ? 1u : 0u);
+
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
@@ -764,7 +771,8 @@ static pure fn digit_value_in_base(char c, u32 radix) wontthrow -> i32
   return value < radix ? static_cast<i32>(value) : -1;
 }
 
-fn parse_integer_in_base(StringView text, int_base base) throws -> ErrorOr<i64>
+fn parse_integer_in_base(StringView text, int_base base, bool *out_of_range)
+    throws -> ErrorOr<i64>
 {
   let const radix = static_cast<u32>(base);
   usize offset = 0;
@@ -806,6 +814,12 @@ fn parse_integer_in_base(StringView text, int_base base) throws -> ErrorOr<i64>
 
   skip_ascii_whitespace(text, offset);
   if (!has_digits || offset != text.length) return not_an_integer_error(text);
+
+  if (out_of_range != nullptr)
+    *out_of_range =
+        has_overflowed ||
+        magnitude > static_cast<u64>(INT64_MAX) + (is_negative ? 1u : 0u);
+
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 

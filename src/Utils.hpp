@@ -55,7 +55,8 @@ pure fn is_posix_reserved_word(StringView word) wontthrow -> bool;
 
 /* The value saturates to the i64 range on overflow, and any other content
    yields an Error. */
-fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
+fn parse_decimal_integer(StringView text, bool *out_of_range = nullptr) throws
+    -> ErrorOr<i64>;
 
 fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>;
 
@@ -86,7 +87,8 @@ fn line_number_at(StringView source, usize position) throws -> usize;
 /* Dropped when the host frees a retained source, so a later source at the same
    address with the same length does not read a stale table. */
 fn invalidate_line_number_cache() wontthrow -> void;
-fn parse_integer_in_base(StringView text, int_base base) throws -> ErrorOr<i64>;
+fn parse_integer_in_base(StringView text, int_base base,
+                         bool *out_of_range = nullptr) throws -> ErrorOr<i64>;
 
 fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     -> Maybe<String>;

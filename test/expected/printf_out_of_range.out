@@ -1,0 +1,93 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%d\n" "99999999999999999999999999"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%d\n" "-99999999999999999999"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%x\n" "0xffffffffffffffffffff"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%d\n" "42"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%d\n"
+]
+[Word
+  Unquoted "99999999999999999999999999"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%d\n"
+]
+[Word
+  Unquoted "-99999999999999999999"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%x\n"
+]
+[Word
+  Unquoted "0xffffffffffffffffffff"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%d\n"
+]
+[Word
+  Unquoted "42"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+shit: printf: 99999999999999999999999999: Numerical result out of range
+9223372036854775807
+rc=1
+shit: printf: -99999999999999999999: Numerical result out of range
+-9223372036854775808
+rc=1
+shit: printf: 0xffffffffffffffffffff: Numerical result out of range
+7fffffffffffffff
+rc=1
+42
+rc=0
+[Code 0]

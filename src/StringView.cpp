@@ -8,8 +8,10 @@
 namespace shit {
 
 namespace utils {
-fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
-fn parse_integer_in_base(StringView text, int_base base) throws -> ErrorOr<i64>;
+fn parse_decimal_integer(StringView text, bool *out_of_range = nullptr) throws
+    -> ErrorOr<i64>;
+fn parse_integer_in_base(StringView text, int_base base,
+                         bool *out_of_range = nullptr) throws -> ErrorOr<i64>;
 } // namespace utils
 
 template <class T>

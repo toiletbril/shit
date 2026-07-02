@@ -1,0 +1,9 @@
+#!/bin/env shit
+printf '%d\n' 99999999999999999999999999
+echo "rc=$?"
+printf '%d\n' -99999999999999999999
+echo "rc=$?"
+printf '%x\n' 0xffffffffffffffffffff
+echo "rc=$?"
+printf '%d\n' 42
+echo "rc=$?"
