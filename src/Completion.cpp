@@ -781,6 +781,113 @@ fn split_completion_words(StringView line, usize cursor, usize &cword) throws
   return words;
 }
 
+/* A tool with an unambiguous file type lists the extensions it operates on,
+   space separated and without the dot. A file argument that carries one of
+   these sorts ahead of the rest, the way fish orders type-relevant files first.
+ */
+static constexpr StaticStringMap<const char *>::entry
+    FILE_EXTENSION_HINT_ENTRIES[] = {
+        {SSK("unzip"),   "zip"                                                   },
+        {SSK("gunzip"),  "gz"                                                    },
+        {SSK("zcat"),    "gz"                                                    },
+        {SSK("bunzip2"), "bz2"                                                   },
+        {SSK("bzcat"),   "bz2"                                                   },
+        {SSK("unxz"),    "xz"                                                    },
+        {SSK("xzcat"),   "xz"                                                    },
+        {SSK("unzstd"),  "zst zstd"                                              },
+        {SSK("zstdcat"), "zst zstd"                                              },
+        {SSK("unlzma"),  "lzma"                                                  },
+        {SSK("unrar"),   "rar"                                                   },
+        {SSK("7z"),      "7z"                                                    },
+        {SSK("7za"),     "7z"                                                    },
+        {SSK("tar"),     "tar tgz tbz2 txz tzst gz bz2 xz zst"                   },
+        {SSK("feh"),     "png jpg jpeg gif bmp webp tiff svg ico"                },
+        {SSK("sxiv"),    "png jpg jpeg gif bmp webp tiff svg ico"                },
+        {SSK("imv"),     "png jpg jpeg gif bmp webp tiff svg ico"                },
+        {SSK("display"), "png jpg jpeg gif bmp webp tiff svg ico"                },
+        {SSK("eog"),     "png jpg jpeg gif bmp webp tiff svg ico"                },
+        {SSK("mpv"),     "mp4 mkv webm avi mov flv mp3 flac wav ogg opus m4a aac"},
+        {SSK("vlc"),     "mp4 mkv webm avi mov flv mp3 flac wav ogg opus m4a aac"},
+};
+static constexpr StaticStringMap<const char *> FILE_EXTENSION_HINTS{
+    FILE_EXTENSION_HINT_ENTRIES, countof(FILE_EXTENSION_HINT_ENTRIES)};
+
+static pure fn file_extension_hint(StringView command) wontthrow -> const char *
+{
+  if (let const hint = FILE_EXTENSION_HINTS.find(command); hint.has_value())
+    return *hint;
+  return nullptr;
+}
+
+static pure fn ascii_lower(char c) wontthrow -> char
+{
+  return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+}
+
+/* The candidate's trailing extension, taken after the last dot of the basename,
+   appears in the space-separated hint list, matched case insensitively. */
+static pure fn candidate_extension_is_hinted(StringView candidate,
+                                             StringView hint_list) wontthrow
+    -> bool
+{
+  if (!candidate.is_empty() && candidate[candidate.length - 1] == '/')
+    return false;
+
+  usize dot = candidate.length;
+  for (usize k = candidate.length; k > 0; k--) {
+    if (candidate[k - 1] == '/') break;
+    if (candidate[k - 1] == '.') {
+      dot = k - 1;
+      break;
+    }
+  }
+  if (dot >= candidate.length) return false;
+
+  let const extension = candidate.substring(dot + 1);
+  usize start = 0;
+  while (start < hint_list.length) {
+    usize end = start;
+    while (end < hint_list.length && hint_list[end] != ' ')
+      end++;
+    if (let const wanted = hint_list.substring_of_length(start, end - start);
+        wanted.length == extension.length)
+    {
+      bool is_equal = true;
+      for (usize i = 0; i < wanted.length; i++)
+        if (ascii_lower(extension[i]) != ascii_lower(wanted[i])) {
+          is_equal = false;
+          break;
+        }
+      if (is_equal) return true;
+    }
+    start = end + 1;
+  }
+  return false;
+}
+
+/* Extension-matching files move to the front, both groups keeping the incoming
+   sorted order, so nothing is hidden. */
+static fn partition_by_extension(ArrayList<String> candidates,
+                                 StringView hint_list) throws
+    -> ArrayList<String>
+{
+  let ordered = ArrayList<String>{candidates.allocator()};
+  ordered.reserve(candidates.count());
+  let rest = ArrayList<String>{candidates.allocator()};
+
+  for (usize i = 0; i < candidates.count(); i++) {
+    if (candidate_extension_is_hinted(candidates[i].view(), hint_list))
+      ordered.push(steal(candidates[i]));
+    else
+      rest.push(steal(candidates[i]));
+  }
+
+  for (usize i = 0; i < rest.count(); i++)
+    ordered.push(steal(rest[i]));
+
+  return ordered;
+}
+
 flatten fn complete(StringView line, usize cursor, EvalContext &context,
                     const Path &base_directory, bool for_listing) throws
     -> completion_result
@@ -844,8 +951,11 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      matches, even in command position. */
   let const inline_glob = token_is_glob && cursor == token_end;
 
-  let const directories_only = !is_command && command_word_of(line) == "cd";
+  let const command_word = command_word_of(line);
+  let const directories_only = !is_command && command_word == "cd";
   let const executables_only = is_command;
+  const char *const extension_hint =
+      is_command ? nullptr : file_extension_hint(command_word);
 
   let candidates = ArrayList<String>{arena};
   let descriptions = StringMap<String>{arena};
@@ -939,6 +1049,10 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     candidates = steal(unique_candidates);
 
     longest_common_prefix = compute_longest_common_prefix(candidates);
+
+    if (extension_hint != nullptr)
+      candidates =
+          partition_by_extension(steal(candidates), StringView{extension_hint});
   }
 
   return completion_result{

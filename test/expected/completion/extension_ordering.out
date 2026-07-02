@@ -1,0 +1,21 @@
+== unzip floats .zip files first (case insensitive), rest still listed:
+ARCHIVE.ZIP
+archive.zip
+backup.tar.gz
+data.csv
+notes.txt
+sub/
+== tar floats the archive, .zip stays in the rest:
+backup.tar.gz
+ARCHIVE.ZIP
+archive.zip
+data.csv
+notes.txt
+sub/
+== a program with no table entry keeps plain alphabetical order:
+ARCHIVE.ZIP
+archive.zip
+backup.tar.gz
+data.csv
+notes.txt
+sub/
