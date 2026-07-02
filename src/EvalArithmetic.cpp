@@ -77,6 +77,33 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
   return is_negative ? -parsed_value.value() : parsed_value.value();
 }
 
+/* Whether the whole text is one integer literal with no surrounding space and
+   nothing after it, the written-back value a hot d=$((d+1)) loop stores. A
+   value that is anything else is re-evaluated as an expression. */
+pure fn is_single_integer_literal(StringView text) wontthrow -> bool
+{
+  usize i = 0;
+  if (i < text.length && (text[i] == '+' || text[i] == '-')) i++;
+  usize digit_count = 0;
+  if (i + 1 < text.length && text[i] == '0' &&
+      (text[i + 1] == 'x' || text[i + 1] == 'X'))
+  {
+    i += 2;
+    digit_count = count_leading_digits(text.substring(i), 16);
+  } else if (i + 1 < text.length && text[i] == '0' &&
+             (text[i + 1] == 'b' || text[i + 1] == 'B'))
+  {
+    i += 2;
+    digit_count = count_leading_digits(text.substring(i), 2);
+  } else if (i < text.length && text[i] == '0') {
+    digit_count = count_leading_digits(text.substring(i), 8);
+  } else {
+    digit_count = count_leading_digits(text.substring(i), 10);
+  }
+
+  return digit_count > 0 && i + digit_count == text.length;
+}
+
 /* The add, subtract, and multiply run in u64 where overflow is defined, a
    direct i64 overflow is undefined and trips UBSan in the dbg build. */
 pure fn arithmetic_add(i64 lhs, i64 rhs) wontthrow -> i64
@@ -195,8 +222,7 @@ public:
   {
     ASSERT(context != nullptr);
     if (let const *stored = context->lookup_shell_variable(name)) {
-      if (stored->count() == 0) return 0;
-      return parse_arithmetic_operand(stored->view());
+      return evaluate_operand_value(stored->view());
     }
 
     let const value = context->get_variable_value(name);
@@ -206,8 +232,23 @@ public:
       if (!m_is_skipping) context->report_unset_reference(name);
       return 0;
     }
-    if (value->is_empty()) return 0;
-    return parse_arithmetic_operand(value->view());
+    return evaluate_operand_value(value->view());
+  }
+
+  /* A variable's value is re-evaluated as an arithmetic expression, the way
+     bash re-reads a name, so " 5 ", "1+1", and an indirect name all resolve. A
+     plain integer literal keeps the direct parse for the hot loop, and the
+     recursion depth is bounded for a self-referential value such as a=a. */
+  fn evaluate_operand_value(StringView value) throws -> i64
+  {
+    if (value.is_empty()) return 0;
+    if (is_single_integer_literal(value))
+      return parse_arithmetic_operand(value);
+
+    if (depth >= MAX_DEPTH) fail("the variable value recurses too deeply");
+
+    ArithmeticParser nested{context, value, 0, depth + 1, m_is_skipping};
+    return nested.parse();
   }
 
   fn read_lvalue_name() wontthrow -> StringView
@@ -869,21 +910,33 @@ static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
   }
 }
 
+/* A variable's value is re-evaluated as an arithmetic expression through a
+   nested parser, the way bash re-reads a name. A plain integer literal keeps
+   the direct parse, and the nested parser's own depth guard bounds a
+   self-reference such as a=a. */
+static fn evaluate_named_value_operand(EvalContext *context,
+                                       StringView value) throws -> i64
+{
+  if (value.is_empty()) return 0;
+  if (is_single_integer_literal(value)) return parse_arithmetic_operand(value);
+
+  ArithmeticParser nested{context, value, 0};
+  return nested.parse();
+}
+
 static fn arith_read_variable(EvalContext *context, StringView name) throws
     -> i64
 {
   ASSERT(context != nullptr);
   if (let const *stored = context->lookup_shell_variable(name)) {
-    if (stored->count() == 0) return 0;
-    return parse_arithmetic_operand(stored->view());
+    return evaluate_named_value_operand(context, stored->view());
   }
   let const value = context->get_variable_value(name);
   if (!value.has_value()) {
     context->report_unset_reference(name);
     return 0;
   }
-  if (value->is_empty()) return 0;
-  return parse_arithmetic_operand(value->view());
+  return evaluate_named_value_operand(context, value->view());
 }
 
 /* A precedence-climbing evaluator over the cached token stream for a simple

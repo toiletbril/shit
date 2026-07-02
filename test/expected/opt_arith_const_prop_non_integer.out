@@ -26,5 +26,7 @@
   ArithmeticExpansion "y+1"
 ]
 13
-1
-[Code 0]
+shit: 5:6: error: Unable to expand 'hello' because the parameter is not set.
+     5 |  echo $((y+1))
+       |       ^~~~~~~~ here.
+note: Replace it with ${hello-} if empty expansion is desired.
