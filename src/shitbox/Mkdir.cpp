@@ -10,8 +10,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-p] [-m mode] directory ...");
 
-HELP_DESCRIPTION_DECL(
-    "The mkdir utility creates each named directory.");
+HELP_DESCRIPTION_DECL("The mkdir utility creates each named directory.");
 
 FLAG(MKDIR_PARENTS, Bool, 'p', "",
      "Create the missing parent directories and ignore one that already "

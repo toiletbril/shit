@@ -8,8 +8,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-rRf] path ...");
 
-HELP_DESCRIPTION_DECL(
-    "The rm utility removes each path.");
+HELP_DESCRIPTION_DECL("The rm utility removes each path.");
 
 FLAG(RM_RECURSIVE_R, Bool, 'r', "", "Remove directories and their contents.");
 FLAG(RM_RECURSIVE_UPPER, Bool, 'R', "",

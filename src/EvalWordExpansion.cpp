@@ -244,7 +244,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
       {
         let const is_star = segment_text[0] == '*';
         let const op = segment_text[positional_test_op_position];
-        let const word = segment_text.substring(positional_test_op_position + 1);
+        let const word =
+            segment_text.substring(positional_test_op_position + 1);
         let const param_count = m_positional_params.count();
         let const positional_is_null =
             param_count == 0 ||

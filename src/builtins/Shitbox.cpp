@@ -10,8 +10,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[utility] [arg ...]");
 
-HELP_DESCRIPTION_DECL(
-    "The shitbox builtin runs a bundled coreutility.");
+HELP_DESCRIPTION_DECL("The shitbox builtin runs a bundled coreutility.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help and list the utilities.");
 FLAG(SHITBOX_LIST, Bool, '\0', "list", "List the utility names, one per line.");

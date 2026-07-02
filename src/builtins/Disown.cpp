@@ -9,8 +9,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-a] [-r] [-h] [%job ...]");
 
-HELP_DESCRIPTION_DECL(
-    "The disown builtin removes a job from the job table.");
+HELP_DESCRIPTION_DECL("The disown builtin removes a job from the job table.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(ALL, Bool, 'a', "all", "Remove every job.");

@@ -8,8 +8,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-rRv] source ... destination");
 
-HELP_DESCRIPTION_DECL(
-    "The cp utility copies each source to the destination.");
+HELP_DESCRIPTION_DECL("The cp utility copies each source to the destination.");
 
 FLAG(CP_RECURSIVE_R, Bool, 'r', "", "Copy directories and their contents.");
 FLAG(CP_RECURSIVE_UPPER, Bool, 'R', "", "Copy directories and their contents.");

@@ -753,8 +753,7 @@ static fn tokenize_arithmetic(StringView src,
             break;
           i++;
         }
-        if (depth != 0)
-          throw Error{"Expected ']' after an array subscript"};
+        if (depth != 0) throw Error{"Expected ']' after an array subscript"};
         out.push(
             arith_token{arith_token::kind::subscript, 0,
                         src.substring_of_length(inner_start, i - inner_start)});
@@ -935,8 +934,7 @@ public:
   {
     depth++;
     defer { depth--; };
-    if (depth > MAX_DEPTH)
-      throw Error{"Expression nested too deeply"};
+    if (depth > MAX_DEPTH) throw Error{"Expression nested too deeply"};
 
     if (at_op("+")) {
       ti++;

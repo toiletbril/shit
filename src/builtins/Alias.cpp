@@ -8,8 +8,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[name[=value] ...]");
 
-HELP_DESCRIPTION_DECL(
-    "The alias builtin defines and prints command aliases.");
+HELP_DESCRIPTION_DECL("The alias builtin defines and prints command aliases.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

@@ -132,7 +132,8 @@ static pure fn is_unmatched_closing_paren(StringView line,
   return depth == 0;
 }
 
-static pure fn quoted_run_end(StringView line, usize position) wontthrow -> usize
+static pure fn quoted_run_end(StringView line, usize position) wontthrow
+    -> usize
 {
   let const opener = line[position];
   if (opener == '\\')

@@ -8,8 +8,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[aux]");
 
-HELP_DESCRIPTION_DECL(
-    "The ps utility lists the running processes.");
+HELP_DESCRIPTION_DECL("The ps utility lists the running processes.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

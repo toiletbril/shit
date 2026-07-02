@@ -5,8 +5,7 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("");
-HELP_DESCRIPTION_DECL(
-    "The false builtin exits with a failure status.");
+HELP_DESCRIPTION_DECL("The false builtin exits with a failure status.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

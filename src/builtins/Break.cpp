@@ -7,8 +7,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[n]");
 
-HELP_DESCRIPTION_DECL(
-    "The break builtin exits an enclosing loop.");
+HELP_DESCRIPTION_DECL("The break builtin exits an enclosing loop.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
