@@ -163,20 +163,23 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
       unreachable("Unhandled builtin of kind %d", ENUM(ec.builtin_kind()));
     }
   } catch (const Error &e) {
-    /* The bash-compatible mood reports a builtin error the way bash does, a
-       soft failure printed to the command's stderr, which a 2>... on the
-       command still redirects since fd 2 is replaced above this try, and a
-       non-zero status so the surrounding list keeps running rather than
-       aborting. The default and posix moods keep the located throw that stops
-       the run up front. */
+    const ErrorWithLocation located{ec.source_location(),
+                                    StringView{"Builtin '"} + ec.program() +
+                                        "': " + e.message()};
+    /* The bash-compatible mood reports a builtin error as a soft located
+       failure and keeps the surrounding list running through the non-zero
+       status, the stderr of which a 2>... on the command still redirects since
+       fd 2 is replaced above this try. The default and posix moods let the
+       located error abort the run up front. */
     if (cxt.is_bash_compatible()) {
-      print_error(StringView{"shit: "} + ec.program() + ": " + e.message() +
-                  "\n");
+      if (const String *source = cxt.current_source(); source != nullptr)
+        show_message(located.to_string(source->view()));
+      else
+        print_error(StringView{"shit: Builtin '"} + ec.program() +
+                    "': " + e.message() + "\n");
       return 1;
     }
-    throw ErrorWithLocation{ec.source_location(), StringView{"Builtin '"} +
-                                                      ec.program() +
-                                                      "': " + e.message()};
+    throw located;
   }
   unreachable("execute_builtin reached the end without dispatching");
 }
@@ -184,14 +187,9 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void
 {
-  /* The bash mood prints the same soft unlocated line the dispatch gives a
-     thrown error, while the default and posix moods render the located caret in
-     place rather than throwing, so the loop that called this keeps processing
-     the rest of its names. */
-  if (cxt.is_bash_compatible()) {
-    print_error(StringView{"shit: "} + ec.program() + ": " + message + "\n");
-    return;
-  }
+  /* The located caret renders in place in every mood rather than throwing, so
+     the loop that called this keeps processing the rest of its names. The
+     fallback line is for the rare case with no source to caret against. */
   const ErrorWithLocation located{ec.source_location(),
                                   StringView{"Builtin '"} + ec.program() +
                                       "': " + message};
