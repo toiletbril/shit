@@ -1,4 +1,5 @@
 #include "Common.hpp"
+#include "Path.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
 
@@ -36,6 +37,11 @@ bool completion_is_enabled();
 
 void enter_calc_history();
 void leave_calc_history();
+
+shit::Maybe<shit::Path> history_path();
+bool history_write();
+bool history_read();
+bool history_clear();
 
 void enable_job_notifications(shit::EvalContext &context);
 

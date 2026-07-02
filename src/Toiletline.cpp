@@ -355,6 +355,41 @@ fn leave_calc_history() -> void
     ::tl_history_load(shell->c_str());
 }
 
+fn history_path() -> shit::Maybe<shit::Path> { return history_file_path(); }
+
+/* The in-memory ring is dumped to the history file. The editor appends every
+   accepted line to the file already, so a dump with no active editor has
+   nothing to add and reports success. */
+fn history_write() -> bool
+{
+  if (!::itl_g_is_active) return true;
+  let const path = history_file_path();
+  if (!path.has_value()) return false;
+  int status = ::tl_history_dump(path->c_str());
+  return status == TL_SUCCESS || status == -EINVAL;
+}
+
+fn history_read() -> bool
+{
+  let const path = history_file_path();
+  if (!path.has_value()) return false;
+  return ::tl_history_load(path->c_str()) == TL_SUCCESS;
+}
+
+/* The history file is truncated and reloaded, so both the file and the ring
+   end empty. */
+fn history_clear() -> bool
+{
+  let const path = history_file_path();
+  if (!path.has_value()) return false;
+  let opened = shit::os::open_file_descriptor(
+      path->text().view(), shit::os::file_open_mode::Truncate);
+  if (!opened.has_value()) return false;
+  shit::os::close_fd(opened.take());
+  ::tl_history_load(path->c_str());
+  return true;
+}
+
 static fn strip_ansi_color(StringView text) throws -> String;
 
 fn set_title(const String &title) -> void
@@ -981,6 +1016,14 @@ fn completion_is_enabled() -> bool { return false; }
 fn enter_calc_history() -> void {}
 
 fn leave_calc_history() -> void {}
+
+fn history_path() -> shit::Maybe<shit::Path> { return shit::None; }
+
+fn history_write() -> bool { return true; }
+
+fn history_read() -> bool { return true; }
+
+fn history_clear() -> bool { return true; }
 
 fn enable_job_notifications(shit::EvalContext &context) -> void
 {

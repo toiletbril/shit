@@ -90,7 +90,7 @@ command node base and the analysis hooks, with the simple command in
 src/ExpressionsSimpleCommand.cpp, the lists, pipeline, loops, case, and compound
 commands in src/ExpressionsCompound.cpp, and the arithmetic and logical nodes in
 src/ExpressionsArith.cpp. Shared free helpers declare in
-src/ExpressionsInternal.hpp. The fifty builtins live under src/builtins, and the
+src/ExpressionsInternal.hpp. The builtins live under src/builtins, and the
 busybox-style coreutils live under src/shitbox.
 
 src/Platform.cpp wraps the operating system behind an os namespace, with the
