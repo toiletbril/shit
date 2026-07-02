@@ -340,23 +340,9 @@ fn complete_from_process_arguments(StringView line, StringView token) throws
     -> Maybe<ArrayList<String>>
 {
   let const command = command_word_of(line);
-  const bool is_by_pid = command == "kill" || command == "wait";
-  const bool is_by_name = command == "pkill" || command == "killall";
+  let const is_by_pid = command == "kill" || command == "wait";
+  let const is_by_name = command == "pkill" || command == "killall";
   if (!is_by_pid && !is_by_name) return None;
-
-  /* kill -SIG completes the signal names. */
-  if (command == "kill" && !token.is_empty() && token[0] == '-') {
-    let const signal_prefix = token.substring(1);
-    let candidates = ArrayList<String>{completion_allocator()};
-    for (let const &name : os::signal_names()) {
-      if (!name.starts_with(signal_prefix)) continue;
-      let candidate = String{completion_allocator(), "-"};
-      candidate.append(name);
-      candidates.push(steal(candidate));
-    }
-    if (candidates.is_empty()) return None;
-    return candidates;
-  }
 
   if (!token.is_empty() && token[0] == '-') return None;
 
