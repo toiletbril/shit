@@ -56,27 +56,39 @@ public:
   {
     if (op == "-z") return operand.is_empty();
     if (op == "-n") return !operand.is_empty();
+
     let const operand_path = Path{operand};
-    if (op == "-e") return operand_path.exists();
-    if (op == "-f") return operand_path.is_regular_file();
-    if (op == "-d") return operand_path.is_directory();
+
     if (op == "-s") {
       let const size = operand_path.file_size();
       return size.has_value() && size.value() > 0;
     }
-    if (op == "-r") return operand_path.is_readable();
-    if (op == "-w") return operand_path.is_writable();
-    if (op == "-x") return operand_path.is_executable();
-    if (op == "-L" || op == "-h") return operand_path.is_symbolic_link();
-    if (op == "-b") return operand_path.is_block_device();
-    if (op == "-c") return operand_path.is_character_device();
-    if (op == "-p") return operand_path.is_fifo();
-    if (op == "-S") return operand_path.is_socket();
-    if (op == "-g") return operand_path.has_setgid_bit();
-    if (op == "-u") return operand_path.has_setuid_bit();
-    if (op == "-k") return operand_path.has_sticky_bit();
-    if (op == "-O") return operand_path.is_owned_by_effective_user();
-    if (op == "-G") return operand_path.is_owned_by_effective_group();
+    using file_predicate = bool (Path::*)() const;
+    static constexpr StaticStringMap<file_predicate>::entry ENTRIES[] = {
+        {SSK("-e"), &Path::exists                     },
+        {SSK("-f"), &Path::is_regular_file            },
+        {SSK("-d"), &Path::is_directory               },
+        {SSK("-r"), &Path::is_readable                },
+        {SSK("-w"), &Path::is_writable                },
+        {SSK("-x"), &Path::is_executable              },
+        {SSK("-L"), &Path::is_symbolic_link           },
+        {SSK("-h"), &Path::is_symbolic_link           },
+        {SSK("-b"), &Path::is_block_device            },
+        {SSK("-c"), &Path::is_character_device        },
+        {SSK("-p"), &Path::is_fifo                    },
+        {SSK("-S"), &Path::is_socket                  },
+        {SSK("-g"), &Path::has_setgid_bit             },
+        {SSK("-u"), &Path::has_setuid_bit             },
+        {SSK("-k"), &Path::has_sticky_bit             },
+        {SSK("-O"), &Path::is_owned_by_effective_user },
+        {SSK("-G"), &Path::is_owned_by_effective_group},
+    };
+    static constexpr StaticStringMap<file_predicate> FILE_TESTS{
+        ENTRIES, countof(ENTRIES)};
+
+    if (let const predicate = FILE_TESTS.find(op.view()); predicate.has_value())
+      return (operand_path.*(*predicate))();
+
     if (op == "-t") {
       i64 file_descriptor = 0;
       if (!parse_integer(operand.view(), file_descriptor)) return false;
