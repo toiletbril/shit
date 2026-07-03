@@ -424,13 +424,19 @@ static fn run_script_contents(const String &script_contents,
       show_message(e.to_string(script_contents));
       show_message(e.details_to_string(script_contents));
     }
-    exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
+    exit_code = e.command_status() != 1
+                    ? static_cast<i32>(e.command_status())
+                    : (context.is_posix_mode() ? 2 : EXIT_FAILURE);
   } catch (const ErrorWithLocation &e) {
     if (!e.was_rendered()) show_message(e.to_string(script_contents));
-    exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
+    exit_code = e.command_status() != 1
+                    ? static_cast<i32>(e.command_status())
+                    : (context.is_posix_mode() ? 2 : EXIT_FAILURE);
   } catch (const Error &e) {
     show_message(e.to_string());
-    exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
+    exit_code = e.command_status() != 1
+                    ? static_cast<i32>(e.command_status())
+                    : (context.is_posix_mode() ? 2 : EXIT_FAILURE);
   } catch (const std::exception &e) {
     show_message(
         "Uncaught exception while executing the AST. Aborting the command.");

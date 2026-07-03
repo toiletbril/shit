@@ -258,6 +258,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
                            is_star);
         };
         let do_emit_word = [&]() throws {
+          if (let const array_word = parse_modifier_array_word(word);
+              array_word.has_value())
+          {
+            do_emit_elements(collect_array_elements(array_word->array_name),
+                             array_word->is_quoted ||
+                                 segment.is_in_double_quotes,
+                             array_word->is_star);
+            return;
+          }
           let const expanded = expand_modifier_word(word);
           if (segment.is_in_double_quotes)
             do_append_run(expanded.view(), false);

@@ -537,9 +537,10 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   bool has_compound_stage = *m_has_compound_stage;
 
-  /* A stage whose command word names a user function must run through the
-     per-stage fork path, since the fast path resolves only builtins and
-     programs and would wrongly run a like-named builtin. */
+  /* A stage whose command word names a user function, or expands from a
+     variable and may name one, runs through the per-stage fork path, since the
+     fast path resolves only builtins and programs and would wrongly run a
+     like-named builtin. */
   if (!has_compound_stage && cxt.has_functions()) {
     for (let const stage : m_commands) {
       const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
@@ -547,8 +548,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
       const Token *first = simple->args()[0];
       if (first->kind() != Token::Kind::Word) continue;
       const Word &word = static_cast<const tokens::WordToken *>(first)->word();
-      if (word.plain_literal_kind() == Word::PlainLiteral::NotPlain) continue;
-      if (cxt.find_function(word.constant_value()) != nullptr) {
+      if (word.plain_literal_kind() == Word::PlainLiteral::NotPlain ||
+          cxt.find_function(word.constant_value()) != nullptr)
+      {
         has_compound_stage = true;
         break;
       }
@@ -880,9 +882,13 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       defer { cxt.leave_condition(); };
       condition_status = m_condition->evaluate(cxt);
     }
-    /* A jump inside the condition stops the loop and stays pending for the
-       caller. */
-    if (cxt.has_pending_control_flow()) break;
+    /* A break or continue inside the condition targets this loop, so it is
+       consumed or decremented here. A return, an exit, or a jump aimed at an
+       outer loop stops the loop and stays pending for the caller. */
+    if (cxt.has_pending_control_flow()) {
+      if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
+      continue;
+    }
 
     let const should_run_body =
         m_is_until ? (condition_status != 0) : (condition_status == 0);

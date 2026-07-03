@@ -375,7 +375,6 @@ hot fn Parser::parse_command_list(
       [[fallthrough]];
     case Token::Kind::Newline:
     case Token::Kind::EndOfFile:
-    case Token::Kind::DoubleSemicolon:
     case Token::Kind::Semicolon: {
       m_lexer.advance_past_last_peek();
 

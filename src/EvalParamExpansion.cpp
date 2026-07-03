@@ -78,25 +78,28 @@ static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
 
 } // namespace
 
-fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
+fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes,
+                                     bool strip_escaped_literals) throws
     -> String
 {
   /* The default, assign, alternate, error, and arithmetic forms never glob, so
      the mask is discarded and the pattern-only unescape stays off. */
   let discarded_mask = Bitset{scratch_allocator()};
-  return expand_modifier_word_worker(word, discarded_mask, remove_quotes,
-                                     false);
+  return expand_modifier_word_worker(word, discarded_mask, remove_quotes, false,
+                                     strip_escaped_literals);
 }
 
 fn EvalContext::expand_modifier_word_masked(StringView word, Bitset &active_out,
                                             bool remove_quotes) throws -> String
 {
-  return expand_modifier_word_worker(word, active_out, remove_quotes, true);
+  return expand_modifier_word_worker(word, active_out, remove_quotes, true,
+                                     false);
 }
 
 fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
                                             bool remove_quotes,
-                                            bool is_pattern_word) throws
+                                            bool is_pattern_word,
+                                            bool strip_escaped_literals) throws
     -> String
 {
   LOG(All, "expanding a modifier word of %zu bytes", word.length);
@@ -140,14 +143,19 @@ fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
       }
       if (i + 1 < word.length) {
         const char next = word[i + 1];
-        if (next == '$' || next == '`' || next == '\\' ||
-            (remove_quotes && next == '"'))
-        {
+        if (next == '\n') {
+          i++;
+          continue;
+        }
+        if (strip_escaped_literals && remove_quotes && !is_in_double_quote) {
           do_emit_byte(next, false);
           i++;
           continue;
         }
-        if (next == '\n') {
+        if (next == '$' || next == '`' || next == '\\' ||
+            (remove_quotes && next == '"'))
+        {
+          do_emit_byte(next, false);
           i++;
           continue;
         }
@@ -852,7 +860,8 @@ fn EvalContext::pattern_replace_value(const String &value,
       remainder.substring_of_length(0, separator), pattern_active);
   let const replacement =
       separator < remainder.length
-          ? expand_modifier_word(remainder.substring(separator + 1))
+          ? expand_modifier_word(remainder.substring(separator + 1), true,
+                                 false)
           : String{heap_allocator()};
 
   /* An empty unanchored pattern matches nothing in bash, so the value is

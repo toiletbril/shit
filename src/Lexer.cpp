@@ -19,8 +19,6 @@ hot pure fn is_whitespace(char ch) wontthrow -> bool
 {
   switch (ch) {
   case ' ':
-  case '\v':
-  case '\r':
   case '\t': return true;
   default: return false;
   }

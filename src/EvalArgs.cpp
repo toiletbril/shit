@@ -30,11 +30,12 @@ pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
   return false;
 }
 
-/* The digit_width lets {01..10} pad its output to the wider operand. */
+/* The field_width lets {01..10} pad its output to the wider operand, counting a
+   leading sign toward the width the way %0*d does. */
 struct sequence_integer
 {
   i64 value;
-  usize digit_width;
+  usize field_width;
   bool has_leading_zero;
 };
 
@@ -56,9 +57,9 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
     magnitude = magnitude * 10 + digit;
   }
   const i64 value = text[0] == '-' ? -magnitude : magnitude;
-  const usize width = text.length - digit_start;
-  let const leading_zero = width > 1 && text[digit_start] == '0';
-  return sequence_integer{value, width, leading_zero};
+  const usize digit_width = text.length - digit_start;
+  let const leading_zero = digit_width > 1 && text[digit_start] == '0';
+  return sequence_integer{value, text.length, leading_zero};
 }
 
 fn split_sequence_parts(StringView content, Allocator alloc) throws
@@ -102,9 +103,9 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
     const i64 to = end_int->value;
     const i64 increment = from <= to ? magnitude : -magnitude;
     const bool pad = start_int->has_leading_zero || end_int->has_leading_zero;
-    const usize width = pad ? (start_int->digit_width > end_int->digit_width
-                                   ? start_int->digit_width
-                                   : end_int->digit_width)
+    const usize width = pad ? (start_int->field_width > end_int->field_width
+                                   ? start_int->field_width
+                                   : end_int->field_width)
                             : 0;
     let elements = ArrayList<String>{alloc};
     elements.reserve(
@@ -115,10 +116,12 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
       if (pad) {
         const bool negative = !number.is_empty() && number.view()[0] == '-';
         const StringView digits = number.view().substring(negative ? 1 : 0);
-        if (digits.length < width) {
+        const usize sign_length = negative ? 1 : 0;
+        const usize digit_width = width > sign_length ? width - sign_length : 0;
+        if (digits.length < digit_width) {
           let padded = String{alloc};
           if (negative) padded.push('-');
-          for (usize z = digits.length; z < width; z++)
+          for (usize z = digits.length; z < digit_width; z++)
             padded.push('0');
           padded.append(digits);
           number = steal(padded);
@@ -545,8 +548,10 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
 
             switch (segment.kind) {
             case WordSegment::Kind::LiteralText:
-            case WordSegment::Kind::DoubleQuotedText:
-            case WordSegment::Kind::ArithmeticExpansion: break;
+            case WordSegment::Kind::DoubleQuotedText: break;
+            case WordSegment::Kind::ArithmeticExpansion:
+              if (!segment.is_in_double_quotes) is_single_field = false;
+              break;
             case WordSegment::Kind::VariableReference: {
               /* The '@', '*', and '[' bytes mark a reference that expands to
                  many fields, so their absence leaves a scalar of one field. */

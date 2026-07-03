@@ -10,6 +10,39 @@
 
 namespace shit {
 
+namespace {
+
+pure fn ascii_lowercase(char ch) wontthrow -> char
+{
+  if (ch >= 'A' && ch <= 'Z') return static_cast<char>(ch - 'A' + 'a');
+  return ch;
+}
+
+fn name_matches_glob(StringView glob, StringView filename,
+                     const Bitset &glob_active, usize mask_offset, bool extglob,
+                     bool should_ignore_case, Allocator allocator) throws
+    -> bool
+{
+  if (!should_ignore_case)
+    return utils::glob_matches(glob, filename, glob_active, mask_offset,
+                               extglob);
+
+  let lowered_glob = String{allocator};
+  lowered_glob.reserve(glob.length);
+  for (usize i = 0; i < glob.length; i++)
+    lowered_glob += ascii_lowercase(glob[i]);
+
+  let lowered_name = String{allocator};
+  lowered_name.reserve(filename.length);
+  for (usize i = 0; i < filename.length; i++)
+    lowered_name += ascii_lowercase(filename[i]);
+
+  return utils::glob_matches(lowered_glob.view(), lowered_name.view(),
+                             glob_active, mask_offset, extglob);
+}
+
+} // namespace
+
 fn EvalContext::expand_path_once(const glob_field &field,
                                  bool should_expand_files) throws
     -> ArrayList<glob_field>
@@ -72,6 +105,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
   }
 
   let const dotglob_is_on = is_shopt_enabled("dotglob");
+  let const nocaseglob_is_on = is_shopt_enabled("nocaseglob");
   for (let const &entry_name : *entries) {
     let const filename = entry_name.view();
 
@@ -90,8 +124,8 @@ fn EvalContext::expand_path_once(const glob_field &field,
       continue;
     }
 
-    if (utils::glob_matches(glob, filename, field.glob_active, stem_start,
-                            extglob_enabled()))
+    if (name_matches_glob(glob, filename, field.glob_active, stem_start,
+                          extglob_enabled(), nocaseglob_is_on, scratch))
     {
       add_expansion();
 
@@ -467,8 +501,12 @@ hot fn EvalContext::expand_path(glob_field field,
      literal fallback with failglob off. A test or [ command is exempt so a glob
      probing for a file keeps its literal text. */
   if (values.count() == 0) {
+    let const failglob_is_on =
+        m_runtime.failglob || is_shopt_enabled("failglob");
+    let const failglob_is_explicit =
+        m_runtime.failglob_explicit || is_shopt_enabled("failglob");
     if (!m_glob_exempt_for_test)
-      warn_or_throw(m_runtime.failglob, m_runtime.failglob_explicit, location,
+      warn_or_throw(failglob_is_on, failglob_is_explicit, location,
                     "The glob pattern '" + pattern +
                         "' matched no file, it expands to its literal text, "
                         "which is rarely intended",

@@ -12,7 +12,9 @@
 /* POSIX regcomp and regexec back the [[ =~ operator, since the release build
    drops libstdc++ and std::regex with it. */
 #if SHIT_PLATFORM_IS POSIX
+#include <locale.h>
 #include <regex.h>
+#include <string.h>
 #endif
 
 #if SHIT_PLATFORM_IS WIN32
@@ -30,6 +32,36 @@ cold [[noreturn]] static fn fail_conditional(StringView message,
 cold [[noreturn]] static fn fail_conditional(StringView reason) throws -> void
 {
   fail_conditional("Unable to evaluate the [[ ]]", reason);
+}
+
+static fn ascii_lower_copy(Allocator allocator, StringView text) throws
+    -> String
+{
+  let lowered = String{allocator};
+  lowered.reserve(text.length);
+
+  for (usize i = 0; i < text.length; i++) {
+    const char c = text[i];
+    lowered += (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+  }
+
+  return lowered;
+}
+
+/* bash orders the [[ < ]] and [[ > ]] operands by the LC_COLLATE collation of
+   the environment. The category is bound once from the environment on the first
+   comparison, since the shell otherwise stays in the C locale. */
+static fn collation_order(const String &left, const String &right) wontthrow
+    -> int
+{
+#if SHIT_PLATFORM_IS POSIX
+  static const int did_bind_collate = (setlocale(LC_COLLATE, ""), 0);
+  unused(did_bind_collate);
+  return strcoll(left.c_str(), right.c_str());
+#else
+  if (left < right) return -1;
+  return right < left ? 1 : 0;
+#endif
 }
 
 namespace {
@@ -102,10 +134,10 @@ struct conditional_evaluator
   static pure fn is_unary_op(StringView s) wontthrow -> bool
   {
     static constexpr PackedStringKey KEYS[] = {
-        SSK("-z"), SSK("-n"), SSK("-e"), SSK("-f"), SSK("-d"), SSK("-r"),
-        SSK("-w"), SSK("-x"), SSK("-s"), SSK("-h"), SSK("-L"), SSK("-b"),
-        SSK("-c"), SSK("-p"), SSK("-S"), SSK("-g"), SSK("-u"), SSK("-k"),
-        SSK("-O"), SSK("-G"), SSK("-v"), SSK("-t"), SSK("-o"),
+        SSK("-a"), SSK("-z"), SSK("-n"), SSK("-e"), SSK("-f"), SSK("-d"),
+        SSK("-r"), SSK("-w"), SSK("-x"), SSK("-s"), SSK("-h"), SSK("-L"),
+        SSK("-b"), SSK("-c"), SSK("-p"), SSK("-S"), SSK("-g"), SSK("-u"),
+        SSK("-k"), SSK("-O"), SSK("-G"), SSK("-v"), SSK("-t"), SSK("-o"),
     };
     static constexpr StaticStringSet UNARY_OPS{KEYS};
     return UNARY_OPS.contains(s);
@@ -206,7 +238,7 @@ struct conditional_evaluator
       return cxt.get_variable_value(operand).has_value();
     }
     let const path = Path{operand};
-    if (op == "-e") return path.exists();
+    if (op == "-a" || op == "-e") return path.exists();
     if (op == "-f") return path.is_regular_file();
     if (op == "-d") return path.is_directory();
     if (op == "-r") return path.is_readable();
@@ -285,9 +317,12 @@ struct conditional_evaluator
 
     const String first_literal = operand_literal(first);
 
-    if (is_unary_op(first_literal.view()) && pos + 1 < elements.count() &&
-        kind_at(pos + 1) == Kind::Operand)
-    {
+    if (is_unary_op(first_literal.view())) {
+      if (pos + 1 >= elements.count() || kind_at(pos + 1) != Kind::Operand) {
+        fail_conditional("The unary operator '" + first_literal +
+                         "' is missing its operand");
+      }
+
       pos += 2;
       if (is_skipping) return false;
       /* bash does not nounset the operand of -v, so the unset-variable
@@ -322,7 +357,8 @@ struct conditional_evaluator
         if (is_skipping) return false;
         const String left = operand_value(elements[pos - 3]);
         const String right = operand_value(elements[pos - 1]);
-        return next == Kind::Less ? left < right : right < left;
+        const int order = collation_order(left, right);
+        return next == Kind::Less ? order < 0 : order > 0;
       }
       if (next == Kind::Operand) {
         const String op = operand_literal(elements[pos + 1]);
@@ -338,8 +374,18 @@ struct conditional_evaluator
             let active = Bitset{cxt.scratch_allocator()};
             const String pattern =
                 operand_pattern_masked(elements[pos - 1], active);
-            const bool is_matched = utils::glob_matches(
-                pattern.view(), left.view(), active, 0, cxt.extglob_enabled());
+            let const is_case_insensitive = cxt.is_shopt_enabled("nocasematch");
+            const String match_pattern =
+                is_case_insensitive
+                    ? ascii_lower_copy(cxt.scratch_allocator(), pattern.view())
+                    : pattern;
+            const String match_value =
+                is_case_insensitive
+                    ? ascii_lower_copy(cxt.scratch_allocator(), left.view())
+                    : left;
+            const bool is_matched =
+                utils::glob_matches(match_pattern.view(), match_value.view(),
+                                    active, 0, cxt.extglob_enabled());
             return op == "!=" ? !is_matched : is_matched;
           }
           if (op == "=~") {
@@ -422,10 +468,17 @@ static constexpr usize REGEX_CACHE_CAP = 128;
 
 fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
 {
-  /* The key is the pattern text alone, sound only because the flags are always
-     REG_EXTENDED. A future option that changes compilation, such as REG_ICASE
-     for nocasematch, must fold into the key or two compilations collide. */
-  if (CompiledRegex *cached = m_regex_cache.find(pattern); cached != nullptr) {
+  /* The key carries a leading flag byte for the case-fold mode, so a
+     nocasematch REG_ICASE compilation and a case-sensitive one never collide on
+     the same pattern text. */
+  let const is_case_insensitive = is_shopt_enabled("nocasematch");
+  let key = String{scratch_allocator()};
+  key.reserve(pattern.length + 1);
+  key += is_case_insensitive ? 'i' : 's';
+  key += pattern;
+
+  if (CompiledRegex *cached = m_regex_cache.find(key.view()); cached != nullptr)
+  {
     LOG(All, "regex cache hit for the pattern '%.*s'",
         static_cast<int>(pattern.length), pattern.data);
     return cached->get();
@@ -441,15 +494,18 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
       static_cast<int>(pattern.length), pattern.data);
   let const pattern_text = String{scratch_allocator(), pattern};
   regex_t compiled;
-  if (regcomp(&compiled, pattern_text.c_str(), REG_EXTENDED) != 0) {
+  int compile_flags = REG_EXTENDED;
+  if (is_case_insensitive) compile_flags |= REG_ICASE;
+
+  if (regcomp(&compiled, pattern_text.c_str(), compile_flags) != 0) {
     let reason = String{scratch_allocator()};
     reason += "The regular expression '";
     reason += pattern;
     reason += "' is invalid";
     fail_conditional(reason.view());
   }
-  m_regex_cache.set(pattern, CompiledRegex{compiled});
-  return m_regex_cache.find(pattern)->get();
+  m_regex_cache.set(key.view(), CompiledRegex{compiled});
+  return m_regex_cache.find(key.view())->get();
 }
 #endif
 

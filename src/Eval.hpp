@@ -1045,8 +1045,8 @@ public:
 
   fn expand_heredoc_body(StringView body) throws -> String;
 
-  fn expand_modifier_word(StringView word, bool remove_quotes = true) throws
-      -> String;
+  fn expand_modifier_word(StringView word, bool remove_quotes = true,
+                          bool strip_escaped_literals = true) throws -> String;
 
   /* active_out marks which output bytes may act as glob metacharacters, so
      ${x#pat} and ${x%pat} match literally. */
@@ -1054,10 +1054,12 @@ public:
                                  bool remove_quotes = true) throws -> String;
 
   /* is_pattern_word makes a backslash quote the following byte, the # and %
-     rule. */
+     rule. strip_escaped_literals removes a backslash before an ordinary byte,
+     the quote-removal a default or alternate word wants, while a replacement
+     word keeps the backslash so \& stays a literal ampersand. */
   fn expand_modifier_word_worker(StringView word, Bitset &active_out,
-                                 bool remove_quotes,
-                                 bool is_pattern_word) throws -> String;
+                                 bool remove_quotes, bool is_pattern_word,
+                                 bool strip_escaped_literals) throws -> String;
 
   pure fn should_echo() const wontthrow -> bool;
   fn set_echo(bool enabled) wontthrow -> void { m_enable_echo = enabled; }
