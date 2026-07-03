@@ -162,21 +162,60 @@ static pure fn is_token_boundary(char c) wontthrow -> bool
   return is_word_separator(c) || is_command_separator(c);
 }
 
-static pure fn find_token_start(StringView line, usize cursor) wontthrow
-    -> usize
+static pure fn is_active_token_boundary(StringView line,
+                                        usize position) wontthrow -> bool
 {
-  let start = cursor;
-  while (start > 0 && !is_token_boundary(line[start - 1]))
-    start--;
-  return start;
+  let const c = line[position];
+  if (!is_token_boundary(c)) return false;
+
+  if ((c == '(' || c == ')') && position > 0 &&
+      !is_token_boundary(line[position - 1]))
+  {
+    return false;
+  }
+
+  return true;
 }
 
-static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
+struct token_bounds
 {
-  let end = cursor;
-  while (end < line.length && !is_token_boundary(line[end]))
+  usize start;
+  usize end;
+};
+
+/* A forward scan that honors single and double quotes and a backslash escape,
+   so a quoted or escaped separator stays part of the word. A paren glued to the
+   preceding byte is literal too, so a name like burner (3).log completes rather
+   than opening a subshell. */
+static pure fn find_token_bounds(StringView line, usize cursor) wontthrow
+    -> token_bounds
+{
+  usize start = 0;
+  usize i = 0;
+  while (i < cursor && i < line.length) {
+    let const c = line[i];
+    if (c == '\\' || c == '\'' || c == '"') {
+      i = quoted_run_end(line, i) + 1;
+      continue;
+    }
+
+    if (is_active_token_boundary(line, i)) start = i + 1;
+    i++;
+  }
+
+  usize end = cursor;
+  while (end < line.length) {
+    let const c = line[end];
+    if (c == '\\' || c == '\'' || c == '"') {
+      end = quoted_run_end(line, end) + 1;
+      continue;
+    }
+
+    if (is_active_token_boundary(line, end)) break;
     end++;
-  return end;
+  }
+
+  return token_bounds{start, end};
 }
 
 struct open_quote_span
@@ -450,6 +489,18 @@ struct path_token
   StringView basename_part;
 };
 
+static fn unescape_path_token(StringView token) throws -> String
+{
+  let out = String{completion_allocator()};
+  usize i = 0;
+  while (i < token.length) {
+    if (token[i] == '\\' && i + 1 < token.length) i++;
+    out.push(token[i]);
+    i++;
+  }
+  return out;
+}
+
 static pure fn split_path_token(StringView token) wontthrow -> path_token
 {
   let last_separator = token.length;
@@ -591,7 +642,10 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
 {
   let candidates = tiered_candidates{};
 
-  path_token parts = split_path_token(token);
+  let unescaped_backing = String{completion_allocator()};
+  if (!inside_quote) unescaped_backing = unescape_path_token(token);
+  path_token parts =
+      split_path_token(inside_quote ? token : unescaped_backing.view());
   const bool is_case_sensitive = token_has_uppercase(parts.basename_part);
 
   TRACELN(
@@ -1014,8 +1068,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   line = line.substring(segment_start);
   cursor -= segment_start;
 
-  let token_start = find_token_start(line, cursor);
-  let token_end = find_token_end(line, cursor);
+  let const bounds = find_token_bounds(line, cursor);
+  let token_start = bounds.start;
+  let token_end = bounds.end;
   let token = line.substring_of_length(token_start, token_end - token_start);
   let const is_command = is_in_command_position(line, token_start);
 

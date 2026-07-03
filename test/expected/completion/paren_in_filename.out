@@ -1,0 +1,13 @@
+== a bare paren glued to the name completes the file:
+'report(1).log'
+== a bare open paren keeps the filesystem context:
+'report(1).log'
+'report(2).log'
+== a backslash-escaped paren completes the file:
+'report(1).log'
+== a double-quoted paren completes the file:
+report(1).log
+report(2).log
+== a single-quoted paren completes the file:
+report(1).log
+report(2).log
