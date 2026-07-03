@@ -507,6 +507,28 @@ namespace {
 
 /* Fold every constant arithmetic expansion in a word once, so the evaluator
    reads the cached value instead of re-parsing on every expansion. */
+pure fn arithmetic_has_side_effect(StringView text) wontthrow -> bool
+{
+  for (usize i = 0; i < text.length; i++) {
+    if (i + 1 < text.length && ((text[i] == '+' && text[i + 1] == '+') ||
+                                (text[i] == '-' && text[i + 1] == '-')))
+    {
+      return true;
+    }
+
+    if (text[i] == '=') {
+      let const previous = i > 0 ? text[i - 1] : '\0';
+      let const next = i + 1 < text.length ? text[i + 1] : '\0';
+      if (previous != '=' && previous != '!' && previous != '<' &&
+          previous != '>' && next != '=')
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 fn fold_constant_arithmetic_in_word(const Word &word,
                                     AnalysisContext &actx) throws -> bool
 {
@@ -514,6 +536,11 @@ fn fold_constant_arithmetic_in_word(const Word &word,
   for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::ArithmeticExpansion) continue;
     if (segment.folded_arithmetic_result.has_value()) continue;
+
+    if (arithmetic_has_side_effect(segment.text.view())) {
+      actx.constant_variables.clear();
+      continue;
+    }
 
     let result = try_fold_constant_arithmetic(segment.text.view());
     if (!result.has_value())

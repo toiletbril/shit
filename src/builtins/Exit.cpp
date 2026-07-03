@@ -54,8 +54,9 @@ fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       static_cast<long long>(status));
 
   if (cxt.in_subshell()) {
-    cxt.request_exit(status, ec.source_location());
-    return static_cast<i32>(status);
+    let const masked_status = status & 0xFF;
+    cxt.request_exit(masked_status, ec.source_location());
+    return static_cast<i32>(masked_status);
   }
 
   cxt.run_exit_trap();

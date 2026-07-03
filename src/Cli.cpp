@@ -159,9 +159,11 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
 
         /* strncmp stops at the argument's NUL, so a short argument such as --f
            against the flag --foobar does not read past it. */
+        let const after_name = flag_start[flag_length];
         if (flag_length > longest_length &&
             std::strncmp(flags[i]->long_name().data, flag_start, flag_length) ==
-                0)
+                0 &&
+            (after_name == '\0' || after_name == '='))
         {
           *result_flag = flags[i];
           *value_start = flag_start + flag_length;

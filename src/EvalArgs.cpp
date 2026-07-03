@@ -411,7 +411,8 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
       is_local_command = name == "local";
       is_declare_command = name == "declare" || name == "typeset";
       is_declaration_command = is_local_command || is_declare_command ||
-                               name == "export" || name == "readonly";
+                               name == "export" || name == "readonly" ||
+                               name == "unset";
       is_test_command = name == "test";
     }
     /* The lone bracket is the test builtin and earns the same glob exemption,
@@ -425,9 +426,11 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
   }
 
   /* A test or [ command probes the filesystem, so an unmatched glob there stays
-     literal and the probe returns false rather than tripping failglob. */
+     literal and the probe returns false rather than tripping failglob. A
+     declaration command such as unset names a variable, so its operand stays
+     literal too. */
   let const previous_glob_exempt = m_glob_exempt_for_test;
-  m_glob_exempt_for_test = is_test_command;
+  m_glob_exempt_for_test = is_test_command || is_declaration_command;
   defer { m_glob_exempt_for_test = previous_glob_exempt; };
 
   /* An unset variable in a test operand is the question the command asks, so
