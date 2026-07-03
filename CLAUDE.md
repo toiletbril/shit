@@ -94,7 +94,14 @@ src/ExpressionsInternal.hpp. The builtins live under src/builtins, and the
 busybox-style coreutils live under src/shitbox.
 
 src/Platform.cpp wraps the operating system behind an os namespace, with the
-POSIX block and the Windows block defining the same API twice on purpose.
+POSIX block and the Windows block defining the same API twice on purpose. Every
+platform call and type lives behind an os:: wrapper, so a non-platform source
+names no syscall, no platform header, and no platform macro. The only remaining
+platform conditionals outside Platform.cpp and Utils.cpp are the fork-based
+process substitution in EvalSubstitution.cpp and pipeline stage in
+ExpressionsCompound.cpp, which run the shell's own AST in the forked child and
+so cannot cross the os boundary, and the Cosmopolitan-only debug flags in
+Main.cpp.
 
 src/Completion.cpp drives zero config completion. Completion first slices the
 buffer to the command segment holding the cursor, and the slice is quote aware,
