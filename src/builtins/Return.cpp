@@ -36,7 +36,38 @@ fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 2;
   }
 
-  let const status = parse_optional_integer_arg(ec, cxt.last_exit_status());
+  i64 status = cxt.last_exit_status();
+
+  if (ec.args().count() > 1) {
+    let const parsed_value = ec.args()[1].to<i64>();
+
+    if (parsed_value.is_error()) {
+      report_soft_builtin_error(ec, cxt,
+                                ec.args()[1] + ": numeric argument required");
+      cxt.request_return(2, ec.source_location());
+      return 2;
+    }
+
+    if (ec.args().count() > 2) {
+      report_soft_builtin_error(ec, cxt, "too many arguments");
+
+      if (cxt.in_subshell()) {
+        cxt.request_exit(1, ec.source_location());
+        return 1;
+      }
+
+      if (!cxt.shell_is_interactive()) {
+        cxt.run_exit_trap();
+        utils::quit(1, true);
+      }
+
+      return 1;
+    }
+
+    status = parsed_value.value();
+  }
+
+  status &= 0xFF;
 
   LOG(Debug, "return stopping the enclosing scope with status %lld",
       static_cast<long long>(status));

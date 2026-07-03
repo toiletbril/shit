@@ -49,20 +49,25 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
-    if (arg == "-t") {
-      should_strip_newline = true;
-      continue;
-    }
+
     if (arg.is_empty() || arg[0] != '-' || arg == "-") {
       array_name = arg;
       continue;
     }
 
-    let const letter = arg[1];
+    usize letter_position = 1;
+    while (letter_position < arg.length && arg[letter_position] == 't') {
+      should_strip_newline = true;
+      letter_position++;
+    }
+
+    if (letter_position >= arg.length) continue;
+
+    let const letter = arg[letter_position];
     let value = StringView{};
     let has_value = false;
-    if (arg.length > 2) {
-      value = arg.substring(2);
+    if (arg.length > letter_position + 1) {
+      value = arg.substring(letter_position + 1);
       has_value = true;
     } else if (i + 1 < args.count() &&
                (letter == 'n' || letter == 's' || letter == 'O' ||
@@ -85,13 +90,23 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
+    if (letter != 'n' && letter != 's' && letter != 'O') {
+      continue;
+    }
+
     let const number = value.to<i64>();
-    if (number.is_error() || number.value() < 0) continue;
+    if (number.is_error() || number.value() < 0) {
+      let const reason = letter == 'O' ? StringView{": invalid array origin"}
+                                       : StringView{": invalid line count"};
+      report_soft_builtin_error(ec, cxt, value + reason);
+      return 1;
+    }
+
     if (letter == 'n') {
       max_lines = number.value();
     } else if (letter == 's') {
       skip_count = number.value();
-    } else if (letter == 'O') {
+    } else {
       origin = number.value();
       has_origin = true;
     }

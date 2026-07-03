@@ -44,6 +44,8 @@ fn Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
+  if (args.count() < 2) return report_usage_error(ec, cxt, ec.program());
+
   i32 status = 0;
   for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];

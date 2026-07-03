@@ -114,17 +114,31 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       max_bytes = parsed.value();
   }
 
+  /* Without -r a backslash escapes the next byte, joining the next line at the
+     delimiter and making any other byte a literal that no longer splits on IFS.
+   */
+  let const should_process_escapes = !FLAG_READ_RAW.is_enabled();
+
   let was_newline_terminated = false;
   let was_timed_out = false;
-  let read_line = Maybe<String>{};
+  let was_read_successful = false;
+
+  /* The de-escaped bytes pair with a mask marking which one came from a
+     backslash escape, so the splitter below keeps an escaped IFS byte inside
+     its field. The mask is all false in the raw forms. */
+  let line = String{cxt.scratch_allocator()};
+  let is_literal_byte = ArrayList<bool>{cxt.scratch_allocator()};
+
   if (FLAG_READ_NCHARS.is_set()) {
-    let buffer = String{cxt.scratch_allocator()};
     const u64 deadline_nanos =
         timeout_nanos > 0
             ? os::monotonic_nanos() + static_cast<u64>(timeout_nanos)
             : 0;
-    i64 bytes_read = 0;
-    while (bytes_read < max_bytes) {
+    /* The count is of the de-escaped output bytes the way bash -n measures
+       them, so a backslash escape consumes two input bytes for one output byte
+       and a backslash newline reads on without counting. */
+    i64 output_count = 0;
+    while (output_count < max_bytes) {
       if (timeout_nanos > 0) {
         i64 remaining_nanos =
             static_cast<i64>(deadline_nanos - os::monotonic_nanos());
@@ -140,69 +154,81 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const got = os::read_fd(read_fd, &byte, 1);
       if (!got.has_value() || *got == 0) break;
 
+      if (should_process_escapes && byte == '\\') {
+        char escaped_byte = 0;
+        let const got_escaped = os::read_fd(read_fd, &escaped_byte, 1);
+        if (!got_escaped.has_value() || *got_escaped == 0) break;
+
+        if (escaped_byte == '\n') continue;
+
+        line.push(escaped_byte);
+        is_literal_byte.push(true);
+        output_count++;
+        continue;
+      }
+
       if (byte == delimiter) {
         was_newline_terminated = true;
         break;
       }
 
-      buffer.push(byte);
-      bytes_read++;
+      line.push(byte);
+      is_literal_byte.push(false);
+      output_count++;
     }
 
-    if (bytes_read >= max_bytes) was_newline_terminated = true;
-    if (bytes_read > 0 || was_newline_terminated) read_line = steal(buffer);
+    if (output_count >= max_bytes) was_newline_terminated = true;
+    was_read_successful = output_count > 0 || was_newline_terminated;
   } else {
-    read_line =
+    let read_line =
         utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter,
                                  timeout_nanos, &was_timed_out);
+    if (read_line.has_value()) {
+      was_read_successful = true;
+
+      let accumulated = String{cxt.scratch_allocator(), read_line->view()};
+      if (should_process_escapes) {
+        let do_trailing_backslash_count = [&accumulated]() -> usize {
+          usize backslash_count = 0;
+          while (backslash_count < accumulated.length() &&
+                 accumulated[accumulated.length() - 1 - backslash_count] ==
+                     '\\')
+            backslash_count++;
+          return backslash_count;
+        };
+        /* An odd run of trailing backslashes leaves one escaping the delimiter,
+           so the delimiter is dropped and the next line is read and appended.
+         */
+        while (was_newline_terminated && do_trailing_backslash_count() % 2 == 1)
+        {
+          accumulated.pop_back();
+          let const continued = utils::read_line_from_fd(
+              read_fd, was_newline_terminated, delimiter);
+          if (!continued.has_value()) break;
+          accumulated.append(continued->view());
+        }
+      }
+
+      line.reserve(accumulated.length());
+      is_literal_byte.reserve(accumulated.length());
+      for (usize i = 0; i < accumulated.length(); i++) {
+        if (should_process_escapes && accumulated[i] == '\\') {
+          if (i + 1 >= accumulated.length()) break;
+          line.push(accumulated[i + 1]);
+          is_literal_byte.push(true);
+          i++;
+        } else {
+          line.push(accumulated[i]);
+          is_literal_byte.push(false);
+        }
+      }
+    }
   }
-  if (!read_line) {
+
+  if (!was_read_successful) {
     for (usize i = 0; i < operand_count; i++)
       cxt.set_shell_variable(do_operand_name(i), "");
     return was_timed_out ? 142 : 1;
-  }
-  /* Without -r a backslash escapes the next byte, joining the next line at the
-     delimiter and making any other byte a literal that no longer splits on IFS.
-   */
-  let accumulated = String{cxt.scratch_allocator(), read_line->view()};
-  let const should_process_escapes =
-      !FLAG_READ_RAW.is_enabled() && !FLAG_READ_NCHARS.is_set();
-  if (should_process_escapes) {
-    let do_trailing_backslash_count = [&accumulated]() -> usize {
-      usize backslash_count = 0;
-      while (backslash_count < accumulated.length() &&
-             accumulated[accumulated.length() - 1 - backslash_count] == '\\')
-        backslash_count++;
-      return backslash_count;
-    };
-    /* An odd run of trailing backslashes leaves one escaping the delimiter, so
-       the delimiter is dropped and the next line is read and appended. */
-    while (was_newline_terminated && do_trailing_backslash_count() % 2 == 1) {
-      accumulated.pop_back();
-      let const continued =
-          utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter);
-      if (!continued.has_value()) break;
-      accumulated.append(continued->view());
-    }
-  }
-
-  /* The de-escaped bytes pair with a mask marking which one came from a
-     backslash escape, so the splitter below keeps an escaped IFS byte inside
-     its field. The mask is all false in the raw forms. */
-  let line = String{cxt.scratch_allocator()};
-  let is_literal_byte = ArrayList<bool>{cxt.scratch_allocator()};
-  line.reserve(accumulated.length());
-  is_literal_byte.reserve(accumulated.length());
-  for (usize i = 0; i < accumulated.length(); i++) {
-    if (should_process_escapes && accumulated[i] == '\\') {
-      if (i + 1 >= accumulated.length()) break;
-      line.push(accumulated[i + 1]);
-      is_literal_byte.push(true);
-      i++;
-    } else {
-      line.push(accumulated[i]);
-      is_literal_byte.push(false);
-    }
   }
 
   let const field_separators = cxt.get_variable_value("IFS").value_or(
@@ -244,22 +270,50 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return was_newline_terminated ? 0 : 1;
   }
 
+  if (!has_operands) {
+    cxt.set_shell_variable(reply_name, line.view());
+    return was_newline_terminated ? 0 : 1;
+  }
+
   usize cursor = 0;
   while (cursor < line.length() && do_is_ifs_whitespace(cursor))
     cursor++;
 
   for (usize i = 0; i < operand_count; i++) {
     if (i + 1 == operand_count) {
-      /* The last variable receives the rest of the line with trailing IFS
-         whitespace trimmed. A trailing non-whitespace IFS delimiter is kept,
-         since dash leaves the empty field it introduces inside the remainder.
-       */
-      usize end_position = line.length();
-      while (end_position > cursor && do_is_ifs_whitespace(end_position - 1))
-        end_position--;
+      /* The last variable receives its own field and, when content follows the
+         terminating delimiter, the rest of the line with trailing IFS
+         whitespace trimmed. A lone trailing non-whitespace IFS delimiter is
+         dropped the way bash drops the empty field it would introduce. */
+      let const field_start = cursor;
+      while (cursor < line.length() && !do_is_separator(cursor))
+        cursor++;
+      let const field_end = cursor;
+
+      let has_trailing_content = false;
+      if (cursor < line.length()) {
+        if (do_is_ifs_whitespace(cursor)) {
+          while (cursor < line.length() && do_is_ifs_whitespace(cursor))
+            cursor++;
+        } else {
+          cursor++;
+          while (cursor < line.length() && do_is_ifs_whitespace(cursor))
+            cursor++;
+        }
+        has_trailing_content = cursor < line.length();
+      }
+
+      usize end_position = field_end;
+      if (has_trailing_content) {
+        end_position = line.length();
+        while (end_position > field_start &&
+               do_is_ifs_whitespace(end_position - 1))
+          end_position--;
+      }
+
       cxt.set_shell_variable(
           do_operand_name(i),
-          line.substring_of_length(cursor, end_position - cursor));
+          line.substring_of_length(field_start, end_position - field_start));
       break;
     }
 

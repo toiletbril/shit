@@ -33,18 +33,25 @@ fn Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   let output = String{cxt.scratch_allocator()};
-  /* The logical form prints PWD, used only when it names an absolute path, so
-     an unset or relative value falls back to the physical directory. */
+  /* The logical form prints PWD, used only when it names an absolute path that
+     still resolves to the current directory, so an unset, relative, or stale
+     value falls back to the physical directory. */
   let const want_physical = FLAG_PWD_PHYSICAL.is_enabled();
   let const logical_pwd = cxt.get_variable_value("PWD");
-  if (!want_physical && logical_pwd.has_value() && !logical_pwd->is_empty() &&
-      logical_pwd->view()[0] == '/')
+  let const physical_directory = Path::current_directory();
+
+  let const has_logical_pwd = !want_physical && logical_pwd.has_value() &&
+                              !logical_pwd->is_empty() &&
+                              logical_pwd->view()[0] == '/';
+
+  if (has_logical_pwd &&
+      Path{logical_pwd->view()}.is_same_file_as(physical_directory))
   {
     LOG(Debug, "pwd printing the logical directory from PWD");
     output.append(logical_pwd->view());
   } else {
     LOG(Debug, "pwd printing the physical directory from getcwd");
-    output.append(Path::current_directory().text());
+    output.append(physical_directory.text());
   }
   output += '\n';
   ec.print_to_stdout(output);

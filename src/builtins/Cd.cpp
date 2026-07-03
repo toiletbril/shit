@@ -62,6 +62,15 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let const operand_count = ec.args().count() - operand_index;
+
+  if (operand_count > 1) {
+    let too_many = ErrorWithLocationAndDetails{
+        ec.source_location(), "cd accepts only a single directory operand",
+        "Quote a path that contains spaces"};
+    too_many.set_command_status(2);
+    throw too_many;
+  }
+
   let arg_path = String{cxt.scratch_allocator()};
 
   let const is_to_previous =
@@ -79,10 +88,6 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     arg_path.append(old_directory->view());
   } else if (operand_count > 0) {
     arg_path.append(ec.args()[operand_index]);
-    for (usize i = operand_index + 1; i < ec.args().count(); i++) {
-      arg_path += ' ';
-      arg_path.append(ec.args()[i]);
-    }
   } else {
     let const home_directory = os::get_home_directory();
     if (!home_directory.has_value())

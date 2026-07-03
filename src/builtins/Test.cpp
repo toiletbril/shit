@@ -27,8 +27,11 @@ namespace {
 
 fn parse_integer(StringView text, i64 &out) throws -> bool
 {
-  let const parsed = text.to<i64>();
-  if (parsed.is_error()) return false;
+  bool is_out_of_range = false;
+  let const parsed = utils::parse_decimal_integer(text, &is_out_of_range);
+  if (parsed.is_error() || is_out_of_range) {
+    return false;
+  }
   out = parsed.value();
   return true;
 }
@@ -50,7 +53,12 @@ public:
   }
   pure bool at_end() const wontthrow { return pos >= end; }
 
-  void fail(StringView message) throws { throw Error{message}; }
+  void fail(StringView message) throws
+  {
+    let error = Error{message};
+    error.set_command_status(2);
+    throw error;
+  }
 
   bool evaluate_unary(const String &op, const String &operand) throws
   {
@@ -337,8 +345,11 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   usize expression_end = arguments.count();
   if (ec.program() == "[") {
-    if (arguments.count() < 2 || arguments[arguments.count() - 1] != "]")
-      throw Error{"The closing ']' is missing"};
+    if (arguments.count() < 2 || arguments[arguments.count() - 1] != "]") {
+      let error = Error{"The closing ']' is missing"};
+      error.set_command_status(2);
+      throw error;
+    }
     expression_end = arguments.count() - 1;
   }
 
@@ -354,8 +365,10 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      rather than the original operand count. */
   if (evaluator.pos != evaluator.end) {
     ASSERT(evaluator.pos < evaluator.end);
-    throw Error{StringView{"'"} + arguments[evaluator.pos] +
-                "' is an unexpected argument"};
+    let error = Error{StringView{"'"} + arguments[evaluator.pos] +
+                      "' is an unexpected argument"};
+    error.set_command_status(2);
+    throw error;
   }
   return result ? 0 : 1;
 }

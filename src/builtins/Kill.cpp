@@ -32,14 +32,58 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* Checked before the signal parsing so -l is not read as a signal named l. */
   if (args.count() > 1 && (args[1] == "-l" || args[1] == "--list")) {
-    ec.print_to_stdout(shitbox::format_signal_list());
-    return 0;
+    if (args.count() == 2) {
+      ec.print_to_stdout(shitbox::format_signal_list());
+      return 0;
+    }
+
+    let listing = String{cxt.scratch_allocator()};
+    i32 status = 0;
+
+    for (usize i = 2; i < args.count(); i++) {
+      let const &spec = args[i];
+
+      if (StringView{spec}.is_all_decimal_digits()) {
+        let const parsed = StringView{spec}.to<i64>();
+        Maybe<String> name = shit::None;
+        if (!parsed.is_error()) {
+          let const number = static_cast<i32>(parsed.value());
+          name = os::signal_name_from_number(number);
+          if (!name.has_value() && number > 128) {
+            name = os::signal_name_from_number(number - 128);
+          }
+        }
+
+        if (name.has_value()) {
+          listing += *name;
+          listing += '\n';
+        } else {
+          report_soft_builtin_error(
+              ec, cxt, StringView{"'"} + spec + "' is not a valid signal");
+          status = 1;
+        }
+      } else if (let const number = os::signal_number_from_name(spec);
+                 number.has_value())
+      {
+        listing += String::from(*number, cxt.scratch_allocator()).view();
+        listing += '\n';
+      } else {
+        report_soft_builtin_error(
+            ec, cxt, StringView{"'"} + spec + "' is not a valid signal");
+        status = 1;
+      }
+    }
+
+    ec.print_to_stdout(listing);
+    return status;
   }
 
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
-  if (args.count() > 1 && (args[1] == "-s" || args[1] == "-n")) {
+  if (args.count() > 1 && args[1] == "--") {
+    first_target = 2;
+  } else if (args.count() > 1 && (args[1] == "-s" || args[1] == "-n")) {
     if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
 
     let const spec = String{cxt.scratch_allocator(), args[2]};

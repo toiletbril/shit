@@ -19,13 +19,13 @@ HELP_DESCRIPTION_DECL(
 
 FLAG(CPU_TIME, Bool, 't', "", "The most CPU time in seconds.");
 FLAG(FILE_SIZE, Bool, 'f', "",
-     "The largest file the shell may create, in 512-byte blocks.");
+     "The largest file the shell may create, in blocks.");
 FLAG(DATA_SIZE, Bool, 'd', "", "The data segment size in kbytes.");
 FLAG(STACK_SIZE, Bool, 's', "", "The stack size in kbytes.");
-FLAG(CORE_SIZE, Bool, 'c', "", "The core dump size in 512-byte blocks.");
+FLAG(CORE_SIZE, Bool, 'c', "", "The core dump size in blocks.");
 FLAG(RSS_SIZE, Bool, 'm', "", "The resident set size in kbytes.");
 FLAG(LOCKED_MEMORY, Bool, 'l', "", "The locked-in-memory size in kbytes.");
-FLAG(PROCESSES_P, Bool, 'p', "", "The most processes for the user.");
+FLAG(PROCESSES_P, Bool, 'p', "", "The pipe buffer size in 512-byte blocks.");
 FLAG(OPEN_FILES, Bool, 'n', "", "The largest number of open file descriptors.");
 FLAG(VIRTUAL_MEMORY, Bool, 'v', "", "The virtual memory size in kbytes.");
 FLAG(FILE_LOCKS, Bool, 'w', "", "The most file locks.");
@@ -78,6 +78,20 @@ constexpr resource_entry RESOURCE_TABLE[] = {
 #endif
 };
 
+constexpr int PIPE_SIZE_PSEUDO = -1;
+
+/* The default mood scales -f and -c by 1024-byte blocks the way bash does, and
+   the posix mood drops back to the 512-byte block. */
+fn block_factor(const resource_entry &entry, bool is_posix_mode) throws
+    -> rlim_t
+{
+  if (entry.which == RLIMIT_FSIZE || entry.which == RLIMIT_CORE) {
+    return is_posix_mode ? 512 : 1024;
+  }
+
+  return entry.units_per_value;
+}
+
 fn selected_resource() throws -> resource_entry
 {
   if (FLAG_CPU_TIME.is_enabled()) return {"time(seconds)", RLIMIT_CPU, 1};
@@ -94,10 +108,10 @@ fn selected_resource() throws -> resource_entry
   if (FLAG_LOCKED_MEMORY.is_enabled())
     return {"locked memory(kbytes)", RLIMIT_MEMLOCK, 1024};
 #endif
+  if (FLAG_PROCESSES_P.is_enabled())
+    return {"pipe size", PIPE_SIZE_PSEUDO, 512};
 #ifdef RLIMIT_NPROC
-  if (FLAG_PROCESSES.is_enabled() || FLAG_PROCESSES_P.is_enabled()) {
-    return {"process", RLIMIT_NPROC, 1};
-  }
+  if (FLAG_PROCESSES.is_enabled()) return {"process", RLIMIT_NPROC, 1};
 #endif
 #ifdef RLIMIT_AS
   if (FLAG_VIRTUAL_MEMORY.is_enabled())
@@ -137,8 +151,8 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       for (usize pad = label.count(); pad < 20; pad++)
         out.push(' ');
       out.push(' ');
-      out +=
-          render_limit(limit, entry.units_per_value, cxt.scratch_allocator());
+      out += render_limit(limit, block_factor(entry, cxt.is_posix_mode()),
+                          cxt.scratch_allocator());
       out.push('\n');
     }
     ec.print_to_stdout(out);
@@ -147,6 +161,15 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const resource = selected_resource();
 
+  if (resource.which == PIPE_SIZE_PSEUDO) {
+    if (args.count() < 2) {
+      ec.print_to_stdout("8\n");
+      return 0;
+    }
+
+    throw Error{"The pipe size cannot be modified"};
+  }
+
   struct rlimit limit{};
   if (getrlimit(resource.which, &limit) != 0)
     throw Error{"Unable to read the resource limit because " +
@@ -154,9 +177,10 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() < 2) {
     LOG(Debug, "ulimit reading the '%s' limit", resource.label);
-    ec.print_to_stdout(
-        render_limit(limit, resource.units_per_value, cxt.scratch_allocator()) +
-        "\n");
+    ec.print_to_stdout(render_limit(limit,
+                                    block_factor(resource, cxt.is_posix_mode()),
+                                    cxt.scratch_allocator()) +
+                       "\n");
     return 0;
   }
 
@@ -164,6 +188,7 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       args[1].c_str());
 
   let const &requested = args[1];
+  let const units = block_factor(resource, cxt.is_posix_mode());
   rlim_t value = RLIM_INFINITY;
   if (requested != "unlimited") {
     let const parsed =
@@ -171,11 +196,11 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     /* A scaled resource multiplies the operand by its unit, so an operand that
        would overflow the multiply saturates to unlimited the way bash reports
        it. */
-    if (resource.units_per_value != 0 &&
-        parsed > RLIM_INFINITY / resource.units_per_value)
+    if (units != 0 && parsed > RLIM_INFINITY / units) {
       value = RLIM_INFINITY;
-    else
-      value = parsed * resource.units_per_value;
+    } else {
+      value = parsed * units;
+    }
   }
 
   /* Naming neither -H nor -S, or both together, sets both, the way dash does.

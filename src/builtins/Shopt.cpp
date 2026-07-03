@@ -206,22 +206,36 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i32 status = 0;
   let do_reject_unknown = [&](StringView name) throws -> bool {
     if (is_known_shopt_option(name)) return false;
-    /* A -q probe stays silent and reports only through the status. */
-    if (is_quiet) {
-      status = 1;
-      return true;
-    }
-    throw Error{StringView{"Unknown shopt option '"} + name + "'"};
+    status = 1;
+    /* A bad name is reported and skipped so the valid names still apply, the
+       way bash keeps going past an invalid option. A -q probe stays silent and
+       reports only through the status. */
+    if (!is_quiet)
+      report_soft_builtin_error(ec, cxt,
+                                StringView{"'"} + name +
+                                    "' is not a valid shell option name");
+    return true;
   };
 
   /* shopt -o operates on the set -o options, the bridge bash provides so the
      same options answer either builtin. A config probes shopt -qo posix. */
   if (should_operate_on_set_options) {
     if (names.is_empty()) {
-      if (!is_quiet)
-        for (let const &name : shell_option_names(false))
-          if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
-            ec.print_to_stdout(do_format_status_line(name, *on).view());
+      if (!is_quiet) {
+        for (let const &name : shell_option_names(false)) {
+          Maybe<bool> on = query_shell_option(cxt, name);
+          if (!on.has_value()) continue;
+
+          if (should_enable && !*on) {
+            continue;
+          }
+          if (should_disable && *on) {
+            continue;
+          }
+
+          ec.print_to_stdout(do_format_status_line(name, *on).view());
+        }
+      }
       return 0;
     }
     for (let const &name : names) {
@@ -248,6 +262,23 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (should_enable || should_disable) {
+    if (names.is_empty()) {
+      if (!is_quiet) {
+        for (let const &name : SHOPT_OPTION_NAMES) {
+          let const is_on = cxt.is_shopt_enabled(name);
+          if (should_enable && !is_on) {
+            continue;
+          }
+          if (should_disable && is_on) {
+            continue;
+          }
+
+          ec.print_to_stdout(do_format_status_line(name, is_on).view());
+        }
+      }
+      return 0;
+    }
+
     for (let const &name : names) {
       if (do_reject_unknown(name)) continue;
       LOG(Info, "shopt setting '%.*s' to %s", static_cast<int>(name.length),

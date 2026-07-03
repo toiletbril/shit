@@ -29,10 +29,21 @@ fn Shift::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  if (ec.args().count() > 2) {
+    report_soft_builtin_error(ec, cxt, "too many arguments");
+    return 2;
+  }
+
   let const shift_count = parse_optional_integer_arg(ec, 1);
 
   let const &params = cxt.positional_params();
-  if (shift_count < 0 || static_cast<usize>(shift_count) > params.count()) {
+
+  if (shift_count < 0) {
+    report_soft_builtin_error(ec, cxt, "shift count out of range");
+    return 1;
+  }
+
+  if (static_cast<usize>(shift_count) > params.count()) {
     if (cxt.is_shopt_enabled("shift_verbose"))
       report_soft_builtin_error(ec, cxt, "shift count out of range");
     return 1;

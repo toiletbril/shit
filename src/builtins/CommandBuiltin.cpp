@@ -69,9 +69,13 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     }
     if (let const alias = cxt.get_alias(name.view()); alias.has_value()) {
       if (is_verbose)
-        ec.print_to_stdout(name + " is an alias for " + *alias + "\n");
+        ec.print_to_stdout(name + " is aliased to `" + *alias + "'\n");
       else
         ec.print_to_stdout("alias " + name + "='" + *alias + "'\n");
+      return 0;
+    }
+    if (cxt.has_functions() && cxt.find_function(name.view()) != nullptr) {
+      ec.print_to_stdout(is_verbose ? name + " is a function\n" : name + "\n");
       return 0;
     }
     if (search_builtin(name.view()).has_value()) {
@@ -95,7 +99,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
       ec.print_to_stdout(resolved_text);
       return 0;
     }
-    if (is_verbose) ec.print_to_stdout(name + ": not found\n");
+    if (is_verbose) ec.print_to_stderr(name + ": not found\n");
     return 1;
   }
 

@@ -76,7 +76,23 @@ fn resolve_jobspec(const ArrayList<job> &jobs, StringView spec) throws
   if (let const parsed_value = body.to<i64>(); !parsed_value.is_error()) {
     for (usize i = 0; i < jobs.count(); i++)
       if (static_cast<i64>(jobs[i].id) == parsed_value.value()) return i;
+
+    return shit::None;
   }
+
+  let const wants_substring_match = body[0] == '?';
+  if (wants_substring_match) body = body.substring(1);
+
+  if (body.is_empty()) return shit::None;
+
+  for (usize i = 0; i < jobs.count(); i++) {
+    if (wants_substring_match) {
+      if (jobs[i].command.find_substring(body).has_value()) return i;
+    } else if (jobs[i].command.starts_with(body)) {
+      return i;
+    }
+  }
+
   return shit::None;
 }
 

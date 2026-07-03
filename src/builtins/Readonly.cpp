@@ -26,6 +26,24 @@ pure fn Readonly::kind() const wontthrow -> Builtin::Kind
   return Kind::Readonly;
 }
 
+static pure fn name_is_valid_identifier(StringView name) wontthrow -> bool
+{
+  if (name.is_empty()) return false;
+
+  let const do_is_name_start = [](char c) wontthrow -> bool {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+  };
+
+  if (!do_is_name_start(name[0])) return false;
+
+  for (usize position = 1; position < name.length; position++) {
+    let const c = name[position];
+    if (!do_is_name_start(c) && !(c >= '0' && c <= '9')) return false;
+  }
+
+  return true;
+}
+
 fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = PARSE_BUILTIN_ARGS(ec);
@@ -49,7 +67,12 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           out += "\"";
         } else {
           out += "='";
-          out += value->view();
+          for (usize k = 0; k < value->count(); k++) {
+            if ((*value)[k] == '\'')
+              out += "'\\''";
+            else
+              out.push((*value)[k]);
+          }
           out += "'";
         }
       }
@@ -59,9 +82,17 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
+  let has_error = false;
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
     let const parts = NameValueArg::from(arg);
+
+    if (!name_is_valid_identifier(parts.get_name())) {
+      report_soft_builtin_error(
+          ec, cxt, StringView{"'"} + arg + "' is not a valid identifier");
+      has_error = true;
+      continue;
+    }
 
     LOG(All, "readonly marking '%.*s' against later assignment",
         static_cast<int>(parts.get_name().length), parts.get_name().data);
@@ -74,7 +105,7 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  return 0;
+  return has_error ? 1 : 0;
 }
 
 } // namespace shit

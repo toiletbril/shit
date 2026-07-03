@@ -38,7 +38,21 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const path = ec.args()[path_index].clone();
   LOG(Info, "source running file '%s' in the current shell", path.c_str());
-  let const contents = Path{path.view()}.read_entire_file();
+
+  /* A slashless name is looked up along PATH first, the bash sourcepath rule,
+     and the current directory is the fallback only outside the sh mood. */
+  let source_path = Path{path.view()};
+  if (!path.view().find_character('/').has_value()) {
+    let const path_matches = utils::search_program_path(path.view());
+    if (!path_matches.is_empty())
+      source_path = path_matches[0].clone();
+    else if (cxt.is_posix_mode())
+      throw ErrorWithLocation{ec.source_location(),
+                              "Unable to source the file '" + path +
+                                  "': not found in PATH"};
+  }
+
+  let const contents = source_path.read_entire_file();
   if (!contents.has_value())
     throw ErrorWithLocation{ec.source_location(),
                             "Unable to source the file '" + path +

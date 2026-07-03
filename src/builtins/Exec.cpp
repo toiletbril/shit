@@ -30,6 +30,32 @@ Exec::Exec() = default;
 
 pure fn Exec::kind() const wontthrow -> Builtin::Kind { return Kind::Exec; }
 
+/* A failed exec must not fell the whole session when the process it would
+   replace is an inner scope or an interactive prompt. An in-process subshell,
+   a command substitution, or a pipeline stage ends only that scope with 127,
+   and an interactive shell survives the failure the way bash keeps the prompt
+   alive. A non-interactive script exits with 127. */
+static fn report_exec_command_not_found(ExecContext &ec, EvalContext &cxt,
+                                        const String &command_name) throws
+    -> i32
+{
+  const CommandNotFound not_found{ec.source_location(),
+                                  StringView{"Command '"} + command_name +
+                                      "' was not found"};
+  const String *source = cxt.current_source();
+  show_message(
+      not_found.to_string(source != nullptr ? source->view() : StringView{}));
+
+  if (cxt.in_subshell() || cxt.is_in_pipeline_stage()) {
+    if (cxt.in_subshell()) cxt.request_exit(127, ec.source_location());
+    return 127;
+  }
+
+  if (cxt.shell_is_interactive()) return 127;
+
+  utils::quit(127, true);
+}
+
 fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
@@ -104,32 +130,16 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   LOG(Info, "exec replacing the shell with '%s'", command_name.c_str());
 
-  /* Resolve to an executable file. A failure here ends the shell with 127, the
-     status a command-not-found leaves. */
   let program_path = Path{};
   if (command_name.find_character('/').has_value()) {
     let resolved = Path::canonicalize(command_name);
-    if (!resolved) {
-      const CommandNotFound not_found{ec.source_location(),
-                                      StringView{"Command '"} + command_name +
-                                          "' was not found"};
-      const String *source = cxt.current_source();
-      show_message(not_found.to_string(source != nullptr ? source->view()
-                                                         : StringView{}));
-      utils::quit(127, true);
-    }
+    if (!resolved) return report_exec_command_not_found(ec, cxt, command_name);
     program_path = resolved.take();
   } else {
     let const found = utils::search_program_path(command_name);
-    if (found.count() == 0) {
-      const CommandNotFound not_found{ec.source_location(),
-                                      StringView{"Command '"} + command_name +
-                                          "' was not found"};
-      const String *source = cxt.current_source();
-      show_message(not_found.to_string(source != nullptr ? source->view()
-                                                         : StringView{}));
-      utils::quit(127, true);
-    }
+    if (found.count() == 0)
+      return report_exec_command_not_found(ec, cxt, command_name);
+
     ASSERT(found.count() > 0);
     program_path = found[0];
   }
@@ -172,7 +182,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* An external command replaces the shell. replace_process returns only by
      throwing, when the program was found but could not be executed, which ends
      the shell with 126, the status reserved for a command that is present but
-     not executable. A name that resolves to None exited 127 above. */
+     not executable. A name that resolves to None yielded 127 above. */
   try {
     os::replace_process(steal(command));
   } catch (const ErrorBase &error) {

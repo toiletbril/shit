@@ -34,7 +34,19 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     utils::invalidate_path_cache();
   }
 
-  return 0;
+  i32 status = 0;
+  for (usize i = 1; i < args.count(); i++) {
+    let const &name = args[i];
+
+    LOG(Debug, "hash resolving '%s' to remember its location", name.c_str());
+
+    if (utils::search_program_path(name).count() == 0) {
+      ec.print_to_stderr("hash: " + name + ": not found\n");
+      status = 1;
+    }
+  }
+
+  return status;
 }
 
 } // namespace shit

@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
+#include "../Platform.hpp"
 #include "../Toiletline.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
@@ -74,6 +75,34 @@ static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
   ec.print_to_stdout(out);
 }
 
+static fn write_history_to_file(EvalContext &cxt, const Path &target) throws
+    -> bool
+{
+  let contents = String{cxt.scratch_allocator()};
+
+  if (let const source_path = toiletline::history_path();
+      source_path.has_value())
+  {
+    let const source_text = source_path->read_entire_file();
+    if (source_text.has_value()) contents.append(source_text->view());
+  }
+
+  let const opened = os::open_file_descriptor(target.text().view(),
+                                              os::file_open_mode::Truncate);
+  if (!opened.has_value()) return false;
+
+  let const fd = opened.value();
+
+  bool was_written = true;
+  if (!contents.is_empty()) {
+    let const written = os::write_fd(fd, contents.data(), contents.count());
+    was_written = written.has_value() && written.value() == contents.count();
+  }
+
+  os::close_fd(fd);
+  return was_written;
+}
+
 fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = PARSE_BUILTIN_ARGS(ec);
@@ -96,7 +125,19 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HISTORY_APPEND.is_enabled() || FLAG_HISTORY_WRITE.is_enabled()) {
     LOG(Debug, "history writing the list to the file");
-    toiletline::history_write();
+
+    if (args.count() > 1) {
+      let const target = Path{args[1].view()};
+      if (!write_history_to_file(cxt, target)) {
+        report_soft_builtin_error(ec, cxt,
+                                  StringView{"cannot write history to '"} +
+                                      args[1].view() + "'");
+        return 1;
+      }
+    } else {
+      toiletline::history_write();
+    }
+
     did_maintain_list = true;
   }
 

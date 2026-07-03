@@ -27,6 +27,24 @@ Export::Export() = default;
 
 pure fn Export::kind() const wontthrow -> Builtin::Kind { return Kind::Export; }
 
+static pure fn name_is_valid_identifier(StringView name) wontthrow -> bool
+{
+  if (name.is_empty()) return false;
+
+  let const do_is_name_start = [](char c) wontthrow -> bool {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+  };
+
+  if (!do_is_name_start(name[0])) return false;
+
+  for (usize position = 1; position < name.length; position++) {
+    let const c = name[position];
+    if (!do_is_name_start(c) && !(c >= '0' && c <= '9')) return false;
+  }
+
+  return true;
+}
+
 fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = PARSE_BUILTIN_ARGS(ec);
@@ -146,6 +164,13 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       value = String{cxt.scratch_allocator(), *parts.get_value()};
     }
 
+    if (!name_is_valid_identifier(name.view())) {
+      report_soft_builtin_error(
+          ec, cxt, StringView{"'"} + arg + "' is not a valid identifier");
+      has_error = true;
+      continue;
+    }
+
     if (cxt.is_readonly(name)) {
       if (has_new_value) {
         report_soft_builtin_error(ec, cxt,
@@ -181,7 +206,7 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (name == "PATH") utils::set_path_for_resolution(String{value.view()});
   }
 
-  return has_error ? 2 : 0;
+  return has_error ? 1 : 0;
 }
 
 } // namespace shit

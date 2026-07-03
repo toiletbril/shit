@@ -48,6 +48,23 @@ fn normalize_condition(StringView raw, Allocator allocator) throws -> String
   return name;
 }
 
+fn is_valid_trap_condition(StringView condition) throws -> bool
+{
+  static constexpr PackedStringKey SPECIAL_CONDITION_KEYS[] = {
+      SSK("EXIT"),
+      SSK("DEBUG"),
+      SSK("ERR"),
+      SSK("RETURN"),
+  };
+  static constexpr StaticStringSet SPECIAL_CONDITIONS{SPECIAL_CONDITION_KEYS};
+
+  if (SPECIAL_CONDITIONS.contains(condition)) return true;
+
+  if (condition.is_all_decimal_digits()) return false;
+
+  return os::signal_number_from_name(condition).has_value();
+}
+
 fn format_listed_condition(StringView condition, bool with_sig_prefix,
                            Allocator allocator) throws -> String
 {
@@ -119,8 +136,16 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &action = args[1];
   let const is_reset = action == "-";
 
+  i32 status = 0;
   for (usize i = 2; i < args.count(); i++) {
     let const condition = normalize_condition(args[i], cxt.scratch_allocator());
+    if (!is_valid_trap_condition(condition.view())) {
+      report_soft_builtin_error(ec, cxt,
+                                args[i] + ": invalid signal specification");
+      status = 1;
+      continue;
+    }
+
     LOG(Info, "trap %s action for signal '%s'",
         is_reset ? "resetting the" : "setting", condition.c_str());
     if (is_reset)
@@ -129,7 +154,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_trap(condition, action);
   }
 
-  return 0;
+  return status;
 }
 
 } // namespace shit

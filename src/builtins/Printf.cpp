@@ -33,13 +33,48 @@ struct printf_number
   bool is_out_of_range;
 };
 
+fn decode_utf8_code_point(const String &arg, usize start) throws -> i64
+{
+  let const first = static_cast<unsigned char>(arg[start]);
+  if (first < 0x80) return first;
+
+  usize continuation_count;
+  i64 code_point;
+  if ((first & 0xE0) == 0xC0) {
+    continuation_count = 1;
+    code_point = first & 0x1F;
+  } else if ((first & 0xF0) == 0xE0) {
+    continuation_count = 2;
+    code_point = first & 0x0F;
+  } else if ((first & 0xF8) == 0xF0) {
+    continuation_count = 3;
+    code_point = first & 0x07;
+  } else {
+    return first;
+  }
+
+  for (usize continuation_index = 1; continuation_index <= continuation_count;
+       continuation_index++)
+  {
+    if (start + continuation_index >= arg.count()) return first;
+
+    let const continuation_byte =
+        static_cast<unsigned char>(arg[start + continuation_index]);
+    if ((continuation_byte & 0xC0) != 0x80) return first;
+
+    code_point = (code_point << 6) | (continuation_byte & 0x3F);
+  }
+
+  return code_point;
+}
+
 /* is_valid is false when a byte follows the number, matching bash. An argument
-   that opens with a quote yields the next byte's code. */
+   that opens with a quote yields the next character's code point. */
 fn parse_printf_number(const String &arg) throws -> printf_number
 {
   if (!arg.is_empty() && (arg[0] == '\'' || arg[0] == '"')) {
-    return {arg.count() > 1 ? static_cast<unsigned char>(arg[1]) : 0, true,
-            false, false};
+    return {arg.count() > 1 ? decode_utf8_code_point(arg, 1) : 0, true, false,
+            false};
   }
 
   usize i = 0;
@@ -100,6 +135,32 @@ pure fn hex_digit_value(char c) wontthrow -> i32
   return c - 'A' + 10;
 }
 
+fn append_utf8_code_point(String &out, u32 code_point) throws -> void
+{
+  if (code_point < 0x80) {
+    out += static_cast<char>(code_point);
+    return;
+  }
+
+  if (code_point < 0x800) {
+    out += static_cast<char>(0xC0 | (code_point >> 6));
+    out += static_cast<char>(0x80 | (code_point & 0x3F));
+    return;
+  }
+
+  if (code_point < 0x10000) {
+    out += static_cast<char>(0xE0 | (code_point >> 12));
+    out += static_cast<char>(0x80 | ((code_point >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (code_point & 0x3F));
+    return;
+  }
+
+  out += static_cast<char>(0xF0 | (code_point >> 18));
+  out += static_cast<char>(0x80 | ((code_point >> 12) & 0x3F));
+  out += static_cast<char>(0x80 | ((code_point >> 6) & 0x3F));
+  out += static_cast<char>(0x80 | (code_point & 0x3F));
+}
+
 fn append_escape(String &out, const String &fmt, usize &i) throws -> void
 {
   ASSERT(i < fmt.length());
@@ -132,6 +193,24 @@ fn append_escape(String &out, const String &fmt, usize &i) throws -> void
       digit_count++;
     }
     out += static_cast<char>(value);
+    return;
+  }
+
+  if ((e == 'u' || e == 'U') && i + 1 < fmt.length() &&
+      is_hex_digit(fmt[i + 1]))
+  {
+    usize max_digit_count = e == 'u' ? 4 : 8;
+    u32 code_point = 0;
+    usize digit_count = 0;
+    while (digit_count < max_digit_count && i + 1 < fmt.length() &&
+           is_hex_digit(fmt[i + 1]))
+    {
+      i++;
+      code_point = code_point * 16 + hex_digit_value(fmt[i]);
+      digit_count++;
+    }
+
+    append_utf8_code_point(out, code_point);
     return;
   }
 
@@ -281,7 +360,15 @@ fn append_conversion(String &out, const String &spec, char conv,
     with_s.push('s');
     append_formatted(with_s.c_str(), arg.c_str());
   } break;
-  case 'c': out += arg.is_empty() ? '\0' : arg[0]; break;
+  case 'c': {
+    if (spec == "%") {
+      out += arg.is_empty() ? '\0' : arg[0];
+    } else {
+      String with_c = spec.clone();
+      with_c.push('c');
+      append_formatted(with_c.c_str(), arg.is_empty() ? '\0' : arg[0]);
+    }
+  } break;
   case 'd':
   case 'i': {
     let const number = parse_printf_number(arg);

@@ -103,10 +103,12 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case 'n':
       case 't': break;
       default: {
-        let invalid = String{heap_allocator()};
+        let invalid = String{cxt.scratch_allocator()};
         invalid += arg[0];
         invalid += arg[c];
-        throw Error{"'" + invalid + "' is not a valid declare option"};
+        report_soft_builtin_error(
+            ec, cxt, "'" + invalid + "' is not a valid declare option");
+        return 2;
       }
       }
     }
@@ -158,68 +160,122 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return status;
   }
 
+  let const do_print_declaration = [&](StringView name) throws -> bool {
+    if (const ArrayList<String> *elements = cxt.lookup_indexed_array(name);
+        elements != nullptr)
+    {
+      let line = String{cxt.scratch_allocator(), "declare -a"};
+      if (cxt.is_integer_variable(name)) line += 'i';
+      line += ' ';
+      line.append(name);
+      line += "=(";
+      for (usize e = 0; e < elements->count(); e++) {
+        if (e > 0) line += ' ';
+        line += '[';
+        char index_text[24];
+        line.append(utils::int_to_text_into(static_cast<i64>(e), index_text,
+                                            sizeof(index_text)));
+        line += "]=\"";
+        line += quote_for_declare((*elements)[e].view());
+        line += '"';
+      }
+      line += ")\n";
+      ec.print_to_stdout(line.view());
+      return true;
+    }
+
+    if (cxt.is_associative_array(name)) {
+      let const keys = cxt.associative_keys(name);
+      let const values = cxt.associative_values(name);
+      let line = String{cxt.scratch_allocator(), "declare -A"};
+      if (cxt.is_integer_variable(name)) line += 'i';
+      line += ' ';
+      line.append(name);
+      line += "=(";
+      for (usize e = 0; e < keys.count(); e++) {
+        line += '[';
+        line.append(keys[e].view());
+        line += "]=\"";
+        if (e < values.count()) line += quote_for_declare(values[e].view());
+        line += "\" ";
+      }
+      line += ")\n";
+      ec.print_to_stdout(line.view());
+      return true;
+    }
+
+    if (const Maybe<String> value = cxt.get_variable_value(name)) {
+      let attribute = String{cxt.scratch_allocator(), "-"};
+      if (cxt.is_integer_variable(name)) attribute += 'i';
+      if (os::get_environment_variable(name).has_value()) attribute += 'x';
+      if (attribute.count() == 1) attribute += '-';
+      let line = String{cxt.scratch_allocator(), "declare "};
+      line.append(attribute.view());
+      line += ' ';
+      line.append(name);
+      line += "=\"";
+      line += quote_for_declare(value->view());
+      line += "\"\n";
+      ec.print_to_stdout(line.view());
+      return true;
+    }
+
+    if (cxt.is_integer_variable(name)) {
+      let line = String{cxt.scratch_allocator(), "declare -i"};
+      if (os::get_environment_variable(name).has_value()) line += 'x';
+      line += ' ';
+      line.append(name);
+      line += '\n';
+      ec.print_to_stdout(line.view());
+      return true;
+    }
+
+    return false;
+  };
+
+  /* The -p print form with no name operands filters the whole variable set the
+     way bash lists every declaration matching the paired attribute. A bare
+     declare cannot take this path, since an array-assignment argument reaches
+     the builtin as an already-applied prefix and leaves no operand behind. */
+  if (should_print && i >= args.count()) {
+    let const do_matches_attribute_filter = [&](StringView name) -> bool {
+      if (should_export && !os::get_environment_variable(name).has_value()) {
+        return false;
+      }
+      if (should_mark_integer_attribute && !cxt.is_integer_variable(name)) {
+        return false;
+      }
+      if (should_make_indexed && cxt.lookup_indexed_array(name) == nullptr) {
+        return false;
+      }
+      if (should_make_associative && !cxt.is_associative_array(name)) {
+        return false;
+      }
+      if (should_mark_readonly && !cxt.is_readonly(name)) return false;
+      return true;
+    };
+
+    let names = cxt.variable_names(cxt.scratch_allocator());
+    for (let const &environment_name : os::environment_names())
+      names.add(environment_name.view());
+
+    let sorted_names = ArrayList<String>{cxt.scratch_allocator()};
+    names.for_each([&](StringView name) { sorted_names.push_managed(name); });
+    sorted_names.sort();
+
+    for (let const &name : sorted_names) {
+      if (do_matches_attribute_filter(name.view()))
+        do_print_declaration(name.view());
+    }
+
+    return 0;
+  }
+
   if (should_print) {
     i32 status = 0;
     for (; i < args.count(); i++) {
       const StringView name = args[i].view();
-      if (const ArrayList<String> *elements = cxt.lookup_indexed_array(name);
-          elements != nullptr)
-      {
-        let line = String{cxt.scratch_allocator(), "declare -a"};
-        if (cxt.is_integer_variable(name)) line += 'i';
-        line += ' ';
-        line.append(name);
-        line += "=(";
-        for (usize e = 0; e < elements->count(); e++) {
-          if (e > 0) line += ' ';
-          line += '[';
-          char index_text[24];
-          line.append(utils::int_to_text_into(static_cast<i64>(e), index_text,
-                                              sizeof(index_text)));
-          line += "]=\"";
-          line += quote_for_declare((*elements)[e].view());
-          line += '"';
-        }
-        line += ")\n";
-        ec.print_to_stdout(line.view());
-      } else if (cxt.is_associative_array(name)) {
-        let const keys = cxt.associative_keys(name);
-        let const values = cxt.associative_values(name);
-        let line = String{cxt.scratch_allocator(), "declare -A"};
-        if (cxt.is_integer_variable(name)) line += 'i';
-        line += ' ';
-        line.append(name);
-        line += "=(";
-        for (usize e = 0; e < keys.count(); e++) {
-          line += '[';
-          line.append(keys[e].view());
-          line += "]=\"";
-          if (e < values.count()) line += quote_for_declare(values[e].view());
-          line += "\" ";
-        }
-        line += ")\n";
-        ec.print_to_stdout(line.view());
-      } else if (const Maybe<String> value = cxt.get_variable_value(name)) {
-        let attribute = String{cxt.scratch_allocator(), "-"};
-        if (cxt.is_integer_variable(name)) attribute += 'i';
-        if (os::get_environment_variable(name).has_value()) attribute += 'x';
-        if (attribute.count() == 1) attribute += '-';
-        let line = String{cxt.scratch_allocator(), "declare "};
-        line.append(attribute.view());
-        line += ' ';
-        line.append(name);
-        line += "=\"";
-        line += quote_for_declare(value->view());
-        line += "\"\n";
-        ec.print_to_stdout(line.view());
-      } else if (cxt.is_integer_variable(name)) {
-        let line = String{cxt.scratch_allocator(), "declare -i"};
-        if (os::get_environment_variable(name).has_value()) line += 'x';
-        line += ' ';
-        line.append(name);
-        line += '\n';
-        ec.print_to_stdout(line.view());
-      } else {
+      if (!do_print_declaration(name)) {
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + name + "' is not defined");
         status = 1;

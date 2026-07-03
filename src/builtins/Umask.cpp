@@ -9,13 +9,16 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-S] [mask]");
+HELP_SYNOPSIS_DECL("[-p] [-S] [mask]");
 
 HELP_DESCRIPTION_DECL(
     "The umask builtin prints or sets the file creation mask.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
-/* -S is hand-parsed in execute, so this FLAG row only feeds the help text. */
+/* -p and -S are hand-parsed in execute, so these FLAG rows only feed the help
+   text. */
+FLAG(UMASK_REUSABLE, Bool, 'p', "",
+     "Print the mask in a form reusable as input.");
 FLAG(UMASK_SYMBOLIC, Bool, 'S', "",
      "Print the mask in symbolic form, the u=rwx,g=rx,o=rx style.");
 
@@ -119,27 +122,57 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   ASSERT(!args.is_empty());
 
   bool should_print_symbolic = false;
+  bool should_print_reusable = false;
   Maybe<usize> operand_index;
-  for (usize i = 1; i < args.count(); i++) {
-    if (args[i] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
-    if (args[i] == "-S") {
-      should_print_symbolic = true;
-      continue;
+
+  usize i = 1;
+  for (; i < args.count(); i++) {
+    const StringView arg = args[i].view();
+    if (arg == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+    if (arg.length < 2 || arg[0] != '-') {
+      break;
     }
-    operand_index = i;
-    break;
+
+    if (arg == "--") {
+      i++;
+      break;
+    }
+
+    for (usize c = 1; c < arg.length; c++) {
+      switch (arg[c]) {
+      case 'S': should_print_symbolic = true; break;
+      case 'p': should_print_reusable = true; break;
+      default: {
+        let invalid = String{cxt.scratch_allocator()};
+        invalid += '-';
+        invalid += arg[c];
+        report_soft_builtin_error(
+            ec, cxt, "'" + invalid + "' is not a valid umask option");
+        return 2;
+      }
+      }
+    }
   }
+
+  if (i < args.count()) operand_index = i;
 
   if (!operand_index.has_value()) {
     const u32 mask = os::get_file_creation_mask();
+    let out = String{cxt.scratch_allocator()};
+    if (should_print_reusable)
+      out += should_print_symbolic ? "umask -S " : "umask ";
+
     if (should_print_symbolic) {
-      ec.print_to_stdout(mask_to_symbolic(mask, cxt.scratch_allocator()) +
-                         "\n");
+      out += mask_to_symbolic(mask, cxt.scratch_allocator()).view();
     } else {
       char buffer[8];
       std::snprintf(buffer, sizeof(buffer), "%04o", mask);
-      ec.print_to_stdout(String{cxt.scratch_allocator(), buffer} + "\n");
+      out += buffer;
     }
+    out.push('\n');
+
+    ec.print_to_stdout(out);
     return 0;
   }
 

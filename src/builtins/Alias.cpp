@@ -52,7 +52,18 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       String message{cxt.scratch_allocator(), "alias "};
       message += arg;
       message += "='";
-      message += *value;
+
+      for (usize value_position = 0; value_position < value->count();
+           value_position++)
+      {
+        let const character = (*value)[value_position];
+
+        if (character == '\'')
+          message += "'\\''";
+        else
+          message += character;
+      }
+
       message += "'\n";
       ec.print_to_stdout(message);
     } else {

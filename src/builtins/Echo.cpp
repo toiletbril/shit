@@ -108,6 +108,37 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         break;
       case '\\': output += '\\'; break;
       case 'c': should_stop = true; break;
+      case 'x': {
+        if (cxt.is_posix_mode()) {
+          output += '\\';
+          output += escaped;
+          break;
+        }
+
+        let const do_hex_value = [](char digit) -> i32 {
+          if (digit >= '0' && digit <= '9') return digit - '0';
+          if (digit >= 'a' && digit <= 'f') return digit - 'a' + 10;
+          if (digit >= 'A' && digit <= 'F') return digit - 'A' + 10;
+          return -1;
+        };
+
+        i32 value = 0;
+        usize digit_count = 0;
+        while (digit_count < 2 && j + 1 < arg.length()) {
+          let const digit = do_hex_value(arg[j + 1]);
+          if (digit < 0) break;
+          value = value * 16 + digit;
+          j++;
+          digit_count++;
+        }
+
+        if (digit_count == 0) {
+          output += '\\';
+          output += escaped;
+        } else {
+          output += static_cast<char>(value);
+        }
+      } break;
       case '0': {
         i32 value = 0;
         usize digit_count = 0;

@@ -202,12 +202,31 @@ fn list_options(const EvalContext &cxt) throws -> String
   return out;
 }
 
+/* The bare set -o listing is a two-column name and state table, while set +o
+   prints the replayable set +o form list_options builds. */
+fn list_options_columnar(const EvalContext &cxt) throws -> String
+{
+  const usize name_field_width = 15;
+  let out = String{heap_allocator()};
+  for (let const &option : SET_OPTIONS) {
+    if (option.name.starts_with(StringView{"show-"})) continue;
+    if (option_is_startup_fact(option)) continue;
+    out += option.name;
+    for (usize pad = option.name.length; pad < name_field_width; pad++)
+      out.push(' ');
+    out.push('\t');
+    out += option_is_on(cxt, option) ? "on" : "off";
+    out.push('\n');
+  }
+  return out;
+}
+
 fn apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
                              const ArrayList<String> &args, usize &i,
                              bool enable) throws -> void
 {
   if (i + 1 >= args.count()) {
-    ec.print_to_stdout(list_options(cxt));
+    ec.print_to_stdout(enable ? list_options_columnar(cxt) : list_options(cxt));
     return;
   }
   let const &name = args[++i];
@@ -456,6 +475,20 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
     if (arg == "+p") continue;
+
+    /* A lone - or + ends option parsing, and a lone - also turns off xtrace
+       and verbose. The positional parameters are rebound only when a word
+       follows, so set - with no argument leaves them untouched. */
+    if (arg == "-" || arg == "+") {
+      if (arg[0] == '-') {
+        apply_or_reject_option(cxt, *find_option_by_letter('x'), false);
+        apply_or_reject_option(cxt, *find_option_by_letter('v'), false);
+      }
+
+      is_collecting_operands = true;
+      should_rebind = i + 1 < args.count();
+      continue;
+    }
 
     if (arg.length() > 1 && (arg[0] == '-' || arg[0] == '+')) {
       let const enable = arg[0] == '-';

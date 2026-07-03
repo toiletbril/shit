@@ -71,7 +71,8 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     if (argument.length >= 2 && argument[0] == '-') {
       if (argument == "-A" || argument == "-P" || argument == "-S" ||
-          argument == "-X" || argument == "-F" || argument == "-C")
+          argument == "-X" || argument == "-F" || argument == "-C" ||
+          argument == "-o")
         i++;
       i++;
       continue;
@@ -105,7 +106,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let out = String{cxt.scratch_allocator()};
   let has_any_matched = false;
   for (let const &candidate : cxt.expand_wordlist_to_fields(*wordlist)) {
-    if (candidate.is_empty() || !candidate.view().starts_with(word)) continue;
+    if (!candidate.view().starts_with(word)) continue;
     out.append(candidate.view());
     out.push('\n');
     has_any_matched = true;

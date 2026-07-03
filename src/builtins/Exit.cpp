@@ -26,7 +26,28 @@ fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  let const status = parse_optional_integer_arg(ec, cxt.last_exit_status());
+  let status = static_cast<i64>(cxt.last_exit_status());
+
+  if (ec.args().count() > 1) {
+    let const parsed_status = ec.args()[1].to<i64>();
+
+    if (parsed_status.is_error()) {
+      report_soft_builtin_error(ec, cxt,
+                                StringView{"'"} + ec.args()[1] +
+                                    "' is not a numeric exit status");
+      return 2;
+    }
+
+    if (ec.args().count() > 2) {
+      report_soft_builtin_error(ec, cxt, "too many arguments");
+
+      if (cxt.shell_is_interactive()) return 2;
+
+      status = 1;
+    } else {
+      status = parsed_status.value();
+    }
+  }
 
   LOG(Debug, "exit ending the shell with status %lld",
       static_cast<long long>(status));

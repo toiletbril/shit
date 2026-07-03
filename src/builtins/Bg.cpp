@@ -23,28 +23,22 @@ Bg::Bg() = default;
 
 pure fn Bg::kind() const wontthrow -> Builtin::Kind { return Kind::Bg; }
 
-fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
+static fn resolve_jobspec(EvalContext &cxt, const String &spec) throws -> job *
 {
-  let const &args = ec.args();
-  ASSERT(!args.is_empty());
+  StringView value{spec};
+  if (!value.is_empty() && value[0] == '%') value = value.substring(1);
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  let const parsed_value = value.to<i64>();
+  if (parsed_value.is_error())
+    throw ErrorWithDetails{"'" + spec + "' is not a valid job",
+                           "Use a job spec like `%1` or `%+`"};
 
-  job *job = nullptr;
-  if (args.count() > 1 && !args[1].is_empty() && args[1][0] == '%') {
-    let const parsed_value = StringView{args[1]}.substring(1).to<i64>();
-    if (parsed_value.is_error())
-      throw ErrorWithDetails{"'" + args[1] + "' is not a valid job",
-                             "Use a job spec like `%1` or `%+`"};
-    job = cxt.find_job(static_cast<int>(parsed_value.value()));
-  } else {
-    job = cxt.most_recent_job();
-  }
+  return cxt.find_job(static_cast<int>(parsed_value.value()));
+}
 
-  if (job == nullptr)
-    throw ErrorWithDetails{"There is no such job", "List jobs with `jobs`"};
-  ASSERT(job != nullptr);
-
+static fn resume_job_in_background(ExecContext &ec, EvalContext &cxt,
+                                   job *job) throws -> void
+{
   LOG(Info, "bg resuming job %d in the background", job->id);
 
   if (const Maybe<i32> cont = os::signal_number_from_name("CONT"))
@@ -53,6 +47,31 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ec.print_to_stdout("[" + String::from(job->id, cxt.scratch_allocator()) +
                      "] " + job->command + " &\n");
+}
+
+fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
+{
+  let const &args = ec.args();
+  ASSERT(!args.is_empty());
+
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  if (args.count() <= 1) {
+    job *job = cxt.most_recent_job();
+    if (job == nullptr)
+      throw ErrorWithDetails{"There is no such job", "List jobs with `jobs`"};
+
+    resume_job_in_background(ec, cxt, job);
+    return 0;
+  }
+
+  for (usize arg_position = 1; arg_position < args.count(); arg_position++) {
+    job *job = resolve_jobspec(cxt, args[arg_position]);
+    if (job == nullptr)
+      throw ErrorWithDetails{"There is no such job", "List jobs with `jobs`"};
+
+    resume_job_in_background(ec, cxt, job);
+  }
 
   return 0;
 }

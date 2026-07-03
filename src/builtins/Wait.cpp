@@ -62,14 +62,23 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     if (!target.is_empty() && target[0] == '%') {
       let const parsed = StringView{target}.substring(1).to<i64>();
-      if (!parsed.is_error()) {
-        if (job *const job = cxt.find_job(static_cast<int>(parsed.value()));
-            job != nullptr)
-          status = wait_for_job(*job);
+      job *const matched = parsed.is_error()
+                               ? nullptr
+                               : cxt.find_job(static_cast<int>(parsed.value()));
+
+      if (matched != nullptr) {
+        status = wait_for_job(*matched);
+      } else {
+        report_soft_builtin_error(ec, cxt, target + ": no such job");
+        status = 127;
       }
     } else {
       let const parsed = target.to<i64>();
-      if (!parsed.is_error()) {
+      if (parsed.is_error()) {
+        report_soft_builtin_error(
+            ec, cxt, "'" + target + "': not a pid or valid job spec");
+        status = 1;
+      } else {
         /* An untracked pid returns 127 with no waitpid, since waiting the raw
            pid would throw on ECHILD and abort the command. */
         job *matched = nullptr;
@@ -88,8 +97,6 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         status = matched != nullptr ? wait_for_job(*matched) : 127;
       }
     }
-    /* A non-numeric operand is ignored, since waitpid(0) would block on the
-       whole process group. */
   }
 
   cxt.forget_done_jobs();

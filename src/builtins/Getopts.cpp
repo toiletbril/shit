@@ -37,6 +37,14 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &name = args[2];
   let const is_silent = !optstring.is_empty() && optstring[0] == ':';
 
+  bool should_print_diagnostic = !is_silent;
+  if (Maybe<String> value = cxt.get_variable_value("OPTERR"); value.has_value())
+  {
+    let const parsed_value = (*value).to<i64>();
+    if (!parsed_value.is_error() && parsed_value.value() == 0)
+      should_print_diagnostic = false;
+  }
+
   let operands = ArrayList<String>{cxt.scratch_allocator()};
   if (args.count() > 3) {
     for (usize i = 3; i < args.count(); i++)
@@ -108,8 +116,9 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_shell_variable("OPTARG", option_as_string);
     } else {
       cxt.unset_shell_variable("OPTARG");
-      report_soft_builtin_error(
-          ec, cxt, StringView{"Illegal option -- "} + option_as_string);
+      if (should_print_diagnostic)
+        report_soft_builtin_error(
+            ec, cxt, StringView{"Illegal option -- "} + option_as_string);
     }
     return do_finish(0);
   }
@@ -136,9 +145,10 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       } else {
         cxt.set_shell_variable(name, "?");
         cxt.unset_shell_variable("OPTARG");
-        report_soft_builtin_error(
-            ec, cxt,
-            StringView{"Option requires an argument -- "} + option_as_string);
+        if (should_print_diagnostic)
+          report_soft_builtin_error(
+              ec, cxt,
+              StringView{"Option requires an argument -- "} + option_as_string);
       }
       return do_finish(0);
     }
