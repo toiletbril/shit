@@ -265,6 +265,10 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void;
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
 
+/* On POSIX the descriptor is the shell fd number, on Windows it is the handle
+   that occupies the shell's standard-handle slot. */
+fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool;
+
 /* On POSIX the number is the descriptor, and on Windows it maps to the C
    runtime handle. */
 fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor;

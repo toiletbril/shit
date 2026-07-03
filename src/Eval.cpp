@@ -18,16 +18,6 @@
 
 #include <exception>
 
-/* The release build drops libstdc++ so std::regex is unavailable, regcomp and
-   regexec back the [[ =~ operator instead. */
-#if SHIT_PLATFORM_IS POSIX
-#include <regex.h>
-#endif
-
-#if SHIT_PLATFORM_IS WIN32
-#include <io.h>
-#endif
-
 namespace shit {
 
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,

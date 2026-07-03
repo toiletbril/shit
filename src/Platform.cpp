@@ -378,6 +378,13 @@ fn is_stdout_a_tty() wontthrow -> bool { return isatty(SHIT_STDOUT); }
 
 fn is_stderr_a_tty() wontthrow -> bool { return isatty(SHIT_STDERR); }
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return isatty(fd); }
+
+fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *
+{
+  return std::aligned_alloc(alignment, length);
+}
+
+fn free_aligned(opaque *pointer) wontthrow -> void { std::free(pointer); }
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
   return is_fd_a_tty(static_cast<descriptor>(shell_fd));
@@ -2017,6 +2024,7 @@ fn enumerate_processes(bool include_resource_stats) throws
 #elif SHIT_PLATFORM_IS WIN32
 
 #include <io.h>
+#include <malloc.h>
 #include <psapi.h>
 #include <sys/stat.h>
 #include <tlhelp32.h>
@@ -2345,6 +2353,13 @@ fn is_fd_a_tty(descriptor fd) wontthrow -> bool
   if (crt_fd == -1) return false;
   return _isatty(crt_fd) != 0;
 }
+
+fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *
+{
+  return _aligned_malloc(length, alignment);
+}
+
+fn free_aligned(opaque *pointer) wontthrow -> void { _aligned_free(pointer); }
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
   return is_fd_a_tty(reinterpret_cast<descriptor>(_get_osfhandle(shell_fd)));
@@ -3408,6 +3423,11 @@ fn get_file_creation_mask() wontthrow -> u32
 }
 
 fn set_file_creation_mask(u32 mask) wontthrow -> void { SHIT_UMASK(mask); }
+
+fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
+{
+  return fd == descriptor_for_shell_fd(shell_fd);
+}
 
 } // namespace os
 } // namespace shit

@@ -711,14 +711,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           cxt.snapshot_subshell_descriptor(redir.fd);
           shit::flush();
           os::replace_descriptor(redir.fd, body_fd);
-#if SHIT_PLATFORM_IS WIN32
-          /* A Windows descriptor is a HANDLE, so the body is compared against
-             the handle that occupies the shell slot, not the bare fd number. */
-          if (body_fd != os::descriptor_for_shell_fd(redir.fd))
+          if (!os::descriptor_is_shell_fd(body_fd, redir.fd))
             os::close_fd(body_fd);
-#else
-          if (body_fd != redir.fd) os::close_fd(body_fd);
-#endif
           break;
         }
 
@@ -733,12 +727,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         /* The temp file already lands on fd N when mkstemp handed back that
            number, so the collision is handled directly and the restore closes
            fd N, which was free before mkstemp claimed it. */
-#if SHIT_PLATFORM_IS WIN32
         const bool body_is_target_fd =
-            body_fd == os::descriptor_for_shell_fd(redir.fd);
-#else
-        const bool body_is_target_fd = body_fd == redir.fd;
-#endif
+            os::descriptor_is_shell_fd(body_fd, redir.fd);
         if (body_is_target_fd) {
           dup_saved_descriptors.push(
               os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
@@ -852,12 +842,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           cxt.snapshot_subshell_descriptor(redir.fd);
           shit::flush();
           const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
-#if SHIT_PLATFORM_IS WIN32
-          if (file_fd != os::descriptor_for_shell_fd(redir.fd))
+          if (!os::descriptor_is_shell_fd(file_fd, redir.fd))
             os::close_fd(file_fd);
-#else
-          if (file_fd != redir.fd) os::close_fd(file_fd);
-#endif
           if (!was_replaced) {
             did_redirection_open_fail = true;
             throw ErrorWithLocation{redir.target->source_location(),
@@ -873,12 +859,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         if (redir.fd == 1 || redir.fd == 2) {
           shit::flush();
         }
-#if SHIT_PLATFORM_IS WIN32
         const bool file_is_target_fd =
-            file_fd == os::descriptor_for_shell_fd(redir.fd);
-#else
-        const bool file_is_target_fd = file_fd == redir.fd;
-#endif
+            os::descriptor_is_shell_fd(file_fd, redir.fd);
         if (file_is_target_fd) {
           /* open returned fd N itself, so the collision is recorded for restore
              without a close. */

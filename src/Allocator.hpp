@@ -5,15 +5,16 @@
 
 #include <new>
 
-#if defined(_WIN32)
-#include <malloc.h>
-#endif
-
 namespace shit {
 
 class BumpArena;
 fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment) throws
     -> opaque *;
+
+namespace os {
+fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *;
+fn free_aligned(opaque *pointer) wontthrow -> void;
+} // namespace os
 
 class Allocator
 {
@@ -192,19 +193,12 @@ hot inline fn heap_alloc(opaque *context, usize length,
 {
   unused(context);
   /* malloc already meets every alignment up to alignof(max_align_t), so the
-     common request stays on the pooled path. An over-aligned type takes
-     aligned_alloc, whose result std::free accepts the same as a malloc result.
-     aligned_alloc wants a size that is a multiple of the alignment, so the
-     length is rounded up. The over-aligned path is rare and stays uncached. */
+     common request stays on the pooled path. The over-aligned path is rare and
+     stays uncached, and its length is rounded up to a multiple of the alignment
+     for aligned_alloc. */
   if (alignment > alignof(max_align_t)) {
     let const rounded_length = (length + alignment - 1) & ~(alignment - 1);
-#if defined(_WIN32)
-    /* Windows has no aligned_alloc, and an _aligned_malloc result must be freed
-       with _aligned_free, so the free path mirrors this branch on alignment. */
-    return _aligned_malloc(rounded_length, alignment);
-#else
-    return std::aligned_alloc(alignment, rounded_length);
-#endif
+    return os::allocate_aligned(rounded_length, alignment);
   }
   return heap_pool_instance().take(length);
 }
@@ -222,16 +216,10 @@ hot inline fn heap_free(opaque *context, opaque *pointer, usize length,
                         usize alignment) wontthrow -> void
 {
   unused(context);
+  /* An over-aligned block skips the pool, so a pooled block always belongs to
+     one size class. */
   if (alignment > alignof(max_align_t)) {
-#if defined(_WIN32)
-    /* An over-aligned block came from _aligned_malloc, so it is freed with the
-       matching _aligned_free rather than free. */
-    _aligned_free(pointer);
-#else
-    /* An over-aligned block came from aligned_alloc, which std::free accepts.
-       It skips the pool, so a pooled block always belongs to one size class. */
-    std::free(pointer);
-#endif
+    os::free_aligned(pointer);
     return;
   }
   heap_pool_instance().give(pointer, length);
