@@ -61,10 +61,7 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(Debug, "wait blocking on target '%s'", target.c_str());
 
     if (!target.is_empty() && target[0] == '%') {
-      let const parsed = StringView{target}.substring(1).to<i64>();
-      job *const matched = parsed.is_error()
-                               ? nullptr
-                               : cxt.find_job(static_cast<int>(parsed.value()));
+      job *const matched = cxt.find_job_by_spec(target);
 
       if (matched != nullptr) {
         status = wait_for_job(*matched);

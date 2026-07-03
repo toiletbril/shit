@@ -70,19 +70,27 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
     body = body.substring(1);
   }
 
-  u64 magnitude = 0;
+  u32 radix;
+  usize prefix_length;
   if (body.length >= 2 && body[0] == '0' && (body[1] == 'x' || body[1] == 'X'))
   {
-    magnitude = fold_leading_digits(body.substring(2), 16);
+    radix = 16;
+    prefix_length = 2;
   } else if (body.length >= 2 && body[0] == '0' &&
              (body[1] == 'b' || body[1] == 'B'))
   {
-    magnitude = fold_leading_digits(body.substring(2), 2);
+    radix = 2;
+    prefix_length = 2;
   } else if (body.length >= 1 && body[0] == '0') {
-    magnitude = fold_leading_digits(body, 8);
+    radix = 8;
+    prefix_length = 0;
   } else {
-    magnitude = fold_leading_digits(body, 10);
+    radix = 10;
+    prefix_length = 0;
   }
+
+  let const magnitude =
+      fold_leading_digits(body.substring(prefix_length), radix);
 
   return static_cast<i64>(is_negative ? -magnitude : magnitude);
 }

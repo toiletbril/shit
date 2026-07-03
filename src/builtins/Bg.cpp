@@ -23,19 +23,6 @@ Bg::Bg() = default;
 
 pure fn Bg::kind() const wontthrow -> Builtin::Kind { return Kind::Bg; }
 
-static fn resolve_jobspec(EvalContext &cxt, const String &spec) throws -> job *
-{
-  StringView value{spec};
-  if (!value.is_empty() && value[0] == '%') value = value.substring(1);
-
-  let const parsed_value = value.to<i64>();
-  if (parsed_value.is_error())
-    throw ErrorWithDetails{"'" + spec + "' is not a valid job",
-                           "Use a job spec like `%1` or `%+`"};
-
-  return cxt.find_job(static_cast<int>(parsed_value.value()));
-}
-
 static fn resume_job_in_background(ExecContext &ec, EvalContext &cxt,
                                    job *job) throws -> void
 {
@@ -66,7 +53,7 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   for (usize arg_position = 1; arg_position < args.count(); arg_position++) {
-    job *job = resolve_jobspec(cxt, args[arg_position]);
+    job *job = cxt.find_job_by_spec(args[arg_position]);
     if (job == nullptr)
       throw ErrorWithDetails{"There is no such job", "List jobs with `jobs`"};
 

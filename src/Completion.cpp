@@ -183,10 +183,10 @@ struct token_bounds
   usize end;
 };
 
-/* A forward scan that honors single and double quotes and a backslash escape,
-   so a quoted or escaped separator stays part of the word. A paren glued to the
-   preceding byte is literal too, so a name like burner (3).log completes rather
-   than opening a subshell. */
+/* A forward scan honors single and double quotes and a backslash escape. A
+   quoted or escaped separator stays part of the word. A paren glued to the
+   preceding byte is literal. A name like burner (3).log completes without
+   opening a subshell. */
 static pure fn find_token_bounds(StringView line, usize cursor) wontthrow
     -> token_bounds
 {
@@ -494,7 +494,9 @@ static fn unescape_path_token(StringView token) throws -> String
   let out = String{completion_allocator()};
   usize i = 0;
   while (i < token.length) {
-    if (token[i] == '\\' && i + 1 < token.length) i++;
+    if (token[i] == '\\' && i + 1 < token.length) {
+      i++;
+    }
     out.push(token[i]);
     i++;
   }
@@ -644,8 +646,7 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
 
   let unescaped_backing = String{completion_allocator()};
   if (!inside_quote) unescaped_backing = unescape_path_token(token);
-  path_token parts =
-      split_path_token(inside_quote ? token : unescaped_backing.view());
+  let parts = split_path_token(inside_quote ? token : unescaped_backing.view());
   const bool is_case_sensitive = token_has_uppercase(parts.basename_part);
 
   TRACELN(
@@ -706,7 +707,7 @@ static fn complete_glob(StringView token, const Path &base_directory,
 {
   let candidates = ArrayList<String>{completion_allocator()};
 
-  path_token parts = split_path_token(token);
+  let parts = split_path_token(token);
 
   TRACELN("resolving glob token '%.*s'", static_cast<int>(token.length),
           token.data);

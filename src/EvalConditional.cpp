@@ -156,8 +156,8 @@ struct conditional_evaluator
         cxt.cached_compiled_regex(escaped_pattern.view());
     let spans = ArrayList<os::regex_span>{cxt.scratch_allocator()};
     let error_message = String{cxt.scratch_allocator()};
-    const os::regex_match_result result =
-        os::execute_regex(*compiled, value, spans, error_message);
+    const os::regex_match_result result = os::execute_regex(
+        *compiled, value, spans, error_message, cxt.scratch_allocator());
     LOG(All, "the =~ regex %s the value",
         result == os::regex_match_result::Matched ? "matched"
                                                   : "did not match");

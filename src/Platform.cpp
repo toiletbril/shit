@@ -411,12 +411,12 @@ fn compile_regex(StringView pattern, bool is_case_insensitive,
 }
 
 fn execute_regex(compiled_regex &compiled, StringView subject,
-                 ArrayList<regex_span> &spans, String &error_message) throws
-    -> regex_match_result
+                 ArrayList<regex_span> &spans, String &error_message,
+                 Allocator scratch) throws -> regex_match_result
 {
-  let const subject_text = String{heap_allocator(), subject};
+  let const subject_text = String{scratch, subject};
   let const group_count = compiled.re.re_nsub + 1;
-  let matches = ArrayList<regmatch_t>{heap_allocator()};
+  let matches = ArrayList<regmatch_t>{scratch};
   matches.reserve(group_count);
   for (usize i = 0; i < group_count; i++)
     matches.push(regmatch_t{});
@@ -462,8 +462,12 @@ fn compile_search_regex(StringView pattern, bool is_case_insensitive,
 
 fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
 {
-  const String subject_text{heap_allocator(), subject};
-  return regexec(&compiled.re, subject_text.c_str(), 0, nullptr, 0) == 0;
+  /* REG_STARTEND bounds the match by offset, so the subject is read in place
+     with no null-terminated copy. */
+  regmatch_t bounds[1];
+  bounds[0].rm_so = 0;
+  bounds[0].rm_eo = static_cast<regoff_t>(subject.length);
+  return regexec(&compiled.re, subject.data, 1, bounds, REG_STARTEND) == 0;
 }
 
 pure fn path_is_absolute(StringView path) wontthrow -> bool
@@ -585,8 +589,9 @@ fn path_file_size(StringView path) wontthrow -> Maybe<u64>
 {
   const String path_string{path};
   struct stat info{};
-  if (::stat(path_string.c_str(), &info) != 0 || !S_ISREG(info.st_mode))
+  if (::stat(path_string.c_str(), &info) != 0 || !S_ISREG(info.st_mode)) {
     return None;
+  }
   return static_cast<u64>(info.st_size);
 }
 
@@ -602,35 +607,36 @@ fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool
 {
   const String first_string{first};
   const String second_string{second};
-  struct stat a{}, b{};
-  if (::stat(first_string.c_str(), &a) != 0) return false;
-  if (::stat(second_string.c_str(), &b) != 0) return false;
-  return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+  struct stat first_info{}, second_info{};
+  if (::stat(first_string.c_str(), &first_info) != 0) return false;
+  if (::stat(second_string.c_str(), &second_info) != 0) return false;
+  return first_info.st_dev == second_info.st_dev &&
+         first_info.st_ino == second_info.st_ino;
 }
 
 fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool
 {
   const String first_string{first};
   const String second_string{second};
-  struct stat a{}, b{};
-  if (::stat(first_string.c_str(), &a) != 0) return false;
-  if (::stat(second_string.c_str(), &b) != 0) return false;
+  struct stat first_info{}, second_info{};
+  if (::stat(first_string.c_str(), &first_info) != 0) return false;
+  if (::stat(second_string.c_str(), &second_info) != 0) return false;
   /* The nanoseconds break a same-second tie. */
-  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
-    return a.st_mtim.tv_sec > b.st_mtim.tv_sec;
-  return a.st_mtim.tv_nsec > b.st_mtim.tv_nsec;
+  if (first_info.st_mtim.tv_sec != second_info.st_mtim.tv_sec)
+    return first_info.st_mtim.tv_sec > second_info.st_mtim.tv_sec;
+  return first_info.st_mtim.tv_nsec > second_info.st_mtim.tv_nsec;
 }
 
 fn path_is_older_than(StringView first, StringView second) wontthrow -> bool
 {
   const String first_string{first};
   const String second_string{second};
-  struct stat a{}, b{};
-  if (::stat(first_string.c_str(), &a) != 0) return false;
-  if (::stat(second_string.c_str(), &b) != 0) return false;
-  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
-    return a.st_mtim.tv_sec < b.st_mtim.tv_sec;
-  return a.st_mtim.tv_nsec < b.st_mtim.tv_nsec;
+  struct stat first_info{}, second_info{};
+  if (::stat(first_string.c_str(), &first_info) != 0) return false;
+  if (::stat(second_string.c_str(), &second_info) != 0) return false;
+  if (first_info.st_mtim.tv_sec != second_info.st_mtim.tv_sec)
+    return first_info.st_mtim.tv_sec < second_info.st_mtim.tv_sec;
+  return first_info.st_mtim.tv_nsec < second_info.st_mtim.tv_nsec;
 }
 
 fn path_is_readable(StringView path) wontthrow -> bool
@@ -835,6 +841,7 @@ fn set_resource_limit(resource_kind kind, const resource_limit &limit) wontthrow
                         : static_cast<rlim_t>(limit.hard);
   return setrlimit(*which, &target) == 0;
 }
+
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
   return is_fd_a_tty(static_cast<descriptor>(shell_fd));
@@ -2349,13 +2356,7 @@ fn enumerate_processes(bool include_resource_stats) throws
   {
     StringView name{entry->d_name};
     if (name.is_empty()) continue;
-    bool is_all_digits = true;
-    for (usize i = 0; i < name.length; i++)
-      if (name[i] < '0' || name[i] > '9') {
-        is_all_digits = false;
-        break;
-      }
-    if (!is_all_digits) continue;
+    if (!name.is_all_decimal_digits()) continue;
 
     let const parsed = name.to<i64>();
     if (parsed.is_error()) continue;
@@ -2828,13 +2829,14 @@ fn compile_regex(StringView pattern, bool is_case_insensitive,
 }
 
 fn execute_regex(compiled_regex &compiled, StringView subject,
-                 ArrayList<regex_span> &spans, String &error_message) throws
-    -> regex_match_result
+                 ArrayList<regex_span> &spans, String &error_message,
+                 Allocator scratch) throws -> regex_match_result
 {
   unused(compiled);
   unused(subject);
   unused(spans);
   unused(error_message);
+  unused(scratch);
   return regex_match_result::Error;
 }
 
@@ -3045,28 +3047,30 @@ fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool
 {
   const String first_string{first};
   const String second_string{second};
-  WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
-  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard, &a) ==
-      0)
+  WIN32_FILE_ATTRIBUTE_DATA first_data{}, second_data{};
+  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard,
+                           &first_data) == 0)
     return false;
-  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard, &b) ==
-      0)
+  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard,
+                           &second_data) == 0)
     return false;
-  return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) > 0;
+  return CompareFileTime(&first_data.ftLastWriteTime,
+                         &second_data.ftLastWriteTime) > 0;
 }
 
 fn path_is_older_than(StringView first, StringView second) wontthrow -> bool
 {
   const String first_string{first};
   const String second_string{second};
-  WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
-  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard, &a) ==
-      0)
+  WIN32_FILE_ATTRIBUTE_DATA first_data{}, second_data{};
+  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard,
+                           &first_data) == 0)
     return false;
-  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard, &b) ==
-      0)
+  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard,
+                           &second_data) == 0)
     return false;
-  return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) < 0;
+  return CompareFileTime(&first_data.ftLastWriteTime,
+                         &second_data.ftLastWriteTime) < 0;
 }
 
 fn path_is_readable(StringView path) wontthrow -> bool

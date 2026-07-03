@@ -71,6 +71,8 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       status = 2;
       continue;
     }
+    let const display_name =
+        source == "-" ? StringView{"(standard input)"} : source;
     for (let const &line : split_keep_newlines(content->view())) {
       let const has_newline = !line.is_empty() && line[line.length - 1] == '\n';
       let const body =
@@ -80,7 +82,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
 
       has_any_match = true;
       if (should_print_names) {
-        output += source == "-" ? StringView{"(standard input)"} : source;
+        output += display_name;
         output += ':';
       }
       output += line;

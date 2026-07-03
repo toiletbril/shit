@@ -320,8 +320,8 @@ fn compile_regex(StringView pattern, bool is_case_insensitive,
                  compiled_regex &out) throws -> regex_compile_result;
 
 fn execute_regex(compiled_regex &compiled, StringView subject,
-                 ArrayList<regex_span> &spans, String &error_message) throws
-    -> regex_match_result;
+                 ArrayList<regex_span> &spans, String &error_message,
+                 Allocator scratch) throws -> regex_match_result;
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void;
 
