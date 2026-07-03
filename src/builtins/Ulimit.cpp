@@ -6,10 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-#if SHIT_PLATFORM_IS POSIX
-#include <sys/resource.h>
-#endif
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-HSacdflmnpstuvw] [limit]");
@@ -39,93 +35,78 @@ REGISTER_BUILTIN_FLAGS(Ulimit);
 
 namespace shit {
 
-#if SHIT_PLATFORM_IS POSIX
-
 namespace {
 
 /* The order matches dash so -a prints the same table. */
 struct resource_entry
 {
   const char *label;
-  int which;
-  rlim_t units_per_value;
+  os::resource_kind kind;
+  u64 units_per_value;
 };
 
 constexpr resource_entry RESOURCE_TABLE[] = {
-    {"time(seconds)",         RLIMIT_CPU,     1   },
-    {"file(blocks)",          RLIMIT_FSIZE,   512 },
-    {"data(kbytes)",          RLIMIT_DATA,    1024},
-    {"stack(kbytes)",         RLIMIT_STACK,   1024},
-    {"coredump(blocks)",      RLIMIT_CORE,    512 },
-#ifdef RLIMIT_RSS
-    {"memory(kbytes)",        RLIMIT_RSS,     1024},
-#endif
-#ifdef RLIMIT_MEMLOCK
-    {"locked memory(kbytes)", RLIMIT_MEMLOCK, 1024},
-#endif
-#ifdef RLIMIT_NPROC
-    {"process",               RLIMIT_NPROC,   1   },
-#endif
-    {"nofiles",               RLIMIT_NOFILE,  1   },
-#ifdef RLIMIT_AS
-    {"vmemory(kbytes)",       RLIMIT_AS,      1024},
-#endif
-#ifdef RLIMIT_LOCKS
-    {"locks",                 RLIMIT_LOCKS,   1   },
-#endif
-#ifdef RLIMIT_RTPRIO
-    {"rtprio",                RLIMIT_RTPRIO,  1   },
-#endif
+    {"time(seconds)",         os::resource_kind::CpuSeconds,          1   },
+    {"file(blocks)",          os::resource_kind::FileBlocks,          512 },
+    {"data(kbytes)",          os::resource_kind::DataKbytes,          1024},
+    {"stack(kbytes)",         os::resource_kind::StackKbytes,         1024},
+    {"coredump(blocks)",      os::resource_kind::CoreBlocks,          512 },
+    {"memory(kbytes)",        os::resource_kind::ResidentKbytes,      1024},
+    {"locked memory(kbytes)", os::resource_kind::LockedMemoryKbytes,  1024},
+    {"process",               os::resource_kind::Processes,           1   },
+    {"nofiles",               os::resource_kind::OpenFiles,           1   },
+    {"vmemory(kbytes)",       os::resource_kind::VirtualMemoryKbytes, 1024},
+    {"locks",                 os::resource_kind::FileLocks,           1   },
+    {"rtprio",                os::resource_kind::RealtimePriority,    1   },
 };
 
-constexpr int PIPE_SIZE_PSEUDO = -1;
-
-fn block_factor(const resource_entry &entry, bool is_posix_mode) throws
-    -> rlim_t
+fn block_factor(const resource_entry &entry, bool is_posix_mode) throws -> u64
 {
-  if (entry.which == RLIMIT_FSIZE || entry.which == RLIMIT_CORE) {
+  if (entry.kind == os::resource_kind::FileBlocks ||
+      entry.kind == os::resource_kind::CoreBlocks)
+  {
     return is_posix_mode ? 512 : 1024;
   }
 
   return entry.units_per_value;
 }
 
-fn selected_resource() throws -> resource_entry
+fn selected_resource(bool &is_pipe_pseudo_out) throws -> resource_entry
 {
-  if (FLAG_CPU_TIME.is_enabled()) return {"time(seconds)", RLIMIT_CPU, 1};
-  if (FLAG_DATA_SIZE.is_enabled()) return {"data(kbytes)", RLIMIT_DATA, 1024};
+  is_pipe_pseudo_out = false;
+  if (FLAG_CPU_TIME.is_enabled())
+    return {"time(seconds)", os::resource_kind::CpuSeconds, 1};
+  if (FLAG_DATA_SIZE.is_enabled())
+    return {"data(kbytes)", os::resource_kind::DataKbytes, 1024};
   if (FLAG_STACK_SIZE.is_enabled())
-    return {"stack(kbytes)", RLIMIT_STACK, 1024};
+    return {"stack(kbytes)", os::resource_kind::StackKbytes, 1024};
   if (FLAG_CORE_SIZE.is_enabled())
-    return {"coredump(blocks)", RLIMIT_CORE, 512};
-  if (FLAG_OPEN_FILES.is_enabled()) return {"nofiles", RLIMIT_NOFILE, 1};
-#ifdef RLIMIT_RSS
-  if (FLAG_RSS_SIZE.is_enabled()) return {"memory(kbytes)", RLIMIT_RSS, 1024};
-#endif
-#ifdef RLIMIT_MEMLOCK
+    return {"coredump(blocks)", os::resource_kind::CoreBlocks, 512};
+  if (FLAG_OPEN_FILES.is_enabled())
+    return {"nofiles", os::resource_kind::OpenFiles, 1};
+  if (FLAG_RSS_SIZE.is_enabled())
+    return {"memory(kbytes)", os::resource_kind::ResidentKbytes, 1024};
   if (FLAG_LOCKED_MEMORY.is_enabled())
-    return {"locked memory(kbytes)", RLIMIT_MEMLOCK, 1024};
-#endif
-  if (FLAG_PROCESSES_P.is_enabled())
-    return {"pipe size", PIPE_SIZE_PSEUDO, 512};
-#ifdef RLIMIT_NPROC
-  if (FLAG_PROCESSES.is_enabled()) return {"process", RLIMIT_NPROC, 1};
-#endif
-#ifdef RLIMIT_AS
+    return {"locked memory(kbytes)", os::resource_kind::LockedMemoryKbytes,
+            1024};
+  if (FLAG_PROCESSES_P.is_enabled()) {
+    is_pipe_pseudo_out = true;
+    return {"pipe size", os::resource_kind::OpenFiles, 512};
+  }
+  if (FLAG_PROCESSES.is_enabled())
+    return {"process", os::resource_kind::Processes, 1};
   if (FLAG_VIRTUAL_MEMORY.is_enabled())
-    return {"vmemory(kbytes)", RLIMIT_AS, 1024};
-#endif
-#ifdef RLIMIT_LOCKS
-  if (FLAG_FILE_LOCKS.is_enabled()) return {"locks", RLIMIT_LOCKS, 1};
-#endif
-  return {"file(blocks)", RLIMIT_FSIZE, 512};
+    return {"vmemory(kbytes)", os::resource_kind::VirtualMemoryKbytes, 1024};
+  if (FLAG_FILE_LOCKS.is_enabled())
+    return {"locks", os::resource_kind::FileLocks, 1};
+  return {"file(blocks)", os::resource_kind::FileBlocks, 512};
 }
 
-fn render_limit(const struct rlimit &limit, rlim_t divisor,
+fn render_limit(const os::resource_limit &limit, u64 divisor,
                 Allocator allocator) throws -> String
 {
-  const rlim_t value = FLAG_HARD.is_enabled() ? limit.rlim_max : limit.rlim_cur;
-  if (value == RLIM_INFINITY) return String{allocator, "unlimited"};
+  const u64 value = FLAG_HARD.is_enabled() ? limit.hard : limit.soft;
+  if (value == os::RESOURCE_UNLIMITED) return String{allocator, "unlimited"};
   return String::from(value / divisor, allocator);
 }
 
@@ -142,8 +123,8 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_ALL.is_enabled()) {
     let out = String{cxt.scratch_allocator()};
     for (let const &entry : RESOURCE_TABLE) {
-      struct rlimit limit{};
-      if (getrlimit(entry.which, &limit) != 0) continue;
+      os::resource_limit limit{};
+      if (!os::get_resource_limit(entry.kind, limit)) continue;
       let const label = String{cxt.scratch_allocator(), entry.label};
       out += label;
       for (usize pad = label.count(); pad < 20; pad++)
@@ -157,9 +138,10 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  let const resource = selected_resource();
+  bool is_pipe_pseudo = false;
+  let const resource = selected_resource(is_pipe_pseudo);
 
-  if (resource.which == PIPE_SIZE_PSEUDO) {
+  if (is_pipe_pseudo) {
     if (args.count() < 2) {
       ec.print_to_stdout("8\n");
       return 0;
@@ -170,8 +152,8 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                            "with `ulimit -p`"};
   }
 
-  struct rlimit limit{};
-  if (getrlimit(resource.which, &limit) != 0)
+  os::resource_limit limit{};
+  if (!os::get_resource_limit(resource.kind, limit))
     throw Error{"Unable to read the resource limit because " +
                 os::last_system_error_message()};
 
@@ -189,15 +171,15 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const &requested = args[1];
   let const units = block_factor(resource, cxt.is_posix_mode());
-  rlim_t value = RLIM_INFINITY;
+  u64 value = os::RESOURCE_UNLIMITED;
   if (requested != "unlimited") {
     let const parsed =
-        static_cast<rlim_t>(std::strtoull(requested.c_str(), nullptr, 10));
+        static_cast<u64>(std::strtoull(requested.c_str(), nullptr, 10));
     /* A scaled resource multiplies the operand by its unit, so an operand that
        would overflow the multiply saturates to unlimited the way bash reports
        it. */
-    if (units != 0 && parsed > RLIM_INFINITY / units) {
-      value = RLIM_INFINITY;
+    if (units != 0 && parsed > os::RESOURCE_UNLIMITED / units) {
+      value = os::RESOURCE_UNLIMITED;
     } else {
       value = parsed * units;
     }
@@ -205,30 +187,15 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* Naming neither -H nor -S, or both together, sets both, the way dash does.
    */
-  if (FLAG_HARD.is_enabled() || !FLAG_SOFT.is_enabled()) limit.rlim_max = value;
-  if (FLAG_SOFT.is_enabled() || !FLAG_HARD.is_enabled()) limit.rlim_cur = value;
+  if (FLAG_HARD.is_enabled() || !FLAG_SOFT.is_enabled()) limit.hard = value;
+  if (FLAG_SOFT.is_enabled() || !FLAG_HARD.is_enabled()) limit.soft = value;
 
-  if (setrlimit(resource.which, &limit) != 0)
+  if (!os::set_resource_limit(resource.kind, limit))
     throw Error{"Unable to set the resource limit because " +
                 os::last_system_error_message()};
 
   return 0;
 }
-
-#else /* not POSIX */
-
-fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
-{
-  unused(cxt);
-
-  let const args = PARSE_BUILTIN_ARGS(ec);
-  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
-
-  if (args.count() < 2) ec.print_to_stdout("unlimited\n");
-  return 0;
-}
-
-#endif
 
 Ulimit::Ulimit() = default;
 

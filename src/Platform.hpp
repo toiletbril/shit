@@ -375,6 +375,38 @@ struct cpu_times
 
 fn read_process_cpu_times() wontthrow -> cpu_times;
 
+enum class resource_kind : u8
+{
+  CpuSeconds,
+  FileBlocks,
+  DataKbytes,
+  StackKbytes,
+  CoreBlocks,
+  ResidentKbytes,
+  LockedMemoryKbytes,
+  Processes,
+  OpenFiles,
+  VirtualMemoryKbytes,
+  FileLocks,
+  RealtimePriority,
+};
+
+/* The shell-level stand-in for an infinite limit, mapped to the platform's own
+   sentinel by the wrappers. */
+constexpr u64 RESOURCE_UNLIMITED = ~static_cast<u64>(0);
+
+struct resource_limit
+{
+  u64 soft{RESOURCE_UNLIMITED};
+  u64 hard{RESOURCE_UNLIMITED};
+};
+
+/* False when the platform carries no such limit. */
+fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow
+    -> bool;
+fn set_resource_limit(resource_kind kind, const resource_limit &limit) wontthrow
+    -> bool;
+
 /* On POSIX the number is the descriptor, and on Windows it maps to the C
    runtime handle. */
 fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor;

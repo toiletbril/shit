@@ -773,6 +773,68 @@ fn read_process_cpu_times() wontthrow -> cpu_times
   }
   return result;
 }
+
+static fn rlimit_resource_of(resource_kind kind) wontthrow -> Maybe<int>
+{
+  switch (kind) {
+  case resource_kind::CpuSeconds: return RLIMIT_CPU;
+  case resource_kind::FileBlocks: return RLIMIT_FSIZE;
+  case resource_kind::DataKbytes: return RLIMIT_DATA;
+  case resource_kind::StackKbytes: return RLIMIT_STACK;
+  case resource_kind::CoreBlocks: return RLIMIT_CORE;
+  case resource_kind::OpenFiles: return RLIMIT_NOFILE;
+#ifdef RLIMIT_RSS
+  case resource_kind::ResidentKbytes: return RLIMIT_RSS;
+#endif
+#ifdef RLIMIT_MEMLOCK
+  case resource_kind::LockedMemoryKbytes: return RLIMIT_MEMLOCK;
+#endif
+#ifdef RLIMIT_NPROC
+  case resource_kind::Processes: return RLIMIT_NPROC;
+#endif
+#ifdef RLIMIT_AS
+  case resource_kind::VirtualMemoryKbytes: return RLIMIT_AS;
+#endif
+#ifdef RLIMIT_LOCKS
+  case resource_kind::FileLocks: return RLIMIT_LOCKS;
+#endif
+#ifdef RLIMIT_RTPRIO
+  case resource_kind::RealtimePriority: return RLIMIT_RTPRIO;
+#endif
+  default: return shit::None;
+  }
+}
+
+fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow -> bool
+{
+  let const which = rlimit_resource_of(kind);
+  if (!which.has_value()) return false;
+
+  struct rlimit limit{};
+  if (getrlimit(*which, &limit) != 0) return false;
+
+  out.soft = limit.rlim_cur == RLIM_INFINITY ? RESOURCE_UNLIMITED
+                                             : static_cast<u64>(limit.rlim_cur);
+  out.hard = limit.rlim_max == RLIM_INFINITY ? RESOURCE_UNLIMITED
+                                             : static_cast<u64>(limit.rlim_max);
+  return true;
+}
+
+fn set_resource_limit(resource_kind kind, const resource_limit &limit) wontthrow
+    -> bool
+{
+  let const which = rlimit_resource_of(kind);
+  if (!which.has_value()) return false;
+
+  struct rlimit target{};
+  target.rlim_cur = limit.soft == RESOURCE_UNLIMITED
+                        ? RLIM_INFINITY
+                        : static_cast<rlim_t>(limit.soft);
+  target.rlim_max = limit.hard == RESOURCE_UNLIMITED
+                        ? RLIM_INFINITY
+                        : static_cast<rlim_t>(limit.hard);
+  return setrlimit(*which, &target) == 0;
+}
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
   return is_fd_a_tty(static_cast<descriptor>(shell_fd));
@@ -3080,6 +3142,22 @@ cold fn list_directory_typed(StringView dir) throws
 }
 
 fn read_process_cpu_times() wontthrow -> cpu_times { return cpu_times{}; }
+
+fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow -> bool
+{
+  unused(kind);
+  out.soft = RESOURCE_UNLIMITED;
+  out.hard = RESOURCE_UNLIMITED;
+  return true;
+}
+
+fn set_resource_limit(resource_kind kind, const resource_limit &limit) wontthrow
+    -> bool
+{
+  unused(kind);
+  unused(limit);
+  return true;
+}
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
   return is_fd_a_tty(reinterpret_cast<descriptor>(_get_osfhandle(shell_fd)));
