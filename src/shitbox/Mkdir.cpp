@@ -29,8 +29,6 @@ static fn make_one(StringView path, u32 mode, bool should_set_exact_mode,
                    bool should_ignore_existing) throws -> bool
 {
   if (os::make_directory(path, mode)) {
-    /* The create narrows the bits by the umask, so the exact mode is
-       re-applied. */
     if (should_set_exact_mode && !os::set_file_mode(path, mode)) {
       return false;
     }
@@ -57,8 +55,6 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const should_make_parents = FLAG_MKDIR_PARENTS.is_enabled();
 
-  /* The named directory takes the -m mode. An intermediate parent forces owner
-     write and search on top of the umask, so the walk descends into it. */
   u32 named_mode = 0777;
   if (FLAG_MKDIR_MODE.is_set()) {
     let const parsed =

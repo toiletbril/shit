@@ -30,8 +30,6 @@ pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
   return false;
 }
 
-/* The field_width lets {01..10} pad its output to the wider operand, counting a
-   leading sign toward the width the way %0*d does. */
 struct sequence_integer
 {
   i64 value;
@@ -298,10 +296,6 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
           WordSegment{WordSegment::Kind::UnquotedText, steal(run), false});
     }
 
-    /* bash brace-expands before lexing a variable name, so a greedy $name a
-       brace expansion left adjacent to name bytes absorbs them, turning
-       {$foo,b}bar into $foobar. A bounded ${name} is not greedy and is left
-       split. */
     for (usize s = 0; s + 1 < out.segments.count(); s++) {
       WordSegment &reference = out.segments[s];
       if (reference.kind != WordSegment::Kind::VariableReference ||

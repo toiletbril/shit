@@ -30,11 +30,6 @@ Exec::Exec() = default;
 
 pure fn Exec::kind() const wontthrow -> Builtin::Kind { return Kind::Exec; }
 
-/* A failed exec must not fell the whole session when the process it would
-   replace is an inner scope or an interactive prompt. An in-process subshell,
-   a command substitution, or a pipeline stage ends only that scope with 127,
-   and an interactive shell survives the failure the way bash keeps the prompt
-   alive. A non-interactive script exits with 127. */
 static fn report_exec_command_not_found(ExecContext &ec, EvalContext &cxt,
                                         const String &command_name) throws
     -> i32

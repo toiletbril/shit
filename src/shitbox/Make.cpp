@@ -864,8 +864,6 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     }
   };
 
-  /* A '|' token opens the order-only section, whose prerequisites are still
-     built but stay out of $< and $^. */
   ArrayList<String> normal_prerequisites{cxt.scratch_allocator()};
   ArrayList<String> order_only_prerequisites{cxt.scratch_allocator()};
   bool is_order_only_section = false;
@@ -891,7 +889,6 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   let const first_prereq = normal_prerequisites.is_empty()
                                ? StringView{}
                                : normal_prerequisites[0].view();
-  /* $^ drops a repeated prerequisite, the way GNU make dedups it. */
   ArrayList<String> seen_prerequisites{cxt.scratch_allocator()};
   String all_prereqs{cxt.scratch_allocator()};
   for (const String &prerequisite : normal_prerequisites) {
@@ -1049,9 +1046,6 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
 
   ArrayList<String> visiting{cxt.scratch_allocator()};
   ArrayList<String> built{cxt.scratch_allocator()};
-  /* GNU make exits 2 on a build error, so a failed recipe or a missing rule
-     carries status 2 while the located caret from the dispatcher is preserved
-     by rethrowing the original error. */
   try {
     for (const String &goal : goals)
       build_target(ec, cxt, mk, goal.view(), visiting, built);

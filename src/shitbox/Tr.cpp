@@ -47,8 +47,6 @@ struct decoded_char
   usize width_count;
 };
 
-/* A backslash escape decodes the way GNU tr reads it, the named controls plus a
-   one-to-three digit octal value, and an unknown escape drops the backslash. */
 static fn decode_escaped_char(StringView set, usize position) wontthrow
     -> decoded_char
 {
@@ -82,9 +80,6 @@ static fn decode_escaped_char(StringView set, usize position) wontthrow
   return {static_cast<unsigned char>(escaped), 2};
 }
 
-/* A `[:name:]` class expands to its member bytes in ascending order, so
-   `[:upper:]` and `[:lower:]` line up for a case translation. A width of zero
-   reports that no class was present at the position. */
 static fn expand_posix_class(StringView set, usize position,
                              String &expanded) throws -> usize
 {
@@ -111,9 +106,6 @@ static fn expand_posix_class(StringView set, usize position,
   return scan + 2 - position;
 }
 
-/* The bytes read as unsigned so a range that touches the 0 or 255 edge does not
-   overflow a char. A reverse range is rejected the way the reference tr does.
- */
 static fn expand_set(StringView set, Allocator allocator) throws -> String
 {
   String expanded{allocator};
@@ -182,9 +174,6 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize i = 0; i < BYTE_VALUE_COUNT; i++)
     translation[i] = static_cast<unsigned char>(i);
 
-  /* A byte repeated in set1 takes the mapping of its last occurrence, the way
-     the reference tr resolves it, so the raw scan position indexes set2 and a
-     later write overwrites an earlier one. */
   for (usize i = 0; i < set1.count(); i++) {
     let const from = static_cast<unsigned char>(set1.view()[i]);
     is_in_set1[from] = true;

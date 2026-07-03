@@ -80,8 +80,6 @@ constexpr resource_entry RESOURCE_TABLE[] = {
 
 constexpr int PIPE_SIZE_PSEUDO = -1;
 
-/* The default mood scales -f and -c by 1024-byte blocks the way bash does, and
-   the posix mood drops back to the 512-byte block. */
 fn block_factor(const resource_entry &entry, bool is_posix_mode) throws
     -> rlim_t
 {

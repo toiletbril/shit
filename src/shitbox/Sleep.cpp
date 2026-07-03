@@ -45,8 +45,6 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
     char *end = nullptr;
     let const seconds_value = std::strtod(start, &end);
 
-    /* A nan compares false against zero, so the explicit nan check is
-       needed, not the sign test alone. */
     let digits = start;
     if (*digits == '+' || *digits == '-') digits++;
     const bool is_hex_prefix =

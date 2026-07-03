@@ -207,9 +207,6 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let do_reject_unknown = [&](StringView name) throws -> bool {
     if (is_known_shopt_option(name)) return false;
     status = 1;
-    /* A bad name is reported and skipped so the valid names still apply, the
-       way bash keeps going past an invalid option. A -q probe stays silent and
-       reports only through the status. */
     if (!is_quiet)
       report_soft_builtin_error(ec, cxt,
                                 StringView{"'"} + name +

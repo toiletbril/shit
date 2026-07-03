@@ -48,9 +48,6 @@ static fn ascii_lower_copy(Allocator allocator, StringView text) throws
   return lowered;
 }
 
-/* bash orders the [[ < ]] and [[ > ]] operands by the LC_COLLATE collation of
-   the environment. The category is bound once from the environment on the first
-   comparison, since the shell otherwise stays in the C locale. */
 static fn collation_order(const String &left, const String &right) wontthrow
     -> int
 {
@@ -468,9 +465,6 @@ static constexpr usize REGEX_CACHE_CAP = 128;
 
 fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
 {
-  /* The key carries a leading flag byte for the case-fold mode, so a
-     nocasematch REG_ICASE compilation and a case-sensitive one never collide on
-     the same pattern text. */
   let const is_case_insensitive = is_shopt_enabled("nocasematch");
   let key = String{scratch_allocator()};
   key.reserve(pattern.length + 1);

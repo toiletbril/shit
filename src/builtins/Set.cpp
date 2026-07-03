@@ -202,8 +202,6 @@ fn list_options(const EvalContext &cxt) throws -> String
   return out;
 }
 
-/* The bare set -o listing is a two-column name and state table, while set +o
-   prints the replayable set +o form list_options builds. */
 fn list_options_columnar(const EvalContext &cxt) throws -> String
 {
   const usize name_field_width = 15;
@@ -476,9 +474,6 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     if (arg == "+p") continue;
 
-    /* A lone - or + ends option parsing, and a lone - also turns off xtrace
-       and verbose. The positional parameters are rebound only when a word
-       follows, so set - with no argument leaves them untouched. */
     if (arg == "-" || arg == "+") {
       if (arg[0] == '-') {
         apply_or_reject_option(cxt, *find_option_by_letter('x'), false);

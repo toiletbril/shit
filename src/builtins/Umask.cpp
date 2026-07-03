@@ -15,8 +15,6 @@ HELP_DESCRIPTION_DECL(
     "The umask builtin prints or sets the file creation mask.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
-/* -p and -S are hand-parsed in execute, so these FLAG rows only feed the help
-   text. */
 FLAG(UMASK_REUSABLE, Bool, 'p', "",
      "Print the mask in a form reusable as input.");
 FLAG(UMASK_SYMBOLIC, Bool, 'S', "",

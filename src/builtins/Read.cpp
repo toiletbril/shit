@@ -114,18 +114,12 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       max_bytes = parsed.value();
   }
 
-  /* Without -r a backslash escapes the next byte, joining the next line at the
-     delimiter and making any other byte a literal that no longer splits on IFS.
-   */
   let const should_process_escapes = !FLAG_READ_RAW.is_enabled();
 
   let was_newline_terminated = false;
   let was_timed_out = false;
   let was_read_successful = false;
 
-  /* The de-escaped bytes pair with a mask marking which one came from a
-     backslash escape, so the splitter below keeps an escaped IFS byte inside
-     its field. The mask is all false in the raw forms. */
   let line = String{cxt.scratch_allocator()};
   let is_literal_byte = ArrayList<bool>{cxt.scratch_allocator()};
 
@@ -134,9 +128,6 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         timeout_nanos > 0
             ? os::monotonic_nanos() + static_cast<u64>(timeout_nanos)
             : 0;
-    /* The count is of the de-escaped output bytes the way bash -n measures
-       them, so a backslash escape consumes two input bytes for one output byte
-       and a backslash newline reads on without counting. */
     i64 output_count = 0;
     while (output_count < max_bytes) {
       if (timeout_nanos > 0) {
@@ -196,9 +187,6 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             backslash_count++;
           return backslash_count;
         };
-        /* An odd run of trailing backslashes leaves one escaping the delimiter,
-           so the delimiter is dropped and the next line is read and appended.
-         */
         while (was_newline_terminated && do_trailing_backslash_count() % 2 == 1)
         {
           accumulated.pop_back();
@@ -281,10 +269,6 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   for (usize i = 0; i < operand_count; i++) {
     if (i + 1 == operand_count) {
-      /* The last variable receives its own field and, when content follows the
-         terminating delimiter, the rest of the line with trailing IFS
-         whitespace trimmed. A lone trailing non-whitespace IFS delimiter is
-         dropped the way bash drops the empty field it would introduce. */
       let const field_start = cursor;
       while (cursor < line.length() && !do_is_separator(cursor))
         cursor++;

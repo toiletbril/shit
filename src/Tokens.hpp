@@ -45,10 +45,6 @@ public:
   Kind kind;
   String text;
   bool is_in_double_quotes{false};
-  /* A $name reference lexed its name greedily, so a following name byte extends
-     it. Brace expansion reads this to merge {$foo,b}bar into $foobar the way
-     bash re-lexes the expanded text. A ${name} reference is bounded and leaves
-     it false. */
   bool is_greedy_name{false};
 
   mutable Maybe<i64> folded_arithmetic_result{};

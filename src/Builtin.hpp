@@ -342,8 +342,6 @@ fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &;
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void;
 
-/* The note renders on its own line under the caret, the how-to-fix hint the
-   reader acts on. */
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message, StringView note) throws
     -> void;

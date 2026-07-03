@@ -33,9 +33,6 @@ fn Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   let output = String{cxt.scratch_allocator()};
-  /* The logical form prints PWD, used only when it names an absolute path that
-     still resolves to the current directory, so an unset, relative, or stale
-     value falls back to the physical directory. */
   let const want_physical = FLAG_PWD_PHYSICAL.is_enabled();
   let const logical_pwd = cxt.get_variable_value("PWD");
   let const physical_directory = Path::current_directory();

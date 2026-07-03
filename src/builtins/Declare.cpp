@@ -233,10 +233,6 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return false;
   };
 
-  /* The -p print form with no name operands filters the whole variable set the
-     way bash lists every declaration matching the paired attribute. A bare
-     declare cannot take this path, since an array-assignment argument reaches
-     the builtin as an already-applied prefix and leaves no operand behind. */
   if (should_print && i >= args.count()) {
     let const do_matches_attribute_filter = [&](StringView name) -> bool {
       if (should_export && !os::get_environment_variable(name).has_value()) {

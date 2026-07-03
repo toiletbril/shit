@@ -36,8 +36,6 @@ static fn is_negative_number_token(StringView token) wontthrow -> bool
          token.substring(1).is_all_decimal_digits();
 }
 
-/* The flag parser reads a leading `-5` as an unknown flag. A negative first
-   operand is delimited with `--` to keep it an operand. */
 static fn
 find_leading_negative_position(const ArrayList<String> &args) wontthrow
     -> Maybe<usize>

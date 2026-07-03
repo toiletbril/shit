@@ -135,8 +135,6 @@ struct job
   String command{heap_allocator()};
   State state{State::Running};
   i32 last_status{0};
-  /* A state change the shell has not yet reported, the set that `jobs -n`
-     lists. It is cleared once the change is listed or announced. */
   bool has_unreported_state_change{false};
 };
 
@@ -410,8 +408,6 @@ public:
   /* Set IFS and refresh the separator table together, so the table never drifts
      from the cached value. */
   fn set_field_separators(StringView value) throws -> void;
-  /* The live IFS a prefix assignment updates for the current command, so read
-     splits on a prefix IFS even when the store still holds the prior value. */
   pure fn field_separators() const wontthrow -> StringView
   {
     return m_field_separators.view();
@@ -1067,9 +1063,7 @@ public:
                                  bool remove_quotes = true) throws -> String;
 
   /* is_pattern_word makes a backslash quote the following byte, the # and %
-     rule. strip_escaped_literals removes a backslash before an ordinary byte,
-     the quote-removal a default or alternate word wants, while a replacement
-     word keeps the backslash so \& stays a literal ampersand. */
+     rule. */
   fn expand_modifier_word_worker(StringView word, Bitset &active_out,
                                  bool remove_quotes, bool is_pattern_word,
                                  bool strip_escaped_literals) throws -> String;

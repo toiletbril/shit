@@ -56,9 +56,7 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* A leading -- ends eval's option scan, matching bash eval -- "$code". eval
-     defines no options, so any other dash-led first word is invalid, while a
-     bare - stays an operand. */
+  /* A leading -- ends eval's option scan, matching bash eval -- "$code". */
   usize first = 1;
   if (ec.args().count() > 1) {
     let const &lead = ec.args()[1];

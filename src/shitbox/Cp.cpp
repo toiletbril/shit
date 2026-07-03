@@ -102,9 +102,6 @@ static fn copy_path(const ExecContext &ec, StringView source,
   let const source_path = Path{source};
   let const source_mode = source_permission_bits(source_path, source);
 
-  /* A recursive copy recreates the symlink at the destination. A non-recursive
-     copy dereferences the link and copies the target contents, and a platform
-     that cannot read the link falls through the same way. */
   if (source_path.is_symbolic_link() && is_recursive) {
     if (let const target = os::read_symlink(source)) {
       /* Symlink creation fails when the path is already present, so an existing
@@ -184,8 +181,6 @@ static fn copy_path(const ExecContext &ec, StringView source,
   let const destination_existed = Path{destination}.exists();
   copy_file(ec, source, destination, is_verbose, allocator);
 
-  /* An existing destination keeps its own mode, a freshly created one takes the
-     source permission bits masked by the umask. */
   if (source_mode.has_value() && !destination_existed) {
     os::set_file_mode(destination,
                       *source_mode & ~os::get_file_creation_mask());

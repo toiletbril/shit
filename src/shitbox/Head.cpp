@@ -132,7 +132,6 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  /* The last of -c and -n on the command line selects the mode. */
   let const has_bytes_flag = FLAG_HEAD_BYTES.is_set();
   let const has_lines_flag = FLAG_HEAD_LINES.is_set();
   let const is_byte_mode =

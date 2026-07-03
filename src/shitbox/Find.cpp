@@ -22,9 +22,6 @@ namespace shit {
 
 namespace shitbox {
 
-/* The name patterns point into the arguments that spelled them, so the
-   arguments outlive the walk that reads the patterns. Every -name must match,
-   so the patterns are ANDed. */
 struct find_options
 {
   const ArrayList<StringView> *name_patterns{nullptr};

@@ -75,9 +75,6 @@ static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
   ec.print_to_stdout(out);
 }
 
-/* The history is backed by its file, so reading a named file into the list
-   appends that file to the backing file and reloads, rather than repointing the
-   default path the way a raw load would. */
 static fn append_file_into_history(EvalContext &cxt, const Path &source) throws
     -> bool
 {
