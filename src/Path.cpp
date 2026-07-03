@@ -3,38 +3,7 @@
 #include "Platform.hpp"
 #include "Trace.hpp"
 
-#if SHIT_PLATFORM_IS POSIX
-#include <dirent.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-#ifdef __APPLE__
-#define st_mtim st_mtimespec
-#define st_atim st_atimespec
-#define st_ctim st_ctimespec
-#endif
-#elif SHIT_PLATFORM_IS WIN32
-#include <direct.h>
-#include <io.h>
-#include <windows.h>
-#endif
-
 namespace shit {
-
-#if SHIT_PLATFORM_IS WIN32
-static constexpr char DIRECTORY_SEPARATOR = '\\';
-#else
-static constexpr char DIRECTORY_SEPARATOR = '/';
-#endif
-
-static pure fn is_directory_separator(char c) wontthrow -> bool
-{
-#if SHIT_PLATFORM_IS WIN32
-  return c == '/' || c == '\\';
-#else
-  return c == '/';
-#endif
-}
 
 Path::Path(StringView text) : m_text(text) {}
 
@@ -48,13 +17,7 @@ hot fn Path::is_empty() const wontthrow -> bool { return m_text.is_empty(); }
 
 fn Path::is_absolute() const wontthrow -> bool
 {
-  if (m_text.is_empty()) return false;
-#if SHIT_PLATFORM_IS WIN32
-  if (is_directory_separator(m_text[0])) return true;
-  return m_text.count() >= 2 && m_text[1] == ':';
-#else
-  return is_directory_separator(m_text[0]);
-#endif
+  return os::path_is_absolute(m_text.view());
 }
 
 fn Path::is_relative() const wontthrow -> bool { return !is_absolute(); }
@@ -62,7 +25,7 @@ fn Path::is_relative() const wontthrow -> bool { return !is_absolute(); }
 static pure fn filename_offset(const String &text) wontthrow -> usize
 {
   for (usize i = text.count(); i > 0; i--)
-    if (is_directory_separator(text[i - 1])) return i;
+    if (os::is_directory_separator(text[i - 1])) return i;
   return 0;
 }
 
@@ -96,10 +59,10 @@ fn Path::parent() const throws -> Path
 fn Path::push_component(StringView component) throws -> Path &
 {
   if (component.length == 0) return *this;
-  if (!m_text.is_empty() && !is_directory_separator(m_text.back()) &&
-      !is_directory_separator(component.data[0]))
+  if (!m_text.is_empty() && !os::is_directory_separator(m_text.back()) &&
+      !os::is_directory_separator(component.data[0]))
   {
-    m_text.push(DIRECTORY_SEPARATOR);
+    m_text.push(os::DIRECTORY_SEPARATOR);
   }
   m_text.append(component);
   return *this;
@@ -130,12 +93,12 @@ cold fn Path::normalized() const throws -> Path
   let components = ArrayList<StringView>{heap_allocator()};
   usize i = 0;
   while (i < m_text.count()) {
-    if (is_directory_separator(m_text[i])) {
+    if (os::is_directory_separator(m_text[i])) {
       i++;
       continue;
     }
     let const component_start = i;
-    while (i < m_text.count() && !is_directory_separator(m_text[i]))
+    while (i < m_text.count() && !os::is_directory_separator(m_text[i]))
       i++;
     let const component =
         m_text.substring_of_length(component_start, i - component_start);
@@ -154,9 +117,9 @@ cold fn Path::normalized() const throws -> Path
   }
 
   let normalized_text = String{heap_allocator()};
-  if (is_absolute_path) normalized_text.push(DIRECTORY_SEPARATOR);
+  if (is_absolute_path) normalized_text.push(os::DIRECTORY_SEPARATOR);
   for (usize i = 0; i < components.count(); i++) {
-    if (i > 0) normalized_text.push(DIRECTORY_SEPARATOR);
+    if (i > 0) normalized_text.push(os::DIRECTORY_SEPARATOR);
     normalized_text.append(components[i]);
   }
   if (normalized_text.is_empty())
@@ -178,444 +141,135 @@ hot fn Path::operator==(const Path &other) const wontthrow -> bool
   return m_text == other.m_text;
 }
 
-#if SHIT_PLATFORM_IS POSIX
-
 cold fn Path::exists() const wontthrow -> bool
 {
-  LOG(Debug, "probing whether '%s' exists", m_text.c_str());
-  struct stat info{};
-  return ::stat(m_text.c_str(), &info) == 0;
-}
-
-/* A failed stat reads as the type not matching. */
-static fn stat_matches_type(const char *path, mode_t expected_type) wontthrow
-    -> bool
-{
-  struct stat info{};
-  if (::stat(path, &info) != 0) return false;
-  return (info.st_mode & S_IFMT) == expected_type;
+  return os::path_exists(m_text.view());
 }
 
 cold fn Path::is_directory() const wontthrow -> bool
 {
-  return stat_matches_type(m_text.c_str(), S_IFDIR);
+  return os::path_is_directory(m_text.view());
 }
 
 fn Path::is_regular_file() const wontthrow -> bool
 {
-  return stat_matches_type(m_text.c_str(), S_IFREG);
+  return os::path_is_regular_file(m_text.view());
 }
 
 fn Path::is_symbolic_link() const wontthrow -> bool
 {
-  struct stat info{};
-  if (::lstat(m_text.c_str(), &info) != 0) return false;
-  return S_ISLNK(info.st_mode);
+  return os::path_is_symbolic_link(m_text.view());
 }
 
 fn Path::is_block_device() const wontthrow -> bool
 {
-  return stat_matches_type(m_text.c_str(), S_IFBLK);
+  return os::path_is_block_device(m_text.view());
 }
 
 fn Path::is_character_device() const wontthrow -> bool
 {
-  return stat_matches_type(m_text.c_str(), S_IFCHR);
+  return os::path_is_character_device(m_text.view());
 }
 
 fn Path::is_fifo() const wontthrow -> bool
 {
-  return stat_matches_type(m_text.c_str(), S_IFIFO);
+  return os::path_is_fifo(m_text.view());
 }
 
 fn Path::is_socket() const wontthrow -> bool
 {
-  return stat_matches_type(m_text.c_str(), S_IFSOCK);
-}
-
-static fn stat_mode_has_bits(const char *path, mode_t bits) wontthrow -> bool
-{
-  struct stat info{};
-  if (::stat(path, &info) != 0) return false;
-  return (info.st_mode & bits) != 0;
+  return os::path_is_socket(m_text.view());
 }
 
 fn Path::has_setuid_bit() const wontthrow -> bool
 {
-  return stat_mode_has_bits(m_text.c_str(), S_ISUID);
+  return os::path_has_setuid_bit(m_text.view());
 }
 
 fn Path::has_setgid_bit() const wontthrow -> bool
 {
-  return stat_mode_has_bits(m_text.c_str(), S_ISGID);
+  return os::path_has_setgid_bit(m_text.view());
 }
 
 fn Path::has_sticky_bit() const wontthrow -> bool
 {
-  return stat_mode_has_bits(m_text.c_str(), S_ISVTX);
+  return os::path_has_sticky_bit(m_text.view());
 }
 
 fn Path::is_owned_by_effective_user() const wontthrow -> bool
 {
-  struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0) return false;
-  return info.st_uid == ::geteuid();
+  return os::path_is_owned_by_effective_user(m_text.view());
 }
 
 fn Path::is_owned_by_effective_group() const wontthrow -> bool
 {
-  struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0) return false;
-  return info.st_gid == ::getegid();
+  return os::path_is_owned_by_effective_group(m_text.view());
 }
 
 fn Path::file_size() const wontthrow -> Maybe<u64>
 {
-  struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0 || !S_ISREG(info.st_mode)) return None;
-  return static_cast<u64>(info.st_size);
+  return os::path_file_size(m_text.view());
 }
 
 fn Path::modification_time() const wontthrow -> Maybe<i64>
 {
-  struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0) return None;
-  return static_cast<i64>(info.st_mtime);
+  return os::path_modification_time(m_text.view());
 }
 
 fn Path::is_same_file_as(const Path &other) const wontthrow -> bool
 {
-  struct stat a{}, b{};
-  if (::stat(m_text.c_str(), &a) != 0) return false;
-  if (::stat(other.m_text.c_str(), &b) != 0) return false;
-  return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+  return os::paths_are_same_file(m_text.view(), other.m_text.view());
 }
 
 fn Path::is_newer_than(const Path &other) const wontthrow -> bool
 {
-  struct stat a{}, b{};
-  if (::stat(m_text.c_str(), &a) != 0) return false;
-  if (::stat(other.m_text.c_str(), &b) != 0) return false;
-  /* The nanoseconds break a same-second tie. */
-  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
-    return a.st_mtim.tv_sec > b.st_mtim.tv_sec;
-  return a.st_mtim.tv_nsec > b.st_mtim.tv_nsec;
+  return os::path_is_newer_than(m_text.view(), other.m_text.view());
 }
 
 fn Path::is_older_than(const Path &other) const wontthrow -> bool
 {
-  struct stat a{}, b{};
-  if (::stat(m_text.c_str(), &a) != 0) return false;
-  if (::stat(other.m_text.c_str(), &b) != 0) return false;
-  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
-    return a.st_mtim.tv_sec < b.st_mtim.tv_sec;
-  return a.st_mtim.tv_nsec < b.st_mtim.tv_nsec;
+  return os::path_is_older_than(m_text.view(), other.m_text.view());
 }
 
 fn Path::is_readable() const wontthrow -> bool
 {
-  return ::access(m_text.c_str(), R_OK) == 0;
+  return os::path_is_readable(m_text.view());
 }
 
 fn Path::is_writable() const wontthrow -> bool
 {
-  return ::access(m_text.c_str(), W_OK) == 0;
+  return os::path_is_writable(m_text.view());
 }
 
 fn Path::is_executable() const wontthrow -> bool
 {
-  return ::access(m_text.c_str(), X_OK) == 0;
+  return os::path_is_executable(m_text.view());
 }
 
 cold fn Path::current_directory() throws -> Path
 {
-  /* ERANGE means the buffer is too small, so it doubles. Any other errno ends
-     the loop with an empty path. */
-  LOG(Debug, "reading the current working directory");
-  let buffer = ArrayList<char>{heap_allocator()};
-  usize buffer_size = 4096;
-  loop
-  {
-    buffer.reserve(buffer_size);
-    errno = 0;
-    if (::getcwd(buffer.begin(), buffer_size) != nullptr)
-      return Path{StringView{buffer.begin()}};
-    if (errno != ERANGE) return Path{};
-    buffer_size *= 2;
-  }
+  return os::read_current_directory();
 }
 
 fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 {
-  LOG(Info, "changing the current directory to '%s'", path.c_str());
-  if (::chdir(path.c_str()) != 0)
-    return Error{"Could not change directory to '" + path.text() + "'"};
-  return Success;
+  return os::change_current_directory(path.text().view());
 }
 
 cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
-  let const handle = ::opendir(dir.c_str());
-  if (handle == nullptr) {
-    LOG(Debug, "could not open the directory '%s'", dir.c_str());
-    return None;
-  }
-
-  let names = ArrayList<String>{heap_allocator()};
-  /* readdir returns NULL for both EOF and error, so errno is cleared first and
-     a changed errno means a real error. */
-  loop
-  {
-    errno = 0;
-    let const entry = ::readdir(handle);
-    if (entry == nullptr) {
-      if (errno != 0) {
-        ::closedir(handle);
-        return None;
-      }
-      break;
-    }
-
-    let const name = StringView{entry->d_name};
-    if (name == StringView{"."} || name == StringView{".."}) continue;
-    names.push(String{name});
-  }
-
-  ::closedir(handle);
-
-  LOG(All, "read %zu entries from the directory '%s'", names.count(),
-      dir.c_str());
-
-  return names;
+  return os::list_directory(dir.text().view());
 }
 
 cold fn Path::read_directory_typed(const Path &dir) throws
     -> Maybe<ArrayList<directory_child>>
 {
-  let const handle = ::opendir(dir.c_str());
-  if (handle == nullptr) return None;
-
-  let entries = ArrayList<directory_child>{heap_allocator()};
-  loop
-  {
-    errno = 0;
-    let const entry = ::readdir(handle);
-    if (entry == nullptr) {
-      if (errno != 0) {
-        ::closedir(handle);
-        return None;
-      }
-      break;
-    }
-
-    let const name = StringView{entry->d_name};
-    if (name == StringView{"."} || name == StringView{".."}) continue;
-
-    entry_kind kind = entry_kind::Unknown;
-    switch (entry->d_type) {
-    case DT_DIR: kind = entry_kind::Directory; break;
-    case DT_REG: kind = entry_kind::Regular; break;
-    case DT_LNK: kind = entry_kind::Symlink; break;
-    case DT_UNKNOWN: kind = entry_kind::Unknown; break;
-    default: kind = entry_kind::Other; break;
-    }
-
-    entries.push(directory_child{String{name}, kind});
-  }
-
-  ::closedir(handle);
-  return entries;
+  return os::list_directory_typed(dir.text().view());
 }
-
-#elif SHIT_PLATFORM_IS WIN32
-
-cold fn Path::exists() const wontthrow -> bool
-{
-  return GetFileAttributesA(m_text.c_str()) != INVALID_FILE_ATTRIBUTES;
-}
-
-cold fn Path::is_directory() const wontthrow -> bool
-{
-  let const attributes = GetFileAttributesA(m_text.c_str());
-  return attributes != INVALID_FILE_ATTRIBUTES &&
-         (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-}
-
-fn Path::is_regular_file() const wontthrow -> bool
-{
-  let const attributes = GetFileAttributesA(m_text.c_str());
-  return attributes != INVALID_FILE_ATTRIBUTES &&
-         (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
-}
-
-fn Path::is_symbolic_link() const wontthrow -> bool
-{
-  let const attributes = GetFileAttributesA(m_text.c_str());
-  return attributes != INVALID_FILE_ATTRIBUTES &&
-         (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
-}
-
-/* Windows has no POSIX block, character, FIFO, or socket file type. */
-fn Path::is_block_device() const wontthrow -> bool { return false; }
-fn Path::is_character_device() const wontthrow -> bool { return false; }
-fn Path::is_fifo() const wontthrow -> bool { return false; }
-fn Path::is_socket() const wontthrow -> bool { return false; }
-
-/* Windows carries no setuid, setgid, sticky, or POSIX ownership bit. */
-fn Path::has_setuid_bit() const wontthrow -> bool { return false; }
-fn Path::has_setgid_bit() const wontthrow -> bool { return false; }
-fn Path::has_sticky_bit() const wontthrow -> bool { return false; }
-fn Path::is_owned_by_effective_user() const wontthrow -> bool { return false; }
-fn Path::is_owned_by_effective_group() const wontthrow -> bool { return false; }
-
-fn Path::file_size() const wontthrow -> Maybe<u64>
-{
-  WIN32_FILE_ATTRIBUTE_DATA data{};
-  if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &data) == 0)
-    return None;
-  if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) return None;
-  return (static_cast<u64>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
-}
-
-fn Path::modification_time() const wontthrow -> Maybe<i64>
-{
-  WIN32_FILE_ATTRIBUTE_DATA data{};
-  if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &data) == 0)
-    return None;
-  return static_cast<i64>(
-      (static_cast<u64>(data.ftLastWriteTime.dwHighDateTime) << 32) |
-      data.ftLastWriteTime.dwLowDateTime);
-}
-
-fn Path::is_same_file_as(const Path &other) const wontthrow -> bool
-{
-  /* FILE_FLAG_BACKUP_SEMANTICS lets a directory open too. */
-  let const first = CreateFileA(
-      m_text.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-      nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-  if (first == INVALID_HANDLE_VALUE) return false;
-  let const second =
-      CreateFileA(other.m_text.c_str(), 0,
-                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                  nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-  if (second == INVALID_HANDLE_VALUE) {
-    CloseHandle(first);
-    return false;
-  }
-  BY_HANDLE_FILE_INFORMATION first_info{}, second_info{};
-  let const both_read = GetFileInformationByHandle(first, &first_info) != 0 &&
-                        GetFileInformationByHandle(second, &second_info) != 0;
-  CloseHandle(first);
-  CloseHandle(second);
-  if (!both_read) return false;
-  return first_info.dwVolumeSerialNumber == second_info.dwVolumeSerialNumber &&
-         first_info.nFileIndexHigh == second_info.nFileIndexHigh &&
-         first_info.nFileIndexLow == second_info.nFileIndexLow;
-}
-
-fn Path::is_newer_than(const Path &other) const wontthrow -> bool
-{
-  WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
-  if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &a) == 0)
-    return false;
-  if (GetFileAttributesExA(other.m_text.c_str(), GetFileExInfoStandard, &b) ==
-      0)
-    return false;
-  return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) > 0;
-}
-
-fn Path::is_older_than(const Path &other) const wontthrow -> bool
-{
-  WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
-  if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &a) == 0)
-    return false;
-  if (GetFileAttributesExA(other.m_text.c_str(), GetFileExInfoStandard, &b) ==
-      0)
-    return false;
-  return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) < 0;
-}
-
-fn Path::is_readable() const wontthrow -> bool
-{
-  return _access(m_text.c_str(), 4) == 0;
-}
-
-fn Path::is_writable() const wontthrow -> bool
-{
-  return _access(m_text.c_str(), 2) == 0;
-}
-
-fn Path::is_executable() const wontthrow -> bool
-{
-  /* Windows has no execute permission bit, so an existing file is runnable. */
-  return exists();
-}
-
-cold fn Path::current_directory() throws -> Path
-{
-  char buffer[4096];
-  if (_getcwd(buffer, sizeof(buffer)) != nullptr)
-    return Path{StringView{buffer}};
-  return Path{};
-}
-
-fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
-{
-  if (_chdir(path.c_str()) != 0)
-    return Error{"Could not change directory to '" + path.text() +
-                 "': " + os::last_system_error_message()};
-  return Success;
-}
-
-cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
-{
-  let pattern = dir.text().clone();
-  pattern.push(DIRECTORY_SEPARATOR);
-  pattern.push('*');
-
-  WIN32_FIND_DATAA data{};
-  let const handle = FindFirstFileA(pattern.c_str(), &data);
-  if (handle == INVALID_HANDLE_VALUE) return None;
-
-  let names = ArrayList<String>{heap_allocator()};
-  do {
-    let const name = StringView{data.cFileName};
-    if (name == StringView{"."} || name == StringView{".."}) continue;
-    names.push(String{name});
-  } while (FindNextFileA(handle, &data) != 0);
-  FindClose(handle);
-  LOG(All, "read %zu entries from the directory '%s'", names.count(),
-      dir.c_str());
-  return names;
-}
-
-cold fn Path::read_directory_typed(const Path &dir) throws
-    -> Maybe<ArrayList<directory_child>>
-{
-  /* Windows carries no readdir type, so each child is left Unknown. */
-  Maybe<ArrayList<String>> names = read_directory(dir);
-  if (!names.has_value()) return None;
-
-  let entries = ArrayList<directory_child>{heap_allocator()};
-  entries.reserve(names->count());
-  for (String &name : *names)
-    entries.push(directory_child{steal(name), entry_kind::Unknown});
-  return entries;
-}
-
-#endif
 
 fn Path::temp_directory() throws -> Path
 {
-#if SHIT_PLATFORM_IS WIN32
-  if (const char *from_env = std::getenv("TEMP"); from_env != nullptr)
-    return Path{StringView{from_env}};
-  return Path{StringView{"C:\\Windows\\Temp"}};
-#else
-  if (const char *from_env = std::getenv("TMPDIR"); from_env != nullptr)
-    return Path{StringView{from_env}};
-  return Path{StringView{"/tmp"}};
-#endif
+  return Path{os::temp_directory_path().view()};
 }
 
 fn Path::read_entire_file() const throws -> Maybe<String>
@@ -729,10 +383,10 @@ PathBuilder::PathBuilder(StringView root) : m_text(root) {}
 fn PathBuilder::append(StringView component) throws -> PathBuilder &
 {
   if (component.length == 0) return *this;
-  if (!m_text.is_empty() && !is_directory_separator(m_text.back()) &&
-      !is_directory_separator(component.data[0]))
+  if (!m_text.is_empty() && !os::is_directory_separator(m_text.back()) &&
+      !os::is_directory_separator(component.data[0]))
   {
-    m_text.push(DIRECTORY_SEPARATOR);
+    m_text.push(os::DIRECTORY_SEPARATOR);
   }
   m_text.append(component);
   return *this;

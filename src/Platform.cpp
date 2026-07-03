@@ -43,6 +43,9 @@
 #include <sys/proc.h>
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
+#define st_mtim st_mtimespec
+#define st_atim st_atimespec
+#define st_ctim st_ctimespec
 #endif
 
 extern char **environ;
@@ -441,6 +444,294 @@ fn execute_regex(compiled_regex &compiled, StringView subject,
 fn free_regex(compiled_regex &compiled) wontthrow -> void
 {
   regfree(&compiled.re);
+}
+
+pure fn path_is_absolute(StringView path) wontthrow -> bool
+{
+  if (path.length == 0) return false;
+  return is_directory_separator(path.data[0]);
+}
+
+fn temp_directory_path() throws -> String
+{
+  if (const char *from_env = std::getenv("TMPDIR"); from_env != nullptr)
+    return String{from_env};
+  return String{"/tmp"};
+}
+
+cold fn path_exists(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  LOG(Debug, "probing whether '%s' exists", path_string.c_str());
+  struct stat info{};
+  return ::stat(path_string.c_str(), &info) == 0;
+}
+
+/* A failed stat reads as the type not matching. */
+static fn stat_matches_type(const char *path, mode_t expected_type) wontthrow
+    -> bool
+{
+  struct stat info{};
+  if (::stat(path, &info) != 0) return false;
+  return (info.st_mode & S_IFMT) == expected_type;
+}
+
+cold fn path_is_directory(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return stat_matches_type(path_string.c_str(), S_IFDIR);
+}
+
+fn path_is_regular_file(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return stat_matches_type(path_string.c_str(), S_IFREG);
+}
+
+fn path_is_symbolic_link(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  struct stat info{};
+  if (::lstat(path_string.c_str(), &info) != 0) return false;
+  return S_ISLNK(info.st_mode);
+}
+
+fn path_is_block_device(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return stat_matches_type(path_string.c_str(), S_IFBLK);
+}
+
+fn path_is_character_device(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return stat_matches_type(path_string.c_str(), S_IFCHR);
+}
+
+fn path_is_fifo(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return stat_matches_type(path_string.c_str(), S_IFIFO);
+}
+
+fn path_is_socket(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return stat_matches_type(path_string.c_str(), S_IFSOCK);
+}
+
+static fn stat_mode_has_bits(const char *path, mode_t bits) wontthrow -> bool
+{
+  struct stat info{};
+  if (::stat(path, &info) != 0) return false;
+  return (info.st_mode & bits) != 0;
+}
+
+fn path_has_setuid_bit(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return stat_mode_has_bits(path_string.c_str(), S_ISUID);
+}
+
+fn path_has_setgid_bit(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return stat_mode_has_bits(path_string.c_str(), S_ISGID);
+}
+
+fn path_has_sticky_bit(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return stat_mode_has_bits(path_string.c_str(), S_ISVTX);
+}
+
+fn path_is_owned_by_effective_user(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  struct stat info{};
+  if (::stat(path_string.c_str(), &info) != 0) return false;
+  return info.st_uid == ::geteuid();
+}
+
+fn path_is_owned_by_effective_group(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  struct stat info{};
+  if (::stat(path_string.c_str(), &info) != 0) return false;
+  return info.st_gid == ::getegid();
+}
+
+fn path_file_size(StringView path) wontthrow -> Maybe<u64>
+{
+  const String path_string{path};
+  struct stat info{};
+  if (::stat(path_string.c_str(), &info) != 0 || !S_ISREG(info.st_mode))
+    return None;
+  return static_cast<u64>(info.st_size);
+}
+
+fn path_modification_time(StringView path) wontthrow -> Maybe<i64>
+{
+  const String path_string{path};
+  struct stat info{};
+  if (::stat(path_string.c_str(), &info) != 0) return None;
+  return static_cast<i64>(info.st_mtime);
+}
+
+fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool
+{
+  const String first_string{first};
+  const String second_string{second};
+  struct stat a{}, b{};
+  if (::stat(first_string.c_str(), &a) != 0) return false;
+  if (::stat(second_string.c_str(), &b) != 0) return false;
+  return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+}
+
+fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool
+{
+  const String first_string{first};
+  const String second_string{second};
+  struct stat a{}, b{};
+  if (::stat(first_string.c_str(), &a) != 0) return false;
+  if (::stat(second_string.c_str(), &b) != 0) return false;
+  /* The nanoseconds break a same-second tie. */
+  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
+    return a.st_mtim.tv_sec > b.st_mtim.tv_sec;
+  return a.st_mtim.tv_nsec > b.st_mtim.tv_nsec;
+}
+
+fn path_is_older_than(StringView first, StringView second) wontthrow -> bool
+{
+  const String first_string{first};
+  const String second_string{second};
+  struct stat a{}, b{};
+  if (::stat(first_string.c_str(), &a) != 0) return false;
+  if (::stat(second_string.c_str(), &b) != 0) return false;
+  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
+    return a.st_mtim.tv_sec < b.st_mtim.tv_sec;
+  return a.st_mtim.tv_nsec < b.st_mtim.tv_nsec;
+}
+
+fn path_is_readable(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return ::access(path_string.c_str(), R_OK) == 0;
+}
+
+fn path_is_writable(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return ::access(path_string.c_str(), W_OK) == 0;
+}
+
+fn path_is_executable(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return ::access(path_string.c_str(), X_OK) == 0;
+}
+
+cold fn read_current_directory() throws -> Path
+{
+  /* ERANGE means the buffer is too small, so it doubles. Any other errno ends
+     the loop with an empty path. */
+  LOG(Debug, "reading the current working directory");
+  let buffer = ArrayList<char>{heap_allocator()};
+  usize buffer_size = 4096;
+  loop
+  {
+    buffer.reserve(buffer_size);
+    errno = 0;
+    if (::getcwd(buffer.begin(), buffer_size) != nullptr)
+      return Path{StringView{buffer.begin()}};
+    if (errno != ERANGE) return Path{};
+    buffer_size *= 2;
+  }
+}
+
+fn change_current_directory(StringView path) throws -> ErrorOr<Ok>
+{
+  const String path_string{path};
+  LOG(Info, "changing the current directory to '%s'", path_string.c_str());
+  if (::chdir(path_string.c_str()) != 0)
+    return Error{"Could not change directory to '" + path_string + "'"};
+  return Success;
+}
+
+cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
+{
+  const String dir_string{dir};
+  let const handle = ::opendir(dir_string.c_str());
+  if (handle == nullptr) {
+    LOG(Debug, "could not open the directory '%s'", dir_string.c_str());
+    return None;
+  }
+
+  let names = ArrayList<String>{heap_allocator()};
+  /* readdir returns NULL for both EOF and error, so errno is cleared first and
+     a changed errno means a real error. */
+  loop
+  {
+    errno = 0;
+    let const entry = ::readdir(handle);
+    if (entry == nullptr) {
+      if (errno != 0) {
+        ::closedir(handle);
+        return None;
+      }
+      break;
+    }
+
+    let const name = StringView{entry->d_name};
+    if (name == StringView{"."} || name == StringView{".."}) continue;
+    names.push(String{name});
+  }
+
+  ::closedir(handle);
+
+  LOG(All, "read %zu entries from the directory '%s'", names.count(),
+      dir_string.c_str());
+
+  return names;
+}
+
+cold fn list_directory_typed(StringView dir) throws
+    -> Maybe<ArrayList<Path::directory_child>>
+{
+  const String dir_string{dir};
+  let const handle = ::opendir(dir_string.c_str());
+  if (handle == nullptr) return None;
+
+  let entries = ArrayList<Path::directory_child>{heap_allocator()};
+  loop
+  {
+    errno = 0;
+    let const entry = ::readdir(handle);
+    if (entry == nullptr) {
+      if (errno != 0) {
+        ::closedir(handle);
+        return None;
+      }
+      break;
+    }
+
+    let const name = StringView{entry->d_name};
+    if (name == StringView{"."} || name == StringView{".."}) continue;
+
+    Path::entry_kind kind = Path::entry_kind::Unknown;
+    switch (entry->d_type) {
+    case DT_DIR: kind = Path::entry_kind::Directory; break;
+    case DT_REG: kind = Path::entry_kind::Regular; break;
+    case DT_LNK: kind = Path::entry_kind::Symlink; break;
+    case DT_UNKNOWN: kind = Path::entry_kind::Unknown; break;
+    default: kind = Path::entry_kind::Other; break;
+    }
+
+    entries.push(Path::directory_child{String{name}, kind});
+  }
+
+  ::closedir(handle);
+  return entries;
 }
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
@@ -2080,6 +2371,7 @@ fn enumerate_processes(bool include_resource_stats) throws
 
 #elif SHIT_PLATFORM_IS WIN32
 
+#include <direct.h>
 #include <io.h>
 #include <malloc.h>
 #include <psapi.h>
@@ -2445,6 +2737,252 @@ fn execute_regex(compiled_regex &compiled, StringView subject,
 }
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void { unused(compiled); }
+
+pure fn path_is_absolute(StringView path) wontthrow -> bool
+{
+  if (path.length == 0) return false;
+  if (is_directory_separator(path.data[0])) return true;
+  return path.length >= 2 && path.data[1] == ':';
+}
+
+fn temp_directory_path() throws -> String
+{
+  if (const char *from_env = std::getenv("TEMP"); from_env != nullptr)
+    return String{from_env};
+  return String{"C:\\Windows\\Temp"};
+}
+
+cold fn path_exists(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return GetFileAttributesA(path_string.c_str()) != INVALID_FILE_ATTRIBUTES;
+}
+
+cold fn path_is_directory(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  let const attributes = GetFileAttributesA(path_string.c_str());
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+         (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
+
+fn path_is_regular_file(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  let const attributes = GetFileAttributesA(path_string.c_str());
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+         (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+fn path_is_symbolic_link(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  let const attributes = GetFileAttributesA(path_string.c_str());
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+         (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+}
+
+/* Windows has no POSIX block, character, FIFO, or socket file type. */
+fn path_is_block_device(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_character_device(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_fifo(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_socket(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+
+/* Windows carries no setuid, setgid, sticky, or POSIX ownership bit. */
+fn path_has_setuid_bit(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_has_setgid_bit(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_has_sticky_bit(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_owned_by_effective_user(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_owned_by_effective_group(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+
+fn path_file_size(StringView path) wontthrow -> Maybe<u64>
+{
+  const String path_string{path};
+  WIN32_FILE_ATTRIBUTE_DATA data{};
+  if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard, &data) ==
+      0)
+    return None;
+  if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) return None;
+  return (static_cast<u64>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
+}
+
+fn path_modification_time(StringView path) wontthrow -> Maybe<i64>
+{
+  const String path_string{path};
+  WIN32_FILE_ATTRIBUTE_DATA data{};
+  if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard, &data) ==
+      0)
+    return None;
+  return static_cast<i64>(
+      (static_cast<u64>(data.ftLastWriteTime.dwHighDateTime) << 32) |
+      data.ftLastWriteTime.dwLowDateTime);
+}
+
+fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool
+{
+  const String first_string{first};
+  const String second_string{second};
+  /* FILE_FLAG_BACKUP_SEMANTICS lets a directory open too. */
+  let const first_handle =
+      CreateFileA(first_string.c_str(), 0,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (first_handle == INVALID_HANDLE_VALUE) return false;
+  let const second_handle =
+      CreateFileA(second_string.c_str(), 0,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (second_handle == INVALID_HANDLE_VALUE) {
+    CloseHandle(first_handle);
+    return false;
+  }
+  BY_HANDLE_FILE_INFORMATION first_info{}, second_info{};
+  let const both_read =
+      GetFileInformationByHandle(first_handle, &first_info) != 0 &&
+      GetFileInformationByHandle(second_handle, &second_info) != 0;
+  CloseHandle(first_handle);
+  CloseHandle(second_handle);
+  if (!both_read) return false;
+  return first_info.dwVolumeSerialNumber == second_info.dwVolumeSerialNumber &&
+         first_info.nFileIndexHigh == second_info.nFileIndexHigh &&
+         first_info.nFileIndexLow == second_info.nFileIndexLow;
+}
+
+fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool
+{
+  const String first_string{first};
+  const String second_string{second};
+  WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
+  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard, &a) ==
+      0)
+    return false;
+  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard, &b) ==
+      0)
+    return false;
+  return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) > 0;
+}
+
+fn path_is_older_than(StringView first, StringView second) wontthrow -> bool
+{
+  const String first_string{first};
+  const String second_string{second};
+  WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
+  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard, &a) ==
+      0)
+    return false;
+  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard, &b) ==
+      0)
+    return false;
+  return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) < 0;
+}
+
+fn path_is_readable(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return _access(path_string.c_str(), 4) == 0;
+}
+
+fn path_is_writable(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return _access(path_string.c_str(), 2) == 0;
+}
+
+fn path_is_executable(StringView path) wontthrow -> bool
+{
+  /* Windows has no execute permission bit, so an existing file is runnable. */
+  return path_exists(path);
+}
+
+cold fn read_current_directory() throws -> Path
+{
+  char buffer[4096];
+  if (_getcwd(buffer, sizeof(buffer)) != nullptr)
+    return Path{StringView{buffer}};
+  return Path{};
+}
+
+fn change_current_directory(StringView path) throws -> ErrorOr<Ok>
+{
+  const String path_string{path};
+  if (_chdir(path_string.c_str()) != 0)
+    return Error{"Could not change directory to '" + path_string +
+                 "': " + os::last_system_error_message()};
+  return Success;
+}
+
+cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
+{
+  const String dir_string{dir};
+  let pattern = dir_string.clone();
+  pattern.push(DIRECTORY_SEPARATOR);
+  pattern.push('*');
+
+  WIN32_FIND_DATAA data{};
+  let const handle = FindFirstFileA(pattern.c_str(), &data);
+  if (handle == INVALID_HANDLE_VALUE) return None;
+
+  let names = ArrayList<String>{heap_allocator()};
+  do {
+    let const name = StringView{data.cFileName};
+    if (name == StringView{"."} || name == StringView{".."}) continue;
+    names.push(String{name});
+  } while (FindNextFileA(handle, &data) != 0);
+  FindClose(handle);
+  LOG(All, "read %zu entries from the directory '%s'", names.count(),
+      dir_string.c_str());
+  return names;
+}
+
+cold fn list_directory_typed(StringView dir) throws
+    -> Maybe<ArrayList<Path::directory_child>>
+{
+  /* Windows carries no readdir type, so each child is left Unknown. */
+  Maybe<ArrayList<String>> names = list_directory(dir);
+  if (!names.has_value()) return None;
+
+  let entries = ArrayList<Path::directory_child>{heap_allocator()};
+  entries.reserve(names->count());
+  for (String &name : *names)
+    entries.push(Path::directory_child{steal(name), Path::entry_kind::Unknown});
+  return entries;
+}
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
   return is_fd_a_tty(reinterpret_cast<descriptor>(_get_osfhandle(shell_fd)));

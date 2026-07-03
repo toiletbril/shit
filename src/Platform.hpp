@@ -46,6 +46,7 @@ namespace os {
 
 #if SHIT_PLATFORM_IS WIN32
 constexpr char PATH_DELIMITER = ';';
+constexpr char DIRECTORY_SEPARATOR = '\\';
 
 using process = HANDLE;
 using descriptor = HANDLE;
@@ -60,6 +61,7 @@ using os_args = String;
 
 #elif SHIT_PLATFORM_IS POSIX
 constexpr char PATH_DELIMITER = ':';
+constexpr char DIRECTORY_SEPARATOR = '/';
 
 using process = pid_t;
 using descriptor = int;
@@ -319,6 +321,36 @@ fn execute_regex(compiled_regex &compiled, StringView subject,
     -> regex_match_result;
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void;
+
+pure fn path_is_absolute(StringView path) wontthrow -> bool;
+fn temp_directory_path() throws -> String;
+
+cold fn path_exists(StringView path) wontthrow -> bool;
+cold fn path_is_directory(StringView path) wontthrow -> bool;
+fn path_is_regular_file(StringView path) wontthrow -> bool;
+fn path_is_symbolic_link(StringView path) wontthrow -> bool;
+fn path_is_block_device(StringView path) wontthrow -> bool;
+fn path_is_character_device(StringView path) wontthrow -> bool;
+fn path_is_fifo(StringView path) wontthrow -> bool;
+fn path_is_socket(StringView path) wontthrow -> bool;
+fn path_has_setuid_bit(StringView path) wontthrow -> bool;
+fn path_has_setgid_bit(StringView path) wontthrow -> bool;
+fn path_has_sticky_bit(StringView path) wontthrow -> bool;
+fn path_is_owned_by_effective_user(StringView path) wontthrow -> bool;
+fn path_is_owned_by_effective_group(StringView path) wontthrow -> bool;
+fn path_file_size(StringView path) wontthrow -> Maybe<u64>;
+fn path_modification_time(StringView path) wontthrow -> Maybe<i64>;
+fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool;
+fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool;
+fn path_is_older_than(StringView first, StringView second) wontthrow -> bool;
+fn path_is_readable(StringView path) wontthrow -> bool;
+fn path_is_writable(StringView path) wontthrow -> bool;
+fn path_is_executable(StringView path) wontthrow -> bool;
+cold fn read_current_directory() throws -> Path;
+fn change_current_directory(StringView path) throws -> ErrorOr<Ok>;
+cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>;
+cold fn list_directory_typed(StringView dir) throws
+    -> Maybe<ArrayList<Path::directory_child>>;
 
 /* On POSIX the number is the descriptor, and on Windows it maps to the C
    runtime handle. */
