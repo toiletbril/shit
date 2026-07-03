@@ -14,3 +14,6 @@ shit: 1:1: error: cp: cannot copy 'sub' into itself.
      1 |  shitbox cp -r sub sub
        |  ^~~~~~~~~~~~~~~~~~~~~ here.
 note: The destination is inside the source directory.
+== rm removes a dangling symlink:
+rc=0
+ls: cannot access 'link': No such file or directory

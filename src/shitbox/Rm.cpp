@@ -103,7 +103,8 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    if (!Path{operand.view()}.exists()) {
+    let const target = Path{operand.view()};
+    if (!target.exists() && !target.is_symbolic_link()) {
       if (should_force) continue;
       report_soft_shitbox_error(ec, cxt,
                                 "rm: cannot remove '" + operand +
