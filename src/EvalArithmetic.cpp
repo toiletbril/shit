@@ -36,8 +36,31 @@ pure fn count_leading_digits(StringView text, u32 radix) wontthrow -> usize
   return length;
 }
 
-/* A leading 0x reads as hex, a leading 0 as octal, anything else as decimal.
-   A value with no leading digit or one that overflows reads as zero. */
+pure fn fold_leading_digits(StringView text, u32 radix) wontthrow -> u64
+{
+  u64 magnitude = 0;
+
+  for (usize length = 0; length < text.length; length++) {
+    let const current_byte = text[length];
+    u32 digit;
+    if (current_byte >= '0' && current_byte <= '9') {
+      digit = static_cast<u32>(current_byte - '0');
+    } else if (current_byte >= 'a' && current_byte <= 'f') {
+      digit = static_cast<u32>(current_byte - 'a') + 10;
+    } else if (current_byte >= 'A' && current_byte <= 'F') {
+      digit = static_cast<u32>(current_byte - 'A') + 10;
+    } else {
+      break;
+    }
+
+    if (digit >= radix) break;
+
+    magnitude = magnitude * radix + digit;
+  }
+
+  return magnitude;
+}
+
 pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
 {
   let body = text;
@@ -47,34 +70,21 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
     body = body.substring(1);
   }
 
-  let const parsed_value = [&]() -> ErrorOr<i64> {
-    if (body.length >= 2 && body[0] == '0' &&
-        (body[1] == 'x' || body[1] == 'X'))
-    {
-      let const digits = body.substring(2);
-      return utils::parse_integer_in_base(
-          digits.substring_of_length(0, count_leading_digits(digits, 16)),
-          int_base::hex);
-    }
-    if (body.length >= 2 && body[0] == '0' &&
-        (body[1] == 'b' || body[1] == 'B'))
-    {
-      let const digits = body.substring(2);
-      return utils::parse_integer_in_base(
-          digits.substring_of_length(0, count_leading_digits(digits, 2)),
-          int_base::binary);
-    }
-    if (body.length >= 1 && body[0] == '0') {
-      return utils::parse_integer_in_base(
-          body.substring_of_length(0, count_leading_digits(body, 8)),
-          int_base::octal);
-    }
-    return body.substring_of_length(0, count_leading_digits(body, 10))
-        .to<i64>();
-  }();
+  u64 magnitude = 0;
+  if (body.length >= 2 && body[0] == '0' && (body[1] == 'x' || body[1] == 'X'))
+  {
+    magnitude = fold_leading_digits(body.substring(2), 16);
+  } else if (body.length >= 2 && body[0] == '0' &&
+             (body[1] == 'b' || body[1] == 'B'))
+  {
+    magnitude = fold_leading_digits(body.substring(2), 2);
+  } else if (body.length >= 1 && body[0] == '0') {
+    magnitude = fold_leading_digits(body, 8);
+  } else {
+    magnitude = fold_leading_digits(body, 10);
+  }
 
-  if (parsed_value.is_error()) return 0;
-  return is_negative ? -parsed_value.value() : parsed_value.value();
+  return static_cast<i64>(is_negative ? -magnitude : magnitude);
 }
 
 pure fn is_single_integer_literal(StringView text) wontthrow -> bool

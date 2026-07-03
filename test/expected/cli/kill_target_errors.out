@@ -15,7 +15,7 @@ shit: 1:1: error: Builtin 'kill': '%999' is not a known job.
        |  ^~~~~~~~~ here.
 rc=1
 == a non-numeric job is rejected:
-shit: 1:1: error: Builtin 'kill': '%abc' is not a valid job or process id.
+shit: 1:1: error: Builtin 'kill': '%abc' is not a known job.
      1 |  kill %abc
        |  ^~~~~~~~~ here.
 rc=1

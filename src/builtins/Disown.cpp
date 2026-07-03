@@ -62,14 +62,8 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   for (usize i = 1; i < names.count(); i++) {
-    StringView spec = StringView{names[i]};
-    if (!spec.is_empty() && spec[0] == '%') {
-      spec = spec.substring(1);
-    }
-
-    let const parsed = spec.to<i64>();
-    if (parsed.is_error() || !cxt.remove_job(static_cast<i32>(parsed.value())))
-    {
+    let const job = cxt.find_job_by_spec(names[i]);
+    if (job == nullptr || !cxt.remove_job(job->id)) {
       throw Error{"'" + names[i] + "' is not a valid job"};
     }
   }

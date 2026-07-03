@@ -1,0 +1,6 @@
+== kill resolves a job by its command name:
+1
+== disown by name drops the job so a later kill fails:
+1
+== fg by %+ selects the current job:
+1

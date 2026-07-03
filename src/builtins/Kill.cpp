@@ -123,23 +123,13 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     let pid = os::process{};
     if (!target.is_empty() && target[0] == '%') {
-      const ErrorOr<i64> parsed_value =
-          StringView{target}.substring(1).to<i64>();
-      if (parsed_value.is_error()) {
-        report_soft_builtin_error(ec, cxt,
-                                  StringView{"'"} + target +
-                                      "' is not a valid job or process id");
-        status = 1;
-        continue;
-      }
-      job *const job = cxt.find_job(static_cast<int>(parsed_value.value()));
+      const job *const job = cxt.find_job_by_spec(target);
       if (job == nullptr) {
         report_soft_builtin_error(
             ec, cxt, StringView{"'"} + target + "' is not a known job");
         status = 1;
         continue;
       }
-      ASSERT(job != nullptr);
       pid = job->pid;
     } else {
       const ErrorOr<i64> parsed_value = target.to<i64>();

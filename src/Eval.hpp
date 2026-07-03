@@ -453,6 +453,8 @@ public:
   fn update_jobs() throws -> void;
   fn jobs() wontthrow -> ArrayList<job> &;
   fn find_job(i32 id) wontthrow -> job *;
+  fn find_job_index_by_spec(StringView spec) throws -> Maybe<usize>;
+  fn find_job_by_spec(StringView spec) throws -> job *;
   fn most_recent_job() wontthrow -> job *;
   fn forget_done_jobs() throws -> void;
   fn remove_job(i32 id) throws -> bool;

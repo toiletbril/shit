@@ -30,19 +30,17 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   job *job = nullptr;
-  if (args.count() > 1 && !args[1].is_empty() && args[1][0] == '%') {
-    let const parsed_value = StringView{args[1]}.substring(1).to<i64>();
-    if (parsed_value.is_error())
+  if (args.count() > 1 && !args[1].is_empty()) {
+    job = cxt.find_job_by_spec(args[1]);
+    if (job == nullptr)
       throw ErrorWithDetails{"'" + args[1] + "' is not a valid job",
-                             "Use a job spec like `%1` or `%+`"};
-    job = cxt.find_job(static_cast<int>(parsed_value.value()));
+                             "Use a job spec like `%1`, `%+`, or `%name`"};
   } else {
     job = cxt.most_recent_job();
   }
 
   if (job == nullptr)
     throw ErrorWithDetails{"There is no such job", "List jobs with `jobs`"};
-  ASSERT(job != nullptr);
 
   LOG(Info, "fg bringing job %d to the foreground", job->id);
 

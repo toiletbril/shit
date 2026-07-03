@@ -135,7 +135,6 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (found.count() == 0)
       return report_exec_command_not_found(ec, cxt, command_name);
 
-    ASSERT(found.count() > 0);
     program_path = found[0];
   }
 

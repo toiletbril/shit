@@ -79,6 +79,49 @@ fn EvalContext::find_job(i32 id) wontthrow -> job *
   return nullptr;
 }
 
+fn EvalContext::find_job_index_by_spec(StringView spec) throws -> Maybe<usize>
+{
+  if (m_jobs.is_empty()) return shit::None;
+
+  StringView body = spec;
+  if (!body.is_empty() && body[0] == '%') body = body.substring(1);
+
+  if (body.is_empty() || body == "+" || body == "%") {
+    return m_jobs.count() - 1;
+  }
+  if (body == "-")
+    return m_jobs.count() >= 2 ? m_jobs.count() - 2 : m_jobs.count() - 1;
+
+  if (let const parsed_value = body.to<i64>(); !parsed_value.is_error()) {
+    for (usize i = 0; i < m_jobs.count(); i++)
+      if (static_cast<i64>(m_jobs[i].id) == parsed_value.value()) return i;
+
+    return shit::None;
+  }
+
+  let const wants_substring_match = body[0] == '?';
+  if (wants_substring_match) body = body.substring(1);
+
+  if (body.is_empty()) return shit::None;
+
+  for (usize i = 0; i < m_jobs.count(); i++) {
+    if (wants_substring_match) {
+      if (m_jobs[i].command.find_substring(body).has_value()) return i;
+    } else if (m_jobs[i].command.starts_with(body)) {
+      return i;
+    }
+  }
+
+  return shit::None;
+}
+
+fn EvalContext::find_job_by_spec(StringView spec) throws -> job *
+{
+  if (let const index = find_job_index_by_spec(spec); index.has_value())
+    return &m_jobs[*index];
+  return nullptr;
+}
+
 fn EvalContext::most_recent_job() wontthrow -> job *
 {
   /* Skip a finished job, so a bare fg or bg acts on a running or stopped job

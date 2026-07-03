@@ -41,9 +41,7 @@ pure fn job_marker(const ArrayList<job> &jobs, usize index) wontthrow -> char
 {
   if (jobs.is_empty()) return ' ';
   if (index == jobs.count() - 1) return '+';
-  if (jobs.count() >= 2 && index == jobs.count() - 2) {
-    return '-';
-  }
+  if (index == jobs.count() - 2) return '-';
   return ' ';
 }
 
@@ -61,43 +59,6 @@ fn state_color(job::State state, bool should_color) throws -> StringView
 fn should_color_jobs(EvalContext &cxt) throws -> bool
 {
   return cxt.shell_is_interactive() && colors::stdout_wants_color();
-}
-
-fn resolve_jobspec(const ArrayList<job> &jobs, StringView spec) throws
-    -> Maybe<usize>
-{
-  if (jobs.is_empty()) return shit::None;
-  StringView body = spec;
-  if (!body.is_empty() && body[0] == '%') {
-    body = body.substring(1);
-  }
-  if (body.is_empty() || body == "+" || body == "%") {
-    return jobs.count() - 1;
-  }
-  if (body == "-")
-    return jobs.count() >= 2 ? jobs.count() - 2 : jobs.count() - 1;
-
-  if (let const parsed_value = body.to<i64>(); !parsed_value.is_error()) {
-    for (usize i = 0; i < jobs.count(); i++)
-      if (static_cast<i64>(jobs[i].id) == parsed_value.value()) return i;
-
-    return shit::None;
-  }
-
-  let const wants_substring_match = body[0] == '?';
-  if (wants_substring_match) body = body.substring(1);
-
-  if (body.is_empty()) return shit::None;
-
-  for (usize i = 0; i < jobs.count(); i++) {
-    if (wants_substring_match) {
-      if (jobs[i].command.find_substring(body).has_value()) return i;
-    } else if (jobs[i].command.starts_with(body)) {
-      return i;
-    }
-  }
-
-  return shit::None;
 }
 
 } // namespace
@@ -123,7 +84,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i32 status = 0;
   if (names.count() > 1) {
     for (usize a = 1; a < names.count(); a++) {
-      if (let const index = resolve_jobspec(jobs, names[a].view());
+      if (let const index = cxt.find_job_index_by_spec(names[a].view());
           index.has_value())
       {
         selected.push(*index);
