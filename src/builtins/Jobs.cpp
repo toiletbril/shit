@@ -41,13 +41,15 @@ pure fn job_marker(const ArrayList<job> &jobs, usize index) wontthrow -> char
 {
   if (jobs.is_empty()) return ' ';
   if (index == jobs.count() - 1) return '+';
-  if (jobs.count() >= 2 && index == jobs.count() - 2) return '-';
+  if (jobs.count() >= 2 && index == jobs.count() - 2) {
+    return '-';
+  }
   return ' ';
 }
 
-fn state_color(job::State state, bool may_color) throws -> StringView
+fn state_color(job::State state, bool should_color) throws -> StringView
 {
-  if (!may_color) return StringView{};
+  if (!should_color) return StringView{};
   switch (state) {
   case job::State::Running: return colors::ansi::BOLD_GREEN;
   case job::State::Stopped: return colors::ansi::BOLD_YELLOW;
@@ -56,7 +58,7 @@ fn state_color(job::State state, bool may_color) throws -> StringView
   return StringView{};
 }
 
-fn may_color_jobs(EvalContext &cxt) throws -> bool
+fn should_color_jobs(EvalContext &cxt) throws -> bool
 {
   return cxt.shell_is_interactive() && colors::stdout_wants_color();
 }
@@ -69,7 +71,9 @@ fn resolve_jobspec(const ArrayList<job> &jobs, StringView spec) throws
   if (!body.is_empty() && body[0] == '%') {
     body = body.substring(1);
   }
-  if (body.is_empty() || body == "+" || body == "%") return jobs.count() - 1;
+  if (body.is_empty() || body == "+" || body == "%") {
+    return jobs.count() - 1;
+  }
   if (body == "-")
     return jobs.count() >= 2 ? jobs.count() - 2 : jobs.count() - 1;
 
@@ -110,7 +114,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   cxt.update_jobs();
 
-  let const may_color = may_color_jobs(cxt);
+  let const should_color = should_color_jobs(cxt);
   let &jobs = cxt.jobs();
 
   LOG(Debug, "jobs listing %zu registered jobs", jobs.count());
@@ -165,12 +169,12 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       out += " ";
     }
 
-    out.append(state_color(job.state, may_color));
+    out.append(state_color(job.state, should_color));
     StringView state = StringView{state_word(job.state)};
     out.append(state);
     for (usize pad = state.length; pad < 7; pad++)
       out.push(' ');
-    if (may_color) out += colors::ansi::RESET;
+    if (should_color) out += colors::ansi::RESET;
 
     out += "  ";
     out += job.command.c_str();

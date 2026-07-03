@@ -849,7 +849,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
   /* The list expands wrapped in an array literal, so a top-level structural
      byte that closes the literal early and runs the tail as a command is a
      break-out. Such a list degrades to the plain split. */
-  let is_array_literal_safe = [&]() wontthrow -> bool {
+  let do_array_literal_is_safe = [&]() wontthrow -> bool {
     char quote = 0;
     usize paren_depth = 0;
     usize brace_depth = 0;
@@ -904,7 +904,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     return quote == 0 && !is_in_backtick && paren_depth == 0 &&
            brace_depth == 0;
   };
-  if (!is_array_literal_safe()) {
+  if (!do_array_literal_is_safe()) {
     LOG(Debug, "-W list is not array-literal safe, splitting plain");
     return do_split_plain();
   }

@@ -49,7 +49,7 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     while (start < args.count()) {
       const StringView arg = args[start].view();
       if (arg.length < 2 || arg[0] != '-') break;
-      bool is_all_option_letters = true;
+      let is_all_option_letters = true;
       for (usize k = 1; k < arg.length; k++)
         if (arg[k] != 'n' && arg[k] != 'e' && arg[k] != 'E') {
           is_all_option_letters = false;

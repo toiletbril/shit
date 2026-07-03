@@ -38,11 +38,11 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const is_silent = !optstring.is_empty() && optstring[0] == ':';
 
   bool should_print_diagnostic = !is_silent;
-  if (Maybe<String> value = cxt.get_variable_value("OPTERR"); value.has_value())
-  {
+  if (let value = cxt.get_variable_value("OPTERR"); value.has_value()) {
     let const parsed_value = (*value).to<i64>();
-    if (!parsed_value.is_error() && parsed_value.value() == 0)
+    if (!parsed_value.is_error() && parsed_value.value() == 0) {
       should_print_diagnostic = false;
+    }
   }
 
   let operands = ArrayList<String>{cxt.scratch_allocator()};
@@ -54,8 +54,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   i64 optind = 1;
-  if (Maybe<String> value = cxt.get_variable_value("OPTIND"); value.has_value())
-  {
+  if (let value = cxt.get_variable_value("OPTIND"); value.has_value()) {
     let const parsed_value = (*value).to<i64>();
     optind = parsed_value.is_error() ? 1 : parsed_value.value();
   }

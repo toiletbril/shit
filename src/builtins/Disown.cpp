@@ -36,25 +36,21 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_NO_HUP.is_enabled()) return 0;
 
-  if (FLAG_ALL.is_enabled()) {
-    let ids = ArrayList<i32>{cxt.scratch_allocator()};
-    for (const job &job : cxt.jobs())
-      ids.push(job.id);
-    for (const i32 id : ids)
-      cxt.remove_job(id);
-    return 0;
-  }
+  if (FLAG_ALL.is_enabled() || FLAG_RUNNING.is_enabled()) {
+    let const should_keep_stopped = FLAG_RUNNING.is_enabled();
 
-  if (FLAG_RUNNING.is_enabled()) {
-    /* The state is refreshed first, so a job stopped since the last poll reads
-       as Stopped and is kept, not dropped as running. */
-    cxt.update_jobs();
+    if (should_keep_stopped) cxt.update_jobs();
+
     let ids = ArrayList<i32>{cxt.scratch_allocator()};
     for (const job &job : cxt.jobs()) {
-      if (job.state == job::State::Running) ids.push(job.id);
+      if (!should_keep_stopped || job.state == job::State::Running) {
+        ids.push(job.id);
+      }
     }
+
     for (const i32 id : ids)
       cxt.remove_job(id);
+
     return 0;
   }
 
@@ -67,7 +63,9 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   for (usize i = 1; i < names.count(); i++) {
     StringView spec = StringView{names[i]};
-    if (!spec.is_empty() && spec[0] == '%') spec = spec.substring(1);
+    if (!spec.is_empty() && spec[0] == '%') {
+      spec = spec.substring(1);
+    }
 
     let const parsed = spec.to<i64>();
     if (parsed.is_error() || !cxt.remove_job(static_cast<i32>(parsed.value())))

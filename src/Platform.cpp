@@ -225,9 +225,9 @@ fn reopen_terminal_as_stdin() wontthrow -> bool
   const int tty_fd = open("/dev/tty", O_RDWR);
   if (tty_fd == -1) return false;
   LOG(Info, "reopening the controlling terminal onto fd 0");
-  const bool replaced = dup2(tty_fd, STDIN_FILENO) != -1;
+  const bool was_replaced = dup2(tty_fd, STDIN_FILENO) != -1;
   close(tty_fd);
-  return replaced && isatty(STDIN_FILENO) == 1;
+  return was_replaced && isatty(STDIN_FILENO) == 1;
 }
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor

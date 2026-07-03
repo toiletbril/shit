@@ -39,7 +39,9 @@ static pure fn name_is_valid_identifier(StringView name) wontthrow -> bool
 
   for (usize position = 1; position < name.length; position++) {
     let const c = name[position];
-    if (!do_is_name_start(c) && !(c >= '0' && c <= '9')) return false;
+    if (!do_is_name_start(c) && !(c >= '0' && c <= '9')) {
+      return false;
+    }
   }
 
   return true;

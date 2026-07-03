@@ -534,7 +534,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     duration_millis =
         parse_count_flag(FLAG_bench_duration.value(), StringView{"duration"});
 
-  const bool should_color = colors::stdout_wants_color();
+  let const should_color = colors::stdout_wants_color();
   let const should_show_progress = progress_is_enabled();
   let const should_ignore_exit_code = FLAG_BENCH_IGNORE_EXIT.is_enabled();
   let const should_suppress_output = !FLAG_BENCH_SHOW_OUTPUT.is_enabled();

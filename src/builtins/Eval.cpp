@@ -16,35 +16,6 @@ REGISTER_BUILTIN_FLAGS(Eval);
 
 namespace shit {
 
-static fn report_eval_invalid_option(const ExecContext &ec, EvalContext &cxt,
-                                     StringView option) throws -> i32
-{
-  let message = String{cxt.scratch_allocator()};
-  message.append(ec.program().view());
-  message += ": ";
-  message.append(option);
-  message += ": invalid option";
-
-  const ErrorWithLocation located{ec.source_location(), message.view()};
-  if (const String *source = cxt.current_source(); source != nullptr) {
-    show_message(located.to_string(source->view()));
-  } else {
-    let fallback = String{cxt.scratch_allocator()};
-    fallback += "shit: ";
-    fallback.append(message.view());
-    fallback += "\n";
-    print_error(fallback.view());
-  }
-
-  let note_message = String{cxt.scratch_allocator()};
-  note_message += "Try `";
-  note_message.append(ec.program().view());
-  note_message += " --help` for more info";
-  show_message(Note{note_message.view()}.to_string());
-
-  return 2;
-}
-
 Eval::Eval() = default;
 
 pure fn Eval::kind() const wontthrow -> Builtin::Kind { return Kind::Eval; }
@@ -66,7 +37,15 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let invalid_option = String{cxt.scratch_allocator()};
       invalid_option += lead[0];
       invalid_option += lead[1];
-      return report_eval_invalid_option(ec, cxt, invalid_option.view());
+
+      let note = String{cxt.scratch_allocator()};
+      note += "Try `";
+      note.append(ec.program().view());
+      note += " --help` for more info";
+
+      report_soft_builtin_error(ec, cxt, invalid_option + ": invalid option",
+                                note.view());
+      return 2;
     }
   }
 

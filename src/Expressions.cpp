@@ -590,34 +590,46 @@ cold fn SimpleCommand::register_defined_functions(
 
 /* The direct test operator a leading ! collapses into, for the SC2335 lint.
    None for an operator with no negated shortcut. */
+constexpr static_string_entry<StringView> NEGATED_TEST_OPERATOR_ENTRIES[] = {
+    {SSK("-eq"), StringView{"-ne", 3}},
+    {SSK("-ne"), StringView{"-eq", 3}},
+    {SSK("-lt"), StringView{"-ge", 3}},
+    {SSK("-ge"), StringView{"-lt", 3}},
+    {SSK("-gt"), StringView{"-le", 3}},
+    {SSK("-le"), StringView{"-gt", 3}},
+    {SSK("="),   StringView{"!=", 2} },
+    {SSK("!="),  StringView{"=", 1}  },
+};
+constexpr StaticStringMap NEGATED_TEST_OPERATORS{NEGATED_TEST_OPERATOR_ENTRIES};
+
 cold fn negated_test_operator(StringView op) wontthrow -> Maybe<StringView>
 {
-  if (op == "-eq") return StringView{"-ne"};
-  if (op == "-ne") return StringView{"-eq"};
-  if (op == "-lt") return StringView{"-ge"};
-  if (op == "-ge") return StringView{"-lt"};
-  if (op == "-gt") return StringView{"-le"};
-  if (op == "-le") return StringView{"-gt"};
-  if (op == "=") return StringView{"!="};
-  if (op == "!=") return StringView{"="};
-  return shit::None;
+  return NEGATED_TEST_OPERATORS.find(op);
 }
 
 /* The binary operators of test, used to tell a == in the operator slot from a
    literal == operand, so the SC3014 lint does not flag [ x = == ]. */
+constexpr PackedStringKey TEST_BINARY_OPERATOR_KEYS[] = {
+    SSK("="),   SSK("=="),  SSK("!="),  SSK("<"),   SSK(">"),
+    SSK("-eq"), SSK("-ne"), SSK("-lt"), SSK("-le"), SSK("-gt"),
+    SSK("-ge"), SSK("-ef"), SSK("-nt"), SSK("-ot"),
+};
+constexpr StaticStringSet TEST_BINARY_OPERATORS{TEST_BINARY_OPERATOR_KEYS};
+
 cold fn is_test_binary_operator_word(StringView op) wontthrow -> bool
 {
-  return op == "=" || op == "==" || op == "!=" || op == "<" || op == ">" ||
-         op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
-         op == "-gt" || op == "-ge" || op == "-ef" || op == "-nt" ||
-         op == "-ot";
+  return TEST_BINARY_OPERATORS.contains(op);
 }
 
 /* The numeric comparison operators of test, for the SC2170 lint. */
+constexpr PackedStringKey TEST_NUMERIC_OPERATOR_KEYS[] = {
+    SSK("-eq"), SSK("-ne"), SSK("-lt"), SSK("-le"), SSK("-gt"), SSK("-ge"),
+};
+constexpr StaticStringSet TEST_NUMERIC_OPERATORS{TEST_NUMERIC_OPERATOR_KEYS};
+
 cold fn is_test_numeric_operator_word(StringView op) wontthrow -> bool
 {
-  return op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
-         op == "-gt" || op == "-ge";
+  return TEST_NUMERIC_OPERATORS.contains(op);
 }
 
 cold fn word_is_fully_literal(const Word &word) wontthrow -> bool

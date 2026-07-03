@@ -1053,7 +1053,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      matches, even in command position. */
   let const inline_glob = token_is_glob && cursor == token_end;
 
-  let const command_word = command_word_of(line);
+  let const command_word = is_command ? StringView{} : command_word_of(line);
   let const directories_only = !is_command && command_word == "cd";
   let const executables_only = is_command;
   const char *const extension_hint =

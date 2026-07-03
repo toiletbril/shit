@@ -73,7 +73,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (argument == "-A" || argument == "-P" || argument == "-S" ||
           argument == "-X" || argument == "-F" || argument == "-C" ||
           argument == "-o")
+      {
         i++;
+      }
       i++;
       continue;
     }

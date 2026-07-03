@@ -48,9 +48,9 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let function_name = String{cxt.scratch_allocator()};
   let word_list = String{cxt.scratch_allocator()};
-  bool should_use_default = false;
-  bool is_default_completion = false;
-  bool should_print_specs = false;
+  let should_use_default = false;
+  let is_default_completion = false;
+  let should_print_specs = false;
   let commands = ArrayList<String>{cxt.scratch_allocator()};
 
   for (usize i = 1; i < args.count();) {
@@ -84,7 +84,9 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (++i < args.count() &&
           (args[i] == "default" || args[i] == "bashdefault" ||
            args[i] == "dirnames"))
+      {
         should_use_default = true;
+      }
       i++;
       continue;
     }

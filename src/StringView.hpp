@@ -15,7 +15,9 @@ public:
   usize length{0};
 
   StringView() = default;
-  StringView(const char *bytes, usize count) : data(bytes), length(count) {}
+  constexpr StringView(const char *bytes, usize count)
+      : data(bytes), length(count)
+  {}
   StringView(const char *cstr) wontthrow;
 
   hot mustuse pure fn count() const wontthrow -> usize { return length; }

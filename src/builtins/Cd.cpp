@@ -103,7 +103,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* An empty CDPATH entry, including one a leading, trailing, or doubled colon
      makes, names the current directory. */
-  bool was_reached_through_cdpath = false;
+  let was_reached_through_cdpath = false;
   if (!is_to_previous && operand_count > 0 && cdpath_search_applies(arg_path)) {
     if (let const cdpath = cxt.get_variable_value("CDPATH")) {
       const StringView entries = cdpath->view();

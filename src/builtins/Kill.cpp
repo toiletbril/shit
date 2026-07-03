@@ -81,44 +81,37 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
-  if (args.count() > 1 && args[1] == "--") {
-    first_target = 2;
-  } else if (args.count() > 1 && (args[1] == "-s" || args[1] == "-n")) {
-    if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
-
-    let const spec = String{cxt.scratch_allocator(), args[2]};
-    if (let const parsed = spec.view().to<i64>();
+  let do_resolve_signal = [](StringView spec) throws -> i32 {
+    /* The leading-digit guard rejects a doubled minus such as --9, whose
+       stripped spec -9 would otherwise parse as the negative signal -9 and
+       reach kill with an invalid number. */
+    if (let const parsed = spec.to<i64>();
         !parsed.is_error() && spec[0] >= '0' && spec[0] <= '9')
     {
-      signal_number = static_cast<i32>(parsed.value());
-    } else if (let const resolved = os::signal_number_from_name(spec);
-               resolved.has_value())
-    {
-      signal_number = *resolved;
-    } else {
-      throw Error{"'" + spec + "' is not a valid signal"};
+      return static_cast<i32>(parsed.value());
     }
 
-    first_target = 3;
-  } else if (args.count() > 1 && args[1].length() > 1 && args[1][0] == '-') {
-    let const name = String{cxt.scratch_allocator(), args[1].substring(1)};
-    if (let const parsed_signal = name.view().to<i64>();
-        !parsed_signal.is_error() && name[0] >= '0' && name[0] <= '9')
+    if (let const resolved = os::signal_number_from_name(spec);
+        resolved.has_value())
     {
-      /* The all-digits guard rejects a doubled minus such as --9, which would
-         otherwise parse as the negative signal -9 and reach kill with an
-         invalid number. */
-      signal_number = static_cast<i32>(parsed_signal.value());
-    } else if (let const resolved = os::signal_number_from_name(name);
-               resolved.has_value())
-    {
-      LOG(Debug, "kill resolved signal '%s' to number %d", name.c_str(),
-          *resolved);
-      signal_number = *resolved;
-    } else {
-      throw Error{"'" + name + "' is not a valid signal"};
+      return *resolved;
     }
-    first_target = 2;
+
+    throw Error{StringView{"'"} + spec + "' is not a valid signal"};
+  };
+
+  if (args.count() > 1) {
+    if (args[1] == "--") {
+      first_target = 2;
+    } else if (args[1] == "-s" || args[1] == "-n") {
+      if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
+
+      signal_number = do_resolve_signal(args[2]);
+      first_target = 3;
+    } else if (args[1].length() > 1 && args[1][0] == '-') {
+      signal_number = do_resolve_signal(args[1].substring(1));
+      first_target = 2;
+    }
   }
 
   if (first_target >= args.count())

@@ -53,21 +53,23 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  bool should_make_associative = false;
-  bool should_make_indexed = false;
-  bool should_export = false;
-  bool should_print = false;
-  bool should_mark_integer_attribute = false;
-  bool should_unmark_integer_attribute = false;
-  bool should_mark_readonly = false;
-  bool should_restrict_to_functions = false;
-  bool should_print_function_names_only = false;
-  bool should_be_global = false;
+  let should_make_associative = false;
+  let should_make_indexed = false;
+  let should_export = false;
+  let should_print = false;
+  let should_mark_integer_attribute = false;
+  let should_unmark_integer_attribute = false;
+  let should_mark_readonly = false;
+  let should_restrict_to_functions = false;
+  let should_print_function_names_only = false;
+  let should_be_global = false;
 
   usize i = 1;
   for (; i < args.count(); i++) {
-    const StringView arg = args[i].view();
-    if (arg.length < 1 || (arg[0] != '-' && arg[0] != '+')) break;
+    let const arg = args[i].view();
+    if (arg.length < 1 || (arg[0] != '-' && arg[0] != '+')) {
+      break;
+    }
     if (arg == "--") {
       i++;
       break;
@@ -135,7 +137,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return 0;
     }
     for (; i < args.count(); i++) {
-      const StringView name = args[i].view();
+      let const name = args[i].view();
       if (cxt.find_function(name) == nullptr) {
         if (!should_print_function_names_only)
           report_soft_builtin_error(
@@ -270,7 +272,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (should_print) {
     i32 status = 0;
     for (; i < args.count(); i++) {
-      const StringView name = args[i].view();
+      let const name = args[i].view();
       if (!do_print_declaration(name)) {
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + name + "' is not defined");
@@ -281,11 +283,11 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   for (; i < args.count(); i++) {
-    const StringView operand = args[i].view();
+    let const operand = args[i].view();
     let const equals = operand.find_character('=');
     let name =
         equals.has_value() ? operand.substring_of_length(0, *equals) : operand;
-    const StringView value =
+    let const value =
         equals.has_value() ? operand.substring(*equals + 1) : StringView{};
 
     /* process_args passes a declare append through as name+=value, so a
@@ -301,7 +303,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const bracket = name.find_character('[');
     let const has_subscript =
         bracket.has_value() && name[name.count() - 1] == ']';
-    const StringView subscript =
+    let const subscript =
         has_subscript ? name.substring_of_length(*bracket + 1,
                                                  name.count() - *bracket - 2)
                       : StringView{};

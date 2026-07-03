@@ -109,7 +109,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   saved_fds.push(ec.err_fd.has_value()
                      ? os::save_and_replace_descriptor(2, *ec.err_fd)
                      : os::save_descriptor(2));
-  let const restore_fds = [&]() {
+  let const do_restore_fds = [&]() {
     for (usize i = saved_fds.count(); i > 0; i--)
       os::restore_descriptor(saved_fds[i - 1]);
   };
@@ -118,7 +118,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
      would have. */
   defer { ec.close_fds(); };
 
-  let const render_error = [&](std::exception_ptr error) {
+  let const do_render_error = [&](std::exception_ptr error) {
     try {
       std::rethrow_exception(error);
     } catch (const ErrorWithLocation &located_error) {
@@ -149,11 +149,11 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       error = std::current_exception();
     }
     m_mimicry_depth--;
-    restore_fds();
+    do_restore_fds();
     if (error) {
       if (mimicked_error_is_interrupt(error)) throw InterruptError{};
 
-      render_error(error);
+      do_render_error(error);
       return 1;
     }
     return last_exit_status();
@@ -186,7 +186,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   }
   leave_subshell();
   m_mimicry_depth--;
-  restore_fds();
+  do_restore_fds();
 
   let const status = last_exit_status();
   restore_state(steal(snapshot));
@@ -199,7 +199,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   if (error) {
     if (mimicked_error_is_interrupt(error)) throw InterruptError{};
 
-    render_error(error);
+    do_render_error(error);
     return 1;
   }
   return status;

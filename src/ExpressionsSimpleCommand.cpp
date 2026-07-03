@@ -758,10 +758,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         if (is_bare_exec) {
           cxt.snapshot_subshell_descriptor(1);
           cxt.snapshot_subshell_descriptor(2);
-          const bool out_ok = os::replace_descriptor(1, file_fd);
-          const bool err_ok = os::replace_descriptor(2, file_fd);
+          const bool did_replace_out = os::replace_descriptor(1, file_fd);
+          const bool did_replace_err = os::replace_descriptor(2, file_fd);
           os::close_fd(file_fd);
-          if (!out_ok || !err_ok) {
+          if (!did_replace_out || !did_replace_err) {
             did_redirection_open_fail = true;
             throw ErrorWithLocation{redir.target->source_location(),
                                     "Bad file descriptor"};

@@ -1205,9 +1205,10 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
 
   if (str.is_empty()) return false;
 
-  if (active && head == '?')
+  if (active && head == '?') {
     return extglob_full_match(glob.substring(1), str.substring(1), mask,
                               mask_offset + 1);
+  }
 
   if (active && head == '[') {
     /* Reuse the iterative matcher for a single bracket class by matching one
@@ -1279,7 +1280,9 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
       const char c = glob[i];
       if ((c == '?' || c == '*' || c == '+' || c == '@' || c == '!') &&
           glob[i + 1] == '(')
+      {
         return extglob_full_match(glob, str, glob_active, mask_offset);
+      }
     }
   }
 
