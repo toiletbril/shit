@@ -1,0 +1,11 @@
+== history -r <file> merges the named file into the list:
+    1  existing one
+    2  existing two
+    3  merged alpha
+    4  merged beta
+== history -r on a missing file errors:
+shit: 1:1: error: Builtin 'history': cannot read history from '/no/such/history/file'.
+     1 |  history -r /no/such/history/file; echo "rc=$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+shit: note: Pass a readable history file, e.g. `history -r ~/.shit_history`.
+rc=1

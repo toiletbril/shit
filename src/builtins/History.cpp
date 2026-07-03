@@ -75,6 +75,32 @@ static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
   ec.print_to_stdout(out);
 }
 
+/* The history is backed by its file, so reading a named file into the list
+   appends that file to the backing file and reloads, rather than repointing the
+   default path the way a raw load would. */
+static fn append_file_into_history(EvalContext &cxt, const Path &source) throws
+    -> bool
+{
+  let const backing = toiletline::history_path();
+  if (!backing.has_value()) return false;
+
+  let const source_text = source.read_entire_file();
+  if (!source_text.has_value()) return false;
+  if (source_text->is_empty()) return true;
+
+  let const opened = os::open_file_descriptor(backing->text().view(),
+                                              os::file_open_mode::Append);
+  if (!opened.has_value()) return false;
+
+  let const fd = opened.value();
+  let payload = String{cxt.scratch_allocator(), source_text->view()};
+  if (payload[payload.count() - 1] != '\n') payload += '\n';
+
+  let const written = os::write_fd(fd, payload.data(), payload.count());
+  os::close_fd(fd);
+  return written.has_value() && written.value() == payload.count();
+}
+
 static fn write_history_to_file(EvalContext &cxt, const Path &target) throws
     -> bool
 {
@@ -119,6 +145,17 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HISTORY_READ.is_enabled() || FLAG_HISTORY_READ_NEW.is_enabled()) {
     LOG(Debug, "history reading the file into the list");
+
+    if (args.count() > 1 &&
+        !append_file_into_history(cxt, Path{args[1].view()}))
+    {
+      report_soft_builtin_error(
+          ec, cxt,
+          StringView{"cannot read history from '"} + args[1].view() + "'",
+          "Pass a readable history file, e.g. `history -r ~/.shit_history`");
+      return 1;
+    }
+
     toiletline::history_read();
     did_maintain_list = true;
   }
