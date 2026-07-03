@@ -47,5 +47,5 @@
 ]
 nomatch_*
 a*.zzznomatch literal
-set +o failglob
+failglob       	off
 [Code 0]

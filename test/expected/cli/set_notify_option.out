@@ -1,4 +1,4 @@
-set +o notify
-set -o notify
-set +o notify
+notify         	off
+notify         	on
+notify         	off
 rc=0

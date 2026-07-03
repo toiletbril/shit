@@ -8,7 +8,7 @@ rc=141
 3
 rc=141
 --- seq through cat into wc counts every line ---
-      50
+50
 rc=0
 --- seq into grep ---
 1

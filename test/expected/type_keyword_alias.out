@@ -73,5 +73,5 @@ ll is an alias for ls -l
 if
 alias ll='ls -l'
 if is a shell keyword
-ll is an alias for ls -l
+ll is aliased to `ls -l'
 [Code 0]

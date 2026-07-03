@@ -121,9 +121,9 @@
 [Word
   Unquoted "done"
 ]
-set -o noglob
-set -o failglob
-set -o errexit
-set -o noclobber
+noglob         	on
+failglob       	on
+errexit        	on
+noclobber      	on
 done
 [Code 0]

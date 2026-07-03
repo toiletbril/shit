@@ -109,5 +109,5 @@
 ]
 echo
 set
-/tmp/shit-command-v-fixture/probe
+probe
 [Code 0]

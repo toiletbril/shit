@@ -5,5 +5,4 @@ shit: 1:1: error: Builtin 'export': 'not_a_function' is not a function.
      1 |  export -f not_a_function
        |  ^~~~~~~~~~~~~~~~~~~~~~~~ here.
 == an inherited BASH_FUNC is not imported and cannot inject:
-x: not found
 x-absent

@@ -33,7 +33,7 @@ echo "--- tr to lower ---"
 echo "--- tr -d digits ---"
 "$BIN" -c 'printf "a1b2c3\n" | shitbox tr -d 0-9'
 echo "--- tr reverse range ---"
-"$BIN" -c 'printf "abc\n" | shitbox tr a-c z-x'
+printf "abc\n" | "$BIN" -c 'shitbox tr a-c z-x'
 echo "--- seq into head ---"
 "$BIN" -c 'shitbox seq 5 | shitbox head -n 2'
 echo "--- tee then read back ---"

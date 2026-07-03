@@ -4,9 +4,9 @@
      3	cherry
      4	apple
 --- wc ---
-       4       4      26 fruit.txt
+ 4  4 26 fruit.txt
 --- wc -l ---
-       4 fruit.txt
+4 fruit.txt
 --- head -n 2 ---
 banana
 apple
@@ -39,7 +39,10 @@ abc
 --- tr -d digits ---
 abc
 --- tr reverse range ---
-zyx
+shit: 1:1: error: tr rejects a reverse range in a set.
+     1 |  shitbox tr a-c z-x
+       |  ^~~~~~~~~~~~~~~~~~ here.
+note: Order the range endpoints so the low byte precedes the high byte.
 --- seq into head ---
 1
 2

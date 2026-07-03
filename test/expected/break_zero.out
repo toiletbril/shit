@@ -47,6 +47,8 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:18: error: Builtin 'break': Unable to break because '0' is not a valid loop count.
+shit: 2:18: error: break count '0' is out of range.
      2 |  for i in 1 2; do break 0; echo unreached; done
        |                   ^~~~~~~ here.
+after
+[Code 0]
