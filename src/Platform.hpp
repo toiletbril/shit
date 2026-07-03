@@ -312,11 +312,26 @@ fn is_running_setuid() wontthrow -> bool;
 fn reopen_terminal_as_stdin() wontthrow -> bool;
 
 fn process_id_of(process p) wontthrow -> i64;
+/* True when the process carries the numeric id, the pid comparison a jobspec
+   operand needs without the caller reaching for the platform process type. */
+fn process_has_id(process p, i64 id) wontthrow -> bool;
 
 fn is_stdin_a_tty() wontthrow -> bool;
 fn is_stdout_a_tty() wontthrow -> bool;
 fn is_stderr_a_tty() wontthrow -> bool;
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool;
+/* True when the shell fd number names a terminal, mapping it to the platform
+   descriptor first. */
+fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool;
+
+/* The separator between path components, '/' on every platform and also '\\' on
+   Windows. */
+pure fn is_directory_separator(char c) wontthrow -> bool;
+
+/* The system shell and its command flag, `/bin/sh -c` on POSIX and `cmd /c` on
+   Windows, the pair that runs a command string as one child. */
+fn system_shell_path() wontthrow -> const char *;
+fn system_shell_command_flag() wontthrow -> const char *;
 
 fn make_fd_inheritable(descriptor fd) wontthrow -> void;
 

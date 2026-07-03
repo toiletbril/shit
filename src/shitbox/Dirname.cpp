@@ -21,11 +21,7 @@ namespace shitbox {
 
 static pure fn is_directory_separator(char c) wontthrow -> bool
 {
-#if SHIT_PLATFORM_IS WIN32
-  return c == '/' || c == '\\';
-#else
-  return c == '/';
-#endif
+  return os::is_directory_separator(c);
 }
 
 static pure fn directory_part_of(StringView path) wontthrow -> StringView

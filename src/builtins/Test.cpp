@@ -6,10 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-#if SHIT_PLATFORM_IS WIN32
-#include <io.h>
-#endif
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("expression", "[ expression ]");
@@ -101,14 +97,7 @@ public:
       if (!parse_integer(operand.view(), file_descriptor)) return false;
       /* Any descriptor is checked, not only the standard three, since a config
          dups the controlling terminal onto a higher descriptor and tests it. */
-#if SHIT_PLATFORM_IS WIN32
-      /* A Windows descriptor is a HANDLE, so the shell fd number is mapped to
-         its C runtime handle before the tty check. */
-      return os::is_fd_a_tty(reinterpret_cast<os::descriptor>(
-          _get_osfhandle(static_cast<int>(file_descriptor))));
-#else
-      return os::is_fd_a_tty(static_cast<os::descriptor>(file_descriptor));
-#endif
+      return os::shell_fd_is_a_tty(static_cast<int>(file_descriptor));
     }
     fail(
         StringView{"'"} + op +

@@ -324,13 +324,8 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
   /* The command string is handed to the system shell so a pipeline, a
      redirection, or a shell builtin all run as one real child. */
   let child_argv = ArrayList<String>{allocator};
-#if SHIT_PLATFORM_IS WIN32
-  child_argv.push(String{allocator, "cmd"});
-  child_argv.push(String{allocator, "/c"});
-#else
-  child_argv.push(String{allocator, "/bin/sh"});
-  child_argv.push(String{allocator, "-c"});
-#endif
+  child_argv.push(String{allocator, os::system_shell_path()});
+  child_argv.push(String{allocator, os::system_shell_command_flag()});
   child_argv.push(String{allocator, command});
 
   let samples = ArrayList<bench_sample>{allocator};

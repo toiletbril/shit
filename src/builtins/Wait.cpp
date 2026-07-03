@@ -84,13 +84,7 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
            pid would throw on ECHILD and abort the command. */
         job *matched = nullptr;
         for (job &job : cxt.jobs()) {
-#if SHIT_PLATFORM_IS WIN32
-          /* A Windows process is a HANDLE, so the stored handle is resolved to
-             its numeric process id before the operand is matched. */
-          if (os::process_id_of(job.pid) == parsed.value()) {
-#else
-          if (job.pid == static_cast<os::process>(parsed.value())) {
-#endif
+          if (os::process_has_id(job.pid, parsed.value())) {
             matched = &job;
             break;
           }

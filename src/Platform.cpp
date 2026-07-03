@@ -367,6 +367,10 @@ fn is_running_setuid() wontthrow -> bool
 }
 
 fn process_id_of(process p) wontthrow -> i64 { return static_cast<i64>(p); }
+fn process_has_id(process p, i64 id) wontthrow -> bool
+{
+  return p == static_cast<process>(id);
+}
 
 fn is_stdin_a_tty() wontthrow -> bool { return isatty(SHIT_STDIN); }
 
@@ -374,6 +378,15 @@ fn is_stdout_a_tty() wontthrow -> bool { return isatty(SHIT_STDOUT); }
 
 fn is_stderr_a_tty() wontthrow -> bool { return isatty(SHIT_STDERR); }
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return isatty(fd); }
+fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
+{
+  return is_fd_a_tty(static_cast<descriptor>(shell_fd));
+}
+
+pure fn is_directory_separator(char c) wontthrow -> bool { return c == '/'; }
+
+fn system_shell_path() wontthrow -> const char * { return "/bin/sh"; }
+fn system_shell_command_flag() wontthrow -> const char * { return "-c"; }
 
 fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
 {
@@ -2318,6 +2331,10 @@ fn process_id_of(process p) wontthrow -> i64
 {
   return static_cast<i64>(GetProcessId(p));
 }
+fn process_has_id(process p, i64 id) wontthrow -> bool
+{
+  return process_id_of(p) == id;
+}
 
 fn is_stdin_a_tty() wontthrow -> bool { return _isatty(_fileno(stdin)) != 0; }
 
@@ -2331,6 +2348,18 @@ fn is_fd_a_tty(descriptor fd) wontthrow -> bool
   if (crt_fd == -1) return false;
   return _isatty(crt_fd) != 0;
 }
+fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
+{
+  return is_fd_a_tty(reinterpret_cast<descriptor>(_get_osfhandle(shell_fd)));
+}
+
+pure fn is_directory_separator(char c) wontthrow -> bool
+{
+  return c == '/' || c == '\\';
+}
+
+fn system_shell_path() wontthrow -> const char * { return "cmd"; }
+fn system_shell_command_flag() wontthrow -> const char * { return "/c"; }
 
 fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
 {
