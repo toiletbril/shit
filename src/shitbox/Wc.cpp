@@ -28,23 +28,49 @@ static fn is_blank(char c) wontthrow -> bool
          c == '\v';
 }
 
+struct wc_row
+{
+  StringView name;
+  u64 line_count;
+  u64 word_count;
+  u64 byte_count;
+};
+
+static fn decimal_digit_count(u64 value) wontthrow -> usize
+{
+  usize digit_count = 1;
+
+  while (value >= 10) {
+    value /= 10;
+    digit_count++;
+  }
+
+  return digit_count;
+}
+
 static fn format_counts(u64 lines, u64 words, u64 bytes, bool should_show_lines,
                         bool should_show_words, bool should_show_bytes,
-                        StringView name, Allocator allocator) throws -> String
+                        StringView name, usize field_width,
+                        Allocator allocator) throws -> String
 {
-  let const do_field = [allocator](u64 value) throws -> String {
+  String line{allocator};
+  bool has_field = false;
+
+  let const do_emit_field = [&line, &has_field, allocator,
+                             field_width](u64 value) throws -> void {
+    if (has_field) line += ' ';
+
     let const digits = String::from(value, allocator);
-    String padded{allocator};
-    for (usize i = digits.count(); i < 8; i++)
-      padded += ' ';
-    padded += digits.view();
-    return padded;
+    for (usize i = digits.count(); i < field_width; i++)
+      line += ' ';
+
+    line += digits.view();
+    has_field = true;
   };
 
-  String line{allocator};
-  if (should_show_lines) line += do_field(lines);
-  if (should_show_words) line += do_field(words);
-  if (should_show_bytes) line += do_field(bytes);
+  if (should_show_lines) do_emit_field(lines);
+  if (should_show_words) do_emit_field(words);
+  if (should_show_bytes) do_emit_field(bytes);
 
   if (!name.is_empty()) {
     line += ' ';
@@ -79,7 +105,7 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
 
-  let output = String{cxt.scratch_allocator()};
+  ArrayList<wc_row> rows{cxt.scratch_allocator()};
   u64 total_lines = 0;
   u64 total_words = 0;
   u64 total_bytes = 0;
@@ -116,16 +142,34 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
     total_bytes += bytes;
 
     let const name = source == "-" ? StringView{} : source;
-    output +=
-        format_counts(lines, words, bytes, should_show_lines, should_show_words,
-                      should_show_bytes, name, cxt.scratch_allocator());
+    rows.push(wc_row{name, lines, words, bytes});
   }
+
+  u64 max_count = 0;
+  if (should_show_lines && total_lines > max_count) {
+    max_count = total_lines;
+  }
+  if (should_show_words && total_words > max_count) {
+    max_count = total_words;
+  }
+  if (should_show_bytes && total_bytes > max_count) {
+    max_count = total_bytes;
+  }
+
+  let const field_width = decimal_digit_count(max_count);
+
+  let output = String{cxt.scratch_allocator()};
+  for (const wc_row &row : rows)
+    output +=
+        format_counts(row.line_count, row.word_count, row.byte_count,
+                      should_show_lines, should_show_words, should_show_bytes,
+                      row.name, field_width, cxt.scratch_allocator());
 
   if (sources.count() > 1)
     output +=
         format_counts(total_lines, total_words, total_bytes, should_show_lines,
                       should_show_words, should_show_bytes, StringView{"total"},
-                      cxt.scratch_allocator());
+                      field_width, cxt.scratch_allocator());
 
   ec.print_to_stdout(output);
   return status;

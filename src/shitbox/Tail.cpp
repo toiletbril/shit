@@ -20,6 +20,31 @@ namespace shit {
 
 namespace shitbox {
 
+enum class count_origin
+{
+  FromEnd,
+  FromStart
+};
+
+static fn parse_tail_count(StringView spec, count_origin &origin_out,
+                           i64 &count_out) throws -> bool
+{
+  origin_out = count_origin::FromEnd;
+  let digits = spec;
+  if (digits.length > 0 && digits[0] == '+') {
+    origin_out = count_origin::FromStart;
+    digits = digits.substring(1);
+  } else if (digits.length > 0 && digits[0] == '-') {
+    digits = digits.substring(1);
+  }
+
+  let const parsed = digits.to<i64>();
+  if (parsed.is_error() || parsed.value() < 0) return false;
+
+  count_out = parsed.value();
+  return true;
+}
+
 Tail::Tail() = default;
 
 pure fn Tail::kind() const wontthrow -> Utility::Kind { return Kind::Tail; }
@@ -34,29 +59,26 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
 
   /* -c takes precedence over -n when both are given, matching GNU tail. */
   let const is_byte_mode = FLAG_TAIL_BYTES.is_set();
+  let origin = count_origin::FromEnd;
   i64 count = 10;
   if (is_byte_mode) {
-    let const parsed = FLAG_TAIL_BYTES.value().to<i64>();
-    if (parsed.is_error() || parsed.value() < 0)
+    if (!parse_tail_count(FLAG_TAIL_BYTES.value(), origin, count)) {
       throw ErrorWithDetails{
           "tail: invalid byte count '" +
               String{cxt.scratch_allocator(), FLAG_TAIL_BYTES.value()}
               + "'",
           "The count must be a non-negative integer"
       };
-
-    count = parsed.value();
+    }
   } else if (FLAG_TAIL_LINES.is_set()) {
-    let const parsed = FLAG_TAIL_LINES.value().to<i64>();
-    if (parsed.is_error() || parsed.value() < 0)
+    if (!parse_tail_count(FLAG_TAIL_LINES.value(), origin, count)) {
       throw ErrorWithDetails{
           "tail: invalid line count '" +
               String{cxt.scratch_allocator(), FLAG_TAIL_LINES.value()}
               + "'",
           "The count must be a non-negative integer"
       };
-
-    count = parsed.value();
+    }
   }
 
   let const sources =
@@ -81,21 +103,28 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     if (should_print_headers) {
       if (source_index > 0) output += '\n';
       output += "==> ";
-      output += sources[source_index];
+      output += sources[source_index] == "-" ? StringView{"standard input"}
+                                             : sources[source_index];
       output += " <==\n";
     }
 
     if (is_byte_mode) {
       let const wanted_count = static_cast<usize>(count);
       let const text = content->view();
-      let const start = sub_sat(text.length, wanted_count);
+      let start = origin == count_origin::FromStart
+                      ? (count > 0 ? static_cast<usize>(count - 1) : 0)
+                      : sub_sat(text.length, wanted_count);
+      if (start > text.length) start = text.length;
+
       output += text.substring(start);
       continue;
     }
 
     let const lines = split_keep_newlines(content->view());
     let const wanted_count = static_cast<usize>(count);
-    let const start = sub_sat(lines.count(), wanted_count);
+    let const start = origin == count_origin::FromStart
+                          ? (count > 0 ? static_cast<usize>(count - 1) : 0)
+                          : sub_sat(lines.count(), wanted_count);
     for (usize i = start; i < lines.count(); i++)
       output += lines[i];
   }

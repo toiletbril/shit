@@ -263,13 +263,16 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
     for (const String &operand : operands)
       targets.push(operand.view());
 
-  let output = String{cxt.scratch_allocator()};
-  let const should_print_headers = targets.count() > 1;
+  sort_stringview_list(targets);
+
+  ArrayList<StringView> file_targets{cxt.scratch_allocator()};
+  ArrayList<StringView> dir_targets{cxt.scratch_allocator()};
   ArrayList<id_name_entry> uid_cache{cxt.scratch_allocator()};
   ArrayList<id_name_entry> gid_cache{cxt.scratch_allocator()};
+  let output = String{cxt.scratch_allocator()};
   i32 status = 0;
-  for (usize t = 0; t < targets.count(); t++) {
-    let const target = targets[t];
+
+  for (const StringView &target : targets) {
     let const path = Path{target};
     if (!path.exists()) {
       report_soft_shitbox_error(ec, cxt,
@@ -280,19 +283,38 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    if (!path.is_directory()) {
-      if (FLAG_LS_LONG.is_enabled()) {
-        ArrayList<long_entry> file_entries{cxt.scratch_allocator()};
-        file_entries.push(build_long_entry(path, target, uid_cache, gid_cache,
-                                           cxt.scratch_allocator()));
-        render_long_entries(file_entries, output);
-      } else {
-        output += target;
-        output += '\n';
-      }
-      continue;
-    }
+    if (path.is_directory())
+      dir_targets.push(target);
+    else
+      file_targets.push(target);
+  }
 
+  let const should_print_headers =
+      file_targets.count() + dir_targets.count() > 1;
+
+  if (!file_targets.is_empty()) {
+    if (FLAG_LS_LONG.is_enabled()) {
+      ArrayList<long_entry> file_entries{cxt.scratch_allocator()};
+      file_entries.reserve(file_targets.count());
+      for (const StringView &target : file_targets)
+        file_entries.push(build_long_entry(Path{target}, target, uid_cache,
+                                           gid_cache, cxt.scratch_allocator()));
+      render_long_entries(file_entries, output);
+    } else {
+      render_columns(file_targets, output, cxt.scratch_allocator());
+    }
+  }
+
+  let const is_showing_all =
+      FLAG_LS_ALL.is_enabled() &&
+      (!FLAG_LS_ALMOST_ALL.is_enabled() ||
+       FLAG_LS_ALL.position() > FLAG_LS_ALMOST_ALL.position());
+  let const is_showing_dot_names =
+      is_showing_all || FLAG_LS_ALMOST_ALL.is_enabled();
+
+  bool has_printed_block = !file_targets.is_empty();
+  for (const StringView &target : dir_targets) {
+    let const path = Path{target};
     Maybe<ArrayList<String>> names = Path::read_directory(path);
     if (!names.has_value()) {
       report_soft_shitbox_error(ec, cxt,
@@ -302,20 +324,15 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       status = 2;
       continue;
     }
-    sort_string_list(*names);
 
     if (should_print_headers) {
-      if (t > 0) output += '\n';
+      if (has_printed_block) output += '\n';
       output += target;
       output += ":\n";
     }
-
-    let const is_showing_all = FLAG_LS_ALL.is_enabled();
-    let const is_showing_dot_names =
-        is_showing_all || FLAG_LS_ALMOST_ALL.is_enabled();
+    has_printed_block = true;
 
     ArrayList<StringView> visible_names{cxt.scratch_allocator()};
-    /* The dot and dot-dot entries are not in the directory read. */
     if (is_showing_all) {
       visible_names.push(StringView{"."});
       visible_names.push(StringView{".."});
@@ -326,6 +343,7 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       }
       visible_names.push(name.view());
     }
+    sort_stringview_list(visible_names);
 
     if (FLAG_LS_LONG.is_enabled()) {
       ArrayList<long_entry> entries{cxt.scratch_allocator()};

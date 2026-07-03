@@ -39,13 +39,12 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const is_quiet = FLAG_QUIET.is_enabled();
   let output = String{cxt.scratch_allocator()};
-  bool has_found_any = false;
+  bool has_missing_any = false;
 
   for (let const &program_name : operands) {
     LOG(Debug, "which resolving '%s' against builtins and PATH",
         program_name.c_str());
     if (search_builtin(program_name.view()).has_value()) {
-      has_found_any = true;
       if (!is_quiet) {
         output += program_name;
         if (os::is_stdout_a_tty()) output += ": Shell builtin";
@@ -55,19 +54,20 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
                    program_name, FLAG_ALL.is_enabled());
                paths.count() != 0)
     {
-      has_found_any = true;
       if (!is_quiet) {
         for (let const &path : paths) {
           output += path.text();
           output += '\n';
         }
       }
+    } else {
+      has_missing_any = true;
     }
   }
 
   if (!is_quiet) ec.print_to_stdout(output);
 
-  return has_found_any ? 0 : 1;
+  return has_missing_any ? 1 : 0;
 }
 
 } // namespace shitbox

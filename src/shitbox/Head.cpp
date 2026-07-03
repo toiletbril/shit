@@ -68,6 +68,58 @@ static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes,
   return out;
 }
 
+static fn read_all(os::descriptor fd, Allocator allocator) throws -> String
+{
+  String out{allocator};
+  char buffer[4096];
+  while (true) {
+    if (os::INTERRUPT_REQUESTED) break;
+    let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
+    if (!read_count.has_value() || *read_count == 0) {
+      break;
+    }
+    out.append(StringView{buffer, *read_count});
+  }
+
+  return out;
+}
+
+static fn line_prefix_length_dropping_last(StringView text,
+                                           i64 drop_count) wontthrow -> usize
+{
+  i64 total_line_count = 0;
+  for (usize i = 0; i < text.length; i++) {
+    if (text[i] == '\n') total_line_count++;
+  }
+
+  if (text.length > 0 && text[text.length - 1] != '\n') {
+    total_line_count++;
+  }
+
+  let const keep_count = total_line_count - drop_count;
+  if (keep_count <= 0) return 0;
+
+  i64 lines_seen = 0;
+  for (usize i = 0; i < text.length; i++) {
+    if (text[i] == '\n') {
+      lines_seen++;
+      if (lines_seen == keep_count) return i + 1;
+    }
+  }
+
+  return text.length;
+}
+
+static fn byte_prefix_length_dropping_last(StringView text,
+                                           i64 drop_count) wontthrow -> usize
+{
+  let const total_length = static_cast<i64>(text.length);
+  let const keep_length = total_length - drop_count;
+  if (keep_length <= 0) return 0;
+
+  return static_cast<usize>(keep_length);
+}
+
 Head::Head() = default;
 
 pure fn Head::kind() const wontthrow -> Utility::Kind { return Kind::Head; }
@@ -80,31 +132,41 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  /* The -c byte count takes precedence over -n when both are given. */
-  let const is_byte_mode = FLAG_HEAD_BYTES.is_set();
+  /* The last of -c and -n on the command line selects the mode. */
+  let const has_bytes_flag = FLAG_HEAD_BYTES.is_set();
+  let const has_lines_flag = FLAG_HEAD_LINES.is_set();
+  let const is_byte_mode =
+      has_bytes_flag && (!has_lines_flag || FLAG_HEAD_BYTES.position() >
+                                                FLAG_HEAD_LINES.position());
+
   i64 count = 10;
+  bool is_all_but_last = false;
   if (is_byte_mode) {
-    let const parsed_value = FLAG_HEAD_BYTES.value().to<i64>();
-    if (parsed_value.is_error() || parsed_value.value() < 0) {
+    let const raw = FLAG_HEAD_BYTES.value();
+    let const parsed_value = raw.to<i64>();
+    if (parsed_value.is_error()) {
       throw ErrorWithDetails{
-          "head: invalid byte count '" +
-              String{cxt.scratch_allocator(), FLAG_HEAD_BYTES.value()}
-              + "'",
-          "The count must be a non-negative integer"
+          "head: invalid byte count '" + String{cxt.scratch_allocator(), raw}
+            +
+              "'",
+          "The count must be an integer"
       };
     }
-    count = parsed_value.value();
-  } else if (FLAG_HEAD_LINES.is_set()) {
-    let const parsed_value = FLAG_HEAD_LINES.value().to<i64>();
-    if (parsed_value.is_error() || parsed_value.value() < 0) {
+    is_all_but_last = raw.length > 0 && raw[0] == '-';
+    count = is_all_but_last ? -parsed_value.value() : parsed_value.value();
+  } else if (has_lines_flag) {
+    let const raw = FLAG_HEAD_LINES.value();
+    let const parsed_value = raw.to<i64>();
+    if (parsed_value.is_error()) {
       throw ErrorWithDetails{
-          "head: invalid line count '" +
-              String{cxt.scratch_allocator(), FLAG_HEAD_LINES.value()}
-              + "'",
-          "The count must be a non-negative integer"
+          "head: invalid line count '" + String{cxt.scratch_allocator(), raw}
+            +
+              "'",
+          "The count must be an integer"
       };
     }
-    count = parsed_value.value();
+    is_all_but_last = raw.length > 0 && raw[0] == '-';
+    count = is_all_but_last ? -parsed_value.value() : parsed_value.value();
   }
 
   let const sources =
@@ -133,9 +195,19 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       was_opened = true;
     }
 
-    let const text = is_byte_mode
-                         ? read_up_to_bytes(fd, count, cxt.scratch_allocator())
-                         : read_up_to_lines(fd, count, cxt.scratch_allocator());
+    String text{cxt.scratch_allocator()};
+    if (is_all_but_last) {
+      let const whole = read_all(fd, cxt.scratch_allocator());
+      let const keep_length =
+          is_byte_mode ? byte_prefix_length_dropping_last(whole.view(), count)
+                       : line_prefix_length_dropping_last(whole.view(), count);
+      text.append(whole.view().substring_of_length(0, keep_length));
+    } else {
+      text = is_byte_mode
+                 ? read_up_to_bytes(fd, count, cxt.scratch_allocator())
+                 : read_up_to_lines(fd, count, cxt.scratch_allocator());
+    }
+
     if (was_opened) os::close_fd(fd);
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;

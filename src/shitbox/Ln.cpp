@@ -1,12 +1,13 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Path.hpp"
 #include "../Shitbox.hpp"
 #include "../Trace.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-sf] target link");
+HELP_SYNOPSIS_DECL("[-sf] target ... link");
 
 HELP_DESCRIPTION_DECL("The ln utility creates a symbolic link to the target.");
 
@@ -34,25 +35,42 @@ fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
-  let const target = operands[0].view();
-  let const link = operands[1].view();
-
   if (!FLAG_LN_SYMBOLIC.is_enabled())
     throw ErrorWithDetails{"ln supports only symbolic links",
                            "Re-run with `-s` to make a symlink"};
 
-  if (FLAG_LN_FORCE.is_enabled()) os::remove_file(link);
+  let const destination = operands[operands.count() - 1].view();
+  let const destination_is_directory = Path{destination}.is_directory();
 
-  if (!os::create_symlink(target, link)) {
+  if (operands.count() > 2 && !destination_is_directory) {
     throw Error{
-        "ln: cannot create symbolic link '" +
-        String{cxt.scratch_allocator(), link}
-        +
-        "': " + os::last_system_error_message()
+        "ln: the destination '" + String{cxt.scratch_allocator(), destination}
+          +
+        "' is not a directory, so it cannot hold several links"
     };
   }
 
-  return 0;
+  i32 status = 0;
+  for (usize i = 0; i + 1 < operands.count(); i++) {
+    let const target = operands[i].view();
+    let link = String{cxt.scratch_allocator(), destination};
+    if (destination_is_directory)
+      link = PathBuilder{destination}
+                 .append(Path{target}.filename())
+                 .build()
+                 .text();
+
+    if (FLAG_LN_FORCE.is_enabled()) os::remove_file(link.view());
+
+    if (!os::create_symlink(target, link.view())) {
+      report_soft_shitbox_error(ec, cxt,
+                                "ln: cannot create symbolic link '" + link +
+                                    "': " + os::last_system_error_message());
+      status = 1;
+    }
+  }
+
+  return status;
 }
 
 } // namespace shitbox

@@ -20,6 +20,7 @@ namespace shit {
 
 namespace shitbox {
 
+#if SHIT_PLATFORM_ISNT POSIX
 static fn lower(char character) wontthrow -> char
 {
   return (character >= 'A' && character <= 'Z')
@@ -66,6 +67,7 @@ static fn contains(StringView haystack, StringView needle,
 
   return false;
 }
+#endif
 
 Grep::Grep() = default;
 
@@ -84,6 +86,25 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const pattern = operands[0].view();
   let const should_ignore_case = FLAG_GREP_IGNORE_CASE.is_enabled();
   let const should_invert = FLAG_GREP_INVERT.is_enabled();
+
+#if SHIT_PLATFORM_IS POSIX
+  let const pattern_text = String{cxt.scratch_allocator(), pattern};
+  int compile_flags = REG_NOSUB;
+  if (should_ignore_case) compile_flags |= REG_ICASE;
+
+  regex_t compiled;
+  const int compile_result =
+      regcomp(&compiled, pattern_text.c_str(), compile_flags);
+  if (compile_result != 0) {
+    char error_text[256];
+    regerror(compile_result, &compiled, error_text, sizeof(error_text));
+    report_soft_shitbox_error(
+        ec, cxt,
+        "grep: " + String{cxt.scratch_allocator(), StringView{error_text}});
+    return 2;
+  }
+  defer { regfree(&compiled); };
+#endif
 
   ArrayList<StringView> sources{cxt.scratch_allocator()};
   if (operands.count() == 1)
@@ -111,12 +132,18 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       let const has_newline = !line.is_empty() && line[line.length - 1] == '\n';
       let const body =
           has_newline ? line.substring_of_length(0, line.length - 1) : line;
+#if SHIT_PLATFORM_IS POSIX
+      let const line_text = String{cxt.scratch_allocator(), body};
+      let const is_match =
+          regexec(&compiled, line_text.c_str(), 0, nullptr, 0) == 0;
+#else
       let const is_match = contains(body, pattern, should_ignore_case);
+#endif
       if (is_match == should_invert) continue;
 
       has_any_match = true;
       if (should_print_names) {
-        output += source;
+        output += source == "-" ? StringView{"(standard input)"} : source;
         output += ':';
       }
       output += line;

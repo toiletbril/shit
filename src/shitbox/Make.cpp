@@ -133,7 +133,8 @@ static fn substitute_stem(StringView text, StringView stem,
    without the following byte being read as an automatic variable. */
 static fn substitute_automatic(StringView text, StringView target,
                                StringView first_prereq, StringView all_prereqs,
-                               Allocator allocator) throws -> String
+                               StringView stem, Allocator allocator) throws
+    -> String
 {
   String out{allocator};
   usize i = 0;
@@ -157,6 +158,11 @@ static fn substitute_automatic(StringView text, StringView target,
       }
       if (next == '^') {
         out += all_prereqs;
+        i += 2;
+        continue;
+      }
+      if (next == '*') {
+        out += stem;
         i += 2;
         continue;
       }
@@ -769,6 +775,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   const ArrayList<String> *recipe_lines = nullptr;
   ArrayList<String> prerequisites{cxt.scratch_allocator()};
   const ArrayList<String> *target_assignments = nullptr;
+  String target_stem{cxt.scratch_allocator()};
 
   if (const make_rule *rule = mk.find_rule(goal); rule != nullptr) {
     for (const String &prerequisite : rule->prerequisites) {
@@ -803,6 +810,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
 
       prerequisites = steal(candidate);
       recipe_lines = &pattern.recipe_lines;
+      target_stem = String{cxt.scratch_allocator(), stem->view()};
       break;
     }
 
@@ -856,15 +864,42 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     }
   };
 
+  /* A '|' token opens the order-only section, whose prerequisites are still
+     built but stay out of $< and $^. */
+  ArrayList<String> normal_prerequisites{cxt.scratch_allocator()};
+  ArrayList<String> order_only_prerequisites{cxt.scratch_allocator()};
+  bool is_order_only_section = false;
+  for (const String &prerequisite : prerequisites) {
+    if (prerequisite.view() == "|") {
+      is_order_only_section = true;
+      continue;
+    }
+
+    if (is_order_only_section)
+      order_only_prerequisites.push(prerequisite.clone());
+    else
+      normal_prerequisites.push(prerequisite.clone());
+  }
+
   visiting.push(String{cxt.scratch_allocator(), goal});
-  for (const String &prerequisite : prerequisites)
+  for (const String &prerequisite : normal_prerequisites)
+    build_target(ec, cxt, mk, prerequisite.view(), visiting, built);
+  for (const String &prerequisite : order_only_prerequisites)
     build_target(ec, cxt, mk, prerequisite.view(), visiting, built);
   visiting.pop_back();
 
-  let const first_prereq =
-      prerequisites.is_empty() ? StringView{} : prerequisites[0].view();
+  let const first_prereq = normal_prerequisites.is_empty()
+                               ? StringView{}
+                               : normal_prerequisites[0].view();
+  /* $^ drops a repeated prerequisite, the way GNU make dedups it. */
+  ArrayList<String> seen_prerequisites{cxt.scratch_allocator()};
   String all_prereqs{cxt.scratch_allocator()};
-  for (const String &prerequisite : prerequisites) {
+  for (const String &prerequisite : normal_prerequisites) {
+    if (utils::find_pos_in_vec(seen_prerequisites, prerequisite.view())
+            .has_value())
+      continue;
+
+    seen_prerequisites.push(prerequisite.clone());
     if (!all_prereqs.is_empty()) all_prereqs += ' ';
     all_prereqs += prerequisite.view();
   }
@@ -883,8 +918,9 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     /* The automatic variables are filled on the raw recipe first, then the
        $(NAME) expansion runs, so a $$ stays an escape and a $@ that the
        expansion would not touch is resolved here. */
-    let const with_autos = substitute_automatic(
-        body, goal, first_prereq, all_prereqs.view(), cxt.scratch_allocator());
+    let const with_autos =
+        substitute_automatic(body, goal, first_prereq, all_prereqs.view(),
+                             target_stem.view(), cxt.scratch_allocator());
     let const command = expand(cxt, mk, with_autos.view(), 0);
     if (command.is_empty()) continue;
     if (!is_silent) ec.print_to_stdout(command + "\n");
@@ -1013,8 +1049,18 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
 
   ArrayList<String> visiting{cxt.scratch_allocator()};
   ArrayList<String> built{cxt.scratch_allocator()};
-  for (const String &goal : goals)
-    build_target(ec, cxt, mk, goal.view(), visiting, built);
+  /* GNU make exits 2 on a build error, so a failed recipe or a missing rule
+     carries status 2 while the located caret from the dispatcher is preserved
+     by rethrowing the original error. */
+  try {
+    for (const String &goal : goals)
+      build_target(ec, cxt, mk, goal.view(), visiting, built);
+  } catch (const InterruptError &) {
+    throw;
+  } catch (Error &error) {
+    error.set_command_status(2);
+    throw;
+  }
 
   return 0;
 }

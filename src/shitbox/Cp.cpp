@@ -78,15 +78,34 @@ static fn copy_file(const ExecContext &ec, StringView source,
                        String{allocator, destination} + "'\n");
 }
 
+static fn source_permission_bits(const Path &source_path,
+                                 StringView source) throws -> Maybe<u32>
+{
+  os::file_status status{};
+  StringView stat_target = source;
+
+  Maybe<Path> resolved;
+  if (source_path.is_symbolic_link()) {
+    resolved = os::canonical_path(source_path);
+    if (resolved.has_value()) stat_target = resolved->text().view();
+  }
+
+  if (!os::stat_path(stat_target, status)) return {};
+
+  return status.mode & 0777;
+}
+
 static fn copy_path(const ExecContext &ec, StringView source,
                     StringView destination, bool is_recursive, bool is_verbose,
                     Allocator allocator) throws -> void
 {
   let const source_path = Path{source};
+  let const source_mode = source_permission_bits(source_path, source);
 
-  /* A symlink is recreated at the destination. A platform that cannot read the
-     link falls through and copies the target contents. */
-  if (source_path.is_symbolic_link()) {
+  /* A recursive copy recreates the symlink at the destination. A non-recursive
+     copy dereferences the link and copies the target contents, and a platform
+     that cannot read the link falls through the same way. */
+  if (source_path.is_symbolic_link() && is_recursive) {
     if (let const target = os::read_symlink(source)) {
       /* Symlink creation fails when the path is already present, so an existing
          destination is removed first. */
@@ -119,17 +138,21 @@ static fn copy_path(const ExecContext &ec, StringView source,
       };
 
     let const source_absolute = Path{source}.to_absolute().normalized();
-    let const destination_absolute = Path{destination}.to_absolute().normalized();
+    let const destination_absolute =
+        Path{destination}.to_absolute().normalized();
     let const source_prefix = source_absolute.text() + "/";
     if (destination_absolute.text().view() == source_absolute.text().view() ||
         destination_absolute.text().view().starts_with(source_prefix.view()))
     {
       throw ErrorWithDetails{
-          "cp: cannot copy '" + String{allocator, source} + "' into itself",
-          "The destination is inside the source directory"};
+          "cp: cannot copy '" + String{allocator, source}
+            + "' into itself",
+          "The destination is inside the source directory"
+      };
     }
 
-    os::make_directory(destination, 0777);
+    let const destination_existed = Path{destination}.is_directory();
+    os::make_directory(destination, 0700);
     Maybe<ArrayList<String>> names = Path::read_directory(source_path);
     if (!names.has_value())
       throw Error{
@@ -146,13 +169,27 @@ static fn copy_path(const ExecContext &ec, StringView source,
                 is_recursive, is_verbose, allocator);
     }
 
+    if (source_mode.has_value() && !destination_existed) {
+      os::set_file_mode(destination,
+                        *source_mode & ~os::get_file_creation_mask());
+    }
+
     return;
   }
 
   /* A destination symlink is removed so the copy does not follow the link and
      truncate its target. */
   if (Path{destination}.is_symbolic_link()) os::remove_file(destination);
+
+  let const destination_existed = Path{destination}.exists();
   copy_file(ec, source, destination, is_verbose, allocator);
+
+  /* An existing destination keeps its own mode, a freshly created one takes the
+     source permission bits masked by the umask. */
+  if (source_mode.has_value() && !destination_existed) {
+    os::set_file_mode(destination,
+                      *source_mode & ~os::get_file_creation_mask());
+  }
 }
 
 Cp::Cp() = default;

@@ -29,8 +29,8 @@ static fn make_one(StringView path, u32 mode, bool should_set_exact_mode,
                    bool should_ignore_existing) throws -> bool
 {
   if (os::make_directory(path, mode)) {
-    /* The create narrows the bits by the umask, so an explicit -m re-applies
-       the exact mode. */
+    /* The create narrows the bits by the umask, so the exact mode is
+       re-applied. */
     if (should_set_exact_mode && !os::set_file_mode(path, mode)) {
       return false;
     }
@@ -57,8 +57,8 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const should_make_parents = FLAG_MKDIR_PARENTS.is_enabled();
 
-  /* The named directory takes the -m mode, the -p parents keep 0777 masked by
-     the umask. */
+  /* The named directory takes the -m mode. An intermediate parent forces owner
+     write and search on top of the umask, so the walk descends into it. */
   u32 named_mode = 0777;
   if (FLAG_MKDIR_MODE.is_set()) {
     let const parsed =
@@ -76,18 +76,34 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
     named_mode = static_cast<u32>(parsed.value());
   }
 
+  constexpr u32 owner_write_and_search_bits = 0300;
+  let const intermediate_mode =
+      (0777u & ~os::get_file_creation_mask()) | owner_write_and_search_bits;
+
   i32 status = 0;
   for (const String &operand : operands) {
     if (should_make_parents) {
       let const text = operand.view();
+
+      if (text.is_empty()) {
+        if (!make_one(text, intermediate_mode, false, true)) {
+          report_soft_shitbox_error(
+              ec, cxt,
+              "mkdir: cannot create directory '" + operand +
+                  "': " + os::last_system_error_message());
+          status = 1;
+        }
+        continue;
+      }
+
       for (usize i = 1; i <= text.length; i++) {
         if (i < text.length && text[i] != '/') continue;
         let const prefix = text.substring_of_length(0, i);
         if (prefix.is_empty()) continue;
         let const is_named_directory = (i == text.length);
-        let const mode = is_named_directory ? named_mode : 0777;
+        let const mode = is_named_directory ? named_mode : intermediate_mode;
         let const should_set_exact_mode =
-            is_named_directory && FLAG_MKDIR_MODE.is_set();
+            !is_named_directory || FLAG_MKDIR_MODE.is_set();
         if (!make_one(prefix, mode, should_set_exact_mode, true)) {
           report_soft_shitbox_error(
               ec, cxt,

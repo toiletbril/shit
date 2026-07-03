@@ -141,7 +141,6 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     if (!remove_path(operand.view(), is_recursive)) {
-      if (should_force) continue;
       report_soft_shitbox_error(ec, cxt,
                                 "rm: cannot remove '" + operand +
                                     "': " + os::last_system_error_message());

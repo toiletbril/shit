@@ -19,6 +19,25 @@ namespace shit {
 
 namespace shitbox {
 
+static fn basename_component(StringView path) wontthrow -> StringView
+{
+  usize end_position = path.length;
+  while (end_position > 0 && path[end_position - 1] == '/')
+    end_position--;
+
+  if (end_position == 0) {
+    if (path.is_empty()) return path;
+    return StringView{"/"};
+  }
+
+  usize start_position = end_position;
+  while (start_position > 0 && path[start_position - 1] != '/')
+    start_position--;
+
+  return path.substring_of_length(start_position,
+                                  end_position - start_position);
+}
+
 Basename::Basename() = default;
 
 pure fn Basename::kind() const wontthrow -> Utility::Kind
@@ -36,11 +55,13 @@ fn Basename::execute(const ExecContext &ec, EvalContext &cxt,
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
+  if (operands.count() > 2) {
+    report_soft_shitbox_error(ec, cxt,
+                              "basename: extra operand '" + operands[2] + "'");
+    return 1;
+  }
 
-  /* The path is held in a named local so its filename view does not dangle
-     past a temporary. */
-  let const path = Path{operands[0].view()};
-  let name = path.filename();
+  let name = basename_component(operands[0].view());
   if (operands.count() > 1) {
     let const suffix = operands[1].view();
     if (suffix.length < name.length &&

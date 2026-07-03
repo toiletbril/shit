@@ -46,7 +46,7 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
       source_list_from_operands(operands, cxt.scratch_allocator());
 
   let output = String{cxt.scratch_allocator()};
-  i64 line_number = 1;
+  let number_buffer = String{cxt.scratch_allocator()};
   i32 status = 0;
   for (let const &source : sources) {
     let const content = read_named_or_stdin(ec, source);
@@ -63,7 +63,12 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
       output += content->view();
       continue;
     }
-    for (let const &line : split_keep_newlines(content->view())) {
+    number_buffer += content->view();
+  }
+
+  if (FLAG_CAT_NUMBER.is_enabled()) {
+    i64 line_number = 1;
+    for (let const &line : split_keep_newlines(number_buffer.view())) {
       output += number_prefix(line_number, cxt.scratch_allocator());
       output += line;
       line_number++;

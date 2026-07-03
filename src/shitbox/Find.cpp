@@ -22,12 +22,12 @@ namespace shit {
 
 namespace shitbox {
 
-/* The name pattern points into the argument that spelled it, so the argument
-   outlives the walk that reads the pattern. */
+/* The name patterns point into the arguments that spelled them, so the
+   arguments outlive the walk that reads the patterns. Every -name must match,
+   so the patterns are ANDed. */
 struct find_options
 {
-  bool has_name{false};
-  StringView name_pattern{};
+  const ArrayList<StringView> *name_patterns{nullptr};
   const Bitset *glob_active{nullptr};
   char type_filter{0};
   i64 max_depth{-1};
@@ -55,18 +55,20 @@ static fn find_entry_matches(char type_letter, StringView filename, usize depth,
   default: break;
   }
 
-  if (options.has_name && !utils::glob_matches(options.name_pattern, filename,
-                                               *options.glob_active, 0))
-  {
-    return false;
+  if (options.name_patterns != nullptr) {
+    for (let const &pattern : *options.name_patterns) {
+      if (!utils::glob_matches(pattern, filename, *options.glob_active, 0))
+        return false;
+    }
   }
 
   return true;
 }
 
-static fn find_walk(const Path &path, StringView display, usize depth,
+static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
+                    StringView display, usize depth,
                     const find_options &options, String &output,
-                    Allocator allocator) throws -> void
+                    i32 &exit_status, Allocator allocator) throws -> void
 {
   /* The stat reads the symlink, not its target, and a failed stat yields the
      marker '\0' that matches no -type filter and is not descended. */
@@ -87,7 +89,16 @@ static fn find_walk(const Path &path, StringView display, usize depth,
   }
 
   Maybe<ArrayList<String>> names = Path::read_directory(path);
-  if (!names.has_value()) return;
+  if (!names.has_value()) {
+    if (!path.is_readable()) {
+      report_soft_shitbox_error(ec, cxt,
+                                "find: '" + String{allocator, display} +
+                                    "': Permission denied");
+      exit_status = 1;
+    }
+
+    return;
+  }
   sort_string_list(*names);
 
   for (let const &child_name : *names) {
@@ -99,8 +110,8 @@ static fn find_walk(const Path &path, StringView display, usize depth,
     }
     child_display += child_name.view();
     let const child_path = Path{child_display.view()};
-    find_walk(child_path, child_display.view(), depth + 1, options, output,
-              allocator);
+    find_walk(ec, cxt, child_path, child_display.view(), depth + 1, options,
+              output, exit_status, allocator);
   }
 }
 
@@ -139,16 +150,19 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   unused(cxt);
 
   ArrayList<StringView> roots{cxt.scratch_allocator()};
+  ArrayList<StringView> name_patterns{cxt.scratch_allocator()};
   find_options options{};
   Bitset name_glob_active{cxt.scratch_allocator()};
 
   /* The flag parser is bypassed, a predicate such as -name is not a
-     single-letter flag bundle. */
+     single-letter flag bundle. An empty argument is a start path, not a
+     predicate, so it is collected as a root. */
   usize index = 1;
-  while (index < args.count() && !args[index].view().is_empty() &&
-         args[index].view()[0] != '-')
-  {
-    roots.push(args[index].view());
+  while (index < args.count()) {
+    let const start_argument = args[index].view();
+    if (!start_argument.is_empty() && start_argument[0] == '-') break;
+
+    roots.push(start_argument);
     index++;
   }
 
@@ -165,8 +179,7 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
       if (index + 1 >= args.count())
         throw ErrorWithDetails{"find: -name expects a pattern",
                                "Pass a glob after `-name`, e.g. `-name '*.c'`"};
-      options.has_name = true;
-      options.name_pattern = args[index + 1].view();
+      name_patterns.push(args[index + 1].view());
       index++;
     } else if (predicate == "-type") {
       if (index + 1 >= args.count())
@@ -198,10 +211,18 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  if (options.has_name) {
-    name_glob_active.reserve(options.name_pattern.length);
-    for (usize i = 0; i < options.name_pattern.length; i++)
+  if (!name_patterns.is_empty()) {
+    usize longest_pattern_length = 0;
+    for (let const &pattern : name_patterns) {
+      if (pattern.length > longest_pattern_length)
+        longest_pattern_length = pattern.length;
+    }
+
+    name_glob_active.reserve(longest_pattern_length);
+    for (usize i = 0; i < longest_pattern_length; i++)
       name_glob_active.push(true);
+
+    options.name_patterns = &name_patterns;
     options.glob_active = &name_glob_active;
   }
 
@@ -219,7 +240,8 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
-    find_walk(root_path, root, 0, options, output, cxt.scratch_allocator());
+    find_walk(ec, cxt, root_path, root, 0, options, output, status,
+              cxt.scratch_allocator());
   }
 
   ec.print_to_stdout(output);

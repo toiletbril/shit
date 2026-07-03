@@ -30,6 +30,34 @@ static fn parse_integer(StringView text, Allocator allocator) throws -> i64
   return parsed.value();
 }
 
+static fn is_negative_number_token(StringView token) wontthrow -> bool
+{
+  return token.count() >= 2 && token[0] == '-' &&
+         token.substring(1).is_all_decimal_digits();
+}
+
+/* The flag parser reads a leading `-5` as an unknown flag. A negative first
+   operand is delimited with `--` to keep it an operand. */
+static fn
+find_leading_negative_position(const ArrayList<String> &args) wontthrow
+    -> Maybe<usize>
+{
+  for (usize i = 1; i < args.count(); i++) {
+    let const token = args[i].view();
+
+    if (token == "--") return None;
+
+    if (is_negative_number_token(token)) return i;
+
+    let const is_flag_token = token.count() >= 2 && token[0] == '-';
+    if (is_flag_token) continue;
+
+    return None;
+  }
+
+  return None;
+}
+
 Seq::Seq() = default;
 
 pure fn Seq::kind() const wontthrow -> Utility::Kind { return Kind::Seq; }
@@ -37,7 +65,19 @@ pure fn Seq::kind() const wontthrow -> Utility::Kind { return Kind::Seq; }
 fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<String> &args) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args);
+  ArrayList<String> patched_args{cxt.scratch_allocator()};
+  let const negative_position = find_leading_negative_position(args);
+  if (negative_position.has_value()) {
+    patched_args.reserve(args.count() + 1);
+    for (usize i = 0; i < args.count(); i++) {
+      if (i == *negative_position) patched_args.push_managed(StringView{"--"});
+      patched_args.push_managed(args[i].view());
+    }
+  }
+
+  let const &effective_args =
+      negative_position.has_value() ? patched_args : args;
+  let const operands = parse_util_operands(FLAG_LIST, effective_args);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);

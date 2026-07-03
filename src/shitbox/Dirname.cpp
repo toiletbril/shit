@@ -19,6 +19,51 @@ namespace shit {
 
 namespace shitbox {
 
+static pure fn is_directory_separator(char c) wontthrow -> bool
+{
+#if SHIT_PLATFORM_IS WIN32
+  return c == '/' || c == '\\';
+#else
+  return c == '/';
+#endif
+}
+
+static pure fn directory_part_of(StringView path) wontthrow -> StringView
+{
+  if (path.is_empty()) return StringView{"."};
+
+  bool has_only_separators = true;
+  for (usize i = 0; i < path.length; i++) {
+    if (!is_directory_separator(path[i])) {
+      has_only_separators = false;
+      break;
+    }
+  }
+  if (has_only_separators) return StringView{"/"};
+
+  usize end_position = path.length;
+  while (end_position > 0 && is_directory_separator(path[end_position - 1]))
+    end_position--;
+
+  bool has_separator = false;
+  usize last_separator_position = 0;
+  for (usize i = 0; i < end_position; i++) {
+    if (is_directory_separator(path[i])) {
+      has_separator = true;
+      last_separator_position = i;
+    }
+  }
+  if (!has_separator) return StringView{"."};
+
+  end_position = last_separator_position;
+  while (end_position > 0 && is_directory_separator(path[end_position - 1]))
+    end_position--;
+
+  if (end_position == 0) return StringView{"/"};
+
+  return path.substring_of_length(0, end_position);
+}
+
 Dirname::Dirname() = default;
 
 pure fn Dirname::kind() const wontthrow -> Utility::Kind
@@ -35,10 +80,12 @@ fn Dirname::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
+  if (operands.is_empty()) {
+    report_usage_error(ec, cxt, args[0].view());
+    return 1;
+  }
 
-  let const parent = Path{operands[0].view()}.parent();
-  let const text = parent.is_empty() ? StringView{"."} : parent.text().view();
+  let const text = directory_part_of(operands[0].view());
   ec.print_to_stdout(String{cxt.scratch_allocator(), text} + "\n");
 
   return 0;

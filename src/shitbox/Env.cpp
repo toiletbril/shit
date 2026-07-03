@@ -91,7 +91,7 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
 
   defer
   {
-    for (usize i = 0; i < saved_names.count(); i++) {
+    for (usize i = saved_names.count(); i-- > 0;) {
       if (was_present[i])
         os::set_environment_variable(saved_names[i].view(),
                                      saved_values[i].view());

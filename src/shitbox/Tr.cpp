@@ -3,6 +3,8 @@
 #include "../Eval.hpp"
 #include "../Shitbox.hpp"
 
+#include <cctype>
+
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-d] set1 [set2]");
@@ -20,27 +22,130 @@ namespace shit {
 
 namespace shitbox {
 
-/* The bounds are read as unsigned bytes and the walk runs over an int, so a
-   range that touches the 0 or 255 edge does not overflow a char. */
+using posix_class_test = bool (*)(u8 byte);
+
+constexpr static_string_entry<posix_class_test> TR_POSIX_CLASS_ENTRIES[] = {
+    {SSK("alnum"),  [](u8 byte) { return std::isalnum(byte) != 0; } },
+    {SSK("alpha"),  [](u8 byte) { return std::isalpha(byte) != 0; } },
+    {SSK("blank"),  [](u8 byte) { return std::isblank(byte) != 0; } },
+    {SSK("cntrl"),  [](u8 byte) { return std::iscntrl(byte) != 0; } },
+    {SSK("digit"),  [](u8 byte) { return std::isdigit(byte) != 0; } },
+    {SSK("graph"),  [](u8 byte) { return std::isgraph(byte) != 0; } },
+    {SSK("lower"),  [](u8 byte) { return std::islower(byte) != 0; } },
+    {SSK("print"),  [](u8 byte) { return std::isprint(byte) != 0; } },
+    {SSK("punct"),  [](u8 byte) { return std::ispunct(byte) != 0; } },
+    {SSK("space"),  [](u8 byte) { return std::isspace(byte) != 0; } },
+    {SSK("upper"),  [](u8 byte) { return std::isupper(byte) != 0; } },
+    {SSK("xdigit"), [](u8 byte) { return std::isxdigit(byte) != 0; }},
+};
+
+constexpr StaticStringMap TR_POSIX_CLASSES{TR_POSIX_CLASS_ENTRIES};
+
+struct decoded_char
+{
+  unsigned char byte;
+  usize width_count;
+};
+
+/* A backslash escape decodes the way GNU tr reads it, the named controls plus a
+   one-to-three digit octal value, and an unknown escape drops the backslash. */
+static fn decode_escaped_char(StringView set, usize position) wontthrow
+    -> decoded_char
+{
+  if (set[position] != '\\' || position + 1 >= set.length)
+    return {static_cast<unsigned char>(set[position]), 1};
+
+  let const escaped = set[position + 1];
+  switch (escaped) {
+  case 'a': return {'\a', 2};
+  case 'b': return {'\b', 2};
+  case 'f': return {'\f', 2};
+  case 'n': return {'\n', 2};
+  case 'r': return {'\r', 2};
+  case 't': return {'\t', 2};
+  case 'v': return {'\v', 2};
+  case '\\': return {'\\', 2};
+  }
+
+  if (escaped >= '0' && escaped <= '7') {
+    int value = 0;
+    usize digit_count = 0;
+    while (digit_count < 3 && position + 1 + digit_count < set.length) {
+      let const digit = set[position + 1 + digit_count];
+      if (digit < '0' || digit > '7') break;
+      value = value * 8 + (digit - '0');
+      digit_count++;
+    }
+    return {static_cast<unsigned char>(value), 1 + digit_count};
+  }
+
+  return {static_cast<unsigned char>(escaped), 2};
+}
+
+/* A `[:name:]` class expands to its member bytes in ascending order, so
+   `[:upper:]` and `[:lower:]` line up for a case translation. A width of zero
+   reports that no class was present at the position. */
+static fn expand_posix_class(StringView set, usize position,
+                             String &expanded) throws -> usize
+{
+  if (set[position] != '[' || position + 1 >= set.length ||
+      set[position + 1] != ':')
+    return 0;
+
+  usize scan = position + 2;
+  while (scan + 1 < set.length && !(set[scan] == ':' && set[scan + 1] == ']'))
+    scan++;
+
+  if (scan + 1 >= set.length || set[scan] != ':' || set[scan + 1] != ']')
+    return 0;
+
+  let const name_start = position + 2;
+  let const class_name = set.substring_of_length(name_start, scan - name_start);
+  let const test = TR_POSIX_CLASSES.find(class_name);
+  if (!test.has_value()) return 0;
+
+  for (int byte = 0; byte < 256; byte++) {
+    if ((*test)(static_cast<u8>(byte))) expanded.push(static_cast<char>(byte));
+  }
+
+  return scan + 2 - position;
+}
+
+/* The bytes read as unsigned so a range that touches the 0 or 255 edge does not
+   overflow a char. A reverse range is rejected the way the reference tr does.
+ */
 static fn expand_set(StringView set, Allocator allocator) throws -> String
 {
   String expanded{allocator};
   usize i = 0;
   while (i < set.length) {
-    if (i + 2 < set.length && set[i + 1] == '-') {
-      let const low = static_cast<int>(static_cast<unsigned char>(set[i]));
-      let const high = static_cast<int>(static_cast<unsigned char>(set[i + 2]));
-      if (low <= high)
-        for (int c = low; c <= high; c++)
-          expanded.push(static_cast<char>(c));
-      else
-        for (int c = low; c >= high; c--)
-          expanded.push(static_cast<char>(c));
-      i += 3;
-    } else {
-      expanded.push(set[i]);
-      i++;
+    if (let const class_width = expand_posix_class(set, i, expanded);
+        class_width > 0)
+    {
+      i += class_width;
+      continue;
     }
+
+    let const first = decode_escaped_char(set, i);
+    let const after = i + first.width_count;
+
+    if (after < set.length && set[after] == '-' && after + 1 < set.length) {
+      let const second = decode_escaped_char(set, after + 1);
+      if (first.byte > second.byte) {
+        throw ErrorWithDetails{
+            "tr rejects a reverse range in a set",
+            "Order the range endpoints so the low byte precedes the high byte"};
+      }
+
+      for (int c = first.byte; c <= second.byte; c++)
+        expanded.push(static_cast<char>(c));
+
+      i = after + 1 + second.width_count;
+      continue;
+    }
+
+    expanded.push(static_cast<char>(first.byte));
+    i = after;
   }
   return expanded;
 }
@@ -77,21 +182,16 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize i = 0; i < BYTE_VALUE_COUNT; i++)
     translation[i] = static_cast<unsigned char>(i);
 
-  /* set2 is indexed by the distinct ordinal of the set1 byte, not its raw scan
-     position, so a duplicate byte earlier in set1 does not shift every later
-     mapping the way a raw position would. */
-  usize distinct_count = 0;
+  /* A byte repeated in set1 takes the mapping of its last occurrence, the way
+     the reference tr resolves it, so the raw scan position indexes set2 and a
+     later write overwrites an earlier one. */
   for (usize i = 0; i < set1.count(); i++) {
     let const from = static_cast<unsigned char>(set1.view()[i]);
-    if (is_in_set1[from]) continue;
     is_in_set1[from] = true;
     if (!is_deleting && set2.count() > 0) {
-      let const index =
-          distinct_count < set2.count() ? distinct_count : set2.count() - 1;
+      let const index = i < set2.count() ? i : set2.count() - 1;
       translation[from] = static_cast<unsigned char>(set2.view()[index]);
     }
-
-    distinct_count++;
   }
 
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));

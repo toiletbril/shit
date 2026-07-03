@@ -39,23 +39,19 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
   bool should_sleep_forever = false;
   for (const String &operand : operands) {
     let const duration = operand.view();
-    if (duration == "inf" || duration == "infinity") {
-      should_sleep_forever = true;
-      continue;
-    }
 
     let const number = String{cxt.scratch_allocator(), duration};
     let const start = number.c_str();
     char *end = nullptr;
     let const seconds_value = std::strtod(start, &end);
 
-    /* A nan compares false against zero, so the explicit finite check is
+    /* A nan compares false against zero, so the explicit nan check is
        needed, not the sign test alone. */
     let digits = start;
     if (*digits == '+' || *digits == '-') digits++;
     const bool is_hex_prefix =
         digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X');
-    if (end == start || is_hex_prefix || !std::isfinite(seconds_value) ||
+    if (end == start || is_hex_prefix || std::isnan(seconds_value) ||
         seconds_value < 0.0)
       throw ErrorWithDetails{
           "sleep: invalid duration '" + number + "'",
@@ -80,6 +76,11 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
           "sleep: invalid duration '" + number + "'",
           "Use a non-negative number with an optional `s`, `m`, `h`, or `d` "
           "suffix, e.g. `sleep 5`"};
+    }
+
+    if (std::isinf(seconds_value)) {
+      should_sleep_forever = true;
+      continue;
     }
 
     total_seconds += seconds_value * unit_multiplier;

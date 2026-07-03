@@ -23,12 +23,27 @@ namespace shit {
 
 namespace shitbox {
 
+static fn uppercase_signal_name(StringView spelled, Allocator allocator) throws
+    -> String
+{
+  let uppercased = String{allocator};
+  uppercased.reserve(spelled.length);
+  for (usize i = 0; i < spelled.length; i++) {
+    let const byte = spelled[i];
+    uppercased.push(byte >= 'a' && byte <= 'z'
+                        ? static_cast<char>(byte - 'a' + 'A')
+                        : byte);
+  }
+  return uppercased;
+}
+
 fn resolve_shitbox_signal(StringView spelled, Allocator allocator) throws -> i32
 {
   if (spelled.is_empty()) return SIGTERM;
   let const parsed = spelled.to<i64>();
   if (!parsed.is_error()) return static_cast<i32>(parsed.value());
-  let const named = os::signal_number_from_name(spelled);
+  let const uppercased = uppercase_signal_name(spelled, allocator);
+  let const named = os::signal_number_from_name(uppercased.view());
   if (!named.has_value())
     throw Error{
         "unknown signal '" + String{allocator, spelled}
@@ -76,7 +91,14 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
     if (process.pid == self_pid) continue;
     if (process.name.find_substring(pattern, 0).has_value()) {
       if (os::signal_process(os::process_from_pid(process.pid), signal_number))
+      {
         did_signal_any = true;
+      } else {
+        let const reason = os::last_system_error_message();
+        ec.print_to_stderr("pkill: killing pid " +
+                           String::from(process.pid, cxt.scratch_allocator()) +
+                           " failed: " + reason + "\n");
+      }
     }
   }
 

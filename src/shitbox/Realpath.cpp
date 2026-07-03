@@ -38,13 +38,22 @@ fn Realpath::execute(const ExecContext &ec, EvalContext &cxt,
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   let output = String{cxt.scratch_allocator()};
+  i32 status = 0;
   for (const String &operand : operands) {
-    let const resolved = Path{operand.view()}.to_absolute().normalized();
-    output += resolved.text().view();
+    let const resolved = os::canonical_path(Path{operand.view()});
+    if (!resolved) {
+      report_soft_shitbox_error(ec, cxt,
+                                "realpath: '" + operand +
+                                    "': " + os::last_system_error_message());
+      status = 1;
+      continue;
+    }
+
+    output += resolved->text().view();
     output += '\n';
   }
   ec.print_to_stdout(output);
-  return 0;
+  return status;
 }
 
 } // namespace shitbox
