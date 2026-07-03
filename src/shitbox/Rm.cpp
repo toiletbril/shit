@@ -6,7 +6,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-rRf] path ...");
+HELP_SYNOPSIS_DECL("[-rRf] [--dry-run] path ...");
 
 HELP_DESCRIPTION_DECL("The rm utility removes each path.");
 
@@ -14,6 +14,8 @@ FLAG(RM_RECURSIVE_R, Bool, 'r', "", "Remove directories and their contents.");
 FLAG(RM_RECURSIVE_UPPER, Bool, 'R', "",
      "Remove directories and their contents.");
 FLAG(RM_FORCE, Bool, 'f', "", "Ignore a missing path and never prompt.");
+FLAG(RM_DRY_RUN, Bool, '\0', "dry-run",
+     "Print what would be removed without removing anything.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Rm);
@@ -35,6 +37,26 @@ fn remove_path(StringView path, bool is_recursive) throws -> bool
     return os::remove_directory(path);
   }
   return os::remove_file(path);
+}
+
+static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
+                                 StringView path, bool is_recursive) throws
+    -> void
+{
+  let const target = Path{path};
+  if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
+    if (Maybe<ArrayList<String>> names = Path::read_directory(target);
+        names.has_value())
+    {
+      for (const String &name : *names) {
+        let const child = PathBuilder{path}.append(name.view()).build();
+        report_dry_run_removal(ec, cxt, child.text().view(), is_recursive);
+      }
+    }
+  }
+
+  ec.print_to_stdout("rm: would remove '" +
+                     String{cxt.scratch_allocator(), path} + "'\n");
 }
 
 /* POSIX requires rm to refuse a . or .. operand even under -f. */
@@ -78,6 +100,7 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_force = FLAG_RM_FORCE.is_enabled();
   let const is_recursive =
       FLAG_RM_RECURSIVE_R.is_enabled() || FLAG_RM_RECURSIVE_UPPER.is_enabled();
+  let const is_dry_run = FLAG_RM_DRY_RUN.is_enabled();
 
   if (operands.is_empty() && !should_force) {
     return report_usage_error(ec, cxt, args[0].view());
@@ -112,6 +135,11 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
+    if (is_dry_run) {
+      report_dry_run_removal(ec, cxt, operand.view(), is_recursive);
+      continue;
+    }
+
     if (!remove_path(operand.view(), is_recursive)) {
       if (should_force) continue;
       report_soft_shitbox_error(ec, cxt,

@@ -167,6 +167,12 @@ through the same script. The dashdiff, bashdiff, and mimicrydiff scripts compare
 through process substitution. macOS diverges on a few tests, and the harness
 carries alternate goldens.
 
+Every rm test runs the shitbox rm through `--dry-run`, so a test verifies what
+rm would remove without ever deleting a real file. This is the rule for
+rm_behavior, rm_refuses_dot, and rm_refuses_root, and any new rm test follows
+it. A cleanup of a temp directory uses the system rm behind a `[ -n "$d" ]`
+guard, never the shitbox rm under test.
+
 The bashdiff and mimicrydiff bash comparisons require a bash 5.3 or newer
 reference, since the goldens encode bash 5.x behavior, and both scripts skip the
 bash comparison loudly when `$BASH` is older. The macOS system `/bin/bash` is

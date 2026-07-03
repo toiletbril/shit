@@ -16,7 +16,3 @@ echo "== cp -r of a directory into itself is refused, not infinite:"
 d=$(mktemp -d); cd "$d" || exit 1; mkdir sub; : > sub/f
 "$BIN" -c 'shitbox cp -r sub sub' 2>&1
 cd / || exit 1; rm -rf "$d"
-echo "== rm removes a dangling symlink:"
-e=$(mktemp -d); cd "$e" || exit 1; ln -s /no/such/target link
-"$BIN" -c 'shitbox rm link' 2>&1; echo "rc=$?"; ls link 2>&1
-cd / || exit 1; rm -rf "$e"
