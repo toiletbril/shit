@@ -15,9 +15,16 @@ FLAG(bench_runs, String, '\0', "runs",
      "The exact number of samples per command.");
 FLAG(bench_duration, String, '\0', "duration",
      "The sampling budget per command in milliseconds.");
+FLAG(BENCH_IGNORE_EXIT, Bool, '\0', "ignore-exit-code",
+     "Keep sampling even when the command returns a non-zero exit code.");
+FLAG(BENCH_SHOW_OUTPUT, Bool, '\0', "show-output",
+     "Show the command's output instead of suppressing it.");
+FLAG(BENCH_NO_SHELL, Bool, '\0', "no-shell",
+     "Fork the command directly, without wrapping it in a shell.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-HELP_SYNOPSIS_DECL("[--runs n] [--duration ms] command [command ...]");
+HELP_SYNOPSIS_DECL("[--runs n] [--duration ms] [--ignore-exit-code] "
+                   "[--show-output] [--no-shell] command [command ...]");
 
 HELP_DESCRIPTION_DECL(
     "The bench builtin measures and compares the runtime of each command.");
@@ -314,19 +321,38 @@ fn clear_progress() throws -> void
   print_error(StringView{"\r                                        \r"});
 }
 
-fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
-                  bool should_show_progress, bool &was_interrupted,
-                  Allocator allocator) throws -> command_result
+fn sample_command(StringView shell_binary, StringView command,
+                  Maybe<u64> run_limit, u64 duration_millis,
+                  bool should_show_progress, bool should_suppress_output,
+                  bool should_ignore_exit_code, bool should_use_shell,
+                  bool &was_interrupted, bool &did_command_fail,
+                  i64 &failure_status, Allocator allocator) throws
+    -> command_result
 {
   let result = command_result{allocator};
   result.label = command;
 
-  /* The command string is handed to the system shell so a pipeline, a
-     redirection, or a shell builtin all run as one real child. */
   let child_argv = ArrayList<String>{allocator};
-  child_argv.push(String{allocator, os::system_shell_path()});
-  child_argv.push(String{allocator, os::system_shell_command_flag()});
-  child_argv.push(String{allocator, command});
+  if (should_use_shell) {
+    child_argv.push(String{allocator, shell_binary});
+    child_argv.push(String{allocator, "-c"});
+    child_argv.push(String{allocator, command});
+  } else {
+    usize start = 0;
+    for (usize i = 0; i <= command.length; i++) {
+      let const at_end = i == command.length;
+      if (at_end || command[i] == ' ' || command[i] == '\t') {
+        if (i > start)
+          child_argv.push(
+              String{allocator, command.substring_of_length(start, i - start)});
+        start = i + 1;
+      }
+    }
+
+    if (child_argv.is_empty())
+      throw Error{StringView{"bench --no-shell needs a command word in '"} +
+                  command + "'"};
+  }
 
   let samples = ArrayList<bench_sample>{allocator};
   const u64 duration_nanos = duration_millis * 1000000ULL;
@@ -364,15 +390,19 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
       draw_progress(command, percent, allocator);
     }
 
-    let const measured = os::run_measured(child_argv, true);
+    let const measured = os::run_measured(child_argv, should_suppress_output);
     if (!measured.has_value())
       throw Error{StringView{"Unable to run '"} + command +
                   "': " + os::last_system_error_message()};
 
-    /* A Ctrl-C delivered while the measured child held the foreground lands
-       here, so the loop breaks before the slow sample is recorded. */
     if (os::INTERRUPT_REQUESTED) {
       was_interrupted = true;
+      break;
+    }
+
+    if (measured->exit_status != 0 && !should_ignore_exit_code) {
+      did_command_fail = true;
+      failure_status = measured->exit_status;
       break;
     }
 
@@ -506,6 +536,19 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   const bool should_color = colors::stdout_wants_color();
   let const should_show_progress = progress_is_enabled();
+  let const should_ignore_exit_code = FLAG_BENCH_IGNORE_EXIT.is_enabled();
+  let const should_suppress_output = !FLAG_BENCH_SHOW_OUTPUT.is_enabled();
+  let const should_use_shell = !FLAG_BENCH_NO_SHELL.is_enabled();
+
+  let shell_binary =
+      String{cxt.scratch_allocator(), cxt.shell_executable_path()};
+  if (shell_binary.is_empty()) {
+    if (let const detected = os::current_executable_path())
+      shell_binary = String{cxt.scratch_allocator(), detected->view()};
+  }
+  if (should_use_shell && shell_binary.is_empty())
+    throw Error{
+        StringView{"bench cannot find the shit binary to run a sample"}};
 
   LOG(Debug, "bench sampling %zu commands for %llu ms each",
       arguments.count() - 1, static_cast<unsigned long long>(duration_millis));
@@ -513,14 +556,28 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let results = ArrayList<command_result>{cxt.scratch_allocator()};
   for (usize i = 1; i < arguments.count(); i++) {
     bool was_interrupted = false;
-    results.push(sample_command(arguments[i].view(), run_limit, duration_millis,
-                                should_show_progress, was_interrupted,
-                                cxt.scratch_allocator()));
+    bool did_command_fail = false;
+    i64 failure_status = 0;
+    results.push(sample_command(
+        shell_binary.view(), arguments[i].view(), run_limit, duration_millis,
+        should_show_progress, should_suppress_output, should_ignore_exit_code,
+        should_use_shell, was_interrupted, did_command_fail, failure_status,
+        cxt.scratch_allocator()));
 
-    /* A Ctrl-C clears the interrupt flag and returns 130. */
     if (was_interrupted) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
+    }
+
+    if (did_command_fail) {
+      if (should_show_progress) clear_progress();
+      report_soft_builtin_error(
+          ec, cxt,
+          StringView{"the command '"} + arguments[i].view() +
+              "' exited with status " +
+              String::from(failure_status, cxt.scratch_allocator()),
+          "Pass `--ignore-exit-code` to benchmark it regardless");
+      return static_cast<i32>(failure_status);
     }
   }
 

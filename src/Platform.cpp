@@ -385,9 +385,6 @@ fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 
 pure fn is_directory_separator(char c) wontthrow -> bool { return c == '/'; }
 
-fn system_shell_path() wontthrow -> const char * { return "/bin/sh"; }
-fn system_shell_command_flag() wontthrow -> const char * { return "-c"; }
-
 fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
 {
   LOG(Debug, "querying the terminal size");
@@ -2357,9 +2354,6 @@ pure fn is_directory_separator(char c) wontthrow -> bool
 {
   return c == '/' || c == '\\';
 }
-
-fn system_shell_path() wontthrow -> const char * { return "cmd"; }
-fn system_shell_command_flag() wontthrow -> const char * { return "/c"; }
 
 fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
 {

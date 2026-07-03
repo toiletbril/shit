@@ -1,0 +1,12 @@
+== bench stops on a non-zero exit code:
+shit: 1:1: error: Builtin 'bench': the command 'false' exited with status 1.
+shit: note: Pass `--ignore-exit-code` to benchmark it regardless.
+== the failure sets the exit status:
+rc=1
+== --ignore-exit-code keeps sampling a failing command:
+Benchmark: false (3 runs)
+== --no-shell --show-output forks the command directly:
+direct
+direct
+direct
+Benchmark: /bin/echo direct (3 runs)

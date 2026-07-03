@@ -331,6 +331,10 @@ public:
   {
     m_shell_executable_path = String{heap_allocator(), path};
   }
+  pure fn shell_executable_path() const wontthrow -> StringView
+  {
+    return m_shell_executable_path.view();
+  }
 
   fn unset_shell_variable(StringView name) throws -> void;
 

@@ -604,7 +604,21 @@ These builtins are unique to shit and have no counterpart in bash or dash.
 Each command is run repeatedly as a measured child, and a summary of the wall
 time, the peak resident set, and the available perf counters is printed as mean,
 standard deviation, and range. With more than one command, each later command is
-printed against the first as a relative speed.
+printed against the first as a relative speed. Each sample forks a fresh shit
+process that runs the command with
+.BR -c ,
+so the command is evaluated by shit rather than the system shell. Sampling stops
+as soon as a sample returns a non-zero exit code, unless
+.B --ignore-exit-code
+is passed. The command output is suppressed unless
+.B --show-output
+is passed.
+.B --no-shell
+forks the command directly, without wrapping it in a shell.
+.B --runs
+sets the exact sample count and
+.B --duration
+sets the sampling budget in milliseconds.
 .TP
 .B z
 The shell changes to a frequently visited directory ranked by a frecency store

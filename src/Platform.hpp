@@ -328,11 +328,6 @@ fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool;
    Windows. */
 pure fn is_directory_separator(char c) wontthrow -> bool;
 
-/* The system shell and its command flag, `/bin/sh -c` on POSIX and `cmd /c` on
-   Windows, the pair that runs a command string as one child. */
-fn system_shell_path() wontthrow -> const char *;
-fn system_shell_command_flag() wontthrow -> const char *;
-
 fn make_fd_inheritable(descriptor fd) wontthrow -> void;
 
 fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index;
