@@ -47,9 +47,10 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!path_matches.is_empty())
       source_path = path_matches[0].clone();
     else if (cxt.is_posix_mode())
-      throw ErrorWithLocation{ec.source_location(),
-                              "Unable to source the file '" + path +
-                                  "': not found in PATH"};
+      throw ErrorWithLocationAndDetails{
+          ec.source_location(),
+          "Unable to source the file '" + path + "': not found in PATH",
+          "Pass a path with a slash, or add its directory to PATH"};
   }
 
   let const contents = source_path.read_entire_file();

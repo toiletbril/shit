@@ -151,12 +151,20 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
     }
   } catch (const Error &e) {
     if (cxt.is_bash_compatible()) {
-      report_soft_builtin_error(ec, cxt, e.message());
+      if (e.has_note())
+        report_soft_builtin_error(ec, cxt, e.message(), e.note());
+      else
+        report_soft_builtin_error(ec, cxt, e.message());
       return 1;
     }
-    throw ErrorWithLocation{ec.source_location(), StringView{"Builtin '"} +
-                                                      ec.program() +
-                                                      "': " + e.message()};
+
+    let const prefixed =
+        StringView{"Builtin '"} + ec.program() + "': " + e.message();
+    if (e.has_note()) {
+      throw ErrorWithLocationAndDetails{ec.source_location(), prefixed.view(),
+                                        e.note()};
+    }
+    throw ErrorWithLocation{ec.source_location(), prefixed.view()};
   }
   unreachable("execute_builtin reached the end without dispatching");
 }
@@ -172,6 +180,13 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
   else
     print_error(StringView{"shit: Builtin '"} + ec.program() + "': " + message +
                 "\n");
+}
+
+fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
+                             StringView message, StringView note) throws -> void
+{
+  report_soft_builtin_error(ec, cxt, message);
+  show_message(Note{String{note}}.to_string());
 }
 
 fn report_usage_error(const ExecContext &ec, EvalContext &cxt,

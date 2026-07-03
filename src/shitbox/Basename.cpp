@@ -56,8 +56,9 @@ fn Basename::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   if (operands.count() > 2) {
-    report_soft_shitbox_error(ec, cxt,
-                              "basename: extra operand '" + operands[2] + "'");
+    report_soft_shitbox_error(
+        ec, cxt, "basename: extra operand '" + operands[2] + "'",
+        "basename takes a path and an optional suffix, e.g. `basename a.c .c`");
     return 1;
   }
 

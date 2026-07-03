@@ -39,7 +39,8 @@ fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     if (ec.args().count() > 2) {
-      report_soft_builtin_error(ec, cxt, "too many arguments");
+      report_soft_builtin_error(ec, cxt, "too many arguments",
+                                "exit takes at most one status, e.g. `exit 1`");
 
       if (cxt.shell_is_interactive()) return 2;
 

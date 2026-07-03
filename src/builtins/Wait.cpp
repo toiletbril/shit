@@ -69,7 +69,8 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (matched != nullptr) {
         status = wait_for_job(*matched);
       } else {
-        report_soft_builtin_error(ec, cxt, target + ": no such job");
+        report_soft_builtin_error(ec, cxt, target + ": no such job",
+                                  "List the running jobs with `jobs`");
         status = 127;
       }
     } else {

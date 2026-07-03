@@ -315,6 +315,13 @@ fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
     print_error("shit: " + String{message} + "\n");
 }
 
+fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
+                             StringView message, StringView note) throws -> void
+{
+  report_soft_shitbox_error(ec, cxt, message);
+  show_message(Note{String{note}}.to_string());
+}
+
 } // namespace shitbox
 
 } // namespace shit

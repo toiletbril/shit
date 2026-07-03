@@ -49,7 +49,9 @@ fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     if (ec.args().count() > 2) {
-      report_soft_builtin_error(ec, cxt, "too many arguments");
+      report_soft_builtin_error(
+          ec, cxt, "too many arguments",
+          "return takes at most one status, e.g. `return 1`");
 
       if (cxt.in_subshell()) {
         cxt.request_exit(1, ec.source_location());

@@ -167,7 +167,9 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return 0;
     }
 
-    throw Error{"The pipe size cannot be modified"};
+    throw ErrorWithDetails{"The pipe size cannot be modified",
+                           "The pipe buffer is a fixed kernel limit, read it "
+                           "with `ulimit -p`"};
   }
 
   struct rlimit limit{};
