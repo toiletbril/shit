@@ -187,7 +187,9 @@ fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
     }
 
     let const next = word[i + 1];
-    if (next == '\'' && !is_in_double_quote && !is_posix_mode()) {
+    if (next == '\'' && remove_quotes && !is_in_double_quote &&
+        !is_posix_mode())
+    {
       let body = String{scratch_allocator()};
       usize j = i + 2;
       while (j < word.length && word[j] != '\'') {

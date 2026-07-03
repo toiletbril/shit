@@ -50,9 +50,9 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() == 1) {
     LOG(Debug, "wait blocking on every job of %zu", cxt.jobs().count());
     for (job &job : cxt.jobs())
-      status = wait_for_job(job);
+      wait_for_job(job);
     cxt.forget_done_jobs();
-    return status;
+    return 0;
   }
 
   for (usize i = 1; i < args.count(); i++) {

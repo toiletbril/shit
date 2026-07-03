@@ -602,11 +602,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_current_location(source_location());
 
-  if (cxt.has_debug_trap() && !cxt.is_posix_mode())
-    cxt.run_named_trap(StringView{"DEBUG", 5});
-
   if (cxt.bash_dynamic_variables_enabled())
     cxt.set_current_command(utils::merge_tokens_to_string(m_args));
+
+  if (cxt.has_debug_trap() && !cxt.is_posix_mode())
+    cxt.run_named_trap(StringView{"DEBUG", 5});
 
   /* The check reads the typed command word before its expansion, so a pattern
      that happens to match a single file is still caught. */

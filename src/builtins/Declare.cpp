@@ -288,18 +288,17 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       } else {
         cxt.set_shell_variable(name, value);
       }
-      if (should_export) {
-        LOG(All, "declare exporting '%.*s' to the environment",
-            static_cast<int>(name.length), name.data);
-        cxt.record_environment_change(name);
-        /* The store may have rewritten the value, an integer name stores the
-           arithmetic result, so the environment receives the stored value
-           rather than the raw text. */
-        let const stored =
-            cxt.get_variable_value(name).value_or(String{heap_allocator()});
-        os::set_environment_variable(name, stored.view());
-        cxt.mark_exported(name);
-      }
+    }
+
+    if (should_export && !has_subscript && !should_make_associative &&
+        !should_make_indexed)
+    {
+      LOG(All, "declare exporting '%.*s' to the environment",
+          static_cast<int>(name.length), name.data);
+      cxt.record_environment_change(name);
+      cxt.mark_exported(name);
+      if (let const stored = cxt.get_variable_value(name))
+        os::set_environment_variable(name, stored->view());
     }
 
     /* The read-only mark applies after the assignment, so declare -r v=1 stores
