@@ -5,11 +5,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-#if SHIT_PLATFORM_IS POSIX
-#include <sys/times.h>
-#include <unistd.h>
-#endif
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("");
@@ -37,26 +32,13 @@ cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   LOG(Debug, "times printing the shell and child process accounting");
 
-  double self_user = 0, self_system = 0, child_user = 0, child_system = 0;
-
-#if SHIT_PLATFORM_IS POSIX
-  struct tms accounting{};
-  if (times(&accounting) != static_cast<clock_t>(-1)) {
-    let const ticks = static_cast<double>(sysconf(_SC_CLK_TCK));
-    if (ticks > 0) {
-      self_user = static_cast<double>(accounting.tms_utime) / ticks;
-      self_system = static_cast<double>(accounting.tms_stime) / ticks;
-      child_user = static_cast<double>(accounting.tms_cutime) / ticks;
-      child_system = static_cast<double>(accounting.tms_cstime) / ticks;
-    }
-  }
-#endif
+  let const times = os::read_process_cpu_times();
 
   let out = String{cxt.scratch_allocator()};
-  out += utils::format_minutes_seconds(self_user) + " " +
-         utils::format_minutes_seconds(self_system) + "\n";
-  out += utils::format_minutes_seconds(child_user) + " " +
-         utils::format_minutes_seconds(child_system) + "\n";
+  out += utils::format_minutes_seconds(times.self_user_seconds) + " " +
+         utils::format_minutes_seconds(times.self_system_seconds) + "\n";
+  out += utils::format_minutes_seconds(times.child_user_seconds) + " " +
+         utils::format_minutes_seconds(times.child_system_seconds) + "\n";
   ec.print_to_stdout(out);
 
   return 0;

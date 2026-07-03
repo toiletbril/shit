@@ -293,6 +293,9 @@ struct compiled_regex
 {
 #if SHIT_PLATFORM_IS POSIX
   regex_t re{};
+#else
+  String pattern{heap_allocator()};
+  bool is_case_insensitive{false};
 #endif
 };
 
@@ -321,6 +324,14 @@ fn execute_regex(compiled_regex &compiled, StringView subject,
     -> regex_match_result;
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void;
+
+/* Compiles a search pattern for a line-at-a-time grep. On POSIX it is a basic
+   regex with no capture, on a platform with no engine it is a literal
+   substring. */
+fn compile_search_regex(StringView pattern, bool is_case_insensitive,
+                        compiled_regex &out) throws -> regex_compile_result;
+
+fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool;
 
 pure fn path_is_absolute(StringView path) wontthrow -> bool;
 fn temp_directory_path() throws -> String;
@@ -351,6 +362,18 @@ fn change_current_directory(StringView path) throws -> ErrorOr<Ok>;
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>;
 cold fn list_directory_typed(StringView dir) throws
     -> Maybe<ArrayList<Path::directory_child>>;
+
+/* The user and system seconds the shell and its children have consumed. Every
+   field is zero on a platform with no process accounting. */
+struct cpu_times
+{
+  double self_user_seconds{0};
+  double self_system_seconds{0};
+  double child_user_seconds{0};
+  double child_system_seconds{0};
+};
+
+fn read_process_cpu_times() wontthrow -> cpu_times;
 
 /* On POSIX the number is the descriptor, and on Windows it maps to the C
    runtime handle. */

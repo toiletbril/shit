@@ -20,55 +20,6 @@ namespace shit {
 
 namespace shitbox {
 
-#if SHIT_PLATFORM_ISNT POSIX
-static fn lower(char character) wontthrow -> char
-{
-  return (character >= 'A' && character <= 'Z')
-             ? static_cast<char>(character - 'A' + 'a')
-             : character;
-}
-
-static fn contains(StringView haystack, StringView needle,
-                   bool should_ignore_case) wontthrow -> bool
-{
-  if (needle.length == 0) return true;
-  if (needle.length > haystack.length) return false;
-
-  if (!should_ignore_case) {
-    usize start = 0;
-    while (start + needle.length <= haystack.length) {
-      let const found = haystack.substring(start).find_character(needle[0]);
-      if (!found.has_value()) return false;
-      start += *found;
-      if (start + needle.length > haystack.length) return false;
-
-      bool is_matched = true;
-      for (usize k = 1; k < needle.length; k++)
-        if (haystack[start + k] != needle[k]) {
-          is_matched = false;
-          break;
-        }
-      if (is_matched) return true;
-      start++;
-    }
-    return false;
-  }
-
-  for (usize start = 0; start + needle.length <= haystack.length; start++) {
-    bool is_matched = true;
-    for (usize k = 0; k < needle.length; k++) {
-      if (lower(haystack[start + k]) != lower(needle[k])) {
-        is_matched = false;
-        break;
-      }
-    }
-    if (is_matched) return true;
-  }
-
-  return false;
-}
-#endif
-
 Grep::Grep() = default;
 
 pure fn Grep::kind() const wontthrow -> Utility::Kind { return Kind::Grep; }
@@ -87,24 +38,16 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_ignore_case = FLAG_GREP_IGNORE_CASE.is_enabled();
   let const should_invert = FLAG_GREP_INVERT.is_enabled();
 
-#if SHIT_PLATFORM_IS POSIX
-  let const pattern_text = String{cxt.scratch_allocator(), pattern};
-  int compile_flags = REG_NOSUB;
-  if (should_ignore_case) compile_flags |= REG_ICASE;
-
-  regex_t compiled;
-  const int compile_result =
-      regcomp(&compiled, pattern_text.c_str(), compile_flags);
-  if (compile_result != 0) {
-    char error_text[256];
-    regerror(compile_result, &compiled, error_text, sizeof(error_text));
-    report_soft_shitbox_error(
-        ec, cxt,
-        "grep: " + String{cxt.scratch_allocator(), StringView{error_text}});
+  os::compiled_regex compiled;
+  if (os::compile_search_regex(pattern, should_ignore_case, compiled) !=
+      os::regex_compile_result::Ok)
+  {
+    report_soft_shitbox_error(ec, cxt,
+                              "grep: the pattern '" + operands[0] +
+                                  "' is not a valid regex");
     return 2;
   }
-  defer { regfree(&compiled); };
-#endif
+  defer { os::free_regex(compiled); };
 
   ArrayList<StringView> sources{cxt.scratch_allocator()};
   if (operands.count() == 1)
@@ -132,13 +75,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       let const has_newline = !line.is_empty() && line[line.length - 1] == '\n';
       let const body =
           has_newline ? line.substring_of_length(0, line.length - 1) : line;
-#if SHIT_PLATFORM_IS POSIX
-      let const line_text = String{cxt.scratch_allocator(), body};
-      let const is_match =
-          regexec(&compiled, line_text.c_str(), 0, nullptr, 0) == 0;
-#else
-      let const is_match = contains(body, pattern, should_ignore_case);
-#endif
+      let const is_match = os::regex_matches(compiled, body);
       if (is_match == should_invert) continue;
 
       has_any_match = true;

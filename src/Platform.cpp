@@ -24,6 +24,7 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/times.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -446,6 +447,25 @@ fn free_regex(compiled_regex &compiled) wontthrow -> void
   regfree(&compiled.re);
 }
 
+fn compile_search_regex(StringView pattern, bool is_case_insensitive,
+                        compiled_regex &out) throws -> regex_compile_result
+{
+  const String pattern_text{heap_allocator(), pattern};
+  int compile_flags = REG_NOSUB;
+  if (is_case_insensitive) compile_flags |= REG_ICASE;
+
+  if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
+    return regex_compile_result::Invalid;
+
+  return regex_compile_result::Ok;
+}
+
+fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
+{
+  const String subject_text{heap_allocator(), subject};
+  return regexec(&compiled.re, subject_text.c_str(), 0, nullptr, 0) == 0;
+}
+
 pure fn path_is_absolute(StringView path) wontthrow -> bool
 {
   if (path.length == 0) return false;
@@ -732,6 +752,26 @@ cold fn list_directory_typed(StringView dir) throws
 
   ::closedir(handle);
   return entries;
+}
+
+fn read_process_cpu_times() wontthrow -> cpu_times
+{
+  cpu_times result{};
+  struct tms accounting{};
+  if (times(&accounting) != static_cast<clock_t>(-1)) {
+    let const ticks = static_cast<double>(sysconf(_SC_CLK_TCK));
+    if (ticks > 0) {
+      result.self_user_seconds =
+          static_cast<double>(accounting.tms_utime) / ticks;
+      result.self_system_seconds =
+          static_cast<double>(accounting.tms_stime) / ticks;
+      result.child_user_seconds =
+          static_cast<double>(accounting.tms_cutime) / ticks;
+      result.child_system_seconds =
+          static_cast<double>(accounting.tms_cstime) / ticks;
+    }
+  }
+  return result;
 }
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
@@ -2738,6 +2778,61 @@ fn execute_regex(compiled_regex &compiled, StringView subject,
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void { unused(compiled); }
 
+fn compile_search_regex(StringView pattern, bool is_case_insensitive,
+                        compiled_regex &out) throws -> regex_compile_result
+{
+  out.pattern = String{heap_allocator(), pattern};
+  out.is_case_insensitive = is_case_insensitive;
+  return regex_compile_result::Ok;
+}
+
+static fn lower_ascii(char character) wontthrow -> char
+{
+  return (character >= 'A' && character <= 'Z')
+             ? static_cast<char>(character - 'A' + 'a')
+             : character;
+}
+
+fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
+{
+  const StringView needle = compiled.pattern.view();
+  if (needle.length == 0) return true;
+  if (needle.length > subject.length) return false;
+
+  if (!compiled.is_case_insensitive) {
+    usize start = 0;
+    while (start + needle.length <= subject.length) {
+      let const found = subject.substring(start).find_character(needle[0]);
+      if (!found.has_value()) return false;
+      start += *found;
+      if (start + needle.length > subject.length) return false;
+
+      bool is_matched = true;
+      for (usize k = 1; k < needle.length; k++)
+        if (subject[start + k] != needle[k]) {
+          is_matched = false;
+          break;
+        }
+      if (is_matched) return true;
+      start++;
+    }
+    return false;
+  }
+
+  for (usize start = 0; start + needle.length <= subject.length; start++) {
+    bool is_matched = true;
+    for (usize k = 0; k < needle.length; k++) {
+      if (lower_ascii(subject[start + k]) != lower_ascii(needle[k])) {
+        is_matched = false;
+        break;
+      }
+    }
+    if (is_matched) return true;
+  }
+
+  return false;
+}
+
 pure fn path_is_absolute(StringView path) wontthrow -> bool
 {
   if (path.length == 0) return false;
@@ -2983,6 +3078,8 @@ cold fn list_directory_typed(StringView dir) throws
     entries.push(Path::directory_child{steal(name), Path::entry_kind::Unknown});
   return entries;
 }
+
+fn read_process_cpu_times() wontthrow -> cpu_times { return cpu_times{}; }
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
   return is_fd_a_tty(reinterpret_cast<descriptor>(_get_osfhandle(shell_fd)));
