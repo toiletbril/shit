@@ -16,6 +16,8 @@ FLAG(EXPORT_PRINT, Bool, 'p', "",
      "List the exported variables in a reusable form.");
 FLAG(EXPORT_UNMARK, Bool, 'n', "",
      "Remove the export attribute, keeping the variable in the shell.");
+FLAG(EXPORT_FUNCTION, Bool, 'f', "",
+     "Export a function into the environment for a child shell.");
 
 REGISTER_BUILTIN_FLAGS(Export);
 
@@ -32,6 +34,49 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   ASSERT(!args.is_empty());
+
+  if (FLAG_EXPORT_FUNCTION.is_enabled()) {
+    let has_error = false;
+    for (usize i = 1; i < args.count(); i++) {
+      let const name = String{cxt.scratch_allocator(), args[i].view()};
+      let const *source = cxt.find_function_source(name.view());
+      if (source == nullptr) {
+        report_soft_builtin_error(
+            ec, cxt, StringView{"'"} + name + "' is not a function");
+        has_error = true;
+        continue;
+      }
+
+      let const src = source->view();
+      usize body_start = 0;
+      if (let const close_paren = src.find_character(')');
+          close_paren.has_value())
+        body_start = close_paren.value() + 1;
+      while (body_start < src.length &&
+             (src[body_start] == ' ' || src[body_start] == '\t' ||
+              src[body_start] == '\n' || src[body_start] == '\r'))
+      {
+        body_start++;
+      }
+      let const body = src.substring(body_start);
+
+      let value = String{cxt.scratch_allocator(), "() "};
+      if (!body.is_empty() && body[0] == '{') {
+        value += body;
+      } else {
+        value += "{ ";
+        value += body;
+        value += " }";
+      }
+
+      let env_key = String{cxt.scratch_allocator(), "BASH_FUNC_"};
+      env_key += name.view();
+      env_key += "%%";
+      cxt.record_environment_change(env_key.view());
+      os::set_environment_variable(env_key, value);
+    }
+    return has_error ? 1 : 0;
+  }
 
   if (FLAG_EXPORT_PRINT.is_enabled() || args.count() == 1) {
     let const is_declare_form = cxt.is_bash_compatible();
@@ -50,7 +95,12 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         out += "\"";
       } else {
         out += "='";
-        out += value.view();
+        for (usize k = 0; k < value.count(); k++) {
+          if (value[k] == '\'')
+            out += "'\\''";
+          else
+            out.push(value[k]);
+        }
         out += "'";
       }
       out += "\n";
