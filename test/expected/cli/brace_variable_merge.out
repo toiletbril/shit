@@ -1,0 +1,8 @@
+== a greedy $name merges with the brace postamble:
+MERGED bbar
+== the merge stops at a non-name byte:
+.tail b_end.tail
+== a bounded ${name} is left split, not merged:
+Xbar
+== a plain brace group without a variable is unchanged:
+ac bc

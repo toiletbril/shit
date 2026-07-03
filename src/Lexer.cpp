@@ -1004,7 +1004,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
           byte_count++;
         }
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       steal(name), is_in_double_quotes});
+                                       steal(name), is_in_double_quotes, true});
       } else if (lexer::is_special_parameter_char(next) ||
                  lexer::is_number(next))
       {

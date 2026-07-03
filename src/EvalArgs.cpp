@@ -297,6 +297,34 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
       out.segments.push(
           WordSegment{WordSegment::Kind::UnquotedText, steal(run), false});
     }
+
+    /* bash brace-expands before lexing a variable name, so a greedy $name a
+       brace expansion left adjacent to name bytes absorbs them, turning
+       {$foo,b}bar into $foobar. A bounded ${name} is not greedy and is left
+       split. */
+    for (usize s = 0; s + 1 < out.segments.count(); s++) {
+      WordSegment &reference = out.segments[s];
+      if (reference.kind != WordSegment::Kind::VariableReference ||
+          !reference.is_greedy_name)
+        continue;
+
+      WordSegment &following = out.segments[s + 1];
+      if (following.kind != WordSegment::Kind::UnquotedText) continue;
+
+      usize taken = 0;
+      while (taken < following.text.count() &&
+             lexer::is_variable_name(following.text.view()[taken]))
+        taken++;
+      if (taken == 0) continue;
+
+      reference.text.append(
+          following.text.view().substring_of_length(0, taken));
+      if (taken == following.text.count())
+        out.segments.remove(s + 1);
+      else
+        following.text = String{alloc, following.text.view().substring(taken)};
+    }
+
     words.push(steal(out));
   }
   LOG(Debug, "brace expansion produced %zu words", words.count());
