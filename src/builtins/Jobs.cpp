@@ -111,7 +111,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   cxt.update_jobs();
 
   let const may_color = may_color_jobs(cxt);
-  let const &jobs = cxt.jobs();
+  let &jobs = cxt.jobs();
 
   LOG(Debug, "jobs listing %zu registered jobs", jobs.count());
 
@@ -136,7 +136,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let out = String{cxt.scratch_allocator()};
   for (let index : selected) {
-    let const &job = jobs[index];
+    job &job = jobs[index];
 
     if (FLAG_JOBS_RUNNING.is_enabled() && job.state != job::State::Running) {
       continue;
@@ -144,6 +144,11 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (FLAG_JOBS_STOPPED.is_enabled() && job.state != job::State::Stopped) {
       continue;
     }
+    if (FLAG_JOBS_CHANGED.is_enabled() && !job.has_unreported_state_change) {
+      continue;
+    }
+
+    job.has_unreported_state_change = false;
 
     if (FLAG_JOBS_PIDS.is_enabled()) {
       out += String::from(os::process_id_of(job.pid), cxt.scratch_allocator());

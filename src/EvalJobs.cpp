@@ -53,9 +53,18 @@ fn EvalContext::update_jobs() throws -> void
       LOG(Info, "job %d finished with status %d", job.id, status);
       job.state = job::State::Done;
       job.last_status = status;
+      job.has_unreported_state_change = true;
       break;
-    case os::process_state::Stopped: job.state = job::State::Stopped; break;
-    case os::process_state::Running: job.state = job::State::Running; break;
+    case os::process_state::Stopped:
+      if (job.state != job::State::Stopped)
+        job.has_unreported_state_change = true;
+      job.state = job::State::Stopped;
+      break;
+    case os::process_state::Running:
+      if (job.state != job::State::Running)
+        job.has_unreported_state_change = true;
+      job.state = job::State::Running;
+      break;
     case os::process_state::Unchanged: break;
     }
   }

@@ -135,6 +135,9 @@ struct job
   String command{heap_allocator()};
   State state{State::Running};
   i32 last_status{0};
+  /* A state change the shell has not yet reported, the set that `jobs -n`
+     lists. It is cleared once the change is listed or announced. */
+  bool has_unreported_state_change{false};
 };
 
 struct environment_undo_entry

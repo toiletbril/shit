@@ -150,9 +150,16 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
   const bool is_foreground_job = !is_async && cxt.shell_is_interactive() &&
                                  os::shell_has_controlling_terminal();
 
-  let const command = (is_async || is_foreground_job)
-                          ? String{ec.program().view()}
-                          : String{heap_allocator()};
+  /* The job listing shows the whole command line, so the operands and the
+     trailing & are captured, not the program word alone. */
+  let command = String{heap_allocator()};
+  if (is_async || is_foreground_job) {
+    for (usize i = 0; i < ec.args().count(); i++) {
+      if (i > 0) command += ' ';
+      command += ec.args()[i].view();
+    }
+    if (is_async) command += " &";
+  }
 
   os::process p = SHIT_INVALID_PROCESS;
   try {
