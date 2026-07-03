@@ -227,7 +227,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     h += "SHIT";
     h += "\n";
     h += wrap_text(
-        "Shit is a pedantic, POSIX-compatible command line interpreter and a "
+        "Shit is a pedantic, Bash-compatible command line interpreter and a "
         "friendly interactive shell.\n\n",
         HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
