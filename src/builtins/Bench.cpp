@@ -371,7 +371,8 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
 
     let const measured = os::run_measured(child_argv, true);
     if (!measured.has_value())
-      throw Error{StringView{"Unable to run '"} + command + "'"};
+      throw Error{StringView{"Unable to run '"} + command +
+                  "': " + os::last_system_error_message()};
 
     /* A Ctrl-C delivered while the measured child held the foreground lands
        here, so the loop breaks before the slow sample is recorded. */

@@ -151,7 +151,8 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     {
       report_soft_builtin_error(
           ec, cxt,
-          StringView{"cannot read history from '"} + args[1].view() + "'",
+          StringView{"cannot read history from '"} + args[1].view() +
+              "': " + os::last_system_error_message(),
           "Pass a readable history file, e.g. `history -r ~/.shit_history`");
       return 1;
     }
@@ -166,9 +167,11 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (args.count() > 1) {
       let const target = Path{args[1].view()};
       if (!write_history_to_file(cxt, target)) {
-        report_soft_builtin_error(ec, cxt,
-                                  StringView{"cannot write history to '"} +
-                                      args[1].view() + "'");
+        report_soft_builtin_error(
+            ec, cxt,
+            StringView{"cannot write history to '"} + args[1].view() +
+                "': " + os::last_system_error_message(),
+            "Pass a writable path, e.g. `history -w ~/.shit_history`");
         return 1;
       }
     } else {
