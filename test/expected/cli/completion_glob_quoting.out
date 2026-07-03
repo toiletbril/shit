@@ -1,0 +1,2 @@
+== inline glob quoting:
+'a b.txt' 'back`tick.txt' 'bang!.txt' 'dollar$x.txt' 'double".txt' 'foo(1).sh' normal.txt "sq'back\`.txt" sq\'bang\!.txt "sq'dollar\$.txt" "sq'double\".txt" 'star*.txt'

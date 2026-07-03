@@ -466,54 +466,78 @@ static pure fn split_path_token(StringView token) wontthrow -> path_token
 }
 
 /* The tilde is excluded since it expands a home the user wants. */
+static pure fn byte_needs_quoting(char byte) wontthrow -> bool
+{
+  switch (byte) {
+  case ' ':
+  case '\t':
+  case '\n':
+  case '*':
+  case '?':
+  case '[':
+  case ']':
+  case '(':
+  case ')':
+  case '{':
+  case '}':
+  case '\'':
+  case '"':
+  case '`':
+  case '$':
+  case '&':
+  case '|':
+  case ';':
+  case '<':
+  case '>':
+  case '\\':
+  case '!':
+  case '#': return true;
+  default: return false;
+  }
+}
+
 static pure fn path_candidate_needs_quoting(StringView candidate) wontthrow
     -> bool
 {
-  for (usize i = 0; i < candidate.length; i++) {
-    switch (candidate[i]) {
-    case ' ':
-    case '\t':
-    case '\n':
-    case '*':
-    case '?':
-    case '[':
-    case ']':
-    case '(':
-    case ')':
-    case '{':
-    case '}':
-    case '\'':
-    case '"':
-    case '`':
-    case '$':
-    case '&':
-    case '|':
-    case ';':
-    case '<':
-    case '>':
-    case '\\':
-    case '!':
-    case '#': return true;
-    default: break;
-    }
-  }
+  for (usize i = 0; i < candidate.length; i++)
+    if (byte_needs_quoting(candidate[i])) return true;
+
   return false;
 }
 
-/* An embedded single quote ends the run, emits an escaped quote, and reopens,
-   the standard '\'' idiom. */
 static fn quote_path_candidate(StringView candidate) throws -> String
 {
   let quoted = String{completion_allocator()};
-  quoted.push('\'');
-  for (usize i = 0; i < candidate.length; i++) {
-    if (candidate[i] == '\'') {
-      quoted += "'\\''";
-    } else {
-      quoted.push(candidate[i]);
-    }
+
+  const bool has_single_quote = candidate.find_character('\'').has_value();
+  const bool has_bang = candidate.find_character('!').has_value();
+
+  if (!has_single_quote) {
+    quoted.push('\'');
+    quoted += candidate;
+    quoted.push('\'');
+    return quoted;
   }
-  quoted.push('\'');
+
+  if (!has_bang) {
+    quoted.push('"');
+    for (usize i = 0; i < candidate.length; i++) {
+      const char byte = candidate[i];
+      if (byte == '"' || byte == '\\' || byte == '$' || byte == '`') {
+        quoted.push('\\');
+      }
+      quoted.push(byte);
+    }
+    quoted.push('"');
+    return quoted;
+  }
+
+  for (usize i = 0; i < candidate.length; i++) {
+    const char byte = candidate[i];
+    if (byte_needs_quoting(byte)) quoted.push('\\');
+    quoted.push(byte);
+  }
+
   return quoted;
 }
 
@@ -1056,7 +1080,11 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
         if (!match.is_empty() && match[match.length - 1] == '/') {
           match = match.substring_of_length(0, match.length - 1);
         }
-        joined.append(match);
+        if (path_candidate_needs_quoting(match)) {
+          joined.append(quote_path_candidate(match).view());
+        } else {
+          joined.append(match);
+        }
       }
       candidates.clear();
       candidates.push(steal(joined));
@@ -1072,6 +1100,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory, directories_only,
                                executables_only);
+    for (String &candidate : candidates)
+      if (path_candidate_needs_quoting(candidate.view()))
+        candidate = quote_path_candidate(candidate.view());
   } else {
     /* The argument cascade runs in the bash and the default moods, the POSIX
        mood goes straight to files. The build tools answer before the man
