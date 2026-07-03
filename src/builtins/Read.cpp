@@ -231,8 +231,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return was_timed_out ? 142 : 1;
   }
 
-  let const field_separators = cxt.get_variable_value("IFS").value_or(
-      String{cxt.scratch_allocator(), " \t\n"});
+  let const field_separators =
+      String{cxt.scratch_allocator(), cxt.field_separators()};
   let do_is_separator = [&](usize i) {
     return !is_literal_byte[i] &&
            field_separators.find_character(line[i]).has_value();

@@ -1,0 +1,6 @@
+== a prefix IFS splits read after the global IFS was changed:
+count=4 first=a last=d
+== a prefix IFS splits read with the default global IFS:
+x|y|z
+== read without a prefix follows the changed global IFS:
+count=3

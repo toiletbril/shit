@@ -406,6 +406,12 @@ public:
   /* Set IFS and refresh the separator table together, so the table never drifts
      from the cached value. */
   fn set_field_separators(StringView value) throws -> void;
+  /* The live IFS a prefix assignment updates for the current command, so read
+     splits on a prefix IFS even when the store still holds the prior value. */
+  pure fn field_separators() const wontthrow -> StringView
+  {
+    return m_field_separators.view();
+  }
   fn get_variable_value(StringView name) const throws -> Maybe<String>;
 
   fn append_dynamic_variable_names(ArrayList<StringView> &out) const throws
