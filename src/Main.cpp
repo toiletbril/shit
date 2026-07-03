@@ -1004,13 +1004,10 @@ fn main(int argc, char **argv) -> int
     should_read_stdin = true;
   }
 #if !defined NDEBUG
-  /* The test drivers never prompt, so a bare driver run reads the empty
-     standard input and exits through the driver's hook. */
-  if ((FLAG_DEBUG_COMPLETE_AT.is_set() || FLAG_DEBUG_HIGHLIGHT_AT.is_set()) &&
-      should_be_interactive)
-  {
+  if (FLAG_DEBUG_COMPLETE_AT.is_set() || FLAG_DEBUG_HIGHLIGHT_AT.is_set()) {
     should_be_interactive = false;
-    should_read_stdin = true;
+    should_read_files = false;
+    if (!should_execute_commands) should_read_stdin = true;
   }
 #endif
   LOG(Info, "the input source is %s",
@@ -1222,8 +1219,15 @@ fn main(int argc, char **argv) -> int
         /* -s or a "-" operand reads standard input, otherwise the named file is
            read through the descriptor layer. */
         if (should_read_stdin || file_names[0] == "-") {
-          LOG(Info, "reading the whole standard input");
-          script_contents = shit::utils::read_entire_standard_input();
+          bool is_driver_run = false;
+#if !defined NDEBUG
+          is_driver_run = FLAG_DEBUG_COMPLETE_AT.is_set() ||
+                          FLAG_DEBUG_HIGHLIGHT_AT.is_set();
+#endif
+          if (!is_driver_run) {
+            LOG(Info, "reading the whole standard input");
+            script_contents = shit::utils::read_entire_standard_input();
+          }
         } else {
           const shit::String &file_name = file_names[0];
           LOG(Info, "reading the script file '%s'", file_name.c_str());
