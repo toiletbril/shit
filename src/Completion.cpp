@@ -1110,7 +1110,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
        targets even when a like-named subcommand man page exists. */
     Maybe<ArrayList<String>> from_stage = None;
     if (!is_posix_completion) {
-      from_stage = complete_from_process_arguments(line, token);
+      from_stage = complete_from_process_arguments(line, token, for_listing);
       if (!from_stage.has_value())
         from_stage =
             complete_from_builtin_flags(line, token, token_start, context);

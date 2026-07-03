@@ -30,6 +30,7 @@ static fn read_up_to_lines(os::descriptor fd, i64 max_lines,
   i64 line_count = 0;
   char buffer[4096];
   while (line_count < max_lines) {
+    if (os::INTERRUPT_REQUESTED) break;
     let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
     if (!read_count.has_value() || *read_count == 0) {
       break;
@@ -52,6 +53,7 @@ static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes,
   i64 byte_count = 0;
   char buffer[4096];
   while (byte_count < max_bytes) {
+    if (os::INTERRUPT_REQUESTED) break;
     let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
     if (!read_count.has_value() || *read_count == 0) {
       break;

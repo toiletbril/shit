@@ -304,9 +304,12 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
   return &BUILD_TARGET_CACHE.find(key)->targets;
 }
 
-fn complete_from_process_arguments(StringView line, StringView token) throws
+fn complete_from_process_arguments(StringView line, StringView token,
+                                   bool for_listing) throws
     -> Maybe<ArrayList<String>>
 {
+  if (!for_listing) return None;
+
   let const command = command_word_of(line);
   let const is_by_pid = command == "kill" || command == "wait";
   let const is_by_name = command == "pkill" || command == "killall";

@@ -118,6 +118,17 @@ static fn copy_path(const ExecContext &ec, StringView source,
           "' is a directory, pass -r to copy it"
       };
 
+    let const source_absolute = Path{source}.to_absolute().normalized();
+    let const destination_absolute = Path{destination}.to_absolute().normalized();
+    let const source_prefix = source_absolute.text() + "/";
+    if (destination_absolute.text().view() == source_absolute.text().view() ||
+        destination_absolute.text().view().starts_with(source_prefix.view()))
+    {
+      throw ErrorWithDetails{
+          "cp: cannot copy '" + String{allocator, source} + "' into itself",
+          "The destination is inside the source directory"};
+    }
+
     os::make_directory(destination, 0777);
     Maybe<ArrayList<String>> names = Path::read_directory(source_path);
     if (!names.has_value())

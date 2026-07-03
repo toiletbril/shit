@@ -61,6 +61,10 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
                            "Pass one pattern, e.g. `pkill ssh`"};
 
   let const pattern = operands[0].view();
+  if (pattern.is_empty())
+    throw ErrorWithDetails{"pkill requires a non-empty pattern",
+                           "Pass a pattern, e.g. `pkill ssh`"};
+
   let const signal_number = resolve_shitbox_signal(
       FLAG_PKILL_SIGNAL.is_set() ? FLAG_PKILL_SIGNAL.value() : StringView{},
       cxt.scratch_allocator());
