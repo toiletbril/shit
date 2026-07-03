@@ -385,6 +385,63 @@ fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *
 }
 
 fn free_aligned(opaque *pointer) wontthrow -> void { std::free(pointer); }
+
+fn collate_compare(const String &left, const String &right) wontthrow -> int
+{
+  static const int did_bind_collate = (setlocale(LC_COLLATE, ""), 0);
+  unused(did_bind_collate);
+  return strcoll(left.c_str(), right.c_str());
+}
+
+fn compile_regex(StringView pattern, bool is_case_insensitive,
+                 compiled_regex &out) throws -> regex_compile_result
+{
+  let const pattern_text = String{heap_allocator(), pattern};
+  int compile_flags = REG_EXTENDED;
+  if (is_case_insensitive) compile_flags |= REG_ICASE;
+
+  if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
+    return regex_compile_result::Invalid;
+
+  return regex_compile_result::Ok;
+}
+
+fn execute_regex(compiled_regex &compiled, StringView subject,
+                 ArrayList<regex_span> &spans, String &error_message) throws
+    -> regex_match_result
+{
+  let const subject_text = String{heap_allocator(), subject};
+  let const group_count = compiled.re.re_nsub + 1;
+  let matches = ArrayList<regmatch_t>{heap_allocator()};
+  matches.reserve(group_count);
+  for (usize i = 0; i < group_count; i++)
+    matches.push(regmatch_t{});
+
+  const int match_result = regexec(&compiled.re, subject_text.c_str(),
+                                   group_count, matches.begin(), 0);
+
+  if (match_result == REG_NOMATCH) return regex_match_result::NoMatch;
+
+  if (match_result != 0) {
+    char error_text[256];
+    regerror(match_result, &compiled.re, error_text, sizeof(error_text));
+    error_message = String{heap_allocator(), StringView{error_text}};
+    return regex_match_result::Error;
+  }
+
+  spans.reserve(group_count);
+  for (usize i = 0; i < group_count; i++) {
+    spans.push(regex_span{static_cast<i64>(matches[i].rm_so),
+                          static_cast<i64>(matches[i].rm_eo)});
+  }
+
+  return regex_match_result::Matched;
+}
+
+fn free_regex(compiled_regex &compiled) wontthrow -> void
+{
+  regfree(&compiled.re);
+}
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
   return is_fd_a_tty(static_cast<descriptor>(shell_fd));
@@ -2360,6 +2417,34 @@ fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *
 }
 
 fn free_aligned(opaque *pointer) wontthrow -> void { _aligned_free(pointer); }
+
+fn collate_compare(const String &left, const String &right) wontthrow -> int
+{
+  if (left < right) return -1;
+  return right < left ? 1 : 0;
+}
+
+fn compile_regex(StringView pattern, bool is_case_insensitive,
+                 compiled_regex &out) throws -> regex_compile_result
+{
+  unused(pattern);
+  unused(is_case_insensitive);
+  unused(out);
+  return regex_compile_result::Invalid;
+}
+
+fn execute_regex(compiled_regex &compiled, StringView subject,
+                 ArrayList<regex_span> &spans, String &error_message) throws
+    -> regex_match_result
+{
+  unused(compiled);
+  unused(subject);
+  unused(spans);
+  unused(error_message);
+  return regex_match_result::Error;
+}
+
+fn free_regex(compiled_regex &compiled) wontthrow -> void { unused(compiled); }
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 {
   return is_fd_a_tty(reinterpret_cast<descriptor>(_get_osfhandle(shell_fd)));

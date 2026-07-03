@@ -9,14 +9,9 @@
 #include "Maybe.hpp"
 #include "MimicMood.hpp"
 #include "Path.hpp"
+#include "Platform.hpp"
 #include "ResolvedCommand.hpp"
 #include "RuntimeState.hpp"
-
-/* The [[ =~ ]] operator compiles its pattern with the POSIX regex API. Windows
-   has no regcomp, so the operator and the cache are POSIX-only. */
-#if SHIT_PLATFORM_IS POSIX
-#include <regex.h>
-#endif
 
 namespace shit {
 
@@ -248,18 +243,19 @@ struct completion_spec
   bool should_use_default{false};
 };
 
-#if SHIT_PLATFORM_IS POSIX
 /* Owns one compiled regex and frees it on destruction, so the regex cache
    reclaims every entry when the table rehashes, clears, or is torn down. It is
-   move-only, since two owners would each regfree the same compiled buffer. */
+   move-only, since two owners would each free the same compiled buffer. */
 class CompiledRegex
 {
 public:
   CompiledRegex() = default;
-  explicit CompiledRegex(regex_t compiled) : m_re(compiled), m_is_owned(true) {}
+  explicit CompiledRegex(os::compiled_regex compiled)
+      : m_re(compiled), m_is_owned(true)
+  {}
   ~CompiledRegex()
   {
-    if (m_is_owned) regfree(&m_re);
+    if (m_is_owned) os::free_regex(m_re);
   }
   CompiledRegex(CompiledRegex &&other) noexcept
       : m_re(other.m_re), m_is_owned(other.m_is_owned)
@@ -269,7 +265,7 @@ public:
   fn operator=(CompiledRegex &&other) noexcept -> CompiledRegex &
   {
     if (this != &other) {
-      if (m_is_owned) regfree(&m_re);
+      if (m_is_owned) os::free_regex(m_re);
       m_re = other.m_re;
       m_is_owned = other.m_is_owned;
       other.m_is_owned = false;
@@ -279,13 +275,12 @@ public:
   CompiledRegex(const CompiledRegex &) = delete;
   CompiledRegex &operator=(const CompiledRegex &) = delete;
 
-  fn get() wontthrow -> regex_t * { return &m_re; }
+  fn get() wontthrow -> os::compiled_regex * { return &m_re; }
 
 private:
-  regex_t m_re{};
+  os::compiled_regex m_re{};
   bool m_is_owned{false};
 };
-#endif
 
 class EvalContext
 {
@@ -378,11 +373,9 @@ public:
 
   fn array_element_is_set(StringView name, StringView subscript) throws -> bool;
 
-#if SHIT_PLATFORM_IS POSIX
   /* The compiled form of an extended regex, reused across matches so a hot =~
      loop compiles each distinct pattern once. */
-  fn cached_compiled_regex(StringView pattern) throws -> regex_t *;
-#endif
+  fn cached_compiled_regex(StringView pattern) throws -> os::compiled_regex *;
 
   fn collect_array_subscripts(StringView name) const throws
       -> ArrayList<String>;
@@ -1178,11 +1171,9 @@ protected:
      dense gap. The name still reads as indexed. */
   StringMap<String> m_sparse_array_values{heap_allocator()};
   StringMap<bool> m_shopt_options{heap_allocator()};
-#if SHIT_PLATFORM_IS POSIX
   /* The compiled form of each [[ =~ ]] pattern, keyed by the pattern text, so a
      hot loop with a constant regex compiles it once and reuses it. */
   StringMap<CompiledRegex> m_regex_cache{heap_allocator()};
-#endif
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up per word. */
   String m_field_separators{" \t\n"};

@@ -9,18 +9,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-/* POSIX regcomp and regexec back the [[ =~ operator, since the release build
-   drops libstdc++ and std::regex with it. */
-#if SHIT_PLATFORM_IS POSIX
-#include <locale.h>
-#include <regex.h>
-#include <string.h>
-#endif
-
-#if SHIT_PLATFORM_IS WIN32
-#include <io.h>
-#endif
-
 namespace shit {
 
 cold [[noreturn]] static fn fail_conditional(StringView message,
@@ -46,19 +34,6 @@ static fn ascii_lower_copy(Allocator allocator, StringView text) throws
   }
 
   return lowered;
-}
-
-static fn collation_order(const String &left, const String &right) wontthrow
-    -> int
-{
-#if SHIT_PLATFORM_IS POSIX
-  static const int did_bind_collate = (setlocale(LC_COLLATE, ""), 0);
-  unused(did_bind_collate);
-  return strcoll(left.c_str(), right.c_str());
-#else
-  if (left < right) return -1;
-  return right < left ? 1 : 0;
-#endif
 }
 
 namespace {
@@ -161,7 +136,11 @@ struct conditional_evaluator
   fn regex_match(StringView value, StringView pattern,
                  const Bitset &active) throws -> bool
   {
-#if SHIT_PLATFORM_IS POSIX
+    if (!os::HAS_REGEX_ENGINE) {
+      fail_conditional("Unable to use =~ in the [[ ]]",
+                       "It is not supported on this platform");
+    }
+
     /* An inactive mask byte came from a quoted part of the operand, so a regex
        metacharacter there is backslash-escaped to match itself. */
     let escaped_pattern = String{cxt.scratch_allocator()};
@@ -172,51 +151,42 @@ struct conditional_evaluator
       }
       escaped_pattern += pattern[i];
     }
-    regex_t *compiled = cxt.cached_compiled_regex(escaped_pattern.view());
-    let const value_text = String{cxt.scratch_allocator(), value};
-    let const group_count = compiled->re_nsub + 1;
-    let matches = ArrayList<regmatch_t>{cxt.scratch_allocator()};
-    matches.reserve(group_count);
-    for (usize i = 0; i < group_count; i++)
-      matches.push(regmatch_t{});
-    const int match_result =
-        regexec(compiled, value_text.c_str(), group_count, matches.begin(), 0);
+
+    os::compiled_regex *compiled =
+        cxt.cached_compiled_regex(escaped_pattern.view());
+    let spans = ArrayList<os::regex_span>{cxt.scratch_allocator()};
+    let error_message = String{cxt.scratch_allocator()};
+    const os::regex_match_result result =
+        os::execute_regex(*compiled, value, spans, error_message);
     LOG(All, "the =~ regex %s the value",
-        match_result == 0 ? "matched" : "did not match");
-    if (match_result == REG_NOMATCH) {
+        result == os::regex_match_result::Matched ? "matched"
+                                                  : "did not match");
+
+    if (result == os::regex_match_result::NoMatch) {
       cxt.set_indexed_array("BASH_REMATCH",
                             ArrayList<String>{heap_allocator()});
       return false;
     }
-    if (match_result != 0) {
+    if (result == os::regex_match_result::Error) {
       /* A genuine engine failure such as REG_ESPACE surfaces with the engine's
          own message instead of reading as false. */
-      char error_text[256];
-      regerror(match_result, compiled, error_text, sizeof(error_text));
-      fail_conditional("Unable to match the =~ pattern", error_text);
+      fail_conditional("Unable to match the =~ pattern", error_message.view());
     }
 
     let rematch = ArrayList<String>{heap_allocator()};
-    rematch.reserve(group_count);
-    for (usize i = 0; i < group_count; i++) {
-      if (matches[i].rm_so < 0) {
+    rematch.reserve(spans.count());
+    for (usize i = 0; i < spans.count(); i++) {
+      if (spans[i].start < 0) {
         rematch.push(String{heap_allocator()});
         continue;
       }
-      let const start = static_cast<usize>(matches[i].rm_so);
-      let const end = static_cast<usize>(matches[i].rm_eo);
+      let const start = static_cast<usize>(spans[i].start);
+      let const end = static_cast<usize>(spans[i].end);
       rematch.push(String{heap_allocator(),
                           value.substring_of_length(start, end - start)});
     }
     cxt.set_indexed_array("BASH_REMATCH", steal(rematch));
     return true;
-#else
-    unused(value);
-    unused(pattern);
-    unused(active);
-    fail_conditional("Unable to use =~ in the [[ ]]",
-                     "It is not supported on this platform");
-#endif
   }
 
   fn eval_unary(StringView op, StringView operand) throws -> bool
@@ -247,12 +217,8 @@ struct conditional_evaluator
     }
     if (op == "-t") {
       if (ErrorOr<i64> descriptor = operand.to<i64>(); !descriptor.is_error())
-#if SHIT_PLATFORM_IS WIN32
-        return os::is_fd_a_tty(reinterpret_cast<os::descriptor>(
-            _get_osfhandle(static_cast<int>(descriptor.value()))));
-#else
-        return os::is_fd_a_tty(static_cast<os::descriptor>(descriptor.value()));
-#endif
+        return os::is_fd_a_tty(
+            os::descriptor_from_fd_number(descriptor.value()));
       /* bash reports a non-integer -t operand with status 2. */
       ErrorWithDetails error{"Unable to test '-t " + operand + "'",
                              "The operand is not an integer"};
@@ -354,7 +320,7 @@ struct conditional_evaluator
         if (is_skipping) return false;
         const String left = operand_value(elements[pos - 3]);
         const String right = operand_value(elements[pos - 1]);
-        const int order = collation_order(left, right);
+        const int order = os::collate_compare(left, right);
         return next == Kind::Less ? order < 0 : order > 0;
       }
       if (next == Kind::Operand) {
@@ -460,10 +426,10 @@ struct conditional_evaluator
 
 } // namespace
 
-#if SHIT_PLATFORM_IS POSIX
 static constexpr usize REGEX_CACHE_CAP = 128;
 
-fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
+fn EvalContext::cached_compiled_regex(StringView pattern) throws
+    -> os::compiled_regex *
 {
   let const is_case_insensitive = is_shopt_enabled("nocasematch");
   let key = String{scratch_allocator()};
@@ -487,11 +453,10 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
   LOG(Debug, "regex cache miss, compiling the pattern '%.*s'",
       static_cast<int>(pattern.length), pattern.data);
   let const pattern_text = String{scratch_allocator(), pattern};
-  regex_t compiled;
-  int compile_flags = REG_EXTENDED;
-  if (is_case_insensitive) compile_flags |= REG_ICASE;
-
-  if (regcomp(&compiled, pattern_text.c_str(), compile_flags) != 0) {
+  os::compiled_regex compiled;
+  if (os::compile_regex(pattern_text.view(), is_case_insensitive, compiled) !=
+      os::regex_compile_result::Ok)
+  {
     let reason = String{scratch_allocator()};
     reason += "The regular expression '";
     reason += pattern;
@@ -501,7 +466,6 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
   m_regex_cache.set(key.view(), CompiledRegex{compiled});
   return m_regex_cache.find(key.view())->get();
 }
-#endif
 
 fn EvalContext::evaluate_conditional(
     const ArrayList<conditional_element> &elements) throws -> bool

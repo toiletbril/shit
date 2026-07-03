@@ -8,8 +8,11 @@
 #if defined __linux__ || defined BSD || defined __APPLE__ ||                   \
     defined __COSMOPOLITAN__
 #include <fcntl.h>
+#include <locale.h>
 #include <pthread.h>
 #include <pwd.h>
+#include <regex.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -268,6 +271,54 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
 /* On POSIX the descriptor is the shell fd number, on Windows it is the handle
    that occupies the shell's standard-handle slot. */
 fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool;
+
+/* Orders two strings by the locale collation on POSIX and by byte value on a
+   platform without one. The sign follows strcmp. */
+fn collate_compare(const String &left, const String &right) wontthrow -> int;
+
+/* One capture group's byte span in the subject. A group that did not
+   participate carries a negative start. */
+struct regex_span
+{
+  i64 start{-1};
+  i64 end{-1};
+};
+
+/* An opaque compiled extended regex. On POSIX it holds a regex_t, on a platform
+   with no regex engine it holds nothing. Ownership is tracked by CompiledRegex,
+   not here. */
+struct compiled_regex
+{
+#if SHIT_PLATFORM_IS POSIX
+  regex_t re{};
+#endif
+};
+
+enum class regex_compile_result : u8
+{
+  Ok,
+  Invalid,
+};
+
+enum class regex_match_result : u8
+{
+  Matched,
+  NoMatch,
+  Error,
+};
+
+/* False on a platform with no regex engine, so [[ =~ ]] reports it is
+   unsupported rather than matching. */
+constexpr bool HAS_REGEX_ENGINE = ((SHIT_SUPPORT_VECTOR) &POSIX) != 0;
+
+fn compile_regex(StringView pattern, bool is_case_insensitive,
+                 compiled_regex &out) throws -> regex_compile_result;
+
+fn execute_regex(compiled_regex &compiled, StringView subject,
+                 ArrayList<regex_span> &spans, String &error_message) throws
+    -> regex_match_result;
+
+fn free_regex(compiled_regex &compiled) wontthrow -> void;
 
 /* On POSIX the number is the descriptor, and on Windows it maps to the C
    runtime handle. */
