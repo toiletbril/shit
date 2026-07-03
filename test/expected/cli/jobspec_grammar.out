@@ -4,3 +4,7 @@
 1
 == fg by %+ selects the current job:
 1
+== wait resolves a job by its command name:
+1
+== bg by name resumes a stopped job:
+1
