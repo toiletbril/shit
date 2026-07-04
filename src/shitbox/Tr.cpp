@@ -50,8 +50,9 @@ struct decoded_char
 static fn decode_escaped_char(StringView set, usize position) wontthrow
     -> decoded_char
 {
-  if (set[position] != '\\' || position + 1 >= set.length)
+  if (set[position] != '\\' || position + 1 >= set.length) {
     return {static_cast<unsigned char>(set[position]), 1};
+  }
 
   let const escaped = set[position + 1];
   switch (escaped) {
@@ -85,7 +86,9 @@ static fn expand_posix_class(StringView set, usize position,
 {
   if (set[position] != '[' || position + 1 >= set.length ||
       set[position + 1] != ':')
+  {
     return 0;
+  }
 
   usize scan = position + 2;
   while (scan + 1 < set.length && !(set[scan] == ':' && set[scan + 1] == ']'))

@@ -929,7 +929,9 @@ fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
       }
       const char target = body[i];
       i++;
-      if (target == '\\' && i < body.length && body[i] == '\\') i++;
+      if (target == '\\' && i < body.length && body[i] == '\\') {
+        i++;
+      }
       const char upper = (target >= 'a' && target <= 'z')
                              ? static_cast<char>(target - 'a' + 'A')
                              : target;
@@ -1091,8 +1093,9 @@ fn extglob_match_repetition(const ArrayList<extglob_alternative> &alternatives,
                             StringView str, const Bitset &mask,
                             usize min_reps) throws -> bool
 {
-  if (min_reps == 0 && extglob_full_match(suffix, str, mask, suffix_offset))
+  if (min_reps == 0 && extglob_full_match(suffix, str, mask, suffix_offset)) {
     return true;
+  }
   for (let const &alternative : alternatives) {
     for (usize length = 1; length <= str.count(); length++) {
       if (!extglob_full_match(alternative.pattern,
@@ -1184,7 +1187,9 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
           if (!any_alternative_matches &&
               extglob_full_match(suffix, str.substring(length), mask,
                                  suffix_offset))
+          {
             return true;
+          }
         }
         return false;
       default: break;
@@ -1377,7 +1382,9 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
           (glob[close_scan] == '!' || glob[close_scan] == '^') &&
           is_active(close_scan))
         close_scan++;
-      if (close_scan < glob.count() && is_close_at(close_scan)) close_scan++;
+      if (close_scan < glob.count() && is_close_at(close_scan)) {
+        close_scan++;
+      }
       bool has_closing_bracket = false;
       while (close_scan < glob.count()) {
         if (Maybe<usize> past_class = class_end_past(close_scan);
@@ -1452,7 +1459,9 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
         is_first_member = false;
       }
 
-      if (g >= glob.count() || !is_close_at(g)) GLOB_GROUP_ERR();
+      if (g >= glob.count() || !is_close_at(g)) {
+        GLOB_GROUP_ERR();
+      }
       if (should_negate) is_matched = !is_matched;
       if (!is_matched) return false;
 

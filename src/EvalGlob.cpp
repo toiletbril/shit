@@ -156,8 +156,12 @@ hot pure fn first_active_glob(StringView text, const Bitset &mask,
     if (extglob && i + 1 < text.length &&
         (ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!') &&
         text.data[i + 1] == '(')
+    {
       return i;
-    if (ch == '*' || ch == '?') return i;
+    }
+    if (ch == '*' || ch == '?') {
+      return i;
+    }
     if (ch == '[') {
       if (!open_bracket) open_bracket = i;
     } else if (ch == ']' && open_bracket) {
@@ -192,7 +196,9 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
 
   for (let const &entry : *entries) {
     let const name = entry.name.view();
-    if (!should_match_dotfiles && !name.is_empty() && name[0] == '.') continue;
+    if (!should_match_dotfiles && !name.is_empty() && name[0] == '.') {
+      continue;
+    }
 
     let child_dir = dir;
     child_dir.push_component(name);
@@ -401,8 +407,9 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment, bool word_continues,
   if (name_end == text.length() && word_continues) return;
 
   let const directory = resolve_tilde_prefix(name);
-  if (name.is_empty() && !directory.has_value())
+  if (name.is_empty() && !directory.has_value()) {
     throw Error{"Could not figure out home directory"};
+  }
   if (!directory.has_value()) return;
 
   LOG(All, "the tilde prefix '~%.*s' expands to '%.*s'",
@@ -514,8 +521,9 @@ hot fn EvalContext::expand_path(glob_field field,
                         "' or relax with set +o failglob");
     /* nullglob drops a no-match glob entirely, while the default and a test
        probe keep its literal text. */
-    if (m_glob_exempt_for_test || !is_shopt_enabled("nullglob"))
+    if (m_glob_exempt_for_test || !is_shopt_enabled("nullglob")) {
       values.push(steal(pattern));
+    }
   }
 
   return values;
