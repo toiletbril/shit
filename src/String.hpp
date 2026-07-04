@@ -217,6 +217,8 @@ private:
 
   cold fn free_storage() wontthrow -> void;
 
+  hot fn adopt_storage_of(String &&other) wontthrow -> void;
+
   mustuse pure fn is_inline() const wontthrow -> bool
   {
     return m_data == m_inline;

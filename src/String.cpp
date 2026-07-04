@@ -30,7 +30,7 @@ cold String::String(const String &other) throws : m_allocator(other.m_allocator)
   append(other.view());
 }
 
-String::String(String &&other) wontthrow : m_allocator(other.m_allocator)
+hot fn String::adopt_storage_of(String &&other) wontthrow -> void
 {
   if (other.is_inline()) {
     std::memcpy(m_inline, other.m_inline, other.m_length + 1);
@@ -43,6 +43,11 @@ String::String(String &&other) wontthrow : m_allocator(other.m_allocator)
     m_capacity = other.m_capacity;
     other.reset_to_inline();
   }
+}
+
+String::String(String &&other) wontthrow : m_allocator(other.m_allocator)
+{
+  adopt_storage_of(steal(other));
 }
 
 fn String::operator=(const String &other) throws -> String &
@@ -59,17 +64,7 @@ fn String::operator=(String &&other) wontthrow -> String &
   if (this != &other) {
     free_storage();
     m_allocator = other.m_allocator;
-    if (other.is_inline()) {
-      std::memcpy(m_inline, other.m_inline, other.m_length + 1);
-      m_data = m_inline;
-      m_length = other.m_length;
-      m_capacity = INLINE_CAPACITY;
-    } else {
-      m_data = other.m_data;
-      m_length = other.m_length;
-      m_capacity = other.m_capacity;
-      other.reset_to_inline();
-    }
+    adopt_storage_of(steal(other));
   }
   return *this;
 }

@@ -89,10 +89,8 @@ public:
          key that short an equal pack and an equal length already prove equality
          and the byte compare is skipped. A longer key shares only its prefix in
          the pack, so it still confirms through the byte compare. */
-      if (slot.state == slot::Occupied && slot.packed == wanted &&
-          (key.count() <= PackedStringKey::BYTE_CAPACITY
-               ? slot.key.count() == key.count()
-               : slot.key == key)) [[likely]]
+      if (slot.state == slot::Occupied &&
+          slot_key_matches(slot, key, wanted)) [[likely]]
       {
         return &slot.value;
       }
@@ -150,11 +148,7 @@ public:
     for (usize probe = 0; probe < m_capacity; probe++) {
       let &slot = m_slots[i];
       if (slot.state == slot::Empty) return;
-      if (slot.state == slot::Occupied && slot.packed == wanted &&
-          (key.count() <= PackedStringKey::BYTE_CAPACITY
-               ? slot.key.count() == key.count()
-               : slot.key == key))
-      {
+      if (slot.state == slot::Occupied && slot_key_matches(slot, key, wanted)) {
         /* Free the stored key and value but keep the slot objects alive, so a
            later place into this tombstone assigns into a live object rather
            than one whose lifetime already ended. */
@@ -195,6 +189,18 @@ private:
     Value value{};
   };
 
+  /* A key no longer than the pack proves equality through the pack and the
+     length, while a longer key shares only its prefix and confirms by bytes. */
+  hot mustuse fn slot_key_matches(const slot &probe_slot, StringView key,
+                                  const PackedStringKey &wanted) const wontthrow
+      -> bool
+  {
+    return probe_slot.packed == wanted &&
+           (key.count() <= PackedStringKey::BYTE_CAPACITY
+                ? probe_slot.key.count() == key.count()
+                : probe_slot.key == key);
+  }
+
   hot fn set_value(StringView key, Value value) throws -> Value *
   {
     /* Tombstones count toward the load, so the table rehashes before a probe
@@ -210,11 +216,7 @@ private:
     let first_tombstone = m_capacity;
     for (usize probe = 0; probe < m_capacity; probe++) {
       let &slot = m_slots[i];
-      if (slot.state == slot::Occupied && slot.packed == wanted &&
-          (key.count() <= PackedStringKey::BYTE_CAPACITY
-               ? slot.key.count() == key.count()
-               : slot.key == key))
-      {
+      if (slot.state == slot::Occupied && slot_key_matches(slot, key, wanted)) {
         slot.value = steal(value);
         return &slot.value;
       }
