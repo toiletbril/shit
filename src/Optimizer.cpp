@@ -83,20 +83,23 @@ fn propagated_test_operand_value(const Token *token,
   return propagated_literal_word_value(token, actx);
 }
 
-fn constant_test_verdict(const ArrayList<const Token *> &operands,
+fn constant_test_verdict(const ArrayList<const Token *> &args,
+                         usize first_operand_index, usize operand_count,
                          const AnalysisContext &actx) throws -> Maybe<bool>
 {
-  if (operands.is_empty()) return Maybe<bool>{false};
+  if (operand_count == 0) return Maybe<bool>{false};
 
-  if (operands.count() == 1) {
-    let const value = propagated_test_operand_value(operands[0], actx);
+  if (operand_count == 1) {
+    let const value =
+        propagated_test_operand_value(args[first_operand_index], actx);
     if (!value.has_value()) return None;
     return Maybe<bool>{!value->is_empty()};
   }
 
-  if (operands.count() == 2) {
-    let const op = propagated_test_operand_value(operands[0], actx);
-    let const arg = propagated_test_operand_value(operands[1], actx);
+  if (operand_count == 2) {
+    let const op = propagated_test_operand_value(args[first_operand_index], actx);
+    let const arg =
+        propagated_test_operand_value(args[first_operand_index + 1], actx);
     if (!op.has_value() || !arg.has_value()) {
       return None;
     }
@@ -105,10 +108,12 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
     return None;
   }
 
-  if (operands.count() == 3) {
-    let const lhs = propagated_test_operand_value(operands[0], actx);
-    let const op = propagated_test_operand_value(operands[1], actx);
-    let const rhs = propagated_test_operand_value(operands[2], actx);
+  if (operand_count == 3) {
+    let const lhs = propagated_test_operand_value(args[first_operand_index], actx);
+    let const op =
+        propagated_test_operand_value(args[first_operand_index + 1], actx);
+    let const rhs =
+        propagated_test_operand_value(args[first_operand_index + 2], actx);
     if (!lhs.has_value() || !op.has_value() || !rhs.has_value()) {
       return None;
     }
@@ -400,6 +405,22 @@ static fn try_algebraic_simplify(StringView expression,
   return None;
 }
 
+enum class static_verdict_kind : u8
+{
+  always_true,
+  always_false,
+  test_like,
+};
+
+constexpr static_string_entry<static_verdict_kind> STATIC_VERDICT_ENTRIES[] = {
+    {SSK("true"),  static_verdict_kind::always_true },
+    {SSK(":"),     static_verdict_kind::always_true },
+    {SSK("false"), static_verdict_kind::always_false},
+    {SSK("test"),  static_verdict_kind::test_like   },
+    {SSK("["),     static_verdict_kind::test_like   },
+};
+constexpr StaticStringMap STATIC_VERDICT_KINDS{STATIC_VERDICT_ENTRIES};
+
 fn simple_command_static_verdict(const ArrayList<const Token *> &args,
                                  const AnalysisContext &actx) throws
     -> Maybe<bool>
@@ -422,20 +443,20 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
     return None;
   }
 
-  if (*name == "true" || *name == ":") {
+  let const kind = STATIC_VERDICT_KINDS.find(name->view());
+  if (!kind.has_value()) return None;
+
+  switch (*kind) {
+  case static_verdict_kind::always_true:
     if (args.count() != 1) return None;
     LOG(All, "the builtin '%s' always succeeds, verdict is true",
         name->c_str());
     return Maybe<bool>{true};
-  }
-  if (*name == "false") {
+  case static_verdict_kind::always_false:
     if (args.count() != 1) return None;
     LOG(All, "the builtin 'false' always fails, verdict is false");
     return Maybe<bool>{false};
-  }
-
-  if (*name == "test" || *name == "[") {
-    ArrayList<const Token *> operands{heap_allocator()};
+  case static_verdict_kind::test_like: {
     usize last_index = args.count();
     if (*name == "[") {
       let const closing = literal_word_value(args[args.count() - 1]);
@@ -444,15 +465,14 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
       }
       last_index -= 1;
     }
-    for (usize i = 1; i < last_index; i++)
-      operands.push(args[i]);
     try {
-      return constant_test_verdict(operands, actx);
+      return constant_test_verdict(args, 1, last_index - 1, actx);
     } catch (...) {
       LOG(All, "swallowed an error while judging the literal "
                "test, leaving it unfolded");
       return None;
     }
+  }
   }
 
   return None;
