@@ -884,7 +884,7 @@ static pure fn is_assignment_builtin_name(StringView name) wontthrow -> bool
 hot fn Parser::parse_simple_command() throws -> Command *
 {
   Maybe<SourceLocation> source_location;
-  ArrayList<Token *> args_accumulator{heap_allocator()};
+  ArrayList<const Token *> args_accumulator{heap_allocator()};
   let local_vars = ArrayList<prefix_assignment>{heap_allocator()};
   let array_args = ArrayList<array_builtin_assignment>{heap_allocator()};
   let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
@@ -892,13 +892,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
   let do_build_command = [&]() -> Command * {
     if (!source_location) return nullptr;
 
-    ArrayList<const Token *> args{heap_allocator()};
-    args.reserve(args_accumulator.count());
-    for (let t : args_accumulator)
-      args.push(t);
-
-    SimpleCommand *c =
-        m_lexer.arena().create<SimpleCommand>(*source_location, steal(args));
+    SimpleCommand *c = m_lexer.arena().create<SimpleCommand>(
+        *source_location, steal(args_accumulator));
     if (local_vars.count() != 0) c->set_local_vars(steal(local_vars));
     if (!array_args.is_empty()) c->set_array_args(steal(array_args));
     if (!redirections.is_empty()) c->set_redirections(steal(redirections));
@@ -1264,6 +1259,42 @@ static fn word_token_from_raw(BumpArena &arena, StringView text,
                               SourceLocation location) throws
     -> tokens::WordToken *;
 
+fn Parser::parse_optional_in_clause_words(
+    ArrayList<const Token *> &words) throws -> bool
+{
+  /* The word 'in' is not a keyword token. */
+  Token *peeked = m_lexer.peek_shell_token();
+  ASSERT(peeked != nullptr);
+  if (peeked->kind() != Token::Kind::Word || peeked->raw_string() != "in") {
+    return false;
+  }
+
+  m_lexer.advance_past_last_peek();
+  loop
+  {
+    Token *word = m_lexer.peek_shell_token();
+    ASSERT(word != nullptr);
+    if (word->kind() == Token::Kind::Assignment) {
+      m_lexer.advance_past_last_peek();
+      words.push(word_token_from_assignment(m_lexer.arena(),
+                                            static_cast<Assignment *>(word)));
+      continue;
+    }
+    if (word->kind() != Token::Kind::Word) {
+      /* A non-keyword separator or operator ends the list. */
+      const String raw = word->raw_string();
+      if (!KEYWORDS.find(raw.view()).has_value()) break;
+      m_lexer.advance_past_last_peek();
+      words.push(word_token_from_raw(m_lexer.arena(), raw.view(),
+                                     word->source_location()));
+      continue;
+    }
+    m_lexer.advance_past_last_peek();
+    words.push(word);
+  }
+  return true;
+}
+
 hot fn Parser::parse_for() throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
@@ -1340,37 +1371,7 @@ hot fn Parser::parse_for() throws -> Command *
   const let variable_name = name_token->raw_string();
 
   ArrayList<const Token *> words{heap_allocator()};
-  bool has_in_clause = false;
-
-  /* The word 'in' is not a keyword token. */
-  Token *peeked = m_lexer.peek_shell_token();
-  ASSERT(peeked != nullptr);
-  if (peeked->kind() == Token::Kind::Word && peeked->raw_string() == "in") {
-    m_lexer.advance_past_last_peek();
-    has_in_clause = true;
-    loop
-    {
-      Token *word = m_lexer.peek_shell_token();
-      ASSERT(word != nullptr);
-      if (word->kind() == Token::Kind::Assignment) {
-        m_lexer.advance_past_last_peek();
-        words.push(word_token_from_assignment(m_lexer.arena(),
-                                              static_cast<Assignment *>(word)));
-        continue;
-      }
-      if (word->kind() != Token::Kind::Word) {
-        /* A non-keyword separator or operator ends the list. */
-        const String raw = word->raw_string();
-        if (!KEYWORDS.find(raw.view()).has_value()) break;
-        m_lexer.advance_past_last_peek();
-        words.push(word_token_from_raw(m_lexer.arena(), raw.view(),
-                                       word->source_location()));
-        continue;
-      }
-      m_lexer.advance_past_last_peek();
-      words.push(word);
-    }
-  }
+  const bool has_in_clause = parse_optional_in_clause_words(words);
 
   skip_semicolons_and_newlines();
 
@@ -1429,35 +1430,7 @@ hot fn Parser::parse_select() throws -> Command *
   const let variable_name = name_token->raw_string();
 
   ArrayList<const Token *> words{heap_allocator()};
-  bool has_in_clause = false;
-  Token *peeked = m_lexer.peek_shell_token();
-  ASSERT(peeked != nullptr);
-  if (peeked->kind() == Token::Kind::Word && peeked->raw_string() == "in") {
-    m_lexer.advance_past_last_peek();
-    has_in_clause = true;
-    loop
-    {
-      Token *word = m_lexer.peek_shell_token();
-      ASSERT(word != nullptr);
-      if (word->kind() == Token::Kind::Assignment) {
-        m_lexer.advance_past_last_peek();
-        words.push(word_token_from_assignment(m_lexer.arena(),
-                                              static_cast<Assignment *>(word)));
-        continue;
-      }
-      if (word->kind() != Token::Kind::Word) {
-        /* A non-keyword separator or operator ends the list. */
-        const String raw = word->raw_string();
-        if (!KEYWORDS.find(raw.view()).has_value()) break;
-        m_lexer.advance_past_last_peek();
-        words.push(word_token_from_raw(m_lexer.arena(), raw.view(),
-                                       word->source_location()));
-        continue;
-      }
-      m_lexer.advance_past_last_peek();
-      words.push(word);
-    }
-  }
+  const bool has_in_clause = parse_optional_in_clause_words(words);
 
   skip_semicolons_and_newlines();
 
@@ -1954,7 +1927,8 @@ hot fn Parser::parse_conditional_command() throws -> Command *
   return node;
 }
 
-hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
+hot fn Parser::parse_function_definition(const Token *name_token) throws
+    -> Command *
 {
   ASSERT(name_token != nullptr);
   const let location = name_token->source_location();

@@ -273,7 +273,9 @@ public:
   fn read_variable_value(StringView name) throws -> i64
   {
     ASSERT(context != nullptr);
-    if (let const *stored = context->lookup_shell_variable(name)) {
+    if (let const *stored = context->lookup_shell_variable(name);
+        stored != nullptr)
+    {
       return evaluate_operand_value(stored->view());
     }
 
@@ -968,7 +970,9 @@ static fn arith_read_variable(EvalContext *context, StringView name) throws
     -> i64
 {
   ASSERT(context != nullptr);
-  if (let const *stored = context->lookup_shell_variable(name)) {
+  if (let const *stored = context->lookup_shell_variable(name);
+      stored != nullptr)
+  {
     return evaluate_named_value_operand(context, stored->view());
   }
   let const value = context->get_variable_value(name);

@@ -356,9 +356,17 @@ fn append_conversion(String &out, const String &spec, char conv,
   switch (conv) {
   case 'q': append_q_argument(out, arg); break;
   case 's': {
-    String with_s = spec.clone();
-    with_s.push('s');
-    append_formatted(with_s.c_str(), arg.c_str());
+    if (spec == "%") {
+      /* A plain %s stops at an embedded NUL the way snprintf on the c_str
+         does, so the output matches the reference shell. */
+      const StringView value = arg.view();
+      const usize printed = value.find_character('\0').value_or(value.length);
+      out.append(value.substring_of_length(0, printed));
+    } else {
+      String with_s = spec.clone();
+      with_s.push('s');
+      append_formatted(with_s.c_str(), arg.c_str());
+    }
   } break;
   case 'c': {
     if (spec == "%") {

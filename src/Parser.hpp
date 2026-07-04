@@ -104,6 +104,8 @@ private:
   mustuse fn parse_while_or_until(bool is_until) throws -> Command *;
   mustuse fn parse_for() throws -> Command *;
   mustuse fn parse_select() throws -> Command *;
+  mustuse fn parse_optional_in_clause_words(
+      ArrayList<const Token *> &words) throws -> bool;
   mustuse fn parse_case() throws -> Command *;
   mustuse fn parse_brace_group() throws -> Command *;
   mustuse fn parse_paren_command() throws -> Command *;
@@ -113,7 +115,8 @@ private:
   mustuse fn parse_c_style_for(SourceLocation location, Token *open) throws
       -> Command *;
   mustuse fn parse_conditional_command() throws -> Command *;
-  mustuse fn parse_function_definition(Token *name_token) throws -> Command *;
+  mustuse fn parse_function_definition(const Token *name_token) throws
+      -> Command *;
 
   mustuse fn parse_keyword_function_definition() throws -> Command *;
 

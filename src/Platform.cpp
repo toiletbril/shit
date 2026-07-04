@@ -2155,7 +2155,7 @@ fn current_executable_path() wontthrow -> Maybe<String>
   _NSGetExecutablePath(nullptr, &capacity);
   if (capacity == 0) return shit::None;
 
-  ArrayList<char> buffer{};
+  ArrayList<char> buffer{heap_allocator()};
   buffer.reserve(capacity);
   if (_NSGetExecutablePath(buffer.begin(), &capacity) != 0) return shit::None;
 
@@ -2304,7 +2304,7 @@ fn enumerate_processes(bool include_resource_stats) throws
   if (::sysctl(name_mib, 4, nullptr, &byte_length, nullptr, 0) != 0)
     return processes;
 
-  ArrayList<struct kinfo_proc> records{};
+  ArrayList<struct kinfo_proc> records{heap_allocator()};
   records.reserve(byte_length / sizeof(struct kinfo_proc) + 1);
   if (::sysctl(name_mib, 4, records.begin(), &byte_length, nullptr, 0) != 0)
     return processes;
