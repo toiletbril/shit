@@ -113,7 +113,10 @@ candidate is matched by smart case and then by subsequence, so an all lowercase
 token matches either case and `fbb` matches `foo_bar_baz`, while an exact prefix
 always ranks first. A command-position path offers only runnable files and the
 directories, and a known utility floats the files whose extension it operates on
-ahead of the rest. A command forks its `--help` at most once per cache key,
+ahead of the rest. A leading `~` or a `$NAME/` prefix on a path token is
+expanded only to list the real directory, while the offered candidate keeps the
+literal prefix so it still expands at run time, and only a glob pattern is
+expanded into its matches. A command forks its `--help` at most once per cache key,
 behind an allowlist and a trusted directory gate, and the subcommand walk stops
 at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The cascade splits across
 src/Completion.cpp, src/CompletionManpage.cpp, src/CompletionScan.cpp, and the
