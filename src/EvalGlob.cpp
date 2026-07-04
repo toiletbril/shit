@@ -36,8 +36,8 @@ fn name_matches_glob(StringView glob, StringView filename,
   for (usize i = 0; i < filename.length; i++)
     lowered_name += ascii_lowercase(filename[i]);
 
-  return utils::glob_matches(glob, lowered_name.view(), glob_active, mask_offset,
-                             extglob);
+  return utils::glob_matches(glob, lowered_name.view(), glob_active,
+                             mask_offset, extglob);
 }
 
 } // namespace

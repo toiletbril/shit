@@ -538,8 +538,8 @@ fn Command::is_assignment() const wontthrow -> bool { return false; }
 
 /* A plain command node carries no redirect target of its own, so the default
    reports that. A node that does take a target overrides this. */
-fn Command::redirect_to(usize target_fd, String &filename, bool duplicate) throws
-    -> void
+fn Command::redirect_to(usize target_fd, String &filename,
+                        bool duplicate) throws -> void
 {
   unused(target_fd);
   unused(filename);
@@ -749,7 +749,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      the not-found check for the prefixed command and everything after it stays
      quiet. */
   for (let const &var : m_local_vars)
-    if (var.name.view() == "PATH") actx.should_silence_unresolved_commands = true;
+    if (var.name.view() == "PATH")
+      actx.should_silence_unresolved_commands = true;
 
   if (m_args.is_empty()) return;
 
@@ -788,12 +789,11 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       (ASSIGNMENT_BUILTINS.contains(name->view()) || *name == "unset"))
   {
     for (usize i = 1; i < m_args.count(); i++) {
-      let const word =
-          m_args[i]->kind() == Token::Kind::Word
-              ? static_cast<const tokens::WordToken *>(m_args[i])
-                    ->word()
-                    .to_literal_string()
-              : m_args[i]->raw_string();
+      let const word = m_args[i]->kind() == Token::Kind::Word
+                           ? static_cast<const tokens::WordToken *>(m_args[i])
+                                 ->word()
+                                 .to_literal_string()
+                           : m_args[i]->raw_string();
       if (operand_target_name(word.view()) == "PATH")
         actx.should_silence_unresolved_commands = true;
     }

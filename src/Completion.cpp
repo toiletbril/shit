@@ -595,10 +595,10 @@ static fn quote_path_candidate(StringView candidate) throws -> String
   return quoted;
 }
 
-/* A leading $NAME or ${NAME} in the directory prefix is expanded to its value so
-   the listing reads the real directory, while the offered candidate keeps the
-   unexpanded prefix. None means no leading variable, so the caller falls back to
-   the literal path. */
+/* A leading $NAME or ${NAME} in the directory prefix is expanded to its value
+   so the listing reads the real directory, while the offered candidate keeps
+   the unexpanded prefix. None means no leading variable, so the caller falls
+   back to the literal path. */
 static fn expand_leading_variable_path(StringView directory_part,
                                        EvalContext &context) throws
     -> Maybe<String>
@@ -615,8 +615,8 @@ static fn expand_leading_variable_path(StringView directory_part,
          lexer::is_variable_name(directory_part[name_end]))
     name_end++;
 
-  let const name = directory_part.substring_of_length(name_start,
-                                                      name_end - name_start);
+  let const name =
+      directory_part.substring_of_length(name_start, name_end - name_start);
   if (name.is_empty()) return None;
 
   usize rest_start = name_end;
@@ -674,8 +674,8 @@ static fn entry_is_executable(const Path &directory, StringView name) throws
 
 static fn complete_filesystem(StringView token, const Path &base_directory,
                               bool inside_quote, bool directories_only,
-                              bool executables_only, EvalContext &context) throws
-    -> ArrayList<String>
+                              bool executables_only,
+                              EvalContext &context) throws -> ArrayList<String>
 {
   let candidates = tiered_candidates{};
 

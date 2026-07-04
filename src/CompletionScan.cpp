@@ -550,7 +550,8 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
 
   if (!builtin_kind.has_value()) {
     if (!was_binary_built) {
-      append_flag_forms(shit_binary_flag_list(), StringView{}, binary_candidates);
+      append_flag_forms(shit_binary_flag_list(), StringView{},
+                        binary_candidates);
       was_binary_built = true;
     }
     return &binary_candidates;

@@ -83,7 +83,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   let const script_filename = ec.program_path().text().view();
   let parser = Parser{
-      Lexer{String{contents->view()}, *AST_ARENA, false, script_filename, mood()}
+      Lexer{String{contents->view()}, *AST_ARENA, false, script_filename,
+            mood()}
   };
 
   let const do_restore_pre_parse_state = [&]() {

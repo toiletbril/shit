@@ -364,7 +364,8 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool should_rebind = false;
 
   usize i = 1;
-  let do_read_option_value = [&](const String &option_arg) -> Maybe<StringView> {
+  let do_read_option_value =
+      [&](const String &option_arg) -> Maybe<StringView> {
     if (let const eq = option_arg.view().find_character('='); eq.has_value())
       return option_arg.view().substring(*eq + 1);
     if (i + 1 < args.count()) return args[++i].view();

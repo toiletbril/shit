@@ -97,7 +97,8 @@ fn constant_test_verdict(const ArrayList<const Token *> &args,
   }
 
   if (operand_count == 2) {
-    let const op = propagated_test_operand_value(args[first_operand_index], actx);
+    let const op =
+        propagated_test_operand_value(args[first_operand_index], actx);
     let const arg =
         propagated_test_operand_value(args[first_operand_index + 1], actx);
     if (!op.has_value() || !arg.has_value()) {
@@ -109,7 +110,8 @@ fn constant_test_verdict(const ArrayList<const Token *> &args,
   }
 
   if (operand_count == 3) {
-    let const lhs = propagated_test_operand_value(args[first_operand_index], actx);
+    let const lhs =
+        propagated_test_operand_value(args[first_operand_index], actx);
     let const op =
         propagated_test_operand_value(args[first_operand_index + 1], actx);
     let const rhs =

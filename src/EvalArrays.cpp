@@ -21,9 +21,9 @@ static fn sparse_array_key(StringView name, usize index,
 }
 
 template <class Visit>
-static fn for_each_sparse_index(const StringMap<String> &sparse, StringView name,
-                                Allocator allocator, Visit do_visit) throws
-    -> void
+static fn for_each_sparse_index(const StringMap<String> &sparse,
+                                StringView name, Allocator allocator,
+                                Visit do_visit) throws -> void
 {
   let const prefix = sparse_array_key(name, 0, allocator);
   let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
@@ -58,7 +58,8 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
   for_each_sparse_index(sparse, name, allocator,
                         [&](usize index, const String &value) throws {
                           out.push(sparse_array_entry{
-                              index, String{allocator, value.view()}});
+                              index, String{allocator, value.view()}
+                          });
                         });
   for (usize i = 1; i < out.count(); i++) {
     let key = steal(out[i]);
@@ -623,8 +624,8 @@ fn EvalContext::apply_array_subscript(StringView name,
   if (index < 0) index += array_negative_index_base(name);
   if (index < 0 || index >= array_count) {
     if (index >= 0) {
-      let const probe =
-          sparse_array_key(name, static_cast<usize>(index), scratch_allocator());
+      let const probe = sparse_array_key(name, static_cast<usize>(index),
+                                         scratch_allocator());
       if (let const *sparse = m_sparse_array_values.find(probe.view());
           sparse != nullptr)
       {

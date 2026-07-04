@@ -89,8 +89,8 @@ public:
          key that short an equal pack and an equal length already prove equality
          and the byte compare is skipped. A longer key shares only its prefix in
          the pack, so it still confirms through the byte compare. */
-      if (slot.state == slot::Occupied &&
-          slot_key_matches(slot, key, wanted)) [[likely]]
+      if (slot.state == slot::Occupied && slot_key_matches(slot, key, wanted))
+          [[likely]]
       {
         return &slot.value;
       }

@@ -380,16 +380,13 @@ enum declaration_command_flag : u8
 };
 
 constexpr static_string_entry<u8> DECLARATION_COMMAND_ENTRIES[] = {
-    {SSK("local"),
-     declaration_flag_local | declaration_flag_declaration                    },
-    {SSK("declare"),
-     declaration_flag_declare | declaration_flag_declaration                  },
-    {SSK("typeset"),
-     declaration_flag_declare | declaration_flag_declaration                  },
-    {SSK("export"),   declaration_flag_declaration                            },
-    {SSK("readonly"), declaration_flag_declaration                            },
-    {SSK("unset"),    declaration_flag_declaration                            },
-    {SSK("test"),     declaration_flag_test                                   },
+    {SSK("local"),    declaration_flag_local | declaration_flag_declaration  },
+    {SSK("declare"),  declaration_flag_declare | declaration_flag_declaration},
+    {SSK("typeset"),  declaration_flag_declare | declaration_flag_declaration},
+    {SSK("export"),   declaration_flag_declaration                           },
+    {SSK("readonly"), declaration_flag_declaration                           },
+    {SSK("unset"),    declaration_flag_declaration                           },
+    {SSK("test"),     declaration_flag_test                                  },
 };
 constexpr StaticStringMap DECLARATION_COMMANDS{DECLARATION_COMMAND_ENTRIES};
 

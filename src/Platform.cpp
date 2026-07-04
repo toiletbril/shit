@@ -1430,8 +1430,7 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
 
   usize offset = 0;
   while (offset < content.count()) {
-    let written =
-        ::write(fd, content.data + offset, content.count() - offset);
+    let written = ::write(fd, content.data + offset, content.count() - offset);
     if (written < 0 && errno == EINTR) {
       continue;
     }
