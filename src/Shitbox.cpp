@@ -247,11 +247,9 @@ fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void
 {
   items.sort([](StringView a, StringView b) {
     let const min_length = a.length < b.length ? a.length : b.length;
-    for (usize i = 0; i < min_length; i++)
-      if (a[i] != b[i])
-        return static_cast<unsigned char>(a[i]) <
-               static_cast<unsigned char>(b[i]);
-    return a.length < b.length;
+    let const order =
+        min_length == 0 ? 0 : __builtin_memcmp(a.data, b.data, min_length);
+    return order != 0 ? order < 0 : a.length < b.length;
   });
 }
 
