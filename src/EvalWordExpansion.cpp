@@ -839,14 +839,15 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
 
   if (!allow_expansion) return do_split_plain();
 
-  let needs_expansion = false;
-  for (usize i = 0; i < wordlist.length && !needs_expansion; i++) {
+  let has_expandable_byte = false;
+  for (usize i = 0; i < wordlist.length && !has_expandable_byte; i++) {
     const char character = wordlist[i];
-    needs_expansion = character == '$' || character == '`' ||
-                      character == '"' || character == '\'' ||
-                      character == '\\' || character == '~' || character == '{';
+    has_expandable_byte = character == '$' || character == '`' ||
+                          character == '"' || character == '\'' ||
+                          character == '\\' || character == '~' ||
+                          character == '{';
   }
-  if (!needs_expansion) return do_split_plain();
+  if (!has_expandable_byte) return do_split_plain();
 
   /* The list expands wrapped in an array literal, so a top-level structural
      byte that closes the literal early and runs the tail as a command is a

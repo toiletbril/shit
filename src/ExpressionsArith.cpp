@@ -75,7 +75,9 @@ cold fn ArithmeticCommand::to_ast_string(usize layer) const throws -> String
 static pure fn is_blank_clause(StringView text) wontthrow -> bool
 {
   for (usize i = 0; i < text.length; i++)
-    if (text[i] != ' ' && text[i] != '\t' && text[i] != '\n') return false;
+    if (text[i] != ' ' && text[i] != '\t' && text[i] != '\n') {
+      return false;
+    }
   return true;
 }
 

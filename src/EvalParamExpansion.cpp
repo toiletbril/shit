@@ -1056,14 +1056,16 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
     pattern = expand_modifier_word_masked(pattern_word, pattern_active);
   }
 
+  let const pattern_matches_any = pattern_word.is_empty();
   let out = String{scratch_allocator()};
   out.reserve(value.length);
   for (usize i = 0; i < value.length; i++) {
     char character = value[i];
     const bool is_affected = should_modify_all || i == 0;
     if (is_affected &&
-        utils::glob_matches(pattern.view(), value.substring_of_length(i, 1),
-                            pattern_active, 0, extglob_enabled()))
+        (pattern_matches_any ||
+         utils::glob_matches(pattern.view(), value.substring_of_length(i, 1),
+                             pattern_active, 0, extglob_enabled())))
     {
       const unsigned char byte = static_cast<unsigned char>(character);
       if (op == '^') {

@@ -395,10 +395,11 @@ static fn add_unique_command(tiered_candidates &candidates, HashSet &seen,
                              bool token_is_glob, bool is_case_sensitive,
                              const Bitset &glob_active) throws -> void
 {
+  if (seen.contains(name)) return;
+
   let const tier = command_name_match(name, token, token_is_glob,
                                       is_case_sensitive, glob_active);
   if (!tier.has_value()) return;
-  if (seen.contains(name)) return;
   seen.add(name);
   candidates.add(*tier, String{completion_allocator(), name});
 }

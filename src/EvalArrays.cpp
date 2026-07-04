@@ -65,6 +65,8 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
 
 fn EvalContext::clear_sparse_array(StringView name) throws -> void
 {
+  if (m_sparse_array_values.count() == 0) return;
+
   /* The erase runs after the scan so the map is not mutated while walked. */
   let indices = ArrayList<usize>{scratch_allocator()};
   let const prefix = sparse_array_key(name, 0, scratch_allocator());
@@ -634,10 +636,8 @@ fn EvalContext::apply_array_subscript(StringView name,
   if (index < 0) index += array_negative_index_base(name);
   if (index < 0 || index >= array_count) {
     if (index >= 0) {
-      let probe = String{scratch_allocator(), name};
-      probe.push('\x01');
-      probe.append(
-          String::from(static_cast<usize>(index), scratch_allocator()).view());
+      let const probe =
+          sparse_array_key(name, static_cast<usize>(index), scratch_allocator());
       if (let const *sparse = m_sparse_array_values.find(probe.view());
           sparse != nullptr)
       {
@@ -680,13 +680,15 @@ fn EvalContext::collect_array_elements(StringView name) const throws
 
   let out = ArrayList<String>{heap_allocator()};
   if (const ArrayList<String> *array = lookup_indexed_array(name)) {
-    let sparse = collect_sparse_array_entries(m_sparse_array_values, name,
-                                              scratch_allocator());
-    out.reserve(array->count() + sparse.count());
+    out.reserve(array->count());
     for (const String &element : *array)
       out.push_managed(element.view());
-    for (sparse_array_entry &entry : sparse)
-      out.push(steal(entry.value));
+    if (m_sparse_array_values.count() != 0) {
+      let sparse = collect_sparse_array_entries(m_sparse_array_values, name,
+                                                scratch_allocator());
+      for (sparse_array_entry &entry : sparse)
+        out.push(steal(entry.value));
+    }
     return out;
   }
   if (Maybe<String> scalar = get_variable_value(name); scalar.has_value())

@@ -1381,7 +1381,9 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
       if (close_scan < glob.count() &&
           (glob[close_scan] == '!' || glob[close_scan] == '^') &&
           is_active(close_scan))
+      {
         close_scan++;
+      }
       if (close_scan < glob.count() && is_close_at(close_scan)) {
         close_scan++;
       }

@@ -98,10 +98,12 @@ hot fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
 {
   loop
   {
-    ssize_t w = write(fd, buf, size);
-    if (w == -1 && errno == EINTR) continue;
-    if (w == -1) return shit::None;
-    return static_cast<usize>(w);
+    let written_count = write(fd, buf, size);
+    if (written_count == -1 && errno == EINTR) {
+      continue;
+    }
+    if (written_count == -1) return shit::None;
+    return static_cast<usize>(written_count);
   }
 }
 
@@ -116,14 +118,14 @@ hot fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
 {
   loop
   {
-    ssize_t r = read(fd, buf, size);
+    let read_count = read(fd, buf, size);
     /* A Ctrl-C returns to the caller, any other interrupting signal retries. */
-    if (r == -1 && errno == EINTR) {
+    if (read_count == -1 && errno == EINTR) {
       if (INTERRUPT_REQUESTED) return shit::None;
       continue;
     }
-    if (r == -1) return shit::None;
-    return static_cast<usize>(r);
+    if (read_count == -1) return shit::None;
+    return static_cast<usize>(read_count);
   }
 }
 
@@ -280,17 +282,7 @@ fn get_current_user() throws -> Maybe<String>
   if (const char *name = std::getenv("USER"); name != nullptr)
     return String{name};
 
-  let const contents = Path{StringView{"/etc/passwd"}}.read_entire_file();
-  if (!contents) return shit::None;
-  let const wanted_uid =
-      String::from(static_cast<u64>(getuid()), heap_allocator());
-  let const text = contents->view();
-  for (let const &line : utils::split_lines(text)) {
-    if (passwd_field(line, 2) != wanted_uid.view()) continue;
-    let const name = passwd_field(line, 0);
-    if (!name.is_empty()) return String{name};
-  }
-  return shit::None;
+  return uid_to_username(static_cast<u32>(getuid()));
 }
 
 fn get_hostname() throws -> Maybe<String>
@@ -709,7 +701,9 @@ cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
     }
 
     let const name = StringView{entry->d_name};
-    if (name == StringView{"."} || name == StringView{".."}) continue;
+    if (name == StringView{"."} || name == StringView{".."}) {
+      continue;
+    }
     names.push(String{name});
   }
 
@@ -742,7 +736,9 @@ cold fn list_directory_typed(StringView dir) throws
     }
 
     let const name = StringView{entry->d_name};
-    if (name == StringView{"."} || name == StringView{".."}) continue;
+    if (name == StringView{"."} || name == StringView{".."}) {
+      continue;
+    }
 
     Path::entry_kind kind = Path::entry_kind::Unknown;
     switch (entry->d_type) {
@@ -1120,10 +1116,7 @@ fn capture_program_output(const ArrayList<String> &argv,
   posix_spawn_file_actions_addclose(&file_actions, write_end);
   posix_spawn_file_actions_addclose(&file_actions, devnull_fd);
 
-  ArrayList<char *> raw_args{heap_allocator()};
-  for (let const &argument : argv)
-    raw_args.push(const_cast<char *>(argument.c_str()));
-  raw_args.push(nullptr);
+  let const raw_args = make_os_args(argv);
 
   /* The shell ignores SIGPIPE. The spawn restores the default in the child, so
      a child that keeps writing after the read end closes on the timeout dies on
@@ -1137,8 +1130,9 @@ fn capture_program_output(const ArrayList<String> &argv,
   posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGDEF);
 
   pid_t child_pid = 0;
-  const int spawn_result = posix_spawn(&child_pid, raw_args[0], &file_actions,
-                                       &attr, raw_args.begin(), environ);
+  const int spawn_result =
+      posix_spawn(&child_pid, raw_args[0], &file_actions, &attr,
+                  const_cast<char *const *>(raw_args.begin()), environ);
   posix_spawnattr_destroy(&attr);
   posix_spawn_file_actions_destroy(&file_actions);
   close(write_end);
@@ -1436,9 +1430,11 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
 
   usize offset = 0;
   while (offset < content.count()) {
-    ssize_t written =
+    let written =
         ::write(fd, content.data + offset, content.count() - offset);
-    if (written < 0 && errno == EINTR) continue;
+    if (written < 0 && errno == EINTR) {
+      continue;
+    }
     if (written < 0) {
       close(fd);
       return shit::None;
@@ -1464,9 +1460,11 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
 
   loop
   {
-    pid_t w = waitpid(pid, &status, wait_flags);
+    let w = waitpid(pid, &status, wait_flags);
     /* A signal interrupted the wait. Retry instead of failing. */
-    if (w == -1 && errno == EINTR) continue;
+    if (w == -1 && errno == EINTR) {
+      continue;
+    }
     if (check_syscall(w) == pid) break;
   }
 
@@ -1494,7 +1492,9 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
 
     return 128 + sig;
   } else if (!WIFEXITED(status)) {
-    throw shit::Error{"???: " + last_system_error_message()};
+    throw shit::Error{"The process did not exit, was not signalled, and did "
+                      "not stop: " +
+                      last_system_error_message()};
   } else {
     return WEXITSTATUS(status);
   }
@@ -1510,10 +1510,14 @@ fn reap_process_quietly(process pid) throws -> i32
   loop
   {
     const pid_t w = waitpid(pid, &status, 0);
-    if (w == -1 && errno == EINTR) continue;
+    if (w == -1 && errno == EINTR) {
+      continue;
+    }
     /* The SIGCHLD handler may already have reaped it, a missing child is fine.
      */
-    if (w == -1 && errno == ECHILD) return 0;
+    if (w == -1 && errno == ECHILD) {
+      return 0;
+    }
     if (check_syscall(w) == pid) break;
   }
 
@@ -1944,10 +1948,7 @@ fn collect_perf_counts(perf_counts &out, Runner &&runner) wontthrow -> bool
 fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
                    i64 &status_out, u64 &peak_rss_out) wontthrow -> bool
 {
-  os::os_args raw_argv{heap_allocator()};
-  for (usize i = 0; i < argv.count(); i++)
-    raw_argv.push(argv[i].c_str());
-  raw_argv.push(nullptr);
+  let const raw_argv = make_os_args(argv);
 
   const pid_t child_pid = fork();
   if (child_pid == -1) return false;
@@ -1973,7 +1974,9 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
   loop
   {
     const pid_t waited = wait4(child_pid, &status, 0, &usage);
-    if (waited == -1 && errno == EINTR) continue;
+    if (waited == -1 && errno == EINTR) {
+      continue;
+    }
     break;
   }
 
@@ -2660,7 +2663,9 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
 
   do {
     const StringView name{find_data.cFileName};
-    if (name == "." || name == "..") continue;
+    if (name == "." || name == "..") {
+      continue;
+    }
 
     let entry = String{allocator, prefix};
     entry += name;
@@ -3122,7 +3127,9 @@ cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
   let names = ArrayList<String>{heap_allocator()};
   do {
     let const name = StringView{data.cFileName};
-    if (name == StringView{"."} || name == StringView{".."}) continue;
+    if (name == StringView{"."} || name == StringView{".."}) {
+      continue;
+    }
     names.push(String{name});
   } while (FindNextFileA(handle, &data) != 0);
   FindClose(handle);
@@ -3635,10 +3642,14 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
   }
 
   let const bare = utils::strip_sig_prefix(name);
-  if (bare == "KILL") return 9;
-  if (bare == "TERM") return 15;
-  if (bare == "INT") return 2;
-  return None;
+
+  static constexpr static_string_entry<i32> NAME_ENTRIES[] = {
+      {SSK("KILL"), 9 },
+      {SSK("TERM"), 15},
+      {SSK("INT"),  2 },
+  };
+  static constexpr StaticStringMap NAMES{NAME_ENTRIES};
+  return NAMES.find(bare);
 }
 
 fn signal_name_from_number(i32 number) -> Maybe<String>

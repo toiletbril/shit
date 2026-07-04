@@ -4,6 +4,7 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
+#include "Optimizer.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -62,7 +63,9 @@ hot pure static fn is_unquoted_word(const Token *token,
   const Word &word = static_cast<const tokens::WordToken *>(token)->word();
   if (word.segments.count() != 1 ||
       word.segments[0].kind != WordSegment::Kind::UnquotedText)
+  {
     return false;
+  }
   return word.segments[0].text == text;
 }
 
@@ -101,7 +104,9 @@ cold pure static fn find_standalone_keyword(StringView source,
     const let left_ok = pos == 0 || do_is_boundary(source[pos - 1]);
     const let right_ok =
         end_position == source.length || do_is_boundary(source[end_position]);
-    if (left_ok && right_ok) return SourceLocation{pos, keyword.length};
+    if (left_ok && right_ok) {
+      return SourceLocation{pos, keyword.length};
+    }
   }
   return shit::None;
 }
@@ -1354,11 +1359,8 @@ hot fn Parser::parse_for() throws -> Command *
       name_word.segments.count() == 1 &&
       name_word.segments[0].kind == WordSegment::Kind::UnquotedText;
   if (is_name_plain) {
-    const StringView name_text = name_word.segments[0].text.view();
     is_name_plain =
-        name_text.length > 0 && lexer::is_variable_name_start(name_text[0]);
-    for (usize i = 1; is_name_plain && i < name_text.length; i++)
-      is_name_plain = lexer::is_variable_name(name_text[i]);
+        optimizer::is_plain_variable_name(name_word.segments[0].text.view());
   }
   if (!is_name_plain) {
     throw ErrorWithLocationAndDetails{name_token->source_location(),

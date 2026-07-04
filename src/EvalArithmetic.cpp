@@ -1489,33 +1489,37 @@ public:
   {
     skip_spaces();
     if (pos >= source.length) return {0, 0, 0};
-    let const a = source[pos];
-    let const b = pos + 1 < source.length ? source[pos + 1] : '\0';
-    switch (a) {
+    let const first_byte = source[pos];
+    let const second_byte = pos + 1 < source.length ? source[pos + 1] : '\0';
+    switch (first_byte) {
     case '*':
-      return b == '*' ? binary_operator{'P', 11, 2}
-                      : binary_operator{'*', 10, 1};
+      return second_byte == '*' ? binary_operator{'P', 11, 2}
+                                : binary_operator{'*', 10, 1};
     case '/': return {'/', 10, 1};
     case '%': return {'%', 10, 1};
     case '+': return {'+', 9, 1};
     case '-': return {'-', 9, 1};
     case '<':
-      if (b == '<') return {'L', 8, 2};
-      if (b == '=') return {'l', 7, 2};
+      if (second_byte == '<') return {'L', 8, 2};
+      if (second_byte == '=') return {'l', 7, 2};
       return {'<', 7, 1};
     case '>':
-      if (b == '>') return {'R', 8, 2};
-      if (b == '=') return {'g', 7, 2};
+      if (second_byte == '>') return {'R', 8, 2};
+      if (second_byte == '=') return {'g', 7, 2};
       return {'>', 7, 1};
     case '=':
-      return b == '=' ? binary_operator{'e', 6, 2} : binary_operator{0, 0, 0};
+      return second_byte == '=' ? binary_operator{'e', 6, 2}
+                                : binary_operator{0, 0, 0};
     case '!':
-      return b == '=' ? binary_operator{'n', 6, 2} : binary_operator{0, 0, 0};
+      return second_byte == '=' ? binary_operator{'n', 6, 2}
+                                : binary_operator{0, 0, 0};
     case '&':
-      return b == '&' ? binary_operator{'A', 2, 2} : binary_operator{'&', 5, 1};
+      return second_byte == '&' ? binary_operator{'A', 2, 2}
+                                : binary_operator{'&', 5, 1};
     case '^': return {'^', 4, 1};
     case '|':
-      return b == '|' ? binary_operator{'O', 1, 2} : binary_operator{'|', 3, 1};
+      return second_byte == '|' ? binary_operator{'O', 1, 2}
+                                : binary_operator{'|', 3, 1};
     default: return {0, 0, 0};
     }
   }

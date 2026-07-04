@@ -1062,7 +1062,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     byte_count++;
   }
 
-  if (quote_char) [[unlikely]] {
+  if (quote_char.has_value()) [[unlikely]] {
     let expected_quote = String{heap_allocator()};
     expected_quote += "Expected ";
     expected_quote += *quote_char;

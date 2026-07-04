@@ -541,17 +541,19 @@ fn Command::is_assignment() const wontthrow -> bool { return false; }
 
 /* A plain command node carries no redirect target of its own, so the default
    reports that. A node that does take a target overrides this. */
-fn Command::redirect_to(usize d, String &f, bool duplicate) throws -> void
+fn Command::redirect_to(usize target_fd, String &filename, bool duplicate) throws
+    -> void
 {
-  unused(d);
-  unused(f);
+  unused(target_fd);
+  unused(filename);
   unused(duplicate);
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-fn Command::append_to(usize d, String &f, bool duplicate) throws -> void
+fn Command::append_to(usize target_fd, String &filename, bool duplicate) throws
+    -> void
 {
-  redirect_to(d, f, duplicate);
+  redirect_to(target_fd, filename, duplicate);
 }
 
 DummyExpression::DummyExpression(SourceLocation location) : Expression(location)
@@ -1313,10 +1315,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   /* Obsolescent or redundant test forms. -a or -o joining two conditions is
      SC2166, warned only past the first operand and not after a !. A negated -z
      or -n is SC2236 and SC2237. */
-  if ((command_literal == "[" || command_literal == "test" ||
-       command_literal == "[[") &&
-      !command_is_shadowed)
-  {
+  if (TEST_COMMANDS.contains(command_literal.view()) && !command_is_shadowed) {
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const literal = static_cast<const tokens::WordToken *>(m_args[i])
@@ -1379,10 +1378,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   /* A single-operand test with no operator is the nonempty-string test,
      shellcheck SC2244. A flag-shaped operand is left alone so [ -n ] is not
      told to use -n. */
-  if ((command_literal == "[" || command_literal == "test" ||
-       command_literal == "[[") &&
-      !command_is_shadowed)
-  {
+  if (TEST_COMMANDS.contains(command_literal.view()) && !command_is_shadowed) {
     usize operand_end = m_args.count();
     bool bracket_form_is_closed = true;
     if (command_literal == "[" || command_literal == "[[") {
