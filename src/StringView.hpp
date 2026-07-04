@@ -96,6 +96,13 @@ public:
 
     return substring_of_length(start, end - start);
   }
+
+  mustuse pure fn without_trailing_newline() const wontthrow -> StringView
+  {
+    if (length > 0 && data[length - 1] == '\n')
+      return substring_of_length(0, length - 1);
+    return *this;
+  }
 };
 
 /* FNV-1a over the view's bytes, inline since the hash sits inside every map

@@ -467,18 +467,14 @@ static fn join_continuations(StringView source, Allocator allocator) throws
   ArrayList<String> logical{allocator};
   usize i = 0;
   while (i < physical.count()) {
-    let raw = physical[i];
-    if (!raw.is_empty() && raw[raw.length - 1] == '\n')
-      raw = raw.substring_of_length(0, raw.length - 1);
+    let const raw = physical[i].without_trailing_newline();
     let line = String{allocator, raw};
 
     while (ends_with_continuation(line.view()) && i + 1 < physical.count()) {
       line = String{allocator,
                     line.view().substring_of_length(0, line.view().length - 1)};
       i++;
-      let next = physical[i];
-      if (!next.is_empty() && next[next.length - 1] == '\n')
-        next = next.substring_of_length(0, next.length - 1);
+      let const next = physical[i].without_trailing_newline();
       line += ' ';
       line += trim(next);
     }

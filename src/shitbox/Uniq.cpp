@@ -69,9 +69,7 @@ fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
   };
 
   for (const StringView &line : split_keep_newlines(content->view())) {
-    let const body = !line.is_empty() && line[line.length - 1] == '\n'
-                         ? line.substring_of_length(0, line.length - 1)
-                         : line;
+    let const body = line.without_trailing_newline();
     if (has_previous && body == previous) {
       run_length++;
       continue;

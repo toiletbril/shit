@@ -74,9 +74,8 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
     let const display_name =
         source == "-" ? StringView{"(standard input)"} : source;
     for (let const &line : split_keep_newlines(content->view())) {
-      let const has_newline = !line.is_empty() && line[line.length - 1] == '\n';
-      let const body =
-          has_newline ? line.substring_of_length(0, line.length - 1) : line;
+      let const body = line.without_trailing_newline();
+      let const has_newline = body.length != line.length;
       let const is_match = os::regex_matches(compiled, body);
       if (is_match == should_invert) continue;
 

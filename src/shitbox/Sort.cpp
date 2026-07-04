@@ -54,10 +54,7 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
 
     contents.push(steal(*content));
     for (const StringView &line : split_keep_newlines(contents.back().view())) {
-      let const body = !line.is_empty() && line[line.length - 1] == '\n'
-                           ? line.substring_of_length(0, line.length - 1)
-                           : line;
-      lines.push(body);
+      lines.push(line.without_trailing_newline());
     }
   }
 
