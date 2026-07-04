@@ -486,6 +486,27 @@ static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
   return os::get_environment_variable(name).has_value();
 }
 
+static fn scan_matching_paren(StringView line, usize open_at, usize end,
+                              usize &close_out) wontthrow -> usize
+{
+  usize depth = 0;
+  close_out = end;
+  usize j = open_at;
+  for (; j < end; j++) {
+    if (line[j] == '(')
+      depth++;
+    else if (line[j] == ')') {
+      depth--;
+      if (depth == 0) {
+        close_out = j;
+        j++;
+        break;
+      }
+    }
+  }
+  return j;
+}
+
 static fn color_dollar(StringView line, usize i, usize end,
                        ArrayList<highlight_span> &spans, EvalContext &context,
                        HashSet &known_vars) throws -> usize
@@ -493,21 +514,8 @@ static fn color_dollar(StringView line, usize i, usize end,
   /* $(( ... )) frames an arithmetic expression, so its inside colors as bare
      names, numbers, and operators. */
   if (i + 2 < end && line[i + 1] == '(' && line[i + 2] == '(') {
-    usize depth = 0;
-    let close = end;
-    let j = i + 1;
-    for (; j < end; j++) {
-      if (line[j] == '(')
-        depth++;
-      else if (line[j] == ')') {
-        depth--;
-        if (depth == 0) {
-          close = j;
-          j++;
-          break;
-        }
-      }
-    }
+    usize close = end;
+    let const j = scan_matching_paren(line, i + 1, end, close);
     let const inner_begin = i + 3 < end ? i + 3 : end;
     /* An unterminated $(( )) colors through to the end. */
     let inner_end = close < end && close >= 1 ? close - 1 : end;
@@ -517,21 +525,8 @@ static fn color_dollar(StringView line, usize i, usize end,
   }
 
   if (i + 1 < end && line[i + 1] == '(') {
-    usize depth = 0;
-    let close = end;
-    let j = i + 1;
-    for (; j < end; j++) {
-      if (line[j] == '(')
-        depth++;
-      else if (line[j] == ')') {
-        depth--;
-        if (depth == 0) {
-          close = j;
-          j++;
-          break;
-        }
-      }
-    }
+    usize close = end;
+    let const j = scan_matching_paren(line, i + 1, end, close);
     let const inner_begin = i + 2 < end ? i + 2 : end;
     let const inner_end = close < inner_begin ? inner_begin : close;
     scan_highlight_range(line, inner_begin, inner_end, context, spans,

@@ -519,6 +519,26 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   return candidates;
 }
 
+static fn append_flag_forms(const ArrayList<Flag *> &flags,
+                            StringView token_filter,
+                            ArrayList<String> &out) throws -> void
+{
+  for (const Flag *flag : flags) {
+    if (flag->short_name() != '\0') {
+      let form = String{"-"};
+      form.push(flag->short_name());
+      if (token_filter.is_empty() || form.view().starts_with(token_filter))
+        out.push(steal(form));
+    }
+    if (!flag->long_name().is_empty()) {
+      let form = String{"--"};
+      form += flag->long_name();
+      if (token_filter.is_empty() || form.view().starts_with(token_filter))
+        out.push(steal(form));
+    }
+  }
+}
+
 /* Null means the kind registered no flags. */
 static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
     -> const ArrayList<String> *
@@ -528,25 +548,9 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
   static ArrayList<String> binary_candidates{heap_allocator()};
   static bool was_binary_built = false;
 
-  let const do_append_flag_forms = [](const ArrayList<Flag *> &flags,
-                                      ArrayList<String> &out) throws {
-    for (let const flag : flags) {
-      if (flag->short_name() != '\0') {
-        let short_form = String{"-"};
-        short_form.push(flag->short_name());
-        out.push(steal(short_form));
-      }
-      if (!flag->long_name().is_empty()) {
-        let long_form = String{"--"};
-        long_form += flag->long_name();
-        out.push(steal(long_form));
-      }
-    }
-  };
-
   if (!builtin_kind.has_value()) {
     if (!was_binary_built) {
-      do_append_flag_forms(shit_binary_flag_list(), binary_candidates);
+      append_flag_forms(shit_binary_flag_list(), StringView{}, binary_candidates);
       was_binary_built = true;
     }
     return &binary_candidates;
@@ -564,7 +568,7 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
     } else {
       let const flags = builtin_flag_list(*builtin_kind);
       if (flags == nullptr) return nullptr;
-      do_append_flag_forms(*flags, *per_kind_candidates[index]);
+      append_flag_forms(*flags, StringView{}, *per_kind_candidates[index]);
       if (*builtin_kind == Builtin::Kind::Set) {
         const String &letters = shell_option_letters();
         for (usize i = 0; i < letters.count(); i++) {
@@ -629,18 +633,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
       let const flags = shitbox::shitbox_util_flag_list(*util_for_flags);
       if (flags == nullptr) return None;
       let forms = ArrayList<String>{heap_allocator()};
-      for (const Flag *flag : *flags) {
-        if (flag->short_name() != '\0') {
-          let form = String{"-"};
-          form.push(flag->short_name());
-          if (form.view().starts_with(token)) forms.push(steal(form));
-        }
-        if (!flag->long_name().is_empty()) {
-          let form = String{"--"};
-          form += flag->long_name();
-          if (form.view().starts_with(token)) forms.push(steal(form));
-        }
-      }
+      append_flag_forms(*flags, token, forms);
       if (forms.is_empty()) return None;
       return forms;
     }
