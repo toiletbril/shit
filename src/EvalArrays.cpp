@@ -20,6 +20,27 @@ static fn sparse_array_key(StringView name, usize index,
   return key;
 }
 
+template <class Visit>
+static fn for_each_sparse_index(const StringMap<String> &sparse, StringView name,
+                                Allocator allocator, Visit do_visit) throws
+    -> void
+{
+  let const prefix = sparse_array_key(name, 0, allocator);
+  let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
+  sparse.for_each([&](StringView key, const String &value) throws {
+    if (key.length <= name_prefix.length ||
+        key.substring_of_length(0, name_prefix.length) != name_prefix)
+    {
+      return;
+    }
+    if (let const parsed = key.substring(name_prefix.length).to<i64>();
+        !parsed.is_error() && parsed.value() >= 0)
+    {
+      do_visit(static_cast<usize>(parsed.value()), value);
+    }
+  });
+}
+
 struct sparse_array_entry
 {
   usize index;
@@ -34,23 +55,11 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
     -> ArrayList<sparse_array_entry>
 {
   let out = ArrayList<sparse_array_entry>{allocator};
-  let const prefix = sparse_array_key(name, 0, allocator);
-  let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
-  sparse.for_each([&](StringView key, const String &value) throws {
-    if (key.length <= name_prefix.length ||
-        key.substring_of_length(0, name_prefix.length) != name_prefix)
-    {
-      return;
-    }
-    let const index_text = key.substring(name_prefix.length);
-    if (let const parsed = index_text.to<i64>();
-        !parsed.is_error() && parsed.value() >= 0)
-    {
-      out.push(sparse_array_entry{
-          static_cast<usize>(parsed.value()), String{allocator, value.view()}
-      });
-    }
-  });
+  for_each_sparse_index(sparse, name, allocator,
+                        [&](usize index, const String &value) throws {
+                          out.push(sparse_array_entry{
+                              index, String{allocator, value.view()}});
+                        });
   for (usize i = 1; i < out.count(); i++) {
     let key = steal(out[i]);
     usize j = i;
@@ -69,22 +78,11 @@ fn EvalContext::clear_sparse_array(StringView name) throws -> void
 
   /* The erase runs after the scan so the map is not mutated while walked. */
   let indices = ArrayList<usize>{scratch_allocator()};
-  let const prefix = sparse_array_key(name, 0, scratch_allocator());
-  let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
-  m_sparse_array_values.for_each(
-      [&](StringView key, const String &value) throws {
-        unused(value);
-        if (key.length <= name_prefix.length ||
-            key.substring_of_length(0, name_prefix.length) != name_prefix)
-        {
-          return;
-        }
-        if (let const parsed = key.substring(name_prefix.length).to<i64>();
-            !parsed.is_error() && parsed.value() >= 0)
-        {
-          indices.push(static_cast<usize>(parsed.value()));
-        }
-      });
+  for_each_sparse_index(m_sparse_array_values, name, scratch_allocator(),
+                        [&](usize index, const String &value) throws {
+                          unused(value);
+                          indices.push(index);
+                        });
 
   for (const usize index : indices)
     m_sparse_array_values.erase(
@@ -497,23 +495,12 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
   if (let const *array = m_indexed_arrays.find(name))
     base = static_cast<i64>(array->count());
 
-  let const prefix = sparse_array_key(name, 0, scratch_allocator());
-  let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
-  m_sparse_array_values.for_each(
-      [&](StringView key, const String &value) throws {
-        unused(value);
-        if (key.length <= name_prefix.length ||
-            key.substring_of_length(0, name_prefix.length) != name_prefix)
-        {
-          return;
-        }
-        if (let const parsed = key.substring(name_prefix.length).to<i64>();
-            !parsed.is_error() && parsed.value() >= 0)
-        {
-          let const past_index = static_cast<i64>(parsed.value()) + 1;
-          if (past_index > base) base = past_index;
-        }
-      });
+  for_each_sparse_index(m_sparse_array_values, name, scratch_allocator(),
+                        [&](usize index, const String &value) throws {
+                          unused(value);
+                          let const past_index = static_cast<i64>(index) + 1;
+                          if (past_index > base) base = past_index;
+                        });
 
   return base;
 }

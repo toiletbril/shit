@@ -594,6 +594,8 @@ public:
      wins. */
   fn snapshot_subshell_descriptor(i32 shell_fd) throws -> void;
 
+  fn request_loop_control(control_flow::Kind kind, i64 level,
+                          SourceLocation location) throws -> void;
   fn request_break(i64 level, SourceLocation location) throws -> void;
   fn request_continue(i64 level, SourceLocation location) throws -> void;
   fn request_return(i64 status, SourceLocation location) throws -> void;

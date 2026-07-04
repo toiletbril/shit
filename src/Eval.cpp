@@ -1055,33 +1055,30 @@ pure fn EvalContext::in_subshell() const wontthrow -> bool
   return m_subshell_depth > 0;
 }
 
-fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
+fn EvalContext::request_loop_control(control_flow::Kind kind, i64 level,
+                                     SourceLocation location) throws -> void
 {
   if (m_loop_depth == 0) {
-    LOG(Debug, "break requested outside a loop, ignored");
+    LOG(Debug, "loop control requested outside a loop, ignored");
     return;
   }
   if (static_cast<usize>(level) > m_loop_depth)
     level = static_cast<i64>(m_loop_depth);
-  LOG(All, "break requested, level %lld of depth %zu", (long long) level,
+  LOG(All, "loop control requested, level %lld of depth %zu", (long long) level,
       m_loop_depth);
-  m_control_flow = control_flow{control_flow::Kind::Break, level, location,
-                                m_current_source, String{m_current_origin}};
+  m_control_flow = control_flow{kind, level, location, m_current_source,
+                                String{m_current_origin}};
+}
+
+fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
+{
+  request_loop_control(control_flow::Kind::Break, level, location);
 }
 
 fn EvalContext::request_continue(i64 level, SourceLocation location) throws
     -> void
 {
-  if (m_loop_depth == 0) {
-    LOG(Debug, "continue requested outside a loop, ignored");
-    return;
-  }
-  if (static_cast<usize>(level) > m_loop_depth)
-    level = static_cast<i64>(m_loop_depth);
-  LOG(All, "continue requested, level %lld of depth %zu", (long long) level,
-      m_loop_depth);
-  m_control_flow = control_flow{control_flow::Kind::Continue, level, location,
-                                m_current_source, String{m_current_origin}};
+  request_loop_control(control_flow::Kind::Continue, level, location);
 }
 
 fn EvalContext::request_return(i64 status, SourceLocation location) throws
@@ -1179,14 +1176,19 @@ static constexpr usize MAX_FUNCTION_CALL_DEPTH = 900;
 static constexpr usize MAX_SUBSTITUTION_DEPTH = 128;
 static constexpr usize MAX_PARAMETER_EXPANSION_DEPTH = 256;
 
-fn EvalContext::enter_source(SourceLocation location) throws -> void
+static fn guard_located_depth(usize current_depth, usize cap, const char *what,
+                              SourceLocation location) throws -> void
 {
-  if (m_source_depth >= MAX_SOURCE_DEPTH) {
-    LOG(Debug, "source depth %zu exceeds cap %zu", m_source_depth,
-        MAX_SOURCE_DEPTH);
+  if (current_depth >= cap) {
+    LOG(Debug, "%s depth %zu exceeds cap %zu", what, current_depth, cap);
     throw ErrorWithLocation{location,
                             "Maximum source/recursion depth exceeded"};
   }
+}
+
+fn EvalContext::enter_source(SourceLocation location) throws -> void
+{
+  guard_located_depth(m_source_depth, MAX_SOURCE_DEPTH, "source", location);
   m_source_depth++;
 }
 
@@ -1198,12 +1200,8 @@ fn EvalContext::leave_source() wontthrow -> void
 
 fn EvalContext::enter_function_call(SourceLocation location) throws -> void
 {
-  if (m_function_call_depth >= MAX_FUNCTION_CALL_DEPTH) {
-    LOG(Debug, "function call depth %zu exceeds cap %zu", m_function_call_depth,
-        MAX_FUNCTION_CALL_DEPTH);
-    throw ErrorWithLocation{location,
-                            "Maximum source/recursion depth exceeded"};
-  }
+  guard_located_depth(m_function_call_depth, MAX_FUNCTION_CALL_DEPTH,
+                      "function call", location);
   m_function_call_depth++;
   LOG(Debug, "entered function call depth %zu", m_function_call_depth);
 }
