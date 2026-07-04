@@ -714,6 +714,8 @@ public:
       if (consume("--")) return postfix_step(target, -1);
       return read_lvalue_value(target);
     }
+    if (pos >= source.length)
+      fail("Unfinished expression", "An operand is missing");
     fail("Unexpected character in the arithmetic expression",
          "This is not a valid operator or operand");
   }
@@ -1040,6 +1042,8 @@ public:
       ti++;
       return arith_read_variable(context, name);
     }
+    if (ti >= toks.count())
+      throw ErrorWithDetails{"Unfinished expression", "An operand is missing"};
     throw ErrorWithDetails{"Unexpected character in the arithmetic expression",
                            "This is not a valid operator or operand"};
   }
@@ -1603,6 +1607,8 @@ public:
       return read_variable(
           source.substring_of_length(name_start, pos - name_start), name_start);
     }
+    if (pos >= source.length)
+      fail("Unfinished expression", "An operand is missing");
     fail("Unexpected character in the arithmetic expression",
          "This is not a valid operator or operand");
   }

@@ -20,11 +20,11 @@ shit: 1:1: error: Builtin 'let': expression expected.
        |  ^~~ here.
 rc=1
 --- calc with no expression ---
-shit: 1:1: error: calc: Not enough arguments.
+shit: 1:1: error: calc has no expression to evaluate.
      1 |  shitbox calc
        |  ^~~~~~~~~~~~ here.
-shit: note: Try `calc --help` for more info.
-rc=2
+note: Pass an expression such as `calc '2 + 2'`, read a pipe with `-p`, or enter the interactive prompt with `-i`.
+rc=1
 --- shitbox cp with one operand ---
 shit: 1:1: error: cp: Not enough arguments.
      1 |  shitbox cp onlyone

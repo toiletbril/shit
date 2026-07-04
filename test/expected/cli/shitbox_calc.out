@@ -7,18 +7,18 @@
 === variable read ===
 42
 === located parse error ===
-shit: 1:4: error: Unexpected character in the arithmetic expression.
+shit: 1:4: error: Unfinished expression.
      1 |  1 +
        |     ^~ here.
-note: This is not a valid operator or operand.
+note: An operand is missing.
 === located division by zero ===
 shit: 1:6: error: Division by zero.
      1 |  5 / 0
        |       ^~ here.
 note: The right operand evaluated to 0.
 === no expression ===
-shit: 1:1: error: calc: Not enough arguments.
+shit: 1:1: error: calc has no expression to evaluate.
      1 |  shitbox calc
        |  ^~~~~~~~~~~~ here.
-shit: note: Try `calc --help` for more info.
-rc=2
+note: Pass an expression such as `calc '2 + 2'`, read a pipe with `-p`, or enter the interactive prompt with `-i`.
+rc=1
