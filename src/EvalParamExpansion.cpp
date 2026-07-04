@@ -463,9 +463,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   if (spec.length > 1 && spec[0] == '#') {
     let const name = spec.substring(1);
     if (name == "@" || name == "*") {
-      return String{
-          scratch_allocator(),
-          String::from(m_positional_params.count(), heap_allocator())};
+      return String::from(m_positional_params.count(), scratch_allocator());
     }
 
     /* ${#a[@]} is the element count, ${#a[i]} the length of one element. */
@@ -480,33 +478,25 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
         if ((array_name == "FUNCNAME" || array_name == "BASH_LINENO") &&
             bash_dynamic_variables_enabled()) [[unlikely]]
         {
-          return String{scratch_allocator(),
-                        String::from(funcname_frame_count(), heap_allocator())};
+          return String::from(funcname_frame_count(), scratch_allocator());
         }
         if (is_associative_array(array_name))
-          return String{heap_allocator(),
-                        String::from(associative_keys(array_name).count(),
-                                     heap_allocator())};
+          return String::from(associative_keys(array_name).count(),
+                              scratch_allocator());
         if (lookup_indexed_array(array_name) != nullptr)
           return String::from(collect_array_elements(array_name).count(),
-                              heap_allocator());
-        return String{
-            scratch_allocator(),
-            String::from(get_variable_value(array_name).has_value() ? 1 : 0,
-                         heap_allocator())};
+                              scratch_allocator());
+        return String::from(get_variable_value(array_name).has_value() ? 1 : 0,
+                            scratch_allocator());
       }
-      return String{
-          scratch_allocator(),
-          String::from(apply_array_subscript(array_name, subscript).length(),
-                       heap_allocator())};
+      return String::from(apply_array_subscript(array_name, subscript).length(),
+                          scratch_allocator());
     }
 
     let const value = get_variable_value(name);
     if (!value.has_value()) report_unset_reference(name);
-    return String{
-        scratch_allocator(),
-        String::from(value.value_or(String{scratch_allocator()}).length(),
-                     heap_allocator())};
+    return String::from(value.value_or(String{scratch_allocator()}).length(),
+                        scratch_allocator());
   }
 
   ASSERT(!spec.is_empty());
@@ -650,7 +640,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   case '-':
     if (treat_as_unset) return expand_modifier_word(word);
     ASSERT(current.has_value());
-    return String{scratch_allocator(), current->view()};
+    return steal(*current);
   case '=':
     if (treat_as_unset) {
       let const assigned = expand_modifier_word(word);
@@ -658,7 +648,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       return assigned;
     }
     ASSERT(current.has_value());
-    return String{scratch_allocator(), current->view()};
+    return steal(*current);
   case '+':
     if (treat_as_unset) return String{scratch_allocator()};
     return expand_modifier_word(word);
@@ -670,7 +660,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       throw_script_fatal(expand_modifier_word(word));
     }
     ASSERT(current.has_value());
-    return String{scratch_allocator(), current->view()};
+    return steal(*current);
 
   case '#': {
     return trim_value_with_modifier(
