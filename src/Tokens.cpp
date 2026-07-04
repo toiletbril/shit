@@ -128,8 +128,9 @@ pure fn Word::fd_allocation_name() const wontthrow -> Maybe<StringView>
   }
 
   let const text = segment.text.view();
-  if (text.length < 3 || text[0] != '{' || text[text.length - 1] != '}')
+  if (text.length < 3 || text[0] != '{' || text[text.length - 1] != '}') {
     return None;
+  }
 
   let const name = text.substring_of_length(1, text.length - 2);
   if (!lexer::is_variable_name_start(name[0])) return None;

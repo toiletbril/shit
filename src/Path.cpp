@@ -39,8 +39,9 @@ fn Path::filename() const wontthrow -> StringView
 fn Path::extension() const wontthrow -> StringView
 {
   let const name = filename();
-  if (name == StringView{"."} || name == StringView{".."})
+  if (name == StringView{"."} || name == StringView{".."}) {
     return StringView{name.data + name.length, 0};
+  }
   /* A leading dot names a hidden file, so the scan stops before the first byte.
    */
   for (usize i = name.length; i > 1; i--)
@@ -56,15 +57,21 @@ fn Path::parent() const throws -> Path
   return Path{m_text.substring_of_length(0, end - 1)};
 }
 
-fn Path::push_component(StringView component) throws -> Path &
+static fn append_path_component(String &text, StringView component) throws
+    -> void
 {
-  if (component.length == 0) return *this;
-  if (!m_text.is_empty() && !os::is_directory_separator(m_text.back()) &&
+  if (component.length == 0) return;
+  if (!text.is_empty() && !os::is_directory_separator(text.back()) &&
       !os::is_directory_separator(component.data[0]))
   {
-    m_text.push(os::DIRECTORY_SEPARATOR);
+    text.push(os::DIRECTORY_SEPARATOR);
   }
-  m_text.append(component);
+  text.append(component);
+}
+
+fn Path::push_component(StringView component) throws -> Path &
+{
+  append_path_component(m_text, component);
   return *this;
 }
 
@@ -77,8 +84,9 @@ fn Path::with_extension(StringView new_extension) const throws -> Path
   let const prefix_length = m_text.count() - current_extension.length;
 
   let result = Path{m_text.substring_of_length(0, prefix_length)};
-  if (new_extension.length > 0 && new_extension.data[0] != '.')
+  if (new_extension.length > 0 && new_extension.data[0] != '.') {
     result.m_text.push('.');
+  }
   result.m_text.append(new_extension);
 
   return result;
@@ -382,13 +390,7 @@ PathBuilder::PathBuilder(StringView root) : m_text(root) {}
 
 fn PathBuilder::append(StringView component) throws -> PathBuilder &
 {
-  if (component.length == 0) return *this;
-  if (!m_text.is_empty() && !os::is_directory_separator(m_text.back()) &&
-      !os::is_directory_separator(component.data[0]))
-  {
-    m_text.push(os::DIRECTORY_SEPARATOR);
-  }
-  m_text.append(component);
+  append_path_component(m_text, component);
   return *this;
 }
 

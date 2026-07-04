@@ -637,9 +637,12 @@ fn EvalContext::apply_array_subscript(StringView name,
       let probe = String{scratch_allocator(), name};
       probe.push('\x01');
       probe.append(
-          String::from(static_cast<usize>(index), heap_allocator()).view());
-      if (let const *sparse = m_sparse_array_values.find(probe.view()))
+          String::from(static_cast<usize>(index), scratch_allocator()).view());
+      if (let const *sparse = m_sparse_array_values.find(probe.view());
+          sparse != nullptr)
+      {
         return String{scratch_allocator(), sparse->view()};
+      }
     }
     return String{scratch_allocator()};
   }

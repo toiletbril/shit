@@ -498,7 +498,9 @@ pure fn classify_plain_literal(const Word &word) wontthrow -> Word::PlainLiteral
   for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::LiteralText &&
         segment.kind != WordSegment::Kind::DoubleQuotedText)
+    {
       return Word::PlainLiteral::NotPlain;
+    }
   }
   return Word::PlainLiteral::PlainNoSplit;
 }
