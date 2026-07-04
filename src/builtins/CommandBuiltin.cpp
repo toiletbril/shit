@@ -108,13 +108,14 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     operand_args.push_managed(args[i]);
 
   /* The default PATH is in force only while make_from resolves the program,
-     then the resolver reverts to the environment PATH. */
+     then the resolver reverts to the shell's own PATH. */
   let const should_use_default_path = FLAG_COMMAND_DEFAULT_PATH.is_enabled();
   if (should_use_default_path)
     utils::set_path_for_resolution(String{"/usr/bin:/bin"});
   defer
   {
-    if (should_use_default_path) utils::set_path_for_resolution(shit::None);
+    if (should_use_default_path)
+      utils::set_path_for_resolution(cxt.get_variable_value("PATH"));
   };
 
   /* An unresolved operand returns 127 here rather than letting the not-found
