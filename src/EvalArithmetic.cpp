@@ -173,6 +173,31 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize;
 
 static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64;
 
+static fn arith_skip_spaces(StringView source, usize &pos) wontthrow -> void
+{
+  while (pos < source.length && (source[pos] == ' ' || source[pos] == '\t' ||
+                                 source[pos] == '\n' || source[pos] == '\r'))
+    pos++;
+}
+
+static fn arith_starts_with(StringView source, usize &pos,
+                            StringView op) wontthrow -> bool
+{
+  arith_skip_spaces(source, pos);
+  if (pos + op.length > source.length) return false;
+  for (usize k = 0; k < op.length; k++)
+    if (source[pos + k] != op[k]) return false;
+  return true;
+}
+
+static fn arith_consume(StringView source, usize &pos, StringView op) wontthrow
+    -> bool
+{
+  if (!arith_starts_with(source, pos, op)) return false;
+  pos += op.length;
+  return true;
+}
+
 /* A recursive-descent evaluator for $((...)) following C operator precedence.
  */
 class ArithmeticParser
@@ -232,27 +257,16 @@ public:
     throw ErrorWithDetails{message, note};
   }
 
-  fn skip_spaces() wontthrow -> void
-  {
-    while (pos < source.length && (source[pos] == ' ' || source[pos] == '\t' ||
-                                   source[pos] == '\n' || source[pos] == '\r'))
-      pos++;
-  }
+  fn skip_spaces() wontthrow -> void { arith_skip_spaces(source, pos); }
 
   fn starts_with(StringView op) wontthrow -> bool
   {
-    skip_spaces();
-    if (pos + op.length > source.length) return false;
-    for (usize k = 0; k < op.length; k++)
-      if (source[pos + k] != op[k]) return false;
-    return true;
+    return arith_starts_with(source, pos, op);
   }
 
   fn consume(StringView op) wontthrow -> bool
   {
-    if (!starts_with(op)) return false;
-    pos += op.length;
-    return true;
+    return arith_consume(source, pos, op);
   }
 
   fn read_variable_value(StringView name) throws -> i64
@@ -1241,27 +1255,16 @@ public:
     throw ErrorWithLocationAndDetails{location, message, note};
   }
 
-  fn skip_spaces() wontthrow -> void
-  {
-    while (pos < source.length && (source[pos] == ' ' || source[pos] == '\t' ||
-                                   source[pos] == '\n' || source[pos] == '\r'))
-      pos++;
-  }
+  fn skip_spaces() wontthrow -> void { arith_skip_spaces(source, pos); }
 
   fn starts_with(StringView op) wontthrow -> bool
   {
-    skip_spaces();
-    if (pos + op.length > source.length) return false;
-    for (usize k = 0; k < op.length; k++)
-      if (source[pos + k] != op[k]) return false;
-    return true;
+    return arith_starts_with(source, pos, op);
   }
 
   fn consume(StringView op) wontthrow -> bool
   {
-    if (!starts_with(op)) return false;
-    pos += op.length;
-    return true;
+    return arith_consume(source, pos, op);
   }
 
   fn read_variable(StringView name, usize name_position) throws -> wide_int
