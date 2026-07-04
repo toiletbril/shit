@@ -226,15 +226,16 @@ CXXFLAGS += \
 	-finstrument-functions \
 	-DNDEBUG \
 	-fno-omit-frame-pointer \
-	-flto \
-	-O1
+	-flto
 ifneq ($(TARGET), Windows_NT)
-# TODO: windows optimization fucks up the RAM.
 CXXFLAGS += \
 	-static-pie \
 	-O3 \
 	-U_FORTIFY_SOURCE \
 	-D_FORTIFY_SOURCE=2
+else
+CXXFLAGS += \
+	-O2
 endif
 ifeq ($(TARGET), Linux)
 CXXFLAGS += \

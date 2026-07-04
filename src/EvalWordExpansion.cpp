@@ -103,6 +103,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
       const char byte = text.data[i];
       if (!is_field_separator(byte)) {
         usize start = i;
+#pragma clang loop unroll_count(4)
         while (i < text.length && !is_field_separator(text.data[i]))
           i++;
         do_append_run(StringView{text.data + start, i - start}, glob_active);
@@ -111,6 +112,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
 
       const bool was_field_started = has_current;
       usize delimiter_count = 0;
+#pragma clang loop unroll_count(4)
       while (i < text.length && is_field_separator(text.data[i])) {
         const char separator = text.data[i];
         if (separator != ' ' && separator != '\t' && separator != '\n') {
@@ -713,7 +715,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     segments = &tilde_expanded_segments;
   }
 
-  let result = String{heap_allocator()};
+  let result = String{scratch_allocator()};
   for (const WordSegment &segment : *segments) {
     let const segment_text = segment.text.view();
     switch (segment.kind) {
@@ -754,7 +756,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
     segments = &tilde_expanded_segments;
   }
 
-  let result = String{heap_allocator()};
+  let result = String{scratch_allocator()};
 
   let do_emit_run = [&](StringView bytes, bool is_active) {
     result.append(bytes);

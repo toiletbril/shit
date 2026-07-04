@@ -469,6 +469,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
     let const location = token->source_location();
     try {
       let fallback_word = Word{};
+      fallback_word.segments = ArrayList<WordSegment>{scratch_allocator()};
       const Word *word = nullptr;
       if (token->kind() == Token::Kind::Word) {
         word = &static_cast<const tokens::WordToken *>(token)->word();
@@ -602,6 +603,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
                  many fields, so their absence leaves a scalar of one field. */
               let const spec = segment.text.view();
               let has_multi_field_marker = !segment.is_in_double_quotes;
+#pragma clang loop unroll_count(4)
               for (usize i = 0; !has_multi_field_marker && i < spec.length; i++)
               {
                 let const byte = spec[i];
@@ -623,6 +625,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
                 let const spec = segment.text.view();
                 let is_plain_name =
                     !spec.is_empty() && lexer::is_variable_name_start(spec[0]);
+#pragma clang loop unroll_count(4)
                 for (usize i = 1; is_plain_name && i < spec.length; i++)
                   if (!lexer::is_variable_name(spec[i])) is_plain_name = false;
                 if (is_plain_name)

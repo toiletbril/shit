@@ -160,7 +160,6 @@ PRIMES_PY := bench/primes.py
 PRIMES_LIMIT ?= 100000
 SCALE ?= 100
 
-bench: BIN := ../shit
 bench:
 	@SCALE='$(SCALE)' BIN='$(BIN)' DASH='$(DASH)' BASH='$(BASH)' ZSH='$(ZSH)' \
 		ASH='$(ASH)' YASH='$(YASH)' BENCH='$(BENCH)' BENCH_BASH='$(BENCH_BASH)' \

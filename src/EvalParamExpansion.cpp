@@ -365,7 +365,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
         }
         inner += ch;
       }
-      do_emit_run(String::from(evaluate_arithmetic(inner), heap_allocator()),
+      do_emit_run(String::from(evaluate_arithmetic(inner), scratch_allocator()),
                   false);
       i = j - 1;
     } else if (next == '(') {
@@ -493,6 +493,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
                           scratch_allocator());
     }
 
+    if (let const *stored = lookup_shell_variable(name); stored != nullptr)
+      return String::from(stored->count(), scratch_allocator());
     let const value = get_variable_value(name);
     if (!value.has_value()) report_unset_reference(name);
     return String::from(value.value_or(String{scratch_allocator()}).length(),
@@ -502,9 +504,11 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   ASSERT(!spec.is_empty());
   usize name_end = 0;
   if (lexer::is_variable_name_start(spec[0])) {
+#pragma clang loop unroll_count(4)
     while (name_end < spec.length && lexer::is_variable_name(spec[name_end]))
       name_end++;
   } else if (lexer::is_number(spec[0])) {
+#pragma clang loop unroll_count(4)
     while (name_end < spec.length && lexer::is_number(spec[name_end]))
       name_end++;
   } else {

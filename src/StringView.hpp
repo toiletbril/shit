@@ -105,15 +105,20 @@ public:
   }
 };
 
-/* FNV-1a over the view's bytes, inline since the hash sits inside every map
-   probe on the hot variable-lookup path. */
 pure forceinline fn hash_bytes(StringView view) wontthrow -> u64
 {
-  u64 hash = 14695981039346656037ull;
-  for (usize i = 0; i < view.length; i++) {
-    hash ^= static_cast<unsigned char>(view.data[i]);
-    hash *= 1099511628211ull;
+  u64 hash = view.length * 0x9e3779b97f4a7c15ull;
+  usize i = 0;
+#pragma clang loop unroll_count(4)
+  for (; i + 8 <= view.length; i += 8) {
+    u64 chunk;
+    __builtin_memcpy(&chunk, view.data + i, 8);
+    hash = (hash ^ chunk) * 0x100000001b3ull;
   }
+  u64 tail = 0;
+  __builtin_memcpy(&tail, view.data + i, view.length - i);
+  hash = (hash ^ tail) * 0x100000001b3ull;
+  hash ^= hash >> 31;
   return hash;
 }
 
