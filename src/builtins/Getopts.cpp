@@ -45,13 +45,15 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  let operands = ArrayList<String>{cxt.scratch_allocator()};
+  let explicit_operands = ArrayList<String>{cxt.scratch_allocator()};
   if (args.count() > 3) {
     for (usize i = 3; i < args.count(); i++)
-      operands.push(args[i]);
-  } else {
-    operands = cxt.positional_params();
+      explicit_operands.push(args[i]);
   }
+  /* The common while-getopts form names no operands, so the positional
+     parameters are read in place with no per-call copy. */
+  const ArrayList<String> &operands =
+      args.count() > 3 ? explicit_operands : cxt.positional_params();
 
   i64 optind = 1;
   if (let value = cxt.get_variable_value("OPTIND"); value.has_value()) {

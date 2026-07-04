@@ -325,7 +325,7 @@ static fn word_names_existing_path(StringView word) throws -> bool
   return Path{word}.exists();
 }
 
-/* A path being typed toward a real file colors yellow rather than red. */
+/* A path being typed toward a real file colors cyan, an unmatched one red. */
 static fn path_partial_prefixes_entry(StringView word, usize existing_end,
                                       StringView partial, bool has_tilde,
                                       bool directories_only) throws -> bool
