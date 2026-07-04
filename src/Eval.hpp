@@ -610,6 +610,9 @@ public:
   fn print_source_backtrace(
       Maybe<SourceLocation> error_location = None) const throws -> void;
 
+  fn render_contained_substitution_error(std::exception_ptr error,
+                                         StringView source) throws -> void;
+
   fn set_current_location(SourceLocation location) wontthrow -> void;
 
   fn set_error_exit(bool enabled) wontthrow -> void;

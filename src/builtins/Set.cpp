@@ -363,7 +363,15 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool is_collecting_operands = false;
   bool should_rebind = false;
 
-  for (usize i = 1; i < args.count(); i++) {
+  usize i = 1;
+  let do_read_option_value = [&](const String &option_arg) -> Maybe<StringView> {
+    if (let const eq = option_arg.view().find_character('='); eq.has_value())
+      return option_arg.view().substring(*eq + 1);
+    if (i + 1 < args.count()) return args[++i].view();
+    return None;
+  };
+
+  for (; i < args.count(); i++) {
     let const &arg = args[i];
 
     if (is_collecting_operands) {
@@ -381,25 +389,17 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         arg.view().starts_with(StringView{"--mood="}) ||
         arg.view().starts_with(StringView{"-M="}))
     {
-      StringView value{};
-      bool has_value = false;
-      if (let const eq = arg.view().find_character('='); eq.has_value()) {
-        value = arg.view().substring(*eq + 1);
-        has_value = true;
-      } else if (i + 1 < args.count()) {
-        value = args[++i].view();
-        has_value = true;
-      }
-      if (!has_value) {
+      let const value = do_read_option_value(arg);
+      if (!value.has_value()) {
         ec.print_to_stdout(
             String{cxt.scratch_allocator(), mood_name(cxt.mood())} + "\n");
         continue;
       }
-      let const parsed = parse_mood_name(value);
+      let const parsed = parse_mood_name(*value);
       if (!parsed.has_value())
         throw Error{
             String{cxt.scratch_allocator(), "Unknown --mood value '"}
-            + value +
+            + *value +
             "', expected 'shit', 'bash', or 'sh'"
         };
       cxt.set_mood(*parsed);
@@ -412,16 +412,8 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         arg.view().starts_with(StringView{"--init-moods="}) ||
         arg.view().starts_with(StringView{"-L="}))
     {
-      StringView value{};
-      bool has_value = false;
-      if (let const eq = arg.view().find_character('='); eq.has_value()) {
-        value = arg.view().substring(*eq + 1);
-        has_value = true;
-      } else if (i + 1 < args.count()) {
-        value = args[++i].view();
-        has_value = true;
-      }
-      if (!has_value) {
+      let const value = do_read_option_value(arg);
+      if (!value.has_value()) {
         let out = String{cxt.scratch_allocator()};
         for (mimic_mood listed :
              {mimic_mood::Default, mimic_mood::Posix, mimic_mood::Bash})
@@ -436,9 +428,9 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       let moods = ArrayList<mimic_mood>{cxt.scratch_allocator()};
       usize name_start = 0;
-      for (usize j = 0; j <= value.length; j++) {
-        if (j != value.length && value[j] != ',') continue;
-        let const name = value.substring_of_length(name_start, j - name_start);
+      for (usize j = 0; j <= value->length; j++) {
+        if (j != value->length && (*value)[j] != ',') continue;
+        let const name = value->substring_of_length(name_start, j - name_start);
         name_start = j + 1;
         if (name.is_empty()) continue;
         let const parsed = parse_mood_name(name);

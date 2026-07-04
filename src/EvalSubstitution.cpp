@@ -13,6 +13,25 @@
 
 namespace shit {
 
+fn EvalContext::render_contained_substitution_error(std::exception_ptr error,
+                                                    StringView source) throws
+    -> void
+{
+  try {
+    std::rethrow_exception(error);
+  } catch (const ErrorWithLocationAndDetails &e) {
+    show_message(e.to_string(source));
+    show_message(e.details_to_string(source));
+    print_source_backtrace(e.location());
+  } catch (const ErrorWithLocation &e) {
+    show_message(e.to_string(source));
+    print_source_backtrace(e.location());
+  } catch (const Error &e) {
+    show_message(e.to_string());
+    print_source_backtrace();
+  }
+}
+
 static constexpr usize DRAIN_CHUNK_LENGTH = 4096;
 
 /* The drain thread reads the pipe into its own libc buffer while the inner
@@ -392,19 +411,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
        holds a fatal expansion error to the command substitution. */
     LOG(Debug,
         "the command substitution failed, containing the error with status 1");
-    try {
-      std::rethrow_exception(error);
-    } catch (const ErrorWithLocationAndDetails &e) {
-      show_message(e.to_string(source.view()));
-      show_message(e.details_to_string(source.view()));
-      print_source_backtrace(e.location());
-    } catch (const ErrorWithLocation &e) {
-      show_message(e.to_string(source.view()));
-      print_source_backtrace(e.location());
-    } catch (const Error &e) {
-      show_message(e.to_string());
-      print_source_backtrace();
-    }
+    render_contained_substitution_error(error, source.view());
     set_last_exit_status(1);
   }
 
@@ -503,19 +510,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   if (error) {
     LOG(Debug,
         "the function substitution failed, containing the error with status 1");
-    try {
-      std::rethrow_exception(error);
-    } catch (const ErrorWithLocationAndDetails &e) {
-      show_message(e.to_string(source.view()));
-      show_message(e.details_to_string(source.view()));
-      print_source_backtrace(e.location());
-    } catch (const ErrorWithLocation &e) {
-      show_message(e.to_string(source.view()));
-      print_source_backtrace(e.location());
-    } catch (const Error &e) {
-      show_message(e.to_string());
-      print_source_backtrace();
-    }
+    render_contained_substitution_error(error, source.view());
     set_last_exit_status(1);
   }
 
