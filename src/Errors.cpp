@@ -590,6 +590,10 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
 
   let result = String{heap_allocator()};
   result += color.location;
+  if (let const name = m_details_location.filename; name.has_value()) {
+    result += *name;
+    result += ':';
+  }
   result += String::from(details_line_number + 1, heap_allocator());
   result += ':';
   result += String::from(details_line_byte_position, heap_allocator());

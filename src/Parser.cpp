@@ -118,11 +118,13 @@ throw_unterminated(SourceLocation opener, StringView what, StringView source,
   if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())
   {
+    found->filename = opener.filename;
     throw ErrorWithLocationAndDetails{
         opener, what, *found,
         "This '" + keyword +
             "' was read as an argument, put a ';' or a newline before it"};
   }
+  fallback.filename = opener.filename;
   throw ErrorWithLocationAndDetails{opener, what, fallback,
                                     "Expected '" + keyword + "'"};
 }
