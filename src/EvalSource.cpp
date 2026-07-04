@@ -81,10 +81,34 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   LOG(Debug, "seeded the strict options for the %s mimicked run",
       is_mimic_strict ? "shit" : "lax");
 
+  let const script_filename = ec.program_path().text().view();
   let parser = Parser{
-      Lexer{String{contents->view()}, *AST_ARENA, false, None, mood()}
+      Lexer{String{contents->view()}, *AST_ARENA, false, script_filename, mood()}
   };
-  const Expression *ast = parser.construct_ast();
+
+  let const do_restore_pre_parse_state = [&]() {
+    m_runtime = previous_runtime;
+    m_is_script_run = previous_script_run;
+    ec.close_fds();
+  };
+
+  const Expression *ast;
+  try {
+    ast = parser.construct_ast();
+  } catch (const ErrorWithLocationAndDetails &detailed_error) {
+    do_restore_pre_parse_state();
+    show_message(detailed_error.to_string(contents->view()));
+    show_message(detailed_error.details_to_string(contents->view()));
+    return 1;
+  } catch (const ErrorWithLocation &located_error) {
+    do_restore_pre_parse_state();
+    show_message(located_error.to_string(contents->view()));
+    return 1;
+  } catch (const Error &caught_error) {
+    do_restore_pre_parse_state();
+    show_message(caught_error.to_string());
+    return 1;
+  }
   ASSERT(ast != nullptr);
 
   let previous_shell_name = String{m_shell_name};
