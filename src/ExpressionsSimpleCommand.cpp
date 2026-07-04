@@ -212,11 +212,6 @@ cold fn AssignCommand::to_string() const throws -> String
   return "Assign " + m_assignment->to_ast_string();
 }
 
-cold fn AssignCommand::to_ast_string(usize layer) const throws -> String
-{
-  return indent_for_layer(layer) + "[" + to_string() + "]";
-}
-
 SimpleCommand::SimpleCommand(SourceLocation location,
                              ArrayList<const Token *> &&args)
     : Command(location), m_args(steal(args))
@@ -1321,11 +1316,6 @@ cold fn SimpleCommand::to_string() const throws -> String
   if (is_async()) s += ", Async";
 
   return s;
-}
-
-cold fn SimpleCommand::to_ast_string(usize layer) const throws -> String
-{
-  return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
 } // namespace expressions

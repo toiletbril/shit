@@ -195,7 +195,6 @@ public:
   fn is_dummy() const wontthrow -> bool override;
 
   fn to_string() const throws -> String override;
-  fn to_ast_string(usize layer = 0) const throws -> String override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -260,7 +259,6 @@ public:
   fn is_assignment() const wontthrow -> bool override;
 
   fn to_string() const throws -> String override;
-  fn to_ast_string(usize layer = 0) const throws -> String override;
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
@@ -328,7 +326,6 @@ public:
   pure fn args() const wontthrow -> const ArrayList<const Token *> &;
 
   fn to_string() const throws -> String override;
-  fn to_ast_string(usize layer = 0) const throws -> String override;
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;

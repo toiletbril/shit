@@ -569,11 +569,6 @@ fn DummyExpression::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 cold fn DummyExpression::to_string() const throws -> String { return "Dummy"; }
 
-cold fn DummyExpression::to_ast_string(usize layer) const throws -> String
-{
-  return indent_for_layer(layer) + "[" + to_string() + "]";
-}
-
 cold fn SimpleCommand::register_defined_functions(
     AnalysisContext &actx) const throws -> void
 {

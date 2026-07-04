@@ -98,13 +98,37 @@ static fn manpage_section1_directories() throws -> ArrayList<Path>
   return directories;
 }
 
+static const StringView COMPRESSION_SUFFIXES[] = {
+    StringView{".gz"}, StringView{".xz"}, StringView{".zst"},
+    StringView{".bz2"}};
+
+static pure fn has_compression_suffix(StringView name) wontthrow -> bool
+{
+  for (let const tail : COMPRESSION_SUFFIXES) {
+    if (name.length > tail.length &&
+        name.substring(name.length - tail.length) == tail)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+static pure fn double_space_gap(StringView row, usize from) wontthrow -> usize
+{
+  for (usize j = from; j + 1 < row.length; j++) {
+    if (row[j] == ' ' && row[j + 1] == ' ') {
+      return j;
+    }
+  }
+  return row.length;
+}
+
 static pure fn strip_man1_suffix(StringView entry) wontthrow
     -> Maybe<StringView>
 {
   let name = entry;
-  for (let const tail : {StringView{".gz"}, StringView{".xz"},
-                         StringView{".zst"}, StringView{".bz2"}})
-  {
+  for (let const tail : COMPRESSION_SUFFIXES) {
     if (name.length > tail.length &&
         name.substring(name.length - tail.length) == tail)
     {
@@ -226,14 +250,10 @@ static fn man_subcommand_page_is_valid(StringView command,
 
   /* A compressed page cannot be scanned without a decompressor. */
   let const path_view = file_path->view();
-  for (let const tail : {StringView{".gz"}, StringView{".xz"},
-                         StringView{".zst"}, StringView{".bz2"}})
-    if (path_view.length > tail.length &&
-        path_view.substring(path_view.length - tail.length) == tail)
-    {
-      MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), true);
-      return true;
-    }
+  if (has_compression_suffix(path_view)) {
+    MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), true);
+    return true;
+  }
 
   let source = Path{file_path->view()}.read_entire_file();
   if (!source.has_value()) {
@@ -426,12 +446,7 @@ static fn parse_manpage_option_entries(StringView text) throws
     do_finalize_pending();
     if (raw[indent] != '-') continue;
 
-    let gap = raw.length;
-    for (usize j = indent; j + 1 < raw.length; j++)
-      if (raw[j] == ' ' && raw[j + 1] == ' ') {
-        gap = j;
-        break;
-      }
+    let const gap = double_space_gap(raw, indent);
     let const option_part = raw.substring_of_length(indent, gap - indent);
     pending_flags = extract_dash_flags(option_part);
     pending_indent = indent;
@@ -646,12 +661,7 @@ static fn parse_help_option_entries(StringView text) throws
     let const start = skip_blanks(raw, 0);
     if (start >= raw.length || raw[start] != '-') continue;
 
-    let gap = raw.length;
-    for (usize j = start; j + 1 < raw.length; j++)
-      if (raw[j] == ' ' && raw[j + 1] == ' ') {
-        gap = j;
-        break;
-      }
+    let const gap = double_space_gap(raw, start);
     let const option_part = raw.substring_of_length(start, gap - start);
 
     let description = StringView{};
@@ -787,12 +797,7 @@ static fn parse_help_subcommands(StringView text) throws
       continue;
     }
 
-    let column_end = trimmed.length;
-    for (usize j = 0; j + 1 < trimmed.length; j++)
-      if (trimmed[j] == ' ' && trimmed[j + 1] == ' ') {
-        column_end = j;
-        break;
-      }
+    let const column_end = double_space_gap(trimmed, 0);
 
     let description = StringView{};
     if (column_end < trimmed.length)

@@ -161,6 +161,24 @@ fn append_utf8_code_point(String &out, u32 code_point) throws -> void
   out += static_cast<char>(0x80 | (code_point & 0x3F));
 }
 
+fn append_simple_escape(String &out, char e) throws -> void
+{
+  switch (e) {
+  case 'n': out += '\n'; break;
+  case 't': out += '\t'; break;
+  case 'r': out += '\r'; break;
+  case 'a': out += '\a'; break;
+  case 'b': out += '\b'; break;
+  case 'f': out += '\f'; break;
+  case 'v': out += '\v'; break;
+  case '\\': out += '\\'; break;
+  default:
+    out += '\\';
+    out += e;
+    break;
+  }
+}
+
 fn append_escape(String &out, const String &fmt, usize &i) throws -> void
 {
   ASSERT(i < fmt.length());
@@ -214,20 +232,7 @@ fn append_escape(String &out, const String &fmt, usize &i) throws -> void
     return;
   }
 
-  switch (e) {
-  case 'n': out += '\n'; break;
-  case 't': out += '\t'; break;
-  case 'r': out += '\r'; break;
-  case 'a': out += '\a'; break;
-  case 'b': out += '\b'; break;
-  case 'f': out += '\f'; break;
-  case 'v': out += '\v'; break;
-  case '\\': out += '\\'; break;
-  default:
-    out += '\\';
-    out += e;
-    break;
-  }
+  append_simple_escape(out, e);
 }
 
 /* Returns true when a \c was seen so the caller can abort the whole printf. */
@@ -273,20 +278,7 @@ fn append_b_argument(String &out, const String &arg) throws -> bool
       continue;
     }
     i++;
-    switch (e) {
-    case 'n': out += '\n'; break;
-    case 't': out += '\t'; break;
-    case 'r': out += '\r'; break;
-    case 'a': out += '\a'; break;
-    case 'b': out += '\b'; break;
-    case 'f': out += '\f'; break;
-    case 'v': out += '\v'; break;
-    case '\\': out += '\\'; break;
-    default:
-      out += '\\';
-      out += e;
-      break;
-    }
+    append_simple_escape(out, e);
   }
   return false;
 }
