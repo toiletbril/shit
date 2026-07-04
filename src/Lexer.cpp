@@ -117,6 +117,11 @@ hot pure fn is_variable_name(char ch) wontthrow -> bool
   return is_variable_name_start(ch) || is_number(ch);
 }
 
+pure fn is_extglob_operator(char ch) wontthrow -> bool
+{
+  return ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!';
+}
+
 hot pure fn is_special_parameter_char(char ch) wontthrow -> bool
 {
   return ch == '?' || ch == '!' || ch == '#' || ch == '$' || ch == '*' ||
@@ -506,8 +511,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
     /* An extended-glob group such as @(a|b) is captured whole so its (, nested
        |, and ) stay in the word for the matcher. */
-    if (!is_inside_quote_or_escape &&
-        (ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!') &&
+    if (!is_inside_quote_or_escape && lexer::is_extglob_operator(ch) &&
         chop_character(byte_count + 1) == '(')
     {
       const let group_start = byte_count;
@@ -523,8 +527,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
       /* The run stops before an extglob opener such as the ? of ?( so the group
          capture above takes it on the next turn. */
       let do_opens_extglob_at = [this](usize offset) -> bool {
-        const char c = chop_character(offset);
-        return (c == '?' || c == '*' || c == '+' || c == '@' || c == '!') &&
+        return lexer::is_extglob_operator(chop_character(offset)) &&
                chop_character(offset + 1) == '(';
       };
       while (!do_opens_extglob_at(byte_count)) {

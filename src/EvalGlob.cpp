@@ -3,6 +3,7 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
+#include "Lexer.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "Trace.hpp"
@@ -153,8 +154,7 @@ hot pure fn first_active_glob(StringView text, const Bitset &mask,
     if (i >= mask.count() || !mask[i]) continue;
 
     let const ch = text.data[i];
-    if (extglob && i + 1 < text.length &&
-        (ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!') &&
+    if (extglob && i + 1 < text.length && lexer::is_extglob_operator(ch) &&
         text.data[i + 1] == '(')
     {
       return i;
