@@ -888,28 +888,33 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     return redirection_status;
   }
 
+  /* The append form reads the current value from the shell store first so a
+     non-exported shell variable still contributes. An integer name evaluates
+     the join to its decimal here. */
+  let do_apply_append = [&](StringView name, String &value_ref) throws {
+    let appended = String{cxt.scratch_allocator()};
+    if (let const existing = cxt.get_variable_value(name))
+      appended.append(existing->view());
+    if (cxt.is_integer_variable(name)) {
+      cxt.append_integer_expression(appended, value_ref.view());
+      char decimal[24];
+      value_ref = String{
+          cxt.scratch_allocator(),
+          utils::int_to_text_into(cxt.evaluate_arithmetic(appended.view()),
+                                  decimal, sizeof(decimal))};
+    } else {
+      appended += value_ref;
+      value_ref = steal(appended);
+    }
+  };
+
   /* An expansion may drop every word. A command-less line still carries its
      assignments, which persist in the current shell. */
   if (program_args.is_empty()) {
     for (let const &var : m_local_vars) {
       const StringView name = var.name.view();
       let value = cxt.expand_word_for_assignment(var.value);
-      if (var.is_append) {
-        let appended = String{cxt.scratch_allocator()};
-        if (let const existing = cxt.get_variable_value(name))
-          appended.append(existing->view());
-        if (cxt.is_integer_variable(name)) {
-          cxt.append_integer_expression(appended, value.view());
-          char decimal[24];
-          value = String{
-              cxt.scratch_allocator(),
-              utils::int_to_text_into(cxt.evaluate_arithmetic(appended.view()),
-                                      decimal, sizeof(decimal))};
-        } else {
-          appended += value;
-          value = steal(appended);
-        }
-      }
+      if (var.is_append) do_apply_append(name, value);
       cxt.set_shell_variable(name, value);
       if (cxt.export_all()) {
         cxt.record_environment_change(name);
@@ -974,25 +979,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     } catch (const Error &e) {
       relocate_error(e, source_location());
     }
-    /* The append form reads the current value from the shell store first so a
-       non-exported shell variable still contributes. An integer name evaluates
-       the join to its decimal here. */
-    if (var.is_append) {
-      let appended = String{cxt.scratch_allocator()};
-      if (let const existing = cxt.get_variable_value(name))
-        appended.append(existing->view());
-      if (cxt.is_integer_variable(name)) {
-        cxt.append_integer_expression(appended, expanded_value.view());
-        char decimal[24];
-        expanded_value = String{
-            cxt.scratch_allocator(),
-            utils::int_to_text_into(cxt.evaluate_arithmetic(appended.view()),
-                                    decimal, sizeof(decimal))};
-      } else {
-        appended += expanded_value;
-        expanded_value = steal(appended);
-      }
-    }
+    if (var.is_append) do_apply_append(name, expanded_value);
 
     /* A special builtin keeps the assignment outside the bash mood, so it
        commits to the store. The bash mood drops it after the command, so it
