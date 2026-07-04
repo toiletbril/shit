@@ -19,6 +19,9 @@ public:
     Cd,
     Exit,
     Pwd,
+    Pushd,
+    Popd,
+    Dirs,
     Export,
     Break,
     Continue,
@@ -85,6 +88,9 @@ inline constexpr static_string_entry<Builtin::Kind> BUILTIN_ENTRIES[] = {
     {SSK("exit"),      Builtin::Kind::Exit          },
     {SSK("cd"),        Builtin::Kind::Cd            },
     {SSK("pwd"),       Builtin::Kind::Pwd           },
+    {SSK("pushd"),     Builtin::Kind::Pushd         },
+    {SSK("popd"),      Builtin::Kind::Popd          },
+    {SSK("dirs"),      Builtin::Kind::Dirs          },
     {SSK("export"),    Builtin::Kind::Export        },
     {SSK("break"),     Builtin::Kind::Break         },
     {SSK("continue"),  Builtin::Kind::Continue      },
@@ -152,6 +158,9 @@ inline constexpr StaticStringMap BUILTINS{BUILTIN_ENTRIES};
   B_CASE(Cd);                                                                  \
   B_CASE(Exit);                                                                \
   B_CASE(Pwd);                                                                 \
+  B_CASE(Pushd);                                                               \
+  B_CASE(Popd);                                                                \
+  B_CASE(Dirs);                                                                \
   B_CASE(Export);                                                              \
   B_CASE(Break);                                                               \
   B_CASE(Continue);                                                            \
@@ -213,6 +222,9 @@ inline constexpr StaticStringMap BUILTINS{BUILTIN_ENTRIES};
 BUILTIN_STRUCT(Echo);
 BUILTIN_STRUCT(Cd);
 BUILTIN_STRUCT(Pwd);
+BUILTIN_STRUCT(Pushd);
+BUILTIN_STRUCT(Popd);
+BUILTIN_STRUCT(Dirs);
 BUILTIN_STRUCT(Export);
 BUILTIN_STRUCT(Break);
 BUILTIN_STRUCT(Continue);
@@ -353,6 +365,24 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
    digits, and underscores, the shell's rule for an export or readonly target.
  */
 pure fn name_is_valid_identifier(StringView name) wontthrow -> bool;
+
+/* pushd, popd, and dirs share these. The cd runs through the cd builtin so the
+   logical PWD, OLDPWD, and the -L rules stay in one place. The stack print
+   shows the current directory first, then the saved stack from the top down,
+   with the home directory abbreviated to ~ unless no_tilde is set. */
+fn run_cd_to_directory(EvalContext &cxt, const ExecContext &ec,
+                       StringView target) throws -> i32;
+fn print_directory_stack(EvalContext &cxt, const ExecContext &ec,
+                         bool one_per_line, bool numbered, bool no_tilde) throws
+    -> void;
+
+/* A +N or -N stack argument names an index into the ring of ring_count entries,
+   the current directory at zero then the saved stack from the top. N counts
+   from the top for +N and from the bottom for -N. False means the argument is
+   not a rotation, and an out-of-range N throws. */
+fn parse_directory_stack_rotation(StringView arg, usize ring_count,
+                                  const ExecContext &ec,
+                                  usize &index_out) throws -> bool;
 
 /* The value a declare -x, declare -r, or declare -p line wraps in double
    quotes, with the characters special inside double quotes escaped, so the

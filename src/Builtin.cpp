@@ -3,7 +3,10 @@
 #include "Cli.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Eval.hpp"
+#include "Path.hpp"
 #include "Platform.hpp"
+#include "ResolvedCommand.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -247,6 +250,93 @@ pure fn name_is_valid_identifier(StringView name) wontthrow -> bool
   }
 
   return true;
+}
+
+fn run_cd_to_directory(EvalContext &cxt, const ExecContext &ec,
+                       StringView target) throws -> i32
+{
+  ArrayList<String> cd_args{heap_allocator()};
+  cd_args.push(String{"cd"});
+  cd_args.push(String{target});
+  let routed = ExecContext::from_resolved(
+      ec.source_location(), ResolvedCommand::from_builtin(Builtin::Kind::Cd),
+      steal(cd_args));
+  return execute_builtin(steal(routed), cxt);
+}
+
+static fn abbreviate_home_directory(StringView path, Allocator allocator) throws
+    -> String
+{
+  let const home = os::get_home_directory();
+  if (home.has_value()) {
+    let const home_view = home->text().view();
+    if (path == home_view) return String{allocator, "~"};
+    if (path.length > home_view.length && path.starts_with(home_view) &&
+        path[home_view.length] == '/')
+    {
+      let result = String{allocator, "~"};
+      result.append(path.substring(home_view.length));
+      return result;
+    }
+  }
+  return String{allocator, path};
+}
+
+fn parse_directory_stack_rotation(StringView arg, usize ring_count,
+                                  const ExecContext &ec,
+                                  usize &index_out) throws -> bool
+{
+  if (arg.length < 2 || (arg[0] != '+' && arg[0] != '-')) return false;
+  let const digits = arg.substring(1);
+  if (!digits.is_all_decimal_digits()) return false;
+
+  let const parsed = digits.to<i64>();
+  if (parsed.is_error()) return false;
+  let const number = static_cast<usize>(parsed.value());
+  if (number >= ring_count) {
+    throw ErrorWithLocationAndDetails{
+        ec.source_location(),
+        StringView{"the directory stack rotation '"} + arg +
+            "' is past the end of the stack",
+        "Run `dirs -v` to see the numbered stack"};
+  }
+
+  index_out = arg[0] == '+' ? number : ring_count - 1 - number;
+  return true;
+}
+
+fn print_directory_stack(EvalContext &cxt, const ExecContext &ec,
+                         bool one_per_line, bool numbered, bool no_tilde) throws
+    -> void
+{
+  let const &stack = cxt.directory_stack();
+  let const pwd = cxt.get_variable_value("PWD").value_or(
+      String{cxt.scratch_allocator(), Path::current_directory().text().view()});
+
+  /* The current directory is index zero, then the saved stack from the top,
+     which is its back, down to its front. */
+  ArrayList<StringView> full{cxt.scratch_allocator()};
+  full.push(pwd.view());
+  for (usize i = stack.count(); i > 0; i--)
+    full.push(stack[i - 1].view());
+
+  let out = String{cxt.scratch_allocator()};
+  for (usize i = 0; i < full.count(); i++) {
+    if (numbered) {
+      out += String::from(i, cxt.scratch_allocator());
+      out += "  ";
+    }
+    if (no_tilde)
+      out.append(full[i]);
+    else
+      out.append(
+          abbreviate_home_directory(full[i], cxt.scratch_allocator()).view());
+    if (one_per_line || numbered || i + 1 == full.count())
+      out += '\n';
+    else
+      out += ' ';
+  }
+  ec.print_to_stdout(out);
 }
 
 } /* namespace shit */

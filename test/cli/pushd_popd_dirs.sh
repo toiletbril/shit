@@ -1,0 +1,30 @@
+unset SHIT_FLAGS
+# pushd saves the current directory and changes to its argument, dirs prints the
+# stack with the current directory first, popd returns to the top, and +N or -N
+# rotates or drops an entry. The home directory abbreviates to ~.
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+mkdir -p "$dir/a" "$dir/b" "$dir/c"
+
+scrub() { sed "s|$dir|D|g"; }
+
+echo "== dirs on an empty stack shows only the current directory:"
+"$BIN" -c "cd '$dir'; dirs" 2>&1 | scrub
+echo "== pushd builds the stack, current first:"
+"$BIN" -c "cd '$dir'; pushd '$dir/a'; pushd '$dir/b'; dirs" 2>&1 | scrub
+echo "== dirs -v numbers each entry from the top:"
+"$BIN" -c "cd '$dir'; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; dirs -v" 2>&1 | scrub
+echo "== popd returns through the stack:"
+"$BIN" -c "cd '$dir'; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; popd; popd; echo PWD=\$PWD" 2>&1 | scrub
+echo "== pushd with no argument swaps the top two:"
+"$BIN" -c "cd '$dir'; pushd '$dir/a' >/dev/null; pushd; echo PWD=\$PWD" 2>&1 | scrub
+echo "== pushd +1 rotates the Nth entry to the top:"
+"$BIN" -c "cd '$dir'; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; pushd +1; echo PWD=\$PWD" 2>&1 | scrub
+echo "== popd +1 drops a saved entry without a chdir:"
+"$BIN" -c "cd '$dir'; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; popd +1; dirs; echo PWD=\$PWD" 2>&1 | scrub
+echo "== dirs -c clears the stack:"
+"$BIN" -c "cd '$dir'; pushd '$dir/a' >/dev/null; dirs -c; dirs" 2>&1 | scrub
+echo "== the home directory abbreviates to ~:"
+HOME="$dir" "$BIN" -c "cd '$dir'; pushd '$dir/a'" 2>&1 | scrub
+echo "== popd on an empty stack reports an error:"
+"$BIN" -c "cd '$dir'; popd" 2>&1 | scrub | sed 's/^shit: [0-9]*:[0-9]*: //'

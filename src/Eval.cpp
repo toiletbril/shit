@@ -853,6 +853,11 @@ fn EvalContext::set_positional_params(ArrayList<String> params) wontthrow
   m_positional_params = steal(params);
 }
 
+fn EvalContext::directory_stack() wontthrow -> ArrayList<String> &
+{
+  return m_directory_stack;
+}
+
 fn EvalContext::take_positional_params() wontthrow -> ArrayList<String>
 {
   return steal(m_positional_params);

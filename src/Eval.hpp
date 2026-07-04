@@ -420,6 +420,8 @@ public:
   pure fn positional_params() const wontthrow -> const ArrayList<String> &;
   fn set_positional_params(ArrayList<String> params) wontthrow -> void;
 
+  fn directory_stack() wontthrow -> ArrayList<String> &;
+
   /* Move the positional parameters out, so a function call saves the caller's
      without a deep copy and restores them by moving the saved list back. */
   fn take_positional_params() wontthrow -> ArrayList<String>;
@@ -1212,6 +1214,10 @@ protected:
   String m_current_command{heap_allocator()};
   bool m_make_shell_suppressed{false};
   ArrayList<String> m_positional_params{heap_allocator()};
+  /* The saved directories below the current one, back is the top of the stack.
+     pushd appends the current directory, popd drops the back and moves to it.
+   */
+  ArrayList<String> m_directory_stack{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
   StringMap<const Expression *> m_functions{heap_allocator()};
   /* The definition text of each function, kept on the heap since a function

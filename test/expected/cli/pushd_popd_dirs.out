@@ -1,0 +1,33 @@
+== dirs on an empty stack shows only the current directory:
+D
+== pushd builds the stack, current first:
+D/a D
+D/b D/a D
+D/b D/a D
+== dirs -v numbers each entry from the top:
+0  D/b
+1  D/a
+2  D
+== popd returns through the stack:
+D/a D
+D
+PWD=D
+== pushd with no argument swaps the top two:
+D D/a
+PWD=D
+== pushd +1 rotates the Nth entry to the top:
+D/a D D/b
+PWD=D/a
+== popd +1 drops a saved entry without a chdir:
+D/b D
+D/b D
+PWD=D/b
+== dirs -c clears the stack:
+D/a
+== the home directory abbreviates to ~:
+~/a ~
+== popd on an empty stack reports an error:
+error: popd found the directory stack empty.
+     1 |  cd 'D'; popd
+       |                            ^~~~ here.
+note: Push a directory first with `pushd DIR`.
