@@ -1,6 +1,8 @@
 #include "Path.hpp"
 
+#include "PackedStringKey.hpp"
 #include "Platform.hpp"
+#include "StaticStringMap.hpp"
 #include "Trace.hpp"
 
 namespace shit {
@@ -380,10 +382,14 @@ fn Path::detect_mimic_shell() const throws -> Maybe<mimic_mood>
     }
   }
 
-  if (shell == "sh" || shell == "dash") return mimic_mood::Posix;
-  if (shell == "bash") return mimic_mood::Bash;
-  if (shell == "shit") return mimic_mood::Default;
-  return None;
+  static constexpr static_string_entry<mimic_mood> SHELL_ENTRIES[] = {
+      {SSK("sh"),   mimic_mood::Posix  },
+      {SSK("dash"), mimic_mood::Posix  },
+      {SSK("bash"), mimic_mood::Bash   },
+      {SSK("shit"), mimic_mood::Default},
+  };
+  static constexpr StaticStringMap SHELL_MOODS{SHELL_ENTRIES};
+  return SHELL_MOODS.find(shell);
 }
 
 PathBuilder::PathBuilder(StringView root) : m_text(root) {}

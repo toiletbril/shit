@@ -601,26 +601,10 @@ static fn resolve_listing_directory(StringView directory_part,
   if (directory_part.is_empty()) return base_directory;
 
   /* An unknown name leaves the tilde literal. */
-  if (directory_part[0] == '~') {
-    usize name_end = 1;
-    while (name_end < directory_part.length && directory_part[name_end] != '/')
-      name_end++;
-    let const name = directory_part.substring_of_length(1, name_end - 1);
-    let home = name.is_empty() ? os::get_home_directory()
-                               : os::get_home_for_user(name);
-    if (home.has_value()) {
-      let resolved_path = home->clone();
-      let rest_start = name_end;
-      if (rest_start < directory_part.length &&
-          directory_part[rest_start] == '/')
-      {
-        rest_start++;
-      }
-      if (rest_start < directory_part.length) {
-        resolved_path.push_component(directory_part.substring(rest_start));
-      }
-      return resolved_path;
-    }
+  if (Maybe<String> expanded = utils::expand_leading_tilde_path(directory_part);
+      expanded.has_value())
+  {
+    return Path{expanded->view()};
   }
 
   let const directory = Path{directory_part};

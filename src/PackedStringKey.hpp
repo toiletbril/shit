@@ -68,8 +68,11 @@ public:
      NUL-padded query stand in for a shorter name. */
   hot mustuse pure fn packed_length() const wontthrow -> usize
   {
-    for (usize i = 0; i < BYTE_CAPACITY; i++)
-      if (((words[i / 8] >> (8 * (i % 8))) & 0xFF) == 0) return i;
+    for (usize k = 0; k < WORD_COUNT; k++) {
+      let const w = words[k];
+      let const z = (w - 0x0101010101010101ull) & ~w & 0x8080808080808080ull;
+      if (z != 0) return k * 8 + static_cast<usize>(__builtin_ctzll(z) >> 3);
+    }
     return BYTE_CAPACITY;
   }
 

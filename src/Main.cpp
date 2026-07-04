@@ -9,10 +9,12 @@
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
+#include "PackedStringKey.hpp"
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "Shitbox.hpp"
+#include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -192,14 +194,16 @@ static fn run_debug_highlight_driver(StringView driver_line,
 
 pure static fn parse_mood_name(StringView name) wontthrow -> Maybe<mimic_mood>
 {
-  if (name == "shit" || name == "default") {
-    return mimic_mood::Default;
-  }
-  if (name == "bash") return mimic_mood::Bash;
-  if (name == "sh" || name == "posix" || name == "dash") {
-    return mimic_mood::Posix;
-  }
-  return None;
+  static constexpr static_string_entry<mimic_mood> MOOD_ENTRIES[] = {
+      {SSK("shit"),    mimic_mood::Default},
+      {SSK("default"), mimic_mood::Default},
+      {SSK("bash"),    mimic_mood::Bash   },
+      {SSK("sh"),      mimic_mood::Posix  },
+      {SSK("posix"),   mimic_mood::Posix  },
+      {SSK("dash"),    mimic_mood::Posix  },
+  };
+  static constexpr StaticStringMap MOODS{MOOD_ENTRIES};
+  return MOODS.find(name);
 }
 
 /* The session mood, from --mood when given, then the invocation mood, then the
