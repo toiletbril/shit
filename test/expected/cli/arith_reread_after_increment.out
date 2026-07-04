@@ -1,0 +1,2 @@
+== a re-read arithmetic variable is not folded stale after a side effect:
+5 6 6

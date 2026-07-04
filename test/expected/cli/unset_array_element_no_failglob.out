@@ -1,0 +1,2 @@
+== unset of an array element is not glob-expanded under failglob:
+x z

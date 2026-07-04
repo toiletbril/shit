@@ -1,0 +1,2 @@
+== a long flag matches its whole name, not a prefix:
+error: Unknown flag '--helpXYZ'.

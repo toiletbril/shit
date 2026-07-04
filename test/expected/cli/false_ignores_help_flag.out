@@ -1,0 +1,2 @@
+== false ignores --help and returns 1:
+rc=1
