@@ -406,6 +406,7 @@ public:
     return m_field_separators.view();
   }
   fn get_variable_value(StringView name) const throws -> Maybe<String>;
+  fn get_variable_value_checked(StringView name) const throws -> Maybe<String>;
 
   fn append_dynamic_variable_names(ArrayList<StringView> &out) const throws
       -> void;

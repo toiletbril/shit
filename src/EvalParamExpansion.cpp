@@ -703,13 +703,20 @@ fn find_substring_length_separator(StringView body) wontthrow -> usize
   return body.length;
 }
 
-fn EvalContext::apply_substring_expansion(StringView name,
-                                          StringView body) throws -> String
+fn EvalContext::get_variable_value_checked(StringView name) const throws
+    -> Maybe<String>
 {
-  let const current = get_variable_value(name);
+  let current = get_variable_value(name);
   if (m_runtime.error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
+  return current;
+}
+
+fn EvalContext::apply_substring_expansion(StringView name,
+                                          StringView body) throws -> String
+{
+  let const current = get_variable_value_checked(name);
   return apply_substring_to_value(
       current.value_or(String{scratch_allocator()}).view(), body);
 }
@@ -799,10 +806,7 @@ static fn longest_pattern_match_at(StringView pattern,
 fn EvalContext::apply_pattern_replacement(StringView name,
                                           StringView spec) throws -> String
 {
-  let const current = get_variable_value(name);
-  if (m_runtime.error_unset && !current.has_value())
-    throw_script_fatal("Unable to expand '" + name +
-                       "' because the parameter is not set");
+  let const current = get_variable_value_checked(name);
   return pattern_replace_value(current.value_or(String{scratch_allocator()}),
                                spec);
 }
@@ -940,10 +944,7 @@ static fn append_shell_quoted(String &out, StringView arg) throws -> void
 fn EvalContext::apply_parameter_transform(StringView name, char op) throws
     -> String
 {
-  let const value = get_variable_value(name);
-  if (m_runtime.error_unset && !value.has_value())
-    throw_script_fatal("Unable to expand '" + name +
-                       "' because the parameter is not set");
+  let const value = get_variable_value_checked(name);
 
   if (!value.has_value()) return String{scratch_allocator()};
 
@@ -1029,10 +1030,7 @@ fn EvalContext::apply_parameter_transform_to_value(StringView text, char op,
 fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
     -> String
 {
-  let const current = get_variable_value(name);
-  if (m_runtime.error_unset && !current.has_value())
-    throw_script_fatal("Unable to expand '" + name +
-                       "' because the parameter is not set");
+  let const current = get_variable_value_checked(name);
   return apply_case_modification_to_value(
       current.value_or(String{scratch_allocator()}).view(), spec);
 }
