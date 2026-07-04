@@ -474,12 +474,6 @@ hot fn EvalContext::expand_word(const Word &word) throws
           }
           break;
         }
-      }
-      if (lexer::is_variable_name_start(segment_text[0])) {
-        usize name_end = 1;
-        while (name_end < segment_text.length &&
-               lexer::is_variable_name(segment_text[name_end]))
-          name_end++;
         const char field_modifier_op = name_end + 3 < segment_text.length
                                            ? segment_text[name_end + 3]
                                            : '\0';
@@ -533,12 +527,6 @@ hot fn EvalContext::expand_word(const Word &word) throws
           }
           break;
         }
-      }
-      if (lexer::is_variable_name_start(segment_text[0])) {
-        usize name_end = 1;
-        while (name_end < segment_text.length &&
-               lexer::is_variable_name(segment_text[name_end]))
-          name_end++;
         if (name_end + 3 < segment_text.length &&
             segment_text[name_end] == '[' &&
             (segment_text[name_end + 1] == '@' ||
@@ -595,12 +583,6 @@ hot fn EvalContext::expand_word(const Word &word) throws
             break;
           }
         }
-      }
-      if (lexer::is_variable_name_start(segment_text[0])) {
-        usize name_end = 1;
-        while (name_end < segment_text.length &&
-               lexer::is_variable_name(segment_text[name_end]))
-          name_end++;
         let const rest = segment_text.substring(name_end);
         let const is_colon_form = !rest.is_empty() && rest[0] == ':';
         let const op_index = is_colon_form ? usize{1} : usize{0};
