@@ -1168,7 +1168,8 @@ static constexpr usize MAX_FUNCTION_CALL_DEPTH = 900;
 static constexpr usize MAX_SUBSTITUTION_DEPTH = 128;
 static constexpr usize MAX_PARAMETER_EXPANSION_DEPTH = 256;
 
-static fn guard_located_depth(usize current_depth, usize cap, const char *what,
+static fn guard_located_depth(usize current_depth, usize cap,
+                              [[maybe_unused]] const char *what,
                               SourceLocation location) throws -> void
 {
   if (current_depth >= cap) {
