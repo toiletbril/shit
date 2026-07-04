@@ -81,6 +81,10 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
 
   let const &name = m_assignment->key();
 
+  /* A PATH assignment leaves the runtime search path unknown to the prepass, so
+     a later command's not-found check stays quiet. */
+  if (name.view() == "PATH") actx.should_silence_unresolved_commands = true;
+
   /* An element assignment a[i]=v changes what $a reads without recording a
      scalar literal, so the base name before the bracket is forgotten. */
   if (let const bracket = name.view().find_character('['); bracket.has_value())

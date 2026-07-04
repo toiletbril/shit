@@ -745,6 +745,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
 
   optimizer::optimize_node(this, actx);
 
+  /* A PATH=... prefix leaves the runtime search path unknown to the prepass, so
+     the not-found check for the prefixed command and everything after it stays
+     quiet. */
+  for (let const &var : m_local_vars)
+    if (var.name.view() == "PATH") actx.should_silence_unresolved_commands = true;
+
   if (m_args.is_empty()) return;
 
   ASSERT(m_args[0] != nullptr);
@@ -775,6 +781,23 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                 ->word()
                 .to_literal_string()
           : m_args[0]->raw_string();
+
+  /* An assignment builtin that sets PATH also leaves the runtime search path
+     unknown to the prepass. */
+  if (name.has_value() &&
+      (ASSIGNMENT_BUILTINS.contains(name->view()) || *name == "unset"))
+  {
+    for (usize i = 1; i < m_args.count(); i++) {
+      let const word =
+          m_args[i]->kind() == Token::Kind::Word
+              ? static_cast<const tokens::WordToken *>(m_args[i])
+                    ->word()
+                    .to_literal_string()
+              : m_args[i]->raw_string();
+      if (operand_target_name(word.view()) == "PATH")
+        actx.should_silence_unresolved_commands = true;
+    }
+  }
 
   /* A user-defined function or alias of a builtin name runs that user code, so
      a lint that keys on the builtin name must stay quiet here. */
