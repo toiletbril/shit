@@ -705,6 +705,23 @@ constexpr PackedStringKey SYSTEM_DIRECTORY_KEYS[] = {
 };
 constexpr StaticStringSet SYSTEM_DIRECTORIES{SYSTEM_DIRECTORY_KEYS};
 
+constexpr PackedStringKey TEST_COMMAND_KEYS[] = {SSK("["), SSK("test"),
+                                                 SSK("[[")};
+constexpr StaticStringSet TEST_COMMANDS{TEST_COMMAND_KEYS};
+
+constexpr PackedStringKey DECLARATION_BUILTIN_KEYS[] = {
+    SSK("local"), SSK("declare"), SSK("typeset")};
+constexpr StaticStringSet DECLARATION_BUILTINS{DECLARATION_BUILTIN_KEYS};
+
+constexpr PackedStringKey RUNTIME_DEFINER_KEYS[] = {SSK("."), SSK("source"),
+                                                    SSK("eval"), SSK("alias")};
+constexpr StaticStringSet RUNTIME_DEFINER_COMMANDS{RUNTIME_DEFINER_KEYS};
+
+constexpr PackedStringKey ASSIGNMENT_BUILTIN_KEYS[] = {
+    SSK("export"), SSK("readonly"), SSK("local"), SSK("declare"),
+    SSK("typeset")};
+constexpr StaticStringSet ASSIGNMENT_BUILTINS{ASSIGNMENT_BUILTIN_KEYS};
+
 constexpr PackedStringKey VARIABLE_PROBE_COMMAND_KEYS[] = {
     SSK("["), SSK("test"), SSK("[["), SSK("unset"), SSK("let"), SSK("eval"),
 };
@@ -742,8 +759,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   /* local, declare, and typeset name variables that stay inside the function,
      so their names are recorded and the leak warning stays quiet for a later
      assignment. */
-  if (actx.function_scope_depth > 0 &&
-      (name == "local" || name == "declare" || name == "typeset"))
+  if (actx.function_scope_depth > 0 && name.has_value() &&
+      DECLARATION_BUILTINS.contains(name->view()))
   {
     for (usize i = 1; i < m_args.count(); i++) {
       let const word = m_args[i]->kind() == Token::Kind::Word
@@ -773,9 +790,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* A dot, source, eval, or alias runs or defines code the prepass cannot see,
      so any later unresolved command must not be a hard failure. */
-  if (command_literal == "." || command_literal == "source" ||
-      command_literal == "eval" || command_literal == "alias")
-  {
+  if (RUNTIME_DEFINER_COMMANDS.contains(command_literal.view())) {
     LOG(Debug,
         "'%s' may define commands at run time, later resolution failures "
         "degrade to warnings",
@@ -810,9 +825,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   /* An unquoted variable inside a test silently breaks when it is empty or
      splits. This stays a warning even at the strict default, since the split
      may be intended. */
-  if (command_literal == "[" || command_literal == "test" ||
-      command_literal == "[[")
-  {
+  if (TEST_COMMANDS.contains(command_literal.view())) {
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
@@ -1018,9 +1031,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      shellcheck SC2046. An assignment-builtin operand such as export FOO=$(cmd)
      does not split in assignment context. */
   let const command_is_assignment_builtin =
-      command_literal == "export" || command_literal == "readonly" ||
-      command_literal == "local" || command_literal == "declare" ||
-      command_literal == "typeset";
+      ASSIGNMENT_BUILTINS.contains(command_literal.view());
 
   /* A declaration builtin that assigns from a command substitution, such as
      local x=$(cmd), reports its own success rather than the command's status,
