@@ -142,7 +142,9 @@ located-and-details form. The
 shell normalizes SIGPIPE, SIG_IGN for the main shell and SIG_DFL in a forked
 child so a producer dies with status 141. The cd builtin resolves a relative
 operand against the logical PWD, the bash -L mode, and cd .. lexically pops the
-last component. PIPESTATUS is published after every foreground command.
+last component. The pushd, popd, and dirs builtins carry a directory stack on
+EvalContext and route every chdir through the cd builtin, so the logical PWD and
+OLDPWD stay in one place. PIPESTATUS is published after every foreground command.
 
 ## Header factoring and value-type methods
 
