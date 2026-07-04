@@ -349,6 +349,11 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
 fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
                       StringView program_name) throws -> i32;
 
+/* A name that opens with a letter or underscore and carries only letters,
+   digits, and underscores, the shell's rule for an export or readonly target.
+ */
+pure fn name_is_valid_identifier(StringView name) wontthrow -> bool;
+
 /* The value a declare -x, declare -r, or declare -p line wraps in double
    quotes, with the characters special inside double quotes escaped, so the
    printed line reloads to the same value the way bash quotes it. */

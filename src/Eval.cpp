@@ -250,7 +250,7 @@ fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 fn EvalContext::append_indexed_array(StringView name,
                                      ArrayList<String> values) throws -> void
 {
-  if (let *existing = m_indexed_arrays.find(name)) {
+  if (let *existing = m_indexed_arrays.find(name); existing != nullptr) {
     LOG(All, "appending %zu elements to the existing array '%.*s'",
         values.count(), static_cast<int>(name.length), name.data);
     if (is_readonly(name))
@@ -568,7 +568,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       }
       joined.reserve(joined_length);
       for (usize i = 0; i < m_positional_params.count(); i++) {
-        if (i > 0 && has_separator) joined.push(separator);
+        if (i > 0 && has_separator) {
+          joined.push(separator);
+        }
         joined.append(m_positional_params[i].view());
       }
       return joined;
@@ -594,12 +596,13 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
   }
 
-  if (let const *stored = m_shell_variables.find(name)) return *stored;
+  if (let const *stored = m_shell_variables.find(name); stored != nullptr)
+    return *stored;
 
   /* A read of an array name with no scalar yields element zero, the way bash
      treats $a as ${a[0]}. */
   if (m_indexed_arrays.count() != 0)
-    if (let const *array = m_indexed_arrays.find(name)) {
+    if (let const *array = m_indexed_arrays.find(name); array != nullptr) {
       if (array->is_empty()) return shit::None;
       return array->front();
     }
@@ -979,7 +982,7 @@ pure fn EvalContext::has_aliases() const wontthrow -> bool
 
 fn EvalContext::get_alias(StringView name) const throws -> Maybe<String>
 {
-  if (let const *value = m_aliases.find(name))
+  if (let const *value = m_aliases.find(name); value != nullptr)
     return String{heap_allocator(), value->view()};
   return None;
 }
@@ -1562,7 +1565,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
     m_environment_undo_log.pop_back();
   }
 
-  if (let const *ifs = m_shell_variables.find(StringView{"IFS", 3}))
+  if (let const *ifs = m_shell_variables.find(StringView{"IFS", 3});
+      ifs != nullptr)
     set_field_separators(ifs->view());
   else
     set_field_separators(" \t\n");

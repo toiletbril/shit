@@ -27,26 +27,6 @@ Export::Export() = default;
 
 pure fn Export::kind() const wontthrow -> Builtin::Kind { return Kind::Export; }
 
-static pure fn name_is_valid_identifier(StringView name) wontthrow -> bool
-{
-  if (name.is_empty()) return false;
-
-  let const do_is_name_start = [](char c) wontthrow -> bool {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
-  };
-
-  if (!do_is_name_start(name[0])) return false;
-
-  for (usize position = 1; position < name.length; position++) {
-    let const c = name[position];
-    if (!do_is_name_start(c) && !(c >= '0' && c <= '9')) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = PARSE_BUILTIN_ARGS(ec);
