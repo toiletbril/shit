@@ -92,7 +92,7 @@ hot pure fn is_string_quote(char ch) wontthrow -> bool
   }
 }
 
-hot pure static fn is_ascii_char(char ch) wontthrow -> bool
+hot pure static fn is_ascii_letter(char ch) wontthrow -> bool
 {
   return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 }
@@ -109,7 +109,7 @@ hot pure fn is_expandable_char(char ch) wontthrow -> bool
 
 hot pure fn is_variable_name_start(char ch) wontthrow -> bool
 {
-  return is_ascii_char(ch) || ch == '_';
+  return is_ascii_letter(ch) || ch == '_';
 }
 
 hot pure fn is_variable_name(char ch) wontthrow -> bool
@@ -596,7 +596,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
     if (is_in_double_quotes) did_quote_enclose_content = true;
 
-    if (!quote_char && lexer::is_string_quote(ch)) {
+    if (!quote_char.has_value() && lexer::is_string_quote(ch)) {
       relative_last_quote_char_pos = byte_count;
       did_quote_enclose_content = false;
       quote_char = ch;

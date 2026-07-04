@@ -338,17 +338,17 @@ fn append_conversion(String &out, const String &spec, char conv,
 
   /* A conversion whose result is wider than the stack buffer is rewritten into
      a heap buffer sized from the length snprintf reports. */
-  let append_formatted = [&](const char *format, auto value) throws {
+  let do_append_formatted = [&](const char *format, auto value) throws {
     const int needed = std::snprintf(buffer, sizeof(buffer), format, value);
     if (needed >= 0 && static_cast<usize>(needed) < sizeof(buffer)) {
       out += buffer;
     } else if (needed > 0) {
       const usize size = static_cast<usize>(needed) + 1;
-      char *const big = static_cast<char *>(std::malloc(size));
-      if (big != nullptr) {
-        std::snprintf(big, size, format, value);
-        out += StringView{big, static_cast<usize>(needed)};
-        std::free(big);
+      char *const heap_buffer = static_cast<char *>(std::malloc(size));
+      if (heap_buffer != nullptr) {
+        std::snprintf(heap_buffer, size, format, value);
+        out += StringView{heap_buffer, static_cast<usize>(needed)};
+        std::free(heap_buffer);
       }
     }
   };
@@ -365,7 +365,7 @@ fn append_conversion(String &out, const String &spec, char conv,
     } else {
       String with_s = spec.clone();
       with_s.push('s');
-      append_formatted(with_s.c_str(), arg.c_str());
+      do_append_formatted(with_s.c_str(), arg.c_str());
     }
   } break;
   case 'c': {
@@ -374,7 +374,7 @@ fn append_conversion(String &out, const String &spec, char conv,
     } else {
       String with_c = spec.clone();
       with_c.push('c');
-      append_formatted(with_c.c_str(), arg.is_empty() ? '\0' : arg[0]);
+      do_append_formatted(with_c.c_str(), arg.is_empty() ? '\0' : arg[0]);
     }
   } break;
   case 'd':
@@ -385,7 +385,7 @@ fn append_conversion(String &out, const String &spec, char conv,
     else if (number.is_out_of_range && !is_missing_argument)
       report_out_of_range(ec, arg, exit_status, allocator);
     let const with_ll = spec + "lld";
-    append_formatted(with_ll.c_str(), static_cast<long long>(number.value));
+    do_append_formatted(with_ll.c_str(), static_cast<long long>(number.value));
   } break;
   case 'x':
   case 'X':
@@ -398,8 +398,8 @@ fn append_conversion(String &out, const String &spec, char conv,
       report_out_of_range(ec, arg, exit_status, allocator);
     String with_ll = spec + "ll";
     with_ll.push(conv);
-    append_formatted(with_ll.c_str(),
-                     static_cast<unsigned long long>(number.value));
+    do_append_formatted(with_ll.c_str(),
+                        static_cast<unsigned long long>(number.value));
   } break;
   case 'f':
   case 'e':
@@ -409,7 +409,7 @@ fn append_conversion(String &out, const String &spec, char conv,
     String with_conv = spec.clone();
     with_conv.push(conv);
     const double value = std::strtod(arg.c_str(), nullptr);
-    append_formatted(with_conv.c_str(), value);
+    do_append_formatted(with_conv.c_str(), value);
   } break;
   default:
     out += spec;

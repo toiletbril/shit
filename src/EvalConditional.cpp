@@ -205,7 +205,9 @@ struct conditional_evaluator
       return cxt.get_variable_value(operand).has_value();
     }
     let const path = Path{operand};
-    if (op == "-a" || op == "-e") return path.exists();
+    if (op == "-a" || op == "-e") {
+      return path.exists();
+    }
     if (op == "-f") return path.is_regular_file();
     if (op == "-d") return path.is_directory();
     if (op == "-r") return path.is_readable();
@@ -225,7 +227,9 @@ struct conditional_evaluator
       error.set_command_status(2);
       throw error;
     }
-    if (op == "-h" || op == "-L") return path.is_symbolic_link();
+    if (op == "-h" || op == "-L") {
+      return path.is_symbolic_link();
+    }
     if (op == "-b") return path.is_block_device();
     if (op == "-c") return path.is_character_device();
     if (op == "-p") return path.is_fifo();
@@ -387,8 +391,9 @@ struct conditional_evaluator
     if (!at_end() && kind_at(pos) == Kind::OpenParen) {
       pos++;
       const bool is_inner_true = eval_or();
-      if (at_end() || kind_at(pos) != Kind::CloseParen)
+      if (at_end() || kind_at(pos) != Kind::CloseParen) {
         throw Error{"Expected ')'"};
+      }
       pos++;
       return is_inner_true;
     }
