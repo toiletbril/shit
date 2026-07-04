@@ -304,6 +304,19 @@ hot fn Parser::parse_command_list(
   bool should_time_pending = false;
   bool is_time_posix_format = false;
 
+  let do_finish_pending = [&](Command *pending, const Token *at) throws {
+    if (should_negate_pending) {
+      pending->set_negated();
+      should_negate_pending = false;
+    }
+    if (should_time_pending) {
+      pending->set_timed(is_time_posix_format);
+      should_time_pending = false;
+    }
+    compound_list->append_node(m_lexer.arena().create<CompoundListCondition>(
+        at->source_location(), next_cond, pending));
+  };
+
   loop
   {
     if (should_parse_command) {
@@ -340,17 +353,7 @@ hot fn Parser::parse_command_list(
     /* A terminator keyword is left for the caller to consume. */
     if (is_list_terminator(token, terminators)) {
       if (lhs != nullptr) {
-        if (should_negate_pending) {
-          lhs->set_negated();
-          should_negate_pending = false;
-        }
-        if (should_time_pending) {
-          lhs->set_timed(is_time_posix_format);
-          should_time_pending = false;
-        }
-        compound_list->append_node(
-            m_lexer.arena().create<CompoundListCondition>(
-                token->source_location(), next_cond, lhs));
+        do_finish_pending(lhs, token);
       } else if (next_cond != CompoundListCondition::Kind::None) {
         throw shit::ErrorWithLocation{token->source_location(),
                                       "Expected a command after an operator"};
@@ -384,17 +387,7 @@ hot fn Parser::parse_command_list(
       m_lexer.advance_past_last_peek();
 
       if (lhs != nullptr) {
-        if (should_negate_pending) {
-          lhs->set_negated();
-          should_negate_pending = false;
-        }
-        if (should_time_pending) {
-          lhs->set_timed(is_time_posix_format);
-          should_time_pending = false;
-        }
-        compound_list->append_node(
-            m_lexer.arena().create<CompoundListCondition>(
-                token->source_location(), next_cond, lhs));
+        do_finish_pending(lhs, token);
         next_cond = get_sequence_kind(token->kind());
       }
 
@@ -1929,23 +1922,9 @@ hot fn Parser::parse_conditional_command() throws -> Command *
   return node;
 }
 
-hot fn Parser::parse_function_definition(const Token *name_token) throws
+fn Parser::finish_function_body(SourceLocation location, StringView name) throws
     -> Command *
 {
-  ASSERT(name_token != nullptr);
-  const let location = name_token->source_location();
-  const let name = name_token->raw_string();
-
-  LOG(Debug, "parsing a function definition for '%s'", name.c_str());
-
-  m_lexer.advance_past_last_peek();
-  Token *close = m_lexer.next_shell_token();
-  ASSERT(close != nullptr);
-  if (close->kind() != Token::Kind::RightParen) {
-    throw ErrorWithLocation{close->source_location(),
-                            "Expected ')' in a function definition"};
-  }
-
   skip_newlines_after_pipe();
 
   /* The body is parsed into the persistent function arena so it outlives the
@@ -1963,9 +1942,29 @@ hot fn Parser::parse_function_definition(const Token *name_token) throws
   /* The span ends where the body ends so declare -f can print the definition
      text from the source. */
   let definition =
-      m_lexer.arena().create<FunctionDefinition>(location, name.view(), body);
+      m_lexer.arena().create<FunctionDefinition>(location, name, body);
   definition->set_source_end_position(body->source_end_position());
   return definition;
+}
+
+hot fn Parser::parse_function_definition(const Token *name_token) throws
+    -> Command *
+{
+  ASSERT(name_token != nullptr);
+  const let location = name_token->source_location();
+  const let name = name_token->raw_string();
+
+  LOG(Debug, "parsing a function definition for '%s'", name.c_str());
+
+  m_lexer.advance_past_last_peek();
+  Token *close = m_lexer.next_shell_token();
+  ASSERT(close != nullptr);
+  if (close->kind() != Token::Kind::RightParen) {
+    throw ErrorWithLocation{close->source_location(),
+                            "Expected ')' in a function definition"};
+  }
+
+  return finish_function_body(location, name.view());
 }
 
 fn Parser::parse_keyword_function_definition() throws -> Command *
@@ -1994,26 +1993,7 @@ fn Parser::parse_keyword_function_definition() throws -> Command *
     }
   }
 
-  skip_newlines_after_pipe();
-
-  /* The body is parsed into the persistent function arena so it outlives the
-     per-command arena reset. */
-  BumpArena &per_command_arena = m_lexer.arena();
-  if (FUNCTION_ARENA != nullptr) m_lexer.set_arena(*FUNCTION_ARENA);
-  Command *body = parse_simple_command();
-  m_lexer.set_arena(per_command_arena);
-
-  if (body == nullptr) {
-    throw ErrorWithLocation{location,
-                            "Expected a compound command as the function body"};
-  }
-
-  /* The span ends where the body ends so declare -f can print the definition
-     text from the source. */
-  let definition =
-      m_lexer.arena().create<FunctionDefinition>(location, name.view(), body);
-  definition->set_source_end_position(body->source_end_position());
-  return definition;
+  return finish_function_body(location, name.view());
 }
 
 fn Parser::consume_bash_array_assignment() throws -> ArrayList<const Token *>

@@ -120,6 +120,9 @@ private:
 
   mustuse fn parse_keyword_function_definition() throws -> Command *;
 
+  mustuse fn finish_function_body(SourceLocation location, StringView name) throws
+      -> Command *;
+
   /* Consume a bash array assignment group NAME=(...) or NAME+=(...) and return
      its element tokens. Bash mode expands them into the array, POSIX mode
      discards the list and evaluates the assignment as a no-op. */
