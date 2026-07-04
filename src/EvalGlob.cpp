@@ -28,18 +28,16 @@ fn name_matches_glob(StringView glob, StringView filename,
     return utils::glob_matches(glob, filename, glob_active, mask_offset,
                                extglob);
 
-  let lowered_glob = String{allocator};
-  lowered_glob.reserve(glob.length);
-  for (usize i = 0; i < glob.length; i++)
-    lowered_glob += ascii_lowercase(glob[i]);
-
+  /* The glob arrives already lowered from the caller, so only the per-entry
+     filename is lowered here. Lowering preserves length, so the active mask
+     stays aligned. */
   let lowered_name = String{allocator};
   lowered_name.reserve(filename.length);
   for (usize i = 0; i < filename.length; i++)
     lowered_name += ascii_lowercase(filename[i]);
 
-  return utils::glob_matches(lowered_glob.view(), lowered_name.view(),
-                             glob_active, mask_offset, extglob);
+  return utils::glob_matches(glob, lowered_name.view(), glob_active, mask_offset,
+                             extglob);
 }
 
 } // namespace
@@ -107,6 +105,15 @@ fn EvalContext::expand_path_once(const glob_field &field,
 
   let const dotglob_is_on = is_shopt_enabled("dotglob");
   let const nocaseglob_is_on = is_shopt_enabled("nocaseglob");
+
+  let lowered_glob = String{scratch};
+  if (nocaseglob_is_on) {
+    lowered_glob.reserve(glob.length);
+    for (usize i = 0; i < glob.length; i++)
+      lowered_glob += ascii_lowercase(glob[i]);
+  }
+  let const match_glob = nocaseglob_is_on ? lowered_glob.view() : glob;
+
   for (let const &entry_name : *entries) {
     let const filename = entry_name.view();
 
@@ -125,7 +132,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
       continue;
     }
 
-    if (name_matches_glob(glob, filename, field.glob_active, stem_start,
+    if (name_matches_glob(match_glob, filename, field.glob_active, stem_start,
                           extglob_enabled(), nocaseglob_is_on, scratch))
     {
       add_expansion();
