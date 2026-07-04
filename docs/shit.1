@@ -591,7 +591,11 @@ moods keep the 64-bit wrap. With no expression on a terminal, or with
 .BR \-i ,
 expressions are read and evaluated interactively through the line editor, with
 the shell completion and the highlighter turned off and the history kept in
-~/.shit_calc_history. An interactive line of the form name=value binds the
+~/.shit_calc_history. With
+.BR \-p ,
+the expressions are read from standard input one per line with no prompt and no
+line editor, so a script pipes a batch through calc. An interactive line of the
+form name=value binds the
 variable to its right-side expression unevaluated, recomputed lazily on each
 later read, and an assignment inside an expression, such as
 .BR "(x = 5) + 1" ,

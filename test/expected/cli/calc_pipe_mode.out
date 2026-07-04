@@ -1,0 +1,10 @@
+== -p evaluates each piped line and binds a variable:
+4
+25
+== --pipe is the long form:
+42
+== no expression off a pipe reports a verbose error:
+shit: 1:1: error: calc has no expression to evaluate.
+     1 |  shitbox calc
+       |  ^~~~~~~~~~~~ here.
+note: Pass an expression such as `calc '2 + 2'`, read a pipe with `-p`, or enter the interactive prompt with `-i`.

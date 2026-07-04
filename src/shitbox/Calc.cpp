@@ -10,13 +10,19 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-i] [expression ...]");
+HELP_SYNOPSIS_DECL("[-i] [-p] [expression ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The calc utility evaluates each argument as an arithmetic expression.");
+    "The calc utility evaluates each argument as an arithmetic expression and "
+    "prints the result. With no expression on a terminal it reads and "
+    "evaluates expressions interactively, and a name = value line binds a "
+    "variable for a later expression to read.");
 
 FLAG(CALC_INTERACTIVE, Bool, 'i', "interactive",
-     "Read and evaluate expressions interactively.");
+     "Read and evaluate expressions interactively, even off a pipe.");
+FLAG(CALC_PIPE, Bool, 'p', "pipe",
+     "Read and evaluate expressions from standard input, one per line, with no "
+     "prompt.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Calc);
@@ -87,10 +93,11 @@ fn try_define(EvalContext &cxt, StringView line) throws -> bool
   return true;
 }
 
-fn run_repl(const ExecContext &ec, EvalContext &cxt) throws -> i32
+fn run_repl(const ExecContext &ec, EvalContext &cxt, bool force_pipe) throws
+    -> i32
 {
   let const input_fd = ec.in_fd.value_or(SHIT_STDIN);
-  let const is_terminal = os::is_fd_a_tty(input_fd);
+  let const is_terminal = !force_pipe && os::is_fd_a_tty(input_fd);
   let const should_use_editor = is_terminal && toiletline::is_active();
 
   /* The editor REPL takes raw mode for itself, otherwise the kernel and the
@@ -210,12 +217,19 @@ fn Calc::execute(const ExecContext &ec, EvalContext &cxt,
   /* A piped run with no expression keeps the usage error so it does not hang.
    */
   let const has_expression = !operands.is_empty();
+  let const should_pipe = FLAG_CALC_PIPE.is_enabled();
   let const is_interactive =
-      FLAG_CALC_INTERACTIVE.is_enabled() ||
-      (!has_expression && os::is_stdin_a_tty() && os::is_stdout_a_tty());
-  if (is_interactive) return run_repl(ec, cxt);
+      !should_pipe &&
+      (FLAG_CALC_INTERACTIVE.is_enabled() ||
+       (!has_expression && os::is_stdin_a_tty() && os::is_stdout_a_tty()));
+  if (should_pipe || is_interactive) return run_repl(ec, cxt, should_pipe);
 
-  if (!has_expression) return report_usage_error(ec, cxt, args[0].view());
+  if (!has_expression) {
+    throw ErrorWithDetails{
+        "calc has no expression to evaluate",
+        "Pass an expression such as `calc '2 + 2'`, read a pipe with `-p`, or "
+        "enter the interactive prompt with `-i`"};
+  }
 
   LOG(Debug, "calc evaluating %zu arithmetic expressions", operands.count());
 
