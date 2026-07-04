@@ -176,11 +176,8 @@ fn window_function_body_error(EvalContext &cxt,
   if (!resolved.is_windowed || resolved.text == nullptr) return None;
 
   let rebased = error.location();
-  rebased.position =
-      rebased.position - resolved.body_start_position + resolved.header_length;
-  rebased.filename = resolved.filename.is_empty()
-                         ? Maybe<StringView>{}
-                         : Maybe<StringView>{resolved.filename};
+  rebased.position = resolved.to_render_position(rebased.position);
+  rebased.filename = resolved.filename_or_none();
   if (rebased.position > resolved.text->count()) return None;
 
   error.set_location(rebased);

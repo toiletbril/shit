@@ -296,12 +296,8 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     let const resolved_source = resolve_render_source(location);
     usize line_offset = 0;
     if (resolved_source.is_windowed) {
-      location.position = location.position -
-                          resolved_source.body_start_position +
-                          resolved_source.header_length;
-      location.filename = resolved_source.filename.is_empty()
-                              ? Maybe<StringView>{}
-                              : Maybe<StringView>{resolved_source.filename};
+      location.position = resolved_source.to_render_position(location.position);
+      location.filename = resolved_source.filename_or_none();
       line_offset = resolved_source.line_offset;
     }
     if (resolved_source.text == nullptr ||
@@ -331,8 +327,7 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
   usize scan_start = fallback.position;
   usize absolute_shift = 0;
   if (resolved_source.is_windowed) {
-    scan_start = fallback.position - resolved_source.body_start_position +
-                 resolved_source.header_length;
+    scan_start = resolved_source.to_render_position(fallback.position);
     absolute_shift =
         resolved_source.body_start_position > resolved_source.header_length
             ? resolved_source.body_start_position -
@@ -924,10 +919,7 @@ fn EvalContext::line_number_at_location(
   usize line = 1;
   if (resolved_source.text != nullptr) {
     const usize render_position =
-        resolved_source.is_windowed
-            ? location.position - resolved_source.body_start_position +
-                  resolved_source.header_length
-            : location.position;
+        resolved_source.to_render_position(location.position);
     line =
         utils::line_number_at(resolved_source.text->view(), render_position) +
         (resolved_source.is_windowed ? resolved_source.line_offset : 0);
