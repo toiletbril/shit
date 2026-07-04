@@ -93,15 +93,23 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
   return static_cast<i64>(is_negative ? -magnitude : magnitude);
 }
 
-pure fn is_single_integer_literal(StringView text) wontthrow -> bool
+pure fn try_parse_single_integer_literal(StringView text) wontthrow
+    -> Maybe<i64>
 {
   usize i = 0;
-  if (i < text.length && (text[i] == '+' || text[i] == '-')) i++;
+  let is_negative = false;
+  if (i < text.length && (text[i] == '+' || text[i] == '-')) {
+    is_negative = text[i] == '-';
+    i++;
+  }
   let const detected = detect_radix_prefix(text.substring(i));
   i += detected.prefix_length;
-  let const digit_count = count_leading_digits(text.substring(i), detected.radix);
+  let const digits = text.substring(i);
+  let const digit_count = count_leading_digits(digits, detected.radix);
+  if (digit_count == 0 || i + digit_count != text.length) return None;
 
-  return digit_count > 0 && i + digit_count == text.length;
+  let const magnitude = fold_leading_digits(digits, detected.radix);
+  return static_cast<i64>(is_negative ? -magnitude : magnitude);
 }
 
 /* The add, subtract, and multiply run in u64 where overflow is defined, a
@@ -291,8 +299,9 @@ public:
   fn evaluate_operand_value(StringView value) throws -> i64
   {
     if (value.is_empty()) return 0;
-    if (is_single_integer_literal(value))
-      return parse_arithmetic_operand(value);
+    if (let const literal = try_parse_single_integer_literal(value);
+        literal.has_value())
+      return literal.value();
 
     if (depth >= MAX_DEPTH)
       fail("The variable value recurses too deeply",
@@ -945,7 +954,9 @@ static fn evaluate_named_value_operand(EvalContext *context,
                                        StringView value) throws -> i64
 {
   if (value.is_empty()) return 0;
-  if (is_single_integer_literal(value)) return parse_arithmetic_operand(value);
+  if (let const literal = try_parse_single_integer_literal(value);
+      literal.has_value())
+    return literal.value();
 
   ArithmeticParser nested{context, value, 0};
   return nested.parse();
