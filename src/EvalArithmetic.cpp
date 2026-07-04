@@ -61,6 +61,22 @@ pure fn fold_leading_digits(StringView text, u32 radix) wontthrow -> u64
   return magnitude;
 }
 
+struct radix_prefix
+{
+  u32 radix;
+  usize prefix_length;
+};
+
+pure fn detect_radix_prefix(StringView body) wontthrow -> radix_prefix
+{
+  if (body.length >= 2 && body[0] == '0' && (body[1] == 'x' || body[1] == 'X'))
+    return {16, 2};
+  if (body.length >= 2 && body[0] == '0' && (body[1] == 'b' || body[1] == 'B'))
+    return {2, 2};
+  if (body.length >= 1 && body[0] == '0') return {8, 0};
+  return {10, 0};
+}
+
 pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
 {
   let body = text;
@@ -70,27 +86,9 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
     body = body.substring(1);
   }
 
-  u32 radix;
-  usize prefix_length;
-  if (body.length >= 2 && body[0] == '0' && (body[1] == 'x' || body[1] == 'X'))
-  {
-    radix = 16;
-    prefix_length = 2;
-  } else if (body.length >= 2 && body[0] == '0' &&
-             (body[1] == 'b' || body[1] == 'B'))
-  {
-    radix = 2;
-    prefix_length = 2;
-  } else if (body.length >= 1 && body[0] == '0') {
-    radix = 8;
-    prefix_length = 0;
-  } else {
-    radix = 10;
-    prefix_length = 0;
-  }
-
-  let const magnitude =
-      fold_leading_digits(body.substring(prefix_length), radix);
+  let const detected = detect_radix_prefix(body);
+  let const magnitude = fold_leading_digits(
+      body.substring(detected.prefix_length), detected.radix);
 
   return static_cast<i64>(is_negative ? -magnitude : magnitude);
 }
@@ -99,22 +97,9 @@ pure fn is_single_integer_literal(StringView text) wontthrow -> bool
 {
   usize i = 0;
   if (i < text.length && (text[i] == '+' || text[i] == '-')) i++;
-  usize digit_count = 0;
-  if (i + 1 < text.length && text[i] == '0' &&
-      (text[i + 1] == 'x' || text[i + 1] == 'X'))
-  {
-    i += 2;
-    digit_count = count_leading_digits(text.substring(i), 16);
-  } else if (i + 1 < text.length && text[i] == '0' &&
-             (text[i + 1] == 'b' || text[i + 1] == 'B'))
-  {
-    i += 2;
-    digit_count = count_leading_digits(text.substring(i), 2);
-  } else if (i < text.length && text[i] == '0') {
-    digit_count = count_leading_digits(text.substring(i), 8);
-  } else {
-    digit_count = count_leading_digits(text.substring(i), 10);
-  }
+  let const detected = detect_radix_prefix(text.substring(i));
+  i += detected.prefix_length;
+  let const digit_count = count_leading_digits(text.substring(i), detected.radix);
 
   return digit_count > 0 && i + digit_count == text.length;
 }
@@ -627,7 +612,6 @@ public:
         }
         lhs = arithmetic_power(lhs, rhs);
         break;
-      case '*': lhs = arithmetic_multiply(lhs, rhs); break;
       case '/':
         if (rhs == 0) {
           if (m_is_skipping) {
@@ -650,20 +634,7 @@ public:
         }
         lhs = arithmetic_modulo(lhs, rhs);
         break;
-      case '+': lhs = arithmetic_add(lhs, rhs); break;
-      case '-': lhs = arithmetic_subtract(lhs, rhs); break;
-      case 'L': lhs = arithmetic_shift_left(lhs, rhs); break;
-      case 'R': lhs = arithmetic_shift_right(lhs, rhs); break;
-      case '<': lhs = lhs < rhs ? 1 : 0; break;
-      case 'l': lhs = lhs <= rhs ? 1 : 0; break;
-      case '>': lhs = lhs > rhs ? 1 : 0; break;
-      case 'g': lhs = lhs >= rhs ? 1 : 0; break;
-      case 'e': lhs = lhs == rhs ? 1 : 0; break;
-      case 'n': lhs = lhs != rhs ? 1 : 0; break;
-      case '&': lhs = lhs & rhs; break;
-      case '^': lhs = lhs ^ rhs; break;
-      case '|': lhs = lhs | rhs; break;
-      default: unreachable();
+      default: lhs = arith_apply_binop(op.kind, lhs, rhs); break;
       }
     }
   }
@@ -1180,20 +1151,9 @@ static pure fn parse_wide_operand(StringView text) wontthrow -> wide_int
     body = body.substring(1);
   }
 
-  u32 radix = 10;
-  usize i = 0;
-  if (body.length >= 2 && body[0] == '0' && (body[1] == 'x' || body[1] == 'X'))
-  {
-    radix = 16;
-    i = 2;
-  } else if (body.length >= 2 && body[0] == '0' &&
-             (body[1] == 'b' || body[1] == 'B'))
-  {
-    radix = 2;
-    i = 2;
-  } else if (body.length >= 1 && body[0] == '0') {
-    radix = 8;
-  }
+  let const detected = detect_radix_prefix(body);
+  let const radix = detected.radix;
+  usize i = detected.prefix_length;
 
   wide_uint value = 0;
   for (; i < body.length; i++) {
