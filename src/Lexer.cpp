@@ -452,12 +452,13 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     return true;
   };
 
-  let do_subscript_closes_with_assignment = [this](usize start) -> bool {
+  let do_subscript_closes_with_assignment =
+      [this](usize start) -> Maybe<usize> {
     usize offset = start + 1;
     usize depth = 1;
     while (depth > 0) {
       const char c = chop_character(offset);
-      if (c == lexer::CEOF) return false;
+      if (c == lexer::CEOF) return None;
       offset++;
       if (c == '[')
         depth++;
@@ -465,7 +466,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         depth--;
     }
     const char after = chop_character(offset);
-    return after == '=' || (after == '+' && chop_character(offset + 1) == '=');
+    if (after == '=' || (after == '+' && chop_character(offset + 1) == '='))
+      return offset;
+    return None;
   };
 
   let do_scan_to_matched_close = [this](usize &offset, char open,
@@ -498,15 +501,17 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
        so a bitmask subscript such as key[a|b]=1 survives, while x[1|2] in
        argument position still splits. */
     if (!is_inside_quote_or_escape && ch == '[' &&
-        do_word_is_plain_array_name() &&
-        do_subscript_closes_with_assignment(byte_count))
+        do_word_is_plain_array_name())
     {
-      const let subscript_start = byte_count;
-      byte_count++;
-      do_scan_to_matched_close(byte_count, '[', ']');
-      do_append_unquoted_run(m_source.view().substring_of_length(
-          m_cursor_position + subscript_start, byte_count - subscript_start));
-      continue;
+      if (Maybe<usize> close = do_subscript_closes_with_assignment(byte_count);
+          close.has_value())
+      {
+        const let subscript_start = byte_count;
+        byte_count = *close;
+        do_append_unquoted_run(m_source.view().substring_of_length(
+            m_cursor_position + subscript_start, byte_count - subscript_start));
+        continue;
+      }
     }
 
     /* An extended-glob group such as @(a|b) is captured whole so its (, nested
