@@ -5,10 +5,12 @@
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
+#include "PackedStringKey.hpp"
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "ResolvedCommand.hpp"
+#include "StaticStringMap.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -369,6 +371,28 @@ static fn word_starts_array_subscript(const Word &word) wontthrow -> bool
   return false;
 }
 
+enum declaration_command_flag : u8
+{
+  declaration_flag_local = 1 << 0,
+  declaration_flag_declare = 1 << 1,
+  declaration_flag_declaration = 1 << 2,
+  declaration_flag_test = 1 << 3,
+};
+
+constexpr static_string_entry<u8> DECLARATION_COMMAND_ENTRIES[] = {
+    {SSK("local"),
+     declaration_flag_local | declaration_flag_declaration                    },
+    {SSK("declare"),
+     declaration_flag_declare | declaration_flag_declaration                  },
+    {SSK("typeset"),
+     declaration_flag_declare | declaration_flag_declaration                  },
+    {SSK("export"),   declaration_flag_declaration                            },
+    {SSK("readonly"), declaration_flag_declaration                            },
+    {SSK("unset"),    declaration_flag_declaration                            },
+    {SSK("test"),     declaration_flag_test                                   },
+};
+constexpr StaticStringMap DECLARATION_COMMANDS{DECLARATION_COMMAND_ENTRIES};
+
 hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
                                          bool args_are_transient,
                                          bool is_array_literal) throws
@@ -408,12 +432,11 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
           joined_name.append(segment.text.view());
         name = joined_name.view();
       }
-      is_local_command = name == "local";
-      is_declare_command = name == "declare" || name == "typeset";
-      is_declaration_command = is_local_command || is_declare_command ||
-                               name == "export" || name == "readonly" ||
-                               name == "unset";
-      is_test_command = name == "test";
+      let const flags = DECLARATION_COMMANDS.find(name).value_or(0);
+      is_local_command = (flags & declaration_flag_local) != 0;
+      is_declare_command = (flags & declaration_flag_declare) != 0;
+      is_declaration_command = (flags & declaration_flag_declaration) != 0;
+      is_test_command = (flags & declaration_flag_test) != 0;
     }
     /* The lone bracket is the test builtin and earns the same glob exemption,
        though it never classifies as a plain literal above. */
