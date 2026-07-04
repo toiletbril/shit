@@ -7,6 +7,8 @@
 #include "Maybe.hpp"
 #include "StringView.hpp"
 
+#include <cstring>
+
 namespace shit {
 
 class String
@@ -114,8 +116,34 @@ public:
 
   fn clear() wontthrow -> void;
 
-  hot fn push(char c) throws -> void;
-  hot fn append(StringView other) throws -> void;
+  /* The has-capacity fast path is inlined, so a hot append that fits pays no
+     call. reserve stays cold for the growth path, and m_capacity counts the
+     null slot, so the fit test is length + count < capacity. */
+  hot fn push(char c) throws -> void
+  {
+    if (m_length + 1 < m_capacity) [[likely]] {
+      m_data[m_length++] = c;
+      m_data[m_length] = '\0';
+      return;
+    }
+    reserve(m_length + 1);
+    m_data[m_length++] = c;
+    m_data[m_length] = '\0';
+  }
+  hot fn append(StringView other) throws -> void
+  {
+    if (other.length == 0) return;
+    if (m_length + other.length < m_capacity) [[likely]] {
+      std::memcpy(m_data + m_length, other.data, other.length);
+      m_length += other.length;
+      m_data[m_length] = '\0';
+      return;
+    }
+    reserve(m_length + other.length);
+    std::memcpy(m_data + m_length, other.data, other.length);
+    m_length += other.length;
+    m_data[m_length] = '\0';
+  }
 
   cold fn reserve(usize needed) throws -> void;
 

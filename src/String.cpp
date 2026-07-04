@@ -80,22 +80,6 @@ fn String::clear() wontthrow -> void
   if (m_data != nullptr) m_data[0] = '\0';
 }
 
-hot fn String::push(char c) throws -> void
-{
-  reserve(m_length + 1);
-  m_data[m_length++] = c;
-  m_data[m_length] = '\0';
-}
-
-hot fn String::append(StringView other) throws -> void
-{
-  if (other.length == 0) return;
-  reserve(m_length + other.length);
-  std::memcpy(m_data + m_length, other.data, other.length);
-  m_length += other.length;
-  m_data[m_length] = '\0';
-}
-
 cold fn String::reserve(usize needed) throws -> void
 {
   if (needed + 1 <= m_capacity) [[likely]]
