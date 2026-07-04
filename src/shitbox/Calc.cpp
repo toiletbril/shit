@@ -98,6 +98,20 @@ fn run_repl(const ExecContext &ec, EvalContext &cxt, bool force_pipe) throws
 {
   let const input_fd = ec.in_fd.value_or(SHIT_STDIN);
   let const is_terminal = !force_pipe && os::is_fd_a_tty(input_fd);
+
+  /* When the host shell ran calc off a -c command, it never entered the
+     interactive loop, so toiletline was never initialized. Bring it up here so
+     the editor path is taken the way it is inside the interactive shell, then
+     tear it down fully on the way out. */
+  let const did_initialize_editor = is_terminal && !toiletline::is_active();
+  if (did_initialize_editor) {
+    try {
+      toiletline::initialize();
+    } catch (const Error &error) {
+      show_message(error.to_string());
+    }
+  }
+
   let const should_use_editor = is_terminal && toiletline::is_active();
 
   /* The editor REPL takes raw mode for itself, otherwise the kernel and the
@@ -122,6 +136,16 @@ fn run_repl(const ExecContext &ec, EvalContext &cxt, bool force_pipe) throws
          defer. */
       try {
         toiletline::exit_raw_mode();
+      } catch (const Error &error) {
+        show_message(error.to_string());
+      }
+    }
+
+    /* A full teardown only runs when calc brought toiletline up itself, so an
+       interactive host shell keeps its editor across the call. */
+    if (did_initialize_editor) {
+      try {
+        toiletline::exit();
       } catch (const Error &error) {
         show_message(error.to_string());
       }
