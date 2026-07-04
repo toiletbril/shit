@@ -1,0 +1,8 @@
+== $HOME/ prefix stays active:
+$HOME/Downloads/
+== ${HOME}/ braced:
+${HOME}/Documents/
+== a bare variable reference still completes names:
+$HOME
+== a tilde stays literal:
+~/Documents/

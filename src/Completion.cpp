@@ -595,8 +595,46 @@ static fn quote_path_candidate(StringView candidate) throws -> String
   return quoted;
 }
 
+/* A leading $NAME or ${NAME} in the directory prefix is expanded to its value so
+   the listing reads the real directory, while the offered candidate keeps the
+   unexpanded prefix. None means no leading variable, so the caller falls back to
+   the literal path. */
+static fn expand_leading_variable_path(StringView directory_part,
+                                       EvalContext &context) throws
+    -> Maybe<String>
+{
+  if (directory_part.is_empty() || directory_part[0] != '$') return None;
+
+  usize name_start = 1;
+  let const is_braced =
+      name_start < directory_part.length && directory_part[name_start] == '{';
+  if (is_braced) name_start++;
+
+  usize name_end = name_start;
+  while (name_end < directory_part.length &&
+         lexer::is_variable_name(directory_part[name_end]))
+    name_end++;
+
+  let const name = directory_part.substring_of_length(name_start,
+                                                      name_end - name_start);
+  if (name.is_empty()) return None;
+
+  usize rest_start = name_end;
+  if (is_braced && rest_start < directory_part.length &&
+      directory_part[rest_start] == '}')
+    rest_start++;
+
+  let const value = context.get_variable_value(name);
+  if (!value.has_value()) return None;
+
+  let expanded = String{completion_allocator(), value->view()};
+  expanded.append(directory_part.substring(rest_start));
+  return expanded;
+}
+
 static fn resolve_listing_directory(StringView directory_part,
-                                    const Path &base_directory) throws -> Path
+                                    const Path &base_directory,
+                                    EvalContext &context) throws -> Path
 {
   if (directory_part.is_empty()) return base_directory;
 
@@ -605,6 +643,17 @@ static fn resolve_listing_directory(StringView directory_part,
       expanded.has_value())
   {
     return Path{expanded->view()};
+  }
+
+  if (Maybe<String> expanded =
+          expand_leading_variable_path(directory_part, context);
+      expanded.has_value())
+  {
+    let const directory = Path{expanded->view()};
+    if (directory.is_absolute()) return directory;
+    let resolved_path = base_directory.clone();
+    resolved_path.push_component(expanded->view());
+    return resolved_path;
   }
 
   let const directory = Path{directory_part};
@@ -625,7 +674,8 @@ static fn entry_is_executable(const Path &directory, StringView name) throws
 
 static fn complete_filesystem(StringView token, const Path &base_directory,
                               bool inside_quote, bool directories_only,
-                              bool executables_only) throws -> ArrayList<String>
+                              bool executables_only, EvalContext &context) throws
+    -> ArrayList<String>
 {
   let candidates = tiered_candidates{};
 
@@ -641,7 +691,7 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
       static_cast<int>(parts.basename_part.length), parts.basename_part.data);
 
   let listing_directory =
-      resolve_listing_directory(parts.directory_part, base_directory);
+      resolve_listing_directory(parts.directory_part, base_directory, context);
 
   let const entries = read_directory_cached(listing_directory);
   if (entries == nullptr) return candidates.best();
@@ -669,14 +719,25 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
       continue;
     }
 
+    /* A variable-prefixed path keeps its $NAME prefix active so it still
+       expands at run time, and only the entry name is quoted when it carries a
+       special byte. */
+    let const is_variable_prefixed =
+        !parts.directory_part.is_empty() && parts.directory_part[0] == '$';
+
+    let entry_name = String{completion_allocator(), name};
+    if (entry.is_directory) entry_name += '/';
+
     let candidate = String{completion_allocator(), parts.directory_part};
-    candidate += name;
-
-    if (entry.is_directory) candidate += '/';
-
-    /* A token already inside a quote is not quoted again. */
-    if (!inside_quote && path_candidate_needs_quoting(candidate.view())) {
-      candidate = quote_path_candidate(candidate.view());
+    if (is_variable_prefixed && !inside_quote) {
+      if (path_candidate_needs_quoting(entry_name.view()))
+        entry_name = quote_path_candidate(entry_name.view());
+      candidate += entry_name;
+    } else {
+      candidate += entry_name;
+      /* A token already inside a quote is not quoted again. */
+      if (!inside_quote && path_candidate_needs_quoting(candidate.view()))
+        candidate = quote_path_candidate(candidate.view());
     }
 
     candidates.add(*tier, steal(candidate));
@@ -687,8 +748,8 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
 
 /* Only the trailing component is globbed. */
 static fn complete_glob(StringView token, const Path &base_directory,
-                        bool directories_only, bool executables_only) throws
-    -> ArrayList<String>
+                        bool directories_only, bool executables_only,
+                        EvalContext &context) throws -> ArrayList<String>
 {
   let candidates = ArrayList<String>{completion_allocator()};
 
@@ -698,7 +759,7 @@ static fn complete_glob(StringView token, const Path &base_directory,
           token.data);
 
   let listing_directory =
-      resolve_listing_directory(parts.directory_part, base_directory);
+      resolve_listing_directory(parts.directory_part, base_directory, context);
 
   let const entries = read_directory_cached(listing_directory);
   if (entries == nullptr) return candidates;
@@ -740,7 +801,10 @@ static fn complete_glob(StringView token, const Path &base_directory,
 
 static pure fn token_is_variable(StringView token) wontthrow -> bool
 {
-  return !token.is_empty() && token[0] == '$';
+  /* A slash after the reference makes it a variable-prefixed path, which the
+     filesystem completion expands to list while keeping the literal prefix. */
+  return !token.is_empty() && token[0] == '$' &&
+         !token.find_character('/').has_value();
 }
 
 static fn complete_variable(StringView token, EvalContext &context) throws
@@ -1111,7 +1175,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     candidates = complete_tilde_user(token);
   } else if (inline_glob) {
     candidates = complete_glob(token, base_directory, directories_only,
-                               executables_only);
+                               executables_only, context);
     if (!candidates.is_empty()) {
       candidates.sort();
       let joined = String{arena};
@@ -1140,7 +1204,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       candidates = complete_command(token, token_is_glob, context);
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory, directories_only,
-                               executables_only);
+                               executables_only, context);
     for (String &candidate : candidates)
       if (path_candidate_needs_quoting(candidate.view()))
         candidate = quote_path_candidate(candidate.view());
@@ -1182,7 +1246,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
          runs only once a basename is typed. An explicit tab still lists. */
       candidates =
           complete_filesystem(token, base_directory, open_quote.has_value(),
-                              directories_only, executables_only);
+                              directories_only, executables_only, context);
     }
   }
 
