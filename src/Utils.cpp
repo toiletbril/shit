@@ -282,6 +282,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
         i32 child_status = 0;
         try {
           child_status = execute_builtin(steal(ec), cxt);
+        } catch (const BrokenPipeExit &) {
+          child_status = 128 + SIGPIPE;
         } catch (const ErrorWithLocation &e) {
           const String *source = cxt.current_source();
           shit::show_message(

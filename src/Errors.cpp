@@ -397,6 +397,8 @@ ExecFormatError::ExecFormatError()
     : Error("the file is not an executable and has no interpreter")
 {}
 
+BrokenPipeExit::BrokenPipeExit() : Error("broken pipe") {}
+
 ErrorWithDetails::ErrorWithDetails(StringView message, StringView note)
     : Error(message)
 {

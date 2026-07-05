@@ -1,12 +1,12 @@
 == unzip with an empty argument shows only .zip files and directories:
-ARCHIVE.ZIP
+OLD.ZIP
 archive.zip
 sub/
 == tar with an empty argument shows only its archive types:
 backup.tar.gz
 sub/
 == a program with no table entry keeps plain alphabetical order:
-ARCHIVE.ZIP
+OLD.ZIP
 archive.zip
 backup.tar.gz
 data.csv

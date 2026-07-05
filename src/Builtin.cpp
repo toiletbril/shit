@@ -152,6 +152,8 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
     default:
       unreachable("Unhandled builtin of kind %d", ENUM(ec.builtin_kind()));
     }
+  } catch (const BrokenPipeExit &) {
+    return 128 + SIGPIPE;
   } catch (const Error &e) {
     if (cxt.is_bash_compatible()) {
       if (e.has_note())

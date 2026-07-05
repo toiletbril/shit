@@ -419,6 +419,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
           {
             stage_status = static_cast<i32>(cxt.pending_control_flow().value);
           }
+        } catch (const BrokenPipeExit &) {
+          stage_status = 128 + SIGPIPE;
         } catch (const ErrorWithLocation &e) {
           const String *source = cxt.current_source();
           shit::show_message(

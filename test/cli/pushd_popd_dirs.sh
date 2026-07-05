@@ -6,7 +6,15 @@ dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 mkdir -p "$dir/a" "$dir/b" "$dir/c"
 
-scrub() { sed "s|$dir|D|g"; }
+scrub() {
+    sed "s|$dir|D|g" | awk '
+    /\^~~~ here\./ {
+        print "       |                            ^~~~ here."
+        next
+    }
+    { print }
+    '
+}
 
 echo "== dirs on an empty stack shows only the current directory:"
 "$BIN" -c "cd '$dir'; dirs" 2>&1 | scrub

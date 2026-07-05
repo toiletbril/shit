@@ -5,7 +5,7 @@
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 : > "$dir/archive.zip"
-: > "$dir/ARCHIVE.ZIP"
+: > "$dir/OLD.ZIP"
 : > "$dir/backup.tar.gz"
 : > "$dir/notes.txt"
 : > "$dir/data.csv"

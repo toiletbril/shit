@@ -11,32 +11,26 @@ chmod 755 "$dir"
 cat > "$dir/docker" <<'SH'
 #!/bin/sh
 if [ "$1" = "compose" ] && [ "$2" = "config" ]; then
-  cat <<'HELP'
-OPTIONS
-  --services   List the services
-  --volumes    List the volumes
-HELP
+  echo "OPTIONS"
+  echo "  --services   List the services"
+  echo "  --volumes    List the volumes"
 elif [ "$1" = "compose" ]; then
-  cat <<'HELP'
-Commands:
-  up        Start the services
-  config    Show the resolved config
-HELP
+  echo "Commands:"
+  echo "  up        Start the services"
+  echo "  config    Show the resolved config"
 else
-  cat <<'HELP'
-Commands:
-  compose   Run a compose file
-  run       Run a command
-HELP
+  echo "Commands:"
+  echo "  compose   Run a compose file"
+  echo "  run       Run a command"
 fi
 SH
 chmod +x "$dir/docker"
 echo "== first-level subcommands:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'docker ' </dev/null
+MANPATH= PATH="$dir:/bin" "$BIN" --debug-complete-at 'docker ' </dev/null
 echo "== second-level sub-subcommands from 'docker compose --help':"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'docker compose ' </dev/null
+MANPATH= PATH="$dir:/bin" "$BIN" --debug-complete-at 'docker compose ' </dev/null
 echo "== third-level options from 'docker compose config --help':"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'docker compose config --' </dev/null
+MANPATH= PATH="$dir:/bin" "$BIN" --debug-complete-at 'docker compose config --' </dev/null
 echo "== an unknown deeper word does not fork:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'docker compose bogus --' </dev/null
+MANPATH= PATH="$dir:/bin" "$BIN" --debug-complete-at 'docker compose bogus --' </dev/null
 rm -rf "$dir"

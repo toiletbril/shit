@@ -11,5 +11,5 @@ echo "== -m 755 under umask 077 keeps every bit (want 755):"
 stat_mode "$dir/exact"
 echo "== -p -m 777 names the deep directory exactly, parents stay umask-narrowed:"
 (umask 022; "$BIN" -c "shitbox mkdir -p -m 777 '$dir/a/b/named'") </dev/null
-echo -n "named (want 777): "; stat_mode "$dir/a/b/named"
-echo -n "parent (want 755): "; stat_mode "$dir/a"
+printf 'named (want 777): '; stat_mode "$dir/a/b/named"
+printf 'parent (want 755): '; stat_mode "$dir/a"

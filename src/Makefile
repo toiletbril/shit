@@ -158,6 +158,10 @@ USE_LD := -fuse-ld=lld
 else
 USE_LD :=
 endif
+else ifeq ($(TARGET), Darwin)
+# mold is ELF-only and lld-as-Mach-O is rare on macOS, so the system ld64
+# links directly with no -fuse-ld flag.
+USE_LD :=
 else ifneq ($(shell command -v mold 2>$(DEVNULL)),)
 USE_LD := -fuse-ld=mold
 else ifneq ($(shell command -v ld.lld 2>$(DEVNULL))$(shell command -v lld 2>$(DEVNULL)),)
@@ -169,7 +173,6 @@ endif
 # MODE=rel
 ifeq ($(MODE), rel)
 CXXFLAGS += \
-	-s \
 	-DNDEBUG \
 	-O3 \
 	-U_FORTIFY_SOURCE \

@@ -72,6 +72,8 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   if (let const chosen = find_util(name); chosen.has_value()) {
     try {
       return run_util(*chosen, ec, cxt, shifted);
+    } catch (const BrokenPipeExit &) {
+      throw;
     } catch (const ErrorWithLocation &error) {
       /* The caret offsets into the utility's own argument vector, so it is
          re-pointed at the command location. */

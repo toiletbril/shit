@@ -122,6 +122,16 @@ public:
   ExecFormatError();
 };
 
+/* Thrown by print_to_stdout and print_to_stderr when write returns EPIPE,
+   since the shell ignores SIGPIPE and so a builtin only sees the EPIPE return.
+   Caught at the builtin and forked-stage boundaries and turned into a silent
+   exit 141, mirroring the SIGPIPE reap in wait_and_monitor_process. */
+class BrokenPipeExit : public Error
+{
+public:
+  BrokenPipeExit();
+};
+
 class ErrorWithLocation : public ErrorBase
 {
 public:
