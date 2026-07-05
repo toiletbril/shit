@@ -65,6 +65,12 @@ const SetOption SET_OPTIONS[] = {
      "Fail a command whose glob matches nothing."},
     {'b', "notify", &EvalContext::set_notify, &EvalContext::notify,
      "Report a background job's completion immediately when it finishes."},
+    /* set -o posix mirrors set --mood sh, and set +o posix steps down to bash
+       only when already in the POSIX mood. A no-op otherwise, since the prior
+       mood is not recoverable. brew's set +o posix runs under bash already. */
+    {'\0', "posix", &EvalContext::set_posix_mode_via_option,
+     &EvalContext::is_posix_mode,
+     "Switch to the POSIX mood, the bash set -o posix form."},
     {'\0', "vi", &EvalContext::set_vi_mode, &EvalContext::vi_mode,
      "Use vi-style command-line editing."},
     {'\0', "emacs", &EvalContext::set_emacs_mode, &EvalContext::emacs_mode,

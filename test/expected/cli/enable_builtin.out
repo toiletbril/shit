@@ -1,0 +1,21 @@
+== enable with no args returns 0:
+rc=0
+== enable compgen unset returns 0:
+rc=0
+== enable -n echo returns 0:
+rc=0
+== enable -a lists builtins:
+enable echo
+enable exit
+enable cd
+== enable -f file echo returns 0:
+rc=0
+== enable -s returns 0:
+rc=0
+== enable nosuchbuiltin reports and exits 1:
+shit: 1:1: error: Builtin 'enable': 'nosuchbuiltin' is not a shell builtin.
+     1 |  enable nosuchbuiltin
+       |  ^~~~~~~~~~~~~~~~~~~~ here.
+rc=1
+== builtin enable compgen unset forwards through enable:
+ok

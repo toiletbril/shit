@@ -39,6 +39,16 @@ builtin, and a
 inside the rc sticks for the session. An explicit
 .BR "set -u" ", " "set -o pipefail" ", or " "set -o failglob"
 is the script's own ask and survives a later mood switch.
+.BR "set -o posix"
+mirrors
+.BR "set --mood sh" ,
+and
+.B "set +o posix"
+steps down to the
+.B bash
+mood only when already in the
+.B sh
+mood, otherwise it is a no-op.
 .SH OPTIONS
 .SS Mood and startup
 .TP

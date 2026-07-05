@@ -1,0 +1,9 @@
+== set -o posix enters posix mood:
+posix          	on
+== set +o posix from bash mood is a no-op:
+posix          	off
+== set +o posix from posix mood steps to bash:
+posix          	off
+== brew's two failing lines now pass:
+ok
+rc-done

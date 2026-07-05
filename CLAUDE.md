@@ -27,7 +27,9 @@ what the man page does not.
 
 The mood drives the nounset, pipefail, and failglob strictness through
 `apply_strictness_for_mood`. An explicit `set -u`, `set -o pipefail`, or `set -o
-failglob` survives a later mood switch through the per-toggle explicit marks. A
+failglob` survives a later mood switch through the per-toggle explicit marks.
+`set -o posix` mirrors `set --mood sh`, and `set +o posix` steps down to bash
+only when already in the posix mood, since the prior mood is not a stack. A
 glob in command position is fatal in the default mood and a warning in a
 compatibility mood, checked in SimpleCommand::evaluate_impl through
 command_word_is_glob. The mood, the diagnostics toggles, and the three strictness
@@ -91,7 +93,10 @@ src/ExpressionsSimpleCommand.cpp, the lists, pipeline, loops, case, and compound
 commands in src/ExpressionsCompound.cpp, and the arithmetic and logical nodes in
 src/ExpressionsArith.cpp. Shared free helpers declare in
 src/ExpressionsInternal.hpp. The builtins live under src/builtins, and the
-busybox-style coreutils live under src/shitbox.
+busybox-style coreutils live under src/shitbox. The `enable` builtin is a
+no-op since every builtin is always enabled in shit, and accepts the bash
+flags `-n`, `-a`, `-f`, and `-s` so a bash script that toggles builtins
+keeps sourcing.
 
 src/Platform.cpp wraps the operating system behind an os namespace, with the
 POSIX block and the Windows block defining the same API twice on purpose. Every

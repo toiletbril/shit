@@ -21,6 +21,7 @@ shitbox        	off
 monitor        	off
 failglob       	on
 notify         	off
+posix          	off
 vi             	off
 emacs          	on
 hashall        	off

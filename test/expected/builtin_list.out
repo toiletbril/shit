@@ -30,6 +30,7 @@ declare
 dirs
 disown
 echo
+enable
 eval
 exec
 exit
@@ -71,15 +72,15 @@ unalias
 unset
 wait
 z
-shit has 59 builtins:
+shit has 60 builtins:
 
   .          :          [          alias      bench      bg         break
   builtin    cd         command    compgen    complete   compopt    continue
-  declare    dirs       disown     echo       eval       exec       exit
-  export     false      fg         getopts    hash       history    jobs
-  kill       let        local      mapfile    newgrp     popd       printf
-  pushd      pwd        read       readarray  readonly   return     set
-  shift      shitbox    shopt      source     test       time       times
-  trap       true       type       typeset    ulimit     umask      unalias
-  unset      wait       z
+  declare    dirs       disown     echo       enable     eval       exec
+  exit       export     false      fg         getopts    hash       history
+  jobs       kill       let        local      mapfile    newgrp     popd
+  printf     pushd      pwd        read       readarray  readonly   return
+  set        shift      shitbox    shopt      source     test       time
+  times      trap       true       type       typeset    ulimit     umask
+  unalias    unset      wait       z
 [Code 0]

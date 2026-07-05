@@ -759,9 +759,28 @@ public:
 
   /* The mood the lexer reads. set_mood changes only the mood, so a caller that
      wants the strictness moved with it calls apply_strictness_for_mood after.
-   */
+  */
   fn set_mood(mimic_mood mood) wontthrow -> void { m_runtime.mood = mood; }
   pure fn mood() const wontthrow -> mimic_mood { return m_runtime.mood; }
+
+  /* The set -o posix form enters the POSIX mood, and set +o posix steps down to
+     bash when already in POSIX. A non-posix mood is left alone, since the mood
+     is not a stack and the prior mood is not recoverable. The explicit mark and
+     the strictness follow the switch the way set --mood does.
+  */
+  fn set_posix_mode_via_option(bool enable) wontthrow -> void
+  {
+    if (enable) {
+      set_mood(mimic_mood::Posix);
+      apply_strictness_for_mood();
+      note_explicit_mood();
+      return;
+    }
+    if (m_runtime.mood != mimic_mood::Posix) return;
+    set_mood(mimic_mood::Bash);
+    apply_strictness_for_mood();
+    note_explicit_mood();
+  }
 
   fn set_execution_string(StringView text) throws -> void
   {

@@ -69,6 +69,7 @@ public:
     Shitbox,
     Compopt,
     History,
+    Enable,
   };
 
   void set_fds(os::descriptor in, os::descriptor out) throws;
@@ -143,6 +144,7 @@ inline constexpr static_string_entry<Builtin::Kind> BUILTIN_ENTRIES[] = {
     {SSK("shitbox"),   Builtin::Kind::Shitbox       },
     {SSK("compopt"),   Builtin::Kind::Compopt       },
     {SSK("history"),   Builtin::Kind::History       },
+    {SSK("enable"),    Builtin::Kind::Enable        },
 };
 
 inline constexpr StaticStringMap BUILTINS{BUILTIN_ENTRIES};
@@ -207,7 +209,8 @@ inline constexpr StaticStringMap BUILTINS{BUILTIN_ENTRIES};
   B_CASE(Compgen);                                                             \
   B_CASE(Shitbox);                                                             \
   B_CASE(Compopt);                                                             \
-  B_CASE(History)
+  B_CASE(History);                                                             \
+  B_CASE(Enable)
 
 #define BUILTIN_STRUCT(b)                                                      \
   class b : public Builtin                                                     \
@@ -272,6 +275,7 @@ BUILTIN_STRUCT(Compopt);
 BUILTIN_STRUCT(Z);
 BUILTIN_STRUCT(Shitbox);
 BUILTIN_STRUCT(History);
+BUILTIN_STRUCT(Enable);
 
 class Exit : public Builtin
 {
@@ -293,7 +297,7 @@ fn is_special_builtin_name(StringView name) wontthrow -> bool;
 const ArrayList<String> &builtin_names() throws;
 
 inline constexpr usize BUILTIN_KIND_COUNT =
-    static_cast<usize>(Builtin::Kind::History) + 1;
+    static_cast<usize>(Builtin::Kind::Enable) + 1;
 
 /* The FLAG_LIST of a builtin, registered at static-init time by the
    REGISTER_BUILTIN_FLAGS line in its file. A kind with no registration reads
