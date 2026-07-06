@@ -454,12 +454,16 @@ fn compile_search_regex(StringView pattern, bool is_case_insensitive,
 
 fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
 {
-  /* REG_STARTEND bounds the match by offset, so the subject is read in place
-     with no null-terminated copy. */
+#if defined REG_STARTEND
   regmatch_t bounds[1];
   bounds[0].rm_so = 0;
   bounds[0].rm_eo = static_cast<regoff_t>(subject.length);
   return regexec(&compiled.re, subject.data, 1, bounds, REG_STARTEND) == 0;
+#else
+  /* musl lacks REG_STARTEND, so the subject must be null-terminated. */
+  const String null_terminated{heap_allocator(), subject};
+  return regexec(&compiled.re, null_terminated.c_str(), 0, nullptr, 0) == 0;
+#endif
 }
 
 pure fn path_is_absolute(StringView path) wontthrow -> bool
