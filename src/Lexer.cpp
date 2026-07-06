@@ -812,6 +812,19 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
           byte_count++;
 
           if (quote != 0) {
+            /* A backslash inside double quotes escapes the next char, so a
+               \" does not close the string the way a bare " would. Inside
+               single quotes every char including \ is literal. */
+            if (quote == '"' && c == '\\') {
+              inner += c;
+              const let escaped = chop_character(byte_count);
+              if (escaped != lexer::CEOF) {
+                byte_count++;
+                inner += escaped;
+              }
+              previous_char = c;
+              continue;
+            }
             if (c == quote) quote = 0;
             inner += c;
             previous_char = c;
