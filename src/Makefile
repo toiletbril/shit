@@ -65,13 +65,14 @@ DEVNULL := "/dev/null"
 endif
 
 # Cosmopolitan/Clang.
+CXX_ORIGIN := $(origin CXX)
 ifeq ($(MODE), cosmo)
 CXX := cosmoc++
 else ifeq ($(MODE), cosmo_dbg)
 CXX := cosmoc++
 else ifeq ($(OS), Windows_NT)
 CXX := clang++
-else ifeq ($(origin CXX), default)
+else ifeq ($(CXX_ORIGIN), default)
 CXX := clang++
 endif
 
@@ -83,8 +84,8 @@ endif
 endif
 
 ifeq ($(TARGET), Darwin)
-ifneq ($(shell uname -s), Darwin)
-ifeq ($(origin CXX), default)
+ifneq ($(HOST_OS), Darwin)
+ifeq ($(CXX_ORIGIN), default)
 ifeq ($(ARCH), x86_64)
 $(error x86_64 Darwin build is not supported)
 else

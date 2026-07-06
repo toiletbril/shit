@@ -460,7 +460,6 @@ fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
   bounds[0].rm_eo = static_cast<regoff_t>(subject.length);
   return regexec(&compiled.re, subject.data, 1, bounds, REG_STARTEND) == 0;
 #else
-  /* musl lacks REG_STARTEND, so the subject must be null-terminated. */
   const String null_terminated{heap_allocator(), subject};
   return regexec(&compiled.re, null_terminated.c_str(), 0, nullptr, 0) == 0;
 #endif
