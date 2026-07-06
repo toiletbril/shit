@@ -128,7 +128,7 @@ refill:
 ZSH ?= /bin/zsh
 ASH ?= /bin/busybox ash
 YASH ?= /bin/yash
-BASH ?= /bin/bash
+BASHP ?= /bin/bash
 DASH ?= /bin/dash
 
 SH_COMPAT := $(filter-out %_1.sh,$(wildcard sh/*.sh))
@@ -142,12 +142,12 @@ dashdiff: $(BIN)
 BASH_COMPAT := $(filter-out %_1.bash,$(wildcard bash/*.bash))
 
 bashdiff: $(BIN)
-	@BIN='$(BIN)' BASH='$(BASH)' DIFF_FLAGS='$(DIFF_FLAGS)' \
+	@BIN='$(BIN)' BASHP='$(BASHP)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 		FAILED_LIST='$(FAILED_LIST)' BASH_COMPAT_FILES='$(BASH_COMPAT)' \
 		$(SHELL) run-bash-diff-test.sh
 
 mimicrydiff: $(BIN)
-	@BIN='$(BIN)' BASH='$(BASH)' DASH='$(DASH)' DIFF_FLAGS='$(DIFF_FLAGS)' \
+	@BIN='$(BIN)' BASHP='$(BASHP)' DASH='$(DASH)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 		FAILED_LIST='$(FAILED_LIST)' SH_COMPAT='$(SH_COMPAT)' \
 		BASH_COMPAT_FILES='$(BASH_COMPAT)' $(SHELL) run-mimicry-diff-test.sh
 
@@ -161,7 +161,7 @@ PRIMES_LIMIT ?= 100000
 SCALE ?= 100
 
 bench:
-	@SCALE='$(SCALE)' BIN='$(BIN)' DASH='$(DASH)' BASH='$(BASH)' ZSH='$(ZSH)' \
+	@SCALE='$(SCALE)' BIN='$(BIN)' DASH='$(DASH)' BASHP='$(BASHP)' ZSH='$(ZSH)' \
 		ASH='$(ASH)' YASH='$(YASH)' BENCH='$(BENCH)' BENCH_BASH='$(BENCH_BASH)' \
 		BENCH_SHIT='$(BENCH_SHIT)' PRIMES='$(PRIMES)' PRIMES_PY='$(PRIMES_PY)' \
 		PRIMES_LIMIT='$(PRIMES_LIMIT)' $(SHELL) run-bench-test.sh
