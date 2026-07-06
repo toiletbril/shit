@@ -489,6 +489,9 @@ cold fn show_version() throws -> void
   s += '\n';
   s += "(c) toiletbril <https://github.com/toiletbril>";
   s += '\n';
+  s += '\n';
+  s += "Report bugs at <https://github.com/toiletbril/shit>";
+  s += '\n';
 
   print(s);
   flush();
