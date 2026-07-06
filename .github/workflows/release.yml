@@ -21,6 +21,7 @@ concurrency:
 
 jobs:
   build-image:
+    name: Build or pull the cached image
     uses: ./.github/workflows/build-image.yml
     permissions:
       contents: read

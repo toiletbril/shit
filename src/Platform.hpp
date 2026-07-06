@@ -32,6 +32,15 @@
 #define SHIT_PLATFORM_IS   (SHIT_SUPPORT_VECTOR) &
 #define SHIT_PLATFORM_ISNT (~SHIT_SUPPORT_VECTOR) &
 
+/* Exit status for a builtin or a pipeline stage whose reader has gone away.
+   POSIX defines this as 128 + SIGPIPE. Windows has no SIGPIPE, so the literal
+   141 keeps the same value bash reports. */
+#if defined SIGPIPE
+#define SHIT_BROKEN_PIPE_EXIT_STATUS (128 + SIGPIPE)
+#else
+#define SHIT_BROKEN_PIPE_EXIT_STATUS 141
+#endif
+
 #include "ArrayList.hpp"
 #include "Common.hpp"
 #include "Maybe.hpp"
