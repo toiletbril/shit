@@ -1044,7 +1044,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
 
     if (ch == '`') {
       /* The POSIX backquote unescaping strips a backslash before a backtick, a
-         dollar sign, or another backslash. */
+         dollar sign, another backslash, or, inside double quotes, a double
+         quote, so a \" inside a quoted backtick opens an inner quoted span. */
       const let relative_open_backtick_pos = byte_count;
       byte_count++;
       let inner = String{heap_allocator()};
@@ -1063,7 +1064,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         }
         if (c == '\\') {
           const let escaped = chop_character(byte_count + 1);
-          if (escaped == '`' || escaped == '$' || escaped == '\\') {
+          if (escaped == '`' || escaped == '$' || escaped == '\\' ||
+              (is_in_double_quotes && escaped == '"'))
+          {
             inner += escaped;
             byte_count += 2;
             continue;

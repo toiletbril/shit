@@ -1,0 +1,75 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign PRG=/foo/bar/retrace]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "$(dirname "$PRG")/.."]
+  [CompoundListCondition, None]
+    [ForLoop "a"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "arg=<$a>"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo "$PRG")"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(printf %s "$PRG")"]
+[Word
+  Unquoted "PRG=/foo/bar/retrace"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  CommandSubstitution "dirname "$PRG""
+  DoubleQuoted "/.."
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "arg=<"
+  Variable "a"
+  DoubleQuoted ">"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo "$PRG""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "printf %s "$PRG""
+]
+shit: 5:1: warning: An echo of a command substitution prints what the command already prints.
+     5 |  echo "`echo \"$PRG\"`"
+       |  ^~~~ here.
+note: Run the command on its own instead.
+shit: 5:6: warning: A command substitution wraps a useless echo.
+     5 |  echo "`echo \"$PRG\"`"
+       |       ^~~~~~~~~~~~~~~~~ here.
+note: The text can be used directly without the subshell.
+shit: 6:1: warning: An echo of a command substitution prints what the command already prints.
+     6 |  echo "`printf %s \"$PRG\"`"
+       |  ^~~~ here.
+note: Run the command on its own instead.
+arg=</foo/bar/..>
+/foo/bar/retrace
+/foo/bar/retrace
+[Code 0]
