@@ -9,17 +9,23 @@ if ! command -v $DASH >/dev/null 2>&1; then
     exit 0
 fi
 
-for f in $SH_COMPAT; do
-    s="$($BIN --mood sh "$f" 2>/dev/null; printf X)"; s="${s%X}"
-    d="$($DASH "$f" 2>/dev/null; printf X)"; d="${d%X}"
-    alt="${f%.sh}_1.sh"
+diff_one() {
+    local file=$1
+    local s d alt d1
+    s="$($BIN --mood sh "$file" 2>/dev/null; printf X)"; s="${s%X}"
+    d="$($DASH "$file" 2>/dev/null; printf X)"; d="${d%X}"
+    alt="${file%.sh}_1.sh"
     if [ "$s" = "$d" ]; then
-        printf "\t%-64s ok\033[K\r" "$f"
+        printf "\t%-64s ok\033[K\r" "$file"
     elif [ -f "$alt" ] && d1="$($DASH "$alt" 2>/dev/null; printf X)" && [ "$s" = "${d1%X}" ]; then
-        printf "\t%-64s ok (flaky alternative)\n" "$f"
+        printf "\t%-64s ok (flaky alternative)\n" "$file"
     else
-        diff $DIFF_FLAGS --label "$f (shit)" --label "$f (dash)" \
+        diff $DIFF_FLAGS --label "$file (shit)" --label "$file (dash)" \
             <(printf '%s' "$s") <(printf '%s' "$d") >> "$FAILED_LIST"
-        printf "\t%-64s FAILED :c\n" "$f"
+        printf "\t%-64s FAILED :c\n" "$file"
     fi
+}
+
+for f in $SH_COMPAT; do
+    diff_one "$f"
 done

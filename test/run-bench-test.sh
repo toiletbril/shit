@@ -2,57 +2,67 @@
 # Benchmark configure.sh, configure.bash, and configure.shit across the reference
 # shells and shit, reporting wall-clock seconds at the given scale and checking
 # that shit output matches the reference shell. The Makefile passes SCALE, BIN,
-# DASH, BASH, ZSH, ASH, YASH, BENCH, BENCH_BASH, and BENCH_SHIT. Run from the
+# DASH, BASHP, ZSH, ASH, YASH, BENCH, BENCH_BASH, and BENCH_SHIT. Run from the
 # test directory. The bash time keyword formats the wall clock through
 # TIMEFORMAT.
 
 export TIMEFORMAT="  %R"
-scale="$SCALE"
 
-d=/tmp/shit_bench_d; b=/tmp/shit_bench_b; z=/tmp/shit_bench_z
-g=/tmp/shit_bench_g; l=/tmp/shit_bench_l; s=/tmp/shit_bench_s
-bb=/tmp/shit_bench_bb; sb=/tmp/shit_bench_sb
-zb=/tmp/shit_bench_zb; zs=/tmp/shit_bench_zs
-pp=/tmp/shit_bench_pp; pb=/tmp/shit_bench_pb; ps=/tmp/shit_bench_ps
+WORK=$(mktemp -d -t shit_bench)
+trap 'rm -rf "$WORK"' EXIT
+D=$WORK/d
+B=$WORK/b
+Z=$WORK/z
+G=$WORK/g
+L=$WORK/l
+S=$WORK/s
+BB=$WORK/bb
+SB=$WORK/sb
+ZB=$WORK/zb
+ZS=$WORK/zs
+PP=$WORK/pp
+PB=$WORK/pb
+PS=$WORK/ps
 
-echo "configure.sh, wall-clock seconds at SCALE=$scale, lower is better:"
-command -v "$DASH"  >/dev/null && printf "  %-16s" "$DASH"   && ( time SCALE=$scale $DASH  $BENCH >"$d" 2>&1 ) 2>&1
-command -v "$BASHP" >/dev/null && printf "  %-16s" "$BASHP"  && ( time SCALE=$scale  $BASHP $BENCH >"$b" 2>&1 ) 2>&1
-command -v "$ZSH"   >/dev/null && printf "  %-16s" "$ZSH"    && ( time SCALE=$scale $ZSH   $BENCH >"$z" 2>&1 ) 2>&1
-command -v "$ASH"   >/dev/null && printf "  %-16s" "$ASH"    && ( time SCALE=$scale $ASH   $BENCH >"$g" 2>&1 ) 2>&1
-command -v "$YASH"  >/dev/null && printf "  %-16s" "$YASH"   && ( time SCALE=$scale $YASH  $BENCH >"$l" 2>&1 ) 2>&1
-printf "  %-16s" "$(basename "$BIN")";  ( time SCALE=$scale $BIN --mood sh $BENCH >"$s" 2>&1 ) 2>&1
-if cmp "$d" "$s"; then echo "output matches dash"
-else echo "output differs from dash:"; diff "$d" "$s" | head -20; fi
-printf "  %-16s" "$BIN+opt"; ( time SCALE=$scale $BIN $BENCH >"$s" 2>/dev/null ) 2>&1
-if cmp "$d" "$s"; then echo "output matches dash with the optimizer on"
-else echo "output differs from dash:"; diff "$d" "$s" | head -20; fi
+run_ref() {
+    if ! command -v "$1" >/dev/null; then return 0; fi
+    printf "  %-16s" "${2:-$1}"
+    ( time SCALE=$SCALE "$1" $3 >"$4" 2>&1 ) 2>&1
+}
 
-echo "configure.bash, wall-clock seconds at SCALE=$scale, lower is better:"
-printf "  %-16s" "$BASH"; ( time SCALE=$scale $BASH $BENCH_BASH >"$bb" 2>&1 ) 2>&1
-printf "  %-16s" "$BIN";  ( time SCALE=$scale $BIN --mood bash $BENCH_BASH >"$sb" 2>&1 ) 2>&1
-if cmp "$bb" "$sb"; then echo "output matches bash"
-else echo "output differs from bash:"; diff "$bb" "$sb" | head -20; fi
-printf "  %-16s" "$BIN+opt"; ( time SCALE=$scale $BIN $BENCH_BASH >"$sb" 2>/dev/null ) 2>&1
-if cmp "$bb" "$sb"; then echo "output matches bash with the optimizer on"
-else echo "output differs from bash:"; diff "$bb" "$sb" | head -20; fi
+compare() {
+    if cmp "$1" "$2"; then echo "output matches $3"
+    else echo "output differs from $3:"; diff "$1" "$2" | head -20; fi
+}
 
-echo "configure.shit, wall-clock seconds at SCALE=$scale, lower is better:"
-printf "  %-16s" "$BASH"; ( time SCALE=$scale $BASH $BENCH_SHIT >"$zb" 2>&1 ) 2>&1
-printf "  %-16s" "$BIN+opt"; ( time SCALE=$scale $BIN $BENCH_SHIT >"$zs" 2>/dev/null ) 2>&1
-if cmp "$zb" "$zs"; then echo "output matches bash with the optimizer on"
-else echo "output differs from bash:"; diff "$zb" "$zs" | head -20; fi
+echo "configure.sh, wall-clock seconds at SCALE=$SCALE, lower is better:"
+run_ref "$DASH"  "$(basename "$DASH")"  "$BENCH" "$D"
+run_ref "$BASHP" "$(basename "$BASHP")" "$BENCH" "$B"
+run_ref "$ZSH"   "$(basename "$ZSH")"   "$BENCH" "$Z"
+run_ref "$ASH"   "$(basename "$ASH")"   "$BENCH" "$G"
+run_ref "$YASH"  "$(basename "$YASH")"  "$BENCH" "$L"
+printf "  %-16s" "$(basename "$BIN")";  ( time SCALE=$SCALE $BIN --mood sh $BENCH >"$S" 2>&1 ) 2>&1
+compare "$D" "$S" "dash"
+printf "  %-16s" "$(basename "$BIN")+opt"; ( time SCALE=$SCALE $BIN $BENCH >"$S" 2>/dev/null ) 2>&1
+compare "$D" "$S" "dash with the optimizer on"
+
+echo "configure.bash, wall-clock seconds at SCALE=$SCALE, lower is better:"
+printf "  %-16s" "$(basename "$BASHP")"; ( time SCALE=$SCALE $BASHP $BENCH_BASH >"$BB" 2>&1 ) 2>&1
+printf "  %-16s" "$(basename "$BIN")";  ( time SCALE=$SCALE $BIN --mood bash $BENCH_BASH >"$SB" 2>&1 ) 2>&1
+compare "$BB" "$SB" "bash"
+printf "  %-16s" "$(basename "$BIN")+opt"; ( time SCALE=$SCALE $BIN $BENCH_BASH >"$SB" 2>/dev/null ) 2>&1
+compare "$BB" "$SB" "bash with the optimizer on"
+
+echo "configure.shit, wall-clock seconds at SCALE=$SCALE, lower is better:"
+printf "  %-16s" "$(basename "$BASHP")"; ( time SCALE=$SCALE $BASHP $BENCH_SHIT >"$ZB" 2>&1 ) 2>&1
+printf "  %-16s" "$(basename "$BIN")+opt"; ( time SCALE=$SCALE $BIN $BENCH_SHIT >"$ZS" 2>/dev/null ) 2>&1
+compare "$ZB" "$ZS" "bash with the optimizer on"
 
 echo "primes.bash, wall-clock seconds up to LIMIT=$PRIMES_LIMIT, lower is better:"
-printf "  %-16s" "python3"; ( time python3 $PRIMES_PY $PRIMES_LIMIT >"$pp" 2>&1 ) 2>&1
-printf "  %-16s" "$BASH";    ( time $BASH $PRIMES $PRIMES_LIMIT >"$pb" 2>&1 ) 2>&1
-printf "  %-16s" "$BIN";     ( time $BIN --mood bash $PRIMES $PRIMES_LIMIT >"$ps" 2>&1 ) 2>&1
-if cmp "$pb" "$ps"; then echo "output matches bash"
-else echo "output differs from bash:"; diff "$pb" "$ps" | head -20; fi
-printf "  %-16s" "$BIN+opt"; ( time $BIN $PRIMES $PRIMES_LIMIT >"$ps" 2>/dev/null ) 2>&1
-if cmp "$pb" "$ps"; then echo "output matches bash with the optimizer on"
-else echo "output differs from bash:"; diff "$pb" "$ps" | head -20; fi
-if cmp "$pb" "$pp"; then echo "output matches python"
-else echo "output differs from python:"; diff "$pb" "$pp" | head -20; fi
-
-rm -f "$d" "$b" "$z" "$g" "$l" "$s" "$bb" "$sb" "$zb" "$zs" "$pp" "$pb" "$ps"
+printf "  %-16s" "python3"; ( time python3 $PRIMES_PY $PRIMES_LIMIT >"$PP" 2>&1 ) 2>&1
+printf "  %-16s" "$(basename "$BASHP")"; ( time $BASHP $PRIMES $PRIMES_LIMIT >"$PB" 2>&1 ) 2>&1
+printf "  %-16s" "$(basename "$BIN")";  ( time $BIN --mood bash $PRIMES $PRIMES_LIMIT >"$PS" 2>&1 ) 2>&1
+compare "$PB" "$PS" "bash"
+printf "  %-16s" "$(basename "$BIN")+opt"; ( time $BIN $PRIMES $PRIMES_LIMIT >"$PS" 2>/dev/null ) 2>&1
+compare "$PB" "$PS" "bash with the optimizer on"
+compare "$PB" "$PP" "python"

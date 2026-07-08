@@ -10,6 +10,23 @@
 # BASH_COMPAT_FILES. The file list avoids the name BASH_COMPAT, which bash reads
 # as its own compatibility level.
 
+mimic_one() {
+    local ref=$1 file=$2 suffix=$3 label=$4
+    local s d alt r1
+    s="$($BIN -I -c "$file" 2>/dev/null; printf X)"; s="${s%X}"
+    d="$($ref "$file" 2>/dev/null; printf X)"; d="${d%X}"
+    alt="${file%$suffix}_1$suffix"
+    if [ "$s" = "$d" ]; then
+        printf "\t%-64s mimic ok\033[K\r" "$file"
+    elif [ -f "$alt" ] && r1="$($ref "$alt" 2>/dev/null; printf X)" && [ "$s" = "${r1%X}" ]; then
+        printf "\t%-64s mimic ok (flaky alternative)\n" "$file"
+    else
+        diff $DIFF_FLAGS --label "$file (shit -I)" --label "$file ($label)" \
+            <(printf '%s' "$s") <(printf '%s' "$d") >> "$FAILED_LIST"
+        printf "\t%-64s mimic FAILED :c\n" "$file"
+    fi
+}
+
 bash_skip_reason=""
 if ! command -v $BASHP >/dev/null 2>&1; then
     bash_skip_reason="no $BASHP"
@@ -24,18 +41,7 @@ fi
 
 if [ -z "$bash_skip_reason" ]; then
     for f in $BASH_COMPAT_FILES; do
-        s="$($BIN -I -c "$f" 2>/dev/null; printf X)"; s="${s%X}"
-        b="$($BASHP "$f" 2>/dev/null; printf X)"; b="${b%X}"
-        alt="${f%.bash}_1.bash"
-        if [ "$s" = "$b" ]; then
-            printf "\t%-64s mimic ok\033[K\r" "$f"
-        elif [ -f "$alt" ] && b1="$($BASHP "$alt" 2>/dev/null; printf X)" && [ "$s" = "${b1%X}" ]; then
-            printf "\t%-64s mimic ok (flaky alternative)\n" "$f"
-        else
-            diff $DIFF_FLAGS --label "$f (shit -I)" --label "$f (bash)" \
-                <(printf '%s' "$s") <(printf '%s' "$b") >> "$FAILED_LIST"
-            printf "\t%-64s mimic FAILED :c\n" "$f"
-        fi
+        mimic_one "$BASHP" "$f" .bash bash
     done
 else
     printf "\t%-64s skipped, %s\n" mimicrydiff "$bash_skip_reason"
@@ -43,18 +49,7 @@ fi
 
 if command -v $DASH >/dev/null 2>&1; then
     for f in $SH_COMPAT; do
-        s="$($BIN -I -c "$f" 2>/dev/null; printf X)"; s="${s%X}"
-        d="$($DASH "$f" 2>/dev/null; printf X)"; d="${d%X}"
-        alt="${f%.sh}_1.sh"
-        if [ "$s" = "$d" ]; then
-            printf "\t%-64s mimic ok\033[K\r" "$f"
-        elif [ -f "$alt" ] && d1="$($DASH "$alt" 2>/dev/null; printf X)" && [ "$s" = "${d1%X}" ]; then
-            printf "\t%-64s mimic ok (flaky alternative)\n" "$f"
-        else
-            diff $DIFF_FLAGS --label "$f (shit -I)" --label "$f (dash)" \
-                <(printf '%s' "$s") <(printf '%s' "$d") >> "$FAILED_LIST"
-            printf "\t%-64s mimic FAILED :c\n" "$f"
-        fi
+        mimic_one "$DASH" "$f" .sh dash
     done
 else
     printf "\t%-64s skipped, no $DASH\n" mimicrydiff

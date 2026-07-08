@@ -19,17 +19,23 @@ if [ -z "$bash_major" ] || [ "$bash_major" -lt 5 ] || { [ "$bash_major" -eq 5 ] 
     exit 0
 fi
 
-for f in $BASH_COMPAT_FILES; do
-    s="$($BIN --mood bash "$f" 2>/dev/null; printf X)"; s="${s%X}"
-    b="$($BASHP "$f" 2>/dev/null; printf X)"; b="${b%X}"
-    alt="${f%.bash}_1.bash"
+diff_one() {
+    local file=$1
+    local s b alt b1
+    s="$($BIN --mood bash "$file" 2>/dev/null; printf X)"; s="${s%X}"
+    b="$($BASHP "$file" 2>/dev/null; printf X)"; b="${b%X}"
+    alt="${file%.bash}_1.bash"
     if [ "$s" = "$b" ]; then
-        printf "\t%-64s ok\033[K\r" "$f"
+        printf "\t%-64s ok\033[K\r" "$file"
     elif [ -f "$alt" ] && b1="$($BASHP "$alt" 2>/dev/null; printf X)" && [ "$s" = "${b1%X}" ]; then
-        printf "\t%-64s ok (flaky alternative)\n" "$f"
+        printf "\t%-64s ok (flaky alternative)\n" "$file"
     else
-        diff $DIFF_FLAGS --label "$f (shit)" --label "$f (bash)" \
+        diff $DIFF_FLAGS --label "$file (shit)" --label "$file (bash)" \
             <(printf '%s' "$s") <(printf '%s' "$b") >> "$FAILED_LIST"
-        printf "\t%-64s FAILED :c\n" "$f"
+        printf "\t%-64s FAILED :c\n" "$file"
     fi
+}
+
+for f in $BASH_COMPAT_FILES; do
+    diff_one "$f"
 done
