@@ -1,0 +1,26 @@
+#!/bin/env shit
+x=$(cat <<\EOF
+backslash escaped delimiter
+EOF
+)
+echo "$x"
+y=$(cat <<FOO-BAR
+bareword with dash
+FOO-BAR
+)
+echo "$y"
+z=$(cat <<   EOF
+leading whitespace before delimiter
+EOF
+)
+echo "$z"
+w=$(echo pre; cat <<EOF
+semicolon sentinel
+EOF
+)
+echo "$w"
+v=$(true && cat <<-EOF
+	tab stripped in substitution
+	EOF
+)
+echo "$v"

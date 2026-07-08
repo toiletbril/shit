@@ -172,10 +172,7 @@ public:
     while (new_capacity < needed)
       new_capacity *= 2;
     let const fresh = m_allocator.alloc_array<T>(new_capacity);
-    for (usize i = 0; i < m_length; i++) {
-      new (&fresh[i]) T(steal(m_data[i]));
-      m_data[i].~T();
-    }
+    relocate_to(fresh);
     if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);
     m_data = fresh;
     m_capacity = new_capacity;
@@ -191,10 +188,7 @@ public:
       return;
     }
     let const fresh = m_allocator.alloc_array<T>(m_length);
-    for (usize i = 0; i < m_length; i++) {
-      new (&fresh[i]) T(steal(m_data[i]));
-      m_data[i].~T();
-    }
+    relocate_to(fresh);
     m_allocator.free_array(m_data, m_capacity);
     m_data = fresh;
     m_capacity = m_length;
@@ -225,6 +219,20 @@ private:
   ArrayList() : m_allocator(fake_allocator()) {}
 
   static constexpr usize INSERTION_SORT_THRESHOLD = 16;
+
+  /* A trivially copyable type relocates as one memcpy, skipping the per-element
+     move constructor and destructor the compiler would otherwise emit. */
+  fn relocate_to(T *fresh) wontthrow -> void
+  {
+    if constexpr (std::is_trivially_copyable_v<T>) {
+      if (m_length > 0) __builtin_memcpy(fresh, m_data, m_length * sizeof(T));
+      return;
+    }
+    for (usize i = 0; i < m_length; i++) {
+      new (&fresh[i]) T(steal(m_data[i]));
+      m_data[i].~T();
+    }
+  }
 
   fn swap_elements(usize a, usize b) wontthrow -> void
   {

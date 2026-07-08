@@ -128,6 +128,10 @@ protected:
   ArrayList<heredoc_pending> m_pending_heredocs{heap_allocator()};
   fn collect_pending_heredocs() throws -> void;
 
+  template <class Emit>
+  fn walk_heredoc_body(usize start, StringView delimiter, bool should_strip_tabs,
+                       Emit emit_line) throws -> usize;
+
   fn lex_expression_token() throws -> Token *;
   fn lex_shell_token() throws -> Token *;
 
@@ -140,12 +144,8 @@ protected:
   fn lex_sentinel() throws -> Token *;
   fn lex_process_substitution(char direction) throws -> Token *;
 
-  /* A heredoc inside a $(...) or ${...} body is raw text up to a line that
-     holds the delimiter alone, so a quote or paren in the body must not
-     disturb the surrounding scan. byte_count points one past the second < of
-     <<. The helper reads the delimiter, then copies the body and the closing
-     delimiter line into inner, and returns the new byte_count one past the
-     closing delimiter newline. */
+  /* A heredoc body is raw text, so a quote or paren in it must not disturb
+     the surrounding $(...) or ${...} scan. */
   fn skip_heredoc_in_substitution(usize byte_count, String &inner) throws
       -> usize;
 };

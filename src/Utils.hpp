@@ -47,6 +47,12 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
 pure fn strip_sig_prefix(StringView name) wontthrow -> StringView;
 
+pure forceinline fn ascii_to_lower(char ch) wontthrow -> char
+{
+  if (ch >= 'A' && ch <= 'Z') return static_cast<char>(ch - 'A' + 'a');
+  return ch;
+}
+
 fn split_lines(StringView text) throws -> ArrayList<StringView>;
 
 fn format_unix_timestamp(i64 unix_time, const char *format) throws -> String;

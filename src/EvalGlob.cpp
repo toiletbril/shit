@@ -13,12 +13,6 @@ namespace shit {
 
 namespace {
 
-pure fn ascii_lowercase(char ch) wontthrow -> char
-{
-  if (ch >= 'A' && ch <= 'Z') return static_cast<char>(ch - 'A' + 'a');
-  return ch;
-}
-
 fn name_matches_glob(StringView glob, StringView filename,
                      const Bitset &glob_active, usize mask_offset, bool extglob,
                      bool should_ignore_case, Allocator allocator) throws
@@ -34,7 +28,7 @@ fn name_matches_glob(StringView glob, StringView filename,
   let lowered_name = String{allocator};
   lowered_name.reserve(filename.length);
   for (usize i = 0; i < filename.length; i++)
-    lowered_name += ascii_lowercase(filename[i]);
+    lowered_name += utils::ascii_to_lower(filename[i]);
 
   return utils::glob_matches(glob, lowered_name.view(), glob_active,
                              mask_offset, extglob);
@@ -110,7 +104,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
   if (nocaseglob_is_on) {
     lowered_glob.reserve(glob.length);
     for (usize i = 0; i < glob.length; i++)
-      lowered_glob += ascii_lowercase(glob[i]);
+      lowered_glob += utils::ascii_to_lower(glob[i]);
   }
   let const match_glob = nocaseglob_is_on ? lowered_glob.view() : glob;
 

@@ -29,8 +29,7 @@ static fn ascii_lower_copy(Allocator allocator, StringView text) throws
   lowered.reserve(text.length);
 
   for (usize i = 0; i < text.length; i++) {
-    const char c = text[i];
-    lowered += (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+    lowered += utils::ascii_to_lower(text[i]);
   }
 
   return lowered;

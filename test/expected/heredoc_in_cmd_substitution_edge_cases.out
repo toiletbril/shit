@@ -1,0 +1,108 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=$(cat <<\EOF
+backslash escaped delimiter
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign y=$(cat <<FOO-BAR
+bareword with dash
+FOO-BAR
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$y"]
+  [CompoundListCondition, None]
+    [Assign z=$(cat <<   EOF
+leading whitespace before delimiter
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$z"]
+  [CompoundListCondition, None]
+    [Assign w=$(echo pre; cat <<EOF
+semicolon sentinel
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$w"]
+  [CompoundListCondition, None]
+    [Assign v=$(true && cat <<-EOF
+	tab stripped in substitution
+	EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$v"]
+[Word
+  Unquoted "x="
+  CommandSubstitution "cat <<\EOF
+backslash escaped delimiter
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "y="
+  CommandSubstitution "cat <<FOO-BAR
+bareword with dash
+FOO-BAR
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "y"
+]
+[Word
+  Unquoted "z="
+  CommandSubstitution "cat <<   EOF
+leading whitespace before delimiter
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "z"
+]
+[Word
+  Unquoted "w="
+  CommandSubstitution "echo pre; cat <<EOF
+semicolon sentinel
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "w"
+]
+[Word
+  Unquoted "v="
+  CommandSubstitution "true && cat <<-EOF
+	tab stripped in substitution
+	EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "v"
+]
+backslash escaped delimiter
+bareword with dash
+leading whitespace before delimiter
+pre
+semicolon sentinel
+tab stripped in substitution
+[Code 0]

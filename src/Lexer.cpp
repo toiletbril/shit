@@ -253,6 +253,45 @@ cold fn Lexer::register_heredoc(StringView delimiter,
   return body;
 }
 
+/* A heredoc body is a run of raw text lines terminated by a line that holds the
+   delimiter alone. The walker yields each line to the callback, which appends
+   it as it sees fit and signals whether to continue. */
+template <class Emit>
+cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
+                                 bool should_strip_tabs,
+                                 Emit emit_line) throws -> usize
+{
+  usize position = start;
+  loop
+  {
+    if (position >= m_source.length()) break;
+    const let line_start = position;
+    usize i = line_start;
+    while (i < m_source.length() && m_source[i] != '\n') i++;
+    const bool has_newline = (i < m_source.length());
+    position = has_newline ? i + 1 : i;
+
+    usize line_offset = line_start;
+    usize line_length = i - line_start;
+    usize stripped_offset = line_offset;
+    usize stripped_length = line_length;
+    if (should_strip_tabs) {
+      while (stripped_length > 0 && m_source[stripped_offset] == '\t') {
+        stripped_offset++;
+        stripped_length--;
+      }
+    }
+
+    const let stripped = m_source.substring_of_length(stripped_offset,
+                                                      stripped_length);
+    const bool is_delimiter = (delimiter == stripped);
+    const let raw = m_source.substring_of_length(line_offset, line_length);
+    if (!emit_line(raw, has_newline, is_delimiter)) break;
+    if (!has_newline) break;
+  }
+  return position;
+}
+
 cold fn Lexer::collect_pending_heredocs() throws -> void
 {
   LOG(Debug, "collecting %zu pending heredoc bodies",
@@ -260,33 +299,21 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
 
   for (heredoc_pending &pending : m_pending_heredocs) {
     let collected = String{heap_allocator()};
-    loop
-    {
-      if (m_cursor_position >= m_source.length()) break;
-
-      const let line_start = m_cursor_position;
-      ASSERT(line_start <= m_source.length());
-
-      usize i = line_start;
-      while (i < m_source.length() && m_source[i] != '\n')
-        i++;
-      const let has_newline = (i < m_source.length());
-      m_cursor_position = has_newline ? i + 1 : i;
-
-      usize line_offset = line_start;
-      usize line_length = i - line_start;
+    let do_append_body_line = [&](StringView line, bool,
+                                  bool is_delimiter) -> bool {
+      if (is_delimiter) return false;
       if (pending.should_strip_tabs) {
-        while (line_length > 0 && m_source[line_offset] == '\t') {
-          line_offset++;
-          line_length--;
-        }
+        usize offset = 0;
+        while (offset < line.length && line[offset] == '\t') offset++;
+        line = line.substring_of_length(offset, line.length - offset);
       }
-
-      const let line = m_source.substring_of_length(line_offset, line_length);
-      if (pending.delimiter == line) break;
       collected.append(line);
       collected += '\n';
-    }
+      return true;
+    };
+    m_cursor_position = walk_heredoc_body(
+        m_cursor_position, pending.delimiter.view(),
+        pending.should_strip_tabs, do_append_body_line);
     LOG(Debug, "capturing a heredoc body of %zu bytes for delimiter '%s'",
         collected.count(), pending.delimiter.c_str());
     ASSERT(pending.body != nullptr);
@@ -312,7 +339,7 @@ cold fn Lexer::skip_heredoc_in_substitution(usize byte_count,
       else delimiter += c;
       continue;
     }
-    if (c == '\\' && !delimiter.is_empty()) {
+    if (c == '\\') {
       byte_count++;
       inner += c;
       const let escaped = chop_character(byte_count);
@@ -328,23 +355,26 @@ cold fn Lexer::skip_heredoc_in_substitution(usize byte_count,
       inner += c;
       continue;
     }
-    if (c == '-') {
+    if (c == '-' && delimiter.is_empty() && quote == 0) {
       byte_count++;
       inner += c;
       should_strip_tabs = true;
       continue;
     }
-    if (c == ' ' || c == '\t' || c == '\n' || c == '<' || c == '>' ||
-        c == '|' || c == '&' || c == ';' || c == '(' || c == ')')
-    {
-      break;
+    if (c == ' ' || c == '\t') {
+      byte_count++;
+      inner += c;
+      continue;
     }
+    if (lexer::is_shell_sentinel(c)) break;
+
     byte_count++;
     inner += c;
     delimiter += c;
   }
 
-  while (true) {
+  loop
+  {
     const let c = chop_character(byte_count);
     if (c == lexer::CEOF) break;
     byte_count++;
@@ -352,38 +382,16 @@ cold fn Lexer::skip_heredoc_in_substitution(usize byte_count,
     if (c == '\n') break;
   }
 
-  loop
-  {
-    usize line_start = byte_count;
-    usize i = line_start;
-    while (true) {
-      const let c = chop_character(i);
-      if (c == lexer::CEOF || c == '\n') break;
-      i++;
-    }
-    const let has_newline = chop_character(i) == '\n';
-    usize line_offset = line_start;
-    usize line_length = i - line_start;
-    if (should_strip_tabs) {
-      while (line_length > 0 && chop_character(line_offset) == '\t') {
-        line_offset++;
-        line_length--;
-      }
-    }
-    const let line = m_source.substring_of_length(
-        m_cursor_position + line_offset, line_length);
-
-    for (usize k = line_start; k <= i; k++) {
-      const let c = chop_character(k);
-      if (c == lexer::CEOF) break;
-      inner += c;
-    }
-    byte_count = has_newline ? i + 1 : i;
-
-    if (delimiter.view() == line) break;
-  }
-
-  return byte_count;
+  let do_append_raw_line = [&](StringView line, bool has_newline,
+                               bool is_delimiter) -> bool {
+    inner.append(line);
+    if (has_newline) inner += '\n';
+    return !is_delimiter;
+  };
+  return walk_heredoc_body(m_cursor_position + byte_count,
+                           delimiter.view(), should_strip_tabs,
+                           do_append_raw_line) -
+         m_cursor_position;
 }
 
 hot flatten fn Lexer::lex_expression_token() throws -> Token *
@@ -940,7 +948,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
           if (c == '<' && chop_character(byte_count) == '<' &&
               chop_character(byte_count + 1) != '<' &&
               (previous_char == 0 || lexer::is_whitespace(previous_char) ||
-               previous_char == '\n'))
+               lexer::is_shell_sentinel(previous_char)))
           {
             inner += c;
             inner += chop_character(byte_count);
