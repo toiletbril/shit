@@ -1,0 +1,12 @@
+== bash mood printf \e:
+00000000: 1b                                       .
+== bash mood printf \E:
+00000000: 1b                                       .
+== sh mood printf \e stays literal:
+00000000: 5c65                                     \e
+== bash-posix mood printf \e:
+00000000: 1b                                       .
+== bash mood %b with \e:
+00000000: 1b0a                                     ..
+== sh mood %b with \e stays literal:
+00000000: 5c65 0a                                  \e.

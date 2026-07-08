@@ -52,7 +52,7 @@ public:
 
   pure fn is_bash_compatible() const wontthrow -> bool
   {
-    return m_mood == mimic_mood::Bash;
+    return m_mood == mimic_mood::Bash || m_mood == mimic_mood::BashPosix;
   }
 
   /* Whether strict POSIX lexing is active. The default mood is neither bash nor

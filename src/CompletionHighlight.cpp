@@ -208,6 +208,14 @@ static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
   return false;
 }
 
+static pure fn word_contains_url_scheme(StringView word) wontthrow -> bool
+{
+  for (usize i = 0; i + 2 < word.length; i++) {
+    if (word[i] == ':' && word[i + 1] == '/' && word[i + 2] == '/') return true;
+  }
+  return false;
+}
+
 enum class highlight_construct : u8
 {
   if_,
@@ -1005,7 +1013,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     }
 
     if (!is_command_position && plain && !is_assignment) {
-      if (!word.is_empty() && word[0] == '-') {
+      if (word_contains_url_scheme(word)) {
+        do_push(word_start, word_end, colors::ansi::BOLD_WHITE);
+      } else if (!word.is_empty() && word[0] == '-') {
         do_push(word_start, word_end, colors::ansi::GRAY);
       } else if (token_has_glob_metacharacter(word)) {
         /* The word is plain here so the metacharacter is live. */

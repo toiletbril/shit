@@ -28,15 +28,22 @@ what the man page does not.
 The mood drives the nounset, pipefail, and failglob strictness through
 `apply_strictness_for_mood`. An explicit `set -u`, `set -o pipefail`, or `set -o
 failglob` survives a later mood switch through the per-toggle explicit marks.
-`set -o posix` mirrors `set --mood sh`, and `set +o posix` steps down to bash
-only when already in the posix mood, since the prior mood is not a stack. A
-glob in command position is fatal in the default mood and a warning in a
-compatibility mood, checked in SimpleCommand::evaluate_impl through
-command_word_is_glob. The mood, the diagnostics toggles, and the three strictness
-toggles with their explicit marks live in one `runtime_state` struct (Eval.hpp),
-which capture and restore copy whole. Main.cpp enters rescue rather than exiting
-when a flag fails to parse in a login shell, the lockout-risk case marked by a
-dash-prefixed argv[0], while any other invocation keeps the usage exit.
+`set -o posix` mirrors `--posix`, which selects the `bash-posix` mood, a bash
+mood that seeds `BASH_VERSION` and sources the bash rc so a terminal that
+re-execs with `--posix` finds the bash integration, and `set +o posix` steps
+down to bash only when already in `bash-posix` or the `sh` mood, since the
+prior mood is not a stack. A glob in command position is fatal in the default
+mood and a warning in a compatibility mood, checked in
+SimpleCommand::evaluate_impl through command_word_is_glob. The mood, the
+diagnostics toggles, and the three strictness toggles with their explicit marks
+live in one `runtime_state` struct (Eval.hpp), which capture and restore copy
+whole. Main.cpp enters rescue rather than exiting when a flag fails to parse in
+a login shell, the lockout-risk case marked by a dash-prefixed argv[0], while
+any other invocation keeps the usage exit.
+
+The name-to-mood mapping is shared from `MimicMood.hpp` as the single
+`parse_mood_name` and `mood_name` pair, so the flag parser, `set --mood`, and
+`set --init-moods` read one table.
 
 All errors are located in all moods.
 

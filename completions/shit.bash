@@ -10,7 +10,7 @@ _shit_complete()
     current_word=${COMP_WORDS[COMP_CWORD]}
     previous_word=${COMP_WORDS[COMP_CWORD-1]}
 
-    local mood_values="shit bash sh"
+    local mood_values="shit bash sh bash-posix"
     local log_levels="info debug all"
 
     case $previous_word in

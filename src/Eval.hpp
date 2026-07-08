@@ -746,15 +746,23 @@ public:
 
   pure fn is_bash_compatible() const wontthrow -> bool
   {
-    return m_runtime.mood == mimic_mood::Bash;
+    return m_runtime.mood == mimic_mood::Bash ||
+           m_runtime.mood == mimic_mood::BashPosix;
   }
 
   /* POSIX mood behaves like dash. The non-posix-breaking bash additions on in
      the default mood, such as the extended globs, read this to stay off here.
-   */
+     BashPosix is bash in posix-option form, not the dash-like sh mood, so the
+     bash additions and the [[ grammar stay on. */
   pure fn is_posix_mode() const wontthrow -> bool
   {
     return m_runtime.mood == mimic_mood::Posix;
+  }
+
+  pure fn is_posix_option_on() const wontthrow -> bool
+  {
+    return m_runtime.mood == mimic_mood::Posix ||
+           m_runtime.mood == mimic_mood::BashPosix;
   }
 
   /* The mood the lexer reads. set_mood changes only the mood, so a caller that
@@ -763,20 +771,23 @@ public:
   fn set_mood(mimic_mood mood) wontthrow -> void { m_runtime.mood = mood; }
   pure fn mood() const wontthrow -> mimic_mood { return m_runtime.mood; }
 
-  /* The set -o posix form enters the POSIX mood, and set +o posix steps down to
-     bash when already in POSIX. A non-posix mood is left alone, since the mood
-     is not a stack and the prior mood is not recoverable. The explicit mark and
-     the strictness follow the switch the way set --mood does.
+  /* The set -o posix form enters the BashPosix mood, and set +o posix steps
+     down to bash when already in BashPosix or the dash-like Posix mood. A
+     non-posix mood is left alone, since the mood is not a stack and the prior
+     mood is not recoverable. The explicit mark and the strictness follow the
+     switch the way set --mood does.
   */
   fn set_posix_mode_via_option(bool enable) wontthrow -> void
   {
     if (enable) {
-      set_mood(mimic_mood::Posix);
+      set_mood(mimic_mood::BashPosix);
       apply_strictness_for_mood();
       note_explicit_mood();
       return;
     }
-    if (m_runtime.mood != mimic_mood::Posix) return;
+    if (m_runtime.mood != mimic_mood::Posix &&
+        m_runtime.mood != mimic_mood::BashPosix)
+      return;
     set_mood(mimic_mood::Bash);
     apply_strictness_for_mood();
     note_explicit_mood();

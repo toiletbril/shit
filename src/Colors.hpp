@@ -26,6 +26,7 @@ inline const StringView BOLD_YELLOW = "\x1b[1;33m";
 inline const StringView CYAN = "\x1b[36m";
 inline const StringView BOLD_MAGENTA = "\x1b[1;35m";
 inline const StringView BOLD_CYAN = "\x1b[1;36m";
+inline const StringView BOLD_WHITE = "\x1b[1;37m";
 } /* namespace ansi */
 
 /* Whether color may be written to a stream, decided fresh so a redirected

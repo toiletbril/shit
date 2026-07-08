@@ -65,12 +65,13 @@ const SetOption SET_OPTIONS[] = {
      "Fail a command whose glob matches nothing."},
     {'b', "notify", &EvalContext::set_notify, &EvalContext::notify,
      "Report a background job's completion immediately when it finishes."},
-    /* set -o posix mirrors set --mood sh, and set +o posix steps down to bash
-       only when already in the POSIX mood. A no-op otherwise, since the prior
-       mood is not recoverable. brew's set +o posix runs under bash already. */
+    /* set -o posix mirrors --posix, which selects the bash-with-posix-identity
+       mood, and set +o posix steps down to bash only when already in that mood
+       or the dash-like sh mood. A no-op otherwise, since the prior mood is not
+       recoverable. brew's set +o posix runs under bash already. */
     {'\0', "posix", &EvalContext::set_posix_mode_via_option,
-     &EvalContext::is_posix_mode,
-     "Switch to the POSIX mood, the bash set -o posix form."},
+     &EvalContext::is_posix_option_on,
+     "Switch to the bash posix mood, the bash set -o posix form."},
     {'\0', "vi", &EvalContext::set_vi_mode, &EvalContext::vi_mode,
      "Use vi-style command-line editing."},
     {'\0', "emacs", &EvalContext::set_emacs_mode, &EvalContext::emacs_mode,
@@ -116,30 +117,6 @@ const SetOption SET_OPTIONS[] = {
     {'\0', "rcfile", nullptr, &EvalContext::has_custom_rcfile,
      "Whether a custom rc file was named at startup, fixed at startup."},
 };
-
-fn parse_mood_name(StringView name) throws -> Maybe<mimic_mood>
-{
-  static constexpr static_string_entry<mimic_mood> ENTRIES[] = {
-      {SSK("shit"),    mimic_mood::Default},
-      {SSK("default"), mimic_mood::Default},
-      {SSK("bash"),    mimic_mood::Bash   },
-      {SSK("sh"),      mimic_mood::Posix  },
-      {SSK("posix"),   mimic_mood::Posix  },
-      {SSK("dash"),    mimic_mood::Posix  },
-  };
-  static constexpr StaticStringMap MOOD_NAMES{ENTRIES};
-  return MOOD_NAMES.find(name);
-}
-
-fn mood_name(mimic_mood mood) throws -> StringView
-{
-  switch (mood) {
-  case mimic_mood::Bash: return "bash";
-  case mimic_mood::Posix: return "sh";
-  case mimic_mood::Default: return "shit";
-  }
-  return "shit";
-}
 
 fn find_option_by_letter(char letter) throws -> const SetOption *
 {
@@ -407,7 +384,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         throw Error{
             String{cxt.scratch_allocator(), "Unknown --mood value '"}
             + *value +
-            "', expected 'shit', 'bash', or 'sh'"
+            "', expected 'shit', 'bash', 'sh', or 'bash-posix'"
         };
       cxt.set_mood(*parsed);
       cxt.apply_strictness_for_mood();
@@ -422,8 +399,8 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const value = do_read_option_value(arg);
       if (!value.has_value()) {
         let out = String{cxt.scratch_allocator()};
-        for (mimic_mood listed :
-             {mimic_mood::Default, mimic_mood::Posix, mimic_mood::Bash})
+        for (mimic_mood listed : {mimic_mood::Default, mimic_mood::Posix,
+                                  mimic_mood::Bash, mimic_mood::BashPosix})
         {
           if (!cxt.mood_initialized(listed)) continue;
           if (!out.is_empty()) out += " ";
@@ -445,7 +422,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           throw Error{
               String{cxt.scratch_allocator(), "Unknown --init-moods value '"}
               +
-              name + "', expected 'shit', 'bash', or 'sh'"
+              name + "', expected 'shit', 'bash', 'sh', or 'bash-posix'"
           };
         moods.push(*parsed);
       }

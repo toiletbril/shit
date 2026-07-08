@@ -1214,7 +1214,7 @@ static constexpr usize MAX_SOURCE_DEPTH = 400;
 static constexpr usize MAX_FUNCTION_CALL_DEPTH = 900;
 /* Command substitution spends the most native frames per level, a sanitizer
    build overflows past two hundred so the cap stays well below. */
-static constexpr usize MAX_SUBSTITUTION_DEPTH = 128;
+static constexpr usize MAX_SUBSTITUTION_DEPTH = 64;
 static constexpr usize MAX_PARAMETER_EXPANSION_DEPTH = 256;
 
 static fn guard_located_depth(usize current_depth, usize cap,

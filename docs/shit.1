@@ -18,7 +18,7 @@ standard input is a terminal and no script is given. A script file named on the
 command line is run, or a command string is run when it is given with
 .BR \-c .
 .SH MOODS
-The shell runs under one of three moods. The mood sets how strict the run is.
+The shell runs under one of four moods. The mood sets how strict the run is.
 The default
 .B shit
 mood is the strict bash superset, and a questionable construct is warned on
@@ -26,7 +26,13 @@ through the analysis stage. The
 .B bash
 mood runs the bash extensions with the analysis stage off. The
 .B sh
-mood behaves like dash. The nounset, pipefail, and failglob strictness, the
+mood behaves like dash. The
+.B bash-posix
+mood is bash reached through the posix option, so a terminal that re-execs
+with
+.B \-\-posix
+to inject its integration finds the bash identity and the bash rc rather than
+the dash-like sh mood. The nounset, pipefail, and failglob strictness, the
 analysis stage, and the parser features are all driven by the mood.
 .PP
 A binary named or symlinked to
@@ -41,12 +47,16 @@ inside the rc sticks for the session. An explicit
 is the script's own ask and survives a later mood switch.
 .BR "set -o posix"
 mirrors
-.BR "set --mood sh" ,
-and
+.BR "\-\-posix" ,
+selecting the
+.B bash-posix
+mood, and
 .B "set +o posix"
 steps down to the
 .B bash
 mood only when already in the
+.B bash-posix
+or
 .B sh
 mood, otherwise it is a no-op.
 .SH OPTIONS
@@ -54,7 +64,7 @@ mood, otherwise it is a no-op.
 .TP
 .BR \-M ", " \-\-mood =\fINAME\fR
 The runtime mood is selected, one of
-.BR shit ", " bash ", or " sh .
+.BR shit ", " bash ", " sh ", or " bash-posix .
 .TP
 .BR \-L ", " \-\-init\-moods =\fILIST\fR
 The startup files for each listed mood are sourced, in order. The list is given
@@ -62,7 +72,9 @@ comma separated or by repeating the flag. The
 .B shit
 mood reads /etc/shitrc and ~/.shitrc, the
 .B bash
-mood reads the bash rc and its completion, and the
+and
+.B bash-posix
+moods read the bash rc and its completion, and the
 .B sh
 mood reads the file named by ENV. The list defaults to the value of
 .BR \-\-mood .
@@ -90,11 +102,11 @@ FILE is sourced as the interactive rc. The shit mood sources it in place of
 /etc/shitrc and ~/.shitrc, and the bash mood in place of ~/.bashrc.
 .TP
 .B \-\-posix
-POSIX mode is selected, the same as
-.BR "\-\-mood sh" .
+The bash-posix mood is selected, the same as
+.BR "\-\-mood bash-posix" .
 A terminal that re-execs the shell with
 .B \-\-posix
-to inject its integration through the ENV file is honored.
+to inject its integration through the bash rc is honored.
 .SS Diagnostics
 .TP
 .B \-W[W...]

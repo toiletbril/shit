@@ -161,7 +161,8 @@ fn append_utf8_code_point(String &out, u32 code_point) throws -> void
   out += static_cast<char>(0x80 | (code_point & 0x3F));
 }
 
-fn append_simple_escape(String &out, char e) throws -> void
+fn append_simple_escape(String &out, char e, bool use_bash_escapes) throws
+    -> void
 {
   switch (e) {
   case 'n': out += '\n'; break;
@@ -171,6 +172,15 @@ fn append_simple_escape(String &out, char e) throws -> void
   case 'b': out += '\b'; break;
   case 'f': out += '\f'; break;
   case 'v': out += '\v'; break;
+  case 'e':
+  case 'E':
+    if (use_bash_escapes) {
+      out += '\x1b';
+    } else {
+      out += '\\';
+      out += e;
+    }
+    break;
   case '\\': out += '\\'; break;
   default:
     out += '\\';
@@ -179,7 +189,8 @@ fn append_simple_escape(String &out, char e) throws -> void
   }
 }
 
-fn append_escape(String &out, const String &fmt, usize &i) throws -> void
+fn append_escape(String &out, const String &fmt, usize &i,
+                 bool use_bash_escapes) throws -> void
 {
   ASSERT(i < fmt.length());
 
@@ -232,11 +243,12 @@ fn append_escape(String &out, const String &fmt, usize &i) throws -> void
     return;
   }
 
-  append_simple_escape(out, e);
+  append_simple_escape(out, e, use_bash_escapes);
 }
 
 /* Returns true when a \c was seen so the caller can abort the whole printf. */
-fn append_b_argument(String &out, const String &arg) throws -> bool
+fn append_b_argument(String &out, const String &arg,
+                     bool use_bash_escapes) throws -> bool
 {
   for (usize i = 0; i < arg.length(); i++) {
     if (arg[i] != '\\' || i + 1 >= arg.length()) {
@@ -278,7 +290,7 @@ fn append_b_argument(String &out, const String &arg) throws -> bool
       continue;
     }
     i++;
-    append_simple_escape(out, e);
+    append_simple_escape(out, e, use_bash_escapes);
   }
   return false;
 }
@@ -468,12 +480,14 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     has_consumed_a_conversion = true;
   };
 
+  let const use_bash_escapes = !cxt.is_posix_mode();
+
   do {
     has_consumed_a_conversion = false;
     for (usize i = 0; i < fmt.length(); i++) {
       if (fmt[i] == '\\' && i + 1 < fmt.length()) {
         i++;
-        append_escape(out, fmt, i);
+        append_escape(out, fmt, i, use_bash_escapes);
         continue;
       }
       if (fmt[i] != '%') {
@@ -551,7 +565,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const is_missing_argument = operand_index >= operand_count;
       let const &arg = do_operand_at(operand_index);
       if (conv == 'b') {
-        should_stop = append_b_argument(out, arg);
+        should_stop = append_b_argument(out, arg, use_bash_escapes);
         operand_index++;
         has_consumed_a_conversion = true;
         if (should_stop) break;

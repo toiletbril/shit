@@ -67,11 +67,12 @@ FLAG(PRIVILEGED, Bool, 'p', "privileged", Bash,
 FLAG(CLEAN, Bool, '\0', "clean", Shit,
      "Start clean, reading no startup file and setting a minimal PATH.");
 FLAG(POSIX_COMPAT, Bool, '\0', "posix", Bash,
-     "Run in POSIX mode, equivalent to --mood sh.");
+     "Run in bash POSIX mode, equivalent to --mood bash-posix.");
 
 FLAG(MOOD, String, 'M', "mood", Compat,
      "Select the runtime mood, 'shit' is strict with the analysis stage on, "
-     "'bash' runs the extensions with it off, and 'sh' behaves like dash.");
+     "'bash' runs the extensions with it off, 'sh' behaves like dash, and "
+     "'bash-posix' is bash with the posix identity reached by --posix.");
 FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods", Compat,
      "Source the startup files for each listed mood, in order, comma separated "
      "or by repeating the flag. Defaults to --mood.");
@@ -192,22 +193,10 @@ static fn run_debug_highlight_driver(StringView driver_line,
 }
 #endif
 
-pure static fn parse_mood_name(StringView name) wontthrow -> Maybe<mimic_mood>
-{
-  static constexpr static_string_entry<mimic_mood> MOOD_ENTRIES[] = {
-      {SSK("shit"),    mimic_mood::Default},
-      {SSK("default"), mimic_mood::Default},
-      {SSK("bash"),    mimic_mood::Bash   },
-      {SSK("sh"),      mimic_mood::Posix  },
-      {SSK("posix"),   mimic_mood::Posix  },
-      {SSK("dash"),    mimic_mood::Posix  },
-  };
-  static constexpr StaticStringMap MOODS{MOOD_ENTRIES};
-  return MOODS.find(name);
-}
-
 /* The session mood, from --mood when given, then the invocation mood, then the
-   strict default. --dumb forces the sh mood when --mood is absent. */
+   strict default. --dumb forces the sh mood when --mood is absent, and --posix
+   selects the bash-with-posix-identity mood so a terminal that re-execs with it
+   to inject its integration runs as bash. */
 pure static fn resolve_session_mood(mimic_mood invocation_mood) wontthrow
     -> mimic_mood
 {
@@ -220,7 +209,7 @@ pure static fn resolve_session_mood(mimic_mood invocation_mood) wontthrow
     return mimic_mood::Default;
   }
   if (FLAG_DUMB.is_enabled()) return mimic_mood::Posix;
-  if (FLAG_POSIX_COMPAT.is_enabled()) return mimic_mood::Posix;
+  if (FLAG_POSIX_COMPAT.is_enabled()) return mimic_mood::BashPosix;
   return invocation_mood;
 }
 
@@ -589,27 +578,28 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
                      const ArrayList<mimic_mood> &moods, bool is_login_shell,
                      bool should_be_interactive) throws -> void
 {
-  /* Each flavor sources under its own mood, so a bash rc parses with the bash
+  /* Each mood sources under its own grammar, so a bash rc parses with the bash
      grammar and a posix profile with the dash grammar. */
   bool did_source_bash_rc = false;
   for (let flavor : moods) {
-    /* A flavor already on the sourcing stack is skipped, so a set --init-moods
+    /* A mood already on the sourcing stack is skipped, so a set --init-moods
        inside the rc this is sourcing cannot recurse to overflow. */
     if (context.init_mood_sourcing(flavor)) {
-      LOG(Info,
-          "skipping the %s flavor, its startup files are already sourcing",
-          flavor == mimic_mood::Bash    ? "bash"
-          : flavor == mimic_mood::Posix ? "posix"
-                                        : "shit");
+      LOG(Info, "skipping the %s mood, its startup files are already sourcing",
+          flavor == mimic_mood::Bash        ? "bash"
+          : flavor == mimic_mood::Posix     ? "posix"
+          : flavor == mimic_mood::BashPosix ? "bash-posix"
+                                            : "shit");
       continue;
     }
     context.set_init_mood_sourcing(flavor, true);
     defer { context.set_init_mood_sourcing(flavor, false); };
     context.set_mood(flavor);
-    LOG(Info, "sourcing the startup files for the %s flavor",
-        flavor == mimic_mood::Bash    ? "bash"
-        : flavor == mimic_mood::Posix ? "posix"
-                                      : "shit");
+    LOG(Info, "sourcing the startup files for the %s mood",
+        flavor == mimic_mood::Bash        ? "bash"
+        : flavor == mimic_mood::Posix     ? "posix"
+        : flavor == mimic_mood::BashPosix ? "bash-posix"
+                                          : "shit");
     switch (flavor) {
     case mimic_mood::Default:
       /* A --rcfile replaces the shit rc with the named file. */
@@ -632,8 +622,9 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
       }
       break;
     case mimic_mood::Bash:
+    case mimic_mood::BashPosix:
       /* bash runs the system rc first even under --rcfile, so the order mirrors
-         that. */
+         that. BashPosix falls through so --posix finds the bash integration. */
       if (is_login_shell) source_bash_login_files(context, ast_arena);
       if (should_be_interactive) {
         did_source_bash_rc = true;
@@ -902,9 +893,10 @@ fn main(int argc, char **argv) -> int
       static_cast<int>(program_basename.length), program_basename.data);
   let const session_mood = shit::resolve_session_mood(invocation_mood);
   LOG(Info, "selecting the %s mood",
-      session_mood == shit::mimic_mood::Posix  ? "posix"
-      : session_mood == shit::mimic_mood::Bash ? "bash"
-                                               : "default");
+      session_mood == shit::mimic_mood::Posix       ? "posix"
+      : session_mood == shit::mimic_mood::Bash      ? "bash"
+      : session_mood == shit::mimic_mood::BashPosix ? "bash-posix"
+                                                    : "default");
 
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
@@ -922,7 +914,8 @@ fn main(int argc, char **argv) -> int
     source += FLAG_MOOD.value();
     shit::show_message(shit::ErrorWithLocation{
         shit::SourceLocation{value_position, FLAG_MOOD.value().length},
-        "Unknown --mood value, expected one of 'shit', 'bash', or 'sh'"
+        "Unknown --mood value, expected one of 'shit', 'bash', 'sh', or "
+        "'bash-posix'"
     }
                            .to_string(source.view()));
     return 2;
@@ -1101,11 +1094,14 @@ fn main(int argc, char **argv) -> int
   context.set_shell_variable("SHIT_BUILD_MODE", SHIT_BUILD_MODE);
   context.set_shell_variable("SHIT_OS", SHIT_OS_INFO);
 
-  /* A bash session or a bash flavor in the init list advertises BASH_VERSION so
-     a bash rc detects it. */
-  bool should_seed_bash_identity = session_mood == shit::mimic_mood::Bash;
+  /* A bash session, a bash-posix session, or a bash flavor in the init list
+     advertises BASH_VERSION so a bash rc detects it. */
+  bool should_seed_bash_identity = session_mood == shit::mimic_mood::Bash ||
+                                   session_mood == shit::mimic_mood::BashPosix;
   for (let listed : init_moods)
-    if (listed == shit::mimic_mood::Bash) should_seed_bash_identity = true;
+    if (listed == shit::mimic_mood::Bash ||
+        listed == shit::mimic_mood::BashPosix)
+      should_seed_bash_identity = true;
   context.seed_shell_identity_variables(should_seed_bash_identity);
 
   /* SHLVL counts shell nesting, incremented and exported so a child shell
@@ -1292,10 +1288,12 @@ fn main(int argc, char **argv) -> int
               !FLAG_NO_SYNTAX_HIGHLIGHTING.is_enabled();
           toiletline::set_highlight_enabled(should_highlight);
           toiletline::set_ghost_enabled(should_highlight);
-          shit::show_message(
-              session_mood == shit::mimic_mood::Posix  ? "POSIX me harder!"
-              : session_mood == shit::mimic_mood::Bash ? "Bash me harder!"
-                                                       : "Welcome :3");
+          shit::show_message(session_mood == shit::mimic_mood::Posix
+                                 ? "POSIX me harder!"
+                             : (session_mood == shit::mimic_mood::Bash ||
+                                session_mood == shit::mimic_mood::BashPosix)
+                                 ? "Bash me harder!"
+                                 : "Welcome :3");
         } else {
           toiletline::enter_raw_mode();
         }
