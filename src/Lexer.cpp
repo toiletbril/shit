@@ -295,6 +295,97 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
   m_pending_heredocs.clear();
 }
 
+cold fn Lexer::skip_heredoc_in_substitution(usize byte_count,
+                                            String &inner) throws -> usize
+{
+  bool should_strip_tabs = false;
+  char quote = 0;
+  let delimiter = String{heap_allocator()};
+
+  for (let c = chop_character(byte_count); c != lexer::CEOF;
+       c = chop_character(byte_count))
+  {
+    if (quote != 0) {
+      byte_count++;
+      inner += c;
+      if (c == quote) quote = 0;
+      else delimiter += c;
+      continue;
+    }
+    if (c == '\\' && !delimiter.is_empty()) {
+      byte_count++;
+      inner += c;
+      const let escaped = chop_character(byte_count);
+      if (escaped == lexer::CEOF) break;
+      byte_count++;
+      inner += escaped;
+      delimiter += escaped;
+      continue;
+    }
+    if (c == '\'' || c == '"') {
+      quote = c;
+      byte_count++;
+      inner += c;
+      continue;
+    }
+    if (c == '-') {
+      byte_count++;
+      inner += c;
+      should_strip_tabs = true;
+      continue;
+    }
+    if (c == ' ' || c == '\t' || c == '\n' || c == '<' || c == '>' ||
+        c == '|' || c == '&' || c == ';' || c == '(' || c == ')')
+    {
+      break;
+    }
+    byte_count++;
+    inner += c;
+    delimiter += c;
+  }
+
+  while (true) {
+    const let c = chop_character(byte_count);
+    if (c == lexer::CEOF) break;
+    byte_count++;
+    inner += c;
+    if (c == '\n') break;
+  }
+
+  loop
+  {
+    usize line_start = byte_count;
+    usize i = line_start;
+    while (true) {
+      const let c = chop_character(i);
+      if (c == lexer::CEOF || c == '\n') break;
+      i++;
+    }
+    const let has_newline = chop_character(i) == '\n';
+    usize line_offset = line_start;
+    usize line_length = i - line_start;
+    if (should_strip_tabs) {
+      while (line_length > 0 && chop_character(line_offset) == '\t') {
+        line_offset++;
+        line_length--;
+      }
+    }
+    const let line = m_source.substring_of_length(
+        m_cursor_position + line_offset, line_length);
+
+    for (usize k = line_start; k <= i; k++) {
+      const let c = chop_character(k);
+      if (c == lexer::CEOF) break;
+      inner += c;
+    }
+    byte_count = has_newline ? i + 1 : i;
+
+    if (delimiter.view() == line) break;
+  }
+
+  return byte_count;
+}
+
 hot flatten fn Lexer::lex_expression_token() throws -> Token *
 {
   if (const let ch = chop_character(); ch != lexer::CEOF) [[likely]] {
@@ -844,6 +935,18 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             quote = c;
             inner += c;
             previous_char = c;
+            continue;
+          }
+          if (c == '<' && chop_character(byte_count) == '<' &&
+              chop_character(byte_count + 1) != '<' &&
+              (previous_char == 0 || lexer::is_whitespace(previous_char) ||
+               previous_char == '\n'))
+          {
+            inner += c;
+            inner += chop_character(byte_count);
+            byte_count += 1;
+            byte_count = skip_heredoc_in_substitution(byte_count, inner);
+            previous_char = '\n';
             continue;
           }
           /* An unquoted '#' at a word boundary begins a comment, so a ')'

@@ -139,6 +139,15 @@ protected:
   fn lex_identifier() throws -> Token *;
   fn lex_sentinel() throws -> Token *;
   fn lex_process_substitution(char direction) throws -> Token *;
+
+  /* A heredoc inside a $(...) or ${...} body is raw text up to a line that
+     holds the delimiter alone, so a quote or paren in the body must not
+     disturb the surrounding scan. byte_count points one past the second < of
+     <<. The helper reads the delimiter, then copies the body and the closing
+     delimiter line into inner, and returns the new byte_count one past the
+     closing delimiter newline. */
+  fn skip_heredoc_in_substitution(usize byte_count, String &inner) throws
+      -> usize;
 };
 
 } /* namespace shit */

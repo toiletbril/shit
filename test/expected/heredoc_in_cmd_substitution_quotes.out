@@ -1,0 +1,109 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=$(cat <<EOF
+body
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign y=$(cat <<'EOF'
+a " b
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$y"]
+  [CompoundListCondition, None]
+    [Assign z=$(cat <<EOF
+$HOME
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$z"]
+  [CompoundListCondition, None]
+    [Assign w=$(echo pre; cat <<EOF
+mid
+EOF
+echo post)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$w"]
+  [CompoundListCondition, None]
+    [Assign t=$(cat <<'EOF'
+has `backticks` and $vars
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$t"]
+[Word
+  Unquoted "x="
+  CommandSubstitution "cat <<EOF
+body
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "y="
+  CommandSubstitution "cat <<'EOF'
+a " b
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "y"
+]
+[Word
+  Unquoted "z="
+  CommandSubstitution "cat <<EOF
+$HOME
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "z"
+]
+[Word
+  Unquoted "w="
+  CommandSubstitution "echo pre; cat <<EOF
+mid
+EOF
+echo post"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "w"
+]
+[Word
+  Unquoted "t="
+  CommandSubstitution "cat <<'EOF'
+has `backticks` and $vars
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "t"
+]
+body
+a " b
+/Users/sd
+pre
+mid
+post
+has `backticks` and $vars
+[Code 0]

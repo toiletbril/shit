@@ -1,0 +1,26 @@
+#!/bin/env shit
+x=$(cat <<EOF
+body
+EOF
+)
+echo "$x"
+y=$(cat <<'EOF'
+a " b
+EOF
+)
+echo "$y"
+z=$(cat <<EOF
+$HOME
+EOF
+)
+echo "$z"
+w=$(echo pre; cat <<EOF
+mid
+EOF
+echo post)
+echo "$w"
+t=$(cat <<'EOF'
+has `backticks` and $vars
+EOF
+)
+echo "$t"
