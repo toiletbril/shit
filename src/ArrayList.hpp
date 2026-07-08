@@ -222,7 +222,7 @@ private:
      it reachable to the table while every call site must name its lifetime. */
   template <class Value>
   friend class StringMap;
-  ArrayList() : m_allocator(heap_allocator()) {}
+  ArrayList() : m_allocator(fake_allocator()) {}
 
   static constexpr usize INSERTION_SORT_THRESHOLD = 16;
 
