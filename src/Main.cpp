@@ -866,22 +866,25 @@ fn main(int argc, char **argv) -> int
   shit::StringView program_basename =
       last_slash.has_value() ? program_path.substring(*last_slash + 1)
                              : program_path.view();
-  /* A login shell receives argv[0] prefixed with a dash, such as -bash. The
-     dash is stripped before the name is matched, and read again below as the
-     login mark. $0 keeps the dashed spelling. */
+  /* A login shell receives argv[0] prefixed with a dash, such as -bash, and
+     exec -l prepends the dash to the whole path, such as -/usr/bin/bash. The
+     mark is the first byte of argv[0], not of the basename, so a path whose
+     directory component contains a dash is not mistaken for a login shell. */
   const bool does_name_mark_login =
-      !program_basename.is_empty() && program_basename[0] == '-';
-  if (does_name_mark_login) program_basename = program_basename.substring(1);
+      !program_path.view().is_empty() && program_path.view()[0] == '-';
 
   /* SHELL and BASH must name a runnable file a child can exec, so the login
      dash is dropped here for the executable identity while $0 keeps the dashed
-     spelling below. A dash inside a directory path is a real filename, and a
-     bare dash keeps its spelling since it names nothing to run. */
+     spelling below. A bare dash keeps its spelling since it names nothing to
+     run. */
   let executable_path = program_path.clone();
-  if (does_name_mark_login && !last_slash.has_value() &&
-      program_path.view().length > 1)
-  {
+  if (does_name_mark_login && program_path.view().length > 1)
     executable_path = shit::String{program_path.view().substring(1)};
+
+  if (does_name_mark_login && !program_basename.is_empty() &&
+      program_basename[0] == '-')
+  {
+    program_basename = program_basename.substring(1);
   }
 
   const shit::mimic_mood invocation_mood =
