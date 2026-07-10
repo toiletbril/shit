@@ -231,6 +231,10 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
                    HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_flag_help(FLAG_LIST);
     h += '\n';
+    h += '\n';
+    h += "Report bugs and suggest features at "
+         "<https://github.com/toiletbril/shit>";
+    h += '\n';
     print_error(h);
     return EXIT_SUCCESS;
   }

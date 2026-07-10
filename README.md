@@ -13,7 +13,12 @@ Shit is a cross-platform shell compatible with Bash and POSIX. It runs at least
 3 times faster than Bash. The UX, the errors, and the interactive experience are
 opinionated.
 
+**The project is in early stage**. There's no gurantee that it will not blow
+you computer up upon the first start. Bug reports are greatly appreciated.
+
 ## Three shells in a trenchcoat
+
+[See the manpage](docs/shit.1) for fuller explanation.
 
 **shit** runs in three modes (called moods). The default mood is **shit** being
 itself, a strict superset of Bash, with the analysis and optimization stages
@@ -70,7 +75,8 @@ bundled one, unless the shitbox applet mode is enabled.
 
 This software was initially made as a late April Fools joke, and everything is
 written from scratch in a heavily macro-modified C++23 dialect I can actually
-stand, and is compiled with `-nostdlib++` :3
+stand, and is compiled with `-nostdlib++`. **shit**'s only dependency is the
+libc.
 
 `staging` is the development branch. It may be broken at any time. `master` is
 more stable and should usually pass all tests.
@@ -106,8 +112,9 @@ $ ./zig-out/bin/shit --help
 
 And install:
 ```bash
-$ make install PREFIX=/usr/local
-$ make uninstall PREFIX=/usr/local
+$ export PREFIX=/usr/local
+$ make install
+$ make uninstall
 ```
 
 ## Roadmap
