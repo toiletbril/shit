@@ -59,6 +59,9 @@ fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
   unreachable("unhandled shitbox utility of kind %d", ENUM(chosen));
 }
 
+fn rewrap_with_prefix(const ErrorWithLocation &error,
+                      StringView prefix) throws -> ErrorWithLocation;
+
 fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
     -> i32
 {
@@ -75,12 +78,15 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   }
 
   if (let const chosen = find_util(name); chosen.has_value()) {
+    let const invocation_name =
+        ec.is_multicall ? String{heap_allocator(), name}
+                         : String{"shitbox "} + name;
     try {
       return run_util(*chosen, ec, cxt, shifted, shifted_locations);
     } catch (const BrokenPipeExit &) {
       throw;
-    } catch (const ErrorWithLocation &) {
-      throw;
+    } catch (const ErrorWithLocation &e) {
+      throw rewrap_with_prefix(e, invocation_name);
     } catch (const Error &error) {
       relocate_error(error, ec.source_location());
     }
@@ -98,6 +104,23 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   throw ErrorWithLocation{ec.arg_location_at(name_index),
                           "shitbox has no utility named '" + String{name} +
                               "'"};
+}
+
+fn rewrap_with_prefix(const ErrorWithLocation &error,
+                      StringView prefix) throws -> ErrorWithLocation
+{
+  let const message = prefix + ": " + error.message();
+  if (error.has_note()) {
+    ErrorWithLocationAndDetails rewrapped{error.location(), message.view(),
+                                          error.note().view()};
+    if (error.is_script_fatal()) rewrapped.set_script_fatal();
+    rewrapped.set_command_status(error.command_status());
+    return rewrapped;
+  }
+  ErrorWithLocation rewrapped{error.location(), message.view()};
+  if (error.is_script_fatal()) rewrapped.set_script_fatal();
+  rewrapped.set_command_status(error.command_status());
+  return rewrapped;
 }
 
 fn run_as_multicall(StringView util_name, ArrayList<String> operands,
@@ -130,7 +153,8 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   try {
     return run_util(*chosen, ec, cxt, ec.args(), ec.arg_locations());
   } catch (const ErrorWithLocation &e) {
-    show_message(e.to_string(utils::merge_args_to_string(ec.args())));
+    show_message(rewrap_with_prefix(e, util_name)
+                     .to_string(utils::merge_args_to_string(ec.args())));
     return 1;
   } catch (const Error &e) {
     show_message(e.to_string());

@@ -180,7 +180,8 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const ArrayList<String> &args, usize base_position,
                    const Flag *operand_value_flag,
                    const ArrayList<SourceLocation> *arg_locations,
-                   ArrayList<SourceLocation> *operand_locations) throws
+                   ArrayList<SourceLocation> *operand_locations,
+                   StringView program_name) throws
     -> ArrayList<String>
 {
   let os_argv = ArrayList<const char *>{heap_allocator()};
@@ -191,7 +192,7 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
 
   return parse_flags(flags, static_cast<int>(os_argv.count()), os_argv.begin(),
                      base_position, operand_value_flag, arg_locations,
-                     operand_locations);
+                     operand_locations, program_name);
 }
 
 static fn flag_name(const Flag *f, bool is_long) throws -> String
@@ -207,11 +208,19 @@ static fn flag_name(const Flag *f, bool is_long) throws -> String
   return name;
 }
 
+static fn prefixed_message(StringView program_name,
+                           StringView message) throws -> String
+{
+  if (program_name.is_empty()) return String{heap_allocator(), message};
+  return program_name + ": " + message;
+}
+
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const char *const *argv, usize base_position,
                const Flag *operand_value_flag,
                const ArrayList<SourceLocation> *arg_locations,
-               ArrayList<SourceLocation> *operand_locations) throws
+               ArrayList<SourceLocation> *operand_locations,
+               StringView program_name) throws
     -> ArrayList<String>
 {
   ASSERT(argc >= 0);
@@ -406,7 +415,8 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
         }
       } else {
         if (*flag_offset == '-') {
-          throw Error{"Missing space between '-' and other options"};
+          throw Error{prefixed_message(program_name,
+                                      "Missing space between '-' and other options")};
         } else {
           let error_message = String{heap_allocator()};
           error_message += "Unknown flag '-";
@@ -439,7 +449,8 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
             flag_location = SourceLocation{base_position + caret_offset,
                                            std::strlen(argv[i])};
           }
-          throw ErrorWithLocation{flag_location, error_message};
+          throw ErrorWithLocation{flag_location,
+                                  prefixed_message(program_name, error_message)};
         }
       }
     }
@@ -447,8 +458,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
   if (next_arg_is_value) {
     ASSERT(prev_flag != nullptr);
-    throw Error{"No value provided for '" + flag_name(prev_flag, prev_is_long) +
-                "' flag"};
+    throw Error{prefixed_message(program_name, "No value provided for '" +
+                                                   flag_name(prev_flag, prev_is_long) +
+                                                   "' flag")};
   }
 
   return args;
