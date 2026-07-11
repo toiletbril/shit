@@ -44,9 +44,11 @@ Mkdir::Mkdir() = default;
 pure fn Mkdir::kind() const wontthrow -> Utility::Kind { return Kind::Mkdir; }
 
 fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
-                  const ArrayList<String> &args) const throws -> i32
+                  const ArrayList<String> &args,
+                  const ArrayList<SourceLocation> &arg_locations) const throws
+    -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args);
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
@@ -65,8 +67,8 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
     if (parsed.is_error() || parsed.value() < 0 || parsed.value() > 07777)
       throw ErrorWithDetails{
           "mkdir: invalid mode '" +
-          String{cxt.scratch_allocator(), FLAG_MKDIR_MODE.value()}
-          + "'",
+              String{cxt.scratch_allocator(), FLAG_MKDIR_MODE.value()}
+              + "'",
           "A mode is an octal number such as 0755"
       };
 

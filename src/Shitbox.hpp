@@ -59,8 +59,10 @@ public:
   };
 
   pure virtual Kind kind() const wontthrow = 0;
-  virtual i32 execute(const ExecContext &ec, EvalContext &cxt,
-                      const ArrayList<String> &args) const throws = 0;
+  virtual i32
+  execute(const ExecContext &ec, EvalContext &cxt,
+          const ArrayList<String> &args,
+          const ArrayList<SourceLocation> &arg_locations) const throws = 0;
 
   virtual ~Utility() = default;
 
@@ -139,13 +141,14 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
                     EvalContext &cxt) throws -> i32;
 
 fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
-            const ArrayList<String> &args) throws -> i32;
+            const ArrayList<String> &args,
+            const ArrayList<SourceLocation> &arg_locations) throws -> i32;
 
-fn parse_util_operands(const ArrayList<Flag *> &flags,
-                       const ArrayList<String> &args,
-                       const ArrayList<SourceLocation> *arg_locations = nullptr,
-                       ArrayList<SourceLocation> *operand_locations = nullptr)
-    throws -> ArrayList<String>;
+fn parse_util_operands(
+    const ArrayList<Flag *> &flags, const ArrayList<String> &args,
+    const ArrayList<SourceLocation> *arg_locations = nullptr,
+    ArrayList<SourceLocation> *operand_locations = nullptr) throws
+    -> ArrayList<String>;
 
 fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
                    StringView description,
@@ -165,7 +168,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
 #define U_CASE(util)                                                           \
   case Utility::Kind::util: {                                                  \
     util utility;                                                              \
-    return utility.execute(ec, cxt, args);                                     \
+    return utility.execute(ec, cxt, args, arg_locations);                      \
   }
 
 #define UTILITY_SWITCH_CASES()                                                 \
@@ -211,8 +214,10 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
     u();                                                                       \
                                                                                \
     pure Kind kind() const wontthrow override;                                 \
-    i32 execute(const ExecContext &ec, EvalContext &cxt,                       \
-                const ArrayList<String> &args) const throws override;          \
+    i32 execute(                                                               \
+        const ExecContext &ec, EvalContext &cxt,                               \
+        const ArrayList<String> &args,                                         \
+        const ArrayList<SourceLocation> &arg_locations) const throws override; \
   };
 
 UTILITY_STRUCT(Ls);

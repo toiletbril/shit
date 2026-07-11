@@ -13,7 +13,8 @@ HELP_DESCRIPTION_DECL("The ps utility lists the running processes.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(PS_ALL, Bool, 'a', "", "List every user's processes.");
 FLAG(PS_USER_FMT, Bool, 'u', "", "List in user-oriented format.");
-FLAG(PS_NO_TTY, Bool, 'x', "", "List processes without a controlling terminal.");
+FLAG(PS_NO_TTY, Bool, 'x', "",
+     "List processes without a controlling terminal.");
 FLAG(PS_WIDE, Bool, 'w', "", "Use a wide output format.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Ps);
@@ -122,9 +123,11 @@ Ps::Ps() = default;
 pure fn Ps::kind() const wontthrow -> Utility::Kind { return Kind::Ps; }
 
 fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
-               const ArrayList<String> &args) const throws -> i32
+               const ArrayList<String> &args,
+               const ArrayList<SourceLocation> &arg_locations) const throws
+    -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args);
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);

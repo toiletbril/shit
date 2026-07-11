@@ -963,16 +963,18 @@ Make::Make() = default;
 pure fn Make::kind() const wontthrow -> Utility::Kind { return Kind::Make; }
 
 fn Make::execute(const ExecContext &ec, EvalContext &cxt,
-                 const ArrayList<String> &args) const throws -> i32
+                 const ArrayList<String> &args,
+                 const ArrayList<SourceLocation> &arg_locations) const throws
+    -> i32
 {
+  unused(arg_locations);
   /* The -j flag accepts an optional job count, with no value meaning
      unlimited, so it is dropped here before the flag parser demands a value. */
   ArrayList<String> filtered{cxt.scratch_allocator()};
   for (const String &arg : args) {
     let const text = arg.view();
     bool is_jobs_flag = text == "-j";
-    if (!is_jobs_flag && text.length > 2 && text[0] == '-' && text[1] == 'j')
-    {
+    if (!is_jobs_flag && text.length > 2 && text[0] == '-' && text[1] == 'j') {
       is_jobs_flag = true;
       for (usize k = 2; k < text.length; k++)
         if (text[k] < '0' || text[k] > '9') {

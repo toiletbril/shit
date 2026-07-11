@@ -62,8 +62,11 @@ Seq::Seq() = default;
 pure fn Seq::kind() const wontthrow -> Utility::Kind { return Kind::Seq; }
 
 fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
-                const ArrayList<String> &args) const throws -> i32
+                const ArrayList<String> &args,
+                const ArrayList<SourceLocation> &arg_locations) const throws
+    -> i32
 {
+  unused(arg_locations);
   ArrayList<String> patched_args{cxt.scratch_allocator()};
   let const negative_position = find_leading_negative_position(args);
   if (negative_position.has_value()) {

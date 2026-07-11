@@ -48,7 +48,8 @@ fn util_names() throws -> const ArrayList<String> &
 }
 
 fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
-            const ArrayList<String> &args) throws -> i32
+            const ArrayList<String> &args,
+            const ArrayList<SourceLocation> &arg_locations) throws -> i32
 {
   LOG(Debug, "dispatching shitbox utility %d with %zu arguments", ENUM(chosen),
       args.count());
@@ -75,7 +76,7 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
 
   if (let const chosen = find_util(name); chosen.has_value()) {
     try {
-      return run_util(*chosen, ec, cxt, shifted);
+      return run_util(*chosen, ec, cxt, shifted, shifted_locations);
     } catch (const BrokenPipeExit &) {
       throw;
     } catch (const ErrorWithLocation &) {
@@ -94,7 +95,7 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
     return execute_builtin(steal(routed), cxt);
   }
 
-  throw ErrorWithLocation{ec.source_location(),
+  throw ErrorWithLocation{ec.arg_location_at(name_index),
                           "shitbox has no utility named '" + String{name} +
                               "'"};
 }
@@ -127,7 +128,7 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   ec.is_multicall = true;
 
   try {
-    return run_util(*chosen, ec, cxt, ec.args());
+    return run_util(*chosen, ec, cxt, ec.args(), ec.arg_locations());
   } catch (const ErrorWithLocation &e) {
     show_message(e.to_string(utils::merge_args_to_string(ec.args())));
     return 1;
@@ -149,8 +150,8 @@ fn parse_util_operands(const ArrayList<Flag *> &flags,
                        ArrayList<SourceLocation> *operand_locations) throws
     -> ArrayList<String>
 {
-  ArrayList<String> operands = parse_flags_vec(flags, args, 0, nullptr,
-                                               arg_locations, operand_locations);
+  ArrayList<String> operands = parse_flags_vec(
+      flags, args, 0, nullptr, arg_locations, operand_locations);
   /* The first operand is the utility name, dropped to leave the real arguments.
    */
   if (!operands.is_empty()) operands.remove(0);

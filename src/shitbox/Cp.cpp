@@ -192,9 +192,11 @@ Cp::Cp() = default;
 pure fn Cp::kind() const wontthrow -> Utility::Kind { return Kind::Cp; }
 
 fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
-               const ArrayList<String> &args) const throws -> i32
+               const ArrayList<String> &args,
+               const ArrayList<SourceLocation> &arg_locations) const throws
+    -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args);
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);

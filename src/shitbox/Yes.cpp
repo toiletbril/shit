@@ -22,10 +22,12 @@ Yes::Yes() = default;
 pure fn Yes::kind() const wontthrow -> Utility::Kind { return Kind::Yes; }
 
 fn Yes::execute(const ExecContext &ec, EvalContext &cxt,
-                const ArrayList<String> &args) const throws -> i32
+                const ArrayList<String> &args,
+                const ArrayList<SourceLocation> &arg_locations) const throws
+    -> i32
 {
   unused(cxt);
-  let const operands = parse_util_operands(FLAG_LIST, args);
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
