@@ -102,7 +102,8 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           option_text.push(option);
           report_soft_builtin_error(
               ec, cxt, ec.arg_location_at(command_index),
-              StringView{"Invalid option -- "} + option_text);
+              StringView{"Invalid option -- "} + option_text,
+              "Run 'exec --help' for the accepted options");
           return 2;
         }
       }

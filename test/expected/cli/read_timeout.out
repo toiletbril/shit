@@ -12,4 +12,5 @@ rc=142
 shit: 1:12: error: Builtin 'read': Invalid timeout specification.
      1 |  read -r -t nope x </dev/null; echo "rc=$?"
        |             ^~~~ here.
+shit: note: The -t timeout needs a fractional second count such as 0.5.
 rc=1

@@ -63,10 +63,11 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
        error, so a sign-prefixed or oversized operand parses cleanly. The range
        check rejects it rather than truncating to an over-permissive mode. */
     if (parsed.is_error() || parsed.value() < 0 || parsed.value() > 07777)
-      throw Error{
+      throw ErrorWithDetails{
           "mkdir: invalid mode '" +
           String{cxt.scratch_allocator(), FLAG_MKDIR_MODE.value()}
-          + "'"
+          + "'",
+          "A mode is an octal number such as 0755"
       };
 
     named_mode = static_cast<u32>(parsed.value());

@@ -843,8 +843,9 @@ mustuse fn Parser::try_parse_trailing_redirection(
       return true;
     }
 
-    throw ErrorWithLocation{word_location,
-                            "Unexpected word after a compound command"};
+    throw ErrorWithLocationAndDetails{
+        word_location, "Unexpected word after a compound command",
+        "A compound command takes no extra words before its terminator"};
   }
 
   default: return false;
@@ -2149,8 +2150,10 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
 
     case Token::Kind::RightParen: {
       if (m_parentheses_depth == 0) {
-        throw ErrorWithLocation{maybe_op->source_location(),
-                                "Unexpected closing parenthesis"};
+        throw ErrorWithLocationAndDetails{
+            maybe_op->source_location(),
+            "Unexpected closing parenthesis",
+            "There is no matching opening parenthesis to close here"};
       }
       return lhs;
     }

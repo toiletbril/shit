@@ -53,7 +53,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        FLAG_READ_DELIM.is_set() || FLAG_READ_FD.is_set() ||
        FLAG_READ_EDIT.is_enabled()))
   {
-    report_soft_builtin_error(ec, cxt, "Illegal option");
+    report_soft_builtin_error(ec, cxt, "Illegal option",
+                              "Run 'read --help' for the accepted options");
     return 2;
   }
 
@@ -77,7 +78,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         }
       }
       report_soft_builtin_error(ec, cxt, ec.arg_location_at(timeout_arg_index),
-                                "Invalid timeout specification");
+                                "Invalid timeout specification",
+                                "The -t timeout needs a fractional second count such as 0.5");
       return 1;
     }
     timeout_nanos = parsed.value();

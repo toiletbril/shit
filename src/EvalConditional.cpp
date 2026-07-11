@@ -276,7 +276,9 @@ struct conditional_evaluator
 
   fn eval_primary() throws -> bool
   {
-    if (at_end()) fail_conditional("The expression ends unexpectedly");
+    if (at_end())
+      fail_conditional("The expression ends unexpectedly",
+                       "A conditional needs an operator or an operand after this point");
     const conditional_element &first = elements[pos];
     if (first.kind != Kind::Operand)
       fail_conditional("An operator appears where an operand is expected");
@@ -465,7 +467,8 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws
     reason += "The regular expression '";
     reason += pattern;
     reason += "' is invalid";
-    fail_conditional(reason.view());
+    fail_conditional(reason.view(),
+                     "The pattern must be a valid extended regular expression");
   }
   m_regex_cache.set(key.view(), CompiledRegex{compiled});
   return m_regex_cache.find(key.view())->get();

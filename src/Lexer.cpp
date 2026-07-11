@@ -404,8 +404,9 @@ hot flatten fn Lexer::lex_expression_token() throws -> Token *
     else if (lexer::is_part_of_identifier(ch))
       return lex_identifier();
     else [[unlikely]]
-      throw ErrorWithLocation{here(m_cursor_position, 1),
-                              "Unexpected character"};
+      throw ErrorWithLocationAndDetails{
+          here(m_cursor_position, 1), "Unexpected character",
+          "The character is not valid in an unquoted word here"};
   }
 
   return m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
@@ -424,8 +425,9 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
     } else if (lexer::is_part_of_identifier(ch)) [[likely]] {
       t = lex_identifier();
     } else [[unlikely]] {
-      throw ErrorWithLocation{here(m_cursor_position, 1),
-                              "Unexpected character"};
+      throw ErrorWithLocationAndDetails{
+          here(m_cursor_position, 1), "Unexpected character",
+          "The character is not valid in an unquoted word here"};
     }
   } else {
     t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));

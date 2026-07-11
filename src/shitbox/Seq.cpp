@@ -23,9 +23,10 @@ static fn parse_integer(StringView text, Allocator allocator) throws -> i64
 {
   let const parsed = text.to<i64>();
   if (parsed.is_error())
-    throw Error{
+    throw ErrorWithDetails{
         "seq: invalid integer argument '" + String{allocator, text}
-          + "'"
+          + "'",
+        "Each argument must be a whole or fractional number"
     };
   return parsed.value();
 }
