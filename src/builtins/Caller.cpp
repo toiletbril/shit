@@ -1,7 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
-#include "../Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -36,11 +35,13 @@ fn Caller::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (parsed.is_error()) {
       throw make_error_for_arg(
           ec, 1, StringView{"'"} + args[1] + "' is not a valid frame number",
-          "caller takes a whole number such as `caller 0`");
+          "the frame index must be a whole number such as 'caller 0'");
     }
     if (parsed.value() < 0) {
       throw make_error_for_arg(
-          ec, 1, StringView{"'"} + args[1] + "' is not a valid frame number");
+          ec, 1, StringView{"'"} + args[1]
+                    + "' is not a valid frame number",
+          "the frame index must not be negative");
     }
     frame_index = static_cast<usize>(parsed.value());
   }

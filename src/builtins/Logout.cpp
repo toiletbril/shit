@@ -29,7 +29,8 @@ fn Logout::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (!cxt.is_login_shell()) {
     report_soft_builtin_error(ec, cxt, ec.source_location(),
-                              "logout: not login shell: use exit");
+                              "Cannot use 'logout' in a non-login shell",
+                              "'exit' may be used instead");
     return 1;
   }
 
@@ -42,14 +43,14 @@ fn Logout::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       report_soft_builtin_error(
           ec, cxt, ec.arg_location_at(1),
           StringView{"'"} + ec.args()[1] + "' is not a numeric exit status",
-          "logout takes a whole number such as `logout 1`");
+          "the status must be a whole number such as 'logout 1'");
       return 2;
     }
 
     if (ec.args().count() > 2) {
       report_soft_builtin_error(
           ec, cxt, ec.arg_location_at(2), "too many arguments",
-          "logout takes at most one status, e.g. `logout 1`");
+          "logout takes at most one status, such as 'logout 1'");
       status = 1;
     } else {
       status = parsed_status.value();

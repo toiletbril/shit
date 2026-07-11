@@ -6,5 +6,5 @@ rc=1
 shit: 1:8: error: Builtin 'caller': 'abc' is not a valid frame number.
      1 |  caller abc
        |         ^~~ here.
-note: caller takes a whole number such as `caller 0`.
+note: the frame index must be a whole number such as 'caller 0'.
 rc=1
