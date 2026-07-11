@@ -302,11 +302,11 @@ public:
      with the returned strings, so each field carries the source_location of
      the token it expanded from. A token that splits into many fields
      contributes one location per field. */
-  fn process_args(const ArrayList<const Token *> &args,
-                  bool args_are_transient = false,
-                  bool is_array_literal = false,
-                  ArrayList<SourceLocation> *expanded_locations = nullptr)
-      throws -> ArrayList<String>;
+  fn process_args(
+      const ArrayList<const Token *> &args, bool args_are_transient = false,
+      bool is_array_literal = false,
+      ArrayList<SourceLocation> *expanded_locations = nullptr) throws
+      -> ArrayList<String>;
 
   fn scratch_allocator() const wontthrow -> Allocator
   {

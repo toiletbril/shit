@@ -245,9 +245,9 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           if (is_quiet)
             status = 1;
           else
-            throw make_error_for_arg(
-                ec, arg_index,
-                StringView{"Unknown shopt option '"} + name + "'");
+            throw make_error_for_arg(ec, arg_index,
+                                     StringView{"Unknown shopt option '"} +
+                                         name + "'");
         }
       } else if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
       {
@@ -259,8 +259,7 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           status = 1;
         else
           throw make_error_for_arg(
-              ec, arg_index,
-              StringView{"Unknown shopt option '"} + name + "'");
+              ec, arg_index, StringView{"Unknown shopt option '"} + name + "'");
       }
     }
     return status;

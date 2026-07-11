@@ -43,9 +43,9 @@ fn Continue::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (!cxt.is_bash_compatible()) throw parsed_level.error();
 
       LOG(All, "continue rejecting a non-numeric count under bash mood");
-      report_soft_builtin_error(
-          ec, cxt, ec.arg_location_at(1),
-          "'" + ec.args()[1] + "' is not a valid loop count");
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
+                                "'" + ec.args()[1] +
+                                    "' is not a valid loop count");
 
       if (!cxt.shell_is_interactive()) {
         if (cxt.in_subshell()) {
@@ -67,15 +67,15 @@ fn Continue::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (level < 1) {
     if (!cxt.is_bash_compatible()) {
-      throw make_error_for_arg(
-          ec, 1, "Unable to continue because '" + ec.args()[1] +
-                      "' is not a valid loop count");
+      throw make_error_for_arg(ec, 1,
+                               "Unable to continue because '" + ec.args()[1] +
+                                   "' is not a valid loop count");
     }
 
     LOG(All, "continue abandoning every enclosing loop for a count below one");
-    report_soft_builtin_error(
-        ec, cxt, ec.arg_location_at(1),
-        "'" + ec.args()[1] + "' is not a valid loop count");
+    report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
+                              "'" + ec.args()[1] +
+                                  "' is not a valid loop count");
     cxt.request_break(static_cast<i64>(cxt.loop_depth()), ec.source_location());
     return 1;
   }

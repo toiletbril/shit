@@ -213,8 +213,8 @@ fn apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
   let const &name = args[++i];
   let const option = find_option_by_name(name);
   if (option == nullptr)
-    throw make_error_for_arg(
-        ec, i, StringView{"Unknown -o option '"} + name + "'");
+    throw make_error_for_arg(ec, i,
+                             StringView{"Unknown -o option '"} + name + "'");
   apply_or_reject_option(cxt, *option, enable);
 }
 
@@ -384,9 +384,8 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (!parsed.has_value())
         throw make_error_for_arg(
             ec, i,
-            String{cxt.scratch_allocator(), "Unknown --mood value '"}
-            + *value +
-            "', expected 'shit', 'bash', 'sh', or 'bash-posix'");
+            String{cxt.scratch_allocator(), "Unknown --mood value '"} + *value +
+                "', expected 'shit', 'bash', 'sh', or 'bash-posix'");
       cxt.set_mood(*parsed);
       cxt.apply_strictness_for_mood();
       cxt.note_explicit_mood();
@@ -422,9 +421,8 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (!parsed.has_value())
           throw make_error_for_arg(
               ec, i,
-              String{cxt.scratch_allocator(),
-                     "Unknown --init-moods value '"} +
-              name + "', expected 'shit', 'bash', 'sh', or 'bash-posix'");
+              String{cxt.scratch_allocator(), "Unknown --init-moods value '"} +
+                  name + "', expected 'shit', 'bash', 'sh', or 'bash-posix'");
         moods.push(*parsed);
       }
       if (AST_ARENA == nullptr)

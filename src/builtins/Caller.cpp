@@ -19,16 +19,12 @@ namespace shit {
 
 Caller::Caller() = default;
 
-pure fn Caller::kind() const wontthrow -> Builtin::Kind
-{
-  return Kind::Caller;
-}
+pure fn Caller::kind() const wontthrow -> Builtin::Kind { return Kind::Caller; }
 
 fn Caller::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const args =
-      PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
+  let const args = PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -39,14 +35,12 @@ fn Caller::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parsed = args[1].to<i64>();
     if (parsed.is_error()) {
       throw make_error_for_arg(
-          ec, 1,
-          StringView{"'"} + args[1] + "' is not a valid frame number",
+          ec, 1, StringView{"'"} + args[1] + "' is not a valid frame number",
           "caller takes a whole number such as `caller 0`");
     }
     if (parsed.value() < 0) {
-      throw make_error_for_arg(ec, 1,
-                              StringView{"'"} + args[1] +
-                                  "' is not a valid frame number");
+      throw make_error_for_arg(
+          ec, 1, StringView{"'"} + args[1] + "' is not a valid frame number");
     }
     frame_index = static_cast<usize>(parsed.value());
   }

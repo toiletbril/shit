@@ -2151,8 +2151,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     case Token::Kind::RightParen: {
       if (m_parentheses_depth == 0) {
         throw ErrorWithLocationAndDetails{
-            maybe_op->source_location(),
-            "Unexpected closing parenthesis",
+            maybe_op->source_location(), "Unexpected closing parenthesis",
             "There is no matching opening parenthesis to close here"};
       }
       return lhs;

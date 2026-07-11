@@ -58,9 +58,9 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           listing += *name;
           listing += '\n';
         } else {
-          report_soft_builtin_error(
-              ec, cxt, ec.arg_location_at(i),
-              StringView{"'"} + spec + "' is not a valid signal");
+          report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                    StringView{"'"} + spec +
+                                        "' is not a valid signal");
           status = 1;
         }
       } else if (let const number = os::signal_number_from_name(spec);
@@ -69,9 +69,9 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         listing += String::from(*number, cxt.scratch_allocator()).view();
         listing += '\n';
       } else {
-        report_soft_builtin_error(
-            ec, cxt, ec.arg_location_at(i),
-            StringView{"'"} + spec + "' is not a valid signal");
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                  StringView{"'"} + spec +
+                                      "' is not a valid signal");
         status = 1;
       }
     }
@@ -128,9 +128,9 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!target.is_empty() && target[0] == '%') {
       const job *const job = cxt.find_job_by_spec(target);
       if (job == nullptr) {
-        report_soft_builtin_error(
-            ec, cxt, ec.arg_location_at(i),
-            StringView{"'"} + target + "' is not a known job");
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                  StringView{"'"} + target +
+                                      "' is not a known job");
         status = 1;
         continue;
       }

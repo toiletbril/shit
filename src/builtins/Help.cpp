@@ -27,8 +27,7 @@ pure fn Help::kind() const wontthrow -> Builtin::Kind { return Kind::Help; }
 fn Help::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const args =
-      PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
+  let const args = PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -50,7 +49,7 @@ fn Help::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       report_soft_builtin_error(
           ec, cxt,
           i < operand_locations.count() ? operand_locations[i]
-                                         : ec.source_location(),
+                                        : ec.source_location(),
           StringView{"'"} + name + "' is not a shell builtin");
       status = 1;
       continue;

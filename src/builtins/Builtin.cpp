@@ -98,9 +98,9 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   let const target = search_builtin(name.view());
   if (!target.has_value()) {
-    report_soft_builtin_error(
-        ec, cxt, ec.arg_location_at(1),
-        StringView{"'"} + name + "' is not a shell builtin");
+    report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
+                              StringView{"'"} + name +
+                                  "' is not a shell builtin");
     return 1;
   }
 
@@ -110,10 +110,9 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     forwarded.push_managed(ec.args()[i]);
     forwarded_locations.push(ec.arg_location_at(i));
   }
-  let sub = ExecContext::from_resolved(ec.source_location(),
-                                       ResolvedCommand::from_builtin(*target),
-                                       steal(forwarded),
-                                       steal(forwarded_locations));
+  let sub = ExecContext::from_resolved(
+      ec.source_location(), ResolvedCommand::from_builtin(*target),
+      steal(forwarded), steal(forwarded_locations));
   return execute_builtin(steal(sub), cxt);
 }
 

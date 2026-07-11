@@ -117,8 +117,7 @@ pure fn Umask::kind() const wontthrow -> Builtin::Kind { return Kind::Umask; }
 cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const operands =
-      PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
+  let const operands = PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
   ASSERT(!ec.args().is_empty());
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
@@ -155,8 +154,8 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   let const &requested = operands[1];
-  let const requested_location =
-      operand_locations.count() > 1 ? operand_locations[1]
+  let const requested_location = operand_locations.count() > 1
+                                     ? operand_locations[1]
                                      : ec.source_location();
 
   LOG(Debug, "umask setting the file creation mask from '%s'",
@@ -176,10 +175,9 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const new_mask =
       apply_symbolic_mask(requested.view(), os::get_file_creation_mask());
   if (!new_mask.has_value())
-    throw make_error_for_arg(
-        ec, 1,
-        "Unable to set the file creation mask because '" + requested +
-            "' is not a valid symbolic mask");
+    throw make_error_for_arg(ec, 1,
+                             "Unable to set the file creation mask because '" +
+                                 requested + "' is not a valid symbolic mask");
   os::set_file_creation_mask(*new_mask);
 
   return 0;

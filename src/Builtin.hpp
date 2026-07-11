@@ -352,17 +352,16 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
 
 #define PARSE_BUILTIN_ARGS(ec)                                                 \
   parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,         \
-                  nullptr, &ec.arg_locations(),                                \
-                  nullptr);                                                    \
+                  nullptr, &ec.arg_locations(), nullptr);                      \
   defer { reset_flags(FLAG_LIST); }
 
 /* The same parse, but it also fills operand_locations with the source span of
    each surviving operand, so a builtin that iterates its parsed operands can
-   caret the specific one. The caller declares the list and passes it by name. */
+   caret the specific one. The caller declares the list and passes it by name.
+ */
 #define PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations)               \
   parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,         \
-                  nullptr, &ec.arg_locations(),                                \
-                  &(operand_locations));                                       \
+                  nullptr, &ec.arg_locations(), &(operand_locations));         \
   defer { reset_flags(FLAG_LIST); }
 
 i32 execute_builtin(ExecContext &&ec, EvalContext &cxt) throws;

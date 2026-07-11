@@ -358,7 +358,7 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let error = make_error_for_arg(
         ec, evaluator.pos,
         StringView{"'"} + arguments[evaluator.pos] +
-                      "' is an unexpected argument",
+            "' is an unexpected argument",
         "A test takes an operator or an operand at this position");
     error.set_command_status(2);
     throw error;

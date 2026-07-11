@@ -30,18 +30,17 @@ pure fn Suspend::kind() const wontthrow -> Builtin::Kind
 fn Suspend::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const operands =
-      PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
+  let const operands = PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (operands.count() > 1) {
-    report_soft_builtin_error(
-        ec, cxt,
-        operand_locations.count() > 1 ? operand_locations[1]
-                                       : ec.arg_location_at(1),
-        "suspend takes no arguments",
-        "Run 'suspend --help' for the accepted options");
+    report_soft_builtin_error(ec, cxt,
+                              operand_locations.count() > 1
+                                  ? operand_locations[1]
+                                  : ec.arg_location_at(1),
+                              "suspend takes no arguments",
+                              "Run 'suspend --help' for the accepted options");
     return 2;
   }
 

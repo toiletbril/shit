@@ -277,8 +277,9 @@ struct conditional_evaluator
   fn eval_primary() throws -> bool
   {
     if (at_end())
-      fail_conditional("The expression ends unexpectedly",
-                       "A conditional needs an operator or an operand after this point");
+      fail_conditional(
+          "The expression ends unexpectedly",
+          "A conditional needs an operator or an operand after this point");
     const conditional_element &first = elements[pos];
     if (first.kind != Kind::Operand)
       fail_conditional("An operator appears where an operand is expected");

@@ -236,10 +236,9 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const old_directory = Path::current_directory();
   if (Path::set_current_directory(target).is_error())
-    throw make_error_for_arg(
-        ec, 1,
-        StringView{"Unable to change directory to '"} + target.text() +
-            "'");
+    throw make_error_for_arg(ec, 1,
+                             StringView{"Unable to change directory to '"} +
+                                 target.text() + "'");
   utils::invalidate_path_cache();
   if (!old_directory.is_empty())
     cxt.set_shell_variable("OLDPWD", old_directory.text());

@@ -258,8 +258,8 @@ cold fn Lexer::register_heredoc(StringView delimiter,
    it as it sees fit and signals whether to continue. */
 template <class Emit>
 cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
-                                 bool should_strip_tabs,
-                                 Emit emit_line) throws -> usize
+                                 bool should_strip_tabs, Emit emit_line) throws
+    -> usize
 {
   usize position = start;
   loop
@@ -267,7 +267,8 @@ cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
     if (position >= m_source.length()) break;
     const let line_start = position;
     usize i = line_start;
-    while (i < m_source.length() && m_source[i] != '\n') i++;
+    while (i < m_source.length() && m_source[i] != '\n')
+      i++;
     const bool has_newline = (i < m_source.length());
     position = has_newline ? i + 1 : i;
 
@@ -282,8 +283,8 @@ cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
       }
     }
 
-    const let stripped = m_source.substring_of_length(stripped_offset,
-                                                      stripped_length);
+    const let stripped =
+        m_source.substring_of_length(stripped_offset, stripped_length);
     const bool is_delimiter = (delimiter == stripped);
     const let raw = m_source.substring_of_length(line_offset, line_length);
     if (!emit_line(raw, has_newline, is_delimiter)) break;
@@ -304,16 +305,17 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
       if (is_delimiter) return false;
       if (pending.should_strip_tabs) {
         usize offset = 0;
-        while (offset < line.length && line[offset] == '\t') offset++;
+        while (offset < line.length && line[offset] == '\t')
+          offset++;
         line = line.substring_of_length(offset, line.length - offset);
       }
       collected.append(line);
       collected += '\n';
       return true;
     };
-    m_cursor_position = walk_heredoc_body(
-        m_cursor_position, pending.delimiter.view(),
-        pending.should_strip_tabs, do_append_body_line);
+    m_cursor_position =
+        walk_heredoc_body(m_cursor_position, pending.delimiter.view(),
+                          pending.should_strip_tabs, do_append_body_line);
     LOG(Debug, "capturing a heredoc body of %zu bytes for delimiter '%s'",
         collected.count(), pending.delimiter.c_str());
     ASSERT(pending.body != nullptr);
@@ -335,8 +337,10 @@ cold fn Lexer::skip_heredoc_in_substitution(usize byte_count,
     if (quote != 0) {
       byte_count++;
       inner += c;
-      if (c == quote) quote = 0;
-      else delimiter += c;
+      if (c == quote)
+        quote = 0;
+      else
+        delimiter += c;
       continue;
     }
     if (c == '\\') {
@@ -388,9 +392,8 @@ cold fn Lexer::skip_heredoc_in_substitution(usize byte_count,
     if (has_newline) inner += '\n';
     return !is_delimiter;
   };
-  return walk_heredoc_body(m_cursor_position + byte_count,
-                           delimiter.view(), should_strip_tabs,
-                           do_append_raw_line) -
+  return walk_heredoc_body(m_cursor_position + byte_count, delimiter.view(),
+                           should_strip_tabs, do_append_raw_line) -
          m_cursor_position;
 }
 

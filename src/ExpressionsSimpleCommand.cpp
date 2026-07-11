@@ -657,9 +657,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const substitution_mark = cxt.mark_process_substitutions();
   let program_arg_locations =
       ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let program_args = cxt.process_args(m_args, /*args_are_transient=*/true,
-                                      /*is_array_literal=*/false,
-                                      &program_arg_locations);
+  let program_args =
+      cxt.process_args(m_args, /*args_are_transient=*/true,
+                       /*is_array_literal=*/false, &program_arg_locations);
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args, program_arg_locations);
 

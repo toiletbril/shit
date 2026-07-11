@@ -108,9 +108,9 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         let invalid = String{cxt.scratch_allocator()};
         invalid += arg[0];
         invalid += arg[c];
-        report_soft_builtin_error(
-            ec, cxt, ec.arg_location_at(i),
-            "'" + invalid + "' is not a valid declare option");
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                  "'" + invalid +
+                                      "' is not a valid declare option");
         return 2;
       }
       }
@@ -141,9 +141,9 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const name = args[i].view();
       if (cxt.find_function(name) == nullptr) {
         if (!should_print_function_names_only)
-          report_soft_builtin_error(
-              ec, cxt, ec.arg_location_at(i),
-              StringView{"'"} + name + "' is not a function");
+          report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                    StringView{"'"} + name +
+                                        "' is not a function");
         status = 1;
         continue;
       }

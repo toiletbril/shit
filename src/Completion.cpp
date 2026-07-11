@@ -324,7 +324,9 @@ static pure fn candidate_match(StringView token, StringView candidate,
   if (!is_case_sensitive && candidate.length >= token.length) {
     bool is_prefix = true;
     for (usize i = 0; i < token.length; i++)
-      if (utils::ascii_to_lower(candidate[i]) != utils::ascii_to_lower(token[i])) {
+      if (utils::ascii_to_lower(candidate[i]) !=
+          utils::ascii_to_lower(token[i]))
+      {
         is_prefix = false;
         break;
       }
@@ -338,11 +340,10 @@ static pure fn candidate_match(StringView token, StringView candidate,
 
   usize matched_count = 0;
   for (usize i = 0; i < candidate.length && matched_count < token.length; i++) {
-    const bool is_equal =
-        is_case_sensitive
-            ? candidate[i] == token[matched_count]
-            : utils::ascii_to_lower(candidate[i]) ==
-                  utils::ascii_to_lower(token[matched_count]);
+    const bool is_equal = is_case_sensitive
+                              ? candidate[i] == token[matched_count]
+                              : utils::ascii_to_lower(candidate[i]) ==
+                                    utils::ascii_to_lower(token[matched_count]);
     if (is_equal) matched_count++;
   }
   if (matched_count == token.length) return match_tier::subsequence;
@@ -1023,7 +1024,8 @@ static pure fn candidate_extension_is_hinted(
     bool is_equal = true;
     for (usize i = 0; i < wanted.length; i++)
       if (utils::ascii_to_lower(extension[i]) !=
-          utils::ascii_to_lower(wanted[i])) {
+          utils::ascii_to_lower(wanted[i]))
+      {
         is_equal = false;
         break;
       }

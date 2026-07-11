@@ -1323,9 +1323,9 @@ fn replace_process(ExecContext &&ec) throws -> void
   /* The reason is read before the concatenation, which allocates and could
      clobber errno. */
   let const reason = last_system_error_message();
-  throw shit::ErrorWithLocation{
-      ec.source_location(),
-      "Unable to execute `" + ec.program_path().text() + "`: " + reason};
+  throw shit::ErrorWithLocation{ec.source_location(),
+                                "Unable to execute `" +
+                                    ec.program_path().text() + "`: " + reason};
 }
 
 fn redirect_self(const ExecContext &ec) throws -> void

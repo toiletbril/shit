@@ -586,9 +586,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     let stage_arg_locations =
         ArrayList<SourceLocation>{cxt.scratch_allocator()};
-    let stage_args = cxt.process_args(e->args(), /*args_are_transient=*/true,
-                                      /*is_array_literal=*/false,
-                                      &stage_arg_locations);
+    let stage_args =
+        cxt.process_args(e->args(), /*args_are_transient=*/true,
+                         /*is_array_literal=*/false, &stage_arg_locations);
 
     if (stage_args.is_empty()) {
       throw ErrorWithLocation{e->source_location(),

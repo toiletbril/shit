@@ -30,8 +30,7 @@ pure fn Export::kind() const wontthrow -> Builtin::Kind { return Kind::Export; }
 fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const args =
-      PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
+  let const args = PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -43,9 +42,8 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const name = String{cxt.scratch_allocator(), args[i].view()};
       let const *source = cxt.find_function_source(name.view());
       if (source == nullptr) {
-        let const loc = i < operand_locations.count()
-                            ? operand_locations[i]
-                            : ec.source_location();
+        let const loc = i < operand_locations.count() ? operand_locations[i]
+                                                      : ec.source_location();
         report_soft_builtin_error(
             ec, cxt, loc, StringView{"'"} + name + "' is not a function");
         has_error = true;
@@ -152,21 +150,18 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     if (!name_is_valid_identifier(name.view())) {
-      let const loc = i < operand_locations.count()
-                          ? operand_locations[i]
-                          : ec.source_location();
+      let const loc = i < operand_locations.count() ? operand_locations[i]
+                                                    : ec.source_location();
       report_soft_builtin_error(
-          ec, cxt, loc,
-          StringView{"'"} + arg + "' is not a valid identifier");
+          ec, cxt, loc, StringView{"'"} + arg + "' is not a valid identifier");
       has_error = true;
       continue;
     }
 
     if (cxt.is_readonly(name)) {
       if (has_new_value) {
-        let const loc = i < operand_locations.count()
-                            ? operand_locations[i]
-                            : ec.source_location();
+        let const loc = i < operand_locations.count() ? operand_locations[i]
+                                                      : ec.source_location();
         report_soft_builtin_error(ec, cxt, loc,
                                   StringView{"'"} + name + "' is read-only");
         has_error = true;

@@ -119,17 +119,15 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.unset_shell_variable("OPTARG");
       if (should_print_diagnostic) {
         let const operand_arg_index =
-            args.count() > 3
-                ? Maybe<usize>{static_cast<usize>(optind) + 2}
-                : Maybe<usize>{None};
+            args.count() > 3 ? Maybe<usize>{static_cast<usize>(optind) + 2}
+                             : Maybe<usize>{None};
         if (operand_arg_index.has_value()) {
           report_soft_builtin_error(
               ec, cxt, ec.arg_location_at(*operand_arg_index),
               StringView{"Illegal option -- "} + option_as_string);
         } else {
           report_soft_builtin_error(
-              ec, cxt,
-              StringView{"Illegal option -- "} + option_as_string);
+              ec, cxt, StringView{"Illegal option -- "} + option_as_string);
         }
       }
     }
@@ -160,9 +158,8 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         cxt.unset_shell_variable("OPTARG");
         if (should_print_diagnostic) {
           let const operand_arg_index =
-              args.count() > 3
-                  ? Maybe<usize>{static_cast<usize>(optind) + 2}
-                  : Maybe<usize>{None};
+              args.count() > 3 ? Maybe<usize>{static_cast<usize>(optind) + 2}
+                               : Maybe<usize>{None};
           if (operand_arg_index.has_value()) {
             report_soft_builtin_error(
                 ec, cxt, ec.arg_location_at(*operand_arg_index),

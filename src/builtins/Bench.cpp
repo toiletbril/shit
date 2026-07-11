@@ -518,7 +518,8 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   /* The flag parser keeps argv[0], so the commands start at index 1. */
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const arguments = PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
+  let const arguments =
+      PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -572,9 +573,9 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     if (did_command_fail) {
       if (should_show_progress) clear_progress();
-      let const operand_location =
-          i < operand_locations.count() ? operand_locations[i]
-                                        : ec.source_location();
+      let const operand_location = i < operand_locations.count()
+                                       ? operand_locations[i]
+                                       : ec.source_location();
       report_soft_builtin_error(
           ec, cxt, operand_location,
           StringView{"the command `"} + arguments[i].view() +

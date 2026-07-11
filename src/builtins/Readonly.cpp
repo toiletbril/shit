@@ -29,8 +29,7 @@ pure fn Readonly::kind() const wontthrow -> Builtin::Kind
 fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const args =
-      PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
+  let const args = PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -72,12 +71,10 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parts = NameValueArg::from(arg);
 
     if (!name_is_valid_identifier(parts.get_name())) {
-      let const loc = i < operand_locations.count()
-                          ? operand_locations[i]
-                          : ec.source_location();
+      let const loc = i < operand_locations.count() ? operand_locations[i]
+                                                    : ec.source_location();
       report_soft_builtin_error(
-          ec, cxt, loc,
-          StringView{"'"} + arg + "' is not a valid identifier");
+          ec, cxt, loc, StringView{"'"} + arg + "' is not a valid identifier");
       has_error = true;
       continue;
     }

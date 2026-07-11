@@ -390,11 +390,9 @@ constexpr static_string_entry<u8> DECLARATION_COMMAND_ENTRIES[] = {
 };
 constexpr StaticStringMap DECLARATION_COMMANDS{DECLARATION_COMMAND_ENTRIES};
 
-hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
-                                         bool args_are_transient,
-                                         bool is_array_literal,
-                                         ArrayList<SourceLocation>
-                                             *expanded_locations) throws
+hot flatten fn EvalContext::process_args(
+    const ArrayList<const Token *> &args, bool args_are_transient,
+    bool is_array_literal, ArrayList<SourceLocation> *expanded_locations) throws
     -> ArrayList<String>
 {
   LOG(Debug, "expanding %zu argument tokens", args.count());
@@ -415,7 +413,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
     expanded_locations->reserve(args.count());
   }
   let const do_record_location = [expanded_locations](SourceLocation loc)
-      wontthrow -> void {
+                                     wontthrow -> void {
     if (expanded_locations != nullptr) expanded_locations->push(loc);
   };
 

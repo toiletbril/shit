@@ -228,8 +228,8 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
   /* When the caller asks for operand locations, each surviving operand records
      the source span of the argv token it came from, so a builtin can caret the
      specific operand after flag parsing drops the flags. */
-  let const do_record_operand = [arg_locations, operand_locations](
-                                    usize arg_index) wontthrow -> void {
+  let const do_record_operand =
+      [arg_locations, operand_locations](usize arg_index) wontthrow -> void {
     if (operand_locations == nullptr) return;
     if (arg_locations != nullptr && arg_index < arg_locations->count())
       operand_locations->push((*arg_locations)[arg_index]);
@@ -430,8 +430,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
           SourceLocation flag_location;
           const usize arg_index = static_cast<usize>(i);
-          if (arg_locations != nullptr && arg_index < arg_locations->count())
-          {
+          if (arg_locations != nullptr && arg_index < arg_locations->count()) {
             flag_location = (*arg_locations)[arg_index];
           } else {
             usize caret_offset = 0;

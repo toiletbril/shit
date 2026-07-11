@@ -1,6 +1,6 @@
 #include "../Builtin.hpp"
-#include "../Eval.hpp"
 #include "../Errors.hpp"
+#include "../Eval.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -8,8 +8,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[n]");
 
-HELP_DESCRIPTION_DECL(
-    "The logout builtin ends a login shell with a status.");
+HELP_DESCRIPTION_DECL("The logout builtin ends a login shell with a status.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -19,10 +18,7 @@ namespace shit {
 
 Logout::Logout() = default;
 
-pure fn Logout::kind() const wontthrow -> Builtin::Kind
-{
-  return Kind::Logout;
-}
+pure fn Logout::kind() const wontthrow -> Builtin::Kind { return Kind::Logout; }
 
 fn Logout::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
@@ -43,17 +39,17 @@ fn Logout::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parsed_status = ec.args()[1].to<i64>();
 
     if (parsed_status.is_error()) {
-      report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
-                                StringView{"'"} + ec.args()[1] +
-                                    "' is not a numeric exit status",
-                                "logout takes a whole number such as `logout 1`");
+      report_soft_builtin_error(
+          ec, cxt, ec.arg_location_at(1),
+          StringView{"'"} + ec.args()[1] + "' is not a numeric exit status",
+          "logout takes a whole number such as `logout 1`");
       return 2;
     }
 
     if (ec.args().count() > 2) {
-      report_soft_builtin_error(ec, cxt, ec.arg_location_at(2),
-                                "too many arguments",
-                                "logout takes at most one status, e.g. `logout 1`");
+      report_soft_builtin_error(
+          ec, cxt, ec.arg_location_at(2), "too many arguments",
+          "logout takes at most one status, e.g. `logout 1`");
       status = 1;
     } else {
       status = parsed_status.value();

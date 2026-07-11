@@ -195,12 +195,11 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
 }
 
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
-                             SourceLocation location,
-                             StringView message) throws -> void
+                             SourceLocation location, StringView message) throws
+    -> void
 {
-  const ErrorWithLocation located{location,
-                                  StringView{"Builtin '"} + ec.program() +
-                                      "': " + message};
+  const ErrorWithLocation located{location, StringView{"Builtin '"} +
+                                                ec.program() + "': " + message};
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view()));
   else
@@ -239,8 +238,8 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
 fn report_usage_error(EvalContext &cxt, SourceLocation location,
                       StringView program_name) throws -> i32
 {
-  const ErrorWithLocation located{
-      location, String{program_name} + ": Not enough arguments"};
+  const ErrorWithLocation located{location, String{program_name} +
+                                                ": Not enough arguments"};
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view()));
   else
@@ -253,18 +252,16 @@ fn report_usage_error(EvalContext &cxt, SourceLocation location,
 fn make_error_for_arg(const ExecContext &ec, usize index,
                       StringView message) throws -> ErrorWithLocation
 {
-  let const prefixed =
-      StringView{"Builtin '"} + ec.program() + "': " + message;
+  let const prefixed = StringView{"Builtin '"} + ec.program() + "': " + message;
   return ErrorWithLocation{ec.arg_location_at(index), prefixed.view()};
 }
 
 fn make_error_for_arg(const ExecContext &ec, usize index, StringView message,
                       StringView note) throws -> ErrorWithLocationAndDetails
 {
-  let const prefixed =
-      StringView{"Builtin '"} + ec.program() + "': " + message;
+  let const prefixed = StringView{"Builtin '"} + ec.program() + "': " + message;
   return ErrorWithLocationAndDetails{ec.arg_location_at(index), prefixed.view(),
-                                      note};
+                                     note};
 }
 
 fn quote_for_declare(StringView value) throws -> String

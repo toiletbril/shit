@@ -129,8 +129,8 @@ protected:
   fn collect_pending_heredocs() throws -> void;
 
   template <class Emit>
-  fn walk_heredoc_body(usize start, StringView delimiter, bool should_strip_tabs,
-                       Emit emit_line) throws -> usize;
+  fn walk_heredoc_body(usize start, StringView delimiter,
+                       bool should_strip_tabs, Emit emit_line) throws -> usize;
 
   fn lex_expression_token() throws -> Token *;
   fn lex_shell_token() throws -> Token *;

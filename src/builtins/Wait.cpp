@@ -74,9 +74,9 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     } else {
       let const parsed = target.to<i64>();
       if (parsed.is_error()) {
-        report_soft_builtin_error(
-            ec, cxt, ec.arg_location_at(i),
-            "'" + target + "': not a pid or valid job spec");
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                  "'" + target +
+                                      "': not a pid or valid job spec");
         status = 1;
       } else {
         /* An untracked pid returns 127 with no waitpid, since waiting the raw
