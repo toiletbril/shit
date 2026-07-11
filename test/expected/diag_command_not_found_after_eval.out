@@ -23,7 +23,7 @@
 shit: 3:1: warning: Command 'zzqqxxnonexist_command_4242' was not found.
      3 |  zzqqxxnonexist_command_4242
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
-shit: 3:1: error: Program 'zzqqxxnonexist_command_4242' wasn't found.
+shit: 3:1: error: Program `zzqqxxnonexist_command_4242` wasn't found.
      3 |  zzqqxxnonexist_command_4242
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 after

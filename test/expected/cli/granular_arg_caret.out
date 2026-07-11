@@ -1,5 +1,5 @@
 == bench points at the failing command, not the whole bench line:
-shit: 1:19: error: Builtin 'bench': the command '--color' exited with status 1.
+shit: 1:19: error: Builtin 'bench': the command `--color` exited with status 1.
      1 |  bench --runs 1 ls --color
 == kill points at the bad pid, not the whole kill line:
 shit: 1:6: error: Builtin 'kill': 'notapid' is not a valid job or process id.

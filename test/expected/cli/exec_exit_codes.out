@@ -9,7 +9,7 @@ shit: 1:6: error: Command 'nonexistent_cmd_xyz' was not found.
        |       ^~~~~~~~~~~~~~~~~~~ here.
 rc=127
 == a non-executable file exits 126:
-shit: Unable to execute 'TMPDIR/notexec' because Permission denied
+shit: Unable to execute `TMPDIR/notexec` because Permission denied
 rc=126
 == exec replaces the shell and runs the command:
 replaced

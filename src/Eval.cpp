@@ -1957,11 +1957,11 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
       kind = ResolvedCommand::from_builtin(Builtin::Kind::Shitbox);
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
-      let const message = "Program '" + program + "' wasn't found";
+      let const message = "Program `" + program + "` wasn't found";
       if (Maybe<String> suggestion = utils::suggest_command(
               program.view(), ArrayList<String>{heap_allocator()}))
       {
-        let const hint = "Did you mean '" + *suggestion + "'?";
+        let const hint = "Did you mean `" + *suggestion + "`?";
         throw CommandNotFound{location, message.view(), hint.view()};
       }
       throw CommandNotFound{location, message.view()};

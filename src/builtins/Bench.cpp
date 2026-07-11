@@ -577,8 +577,8 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                         : ec.source_location();
       report_soft_builtin_error(
           ec, cxt, operand_location,
-          StringView{"the command '"} + arguments[i].view() +
-              "' exited with status " +
+          StringView{"the command `"} + arguments[i].view() +
+              "` exited with status " +
               String::from(failure_status, cxt.scratch_allocator()),
           "Pass `--ignore-exit-code` to benchmark it regardless");
       return static_cast<i32>(failure_status);
