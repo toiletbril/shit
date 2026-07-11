@@ -66,7 +66,7 @@ fn Popd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   throw ErrorWithLocationAndDetails{
-      ec.source_location(),
+      ec.arg_location_at(1),
       StringView{"popd does not accept the argument '"} + args[1].view() + "'",
       "Pass a +N or a -N stack index, or no argument to pop the top"};
 }

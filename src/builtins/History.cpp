@@ -147,7 +147,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         !append_file_into_history(cxt, Path{args[1].view()}))
     {
       report_soft_builtin_error(
-          ec, cxt,
+          ec, cxt, ec.arg_location_at(1),
           StringView{"cannot read history from '"} + args[1].view() +
               "': " + os::last_system_error_message(),
           "Pass a readable history file, e.g. `history -r ~/.shit_history`");
@@ -165,7 +165,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const target = Path{args[1].view()};
       if (!write_history_to_file(cxt, target)) {
         report_soft_builtin_error(
-            ec, cxt,
+            ec, cxt, ec.arg_location_at(1),
             StringView{"cannot write history to '"} + args[1].view() +
                 "': " + os::last_system_error_message(),
             "Pass a writable path, e.g. `history -w ~/.shit_history`");
@@ -199,7 +199,8 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parsed = utils::parse_decimal_integer(args[1].view());
     if (parsed.is_error()) {
       report_soft_builtin_error(
-          ec, cxt, StringView{"'"} + args[1].view() + "' is not a valid count");
+          ec, cxt, ec.arg_location_at(1),
+          StringView{"'"} + args[1].view() + "' is not a valid count");
       return 2;
     }
 

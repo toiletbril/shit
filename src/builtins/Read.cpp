@@ -68,7 +68,16 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parsed =
         utils::parse_timeout_seconds_to_nanos(FLAG_READ_TIMEOUT.value());
     if (parsed.is_error()) {
-      report_soft_builtin_error(ec, cxt, "Invalid timeout specification");
+      let timeout_arg_index = usize{1};
+      for (usize k = 1; k < ec.args().count(); k++) {
+        let const &a = ec.args()[k];
+        if (a == "-t" || (a.length() > 2 && a[0] == '-' && a[1] == 't')) {
+          timeout_arg_index = a == "-t" ? k + 1 : k;
+          break;
+        }
+      }
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(timeout_arg_index),
+                                "Invalid timeout specification");
       return 1;
     }
     timeout_nanos = parsed.value();

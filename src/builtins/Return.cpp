@@ -42,7 +42,7 @@ fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parsed_value = ec.args()[1].to<i64>();
 
     if (parsed_value.is_error()) {
-      report_soft_builtin_error(ec, cxt,
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
                                 ec.args()[1] + ": numeric argument required");
       cxt.request_return(2, ec.source_location());
       return 2;
@@ -50,7 +50,7 @@ fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     if (ec.args().count() > 2) {
       report_soft_builtin_error(
-          ec, cxt, "too many arguments",
+          ec, cxt, ec.arg_location_at(2), "too many arguments",
           "return takes at most one status, e.g. `return 1`");
 
       if (cxt.in_subshell()) {

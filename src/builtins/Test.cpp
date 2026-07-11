@@ -37,6 +37,7 @@ fn parse_integer(StringView text, i64 &out) throws -> bool
 class TestEvaluator
 {
 public:
+  const ExecContext &ec;
   const ArrayList<String> &args;
   usize pos;
   usize end;
@@ -51,7 +52,7 @@ public:
 
   void fail(StringView message) throws
   {
-    let error = Error{message};
+    let error = make_error_for_arg(ec, pos, message);
     error.set_command_status(2);
     throw error;
   }
@@ -347,15 +348,17 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(All, "test evaluating %zu operands", expression_end - 1);
 
   let evaluator =
-      TestEvaluator{arguments, 1, expression_end, cxt.is_bash_compatible()};
+      TestEvaluator{ec, arguments, 1, expression_end, cxt.is_bash_compatible()};
   let const result = evaluator.evaluate_top();
   /* A paren pair the argument-count rules stripped narrowed end past the
      closing paren, so the leftover check runs against the narrowed window
      rather than the original operand count. */
   if (evaluator.pos != evaluator.end) {
     ASSERT(evaluator.pos < evaluator.end);
-    let error = Error{StringView{"'"} + arguments[evaluator.pos] +
-                      "' is an unexpected argument"};
+    let error = make_error_for_arg(
+        ec, evaluator.pos,
+        StringView{"'"} + arguments[evaluator.pos] +
+                      "' is an unexpected argument");
     error.set_command_status(2);
     throw error;
   }

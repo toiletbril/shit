@@ -253,13 +253,18 @@ fn report_usage_error(EvalContext &cxt, SourceLocation location,
 fn make_error_for_arg(const ExecContext &ec, usize index,
                       StringView message) throws -> ErrorWithLocation
 {
-  return ErrorWithLocation{ec.arg_location_at(index), message};
+  let const prefixed =
+      StringView{"Builtin '"} + ec.program() + "': " + message;
+  return ErrorWithLocation{ec.arg_location_at(index), prefixed.view()};
 }
 
 fn make_error_for_arg(const ExecContext &ec, usize index, StringView message,
                       StringView note) throws -> ErrorWithLocationAndDetails
 {
-  return ErrorWithLocationAndDetails{ec.arg_location_at(index), message, note};
+  let const prefixed =
+      StringView{"Builtin '"} + ec.program() + "': " + message;
+  return ErrorWithLocationAndDetails{ec.arg_location_at(index), prefixed.view(),
+                                      note};
 }
 
 fn quote_for_declare(StringView value) throws -> String

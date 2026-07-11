@@ -173,6 +173,7 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool should_operate_on_set_options = false;
   bool should_print_reusable = false;
   let names = ArrayList<StringView>{cxt.scratch_allocator()};
+  let name_arg_indices = ArrayList<usize>{cxt.scratch_allocator()};
 
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
@@ -193,6 +194,7 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
     } else {
       names.push(arg);
+      name_arg_indices.push(i);
     }
   }
 
@@ -204,11 +206,11 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   };
 
   i32 status = 0;
-  let do_reject_unknown = [&](StringView name) throws -> bool {
+  let do_reject_unknown = [&](StringView name, usize arg_index) throws -> bool {
     if (is_known_shopt_option(name)) return false;
     status = 1;
     if (!is_quiet)
-      report_soft_builtin_error(ec, cxt,
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(arg_index),
                                 StringView{"'"} + name +
                                     "' is not a valid shell option name");
     return true;
@@ -235,13 +237,17 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       return 0;
     }
-    for (let const &name : names) {
+    for (usize n = 0; n < names.count(); n++) {
+      let const &name = names[n];
+      let const arg_index = name_arg_indices[n];
       if (should_enable || should_disable) {
         if (!apply_shell_option(cxt, name, should_enable)) {
           if (is_quiet)
             status = 1;
           else
-            throw Error{StringView{"Unknown shopt option '"} + name + "'"};
+            throw make_error_for_arg(
+                ec, arg_index,
+                StringView{"Unknown shopt option '"} + name + "'");
         }
       } else if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
       {
@@ -252,7 +258,9 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (is_quiet)
           status = 1;
         else
-          throw Error{StringView{"Unknown shopt option '"} + name + "'"};
+          throw make_error_for_arg(
+              ec, arg_index,
+              StringView{"Unknown shopt option '"} + name + "'");
       }
     }
     return status;
@@ -276,8 +284,10 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return 0;
     }
 
-    for (let const &name : names) {
-      if (do_reject_unknown(name)) continue;
+    for (usize n = 0; n < names.count(); n++) {
+      let const &name = names[n];
+      let const arg_index = name_arg_indices[n];
+      if (do_reject_unknown(name, arg_index)) continue;
       LOG(Info, "shopt setting '%.*s' to %s", static_cast<int>(name.length),
           name.data, should_enable ? "on" : "off");
       cxt.set_shopt_option(name, should_enable);
@@ -296,8 +306,10 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  for (let const &name : names) {
-    if (do_reject_unknown(name)) continue;
+  for (usize n = 0; n < names.count(); n++) {
+    let const &name = names[n];
+    let const arg_index = name_arg_indices[n];
+    if (do_reject_unknown(name, arg_index)) continue;
     let const is_on = cxt.is_shopt_enabled(name);
     if (!is_on) status = 1;
     if (!is_quiet)

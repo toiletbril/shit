@@ -98,7 +98,8 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (number.is_error() || number.value() < 0) {
       let const reason = letter == 'O' ? StringView{": invalid array origin"}
                                        : StringView{": invalid line count"};
-      report_soft_builtin_error(ec, cxt, value + reason);
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                value + reason);
       return 1;
     }
 

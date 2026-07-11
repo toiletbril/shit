@@ -28,7 +28,9 @@ pure fn Disown::kind() const wontthrow -> Builtin::Kind { return Kind::Disown; }
 
 fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const names = PARSE_BUILTIN_ARGS(ec);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const names =
+      PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
 
   ASSERT(!names.is_empty());
 
@@ -64,7 +66,11 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   for (usize i = 1; i < names.count(); i++) {
     let const job = cxt.find_job_by_spec(names[i]);
     if (job == nullptr || !cxt.remove_job(job->id)) {
-      throw Error{"'" + names[i] + "' is not a valid job"};
+      let const loc = i < operand_locations.count()
+                          ? operand_locations[i]
+                          : ec.source_location();
+      throw ErrorWithLocation{loc,
+                              "'" + names[i] + "' is not a valid job"};
     }
   }
 

@@ -27,7 +27,7 @@ static fn report_break_out_of_range(const ExecContext &ec, EvalContext &cxt,
   message.append(count);
   message += "' is out of range";
 
-  const ErrorWithLocation located{ec.source_location(), message.view()};
+  const ErrorWithLocation located{ec.arg_location_at(1), message.view()};
   if (const String *source = cxt.current_source(); source != nullptr) {
     show_message(located.to_string(source->view()));
   } else {
@@ -55,7 +55,7 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       message.append(ec.args()[1].view());
       message += "' is not a valid integer";
 
-      ErrorWithLocation located{ec.source_location(), message.view()};
+      ErrorWithLocation located{ec.arg_location_at(1), message.view()};
       located.set_script_fatal();
       located.set_command_status(2);
       throw located;
@@ -65,7 +65,7 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (ec.args().count() > 2) {
     ErrorWithLocation located{
-        ec.source_location(),
+        ec.arg_location_at(2),
         StringView{"break accepts at most one loop count"}};
     located.set_script_fatal();
     located.set_command_status(1);

@@ -99,7 +99,8 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const target = search_builtin(name.view());
   if (!target.has_value()) {
     report_soft_builtin_error(
-        ec, cxt, StringView{"'"} + name + "' is not a shell builtin");
+        ec, cxt, ec.arg_location_at(1),
+        StringView{"'"} + name + "' is not a shell builtin");
     return 1;
   }
 

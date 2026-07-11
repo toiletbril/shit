@@ -46,14 +46,14 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       source_path = path_matches[0].clone();
     else if (cxt.is_posix_mode())
       throw ErrorWithLocationAndDetails{
-          ec.source_location(),
+          ec.arg_location_at(path_index),
           "Unable to source the file '" + path + "': not found in PATH",
           "Pass a path with a slash, or add its directory to PATH"};
   }
 
   let const contents = source_path.read_entire_file();
   if (!contents.has_value())
-    throw ErrorWithLocation{ec.source_location(),
+    throw ErrorWithLocation{ec.arg_location_at(path_index),
                             "Unable to source the file '" + path +
                                 "': " + os::last_system_error_message()};
 
@@ -76,7 +76,7 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   };
 
   return cxt.run_source(*contents, "the file '" + path + "'", true,
-                        ec.source_location(), StringView{path});
+                        ec.arg_location_at(path_index), StringView{path});
 }
 
 } // namespace shit

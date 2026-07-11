@@ -70,8 +70,8 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       default: {
         let invalid = String{heap_allocator()};
         invalid += arg[c];
-        let bad_option =
-            Error{"'-" + invalid + "' is not a valid local option"};
+        let bad_option = make_error_for_arg(
+            ec, first_name, "'-" + invalid + "' is not a valid local option");
         bad_option.set_command_status(2);
         throw bad_option;
       }

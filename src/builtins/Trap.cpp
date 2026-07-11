@@ -128,7 +128,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() == 2) {
     let const condition = normalize_condition(args[1], cxt.scratch_allocator());
     if (!is_valid_trap_condition(condition.view())) {
-      report_soft_builtin_error(ec, cxt,
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
                                 args[1] + ": invalid signal specification",
                                 "List the signal names with `trap -l`");
       return 2;
@@ -147,7 +147,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   for (usize i = 2; i < args.count(); i++) {
     let const condition = normalize_condition(args[i], cxt.scratch_allocator());
     if (!is_valid_trap_condition(condition.view())) {
-      report_soft_builtin_error(ec, cxt,
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                 args[i] + ": invalid signal specification",
                                 "List the signal names with `trap -l`");
       status = 1;

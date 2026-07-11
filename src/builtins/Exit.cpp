@@ -32,14 +32,15 @@ fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parsed_status = ec.args()[1].to<i64>();
 
     if (parsed_status.is_error()) {
-      report_soft_builtin_error(ec, cxt,
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
                                 StringView{"'"} + ec.args()[1] +
                                     "' is not a numeric exit status");
       return 2;
     }
 
     if (ec.args().count() > 2) {
-      report_soft_builtin_error(ec, cxt, "too many arguments",
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(2),
+                                "too many arguments",
                                 "exit takes at most one status, e.g. `exit 1`");
 
       if (cxt.shell_is_interactive()) return 2;

@@ -59,7 +59,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           listing += '\n';
         } else {
           report_soft_builtin_error(
-              ec, cxt, StringView{"'"} + spec + "' is not a valid signal");
+              ec, cxt, ec.arg_location_at(i),
+              StringView{"'"} + spec + "' is not a valid signal");
           status = 1;
         }
       } else if (let const number = os::signal_number_from_name(spec);
@@ -69,7 +70,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         listing += '\n';
       } else {
         report_soft_builtin_error(
-            ec, cxt, StringView{"'"} + spec + "' is not a valid signal");
+            ec, cxt, ec.arg_location_at(i),
+            StringView{"'"} + spec + "' is not a valid signal");
         status = 1;
       }
     }
@@ -81,7 +83,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
-  let do_resolve_signal = [](StringView spec) throws -> i32 {
+  let do_resolve_signal = [&ec](StringView spec, usize index) throws -> i32 {
     /* The leading-digit guard rejects a doubled minus such as --9, whose
        stripped spec -9 would otherwise parse as the negative signal -9 and
        reach kill with an invalid number. */
@@ -97,7 +99,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return *resolved;
     }
 
-    throw Error{StringView{"'"} + spec + "' is not a valid signal"};
+    throw make_error_for_arg(
+        ec, index, StringView{"'"} + spec + "' is not a valid signal");
   };
 
   if (args.count() > 1) {
@@ -106,10 +109,10 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     } else if (args[1] == "-s" || args[1] == "-n") {
       if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
 
-      signal_number = do_resolve_signal(args[2]);
+      signal_number = do_resolve_signal(args[2], 2);
       first_target = 3;
     } else if (args[1].length() > 1 && args[1][0] == '-') {
-      signal_number = do_resolve_signal(args[1].substring(1));
+      signal_number = do_resolve_signal(args[1].substring(1), 1);
       first_target = 2;
     }
   }
@@ -126,7 +129,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       const job *const job = cxt.find_job_by_spec(target);
       if (job == nullptr) {
         report_soft_builtin_error(
-            ec, cxt, StringView{"'"} + target + "' is not a known job");
+            ec, cxt, ec.arg_location_at(i),
+            StringView{"'"} + target + "' is not a known job");
         status = 1;
         continue;
       }
@@ -136,7 +140,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (parsed_value.is_error()) {
         /* A non-numeric target must not fall through to kill(0), which would
            signal the whole process group including this shell. */
-        report_soft_builtin_error(ec, cxt,
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                   StringView{"'"} + target +
                                       "' is not a valid job or process id");
         status = 1;
@@ -148,7 +152,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(Debug, "kill sending signal %d to target '%s'", signal_number,
         target.c_str());
     if (!os::signal_process(pid, signal_number)) {
-      report_soft_builtin_error(ec, cxt,
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                 StringView{"Cannot signal '"} + target +
                                     "' because " +
                                     os::last_system_error_message());

@@ -28,7 +28,9 @@ pure fn Enable::kind() const wontthrow -> Builtin::Kind { return Kind::Enable; }
 
 fn Enable::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const args = PARSE_BUILTIN_ARGS(ec);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const args =
+      PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -52,8 +54,11 @@ fn Enable::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const &name = args[i];
     let const resolved = search_builtin(name.view());
     if (!resolved.has_value()) {
+      let const loc = i < operand_locations.count()
+                          ? operand_locations[i]
+                          : ec.source_location();
       report_soft_builtin_error(
-          ec, cxt, StringView{"'"} + name + "' is not a shell builtin");
+          ec, cxt, loc, StringView{"'"} + name + "' is not a shell builtin");
       status = 1;
     }
   }

@@ -109,7 +109,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         invalid += arg[0];
         invalid += arg[c];
         report_soft_builtin_error(
-            ec, cxt, "'" + invalid + "' is not a valid declare option");
+            ec, cxt, ec.arg_location_at(i),
+            "'" + invalid + "' is not a valid declare option");
         return 2;
       }
       }
@@ -141,7 +142,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (cxt.find_function(name) == nullptr) {
         if (!should_print_function_names_only)
           report_soft_builtin_error(
-              ec, cxt, StringView{"'"} + name + "' is not a function");
+              ec, cxt, ec.arg_location_at(i),
+              StringView{"'"} + name + "' is not a function");
         status = 1;
         continue;
       }
@@ -274,7 +276,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     for (; i < args.count(); i++) {
       let const name = args[i].view();
       if (!do_print_declaration(name)) {
-        report_soft_builtin_error(ec, cxt,
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                   StringView{"'"} + name + "' is not defined");
         status = 1;
       }

@@ -30,7 +30,8 @@ fn Shift::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (ec.args().count() > 2) {
-    report_soft_builtin_error(ec, cxt, "too many arguments",
+    report_soft_builtin_error(ec, cxt, ec.arg_location_at(2),
+                              "too many arguments",
                               "shift takes at most one count, e.g. `shift 2`");
     return 2;
   }
@@ -46,14 +47,16 @@ fn Shift::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   };
 
   if (shift_count < 0) {
-    report_soft_builtin_error(ec, cxt, "shift count out of range",
+    report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
+                              "shift count out of range",
                               do_range_note().view());
     return 1;
   }
 
   if (static_cast<usize>(shift_count) > params.count()) {
     if (cxt.is_shopt_enabled("shift_verbose"))
-      report_soft_builtin_error(ec, cxt, "shift count out of range",
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
+                                "shift count out of range",
                                 do_range_note().view());
     return 1;
   }

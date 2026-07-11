@@ -31,10 +31,11 @@ Exec::Exec() = default;
 pure fn Exec::kind() const wontthrow -> Builtin::Kind { return Kind::Exec; }
 
 static fn report_exec_command_not_found(ExecContext &ec, EvalContext &cxt,
-                                        const String &command_name) throws
+                                        const String &command_name,
+                                        usize command_index) throws
     -> i32
 {
-  const CommandNotFound not_found{ec.source_location(),
+  const CommandNotFound not_found{ec.arg_location_at(command_index),
                                   StringView{"Command '"} + command_name +
                                       "' was not found"};
   const String *source = cxt.current_source();
@@ -90,7 +91,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             custom_argv0 = args[command_index + 1];
             did_consume_value_word = true;
           } else {
-            report_soft_builtin_error(ec, cxt,
+            report_soft_builtin_error(ec, cxt, ec.arg_location_at(command_index),
                                       "Option requires an argument -- a");
             return 2;
           }
@@ -100,7 +101,8 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           let option_text = String{cxt.scratch_allocator()};
           option_text.push(option);
           report_soft_builtin_error(
-              ec, cxt, StringView{"Invalid option -- "} + option_text);
+              ec, cxt, ec.arg_location_at(command_index),
+              StringView{"Invalid option -- "} + option_text);
           return 2;
         }
       }
@@ -128,12 +130,13 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let program_path = Path{};
   if (command_name.find_character('/').has_value()) {
     let resolved = Path::canonicalize(command_name);
-    if (!resolved) return report_exec_command_not_found(ec, cxt, command_name);
+    if (!resolved)
+      return report_exec_command_not_found(ec, cxt, command_name, command_index);
     program_path = resolved.take();
   } else {
     let const found = utils::search_program_path(command_name);
     if (found.count() == 0)
-      return report_exec_command_not_found(ec, cxt, command_name);
+      return report_exec_command_not_found(ec, cxt, command_name, command_index);
 
     program_path = found[0];
   }
