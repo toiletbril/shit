@@ -1,0 +1,9 @@
+== subcommands in subcommand position:
+bug
+build
+== subcommands with no prefix:
+bug
+build
+clean
+doc
+env

@@ -747,7 +747,8 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
   };
   if (trimmed[trimmed.length - 1] == ':')
     return ends_with_ignoring_case(StringView{"commands:"}) ||
-           ends_with_ignoring_case(StringView{"subcommands:"});
+           ends_with_ignoring_case(StringView{"subcommands:"}) ||
+           ends_with_ignoring_case(StringView{"commands are:"});
 
   let const is_all_uppercase = [&]() {
     for (usize i = 0; i < trimmed.length; i++)
@@ -770,6 +771,7 @@ static fn parse_help_subcommands(StringView text) throws
   let subcommands = ArrayList<help_entry>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
   let in_section = false;
+  let saw_entry_in_section = false;
   usize i = 0;
   while (i < text.length) {
     let line_end = i;
@@ -783,17 +785,19 @@ static fn parse_help_subcommands(StringView text) throws
 
     if (line_opens_subcommand_section(trimmed)) {
       in_section = true;
+      saw_entry_in_section = false;
       continue;
     }
     if (!in_section) continue;
     if (trimmed.is_empty()) {
-      in_section = false;
+      if (saw_entry_in_section) in_section = false;
       continue;
     }
     /* A line that returns to the left margin ends the section, and may open a
        new one. */
     if (trim_start == 0) {
       in_section = line_opens_subcommand_section(trimmed);
+      saw_entry_in_section = false;
       continue;
     }
 
@@ -823,6 +827,7 @@ static fn parse_help_subcommands(StringView text) throws
 
       seen.add(alias);
       subcommands.push(help_entry{String{alias}, String{description}});
+      saw_entry_in_section = true;
     }
   }
   return subcommands;

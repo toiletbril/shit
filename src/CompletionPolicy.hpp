@@ -112,7 +112,7 @@ inline constexpr static_string_entry<const char *> HELP_ALLOWLIST_ENTRIES[] = {
     {SSK("rustup"),              "--help"     },
     {SSK("rustc"),               "--help"     },
     {SSK("rustfmt"),             "--help"     },
-    {SSK("go"),                  "--help"     },
+    {SSK("go"),                  "help"       },
     {SSK("npm"),                 "--help"     },
     {SSK("pnpm"),                "--help"     },
     {SSK("yarn"),                "--help"     },
