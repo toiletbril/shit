@@ -194,6 +194,28 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
   show_message(Note{String{note}}.to_string());
 }
 
+fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
+                             SourceLocation location,
+                             StringView message) throws -> void
+{
+  const ErrorWithLocation located{location,
+                                  StringView{"Builtin '"} + ec.program() +
+                                      "': " + message};
+  if (const String *source = cxt.current_source(); source != nullptr)
+    show_message(located.to_string(source->view()));
+  else
+    print_error(StringView{"shit: Builtin '"} + ec.program() + "': " + message +
+                "\n");
+}
+
+fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
+                             SourceLocation location, StringView message,
+                             StringView note) throws -> void
+{
+  report_soft_builtin_error(ec, cxt, location, message);
+  show_message(Note{String{note}}.to_string());
+}
+
 fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
                       StringView program_name) throws -> i32
 {
@@ -212,6 +234,32 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
   show_message(Note{String{"Try `"} + program_name + " --help` for more info"}
                    .to_string());
   return 2;
+}
+
+fn report_usage_error(EvalContext &cxt, SourceLocation location,
+                      StringView program_name) throws -> i32
+{
+  const ErrorWithLocation located{
+      location, String{program_name} + ": Not enough arguments"};
+  if (const String *source = cxt.current_source(); source != nullptr)
+    show_message(located.to_string(source->view()));
+  else
+    print_error(String{"shit: "} + program_name + ": Not enough arguments.\n");
+  show_message(Note{String{"Try `"} + program_name + " --help` for more info"}
+                   .to_string());
+  return 2;
+}
+
+fn make_error_for_arg(const ExecContext &ec, usize index,
+                      StringView message) throws -> ErrorWithLocation
+{
+  return ErrorWithLocation{ec.arg_location_at(index), message};
+}
+
+fn make_error_for_arg(const ExecContext &ec, usize index, StringView message,
+                      StringView note) throws -> ErrorWithLocationAndDetails
+{
+  return ErrorWithLocationAndDetails{ec.arg_location_at(index), message, note};
 }
 
 fn quote_for_declare(StringView value) throws -> String
@@ -260,9 +308,10 @@ fn run_cd_to_directory(EvalContext &cxt, const ExecContext &ec,
   ArrayList<String> cd_args{heap_allocator()};
   cd_args.push(String{"cd"});
   cd_args.push(String{target});
+  let cd_arg_locations = ArrayList<SourceLocation>{heap_allocator()};
   let routed = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_builtin(Builtin::Kind::Cd),
-      steal(cd_args));
+      steal(cd_args), steal(cd_arg_locations));
   return execute_builtin(steal(routed), cxt);
 }
 

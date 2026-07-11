@@ -331,7 +331,18 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
   } while (false)
 
 #define PARSE_BUILTIN_ARGS(ec)                                                 \
-  parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);        \
+  parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,         \
+                  nullptr, &ec.arg_locations(),                                \
+                  nullptr);                                                    \
+  defer { reset_flags(FLAG_LIST); }
+
+/* The same parse, but it also fills operand_locations with the source span of
+   each surviving operand, so a builtin that iterates its parsed operands can
+   caret the specific one. The caller declares the list and passes it by name. */
+#define PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations)               \
+  parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,         \
+                  nullptr, &ec.arg_locations(),                                \
+                  &(operand_locations));                                       \
   defer { reset_flags(FLAG_LIST); }
 
 i32 execute_builtin(ExecContext &&ec, EvalContext &cxt) throws;
@@ -362,8 +373,31 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message, StringView note) throws
     -> void;
 
+/* The span-aware forms caret the specific argument whose SourceLocation is
+   passed, rather than the whole command. A builtin that has identified the bad
+   argument passes its span here. */
+fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
+                             SourceLocation location, StringView message) throws
+    -> void;
+
+fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
+                             SourceLocation location, StringView message,
+                             StringView note) throws -> void;
+
 fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
                       StringView program_name) throws -> i32;
+
+fn report_usage_error(EvalContext &cxt, SourceLocation location,
+                      StringView program_name) throws -> i32;
+
+/* Build a located error pointing at the argument at index, so a builtin can
+   throw with a precise caret and let execute_builtin render it. The note
+   variant produces ErrorWithLocationAndDetails. */
+fn make_error_for_arg(const ExecContext &ec, usize index,
+                      StringView message) throws -> ErrorWithLocation;
+
+fn make_error_for_arg(const ExecContext &ec, usize index, StringView message,
+                      StringView note) throws -> ErrorWithLocationAndDetails;
 
 /* A name that opens with a letter or underscore and carries only letters,
    digits, and underscores, the shell's rule for an export or readonly target.

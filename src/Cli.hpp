@@ -2,6 +2,7 @@
 
 #include "Common.hpp"
 #include "Containers.hpp"
+#include "Errors.hpp"
 
 #define FLAG_LIST T__FLAG_LIST
 
@@ -158,11 +159,15 @@ private:
    argument verbatim the way bash's getopt does. */
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const ArrayList<String> &args, usize base_position = 0,
-                   const Flag *operand_value_flag = nullptr) throws
-    -> ArrayList<String>;
+                   const Flag *operand_value_flag = nullptr,
+                   const ArrayList<SourceLocation> *arg_locations = nullptr,
+                   ArrayList<SourceLocation> *operand_locations = nullptr)
+    throws -> ArrayList<String>;
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const char *const *argv, usize base_position = 0,
-               const Flag *operand_value_flag = nullptr) throws
+               const Flag *operand_value_flag = nullptr,
+               const ArrayList<SourceLocation> *arg_locations = nullptr,
+               ArrayList<SourceLocation> *operand_locations = nullptr) throws
     -> ArrayList<String>;
 
 fn join_command_line(int argc, const char *const *argv) throws -> String;

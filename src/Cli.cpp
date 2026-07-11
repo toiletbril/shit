@@ -178,7 +178,10 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
 
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const ArrayList<String> &args, usize base_position,
-                   const Flag *operand_value_flag) throws -> ArrayList<String>
+                   const Flag *operand_value_flag,
+                   const ArrayList<SourceLocation> *arg_locations,
+                   ArrayList<SourceLocation> *operand_locations) throws
+    -> ArrayList<String>
 {
   let os_argv = ArrayList<const char *>{heap_allocator()};
   os_argv.reserve(args.count());
@@ -187,7 +190,8 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
     os_argv.push(arg.c_str());
 
   return parse_flags(flags, static_cast<int>(os_argv.count()), os_argv.begin(),
-                     base_position, operand_value_flag);
+                     base_position, operand_value_flag, arg_locations,
+                     operand_locations);
 }
 
 static fn flag_name(const Flag *f, bool is_long) throws -> String
@@ -205,7 +209,10 @@ static fn flag_name(const Flag *f, bool is_long) throws -> String
 
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const char *const *argv, usize base_position,
-               const Flag *operand_value_flag) throws -> ArrayList<String>
+               const Flag *operand_value_flag,
+               const ArrayList<SourceLocation> *arg_locations,
+               ArrayList<SourceLocation> *operand_locations) throws
+    -> ArrayList<String>
 {
   ASSERT(argc >= 0);
 
@@ -217,6 +224,18 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
   u32 position = 0;
   let args = ArrayList<String>{heap_allocator()};
+
+  /* When the caller asks for operand locations, each surviving operand records
+     the source span of the argv token it came from, so a builtin can caret the
+     specific operand after flag parsing drops the flags. */
+  let const do_record_operand = [arg_locations, operand_locations](
+                                    usize arg_index) wontthrow -> void {
+    if (operand_locations == nullptr) return;
+    if (arg_locations != nullptr && arg_index < arg_locations->count())
+      operand_locations->push((*arg_locations)[arg_index]);
+    else
+      operand_locations->push(SourceLocation{});
+  };
 
   Flag *prev_flag{};
   bool next_arg_is_value = false;
@@ -272,6 +291,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
       const bool is_program_name = args.is_empty();
       LOG(Debug, "taking '%s' as an operand", argv[i]);
       args.push_managed(StringView{argv[i]});
+      do_record_operand(static_cast<usize>(i));
       if (!is_program_name) should_ignore_rest = true;
       continue;
     }
@@ -292,6 +312,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
         should_ignore_rest = true;
       } else {
         args.push_managed(StringView{argv[i]});
+        do_record_operand(static_cast<usize>(i));
       }
 
       continue;
@@ -407,16 +428,19 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
           LOG(Debug, "rejecting the unknown flag in '%s'", argv[i]);
 
-          /* The caret offset is every earlier argument's length plus one space
-             each, pointing at the whole offending argument. */
-          usize caret_offset = 0;
-          for (int k = 0; k < i; k++)
-            caret_offset += std::strlen(argv[k]) + 1;
-          throw ErrorWithLocation{
-              SourceLocation{base_position + caret_offset,
-                             std::strlen(argv[i])},
-              error_message
-          };
+          SourceLocation flag_location;
+          const usize arg_index = static_cast<usize>(i);
+          if (arg_locations != nullptr && arg_index < arg_locations->count())
+          {
+            flag_location = (*arg_locations)[arg_index];
+          } else {
+            usize caret_offset = 0;
+            for (int k = 0; k < i; k++)
+              caret_offset += std::strlen(argv[k]) + 1;
+            flag_location = SourceLocation{base_position + caret_offset,
+                                           std::strlen(argv[i])};
+          }
+          throw ErrorWithLocation{flag_location, error_message};
         }
       }
     }
