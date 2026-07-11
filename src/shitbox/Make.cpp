@@ -17,6 +17,10 @@ FLAG(MAKE_FILE, String, 'f', "file",
      "Read the named file instead of Makefile.");
 FLAG(MAKE_DIR, String, 'C', "directory",
      "Change to this directory before reading the Makefile.");
+FLAG(MAKE_ALWAYS_MAKE, Bool, 'B', "always-make",
+     "Rebuild every target unconditionally.");
+FLAG(MAKE_KEEP_GOING, Bool, 'k', "keep-going",
+     "Keep going after a target fails.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Make);
@@ -961,23 +965,22 @@ pure fn Make::kind() const wontthrow -> Utility::Kind { return Kind::Make; }
 fn Make::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<String> &args) const throws -> i32
 {
-  /* The -j, -B, and -k flags are accepted and dropped before flag parsing. */
+  /* The -j flag accepts an optional job count, with no value meaning
+     unlimited, so it is dropped here before the flag parser demands a value. */
   ArrayList<String> filtered{cxt.scratch_allocator()};
   for (const String &arg : args) {
     let const text = arg.view();
-    bool is_ignored_flag = text == "-j" || text == "-B" ||
-                           text == "--always-make" || text == "-k" ||
-                           text == "--keep-going";
-    if (!is_ignored_flag && text.length > 2 && text[0] == '-' && text[1] == 'j')
+    bool is_jobs_flag = text == "-j";
+    if (!is_jobs_flag && text.length > 2 && text[0] == '-' && text[1] == 'j')
     {
-      is_ignored_flag = true;
+      is_jobs_flag = true;
       for (usize k = 2; k < text.length; k++)
         if (text[k] < '0' || text[k] > '9') {
-          is_ignored_flag = false;
+          is_jobs_flag = false;
           break;
         }
     }
-    if (!is_ignored_flag) filtered.push(arg.clone());
+    if (!is_jobs_flag) filtered.push(arg.clone());
   }
 
   /* A recipe's $(MAKE) re-enters this util while the outer call is still on the

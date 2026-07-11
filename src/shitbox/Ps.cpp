@@ -11,6 +11,10 @@ HELP_SYNOPSIS_DECL("[aux]");
 HELP_DESCRIPTION_DECL("The ps utility lists the running processes.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+FLAG(PS_ALL, Bool, 'a', "", "List every user's processes.");
+FLAG(PS_USER_FMT, Bool, 'u', "", "List in user-oriented format.");
+FLAG(PS_NO_TTY, Bool, 'x', "", "List processes without a controlling terminal.");
+FLAG(PS_WIDE, Bool, 'w', "", "Use a wide output format.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Ps);
 
@@ -120,38 +124,14 @@ pure fn Ps::kind() const wontthrow -> Utility::Kind { return Kind::Ps; }
 fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args) const throws -> i32
 {
-  /* The -aux spelling is recognized before flag parsing. */
-  ArrayList<String> flag_args{cxt.scratch_allocator()};
-  flag_args.reserve(args.count());
-  bool should_show_aux = false;
-  for (usize i = 0; i < args.count(); i++) {
-    let const argument = args[i].view();
-    /* A dashed bundle of only a, u, x, and w is the classic ps spelling, the
-       a, u, and x select the aux view. */
-    if (i > 0 && argument.length > 1 && argument[0] == '-') {
-      let is_only_ps_options = true;
-      for (usize k = 1; k < argument.length; k++)
-        if (argument[k] != 'a' && argument[k] != 'u' && argument[k] != 'x' &&
-            argument[k] != 'w')
-        {
-          is_only_ps_options = false;
-          break;
-        }
-      if (is_only_ps_options) {
-        for (usize k = 1; k < argument.length; k++)
-          if (argument[k] == 'a' || argument[k] == 'u' || argument[k] == 'x')
-            should_show_aux = true;
-        continue;
-      }
-    }
-    flag_args.push(args[i].clone());
-  }
-
-  let const operands = parse_util_operands(FLAG_LIST, flag_args);
+  let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
+  bool should_show_aux = FLAG_PS_ALL.is_enabled() ||
+                         FLAG_PS_USER_FMT.is_enabled() ||
+                         FLAG_PS_NO_TTY.is_enabled();
   for (const String &operand : operands)
     if (operand.view() == "aux") should_show_aux = true;
 
