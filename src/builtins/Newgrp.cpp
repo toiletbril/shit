@@ -41,12 +41,16 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let command_args = ArrayList<String>{heap_allocator()};
   command_args.push_managed("newgrp");
-  for (usize i = 1; i < args.count(); i++)
+  let command_arg_locations = ArrayList<SourceLocation>{heap_allocator()};
+  command_arg_locations.push(ec.source_location());
+  for (usize i = 1; i < args.count(); i++) {
     command_args.push_managed(args[i]);
+    command_arg_locations.push(ec.arg_location_at(i));
+  }
 
   let command = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_program(found[0]),
-      steal(command_args));
+      steal(command_args), steal(command_arg_locations));
 
   LOG(Info, "newgrp handing the shell off to '%s'", found[0].text().c_str());
 

@@ -66,8 +66,12 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
 
   ArrayList<String> shifted{heap_allocator()};
   shifted.reserve(ec.args().count() - name_index);
-  for (usize i = name_index; i < ec.args().count(); i++)
+  let shifted_locations = ArrayList<SourceLocation>{heap_allocator()};
+  shifted_locations.reserve(ec.args().count() - name_index);
+  for (usize i = name_index; i < ec.args().count(); i++) {
     shifted.push(ec.args()[i].clone());
+    shifted_locations.push(ec.arg_location_at(i));
+  }
 
   if (let const chosen = find_util(name); chosen.has_value()) {
     try {
@@ -88,7 +92,7 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   if (let const builtin_kind = search_builtin(name); builtin_kind.has_value()) {
     let routed = ExecContext::from_resolved(
         ec.source_location(), ResolvedCommand::from_builtin(*builtin_kind),
-        steal(shifted));
+        steal(shifted), steal(shifted_locations));
     return execute_builtin(steal(routed), cxt);
   }
 
@@ -118,9 +122,10 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   for (String &operand : operands)
     args.push(steal(operand));
 
+  let arg_locations = ArrayList<SourceLocation>{heap_allocator()};
   let ec = ExecContext::from_resolved(
       SourceLocation{}, ResolvedCommand::from_builtin(Builtin::Kind::Shitbox),
-      steal(args));
+      steal(args), steal(arg_locations));
   ec.is_multicall = true;
 
   try {

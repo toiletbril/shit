@@ -104,8 +104,11 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   let operand_args = ArrayList<String>{heap_allocator()};
-  for (usize i = 1; i < args.count(); i++)
+  let operand_arg_locations = ArrayList<SourceLocation>{heap_allocator()};
+  for (usize i = 1; i < args.count(); i++) {
     operand_args.push_managed(args[i]);
+    operand_arg_locations.push(ec.arg_location_at(i));
+  }
 
   /* The default PATH is in force only while make_from resolves the program,
      then the resolver reverts to the shell's own PATH. */
@@ -123,7 +126,8 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   Maybe<ExecContext> sub;
   try {
     sub = ExecContext::make_from(ec.source_location(), steal(operand_args),
-                                 cxt.mood(), cxt.shitbox());
+                                 cxt.mood(), cxt.shitbox(),
+                                 steal(operand_arg_locations));
   } catch (const CommandNotFound &not_found) {
     LOG(Debug, "command swallowed a not-found error: %s",
         not_found.message().c_str());

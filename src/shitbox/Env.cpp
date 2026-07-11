@@ -109,10 +109,12 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize i = first_command; i < operands.count(); i++)
     env_args.push_managed(operands[i]);
 
+  let env_arg_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   Maybe<ExecContext> sub;
   try {
     sub = ExecContext::make_from(ec.source_location(), steal(env_args),
-                                 cxt.mood(), cxt.shitbox());
+                                 cxt.mood(), cxt.shitbox(),
+                                 steal(env_arg_locations));
   } catch (const CommandNotFound &not_found) {
     const String *source = cxt.current_source();
     show_message(

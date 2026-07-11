@@ -139,8 +139,11 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let command_args = ArrayList<String>{heap_allocator()};
-  for (usize i = command_index; i < args.count(); i++)
+  let command_arg_locations = ArrayList<SourceLocation>{heap_allocator()};
+  for (usize i = command_index; i < args.count(); i++) {
     command_args.push_managed(args[i]);
+    command_arg_locations.push(ec.arg_location_at(i));
+  }
 
   if (has_custom_argv0) command_args[0] = custom_argv0;
 
@@ -151,7 +154,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let command = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_program(program_path),
-      steal(command_args));
+      steal(command_args), steal(command_arg_locations));
   if (ec.in_fd) command.in_fd = ec.in_fd.take();
   if (ec.out_fd) command.out_fd = ec.out_fd.take();
   if (ec.err_fd) command.err_fd = ec.err_fd.take();

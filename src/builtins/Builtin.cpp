@@ -104,11 +104,15 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   let forwarded = ArrayList<String>{heap_allocator()};
-  for (usize i = 1; i < ec.args().count(); i++)
+  let forwarded_locations = ArrayList<SourceLocation>{heap_allocator()};
+  for (usize i = 1; i < ec.args().count(); i++) {
     forwarded.push_managed(ec.args()[i]);
+    forwarded_locations.push(ec.arg_location_at(i));
+  }
   let sub = ExecContext::from_resolved(ec.source_location(),
                                        ResolvedCommand::from_builtin(*target),
-                                       steal(forwarded));
+                                       steal(forwarded),
+                                       steal(forwarded_locations));
   return execute_builtin(steal(sub), cxt);
 }
 
