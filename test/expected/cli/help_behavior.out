@@ -1,0 +1,15 @@
+== help with no operand lists builtins:
+echo
+exit
+cd
+pwd
+pushd
+== help cd renders the cd builtin help:
+DESCRIPTION
+  The cd builtin changes the working directory.
+
+== help nope is a located error:
+shit: 1:6: error: Builtin 'help': 'nope' is not a shell builtin.
+     1 |  help nope
+       |       ^~~~ here.
+rc=1

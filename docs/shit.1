@@ -652,6 +652,44 @@ at ~/.shit_directory_history. The store weights each directory by its visit
 count and how recently it was seen. The operands join into one query, and a
 directory
 is matched by case insensitive substring.
+.SH BASH BUILTIN EXTENSIONS
+These builtins follow bash semantics rather than being unique to shit. They are
+present so a bash script that probes or calls them keeps sourcing.
+.TP
+.B bind
+A no-op stub. The flags and the operands are accepted without effect, and the
+builtin returns zero. The interactive editor is the vendored toiletline editor,
+and key binding is not wired through this builtin.
+.TP
+.B caller
+Without an operand the builtin prints nothing and returns one at the top level
+and zero inside a function or a sourced file. With an operand the operand is a
+frame index, and the builtin prints the line number and the source file of that
+frame. A non-numeric operand is a located error.
+.TP
+.B help
+Without a pattern every builtin name is printed one per line. With a pattern the
+pattern is a builtin name, and the builtin help is rendered the same way the
+target's
+.B \-\-help
+flag renders it. A name that is not a builtin is a located error. The
+.B \-d
+short description flag and the
+.B \-m
+manpage flag are accepted without effect.
+.TP
+.B logout
+Exits a login shell after the EXIT trap runs. The optional operand is the exit
+status. In a non-login shell the builtin prints a not-login-shell message and
+returns one, since
+.B exit
+is the non-login counterpart.
+.TP
+.B suspend
+The shell is stopped with SIGSTOP and resumes on SIGCONT. A login shell is
+refused unless
+.B \-f
+is passed to force the suspension.
 .SH EXIT STATUS
 The shell exits with the status of the last command it ran. A usage error such
 as an unknown flag in a non-interactive run exits with status 2.

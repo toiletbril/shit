@@ -69,6 +69,11 @@ public:
     Shitbox,
     Compopt,
     History,
+    Caller,
+    Help,
+    Logout,
+    Suspend,
+    Bind,
     Enable,
   };
 
@@ -144,6 +149,11 @@ inline constexpr static_string_entry<Builtin::Kind> BUILTIN_ENTRIES[] = {
     {SSK("shitbox"),   Builtin::Kind::Shitbox       },
     {SSK("compopt"),   Builtin::Kind::Compopt       },
     {SSK("history"),   Builtin::Kind::History       },
+    {SSK("caller"),    Builtin::Kind::Caller        },
+    {SSK("help"),      Builtin::Kind::Help          },
+    {SSK("logout"),    Builtin::Kind::Logout        },
+    {SSK("suspend"),   Builtin::Kind::Suspend       },
+    {SSK("bind"),      Builtin::Kind::Bind          },
     {SSK("enable"),    Builtin::Kind::Enable        },
 };
 
@@ -210,6 +220,11 @@ inline constexpr StaticStringMap BUILTINS{BUILTIN_ENTRIES};
   B_CASE(Shitbox);                                                             \
   B_CASE(Compopt);                                                             \
   B_CASE(History);                                                             \
+  B_CASE(Caller);                                                              \
+  B_CASE(Help);                                                                \
+  B_CASE(Logout);                                                              \
+  B_CASE(Suspend);                                                             \
+  B_CASE(Bind);                                                                \
   B_CASE(Enable)
 
 #define BUILTIN_STRUCT(b)                                                      \
@@ -275,6 +290,11 @@ BUILTIN_STRUCT(Compopt);
 BUILTIN_STRUCT(Z);
 BUILTIN_STRUCT(Shitbox);
 BUILTIN_STRUCT(History);
+BUILTIN_STRUCT(Caller);
+BUILTIN_STRUCT(Help);
+BUILTIN_STRUCT(Logout);
+BUILTIN_STRUCT(Suspend);
+BUILTIN_STRUCT(Bind);
 BUILTIN_STRUCT(Enable);
 
 class Exit : public Builtin

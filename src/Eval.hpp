@@ -585,6 +585,8 @@ public:
   mustuse fn funcname_frame_at(usize index) const wontthrow -> StringView;
   /* A frame past the function calls reports zero. */
   mustuse fn funcname_line_at(usize index) const throws -> usize;
+  /* A frame past the source stack reports an empty path. */
+  mustuse fn funcname_source_at(usize index) const wontthrow -> StringView;
   mustuse fn
   line_number_at_location(const SourceLocation &location) const throws -> usize;
   fn set_script_run(bool is_script_run) wontthrow -> void

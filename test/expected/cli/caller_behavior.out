@@ -1,0 +1,10 @@
+== caller at top level returns 1:
+rc=1
+== caller 0 inside a function prints line and source:
+4 SRC
+== caller with a non-numeric operand is a located error:
+shit: 1:8: error: Builtin 'caller': 'abc' is not a valid frame number.
+     1 |  caller abc
+       |         ^~~ here.
+note: caller takes a whole number such as `caller 0`.
+rc=1

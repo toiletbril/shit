@@ -1,0 +1,10 @@
+== logout in a non-login shell is refused:
+shit: 1:1: error: Builtin 'logout': logout: not login shell: use exit.
+     1 |  logout
+       |  ^~~~~~ here.
+rc=1
+== logout with a non-numeric operand is a located error:
+shit: 1:1: error: Builtin 'logout': logout: not login shell: use exit.
+     1 |  logout abc
+       |  ^~~~~~~~~~ here.
+rc=1

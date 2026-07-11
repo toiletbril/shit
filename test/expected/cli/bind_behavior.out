@@ -1,0 +1,9 @@
+== bind -m returns 0:
+rc=0
+== bind -l returns 0:
+rc=0
+== bind with a keyseq returns 0:
+rc=0
+== bind --help shows the help:
+DESCRIPTION
+  The bind builtin accepts readline key bindings without effect. The shit editor

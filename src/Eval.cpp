@@ -987,6 +987,23 @@ fn EvalContext::funcname_line_at(usize index) const throws -> usize
   return 0;
 }
 
+pure fn EvalContext::funcname_source_at(usize index) const wontthrow
+    -> StringView
+{
+  if (!m_source_frames.is_empty()) {
+    let const source_index = m_source_frames.count() - 1;
+    if (index <= source_index)
+      return m_source_frames[source_index - index].source_path.view();
+  }
+  if (index < m_function_call_names.count()) {
+    let const frame_name = funcname_frame_at(index);
+    let const *info = m_function_definition_infos.find(frame_name);
+    if (info != nullptr && !info->filename.is_empty())
+      return info->filename.view();
+  }
+  return StringView{};
+}
+
 pure fn EvalContext::in_function_scope() const wontthrow -> bool
 {
   return !m_local_scopes.is_empty();
