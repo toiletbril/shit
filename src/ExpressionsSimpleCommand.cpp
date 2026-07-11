@@ -528,7 +528,8 @@ namespace {
    split on whitespace, and a name already expanded is not expanded again so a
    self-referential alias terminates. A quoted space inside the body is not
    preserved, since the full tokenizer is not re-run. */
-fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
+fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args,
+                          ArrayList<SourceLocation> &arg_locations) throws
     -> void
 {
   if (!cxt.has_aliases()) return;
@@ -546,8 +547,13 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
     LOG(Debug, "expanding the alias '%s'", word.c_str());
 
     let rebuilt = ArrayList<String>{heap_allocator()};
+    let rebuilt_locations = ArrayList<SourceLocation>{heap_allocator()};
     let current = String{cxt.scratch_allocator()};
     let const &body_value = *body;
+    /* An alias body word has no span in this command, so it inherits the
+       command word's location. */
+    let const body_location =
+        !arg_locations.is_empty() ? arg_locations[0] : SourceLocation{};
     for (usize i = 0; i < body_value.count(); i++) {
       const char c = body_value[i];
       if (c == ' ' || c == '\t') {
@@ -555,21 +561,30 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
           rebuilt.push(String{
               heap_allocator(), StringView{current.data(), current.count()}
           });
+          rebuilt_locations.push(body_location);
           current.clear();
         }
       } else {
         current += c;
       }
     }
-    if (!current.is_empty())
+    if (!current.is_empty()) {
       rebuilt.push(String{
           heap_allocator(), StringView{current.data(), current.count()}
       });
+      rebuilt_locations.push(body_location);
+    }
 
-    for (usize i = 1; i < args.count(); i++)
+    for (usize i = 1; i < args.count(); i++) {
       rebuilt.push(steal(args[i]));
+      if (i < arg_locations.count())
+        rebuilt_locations.push(arg_locations[i]);
+      else
+        rebuilt_locations.push(body_location);
+    }
 
     args = steal(rebuilt);
+    arg_locations = steal(rebuilt_locations);
   }
 }
 
@@ -640,9 +655,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      process substitution it opens, leaving an enclosing command's for that
      command to reap. */
   let const substitution_mark = cxt.mark_process_substitutions();
-  let program_args = cxt.process_args(m_args, /*args_are_transient=*/true);
+  let program_arg_locations =
+      ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let program_args = cxt.process_args(m_args, /*args_are_transient=*/true,
+                                      /*is_array_literal=*/false,
+                                      &program_arg_locations);
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
-  expand_command_aliases(cxt, program_args);
+  expand_command_aliases(cxt, program_args, program_arg_locations);
 
   LOG(Info, "dispatching the command '%s' with %zu words",
       program_args.is_empty() ? "" : program_args[0].c_str(),
@@ -1187,9 +1206,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     resolved_ec =
         is_cache_valid
             ? ExecContext::from_resolved(source_location(), *m_resolved_kind,
-                                         steal(program_args))
+                                         steal(program_args),
+                                         steal(program_arg_locations))
             : ExecContext::make_from(source_location(), steal(program_args),
-                                     cxt.mood(), cxt.shitbox());
+                                     cxt.mood(), cxt.shitbox(),
+                                     steal(program_arg_locations));
   } catch (const CommandNotFound &e) {
     report_command_not_found(cxt, e);
     cxt.set_last_exit_status(127);

@@ -392,7 +392,9 @@ constexpr StaticStringMap DECLARATION_COMMANDS{DECLARATION_COMMAND_ENTRIES};
 
 hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
                                          bool args_are_transient,
-                                         bool is_array_literal) throws
+                                         bool is_array_literal,
+                                         ArrayList<SourceLocation>
+                                             *expanded_locations) throws
     -> ArrayList<String>
 {
   LOG(Debug, "expanding %zu argument tokens", args.count());
@@ -402,6 +404,20 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
                           ? ArrayList<String>{scratch_allocator()}
                           : ArrayList<String>{heap_allocator()};
   expanded_args.reserve(args.count());
+
+  /* The location list mirrors the string list one field per entry, so a builtin
+     can caret the specific token a field came from. It lives on the same
+     allocator as the strings. */
+  if (expanded_locations != nullptr) {
+    *expanded_locations = args_are_transient
+                              ? ArrayList<SourceLocation>{scratch_allocator()}
+                              : ArrayList<SourceLocation>{heap_allocator()};
+    expanded_locations->reserve(args.count());
+  }
+  let const do_record_location = [expanded_locations](SourceLocation loc)
+      wontthrow -> void {
+    if (expanded_locations != nullptr) expanded_locations->push(loc);
+  };
 
   let const fields_mark = m_scratch_arena.mark();
   defer
@@ -509,6 +525,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
             }
           }
           expanded_args.push(steal(assignment));
+          do_record_location(location);
           continue;
         }
         /* An assignment as an argument, like echo k=$v, is an ordinary word. */
@@ -532,6 +549,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
       {
         expanded_args.push(String{expanded_args.allocator(),
                                   expand_word_for_assignment(*word).view()});
+        do_record_location(location);
         continue;
       }
 
@@ -542,6 +560,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
         if (plain_kind == Word::PlainLiteral::PlainNoSplit) {
           expanded_args.push(
               String{expanded_args.allocator(), expandable.constant_value()});
+          do_record_location(location);
           did_take_fast_path = true;
         } else if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
           /* A single unquoted segment still needs the IFS check, since an IFS
@@ -558,6 +577,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
 
           if (!should_split) {
             expanded_args.push(steal(literal));
+            do_record_location(location);
             did_take_fast_path = true;
           }
         }
@@ -569,9 +589,11 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
           if (only.kind == WordSegment::Kind::VariableReference &&
               only.is_in_double_quotes && only.text.view() == "@")
           {
-            for (const String &param : m_positional_params)
+            for (const String &param : m_positional_params) {
               expanded_args.push(
                   String{expanded_args.allocator(), param.view()});
+              do_record_location(location);
+            }
             did_take_fast_path = true;
           }
         }
@@ -647,6 +669,7 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
               }
             }
             expanded_args.push(steal(value));
+            do_record_location(location);
             did_take_fast_path = true;
           }
         }
@@ -661,10 +684,13 @@ hot flatten fn EvalContext::process_args(const ArrayList<const Token *> &args,
                      .has_value())
             {
               expanded_args.push_managed(field.text.view());
+              do_record_location(location);
               continue;
             }
-            for (String &g : expand_path(steal(field), location))
+            for (String &g : expand_path(steal(field), location)) {
               expanded_args.push_managed(StringView{g.c_str(), g.count()});
+              do_record_location(location);
+            }
           }
         }
       };

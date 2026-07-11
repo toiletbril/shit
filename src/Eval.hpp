@@ -297,10 +297,16 @@ public:
 
   fn end_command() wontthrow -> void;
 
-  /* Variable expand, tilde expand, field split, and glob each token. */
+  /* Variable expand, tilde expand, field split, and glob each token. The
+     expanded_locations out-parameter, when not null, is filled in parallel
+     with the returned strings, so each field carries the source_location of
+     the token it expanded from. A token that splits into many fields
+     contributes one location per field. */
   fn process_args(const ArrayList<const Token *> &args,
                   bool args_are_transient = false,
-                  bool is_array_literal = false) throws -> ArrayList<String>;
+                  bool is_array_literal = false,
+                  ArrayList<SourceLocation> *expanded_locations = nullptr)
+      throws -> ArrayList<String>;
 
   fn scratch_allocator() const wontthrow -> Allocator
   {
@@ -1476,13 +1482,16 @@ class ExecContext
 {
 public:
   static fn make_from(SourceLocation location, ArrayList<String> &&args,
-                      mimic_mood mood, bool is_shitbox_enabled) throws
+                      mimic_mood mood, bool is_shitbox_enabled,
+                      ArrayList<SourceLocation> &&arg_locations) throws
       -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution. */
   static fn from_resolved(SourceLocation location, ResolvedCommand kind,
-                          ArrayList<String> &&args) throws -> ExecContext;
+                          ArrayList<String> &&args,
+                          ArrayList<SourceLocation> &&arg_locations) throws
+      -> ExecContext;
 
   /* Build a stage whose command did not resolve, so it runs nothing in the
      pipeline, closes its descriptors to give the next stage EOF, and reports
@@ -1517,6 +1526,11 @@ public:
   pure fn args() const wontthrow -> const ArrayList<String> &;
   pure fn program() const wontthrow -> const String &;
   pure fn source_location() const wontthrow -> const SourceLocation &;
+  pure fn arg_locations() const wontthrow -> const ArrayList<SourceLocation> &;
+  /* The source span of the field at index, clamped to the whole-command span
+     when the index is out of range or the list is empty, so a builtin that
+     forgot to thread spans degrades to the whole-command caret. */
+  pure fn arg_location_at(usize index) const wontthrow -> SourceLocation;
 
   fn close_fds() throws -> void;
   fn print_to_stdout(StringView s) const throws -> void;
@@ -1554,12 +1568,14 @@ public:
 
 private:
   ExecContext(SourceLocation location, ResolvedCommand &&kind,
-              ArrayList<String> &&args);
+              ArrayList<String> &&args,
+              ArrayList<SourceLocation> &&arg_locations);
 
   ResolvedCommand m_kind;
 
   SourceLocation m_location;
   ArrayList<String> m_args{heap_allocator()};
+  ArrayList<SourceLocation> m_arg_locations{heap_allocator()};
 };
 
 /* Parse and evaluate a constant arithmetic expression with no evaluation

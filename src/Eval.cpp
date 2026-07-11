@@ -1810,8 +1810,10 @@ pure fn EvalContext::peak_ast_arena_bytes() const wontthrow -> usize
    the EvalContext arithmetic methods, lives in EvalArithmetic.cpp. */
 
 ExecContext::ExecContext(SourceLocation location, ResolvedCommand &&kind,
-                         ArrayList<String> &&args)
-    : m_kind(steal(kind)), m_location(location), m_args(steal(args))
+                         ArrayList<String> &&args,
+                         ArrayList<SourceLocation> &&arg_locations)
+    : m_kind(steal(kind)), m_location(location), m_args(steal(args)),
+      m_arg_locations(steal(arg_locations))
 {}
 
 pure fn ExecContext::source_location() const wontthrow -> const SourceLocation &
@@ -1828,6 +1830,19 @@ pure fn ExecContext::program() const wontthrow -> const String &
 pure fn ExecContext::args() const wontthrow -> const ArrayList<String> &
 {
   return m_args;
+}
+
+pure fn ExecContext::arg_locations() const wontthrow
+    -> const ArrayList<SourceLocation> &
+{
+  return m_arg_locations;
+}
+
+pure fn ExecContext::arg_location_at(usize index) const wontthrow
+    -> SourceLocation
+{
+  if (index < m_arg_locations.count()) return m_arg_locations[index];
+  return m_location;
 }
 
 pure fn ExecContext::is_builtin() const wontthrow -> bool
@@ -1891,7 +1906,8 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
 }
 
 fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
-                          mimic_mood mood, bool is_shitbox_enabled) throws
+                          mimic_mood mood, bool is_shitbox_enabled,
+                          ArrayList<SourceLocation> &&arg_locations) throws
     -> ExecContext
 {
   ASSERT(args.count() > 0);
@@ -1955,21 +1971,26 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
     kind = ResolvedCommand::from_builtin(*resolved_builtin);
   }
 
-  return {location, steal(kind), steal(args)};
+  return {location, steal(kind), steal(args), steal(arg_locations)};
 }
 
 fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
-                              ArrayList<String> &&args) throws -> ExecContext
+                              ArrayList<String> &&args,
+                              ArrayList<SourceLocation> &&arg_locations) throws
+    -> ExecContext
 {
   ASSERT(args.count() > 0);
-  return {location, steal(kind), steal(args)};
+  return {location, steal(kind), steal(args), steal(arg_locations)};
 }
 
 fn ExecContext::make_unresolved(SourceLocation location) throws -> ExecContext
 {
   let args = ArrayList<String>{heap_allocator()};
   args.push(String{heap_allocator()});
-  return {location, ResolvedCommand::from_unresolved(), steal(args)};
+  let arg_locations = ArrayList<SourceLocation>{heap_allocator()};
+  arg_locations.push(location);
+  return {location, ResolvedCommand::from_unresolved(), steal(args),
+          steal(arg_locations)};
 }
 
 } // namespace shit

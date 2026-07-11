@@ -584,7 +584,11 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
        words carets the stage that read the variable. */
     cxt.set_current_location(e->source_location());
 
-    let stage_args = cxt.process_args(e->args(), /*args_are_transient=*/true);
+    let stage_arg_locations =
+        ArrayList<SourceLocation>{cxt.scratch_allocator()};
+    let stage_args = cxt.process_args(e->args(), /*args_are_transient=*/true,
+                                      /*is_array_literal=*/false,
+                                      &stage_arg_locations);
 
     if (stage_args.is_empty()) {
       throw ErrorWithLocation{e->source_location(),
@@ -597,7 +601,8 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     Maybe<ExecContext> stage_ec;
     try {
       stage_ec = ExecContext::make_from(e->source_location(), steal(stage_args),
-                                        cxt.mood(), cxt.shitbox());
+                                        cxt.mood(), cxt.shitbox(),
+                                        steal(stage_arg_locations));
     } catch (const CommandNotFound &not_found) {
       report_command_not_found(cxt, not_found);
       /* The stage still applies its own redirections. A > onto its stdout takes
