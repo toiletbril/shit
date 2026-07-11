@@ -4,9 +4,9 @@ rc=1
 reached
 rc=0
 == an unknown mood is rejected:
-shit: 1:1: error: Builtin 'set': Unknown --mood value 'badmood', expected 'shit', 'bash', 'sh', or 'bash-posix'.
+shit: 1:12: error: Builtin 'set': Unknown --mood value 'badmood', expected 'shit', 'bash', 'sh', or 'bash-posix'.
      1 |  set --mood badmood
-       |  ^~~~~~~~~~~~~~~~~~ here.
+       |             ^~~~~~~ here.
 rc=1
 == set -o lists the option states:
 errexit        	off

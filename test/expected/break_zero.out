@@ -47,8 +47,8 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:18: error: break count '0' is out of range.
+shit: 2:24: error: break count '0' is out of range.
      2 |  for i in 1 2; do break 0; echo unreached; done
-       |                   ^~~~~~~ here.
+       |                         ^~ here.
 after
 [Code 0]

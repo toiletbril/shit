@@ -1,5 +1,5 @@
 == bench stops on a non-zero exit code:
-shit: 1:1: error: Builtin 'bench': the command 'false' exited with status 1.
+shit: 1:16: error: Builtin 'bench': the command 'false' exited with status 1.
 shit: note: Pass `--ignore-exit-code` to benchmark it regardless.
 == the failure sets the exit status:
 rc=1

@@ -4,8 +4,8 @@
     3  merged alpha
     4  merged beta
 == history -r on a missing file errors:
-shit: 1:1: error: Builtin 'history': cannot read history from '/no/such/history/file': No such file or directory.
+shit: 1:9: error: Builtin 'history': cannot read history from '/no/such/history/file': No such file or directory.
      1 |  history -r /no/such/history/file; echo "rc=$?"
-       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+       |          ^~ here.
 shit: note: Pass a readable history file, e.g. `history -r ~/.shit_history`.
 rc=1

@@ -1,7 +1,7 @@
 == a zero count is rejected:
-shit: 1:18: error: Builtin 'continue': Unable to continue because '0' is not a valid loop count.
+shit: 1:27: error: Builtin 'continue': Unable to continue because '0' is not a valid loop count.
      1 |  for i in 1 2; do continue 0; done
-       |                   ^~~~~~~~~~ here.
+       |                            ^~ here.
 rc=1
 == a bare continue skips the rest of the body:
 done

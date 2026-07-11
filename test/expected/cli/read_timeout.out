@@ -9,7 +9,7 @@ rc=0 x=[abc]
 == read -t times out on a silent producer, status is 142:
 rc=142
 == an unparsable timeout is rejected:
-shit: 1:1: error: Builtin 'read': Invalid timeout specification.
+shit: 1:12: error: Builtin 'read': Invalid timeout specification.
      1 |  read -r -t nope x </dev/null; echo "rc=$?"
-       |  ^~~~~~~~~~~~~~~~~ here.
+       |             ^~~~ here.
 rc=1

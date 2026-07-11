@@ -5,22 +5,22 @@ shit: 1:1: error: kill: Not enough arguments.
 shit: note: Try `kill --help` for more info.
 rc=2
 == an unknown signal name is rejected:
-shit: 1:1: error: Builtin 'kill': 'BOGUSSIG' is not a valid signal.
+shit: 1:6: error: Builtin 'kill': 'BOGUSSIG' is not a valid signal.
      1 |  kill -BOGUSSIG 123
-       |  ^~~~~~~~~~~~~~~~~~ here.
+       |       ^~~~~~~~~ here.
 rc=1
 == an unknown job is reported:
-shit: 1:1: error: Builtin 'kill': '%999' is not a known job.
+shit: 1:6: error: Builtin 'kill': '%999' is not a known job.
      1 |  kill %999
-       |  ^~~~~~~~~ here.
+       |       ^~~~ here.
 rc=1
 == a non-numeric job is rejected:
-shit: 1:1: error: Builtin 'kill': '%abc' is not a known job.
+shit: 1:6: error: Builtin 'kill': '%abc' is not a known job.
      1 |  kill %abc
-       |  ^~~~~~~~~ here.
+       |       ^~~~ here.
 rc=1
 == a non-numeric pid is rejected:
-shit: 1:1: error: Builtin 'kill': 'notanumber' is not a valid job or process id.
+shit: 1:6: error: Builtin 'kill': 'notanumber' is not a valid job or process id.
      1 |  kill notanumber
-       |  ^~~~~~~~~~~~~~~ here.
+       |       ^~~~~~~~~~ here.
 rc=1

@@ -31,9 +31,9 @@ shit: 1:1: error: kill: Not enough arguments.
 shit: note: Try `kill --help` for more info.
 rc=2
 --- kill with a non-numeric pid ---
-shit: 1:1: error: Builtin 'kill': 'notapid' is not a valid job or process id.
+shit: 1:14: error: Builtin 'kill': 'notapid' is not a valid job or process id.
      1 |  shitbox kill notapid
-       |  ^~~~~~~~~~~~~~~~~~~~ here.
+       |               ^~~~~~~ here.
 rc=1
 --- ps prints the header ---
   PID CMD
