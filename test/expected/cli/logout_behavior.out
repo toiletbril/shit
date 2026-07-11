@@ -2,11 +2,11 @@
 shit: 1:1: error: Builtin 'logout': Cannot use 'logout' in a non-login shell.
      1 |  logout
        |  ^~~~~~ here.
-shit: note: 'exit' may be used instead.
+shit: note: `exit` may be used instead.
 rc=1
 == logout with a non-numeric operand is a located error:
 shit: 1:1: error: Builtin 'logout': Cannot use 'logout' in a non-login shell.
      1 |  logout abc
        |  ^~~~~~~~~~ here.
-shit: note: 'exit' may be used instead.
+shit: note: `exit` may be used instead.
 rc=1

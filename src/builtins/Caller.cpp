@@ -34,14 +34,13 @@ fn Caller::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parsed = args[1].to<i64>();
     if (parsed.is_error()) {
       throw make_error_for_arg(
-          ec, 1, StringView{"'"} + args[1] + "' is not a valid frame number",
-          "the frame index must be a whole number such as 'caller 0'");
+          ec, 1, StringView{"'"} + args[1] + "' is not a whole number",
+          "The frame index must be a whole number such as `caller 0`");
     }
     if (parsed.value() < 0) {
       throw make_error_for_arg(
-          ec, 1, StringView{"'"} + args[1]
-                    + "' is not a valid frame number",
-          "the frame index must not be negative");
+          ec, 1, StringView{"'"} + args[1] + "' is a negative frame number",
+          "The frame index must not be negative");
     }
     frame_index = static_cast<usize>(parsed.value());
   }

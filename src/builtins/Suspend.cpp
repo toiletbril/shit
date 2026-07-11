@@ -39,8 +39,8 @@ fn Suspend::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                               operand_locations.count() > 1
                                   ? operand_locations[1]
                                   : ec.arg_location_at(1),
-                              "suspend takes no arguments",
-                              "Run 'suspend --help' for the accepted options");
+                              "Suspend takes no arguments",
+                              "Run `suspend --help` for the accepted options");
     return 2;
   }
 
@@ -59,7 +59,7 @@ fn Suspend::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const self_process = os::process_from_pid(self_pid);
   if (!os::signal_process(self_process, *signal_number)) {
     report_soft_builtin_error(ec, cxt, ec.source_location(),
-                              "unable to suspend the shell",
+                              "Unable to suspend the shell",
                               os::last_system_error_message());
     return 1;
   }

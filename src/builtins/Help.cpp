@@ -51,7 +51,7 @@ fn Help::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           i < operand_locations.count() ? operand_locations[i]
                                         : ec.source_location(),
           StringView{"'"} + name + "' is not a shell builtin",
-          "Run 'help' with no operand to list every builtin");
+          "Run `help` with no operand to list every builtin");
       status = 1;
       continue;
     }

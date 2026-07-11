@@ -4,7 +4,7 @@ one.txt
 two.txt
 rc=0
 --- unknown flag on a symlinked utility reports an error, not a crash ---
-shit: 1:6: error: Unknown flag '--bogus'.
+shit: 1:6: error: tail: Unknown flag '--bogus'.
      1 |  tail --bogus
        |       ^~~~~~~ here.
 rc=1

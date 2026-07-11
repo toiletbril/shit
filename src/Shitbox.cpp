@@ -60,7 +60,21 @@ fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
 }
 
 fn rewrap_with_prefix(const ErrorWithLocation &error,
-                      StringView prefix) throws -> ErrorWithLocation;
+                      StringView prefix) throws -> ErrorWithLocation
+{
+  let const message = prefix + ": " + error.message();
+  if (error.has_note()) {
+    ErrorWithLocationAndDetails rewrapped{error.location(), message.view(),
+                                          error.note().view()};
+    if (error.is_script_fatal()) rewrapped.set_script_fatal();
+    rewrapped.set_command_status(error.command_status());
+    return rewrapped;
+  }
+  ErrorWithLocation rewrapped{error.location(), message.view()};
+  if (error.is_script_fatal()) rewrapped.set_script_fatal();
+  rewrapped.set_command_status(error.command_status());
+  return rewrapped;
+}
 
 fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
     -> i32
@@ -78,14 +92,14 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   }
 
   if (let const chosen = find_util(name); chosen.has_value()) {
-    let const invocation_name =
-        ec.is_multicall ? String{heap_allocator(), name}
-                         : String{"shitbox "} + name;
     try {
       return run_util(*chosen, ec, cxt, shifted, shifted_locations);
     } catch (const BrokenPipeExit &) {
       throw;
     } catch (const ErrorWithLocation &e) {
+      let const invocation_name =
+          ec.is_multicall ? String{heap_allocator(), name}
+                           : String{"shitbox "} + name;
       throw rewrap_with_prefix(e, invocation_name);
     } catch (const Error &error) {
       relocate_error(error, ec.source_location());
@@ -104,23 +118,6 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   throw ErrorWithLocation{ec.arg_location_at(name_index),
                           "shitbox has no utility named '" + String{name} +
                               "'"};
-}
-
-fn rewrap_with_prefix(const ErrorWithLocation &error,
-                      StringView prefix) throws -> ErrorWithLocation
-{
-  let const message = prefix + ": " + error.message();
-  if (error.has_note()) {
-    ErrorWithLocationAndDetails rewrapped{error.location(), message.view(),
-                                          error.note().view()};
-    if (error.is_script_fatal()) rewrapped.set_script_fatal();
-    rewrapped.set_command_status(error.command_status());
-    return rewrapped;
-  }
-  ErrorWithLocation rewrapped{error.location(), message.view()};
-  if (error.is_script_fatal()) rewrapped.set_script_fatal();
-  rewrapped.set_command_status(error.command_status());
-  return rewrapped;
 }
 
 fn run_as_multicall(StringView util_name, ArrayList<String> operands,
