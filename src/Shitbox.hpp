@@ -142,8 +142,10 @@ fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
             const ArrayList<String> &args) throws -> i32;
 
 fn parse_util_operands(const ArrayList<Flag *> &flags,
-                       const ArrayList<String> &args) throws
-    -> ArrayList<String>;
+                       const ArrayList<String> &args,
+                       const ArrayList<SourceLocation> *arg_locations = nullptr,
+                       ArrayList<SourceLocation> *operand_locations = nullptr)
+    throws -> ArrayList<String>;
 
 fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
                    StringView description,

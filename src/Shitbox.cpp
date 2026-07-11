@@ -78,10 +78,8 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
       return run_util(*chosen, ec, cxt, shifted);
     } catch (const BrokenPipeExit &) {
       throw;
-    } catch (const ErrorWithLocation &error) {
-      /* The caret offsets into the utility's own argument vector, so it is
-         re-pointed at the command location. */
-      relocate_error(error, ec.source_location());
+    } catch (const ErrorWithLocation &) {
+      throw;
     } catch (const Error &error) {
       relocate_error(error, ec.source_location());
     }
@@ -146,13 +144,18 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
 }
 
 fn parse_util_operands(const ArrayList<Flag *> &flags,
-                       const ArrayList<String> &args) throws
+                       const ArrayList<String> &args,
+                       const ArrayList<SourceLocation> *arg_locations,
+                       ArrayList<SourceLocation> *operand_locations) throws
     -> ArrayList<String>
 {
-  ArrayList<String> operands = parse_flags_vec(flags, args, 0);
+  ArrayList<String> operands = parse_flags_vec(flags, args, 0, nullptr,
+                                               arg_locations, operand_locations);
   /* The first operand is the utility name, dropped to leave the real arguments.
    */
   if (!operands.is_empty()) operands.remove(0);
+  if (operand_locations != nullptr && !operand_locations->is_empty())
+    operand_locations->remove(0);
   return operands;
 }
 
