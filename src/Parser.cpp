@@ -273,10 +273,9 @@ fn Parser::reject_empty_loop_body(const Expression *body) throws -> void
   if (!body->is_dummy()) return;
   Token *terminator = m_lexer.peek_shell_token();
   ASSERT(terminator != nullptr);
-  throw shit::ErrorWithLocation{
-      terminator->source_location(),
-      "Unable to parse the loop because its body between 'do' and 'done' is "
-      "empty, a command is required there"};
+  throw shit::ErrorWithLocationAndDetails{
+      terminator->source_location(), "Unable to parse the loop",
+      "The body between 'do' and 'done' is empty, a command is required"};
 }
 
 hot fn Parser::parse_command_list(
