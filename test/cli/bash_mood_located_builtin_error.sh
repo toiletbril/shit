@@ -5,4 +5,4 @@ echo "rc=$?"
 echo "== the run keeps going past the soft error =="
 "$BIN" --mood bash -c 'builtin nosuchbuiltin; echo after'
 echo "== a thrown builtin error in the bash mood is located and soft too =="
-"$BIN" --mood bash -c 'read -q; echo after'
+"$BIN" --mood bash -c 'read -Z; echo after'

@@ -9,7 +9,7 @@ shit: 1:9: error: Builtin 'builtin': 'nosuchbuiltin' is not a shell builtin.
        |          ^~~~~~~~~~~~~ here.
 after
 == a thrown builtin error in the bash mood is located and soft too ==
-shit: 1:6: error: Unknown flag '-q'.
-     1 |  read -q; echo after
+shit: 1:6: error: Builtin 'read': Unknown flag '-Z'.
+     1 |  read -Z; echo after
        |       ^~ here.
 after

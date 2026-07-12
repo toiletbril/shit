@@ -7,7 +7,8 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-r] [name ...]");
+HELP_SYNOPSIS_DECL("[-ers] [-a name] [-d delim] [-n count] [-p prompt] "
+                   "[-t timeout] [-u fd] [-q] [name ...]");
 HELP_DESCRIPTION_DECL(
     "The read builtin reads one line from standard input into the named "
     "variables.");
@@ -27,6 +28,8 @@ FLAG(READ_FD, String, 'u', "", "Read from the given file descriptor.");
 FLAG(READ_EDIT, Bool, 'e', "",
      "Accepted for compatibility. The line editor is always used at a "
      "terminal.");
+FLAG(READ_QUERY, Bool, 'q', "",
+     "Read one byte and return zero for y or Y, one otherwise.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Read);
@@ -45,16 +48,16 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* The array, count, timeout, silent, delimiter, descriptor, and editor
-     options are bash extensions the sh mood rejects. */
+  /* The array, count, query, timeout, silent, delimiter, descriptor, and
+     editor options are bash extensions the sh mood rejects. */
   if (cxt.is_posix_mode() &&
       (FLAG_READ_ARRAY.is_set() || FLAG_READ_TIMEOUT.is_set() ||
-       FLAG_READ_NCHARS.is_set() || FLAG_READ_SILENT.is_enabled() ||
-       FLAG_READ_DELIM.is_set() || FLAG_READ_FD.is_set() ||
-       FLAG_READ_EDIT.is_enabled()))
+       FLAG_READ_NCHARS.is_set() || FLAG_READ_QUERY.is_enabled() ||
+       FLAG_READ_SILENT.is_enabled() || FLAG_READ_DELIM.is_set() ||
+       FLAG_READ_FD.is_set() || FLAG_READ_EDIT.is_enabled()))
   {
     report_soft_builtin_error(ec, cxt, "Illegal option",
-                              "Run 'read --help' for the accepted options");
+                              "Run `read --help` for the accepted options");
     return 2;
   }
 
@@ -95,6 +98,15 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       os::is_fd_a_tty(ec.in_fd.value_or(SHIT_STDIN)))
   {
     shit::print_error(FLAG_READ_PROMPT.value());
+  }
+
+  /* The query mode reads one byte and returns zero only for y or Y, so no
+     variable receives the answer. */
+  if (FLAG_READ_QUERY.is_enabled()) {
+    char answer = 0;
+    let const got = os::read_fd(read_fd, &answer, 1);
+    if (!got.has_value() || *got == 0) return 1;
+    return (answer == 'y' || answer == 'Y') ? 0 : 1;
   }
 
   let const has_operands = names.count() > 1;

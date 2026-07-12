@@ -1,0 +1,10 @@
+== read -q returns zero for y:
+rc=0
+== read -q returns zero for Y:
+rc=0
+== read -q returns one for n:
+rc=1
+== read -q returns one for a non-y byte:
+rc=1
+== read -q at EOF returns one:
+rc=1

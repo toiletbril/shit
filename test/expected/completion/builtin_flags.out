@@ -79,6 +79,7 @@ globstar
 -e
 -n
 -p
+-q
 -r
 -s
 -t
