@@ -1,0 +1,13 @@
+#!/bin/env shit
+x=$( cat <<< "payload" )
+echo "x=$x"
+empty=""
+y=$( cat <<<"$empty" )
+echo "y=$y"
+z=$( echo "$( echo nested )" -- "$x" )
+echo "z=$z"
+w=$( echo "$( printf '%s\n' "'")")
+echo "w=$w"
+line="part value tail"
+tar=$( printf '%s\n' "$line" | sed -e 's/^.* \([^ ]*x\) .*$/\1/' <<<"$line" )
+echo "tar=$tar"

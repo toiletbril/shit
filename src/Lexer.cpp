@@ -929,6 +929,54 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
               previous_char = c;
               continue;
             }
+            /* A $( inside double quotes is a nested command substitution, so
+               its closing paren must not close the outer substitution. */
+            if (quote == '"' && c == '$' &&
+                chop_character(byte_count) == '(')
+            {
+              inner += c;
+              inner += chop_character(byte_count);
+              byte_count++;
+              usize nested_paren_depth = 1;
+              char nested_quote = 0;
+              loop
+              {
+                const let p = chop_character(byte_count);
+                if (p == lexer::CEOF) break;
+                byte_count++;
+                inner += p;
+                if (nested_quote != 0) {
+                  if (nested_quote == '"' && p == '\\') {
+                    const let escaped = chop_character(byte_count);
+                    if (escaped != lexer::CEOF) {
+                      byte_count++;
+                      inner += escaped;
+                    }
+                    continue;
+                  }
+                  if (p == nested_quote) nested_quote = 0;
+                  continue;
+                }
+                if (p == '\\') {
+                  const let escaped = chop_character(byte_count);
+                  if (escaped != lexer::CEOF) {
+                    byte_count++;
+                    inner += escaped;
+                  }
+                  continue;
+                }
+                if (p == '\'' || p == '"') {
+                  nested_quote = p;
+                } else if (p == '(') {
+                  nested_paren_depth++;
+                } else if (p == ')') {
+                  nested_paren_depth--;
+                  if (nested_paren_depth == 0) break;
+                }
+              }
+              previous_char = ')';
+              continue;
+            }
             if (c == quote) quote = 0;
             inner += c;
             previous_char = c;
@@ -948,6 +996,22 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             quote = c;
             inner += c;
             previous_char = c;
+            continue;
+          }
+          /* <<< is the bash here-string, and its body is a normal word rather
+             than a heredoc, so the three chevrons are consumed here to keep the
+             heredoc branch below from swallowing the body as a delimiter. */
+          if (bash_additions_enabled() && c == '<' &&
+              chop_character(byte_count) == '<' &&
+              chop_character(byte_count + 1) == '<' &&
+              (previous_char == 0 || lexer::is_whitespace(previous_char) ||
+               lexer::is_shell_sentinel(previous_char)))
+          {
+            inner += c;
+            inner += chop_character(byte_count);
+            inner += chop_character(byte_count + 1);
+            byte_count += 2;
+            previous_char = '<';
             continue;
           }
           if (c == '<' && chop_character(byte_count) == '<' &&

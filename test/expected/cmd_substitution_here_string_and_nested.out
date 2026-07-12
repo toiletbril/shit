@@ -1,0 +1,94 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=$( cat <<< "payload" )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "x=$x"]
+  [CompoundListCondition, None]
+    [Assign empty=]
+  [CompoundListCondition, None]
+    [Assign y=$( cat <<<"$empty" )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "y=$y"]
+  [CompoundListCondition, None]
+    [Assign z=$( echo "$( echo nested )" -- "$x" )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "z=$z"]
+  [CompoundListCondition, None]
+    [Assign w=$( echo "$( printf '%s\n' "'")")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "w=$w"]
+  [CompoundListCondition, None]
+    [Assign line=part value tail]
+  [CompoundListCondition, None]
+    [Assign tar=$( printf '%s\n' "$line" | sed -e 's/^.* \([^ ]*x\) .*$/\1/' <<<"$line" )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tar=$tar"]
+[Word
+  Unquoted "x="
+  CommandSubstitution " cat <<< "payload" "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "x="
+  Variable "x"
+]
+[Word
+  Unquoted "empty="
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "y="
+  CommandSubstitution " cat <<<"$empty" "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "y="
+  Variable "y"
+]
+[Word
+  Unquoted "z="
+  CommandSubstitution " echo "$( echo nested )" -- "$x" "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "z="
+  Variable "z"
+]
+[Word
+  Unquoted "w="
+  CommandSubstitution " echo "$( printf '%s\n' "'")""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "w="
+  Variable "w"
+]
+[Word
+  Unquoted "line="
+  DoubleQuoted "part value tail"
+]
+[Word
+  Unquoted "tar="
+  CommandSubstitution " printf '%s\n' "$line" | sed -e 's/^.* \([^ ]*x\) .*$/\1/' <<<"$line" "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tar="
+  Variable "tar"
+]
+x=payload
+y=
+z=nested -- payload
+w='
+tar=part value tail
+[Code 0]
