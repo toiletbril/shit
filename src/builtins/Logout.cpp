@@ -52,6 +52,9 @@ fn Logout::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       report_soft_builtin_error(
           ec, cxt, ec.arg_location_at(2), "Too many arguments",
           "Logout takes at most one status, such as `logout 1`");
+
+      if (cxt.shell_is_interactive()) return 2;
+
       status = 1;
     } else {
       status = parsed_status.value();
