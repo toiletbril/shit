@@ -13,16 +13,16 @@ HELP_DESCRIPTION_DECL(
     "shit editor is the vendored toiletline, so key binding is not wired "
     "through this builtin.");
 
-FLAG(LIST_NAMES, Bool, 'l', "", "Accepted without effect.");
-FLAG(READLINE_META, Bool, 'm', "", "Accepted without effect.");
-FLAG(REMOVE, Bool, 'r', "", "Accepted without effect.");
-FLAG(PRINT, Bool, 'p', "", "Accepted without effect.");
-FLAG(PRINT_ALL, Bool, 'P', "", "Accepted without effect.");
-FLAG(QUERY, Bool, 'q', "", "Accepted without effect.");
-FLAG(SHOW_HELP, Bool, 's', "", "Accepted without effect.");
-FLAG(VARIABLE, Bool, 'v', "", "Accepted without effect.");
-FLAG(FILENAME, String, 'f', "", "Accepted without effect.");
-FLAG(UNBIND, String, 'u', "", "Accepted without effect.");
+FLAG(LIST_NAMES, Bool, 'l', "\0", "Accepted without effect.");
+FLAG(READLINE_META, Bool, 'm', "\0", "Accepted without effect.");
+FLAG(REMOVE, Bool, 'r', "\0", "Accepted without effect.");
+FLAG(PRINT, Bool, 'p', "\0", "Accepted without effect.");
+FLAG(PRINT_ALL, Bool, 'P', "\0", "Accepted without effect.");
+FLAG(QUERY, Bool, 'q', "\0", "Accepted without effect.");
+FLAG(SHOW_HELP, Bool, 's', "\0", "Accepted without effect.");
+FLAG(VARIABLE, Bool, 'v', "\0", "Accepted without effect.");
+FLAG(FILENAME, String, 'f', "\0", "Accepted without effect.");
+FLAG(UNBIND, String, 'u', "\0", "Accepted without effect.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Bind);

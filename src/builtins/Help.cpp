@@ -10,10 +10,10 @@ HELP_SYNOPSIS_DECL("[-dms] [pattern ...]");
 HELP_DESCRIPTION_DECL(
     "The help builtin lists the builtins or displays the help for one.");
 
-FLAG(SHORT, Bool, 'd', "",
+FLAG(SHORT, Bool, 'd', "\0",
      "Display a short description instead of the full help.");
-FLAG(MANPAGE, Bool, 'm', "", "Accepted without effect.");
-FLAG(SUMMARY, Bool, 's', "", "Accepted without effect.");
+FLAG(MANPAGE, Bool, 'm', "\0", "Accepted without effect.");
+FLAG(SUMMARY, Bool, 's', "\0", "Accepted without effect.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Help);

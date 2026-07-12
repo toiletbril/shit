@@ -13,22 +13,22 @@ HELP_DESCRIPTION_DECL(
     "The read builtin reads one line from standard input into the named "
     "variables.");
 
-FLAG(READ_RAW, Bool, 'r', "", "Do not treat a backslash as an escape.");
-FLAG(READ_ARRAY, String, 'a', "",
+FLAG(READ_RAW, Bool, 'r', "\0", "Do not treat a backslash as an escape.");
+FLAG(READ_ARRAY, String, 'a', "\0",
      "Split the line into the named indexed array.");
-FLAG(READ_PROMPT, String, 'p', "",
+FLAG(READ_PROMPT, String, 'p', "\0",
      "Print the prompt before reading, when reading from a terminal.");
-FLAG(READ_TIMEOUT, String, 't', "", "Time out after the given seconds.");
-FLAG(READ_NCHARS, String, 'n', "", "Read at most the given number of bytes.");
-FLAG(READ_SILENT, Bool, 's', "", "Do not echo the input from a terminal.");
-FLAG(READ_DELIM, String, 'd', "",
+FLAG(READ_TIMEOUT, String, 't', "\0", "Time out after the given seconds.");
+FLAG(READ_NCHARS, String, 'n', "\0", "Read at most the given number of bytes.");
+FLAG(READ_SILENT, Bool, 's', "\0", "Do not echo the input from a terminal.");
+FLAG(READ_DELIM, String, 'd', "\0",
      "Read until the first byte of the given delimiter, or until a NUL byte "
      "when the delimiter is empty.");
-FLAG(READ_FD, String, 'u', "", "Read from the given file descriptor.");
-FLAG(READ_EDIT, Bool, 'e', "",
+FLAG(READ_FD, String, 'u', "\0", "Read from the given file descriptor.");
+FLAG(READ_EDIT, Bool, 'e', "\0",
      "Accepted for compatibility. The line editor is always used at a "
      "terminal.");
-FLAG(READ_QUERY, Bool, 'q', "",
+FLAG(READ_QUERY, Bool, 'q', "\0",
      "Read one byte and return zero for y or Y, one otherwise.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

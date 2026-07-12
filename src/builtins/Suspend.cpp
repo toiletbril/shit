@@ -12,7 +12,7 @@ HELP_SYNOPSIS_DECL("[-f]");
 HELP_DESCRIPTION_DECL(
     "The suspend builtin stops the shell until a SIGCONT is received.");
 
-FLAG(FORCE, Bool, 'f', "",
+FLAG(FORCE, Bool, 'f', "\0",
      "Suspend even a login shell, which is refused by default.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
