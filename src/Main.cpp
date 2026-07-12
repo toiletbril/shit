@@ -1258,7 +1258,10 @@ fn main(int argc, char **argv) -> int
             usize operand_offset = 0;
             for (int a = 0; a < parse_argc; a++) {
               if (file_name.view() == parse_argv[a]) break;
-              operand_offset += std::strlen(parse_argv[a]) + 1;
+              operand_offset += shit::shell_quoted_arg_length(
+                                    shit::StringView{parse_argv[a],
+                                               std::strlen(parse_argv[a])}) +
+                                1;
             }
             shit::show_message(
                 shit::ErrorWithLocation{
@@ -1280,7 +1283,10 @@ fn main(int argc, char **argv) -> int
             usize operand_offset = 0;
             for (int a = 0; a < parse_argc; a++) {
               if (file_name.view() == parse_argv[a]) break;
-              operand_offset += std::strlen(parse_argv[a]) + 1;
+              operand_offset += shit::shell_quoted_arg_length(
+                                    shit::StringView{parse_argv[a],
+                                               std::strlen(parse_argv[a])}) +
+                                1;
             }
             root_frame_call_site = shit::SourceLocation{
                 operand_offset, file_name.count(), shit::None};
@@ -1295,17 +1301,31 @@ fn main(int argc, char **argv) -> int
         LOG(Info, "taking the next -c command string, %zu bytes",
             script_contents.count());
         {
+          /* The consumed -c is the Nth -c token, where N is how many
+             commands FLAG_COMMAND has handed out so far. */
+          const usize consumed_command_index = FLAG_COMMAND.value_position();
+          usize seen_dash_c_count = 0;
           usize flag_offset = 0;
           for (int a = 0; a < parse_argc; a++) {
             const usize token_length = std::strlen(parse_argv[a]);
-            if (shit::StringView{parse_argv[a], token_length} == "-c") {
-              const usize span =
-                  token_length + 1 + std::strlen(parse_argv[a + 1]);
-              root_frame_call_site = shit::SourceLocation{
-                  flag_offset, span, shit::None};
-              break;
+            const shit::StringView token{parse_argv[a], token_length};
+            const usize quoted_length =
+                shit::shell_quoted_arg_length(token);
+            if (token == "-c") {
+              seen_dash_c_count++;
+              if (seen_dash_c_count == consumed_command_index &&
+                  a + 1 < parse_argc) {
+                const usize argument_length =
+                    shit::shell_quoted_arg_length(
+                        shit::StringView{parse_argv[a + 1],
+                                         std::strlen(parse_argv[a + 1])});
+                const usize span = quoted_length + 1 + argument_length;
+                root_frame_call_site = shit::SourceLocation{
+                    flag_offset, span, shit::None};
+                break;
+              }
             }
-            flag_offset += token_length + 1;
+            flag_offset += quoted_length + 1;
           }
         }
         if (FLAG_COMMAND.at_end()) should_quit = true;

@@ -13,8 +13,8 @@ shit: 1:8: error: Program `seq` wasn't found.
        |         ^~~~~ here.
 note: Did you mean `set`?
 shit: 1:44: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg --mood sh -c PATH=; seq 3
-       |                                             ^~~~~~~~~~~~~~~ here.
+     1 |  /Users/sd/Projects/shit/shit-dbg --mood sh -c 'PATH=; seq 3'
+       |                                             ^~~~~~~~~~~~~~~~~ here.
 rc=127
 === set -o shitbox turns bare names on ===
 1

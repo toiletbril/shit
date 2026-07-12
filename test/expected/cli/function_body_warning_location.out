@@ -2,23 +2,23 @@ shit: 1:23: warning: Command 'probe_fn' was not found.
      1 |  . LIB; probe_fn
        |                        ^~~~~~~~ here.
 shit: 1:37: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -W -c . LIB; probe_fn
-       |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+     1 |  /Users/sd/Projects/shit/shit-dbg -W -c '. LIB; probe_fn'
+       |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 shit: LIB:3:15: warning: The variable 'UNSET_FN_PROBE' is not set, it expands to empty.
      3 |    echo "first=${UNSET_FN_PROBE}"
        |                ^~~~~~~~~~~~~~~~~ here.
 note: Replace it with ${UNSET_FN_PROBE-} if empty expansion is desired.
 shit: 1:37: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -W -c . LIB; probe_fn
-       |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+     1 |  /Users/sd/Projects/shit/shit-dbg -W -c '. LIB; probe_fn'
+       |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 first=
 shit: LIB:4:11: warning: The variable 'UNSET_FN_ARITH' is not set, it expands to empty.
      4 |    echo $((UNSET_FN_ARITH + 1))
        |            ^~~~~~~~~~~~~~ here.
 note: Replace it with ${UNSET_FN_ARITH-} if empty expansion is desired.
 shit: 1:37: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -W -c . LIB; probe_fn
-       |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+     1 |  /Users/sd/Projects/shit/shit-dbg -W -c '. LIB; probe_fn'
+       |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 1
 line=5
 rc=0

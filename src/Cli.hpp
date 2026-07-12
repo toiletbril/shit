@@ -144,6 +144,7 @@ public:
 
   fn next() throws -> StringView;
   pure fn at_end() const wontthrow -> bool;
+  pure fn value_position() const wontthrow -> usize { return m_value_position; }
 
   fn reset() throws -> void override;
 
@@ -173,6 +174,10 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     -> ArrayList<String>;
 
 fn join_command_line(int argc, const char *const *argv) throws -> String;
+
+pure fn arg_needs_shell_quoting(StringView arg) wontthrow -> bool;
+pure fn shell_quoted_arg_length(StringView arg) wontthrow -> usize;
+fn append_shell_quoted_arg(String &out, StringView arg) throws -> void;
 
 fn reset_flags(const ArrayList<Flag *> &flags) throws -> void;
 

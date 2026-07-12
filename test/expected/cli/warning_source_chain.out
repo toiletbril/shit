@@ -9,7 +9,7 @@ shit: 1:3: trace location:
      1 |  . OUTER
        |    ^~~~~~~~~~~~~~~~~~~ here.
 shit: 1:37: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -W -c . OUTER
-       |                                      ^~~~~~~~~~~~~~~~~~~~~~~~ here.
+     1 |  /Users/sd/Projects/shit/shit-dbg -W -c '. OUTER'
+       |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 1
 rc=0

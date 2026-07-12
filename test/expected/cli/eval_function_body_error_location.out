@@ -4,8 +4,8 @@ shit: 1:32: warning: Command 'f' was not found.
        |                                 ^~ here.
 note: Did you mean ':'?
 shit: 1:34: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -c eval "f(){ echo \$((1/0)); }"; f
-       |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+     1 |  /Users/sd/Projects/shit/shit-dbg -c 'eval "f(){ echo \$((1/0)); }"; f'
+       |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.
@@ -23,8 +23,8 @@ shit: 1:61: warning: Command 'h' was not found.
        |                                                              ^~ here.
 note: Did you mean ':'?
 shit: 1:34: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -c code=$(printf "%s" "h(){ echo \$((1/0)); }"); eval "$code"; h
-       |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+     1 |  /Users/sd/Projects/shit/shit-dbg -c 'code=$(printf "%s" "h(){ echo \$((1/0)); }"); eval "$code"; h'
+       |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~ here.

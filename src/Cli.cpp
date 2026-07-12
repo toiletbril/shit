@@ -444,8 +444,11 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
             flag_location = (*arg_locations)[arg_index];
           } else {
             usize caret_offset = 0;
-            for (int k = 0; k < i; k++)
-              caret_offset += std::strlen(argv[k]) + 1;
+            for (int k = 0; k < i; k++) {
+              caret_offset += shell_quoted_arg_length(
+                                   StringView{argv[k], std::strlen(argv[k])}) +
+                               1;
+            }
             flag_location = SourceLocation{base_position + caret_offset,
                                            std::strlen(argv[i])};
           }
@@ -466,12 +469,50 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
   return args;
 }
 
+pure fn arg_needs_shell_quoting(StringView arg) wontthrow -> bool
+{
+  if (arg.is_empty()) return true;
+  for (usize i = 0; i < arg.length; i++) {
+    let const character = arg[i];
+    if (character == ' ' || character == '\t' || character == '\n' ||
+        character == '\'')
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+pure fn shell_quoted_arg_length(StringView arg) wontthrow -> usize
+{
+  if (!arg_needs_shell_quoting(arg)) return arg.length;
+  usize count = 2;
+  for (usize i = 0; i < arg.length; i++) {
+    count += arg[i] == '\'' ? 4 : 1;
+  }
+  return count;
+}
+
+fn append_shell_quoted_arg(String &out, StringView arg) throws -> void
+{
+  if (!arg_needs_shell_quoting(arg)) {
+    out.append(arg);
+    return;
+  }
+  out.push('\'');
+  for (usize i = 0; i < arg.length; i++) {
+    if (arg[i] == '\'') out += "'\\''";
+    else out.push(arg[i]);
+  }
+  out.push('\'');
+}
+
 fn join_command_line(int argc, const char *const *argv) throws -> String
 {
   let s = String{heap_allocator()};
   for (int i = 0; i < argc; i++) {
     if (i > 0) s.push(' ');
-    s.append(StringView{argv[i], std::strlen(argv[i])});
+    append_shell_quoted_arg(s, StringView{argv[i], std::strlen(argv[i])});
   }
   return s;
 }

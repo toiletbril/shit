@@ -4,8 +4,8 @@ shit: 1:1: warning: A local outside a function has no scope to bind.
        |  ^~~~~ here.
 note: Declare the variable plainly or move it into a function.
 shit: 1:34: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -c local x=5
-       |                                   ^~~~~~~~~~~~ here.
+     1 |  /Users/sd/Projects/shit/shit-dbg -c 'local x=5'
+       |                                   ^~~~~~~~~~~~~~ here.
 shit: 1:1: error: Builtin 'local': Unable to declare a local variable outside a function.
      1 |  local x=5
        |  ^~~~~~~~~ here.

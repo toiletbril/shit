@@ -5,6 +5,6 @@ error: Command 'definitely_absent_cmd' was not found.
      1 |  FOO=1; definitely_absent_cmd
        |         ^~~~~~~~~~~~~~~~~~~~~ here.
 trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -c FOO=1; definitely_absent_cmd
-       |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+     1 |  /Users/sd/Projects/shit/shit-dbg -c 'FOO=1; definitely_absent_cmd'
+       |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 rc=0
