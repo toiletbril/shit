@@ -1056,6 +1056,9 @@ fn main(int argc, char **argv) -> int
 
   shit::utils::set_quit_context(&context);
 
+  context.set_cli_invocation(
+      shit::join_command_line(parse_argc, parse_argv));
+
   context.set_stats_enabled(FLAG_STATS.is_enabled());
   context.set_show_ast(FLAG_AST.is_enabled());
   context.set_show_lexed_words(FLAG_ESCAPE_MAP.is_enabled());
@@ -1226,6 +1229,10 @@ fn main(int argc, char **argv) -> int
     /* The named script file flows into the diagnostics so an error reads
        path:line:col. A -c or interactive line carries no path. */
     shit::Maybe<shit::StringView> source_filename = shit::None;
+    /* The root frame caret underlines the operand that produced the script body,
+       the -c flag and its argument for a command string, the file name for a
+       script file. Stdin and interactive runs leave it empty. */
+    shit::Maybe<shit::SourceLocation> root_frame_call_site = shit::None;
 
     try {
       if (should_read_files || should_read_stdin) {
@@ -1269,6 +1276,15 @@ fn main(int argc, char **argv) -> int
           /* A script-file run bottoms FUNCNAME out at "main", while -c and
              stdin runs leave it off. */
           context.set_script_run(true);
+          {
+            usize operand_offset = 0;
+            for (int a = 0; a < parse_argc; a++) {
+              if (file_name.view() == parse_argv[a]) break;
+              operand_offset += std::strlen(parse_argv[a]) + 1;
+            }
+            root_frame_call_site = shit::SourceLocation{
+                operand_offset, file_name.count(), shit::None};
+          }
         }
 
         should_quit = true;
@@ -1278,6 +1294,20 @@ fn main(int argc, char **argv) -> int
         context.set_execution_string(command_view);
         LOG(Info, "taking the next -c command string, %zu bytes",
             script_contents.count());
+        {
+          usize flag_offset = 0;
+          for (int a = 0; a < parse_argc; a++) {
+            const usize token_length = std::strlen(parse_argv[a]);
+            if (shit::StringView{parse_argv[a], token_length} == "-c") {
+              const usize span =
+                  token_length + 1 + std::strlen(parse_argv[a + 1]);
+              root_frame_call_site = shit::SourceLocation{
+                  flag_offset, span, shit::None};
+              break;
+            }
+            flag_offset += token_length + 1;
+          }
+        }
         if (FLAG_COMMAND.at_end()) should_quit = true;
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
@@ -1434,6 +1464,15 @@ fn main(int argc, char **argv) -> int
         shit::flush();
       }
     }
+
+    if (root_frame_call_site.has_value()) {
+      context.push_root_source_frame(&context.cli_invocation(),
+                                    *root_frame_call_site);
+    }
+    defer
+    {
+      if (root_frame_call_site.has_value()) context.pop_root_source_frame();
+    };
 
     exit_code = run_script_contents(script_contents, context, ast_arena,
                                     source_filename);

@@ -792,10 +792,12 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return String::from(static_cast<i64>(m_subshell_depth),
                               heap_allocator());
         case dynamic_var::BASH_SOURCE:
-          if (!m_source_frames.is_empty())
-            return String{heap_allocator(),
-                          m_source_frames[m_source_frames.count() - 1]
-                              .source_path.view()};
+          for (usize i = m_source_frames.count(); i > 0; i--) {
+            let const &path = m_source_frames[i - 1].source_path;
+            if (!path.is_empty()) {
+              return String{heap_allocator(), path.view()};
+            }
+          }
           if (funcname_frame_count() > 0) {
             let const *info =
                 m_function_definition_infos.find(funcname_frame_at(0));
@@ -1190,6 +1192,20 @@ pure fn EvalContext::current_source() const wontthrow -> const String *
 pure fn EvalContext::current_origin() const wontthrow -> const String &
 {
   return m_current_origin;
+}
+
+fn EvalContext::push_root_source_frame(const String *parent_source,
+                                        SourceLocation call_site) throws
+    -> void
+{
+  m_source_frames.push(source_frame{
+      String{heap_allocator(), StringView{"the command line"}},
+      call_site, parent_source, String{heap_allocator()}});
+}
+
+fn EvalContext::pop_root_source_frame() wontthrow -> void
+{
+  if (!m_source_frames.is_empty()) m_source_frames.pop_back();
 }
 
 fn EvalContext::print_source_backtrace(

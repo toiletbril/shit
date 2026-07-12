@@ -87,6 +87,8 @@ public:
   fn trace_optimizer_line(StringView message) const throws -> void;
   fn trace_eliminated_node(SourceLocation location,
                            StringView message) const throws -> void;
+  fn print_script_backtrace_if_rooted(SourceLocation location) const throws
+      -> void;
 };
 
 fn analyze_ast(const Expression *root, StringView source,

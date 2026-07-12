@@ -593,10 +593,17 @@ public:
   {
     m_is_script_run = is_script_run;
   }
+  pure fn is_script_run() const wontthrow -> bool { return m_is_script_run; }
   pure fn in_function_scope() const wontthrow -> bool;
   /* True while a dot-source or eval run is on the stack, so return knows it has
      a sourced file to return from even outside a function. */
   pure fn is_sourcing() const wontthrow -> bool { return m_source_depth > 0; }
+  /* A -c body or script-file run has no sourcing frame, so a synthetic root
+     frame pointing at the joined command line is pushed so the analysis and
+     runtime backtraces name the invocation that produced the error. */
+  fn push_root_source_frame(const String *parent_source,
+                            SourceLocation call_site) throws -> void;
+  fn pop_root_source_frame() wontthrow -> void;
   fn declare_local(StringView name) throws -> void;
   mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;
 
@@ -804,6 +811,15 @@ public:
   fn set_execution_string(StringView text) throws -> void
   {
     m_execution_string = String{heap_allocator(), text};
+  }
+
+  fn set_cli_invocation(String text) wontthrow -> void
+  {
+    m_cli_invocation = steal(text);
+  }
+  pure fn cli_invocation() const wontthrow -> const String &
+  {
+    return m_cli_invocation;
   }
 
   fn set_current_command(String text) throws -> void
@@ -1249,6 +1265,7 @@ protected:
   String m_shell_executable_path{heap_allocator()};
   String m_last_argument{heap_allocator()};
   String m_execution_string{heap_allocator()};
+  String m_cli_invocation{heap_allocator()};
   String m_current_command{heap_allocator()};
   bool m_make_shell_suppressed{false};
   ArrayList<String> m_positional_params{heap_allocator()};

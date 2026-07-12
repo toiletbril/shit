@@ -2,6 +2,9 @@ shit: 1:1: warning: A local outside a function has no scope to bind.
      1 |  local --help
        |  ^~~~~ here.
 note: Declare the variable plainly or move it into a function.
+shit: 1:34: trace location:
+     1 |  /Users/sd/Projects/shit/shit-dbg -c local --help
+       |                                   ^~~~~~~~~~~~~~~ here.
 DESCRIPTION
   The local builtin declares each named variable local to the current function.
 

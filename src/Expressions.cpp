@@ -78,6 +78,7 @@ cold fn AnalysisContext::warn(SourceLocation location, StringView message,
   let const located =
       WarningWithLocationAndDetails{location, message, suggestion};
   show_message(located.to_string(source));
+  print_script_backtrace_if_rooted(location);
 }
 
 cold fn AnalysisContext::trace_optimizer_line(StringView message) const throws
@@ -100,6 +101,12 @@ cold fn AnalysisContext::trace_eliminated_node(SourceLocation location,
   print_error("\n");
 }
 
+cold fn AnalysisContext::print_script_backtrace_if_rooted(
+    SourceLocation location) const throws -> void
+{
+  if (eval_context != nullptr) eval_context->print_source_backtrace(location);
+}
+
 cold fn AnalysisContext::fail(SourceLocation location, StringView message,
                               StringView suggestion,
                               analyze_severity severity) throws -> void
@@ -114,6 +121,7 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
   let const located =
       ErrorWithLocationAndDetails{location, message, suggestion};
   show_message(located.to_string(source));
+  print_script_backtrace_if_rooted(location);
   has_fatal = true;
 }
 
