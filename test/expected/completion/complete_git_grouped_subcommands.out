@@ -1,0 +1,11 @@
+== grouped subcommands with no prefix:
+add
+clone
+diff
+init
+log
+mv
+restore
+status
+== grouped subcommands with a prefix:
+diff

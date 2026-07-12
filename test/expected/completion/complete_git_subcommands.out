@@ -1,0 +1,5 @@
+== subcommands with no prefix:
+bar
+foo
+== subcommands with a prefix:
+bar

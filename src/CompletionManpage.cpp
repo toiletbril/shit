@@ -58,8 +58,52 @@ static StringMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
 static StringMap<bool> MAN_SUBCOMMAND_PAGE_VALID{heap_allocator()};
 static bool is_man_subcommand_index_built = false;
 
+/* A fork that runs past this budget is killed and caches the empty string, so
+   the prompt never freezes and the command is not forked again this session. */
+static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
+
 /* An empty $MANPATH segment stands for the system defaults at that position,
    the manpath(1) reading. */
+static fn manpage_section1_directories() throws -> ArrayList<Path>;
+
+/* A trusted `manpath` or `man --path` run reports every man root the system
+   resolves, including the macOS CommandLineTools root a bare $MANPATH leaves
+   out. A result line is colon-separated. The fork happens once and the output
+   is cached for the session. */
+static fn manpath_command_output() throws -> StringView
+{
+  static bool was_tried = false;
+  static String cached{heap_allocator()};
+  if (was_tried) return cached.view();
+  was_tried = true;
+
+  let const man_paths = utils::search_program_path("manpath");
+  let const manbin_paths = utils::search_program_path("man");
+  let const manpath_present =
+      !man_paths.is_empty() &&
+      os::directory_is_trusted_for_exec(man_paths[0].parent());
+  let const man_present =
+      !manbin_paths.is_empty() &&
+      os::directory_is_trusted_for_exec(manbin_paths[0].parent());
+  if (manpath_present) {
+    let argv = ArrayList<String>{heap_allocator()};
+    argv.push(String{man_paths[0].text().view()});
+    if (Maybe<String> output =
+            os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
+        output.has_value())
+      cached = steal(*output);
+  } else if (man_present) {
+    let argv = ArrayList<String>{heap_allocator()};
+    argv.push(String{manbin_paths[0].text().view()});
+    argv.push(String{"--path"});
+    if (Maybe<String> output =
+            os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
+        output.has_value())
+      cached = steal(*output);
+  }
+  return cached.view();
+}
+
 static fn manpage_section1_directories() throws -> ArrayList<Path>
 {
   let directories = ArrayList<Path>{heap_allocator()};
@@ -76,10 +120,25 @@ static fn manpage_section1_directories() throws -> ArrayList<Path>
     do_push_man1_of_root("/usr/local/share/man");
     do_push_man1_of_root("/usr/share/man");
   };
+  let do_push_command_roots = [&]() {
+    let const view = manpath_command_output();
+    usize segment_start = 0;
+    for (usize i = 0; i <= view.length; i++) {
+      if (i != view.length && view[i] != os::PATH_DELIMITER &&
+          view[i] != '\n' && view[i] != '\r')
+        continue;
+      let const segment =
+          view.substring_of_length(segment_start, i - segment_start)
+              .trim_blanks();
+      segment_start = i + 1;
+      if (!segment.is_empty()) do_push_man1_of_root(segment);
+    }
+  };
 
   let const manpath = os::get_environment_variable("MANPATH");
   if (!manpath.has_value() || manpath->is_empty()) {
     do_push_default_roots();
+    do_push_command_roots();
     return directories;
   }
 
@@ -95,6 +154,7 @@ static fn manpage_section1_directories() throws -> ArrayList<Path>
     else
       do_push_man1_of_root(segment);
   }
+  do_push_command_roots();
   return directories;
 }
 
@@ -500,10 +560,6 @@ static fn command_prefers_help_over_manpage(StringView command) throws -> bool
 
 static fn command_directory_is_trusted(StringView absolute_path) throws -> bool;
 
-/* A fork that runs past this budget is killed and caches the empty string, so
-   the prompt never freezes and the command is not forked again this session. */
-static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
-
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<help_entry> &
 {
@@ -745,10 +801,41 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
     }
     return true;
   };
-  if (trimmed[trimmed.length - 1] == ':')
-    return ends_with_ignoring_case(StringView{"commands:"}) ||
-           ends_with_ignoring_case(StringView{"subcommands:"}) ||
-           ends_with_ignoring_case(StringView{"commands are:"});
+  if (trimmed[trimmed.length - 1] == ':') {
+    if (ends_with_ignoring_case(StringView{"commands:"}) ||
+        ends_with_ignoring_case(StringView{"subcommands:"}) ||
+        ends_with_ignoring_case(StringView{"commands are:"}))
+      return true;
+    /* git opens with "These are common Git commands used in various
+       situations:", a colon-terminated line that names commands without
+       matching a fixed suffix. */
+    let const contains_word_ignoring_case = [&](StringView needle) {
+      if (needle.length > trimmed.length) return false;
+      let const is_alpha = [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+      };
+      for (usize i = 0; i + needle.length <= trimmed.length; i++) {
+        if (i > 0 && is_alpha(trimmed[i - 1])) continue;
+        if (i + needle.length < trimmed.length &&
+            is_alpha(trimmed[i + needle.length]))
+          continue;
+        let const candidate = trimmed.substring_of_length(i, needle.length);
+        let const eq = [&]() {
+          for (usize j = 0; j < needle.length; j++) {
+            let a = candidate[j];
+            let b = needle[j];
+            if (a >= 'A' && a <= 'Z') a = static_cast<char>(a - 'A' + 'a');
+            if (b >= 'A' && b <= 'Z') b = static_cast<char>(b - 'A' + 'a');
+            if (a != b) return false;
+          }
+          return true;
+        }();
+        if (eq) return true;
+      }
+      return false;
+    };
+    return contains_word_ignoring_case(StringView{"commands"});
+  }
 
   let const is_all_uppercase = [&]() {
     for (usize i = 0; i < trimmed.length; i++)
@@ -761,6 +848,25 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
   return is_all_uppercase() &&
          (equals_ignoring_case(StringView{"commands"}) ||
           equals_ignoring_case(StringView{"subcommands"}));
+}
+
+/* git groups its subcommands under left-margin headers like "start a working
+   area (see also: git help tutorial)". A header is not itself a subcommand and
+   holds no double-space gap before a name, so it keeps an open section intact
+   instead of closing it. */
+static fn line_is_subcommand_group_header(StringView trimmed) wontthrow -> bool
+{
+  if (trimmed.is_empty()) return false;
+  if (line_opens_subcommand_section(trimmed)) return true;
+  if (trimmed[trimmed.length - 1] == ')') return true;
+  let const contains = [&](StringView needle) {
+    if (needle.length > trimmed.length) return false;
+    for (usize i = 0; i + needle.length <= trimmed.length; i++)
+      if (trimmed.substring_of_length(i, needle.length) == needle) return true;
+    return false;
+  };
+  return contains(StringView{"(see also"}) ||
+         contains(StringView{"see also:"});
 }
 
 /* cargo and other tools with subcommands but no manpage list them under a
@@ -788,14 +894,26 @@ static fn parse_help_subcommands(StringView text) throws
       saw_entry_in_section = false;
       continue;
     }
+    if (line_is_subcommand_group_header(trimmed)) {
+      in_section = true;
+      saw_entry_in_section = false;
+      continue;
+    }
     if (!in_section) continue;
     if (trimmed.is_empty()) {
       if (saw_entry_in_section) in_section = false;
       continue;
     }
     /* A line that returns to the left margin ends the section, and may open a
-       new one. */
+       new one. A grouped header such as git's "start a working area (see
+       also: ...)" opens a section too, since the indented entries beneath it
+       are the subcommands. */
     if (trim_start == 0) {
+      if (line_is_subcommand_group_header(trimmed)) {
+        in_section = true;
+        saw_entry_in_section = false;
+        continue;
+      }
       in_section = line_opens_subcommand_section(trimmed);
       saw_entry_in_section = false;
       continue;
