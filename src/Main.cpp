@@ -653,6 +653,19 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
   }
 }
 
+pure fn quoted_argv_offset_until(int argc, const char *const *argv,
+                                 StringView needle) wontthrow -> usize
+{
+  usize offset = 0;
+  for (int a = 0; a < argc; a++) {
+    if (needle == StringView{argv[a], std::strlen(argv[a])}) break;
+    offset += shell_quoted_arg_length(
+                  StringView{argv[a], std::strlen(argv[a])}) +
+              1;
+  }
+  return offset;
+}
+
 } // namespace shit
 
 fn main(int argc, char **argv) -> int
@@ -1255,14 +1268,8 @@ fn main(int argc, char **argv) -> int
               shit::Path{file_name.view()}.read_entire_file();
           if (!contents) {
             /* The caret points at the operand in the joined invocation. */
-            usize operand_offset = 0;
-            for (int a = 0; a < parse_argc; a++) {
-              if (file_name.view() == parse_argv[a]) break;
-              operand_offset += shit::shell_quoted_arg_length(
-                                    shit::StringView{parse_argv[a],
-                                               std::strlen(parse_argv[a])}) +
-                                1;
-            }
+            const usize operand_offset = shit::quoted_argv_offset_until(
+                parse_argc, parse_argv, file_name.view());
             shit::show_message(
                 shit::ErrorWithLocation{
                     shit::SourceLocation{operand_offset, file_name.count(),
@@ -1270,8 +1277,7 @@ fn main(int argc, char **argv) -> int
                     "Could not open '" + file_name.view() +
                         "': " + shit::os::last_system_error_message()
             }
-                    .to_string(shit::join_command_line(parse_argc, parse_argv)
-                                   .view()));
+                    .to_string(context.cli_invocation().view()));
             shit::utils::quit(127, true);
           }
           script_contents = steal(*contents);
@@ -1280,14 +1286,8 @@ fn main(int argc, char **argv) -> int
              stdin runs leave it off. */
           context.set_script_run(true);
           {
-            usize operand_offset = 0;
-            for (int a = 0; a < parse_argc; a++) {
-              if (file_name.view() == parse_argv[a]) break;
-              operand_offset += shit::shell_quoted_arg_length(
-                                    shit::StringView{parse_argv[a],
-                                               std::strlen(parse_argv[a])}) +
-                                1;
-            }
+            const usize operand_offset = shit::quoted_argv_offset_until(
+                parse_argc, parse_argv, file_name.view());
             root_frame_call_site = shit::SourceLocation{
                 operand_offset, file_name.count(), shit::None};
           }
