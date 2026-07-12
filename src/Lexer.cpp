@@ -929,8 +929,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
               previous_char = c;
               continue;
             }
-            /* A $( inside double quotes is a nested command substitution, so
-               its closing paren must not close the outer substitution. */
+            /* A $( inside double quotes opens a nested substitution whose
+               closing paren belongs to it, not the outer one. */
             if (quote == '"' && c == '$' &&
                 chop_character(byte_count) == '(')
             {
@@ -998,9 +998,8 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             previous_char = c;
             continue;
           }
-          /* <<< is the bash here-string, and its body is a normal word rather
-             than a heredoc, so the three chevrons are consumed here to keep the
-             heredoc branch below from swallowing the body as a delimiter. */
+          /* A here-string body is a normal word, not a heredoc body, so the
+             three chevrons are consumed before the heredoc branch runs. */
           if (bash_additions_enabled() && c == '<' &&
               chop_character(byte_count) == '<' &&
               chop_character(byte_count + 1) == '<' &&

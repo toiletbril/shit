@@ -100,8 +100,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     shit::print_error(FLAG_READ_PROMPT.value());
   }
 
-  /* The query mode reads one byte and returns zero only for y or Y, so no
-     variable receives the answer. */
+  /* Query mode is a yes or no probe, so the answer never reaches a variable. */
   if (FLAG_READ_QUERY.is_enabled()) {
     char answer = 0;
     let const got = os::read_fd(read_fd, &answer, 1);
