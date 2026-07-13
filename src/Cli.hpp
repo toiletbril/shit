@@ -158,12 +158,12 @@ private:
    flag that follows it is parsed as a flag rather than swallowed as the value.
    It is null for every builtin, which take an option value from the next
    argument verbatim the way bash's getopt does. */
-fn parse_flags_vec(
-    const ArrayList<Flag *> &flags, const ArrayList<String> &args,
-    usize base_position = 0, const Flag *operand_value_flag = nullptr,
-    const ArrayList<SourceLocation> *arg_locations = nullptr,
-    ArrayList<SourceLocation> *operand_locations = nullptr,
-    StringView program_name = StringView{}) throws
+fn parse_flags_vec(const ArrayList<Flag *> &flags,
+                   const ArrayList<String> &args, usize base_position = 0,
+                   const Flag *operand_value_flag = nullptr,
+                   const ArrayList<SourceLocation> *arg_locations = nullptr,
+                   ArrayList<SourceLocation> *operand_locations = nullptr,
+                   StringView program_name = StringView{}) throws
     -> ArrayList<String>;
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const char *const *argv, usize base_position = 0,

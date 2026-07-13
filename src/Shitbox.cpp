@@ -59,8 +59,8 @@ fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
   unreachable("unhandled shitbox utility of kind %d", ENUM(chosen));
 }
 
-fn rewrap_with_prefix(const ErrorWithLocation &error,
-                      StringView prefix) throws -> ErrorWithLocation
+fn rewrap_with_prefix(const ErrorWithLocation &error, StringView prefix) throws
+    -> ErrorWithLocation
 {
   let const message = prefix + ": " + error.message();
   if (error.has_note()) {
@@ -97,9 +97,9 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
     } catch (const BrokenPipeExit &) {
       throw;
     } catch (const ErrorWithLocation &e) {
-      let const invocation_name =
-          ec.is_multicall ? String{heap_allocator(), name}
-                           : String{"shitbox "} + name;
+      let const invocation_name = ec.is_multicall
+                                      ? String{heap_allocator(), name}
+                                      : String{"shitbox "} + name;
       throw rewrap_with_prefix(e, invocation_name);
     } catch (const Error &error) {
       relocate_error(error, ec.source_location());

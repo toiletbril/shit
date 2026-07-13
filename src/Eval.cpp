@@ -1195,12 +1195,13 @@ pure fn EvalContext::current_origin() const wontthrow -> const String &
 }
 
 fn EvalContext::push_root_source_frame(const String *parent_source,
-                                        SourceLocation call_site) throws
-    -> void
+                                       SourceLocation call_site) throws -> void
 {
   m_source_frames.push(source_frame{
       String{heap_allocator(), StringView{"the command line"}},
-      call_site, parent_source, String{heap_allocator()}});
+      call_site,
+      parent_source, String{heap_allocator()}
+  });
 }
 
 fn EvalContext::pop_root_source_frame() wontthrow -> void

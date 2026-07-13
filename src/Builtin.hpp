@@ -353,7 +353,7 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
 #define PARSE_BUILTIN_ARGS(ec)                                                 \
   parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,         \
                   nullptr, &ec.arg_locations(), nullptr,                       \
-                  StringView{"Builtin '"} + ec.program() + "'");                \
+                  StringView{"Builtin '"} + ec.program() + "'");               \
   defer { reset_flags(FLAG_LIST); }
 
 /* The same parse, but it also fills operand_locations with the source span of
@@ -362,8 +362,8 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
  */
 #define PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations)               \
   parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,         \
-                  nullptr, &ec.arg_locations(), &(operand_locations),         \
-                  StringView{"Builtin '"} + ec.program() + "'");                \
+                  nullptr, &ec.arg_locations(), &(operand_locations),          \
+                  StringView{"Builtin '"} + ec.program() + "'");               \
   defer { reset_flags(FLAG_LIST); }
 
 i32 execute_builtin(ExecContext &&ec, EvalContext &cxt) throws;

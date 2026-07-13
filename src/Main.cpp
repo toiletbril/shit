@@ -659,9 +659,8 @@ pure fn quoted_argv_offset_until(int argc, const char *const *argv,
   usize offset = 0;
   for (int a = 0; a < argc; a++) {
     if (needle == StringView{argv[a], std::strlen(argv[a])}) break;
-    offset += shell_quoted_arg_length(
-                  StringView{argv[a], std::strlen(argv[a])}) +
-              1;
+    offset +=
+        shell_quoted_arg_length(StringView{argv[a], std::strlen(argv[a])}) + 1;
   }
   return offset;
 }
@@ -1069,8 +1068,7 @@ fn main(int argc, char **argv) -> int
 
   shit::utils::set_quit_context(&context);
 
-  context.set_cli_invocation(
-      shit::join_command_line(parse_argc, parse_argv));
+  context.set_cli_invocation(shit::join_command_line(parse_argc, parse_argv));
 
   context.set_stats_enabled(FLAG_STATS.is_enabled());
   context.set_show_ast(FLAG_AST.is_enabled());
@@ -1247,9 +1245,9 @@ fn main(int argc, char **argv) -> int
     /* The named script file flows into the diagnostics so an error reads
        path:line:col. A -c or interactive line carries no path. */
     shit::Maybe<shit::StringView> source_filename = shit::None;
-    /* The root frame caret underlines the operand that produced the script body,
-       the -c flag and its argument for a command string, the file name for a
-       script file. Stdin and interactive runs leave it empty. */
+    /* The root frame caret underlines the operand that produced the script
+       body, the -c flag and its argument for a command string, the file name
+       for a script file. Stdin and interactive runs leave it empty. */
     shit::Maybe<shit::SourceLocation> root_frame_call_site = shit::None;
 
     try {
@@ -1275,14 +1273,13 @@ fn main(int argc, char **argv) -> int
             /* The caret points at the operand in the joined invocation. */
             const usize operand_offset = shit::quoted_argv_offset_until(
                 parse_argc, parse_argv, file_name.view());
-            shit::show_message(
-                shit::ErrorWithLocation{
-                    shit::SourceLocation{operand_offset, file_name.count(),
-                                         shit::None},
-                    "Could not open '" + file_name.view() +
-                        "': " + shit::os::last_system_error_message()
+            shit::show_message(shit::ErrorWithLocation{
+                shit::SourceLocation{operand_offset, file_name.count(),
+                                     shit::None},
+                "Could not open '" + file_name.view() +
+                    "': " + shit::os::last_system_error_message()
             }
-                    .to_string(context.cli_invocation().view()));
+                                   .to_string(context.cli_invocation().view()));
             shit::utils::quit(127, true);
           }
           script_contents = steal(*contents);
@@ -1314,19 +1311,18 @@ fn main(int argc, char **argv) -> int
           for (int a = 0; a < parse_argc; a++) {
             const usize token_length = std::strlen(parse_argv[a]);
             const shit::StringView token{parse_argv[a], token_length};
-            const usize quoted_length =
-                shit::shell_quoted_arg_length(token);
+            const usize quoted_length = shit::shell_quoted_arg_length(token);
             if (token == "-c") {
               seen_dash_c_count++;
               if (seen_dash_c_count == consumed_command_index &&
-                  a + 1 < parse_argc) {
+                  a + 1 < parse_argc)
+              {
                 const usize argument_length =
-                    shit::shell_quoted_arg_length(
-                        shit::StringView{parse_argv[a + 1],
-                                         std::strlen(parse_argv[a + 1])});
+                    shit::shell_quoted_arg_length(shit::StringView{
+                        parse_argv[a + 1], std::strlen(parse_argv[a + 1])});
                 const usize span = quoted_length + 1 + argument_length;
-                root_frame_call_site = shit::SourceLocation{
-                    flag_offset, span, shit::None};
+                root_frame_call_site =
+                    shit::SourceLocation{flag_offset, span, shit::None};
                 break;
               }
             }
@@ -1492,7 +1488,7 @@ fn main(int argc, char **argv) -> int
 
     if (root_frame_call_site.has_value()) {
       context.push_root_source_frame(&context.cli_invocation(),
-                                    *root_frame_call_site);
+                                     *root_frame_call_site);
     }
     defer
     {

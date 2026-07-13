@@ -660,6 +660,10 @@ static fn help_text_for(StringView command, StringView subcommand = {}) throws
   if (help_argument.has_value() && !paths.is_empty() &&
       command_directory_is_trusted(paths[0].text().view()))
   {
+    LOG(Debug,
+        "the help allowlist lists '%.*s' and the directory is trusted, "
+        "preparing the --help fork",
+        static_cast<int>(command.length), command.data);
     /* argv is the absolute path, then the subcommand chain split on spaces,
        then the help argument split on spaces, so git remote add runs as path,
        remote, add, --help. */
@@ -696,7 +700,26 @@ static fn help_text_for(StringView command, StringView subcommand = {}) throws
     if (Maybe<String> output =
             os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
         output.has_value())
+    {
+      LOG(Debug, "the --help fork for '%.*s' produced %zu bytes",
+          static_cast<int>(command.length), command.data, output->length());
       text = steal(*output);
+    } else {
+      LOG(Debug, "the --help fork for '%.*s' produced no output",
+          static_cast<int>(command.length), command.data);
+    }
+  } else if (help_argument.has_value() && paths.is_empty()) {
+    LOG(Debug,
+        "the help allowlist lists '%.*s' but the program is not on the "
+        "path, skipping the --help fork",
+        static_cast<int>(command.length), command.data);
+  } else if (help_argument.has_value()) {
+    LOG(Debug,
+        "the help allowlist lists '%.*s' but the directory '%.*s' is "
+        "not trusted, skipping the --help fork",
+        static_cast<int>(command.length), command.data,
+        static_cast<int>(paths[0].text().view().length),
+        paths[0].text().view().data);
   }
   return text;
 }
@@ -734,7 +757,7 @@ static fn parse_help_option_entries(StringView text) throws
   return entries;
 }
 
-static fn parse_help_subcommands(StringView text) throws
+static fn parse_help_subcommands(StringView text, StringView command) throws
     -> ArrayList<help_entry>;
 
 static fn help_cache_key(StringView command, StringView subcommand) throws
@@ -755,7 +778,8 @@ static fn ensure_help_parsed(StringView command,
   if (HELP_PARSED.contains(key.view())) return;
   let const text = help_text_for(command, subcommand);
   HELP_OPTION_CACHE.set(key.view(), parse_help_option_entries(text.view()));
-  HELP_SUBCOMMAND_CACHE.set(key.view(), parse_help_subcommands(text.view()));
+  HELP_SUBCOMMAND_CACHE.set(key.view(),
+                            parse_help_subcommands(text.view(), command));
   HELP_PARSED.add(key.view());
 }
 
@@ -804,7 +828,8 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
   if (trimmed[trimmed.length - 1] == ':') {
     if (ends_with_ignoring_case(StringView{"commands:"}) ||
         ends_with_ignoring_case(StringView{"subcommands:"}) ||
-        ends_with_ignoring_case(StringView{"commands are:"}))
+        ends_with_ignoring_case(StringView{"commands are:"}) ||
+        ends_with_ignoring_case(StringView{"example usage:"}))
       return true;
     /* git opens with "These are common Git commands used in various
        situations:", a colon-terminated line that names commands without
@@ -865,13 +890,12 @@ static fn line_is_subcommand_group_header(StringView trimmed) wontthrow -> bool
       if (trimmed.substring_of_length(i, needle.length) == needle) return true;
     return false;
   };
-  return contains(StringView{"(see also"}) ||
-         contains(StringView{"see also:"});
+  return contains(StringView{"(see also"}) || contains(StringView{"see also:"});
 }
 
 /* cargo and other tools with subcommands but no manpage list them under a
    "Commands:" header as indented "name<spaces>description" lines. */
-static fn parse_help_subcommands(StringView text) throws
+static fn parse_help_subcommands(StringView text, StringView command) throws
     -> ArrayList<help_entry>
 {
   let subcommands = ArrayList<help_entry>{heap_allocator()};
@@ -890,11 +914,18 @@ static fn parse_help_subcommands(StringView text) throws
     let const trimmed = raw.trim_blanks();
 
     if (line_opens_subcommand_section(trimmed)) {
+      LOG(Debug, "help parse opens a subcommand section at '%.*s'",
+          static_cast<int>(trimmed.length), trimmed.data);
       in_section = true;
       saw_entry_in_section = false;
       continue;
     }
-    if (line_is_subcommand_group_header(trimmed)) {
+    /* A grouped header such as git's "start a working area (see also: ...)"
+       sits at the left margin and opens a section even when no section was
+       open, since the indented entries beneath it are the subcommands. An
+       indented line that happens to end with ')' is a wrapped option
+       description, not a group header. */
+    if (trim_start == 0 && line_is_subcommand_group_header(trimmed)) {
       in_section = true;
       saw_entry_in_section = false;
       continue;
@@ -904,32 +935,48 @@ static fn parse_help_subcommands(StringView text) throws
       if (saw_entry_in_section) in_section = false;
       continue;
     }
-    /* A line that returns to the left margin ends the section, and may open a
-       new one. A grouped header such as git's "start a working area (see
-       also: ...)" opens a section too, since the indented entries beneath it
-       are the subcommands. */
+    /* A line that returns to the left margin ends the section. A blank line
+       already closed it above, and a left-margin group header reopened it, so
+       a left-margin line here is a non-header such as a trailing note. */
     if (trim_start == 0) {
-      if (line_is_subcommand_group_header(trimmed)) {
-        in_section = true;
-        saw_entry_in_section = false;
-        continue;
-      }
-      in_section = line_opens_subcommand_section(trimmed);
-      saw_entry_in_section = false;
+      in_section = false;
       continue;
     }
 
-    let const column_end = double_space_gap(trimmed, 0);
+    /* brew's help repeats the command word on every entry, "  brew install
+       FORMULA|CASK...", so the surface command is stripped before the column
+       split reads the real subcommand name. */
+    let entry_text = trimmed;
+    if (!command.is_empty() && entry_text.length > command.length + 1 &&
+        entry_text.substring_of_length(0, command.length) == command &&
+        entry_text[command.length] == ' ')
+      entry_text = entry_text.substring_of_length(
+          command.length + 1, entry_text.length - command.length - 1);
+
+    let column_end = double_space_gap(entry_text, 0);
+
+    /* A single-space separated help such as brew's "brew install
+       FORMULA|CASK..." has no double-space gap, so the column boundary falls
+       back to the first single space. The plausibility check then rejects
+       argument tokens that are not valid subcommand names. */
+    if (column_end >= entry_text.length) {
+      usize single_space = 0;
+      while (single_space < entry_text.length &&
+             entry_text[single_space] != ' ')
+        single_space++;
+      column_end = single_space;
+    }
 
     let description = StringView{};
-    if (column_end < trimmed.length)
+    if (column_end < entry_text.length)
       description =
-          trimmed.substring_of_length(column_end, trimmed.length - column_end)
+          entry_text
+              .substring_of_length(column_end, entry_text.length - column_end)
               .trim_blanks();
 
     /* Each comma-separated alias such as `ft, fetch` becomes its own candidate
        under the shared description. */
-    let const column = trimmed.substring_of_length(0, column_end);
+    let const column = entry_text.substring_of_length(0, column_end);
     usize alias_start = 0;
     while (alias_start < column.length) {
       let alias_end = alias_start;
@@ -948,6 +995,8 @@ static fn parse_help_subcommands(StringView text) throws
       saw_entry_in_section = true;
     }
   }
+  LOG(Debug, "help parse for command '%.*s' collected %zu subcommands",
+      static_cast<int>(command.length), command.data, subcommands.count());
   return subcommands;
 }
 
@@ -1041,36 +1090,53 @@ fn complete_from_help_subcommands(StringView line, StringView token,
                                   StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
+  LOG(Debug, "help subcommands entry token '%.*s' listing %d",
+      static_cast<int>(token.length), token.data, for_listing ? 1 : 0);
   if (!for_listing) return None;
   if (!token.is_empty() && token[0] == '-') return None;
   if (token.find_character('/').has_value()) return None;
   let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
       surface_command.find_character('/').has_value())
+  {
+    LOG(Debug, "help subcommands bail because the surface command is empty");
     return None;
+  }
 
   let const resolved_name = resolve_completion_alias(surface_command, context);
+  LOG(Debug, "help subcommands resolved the surface to '%.*s'",
+      static_cast<int>(resolved_name.view().length), resolved_name.view().data);
 
   /* An empty chain at the first-argument position lists the base subcommands.
    */
   let const chain =
       settled_subcommand_chain(resolved_name.view(), line, token_start);
   if (chain.is_empty()) {
-    if (!is_first_argument_token(line, token_start)) return None;
+    if (!is_first_argument_token(line, token_start)) {
+      LOG(Debug, "help subcommands bail because the token is not the first "
+                 "argument");
+      return None;
+    }
 
     /* A command the man index already lists never forks --help to relist them,
        the fork is reserved for a tool like cargo with no man pages. */
     if (is_man_subcommand_index_built) {
       let const man_subcommands =
           MAN_SUBCOMMAND_INDEX.find(resolved_name.view());
-      if (man_subcommands != nullptr && !man_subcommands->is_empty())
+      if (man_subcommands != nullptr && !man_subcommands->is_empty()) {
+        LOG(Debug, "help subcommands bail because the man index lists them");
         return None;
+      }
     }
   }
 
   let const &subcommands =
       help_subcommands_for(resolved_name.view(), chain.view());
-  if (subcommands.is_empty()) return None;
+  if (subcommands.is_empty()) {
+    LOG(Debug, "help subcommands bail because the parsed subcommands are "
+               "empty");
+    return None;
+  }
 
   let matches = matches_from_help_entries(subcommands, token, descriptions);
   if (matches.is_empty()) return None;

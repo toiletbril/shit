@@ -45,10 +45,9 @@ fn Suspend::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (cxt.is_login_shell() && !FLAG_FORCE.is_enabled()) {
-    report_soft_builtin_error(
-        ec, cxt, ec.source_location(),
-        "Cannot suspend a login shell",
-        "Pass '-f' to force the suspension");
+    report_soft_builtin_error(ec, cxt, ec.source_location(),
+                              "Cannot suspend a login shell",
+                              "Pass '-f' to force the suspension");
     return 1;
   }
 

@@ -931,9 +931,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             }
             /* A $( inside double quotes opens a nested substitution whose
                closing paren belongs to it, not the outer one. */
-            if (quote == '"' && c == '$' &&
-                chop_character(byte_count) == '(')
-            {
+            if (quote == '"' && c == '$' && chop_character(byte_count) == '(') {
               inner += c;
               inner += chop_character(byte_count);
               byte_count++;

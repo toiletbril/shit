@@ -1083,14 +1083,50 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
 fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
 {
   struct stat directory_stat;
-  if (stat(directory.c_str(), &directory_stat) != 0) return false;
-  /* Trusted means owned by root or the user and not group- or world-writable,
-     so no one else can drop a binary in. */
+  if (stat(directory.c_str(), &directory_stat) != 0) {
+    LOG(Debug, "trust check failed because stat failed on '%s'",
+        directory.c_str());
+    return false;
+  }
+  /* Trusted means owned by root or the user, and write access is held by root,
+     the user, or one of the user's own groups. A group-writable Homebrew
+     install directory is owned by the user's own group, so it is trusted,
+     while a world-writable directory stays untrusted. */
   const bool owner_is_trusted =
       directory_stat.st_uid == 0 || directory_stat.st_uid == geteuid();
-  const bool others_cannot_write =
-      (directory_stat.st_mode & (S_IWGRP | S_IWOTH)) == 0;
-  return owner_is_trusted && others_cannot_write;
+  if (!owner_is_trusted) {
+    LOG(Debug,
+        "trust check failed because '%s' is owned by uid %d, not root "
+        "or the current user",
+        directory.c_str(), directory_stat.st_uid);
+    return false;
+  }
+  if ((directory_stat.st_mode & S_IWOTH) != 0) {
+    LOG(Debug, "trust check failed because '%s' is world-writable",
+        directory.c_str());
+    return false;
+  }
+  if ((directory_stat.st_mode & S_IWGRP) == 0) {
+    LOG(Debug, "trust check passed for '%s', owner-only write",
+        directory.c_str());
+    return true;
+  }
+
+  gid_t groups[NGROUPS_MAX];
+  int group_count = getgroups(NGROUPS_MAX, groups);
+  for (int i = 0; i < group_count; i++)
+    if (groups[i] == directory_stat.st_gid) {
+      LOG(Debug,
+          "trust check passed for '%s', group-writable but gid %d is "
+          "one of the user's groups",
+          directory.c_str(), directory_stat.st_gid);
+      return true;
+    }
+  LOG(Debug,
+      "trust check failed because '%s' is group-writable by gid %d, "
+      "not one of the user's groups",
+      directory.c_str(), directory_stat.st_gid);
+  return false;
 }
 
 fn capture_program_output(const ArrayList<String> &argv,

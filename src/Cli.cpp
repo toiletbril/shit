@@ -181,8 +181,7 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const Flag *operand_value_flag,
                    const ArrayList<SourceLocation> *arg_locations,
                    ArrayList<SourceLocation> *operand_locations,
-                   StringView program_name) throws
-    -> ArrayList<String>
+                   StringView program_name) throws -> ArrayList<String>
 {
   let os_argv = ArrayList<const char *>{heap_allocator()};
   os_argv.reserve(args.count());
@@ -208,8 +207,8 @@ static fn flag_name(const Flag *f, bool is_long) throws -> String
   return name;
 }
 
-static fn prefixed_message(StringView program_name,
-                           StringView message) throws -> String
+static fn prefixed_message(StringView program_name, StringView message) throws
+    -> String
 {
   if (program_name.is_empty()) return String{heap_allocator(), message};
   return program_name + ": " + message;
@@ -220,8 +219,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const Flag *operand_value_flag,
                const ArrayList<SourceLocation> *arg_locations,
                ArrayList<SourceLocation> *operand_locations,
-               StringView program_name) throws
-    -> ArrayList<String>
+               StringView program_name) throws -> ArrayList<String>
 {
   ASSERT(argc >= 0);
 
@@ -415,8 +413,8 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
         }
       } else {
         if (*flag_offset == '-') {
-          throw Error{prefixed_message(program_name,
-                                      "Missing space between '-' and other options")};
+          throw Error{prefixed_message(
+              program_name, "Missing space between '-' and other options")};
         } else {
           let error_message = String{heap_allocator()};
           error_message += "Unknown flag '-";
@@ -446,14 +444,14 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
             usize caret_offset = 0;
             for (int k = 0; k < i; k++) {
               caret_offset += shell_quoted_arg_length(
-                                   StringView{argv[k], std::strlen(argv[k])}) +
-                               1;
+                                  StringView{argv[k], std::strlen(argv[k])}) +
+                              1;
             }
             flag_location = SourceLocation{base_position + caret_offset,
                                            std::strlen(argv[i])};
           }
-          throw ErrorWithLocation{flag_location,
-                                  prefixed_message(program_name, error_message)};
+          throw ErrorWithLocation{
+              flag_location, prefixed_message(program_name, error_message)};
         }
       }
     }
@@ -461,9 +459,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
   if (next_arg_is_value) {
     ASSERT(prev_flag != nullptr);
-    throw Error{prefixed_message(program_name, "No value provided for '" +
-                                                   flag_name(prev_flag, prev_is_long) +
-                                                   "' flag")};
+    throw Error{prefixed_message(
+        program_name, "No value provided for '" +
+                          flag_name(prev_flag, prev_is_long) + "' flag")};
   }
 
   return args;
@@ -501,8 +499,10 @@ fn append_shell_quoted_arg(String &out, StringView arg) throws -> void
   }
   out.push('\'');
   for (usize i = 0; i < arg.length; i++) {
-    if (arg[i] == '\'') out += "'\\''";
-    else out.push(arg[i]);
+    if (arg[i] == '\'')
+      out += "'\\''";
+    else
+      out.push(arg[i]);
   }
   out.push('\'');
 }
