@@ -18,6 +18,9 @@ mv
 --kill-after
 --preserve-status
 --signal
+-k
+-p
+-s
 == shitbox own flags:
 --assimilate
 --help

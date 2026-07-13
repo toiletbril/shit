@@ -283,6 +283,8 @@ static pure fn timeout_managed_command_start(StringView line,
       continue;
     }
 
+    if (*decoded_word == "-") return None;
+
     if (*decoded_word == "--") {
       let const duration = next_completion_prefix_word(line, position);
       if (!duration.has_value()) return None;
