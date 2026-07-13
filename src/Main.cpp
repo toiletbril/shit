@@ -1148,12 +1148,17 @@ fn main(int argc, char **argv) -> int
      one. */
   context.mark_exported("SHLVL");
 
-  /* The default prompt lives in PS1 unless the environment already supplies
-     one. */
-  if (!shit::os::get_environment_variable("PS1").has_value())
-    context.set_shell_variable("PS1", toiletline::default_prompt_template());
+  /* PS1 is seeded only for an interactive shell, since bash leaves it unset in
+     a non-interactive run and a config that gates on -z "$PS1", such as
+     bash_completion.sh, returns early before sourcing its body. PS2 is the
+     continuation prompt and PS4 prefixes the xtrace lines, and both carry
+     their defaults in every run. PS3 is left unset, since the select loop
+     falls back to its own default. */
+  if (should_be_interactive) {
+    if (!shit::os::get_environment_variable("PS1").has_value())
+      context.set_shell_variable("PS1", toiletline::default_prompt_template());
+  }
 
-  /* PS3 is left unset, since the select loop falls back to its own default. */
   if (!shit::os::get_environment_variable("PS2").has_value())
     context.set_shell_variable("PS2", "> ");
   if (!shit::os::get_environment_variable("PS4").has_value())
