@@ -1,5 +1,7 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [Assign HOME=/testhome]
+  [CompoundListCondition, None]
     [Assign x=$(cat <<EOF
 body
 EOF
@@ -34,6 +36,9 @@ EOF
 )]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$t"]
+[Word
+  Unquoted "HOME=/testhome"
+]
 [Word
   Unquoted "x="
   CommandSubstitution "cat <<EOF
@@ -101,7 +106,7 @@ EOF
 ]
 body
 a " b
-/Users/sd
+/testhome
 pre
 mid
 post

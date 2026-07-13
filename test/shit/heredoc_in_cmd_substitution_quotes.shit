@@ -1,4 +1,5 @@
 #!/bin/env shit
+HOME=/testhome
 x=$(cat <<EOF
 body
 EOF
