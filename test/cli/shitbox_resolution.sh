@@ -40,7 +40,8 @@ echo "=== command reports the enabled fallback ==="
 "$BIN" --enable-shitbox -c 'PATH=; command -v seq; command -V seq'
 
 echo "=== which reports the enabled fallback ==="
-"$BIN" --enable-shitbox -c 'PATH=; which seq'
+"$BIN" --enable-shitbox -c 'PATH=; which seq' 2>&1 |
+  ./normalize-trace.sh "$BIN"
 
 echo "=== a builtin name is not a shitbox utility ==="
 "$BIN" -c 'shitbox echo routed via shitbox' 2>&1

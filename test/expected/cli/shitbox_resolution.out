@@ -35,6 +35,12 @@ PATH seq
 seq
 seq is a built-in utility
 === which reports the enabled fallback ===
+shit: 1:8: warning: The which command is non-standard.
+     1 |  PATH=; which seq
+       |         ^~~~~ here.
+note: Use command -v for a portable lookup.
+shit: 1:0: trace location:
+     1 |  SHIT --enable-shitbox -c 'PATH=; which seq'
 seq
 === a builtin name is not a shitbox utility ===
 shit: 1:9: error: shitbox has no utility named 'echo'.
