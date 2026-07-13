@@ -15,9 +15,8 @@ shit: 1:1: warning: A let runs arithmetic as a command.
      1 |  let
        |  ^~~ here.
 note: Use the ((...)) compound so the operands need no quoting.
-shit: 1:34: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -c let
-       |                                   ^~~~~~ here.
+shit: 1:0: trace location:
+     1 |  SHIT -c let
 shit: 1:1: error: Builtin 'let': expression expected.
      1 |  let
        |  ^~~ here.

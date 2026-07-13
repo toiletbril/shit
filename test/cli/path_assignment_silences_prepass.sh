@@ -10,5 +10,5 @@ chmod +x "$dir/laterprobe"
 "$BIN" -c "PATH=\"$dir:\$PATH\"; laterprobe"
 "$BIN" -c "export PATH=\"$dir:\$PATH\"; laterprobe"
 "$BIN" -c "PATH=\"$dir:\$PATH\" laterprobe"
-"$BIN" -c 'FOO=1; definitely_absent_cmd' 2>&1 | sed 's/^shit: [0-9]*:[0-9]*: //'
+"$BIN" -c 'FOO=1; definitely_absent_cmd' 2>&1 | sed 's/^shit: [0-9]*:[0-9]*: //' | ./normalize-trace.sh "$BIN"
 echo "rc=$?"

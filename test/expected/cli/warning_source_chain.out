@@ -5,11 +5,10 @@ note: Replace it with ${UNSET_CHAIN-} if empty expansion is desired.
 shit: OUTER:2:3: trace location:
      2 |  . INNER
        |    ^~~~~~~~~~~~~~~~~~~ here.
-shit: 1:3: trace location:
+shit: 1:0: trace location:
      1 |  . OUTER
        |    ^~~~~~~~~~~~~~~~~~~ here.
-shit: 1:37: trace location:
-     1 |  /Users/sd/Projects/shit/shit-dbg -W -c '. OUTER'
-       |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+shit: 1:0: trace location:
+     1 |  SHIT -W -c '. OUTER'
 1
 rc=0

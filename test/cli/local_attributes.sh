@@ -3,7 +3,7 @@ unset SHIT_FLAGS
 # The attribute flags declare an integer, an indexed array, and an associative
 # array, the same letters declare takes.
 echo "== local outside a function is an error:"
-"$BIN" -c 'local x=5'; echo "rc=$?"
+"$BIN" -c 'local x=5' 2>&1 | ./normalize-trace.sh "$BIN"; rc=${PIPESTATUS[0]}; echo "rc=$rc"
 echo "== local -i evaluates an integer assignment:"
 "$BIN" -c 'f(){ local -i n=3+4; echo $n; }; f'
 echo "== local -a declares an indexed array:"

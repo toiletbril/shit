@@ -15,7 +15,7 @@ cat > "$inner" <<'EOF'
 inner=1
 [[ x = "$UNSET_CHAIN" ]]
 EOF
-"$BIN" -W -c ". $outer" 2>&1 | sed "s|$outer|OUTER|; s|$inner|INNER|"
+"$BIN" -W -c ". $outer" 2>&1 | sed "s|$outer|OUTER|; s|$inner|INNER|" | ./normalize-trace.sh "$BIN"
 "$BIN" -W -c '[[ x = "$UNSET_FLAT" ]]' 2>&1 | grep -c trace
 rm -f "$outer" "$inner"
 echo "rc=$?"

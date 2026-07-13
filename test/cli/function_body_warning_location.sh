@@ -14,6 +14,6 @@ probe_fn() {
   echo "line=$LINENO"
 }
 EOF
-"$BIN" -W -c ". $lib; probe_fn" 2>&1 | sed "s|$lib|LIB|"
+"$BIN" -W -c ". $lib; probe_fn" 2>&1 | sed "s|$lib|LIB|" | ./normalize-trace.sh "$BIN"
 rm -f "$lib"
 echo "rc=$?"
