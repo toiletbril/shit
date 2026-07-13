@@ -57,7 +57,7 @@ sensible word-jumps and controls, full UTF-8 support, wide character (CJK and
 emoji) width handling, multiline editing, history search, and persistent
 history.
 
-**shit** also has more than 50 builtins, each with `--help`. That includes
+**shit** has more than 50 builtins, each with `--help`. That includes
 every builtin from `bash` and POSIX standard, with the addition of:
 - `z`, a port of [zoxide](https://github.com/ajeetdsouza/zoxide)
 - `bench`, built-in benchmark infrastructure inspired by Performance
@@ -65,13 +65,12 @@ every builtin from `bash` and POSIX standard, with the addition of:
   short)
 - and more
 
-It also bundles a busybox-style set of coreutilities behind the `shitbox`
-builtin, including `calc`, an arithmetic evaluator that prints in 128 bits in
-the default mood and keeps the 64-bit wrap in the bash and POSIX moods. The
-bundled `timeout` utility supervises a command with a selectable signal and an
-optional kill-after deadline. A binary of the same name on `PATH` is preferred.
-A `calc` on `PATH` runs in place of the bundled one, unless the shitbox applet
-mode is enabled.
+It also bundles a busybox-style set of little coreutilities behind the
+`shitbox` builtin, such as:
+- `cp`, `mv`, `ln`, `rm` and other fileutils
+- `find` and `grep`
+- `pkill`, `killall`, `ps` and `timeout`
+- minimal `calc` and `make`
 
 # Development
 
