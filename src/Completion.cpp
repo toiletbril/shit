@@ -506,8 +506,8 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
                 first.substring_of_length(0, prefix_length)};
 }
 
-static fn complete_command(StringView token, bool token_is_glob,
-                           EvalContext &context) throws -> ArrayList<String>
+fn complete_command_names(StringView token, bool token_is_glob,
+                          EvalContext &context) throws -> ArrayList<String>
 {
   let candidates = TieredCandidates{};
   let seen = HashSet{completion_allocator()};
@@ -1275,14 +1275,14 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       candidates.clear();
       candidates.push(steal(joined));
     } else if (is_command && !token_has_path_separator) {
-      candidates = complete_command(token, token_is_glob, context);
+      candidates = complete_command_names(token, token_is_glob, context);
     }
   } else if (is_command && !token_has_path_separator) {
     /* An empty command token would enumerate every PATH command on each
        keystroke for the ghost, so command completion runs only once a prefix
        is typed. An explicit tab still lists them all. */
     if (!token.is_empty() || for_listing)
-      candidates = complete_command(token, token_is_glob, context);
+      candidates = complete_command_names(token, token_is_glob, context);
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory, directories_only,
                                executables_only, context);

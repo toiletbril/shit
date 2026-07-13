@@ -28,6 +28,9 @@ fn complete(StringView line, usize cursor, EvalContext &context,
             const Path &base_directory, bool for_listing = false) throws
     -> completion_result;
 
+fn complete_command_names(StringView token, bool token_is_glob,
+                          EvalContext &context) throws -> ArrayList<String>;
+
 /* The spans come back sorted by start and non-overlapping. */
 struct highlight_span
 {

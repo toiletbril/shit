@@ -831,16 +831,11 @@ fn make_fd_inheritable(descriptor fd) wontthrow -> void
 
 /* TODO replace with a runtime check, Cosmopolitan runs on Linux and Windows. */
 #if SHIT_PLATFORM_ISNT COSMO
-const ArrayList<String> OMITTED_SUFFIXES = []() {
-  ArrayList<String> suffixes{heap_allocator()};
-  suffixes.push(String{heap_allocator()});
-  return suffixes;
-}();
+const ProgramSuffixList PROGRAM_SUFFIXES{POSIX_PROGRAM_SUFFIXES};
 
-fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index
+fn normalize_program_name(String &program_name) throws -> program_name_info
 {
-  unused(program_name);
-  return 0;
+  return {program_extension::None, program_name.length()};
 }
 #endif /* !COSMO */
 
@@ -2247,13 +2242,15 @@ namespace shit {
 
 namespace os {
 
-const ArrayList<String> OMITTED_SUFFIXES =
-    utils::make_windows_program_suffixes();
+const ProgramSuffixList PROGRAM_SUFFIXES = []() {
+  if (IsWindows()) return ProgramSuffixList{WINDOWS_PROGRAM_SUFFIXES};
+  return ProgramSuffixList{POSIX_PROGRAM_SUFFIXES};
+}();
 
-fn erase_extension_and_get_its_index(String &program_name) -> ext_index
+fn normalize_program_name(String &program_name) -> program_name_info
 {
-  if (!IsWindows()) return 0;
-  return utils::erase_program_extension(program_name, OMITTED_SUFFIXES);
+  if (!IsWindows()) return {program_extension::None, program_name.length()};
+  return normalize_windows_program_name(program_name);
 }
 
 } /* namespace os */

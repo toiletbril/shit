@@ -123,7 +123,101 @@ using os_args = ArrayList<const char *>;
 #define SHIT_STDERR STDERR_FILENO
 #endif
 
-using ext_index = usize;
+enum class program_extension : u8
+{
+  None,
+  Exe,
+  Com,
+  Scr,
+  Bat,
+};
+
+struct program_name_info
+{
+  program_extension extension{program_extension::None};
+  usize stem_length{0};
+};
+
+struct program_suffix
+{
+  program_extension extension{program_extension::None};
+  u32 packed_name{0};
+  StringView text{};
+};
+
+inline constexpr program_suffix WINDOWS_PROGRAM_SUFFIXES[] = {
+    {program_extension::None, 0,                                     StringView{"", 0}},
+    {program_extension::Exe,
+     static_cast<u32>('e') << 16 | static_cast<u32>('x') << 8 | 'e',
+     StringView{".exe", 4}                                                            },
+    {program_extension::Com,
+     static_cast<u32>('c') << 16 | static_cast<u32>('o') << 8 | 'm',
+     StringView{".com", 4}                                                            },
+    {program_extension::Scr,
+     static_cast<u32>('s') << 16 | static_cast<u32>('c') << 8 | 'r',
+     StringView{".scr", 4}                                                            },
+    {program_extension::Bat,
+     static_cast<u32>('b') << 16 | static_cast<u32>('a') << 8 | 't',
+     StringView{".bat", 4}                                                            },
+};
+
+inline constexpr program_suffix POSIX_PROGRAM_SUFFIXES[] = {
+    {program_extension::None, 0, StringView{"", 0}}
+};
+
+class ProgramSuffixList
+{
+public:
+  template <usize suffix_count>
+  constexpr ProgramSuffixList(const program_suffix (&data)[suffix_count])
+      : m_data(data), m_count(suffix_count)
+  {}
+
+  pure constexpr fn count() const wontthrow -> usize { return m_count; }
+
+  pure constexpr fn
+  operator[](usize position) const wontthrow->const program_suffix &
+  {
+    return m_data[position];
+  }
+
+  pure constexpr fn begin() const wontthrow -> const program_suffix *
+  {
+    return m_data;
+  }
+
+  pure constexpr fn end() const wontthrow -> const program_suffix *
+  {
+    return m_data + m_count;
+  }
+
+private:
+  const program_suffix *m_data{nullptr};
+  usize m_count{0};
+};
+
+inline fn normalize_windows_program_name(String &program_name) throws
+    -> program_name_info
+{
+  program_name.lowercase_ascii();
+  let const length = program_name.length();
+  program_extension extension = program_extension::None;
+  if (length >= 4 && program_name[length - 4] == '.') {
+    let const packed_suffix = static_cast<u32>(program_name[length - 3]) << 16 |
+                              static_cast<u32>(program_name[length - 2]) << 8 |
+                              static_cast<u32>(program_name[length - 1]);
+
+    for (let const &suffix : WINDOWS_PROGRAM_SUFFIXES) {
+      if (suffix.packed_name == packed_suffix) {
+        extension = suffix.extension;
+        break;
+      }
+    }
+  }
+
+  return {extension,
+          extension == program_extension::None ? length : length - 4};
+}
 
 struct Pipe
 {
@@ -279,7 +373,7 @@ fn gid_to_groupname(u32 gid) throws -> Maybe<String>;
 
 fn sleep_for_seconds(double seconds) wontthrow -> void;
 
-extern const ArrayList<String> OMITTED_SUFFIXES;
+extern const ProgramSuffixList PROGRAM_SUFFIXES;
 
 fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
@@ -517,7 +611,7 @@ pure fn is_directory_separator(char c) wontthrow -> bool;
 
 fn make_fd_inheritable(descriptor fd) wontthrow -> void;
 
-fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index;
+fn normalize_program_name(String &program_name) throws -> program_name_info;
 
 fn get_current_user() throws -> Maybe<String>;
 

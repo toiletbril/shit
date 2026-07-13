@@ -2044,17 +2044,11 @@ namespace shit {
 
 namespace os {
 
-const ArrayList<String> OMITTED_SUFFIXES =
-    utils::make_windows_program_suffixes();
+const ProgramSuffixList PROGRAM_SUFFIXES{WINDOWS_PROGRAM_SUFFIXES};
 
-fn erase_extension_and_get_its_index(String &program_name) -> ext_index
+fn normalize_program_name(String &program_name) -> program_name_info
 {
-  let normalized_name = String{program_name.allocator()};
-  for (usize position = 0; position < program_name.length(); position++)
-    normalized_name += utils::ascii_to_lower(program_name[position]);
-  program_name = steal(normalized_name);
-
-  return utils::erase_program_extension(program_name, OMITTED_SUFFIXES);
+  return normalize_windows_program_name(program_name);
 }
 
 } /* namespace os */

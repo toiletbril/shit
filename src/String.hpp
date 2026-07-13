@@ -102,6 +102,14 @@ public:
   {
     return m_data[i];
   }
+  hot fn lowercase_ascii() wontthrow -> void
+  {
+    for (usize position = 0; position < m_length; position++) {
+      let &byte = m_data[position];
+      if (byte >= 'A' && byte <= 'Z')
+        byte = static_cast<char>(byte - 'A' + 'a');
+    }
+  }
   hot mustuse pure fn view() const wontthrow -> StringView
   {
     return StringView{m_data, m_length};

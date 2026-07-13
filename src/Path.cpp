@@ -322,9 +322,9 @@ fn Path::canonicalize(StringView path) throws -> Maybe<Path>
       path.length > 0 && path.data[path.length - 1] == '.';
   if (candidate.extension().is_empty() && !ends_with_dot) {
     usize suffix_index = 0;
-    while (!candidate.exists() && suffix_index < os::OMITTED_SUFFIXES.count()) {
-      const String &suffix = os::OMITTED_SUFFIXES[suffix_index++];
-      candidate = candidate.with_extension(suffix.view());
+    while (!candidate.exists() && suffix_index < os::PROGRAM_SUFFIXES.count()) {
+      let const &suffix = os::PROGRAM_SUFFIXES[suffix_index++];
+      candidate = candidate.with_extension(suffix.text);
     }
   }
 
@@ -408,4 +408,4 @@ fn PathBuilder::append_raw(StringView bytes) throws -> PathBuilder &
 
 fn PathBuilder::build() const throws -> Path { return Path{m_text}; }
 
-} // namespace shit
+} /* namespace shit */

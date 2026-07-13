@@ -28,10 +28,6 @@ inline fn merge_args_to_string(const ArrayList<String> &args) throws -> String
   return result;
 }
 
-fn make_windows_program_suffixes() throws -> ArrayList<String>;
-fn erase_program_extension(String &program_name,
-                           const ArrayList<String> &suffixes) throws -> usize;
-
 fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>;
 
 /* Returns false when the value has no control byte, so the caller applies its
@@ -125,7 +121,8 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
                      Allocator allocator = heap_allocator()) throws
     -> Maybe<String>;
 
-fn read_directory_cached(const Path &directory) throws
+fn read_directory_cached(const Path &directory,
+                         bool should_invalidate_path_cache = true) throws
     -> const ArrayList<Path::directory_child> *;
 fn directory_entry_kind(const Path &directory,
                         const Path::directory_child &entry) throws

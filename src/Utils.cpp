@@ -921,29 +921,6 @@ fn parse_integer_in_base_u64(StringView text, int_base base) throws
   return parsed.magnitude;
 }
 
-fn make_windows_program_suffixes() throws -> ArrayList<String>
-{
-  let suffixes = ArrayList<String>{heap_allocator()};
-  for (const char *suffix : {"", ".exe", ".com", ".scr", ".bat"})
-    suffixes.push(String{suffix});
-  return suffixes;
-}
-
-fn erase_program_extension(String &program_name,
-                           const ArrayList<String> &suffixes) throws -> usize
-{
-  let const extension_position = program_name.find_last_character('.');
-  if (!extension_position.has_value()) return 0;
-
-  let const extension = program_name.substring(*extension_position);
-  let const suffix_position = suffixes.find(extension);
-  if (!suffix_position.has_value()) return 0;
-
-  program_name =
-      String{program_name.substring_of_length(0, *extension_position)};
-  return *suffix_position;
-}
-
 fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>
 {
   if (name.is_empty() || name[0] != '~') return None;
@@ -1670,12 +1647,21 @@ cold fn print_memory_report() wontthrow -> void
   std::exit(actual_code);
 }
 
-/* The program name without its extension maps to every absolute path where it
-   was found. The resolved path is stored directly, so a lookup returns it
-   without rebuilding from a directory index. The resizable map carries a packed
-   key per slot, so a lookup rejects a mismatch in two words before the byte
-   compare. */
-static StringMap<ArrayList<Path>> PATH_CACHE{heap_allocator()};
+struct cached_program_path
+{
+  Path path;
+  os::program_extension extension{os::program_extension::None};
+  bool is_runnable{false};
+};
+
+struct program_path_cache_entry
+{
+  ArrayList<cached_program_path> paths{heap_allocator()};
+  Maybe<usize> bare_path_position{};
+  bool is_complete{false};
+};
+
+static StringMap<program_path_cache_entry> PATH_CACHE{heap_allocator()};
 
 struct cached_directory_listing
 {
@@ -1706,30 +1692,59 @@ static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 /* Defined below, declared here so the cache rebuild can split the current PATH
    into its deduplicated directories. */
 static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>;
+static fn path_dirs() throws -> const ArrayList<String> &;
 
 /* Append one resolved absolute path under a program name, creating the list on
    the first hit. */
-static fn cache_resolved_path(StringView name, const Path &full_path) throws
+static fn cache_resolved_path(StringView name, const Path &full_path,
+                              os::program_extension extension, bool is_runnable,
+                              bool is_bare_result, bool is_complete) throws
     -> void
 {
-  PATH_CACHE.get_or_create(name, ArrayList<Path>{heap_allocator()})
-      .push(full_path);
+  let &entry = PATH_CACHE.get_or_create(name, program_path_cache_entry{});
+  if (is_bare_result && !entry.bare_path_position.has_value())
+    entry.bare_path_position = entry.paths.count();
+  entry.paths.push({full_path, extension, is_runnable});
+  entry.is_complete |= is_complete;
 }
 
-fn read_directory_cached(const Path &directory) throws
+static fn find_cached_program_path(const program_path_cache_entry &entry,
+                                   os::program_extension wanted_extension,
+                                   bool require_runnable) wontthrow
+    -> const Path *
+{
+  if (wanted_extension == os::program_extension::None) {
+    if (!entry.bare_path_position.has_value()) return nullptr;
+    let const &cached = entry.paths[*entry.bare_path_position];
+    if (require_runnable && !cached.is_runnable) return nullptr;
+    return &cached.path;
+  }
+
+  for (let const &cached : entry.paths) {
+    if (cached.extension != wanted_extension) continue;
+    if (require_runnable && !cached.is_runnable) return nullptr;
+    return &cached.path;
+  }
+
+  return nullptr;
+}
+
+fn read_directory_cached(const Path &directory,
+                         bool should_invalidate_path_cache) throws
     -> const ArrayList<Path::directory_child> *
 {
   let const key = directory.text().view();
   os::file_status status{};
   let const has_status = os::stat_path(key, status);
-  if (const cached_directory_listing *cached = DIR_LISTING_CACHE.find(key);
-      cached != nullptr && cached->is_valid && has_status &&
+  const cached_directory_listing *cached = DIR_LISTING_CACHE.find(key);
+  if (cached != nullptr && cached->is_valid && has_status &&
       cached->modification_time == status.modification_time &&
       cached->modification_nanoseconds == status.modification_nanoseconds &&
       cached->size == status.size)
   {
     return &cached->entries;
   }
+  let const had_cached_listing = cached != nullptr;
 
   let entries = Path::read_directory_typed(directory);
   if (!entries.has_value()) return nullptr;
@@ -1755,6 +1770,14 @@ fn read_directory_cached(const Path &directory) throws
   fresh.is_valid = has_status;
   fresh.entries = steal(*entries);
   DIR_LISTING_CACHE.set(key, steal(fresh));
+
+  if (had_cached_listing && should_invalidate_path_cache &&
+      path_dirs().find(key).has_value())
+  {
+    PATH_CACHE_IS_STALE = true;
+    PATH_COMMAND_NAMES_IS_VALID = false;
+  }
+
   return &DIR_LISTING_CACHE.find(key)->entries;
 }
 
@@ -1787,19 +1810,47 @@ static fn rebuild_path_cache() throws -> void
 
   for (let const &dir_string : path_dirs) {
     let const directory = Path{dir_string.view()};
-    let const entries = read_directory_cached(directory);
+    let const entries = read_directory_cached(directory, false);
     if (entries == nullptr) continue;
+
+    struct program_candidate
+    {
+      Path path;
+      String normalized_name;
+      os::program_name_info name_info;
+      bool is_runnable{false};
+    };
+
+    let program_candidates = ArrayList<program_candidate>{heap_allocator()};
+    program_candidates.reserve(entries->count());
+
     for (let const &entry : *entries) {
-      let name = entry.name.clone();
-      os::erase_extension_and_get_its_index(name);
       let full_path = directory.clone();
       full_path.push_component(entry.name.view());
-      cache_resolved_path(name.view(), full_path);
+      if (entry.kind == Path::entry_kind::Symlink && !full_path.exists()) {
+        continue;
+      }
+      let normalized_name = entry.name.clone();
+      let const name_info = os::normalize_program_name(normalized_name);
+      let const is_runnable =
+          directory_entry_kind(directory, entry) == Path::entry_kind::Regular &&
+          full_path.is_executable();
+      program_candidates.push(
+          {steal(full_path), steal(normalized_name), name_info, is_runnable});
+    }
 
-      if (directory_entry_kind(directory, entry) == Path::entry_kind::Regular &&
-          full_path.is_executable())
-      {
-        PATH_COMMAND_NAMES.push(String{name.view()});
+    for (let const &suffix : os::PROGRAM_SUFFIXES) {
+      for (let const &program : program_candidates) {
+        if (program.name_info.extension != suffix.extension) continue;
+
+        let const stem = program.normalized_name.substring_of_length(
+            0, program.name_info.stem_length);
+        cache_resolved_path(stem, program.path, program.name_info.extension,
+                            program.is_runnable, true, true);
+        if (!program.is_runnable) continue;
+        PATH_COMMAND_NAMES.push(String{program.normalized_name.view()});
+        if (stem.length != program.normalized_name.length())
+          PATH_COMMAND_NAMES.push(String{stem});
       }
     }
   }
@@ -1921,10 +1972,15 @@ fn initialize_path_map() throws -> void
   rebuild_path_cache();
 }
 
-fn path_command_names() throws -> const ArrayList<String> &
+static fn prepare_complete_path_cache() throws -> void
 {
   if (PATH_CACHE_IS_STALE || !PATH_COMMAND_NAMES_IS_VALID)
     initialize_path_map();
+}
+
+fn path_command_names() throws -> const ArrayList<String> &
+{
+  prepare_complete_path_cache();
 
   return PATH_COMMAND_NAMES;
 }
@@ -1948,20 +2004,38 @@ static pure fn path_command_name_lower_bound(const ArrayList<String> &names,
 fn path_command_name_has_prefix(StringView prefix) throws -> bool
 {
   let const &names = path_command_names();
-  let const lower = path_command_name_lower_bound(names, prefix);
+  let normalized_prefix = String{prefix};
+  let const name_info = os::normalize_program_name(normalized_prefix);
+  let const stem =
+      normalized_prefix.substring_of_length(0, name_info.stem_length);
+  if (let const cached_entry = PATH_CACHE.find(stem);
+      cached_entry != nullptr &&
+      find_cached_program_path(*cached_entry, name_info.extension, false) !=
+          nullptr &&
+      find_cached_program_path(*cached_entry, name_info.extension, true) ==
+          nullptr)
+  {
+    return false;
+  }
+  let const lower =
+      path_command_name_lower_bound(names, normalized_prefix.view());
 
-  return lower < names.count() && names[lower].view().starts_with(prefix);
+  return lower < names.count() &&
+         names[lower].view().starts_with(normalized_prefix.view());
 }
 
 fn path_command_name_exists(StringView name) throws -> bool
 {
-  let const &names = path_command_names();
+  prepare_complete_path_cache();
   let normalized_name = String{name};
-  os::erase_extension_and_get_its_index(normalized_name);
-  let const lower =
-      path_command_name_lower_bound(names, normalized_name.view());
+  let const name_info = os::normalize_program_name(normalized_name);
+  let const stem =
+      normalized_name.substring_of_length(0, name_info.stem_length);
+  let const cached_entry = PATH_CACHE.find(stem);
+  if (cached_entry == nullptr) return false;
 
-  return lower < names.count() && names[lower].view() == normalized_name.view();
+  return find_cached_program_path(*cached_entry, name_info.extension, true) !=
+         nullptr;
 }
 
 /* Stat dir/name along PATH until a match, the way dash stats each candidate
@@ -1984,8 +2058,9 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
 
   /* The cache key is the program name without an omitted extension, the same
      key the lookup uses. */
-  let key = String{program_name};
-  let const explicit_ext = os::erase_extension_and_get_its_index(key);
+  let normalized_name = String{program_name};
+  let const name_info = os::normalize_program_name(normalized_name);
+  let const key = normalized_name.substring_of_length(0, name_info.stem_length);
 
   for (let const &dir_string : path_dirs()) {
     let const directory = Path{dir_string.view()};
@@ -1995,17 +2070,17 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
 
     /* A name with an explicit extension is tried as is, while a bare name tries
        each omitted suffix in turn. */
-    if (explicit_ext == 0) {
-      for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.count();
-           ext_index++)
-      {
-        const String &suffix = os::OMITTED_SUFFIXES[ext_index];
-        let const try_path = Path{(full_path.text() + suffix.view()).view()};
+    if (name_info.extension == os::program_extension::None) {
+      for (let const &suffix : os::PROGRAM_SUFFIXES) {
+        let const try_path = Path{(full_path.text() + suffix.text).view()};
 
         if (try_path.exists()) {
           result.push(try_path);
           if (!find_all) {
-            cache_resolved_path(key.view(), try_path);
+            let const is_runnable =
+                try_path.is_regular_file() && try_path.is_executable();
+            cache_resolved_path(key, try_path, suffix.extension, is_runnable,
+                                true, false);
             return result;
           }
         }
@@ -2013,7 +2088,10 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
     } else if (full_path.exists()) {
       result.push(full_path);
       if (!find_all) {
-        cache_resolved_path(key.view(), full_path);
+        let const is_runnable =
+            full_path.is_regular_file() && full_path.is_executable();
+        cache_resolved_path(key, full_path, name_info.extension, is_runnable,
+                            false, false);
         return result;
       }
     }
@@ -2044,25 +2122,22 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
    */
   if (find_all) return resolve_along_path(program_name, true);
 
-  let program_name_without_extension = String{program_name};
+  let normalized_name = String{program_name};
+  let const name_info = os::normalize_program_name(normalized_name);
+  let const stem =
+      normalized_name.substring_of_length(0, name_info.stem_length);
 
-  const os::ext_index typed_extension =
-      os::erase_extension_and_get_its_index(program_name_without_extension);
-
-  /* A name typed with an explicit extension is matched exactly by the search,
-     so the extension-stripped cache key would resolve the wrong file. The cache
-     is consulted only when no extension was typed, which on POSIX is always. A
-     hit returns the stored absolute path with no stat, the way dash returns a
-     hashed location. */
-  if (typed_extension == 0) {
-    if (const ArrayList<Path> *const cached =
-            PATH_CACHE.find(program_name_without_extension.view());
-        cached != nullptr)
-    {
-      let result = ArrayList<Path>{heap_allocator()};
-      if (!cached->is_empty()) result.push((*cached)[0]);
+  if (const program_path_cache_entry *const cached = PATH_CACHE.find(stem);
+      cached != nullptr)
+  {
+    let result = ArrayList<Path>{heap_allocator()};
+    let const path =
+        find_cached_program_path(*cached, name_info.extension, false);
+    if (path != nullptr) {
+      result.push(*path);
       return result;
     }
+    if (cached->is_complete) return result;
   }
 
   return resolve_along_path(program_name, false);

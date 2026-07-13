@@ -1,11 +1,12 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
+#include "../Completion.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-W wordlist] [-G glob] [-A action] [-P prefix] "
+HELP_SYNOPSIS_DECL("[-c] [-W wordlist] [-G glob] [-A action] [-P prefix] "
                    "[-S suffix] [-X filterpat] [-F function] [-C command] "
                    "[word]");
 HELP_DESCRIPTION_DECL(
@@ -18,7 +19,7 @@ FLAG(COMPGEN_WORDLIST, String, 'W', "",
      "Expand the word list the way the shell does and filter to the entries "
      "that start with the word.");
 FLAG(COMPGEN_GLOB, String, 'G', "", "Probe the filesystem with the glob.");
-FLAG(COMPGEN_ACTION, String, 'A', "", "Accepted without effect.");
+FLAG(COMPGEN_ACTION, String, 'A', "", "List commands for the command action.");
 FLAG(COMPGEN_PREFIX, String, 'P', "", "Accepted without effect.");
 FLAG(COMPGEN_SUFFIX, String, 'S', "", "Accepted without effect.");
 FLAG(COMPGEN_FILTER, String, 'X', "", "Accepted without effect.");
@@ -45,6 +46,8 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   Maybe<StringView> wordlist;
   Maybe<StringView> glob_pattern;
+  Maybe<StringView> action;
+  bool should_list_commands = false;
   StringView word{};
   for (usize i = 1; i < args.count();) {
     let const argument = args[i].view();
@@ -69,10 +72,22 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       continue;
     }
+    if (argument == "-A") {
+      i++;
+      if (i < args.count()) {
+        action = args[i].view();
+        i++;
+      }
+      continue;
+    }
+    if (argument == "-c") {
+      should_list_commands = true;
+      i++;
+      continue;
+    }
     if (argument.length >= 2 && argument[0] == '-') {
-      if (argument == "-A" || argument == "-P" || argument == "-S" ||
-          argument == "-X" || argument == "-F" || argument == "-C" ||
-          argument == "-o")
+      if (argument == "-P" || argument == "-S" || argument == "-X" ||
+          argument == "-F" || argument == "-C" || argument == "-o")
       {
         i++;
       }
@@ -81,6 +96,21 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     word = argument;
     i++;
+  }
+
+  if (should_list_commands || (action.has_value() && *action == "command")) {
+    let out = String{cxt.scratch_allocator()};
+    let has_any_matched = false;
+    for (let const &candidate :
+         completion::complete_command_names(word, false, cxt))
+    {
+      out.append(candidate.view());
+      out.push('\n');
+      has_any_matched = true;
+    }
+
+    if (has_any_matched) ec.print_to_stdout(out.view());
+    return has_any_matched ? 0 : 1;
   }
 
   if (glob_pattern.has_value()) {
@@ -118,4 +148,4 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return has_any_matched ? 0 : 1;
 }
 
-} // namespace shit
+} /* namespace shit */
