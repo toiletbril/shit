@@ -25,3 +25,7 @@ nounset
 -TSTP
 -USR1
 -USR2
+== command position through timeout:
+export
+== command position through shitbox timeout:
+export

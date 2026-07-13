@@ -1,7 +1,14 @@
 == command position offers the executable and the directory, not the data file:
 ./run
 ./sub/
+./zz_path_dir/
+./zz_path_exec
 == argument position still offers every file:
 ./data.txt
 ./run
 ./sub/
+./zz_path_data
+./zz_path_dir/
+./zz_path_exec
+== PATH command completion offers only the executable
+zz_path_exec

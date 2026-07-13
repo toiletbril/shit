@@ -1,0 +1,16 @@
+== URLs and SSH remote paths share the URL highlight:
+echo	\e[34m
+https://example.com/a	\e[1;37m
+host:path	\e[1;37m
+user@host:/dir/file	\e[1;37m
+== an unknown command keeps its own error color:
+definitely_missing_command	\e[31m
+host:path	\e[1;37m
+== a local colon path remains a local path:
+echo	\e[34m
+./	\e[96m
+missing:part	\e[31m
+== a Windows drive path remains a local path:
+echo	\e[34m
+C:	\e[31m
+/missing	\e[31m

@@ -13,6 +13,11 @@ echo "=== parentheses and power ==="
 echo "=== 128-bit in the default mood ==="
 "$BIN" -c 'shitbox calc "2 ** 100"'
 
+echo "=== signed 128-bit minimum ==="
+"$BIN" -c 'shitbox calc -- "-170141183460469231731687303715884105728"'
+"$BIN" -c 'shitbox calc "(2 ** 127) / -1"'
+"$BIN" -c 'shitbox calc "(2 ** 127) % -1"'
+
 echo "=== variable read ==="
 "$BIN" -c 'x=6; shitbox calc "x * 7"'
 

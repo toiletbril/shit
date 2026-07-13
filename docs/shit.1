@@ -602,6 +602,21 @@ utility name also falls back to the bundled utility when PATH holds no binary of
 that name. A missing system coreutil is filled in. A PATH binary still takes
 precedence.
 .TP
+.B timeout
+The bundled timeout utility runs a command until its duration expires. A
+duration accepts seconds and the s, m, h, or d suffix. The default signal is
+TERM. The
+.B --signal
+option selects another signal, and
+.B --kill-after
+sends KILL after an additional duration. The
+.B --preserve-status
+option returns the command status after a timeout. A timeout returns 124 by
+default, 125 when supervision fails, 126 when the command cannot execute, and
+127 when the command cannot be found. On Windows, timeout supports TERM and
+KILL. Both signals terminate the supervised job immediately, so kill-after does
+not add a grace period after TERM on that platform.
+.TP
 .B calc
 The bundled calc utility evaluates each argument as an arithmetic expression and
 prints the value of the last one, with the same operators and located errors the

@@ -57,7 +57,7 @@ _shit_complete()
 complete -o filenames -F _shit_complete shit
 
 _shitbox_utils="basename calc cat cp dirname du env find grep head killall ln \
-ls make mkdir mv pkill ps realpath rm rmdir seq sleep sort tail tee touch tr \
+ls make mkdir mv pkill ps realpath rm rmdir seq sleep sort tail tee timeout touch tr \
 uniq unlink wc which whoami yes"
 
 _shitbox_util_flags()
@@ -79,6 +79,7 @@ _shitbox_util_flags()
         grep)          echo "-i -v" ;;
         sort)          echo "-r" ;;
         uniq)          echo "-c" ;;
+        timeout)       echo "-s --signal -k --kill-after -p --preserve-status" ;;
         pkill|killall) echo "-s -l" ;;
         make)          echo "-f" ;;
         find)          echo "-name -type -maxdepth -mindepth -print" ;;

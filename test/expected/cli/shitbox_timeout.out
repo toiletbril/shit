@@ -1,0 +1,32 @@
+--- timeout passes output and status ---
+okay
+rc=7
+--- timeout returns its timeout status ---
+rc=124
+--- timeout preserves the selected signal status ---
+rc=23
+--- timeout forces a kill after the grace period ---
+rc=137
+--- timeout zero allows completion ---
+rc=9
+--- timeout reports missing and unusable commands ---
+missing=127
+unusable=126
+fallback-script
+--- timeout rejects unsupported signals ---
+rc=1
+wrapped=1
+--- timeout resumes a stopped child to finish supervision ---
+rc=124
+--- timeout rejects invalid durations ---
+invalid=1
+invalid=1
+invalid=1
+invalid=1
+invalid=1
+--- timeout kills process group descendants ---
+contained
+--- timeout works through a multicall symlink ---
+rc=0
+--- timeout runs Windows batch commands through the command processor ---
+batch-ran

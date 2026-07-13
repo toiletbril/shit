@@ -8,5 +8,18 @@ Benchmark: false (3 runs)
 == --no-shell --show-output forks the command directly:
 direct
 direct
-direct
-Benchmark: /bin/echo direct (3 runs)
+Benchmark: /bin/echo direct (2 runs)
+== --runs executes exactly one sample:
+Benchmark: true (1 runs)
+== invalid sample counts are rejected:
+rc=1
+rc=1
+rc=1
+== unsigned overflow is rejected by number parsing:
+shit: 1:1: error: Builtin 'bench': --runs expects a number, got '18446744073709551616'.
+== an overflowing duration is rejected:
+rc=1
+== counter capability keeps one complete sample:
+counter capability passed
+== counter fallback keeps one complete sample:
+counter fallback passed

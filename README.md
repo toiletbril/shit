@@ -67,9 +67,11 @@ every builtin from `bash` and POSIX standard, with the addition of:
 
 It also bundles a busybox-style set of coreutilities behind the `shitbox`
 builtin, including `calc`, an arithmetic evaluator that prints in 128 bits in
-the default mood and keeps the 64-bit wrap in the bash and POSIX moods. A binary
-of the same name on `PATH` is preferred. A `calc` on `PATH` runs in place of the
-bundled one, unless the shitbox applet mode is enabled.
+the default mood and keeps the 64-bit wrap in the bash and POSIX moods. The
+bundled `timeout` utility supervises a command with a selectable signal and an
+optional kill-after deadline. A binary of the same name on `PATH` is preferred.
+A `calc` on `PATH` runs in place of the bundled one, unless the shitbox applet
+mode is enabled.
 
 # Development
 

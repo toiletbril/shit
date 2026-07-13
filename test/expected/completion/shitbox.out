@@ -13,6 +13,11 @@ mv
 --help
 -h
 -s
+== timeout flags through shitbox:
+--help
+--kill-after
+--preserve-status
+--signal
 == shitbox own flags:
 --assimilate
 --help

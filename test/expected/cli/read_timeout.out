@@ -1,16 +1,5 @@
-== read -t 0 polls, data ready reports success:
-rc=0
-== read -t 0 polls, EOF counts as readable:
-rc=0
-== read -t with data present returns it:
-rc=0 x=[hello]
-== read -t -n reads the count and stops:
-rc=0 x=[abc]
-== read -t times out on a silent producer, status is 142:
-rc=142
-== an unparsable timeout is rejected:
-shit: 1:12: error: Builtin 'read': Invalid timeout specification.
-     1 |  read -r -t nope x </dev/null; echo "rc=$?"
-       |             ^~~~ here.
-shit: note: The -t timeout needs a fractional second count such as 0.5.
-rc=1
+query=142
+count=142 value=[a]
+continued=142 value=[a]
+invalid=1
+eof=1 value=[]
