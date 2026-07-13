@@ -615,9 +615,10 @@ fn complete_from_builtin_flags(StringView line, StringView token,
       } else if (let const second = second_word_of(line); second.has_value()) {
         util_for_flags = shitbox::find_util(*second);
       }
-    } else if (!completes_shell_binary && context.shitbox()) {
-      /* A plain ls keeps the system ls completion when the shitbox option is
-         off. */
+    } else if (!completes_shell_binary && context.shitbox() &&
+               utils::get_program_path_status(command) ==
+                   utils::program_path_status::Missing)
+    {
       util_for_flags = shitbox::find_util(command);
     }
 

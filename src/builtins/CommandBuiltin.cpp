@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
+#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -97,6 +98,11 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
         resolved_text += "\n";
       }
       ec.print_to_stdout(resolved_text);
+      return 0;
+    }
+    if (cxt.shitbox() && shitbox::find_util(name.view()).has_value()) {
+      ec.print_to_stdout(is_verbose ? name + " is a built-in utility\n"
+                                    : name + "\n");
       return 0;
     }
     if (is_verbose) ec.print_to_stderr(name + ": not found\n");

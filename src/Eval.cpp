@@ -1958,14 +1958,6 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
       resolved_builtin = None;
     }
 
-    /* With the shitbox option on, a bare utility name resolves to the shitbox
-       builtin ahead of an external program. */
-    if (!resolved_builtin.has_value() && is_shitbox_enabled &&
-        shitbox::find_util(program.view()).has_value())
-    {
-      resolved_builtin = Builtin::Kind::Shitbox;
-    }
-
     if (!resolved_builtin.has_value()) {
       let program_search_paths = utils::search_program_path(program.view());
       if (program_search_paths.count() > 0)
@@ -1981,7 +1973,7 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
       LOG(Debug, "resolved '%s' to the program '%s'", program.c_str(),
           resolved_program_path->text().c_str());
       kind = ResolvedCommand::from_program(steal(*resolved_program_path));
-    } else if (mood == mimic_mood::Default &&
+    } else if ((is_shitbox_enabled || mood == mimic_mood::Default) &&
                shitbox::find_util(program.view()).has_value())
     {
       LOG(Debug, "no program matches '%s', using the shitbox utility",

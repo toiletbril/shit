@@ -32,8 +32,6 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  unused(cxt);
-
   let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
@@ -61,6 +59,11 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
           output += path.text();
           output += '\n';
         }
+      }
+    } else if (cxt.shitbox() && find_util(program_name.view()).has_value()) {
+      if (!is_quiet) {
+        output += program_name;
+        output += '\n';
       }
     } else {
       has_missing_any = true;

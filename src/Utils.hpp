@@ -147,7 +147,14 @@ fn path_command_names() throws -> const ArrayList<String> &;
 
 fn path_command_name_has_prefix(StringView prefix) throws -> bool;
 
-fn path_command_name_exists(StringView name) throws -> bool;
+enum class program_path_status : u8
+{
+  Missing,
+  Blocked,
+  Runnable,
+};
+
+fn get_program_path_status(StringView name) throws -> program_path_status;
 
 /* glob_active reads which bytes act as metacharacters. With extglob set the
    bash extended-glob groups ?(..), *(..), +(..), @(..), and !(..) are

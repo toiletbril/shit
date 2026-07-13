@@ -9,6 +9,7 @@ mv
 -a
 -h
 -l
+== a PATH program keeps its own flags:
 == du flags through shitbox:
 --help
 -h

@@ -53,14 +53,15 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   if (search_builtin(word).has_value()) return true;
   if (context.find_function(word) != nullptr) return true;
   if (context.get_alias(word).has_value()) return true;
-  /* A bare coreutil with no PATH binary still runs through the shitbox fallback
-     when the toggle is on. */
-  if (context.shitbox() && shitbox::find_util(word).has_value()) return true;
 
-  let const resolves = utils::path_command_name_exists(word);
+  let const path_status = utils::get_program_path_status(word);
+  let const resolves = path_status == utils::program_path_status::Runnable;
   LOG(All, "the path search resolves '%.*s' to %s",
       static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
-  return resolves;
+  if (path_status != utils::program_path_status::Missing) return resolves;
+
+  return (context.shitbox() || context.mood() == mimic_mood::Default) &&
+         shitbox::find_util(word).has_value();
 }
 
 static fn command_word_prefixes_any(StringView word,

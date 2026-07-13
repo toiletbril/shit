@@ -23,6 +23,19 @@ rc=127
 1
 2
 3
+=== --enable-shitbox prefers a PATH binary ===
+PATH seq
+=== set -o shitbox prefers a PATH binary ===
+PATH seq
+=== --enable-shitbox works in the sh mood ===
+1
+2
+3
+=== command reports the enabled fallback ===
+seq
+seq is a built-in utility
+=== which reports the enabled fallback ===
+seq
 === a builtin name is not a shitbox utility ===
 shit: 1:9: error: shitbox has no utility named 'echo'.
      1 |  shitbox echo routed via shitbox

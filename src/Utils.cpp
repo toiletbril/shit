@@ -2024,7 +2024,7 @@ fn path_command_name_has_prefix(StringView prefix) throws -> bool
          names[lower].view().starts_with(normalized_prefix.view());
 }
 
-fn path_command_name_exists(StringView name) throws -> bool
+fn get_program_path_status(StringView name) throws -> program_path_status
 {
   prepare_complete_path_cache();
   let normalized_name = String{name};
@@ -2032,10 +2032,21 @@ fn path_command_name_exists(StringView name) throws -> bool
   let const stem =
       normalized_name.substring_of_length(0, name_info.stem_length);
   let const cached_entry = PATH_CACHE.find(stem);
-  if (cached_entry == nullptr) return false;
+  if (cached_entry == nullptr) return program_path_status::Missing;
 
-  return find_cached_program_path(*cached_entry, name_info.extension, true) !=
-         nullptr;
+  if (find_cached_program_path(*cached_entry, name_info.extension, true) !=
+      nullptr)
+  {
+    return program_path_status::Runnable;
+  }
+
+  if (find_cached_program_path(*cached_entry, name_info.extension, false) !=
+      nullptr)
+  {
+    return program_path_status::Blocked;
+  }
+
+  return program_path_status::Missing;
 }
 
 /* Stat dir/name along PATH until a match, the way dash stats each candidate
