@@ -7,6 +7,7 @@ rc=0
 shit: 1:6: error: tail: Unknown flag '--bogus'.
      1 |  tail --bogus
        |       ^~~~~~~ here.
+note: Use `--` before an operand that begins with a dash.
 rc=1
 --- a symlinked utility names the shit binary in its help ---
 1

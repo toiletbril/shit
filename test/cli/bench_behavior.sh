@@ -19,6 +19,13 @@ done
 echo "== unsigned overflow is rejected by number parsing:"
 "$BIN" -c 'bench --runs 18446744073709551616 true' 2>&1 |
     grep 'expects a number, got'
+echo "== invalid values carry granular carets:"
+"$BIN" -c 'bench --runs nope true' 2>&1
+"$BIN" -c 'bench --runs=nope true' 2>&1
+"$BIN" -c 'bench --runs 0 true' 2>&1
+"$BIN" -c 'bench --duration 18446744073710 true' 2>&1
+"$BIN" -c 'bench "--runs=nope" true' 2>&1
+"$BIN" -c 'runs=nope; bench --runs=$runs true' 2>&1
 echo "== an overflowing duration is rejected:"
 "$BIN" -c 'bench --duration 18446744073710 true' >/dev/null 2>&1
 echo "rc=$?"
@@ -35,7 +42,8 @@ case "$counter_row_count" in
     *) exit 1 ;;
 esac
 if [ "$(uname -s)" = Linux ] && command -v perf >/dev/null 2>&1 &&
-    perf stat -e cycles -- /bin/true >/dev/null 2>&1; then
+    perf stat -e cycles,instructions,cache-references,cache-misses,branch-misses \
+        -- /bin/true >/dev/null 2>&1; then
     test "$counter_row_count" -eq 5
 fi
 printf '%s\n' "$counter_output" | grep -q 'Benchmark: /bin/echo counter-run (1 runs)'

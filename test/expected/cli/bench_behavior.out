@@ -16,7 +16,26 @@ rc=1
 rc=1
 rc=1
 == unsigned overflow is rejected by number parsing:
-shit: 1:1: error: Builtin 'bench': --runs expects a number, got '18446744073709551616'.
+shit: 1:14: error: --runs expects a number, got '18446744073709551616'.
+== invalid values carry granular carets:
+shit: 1:14: error: --runs expects a number, got 'nope'.
+     1 |  bench --runs nope true
+       |               ^~~~ here.
+shit: 1:14: error: --runs expects a number, got 'nope'.
+     1 |  bench --runs=nope true
+       |               ^~~~ here.
+shit: 1:14: error: --runs expects a number from 1 through 100000.
+     1 |  bench --runs 0 true
+       |               ^~ here.
+shit: 1:18: error: --duration is too large.
+     1 |  bench --duration 18446744073710 true
+       |                   ^~~~~~~~~~~~~~ here.
+shit: 1:7: error: --runs expects a number, got 'nope'.
+     1 |  bench "--runs=nope" true
+       |        ^~~~~~~~~~~~~ here.
+shit: 1:18: error: --runs expects a number, got 'nope'.
+     1 |  runs=nope; bench --runs=$runs true
+       |                   ^~~~~~~~~~~~ here.
 == an overflowing duration is rejected:
 rc=1
 == counter capability keeps one complete sample:

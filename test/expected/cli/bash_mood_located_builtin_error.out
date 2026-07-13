@@ -12,4 +12,5 @@ after
 shit: 1:6: error: Builtin 'read': Unknown flag '-Z'.
      1 |  read -Z; echo after
        |       ^~ here.
+note: Use `--` before an operand that begins with a dash.
 after

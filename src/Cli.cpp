@@ -242,6 +242,20 @@ static fn argument_location(
                         std::strlen(argv[argument_index])};
 }
 
+static fn attached_flag_value_location(
+    const char *const *argv, usize argument_index, const char *value,
+    usize base_position, const ArrayList<SourceLocation> *arg_locations) throws
+    -> SourceLocation
+{
+  let location =
+      argument_location(argv, argument_index, base_position, arg_locations);
+  if (location.length != std::strlen(argv[argument_index])) return location;
+
+  location.position += static_cast<usize>(value - argv[argument_index]);
+  location.length = std::strlen(value);
+  return location;
+}
+
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const char *const *argv, usize base_position,
                const Flag *operand_value_flag,
@@ -420,12 +434,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                   static_cast<FlagManyStrings *>(flag)->append(value_offset);
 
                 flag->set_position(++position);
-                let value_location = argument_location(
-                    argv, static_cast<usize>(i), base_position, arg_locations);
-                value_location.position +=
-                    static_cast<usize>(value_offset - argv[i]);
-                value_location.length = std::strlen(value_offset);
-                flag->set_value_location(value_location);
+                flag->set_value_location(attached_flag_value_location(
+                    argv, static_cast<usize>(i), value_offset, base_position,
+                    arg_locations));
                 LOG(All, "set the flag '%s' to '%s'",
                     flag_name(flag, is_long).c_str(), value_offset);
               } else {
@@ -442,12 +453,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                 static_cast<FlagManyStrings *>(flag)->append(value_offset);
 
               flag->set_position(++position);
-              let value_location = argument_location(
-                  argv, static_cast<usize>(i), base_position, arg_locations);
-              value_location.position +=
-                  static_cast<usize>(value_offset - argv[i]);
-              value_location.length = std::strlen(value_offset);
-              flag->set_value_location(value_location);
+              flag->set_value_location(attached_flag_value_location(
+                  argv, static_cast<usize>(i), value_offset, base_position,
+                  arg_locations));
               LOG(All, "set the flag '%s' to the attached value '%s'",
                   flag_name(flag, is_long).c_str(), value_offset);
             } else {
@@ -810,4 +818,4 @@ cold fn show_message(StringView err) throws -> void
   print_error("\n");
 }
 
-} // namespace shit
+} /* namespace shit */

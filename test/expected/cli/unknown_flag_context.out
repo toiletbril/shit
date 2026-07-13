@@ -2,7 +2,9 @@
 shit: 1:8: error: Builtin 'enable': Unknown flag '--badflag'.
      1 |  enable --badflag
        |         ^~~~~~~~~ here.
+note: Use `--` before an operand that begins with a dash.
 == shitbox unknown flag carries the shitbox util prefix:
 shit: 1:12: error: shitbox ls: Unknown flag '--dasdas'.
      1 |  shitbox ls --dasdas
        |             ^~~~~~~~ here.
+note: Use `--` before an operand that begins with a dash.
