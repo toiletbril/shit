@@ -8,3 +8,15 @@ fi
 printf '#!/bin/sh\n' > "$dir/$executable_name"
 chmod +x "$dir/$executable_name"
 PATH="$dir" "$BIN" --debug-highlight-at 'EXPLICIT-PROBE.EXE'
+PATH="$dir" "$BIN" --debug-highlight-at 'EXPLICIT-P'
+printf '#!/bin/sh\n' > "$dir/collision.com"
+chmod +x "$dir/collision.com"
+PATH="$dir" "$BIN" --debug-highlight-at 'collision.exe'
+mkdir "$dir/directory.exe"
+PATH="$dir" "$BIN" --debug-highlight-at 'directory.exe'
+mkdir "$dir/blocker-first" "$dir/blocker-second"
+mkdir "$dir/blocker-first/blocked.exe"
+printf '#!/bin/sh\n' > "$dir/blocker-second/blocked.exe"
+chmod +x "$dir/blocker-second/blocked.exe"
+PATH="$dir/blocker-first:$dir/blocker-second" \
+    "$BIN" --debug-highlight-at 'blocked.exe'

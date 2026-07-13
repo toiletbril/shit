@@ -1,6 +1,12 @@
 one
 two
 126
+126
 refreshed
 appeared
 blockedprobe
+shopt
+compfunc
+compalias
+broken-symlink
+suffix-priority
