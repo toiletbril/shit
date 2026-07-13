@@ -48,7 +48,7 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       throw ErrorWithLocationAndDetails{
           ec.arg_location_at(path_index),
           "Unable to source the file '" + path + "': not found in PATH",
-          "Pass a path with a slash, or add its directory to PATH"};
+          "Pass an absolute path or add its directory to PATH"};
   }
 
   let const contents = source_path.read_entire_file();
@@ -79,4 +79,4 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                         ec.arg_location_at(path_index), StringView{path});
 }
 
-} // namespace shit
+} /* namespace shit */
