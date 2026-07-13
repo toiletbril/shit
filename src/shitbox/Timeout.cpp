@@ -35,34 +35,46 @@ pure fn Timeout::kind() const wontthrow -> Utility::Kind
 static fn duration_to_nanos(f64 seconds) wontthrow -> u64
 {
   if (__builtin_isinf(seconds)) return UINT64_MAX;
+  if (seconds == 0.0) return 0;
 
   constexpr f64 NANOS_PER_SECOND = 1000000000.0;
   constexpr f64 MAX_SECONDS = static_cast<f64>(UINT64_MAX) / NANOS_PER_SECOND;
   if (seconds >= MAX_SECONDS) return UINT64_MAX;
 
-  return static_cast<u64>(seconds * NANOS_PER_SECOND);
+  let const nanos = seconds * NANOS_PER_SECOND;
+  if (nanos < 1.0) return 1;
+  return static_cast<u64>(nanos);
 }
 
-static fn wait_for_process_until(os::process child, u64 timeout_nanos,
-                                 i32 &status) throws -> bool
+enum class supervision_wait_result : u8
 {
-  if (timeout_nanos == 0 || timeout_nanos == UINT64_MAX) {
-    status = os::wait_and_monitor_process(child);
-    return true;
-  }
+  Exited,
+  TimedOut,
+  Interrupted,
+};
 
+static fn wait_for_process_until(os::process child, u64 timeout_nanos,
+                                 i32 &status) throws -> supervision_wait_result
+{
+  let const has_deadline = timeout_nanos != 0 && timeout_nanos != UINT64_MAX;
   let const started_at_nanos = os::monotonic_nanos();
   loop
   {
+    if (os::INTERRUPT_REQUESTED) return supervision_wait_result::Interrupted;
+
     let const state = os::poll_process(child, status);
-    if (state == os::process_state::Exited) return true;
+    if (state == os::process_state::Exited)
+      return supervision_wait_result::Exited;
 
-    let const elapsed_nanos = os::monotonic_nanos() - started_at_nanos;
-    if (elapsed_nanos >= timeout_nanos) return false;
+    u64 sleep_nanos = 10000000;
+    if (has_deadline) {
+      let const elapsed_nanos = os::monotonic_nanos() - started_at_nanos;
+      if (elapsed_nanos >= timeout_nanos)
+        return supervision_wait_result::TimedOut;
 
-    let const remaining_nanos = timeout_nanos - elapsed_nanos;
-    let const sleep_nanos =
-        remaining_nanos < 1000000 ? remaining_nanos : 1000000;
+      let const remaining_nanos = timeout_nanos - elapsed_nanos;
+      sleep_nanos = remaining_nanos < 1000000 ? remaining_nanos : 1000000;
+    }
     os::sleep_for_seconds(static_cast<f64>(sleep_nanos) / 1000000000.0);
   }
 }
@@ -73,6 +85,23 @@ static fn signal_supervised_process(os::process child,
   let const process_group = os::process_group_of(child);
   if (os::signal_process(process_group, signal_number)) return true;
   return os::signal_process(child, signal_number);
+}
+
+static fn finish_interrupted_supervision(os::process child) throws -> i32
+{
+  os::INTERRUPT_REQUESTED = 0;
+  if (let const interrupt_signal = os::signal_number_from_name("INT");
+      interrupt_signal.has_value() &&
+      os::is_process_signal_supported(*interrupt_signal))
+  {
+    signal_supervised_process(child, *interrupt_signal);
+  }
+
+  os::sleep_for_seconds(0.01);
+  signal_supervised_process(child, 9);
+  os::reap_process_quietly(child);
+  os::INTERRUPT_REQUESTED = 0;
+  return 130;
 }
 
 static fn resolve_timeout_program(StringView program_name) throws -> Maybe<Path>
@@ -169,8 +198,19 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     child = os::execute_program(steal(fallback), false, true);
   }
 
+  let const has_controlling_terminal =
+      cxt.shell_is_interactive() && os::shell_has_controlling_terminal();
+  if (has_controlling_terminal) os::give_controlling_terminal_to(child);
+  defer
+  {
+    if (has_controlling_terminal) os::reclaim_controlling_terminal();
+  };
+
   i32 status = 0;
-  if (wait_for_process_until(child, timeout_nanos, status)) return status;
+  let wait_result = wait_for_process_until(child, timeout_nanos, status);
+  if (wait_result == supervision_wait_result::Exited) return status;
+  if (wait_result == supervision_wait_result::Interrupted)
+    return finish_interrupted_supervision(child);
 
   if (!signal_supervised_process(child, timeout_signal)) {
     if (os::poll_process(child, status) == os::process_state::Exited)
@@ -187,9 +227,12 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     signal_supervised_process(child, *continue_signal);
   }
 
-  if (kill_after_nanos != 0 &&
-      !wait_for_process_until(child, kill_after_nanos, status))
-  {
+  wait_result = wait_for_process_until(
+      child, kill_after_nanos == 0 ? UINT64_MAX : kill_after_nanos, status);
+  if (wait_result == supervision_wait_result::Interrupted)
+    return finish_interrupted_supervision(child);
+
+  if (wait_result == supervision_wait_result::TimedOut) {
     if (!signal_supervised_process(child, 9)) {
       if (os::poll_process(child, status) == os::process_state::Exited)
         return FLAG_TIMEOUT_PRESERVE_STATUS.is_enabled() ? status : 124;
@@ -198,8 +241,6 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     os::reap_process_quietly(child);
     return 137;
   }
-
-  if (kill_after_nanos == 0) status = os::reap_process_quietly(child);
 
   return FLAG_TIMEOUT_PRESERVE_STATUS.is_enabled() ? status : 124;
 }

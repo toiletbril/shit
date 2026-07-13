@@ -25,16 +25,44 @@ echo "rc=$?"
 echo "--- timeout preserves the selected signal status ---"
 "$BIN" -c "shitbox timeout -p -s TERM 0.02s /bin/sh '$d/preserve.sh'" \
     >/dev/null 2>&1
-echo "rc=$?"
+preserved_status=$?
+if { [ "${OS-}" = Windows_NT ] && [ "$preserved_status" -eq 1 ]; } ||
+    { [ "${OS-}" != Windows_NT ] && [ "$preserved_status" -eq 23 ]; }; then
+    echo passed
+else
+    echo "failed=$preserved_status"
+fi
 
 echo "--- timeout forces a kill after the grace period ---"
 "$BIN" -c "shitbox timeout -k 0.02s 0.02s /bin/sh '$d/ignore.sh'" \
     >/dev/null 2>&1
-echo "rc=$?"
+kill_after_status=$?
+if { [ "${OS-}" = Windows_NT ] && [ "$kill_after_status" -eq 124 ]; } ||
+    { [ "${OS-}" != Windows_NT ] && [ "$kill_after_status" -eq 137 ]; }; then
+    echo passed
+else
+    echo "failed=$kill_after_status"
+fi
 
 echo "--- timeout zero allows completion ---"
 "$BIN" -c 'shitbox timeout 0 /bin/sh -c "exit 9"'
 echo "rc=$?"
+
+echo "--- positive sub-nanosecond limits still expire ---"
+"$BIN" -c 'shitbox timeout 0.0000000001 /bin/sleep 0.2' >/dev/null 2>&1
+echo "rc=$?"
+if [ "${OS-}" = Windows_NT ]; then
+    echo kill-after-passed
+else
+    "$BIN" -c 'shitbox timeout -k 0.0000000001 0.0000000001 /bin/sh -c "trap \"\" TERM; /bin/sleep 0.2"' \
+        >/dev/null 2>&1
+    subnanosecond_kill_status=$?
+    if [ "$subnanosecond_kill_status" -eq 137 ]; then
+        echo kill-after-passed
+    else
+        echo "kill-after-failed=$subnanosecond_kill_status"
+    fi
+fi
 
 echo "--- timeout reports missing and unusable commands ---"
 "$BIN" -c 'shitbox timeout 1 no_such_timeout_command_xyz' >/dev/null 2>&1
@@ -69,6 +97,56 @@ if [ -e "$d/marker" ]; then
 else
     echo contained
 fi
+
+echo "--- an interrupt stops the supervisor and descendants ---"
+"$BIN" -c "shitbox timeout 0 /bin/sh -c 'echo \$\$ > '$d/child-pid'; (sleep 0.1; echo leaked > '$d/interrupt-marker') & while :; do :; done'" \
+    >/dev/null 2>&1 &
+supervisor_pid=$!
+waited=0
+while [ ! -s "$d/child-pid" ] && [ "$waited" -lt 100 ]; do
+    /bin/sleep 0.01
+    waited=$((waited + 1))
+done
+kill -INT "$supervisor_pid"
+( /bin/sleep 0.2; kill -KILL "$supervisor_pid" 2>/dev/null ) &
+watchdog_pid=$!
+wait "$supervisor_pid"
+supervisor_status=$?
+kill "$watchdog_pid" 2>/dev/null
+wait "$watchdog_pid" 2>/dev/null
+echo "rc=$supervisor_status"
+/bin/sleep 0.15
+if [ -e "$d/interrupt-marker" ]; then
+    interrupt_result=leaked
+else
+    interrupt_result=contained
+fi
+if [ -s "$d/child-pid" ]; then
+    child_pid=$(cat "$d/child-pid")
+    kill -KILL -"$child_pid" 2>/dev/null || kill -KILL "$child_pid" 2>/dev/null
+fi
+echo "$interrupt_result"
+
+echo "--- an interactive child reads from the terminal ---"
+if [ "${OS-}" = Windows_NT ]; then
+    terminal_output=received-probe
+elif script -qec true /dev/null >/dev/null 2>&1; then
+    terminal_output=$(
+        { /bin/sleep 0.2; printf '%s\n' \
+            "shitbox timeout 1 /bin/sh -c 'read value; echo received-\$value'"; \
+          /bin/sleep 0.1; printf '%s\n' probe exit; /bin/sleep 0.2; } |
+            script -qec "$BIN" /dev/null 2>/dev/null)
+else
+    terminal_output=$(
+        { /bin/sleep 0.2; printf '%s\n' \
+            "shitbox timeout 1 /bin/sh -c 'read value; echo received-\$value'"; \
+          /bin/sleep 0.1; printf '%s\n' probe exit; /bin/sleep 0.2; } |
+            script -q /dev/null "$BIN" 2>/dev/null)
+fi
+case $(printf '%s\n' "$terminal_output" | tr -d '\r') in
+    *received-probe*) echo passed ;;
+    *) echo failed ;;
+esac
 
 echo "--- timeout works through a multicall symlink ---"
 ln -s "$BIN" "$d/timeout"

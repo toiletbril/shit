@@ -27,5 +27,8 @@ nounset
 -USR2
 == command position through timeout:
 export
+== quoted and escaped timeout options stay transparent:
+export
+export
 == command position through shitbox timeout:
 export

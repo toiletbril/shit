@@ -195,6 +195,40 @@ static pure fn next_completion_prefix_word(StringView line,
   return line.substring_of_length(start, position - start);
 }
 
+static pure fn decode_completion_prefix_word(StringView word, char *buffer,
+                                             usize buffer_capacity) wontthrow
+    -> Maybe<StringView>
+{
+  char quote_character = 0;
+  usize decoded_length = 0;
+  for (usize position = 0; position < word.length; position++) {
+    let const byte = word[position];
+    if (quote_character == 0 && (byte == '\'' || byte == '"')) {
+      quote_character = byte;
+      continue;
+    }
+    if (byte == quote_character) {
+      quote_character = 0;
+      continue;
+    }
+    if (byte == '\\' && quote_character != '\'' && position + 1 < word.length) {
+      let const escaped_byte = word[position + 1];
+      if (quote_character != '"' || escaped_byte == '$' ||
+          escaped_byte == '`' || escaped_byte == '"' || escaped_byte == '\\' ||
+          escaped_byte == '\n')
+      {
+        position++;
+        if (decoded_length >= buffer_capacity) return None;
+        buffer[decoded_length++] = escaped_byte;
+        continue;
+      }
+    }
+    if (decoded_length >= buffer_capacity) return None;
+    buffer[decoded_length++] = byte;
+  }
+  return StringView{buffer, decoded_length};
+}
+
 static fn timeout_flag_takes_value(char short_name,
                                    StringView long_name) wontthrow -> bool
 {
@@ -239,20 +273,24 @@ static pure fn timeout_managed_command_start(StringView line,
   {
     let const word = next_completion_prefix_word(line, position);
     if (!word.has_value()) return None;
+    char decoded_buffer[256];
+    let const decoded_word = decode_completion_prefix_word(
+        *word, decoded_buffer, sizeof(decoded_buffer));
+    if (!decoded_word.has_value()) return skip_blanks(line, position);
 
     if (should_skip_value) {
       should_skip_value = false;
       continue;
     }
 
-    if (*word == "--") {
+    if (*decoded_word == "--") {
       let const duration = next_completion_prefix_word(line, position);
       if (!duration.has_value()) return None;
       return skip_blanks(line, position);
     }
 
-    if (word->length > 1 && (*word)[0] == '-') {
-      should_skip_value = timeout_option_takes_next_word(*word);
+    if (decoded_word->length > 1 && (*decoded_word)[0] == '-') {
+      should_skip_value = timeout_option_takes_next_word(*decoded_word);
       continue;
     }
 
@@ -267,13 +305,21 @@ static pure fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
   {
     let const word = next_completion_prefix_word(line, position);
     if (!word.has_value()) return None;
+    char decoded_buffer[256];
+    let const decoded_word = decode_completion_prefix_word(
+        *word, decoded_buffer, sizeof(decoded_buffer));
+    if (!decoded_word.has_value()) return None;
 
-    if (*word == "timeout")
+    if (*decoded_word == "timeout")
       return timeout_managed_command_start(line, position);
 
-    if (*word == "shitbox") {
+    if (*decoded_word == "shitbox") {
       let const utility = next_completion_prefix_word(line, position);
-      if (utility.has_value() && *utility == "timeout")
+      if (!utility.has_value()) return None;
+      char utility_buffer[256];
+      let const decoded_utility = decode_completion_prefix_word(
+          *utility, utility_buffer, sizeof(utility_buffer));
+      if (decoded_utility.has_value() && *decoded_utility == "timeout")
         return timeout_managed_command_start(line, position);
       return None;
     }

@@ -13,5 +13,9 @@ echo "== signal names through command:"
 "$BIN" --debug-complete-at 'command kill -' </dev/null
 echo "== command position through timeout:"
 "$BIN" --debug-complete-at 'timeout -s TERM 1 expor' </dev/null
+echo "== quoted and escaped timeout options stay transparent:"
+"$BIN" --debug-complete-at "timeout '-s' TERM 1 expor" </dev/null
+"$BIN" --debug-complete-at 'timeout \-s TERM 1 expor' </dev/null
+"$BIN" --debug-complete-at 'timeout "\-s" TERM 1 expor' </dev/null
 echo "== command position through shitbox timeout:"
 "$BIN" --debug-complete-at 'shitbox timeout --kill-after=1 2 expor' </dev/null
