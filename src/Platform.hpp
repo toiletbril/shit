@@ -579,6 +579,15 @@ fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
 
 fn children_peak_rss_bytes() wontthrow -> u64;
 
+struct malloc_heap_stats
+{
+  usize bytes_in_use{0};
+  usize arena_bytes{0};
+  usize mapped_bytes{0};
+};
+
+fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool;
+
 struct perf_counts
 {
   u64 cpu_cycles{0};

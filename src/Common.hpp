@@ -60,6 +60,7 @@
 
 /* clang-format off */
 #include <cctype>
+#include <climits>
 #include <cerrno>
 #include <cstdarg>
 #include <cstddef>

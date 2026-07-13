@@ -57,7 +57,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
      when the toggle is on. */
   if (context.shitbox() && shitbox::find_util(word).has_value()) return true;
 
-  let const resolves = utils::search_program_path(word).count() > 0;
+  let const resolves = utils::path_command_name_exists(word);
   LOG(All, "the path search resolves '%.*s' to %s",
       static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
   return resolves;
@@ -372,13 +372,14 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
     directory = String{bump_allocator(HIGHLIGHT_ARENA), "."};
   }
 
-  let const entries = utils::read_directory_cached(Path{directory.view()});
+  let const listing_directory = Path{directory.view()};
+  let const entries = utils::read_directory_cached(listing_directory);
   if (entries == nullptr) return false;
 
   for (let const &entry : *entries)
     if (entry.name.view().starts_with(partial) &&
         (!directories_only ||
-         utils::directory_entry_kind(Path{directory.view()}, entry) ==
+         utils::directory_entry_kind(listing_directory, entry) ==
              Path::entry_kind::Directory))
     {
       return true;

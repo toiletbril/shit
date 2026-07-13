@@ -150,6 +150,8 @@ fn path_command_names() throws -> const ArrayList<String> &;
 
 fn path_command_name_has_prefix(StringView prefix) throws -> bool;
 
+fn path_command_name_exists(StringView name) throws -> bool;
+
 /* glob_active reads which bytes act as metacharacters. With extglob set the
    bash extended-glob groups ?(..), *(..), +(..), @(..), and !(..) are
    recognized, otherwise they are plain bytes. */

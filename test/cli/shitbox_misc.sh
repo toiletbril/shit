@@ -8,6 +8,12 @@ echo "--- sleep zero ---"
 "$BIN" -c 'shitbox sleep 0'
 echo "rc=$?"
 
+echo "--- sleep accepts representable subnormal values ---"
+"$BIN" -c 'shitbox sleep 4.9406564584124654e-324'
+echo "minimum=$?"
+"$BIN" -c 'shitbox sleep 1e-323'
+echo "subnormal=$?"
+
 echo "--- sleep bad duration ---"
 "$BIN" -c 'shitbox sleep abc' 2>&1
 echo "rc=$?"

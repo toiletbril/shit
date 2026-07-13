@@ -1757,6 +1757,12 @@ fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
 
 fn children_peak_rss_bytes() wontthrow -> u64 { return 0; }
 
+fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
+{
+  unused(stats);
+  return false;
+}
+
 fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
     -> Maybe<measured_result>
 {
@@ -1917,9 +1923,19 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
 fn current_executable_path() wontthrow -> Maybe<String>
 {
   char module_path[MAX_PATH];
-  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
+  let const module_path_length =
+      GetModuleFileNameA(nullptr, module_path, MAX_PATH);
+  if (module_path_length == 0 || module_path_length == MAX_PATH)
     return shit::None;
-  return String{module_path};
+
+  char full_path[MAX_PATH];
+  let const full_path_length =
+      GetFullPathNameA(module_path, MAX_PATH, full_path, nullptr);
+  if (full_path_length == 0 || full_path_length >= MAX_PATH) return shit::None;
+
+  return String{
+      StringView{full_path, full_path_length}
+  };
 }
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
@@ -2033,6 +2049,11 @@ const ArrayList<String> OMITTED_SUFFIXES =
 
 fn erase_extension_and_get_its_index(String &program_name) -> ext_index
 {
+  let normalized_name = String{program_name.allocator()};
+  for (usize position = 0; position < program_name.length(); position++)
+    normalized_name += utils::ascii_to_lower(program_name[position]);
+  program_name = steal(normalized_name);
+
   return utils::erase_program_extension(program_name, OMITTED_SUFFIXES);
 }
 

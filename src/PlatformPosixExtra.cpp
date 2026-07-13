@@ -473,7 +473,13 @@ fn current_executable_path() wontthrow -> Maybe<String>
 
   return String{raw_path};
 #else
-  return read_symlink("/proc/self/exe");
+  let const raw_path = read_symlink("/proc/self/exe");
+  if (!raw_path.has_value()) return None;
+
+  if (let const canonical = canonical_path(Path{raw_path->view()}); canonical)
+    return String{canonical->text()};
+
+  return raw_path;
 #endif
 }
 
@@ -629,14 +635,16 @@ fn enumerate_processes(bool include_resource_stats) throws
             Path{(process_directory + "/cmdline").view()}.read_entire_file();
         command_line.has_value() && !command_line->is_empty())
     {
+      let normalized_command_line = String{heap_allocator()};
+      normalized_command_line.reserve(command_line->count());
       for (usize position = 0; position < command_line->count(); position++) {
-        if (command_line->view()[position] != '\0') continue;
-        if (position + 1 < command_line->count())
-          command_line->data()[position] = ' ';
-        else
-          command_line->pop_back();
+        let const byte = command_line->view()[position];
+        if (byte != '\0')
+          normalized_command_line.push(byte);
+        else if (position + 1 < command_line->count())
+          normalized_command_line.push(' ');
       }
-      process.command_line = steal(*command_line);
+      process.command_line = steal(normalized_command_line);
     } else {
       process.command_line = "[" + process.name + "]";
     }
@@ -694,6 +702,20 @@ fn enumerate_processes(bool) throws -> ArrayList<process_entry>
 }
 
 #endif
+
+fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
+{
+#if defined __GLIBC__
+  let const info = mallinfo2();
+  stats.bytes_in_use = static_cast<usize>(info.uordblks);
+  stats.arena_bytes = static_cast<usize>(info.arena);
+  stats.mapped_bytes = static_cast<usize>(info.hblkhd);
+  return true;
+#else
+  unused(stats);
+  return false;
+#endif
+}
 
 } /* namespace os */
 } /* namespace shit */

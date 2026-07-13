@@ -740,7 +740,6 @@ fn parse_decimal_f64(const String &text) throws -> ErrorOr<f64>
   if (end == start || end != start + text.length()) {
     return Error{"invalid number"};
   }
-  if (errno == ERANGE) return Error{"number value out of range"};
 
   let digits = start;
   while (*digits == ' ' || *digits == '\t' || *digits == '\n' ||
@@ -756,6 +755,11 @@ fn parse_decimal_f64(const String &text) throws -> ErrorOr<f64>
   }
 
   let const magnitude = __builtin_fabsl(parsed_value);
+  if (errno == ERANGE &&
+      (magnitude == 0.0L || !__builtin_isfinite(parsed_value)))
+  {
+    return Error{"number value out of range"};
+  }
   if (__builtin_isfinite(parsed_value) &&
       (magnitude > static_cast<long double>(__DBL_MAX__) ||
        (magnitude != 0.0L &&
@@ -1624,13 +1628,12 @@ cold fn print_memory_report() wontthrow -> void
     std::fprintf(stderr, "Function arena: used %zu, reserved %zu, blocks %zu\n",
                  FUNCTION_ARENA->bytes_used(), FUNCTION_ARENA->bytes_capacity(),
                  FUNCTION_ARENA->block_count());
-#if defined(__GLIBC__)
-  const struct mallinfo2 info = mallinfo2();
-  std::fprintf(stderr,
-               "Malloc heap: in use %zu, total arena %zu, mmapped %zu\n",
-               static_cast<usize>(info.uordblks),
-               static_cast<usize>(info.arena), static_cast<usize>(info.hblkhd));
-#endif
+  os::malloc_heap_stats heap_stats{};
+  if (os::read_malloc_heap_stats(heap_stats))
+    std::fprintf(stderr,
+                 "Malloc heap: in use %zu, total arena %zu, mmapped %zu\n",
+                 heap_stats.bytes_in_use, heap_stats.arena_bytes,
+                 heap_stats.mapped_bytes);
 }
 
 [[noreturn]] fn quit(i32 code, bool should_goodbye) throws -> void
@@ -1926,20 +1929,39 @@ fn path_command_names() throws -> const ArrayList<String> &
   return PATH_COMMAND_NAMES;
 }
 
-fn path_command_name_has_prefix(StringView prefix) throws -> bool
+static pure fn path_command_name_lower_bound(const ArrayList<String> &names,
+                                             StringView name) wontthrow -> usize
 {
-  let const &names = path_command_names();
   usize lower = 0;
   usize upper = names.count();
   while (lower < upper) {
     let const middle = lower + (upper - lower) / 2;
-    if (names[middle].view() < prefix)
+    if (names[middle].view() < name)
       lower = middle + 1;
     else
       upper = middle;
   }
 
+  return lower;
+}
+
+fn path_command_name_has_prefix(StringView prefix) throws -> bool
+{
+  let const &names = path_command_names();
+  let const lower = path_command_name_lower_bound(names, prefix);
+
   return lower < names.count() && names[lower].view().starts_with(prefix);
+}
+
+fn path_command_name_exists(StringView name) throws -> bool
+{
+  let const &names = path_command_names();
+  let normalized_name = String{name};
+  os::erase_extension_and_get_its_index(normalized_name);
+  let const lower =
+      path_command_name_lower_bound(names, normalized_name.view());
+
+  return lower < names.count() && names[lower].view() == normalized_name.view();
 }
 
 /* Stat dir/name along PATH until a match, the way dash stats each candidate
@@ -2000,20 +2022,23 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
   return result;
 }
 
-hot fn search_program_path(StringView program_name, bool find_all) throws
-    -> ArrayList<Path>
+static fn prepare_path_cache_for_lookup() wontthrow -> void
 {
   /* A cd, a PATH change, or hash -r left the cache stale, so it is dropped here
      before the lookup re-resolves against the current filesystem. */
   if (PATH_CACHE_IS_STALE) {
-    LOG(Info,
-        "search_program_path clearing stale cache before resolving '%.*s'",
-        static_cast<int>(program_name.length), program_name.data);
+    LOG(Info, "search_program_path clearing stale cache before resolving");
     PATH_CACHE.clear();
     PATH_CACHE_IS_STALE = false;
     PATH_COMMAND_NAMES.clear();
     PATH_COMMAND_NAMES_IS_VALID = false;
   }
+}
+
+hot fn search_program_path(StringView program_name, bool find_all) throws
+    -> ArrayList<Path>
+{
+  prepare_path_cache_for_lookup();
 
   /* which -a wants every match, so it skips the cache and scans PATH in full.
    */

@@ -24,8 +24,11 @@ override BIN := $(shell \
 	if [ -x "$(BIN)" ]; then \
 		echo "$$(cd "$$(dirname "$(BIN)")" && pwd)/$$(basename "$(BIN)")"; \
 	elif [ -x "$(CURDIR)/../$(BIN)" ]; then \
-		echo "$$(cd "$(CURDIR)/.." && pwd)/$(BIN)"; \
-	elif command -v "$(BIN)" >/dev/null 2>&1; then command -v "$(BIN)"; \
+		candidate="$(CURDIR)/../$(BIN)"; \
+		echo "$$(cd "$$(dirname "$$candidate")" && pwd)/$$(basename "$$candidate")"; \
+	elif command -v "$(BIN)" >/dev/null 2>&1; then \
+		found=$$(command -v "$(BIN)"); \
+		echo "$$(cd "$$(dirname "$$found")" && pwd)/$$(basename "$$found")"; \
 	else echo "$(BIN)"; fi)
 
 BIN_FLAGS := -AER

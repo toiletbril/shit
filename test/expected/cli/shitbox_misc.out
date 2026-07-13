@@ -1,5 +1,8 @@
 --- sleep zero ---
 rc=0
+--- sleep accepts representable subnormal values ---
+minimum=0
+subnormal=0
 --- sleep bad duration ---
 shit: 1:1: error: sleep: invalid duration 'abc'.
      1 |  shitbox sleep abc
