@@ -18,12 +18,6 @@ inline fn completion_allocator() wontthrow -> Allocator
   return bump_allocator(COMPLETION_ARENA);
 }
 
-struct cached_directory_entry
-{
-  String name{heap_allocator()};
-  bool is_directory{false};
-};
-
 static pure forceinline fn is_blank(char byte) wontthrow -> bool
 {
   return byte == ' ' || byte == '\t';
@@ -39,9 +33,6 @@ static pure forceinline fn skip_blanks(StringView text, usize from) wontthrow
 
 /* Primitives defined in Completion.cpp and reached from the cascade stages and
    the highlighter. */
-fn read_directory_cached(const Path &directory) throws
-    -> const ArrayList<cached_directory_entry> *;
-fn environment_path_changed(String &cached_path) throws -> bool;
 fn command_word_of(StringView line) wontthrow -> StringView;
 pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool;
 fn resolve_completion_alias(StringView command, EvalContext &context) throws
@@ -89,6 +80,6 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
 fn command_substitution_body_start(StringView line, usize cursor) throws
     -> usize;
 
-} // namespace completion
+} /* namespace completion */
 
-} // namespace shit
+} /* namespace shit */

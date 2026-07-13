@@ -7,8 +7,6 @@
 #include "Maybe.hpp"
 #include "StringView.hpp"
 
-#include <cstring>
-
 namespace shit {
 
 class String
@@ -241,6 +239,12 @@ private:
   char m_inline[INLINE_CAPACITY];
 };
 
+template <>
+fn String::from<f64>(f64 value, Allocator allocator) throws -> String;
+
+template <>
+fn String::to<f64>() const throws -> ErrorOr<f64>;
+
 fn operator+(StringView left, StringView right) throws->String;
 
-} // namespace shit
+} /* namespace shit */

@@ -6,9 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-#include <cmath>
-#include <cstdio>
-
 FLAG_LIST_DECL();
 
 FLAG(bench_runs, String, '\0', "runs",
@@ -54,7 +51,6 @@ struct metric_stats
   double max{0};
 };
 
-/* The perf fields stay zero on a platform without hardware counters. */
 struct bench_sample
 {
   double wall_nanos{0};
@@ -66,12 +62,14 @@ struct bench_sample
   double branch_misses{0};
 };
 
-struct command_result
+class CommandResult
 {
-  explicit command_result(Allocator allocator) : label(allocator) {}
+public:
+  explicit CommandResult(Allocator allocator) : label(allocator) {}
   String label;
   usize sample_count{0};
   bool has_perf{false};
+  bool is_perf_system_wide{false};
   metric_stats wall_time{};
   metric_stats peak_rss{};
   metric_stats cpu_cycles{};
@@ -113,8 +111,6 @@ fn compute_stats(const ArrayList<bench_sample> &samples,
     const double delta = accessor(samples[i]) - stats.mean;
     variance_sum += delta * delta;
   }
-  /* The sample standard deviation divides by n-1, the unbiased estimator poop
-     uses, and degrades to zero for a single sample. */
   stats.std_dev =
       (samples.count() > 1) ? std::sqrt(variance_sum / (count - 1)) : 0.0;
 
@@ -179,9 +175,10 @@ cold fn format_metric(double value, metric_unit unit,
 
 /* The color escapes are added at render time, not here, since they carry no
    display width and would corrupt the width measurement. */
-struct metric_row
+class MetricRow
 {
-  explicit metric_row(Allocator allocator)
+public:
+  explicit MetricRow(Allocator allocator)
       : mean(allocator), std_dev(allocator), min(allocator), max(allocator)
   {}
   StringView name{};
@@ -193,9 +190,9 @@ struct metric_row
 };
 
 fn make_metric_row(StringView name, const metric_stats &stats, metric_unit unit,
-                   Allocator allocator) throws -> metric_row
+                   Allocator allocator) throws -> MetricRow
 {
-  let row = metric_row{allocator};
+  let row = MetricRow{allocator};
   row.name = name;
   row.unit = unit;
   row.mean = format_metric(stats.mean, unit, allocator);
@@ -211,13 +208,13 @@ fn append_padding(String &out, usize count) throws -> void
     out.push(' ');
 }
 
-fn append_metric_line(String &out, const metric_row &row, usize mean_width,
+fn append_metric_line(String &out, const MetricRow &row, usize mean_width,
                       usize std_dev_width, bool should_color) throws -> void
 {
   out += "  ";
   out.append(row.name);
-  for (usize pad = row.name.length; pad < 18; pad++)
-    out.push(' ');
+  let const name_padding = row.name.length < 22 ? 22 - row.name.length : 1;
+  append_padding(out, name_padding);
 
   out.append(colored(colors::ansi::BOLD_GREEN, should_color));
   out.append(row.mean.view());
@@ -280,24 +277,15 @@ fn append_relative_line(String &out, StringView name, const metric_stats &first,
   out += "\n";
 }
 
-fn parse_count_flag(StringView text, StringView flag_name) throws -> u64
+fn parse_count_flag(const FlagString &flag, StringView flag_name) throws -> u64
 {
-  u64 value = 0;
-  bool has_seen_digit = false;
-  for (usize i = 0; i < text.length; i++) {
-    const char c = text[i];
-    if (c < '0' || c > '9') {
-      throw Error{StringView{"--"} + flag_name + " expects a number, got '" +
-                  text + "'"};
-    }
-    value = value * 10 + static_cast<u64>(c - '0');
-    has_seen_digit = true;
+  let const parsed = flag.value().to<u64>();
+  if (parsed.is_error()) {
+    let const error = Error{StringView{"--"} + flag_name +
+                            " expects a number, got '" + flag.value() + "'"};
+    relocate_error(error, flag.value_location());
   }
-
-  if (!has_seen_digit)
-    throw Error{StringView{"--"} + flag_name + " expects a number"};
-
-  return value;
+  return parsed.value();
 }
 
 constexpr u64 PROGRESS_INTERVAL_NANOS = 16ULL * 1000000ULL;
@@ -327,9 +315,9 @@ fn sample_command(StringView shell_binary, StringView command,
                   bool should_ignore_exit_code, bool should_use_shell,
                   bool &was_interrupted, bool &did_command_fail,
                   i64 &failure_status, Allocator allocator) throws
-    -> command_result
+    -> CommandResult
 {
-  let result = command_result{allocator};
+  let result = CommandResult{allocator};
   result.label = command;
 
   let child_argv = ArrayList<String>{allocator};
@@ -358,7 +346,8 @@ fn sample_command(StringView shell_binary, StringView command,
   const u64 duration_nanos = duration_millis * 1000000ULL;
   const u64 start_nanos = os::monotonic_nanos();
   u64 last_progress_nanos = 0;
-  bool has_perf = false;
+  bool has_perf = true;
+  bool is_perf_system_wide = false;
 
   for (usize i = 0;; i++) {
     if (os::INTERRUPT_REQUESTED) {
@@ -366,13 +355,11 @@ fn sample_command(StringView shell_binary, StringView command,
       break;
     }
 
-    const bool has_reached_min = i >= MIN_SAMPLES;
-    const bool has_reached_run_limit = run_limit.has_value() && i >= *run_limit;
     const u64 elapsed_nanos = os::monotonic_nanos() - start_nanos;
-    const bool has_reached_duration =
-        !run_limit.has_value() && elapsed_nanos >= duration_nanos;
-
-    if (has_reached_min && (has_reached_run_limit || has_reached_duration)) {
+    if (run_limit.has_value() && i >= *run_limit) break;
+    if (!run_limit.has_value() && i >= MIN_SAMPLES &&
+        elapsed_nanos >= duration_nanos)
+    {
       break;
     }
     if (i >= MAX_SAMPLES) break;
@@ -385,7 +372,8 @@ fn sample_command(StringView shell_binary, StringView command,
       if (run_limit.has_value() && *run_limit > 0) {
         percent = static_cast<u64>(i) * 100 / *run_limit;
       } else if (duration_nanos > 0) {
-        percent = elapsed_nanos * 100 / duration_nanos;
+        percent = static_cast<u64>(static_cast<u128>(elapsed_nanos) * 100 /
+                                   duration_nanos);
       }
       draw_progress(command, percent, allocator);
     }
@@ -409,8 +397,9 @@ fn sample_command(StringView shell_binary, StringView command,
     let sample = bench_sample{};
     sample.wall_nanos = static_cast<double>(measured->wall_nanos);
     sample.peak_rss_bytes = static_cast<double>(measured->peak_rss_bytes);
+    has_perf = has_perf && measured->has_perf;
+    is_perf_system_wide = is_perf_system_wide || measured->is_perf_system_wide;
     if (measured->has_perf) {
-      has_perf = true;
       sample.cpu_cycles = static_cast<double>(measured->perf.cpu_cycles);
       sample.instructions = static_cast<double>(measured->perf.instructions);
       sample.cache_references =
@@ -424,7 +413,8 @@ fn sample_command(StringView shell_binary, StringView command,
   if (should_show_progress) clear_progress();
 
   result.sample_count = samples.count();
-  result.has_perf = has_perf;
+  result.has_perf = !samples.is_empty() && has_perf;
+  result.is_perf_system_wide = result.has_perf && is_perf_system_wide;
   result.wall_time = compute_stats(
       samples, [](const bench_sample &s) { return s.wall_nanos; });
   result.peak_rss = compute_stats(
@@ -443,7 +433,7 @@ fn sample_command(StringView shell_binary, StringView command,
   return result;
 }
 
-fn append_summary(String &out, const command_result &result, bool should_color,
+fn append_summary(String &out, const CommandResult &result, bool should_color,
                   Allocator allocator) throws -> void
 {
   out.append(colored(colors::ansi::BOLD, should_color));
@@ -452,21 +442,36 @@ fn append_summary(String &out, const command_result &result, bool should_color,
   out.append(colored(colors::ansi::RESET, should_color));
   out += " (" + String::from(result.sample_count, allocator) + " runs)\n";
 
-  let rows = ArrayList<metric_row>{allocator};
+  let rows = ArrayList<MetricRow>{allocator};
   rows.push(make_metric_row("wall time", result.wall_time,
                             metric_unit::Nanoseconds, allocator));
   rows.push(make_metric_row("peak rss", result.peak_rss, metric_unit::Bytes,
                             allocator));
   if (result.has_perf) {
-    rows.push(make_metric_row("cpu cycles", result.cpu_cycles,
+    let const cpu_cycles_name = result.is_perf_system_wide
+                                    ? StringView{"cpu cycles (system)"}
+                                    : StringView{"cpu cycles"};
+    let const instructions_name = result.is_perf_system_wide
+                                      ? StringView{"instructions (system)"}
+                                      : StringView{"instructions"};
+    let const cache_references_name = result.is_perf_system_wide
+                                          ? StringView{"cache refs (system)"}
+                                          : StringView{"cache refs"};
+    let const cache_misses_name = result.is_perf_system_wide
+                                      ? StringView{"cache misses (system)"}
+                                      : StringView{"cache misses"};
+    let const branch_misses_name = result.is_perf_system_wide
+                                       ? StringView{"branch misses (system)"}
+                                       : StringView{"branch misses"};
+    rows.push(make_metric_row(cpu_cycles_name, result.cpu_cycles,
                               metric_unit::Count, allocator));
-    rows.push(make_metric_row("instructions", result.instructions,
+    rows.push(make_metric_row(instructions_name, result.instructions,
                               metric_unit::Count, allocator));
-    rows.push(make_metric_row("cache refs", result.cache_references,
+    rows.push(make_metric_row(cache_references_name, result.cache_references,
                               metric_unit::Count, allocator));
-    rows.push(make_metric_row("cache misses", result.cache_misses,
+    rows.push(make_metric_row(cache_misses_name, result.cache_misses,
                               metric_unit::Count, allocator));
-    rows.push(make_metric_row("branch misses", result.branch_misses,
+    rows.push(make_metric_row(branch_misses_name, result.branch_misses,
                               metric_unit::Count, allocator));
   }
 
@@ -482,8 +487,8 @@ fn append_summary(String &out, const command_result &result, bool should_color,
     append_metric_line(out, rows[i], mean_width, std_dev_width, should_color);
 }
 
-fn append_comparison(String &out, const command_result &first,
-                     const command_result &other, bool should_color) throws
+fn append_comparison(String &out, const CommandResult &first,
+                     const CommandResult &other, bool should_color) throws
     -> void
 {
   out.append(colored(colors::ansi::BOLD, should_color));
@@ -501,14 +506,20 @@ fn append_comparison(String &out, const command_result &first,
   append_relative_line(out, "peak rss", first.peak_rss, other.peak_rss,
                        should_color);
   if (first.has_perf && other.has_perf) {
-    append_relative_line(out, "cpu cycles", first.cpu_cycles, other.cpu_cycles,
-                         should_color);
-    append_relative_line(out, "instructions", first.instructions,
+    let const cpu_cycles_name = first.is_perf_system_wide
+                                    ? StringView{"cpu cycles (system)"}
+                                    : StringView{"cpu cycles"};
+    let const instructions_name = first.is_perf_system_wide
+                                      ? StringView{"instructions (system)"}
+                                      : StringView{"instructions"};
+    append_relative_line(out, cpu_cycles_name, first.cpu_cycles,
+                         other.cpu_cycles, should_color);
+    append_relative_line(out, instructions_name, first.instructions,
                          other.instructions, should_color);
   }
 }
 
-} // namespace
+} /* namespace */
 
 Bench::Bench() = default;
 
@@ -529,12 +540,21 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   Maybe<u64> run_limit = None;
   if (FLAG_bench_runs.is_set())
-    run_limit = parse_count_flag(FLAG_bench_runs.value(), StringView{"runs"});
+    run_limit = parse_count_flag(FLAG_bench_runs, StringView{"runs"});
+
+  if (run_limit.has_value() && (*run_limit == 0 || *run_limit > MAX_SAMPLES))
+    throw ErrorWithLocation{
+        FLAG_bench_runs.value_location(),
+        "--runs expects a number from 1 through " +
+            String::from(MAX_SAMPLES, cxt.scratch_allocator())};
 
   u64 duration_millis = DEFAULT_DURATION_MILLIS;
   if (FLAG_bench_duration.is_set())
     duration_millis =
-        parse_count_flag(FLAG_bench_duration.value(), StringView{"duration"});
+        parse_count_flag(FLAG_bench_duration, StringView{"duration"});
+  if (duration_millis > UINT64_MAX / 1000000ULL)
+    throw ErrorWithLocation{FLAG_bench_duration.value_location(),
+                            "--duration is too large"};
 
   let const should_color = colors::stdout_wants_color();
   let const should_show_progress = progress_is_enabled();
@@ -555,7 +575,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Debug, "bench sampling %zu commands for %llu ms each",
       arguments.count() - 1, static_cast<unsigned long long>(duration_millis));
 
-  let results = ArrayList<command_result>{cxt.scratch_allocator()};
+  let results = ArrayList<CommandResult>{cxt.scratch_allocator()};
   for (usize i = 1; i < arguments.count(); i++) {
     bool was_interrupted = false;
     bool did_command_fail = false;
@@ -602,4 +622,4 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} /* namespace shit */

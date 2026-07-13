@@ -2,6 +2,7 @@
 
 #include "ErrorOr.hpp"
 #include "IntBase.hpp"
+#include "Utils.hpp"
 
 namespace shit {
 
@@ -113,14 +114,7 @@ fn String::operator+=(char c) throws -> String &
 
 hot fn String::operator<(const String &other) const wontthrow -> bool
 {
-  let const shared_length =
-      m_length < other.m_length ? m_length : other.m_length;
-  let const order = shared_length == 0
-                        ? 0
-                        : std::memcmp(c_str(), other.c_str(), shared_length);
-
-  if (order != 0) return order < 0;
-  return m_length < other.m_length;
+  return view() < other.view();
 }
 
 fn String::find_substring(StringView needle, usize from) const wontthrow
@@ -174,6 +168,18 @@ fn String::to() const throws -> ErrorOr<T>
   return view().to<T>();
 }
 
+template <>
+fn String::to<f64>() const throws -> ErrorOr<f64>
+{
+  return utils::parse_decimal_f64(*this);
+}
+
+template <>
+fn String::from<f64>(f64 value, Allocator allocator) throws -> String
+{
+  return utils::format_f64(value, allocator);
+}
+
 #define SHIT_STRING_TO(T) template ErrorOr<T> String::to<T>() const;
 SHIT_STRING_TO(i16)
 SHIT_STRING_TO(u16)
@@ -201,4 +207,4 @@ SHIT_STRING_TO(hu32)
 SHIT_STRING_TO(hu64)
 #undef SHIT_STRING_TO
 
-} // namespace shit
+} /* namespace shit */

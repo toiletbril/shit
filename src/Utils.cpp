@@ -11,10 +11,6 @@
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 
-#if defined(__GLIBC__)
-#include <malloc.h>
-#endif
-
 namespace shit {
 
 namespace utils {
@@ -663,8 +659,15 @@ static fn skip_ascii_whitespace(StringView text, usize &offset) wontthrow
     offset++;
 }
 
-fn parse_decimal_integer(StringView text, bool *out_of_range) throws
-    -> ErrorOr<i64>
+struct parsed_integer_magnitude
+{
+  u64 magnitude;
+  bool is_negative;
+  bool has_overflowed;
+};
+
+static fn parse_decimal_magnitude(StringView text) throws
+    -> ErrorOr<parsed_integer_magnitude>
 {
   usize offset = 0;
   skip_ascii_whitespace(text, offset);
@@ -704,11 +707,77 @@ fn parse_decimal_integer(StringView text, bool *out_of_range) throws
   skip_ascii_whitespace(text, offset);
   if (!has_digits || offset != text.length) return not_an_integer_error(text);
 
-  if (out_of_range != nullptr)
-    *out_of_range = has_overflowed || magnitude > static_cast<u64>(INT64_MAX) +
-                                                      (is_negative ? 1u : 0u);
+  return parsed_integer_magnitude{magnitude, is_negative, has_overflowed};
+}
 
-  return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
+fn parse_decimal_i64(StringView text, bool *out_of_range) throws -> ErrorOr<i64>
+{
+  let const parsed = TRY(parse_decimal_magnitude(text));
+
+  if (out_of_range != nullptr)
+    *out_of_range = parsed.has_overflowed ||
+                    parsed.magnitude > static_cast<u64>(INT64_MAX) +
+                                           (parsed.is_negative ? 1u : 0u);
+
+  return saturate_signed_magnitude(parsed.magnitude, parsed.is_negative,
+                                   parsed.has_overflowed);
+}
+
+fn parse_decimal_u64(StringView text) throws -> ErrorOr<u64>
+{
+  let const parsed = TRY(parse_decimal_magnitude(text));
+  if (parsed.is_negative || parsed.has_overflowed)
+    return Error{"integer value out of range"};
+  return parsed.magnitude;
+}
+
+fn parse_decimal_f64(const String &text) throws -> ErrorOr<f64>
+{
+  let const start = text.c_str();
+  char *end = nullptr;
+  errno = 0;
+  let const parsed_value = ::strtold(start, &end);
+  if (end == start || end != start + text.length()) {
+    return Error{"invalid number"};
+  }
+  if (errno == ERANGE) return Error{"number value out of range"};
+
+  let digits = start;
+  while (*digits == ' ' || *digits == '\t' || *digits == '\n' ||
+         *digits == '\r' || *digits == '\f' || *digits == '\v')
+  {
+    digits++;
+  }
+  if (*digits == '+' || *digits == '-') {
+    digits++;
+  }
+  if (digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X')) {
+    return Error{"invalid number"};
+  }
+
+  let const magnitude = __builtin_fabsl(parsed_value);
+  if (__builtin_isfinite(parsed_value) &&
+      (magnitude > static_cast<long double>(__DBL_MAX__) ||
+       (magnitude != 0.0L &&
+        magnitude < static_cast<long double>(__DBL_DENORM_MIN__))))
+  {
+    return Error{"number value out of range"};
+  }
+
+  return static_cast<f64>(parsed_value);
+}
+
+fn format_f64(f64 value, Allocator allocator) throws -> String
+{
+  char buffer[32];
+  let const length = ::snprintf(buffer, sizeof(buffer), "%.17g", value);
+  if (length < 0 || static_cast<usize>(length) >= sizeof(buffer)) {
+    return String{allocator};
+  }
+
+  return String{
+      allocator, StringView{buffer, static_cast<usize>(length)}
+  };
 }
 
 fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>
@@ -752,8 +821,13 @@ fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>
   /* A whole-seconds part too large for the signed nanosecond result saturates
      to the maximum rather than overflowing. */
   constexpr u64 max_whole_seconds = INT64_MAX / 1'000'000'000;
-  if (has_overflowed || whole_seconds >= max_whole_seconds)
+  constexpr i64 max_fractional_nanos = INT64_MAX % 1'000'000'000;
+  if (has_overflowed || whole_seconds > max_whole_seconds ||
+      (whole_seconds == max_whole_seconds &&
+       fractional_nanos > max_fractional_nanos))
+  {
     return static_cast<i64>(INT64_MAX);
+  }
 
   return static_cast<i64>(whole_seconds) * 1'000'000'000 + fractional_nanos;
 }
@@ -773,8 +847,8 @@ static pure fn digit_value_in_base(char c, u32 radix) wontthrow -> i32
   return value < radix ? static_cast<i32>(value) : -1;
 }
 
-fn parse_integer_in_base(StringView text, int_base base,
-                         bool *out_of_range) throws -> ErrorOr<i64>
+static fn parse_magnitude_in_base(StringView text, int_base base) throws
+    -> ErrorOr<parsed_integer_magnitude>
 {
   let const radix = static_cast<u32>(base);
   usize offset = 0;
@@ -817,20 +891,53 @@ fn parse_integer_in_base(StringView text, int_base base,
   skip_ascii_whitespace(text, offset);
   if (!has_digits || offset != text.length) return not_an_integer_error(text);
 
-  if (out_of_range != nullptr)
-    *out_of_range = has_overflowed || magnitude > static_cast<u64>(INT64_MAX) +
-                                                      (is_negative ? 1u : 0u);
-
-  return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
+  return parsed_integer_magnitude{magnitude, is_negative, has_overflowed};
 }
 
-fn find_pos_in_vec(const ArrayList<String> &suffixes,
-                   StringView wanted) wontthrow -> Maybe<usize>
+fn parse_integer_in_base(StringView text, int_base base,
+                         bool *out_of_range) throws -> ErrorOr<i64>
 {
-  for (usize i = 0; i < suffixes.count(); i++) {
-    if (suffixes[i] == wanted) return i;
-  }
-  return None;
+  let const parsed = TRY(parse_magnitude_in_base(text, base));
+
+  if (out_of_range != nullptr)
+    *out_of_range = parsed.has_overflowed ||
+                    parsed.magnitude > static_cast<u64>(INT64_MAX) +
+                                           (parsed.is_negative ? 1u : 0u);
+
+  return saturate_signed_magnitude(parsed.magnitude, parsed.is_negative,
+                                   parsed.has_overflowed);
+}
+
+fn parse_integer_in_base_u64(StringView text, int_base base) throws
+    -> ErrorOr<u64>
+{
+  let const parsed = TRY(parse_magnitude_in_base(text, base));
+  if (parsed.is_negative || parsed.has_overflowed)
+    return Error{"integer value out of range"};
+  return parsed.magnitude;
+}
+
+fn make_windows_program_suffixes() throws -> ArrayList<String>
+{
+  let suffixes = ArrayList<String>{heap_allocator()};
+  for (const char *suffix : {"", ".exe", ".com", ".scr", ".bat"})
+    suffixes.push(String{suffix});
+  return suffixes;
+}
+
+fn erase_program_extension(String &program_name,
+                           const ArrayList<String> &suffixes) throws -> usize
+{
+  let const extension_position = program_name.find_last_character('.');
+  if (!extension_position.has_value()) return 0;
+
+  let const extension = program_name.substring(*extension_position);
+  let const suffix_position = suffixes.find(extension);
+  if (!suffix_position.has_value()) return 0;
+
+  program_name =
+      String{program_name.substring_of_length(0, *extension_position)};
+  return *suffix_position;
 }
 
 fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>
@@ -1273,7 +1380,7 @@ fn byte_is_in_posix_class(StringView class_name, u8 byte) throws -> bool
   return false;
 }
 
-} // namespace
+} /* namespace */
 
 fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
                 usize mask_offset, bool extglob) throws -> bool
@@ -1567,27 +1674,29 @@ cold fn print_memory_report() wontthrow -> void
    compare. */
 static StringMap<ArrayList<Path>> PATH_CACHE{heap_allocator()};
 
-/* The filenames of each PATH directory, keyed by the directory text, so a
-   directory shared by several PATH entries or kept across a PATH change is read
-   from disk only once. A PATH update rebuilds PATH_CACHE from these listings,
-   reading from disk only the directories not already here. */
-static StringMap<ArrayList<String>> DIR_LISTING_CACHE{heap_allocator()};
+struct cached_directory_listing
+{
+  i64 modification_time{0};
+  u32 modification_nanoseconds{0};
+  u64 size{0};
+  bool is_valid{false};
+  ArrayList<Path::directory_child> entries{heap_allocator()};
+};
+
+static StringMap<cached_directory_listing> DIR_LISTING_CACHE{heap_allocator()};
+
+static fn clear_directory_listing_cache() throws -> void
+{
+  DIR_LISTING_CACHE.clear();
+}
 
 /* A cd and hash -r set this so the next lookup drops the cache and re-resolves,
    the way dash rehashes lazily. While it is false a hit returns the stored path
    with no stat. */
 static bool PATH_CACHE_IS_STALE = false;
 
-/* True once the interactive setup seeded the whole map, so a PATH change
-   rebuilds it eagerly. A non-interactive run never seeds it, so a PATH change
-   there only marks the cache stale and the resolver stays lazy. */
-static bool PATH_MAP_IS_EAGER = false;
-
 static ArrayList<String> PATH_COMMAND_NAMES{heap_allocator()};
 static bool PATH_COMMAND_NAMES_IS_VALID = false;
-
-static ArrayList<String> BUILT_PATH_DIRS{heap_allocator()};
-static bool BUILT_PATH_DIRS_IS_VALID = false;
 
 static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
@@ -1604,59 +1713,103 @@ static fn cache_resolved_path(StringView name, const Path &full_path) throws
       .push(full_path);
 }
 
-/* The filenames in a directory, read from disk on the first request and kept
-   under the directory text for later. An unreadable directory caches an empty
-   listing so it is not stat-walked again until the cache is dropped. */
-static fn directory_listing(const Path &directory) throws
-    -> const ArrayList<String> &
+fn read_directory_cached(const Path &directory) throws
+    -> const ArrayList<Path::directory_child> *
 {
   let const key = directory.text().view();
-  if (const ArrayList<String> *cached = DIR_LISTING_CACHE.find(key))
-    return *cached;
-  let entries = Path::read_directory(directory);
-  DIR_LISTING_CACHE.set(key, entries.has_value()
-                                 ? steal(*entries)
-                                 : ArrayList<String>{heap_allocator()});
-  return *DIR_LISTING_CACHE.find(key);
+  os::file_status status{};
+  let const has_status = os::stat_path(key, status);
+  if (const cached_directory_listing *cached = DIR_LISTING_CACHE.find(key);
+      cached != nullptr && cached->is_valid && has_status &&
+      cached->modification_time == status.modification_time &&
+      cached->modification_nanoseconds == status.modification_nanoseconds &&
+      cached->size == status.size)
+  {
+    return &cached->entries;
+  }
+
+  let entries = Path::read_directory_typed(directory);
+  if (!entries.has_value()) return nullptr;
+
+  for (let &child : *entries) {
+    if (child.kind != Path::entry_kind::Unknown) continue;
+
+    let full_path = directory.clone();
+    full_path.push_component(child.name.view());
+    if (full_path.is_directory())
+      child.kind = Path::entry_kind::Directory;
+    else if (full_path.is_regular_file())
+      child.kind = Path::entry_kind::Regular;
+    else
+      child.kind = Path::entry_kind::Other;
+  }
+
+  cached_directory_listing fresh{};
+  fresh.modification_time = has_status ? status.modification_time : 0;
+  fresh.modification_nanoseconds =
+      has_status ? status.modification_nanoseconds : 0;
+  fresh.size = has_status ? status.size : 0;
+  fresh.is_valid = has_status;
+  fresh.entries = steal(*entries);
+  DIR_LISTING_CACHE.set(key, steal(fresh));
+  return &DIR_LISTING_CACHE.find(key)->entries;
 }
 
-/* Rebuild the program cache from the current PATH, in PATH order so the first
-   directory's copy of a name wins. A directory whose listing is already cached
-   is not read again, so a PATH change that only adds a directory reads just
-   that one from disk. */
+fn directory_entry_kind(const Path &directory,
+                        const Path::directory_child &entry) throws
+    -> Path::entry_kind
+{
+  if (entry.kind != Path::entry_kind::Symlink) return entry.kind;
+
+  let full_path = directory.clone();
+  full_path.push_component(entry.name.view());
+  if (full_path.is_directory()) return Path::entry_kind::Directory;
+  if (full_path.is_regular_file()) return Path::entry_kind::Regular;
+  return Path::entry_kind::Other;
+}
+
+/* Rebuild the program cache in PATH order so the first copy of a name wins. */
 static fn rebuild_path_cache() throws -> void
 {
   PATH_CACHE.clear();
   PATH_CACHE_IS_STALE = false;
+  PATH_COMMAND_NAMES.clear();
   PATH_COMMAND_NAMES_IS_VALID = false;
-  if (!MAYBE_PATH.has_value()) return;
+  if (!MAYBE_PATH.has_value()) {
+    PATH_COMMAND_NAMES_IS_VALID = true;
+    return;
+  }
 
   let const path_dirs = split_path_dirs(*MAYBE_PATH);
 
-  BUILT_PATH_DIRS.clear();
-  BUILT_PATH_DIRS.reserve(path_dirs.count());
-  for (let const &dir_string : path_dirs)
-    BUILT_PATH_DIRS.push(String{dir_string.view()});
-  BUILT_PATH_DIRS_IS_VALID = true;
-
-  /* A counting pass sizes the cache once so the bulk insert does not climb a
-     rehash chain from sixteen slots. The directory listings cache, so the
-     insert pass below reads them back without a second readdir. */
-  usize total_entries = 0;
-  for (let const &dir_string : path_dirs)
-    total_entries += directory_listing(Path{dir_string.view()}).count();
-  PATH_CACHE.reserve(total_entries);
-
   for (let const &dir_string : path_dirs) {
     let const directory = Path{dir_string.view()};
-    for (let const &entry_name : directory_listing(directory)) {
-      let name = entry_name.clone();
+    let const entries = read_directory_cached(directory);
+    if (entries == nullptr) continue;
+    for (let const &entry : *entries) {
+      let name = entry.name.clone();
       os::erase_extension_and_get_its_index(name);
       let full_path = directory.clone();
-      full_path.push_component(entry_name.view());
+      full_path.push_component(entry.name.view());
       cache_resolved_path(name.view(), full_path);
+
+      if (directory_entry_kind(directory, entry) == Path::entry_kind::Regular &&
+          full_path.is_executable())
+      {
+        PATH_COMMAND_NAMES.push(String{name.view()});
+      }
     }
   }
+
+  PATH_COMMAND_NAMES.sort();
+  for (usize name_index = 1; name_index < PATH_COMMAND_NAMES.count();) {
+    if (PATH_COMMAND_NAMES[name_index - 1].view() ==
+        PATH_COMMAND_NAMES[name_index].view())
+      PATH_COMMAND_NAMES.remove(name_index);
+    else
+      name_index++;
+  }
+  PATH_COMMAND_NAMES_IS_VALID = true;
 }
 
 fn clear_path_map() throws -> void
@@ -1665,13 +1818,10 @@ fn clear_path_map() throws -> void
       PATH_CACHE.count());
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
-  DIR_LISTING_CACHE.clear();
+  clear_directory_listing_cache();
   PATH_COMMAND_NAMES.clear();
   PATH_COMMAND_NAMES_IS_VALID = false;
-  BUILT_PATH_DIRS.clear();
-  BUILT_PATH_DIRS_IS_VALID = false;
   PATH_CACHE_IS_STALE = false;
-  PATH_MAP_IS_EAGER = false;
 }
 
 fn invalidate_path_cache() throws -> void
@@ -1682,8 +1832,10 @@ fn invalidate_path_cache() throws -> void
      clear to the next lookup so a run that resolves no further command pays
      nothing. */
   LOG(Info, "invalidate_path_cache marking the program cache stale");
-  DIR_LISTING_CACHE.clear();
+  clear_directory_listing_cache();
   PATH_CACHE_IS_STALE = true;
+  PATH_COMMAND_NAMES.clear();
+  PATH_COMMAND_NAMES_IS_VALID = false;
 }
 
 fn set_path_for_resolution(Maybe<String> path) throws -> void
@@ -1696,23 +1848,9 @@ fn set_path_for_resolution(Maybe<String> path) throws -> void
     return;
 
   MAYBE_PATH = steal(path);
-  if (!PATH_MAP_IS_EAGER) {
-    /* A non-interactive run never seeded the map, so it stays lazy. */
-    PATH_CACHE_IS_STALE = true;
-    return;
-  }
-
-  if (MAYBE_PATH.has_value() && BUILT_PATH_DIRS_IS_VALID &&
-      !PATH_CACHE_IS_STALE)
-  {
-    let const new_dirs = split_path_dirs(*MAYBE_PATH);
-    if (new_dirs == BUILT_PATH_DIRS) return;
-  }
-
-  /* The listing cache survives a PATH change, so the rebuild reads from disk
-     only the directories the new PATH adds and reuses the rest. */
-  LOG(Info, "set_path_for_resolution rebuilding for a changed PATH");
-  rebuild_path_cache();
+  PATH_CACHE_IS_STALE = true;
+  PATH_COMMAND_NAMES.clear();
+  PATH_COMMAND_NAMES_IS_VALID = false;
 }
 
 /* Split PATH into its directory components. The last component carries no
@@ -1724,7 +1862,7 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
   let current = String{heap_allocator()};
 
   /* A directory that appears more than once in PATH is kept only on its first
-     occurrence, so the eager scan and the per-command resolve do not read it
+     occurrence, so the cache rebuild and the per-command resolve do not read it
      and re-resolve its files twice. The first occurrence keeps the search order
      unchanged. The directory count is small, so a linear check beats a set. */
   let const do_push_unique = [&](String dir) throws -> void {
@@ -1777,30 +1915,31 @@ static fn path_dirs() throws -> const ArrayList<String> &
 fn initialize_path_map() throws -> void
 {
   LOG(Info, "scanning every PATH directory to seed the program cache");
-  /* The interactive setup seeds the whole map once, so a later PATH change
-     rebuilds it eagerly while reading only the directories the change adds. */
-  PATH_MAP_IS_EAGER = true;
   rebuild_path_cache();
 }
 
 fn path_command_names() throws -> const ArrayList<String> &
 {
-  if (!PATH_MAP_IS_EAGER)
+  if (PATH_CACHE_IS_STALE || !PATH_COMMAND_NAMES_IS_VALID)
     initialize_path_map();
-  else if (PATH_CACHE_IS_STALE)
-    rebuild_path_cache();
-
-  if (!PATH_COMMAND_NAMES_IS_VALID) {
-    PATH_COMMAND_NAMES.clear();
-    PATH_COMMAND_NAMES.reserve(PATH_CACHE.count());
-    PATH_CACHE.for_each([](StringView name, const ArrayList<Path> &paths) {
-      unused(paths);
-      PATH_COMMAND_NAMES.push(String{name});
-    });
-    PATH_COMMAND_NAMES_IS_VALID = true;
-  }
 
   return PATH_COMMAND_NAMES;
+}
+
+fn path_command_name_has_prefix(StringView prefix) throws -> bool
+{
+  let const &names = path_command_names();
+  usize lower = 0;
+  usize upper = names.count();
+  while (lower < upper) {
+    let const middle = lower + (upper - lower) / 2;
+    if (names[middle].view() < prefix)
+      lower = middle + 1;
+    else
+      upper = middle;
+  }
+
+  return lower < names.count() && names[lower].view().starts_with(prefix);
 }
 
 /* Stat dir/name along PATH until a match, the way dash stats each candidate
@@ -1872,6 +2011,8 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
         static_cast<int>(program_name.length), program_name.data);
     PATH_CACHE.clear();
     PATH_CACHE_IS_STALE = false;
+    PATH_COMMAND_NAMES.clear();
+    PATH_COMMAND_NAMES_IS_VALID = false;
   }
 
   /* which -a wants every match, so it skips the cache and scans PATH in full.
@@ -1891,10 +2032,10 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
   if (typed_extension == 0) {
     if (const ArrayList<Path> *const cached =
             PATH_CACHE.find(program_name_without_extension.view());
-        cached != nullptr && cached->count() != 0)
+        cached != nullptr)
     {
       let result = ArrayList<Path>{heap_allocator()};
-      result.push((*cached)[0]);
+      if (!cached->is_empty()) result.push((*cached)[0]);
       return result;
     }
   }
@@ -2029,20 +2170,24 @@ fn read_entire_standard_input() throws -> String
 }
 
 fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
-                     char delimiter, i64 timeout_nanos,
-                     bool *was_timed_out) throws -> Maybe<String>
+                     char delimiter, u64 deadline_nanos, bool *was_timed_out,
+                     Allocator allocator) throws -> Maybe<String>
 {
-  const bool has_timeout = timeout_nanos >= 0;
-  const u64 deadline_nanos =
-      has_timeout ? os::monotonic_nanos() + static_cast<u64>(timeout_nanos) : 0;
-  let line = String{heap_allocator()};
+  let line = String{allocator};
   bool has_read_any_byte = false;
   loop
   {
-    if (has_timeout) {
-      i64 remaining_nanos =
-          static_cast<i64>(deadline_nanos - os::monotonic_nanos());
-      if (remaining_nanos < 0) remaining_nanos = 0;
+    if (deadline_nanos != 0) {
+      let const now_nanos = os::monotonic_nanos();
+      if (now_nanos >= deadline_nanos) {
+        if (was_timed_out != nullptr) *was_timed_out = true;
+        break;
+      }
+      let const remaining_nanos_unsigned = deadline_nanos - now_nanos;
+      let const remaining_nanos = static_cast<i64>(
+          remaining_nanos_unsigned > static_cast<u64>(INT64_MAX)
+              ? INT64_MAX
+              : remaining_nanos_unsigned);
       let const readable = os::wait_for_fd_readable(fd, remaining_nanos);
       if (readable != 1) {
         if (readable == 0 && was_timed_out != nullptr) *was_timed_out = true;
@@ -2126,6 +2271,6 @@ fn current_git_branch() throws -> String
   return String{heap_allocator()};
 }
 
-} // namespace utils
+} /* namespace utils */
 
-} // namespace shit
+} /* namespace shit */

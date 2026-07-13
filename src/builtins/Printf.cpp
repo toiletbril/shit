@@ -3,10 +3,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-v var] format [argument ...]");
@@ -110,7 +106,7 @@ fn parse_printf_number(const String &arg) throws -> printf_number
                                                     &is_out_of_range)
       : is_octal ? utils::parse_integer_in_base(number_text, int_base::octal,
                                                 &is_out_of_range)
-                 : utils::parse_decimal_integer(number_text, &is_out_of_range);
+                 : utils::parse_decimal_i64(number_text, &is_out_of_range);
   let const has_digits = number_end > digit_start;
   return {parsed.is_error() ? 0 : parsed.value(),
           has_digits && number_end == arg.count(), is_hexadecimal,
@@ -422,7 +418,7 @@ fn append_conversion(String &out, const String &spec, char conv,
   }
 }
 
-} // namespace
+} /* namespace */
 
 Printf::Printf() = default;
 
@@ -599,4 +595,4 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return exit_status;
 }
 
-} // namespace shit
+} /* namespace shit */

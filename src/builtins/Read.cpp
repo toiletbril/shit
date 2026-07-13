@@ -92,6 +92,36 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (timeout_nanos == 0)
     return os::wait_for_fd_readable(read_fd, 0) == 1 ? 0 : 1;
 
+  let was_timed_out = false;
+  let const start_nanos = os::monotonic_nanos();
+  let const duration_nanos = static_cast<u64>(timeout_nanos);
+  const u64 deadline_nanos = timeout_nanos < 0
+                                 ? 0
+                                 : (UINT64_MAX - start_nanos < duration_nanos
+                                        ? UINT64_MAX
+                                        : start_nanos + duration_nanos);
+  let do_read_byte = [&](char &byte) -> Maybe<usize> {
+    if (deadline_nanos != 0) {
+      let const now_nanos = os::monotonic_nanos();
+      if (now_nanos >= deadline_nanos) {
+        was_timed_out = true;
+        return shit::None;
+      }
+      let const remaining_nanos_unsigned = deadline_nanos - now_nanos;
+      let const remaining_nanos = static_cast<i64>(
+          remaining_nanos_unsigned > static_cast<u64>(INT64_MAX)
+              ? INT64_MAX
+              : remaining_nanos_unsigned);
+      let const readable = os::wait_for_fd_readable(read_fd, remaining_nanos);
+      if (readable != 1) {
+        was_timed_out = readable == 0;
+        return shit::None;
+      }
+    }
+
+    return os::read_fd(read_fd, &byte, 1);
+  };
+
   /* A -p prompt prints only when the read's own input is a terminal, matching
      bash for a redirected descriptor. */
   if (FLAG_READ_PROMPT.is_set() &&
@@ -103,8 +133,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* Query mode is a yes or no probe, so the answer never reaches a variable. */
   if (FLAG_READ_QUERY.is_enabled()) {
     char answer = 0;
-    let const got = os::read_fd(read_fd, &answer, 1);
-    if (!got.has_value() || *got == 0) return 1;
+    let const got = do_read_byte(answer);
+    if (!got.has_value() || *got == 0) return was_timed_out ? 142 : 1;
     return (answer == 'y' || answer == 'Y') ? 0 : 1;
   }
 
@@ -140,37 +170,21 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const should_process_escapes = !FLAG_READ_RAW.is_enabled();
 
   let was_newline_terminated = false;
-  let was_timed_out = false;
   let was_read_successful = false;
 
   let line = String{cxt.scratch_allocator()};
   let is_literal_byte = ArrayList<bool>{cxt.scratch_allocator()};
 
   if (FLAG_READ_NCHARS.is_set()) {
-    const u64 deadline_nanos =
-        timeout_nanos > 0
-            ? os::monotonic_nanos() + static_cast<u64>(timeout_nanos)
-            : 0;
     i64 output_count = 0;
     while (output_count < max_bytes) {
-      if (timeout_nanos > 0) {
-        i64 remaining_nanos =
-            static_cast<i64>(deadline_nanos - os::monotonic_nanos());
-        if (remaining_nanos < 0) remaining_nanos = 0;
-        let const readable = os::wait_for_fd_readable(read_fd, remaining_nanos);
-        if (readable != 1) {
-          if (readable == 0) was_timed_out = true;
-          break;
-        }
-      }
-
       char byte = 0;
-      let const got = os::read_fd(read_fd, &byte, 1);
+      let const got = do_read_byte(byte);
       if (!got.has_value() || *got == 0) break;
 
       if (should_process_escapes && byte == '\\') {
         char escaped_byte = 0;
-        let const got_escaped = os::read_fd(read_fd, &escaped_byte, 1);
+        let const got_escaped = do_read_byte(escaped_byte);
         if (!got_escaped.has_value() || *got_escaped == 0) break;
 
         if (escaped_byte == '\n') continue;
@@ -194,13 +208,13 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (output_count >= max_bytes) was_newline_terminated = true;
     was_read_successful = output_count > 0 || was_newline_terminated;
   } else {
-    let read_line =
-        utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter,
-                                 timeout_nanos, &was_timed_out);
+    let read_line = utils::read_line_from_fd(
+        read_fd, was_newline_terminated, delimiter, deadline_nanos,
+        &was_timed_out, cxt.scratch_allocator());
     if (read_line.has_value()) {
       was_read_successful = true;
 
-      let accumulated = String{cxt.scratch_allocator(), read_line->view()};
+      let accumulated = steal(*read_line);
       if (should_process_escapes) {
         let do_trailing_backslash_count = [&accumulated]() -> usize {
           usize backslash_count = 0;
@@ -214,7 +228,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         {
           accumulated.pop_back();
           let const continued = utils::read_line_from_fd(
-              read_fd, was_newline_terminated, delimiter);
+              read_fd, was_newline_terminated, delimiter, deadline_nanos,
+              &was_timed_out, cxt.scratch_allocator());
           if (!continued.has_value()) break;
           accumulated.append(continued->view());
         }
@@ -278,12 +293,12 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
     }
     cxt.set_indexed_array(FLAG_READ_ARRAY.value(), steal(words));
-    return was_newline_terminated ? 0 : 1;
+    return was_timed_out ? 142 : (was_newline_terminated ? 0 : 1);
   }
 
   if (!has_operands) {
     cxt.set_shell_variable(reply_name, line.view());
-    return was_newline_terminated ? 0 : 1;
+    return was_timed_out ? 142 : (was_newline_terminated ? 0 : 1);
   }
 
   usize cursor = 0;
@@ -339,7 +354,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  return was_newline_terminated ? 0 : 1;
+  return was_timed_out ? 142 : (was_newline_terminated ? 0 : 1);
 }
 
-} // namespace shit
+} /* namespace shit */

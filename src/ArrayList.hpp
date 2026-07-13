@@ -3,6 +3,7 @@
 #include "Allocator.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
+#include "Maybe.hpp"
 
 namespace shit {
 
@@ -99,6 +100,14 @@ public:
   hot mustuse pure fn end() const wontthrow -> const T *
   {
     return m_data + m_length;
+  }
+
+  template <class Wanted>
+  hot mustuse pure fn find(const Wanted &wanted) const wontthrow -> Maybe<usize>
+  {
+    for (usize element_index = 0; element_index < m_length; element_index++)
+      if (m_data[element_index] == wanted) return element_index;
+    return None;
   }
 
   hot fn push(T value) throws -> void
@@ -308,4 +317,4 @@ private:
   usize m_capacity{0};
 };
 
-} // namespace shit
+} /* namespace shit */

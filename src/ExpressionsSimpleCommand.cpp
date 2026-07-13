@@ -308,7 +308,7 @@ fn resolve_duplication(const Redirection &redir, EvalContext &cxt) throws
                               shit::None};
 }
 
-} // namespace
+} /* namespace */
 
 static fn redirection_open_mode(Redirection::Kind kind,
                                 bool no_clobber) wontthrow -> os::file_open_mode
@@ -605,7 +605,7 @@ static fn command_word_is_glob(const Word &word) wontthrow -> bool
   return false;
 }
 
-} // namespace
+} /* namespace */
 
 hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
@@ -1191,10 +1191,6 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (cxt.should_retitle_for_command())
     toiletline::set_title(utils::merge_args_to_string(program_args));
 
-  const bool is_cache_valid = m_resolved_kind.has_value() &&
-                              program_args[0] == m_resolved_name &&
-                              m_resolved_mood == cxt.mood();
-
   /* $_ reads the last argument of the previous command, captured here before
      the argument vector moves into the exec context. */
   let const last_argument = program_args.is_empty()
@@ -1203,14 +1199,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   Maybe<ExecContext> resolved_ec;
   try {
-    resolved_ec =
-        is_cache_valid
-            ? ExecContext::from_resolved(source_location(), *m_resolved_kind,
-                                         steal(program_args),
-                                         steal(program_arg_locations))
-            : ExecContext::make_from(source_location(), steal(program_args),
-                                     cxt.mood(), cxt.shitbox(),
-                                     steal(program_arg_locations));
+    resolved_ec = ExecContext::make_from(source_location(), steal(program_args),
+                                         cxt.mood(), cxt.shitbox(),
+                                         steal(program_arg_locations));
   } catch (const CommandNotFound &e) {
     report_command_not_found(cxt, e);
     cxt.set_last_exit_status(127);
@@ -1218,24 +1209,6 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     return 127;
   }
   let ec = resolved_ec.take();
-
-  if (!is_cache_valid) {
-    /* A shitbox resolution depends on the mood-gated fallback or the runtime
-       toggle, which can differ between runs, so it is not memoized. */
-    Maybe<ResolvedCommand> to_cache;
-    if (ec.is_builtin()) {
-      if (ec.builtin_kind() != Builtin::Kind::Shitbox)
-        to_cache = ResolvedCommand::from_builtin(ec.builtin_kind());
-    } else {
-      to_cache = ResolvedCommand::from_program(ec.program_path());
-    }
-
-    if (to_cache.has_value()) {
-      m_resolved_kind = to_cache;
-      m_resolved_name = ec.program();
-      m_resolved_mood = cxt.mood();
-    }
-  }
 
   /* The exec context now owns and closes the staged input descriptor. The
      stdout and stderr redirects already took effect on the real shell fds. */
@@ -1330,6 +1303,6 @@ cold fn SimpleCommand::to_string() const throws -> String
   return s;
 }
 
-} // namespace expressions
+} /* namespace expressions */
 
-} // namespace shit
+} /* namespace shit */

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Common.hpp"
+
 #define POSIX 0b1
 #define WIN32 0b10
 #define COSMO 0b100
@@ -7,15 +9,46 @@
 /* clang-format off */
 #if defined __linux__ || defined BSD || defined __APPLE__ ||                   \
     defined __COSMOPOLITAN__
+#include <dirent.h>
 #include <fcntl.h>
-#include <locale.h>
+#include <glob.h>
+#include <poll.h>
 #include <pthread.h>
 #include <pwd.h>
 #include <regex.h>
-#include <string.h>
+#include <spawn.h>
+#include <sys/ioctl.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/times.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
+#include <termios.h>
 #include <unistd.h>
+#if defined CEOF
+#undef CEOF
+#endif
+#if defined __linux__
+#include <linux/perf_event.h>
+#include <sys/syscall.h>
+#endif
+#if defined __GLIBC__
+#include <malloc.h>
+#endif
+#if defined __APPLE__
+#include <dlfcn.h>
+#include <libproc.h>
+#include <mach-o/dyld.h>
+#include <sys/proc.h>
+#include <sys/proc_info.h>
+#include <sys/sysctl.h>
+#endif
+#if defined __SANITIZE_ADDRESS__
+#include <sanitizer/lsan_interface.h>
+#define SHIT_HAS_ADDRESS_SANITIZER 1
+#endif
 #if defined __COSMOPOLITAN__
 #include <cosmo.h>
 #define SHIT_SUPPORT_VECTOR (COSMO | POSIX)
@@ -25,6 +58,12 @@
 #elif defined _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <direct.h>
+#include <io.h>
+#include <malloc.h>
+#include <psapi.h>
+#include <sys/stat.h>
+#include <tlhelp32.h>
 #define SHIT_SUPPORT_VECTOR (WIN32)
 #endif
 /* clang-format on */
@@ -38,8 +77,11 @@
 #define SHIT_BROKEN_PIPE_EXIT_STATUS 141
 #endif
 
+#if SHIT_PLATFORM_IS POSIX
+extern char **environ;
+#endif
+
 #include "ArrayList.hpp"
-#include "Common.hpp"
 #include "Maybe.hpp"
 #include "Path.hpp"
 #include "String.hpp"
@@ -165,6 +207,7 @@ enum class process_state : u8
 fn poll_process(process p, i32 &status_out) wontthrow -> process_state;
 
 fn signal_process(process p, i32 signal_number) wontthrow -> bool;
+fn is_process_signal_supported(i32 signal_number) wontthrow -> bool;
 
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>;
 
@@ -218,6 +261,7 @@ struct file_status
   u32 group_id{0};
   u64 size{0};
   i64 modification_time{0};
+  u32 modification_nanoseconds{0};
   u64 blocks{0};
 };
 
@@ -460,6 +504,7 @@ fn is_running_setuid() wontthrow -> bool;
 fn reopen_terminal_as_stdin() wontthrow -> bool;
 
 fn process_id_of(process p) wontthrow -> i64;
+fn process_group_of(process p) wontthrow -> process;
 fn process_has_id(process p, i64 id) wontthrow -> bool;
 
 fn is_stdin_a_tty() wontthrow -> bool;
@@ -550,6 +595,7 @@ struct measured_result
   u64 peak_rss_bytes{0};
   i64 exit_status{0};
   bool has_perf{false};
+  bool is_perf_system_wide{false};
   perf_counts perf{};
 };
 
@@ -606,6 +652,6 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
 
 fn redirect_self(const ExecContext &ec) throws -> void;
 
-} // namespace os
+} /* namespace os */
 
-} // namespace shit
+} /* namespace shit */

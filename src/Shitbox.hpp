@@ -45,6 +45,7 @@ public:
     Sort,
     Uniq,
     Sleep,
+    Timeout,
     Env,
     Yes,
     Pkill,
@@ -94,6 +95,7 @@ inline constexpr static_string_entry<Utility::Kind> SHITBOX_ENTRIES[] = {
     {SSK("sort"),     Utility::Kind::Sort    },
     {SSK("uniq"),     Utility::Kind::Uniq    },
     {SSK("sleep"),    Utility::Kind::Sleep   },
+    {SSK("timeout"),  Utility::Kind::Timeout },
     {SSK("env"),      Utility::Kind::Env     },
     {SSK("yes"),      Utility::Kind::Yes     },
     {SSK("pkill"),    Utility::Kind::Pkill   },
@@ -195,6 +197,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Sort);                                                                \
   U_CASE(Uniq);                                                                \
   U_CASE(Sleep);                                                               \
+  U_CASE(Timeout);                                                             \
   U_CASE(Env);                                                                 \
   U_CASE(Yes);                                                                 \
   U_CASE(Pkill);                                                               \
@@ -243,6 +246,7 @@ UTILITY_STRUCT(Grep);
 UTILITY_STRUCT(Sort);
 UTILITY_STRUCT(Uniq);
 UTILITY_STRUCT(Sleep);
+UTILITY_STRUCT(Timeout);
 UTILITY_STRUCT(Env);
 UTILITY_STRUCT(Yes);
 UTILITY_STRUCT(Pkill);
@@ -276,6 +280,9 @@ fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void;
 
 fn format_human_size(u64 bytes, Allocator allocator) throws -> String;
 
+fn parse_shitbox_duration_seconds(StringView text, StringView utility_name,
+                                  Allocator allocator) throws -> f64;
+
 fn resolve_shitbox_signal(StringView spelled, Allocator allocator) throws
     -> i32;
 
@@ -291,6 +298,6 @@ fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message, StringView note) throws
     -> void;
 
-} // namespace shitbox
+} /* namespace shitbox */
 
-} // namespace shit
+} /* namespace shit */

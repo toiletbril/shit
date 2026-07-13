@@ -57,6 +57,14 @@ public:
   {
     return !(*this == other);
   }
+  hot mustuse pure fn operator<(StringView other) const wontthrow->bool
+  {
+    let const shared_length = length < other.length ? length : other.length;
+    let const order = shared_length == 0
+                          ? 0
+                          : __builtin_memcmp(data, other.data, shared_length);
+    return order < 0 || (order == 0 && length < other.length);
+  }
 
   template <class T>
   mustuse fn to() const throws -> ErrorOr<T>;

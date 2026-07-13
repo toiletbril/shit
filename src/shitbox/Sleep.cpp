@@ -3,9 +3,6 @@
 #include "../Eval.hpp"
 #include "../Shitbox.hpp"
 
-#include <cmath>
-#include <cstdlib>
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("duration ...");
@@ -37,53 +34,18 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
-  double total_seconds = 0.0;
+  f64 total_seconds = 0.0;
   bool should_sleep_forever = false;
   for (const String &operand : operands) {
-    let const duration = operand.view();
+    let const seconds_value = parse_shitbox_duration_seconds(
+        operand.view(), StringView{"sleep"}, cxt.scratch_allocator());
 
-    let const number = String{cxt.scratch_allocator(), duration};
-    let const start = number.c_str();
-    char *end = nullptr;
-    let const seconds_value = std::strtod(start, &end);
-
-    let digits = start;
-    if (*digits == '+' || *digits == '-') digits++;
-    const bool is_hex_prefix =
-        digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X');
-    if (end == start || is_hex_prefix || std::isnan(seconds_value) ||
-        seconds_value < 0.0)
-      throw ErrorWithDetails{
-          "sleep: invalid duration '" + number + "'",
-          "Use a non-negative number with an optional `s`, `m`, `h`, or `d` "
-          "suffix, e.g. `sleep 5`"};
-
-    double unit_multiplier = 1.0;
-    if (*end != '\0' && *(end + 1) == '\0') {
-      switch (*end) {
-      case 's': unit_multiplier = 1.0; break;
-      case 'm': unit_multiplier = 60.0; break;
-      case 'h': unit_multiplier = 60.0 * 60.0; break;
-      case 'd': unit_multiplier = 60.0 * 60.0 * 24.0; break;
-      default:
-        throw ErrorWithDetails{
-            "sleep: invalid duration '" + number + "'",
-            "Use a non-negative number with an optional `s`, `m`, `h`, or `d` "
-            "suffix, e.g. `sleep 5`"};
-      }
-    } else if (*end != '\0') {
-      throw ErrorWithDetails{
-          "sleep: invalid duration '" + number + "'",
-          "Use a non-negative number with an optional `s`, `m`, `h`, or `d` "
-          "suffix, e.g. `sleep 5`"};
-    }
-
-    if (std::isinf(seconds_value)) {
+    if (__builtin_isinf(seconds_value)) {
       should_sleep_forever = true;
       continue;
     }
 
-    total_seconds += seconds_value * unit_multiplier;
+    total_seconds += seconds_value;
   }
 
   if (should_sleep_forever) {
@@ -97,6 +59,6 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
   return os::INTERRUPT_REQUESTED ? 130 : 0;
 }
 
-} // namespace shitbox
+} /* namespace shitbox */
 
-} // namespace shit
+} /* namespace shit */

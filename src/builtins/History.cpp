@@ -196,7 +196,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   usize wanted_count = 0;
   if (args.count() > 1) {
-    let const parsed = utils::parse_decimal_integer(args[1].view());
+    let const parsed = utils::parse_decimal_i64(args[1].view());
     if (parsed.is_error()) {
       report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
                                 StringView{"'"} + args[1].view() +
@@ -211,4 +211,4 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} /* namespace shit */

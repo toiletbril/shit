@@ -1,0 +1,2068 @@
+#include "Cli.hpp"
+#include "Common.hpp"
+#include "Debug.hpp"
+#include "Errors.hpp"
+#include "Eval.hpp"
+#include "Platform.hpp"
+#include "Trace.hpp"
+#include "Utils.hpp"
+
+namespace shit {
+namespace os {
+
+volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
+volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
+volatile sig_atomic_t SIGNAL_PENDING = 0;
+
+static constexpr i32 SIGNAL_FLAG_COUNT = 128;
+static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
+
+static fn is_trappable_signal(i32 signal_number) wontthrow -> bool
+{
+  return signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT;
+}
+
+fn take_pending_signal() wontthrow -> i32
+{
+  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
+    if (PENDING_SIGNAL_FLAGS[number] != 0) {
+      PENDING_SIGNAL_FLAGS[number] = 0;
+      return number;
+    }
+  }
+  return 0;
+}
+
+} /* namespace os */
+} /* namespace shit */
+
+#define SHIT_UMASK(mask) _umask(static_cast<int>(mask))
+
+namespace shit {
+
+namespace os {
+
+fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
+    -> Maybe<usize>
+{
+  DWORD w = -1;
+  if (WriteFile(fd, buf, size, &w, 0) == FALSE) /* NOLINT */
+    return shit::None;
+  return static_cast<usize>(w);
+}
+
+fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
+    -> Maybe<usize>
+{
+  let const handle = reinterpret_cast<os::descriptor>(
+      _get_osfhandle(static_cast<int>(fd_number)));
+  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+  return write_fd(handle, buf, size);
+}
+
+fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
+{
+  DWORD r = -1;
+  if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
+    return shit::None;
+  return static_cast<usize>(r);
+}
+
+fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32
+{
+  let const file_type = GetFileType(fd);
+  if (file_type == FILE_TYPE_UNKNOWN && GetLastError() != NO_ERROR) return -1;
+  if (file_type == FILE_TYPE_DISK) return 1;
+
+  let const has_timeout = timeout_nanos >= 0;
+  let const started_at = monotonic_nanos();
+  let const timeout = has_timeout ? static_cast<u64>(timeout_nanos) : 0;
+  INPUT_RECORD *console_events = nullptr;
+  DWORD console_event_capacity = 0;
+  defer
+  {
+    if (console_events != nullptr)
+      HeapFree(GetProcessHeap(), 0, console_events);
+  };
+
+  loop
+  {
+    if (file_type == FILE_TYPE_PIPE) {
+      DWORD available_byte_count = 0;
+      if (PeekNamedPipe(fd, nullptr, 0, nullptr, &available_byte_count,
+                        nullptr) != FALSE)
+      {
+        if (available_byte_count != 0) return 1;
+      } else {
+        let const error = GetLastError();
+        if (error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA) return 1;
+        return -1;
+      }
+    } else if (file_type == FILE_TYPE_CHAR) {
+      DWORD console_mode = 0;
+      if (GetConsoleMode(fd, &console_mode) == FALSE) {
+        let const wait_result = WaitForSingleObject(fd, 0);
+        if (wait_result == WAIT_OBJECT_0) return 1;
+        if (wait_result == WAIT_FAILED) return -1;
+      } else {
+        DWORD event_count = 0;
+        if (GetNumberOfConsoleInputEvents(fd, &event_count) == FALSE) return -1;
+        if (event_count == 0) {
+          if (has_timeout && monotonic_nanos() - started_at >= timeout)
+            return 0;
+          Sleep(1);
+          continue;
+        }
+
+        if (event_count > console_event_capacity) {
+          let const resized =
+              console_events == nullptr
+                  ? HeapAlloc(GetProcessHeap(), 0,
+                              static_cast<usize>(event_count) *
+                                  sizeof(INPUT_RECORD))
+                  : HeapReAlloc(GetProcessHeap(), 0, console_events,
+                                static_cast<usize>(event_count) *
+                                    sizeof(INPUT_RECORD));
+          if (resized == nullptr) return -1;
+          console_events = static_cast<INPUT_RECORD *>(resized);
+          console_event_capacity = event_count;
+        }
+        DWORD peeked_event_count = 0;
+        let const did_peek = PeekConsoleInputA(fd, console_events, event_count,
+                                               &peeked_event_count);
+        let const needs_complete_line = (console_mode & ENABLE_LINE_INPUT) != 0;
+        bool is_readable = false;
+        if (did_peek != FALSE) {
+          for (DWORD event_index = 0; event_index < peeked_event_count;
+               event_index++)
+          {
+            let const &event = console_events[event_index];
+            if (event.EventType != KEY_EVENT ||
+                event.Event.KeyEvent.bKeyDown == FALSE)
+              continue;
+
+            let const character = event.Event.KeyEvent.uChar.UnicodeChar;
+            if ((!needs_complete_line && character != 0) ||
+                (needs_complete_line &&
+                 (character == '\r' || character == '\n' || character == 0x1a)))
+            {
+              is_readable = true;
+              break;
+            }
+          }
+        }
+        if (did_peek == FALSE) return -1;
+        if (is_readable) return 1;
+      }
+    } else {
+      return -1;
+    }
+
+    if (has_timeout && monotonic_nanos() - started_at >= timeout) return 0;
+    Sleep(1);
+  }
+}
+
+fn close_fd(os::descriptor fd) wontthrow -> bool
+{
+  return CloseHandle(fd) != FALSE;
+}
+
+fn TempFileSet::track(Path path) throws -> void { m_paths.push(steal(path)); }
+fn TempFileSet::count() const wontthrow -> usize { return m_paths.count(); }
+fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
+{
+  /* A failed delete keeps the path and retries once the descriptor closes. */
+  usize kept = mark;
+  for (usize i = mark; i < m_paths.count(); i++) {
+    if (DeleteFileA(m_paths[i].c_str()) != FALSE) continue;
+    if (kept != i) m_paths[kept] = steal(m_paths[i]);
+    kept++;
+  }
+  while (m_paths.count() > kept)
+    m_paths.remove(m_paths.count() - 1);
+}
+
+/* Windows inherits handles per CreateProcess, so this is a no-op. */
+fn make_fd_inheritable(os::descriptor fd) wontthrow -> void { unused(fd); }
+
+fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
+{
+  os::descriptor saved = GetStdHandle(STD_OUTPUT_HANDLE);
+  SetStdHandle(STD_OUTPUT_HANDLE, target);
+  return saved;
+}
+
+fn restore_stdout(os::descriptor saved) wontthrow -> void
+{
+  SetStdHandle(STD_OUTPUT_HANDLE, saved);
+}
+
+/* Windows addresses only the three standard streams. */
+static fn std_handle_slot_for_shell_fd(i32 shell_fd) -> Maybe<DWORD>
+{
+  switch (shell_fd) {
+  case 0: return STD_INPUT_HANDLE;
+  case 1: return STD_OUTPUT_HANDLE;
+  case 2: return STD_ERROR_HANDLE;
+  default: return shit::None;
+  }
+}
+
+fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
+    -> saved_descriptor
+{
+  saved_descriptor result{};
+  result.shell_fd = shell_fd;
+
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) {
+    result.is_dup2_ok = false;
+    return result;
+  }
+
+  if (target == INVALID_HANDLE_VALUE) {
+    result.is_dup2_ok = false;
+    return result;
+  }
+
+  result.saved = GetStdHandle(*slot);
+  result.was_open = result.saved != INVALID_HANDLE_VALUE;
+
+  /* SetStdHandle does not copy, so the target is duplicated here and the dup
+     stays valid until restore_descriptor closes it. */
+  HANDLE duplicate = INVALID_HANDLE_VALUE;
+  if (DuplicateHandle(GetCurrentProcess(), target, GetCurrentProcess(),
+                      &duplicate, 0, TRUE, DUPLICATE_SAME_ACCESS) == 0)
+  {
+    result.is_dup2_ok = false;
+    return result;
+  }
+  SetStdHandle(*slot, duplicate);
+  result.replacement = duplicate;
+  result.is_dup2_ok = true;
+  return result;
+}
+
+fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
+{
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
+  if (!slot.has_value()) return;
+  SetStdHandle(*slot, saved.was_open ? saved.saved : INVALID_HANDLE_VALUE);
+  if (saved.is_dup2_ok && saved.replacement != INVALID_HANDLE_VALUE)
+    CloseHandle(saved.replacement);
+}
+
+fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
+{
+  saved_descriptor result{};
+  result.shell_fd = shell_fd;
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) {
+    result.is_dup2_ok = false;
+    return result;
+  }
+  result.saved = GetStdHandle(*slot);
+  result.was_open = result.saved != INVALID_HANDLE_VALUE;
+  result.replacement = INVALID_HANDLE_VALUE;
+  result.is_dup2_ok = true;
+  return result;
+}
+
+/* Windows has no /dev/tty rebind. */
+fn reopen_terminal_as_stdin() wontthrow -> bool { return false; }
+
+/* Windows has no POSIX process groups, so the terminal handoff is a no-op. */
+fn shell_has_controlling_terminal() wontthrow -> bool { return false; }
+fn give_controlling_terminal_to(process p) wontthrow -> void { unused(p); }
+fn reclaim_controlling_terminal() wontthrow -> void {}
+
+/* Windows resolves a path lazily, so completion uses it as given. */
+fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
+{
+  return path.clone();
+}
+
+fn glob_matches(StringView pattern, Allocator allocator) throws
+    -> ArrayList<String>
+{
+  let matches = ArrayList<String>{allocator};
+
+  const String pattern_string{allocator, pattern};
+  WIN32_FIND_DATAA find_data;
+  const HANDLE handle = FindFirstFileA(pattern_string.c_str(), &find_data);
+  if (handle == INVALID_HANDLE_VALUE) return matches;
+  defer { FindClose(handle); };
+
+  /* FindFirstFile yields bare names, so the directory prefix is kept to rebuild
+     the path. */
+  usize prefix_length = 0;
+  for (usize i = 0; i < pattern.length; i++)
+    if (pattern[i] == '/' || pattern[i] == '\\') prefix_length = i + 1;
+  const StringView prefix = pattern.substring_of_length(0, prefix_length);
+
+  do {
+    const StringView name{find_data.cFileName};
+    if (name == "." || name == "..") {
+      continue;
+    }
+
+    let entry = String{allocator, prefix};
+    entry += name;
+    matches.push(steal(entry));
+  } while (FindNextFileA(handle, &find_data) != 0);
+
+  return matches;
+}
+
+fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
+{
+  /* Windows ownership and ACL checks differ from the POSIX owner and mode bits,
+     so until a Windows check lands no directory is trusted and the --help
+     completion fork stays off. */
+  unused(directory);
+  return false;
+}
+
+fn capture_program_output(const ArrayList<String> &argv,
+                          u64 timeout_nanos) wontthrow -> Maybe<String>
+{
+  /* The --help completion fork is off on Windows until the timed capture is
+     ported, so nothing is captured. */
+  unused(argv);
+  unused(timeout_nanos);
+  return None;
+}
+
+fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
+{
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) return SHIT_INVALID_FD;
+  return GetStdHandle(*slot);
+}
+
+fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
+{
+  return reinterpret_cast<os::descriptor>(
+      _get_osfhandle(static_cast<int>(fd_number)));
+}
+
+fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
+{
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) return false;
+  if (target == INVALID_HANDLE_VALUE) return false;
+  SetStdHandle(*slot, target);
+  return true;
+}
+
+fn close_shell_fd(i32 shell_fd) wontthrow -> bool
+{
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) return false;
+  const os::descriptor handle = GetStdHandle(*slot);
+  SetStdHandle(*slot, INVALID_HANDLE_VALUE);
+  if (handle == INVALID_HANDLE_VALUE) return false;
+  return CloseHandle(handle) != FALSE;
+}
+
+fn allocate_free_shell_fd(i32 floor_fd) wontthrow -> i32
+{
+  (void) floor_fd;
+  return -1;
+}
+
+fn get_current_user() -> Maybe<String>
+{
+  DWORD size = 0;
+  GetUserNameA(nullptr, &size);
+  if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+    ArrayList<char> buffer{heap_allocator()};
+    buffer.reserve(size);
+    for (DWORD i = 0; i < size; i++)
+      buffer.push('\0');
+    if (GetUserNameA(buffer.begin(), &size))
+      return String{
+          StringView{buffer.begin(), size - 1}
+      };
+  }
+  return shit::None;
+}
+
+fn get_hostname() throws -> Maybe<String>
+{
+  char buffer[MAX_COMPUTERNAME_LENGTH + 1];
+  DWORD size = sizeof(buffer);
+  if (GetComputerNameA(buffer, &size))
+    return String{
+        StringView{buffer, size}
+    };
+  return shit::None;
+}
+
+fn get_home_directory() -> Maybe<Path>
+{
+  if (Maybe<String> home = get_environment_variable("USERPROFILE"))
+    return Path{StringView{*home}};
+  return shit::None;
+}
+
+/* Windows has no /etc/passwd, so ~user stays literal. */
+fn get_home_for_user(StringView username) throws -> Maybe<Path>
+{
+  unused(username);
+  return shit::None;
+}
+
+fn enumerate_users() throws -> ArrayList<String>
+{
+  return ArrayList<String>{heap_allocator()};
+}
+
+static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
+static constexpr uintptr PROCESS_REFERENCE_MASK = 3u;
+static constexpr uintptr PID_REFERENCE_TAG = 1u;
+static constexpr uintptr PROCESS_GROUP_REFERENCE_TAG = 3u;
+
+static pure fn process_is_pid_reference(process p) wontthrow -> bool
+{
+  return (reinterpret_cast<uintptr_t>(p) & PROCESS_REFERENCE_MASK) ==
+         PID_REFERENCE_TAG;
+}
+
+static pure fn process_is_group_reference(process p) wontthrow -> bool
+{
+  return (reinterpret_cast<uintptr_t>(p) & PROCESS_REFERENCE_MASK) ==
+         PROCESS_GROUP_REFERENCE_TAG;
+}
+
+static pure fn pid_from_reference(process p) wontthrow -> DWORD
+{
+  return static_cast<DWORD>(reinterpret_cast<uintptr_t>(p) >> 2u);
+}
+
+static pure fn process_from_group_reference(process p) wontthrow -> process
+{
+  return reinterpret_cast<process>(reinterpret_cast<uintptr>(p) &
+                                   ~PROCESS_REFERENCE_MASK);
+}
+
+fn is_child_process() wontthrow -> bool
+{
+  return GetCurrentProcessId() != PARENT_SHELL_PID;
+}
+
+/* Windows has no setuid or setgid notion. */
+fn is_running_setuid() wontthrow -> bool { return false; }
+
+fn process_id_of(process p) wontthrow -> i64
+{
+  if (process_is_pid_reference(p)) return pid_from_reference(p);
+  if (process_is_group_reference(p)) p = process_from_group_reference(p);
+  return static_cast<i64>(GetProcessId(p));
+}
+
+fn process_group_of(process p) wontthrow -> process
+{
+  return reinterpret_cast<process>(reinterpret_cast<uintptr>(p) |
+                                   PROCESS_GROUP_REFERENCE_TAG);
+}
+fn process_has_id(process p, i64 id) wontthrow -> bool
+{
+  return process_id_of(p) == id;
+}
+
+fn is_stdin_a_tty() wontthrow -> bool { return _isatty(_fileno(stdin)) != 0; }
+
+fn is_stdout_a_tty() wontthrow -> bool { return _isatty(_fileno(stdout)) != 0; }
+
+fn is_stderr_a_tty() wontthrow -> bool { return _isatty(_fileno(stderr)) != 0; }
+
+fn is_fd_a_tty(descriptor fd) wontthrow -> bool
+{
+  DWORD console_mode = 0;
+  return GetConsoleMode(fd, &console_mode) != FALSE;
+}
+
+fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *
+{
+  return _aligned_malloc(length, alignment);
+}
+
+fn free_aligned(opaque *pointer) wontthrow -> void { _aligned_free(pointer); }
+
+fn collate_compare(const String &left, const String &right) wontthrow -> int
+{
+  if (left < right) return -1;
+  return right < left ? 1 : 0;
+}
+
+fn compile_regex(StringView pattern, bool is_case_insensitive,
+                 compiled_regex &out) throws -> regex_compile_result
+{
+  unused(pattern);
+  unused(is_case_insensitive);
+  unused(out);
+  return regex_compile_result::Invalid;
+}
+
+fn execute_regex(compiled_regex &compiled, StringView subject,
+                 ArrayList<regex_span> &spans, String &error_message,
+                 Allocator scratch) throws -> regex_match_result
+{
+  unused(compiled);
+  unused(subject);
+  unused(spans);
+  unused(error_message);
+  unused(scratch);
+  return regex_match_result::Error;
+}
+
+fn free_regex(compiled_regex &compiled) wontthrow -> void { unused(compiled); }
+
+fn compile_search_regex(StringView pattern, bool is_case_insensitive,
+                        compiled_regex &out) throws -> regex_compile_result
+{
+  out.pattern = String{heap_allocator(), pattern};
+  out.is_case_insensitive = is_case_insensitive;
+  return regex_compile_result::Ok;
+}
+
+static fn lower_ascii(char character) wontthrow -> char
+{
+  return (character >= 'A' && character <= 'Z')
+             ? static_cast<char>(character - 'A' + 'a')
+             : character;
+}
+
+fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
+{
+  const StringView needle = compiled.pattern.view();
+  if (needle.length == 0) return true;
+  if (needle.length > subject.length) return false;
+
+  if (!compiled.is_case_insensitive) {
+    usize start = 0;
+    while (start + needle.length <= subject.length) {
+      let const found = subject.substring(start).find_character(needle[0]);
+      if (!found.has_value()) return false;
+      start += *found;
+      if (start + needle.length > subject.length) return false;
+
+      bool is_matched = true;
+      for (usize k = 1; k < needle.length; k++)
+        if (subject[start + k] != needle[k]) {
+          is_matched = false;
+          break;
+        }
+      if (is_matched) return true;
+      start++;
+    }
+    return false;
+  }
+
+  for (usize start = 0; start + needle.length <= subject.length; start++) {
+    bool is_matched = true;
+    for (usize k = 0; k < needle.length; k++) {
+      if (lower_ascii(subject[start + k]) != lower_ascii(needle[k])) {
+        is_matched = false;
+        break;
+      }
+    }
+    if (is_matched) return true;
+  }
+
+  return false;
+}
+
+pure fn path_is_absolute(StringView path) wontthrow -> bool
+{
+  if (path.length == 0) return false;
+  if (is_directory_separator(path.data[0])) return true;
+  return path.length >= 2 && path.data[1] == ':';
+}
+
+fn temp_directory_path() throws -> String
+{
+  if (const char *from_env = std::getenv("TEMP"); from_env != nullptr)
+    return String{from_env};
+  return String{"C:\\Windows\\Temp"};
+}
+
+cold fn path_exists(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return GetFileAttributesA(path_string.c_str()) != INVALID_FILE_ATTRIBUTES;
+}
+
+cold fn path_is_directory(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  let const attributes = GetFileAttributesA(path_string.c_str());
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+         (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
+
+fn path_is_regular_file(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  let const attributes = GetFileAttributesA(path_string.c_str());
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+         (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+fn path_is_symbolic_link(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  let const attributes = GetFileAttributesA(path_string.c_str());
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+         (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+}
+
+/* Windows has no POSIX block, character, FIFO, or socket file type. */
+fn path_is_block_device(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_character_device(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_fifo(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_socket(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+
+/* Windows carries no setuid, setgid, sticky, or POSIX ownership bit. */
+fn path_has_setuid_bit(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_has_setgid_bit(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_has_sticky_bit(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_owned_by_effective_user(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+fn path_is_owned_by_effective_group(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+
+fn path_file_size(StringView path) wontthrow -> Maybe<u64>
+{
+  const String path_string{path};
+  WIN32_FILE_ATTRIBUTE_DATA data{};
+  if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard, &data) ==
+      0)
+    return None;
+  if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) return None;
+  return (static_cast<u64>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
+}
+
+fn path_modification_time(StringView path) wontthrow -> Maybe<i64>
+{
+  const String path_string{path};
+  WIN32_FILE_ATTRIBUTE_DATA data{};
+  if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard, &data) ==
+      0)
+    return None;
+  return static_cast<i64>(
+      (static_cast<u64>(data.ftLastWriteTime.dwHighDateTime) << 32) |
+      data.ftLastWriteTime.dwLowDateTime);
+}
+
+fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool
+{
+  const String first_string{first};
+  const String second_string{second};
+  /* FILE_FLAG_BACKUP_SEMANTICS lets a directory open too. */
+  let const first_handle =
+      CreateFileA(first_string.c_str(), 0,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (first_handle == INVALID_HANDLE_VALUE) return false;
+  let const second_handle =
+      CreateFileA(second_string.c_str(), 0,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (second_handle == INVALID_HANDLE_VALUE) {
+    CloseHandle(first_handle);
+    return false;
+  }
+  BY_HANDLE_FILE_INFORMATION first_info{}, second_info{};
+  let const both_read =
+      GetFileInformationByHandle(first_handle, &first_info) != 0 &&
+      GetFileInformationByHandle(second_handle, &second_info) != 0;
+  CloseHandle(first_handle);
+  CloseHandle(second_handle);
+  if (!both_read) return false;
+  return first_info.dwVolumeSerialNumber == second_info.dwVolumeSerialNumber &&
+         first_info.nFileIndexHigh == second_info.nFileIndexHigh &&
+         first_info.nFileIndexLow == second_info.nFileIndexLow;
+}
+
+fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool
+{
+  const String first_string{first};
+  const String second_string{second};
+  WIN32_FILE_ATTRIBUTE_DATA first_data{}, second_data{};
+  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard,
+                           &first_data) == 0)
+    return false;
+  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard,
+                           &second_data) == 0)
+    return false;
+  return CompareFileTime(&first_data.ftLastWriteTime,
+                         &second_data.ftLastWriteTime) > 0;
+}
+
+fn path_is_older_than(StringView first, StringView second) wontthrow -> bool
+{
+  const String first_string{first};
+  const String second_string{second};
+  WIN32_FILE_ATTRIBUTE_DATA first_data{}, second_data{};
+  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard,
+                           &first_data) == 0)
+    return false;
+  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard,
+                           &second_data) == 0)
+    return false;
+  return CompareFileTime(&first_data.ftLastWriteTime,
+                         &second_data.ftLastWriteTime) < 0;
+}
+
+fn path_is_readable(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return _access(path_string.c_str(), 4) == 0;
+}
+
+fn path_is_writable(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return _access(path_string.c_str(), 2) == 0;
+}
+
+fn path_is_executable(StringView path) wontthrow -> bool
+{
+  /* Windows has no execute permission bit, so an existing file is runnable. */
+  return path_exists(path);
+}
+
+cold fn read_current_directory() throws -> Path
+{
+  char buffer[4096];
+  if (_getcwd(buffer, sizeof(buffer)) != nullptr)
+    return Path{StringView{buffer}};
+  return Path{};
+}
+
+fn change_current_directory(StringView path) throws -> ErrorOr<Ok>
+{
+  const String path_string{path};
+  if (_chdir(path_string.c_str()) != 0)
+    return Error{"Could not change directory to '" + path_string +
+                 "': " + os::last_system_error_message()};
+  return Success;
+}
+
+cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
+{
+  const String dir_string{dir};
+  let pattern = dir_string.clone();
+  pattern.push(DIRECTORY_SEPARATOR);
+  pattern.push('*');
+
+  WIN32_FIND_DATAA data{};
+  let const handle = FindFirstFileA(pattern.c_str(), &data);
+  if (handle == INVALID_HANDLE_VALUE) return None;
+
+  let names = ArrayList<String>{heap_allocator()};
+  do {
+    let const name = StringView{data.cFileName};
+    if (name == StringView{"."} || name == StringView{".."}) {
+      continue;
+    }
+    names.push(String{name});
+  } while (FindNextFileA(handle, &data) != 0);
+  FindClose(handle);
+  LOG(All, "read %zu entries from the directory '%s'", names.count(),
+      dir_string.c_str());
+  return names;
+}
+
+cold fn list_directory_typed(StringView dir) throws
+    -> Maybe<ArrayList<Path::directory_child>>
+{
+  /* Windows carries no readdir type, so each child is left Unknown. */
+  Maybe<ArrayList<String>> names = list_directory(dir);
+  if (!names.has_value()) return None;
+
+  let entries = ArrayList<Path::directory_child>{heap_allocator()};
+  entries.reserve(names->count());
+  for (String &name : *names)
+    entries.push(Path::directory_child{steal(name), Path::entry_kind::Unknown});
+  return entries;
+}
+
+fn read_process_cpu_times() wontthrow -> cpu_times { return cpu_times{}; }
+
+fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow -> bool
+{
+  unused(kind);
+  out.soft = RESOURCE_UNLIMITED;
+  out.hard = RESOURCE_UNLIMITED;
+  return true;
+}
+
+fn set_resource_limit(resource_kind kind, const resource_limit &limit) wontthrow
+    -> bool
+{
+  unused(kind);
+  unused(limit);
+  return true;
+}
+fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
+{
+  return is_fd_a_tty(reinterpret_cast<descriptor>(_get_osfhandle(shell_fd)));
+}
+
+pure fn is_directory_separator(char c) wontthrow -> bool
+{
+  return c == '/' || c == '\\';
+}
+
+fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
+{
+  CONSOLE_SCREEN_BUFFER_INFO info;
+  if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info) == 0)
+    return false;
+  const i32 width = info.srWindow.Right - info.srWindow.Left + 1;
+  const i32 height = info.srWindow.Bottom - info.srWindow.Top + 1;
+  if (width <= 0 || height <= 0) return false;
+  columns = static_cast<u32>(width);
+  rows = static_cast<u32>(height);
+
+  return true;
+}
+
+constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
+
+fn get_environment_variable(StringView key) -> Maybe<String>
+{
+  String key_string{key};
+  char buffer[WIN32_MAX_ENV_SIZE] = {0};
+  if (GetEnvironmentVariableA(key_string.c_str(), buffer, sizeof(buffer)) == 0)
+    return shit::None;
+  return String{buffer};
+}
+
+fn set_environment_variable(StringView key, StringView value) -> void
+{
+  String key_string{key};
+  String value_string{value};
+  SetEnvironmentVariableA(key_string.c_str(), value_string.c_str());
+}
+
+fn unset_environment_variable(StringView key) -> void
+{
+  String key_string{key};
+  SetEnvironmentVariableA(key_string.c_str(), nullptr);
+}
+
+fn environment_names() -> ArrayList<String>
+{
+  ArrayList<String> names{heap_allocator()};
+  char *block = GetEnvironmentStringsA();
+  if (block == nullptr) return names;
+  for (char *entry = block; *entry != '\0';) {
+    StringView pair{entry};
+    let const equals = pair.find_character('=');
+    /* Drive entries such as =C: keep their leading '=' as part of the name. */
+    let const split = (equals.has_value() && *equals > 0)
+                          ? pair.substring_of_length(0, *equals)
+                          : pair;
+    names.push(String{split});
+    entry += pair.length + 1;
+  }
+  FreeEnvironmentStringsA(block);
+  return names;
+}
+
+struct inherited_handle_state
+{
+  HANDLE handle{INVALID_HANDLE_VALUE};
+  DWORD original_flags{0};
+  bool should_restore{false};
+};
+
+static fn make_handle_inheritable(HANDLE handle,
+                                  inherited_handle_state &state) wontthrow
+    -> void
+{
+  if (handle == nullptr || handle == INVALID_HANDLE_VALUE) return;
+
+  DWORD flags = 0;
+  if (GetHandleInformation(handle, &flags) == FALSE) return;
+  if ((flags & HANDLE_FLAG_INHERIT) != 0) return;
+  if (SetHandleInformation(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT) ==
+      FALSE)
+    return;
+
+  state.handle = handle;
+  state.original_flags = flags;
+  state.should_restore = true;
+}
+
+static fn
+restore_handle_inheritance(const inherited_handle_state &state) wontthrow
+    -> void
+{
+  if (!state.should_restore) return;
+  SetHandleInformation(state.handle, HANDLE_FLAG_INHERIT,
+                       state.original_flags & HANDLE_FLAG_INHERIT);
+}
+
+static fn timeout_job_name(HANDLE process_handle, char (&name)[64]) wontthrow
+    -> bool
+{
+  FILETIME creation_time;
+  FILETIME exit_time;
+  FILETIME kernel_time;
+  FILETIME user_time;
+  if (GetProcessTimes(process_handle, &creation_time, &exit_time, &kernel_time,
+                      &user_time) == FALSE)
+    return false;
+
+  let const creation_ticks =
+      (static_cast<u64>(creation_time.dwHighDateTime) << 32u) |
+      creation_time.dwLowDateTime;
+  ::snprintf(name, sizeof(name), "shit-timeout-%lu-%llu",
+             static_cast<unsigned long>(GetProcessId(process_handle)),
+             static_cast<unsigned long long>(creation_ticks));
+  return true;
+}
+
+static fn attach_timeout_job(const PROCESS_INFORMATION &process_info) throws
+    -> void
+{
+  char job_name[64];
+  if (!timeout_job_name(process_info.hProcess, job_name))
+    throw Error{last_system_error_message()};
+  let const job = CreateJobObjectA(nullptr, job_name);
+  if (job == nullptr) throw Error{last_system_error_message()};
+  defer { CloseHandle(job); };
+  if (GetLastError() == ERROR_ALREADY_EXISTS)
+    throw Error{"timeout job already exists"};
+
+  if (AssignProcessToJobObject(job, process_info.hProcess) == FALSE)
+    throw Error{last_system_error_message()};
+
+  HANDLE child_job_handle = nullptr;
+  if (DuplicateHandle(GetCurrentProcess(), job, process_info.hProcess,
+                      &child_job_handle, 0, TRUE,
+                      DUPLICATE_SAME_ACCESS) == FALSE)
+    throw Error{last_system_error_message()};
+}
+
+static fn append_windows_quoted_arg(String &out, StringView arg) throws -> void;
+
+static pure fn is_batch_program(StringView path) wontthrow -> bool
+{
+  if (path.length < 4) return false;
+  let const suffix = path.substring_of_length(path.length - 4, 4);
+  return suffix[0] == '.' && utils::ascii_to_lower(suffix[1]) == 'b' &&
+         utils::ascii_to_lower(suffix[2]) == 'a' &&
+         utils::ascii_to_lower(suffix[3]) == 't';
+}
+
+fn execute_program(ExecContext &&ec, bool allow_script_fallback,
+                   bool new_process_group) -> process
+{
+  LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
+      ec.args().count());
+
+  String application_path{heap_allocator(), ec.program_path().text().view()};
+  String command_line = make_os_args(ec.args());
+  if (is_batch_program(ec.program_path().text().view())) {
+    let batch_command = String{heap_allocator()};
+    append_windows_quoted_arg(batch_command, ec.program_path().text().view());
+    for (usize argument_index = 1; argument_index < ec.args().count();
+         argument_index++)
+    {
+      batch_command += ' ';
+      append_windows_quoted_arg(batch_command,
+                                ec.args()[argument_index].view());
+    }
+
+    let const command_processor = std::getenv("COMSPEC");
+    application_path =
+        String{command_processor != nullptr ? command_processor : "cmd.exe"};
+    let processor_command_line = String{heap_allocator()};
+    append_windows_quoted_arg(processor_command_line, application_path.view());
+    processor_command_line += " /d /s /c \"";
+    processor_command_line += batch_command;
+    processor_command_line += '"';
+    command_line = steal(processor_command_line);
+  }
+
+  PROCESS_INFORMATION process_info{};
+  STARTUPINFOA startup_info{};
+
+  startup_info.cb = sizeof(startup_info);
+
+  BOOL should_inherit_handles = ec.in_fd || ec.out_fd || ec.err_fd ||
+                                ec.dup_err_to_out || ec.dup_out_to_err;
+
+  if (should_inherit_handles) startup_info.dwFlags |= STARTF_USESTDHANDLES;
+
+  startup_info.hStdInput = ec.in_fd.value_or(GetStdHandle(STD_INPUT_HANDLE));
+  startup_info.hStdOutput = ec.out_fd.value_or(GetStdHandle(STD_OUTPUT_HANDLE));
+  startup_info.hStdError = ec.err_fd.value_or(GetStdHandle(STD_ERROR_HANDLE));
+
+  /* Each dup reads the current target of its source, so the source order
+     decides a mixed 2>&1 1>&2. */
+  ec.apply_dup_routing(
+      [&]() { startup_info.hStdError = startup_info.hStdOutput; },
+      [&]() { startup_info.hStdOutput = startup_info.hStdError; });
+
+  defer
+  {
+    if (ec.in_fd) CloseHandle(*ec.in_fd);
+    if (ec.out_fd) CloseHandle(*ec.out_fd);
+    if (ec.err_fd) CloseHandle(*ec.err_fd);
+  };
+
+  inherited_handle_state input_inheritance{};
+  inherited_handle_state output_inheritance{};
+  inherited_handle_state error_inheritance{};
+  if (should_inherit_handles) {
+    make_handle_inheritable(startup_info.hStdInput, input_inheritance);
+    make_handle_inheritable(startup_info.hStdOutput, output_inheritance);
+    make_handle_inheritable(startup_info.hStdError, error_inheritance);
+  }
+  defer { restore_handle_inheritance(input_inheritance); };
+  defer { restore_handle_inheritance(output_inheritance); };
+  defer { restore_handle_inheritance(error_inheritance); };
+
+  /* An empty CreateProcess environment block is two nulls, a null pointer would
+     inherit the shell's environment. */
+  char empty_environment_block[] = {'\0', '\0'};
+  LPVOID environment_block =
+      ec.should_use_empty_environment ? empty_environment_block : nullptr;
+
+  let const creation_flags =
+      new_process_group ? CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED : 0;
+
+  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
+   */
+  if (CreateProcessA(application_path.c_str(),
+                     const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
+                     should_inherit_handles, creation_flags, environment_block,
+                     nullptr, &startup_info, &process_info) == 0)
+  {
+    if (allow_script_fallback && GetLastError() == ERROR_BAD_EXE_FORMAT)
+      throw ExecFormatError{};
+    throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
+  }
+
+  if (new_process_group) {
+    try {
+      attach_timeout_job(process_info);
+    } catch (...) {
+      TerminateProcess(process_info.hProcess, 1);
+      CloseHandle(process_info.hProcess);
+      CloseHandle(process_info.hThread);
+      throw;
+    }
+    if (ResumeThread(process_info.hThread) == static_cast<DWORD>(-1)) {
+      let const message = last_system_error_message();
+      TerminateProcess(process_info.hProcess, 1);
+      CloseHandle(process_info.hProcess);
+      CloseHandle(process_info.hThread);
+      throw Error{steal(message)};
+    }
+  }
+
+  CloseHandle(process_info.hThread);
+  return process_info.hProcess;
+}
+
+fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
+    -> Maybe<String>
+{
+  /* Windows has no fork, so <(cmd) spawns a fresh shell that writes its output
+     into a temp file the consumer reads by path. The whole output is written
+     before the path returns. */
+  char module_path[MAX_PATH];
+  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
+    return shit::None;
+
+  char temp_dir[MAX_PATH];
+  if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::None;
+  char temp_path[MAX_PATH];
+  if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0) return shit::None;
+
+  SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+  const HANDLE temp_file =
+      CreateFileA(temp_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
+                  CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
+  if (temp_file == INVALID_HANDLE_VALUE) return shit::None;
+
+  let arguments = ArrayList<String>{heap_allocator()};
+  arguments.push(String{heap_allocator(), StringView{module_path}});
+  if (bash_compatible) {
+    arguments.push(String{heap_allocator(), StringView{"--mood"}});
+    arguments.push(String{heap_allocator(), StringView{"bash"}});
+  }
+  arguments.push(String{heap_allocator(), StringView{"-c"}});
+  arguments.push(String{heap_allocator(), source});
+  let command_line = make_os_args(arguments);
+
+  STARTUPINFOA startup_info{};
+  startup_info.cb = sizeof(startup_info);
+  startup_info.dwFlags = STARTF_USESTDHANDLES;
+  startup_info.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  startup_info.hStdOutput = temp_file;
+  startup_info.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  inherited_handle_state input_inheritance{};
+  inherited_handle_state error_inheritance{};
+  make_handle_inheritable(startup_info.hStdInput, input_inheritance);
+  make_handle_inheritable(startup_info.hStdError, error_inheritance);
+  defer { restore_handle_inheritance(input_inheritance); };
+  defer { restore_handle_inheritance(error_inheritance); };
+
+  PROCESS_INFORMATION process_info{};
+  if (CreateProcessA(module_path, const_cast<LPSTR>(command_line.data()),
+                     nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup_info,
+                     &process_info) == 0)
+  {
+    CloseHandle(temp_file);
+    return shit::None;
+  }
+  WaitForSingleObject(process_info.hProcess, INFINITE);
+  CloseHandle(process_info.hProcess);
+  CloseHandle(process_info.hThread);
+  CloseHandle(temp_file);
+
+  /* A backslash would read as an escape in the target word, so slashes are
+     returned, which CreateFile accepts the same. */
+  let result = String{heap_allocator()};
+  for (const char *byte = temp_path; *byte != '\0'; byte++)
+    result += *byte == '\\' ? '/' : *byte;
+  return result;
+}
+
+fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
+                        Maybe<descriptor> out_fd, bool bash_compatible) throws
+    -> Maybe<process>
+{
+  /* Windows has no fork, so a compound pipeline stage re-parses its source in a
+     fresh shell, returned unwaited for the pipeline to reap. */
+  char module_path[MAX_PATH];
+  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
+    return shit::None;
+
+  let arguments = ArrayList<String>{heap_allocator()};
+  arguments.push(String{heap_allocator(), StringView{module_path}});
+  if (bash_compatible) {
+    arguments.push(String{heap_allocator(), StringView{"--mood"}});
+    arguments.push(String{heap_allocator(), StringView{"bash"}});
+  }
+  arguments.push(String{heap_allocator(), StringView{"-c"}});
+  arguments.push(String{heap_allocator(), source});
+  let command_line = make_os_args(arguments);
+
+  STARTUPINFOA startup_info{};
+  startup_info.cb = sizeof(startup_info);
+  startup_info.dwFlags = STARTF_USESTDHANDLES;
+  startup_info.hStdInput = in_fd ? *in_fd : GetStdHandle(STD_INPUT_HANDLE);
+  startup_info.hStdOutput = out_fd ? *out_fd : GetStdHandle(STD_OUTPUT_HANDLE);
+  startup_info.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  inherited_handle_state input_inheritance{};
+  inherited_handle_state output_inheritance{};
+  inherited_handle_state error_inheritance{};
+  make_handle_inheritable(startup_info.hStdInput, input_inheritance);
+  make_handle_inheritable(startup_info.hStdOutput, output_inheritance);
+  make_handle_inheritable(startup_info.hStdError, error_inheritance);
+  defer { restore_handle_inheritance(input_inheritance); };
+  defer { restore_handle_inheritance(output_inheritance); };
+  defer { restore_handle_inheritance(error_inheritance); };
+
+  PROCESS_INFORMATION process_info{};
+  if (CreateProcessA(module_path, const_cast<LPSTR>(command_line.data()),
+                     nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup_info,
+                     &process_info) == 0)
+    return shit::None;
+  CloseHandle(process_info.hThread);
+  return process_info.hProcess;
+}
+
+fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+                       Maybe<descriptor> err_fd) -> process
+{
+  unused(in_fd);
+  unused(out_fd);
+  unused(err_fd);
+  /* Reached only for a stage whose end position the parser does not yet record.
+   */
+  throw shit::Error{
+      "A compound command in a pipeline is not supported on this platform"};
+}
+
+fn fork_job_process() -> process
+{
+  throw shit::Error{"Job control is not supported on this platform"};
+}
+
+[[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void
+{
+  ExitProcess(static_cast<UINT>(status));
+  unreachable();
+}
+
+fn replace_process(ExecContext &&ec) -> void
+{
+  /* Windows cannot exec in place, so the program runs to completion and the
+     shell exits with its status. */
+  LOG(Debug, "running '%s' to completion in place of an exec",
+      ec.program_path().c_str());
+  process child = execute_program(steal(ec));
+  i32 status = wait_and_monitor_process(child);
+  ExitProcess(static_cast<UINT>(status));
+  unreachable();
+}
+
+fn redirect_self(const ExecContext &ec) -> void
+{
+  /* Duplicate each redirect handle into the standard slot, so the caller's
+     close of the original handles leaves the shell's new standard handles
+     valid for the rest of the session. */
+  HANDLE self = GetCurrentProcess();
+  HANDLE duplicate = nullptr;
+  if (ec.in_fd && DuplicateHandle(self, *ec.in_fd, self, &duplicate, 0, TRUE,
+                                  DUPLICATE_SAME_ACCESS))
+    SetStdHandle(STD_INPUT_HANDLE, duplicate);
+  if (ec.out_fd && DuplicateHandle(self, *ec.out_fd, self, &duplicate, 0, TRUE,
+                                   DUPLICATE_SAME_ACCESS))
+    SetStdHandle(STD_OUTPUT_HANDLE, duplicate);
+  if (ec.err_fd && DuplicateHandle(self, *ec.err_fd, self, &duplicate, 0, TRUE,
+                                   DUPLICATE_SAME_ACCESS))
+    SetStdHandle(STD_ERROR_HANDLE, duplicate);
+}
+
+fn make_pipe() wontthrow -> Maybe<Pipe>
+{
+  SECURITY_ATTRIBUTES attributes{};
+
+  attributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+  /* Both ends non-inheritable, the child receives only what
+     STARTF_USESTDHANDLES names. */
+  attributes.bInheritHandle = FALSE;
+  attributes.lpSecurityDescriptor = nullptr; /* NOLINT */
+
+  HANDLE in = INVALID_HANDLE_VALUE;
+  HANDLE out = INVALID_HANDLE_VALUE;
+
+  if (CreatePipe(&in, &out, &attributes, 0) == 0) {
+    if (in != INVALID_HANDLE_VALUE) close_fd(in);
+    if (out != INVALID_HANDLE_VALUE) close_fd(out);
+
+    return shit::None;
+  }
+
+  return Pipe{in, out};
+}
+
+struct thread_start_context
+{
+  void (*entry)(opaque *);
+  opaque *context;
+};
+
+fn thread_trampoline(LPVOID raw_context) -> DWORD
+{
+  let const start = static_cast<thread_start_context *>(raw_context);
+  let const entry = start->entry;
+  let const context = start->context;
+  delete start;
+  entry(context);
+  return 0;
+}
+
+fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow
+    -> Maybe<thread>
+{
+  let const start = new thread_start_context{entry, context};
+  HANDLE handle =
+      CreateThread(nullptr, 0, thread_trampoline, start, 0, nullptr);
+  if (handle == nullptr) {
+    delete start;
+    return shit::None;
+  }
+  return thread{handle};
+}
+
+fn join_thread(thread t) wontthrow -> void
+{
+  WaitForSingleObject(t.handle, INFINITE);
+  CloseHandle(t.handle);
+}
+
+fn open_file_descriptor(StringView path, file_open_mode mode)
+    -> Maybe<descriptor>
+{
+  DWORD access = (mode == file_open_mode::Read) ? GENERIC_READ : GENERIC_WRITE;
+  if (mode == file_open_mode::ReadWrite) access = GENERIC_READ | GENERIC_WRITE;
+  DWORD disposition = OPEN_EXISTING;
+  switch (mode) {
+  case file_open_mode::Truncate: disposition = CREATE_ALWAYS; break;
+  case file_open_mode::TruncateNoClobber: disposition = CREATE_NEW; break;
+  case file_open_mode::Append: disposition = OPEN_ALWAYS; break;
+  case file_open_mode::Read: disposition = OPEN_EXISTING; break;
+  case file_open_mode::ReadWrite: disposition = OPEN_ALWAYS; break;
+  }
+
+  /* Non-inheritable, execute_program flips it only while spawning the child. */
+  SECURITY_ATTRIBUTES att{};
+  att.nLength = sizeof(SECURITY_ATTRIBUTES);
+  att.bInheritHandle = FALSE;
+  att.lpSecurityDescriptor = nullptr; /* NOLINT */
+
+  String path_string{path};
+  HANDLE handle = CreateFileA(path_string.c_str(), access,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, &att,
+                              disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+
+  if (mode == file_open_mode::Append)
+    SetFilePointer(handle, 0, nullptr, FILE_END);
+
+  return handle;
+}
+
+fn write_to_temp_file(StringView content) -> Maybe<descriptor>
+{
+  char temp_dir[MAX_PATH];
+  if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::None;
+
+  char temp_path[MAX_PATH];
+  if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0) return shit::None;
+
+  HANDLE handle = CreateFileA(
+      temp_path, GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+      FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
+  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+
+  DWORD written = 0;
+  if (WriteFile(handle, content.data, static_cast<DWORD>(content.count()),
+                &written, nullptr) == 0)
+  {
+    close_fd(handle);
+    return shit::None;
+  }
+
+  SetFilePointer(handle, 0, nullptr, FILE_BEGIN);
+  return handle;
+}
+
+fn wait_and_monitor_process(process p, bool *was_stopped) -> i32
+{
+  unused(was_stopped);
+  defer { CloseHandle(p); };
+  if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
+    throw Error{"Could not wait for the process to finish: " +
+                last_system_error_message()};
+
+  DWORD code = -1;
+  if (GetExitCodeProcess(p, &code) == 0)
+    throw Error{"Could not read the process exit code: " +
+                last_system_error_message()};
+
+  return code;
+}
+
+fn reap_process_quietly(process p) -> i32
+{
+  defer { CloseHandle(p); };
+  if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
+    throw Error{"Could not wait for the process to finish: " +
+                last_system_error_message()};
+  DWORD code = 1;
+  GetExitCodeProcess(p, &code);
+  return static_cast<i32>(code);
+}
+
+fn poll_process(process p, i32 &status_out) wontthrow -> process_state
+{
+  let const wait_result = WaitForSingleObject(p, 0);
+  if (wait_result == WAIT_TIMEOUT) return process_state::Running;
+  if (wait_result != WAIT_OBJECT_0) {
+    status_out = 0;
+    CloseHandle(p);
+    return process_state::Exited;
+  }
+
+  DWORD code = 0;
+  if (GetExitCodeProcess(p, &code) == 0) {
+    status_out = 0;
+    CloseHandle(p);
+    return process_state::Exited;
+  }
+  status_out = static_cast<i32>(code);
+  CloseHandle(p);
+  return process_state::Exited;
+}
+
+fn signal_process(process p, i32 signal_number) wontthrow -> bool
+{
+  if (signal_number != 9 && signal_number != 15) return false;
+
+  if (process_is_group_reference(p)) {
+    let const process_handle = process_from_group_reference(p);
+    char job_name[64];
+    if (!timeout_job_name(process_handle, job_name)) return false;
+    let const job = OpenJobObjectA(JOB_OBJECT_TERMINATE, FALSE, job_name);
+    if (job == nullptr) return false;
+    let const did_terminate = TerminateJobObject(job, 1) != FALSE;
+    CloseHandle(job);
+    return did_terminate;
+  }
+
+  if (!process_is_pid_reference(p)) return TerminateProcess(p, 1) != 0;
+
+  let const target =
+      OpenProcess(PROCESS_TERMINATE, FALSE, pid_from_reference(p));
+  if (target == nullptr) return false;
+  let const did_terminate = TerminateProcess(target, 1) != 0;
+  CloseHandle(target);
+  return did_terminate;
+}
+
+fn is_process_signal_supported(i32 signal_number) wontthrow -> bool
+{
+  return signal_number == 9 || signal_number == 15;
+}
+
+fn process_from_pid(i64 pid) wontthrow -> process
+{
+  if (pid <= 0 || static_cast<u64>(pid) > UINT32_MAX) return nullptr;
+  let const encoded = (static_cast<uintptr_t>(pid) << 2u) | PID_REFERENCE_TAG;
+  return reinterpret_cast<process>(encoded);
+}
+
+fn signal_number_from_name(StringView name) -> Maybe<i32>
+{
+  if (name.is_all_decimal_digits()) {
+    const ErrorOr<i64> parsed_value = name.to<i64>();
+    if (parsed_value.is_error() || parsed_value.value() < INT32_MIN ||
+        parsed_value.value() > INT32_MAX)
+      return shit::None;
+    return static_cast<i32>(parsed_value.value());
+  }
+
+  let const bare = utils::strip_sig_prefix(name);
+
+  static constexpr static_string_entry<i32> NAME_ENTRIES[] = {
+      {SSK("KILL"), 9 },
+      {SSK("TERM"), 15},
+      {SSK("INT"),  2 },
+  };
+  static constexpr StaticStringMap NAMES{NAME_ENTRIES};
+  return NAMES.find(bare);
+}
+
+fn signal_name_from_number(i32 number) -> Maybe<String>
+{
+  if (number == 1) return String{"HUP"};
+  if (number == 2) return String{"INT"};
+  if (number == 3) return String{"QUIT"};
+  if (number == 9) return String{"KILL"};
+  if (number == 15) return String{"TERM"};
+  return None;
+}
+
+fn signal_names() throws -> const ArrayList<StringView> &
+{
+  static ArrayList<StringView> names = [] throws {
+    let collected = ArrayList<StringView>{heap_allocator()};
+    static const StringView WINDOWS_SIGNAL_NAMES[] = {"HUP", "INT", "QUIT",
+                                                      "KILL", "TERM"};
+    for (const StringView name : WINDOWS_SIGNAL_NAMES)
+      collected.push(name);
+    return collected;
+  }();
+  return names;
+}
+
+/* Quotes and escapes the way CommandLineToArgvW parses back, so an argument
+   with a space, tab, or quote cannot inject further arguments. A backslash run
+   is doubled only before a quote, an empty argument is quoted so it is kept. */
+static fn append_windows_quoted_arg(String &out, StringView arg) -> void
+{
+  bool should_quote_arg = arg.count() == 0;
+  for (usize i = 0; i < arg.count() && !should_quote_arg; i++) {
+    const char c = arg[i];
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '"') {
+      should_quote_arg = true;
+    }
+  }
+  if (!should_quote_arg) {
+    out.append(arg);
+    return;
+  }
+
+  out += '"';
+  for (usize i = 0; i < arg.count();) {
+    usize backslash_count = 0;
+    while (i < arg.count() && arg[i] == '\\') {
+      i++;
+      backslash_count++;
+    }
+    if (i == arg.count()) {
+      /* Trailing backslashes precede the closing quote, so they are doubled to
+         stay literal rather than escaping the quote. */
+      for (usize k = 0; k < backslash_count * 2; k++)
+        out += '\\';
+      break;
+    }
+    if (arg[i] == '"') {
+      /* The backslashes before a quote are doubled and the quote is escaped. */
+      for (usize k = 0; k < backslash_count * 2 + 1; k++)
+        out += '\\';
+      out += '"';
+      i++;
+    } else {
+      for (usize k = 0; k < backslash_count; k++)
+        out += '\\';
+      out += arg[i];
+      i++;
+    }
+  }
+  out += '"';
+}
+
+fn make_os_args(const ArrayList<String> &args) -> os_args
+{
+  ASSERT(args.count() > 0);
+
+  String command_line{heap_allocator()};
+  append_windows_quoted_arg(command_line, args[0].view());
+  for (usize i = 1; i < args.count(); i++) {
+    command_line += ' ';
+    append_windows_quoted_arg(command_line, args[i].view());
+  }
+
+  return command_line;
+}
+
+cold fn last_system_error_message() throws -> String
+{
+  LPSTR errno_str{};
+  DWORD win_errno = GetLastError();
+
+  DWORD ret = FormatMessageA(
+      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+          FORMAT_MESSAGE_IGNORE_INSERTS,
+      nullptr, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+      reinterpret_cast<LPSTR>(&errno_str), 0, nullptr); /* NOLINT */
+
+  if (ret == 0) {
+    return String::from(win_errno, heap_allocator()) +
+           StringView{" (Error message could not be processed due to "
+                      "a FormatMessage() failure)"};
+  }
+
+  StringView view{static_cast<char *>(errno_str)};
+  /* FormatMessage ends with a period, spacing, and a CRLF, trimmed here. */
+  while (view.length > 0) {
+    let const last_byte = view[view.length - 1];
+    if (last_byte != '.' && last_byte != ' ' && last_byte != '\r' &&
+        last_byte != '\n')
+    {
+      break;
+    }
+    view = view.substring_of_length(0, view.length - 1);
+  }
+
+  String err{heap_allocator()};
+  for (usize i = 0; i < view.length; i++) {
+    /* A %N placeholder is replaced with a word since no argument is passed. */
+    if (view[i] == '%' && i + 1 < view.length && isdigit(view[i + 1])) {
+      err += StringView{"input"};
+      i++;
+      continue;
+    }
+    err.push(view[i]);
+  }
+
+  LocalFree(errno_str);
+
+  if (err.length() > 0) {
+    String capitalized{heap_allocator()};
+    capitalized.push(static_cast<char>(toupper(err[0])));
+    capitalized += err.substring(1);
+    err = steal(capitalized);
+  }
+
+  return err;
+}
+
+static fn handle_interrupt(int s) -> void
+{
+  unused(s);
+  INTERRUPT_REQUESTED = 1;
+  signal(SIGINT, handle_interrupt);
+}
+
+fn set_default_signal_handlers(bool is_interactive) -> void
+{
+  /* The interactive shell ignores SIGTERM so a stray terminate does not close
+     the prompt. */
+  if (is_interactive && signal(SIGTERM, SIG_IGN) == SIG_ERR) {
+    throw Error{"Could not install the signal handlers: " +
+                last_system_error_message()};
+  }
+
+  if (signal(SIGINT, handle_interrupt) == SIG_ERR) {
+    throw Error{"Could not install the signal handlers: " +
+                last_system_error_message()};
+  }
+}
+
+fn reset_signal_handlers() -> void
+{
+  if (signal(SIGTERM, SIG_DFL) == SIG_ERR || signal(SIGINT, SIG_DFL) == SIG_ERR)
+  {
+    throw Error{"Could not restore the default signal handlers: " +
+                last_system_error_message()};
+  }
+
+  /* A stale inherited flag would throw Interrupted before the child runs. */
+  INTERRUPT_REQUESTED = 0;
+}
+
+static fn handle_trapped_signal(int signal_number) -> void
+{
+  if (is_trappable_signal(signal_number))
+    PENDING_SIGNAL_FLAGS[signal_number] = 1;
+  SIGNAL_PENDING = 1;
+  /* The C runtime resets the disposition, so it is reinstalled for the next. */
+  signal(signal_number, handle_trapped_signal);
+}
+
+fn set_trap_handler(i32 signal_number) -> void
+{
+  if (!is_trappable_signal(signal_number)) return;
+  signal(signal_number, handle_trapped_signal);
+}
+
+fn set_trap_ignore(i32 signal_number) -> void
+{
+  if (!is_trappable_signal(signal_number)) return;
+  signal(signal_number, SIG_IGN);
+}
+
+fn clear_trap_handler(i32 signal_number) -> void
+{
+  if (!is_trappable_signal(signal_number)) return;
+  if (signal_number == SIGINT)
+    signal(signal_number, handle_interrupt);
+  else
+    signal(signal_number, SIG_DFL);
+}
+
+fn monotonic_nanos() wontthrow -> u64
+{
+  LARGE_INTEGER frequency;
+  LARGE_INTEGER counter;
+  if (QueryPerformanceFrequency(&frequency) == 0) return 0;
+  if (QueryPerformanceCounter(&counter) == 0) return 0;
+  /* The counter is scaled to nanoseconds through the frequency, splitting the
+     whole seconds from the remainder so the multiply never overflows the way a
+     raw counter times a billion would. */
+  const u64 whole_seconds = counter.QuadPart / frequency.QuadPart;
+  const u64 remainder = counter.QuadPart % frequency.QuadPart;
+  return whole_seconds * 1000000000ULL +
+         (remainder * 1000000000ULL) / static_cast<u64>(frequency.QuadPart);
+}
+
+fn get_parent_process_id() wontthrow -> i64 { return 0; }
+
+fn get_real_user_id() wontthrow -> i64 { return 0; }
+
+fn get_effective_user_id() wontthrow -> i64 { return 0; }
+
+fn get_real_group_id() wontthrow -> i64 { return 0; }
+
+fn child_max() wontthrow -> i64 { return 0; }
+
+fn machine_type() throws -> String { return String{"x86_64"}; }
+
+fn realtime_microseconds() wontthrow -> u64
+{
+  FILETIME file_time;
+  GetSystemTimePreciseAsFileTime(&file_time);
+  ULARGE_INTEGER ticks;
+  ticks.LowPart = file_time.dwLowDateTime;
+  ticks.HighPart = file_time.dwHighDateTime;
+  /* FILETIME counts 100ns intervals since 1601, so the 1970 offset is removed.
+   */
+  const u64 epoch_offset_100ns = 116444736000000000ULL;
+  if (ticks.QuadPart < epoch_offset_100ns) return 0;
+  return (ticks.QuadPart - epoch_offset_100ns) / 10ULL;
+}
+
+fn format_local_time(StringView format, i64 epoch) throws -> String
+{
+  const time_t when = epoch < 0 ? time(nullptr) : static_cast<time_t>(epoch);
+  struct tm broken_down{};
+  localtime_s(&broken_down, &when);
+  let const format_string = String{format};
+  char buffer[512];
+  let const written =
+      strftime(buffer, sizeof(buffer), format_string.c_str(), &broken_down);
+  return String{
+      StringView{buffer, written}
+  };
+}
+
+fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
+    -> void
+{
+  /* Windows has no RUSAGE_CHILDREN, only the wall time is meaningful. */
+  user_seconds = 0;
+  system_seconds = 0;
+}
+
+fn children_peak_rss_bytes() wontthrow -> u64 { return 0; }
+
+fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
+    -> Maybe<measured_result>
+{
+  if (argv.is_empty()) return None;
+
+  /* Windows has no hardware perf counters, only wall time and peak working set.
+   */
+  measured_result result{};
+
+  let command_line = make_os_args(argv);
+
+  STARTUPINFOA startup{};
+  startup.cb = sizeof(startup);
+
+  HANDLE null_handle = INVALID_HANDLE_VALUE;
+  if (suppress_output) {
+    SECURITY_ATTRIBUTES inherit_sa{};
+    inherit_sa.nLength = sizeof(inherit_sa);
+    inherit_sa.bInheritHandle = TRUE;
+    null_handle = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE,
+                              &inherit_sa, OPEN_EXISTING, 0, nullptr);
+    if (null_handle != INVALID_HANDLE_VALUE) {
+      startup.dwFlags |= STARTF_USESTDHANDLES;
+      startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+      startup.hStdOutput = null_handle;
+      startup.hStdError = null_handle;
+    }
+  }
+  defer
+  {
+    if (null_handle != INVALID_HANDLE_VALUE) CloseHandle(null_handle);
+  };
+
+  PROCESS_INFORMATION process_info{};
+  String mutable_command_line = command_line;
+  let const should_inherit_handles =
+      suppress_output && null_handle != INVALID_HANDLE_VALUE;
+  inherited_handle_state input_inheritance{};
+  inherited_handle_state output_inheritance{};
+  if (should_inherit_handles) {
+    make_handle_inheritable(startup.hStdInput, input_inheritance);
+    make_handle_inheritable(null_handle, output_inheritance);
+  }
+  defer { restore_handle_inheritance(input_inheritance); };
+  defer { restore_handle_inheritance(output_inheritance); };
+
+  const u64 start_nanos = monotonic_nanos();
+
+  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
+   */
+  if (CreateProcessA(nullptr, const_cast<LPSTR>(mutable_command_line.data()),
+                     nullptr, nullptr, should_inherit_handles, 0, nullptr,
+                     nullptr, &startup, &process_info) == 0)
+    return None;
+
+  WaitForSingleObject(process_info.hProcess, INFINITE);
+
+  result.wall_nanos = monotonic_nanos() - start_nanos;
+
+  DWORD exit_code = 0;
+  GetExitCodeProcess(process_info.hProcess, &exit_code);
+  result.exit_status = static_cast<i64>(exit_code);
+
+  PROCESS_MEMORY_COUNTERS memory_counters{};
+  memory_counters.cb = sizeof(memory_counters);
+  if (GetProcessMemoryInfo(process_info.hProcess, &memory_counters,
+                           sizeof(memory_counters)) != 0)
+    result.peak_rss_bytes =
+        static_cast<u64>(memory_counters.PeakWorkingSetSize);
+
+  CloseHandle(process_info.hProcess);
+  CloseHandle(process_info.hThread);
+
+  return result;
+}
+
+fn make_directory(StringView path, u32 mode) wontthrow -> bool
+{
+  unused(mode);
+  const String path_string{path};
+  return CreateDirectoryA(path_string.c_str(), nullptr) != 0;
+}
+
+fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
+{
+  /* Windows has no POSIX permission bits, so the mode is accepted and ignored.
+   */
+  unused(path);
+  unused(mode);
+  return true;
+}
+
+fn touch_file_times(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  HANDLE handle =
+      CreateFileA(path_string.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ,
+                  nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (handle == INVALID_HANDLE_VALUE) return false;
+
+  FILETIME now;
+  GetSystemTimeAsFileTime(&now);
+  let const did_set = SetFileTime(handle, nullptr, &now, &now) != 0;
+  CloseHandle(handle);
+  return did_set;
+}
+
+fn remove_directory(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return RemoveDirectoryA(path_string.c_str()) != 0;
+}
+
+fn remove_file(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return DeleteFileA(path_string.c_str()) != 0;
+}
+
+fn rename_path(StringView from, StringView to) wontthrow -> bool
+{
+  const String from_string{from};
+  const String to_string{to};
+  return MoveFileExA(from_string.c_str(), to_string.c_str(),
+                     MOVEFILE_REPLACE_EXISTING) != 0;
+}
+
+fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
+{
+  const String target_string{target};
+  const String link_string{link_path};
+/* An older mingw SDK omits these flags, defined here when absent. */
+#ifndef SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
+#define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
+#endif
+#ifndef SYMBOLIC_LINK_FLAG_DIRECTORY
+#define SYMBOLIC_LINK_FLAG_DIRECTORY 0x1
+#endif
+  /* A directory target needs the directory flag, the unprivileged flag avoids
+     elevation on developer-mode Windows. */
+  DWORD flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+  const DWORD attributes = GetFileAttributesA(target_string.c_str());
+  if (attributes != INVALID_FILE_ATTRIBUTES &&
+      (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+    flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
+  return CreateSymbolicLinkA(link_string.c_str(), target_string.c_str(),
+                             flags) != 0;
+}
+
+fn read_symlink(StringView path) wontthrow -> Maybe<String>
+{
+  /* Reading a reparse point needs a device control call this layer does not
+     wrap, so cp on Windows copies a symlink's contents rather than the link. */
+  unused(path);
+  return shit::None;
+}
+
+fn current_executable_path() wontthrow -> Maybe<String>
+{
+  char module_path[MAX_PATH];
+  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
+    return shit::None;
+  return String{module_path};
+}
+
+fn stat_path(StringView path, file_status &status) wontthrow -> bool
+{
+  const String path_string{path};
+  struct stat info{};
+  /* Windows has no lstat, so a symlink reports its resolved target. */
+  if (::stat(path_string.c_str(), &info) != 0) return false;
+  status.mode = static_cast<u32>(info.st_mode);
+  status.link_count = static_cast<u64>(info.st_nlink);
+  status.owner_id = static_cast<u32>(info.st_uid);
+  status.group_id = static_cast<u32>(info.st_gid);
+  status.size = static_cast<u64>(info.st_size);
+  status.modification_time = static_cast<i64>(info.st_mtime);
+  WIN32_FILE_ATTRIBUTE_DATA attributes{};
+  if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard,
+                           &attributes) != 0)
+  {
+    ULARGE_INTEGER modification_ticks{};
+    modification_ticks.LowPart = attributes.ftLastWriteTime.dwLowDateTime;
+    modification_ticks.HighPart = attributes.ftLastWriteTime.dwHighDateTime;
+    status.modification_nanoseconds =
+        static_cast<u32>(modification_ticks.QuadPart % 10000000ULL * 100ULL);
+  }
+  /* Windows stat has no block count, so 512-byte blocks are derived from size.
+   */
+  status.blocks = (static_cast<u64>(info.st_size) + 511) / 512;
+  return true;
+}
+
+fn format_mode_string(u32 mode) throws -> String
+{
+  /* Windows stat exposes only the owner bits, mirrored across all three
+   * triplets. */
+  const bool is_readable = (mode & 0000400u) != 0;
+  const bool is_writable = (mode & 0000200u) != 0;
+  const bool is_executable = (mode & 0000100u) != 0;
+
+  String result{heap_allocator()};
+  result.push(file_type_letter(mode));
+  for (usize triplet = 0; triplet < 3; triplet++) {
+    result.push(is_readable ? 'r' : '-');
+    result.push(is_writable ? 'w' : '-');
+    result.push(is_executable ? 'x' : '-');
+  }
+  return result;
+}
+
+fn file_type_letter(u32 mode) wontthrow -> char
+{
+  /* Windows stat distinguishes only the directory bit from a regular file. */
+  return (mode & 0040000u) != 0 ? 'd' : '-';
+}
+
+fn uid_to_username(u32 uid) throws -> Maybe<String>
+{
+  /* Windows names users through the security database, so ls uses the numeric
+   * id. */
+  unused(uid);
+  return shit::None;
+}
+
+fn gid_to_groupname(u32 gid) throws -> Maybe<String>
+{
+  unused(gid);
+  return shit::None;
+}
+
+fn sleep_for_seconds(double seconds) wontthrow -> void
+{
+  if (seconds <= 0.0) return;
+  Sleep(static_cast<DWORD>(seconds * 1000.0));
+}
+
+fn enumerate_processes(bool include_resource_stats) throws
+    -> ArrayList<process_entry>
+{
+  /* The snapshot has no per-process resource stats, so the BSD columns stay
+   * zero. */
+  unused(include_resource_stats);
+  ArrayList<process_entry> processes{heap_allocator()};
+  HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (snapshot == INVALID_HANDLE_VALUE) return processes;
+  defer { CloseHandle(snapshot); };
+
+  PROCESSENTRY32 entry{};
+  entry.dwSize = sizeof(entry);
+  if (Process32First(snapshot, &entry) == 0) return processes;
+  do {
+    process_entry process{};
+    process.pid = static_cast<i64>(entry.th32ProcessID);
+    process.name = String{entry.szExeFile};
+    /* The snapshot exposes only the executable name, used as the command line.
+     */
+    process.command_line = process.name.clone();
+    processes.push(steal(process));
+  } while (Process32Next(snapshot, &entry) != 0);
+  return processes;
+}
+
+} /* namespace os */
+
+} /* namespace shit */
+
+namespace shit {
+
+namespace os {
+
+const ArrayList<String> OMITTED_SUFFIXES =
+    utils::make_windows_program_suffixes();
+
+fn erase_extension_and_get_its_index(String &program_name) -> ext_index
+{
+  return utils::erase_program_extension(program_name, OMITTED_SUFFIXES);
+}
+
+} /* namespace os */
+
+} /* namespace shit */
+
+namespace shit {
+namespace os {
+
+fn get_shell_process_id() wontthrow -> i64
+{
+  return static_cast<i64>(PARENT_SHELL_PID);
+}
+
+fn get_file_creation_mask() wontthrow -> u32
+{
+  /* umask reads only through a set, so it is read and put back. */
+  let const previous_mask = SHIT_UMASK(0);
+  SHIT_UMASK(previous_mask);
+
+  return static_cast<u32>(previous_mask);
+}
+
+fn set_file_creation_mask(u32 mask) wontthrow -> void { SHIT_UMASK(mask); }
+
+fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
+{
+  return fd == descriptor_for_shell_fd(shell_fd);
+}
+
+} /* namespace os */
+} /* namespace shit */

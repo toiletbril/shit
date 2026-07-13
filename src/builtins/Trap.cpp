@@ -5,8 +5,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-#include <cctype>
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[action condition ...]");
@@ -76,7 +74,7 @@ fn format_listed_condition(StringView condition, bool with_sig_prefix,
   return String{allocator, condition};
 }
 
-} // namespace
+} /* namespace */
 
 fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
@@ -165,4 +163,4 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace shit
+} /* namespace shit */

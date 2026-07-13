@@ -325,6 +325,46 @@ fn format_human_size(u64 bytes, Allocator allocator) throws -> String
   return out;
 }
 
+fn parse_shitbox_duration_seconds(StringView text, StringView utility_name,
+                                  Allocator allocator) throws -> f64
+{
+  let const do_throw_invalid = [&]() throws -> void {
+    throw ErrorWithDetails{
+        String{allocator, utility_name}
+        + ": invalid duration '" + text + "'",
+        "Use a non-negative number with an optional `s`, `m`, `h`, or `d` "
+        "suffix, e.g. `" +
+            String{allocator, utility_name}
+        + " 5`"
+    };
+  };
+
+  f64 multiplier = 1.0;
+  usize number_length = text.length;
+  if (number_length != 0) {
+    switch (text[number_length - 1]) {
+    case 's': multiplier = 1.0; break;
+    case 'm': multiplier = 60.0; break;
+    case 'h': multiplier = 60.0 * 60.0; break;
+    case 'd': multiplier = 60.0 * 60.0 * 24.0; break;
+    default: break;
+    }
+    if (multiplier != 1.0 || text[number_length - 1] == 's') {
+      number_length--;
+    }
+  }
+
+  let const number =
+      String{allocator, text.substring_of_length(0, number_length)};
+  let const parsed_value = number.to<f64>();
+  if (parsed_value.is_error()) do_throw_invalid();
+
+  let const value = parsed_value.value();
+  if (__builtin_isnan(value) || value < 0.0) do_throw_invalid();
+
+  return value * multiplier;
+}
+
 fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void
 {
@@ -343,6 +383,6 @@ fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
   show_message(Note{String{note}}.to_string());
 }
 
-} // namespace shitbox
+} /* namespace shitbox */
 
-} // namespace shit
+} /* namespace shit */

@@ -28,8 +28,9 @@ inline fn merge_args_to_string(const ArrayList<String> &args) throws -> String
   return result;
 }
 
-fn find_pos_in_vec(const ArrayList<String> &suffixes,
-                   StringView wanted) wontthrow -> Maybe<usize>;
+fn make_windows_program_suffixes() throws -> ArrayList<String>;
+fn erase_program_extension(String &program_name,
+                           const ArrayList<String> &suffixes) throws -> usize;
 
 fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>;
 
@@ -63,8 +64,13 @@ pure fn is_posix_reserved_word(StringView word) wontthrow -> bool;
 
 /* The value saturates to the i64 range on overflow, and any other content
    yields an Error. */
-fn parse_decimal_integer(StringView text, bool *out_of_range = nullptr) throws
+fn parse_decimal_i64(StringView text, bool *out_of_range = nullptr) throws
     -> ErrorOr<i64>;
+fn parse_decimal_u64(StringView text) throws -> ErrorOr<u64>;
+
+fn parse_decimal_f64(const String &text) throws -> ErrorOr<f64>;
+
+fn format_f64(f64 value, Allocator allocator) throws -> String;
 
 fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>;
 
@@ -97,6 +103,8 @@ fn line_number_at(StringView source, usize position) throws -> usize;
 fn invalidate_line_number_cache() wontthrow -> void;
 fn parse_integer_in_base(StringView text, int_base base,
                          bool *out_of_range = nullptr) throws -> ErrorOr<i64>;
+fn parse_integer_in_base_u64(StringView text, int_base base) throws
+    -> ErrorOr<u64>;
 
 fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     -> Maybe<String>;
@@ -112,8 +120,16 @@ fn read_entire_standard_input() throws -> String;
    newline, and read -d passes the first byte of its argument, or a NUL for an
    empty argument. */
 fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
-                     char delimiter = '\n', i64 timeout_nanos = -1,
-                     bool *was_timed_out = nullptr) throws -> Maybe<String>;
+                     char delimiter = '\n', u64 deadline_nanos = 0,
+                     bool *was_timed_out = nullptr,
+                     Allocator allocator = heap_allocator()) throws
+    -> Maybe<String>;
+
+fn read_directory_cached(const Path &directory) throws
+    -> const ArrayList<Path::directory_child> *;
+fn directory_entry_kind(const Path &directory,
+                        const Path::directory_child &entry) throws
+    -> Path::entry_kind;
 
 fn initialize_path_map() throws -> void;
 
@@ -132,6 +148,8 @@ fn search_program_path(StringView program_name, bool find_all = false) throws
 
 fn path_command_names() throws -> const ArrayList<String> &;
 
+fn path_command_name_has_prefix(StringView prefix) throws -> bool;
+
 /* glob_active reads which bytes act as metacharacters. With extglob set the
    bash extended-glob groups ?(..), *(..), +(..), @(..), and !(..) are
    recognized, otherwise they are plain bytes. */
@@ -142,6 +160,6 @@ fn set_quit_context(const EvalContext *context) wontthrow -> void;
 
 [[noreturn]] fn quit(i32 code, bool should_goodbye = false) throws -> void;
 
-} // namespace utils
+} /* namespace utils */
 
-} // namespace shit
+} /* namespace shit */

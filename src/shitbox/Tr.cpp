@@ -3,8 +3,6 @@
 #include "../Eval.hpp"
 #include "../Shitbox.hpp"
 
-#include <cctype>
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-d] set1 [set2]");
@@ -207,6 +205,6 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-} // namespace shitbox
+} /* namespace shitbox */
 
-} // namespace shit
+} /* namespace shit */

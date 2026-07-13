@@ -763,9 +763,9 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
                        StringView goal, ArrayList<String> &visiting,
                        ArrayList<String> &built) throws -> void
 {
-  if (utils::find_pos_in_vec(built, goal).has_value()) return;
+  if (built.find(goal).has_value()) return;
 
-  if (utils::find_pos_in_vec(visiting, goal).has_value())
+  if (visiting.find(goal).has_value())
     throw Error{
         "The target '" + String{cxt.scratch_allocator(), goal}
           +
@@ -892,9 +892,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   ArrayList<String> seen_prerequisites{cxt.scratch_allocator()};
   String all_prereqs{cxt.scratch_allocator()};
   for (const String &prerequisite : normal_prerequisites) {
-    if (utils::find_pos_in_vec(seen_prerequisites, prerequisite.view())
-            .has_value())
-      continue;
+    if (seen_prerequisites.find(prerequisite.view()).has_value()) continue;
 
     seen_prerequisites.push(prerequisite.clone());
     if (!all_prereqs.is_empty()) all_prereqs += ' ';
@@ -956,7 +954,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   built.push(String{cxt.scratch_allocator(), goal});
 }
 
-} // namespace
+} /* namespace */
 
 Make::Make() = default;
 
@@ -1081,6 +1079,6 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
   return targets;
 }
 
-} // namespace shitbox
+} /* namespace shitbox */
 
-} // namespace shit
+} /* namespace shit */

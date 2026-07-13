@@ -6,8 +6,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-#include <ctime>
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[query ...]");
@@ -152,7 +150,7 @@ static fn contains_ignore_case(StringView haystack, StringView needle) wontthrow
   return false;
 }
 
-} // namespace
+} /* namespace */
 
 fn record_directory_access(StringView directory, Allocator allocator) throws
     -> void
@@ -249,4 +247,4 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} /* namespace shit */

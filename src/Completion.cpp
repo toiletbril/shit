@@ -19,94 +19,7 @@ namespace shit {
 
 namespace completion {
 
-struct directory_listing_cache_entry
-{
-  String directory_path{heap_allocator()};
-  i64 modification_time{0};
-  bool is_valid{false};
-  ArrayList<cached_directory_entry> entries{heap_allocator()};
-};
-
-static constexpr usize DIRECTORY_LISTING_CACHE_SLOT_COUNT = 4;
-static directory_listing_cache_entry
-    DIRECTORY_LISTING_CACHE[DIRECTORY_LISTING_CACHE_SLOT_COUNT]{};
-
 BumpArena COMPLETION_ARENA{};
-
-/* The returned pointer stays valid until the next call. */
-fn read_directory_cached(const Path &directory) throws
-    -> const ArrayList<cached_directory_entry> *
-{
-  let const path_view = directory.text().view();
-
-  os::file_status status{};
-  let const has_status = os::stat_path(path_view, status);
-
-  for (usize slot = 0; slot < DIRECTORY_LISTING_CACHE_SLOT_COUNT; slot++) {
-    directory_listing_cache_entry &entry = DIRECTORY_LISTING_CACHE[slot];
-    if (!entry.is_valid) continue;
-    if (entry.directory_path.view() != path_view) continue;
-
-    if (has_status && entry.modification_time == status.modification_time) {
-      LOG(All, "directory listing cache hit for '%.*s'",
-          static_cast<int>(path_view.length), path_view.data);
-      if (slot != 0) {
-        directory_listing_cache_entry hit = steal(entry);
-        for (usize back = slot; back > 0; back--) {
-          DIRECTORY_LISTING_CACHE[back] =
-              steal(DIRECTORY_LISTING_CACHE[back - 1]);
-        }
-        DIRECTORY_LISTING_CACHE[0] = steal(hit);
-        return &DIRECTORY_LISTING_CACHE[0].entries;
-      }
-      return &entry.entries;
-    }
-
-    entry.is_valid = false;
-    break;
-  }
-
-  let listing = Path::read_directory_typed(directory);
-  if (!listing.has_value()) return nullptr;
-
-  let resolved_entries = ArrayList<cached_directory_entry>{heap_allocator()};
-  resolved_entries.reserve(listing->count());
-  for (let &child : *listing) {
-    let is_directory = false;
-    switch (child.kind) {
-    case Path::entry_kind::Directory: is_directory = true; break;
-    case Path::entry_kind::Regular:
-    case Path::entry_kind::Other: is_directory = false; break;
-    default: {
-      let full = directory.clone();
-      full.push_component(child.name.view());
-      is_directory = full.is_directory();
-      break;
-    }
-    }
-
-    resolved_entries.push(
-        cached_directory_entry{steal(child.name), is_directory});
-  }
-
-  for (usize back = DIRECTORY_LISTING_CACHE_SLOT_COUNT - 1; back > 0; back--)
-    DIRECTORY_LISTING_CACHE[back] = steal(DIRECTORY_LISTING_CACHE[back - 1]);
-
-  directory_listing_cache_entry fresh{};
-  fresh.directory_path = String{path_view};
-  fresh.modification_time = has_status ? status.modification_time : 0;
-  fresh.is_valid = has_status;
-  fresh.entries = steal(resolved_entries);
-  DIRECTORY_LISTING_CACHE[0] = steal(fresh);
-
-  LOG(All, "directory listing cache miss for '%.*s', read %zu entries",
-      static_cast<int>(path_view.length), path_view.data,
-      DIRECTORY_LISTING_CACHE[0].entries.count());
-
-  /* A directory with no readable mtime is left invalid so a later keystroke
-     re-reads rather than trust an unkeyed slot. */
-  return &DIRECTORY_LISTING_CACHE[0].entries;
-}
 
 static pure fn is_word_separator(char c) wontthrow -> bool
 {
@@ -259,9 +172,125 @@ static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
   return TRANSPARENT_PREFIXES.contains(word);
 }
 
+static pure fn next_completion_prefix_word(StringView line,
+                                           usize &position) wontthrow
+    -> Maybe<StringView>
+{
+  position = skip_blanks(line, position);
+  if (position >= line.length) return None;
+
+  let const start = position;
+  while (position < line.length && line[position] != ' ' &&
+         line[position] != '\t')
+  {
+    if (line[position] == '\'' || line[position] == '"' ||
+        line[position] == '\\')
+    {
+      position = quoted_run_end(line, position) + 1;
+    } else {
+      position++;
+    }
+  }
+
+  return line.substring_of_length(start, position - start);
+}
+
+static fn timeout_flag_takes_value(char short_name,
+                                   StringView long_name) wontthrow -> bool
+{
+  let const flags =
+      shitbox::shitbox_util_flag_list(shitbox::Utility::Kind::Timeout);
+  if (flags == nullptr) return false;
+
+  for (let const flag : *flags) {
+    if (short_name != '\0' && flag->short_name() != short_name) continue;
+    if (!long_name.is_empty() && flag->long_name() != long_name) continue;
+    return flag->kind() == Flag::Kind::String ||
+           flag->kind() == Flag::Kind::ManyStrings;
+  }
+  return false;
+}
+
+static fn timeout_option_takes_next_word(StringView word) wontthrow -> bool
+{
+  if (word.length < 2 || word[0] != '-') return false;
+
+  if (word[1] == '-') {
+    let const separator = word.find_character('=');
+    let const name_length =
+        separator.has_value() ? *separator - 2 : word.length - 2;
+    let const name = word.substring_of_length(2, name_length);
+    return !separator.has_value() && timeout_flag_takes_value('\0', name);
+  }
+
+  for (usize flag_index = 1; flag_index < word.length; flag_index++) {
+    if (timeout_flag_takes_value(word[flag_index], {}))
+      return flag_index + 1 == word.length;
+  }
+  return false;
+}
+
+static pure fn timeout_managed_command_start(StringView line,
+                                             usize position) wontthrow
+    -> Maybe<usize>
+{
+  let should_skip_value = false;
+  loop
+  {
+    let const word = next_completion_prefix_word(line, position);
+    if (!word.has_value()) return None;
+
+    if (should_skip_value) {
+      should_skip_value = false;
+      continue;
+    }
+
+    if (*word == "--") {
+      let const duration = next_completion_prefix_word(line, position);
+      if (!duration.has_value()) return None;
+      return skip_blanks(line, position);
+    }
+
+    if (word->length > 1 && (*word)[0] == '-') {
+      should_skip_value = timeout_option_takes_next_word(*word);
+      continue;
+    }
+
+    return skip_blanks(line, position);
+  }
+}
+
+static pure fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
+{
+  usize position = 0;
+  loop
+  {
+    let const word = next_completion_prefix_word(line, position);
+    if (!word.has_value()) return None;
+
+    if (*word == "timeout")
+      return timeout_managed_command_start(line, position);
+
+    if (*word == "shitbox") {
+      let const utility = next_completion_prefix_word(line, position);
+      if (utility.has_value() && *utility == "timeout")
+        return timeout_managed_command_start(line, position);
+      return None;
+    }
+
+    if (!is_transparent_command_prefix(*word)) return None;
+  }
+}
+
 static pure fn is_in_command_position(StringView line,
                                       usize token_start) wontthrow -> bool
 {
+  if (let const managed_start = timeout_command_start(line);
+      managed_start.has_value())
+  {
+    return token_start == *managed_start;
+  }
+
   let i = token_start;
   loop
   {
@@ -351,11 +380,10 @@ static pure fn candidate_match(StringView token, StringView candidate,
   return None;
 }
 
-struct tiered_candidates
+class TieredCandidates
 {
-  ArrayList<String> by_tier[MATCH_TIER_COUNT];
-
-  tiered_candidates()
+public:
+  TieredCandidates()
       : by_tier{ArrayList<String>{completion_allocator()},
                 ArrayList<String>{completion_allocator()},
                 ArrayList<String>{completion_allocator()}}
@@ -372,6 +400,9 @@ struct tiered_candidates
       if (!by_tier[tier].is_empty()) return steal(by_tier[tier]);
     return ArrayList<String>{completion_allocator()};
   }
+
+private:
+  ArrayList<String> by_tier[MATCH_TIER_COUNT];
 };
 
 static fn command_name_match(StringView name, StringView token,
@@ -387,7 +418,7 @@ static fn command_name_match(StringView name, StringView token,
   return candidate_match(token, name, is_case_sensitive);
 }
 
-static fn add_unique_command(tiered_candidates &candidates, HashSet &seen,
+static fn add_unique_command(TieredCandidates &candidates, HashSet &seen,
                              StringView name, StringView token,
                              bool token_is_glob, bool is_case_sensitive,
                              const Bitset &glob_active) throws -> void
@@ -429,19 +460,10 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
                 first.substring_of_length(0, prefix_length)};
 }
 
-fn environment_path_changed(String &cached_path) throws -> bool
-{
-  const char *path = std::getenv("PATH");
-  let const current = path != nullptr ? StringView{path} : StringView{};
-  if (cached_path.view() == current) return false;
-  cached_path = String{current};
-  return true;
-}
-
 static fn complete_command(StringView token, bool token_is_glob,
                            EvalContext &context) throws -> ArrayList<String>
 {
-  let candidates = tiered_candidates{};
+  let candidates = TieredCandidates{};
   let seen = HashSet{completion_allocator()};
 
   TRACELN("completing command position for token '%.*s'",
@@ -674,7 +696,7 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
                               bool executables_only,
                               EvalContext &context) throws -> ArrayList<String>
 {
-  let candidates = tiered_candidates{};
+  let candidates = TieredCandidates{};
 
   let unescaped_backing = String{completion_allocator()};
   if (!inside_quote) unescaped_backing = unescape_path_token(token);
@@ -690,7 +712,7 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory, context);
 
-  let const entries = read_directory_cached(listing_directory);
+  let const entries = utils::read_directory_cached(listing_directory);
   if (entries == nullptr) return candidates.best();
 
   for (let const &entry : *entries) {
@@ -699,11 +721,14 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
         candidate_match(parts.basename_part, name, is_case_sensitive);
     if (!tier.has_value()) continue;
 
-    if (directories_only && !entry.is_directory) continue;
+    let const is_directory =
+        utils::directory_entry_kind(listing_directory, entry) ==
+        Path::entry_kind::Directory;
+    if (directories_only && !is_directory) continue;
 
     /* A command-position path completes only runnable files, so a plain data
        file is dropped, while directories stay for navigation. */
-    if (executables_only && !entry.is_directory &&
+    if (executables_only && !is_directory &&
         !entry_is_executable(listing_directory, name))
     {
       continue;
@@ -723,7 +748,7 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
         !parts.directory_part.is_empty() && parts.directory_part[0] == '$';
 
     let entry_name = String{completion_allocator(), name};
-    if (entry.is_directory) entry_name += '/';
+    if (is_directory) entry_name += '/';
 
     let candidate = String{completion_allocator(), parts.directory_part};
     if (is_variable_prefixed && !inside_quote) {
@@ -758,7 +783,7 @@ static fn complete_glob(StringView token, const Path &base_directory,
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory, context);
 
-  let const entries = read_directory_cached(listing_directory);
+  let const entries = utils::read_directory_cached(listing_directory);
   if (entries == nullptr) return candidates;
 
   let const glob_active = all_active_glob_mask(parts.basename_part.length);
@@ -775,9 +800,12 @@ static fn complete_glob(StringView token, const Path &base_directory,
       continue;
     }
 
-    if (directories_only && !entry.is_directory) continue;
+    let const is_directory =
+        utils::directory_entry_kind(listing_directory, entry) ==
+        Path::entry_kind::Directory;
+    if (directories_only && !is_directory) continue;
 
-    if (executables_only && !entry.is_directory &&
+    if (executables_only && !is_directory &&
         !entry_is_executable(listing_directory, name))
     {
       continue;
@@ -785,7 +813,7 @@ static fn complete_glob(StringView token, const Path &base_directory,
 
     let candidate = String{completion_allocator(), parts.directory_part};
     candidate += name;
-    if (entry.is_directory) candidate += '/';
+    if (is_directory) candidate += '/';
 
     candidates.push(steal(candidate));
   }
@@ -873,6 +901,14 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 
 fn command_word_of(StringView line) wontthrow -> StringView
 {
+  if (let const managed_start = timeout_command_start(line);
+      managed_start.has_value())
+  {
+    usize position = *managed_start;
+    let const command = next_completion_prefix_word(line, position);
+    return command.has_value() ? *command : StringView{};
+  }
+
   usize i = 0;
   usize open_paren_depth = 0;
   for (usize k = 0; k < line.length; k++) {
@@ -1284,6 +1320,6 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   };
 }
 
-} // namespace completion
+} /* namespace completion */
 
-} // namespace shit
+} /* namespace shit */

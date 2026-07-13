@@ -21,9 +21,6 @@ namespace completion {
    the editor drains it. */
 static BumpArena HIGHLIGHT_ARENA{};
 
-static String CACHED_PATH_VERDICT_PATH{heap_allocator()};
-static StringMap<bool> PATH_SEARCH_VERDICTS{heap_allocator()};
-
 static fn first_word_resolves(StringView word, EvalContext &context) throws
     -> bool
 {
@@ -60,15 +57,9 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
      when the toggle is on. */
   if (context.shitbox() && shitbox::find_util(word).has_value()) return true;
 
-  /* Only the PATH search verdict caches, dropped when PATH changes. */
-  if (environment_path_changed(CACHED_PATH_VERDICT_PATH))
-    PATH_SEARCH_VERDICTS.clear();
-  if (const bool *verdict = PATH_SEARCH_VERDICTS.find(word); verdict != nullptr)
-    return *verdict;
   let const resolves = utils::search_program_path(word).count() > 0;
   LOG(All, "the path search resolves '%.*s' to %s",
       static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
-  PATH_SEARCH_VERDICTS.set(word, resolves);
   return resolves;
 }
 
@@ -95,8 +86,7 @@ static fn command_word_prefixes_any(StringView word,
   });
   if (was_found) return true;
 
-  for (let const &command_name : utils::path_command_names())
-    if (has_prefix(command_name.view())) return true;
+  if (utils::path_command_name_has_prefix(word)) return true;
 
   return false;
 }
@@ -216,6 +206,31 @@ static pure fn word_contains_url_scheme(StringView word) wontthrow -> bool
   return false;
 }
 
+static pure fn word_looks_like_ssh_remote_path(StringView word) wontthrow
+    -> bool
+{
+  let const colon_position = word.find_character(':');
+  if (!colon_position.has_value() || *colon_position == 0) return false;
+
+  for (usize byte_index = 0; byte_index < *colon_position; byte_index++)
+    if (word[byte_index] == '/' || word[byte_index] == '\\') return false;
+
+  if (*colon_position == 1 && word.length > 2 &&
+      (word[2] == '/' || word[2] == '\\'))
+  {
+    return false;
+  }
+
+  let const authority = word.substring_of_length(0, *colon_position);
+  if (let const at_position = authority.find_character('@');
+      at_position.has_value() &&
+      (*at_position == 0 || *at_position + 1 == authority.length))
+  {
+    return false;
+  }
+  return true;
+}
+
 enum class highlight_construct : u8
 {
   if_,
@@ -307,7 +322,7 @@ constexpr static_string_entry<keyword_spec> HIGHLIGHT_KEYWORD_ENTRIES[] = {
 
 constexpr StaticStringMap HIGHLIGHT_KEYWORDS{HIGHLIGHT_KEYWORD_ENTRIES};
 
-} // namespace
+} /* namespace */
 
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
@@ -357,12 +372,14 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
     directory = String{bump_allocator(HIGHLIGHT_ARENA), "."};
   }
 
-  let const entries = read_directory_cached(Path{directory.view()});
+  let const entries = utils::read_directory_cached(Path{directory.view()});
   if (entries == nullptr) return false;
 
   for (let const &entry : *entries)
     if (entry.name.view().starts_with(partial) &&
-        (!directories_only || entry.is_directory))
+        (!directories_only ||
+         utils::directory_entry_kind(Path{directory.view()}, entry) ==
+             Path::entry_kind::Directory))
     {
       return true;
     }
@@ -1013,7 +1030,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     }
 
     if (!is_command_position && plain && !is_assignment) {
-      if (word_contains_url_scheme(word)) {
+      if (word_contains_url_scheme(word) ||
+          word_looks_like_ssh_remote_path(word))
+      {
         do_push(word_start, word_end, colors::ansi::BOLD_WHITE);
       } else if (!word.is_empty() && word[0] == '-') {
         do_push(word_start, word_end, colors::ansi::GRAY);
@@ -1058,6 +1077,6 @@ fn highlight_line(StringView line, EvalContext &context) throws
   return spans;
 }
 
-} // namespace completion
+} /* namespace completion */
 
-} // namespace shit
+} /* namespace shit */

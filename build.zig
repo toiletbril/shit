@@ -103,6 +103,9 @@ fn collectSources(b: *std.Build) []const []const u8 {
     while (walker.next() catch @panic("unable to walk src")) |entry| {
         if (entry.kind != .file) continue;
         if (!std.mem.endsWith(u8, entry.path, ".cpp")) continue;
+        if (std.mem.eql(u8, entry.path, "PlatformPosix.cpp")) continue;
+        if (std.mem.eql(u8, entry.path, "PlatformPosixExtra.cpp")) continue;
+        if (std.mem.eql(u8, entry.path, "PlatformWin32.cpp")) continue;
         sources.append(b.allocator, b.dupe(entry.path)) catch @panic("out of memory");
     }
 

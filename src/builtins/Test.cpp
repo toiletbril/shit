@@ -24,7 +24,7 @@ namespace {
 fn parse_integer(StringView text, i64 &out) throws -> bool
 {
   bool is_out_of_range = false;
-  let const parsed = utils::parse_decimal_integer(text, &is_out_of_range);
+  let const parsed = utils::parse_decimal_i64(text, &is_out_of_range);
   if (parsed.is_error() || is_out_of_range) {
     return false;
   }
@@ -313,7 +313,7 @@ public:
   }
 };
 
-} // namespace
+} /* namespace */
 
 Test::Test() = default;
 
@@ -366,4 +366,4 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return result ? 0 : 1;
 }
 
-} // namespace shit
+} /* namespace shit */

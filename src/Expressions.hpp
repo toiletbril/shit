@@ -17,7 +17,7 @@ class AssignCommand;
 class SimpleCommand;
 class ForLoop;
 class CStyleForLoop;
-} // namespace expressions
+} /* namespace expressions */
 
 enum class analyze_severity : u8
 {
@@ -34,7 +34,6 @@ public:
   bool has_seen_runtime_definer{false};
   HashSet defined_functions{heap_allocator()};
   HashSet known_aliases{heap_allocator()};
-  StringMap<bool> command_resolution_cache{heap_allocator()};
   /* The table is cleared at a conditional branch, a loop body, a function body,
      a subshell, and on any runtime definer, since a value recorded before such
      a boundary is no longer proven to hold past it. */
@@ -344,13 +343,6 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   ArrayList<const Token *> m_args{heap_allocator()};
-
-  /* The name guards the cache, since an expanded name from a variable may
-     differ between runs, and the mood guards it too, since a mood-gated builtin
-     such as let resolves differently after a set --mood switch. */
-  mutable String m_resolved_name{heap_allocator()};
-  mutable Maybe<ResolvedCommand> m_resolved_kind{};
-  mutable mimic_mood m_resolved_mood{};
 
   mutable Maybe<bool> m_command_word_is_glob{};
 
@@ -918,6 +910,6 @@ BINARY_EXPRESSION_STRUCT(Xor);
 BINARY_EXPRESSION_STRUCT(Equal);
 BINARY_EXPRESSION_STRUCT(NotEqual);
 
-} // namespace expressions
+} /* namespace expressions */
 
-} // namespace shit
+} /* namespace shit */

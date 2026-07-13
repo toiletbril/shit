@@ -5,8 +5,6 @@
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
-#include <cstdio>
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-p] [-S] [mask]");
@@ -108,7 +106,7 @@ fn apply_symbolic_mask(StringView spec, u32 current_mask) throws -> Maybe<u32>
   return (~allowed) & PERMISSION_BITS;
 }
 
-} // namespace
+} /* namespace */
 
 Umask::Umask() = default;
 
@@ -183,4 +181,4 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} // namespace shit
+} /* namespace shit */

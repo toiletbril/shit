@@ -23,6 +23,16 @@ fn Flag::set_position(u32 position) throws -> void { m_position = position; }
 
 pure fn Flag::position() const wontthrow -> usize { return m_position; }
 
+pure fn Flag::value_location() const wontthrow -> SourceLocation
+{
+  return m_value_location;
+}
+
+fn Flag::set_value_location(SourceLocation location) wontthrow -> void
+{
+  m_value_location = location;
+}
+
 pure fn Flag::short_name() const wontthrow -> char { return m_short_name; }
 
 pure fn Flag::long_name() const wontthrow -> StringView { return m_long_name; }
@@ -46,6 +56,7 @@ pure fn FlagBool::is_enabled() const wontthrow -> bool { return m_value; }
 fn FlagBool::reset() throws -> void
 {
   m_position = 0;
+  m_value_location = {};
   m_value = false;
 }
 
@@ -64,6 +75,7 @@ pure fn FlagRepeatedBool::count() const wontthrow -> usize { return m_count; }
 fn FlagRepeatedBool::reset() throws -> void
 {
   m_position = 0;
+  m_value_location = {};
   m_count = 0;
 }
 
@@ -88,6 +100,7 @@ pure fn FlagString::value() const wontthrow -> StringView
 fn FlagString::reset() throws -> void
 {
   m_position = 0;
+  m_value_location = {};
   m_value.clear();
   m_is_set = false;
 }
@@ -133,6 +146,7 @@ pure fn FlagManyStrings::at_end() const wontthrow -> bool
 fn FlagManyStrings::reset() throws -> void
 {
   m_position = 0;
+  m_value_location = {};
   m_values.clear();
   m_value_position = 0;
 }
@@ -214,6 +228,20 @@ static fn prefixed_message(StringView program_name, StringView message) throws
   return program_name + ": " + message;
 }
 
+static fn argument_location(
+    const char *const *argv, usize argument_index, usize base_position,
+    const ArrayList<SourceLocation> *arg_locations) throws -> SourceLocation
+{
+  if (arg_locations != nullptr && argument_index < arg_locations->count())
+    return (*arg_locations)[argument_index];
+
+  usize caret_offset = 0;
+  for (usize prior_index = 0; prior_index < argument_index; prior_index++)
+    caret_offset += shell_quoted_arg_length(StringView{argv[prior_index]}) + 1;
+  return SourceLocation{base_position + caret_offset,
+                        std::strlen(argv[argument_index])};
+}
+
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const char *const *argv, usize base_position,
                const Flag *operand_value_flag,
@@ -285,6 +313,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           static_cast<FlagString *>(prev_flag)->set(argv[i]);
         else
           static_cast<FlagManyStrings *>(prev_flag)->append(argv[i]);
+        prev_flag->set_position(++position);
+        prev_flag->set_value_location(argument_location(
+            argv, static_cast<usize>(i), base_position, arg_locations));
 
         continue;
       }
@@ -376,6 +407,8 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
             next_arg_is_value = true;
             prev_flag = flag;
             prev_is_long = is_long;
+            flag->set_value_location(argument_location(
+                argv, static_cast<usize>(i), base_position, arg_locations));
           } else {
             if (*value_offset == '=') {
               value_offset++;
@@ -387,11 +420,20 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                   static_cast<FlagManyStrings *>(flag)->append(value_offset);
 
                 flag->set_position(++position);
+                let value_location = argument_location(
+                    argv, static_cast<usize>(i), base_position, arg_locations);
+                value_location.position +=
+                    static_cast<usize>(value_offset - argv[i]);
+                value_location.length = std::strlen(value_offset);
+                flag->set_value_location(value_location);
                 LOG(All, "set the flag '%s' to '%s'",
                     flag_name(flag, is_long).c_str(), value_offset);
               } else {
-                throw Error{"No value provided for '" +
-                            flag_name(flag, is_long) + "' flag"};
+                throw ErrorWithLocation{
+                    argument_location(argv, static_cast<usize>(i),
+                                      base_position, arg_locations),
+                    "No value provided for '" + flag_name(flag, is_long) +
+                        "' flag"};
               }
             } else if (!is_long) {
               if (flag->kind() == Flag::Kind::String)
@@ -400,13 +442,21 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                 static_cast<FlagManyStrings *>(flag)->append(value_offset);
 
               flag->set_position(++position);
+              let value_location = argument_location(
+                  argv, static_cast<usize>(i), base_position, arg_locations);
+              value_location.position +=
+                  static_cast<usize>(value_offset - argv[i]);
+              value_location.length = std::strlen(value_offset);
+              flag->set_value_location(value_location);
               LOG(All, "set the flag '%s' to the attached value '%s'",
                   flag_name(flag, is_long).c_str(), value_offset);
             } else {
-              throw Error{"Long flags require a separator "
-                          "between the flag and the "
-                          "value. Try using '" +
-                          flag_name(flag, is_long) + "=" + value_offset + "'"};
+              throw ErrorWithLocation{
+                  argument_location(argv, static_cast<usize>(i), base_position,
+                                    arg_locations),
+                  "Long flags require a separator between the flag and the "
+                  "value. Try using '" +
+                      flag_name(flag, is_long) + "=" + value_offset + "'"};
             }
           }
         } break;
@@ -436,22 +486,11 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
           LOG(Debug, "rejecting the unknown flag in '%s'", argv[i]);
 
-          SourceLocation flag_location;
           const usize arg_index = static_cast<usize>(i);
-          if (arg_locations != nullptr && arg_index < arg_locations->count()) {
-            flag_location = (*arg_locations)[arg_index];
-          } else {
-            usize caret_offset = 0;
-            for (int k = 0; k < i; k++) {
-              caret_offset += shell_quoted_arg_length(
-                                  StringView{argv[k], std::strlen(argv[k])}) +
-                              1;
-            }
-            flag_location = SourceLocation{base_position + caret_offset,
-                                           std::strlen(argv[i])};
-          }
-          throw ErrorWithLocation{
-              flag_location, prefixed_message(program_name, error_message)};
+          throw ErrorWithLocationAndDetails{
+              argument_location(argv, arg_index, base_position, arg_locations),
+              prefixed_message(program_name, error_message),
+              "Use `--` before an operand that begins with a dash"};
         }
       }
     }
@@ -459,9 +498,11 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
   if (next_arg_is_value) {
     ASSERT(prev_flag != nullptr);
-    throw Error{prefixed_message(
-        program_name, "No value provided for '" +
-                          flag_name(prev_flag, prev_is_long) + "' flag")};
+    throw ErrorWithLocation{
+        prev_flag->value_location(),
+        prefixed_message(program_name, "No value provided for '" +
+                                           flag_name(prev_flag, prev_is_long) +
+                                           "' flag")};
   }
 
   return args;

@@ -64,6 +64,8 @@ public:
   pure fn kind() const wontthrow -> Kind;
   pure fn position() const wontthrow -> usize;
   fn set_position(u32 position) throws -> void;
+  pure fn value_location() const wontthrow -> SourceLocation;
+  fn set_value_location(SourceLocation location) wontthrow -> void;
   pure fn short_name() const wontthrow -> char;
   pure fn long_name() const wontthrow -> StringView;
   pure fn section() const wontthrow -> flag_section;
@@ -77,6 +79,7 @@ protected:
 
   Kind m_kind;
   usize m_position{0}; /* 0 if it wasn't specified. */
+  SourceLocation m_value_location{};
   char m_short_name;
   flag_section m_section;
   String m_long_name;

@@ -41,7 +41,11 @@ fn resolve_shitbox_signal(StringView spelled, Allocator allocator) throws -> i32
 {
   if (spelled.is_empty()) return SIGTERM;
   let const parsed = spelled.to<i64>();
-  if (!parsed.is_error()) return static_cast<i32>(parsed.value());
+  if (!parsed.is_error()) {
+    if (parsed.value() < INT32_MIN || parsed.value() > INT32_MAX)
+      throw Error{"signal number is out of range"};
+    return static_cast<i32>(parsed.value());
+  }
   let const uppercased = uppercase_signal_name(spelled, allocator);
   let const named = os::signal_number_from_name(uppercased.view());
   if (!named.has_value())
@@ -107,6 +111,6 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
   return did_signal_any ? 0 : 1;
 }
 
-} // namespace shitbox
+} /* namespace shitbox */
 
-} // namespace shit
+} /* namespace shit */

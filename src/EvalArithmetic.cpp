@@ -1078,7 +1078,7 @@ public:
   }
 };
 
-} // namespace
+} /* namespace */
 
 fn EvalContext::read_array_element_integer(StringView name,
                                            StringView subscript) throws -> i64
@@ -1161,11 +1161,9 @@ fn evaluate_constant_arithmetic(StringView expression) throws -> i64
 
 namespace {
 
-/* calc computes in 128 bits through the compiler's __int128, falling back to
-   i64 without the extension. */
 #if T__HAS_GCC_EXTENSIONS
-using wide_int = __int128;
-using wide_uint = unsigned __int128;
+using wide_int = i128;
+using wide_uint = u128;
 #else
 using wide_int = i64;
 using wide_uint = u64;
@@ -1200,8 +1198,21 @@ static pure fn parse_wide_operand(StringView text) wontthrow -> wide_int
     value = value * radix + digit;
   }
 
-  let const result = static_cast<wide_int>(value);
-  return is_negative ? static_cast<wide_int>(-result) : result;
+  return static_cast<wide_int>(is_negative ? wide_uint{0} - value : value);
+}
+
+static pure fn wide_divide(wide_int lhs, wide_int rhs) wontthrow -> wide_int
+{
+  constexpr wide_int WIDE_MINIMUM = static_cast<wide_int>(wide_uint{1} << 127u);
+  if (lhs == WIDE_MINIMUM && rhs == -1) return WIDE_MINIMUM;
+  return lhs / rhs;
+}
+
+static pure fn wide_modulo(wide_int lhs, wide_int rhs) wontthrow -> wide_int
+{
+  constexpr wide_int WIDE_MINIMUM = static_cast<wide_int>(wide_uint{1} << 127u);
+  if (lhs == WIDE_MINIMUM && rhs == -1) return 0;
+  return lhs % rhs;
 }
 
 static fn lex_wide_number(StringView from, wide_int *out_value) throws -> usize
@@ -1523,7 +1534,7 @@ public:
           }
           fail("Division by zero", "The right operand evaluated to 0");
         }
-        lhs = lhs / rhs;
+        lhs = wide_divide(lhs, rhs);
         break;
       case '%':
         if (rhs == 0) {
@@ -1533,7 +1544,7 @@ public:
           }
           fail("Division by zero", "The right operand evaluated to 0");
         }
-        lhs = lhs % rhs;
+        lhs = wide_modulo(lhs, rhs);
         break;
       case '+': lhs = wrap_add(lhs, rhs); break;
       case '-': lhs = wrap_sub(lhs, rhs); break;
@@ -1622,7 +1633,7 @@ static fn evaluate_wide_expression(EvalContext *context, StringView expression,
   return sub.parse();
 }
 
-} // namespace
+} /* namespace */
 
 fn EvalContext::evaluate_arithmetic_wide(StringView expression,
                                          bool &out_nonzero) throws -> String
@@ -1652,4 +1663,4 @@ fn EvalContext::evaluate_arithmetic_wide(StringView expression,
   return format_wide(value);
 }
 
-} // namespace shit
+} /* namespace shit */

@@ -3,7 +3,8 @@ MODE ?= dbg
 TARGET ?= # Linux/Windows_NT/Darwin
 ARCH ?= $(shell uname -m) # TODO: arm64/x86_64
 
-SOURCES := $(wildcard *.cpp)
+ROUTED_SOURCES := PlatformPosix.cpp PlatformPosixExtra.cpp PlatformWin32.cpp
+SOURCES := $(filter-out $(ROUTED_SOURCES),$(wildcard *.cpp))
 HEADERS := $(wildcard *.hpp)
 
 DIRS := $(wildcard */.)
@@ -360,7 +361,7 @@ CLANG_FORMAT ?= clang-format
 
 fmt:
 	echo "	CLANG_FORMAT -i $(SOURCES) $(HEADERS)"
-	$(CLANG_FORMAT) -i $(SOURCES) $(HEADERS)
+	$(CLANG_FORMAT) -i $(SOURCES) $(ROUTED_SOURCES) $(HEADERS)
 
 clean:
 	rm -rf ./o ../shit ../shit-$(MODE) ../shit.exe ../shit-$(MODE).exe

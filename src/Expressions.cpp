@@ -282,10 +282,7 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
   return name;
 }
 
-/* A command resolves when it is a builtin, a program on PATH, or an existing
-   path. The result is memoized per name, so a command run many times across the
-   file scans PATH at most once. */
-fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
+fn command_resolves(const String &name) throws -> bool
 {
   if (name.is_empty()) return false;
   if (search_builtin(name.view()).has_value()) return true;
@@ -299,16 +296,10 @@ fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
     return Path::canonicalize(name.view()).has_value();
   }
 
-  if (const bool *cached = actx.command_resolution_cache.find(name.view())) {
-    LOG(Debug, "reusing the cached resolution of '%s'", name.c_str());
-    return *cached;
-  }
-
   const bool was_resolved =
       utils::search_program_path(name.view()).count() != 0;
   LOG(Debug, "scanning PATH for '%s', the command was %s", name.c_str(),
       was_resolved ? "found" : "not found");
-  actx.command_resolution_cache.set(name.view(), was_resolved);
   return was_resolved;
 }
 
@@ -372,7 +363,7 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
   return false;
 }
 
-} // namespace
+} /* namespace */
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
@@ -1544,7 +1535,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   }
 
   if (name.has_value() && !actx.should_silence_unresolved_commands &&
-      !command_resolves(actx, *name) &&
+      !command_resolves(*name) &&
       !actx.defined_functions.contains(
           StringView{name->data(), name->count()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->count()}))
@@ -1870,6 +1861,6 @@ cold fn IfStatement::register_defined_functions(
   if (m_otherwise != nullptr) m_otherwise->register_defined_functions(actx);
 }
 
-} // namespace expressions
+} /* namespace expressions */
 
-} // namespace shit
+} /* namespace shit */

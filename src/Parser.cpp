@@ -9,8 +9,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <cctype>
-
 namespace shit {
 
 using namespace tokens;
@@ -2200,4 +2198,4 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
   return lhs;
 }
 
-} // namespace shit
+} /* namespace shit */

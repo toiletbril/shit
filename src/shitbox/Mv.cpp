@@ -4,8 +4,6 @@
 #include "../Path.hpp"
 #include "../Shitbox.hpp"
 
-#include <cerrno>
-
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-fv] source ... destination");
@@ -168,6 +166,6 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} // namespace shitbox
+} /* namespace shitbox */
 
-} // namespace shit
+} /* namespace shit */

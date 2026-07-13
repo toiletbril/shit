@@ -7,7 +7,6 @@ class String;
 }
 
 #if !defined NDEBUG
-#include <cstdio>
 #define TRACE(...)                                                             \
   do {                                                                         \
     unused(std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));       \
@@ -22,7 +21,6 @@ class String;
     unused(fflush(stderr));                                                    \
   } while (0)
 #if defined __clang__
-#include <cstdarg>
 /* The string parameter is a template so the body sees a complete ::shit::String
    only at the call site. Debug.hpp can not include String.hpp, since String.hpp
    includes Debug.hpp, so naming String here would close an include cycle. */

@@ -17,8 +17,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <exception>
-
 namespace shit {
 
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
@@ -2027,4 +2025,4 @@ fn ExecContext::make_unresolved(SourceLocation location) throws -> ExecContext
           steal(arg_locations)};
 }
 
-} // namespace shit
+} /* namespace shit */

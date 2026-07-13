@@ -3,16 +3,17 @@
 #include "ErrorOr.hpp"
 #include "IntBase.hpp"
 
-#include <limits>
-
 namespace shit {
 
 namespace utils {
-fn parse_decimal_integer(StringView text, bool *out_of_range = nullptr) throws
+fn parse_decimal_i64(StringView text, bool *out_of_range = nullptr) throws
     -> ErrorOr<i64>;
+fn parse_decimal_u64(StringView text) throws -> ErrorOr<u64>;
 fn parse_integer_in_base(StringView text, int_base base,
                          bool *out_of_range = nullptr) throws -> ErrorOr<i64>;
-} // namespace utils
+fn parse_integer_in_base_u64(StringView text, int_base base) throws
+    -> ErrorOr<u64>;
+} /* namespace utils */
 
 template <class T>
 static fn narrow_integer(i64 value) throws -> ErrorOr<T>
@@ -38,11 +39,17 @@ fn StringView::to() const throws -> ErrorOr<T>
 {
   if constexpr (is_tagged_int_v<T>) {
     using U = typename T::underlying;
-    return T{TRY(
-        narrow_integer<U>(TRY(utils::parse_integer_in_base(*this, T::base))))};
+    if constexpr (std::is_same_v<U, u64>)
+      return T{TRY(utils::parse_integer_in_base_u64(*this, T::base))};
+    else
+      return T{TRY(narrow_integer<U>(
+          TRY(utils::parse_integer_in_base(*this, T::base))))};
   } else {
     static_assert(std::is_integral_v<T>, "StringView::to parses an integer");
-    return narrow_integer<T>(TRY(utils::parse_decimal_integer(*this)));
+    if constexpr (std::is_same_v<T, u64>)
+      return utils::parse_decimal_u64(*this);
+    else
+      return narrow_integer<T>(TRY(utils::parse_decimal_i64(*this)));
   }
 }
 
@@ -111,4 +118,4 @@ fn StringView::starts_with(StringView prefix) const wontthrow -> bool
          std::memcmp(data, prefix.data, prefix.length) == 0;
 }
 
-} // namespace shit
+} /* namespace shit */
