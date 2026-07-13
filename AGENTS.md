@@ -60,7 +60,8 @@ Names are verbose and semantic, never terse. A boolean reads `is_`, `should_`,
 such as `_length`, `_depth`, or `_position`, and never a bare `n_` prefix. A
 variable-bound lambda is named `do_`. An accessor reads `get_` or `set_`. A clear
 name replaces a comment that would explain an unclear one. A comment states why
-the code is the way it is, not what it does.
+the code is the way it is, not what it does. C and C++ comments always use
+`/* ... */`, never `//`.
 
 An if whose condition has `&&` or `||` is braced, while a trivial
 single-condition if stays unbraced. Logical blocks are separated by a blank line,
@@ -105,14 +106,15 @@ no-op since every builtin is always enabled in shit, and accepts the bash
 flags `-n`, `-a`, `-f`, and `-s` so a bash script that toggles builtins
 keeps sourcing.
 
-src/Platform.cpp wraps the operating system behind an os namespace, with the
-POSIX block and the Windows block defining the same API twice on purpose. Every
-platform call and type lives behind an os:: wrapper, so a non-platform source
-names no syscall, no platform header, and no platform macro. The only remaining
-platform conditionals outside Platform.cpp and Utils.cpp are the fork-based
-process substitution in EvalSubstitution.cpp and pipeline stage in
-ExpressionsCompound.cpp, which run the shell's own AST in the forked child and
-so cannot cross the os boundary, and the Cosmopolitan-only debug flags in
+src/Platform.cpp routes the operating system implementation. POSIX targets use
+PlatformPosix.cpp as the base and PlatformPosixExtra.cpp for the Linux and
+Darwin overlays. Windows loads only PlatformWin32.cpp. Platform.hpp owns every
+platform header. Every platform call and type lives behind an os:: wrapper, so a
+non-platform source names no syscall, no platform header, and no platform macro.
+The remaining platform conditionals outside the platform files and Utils.cpp
+are the fork-based process substitution in EvalSubstitution.cpp and pipeline
+stage in ExpressionsCompound.cpp, which run the shell's own AST in the forked
+child and cannot cross the os boundary, and the Cosmopolitan-only debug flags in
 Main.cpp.
 
 src/Completion.cpp drives zero config completion. Completion first slices the
@@ -130,15 +132,17 @@ expanded only to list the real directory, while the offered candidate keeps the
 literal prefix so it still expands at run time, and only a glob pattern is
 expanded into its matches. A command forks its `--help` at most once per cache key,
 behind an allowlist and a trusted directory gate, and the subcommand walk stops
-at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The cascade splits across
-src/Completion.cpp, src/CompletionManpage.cpp, src/CompletionScan.cpp, and the
-per-keystroke highlighter in src/CompletionHighlight.cpp, with shared helpers in
-src/CompletionInternal.hpp. The per-program policy tables, the --help allowlist,
+at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The
+cascade splits across src/Completion.cpp, src/CompletionManpage.cpp,
+src/CompletionScan.cpp, and the per-keystroke highlighter in
+src/CompletionHighlight.cpp, with shared helpers in src/CompletionInternal.hpp.
+The per-program policy tables, the --help allowlist,
 the extension hints, the custom-completer routing, and the transparent prefixes,
 live in src/CompletionPolicy.hpp, so a program absent from every table falls
-through to the manpage and the filesystem. The highlighter and TAB completion share one
-most-recently-used cache of directory listings keyed by path and invalidated by
-mtime. src/Toiletline.cpp bridges the editor to the evaluator, and
+through to the manpage and the filesystem. The highlighter and TAB completion
+share one cache of directory listings keyed by path and invalidated by mtime.
+Symlink target kinds are resolved when each listing is used. src/Toiletline.cpp
+bridges the editor to the evaluator, and
 src/toiletline/toiletline.h is the editor. The `--debug-highlight-at` flag, a
 debug-only test driver gated behind NDEBUG like `--debug-complete-at`, prints the
 highlight spans for a line so the highlighter is testable without the editor.
@@ -167,8 +171,9 @@ performs the split. A factored data structure lives directly in the shit
 namespace, and a factored class method is defined inline in its header. A free
 helper whose receiver is a value type is a method on that type, such as
 StringView::is_all_decimal_digits, String::replace, and Path::read_entire_file.
-find_pos_in_vec returns Maybe<usize> rather than a sentinel. Logic shared by the
-POSIX and Windows blocks of Platform.cpp lives in Utils.cpp.
+ArrayList::find returns Maybe<usize>, and callers test membership with
+find().has_value(). Logic shared by the POSIX and Windows implementations lives
+in Utils.cpp.
 
 ## Memory discipline
 
@@ -205,11 +210,11 @@ test bashdiff BASH=/opt/homebrew/bin/bash`.
 
 ## Finishing a change
 
-Before finishing a plan, update this CLAUDE.md, the README, docs/shit.1, and
+Before finishing a plan, update this AGENTS.md, the README, docs/shit.1, and
 completions/shit.bash so the docs, the manual, and the completions stay in sync.
 A new flag, a new mood, a new builtin, or a renamed option touches all four. The
 flag, mood, and UX documentation lives in the man page docs/shit.1, so that file
-is the primary write for such a change and this CLAUDE.md only routes to it. A
+is the primary write for such a change and this AGENTS.md only routes to it. A
 flag also updates completions/shit.bash so the completion offers it.
 
 ## Logging and debugging
