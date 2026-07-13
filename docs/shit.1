@@ -585,19 +585,17 @@ The
 builtin hosts a set of small bundled coreutilities. A system with only a
 compiler can run a configure and a make under shit.
 .B "shitbox ls"
-runs the bundled ls. A bundled utility is tried first, and a name with no
-matching utility falls back to a shell builtin of that name.
-.B "shitbox echo"
-runs the echo builtin. With the
+runs the bundled ls. A name with no matching utility is an error, since the
+shitbox builtin only runs the bundled utilities and never routes to a shell
+builtin. With the
 .B \-\-enable\-shitbox
 flag or
 .B "set \-o shitbox"
-the utility names resolve directly as commands without the prefix. A builtin
-still wins over a utility, and a utility wins over a program on PATH. A binary
-whose name is a utility, such as a symlink named ls, acts as that utility, and
-the utility's own flags reach its parser. A symlinked
-utility prints the shit version on \-\-version. The binary behind the name is
-visible, and its help names the shit shell.
+the utility names resolve directly as commands without the prefix. A utility
+wins over a program on PATH. A binary whose name is a utility, such as a
+symlink named ls, acts as that utility, and the utility's own flags reach its
+parser. A symlinked utility prints the shit version on \-\-version. The binary
+behind the name is visible, and its help names the shit shell.
 .B "shitbox \-\-assimilate DIR"
 installs one such symlink per utility into DIR. In the default shit mood a bare
 utility name also falls back to the bundled utility when PATH holds no binary of

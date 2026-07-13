@@ -23,8 +23,16 @@ rc=127
 1
 2
 3
-=== an existing builtin name routes to the builtin ===
-routed via shitbox
+=== a builtin name is not a shitbox utility ===
+shit: 1:9: error: shitbox has no utility named 'echo'.
+     1 |  shitbox echo routed via shitbox
+       |          ^~~~ here.
+rc=1
+=== the shitbox name does not recurse ===
+shit: 1:9: error: shitbox has no utility named 'shitbox'.
+     1 |  shitbox shitbox
+       |          ^~~~~~~ here.
+rc=1
 === unknown utility errors ===
 shit: 1:9: error: shitbox has no utility named 'nope'.
      1 |  shitbox nope

@@ -1,9 +1,3 @@
---- builtin kill with no target ---
-shit: 1:1: error: kill: Not enough arguments.
-     1 |  kill
-       |  ^~~~ here.
-shit: note: Try `kill --help` for more info.
-rc=2
 --- builtin getopts with no arguments ---
 shit: 1:1: error: getopts: Not enough arguments.
      1 |  getopts
@@ -40,10 +34,10 @@ shit: 1:1: error: grep: Not enough arguments.
 shit: note: Try `grep --help` for more info.
 rc=2
 --- the note is located in the bash mood too ---
-shit: 1:1: error: kill: Not enough arguments.
-     1 |  shitbox kill
-       |  ^~~~~~~~~~~~ here.
-shit: note: Try `kill --help` for more info.
+shit: 1:1: error: mkdir: Not enough arguments.
+     1 |  shitbox mkdir
+       |  ^~~~~~~~~~~~~ here.
+shit: note: Try `mkdir --help` for more info.
 rc=2
 --- and in the sh mood ---
 shit: 1:1: error: mkdir: Not enough arguments.

@@ -7,7 +7,7 @@ shit: 1:1: error: sleep: invalid duration 'abc'.
 note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, e.g. `sleep 5`.
 rc=1
 --- env runs the command ---
-ran
+1
 rc=0
 --- env applies the assignment ---
 SHITBOX_TESTVAR=present
@@ -24,16 +24,15 @@ shit: 1:1: error: killall: no_such_process_xyz_123: no process found.
      1 |  shitbox killall no_such_process_xyz_123
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 rc=1
---- kill with no pid ---
-shit: 1:1: error: kill: Not enough arguments.
+--- kill is a builtin, not a shitbox utility ---
+shit: 1:9: error: shitbox has no utility named 'kill'.
      1 |  shitbox kill
-       |  ^~~~~~~~~~~~ here.
-shit: note: Try `kill --help` for more info.
-rc=2
+       |          ^~~~ here.
+rc=1
 --- kill with a non-numeric pid ---
-shit: 1:14: error: Builtin 'kill': 'notapid' is not a valid job or process id.
-     1 |  shitbox kill notapid
-       |               ^~~~~~~ here.
+shit: 1:6: error: Builtin 'kill': 'notapid' is not a valid job or process id.
+     1 |  kill notapid
+       |       ^~~~~~~ here.
 rc=1
 --- ps prints the header ---
   PID CMD

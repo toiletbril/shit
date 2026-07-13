@@ -106,15 +106,6 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
     }
   }
 
-  /* A name that is not a utility but is a shell builtin routes to that builtin.
-   */
-  if (let const builtin_kind = search_builtin(name); builtin_kind.has_value()) {
-    let routed = ExecContext::from_resolved(
-        ec.source_location(), ResolvedCommand::from_builtin(*builtin_kind),
-        steal(shifted), steal(shifted_locations));
-    return execute_builtin(steal(routed), cxt);
-  }
-
   throw ErrorWithLocation{ec.arg_location_at(name_index),
                           "shitbox has no utility named '" + String{name} +
                               "'"};

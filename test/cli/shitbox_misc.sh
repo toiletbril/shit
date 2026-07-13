@@ -13,7 +13,7 @@ echo "--- sleep bad duration ---"
 echo "rc=$?"
 
 echo "--- env runs the command ---"
-"$BIN" -c 'shitbox env X=1 shitbox echo ran'
+"$BIN" -c 'shitbox env X=1 shitbox seq 1'
 echo "rc=$?"
 
 echo "--- env applies the assignment ---"
@@ -31,12 +31,12 @@ echo "--- killall with no match ---"
 "$BIN" -c 'shitbox killall no_such_process_xyz_123' 2>&1
 echo "rc=$?"
 
-echo "--- kill with no pid ---"
+echo "--- kill is a builtin, not a shitbox utility ---"
 "$BIN" -c 'shitbox kill' 2>&1
 echo "rc=$?"
 
 echo "--- kill with a non-numeric pid ---"
-"$BIN" -c 'shitbox kill notapid' 2>&1
+"$BIN" -c 'kill notapid' 2>&1
 echo "rc=$?"
 
 echo "--- ps prints the header ---"

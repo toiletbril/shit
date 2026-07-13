@@ -4,8 +4,6 @@
 # no file.
 unset SHIT_FLAGS
 
-echo "--- builtin kill with no target ---"
-"$BIN" -c 'kill'; echo "rc=$?"
 echo "--- builtin getopts with no arguments ---"
 "$BIN" -c 'getopts' 2>&1; echo "rc=$?"
 echo "--- builtin let with no expression ---"
@@ -17,6 +15,6 @@ echo "--- shitbox cp with one operand ---"
 echo "--- shitbox grep with no pattern ---"
 "$BIN" -c 'shitbox grep' 2>&1; echo "rc=$?"
 echo "--- the note is located in the bash mood too ---"
-"$BIN" --mood bash -c 'shitbox kill' 2>&1; echo "rc=$?"
+"$BIN" --mood bash -c 'shitbox mkdir' 2>&1; echo "rc=$?"
 echo "--- and in the sh mood ---"
 "$BIN" --mood sh -c 'shitbox mkdir' 2>&1; echo "rc=$?"

@@ -22,8 +22,13 @@ echo "=== set -o shitbox turns bare names on ==="
 echo "=== --enable-shitbox turns bare names on ==="
 "$BIN" --enable-shitbox -c 'PATH=; seq 3'
 
-echo "=== an existing builtin name routes to the builtin ==="
-"$BIN" -c 'shitbox echo routed via shitbox'
+echo "=== a builtin name is not a shitbox utility ==="
+"$BIN" -c 'shitbox echo routed via shitbox' 2>&1
+echo "rc=$?"
+
+echo "=== the shitbox name does not recurse ==="
+"$BIN" -c 'shitbox shitbox' 2>&1
+echo "rc=$?"
 
 echo "=== unknown utility errors ==="
 "$BIN" -c 'shitbox nope' 2>&1
