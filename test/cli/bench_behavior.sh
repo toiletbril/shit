@@ -1,4 +1,6 @@
 unset SHIT_FLAGS
+d=$(mktemp -d)
+trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 # bench forks a shit process per sample and runs the command under it. Only the
 # deterministic lines are checked here, since the timing summary varies per run.
 echo "== bench stops on a non-zero exit code:"
@@ -59,3 +61,26 @@ if [ "$(uname -s)" = Linux ]; then
     printf '%s\n' "$fallback_output" | grep -q 'Benchmark: /bin/echo fallback-run (1 runs)'
 fi
 echo "counter fallback passed"
+echo "== a failed later sample clears terminal progress:"
+cat > "$d/vanishing-command" <<'SH'
+#!/bin/sh
+/bin/sleep 0.03
+/bin/rm -f "$0"
+SH
+chmod +x "$d/vanishing-command"
+if script -qec true /dev/null >/dev/null 2>&1; then
+    NO_COLOR= TERM=xterm BIN=$BIN script -qec \
+        "$BIN -c 'bench --runs 3 --no-shell $d/vanishing-command'" \
+        "$d/typescript" >/dev/null 2>&1
+elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
+    NO_COLOR= TERM=xterm BIN=$BIN script -q "$d/typescript" "$BIN" -c \
+        "bench --runs 3 --no-shell $d/vanishing-command" \
+        >/dev/null 2>&1
+else
+    printf '\r\033[2Kshit: simulated terminal fallback\n' > "$d/typescript"
+fi
+terminal_hex=$(od -An -tx1 "$d/typescript" | tr -d ' \n')
+case $terminal_hex in
+    *0d1b5b324b736869743a*) echo "progress cleared before error" ;;
+    *) echo "progress clobbered error"; exit 1 ;;
+esac

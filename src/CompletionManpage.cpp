@@ -66,12 +66,7 @@ static fn
 capture_completion_program_output(const ArrayList<String> &arguments) wontthrow
     -> Maybe<String>
 {
-  for (usize attempt_count = 0; attempt_count < 3; attempt_count++) {
-    let output = os::capture_program_output(arguments, HELP_FORK_TIMEOUT_NANOS);
-    if (output.has_value()) return output;
-  }
-
-  return None;
+  return os::capture_program_output(arguments, HELP_FORK_TIMEOUT_NANOS);
 }
 
 /* An empty $MANPATH segment stands for the system defaults at that position,

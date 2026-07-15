@@ -8,3 +8,5 @@ not forked
 == an allowlisted command in a world-writable directory is never forked:
 == and was never forked:
 not forked
+== a timed out help command is attempted once:
+attempted once

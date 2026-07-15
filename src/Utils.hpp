@@ -124,13 +124,20 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
     -> Maybe<String>;
 
 fn read_directory_cached(const Path &directory,
-                         bool should_invalidate_path_cache = true) throws
+                         bool should_invalidate_path_cache = true,
+                         bool should_validate = true) throws
     -> const ArrayList<Path::directory_child> *;
 fn directory_entry_kind(const Path &directory,
                         const Path::directory_child &entry) throws
     -> Path::entry_kind;
 
 fn initialize_path_map() throws -> void;
+
+fn begin_interactive_completion() throws -> void;
+
+#if !defined NDEBUG
+pure fn debug_directory_stat_count() wontthrow -> usize;
+#endif
 
 fn clear_path_map() throws -> void;
 
@@ -154,6 +161,8 @@ fn search_program_path(StringView program_name, bool find_all = false,
     -> ArrayList<Path>;
 
 fn path_command_names() throws -> const ArrayList<String> &;
+
+pure fn path_command_name_lower_bound(StringView name) throws -> usize;
 
 fn path_command_name_has_prefix(StringView prefix) throws -> bool;
 

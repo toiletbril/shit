@@ -2,7 +2,8 @@ ifndef VERBOSE
 MAKEFLAGS += -s
 endif
 
-MAKE := $(MAKE) -j$(shell nproc)
+CPU_COUNT := $(shell ./scripts/cpu-count.sh)
+MAKEFLAGS += -j$(CPU_COUNT)
 
 MODE ?= dbg
 

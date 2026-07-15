@@ -40,4 +40,15 @@ PATH="$untrusted:$PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
 echo "== and was never forked:"
 if [ -f /tmp/shit_help_marker ]; then echo "forked"; else echo "not forked"; fi
 
+cat > "$trusted/cargo" <<'SH'
+#!/bin/sh
+echo attempted >> /tmp/shit_help_marker
+sleep 2
+SH
+chmod +x "$trusted/cargo"
+rm -f /tmp/shit_help_marker
+echo "== a timed out help command is attempted once:"
+PATH="$trusted:$PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
+test "$(wc -l < /tmp/shit_help_marker)" -eq 1 && echo "attempted once"
+
 rm -rf "$trusted" "$untrusted" /tmp/shit_help_marker

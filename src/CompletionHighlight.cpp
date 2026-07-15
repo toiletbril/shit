@@ -374,7 +374,8 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
   }
 
   let const listing_directory = Path{directory.view()};
-  let const entries = utils::read_directory_cached(listing_directory);
+  let const entries =
+      utils::read_directory_cached(listing_directory, true, false);
   if (entries == nullptr) return false;
 
   for (let const &entry : *entries)
@@ -447,17 +448,15 @@ static fn color_path_argument(usize word_start, StringView word,
   };
 
   let const has_no_path_shape = !has_separator && !has_tilde && !has_dot_prefix;
-  if (has_no_path_shape && !directories_only && !word_names_existing_path(word))
-  {
-    return false;
-  }
 
   /* The prefix is monotonic on the filesystem, a deeper path cannot exist when
      a shallower one does not, so the boundaries are walked from the longest
      down and the first that exists is the answer. */
   usize existing_end = 0;
   if (has_no_path_shape) {
-    existing_end = do_prefix_is_valid(word) ? word.length : 0;
+    if (!directories_only && !word_names_existing_path(word)) return false;
+    existing_end =
+        directories_only && !do_prefix_is_valid(word) ? 0 : word.length;
   } else {
     for (usize scan = word.length; scan >= 1; scan--) {
       let const at_boundary = scan == word.length || word[scan] == '/';

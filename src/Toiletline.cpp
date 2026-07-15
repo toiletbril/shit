@@ -116,16 +116,17 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 #endif
 
 shit::EvalContext *COMPLETION_CONTEXT = nullptr;
+bool HIGHLIGHT_COLOR_ENABLED = false;
+#if !defined NDEBUG
+usize DEBUG_COMPLETION_CWD_FALLBACK_COUNT = 0;
+usize DEBUG_COMPLETION_SOURCE_SCAN_COUNT = 0;
+usize DEBUG_COMPLETION_MATERIALIZED_COUNT = 0;
+#endif
 
-/* The C-string pointers handed back to toiletline must outlive the callback
-   return, so the owned strings are kept here until the next call. */
-shit::ArrayList<shit::String> COMPLETION_CANDIDATES{shit::heap_allocator()};
 shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{
     shit::heap_allocator()};
-shit::ArrayList<shit::String> COMPLETION_DESCRIPTIONS{shit::heap_allocator()};
 shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
     shit::heap_allocator()};
-shit::String COMPLETION_LCP{shit::heap_allocator()};
 
 /* Toiletline edits in codepoints while the completion engine works in bytes. */
 fn shit_completion_callback(const char *buffer, size_t cursor,
@@ -139,7 +140,15 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
   try {
     const usize byte_length = std::strlen(buffer);
     let line = shit::StringView{buffer, byte_length};
-    shit::Path base = shit::Path::current_directory();
+    let const logical_directory = COMPLETION_CONTEXT->get_variable_value("PWD");
+    shit::Path base =
+        logical_directory.has_value() && !logical_directory->is_empty()
+            ? shit::Path{logical_directory->view()}
+            : shit::Path::current_directory();
+#if !defined NDEBUG
+    if (!logical_directory.has_value() || logical_directory->is_empty())
+      DEBUG_COMPLETION_CWD_FALLBACK_COUNT++;
+#endif
 
     const usize byte_cursor =
         toiletline::byte_offset_of_codepoint(buffer, byte_length, cursor);
@@ -149,47 +158,42 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     shit::arm_message_leading_newline(true);
     shit::completion::completion_result result = shit::completion::complete(
         line, byte_cursor, *COMPLETION_CONTEXT, base, for_listing != 0);
+#if !defined NDEBUG
+    DEBUG_COMPLETION_SOURCE_SCAN_COUNT += result.source_candidate_scan_count;
+    DEBUG_COMPLETION_MATERIALIZED_COUNT += result.materialized_candidate_count;
+#endif
     shit::arm_message_leading_newline(false);
 
-    if (result.candidates.is_empty()) return 0;
-
-    COMPLETION_CANDIDATES.clear();
-    COMPLETION_CANDIDATES.reserve(result.candidates.count());
-    for (let const &candidate : result.candidates)
-      COMPLETION_CANDIDATES.push(
-          shit::String{shit::heap_allocator(), candidate.view()});
-    COMPLETION_LCP = shit::String{shit::heap_allocator(),
-                                  result.longest_common_prefix.view()};
+    if (result.candidate_count == 0) return 0;
 
     COMPLETION_CANDIDATE_POINTERS.clear();
-    COMPLETION_CANDIDATE_POINTERS.reserve(COMPLETION_CANDIDATES.count());
-    for (let const &candidate : COMPLETION_CANDIDATES)
-      COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
+    if (for_listing != 0) {
+      COMPLETION_CANDIDATE_POINTERS.reserve(result.candidates.count());
+      for (let const &candidate : result.candidates)
+        COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
+    }
 
     /* The candidate text keys the description lookup, and the build is skipped
        when none was produced. */
-    COMPLETION_DESCRIPTIONS.clear();
     COMPLETION_DESCRIPTION_POINTERS.clear();
     out->descriptions = nullptr;
-    if (result.descriptions.count() > 0) {
-      COMPLETION_DESCRIPTIONS.reserve(COMPLETION_CANDIDATES.count());
-      for (let const &candidate : COMPLETION_CANDIDATES) {
+    if (for_listing != 0 && result.descriptions.count() > 0) {
+      COMPLETION_DESCRIPTION_POINTERS.reserve(result.candidates.count());
+      for (let const &candidate : result.candidates) {
         if (const shit::String *found_description =
                 result.descriptions.find(candidate.view());
             found_description != nullptr)
-          COMPLETION_DESCRIPTIONS.push(shit::String{found_description->view()});
+          COMPLETION_DESCRIPTION_POINTERS.push(found_description->c_str());
         else
-          COMPLETION_DESCRIPTIONS.push(shit::String{shit::heap_allocator()});
+          COMPLETION_DESCRIPTION_POINTERS.push("");
       }
-      COMPLETION_DESCRIPTION_POINTERS.reserve(COMPLETION_DESCRIPTIONS.count());
-      for (let const &description : COMPLETION_DESCRIPTIONS)
-        COMPLETION_DESCRIPTION_POINTERS.push(description.c_str());
       out->descriptions = COMPLETION_DESCRIPTION_POINTERS.begin();
     }
 
-    out->candidates = COMPLETION_CANDIDATE_POINTERS.begin();
-    out->count = COMPLETION_CANDIDATE_POINTERS.count();
-    out->longest_common_prefix = COMPLETION_LCP.c_str();
+    out->candidates =
+        for_listing != 0 ? COMPLETION_CANDIDATE_POINTERS.begin() : nullptr;
+    out->count = result.candidate_count;
+    out->longest_common_prefix = result.longest_common_prefix.c_str();
     /* The engine reports the span in bytes, converted to codepoint indices. */
     out->token_start = ::tl_utf8_strnlen(buffer, result.token_start);
     out->token_end = ::tl_utf8_strnlen(buffer, result.token_end);
@@ -211,8 +215,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
-  /* NO_COLOR is honored live, gated here rather than at startup. */
-  if (!shit::colors::stdout_wants_color()) return 0;
+  if (!HIGHLIGHT_COLOR_ENABLED) return 0;
 
   try {
     const usize byte_length = std::strlen(buffer);
@@ -222,10 +225,22 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
         shit::completion::highlight_line(line, *COMPLETION_CONTEXT);
 
     size_t filled = 0;
+    usize byte_position = 0;
+    usize codepoint_position = 0;
     for (let const &span : result) {
       if (filled >= out->capacity) break;
-      out->spans[filled].start = ::tl_utf8_strnlen(buffer, span.start);
-      out->spans[filled].end = ::tl_utf8_strnlen(buffer, span.end);
+      while (byte_position < span.start) {
+        if ((static_cast<unsigned char>(buffer[byte_position]) & 0xC0) != 0x80)
+          codepoint_position++;
+        byte_position++;
+      }
+      out->spans[filled].start = codepoint_position;
+      while (byte_position < span.end) {
+        if ((static_cast<unsigned char>(buffer[byte_position]) & 0xC0) != 0x80)
+          codepoint_position++;
+        byte_position++;
+      }
+      out->spans[filled].end = codepoint_position;
       out->spans[filled].sgr = span.sgr.data;
       filled++;
     }
@@ -490,7 +505,52 @@ fn exit() -> void
 
 fn get_input(const String &prompt) -> input_result
 {
+  utils::begin_interactive_completion();
+  HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
+#if !defined NDEBUG
+  let const append_refresh_count_before = ::itl_g_debug_append_refresh_count;
+  let const full_refresh_count_before = ::itl_g_debug_full_refresh_count;
+  let const metrics_scan_count_before = ::itl_g_debug_metrics_scan_count;
+  let const cwd_fallback_count_before = DEBUG_COMPLETION_CWD_FALLBACK_COUNT;
+  let const source_scan_count_before = DEBUG_COMPLETION_SOURCE_SCAN_COUNT;
+  let const materialized_count_before = DEBUG_COMPLETION_MATERIALIZED_COUNT;
+  let const directory_stat_count_before = utils::debug_directory_stat_count();
+#endif
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
+#if !defined NDEBUG
+  if (shit::os::get_environment_variable("SHIT_TEST_EDITOR_STATS").has_value())
+  {
+    shit::print_error("editor-refresh append=" +
+                      shit::String::from(::itl_g_debug_append_refresh_count -
+                                             append_refresh_count_before,
+                                         shit::heap_allocator()) +
+                      " full=" +
+                      shit::String::from(::itl_g_debug_full_refresh_count -
+                                             full_refresh_count_before,
+                                         shit::heap_allocator()) +
+                      " metrics=" +
+                      shit::String::from(::itl_g_debug_metrics_scan_count -
+                                             metrics_scan_count_before,
+                                         shit::heap_allocator()) +
+                      " cwd=" +
+                      shit::String::from(DEBUG_COMPLETION_CWD_FALLBACK_COUNT -
+                                             cwd_fallback_count_before,
+                                         shit::heap_allocator()) +
+                      " stats=" +
+                      shit::String::from(utils::debug_directory_stat_count() -
+                                             directory_stat_count_before,
+                                         shit::heap_allocator()) +
+                      " scans=" +
+                      shit::String::from(DEBUG_COMPLETION_SOURCE_SCAN_COUNT -
+                                             source_scan_count_before,
+                                         shit::heap_allocator()) +
+                      " materialized=" +
+                      shit::String::from(DEBUG_COMPLETION_MATERIALIZED_COUNT -
+                                             materialized_count_before,
+                                         shit::heap_allocator()) +
+                      "\n");
+  }
+#endif
   if (code == TL_ERROR) {
     throw shit::ErrorWithDetails{"Toiletline: could not read the input: " +
                                      shit::os::last_system_error_message(),

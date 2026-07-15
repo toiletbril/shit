@@ -306,7 +306,11 @@ fn draw_progress(StringView command, u64 percent, Allocator allocator) throws
   print_error(line.view());
 }
 
-fn clear_progress() throws -> void { print_error(CLEAR_PROGRESS_LINE); }
+fn clear_progress() wontthrow -> void
+{
+  unused(os::write_fd(SHIT_STDERR, CLEAR_PROGRESS_LINE.data,
+                      CLEAR_PROGRESS_LINE.count()));
+}
 
 fn sample_command(StringView shell_binary, StringView command,
                   Maybe<u64> run_limit, u64 duration_millis,
@@ -316,6 +320,11 @@ fn sample_command(StringView shell_binary, StringView command,
                   i64 &failure_status, Allocator allocator) throws
     -> CommandResult
 {
+  defer
+  {
+    if (should_show_progress) clear_progress();
+  };
+
   let result = CommandResult{allocator};
   result.label = command;
 
@@ -408,8 +417,6 @@ fn sample_command(StringView shell_binary, StringView command,
     }
     samples.push(sample);
   }
-
-  if (should_show_progress) clear_progress();
 
   result.sample_count = samples.count();
   result.has_perf = !samples.is_empty() && has_perf;

@@ -442,6 +442,11 @@ public:
     by_tier[static_cast<usize>(tier)].push(steal(candidate));
   }
 
+  pure fn has(match_tier tier) const wontthrow -> bool
+  {
+    return !by_tier[static_cast<usize>(tier)].is_empty();
+  }
+
   mustuse fn best() throws -> ArrayList<String>
   {
     for (usize tier = 0; tier < MATCH_TIER_COUNT; tier++)
@@ -466,18 +471,129 @@ static fn command_name_match(StringView name, StringView token,
   return candidate_match(token, name, is_case_sensitive);
 }
 
-static fn add_unique_command(TieredCandidates &candidates, HashSet &seen,
-                             StringView name, StringView token,
-                             bool token_is_glob, bool is_case_sensitive,
-                             const Bitset &glob_active) throws -> void
+class CommandListCollector
 {
-  if (seen.contains(name)) return;
+public:
+  fn add(StringView name, match_tier tier) throws -> void
+  {
+    if (seen.contains(name)) return;
+    seen.add(name);
+    candidates.add(tier, String{completion_allocator(), name});
+    materialized_count++;
+  }
 
-  let const tier = command_name_match(name, token, token_is_glob,
-                                      is_case_sensitive, glob_active);
-  if (!tier.has_value()) return;
-  seen.add(name);
-  candidates.add(*tier, String{completion_allocator(), name});
+  fn note_source_candidate() wontthrow -> void { source_scan_count++; }
+
+  pure fn has_exact() const wontthrow -> bool
+  {
+    return candidates.has(match_tier::exact_prefix);
+  }
+
+  fn take() throws -> ArrayList<String> { return candidates.best(); }
+  pure fn source_scans() const wontthrow -> usize { return source_scan_count; }
+  pure fn materialized() const wontthrow -> usize { return materialized_count; }
+
+private:
+  TieredCandidates candidates{};
+  HashSet seen{completion_allocator()};
+  usize source_scan_count{0};
+  usize materialized_count{0};
+};
+
+class GhostPrefixCollector
+{
+public:
+  fn add(StringView name, match_tier tier) throws -> void
+  {
+    let const tier_index = static_cast<usize>(tier);
+    if (tier_index > best_tier) return;
+    if (tier_index < best_tier) {
+      best_tier = tier_index;
+      prefix = String{completion_allocator(), name};
+      match_count = 1;
+      return;
+    }
+
+    usize shared_length = 0;
+    while (shared_length < prefix.count() && shared_length < name.length &&
+           prefix[shared_length] == name[shared_length])
+    {
+      shared_length++;
+    }
+    while (shared_length > 0 && shared_length < prefix.count() &&
+           (static_cast<unsigned char>(prefix[shared_length]) & 0xC0) == 0x80)
+    {
+      shared_length--;
+    }
+    while (prefix.count() > shared_length)
+      prefix.pop_back();
+    match_count++;
+  }
+
+  fn note_source_candidate() wontthrow -> void { source_scan_count++; }
+
+  pure fn has_exact() const wontthrow -> bool { return best_tier == 0; }
+  pure fn count() const wontthrow -> usize { return match_count; }
+  pure fn source_scans() const wontthrow -> usize { return source_scan_count; }
+  pure fn materialized() const wontthrow -> usize { return 0; }
+  fn take_prefix() wontthrow -> String { return steal(prefix); }
+
+private:
+  usize best_tier{MATCH_TIER_COUNT};
+  usize match_count{0};
+  usize source_scan_count{0};
+  String prefix{completion_allocator()};
+};
+
+template <typename Collector>
+static fn collect_command_names(StringView token, bool token_is_glob,
+                                EvalContext &context,
+                                Collector &collector) throws -> void
+{
+  let const is_case_sensitive = token_has_uppercase(token);
+  let const glob_active = token_is_glob ? all_active_glob_mask(token.length)
+                                        : Bitset{completion_allocator()};
+
+  let const do_add = [&](StringView name) throws {
+    collector.note_source_candidate();
+    let const tier = command_name_match(name, token, token_is_glob,
+                                        is_case_sensitive, glob_active);
+    if (tier.has_value()) collector.add(name, *tier);
+  };
+
+  for (let const &builtin_name : builtin_names())
+    do_add(builtin_name.view());
+
+  if (context.shitbox() || context.mood() == mimic_mood::Default)
+    for (const String &util_name : shitbox::util_names())
+      do_add(util_name.view());
+
+  context.function_names().for_each(do_add);
+  context.alias_names().for_each(do_add);
+
+  let const &path_names = utils::path_command_names();
+  if (!token_is_glob && !token.is_empty()) {
+    let name_index = utils::path_command_name_lower_bound(token);
+    while (name_index < path_names.count() &&
+           path_names[name_index].view().starts_with(token))
+    {
+      do_add(path_names[name_index].view());
+      name_index++;
+    }
+  }
+
+  if (!collector.has_exact())
+    for (let const &entry : path_names)
+      do_add(entry.view());
+}
+
+static fn complete_command_name_prefix(StringView token, bool token_is_glob,
+                                       EvalContext &context) throws
+    -> GhostPrefixCollector
+{
+  let collector = GhostPrefixCollector{};
+  collect_command_names(token, token_is_glob, context, collector);
+  return collector;
 }
 
 static fn
@@ -511,42 +627,13 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
 fn complete_command_names(StringView token, bool token_is_glob,
                           EvalContext &context) throws -> ArrayList<String>
 {
-  let candidates = TieredCandidates{};
-  let seen = HashSet{completion_allocator()};
+  let collector = CommandListCollector{};
 
   TRACELN("completing command position for token '%.*s'",
           static_cast<int>(token.length), token.data);
 
-  let const is_case_sensitive = token_has_uppercase(token);
-  let const glob_active = token_is_glob ? all_active_glob_mask(token.length)
-                                        : Bitset{completion_allocator()};
-
-  for (let const &builtin_name : builtin_names()) {
-    add_unique_command(candidates, seen, builtin_name.view(), token,
-                       token_is_glob, is_case_sensitive, glob_active);
-  }
-
-  if (context.shitbox() || context.mood() == mimic_mood::Default) {
-    for (const String &util_name : shitbox::util_names())
-      add_unique_command(candidates, seen, util_name.view(), token,
-                         token_is_glob, is_case_sensitive, glob_active);
-  }
-
-  context.function_names().for_each([&](StringView name) {
-    add_unique_command(candidates, seen, name, token, token_is_glob,
-                       is_case_sensitive, glob_active);
-  });
-
-  context.alias_names().for_each([&](StringView name) {
-    add_unique_command(candidates, seen, name, token, token_is_glob,
-                       is_case_sensitive, glob_active);
-  });
-
-  for (let const &entry : utils::path_command_names())
-    add_unique_command(candidates, seen, entry.view(), token, token_is_glob,
-                       is_case_sensitive, glob_active);
-
-  return candidates.best();
+  collect_command_names(token, token_is_glob, context, collector);
+  return collector.take();
 }
 
 /* The directory part keeps its trailing separator so the basename joins back
@@ -739,12 +826,36 @@ static fn entry_is_executable(const Path &directory, StringView name) throws
   return full.is_executable();
 }
 
-static fn complete_filesystem(StringView token, const Path &base_directory,
-                              bool inside_quote, bool directories_only,
-                              bool executables_only,
-                              EvalContext &context) throws -> ArrayList<String>
+static fn build_filesystem_candidate(StringView directory_part, StringView name,
+                                     bool is_directory,
+                                     bool inside_quote) throws -> String
 {
-  let candidates = TieredCandidates{};
+  let entry_name = String{completion_allocator(), name};
+  if (is_directory) entry_name += '/';
+
+  let candidate = String{completion_allocator(), directory_part};
+  let const is_variable_prefixed =
+      !directory_part.is_empty() && directory_part[0] == '$';
+  if (is_variable_prefixed && !inside_quote) {
+    if (path_candidate_needs_quoting(entry_name.view()))
+      entry_name = quote_path_candidate(entry_name.view());
+    candidate += entry_name;
+  } else {
+    candidate += entry_name;
+    if (!inside_quote && path_candidate_needs_quoting(candidate.view()))
+      candidate = quote_path_candidate(candidate.view());
+  }
+
+  return candidate;
+}
+
+template <typename Collector>
+static fn
+collect_filesystem_matches(StringView token, const Path &base_directory,
+                           bool inside_quote, bool directories_only,
+                           bool executables_only, EvalContext &context,
+                           Collector &collector) throws -> void
+{
 
   let unescaped_backing = String{completion_allocator()};
   if (!inside_quote) unescaped_backing = unescape_path_token(token);
@@ -760,11 +871,13 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory, context);
 
-  let const entries = utils::read_directory_cached(listing_directory);
-  if (entries == nullptr) return candidates.best();
+  let const entries =
+      utils::read_directory_cached(listing_directory, true, false);
+  if (entries == nullptr) return;
 
   for (let const &entry : *entries) {
     let const name = entry.name.view();
+    collector.note_source_candidate();
     let const tier =
         candidate_match(parts.basename_part, name, is_case_sensitive);
     if (!tier.has_value()) continue;
@@ -789,31 +902,37 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
       continue;
     }
 
-    /* A variable-prefixed path keeps its $NAME prefix active so it still
-       expands at run time, and only the entry name is quoted when it carries a
-       special byte. */
-    let const is_variable_prefixed =
-        !parts.directory_part.is_empty() && parts.directory_part[0] == '$';
-
-    let entry_name = String{completion_allocator(), name};
-    if (is_directory) entry_name += '/';
-
-    let candidate = String{completion_allocator(), parts.directory_part};
-    if (is_variable_prefixed && !inside_quote) {
-      if (path_candidate_needs_quoting(entry_name.view()))
-        entry_name = quote_path_candidate(entry_name.view());
-      candidate += entry_name;
-    } else {
-      candidate += entry_name;
-      /* A token already inside a quote is not quoted again. */
-      if (!inside_quote && path_candidate_needs_quoting(candidate.view()))
-        candidate = quote_path_candidate(candidate.view());
-    }
-
-    candidates.add(*tier, steal(candidate));
+    let candidate = build_filesystem_candidate(parts.directory_part, name,
+                                               is_directory, inside_quote);
+    collector.add(candidate.view(), *tier);
   }
+}
 
-  return candidates.best();
+static fn complete_filesystem(StringView token, const Path &base_directory,
+                              bool inside_quote, bool directories_only,
+                              bool executables_only,
+                              EvalContext &context) throws -> ArrayList<String>
+{
+  let collector = CommandListCollector{};
+  collect_filesystem_matches(token, base_directory, inside_quote,
+                             directories_only, executables_only, context,
+                             collector);
+
+  return collector.take();
+}
+
+static fn
+complete_filesystem_prefix(StringView token, const Path &base_directory,
+                           bool inside_quote, bool directories_only,
+                           bool executables_only, EvalContext &context) throws
+    -> GhostPrefixCollector
+{
+  let collector = GhostPrefixCollector{};
+  collect_filesystem_matches(token, base_directory, inside_quote,
+                             directories_only, executables_only, context,
+                             collector);
+
+  return collector;
 }
 
 /* Only the trailing component is globbed. */
@@ -831,7 +950,8 @@ static fn complete_glob(StringView token, const Path &base_directory,
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory, context);
 
-  let const entries = utils::read_directory_cached(listing_directory);
+  let const entries =
+      utils::read_directory_cached(listing_directory, true, false);
   if (entries == nullptr) return candidates;
 
   let const glob_active = all_active_glob_mask(parts.basename_part.length);
@@ -1249,6 +1369,10 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
 
   let candidates = ArrayList<String>{arena};
   let descriptions = StringMap<String>{arena};
+  let ghost_prefix = String{arena};
+  usize ghost_candidate_count = 0;
+  usize source_candidate_scan_count = 0;
+  usize materialized_candidate_count = 0;
 
   let const is_posix_completion = context.mood() == mimic_mood::Posix;
 
@@ -1283,8 +1407,18 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     /* An empty command token would enumerate every PATH command on each
        keystroke for the ghost, so command completion runs only once a prefix
        is typed. An explicit tab still lists them all. */
-    if (!token.is_empty() || for_listing)
-      candidates = complete_command_names(token, token_is_glob, context);
+    if (!token.is_empty() || for_listing) {
+      if (for_listing) {
+        candidates = complete_command_names(token, token_is_glob, context);
+      } else {
+        let collector =
+            complete_command_name_prefix(token, token_is_glob, context);
+        ghost_candidate_count = collector.count();
+        source_candidate_scan_count = collector.source_scans();
+        materialized_candidate_count = collector.materialized();
+        ghost_prefix = collector.take_prefix();
+      }
+    }
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory, directories_only,
                                executables_only, context);
@@ -1327,41 +1461,60 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     {
       /* A token ending in a slash has an empty basename, so the ghost listing
          runs only once a basename is typed. An explicit tab still lists. */
-      candidates =
-          complete_filesystem(token, base_directory, open_quote.has_value(),
-                              directories_only, executables_only, context);
+      if (for_listing) {
+        candidates =
+            complete_filesystem(token, base_directory, open_quote.has_value(),
+                                directories_only, executables_only, context);
+      } else {
+        let collector = complete_filesystem_prefix(
+            token, base_directory, open_quote.has_value(), directories_only,
+            executables_only, context);
+        ghost_candidate_count = collector.count();
+        source_candidate_scan_count = collector.source_scans();
+        materialized_candidate_count = collector.materialized();
+        ghost_prefix = collector.take_prefix();
+      }
     }
   }
 
   let longest_common_prefix = String{arena};
-  if (!candidates.is_empty()) {
-    candidates.sort();
+  if (ghost_candidate_count > 0) {
+    longest_common_prefix = steal(ghost_prefix);
+  } else if (!candidates.is_empty()) {
+    if (for_listing) {
+      candidates.sort();
 
-    let unique_candidates = ArrayList<String>{candidates.allocator()};
-    unique_candidates.reserve(candidates.count());
+      let unique_candidates = ArrayList<String>{candidates.allocator()};
+      unique_candidates.reserve(candidates.count());
 
-    for (usize i = 0; i < candidates.count(); i++) {
-      if (unique_candidates.is_empty() ||
-          unique_candidates.back().view() != candidates[i].view())
-        unique_candidates.push(steal(candidates[i]));
+      for (usize i = 0; i < candidates.count(); i++) {
+        if (unique_candidates.is_empty() ||
+            unique_candidates.back().view() != candidates[i].view())
+          unique_candidates.push(steal(candidates[i]));
+      }
+      candidates = steal(unique_candidates);
+
+      if (extension_hint != nullptr && token.is_empty())
+        candidates = keep_hinted_extension(steal(candidates),
+                                           StringView{extension_hint});
     }
-    candidates = steal(unique_candidates);
-
-    if (extension_hint != nullptr && token.is_empty())
-      candidates =
-          keep_hinted_extension(steal(candidates), StringView{extension_hint});
 
     longest_common_prefix = compute_longest_common_prefix(candidates);
 
-    if (extension_hint != nullptr && !token.is_empty())
+    if (for_listing && extension_hint != nullptr && !token.is_empty())
       candidates =
           partition_by_extension(steal(candidates), StringView{extension_hint});
   }
 
+  let const candidate_count =
+      ghost_candidate_count > 0 ? ghost_candidate_count : candidates.count();
   return completion_result{
       steal(candidates),
       steal(descriptions),
       steal(longest_common_prefix),
+      candidate_count,
+      source_candidate_scan_count,
+      materialized_candidate_count,
       token_start + completion_offset,
       token_end + completion_offset,
       is_command,

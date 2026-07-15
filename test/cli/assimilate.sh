@@ -31,8 +31,13 @@ shift
 printf 'ssh-target=%s args=%s\n' "$target" "$#" >> "$ASSIMILATE_LOG"
 if [ "${ASSIMILATE_FAIL_SSH_START-0}" -eq 1 ]; then
     case $1 in
-        '/bin/rm -f '*) ;;
+        *" recover") ;;
         *) exit 31 ;;
+    esac
+fi
+if [ "${ASSIMILATE_FAIL_CLEANUP-0}" -eq 1 ]; then
+    case $1 in
+        *" recover") exit 42 ;;
     esac
 fi
 cd "$ASSIMILATE_REMOTE" || exit 1
@@ -69,6 +74,13 @@ printf 'ssh-start-status=%s old=%s leftovers=%s\n' "$?" \
     "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
 unset ASSIMILATE_FAIL_SSH_START
 
+export ASSIMILATE_FAIL_SCP=1
+export ASSIMILATE_FAIL_CLEANUP=1
+PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
+printf 'cleanup-failure-status=%s\n' "$?"
+unset ASSIMILATE_FAIL_SCP ASSIMILATE_FAIL_CLEANUP
+/bin/rm -f "$remote"/.shit-assimilate-*.upload
+
 export ASSIMILATE_REMOTE_PATH=$remote/missing
 PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
 printf 'no-path-status=%s old=%s leftovers=%s\n' "$?" \
@@ -100,6 +112,25 @@ fi
 printf 'rollback-status=%s symlink=%s leftovers=%s\n' "$rollback_status" \
     "$rollback" \
     "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
+unset ASSIMILATE_PAYLOAD
+
+printf 'old-regular\n' > "$first/shit"
+export ASSIMILATE_PAYLOAD=$payload
+PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
+regular_rollback_status=$?
+printf 'regular-rollback-status=%s old=%s\n' "$regular_rollback_status" \
+    "$(cat "$first/shit")"
+
+/bin/rm -f "$first/shit"
+PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
+absent_rollback_status=$?
+if [ -e "$first/shit" ] || [ -L "$first/shit" ]; then
+    absent_rollback=damaged
+else
+    absent_rollback=restored
+fi
+printf 'absent-rollback-status=%s target=%s\n' "$absent_rollback_status" \
+    "$absent_rollback"
 unset ASSIMILATE_PAYLOAD
 
 locking_payload=$root/locking-payload
@@ -169,6 +200,23 @@ PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
 printf 'precommit-status=%s old=%s leftovers=%s\n' "$?" \
     "$(cat "$first/shit")" \
     "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
+unset ASSIMILATE_PAYLOAD
+
+printf 'stale-old\n' > "$first/.shit-assimilate.backup"
+printf 'stale-rejected\n' > "$first/shit"
+/bin/mkdir "$first/.shit-assimilate.lock"
+printf '99999999\n' > "$first/.shit-assimilate.lock/owner"
+printf '%s\n' "$remote/stale.upload" > "$first/.shit-assimilate.lock/upload"
+printf '%s\n' "$first/stale.candidate" > "$first/.shit-assimilate.lock/candidate"
+: > "$first/.shit-assimilate.lock/had-target"
+: > "$first/.shit-assimilate.lock/rollback"
+: > "$remote/stale.upload"
+: > "$first/stale.candidate"
+export ASSIMILATE_PAYLOAD=$precommit_payload
+PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
+printf 'stale-recovery-status=%s old=%s leftovers=%s\n' "$?" \
+    "$(cat "$first/shit")" \
+    "$(find "$remote" -name '.shit-assimilate*' | wc -l | tr -d ' ')"
 unset ASSIMILATE_PAYLOAD
 
 /bin/rm -f "$first/shit"

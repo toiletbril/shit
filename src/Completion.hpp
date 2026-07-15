@@ -18,6 +18,9 @@ struct completion_result
      filesystem or command-name completion. */
   StringMap<String> descriptions{heap_allocator()};
   String longest_common_prefix;
+  usize candidate_count;
+  usize source_candidate_scan_count;
+  usize materialized_candidate_count;
   usize token_start;
   usize token_end;
   /* Argument position completes against the filesystem instead. */

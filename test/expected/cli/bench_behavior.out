@@ -42,3 +42,5 @@ rc=1
 counter capability passed
 == counter fallback keeps one complete sample:
 counter fallback passed
+== a failed later sample clears terminal progress:
+progress cleared before error

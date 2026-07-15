@@ -22,31 +22,70 @@ namespace {
 constexpr char REMOTE_TRANSACTION_TEXT[] = R"SH(set -eu
 upload=$1
 candidate=
-backup=
 target=
 lock=
 had_target=0
 rollback_active=0
-cleanup_status=0
+committed=0
 cleanup() {
-  cleanup_status=$?
+  transaction_status=$?
+  cleanup_failed=0
   trap - 0 1 2 15
-  if [ "$rollback_active" -eq 1 ]; then
-    if [ "$had_target" -eq 1 ] && { [ -e "$backup" ] || [ -L "$backup" ]; }; then
-      if /bin/mv -f "$backup" "$target"; then backup=; else cleanup_status=1; fi
-    elif [ "$had_target" -eq 1 ]; then
-      cleanup_status=1
+  if [ -n "$lock" ]; then
+    if [ "$rollback_active" -eq 1 ] && [ "$committed" -eq 0 ]; then
+      if [ "$had_target" -eq 1 ] && { [ -e "$backup" ] || [ -L "$backup" ]; }; then
+        /bin/mv -f "$backup" "$target" || cleanup_failed=1
+      elif [ "$had_target" -eq 1 ]; then
+        cleanup_failed=1
+      else
+        /bin/rm -f "$target" || cleanup_failed=1
+      fi
+    fi
+    [ -z "$candidate" ] || /bin/rm -f "$candidate" || cleanup_failed=1
+    /bin/rm -f "$upload" || cleanup_failed=1
+    if [ "$committed" -eq 1 ] || [ "$rollback_active" -eq 0 ]; then
+      /bin/rm -f "$backup" || cleanup_failed=1
+    fi
+    if [ "$cleanup_failed" -eq 0 ]; then
+      /bin/rm -f "$lock/owner" "$lock/upload" "$lock/candidate" \
+        "$lock/had-target" "$lock/rollback" "$lock/committed"
+      /bin/rmdir "$lock" || cleanup_failed=1
+    fi
+  else
+    [ -z "$candidate" ] || /bin/rm -f "$candidate" || cleanup_failed=1
+    /bin/rm -f "$upload" || cleanup_failed=1
+  fi
+  [ "$cleanup_failed" -eq 0 ] || exit 1
+  exit "$transaction_status"
+}
+recover_stale_lock() {
+  stale_upload=
+  stale_candidate=
+  [ ! -r "$lock_path/upload" ] || stale_upload=$(/bin/cat "$lock_path/upload")
+  [ ! -r "$lock_path/candidate" ] || stale_candidate=$(/bin/cat "$lock_path/candidate")
+  if [ ! -e "$lock_path/committed" ] && [ -e "$lock_path/rollback" ]; then
+    if [ -e "$lock_path/had-target" ]; then
+      [ -e "$backup" ] || [ -L "$backup" ]
+      /bin/mv -f "$backup" "$target"
     else
-      /bin/rm -f "$target" || cleanup_status=1
+      /bin/rm -f "$target"
     fi
   fi
-  [ -z "$candidate" ] || /bin/rm -f "$candidate" || cleanup_status=1
-  if [ "$rollback_active" -eq 0 ] && [ -n "$backup" ]; then
-    /bin/rm -f "$backup" || cleanup_status=1
-  fi
-  [ -z "$lock" ] || /bin/rmdir "$lock" || cleanup_status=1
-  /bin/rm -f "$upload" || cleanup_status=1
-  exit "$cleanup_status"
+  [ -z "$stale_candidate" ] || /bin/rm -f "$stale_candidate"
+  [ -z "$stale_upload" ] || /bin/rm -f "$stale_upload"
+  /bin/rm -f "$backup"
+  /bin/rm -f "$lock_path/owner" "$lock_path/upload" \
+    "$lock_path/candidate" "$lock_path/had-target" \
+    "$lock_path/rollback" "$lock_path/committed"
+  /bin/rmdir "$lock_path"
+}
+lock_owner_is_live() {
+  owner=
+  [ ! -r "$lock_path/owner" ] || owner=$(/bin/cat "$lock_path/owner")
+  case $owner in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  /bin/kill -0 "$owner" 2>/dev/null
 }
 trap cleanup 0
 trap 'exit 129' 1
@@ -68,36 +107,57 @@ while :; do
 done
 [ -n "$install_dir" ] || exit 1
 candidate=$install_dir/.shit-assimilate-$2.candidate
-backup=$install_dir/.shit-assimilate-$2.backup
+backup=$install_dir/.shit-assimilate.backup
 target=$install_dir/shit
 lock_path=$install_dir/.shit-assimilate.lock
+[ "${3-}" != recover ] || {
+  if [ -d "$lock_path" ]; then
+    if lock_owner_is_live; then
+      exit 1
+    fi
+    recover_stale_lock
+  fi
+  /bin/rm -f "$upload"
+  trap - 0 1 2 15
+  exit 0
+}
 [ ! -d "$target" ] || exit 1
-/bin/cp "$upload" "$candidate"
-/bin/chmod 755 "$candidate"
-"$candidate" --short-version >/dev/null
 trap '' 1 2 15
-if /bin/mkdir "$lock_path"; then
-  lock=$lock_path
-  lock_status=0
-else
-  lock_status=$?
+if ! /bin/mkdir "$lock_path"; then
+  if lock_owner_is_live; then
+    exit 1
+  fi
+  recover_stale_lock
+  /bin/mkdir "$lock_path"
 fi
+lock=$lock_path
+printf '%s\n' "$$" > "$lock/owner"
+printf '%s\n' "$upload" > "$lock/upload"
+printf '%s\n' "$candidate" > "$lock/candidate"
 trap 'exit 129' 1
 trap 'exit 130' 2
 trap 'exit 143' 15
-[ "$lock_status" -eq 0 ] || exit "$lock_status"
+/bin/cp "$upload" "$candidate"
+/bin/chmod 755 "$candidate"
+"$candidate" --short-version >/dev/null
 if [ -e "$target" ] || [ -L "$target" ]; then
   /bin/cp -a "$target" "$backup"
   had_target=1
+  : > "$lock/had-target"
 fi
 rollback_active=1
+: > "$lock/rollback"
 /bin/mv -f "$candidate" "$target"
 candidate=
 "$target" --short-version >/dev/null
 trap '' 1 2 15
-[ "$had_target" -eq 0 ] || /bin/rm -f "$backup"
-backup=
+committed=1
+: > "$lock/committed"
 rollback_active=0
+/bin/rm -f "$lock/rollback"
+[ "$had_target" -eq 0 ] || /bin/rm -f "$backup"
+/bin/rm -f "$lock/owner" "$lock/upload" "$lock/candidate" \
+  "$lock/had-target" "$lock/committed"
 /bin/rmdir "$lock"
 lock=
 /bin/rm -f "$upload"
@@ -125,7 +185,7 @@ fn resolve_transfer_program(StringView name) throws -> Maybe<Path>
 }
 
 fn remote_command(StringView upload_name, StringView transaction_id,
-                  Allocator allocator) throws -> String
+                  bool recovery_only, Allocator allocator) throws -> String
 {
   let command = String{allocator};
   append_shell_quoted_arg(command, "/bin/sh");
@@ -139,8 +199,24 @@ fn remote_command(StringView upload_name, StringView transaction_id,
   append_shell_quoted_arg(command, upload_name);
   command += ' ';
   append_shell_quoted_arg(command, transaction_id);
+  if (recovery_only) {
+    command += ' ';
+    append_shell_quoted_arg(command, "recover");
+  }
 
   return command;
+}
+
+fn cleanup_remote_transaction(const Path &ssh, StringView target,
+                              StringView upload_name, StringView transaction_id,
+                              Allocator allocator) throws -> i32
+{
+  let arguments = ArrayList<String>{allocator};
+  arguments.push(String{"ssh"});
+  arguments.push(String{"--"});
+  arguments.push(String{target});
+  arguments.push(remote_command(upload_name, transaction_id, true, allocator));
+  return run_program(ssh, steal(arguments));
 }
 
 } /* namespace */
@@ -212,14 +288,13 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   scp_arguments.push(String{destination.view()});
   let status = run_program(*scp, steal(scp_arguments));
   if (status != 0) {
-    let cleanup_arguments = ArrayList<String>{allocator};
-    cleanup_arguments.push(String{"ssh"});
-    cleanup_arguments.push(String{"--"});
-    cleanup_arguments.push(arguments[1].clone());
-    let cleanup_command = String{allocator, "/bin/rm -f "};
-    append_shell_quoted_arg(cleanup_command, upload_name.view());
-    cleanup_arguments.push(steal(cleanup_command));
-    run_program(*ssh, steal(cleanup_arguments));
+    let const cleanup_status = cleanup_remote_transaction(
+        *ssh, arguments[1].view(), upload_name.view(), transaction_id.view(),
+        allocator);
+    if (cleanup_status != 0) {
+      report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
+      return cleanup_status;
+    }
     return status;
   }
 
@@ -227,19 +302,18 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   ssh_arguments.push(String{"ssh"});
   ssh_arguments.push(String{"--"});
   ssh_arguments.push(arguments[1].clone());
-  ssh_arguments.push(
-      remote_command(upload_name.view(), transaction_id.view(), allocator));
+  ssh_arguments.push(remote_command(upload_name.view(), transaction_id.view(),
+                                    false, allocator));
 
   status = run_program(*ssh, steal(ssh_arguments));
   if (status != 0) {
-    let cleanup_arguments = ArrayList<String>{allocator};
-    cleanup_arguments.push(String{"ssh"});
-    cleanup_arguments.push(String{"--"});
-    cleanup_arguments.push(arguments[1].clone());
-    let cleanup_command = String{allocator, "/bin/rm -f "};
-    append_shell_quoted_arg(cleanup_command, upload_name.view());
-    cleanup_arguments.push(steal(cleanup_command));
-    run_program(*ssh, steal(cleanup_arguments));
+    let const cleanup_status = cleanup_remote_transaction(
+        *ssh, arguments[1].view(), upload_name.view(), transaction_id.view(),
+        allocator);
+    if (cleanup_status != 0) {
+      report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
+      return cleanup_status;
+    }
   }
 
   return status;

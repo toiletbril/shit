@@ -134,6 +134,8 @@ FLAG(DEBUG_COMPLETE_AT, String, '\0', "debug-complete-at", Debug,
 FLAG(DEBUG_HIGHLIGHT_AT, String, '\0', "debug-highlight-at", Debug,
      "Print the highlight spans for the given line, then exit. The highlighter "
      "test driver.");
+FLAG(DEBUG_GHOST_AT, String, '\0', "debug-ghost-at", Debug,
+     "Print the ghost completion result and operation counts, then exit.");
 #endif
 
 #if SHIT_PLATFORM_IS COSMO
@@ -188,6 +190,23 @@ static fn run_debug_highlight_driver(StringView driver_line,
     listing += '\n';
   }
   print(listing);
+  flush();
+  return 0;
+}
+
+static fn run_debug_ghost_driver(StringView driver_line,
+                                 EvalContext &context) throws -> i32
+{
+  utils::initialize_path_map();
+  let const result =
+      completion::complete(driver_line, driver_line.length, context,
+                           Path::current_directory(), false);
+  print("count=" + String::from(result.candidate_count, heap_allocator()) +
+        "\nprefix=" + result.longest_common_prefix.view() + "\nsource-scans=" +
+        String::from(result.source_candidate_scan_count, heap_allocator()) +
+        "\nmaterialized=" +
+        String::from(result.materialized_candidate_count, heap_allocator()) +
+        "\n");
   flush();
   return 0;
 }
@@ -1026,7 +1045,9 @@ fn main(int argc, char **argv) -> int
     should_read_stdin = true;
   }
 #if !defined NDEBUG
-  if (FLAG_DEBUG_COMPLETE_AT.is_set() || FLAG_DEBUG_HIGHLIGHT_AT.is_set()) {
+  if (FLAG_DEBUG_COMPLETE_AT.is_set() || FLAG_DEBUG_HIGHLIGHT_AT.is_set() ||
+      FLAG_DEBUG_GHOST_AT.is_set())
+  {
     should_be_interactive = false;
     should_read_files = false;
     if (!should_execute_commands) should_read_stdin = true;
@@ -1258,7 +1279,8 @@ fn main(int argc, char **argv) -> int
           bool is_driver_run = false;
 #if !defined NDEBUG
           is_driver_run = FLAG_DEBUG_COMPLETE_AT.is_set() ||
-                          FLAG_DEBUG_HIGHLIGHT_AT.is_set();
+                          FLAG_DEBUG_HIGHLIGHT_AT.is_set() ||
+                          FLAG_DEBUG_GHOST_AT.is_set();
 #endif
           if (!is_driver_run) {
             LOG(Info, "reading the whole standard input");
@@ -1516,6 +1538,10 @@ fn main(int argc, char **argv) -> int
       if (FLAG_DEBUG_HIGHLIGHT_AT.is_set() && !shit::os::is_child_process()) {
         exit_code = shit::run_debug_highlight_driver(
             FLAG_DEBUG_HIGHLIGHT_AT.value(), context);
+      }
+      if (FLAG_DEBUG_GHOST_AT.is_set() && !shit::os::is_child_process()) {
+        exit_code =
+            shit::run_debug_ghost_driver(FLAG_DEBUG_GHOST_AT.value(), context);
       }
 #endif
       LOG(Info, "exiting after the final chunk with code %d", exit_code);

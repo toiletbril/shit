@@ -99,10 +99,10 @@ The `MODE` variable controls build type:
 The `$CXXFLAGS` environment variable can be used to append new flags to the
 build commands.
 
-An example of the build process:
+An example of the build process is shown below. Make uses every logical CPU and
+shares the bounded job pool with recursive builds.
 ```bash
-$ export MODE=<rel/prof/dbg/cov/cosmo/cosmo_dbg>
-$ make
+$ make MODE=<rel/prof/dbg/cov/cosmo/cosmo_dbg>
 $ ./shit --help
 ```
 

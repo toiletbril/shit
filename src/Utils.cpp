@@ -1684,6 +1684,9 @@ struct cached_directory_listing
 };
 
 static StringMap<cached_directory_listing> DIR_LISTING_CACHE{heap_allocator()};
+#if !defined NDEBUG
+static usize DEBUG_DIRECTORY_STAT_COUNT = 0;
+#endif
 
 static fn clear_directory_listing_cache() throws -> void
 {
@@ -1747,13 +1750,19 @@ static fn find_cached_program_path(const program_path_cache_entry &entry,
 }
 
 fn read_directory_cached(const Path &directory,
-                         bool should_invalidate_path_cache) throws
+                         bool should_invalidate_path_cache,
+                         bool should_validate) throws
     -> const ArrayList<Path::directory_child> *
 {
   let const key = directory.text().view();
+  const cached_directory_listing *cached = DIR_LISTING_CACHE.find(key);
+  if (!should_validate && cached != nullptr) return &cached->entries;
+
+#if !defined NDEBUG
+  DEBUG_DIRECTORY_STAT_COUNT++;
+#endif
   os::file_status status{};
   let const has_status = os::stat_path_following(key, status);
-  const cached_directory_listing *cached = DIR_LISTING_CACHE.find(key);
   if (cached != nullptr && cached->is_valid && has_status &&
       cached->modification_time == status.modification_time &&
       cached->modification_nanoseconds == status.modification_nanoseconds &&
@@ -1979,6 +1988,18 @@ fn initialize_path_map() throws -> void
   rebuild_path_cache();
 }
 
+fn begin_interactive_completion() throws -> void
+{
+  clear_directory_listing_cache();
+}
+
+#if !defined NDEBUG
+pure fn debug_directory_stat_count() wontthrow -> usize
+{
+  return DEBUG_DIRECTORY_STAT_COUNT;
+}
+#endif
+
 static fn prepare_complete_path_cache() throws -> void
 {
   if (PATH_CACHE_IS_STALE || !PATH_COMMAND_NAMES_IS_VALID)
@@ -1992,8 +2013,9 @@ fn path_command_names() throws -> const ArrayList<String> &
   return PATH_COMMAND_NAMES;
 }
 
-static pure fn path_command_name_lower_bound(const ArrayList<String> &names,
-                                             StringView name) wontthrow -> usize
+static pure fn path_command_name_lower_bound_in(const ArrayList<String> &names,
+                                                StringView name) wontthrow
+    -> usize
 {
   usize lower = 0;
   usize upper = names.count();
@@ -2006,6 +2028,11 @@ static pure fn path_command_name_lower_bound(const ArrayList<String> &names,
   }
 
   return lower;
+}
+
+pure fn path_command_name_lower_bound(StringView name) throws -> usize
+{
+  return path_command_name_lower_bound_in(path_command_names(), name);
 }
 
 fn path_command_name_has_prefix(StringView prefix) throws -> bool
@@ -2025,7 +2052,7 @@ fn path_command_name_has_prefix(StringView prefix) throws -> bool
     return false;
   }
   let const lower =
-      path_command_name_lower_bound(names, normalized_prefix.view());
+      path_command_name_lower_bound_in(names, normalized_prefix.view());
 
   return lower < names.count() &&
          names[lower].view().starts_with(normalized_prefix.view());
