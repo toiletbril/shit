@@ -603,6 +603,7 @@ fn reopen_terminal_as_stdin() wontthrow -> bool;
 
 fn process_id_of(process p) wontthrow -> i64;
 fn process_group_of(process p) wontthrow -> process;
+fn close_process_group(process group) wontthrow -> void;
 fn process_has_id(process p, i64 id) wontthrow -> bool;
 
 fn is_stdin_a_tty() wontthrow -> bool;

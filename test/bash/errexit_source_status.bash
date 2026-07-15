@@ -1,3 +1,4 @@
+#!/bin/bash
 if false; then
     printf 'unreachable direct branch\n'
 fi

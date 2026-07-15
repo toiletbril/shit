@@ -102,6 +102,64 @@ printf 'rollback-status=%s symlink=%s leftovers=%s\n' "$rollback_status" \
     "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
 unset ASSIMILATE_PAYLOAD
 
+locking_payload=$root/locking-payload
+cat > "$locking_payload" <<'SH'
+#!/bin/sh
+case $0 in
+    */shit)
+        : > "$ASSIMILATE_FIRST_ENTERED"
+        while [ ! -e "$ASSIMILATE_RELEASE_FIRST" ]; do /bin/sleep 0.01; done
+        ;;
+esac
+exit 0
+SH
+chmod +x "$locking_payload"
+third_payload=$root/third-payload
+cat > "$third_payload" <<'SH'
+#!/bin/sh
+case $0 in
+    */shit) : > "$ASSIMILATE_THIRD_ENTERED" ;;
+esac
+exit 0
+SH
+chmod +x "$third_payload"
+export ASSIMILATE_FIRST_ENTERED=$root/first-entered
+export ASSIMILATE_RELEASE_FIRST=$root/release-first
+export ASSIMILATE_THIRD_ENTERED=$root/third-entered
+/bin/rm -f "$first/shit"
+ASSIMILATE_PAYLOAD=$locking_payload \
+    PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' \
+    >/dev/null 2>&1 &
+first_assimilate_pid=$!
+wait_iteration=0
+while [ ! -e "$ASSIMILATE_FIRST_ENTERED" ] && [ "$wait_iteration" -lt 500 ]; do
+    /bin/sleep 0.01
+    wait_iteration=$((wait_iteration + 1))
+done
+PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
+second_assimilate_status=$?
+if [ -d "$first/.shit-assimilate.lock" ]; then
+    lock_after_second=owned
+else
+    lock_after_second=lost
+fi
+ASSIMILATE_PAYLOAD=$third_payload \
+    PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' \
+    >/dev/null 2>&1
+third_assimilate_status=$?
+: > "$ASSIMILATE_RELEASE_FIRST"
+wait "$first_assimilate_pid"
+first_assimilate_status=$?
+if [ -e "$ASSIMILATE_THIRD_ENTERED" ]; then
+    third_entered=yes
+else
+    third_entered=no
+fi
+printf 'concurrent-first=%s second=%s lock=%s third=%s entered=%s leftovers=%s\n' \
+    "$first_assimilate_status" "$second_assimilate_status" \
+    "$lock_after_second" "$third_assimilate_status" "$third_entered" \
+    "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
+
 precommit_payload=$root/precommit-payload
 printf '#!/bin/sh\nexit 1\n' > "$precommit_payload"
 chmod +x "$precommit_payload"

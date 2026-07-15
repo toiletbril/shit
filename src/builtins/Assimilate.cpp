@@ -70,12 +70,22 @@ done
 candidate=$install_dir/.shit-assimilate-$2.candidate
 backup=$install_dir/.shit-assimilate-$2.backup
 target=$install_dir/shit
-lock=$install_dir/.shit-assimilate.lock
+lock_path=$install_dir/.shit-assimilate.lock
 [ ! -d "$target" ] || exit 1
 /bin/cp "$upload" "$candidate"
 /bin/chmod 755 "$candidate"
 "$candidate" --short-version >/dev/null
-/bin/mkdir "$lock"
+trap '' 1 2 15
+if /bin/mkdir "$lock_path"; then
+  lock=$lock_path
+  lock_status=0
+else
+  lock_status=$?
+fi
+trap 'exit 129' 1
+trap 'exit 130' 2
+trap 'exit 143' 15
+[ "$lock_status" -eq 0 ] || exit "$lock_status"
 if [ -e "$target" ] || [ -L "$target" ]; then
   /bin/cp -a "$target" "$backup"
   had_target=1

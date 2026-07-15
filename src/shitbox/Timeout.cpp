@@ -53,14 +53,14 @@ enum class supervision_wait_result : u8
   Interrupted,
 };
 
-static fn wait_for_process_until(os::process child, u64 timeout_nanos,
-                                 i32 &status,
+static fn wait_for_process_until(os::process child, os::process process_group,
+                                 u64 timeout_nanos, i32 &status,
+                                 bool &has_child_exited,
                                  bool wait_for_process_group = false) throws
     -> supervision_wait_result
 {
   let const has_deadline = timeout_nanos != 0 && timeout_nanos != UINT64_MAX;
   let const started_at_nanos = os::monotonic_nanos();
-  let has_child_exited = false;
   loop
   {
     if (os::INTERRUPT_REQUESTED) return supervision_wait_result::Interrupted;
@@ -69,9 +69,8 @@ static fn wait_for_process_until(os::process child, u64 timeout_nanos,
       let const state = os::poll_process(child, status);
       has_child_exited = state == os::process_state::Exited;
     }
-    if (has_child_exited &&
-        (!wait_for_process_group ||
-         !os::process_group_has_members(os::process_group_of(child))))
+    if (has_child_exited && (!wait_for_process_group ||
+                             !os::process_group_has_members(process_group)))
     {
       return supervision_wait_result::Exited;
     }
@@ -90,26 +89,31 @@ static fn wait_for_process_until(os::process child, u64 timeout_nanos,
 }
 
 static fn signal_supervised_process(os::process child,
+                                    os::process process_group,
+                                    bool has_child_exited,
                                     i32 signal_number) wontthrow -> bool
 {
-  let const process_group = os::process_group_of(child);
   if (os::signal_process(process_group, signal_number)) return true;
+  if (has_child_exited) return false;
   return os::signal_process(child, signal_number);
 }
 
-static fn finish_interrupted_supervision(os::process child) throws -> i32
+static fn finish_interrupted_supervision(os::process child,
+                                         os::process process_group,
+                                         bool has_child_exited) throws -> i32
 {
   os::INTERRUPT_REQUESTED = 0;
   if (let const interrupt_signal = os::signal_number_from_name("INT");
       interrupt_signal.has_value() &&
       os::is_process_signal_supported(*interrupt_signal))
   {
-    signal_supervised_process(child, *interrupt_signal);
+    signal_supervised_process(child, process_group, has_child_exited,
+                              *interrupt_signal);
   }
 
   os::sleep_for_seconds(0.01);
-  signal_supervised_process(child, 9);
-  os::reap_process_quietly(child);
+  signal_supervised_process(child, process_group, has_child_exited, 9);
+  if (!has_child_exited) os::reap_process_quietly(child);
   os::INTERRUPT_REQUESTED = 0;
   return 130;
 }
@@ -237,17 +241,29 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     if (has_controlling_terminal) os::reclaim_controlling_terminal();
   };
 
+  let const process_group = os::process_group_of(child);
+  defer { os::close_process_group(process_group); };
+
   i32 status = 0;
-  let wait_result = wait_for_process_until(child, timeout_nanos, status);
+  let has_child_exited = false;
+  let wait_result = wait_for_process_until(child, process_group, timeout_nanos,
+                                           status, has_child_exited);
   if (wait_result == supervision_wait_result::Exited) return status;
   if (wait_result == supervision_wait_result::Interrupted)
-    return finish_interrupted_supervision(child);
+    return finish_interrupted_supervision(child, process_group,
+                                          has_child_exited);
 
-  if (!signal_supervised_process(child, timeout_signal)) {
-    if (os::poll_process(child, status) == os::process_state::Exited)
+  if (!signal_supervised_process(child, process_group, has_child_exited,
+                                 timeout_signal))
+  {
+    if (!has_child_exited &&
+        os::poll_process(child, status) == os::process_state::Exited)
+    {
+      has_child_exited = true;
       return status;
-    signal_supervised_process(child, 9);
-    os::reap_process_quietly(child);
+    }
+    signal_supervised_process(child, process_group, has_child_exited, 9);
+    if (!has_child_exited) os::reap_process_quietly(child);
     return 125;
   }
 
@@ -255,22 +271,29 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
       continue_signal.has_value() &&
       os::is_process_signal_supported(*continue_signal))
   {
-    signal_supervised_process(child, *continue_signal);
+    signal_supervised_process(child, process_group, has_child_exited,
+                              *continue_signal);
   }
 
   wait_result = wait_for_process_until(
-      child, kill_after_nanos == 0 ? UINT64_MAX : kill_after_nanos, status,
-      kill_after_nanos != 0);
+      child, process_group,
+      kill_after_nanos == 0 ? UINT64_MAX : kill_after_nanos, status,
+      has_child_exited, kill_after_nanos != 0);
   if (wait_result == supervision_wait_result::Interrupted)
-    return finish_interrupted_supervision(child);
+    return finish_interrupted_supervision(child, process_group,
+                                          has_child_exited);
 
   if (wait_result == supervision_wait_result::TimedOut) {
-    if (!signal_supervised_process(child, 9)) {
-      if (os::poll_process(child, status) == os::process_state::Exited)
+    if (!signal_supervised_process(child, process_group, has_child_exited, 9)) {
+      if (!has_child_exited &&
+          os::poll_process(child, status) == os::process_state::Exited)
+      {
+        has_child_exited = true;
         return FLAG_TIMEOUT_PRESERVE_STATUS.is_enabled() ? status : 124;
+      }
       return 125;
     }
-    os::reap_process_quietly(child);
+    if (!has_child_exited) os::reap_process_quietly(child);
     return 137;
   }
 

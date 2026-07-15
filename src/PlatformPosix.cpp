@@ -191,7 +191,7 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
       fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
   result.was_open = backup != -1;
   result.saved = backup;
-  result.is_dup2_ok = true;
+  result.is_dup2_ok = backup != -1 || errno == EBADF;
   return result;
 }
 
@@ -333,6 +333,7 @@ fn is_running_setuid() wontthrow -> bool
 
 fn process_id_of(process p) wontthrow -> i64 { return static_cast<i64>(p); }
 fn process_group_of(process p) wontthrow -> process { return -p; }
+fn close_process_group(process group) wontthrow -> void { unused(group); }
 fn process_has_id(process p, i64 id) wontthrow -> bool
 {
   return p == static_cast<process>(id);
@@ -1317,6 +1318,21 @@ fn replace_process(ExecContext &&ec) throws -> void
       [&]() { check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO)); },
       [&]() { check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO)); });
 
+  sigset_t saved_signal_mask;
+  struct sigaction saved_sigchild_action = {};
+  struct sigaction saved_sigpipe_action = {};
+  let const saved_interrupt_requested = INTERRUPT_REQUESTED;
+  check_syscall(sigprocmask(SIG_SETMASK, nullptr, &saved_signal_mask));
+  check_syscall(sigaction(SIGCHLD, nullptr, &saved_sigchild_action));
+  check_syscall(sigaction(SIGPIPE, nullptr, &saved_sigpipe_action));
+  defer
+  {
+    sigaction(SIGCHLD, &saved_sigchild_action, nullptr);
+    sigaction(SIGPIPE, &saved_sigpipe_action, nullptr);
+    INTERRUPT_REQUESTED = saved_interrupt_requested;
+    sigprocmask(SIG_SETMASK, &saved_signal_mask, nullptr);
+  };
+
   reset_signal_handlers();
 
   /* exec -c replaces the inherited environ with a single null, so the program
@@ -1329,9 +1345,11 @@ fn replace_process(ExecContext &&ec) throws -> void
              ? const_cast<char *const *>(empty_environment)
              : environ);
 
-  if (errno == ENOEXEC) throw shit::ExecFormatError{};
+  let const exec_error = errno;
+  if (exec_error == ENOEXEC) throw shit::ExecFormatError{};
   /* The reason is read before the concatenation, which allocates and could
      clobber errno. */
+  errno = exec_error;
   let const reason = last_system_error_message();
   throw shit::ErrorWithLocation{ec.source_location(),
                                 "Unable to execute `" +

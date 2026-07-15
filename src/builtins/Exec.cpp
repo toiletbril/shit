@@ -194,6 +194,23 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return status;
   }
 
+  let saved_descriptors =
+      ArrayList<os::saved_descriptor>{cxt.scratch_allocator()};
+  defer
+  {
+    for (usize i = saved_descriptors.count(); i > 0; i--)
+      os::restore_descriptor(saved_descriptors[i - 1]);
+  };
+  for (i32 shell_fd = 0; shell_fd < 3; shell_fd++) {
+    let const saved_descriptor = os::save_descriptor(shell_fd);
+    if (!saved_descriptor.is_dup2_ok) {
+      return report_exec_resolution_error(
+          ec, cxt, command_index,
+          "Unable to preserve the shell's standard descriptors", 126);
+    }
+    saved_descriptors.push(saved_descriptor);
+  }
+
   /* An external command replaces the shell. replace_process returns only by
      throwing, when the program was found but could not be executed, which ends
      the shell with 126, the status reserved for a command that is present but

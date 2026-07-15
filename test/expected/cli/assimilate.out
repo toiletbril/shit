@@ -6,6 +6,7 @@ upload-status=23 old=old-install leftovers=0
 ssh-start-status=31 old=old-install leftovers=0
 no-path-status=1 old=old-install leftovers=0
 rollback-status=1 symlink=restored leftovers=0
+concurrent-first=0 second=1 lock=owned third=1 entered=no leftovers=0
 precommit-status=1 old=old-install leftovers=0
 directory-status=1 marker=directory-marker leftovers=0
 invalid-transport-lines=0

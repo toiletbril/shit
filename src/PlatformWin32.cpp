@@ -63,8 +63,10 @@ fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
 fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
 {
   DWORD r = -1;
-  if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
+  if (ReadFile(fd, buf, size, &r, 0) == FALSE) { /* NOLINT */
+    if (GetLastError() == ERROR_BROKEN_PIPE) return 0;
     return shit::None;
+  }
   return static_cast<usize>(r);
 }
 
@@ -467,8 +469,19 @@ fn process_id_of(process p) wontthrow -> i64
 
 fn process_group_of(process p) wontthrow -> process
 {
-  return reinterpret_cast<process>(reinterpret_cast<uintptr>(p) |
+  HANDLE duplicate = INVALID_HANDLE_VALUE;
+  if (DuplicateHandle(GetCurrentProcess(), p, GetCurrentProcess(), &duplicate,
+                      0, FALSE, DUPLICATE_SAME_ACCESS) == 0)
+    return nullptr;
+
+  return reinterpret_cast<process>(reinterpret_cast<uintptr>(duplicate) |
                                    PROCESS_GROUP_REFERENCE_TAG);
+}
+
+fn close_process_group(process group) wontthrow -> void
+{
+  if (group == nullptr || !process_is_group_reference(group)) return;
+  CloseHandle(process_from_group_reference(group));
 }
 fn process_has_id(process p, i64 id) wontthrow -> bool
 {
