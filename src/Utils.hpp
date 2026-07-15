@@ -138,11 +138,16 @@ fn begin_explicit_completion() throws -> void;
 
 #if !defined NDEBUG
 pure fn debug_directory_stat_count() wontthrow -> usize;
+pure fn debug_directory_read_count() wontthrow -> usize;
+pure fn debug_executable_probe_count() wontthrow -> usize;
 #endif
 
 fn clear_path_map() throws -> void;
 
 fn invalidate_path_cache() throws -> void;
+
+fn file_content_identity(const Path &path, Allocator allocator) throws
+    -> Maybe<String>;
 
 /* None restores the search to the process environment's PATH. */
 fn set_path_for_resolution(Maybe<String> path) throws -> void;
@@ -161,9 +166,10 @@ fn search_program_path(StringView program_name, bool find_all = false,
                            program_path_requirement::Runnable) throws
     -> ArrayList<Path>;
 
-fn path_command_names() throws -> const ArrayList<String> &;
+fn path_command_names(StringView validation_prefix = {}) throws
+    -> const ArrayList<String> &;
 
-pure fn path_command_name_lower_bound(StringView name) throws -> usize;
+pure fn path_command_name_lower_bound(StringView name) wontthrow -> usize;
 
 fn path_command_name_has_prefix(StringView prefix) throws -> bool;
 

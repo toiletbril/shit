@@ -134,9 +134,11 @@ $ make uninstall
 The running binary can install itself on an SSH target with
 `assimilate user@host`. The first writable and searchable directory in the
 remote PATH receives `shit`. An existing binary or symlink is restored when a
-handled transfer, validation, or install step fails. Concurrent installs share
-a remote transaction lock, and a later install recovers an abandoned journal.
-The transferred shell performs the transaction with bundled shitbox utilities.
+handled transfer, validation, or install step fails. A remote keeper process
+holds the transaction lock until the transaction child exits, including after
+its launcher exits. A later install recovers published and orphaned journals.
+The candidate SHA-256 identity must match the local executable. The transferred
+shell performs the transaction with bundled shitbox utilities.
 
 ## Roadmap
 

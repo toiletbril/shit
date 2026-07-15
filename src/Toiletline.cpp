@@ -517,6 +517,8 @@ fn get_input(const String &prompt) -> input_result
   let const source_scan_count_before = DEBUG_COMPLETION_SOURCE_SCAN_COUNT;
   let const materialized_count_before = DEBUG_COMPLETION_MATERIALIZED_COUNT;
   let const directory_stat_count_before = utils::debug_directory_stat_count();
+  let const executable_probe_count_before =
+      utils::debug_executable_probe_count();
 #endif
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
 #if !defined NDEBUG
@@ -541,6 +543,10 @@ fn get_input(const String &prompt) -> input_result
                       " stats=" +
                       shit::String::from(utils::debug_directory_stat_count() -
                                              directory_stat_count_before,
+                                         shit::heap_allocator()) +
+                      " probes=" +
+                      shit::String::from(utils::debug_executable_probe_count() -
+                                             executable_probe_count_before,
                                          shit::heap_allocator()) +
                       " scans=" +
                       shit::String::from(DEBUG_COMPLETION_SOURCE_SCAN_COUNT -

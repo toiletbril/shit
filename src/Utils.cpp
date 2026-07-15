@@ -15,6 +15,159 @@ namespace shit {
 
 namespace utils {
 
+namespace {
+
+struct sha256_state
+{
+  u32 words[8]{0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+               0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+  u64 byte_count{0};
+  u8 block[64]{};
+  usize block_length{0};
+};
+
+constexpr u32 SHA256_CONSTANTS[64] = {
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
+    0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+    0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+    0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+    0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+    0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
+
+pure forceinline fn rotate_right(u32 value, u32 count) wontthrow -> u32
+{
+  return (value >> count) | (value << (32 - count));
+}
+
+fn transform_sha256(sha256_state &state) wontthrow -> void
+{
+  u32 schedule[64];
+  for (usize position = 0; position < 16; position++) {
+    let const offset = position * 4;
+    schedule[position] = static_cast<u32>(state.block[offset]) << 24 |
+                         static_cast<u32>(state.block[offset + 1]) << 16 |
+                         static_cast<u32>(state.block[offset + 2]) << 8 |
+                         static_cast<u32>(state.block[offset + 3]);
+  }
+  for (usize position = 16; position < 64; position++) {
+    let const previous = schedule[position - 15];
+    let const before_previous = schedule[position - 2];
+    let const first = rotate_right(previous, 7) ^ rotate_right(previous, 18) ^
+                      (previous >> 3);
+    let const second = rotate_right(before_previous, 17) ^
+                       rotate_right(before_previous, 19) ^
+                       (before_previous >> 10);
+    schedule[position] =
+        schedule[position - 16] + first + schedule[position - 7] + second;
+  }
+
+  u32 first = state.words[0];
+  u32 second = state.words[1];
+  u32 third = state.words[2];
+  u32 fourth = state.words[3];
+  u32 fifth = state.words[4];
+  u32 sixth = state.words[5];
+  u32 seventh = state.words[6];
+  u32 eighth = state.words[7];
+  for (usize position = 0; position < 64; position++) {
+    let const fifth_mix = rotate_right(fifth, 6) ^ rotate_right(fifth, 11) ^
+                          rotate_right(fifth, 25);
+    let const choice = (fifth & sixth) ^ (~fifth & seventh);
+    let const temporary_first = eighth + fifth_mix + choice +
+                                SHA256_CONSTANTS[position] + schedule[position];
+    let const first_mix = rotate_right(first, 2) ^ rotate_right(first, 13) ^
+                          rotate_right(first, 22);
+    let const majority = (first & second) ^ (first & third) ^ (second & third);
+    let const temporary_second = first_mix + majority;
+    eighth = seventh;
+    seventh = sixth;
+    sixth = fifth;
+    fifth = fourth + temporary_first;
+    fourth = third;
+    third = second;
+    second = first;
+    first = temporary_first + temporary_second;
+  }
+
+  state.words[0] += first;
+  state.words[1] += second;
+  state.words[2] += third;
+  state.words[3] += fourth;
+  state.words[4] += fifth;
+  state.words[5] += sixth;
+  state.words[6] += seventh;
+  state.words[7] += eighth;
+}
+
+fn update_sha256(sha256_state &state, const u8 *data, usize length) wontthrow
+    -> void
+{
+  state.byte_count += length;
+  for (usize position = 0; position < length; position++) {
+    state.block[state.block_length++] = data[position];
+    if (state.block_length == sizeof(state.block)) {
+      transform_sha256(state);
+      state.block_length = 0;
+    }
+  }
+}
+
+fn finish_sha256(sha256_state &state, Allocator allocator) throws -> String
+{
+  let const bit_count = state.byte_count * 8;
+  state.block[state.block_length++] = 0x80;
+  if (state.block_length > 56) {
+    while (state.block_length < sizeof(state.block))
+      state.block[state.block_length++] = 0;
+    transform_sha256(state);
+    state.block_length = 0;
+  }
+  while (state.block_length < 56)
+    state.block[state.block_length++] = 0;
+  for (usize position = 0; position < 8; position++)
+    state.block[63 - position] = static_cast<u8>(bit_count >> (position * 8));
+  transform_sha256(state);
+
+  constexpr char HEX_DIGITS[] = "0123456789abcdef";
+  let digest = String{allocator};
+  digest.reserve(64);
+  for (u32 word : state.words) {
+    for (usize position = 0; position < 8; position++) {
+      let const shift = static_cast<u32>((7 - position) * 4);
+      digest.push(HEX_DIGITS[(word >> shift) & 0xf]);
+    }
+  }
+  return digest;
+}
+
+} // namespace
+
+fn file_content_identity(const Path &path, Allocator allocator) throws
+    -> Maybe<String>
+{
+  let const file =
+      os::open_file_descriptor(path.text().view(), os::file_open_mode::Read);
+  if (!file.has_value()) return None;
+  defer { os::close_fd(*file); };
+
+  sha256_state digest;
+  char buffer[65536];
+  loop
+  {
+    let const read_count = os::read_fd(*file, buffer, sizeof(buffer));
+    if (!read_count.has_value()) return None;
+    if (*read_count == 0) break;
+    update_sha256(digest, reinterpret_cast<const u8 *>(buffer), *read_count);
+  }
+
+  return finish_sha256(digest, allocator);
+}
+
 fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
     -> String
 {
@@ -1662,6 +1815,7 @@ struct cached_program_path
 {
   Path path;
   os::program_extension extension{os::program_extension::None};
+  u64 executable_validation_epoch{0};
   bool is_runnable{false};
 };
 
@@ -1681,20 +1835,38 @@ struct cached_directory_listing
   i64 modification_time{0};
   u32 modification_nanoseconds{0};
   u64 size{0};
-  u64 validation_epoch{0};
+  u64 generation{0};
+  usize alias_count{0};
+  bool has_file_identity{false};
   bool is_valid{false};
   ArrayList<Path::directory_child> entries{heap_allocator()};
 };
 
-static StringMap<cached_directory_listing> DIR_LISTING_CACHE{heap_allocator()};
+struct cached_directory_alias
+{
+  usize listing_position{0};
+  u64 validation_epoch{0};
+  u64 observed_generation{0};
+};
+
+static StringMap<cached_directory_alias> DIR_LISTING_ALIASES{heap_allocator()};
+static StringMap<usize> DIR_LISTING_IDENTITIES{heap_allocator()};
+static ArrayList<cached_directory_listing> DIR_LISTINGS{heap_allocator()};
+static ArrayList<usize> FREE_DIR_LISTING_POSITIONS{heap_allocator()};
 static u64 DIRECTORY_VALIDATION_EPOCH = 0;
+static u64 DIRECTORY_LISTING_GENERATION = 0;
 #if !defined NDEBUG
 static usize DEBUG_DIRECTORY_STAT_COUNT = 0;
+static usize DEBUG_DIRECTORY_READ_COUNT = 0;
+static usize DEBUG_EXECUTABLE_PROBE_COUNT = 0;
 #endif
 
 static fn clear_directory_listing_cache() throws -> void
 {
-  DIR_LISTING_CACHE.clear();
+  DIR_LISTING_ALIASES.clear();
+  DIR_LISTING_IDENTITIES.clear();
+  DIR_LISTINGS.clear();
+  FREE_DIR_LISTING_POSITIONS.clear();
 }
 
 static bool PATH_CACHE_IS_STALE = false;
@@ -1702,6 +1874,7 @@ static bool PATH_CACHE_IS_STALE = false;
 static ArrayList<String> PATH_COMMAND_NAMES{heap_allocator()};
 static bool PATH_COMMAND_NAMES_IS_VALID = false;
 static u64 PATH_COMMAND_NAMES_VALIDATION_EPOCH = 0;
+static bool SHOULD_VALIDATE_ALL_PATH_COMMANDS = false;
 
 static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
@@ -1725,8 +1898,38 @@ static fn cache_resolved_path(StringView name, const Path &full_path,
       entry.bare_path_position = entry.paths.count();
     }
   }
-  entry.paths.push({full_path, extension, is_runnable});
+  entry.paths.push(
+      {full_path, extension, DIRECTORY_VALIDATION_EPOCH, is_runnable});
   entry.is_complete |= is_complete;
+}
+
+static fn validate_cached_program_paths(program_path_cache_entry &entry) throws
+    -> bool
+{
+  bool did_change = false;
+
+  for (let &cached : entry.paths) {
+    if (cached.executable_validation_epoch == DIRECTORY_VALIDATION_EPOCH)
+      continue;
+
+#if !defined NDEBUG
+    DEBUG_EXECUTABLE_PROBE_COUNT++;
+#endif
+    let const is_runnable =
+        cached.path.is_regular_file() && cached.path.is_executable();
+    cached.executable_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
+    if (cached.is_runnable == is_runnable) continue;
+
+    cached.is_runnable = is_runnable;
+    did_change = true;
+  }
+
+  if (did_change) {
+    PATH_CACHE_IS_STALE = true;
+    PATH_COMMAND_NAMES_IS_VALID = false;
+  }
+
+  return did_change;
 }
 
 static fn find_cached_program_path(const program_path_cache_entry &entry,
@@ -1751,17 +1954,75 @@ static fn find_cached_program_path(const program_path_cache_entry &entry,
   return require_runnable ? nullptr : blocked_path;
 }
 
+static fn directory_identity_key(u64 device_id, u64 file_id) throws -> String
+{
+  let key = String{heap_allocator()};
+  key.append(StringView{reinterpret_cast<const char *>(&device_id),
+                        sizeof(device_id)});
+  key.append(
+      StringView{reinterpret_cast<const char *>(&file_id), sizeof(file_id)});
+  return key;
+}
+
+static fn release_directory_listing_alias(usize position) throws -> void
+{
+  let &listing = DIR_LISTINGS[position];
+  ASSERT(listing.alias_count > 0);
+  listing.alias_count--;
+  if (listing.alias_count != 0) return;
+
+  if (listing.has_file_identity) {
+    let const key = directory_identity_key(listing.device_id, listing.file_id);
+    DIR_LISTING_IDENTITIES.erase(key.view());
+  }
+  listing = cached_directory_listing{};
+  FREE_DIR_LISTING_POSITIONS.push(position);
+}
+
+static fn set_directory_listing_alias(StringView key, usize position) throws
+    -> void
+{
+  let *existing = DIR_LISTING_ALIASES.find(key);
+  if (existing != nullptr && existing->listing_position == position) {
+    existing->validation_epoch = DIRECTORY_VALIDATION_EPOCH;
+    existing->observed_generation = DIR_LISTINGS[position].generation;
+    return;
+  }
+
+  if (existing != nullptr)
+    release_directory_listing_alias(existing->listing_position);
+  DIR_LISTINGS[position].alias_count++;
+  DIR_LISTING_ALIASES.set(
+      key, cached_directory_alias{position, DIRECTORY_VALIDATION_EPOCH,
+                                  DIR_LISTINGS[position].generation});
+}
+
+static fn allocate_directory_listing_position() throws -> usize
+{
+  if (!FREE_DIR_LISTING_POSITIONS.is_empty()) {
+    let const position = FREE_DIR_LISTING_POSITIONS.back();
+    FREE_DIR_LISTING_POSITIONS.pop_back();
+    return position;
+  }
+
+  let const position = DIR_LISTINGS.count();
+  DIR_LISTINGS.push({});
+  return position;
+}
+
 fn read_directory_cached(const Path &directory,
                          bool should_invalidate_path_cache,
                          bool should_validate) throws
     -> const ArrayList<Path::directory_child> *
 {
   let const key = directory.text().view();
-  cached_directory_listing *cached = DIR_LISTING_CACHE.find(key);
-  if (!should_validate && cached != nullptr &&
-      cached->validation_epoch == DIRECTORY_VALIDATION_EPOCH)
+  let *alias = DIR_LISTING_ALIASES.find(key);
+  if (!should_validate && alias != nullptr &&
+      alias->validation_epoch == DIRECTORY_VALIDATION_EPOCH &&
+      alias->observed_generation ==
+          DIR_LISTINGS[alias->listing_position].generation)
   {
-    return &cached->entries;
+    return &DIR_LISTINGS[alias->listing_position].entries;
   }
 
 #if !defined NDEBUG
@@ -1769,17 +2030,35 @@ fn read_directory_cached(const Path &directory,
 #endif
   os::file_status status{};
   let const has_status = os::stat_path_following(key, status);
-  if (cached != nullptr && cached->is_valid && has_status &&
-      cached->device_id == status.device_id &&
-      cached->file_id == status.file_id &&
-      cached->modification_time == status.modification_time &&
-      cached->modification_nanoseconds == status.modification_nanoseconds &&
-      cached->size == status.size)
-  {
-    cached->validation_epoch = DIRECTORY_VALIDATION_EPOCH;
-    return &cached->entries;
+  let physical_position = Maybe<usize>{};
+  if (has_status && status.has_file_identity) {
+    let const identity_key =
+        directory_identity_key(status.device_id, status.file_id);
+    if (let const *position = DIR_LISTING_IDENTITIES.find(identity_key.view()))
+      physical_position = *position;
   }
-  let const had_cached_listing = cached != nullptr;
+
+  if (physical_position.has_value()) {
+    let &cached = DIR_LISTINGS[*physical_position];
+    if (cached.modification_time == status.modification_time &&
+        cached.modification_nanoseconds == status.modification_nanoseconds &&
+        cached.size == status.size)
+    {
+      let const did_observe_new_generation =
+          alias == nullptr || alias->listing_position != *physical_position ||
+          alias->observed_generation != cached.generation;
+      if (did_observe_new_generation && should_invalidate_path_cache &&
+          path_dirs().find(key).has_value())
+      {
+        PATH_CACHE_IS_STALE = true;
+        PATH_COMMAND_NAMES_IS_VALID = false;
+      }
+      set_directory_listing_alias(key, *physical_position);
+      return &cached.entries;
+    }
+  }
+
+  let const had_cached_listing = alias != nullptr;
   if (had_cached_listing && should_invalidate_path_cache &&
       path_dirs().find(key).has_value())
   {
@@ -1787,6 +2066,9 @@ fn read_directory_cached(const Path &directory,
     PATH_COMMAND_NAMES_IS_VALID = false;
   }
 
+#if !defined NDEBUG
+  DEBUG_DIRECTORY_READ_COUNT++;
+#endif
   let entries = Path::read_directory_typed(directory);
   if (!entries.has_value()) return nullptr;
 
@@ -1810,12 +2092,26 @@ fn read_directory_cached(const Path &directory,
   fresh.modification_nanoseconds =
       has_status ? status.modification_nanoseconds : 0;
   fresh.size = has_status ? status.size : 0;
-  fresh.validation_epoch = DIRECTORY_VALIDATION_EPOCH;
+  fresh.generation = ++DIRECTORY_LISTING_GENERATION;
+  fresh.has_file_identity = has_status && status.has_file_identity;
   fresh.is_valid = has_status;
   fresh.entries = steal(*entries);
-  DIR_LISTING_CACHE.set(key, steal(fresh));
+  if (physical_position.has_value()) {
+    fresh.alias_count = DIR_LISTINGS[*physical_position].alias_count;
+    DIR_LISTINGS[*physical_position] = steal(fresh);
+  } else {
+    physical_position = allocate_directory_listing_position();
+    DIR_LISTINGS[*physical_position] = steal(fresh);
+    if (DIR_LISTINGS[*physical_position].has_file_identity) {
+      let const identity_key =
+          directory_identity_key(DIR_LISTINGS[*physical_position].device_id,
+                                 DIR_LISTINGS[*physical_position].file_id);
+      DIR_LISTING_IDENTITIES.set(identity_key.view(), *physical_position);
+    }
+  }
+  set_directory_listing_alias(key, *physical_position);
 
-  return &DIR_LISTING_CACHE.find(key)->entries;
+  return &DIR_LISTINGS[*physical_position].entries;
 }
 
 fn directory_entry_kind(const Path &directory,
@@ -1869,9 +2165,13 @@ static fn rebuild_path_cache() throws -> void
       }
       let normalized_name = entry.name.clone();
       let const name_info = os::normalize_program_name(normalized_name);
-      let const is_runnable =
-          directory_entry_kind(directory, entry) == Path::entry_kind::Regular &&
-          full_path.is_executable();
+      let is_runnable = false;
+      if (directory_entry_kind(directory, entry) == Path::entry_kind::Regular) {
+#if !defined NDEBUG
+        DEBUG_EXECUTABLE_PROBE_COUNT++;
+#endif
+        is_runnable = full_path.is_executable();
+      }
       program_candidates.push(
           {steal(full_path), steal(normalized_name), name_info, is_runnable});
     }
@@ -2007,11 +2307,13 @@ static fn begin_directory_validation_epoch() wontthrow -> void
 fn begin_interactive_completion() throws -> void
 {
   begin_directory_validation_epoch();
+  SHOULD_VALIDATE_ALL_PATH_COMMANDS = false;
 }
 
 fn begin_explicit_completion() throws -> void
 {
   begin_directory_validation_epoch();
+  SHOULD_VALIDATE_ALL_PATH_COMMANDS = true;
 }
 
 #if !defined NDEBUG
@@ -2019,28 +2321,47 @@ pure fn debug_directory_stat_count() wontthrow -> usize
 {
   return DEBUG_DIRECTORY_STAT_COUNT;
 }
+
+pure fn debug_directory_read_count() wontthrow -> usize
+{
+  return DEBUG_DIRECTORY_READ_COUNT;
+}
+
+pure fn debug_executable_probe_count() wontthrow -> usize
+{
+  return DEBUG_EXECUTABLE_PROBE_COUNT;
+}
 #endif
 
-static fn validate_path_command_names() throws -> void
+static fn validate_path_command_names(StringView prefix) throws -> void
 {
+  if (!SHOULD_VALIDATE_ALL_PATH_COMMANDS) return;
   if (PATH_COMMAND_NAMES_VALIDATION_EPOCH == DIRECTORY_VALIDATION_EPOCH) return;
 
   for (let const &directory_text : path_dirs())
     read_directory_cached(Path{directory_text.view()}, true, false);
 
-  PATH_COMMAND_NAMES_VALIDATION_EPOCH = DIRECTORY_VALIDATION_EPOCH;
+  PATH_CACHE.for_each([&](StringView name, program_path_cache_entry &entry) {
+    if (prefix.is_empty() || name.starts_with(prefix))
+      validate_cached_program_paths(entry);
+  });
+
+  if (prefix.is_empty())
+    PATH_COMMAND_NAMES_VALIDATION_EPOCH = DIRECTORY_VALIDATION_EPOCH;
 }
 
-static fn prepare_complete_path_cache() throws -> void
+static fn prepare_complete_path_cache(StringView validation_prefix) throws
+    -> void
 {
-  validate_path_command_names();
+  validate_path_command_names(validation_prefix);
   if (PATH_CACHE_IS_STALE || !PATH_COMMAND_NAMES_IS_VALID)
     initialize_path_map();
 }
 
-fn path_command_names() throws -> const ArrayList<String> &
+fn path_command_names(StringView validation_prefix) throws
+    -> const ArrayList<String> &
 {
-  prepare_complete_path_cache();
+  prepare_complete_path_cache(validation_prefix);
 
   return PATH_COMMAND_NAMES;
 }
@@ -2062,19 +2383,24 @@ static pure fn path_command_name_lower_bound_in(const ArrayList<String> &names,
   return lower;
 }
 
-pure fn path_command_name_lower_bound(StringView name) throws -> usize
+pure fn path_command_name_lower_bound(StringView name) wontthrow -> usize
 {
-  return path_command_name_lower_bound_in(path_command_names(), name);
+  return path_command_name_lower_bound_in(PATH_COMMAND_NAMES, name);
 }
 
 fn path_command_name_has_prefix(StringView prefix) throws -> bool
 {
-  let const &names = path_command_names();
+  prepare_complete_path_cache(prefix);
   let normalized_prefix = String{prefix};
   let const name_info = os::normalize_program_name(normalized_prefix);
   let const stem =
       normalized_prefix.substring_of_length(0, name_info.stem_length);
-  if (let const cached_entry = PATH_CACHE.find(stem);
+  if (let *cached_entry = PATH_CACHE.find(stem); cached_entry != nullptr)
+    validate_cached_program_paths(*cached_entry);
+  if (PATH_CACHE_IS_STALE) initialize_path_map();
+
+  let const &names = PATH_COMMAND_NAMES;
+  if (let const *cached_entry = PATH_CACHE.find(stem);
       cached_entry != nullptr &&
       find_cached_program_path(*cached_entry, name_info.extension, false) !=
           nullptr &&
@@ -2092,12 +2418,16 @@ fn path_command_name_has_prefix(StringView prefix) throws -> bool
 
 fn get_program_path_status(StringView name) throws -> program_path_status
 {
-  prepare_complete_path_cache();
   let normalized_name = String{name};
   let const name_info = os::normalize_program_name(normalized_name);
   let const stem =
       normalized_name.substring_of_length(0, name_info.stem_length);
-  let const cached_entry = PATH_CACHE.find(stem);
+  prepare_complete_path_cache(stem);
+  if (let *cached_entry = PATH_CACHE.find(stem); cached_entry != nullptr)
+    validate_cached_program_paths(*cached_entry);
+  if (PATH_CACHE_IS_STALE) initialize_path_map();
+
+  let const *cached_entry = PATH_CACHE.find(stem);
   if (cached_entry == nullptr) return program_path_status::Missing;
 
   if (find_cached_program_path(*cached_entry, name_info.extension, true) !=
@@ -2169,7 +2499,7 @@ static fn resolve_along_path(StringView program_name, bool find_all,
                                 true, false);
             return result;
           } else if (!blocked.has_value()) {
-            blocked = cached_program_path{try_path, suffix.extension, false};
+            blocked = cached_program_path{try_path, suffix.extension, 0, false};
           }
         }
       }
@@ -2189,7 +2519,7 @@ static fn resolve_along_path(StringView program_name, bool find_all,
                             false, false);
         return result;
       } else if (!blocked.has_value()) {
-        blocked = cached_program_path{full_path, name_info.extension, false};
+        blocked = cached_program_path{full_path, name_info.extension, 0, false};
       }
     }
   }
@@ -2374,16 +2704,8 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     suggestion.consider(local.view());
   for (let const &builtin : builtin_names())
     suggestion.consider(builtin.view());
-  if (MAYBE_PATH.has_value()) {
-    for (let const &dir_string : path_dirs()) {
-      if (Maybe<ArrayList<String>> entries =
-              Path::read_directory(Path{dir_string.view()}))
-      {
-        for (let const &entry : *entries)
-          suggestion.consider(entry.view());
-      }
-    }
-  }
+  for (let const &entry : path_command_names({}))
+    suggestion.consider(entry.view());
 
   return suggestion.take_suggestion();
 }

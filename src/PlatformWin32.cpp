@@ -435,26 +435,35 @@ fn get_processor_counts() wontthrow -> processor_counts
   let const configured = GetMaximumProcessorCount(ALL_PROCESSOR_GROUPS);
   if (online != 0) counts.online_count = static_cast<usize>(online);
   if (configured != 0) counts.configured_count = static_cast<usize>(configured);
-  USHORT group_count = 64;
-  USHORT groups[64];
-  if (GetProcessGroupAffinity(GetCurrentProcess(), &group_count, groups)) {
+  ULONG cpu_set_count = 0;
+  unused(GetProcessDefaultCpuSets(GetCurrentProcess(), nullptr, 0,
+                                  &cpu_set_count));
+  if (cpu_set_count != 0) {
+    let const selected_count = static_cast<usize>(cpu_set_count);
+    if (selected_count < counts.online_count)
+      counts.online_count = selected_count;
+  } else {
+    USHORT group_count = 64;
+    USHORT groups[64];
     usize affinity_count = 0;
-    if (group_count == 1) {
-      DWORD_PTR process_affinity = 0;
-      DWORD_PTR system_affinity = 0;
-      if (GetProcessAffinityMask(GetCurrentProcess(), &process_affinity,
-                                 &system_affinity))
-      {
-        while (process_affinity != 0) {
-          affinity_count += process_affinity & 1;
-          process_affinity >>= 1;
+    if (GetProcessGroupAffinity(GetCurrentProcess(), &group_count, groups)) {
+      if (group_count == 1) {
+        DWORD_PTR process_affinity = 0;
+        DWORD_PTR system_affinity = 0;
+        if (GetProcessAffinityMask(GetCurrentProcess(), &process_affinity,
+                                   &system_affinity))
+        {
+          while (process_affinity != 0) {
+            affinity_count += process_affinity & 1;
+            process_affinity >>= 1;
+          }
         }
+      } else {
+        for (USHORT group_index = 0; group_index < group_count; group_index++)
+          affinity_count += GetActiveProcessorCount(groups[group_index]);
       }
-    } else {
-      for (USHORT group_index = 0; group_index < group_count; group_index++)
-        affinity_count += GetActiveProcessorCount(groups[group_index]);
+      if (affinity_count != 0) counts.online_count = affinity_count;
     }
-    if (affinity_count != 0) counts.online_count = affinity_count;
   }
   if (counts.configured_count < counts.online_count)
     counts.configured_count = counts.online_count;
@@ -657,7 +666,32 @@ pure fn path_is_absolute(StringView path) wontthrow -> bool
 {
   if (path.length == 0) return false;
   if (is_directory_separator(path.data[0])) return true;
-  return path.length >= 2 && path.data[1] == ':';
+  return path.length >= 3 && path.data[1] == ':' &&
+         is_directory_separator(path.data[2]);
+}
+
+pure fn path_is_drive_relative(StringView path) wontthrow -> bool
+{
+  return path.length >= 2 && path[1] == ':' &&
+         (path.length == 2 || !is_directory_separator(path[2]));
+}
+
+fn resolve_drive_relative_path(StringView path) throws -> Maybe<Path>
+{
+  if (!path_is_drive_relative(path)) return None;
+
+  const String path_string{path};
+  let const required =
+      GetFullPathNameA(path_string.c_str(), 0, nullptr, nullptr);
+  if (required == 0) return None;
+  let buffer = ArrayList<char>{heap_allocator()};
+  buffer.reserve(static_cast<usize>(required));
+  let const length =
+      GetFullPathNameA(path_string.c_str(), required, buffer.begin(), nullptr);
+  if (length == 0 || length >= required) return None;
+  return Path{
+      StringView{buffer.begin(), static_cast<usize>(length)}
+  };
 }
 
 pure fn path_root_length(StringView path) wontthrow -> usize
@@ -667,7 +701,9 @@ pure fn path_root_length(StringView path) wontthrow -> usize
   {
     return 2;
   }
-  if (path.length >= 2 && path[1] == ':') return 2;
+  if (path.length >= 3 && path[1] == ':' && is_directory_separator(path[2])) {
+    return 3;
+  }
   if (path.length >= 1 && is_directory_separator(path[0])) return 1;
   return 0;
 }
@@ -874,6 +910,26 @@ fn change_current_directory(StringView path) throws -> ErrorOr<Ok>
     return Error{"Could not change directory to '" + path_string +
                  "': " + os::last_system_error_message()};
   return Success;
+}
+
+fn reference_current_directory() wontthrow -> DirectoryReference
+{
+  return DirectoryReference{CreateFileA(
+      ".", 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr)};
+}
+
+fn restore_current_directory(const DirectoryReference &reference) wontthrow
+    -> bool
+{
+  if (!reference.is_valid()) return false;
+
+  char path[32768];
+  let const length = GetFinalPathNameByHandleA(
+      reference.get(), path, static_cast<DWORD>(countof(path)),
+      FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+  if (length == 0 || length >= countof(path)) return false;
+  return SetCurrentDirectoryA(path) != 0;
 }
 
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
@@ -1458,6 +1514,39 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
   return handle;
 }
 
+fn acquire_process_lock(StringView path) throws -> Maybe<descriptor>
+{
+  const String path_string{path};
+  char absolute_path[32768];
+  let const length = GetFullPathNameA(
+      path_string.c_str(), countof(absolute_path), absolute_path, nullptr);
+  if (length == 0 || length >= countof(absolute_path)) return None;
+
+  let lock_path = String{
+      StringView{absolute_path, static_cast<usize>(length)}
+  };
+  if (!is_directory_separator(lock_path.back())) lock_path += '\\';
+  lock_path += ".shit-assimilate.process.lock";
+  SECURITY_ATTRIBUTES attributes{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+  loop
+  {
+    let const lock = CreateFileA(
+        lock_path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, &attributes,
+        OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (lock != INVALID_HANDLE_VALUE) return lock;
+
+    let const error = GetLastError();
+    if (error != ERROR_SHARING_VIOLATION && error != ERROR_LOCK_VIOLATION)
+      return None;
+    Sleep(10);
+  }
+}
+
+fn release_process_lock(descriptor lock) wontthrow -> void
+{
+  unused(CloseHandle(lock));
+}
+
 fn write_to_temp_file(StringView content) -> Maybe<descriptor>
 {
   char temp_dir[MAX_PATH];
@@ -1879,7 +1968,8 @@ fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
   return false;
 }
 
-fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
+fn run_measured(const ArrayList<String> &argv, bool suppress_output,
+                Maybe<descriptor> inherited_handle) throws
     -> Maybe<measured_result>
 {
   if (argv.is_empty()) return None;
@@ -1915,10 +2005,11 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
   PROCESS_INFORMATION process_info{};
   String mutable_command_line = command_line;
   let const should_inherit_handles =
-      suppress_output && null_handle != INVALID_HANDLE_VALUE;
+      inherited_handle.has_value() ||
+      (suppress_output && null_handle != INVALID_HANDLE_VALUE);
   inherited_handle_state input_inheritance{};
   inherited_handle_state output_inheritance{};
-  if (should_inherit_handles) {
+  if (suppress_output && null_handle != INVALID_HANDLE_VALUE) {
     make_handle_inheritable(startup.hStdInput, input_inheritance);
     make_handle_inheritable(null_handle, output_inheritance);
   }
@@ -2062,6 +2153,7 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   if (::stat(path_string.c_str(), &info) != 0) return false;
   status.device_id = 0;
   status.file_id = 0;
+  status.has_file_identity = false;
   let const handle =
       CreateFileA(path_string.c_str(), 0,
                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -2072,6 +2164,7 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
       status.device_id = identity.dwVolumeSerialNumber;
       status.file_id = (static_cast<u64>(identity.nFileIndexHigh) << 32) |
                        identity.nFileIndexLow;
+      status.has_file_identity = true;
     }
     CloseHandle(handle);
   }

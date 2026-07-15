@@ -456,6 +456,18 @@ pure fn path_is_absolute(StringView path) wontthrow -> bool
   return is_directory_separator(path.data[0]);
 }
 
+pure fn path_is_drive_relative(StringView path) wontthrow -> bool
+{
+  unused(path);
+  return false;
+}
+
+fn resolve_drive_relative_path(StringView path) throws -> Maybe<Path>
+{
+  unused(path);
+  return None;
+}
+
 pure fn path_root_length(StringView path) wontthrow -> usize
 {
   return path_is_absolute(path) ? 1 : 0;
@@ -667,6 +679,17 @@ fn change_current_directory(StringView path) throws -> ErrorOr<Ok>
   if (::chdir(path_string.c_str()) != 0)
     return Error{"Could not change directory to '" + path_string + "'"};
   return Success;
+}
+
+fn reference_current_directory() wontthrow -> DirectoryReference
+{
+  return DirectoryReference{open_current_directory_reference()};
+}
+
+fn restore_current_directory(const DirectoryReference &reference) wontthrow
+    -> bool
+{
+  return reference.is_valid() && ::fchdir(reference.get()) == 0;
 }
 
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
@@ -1451,6 +1474,22 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
   return fd;
 }
 
+fn acquire_process_lock(StringView path) throws -> Maybe<descriptor>
+{
+  const String path_string{path};
+  let const lock = ::open(path_string.c_str(), O_RDONLY | O_DIRECTORY);
+  if (lock < 0) return None;
+  if (::flock(lock, LOCK_EX) == 0) return lock;
+  ::close(lock);
+  return None;
+}
+
+fn release_process_lock(descriptor lock) wontthrow -> void
+{
+  unused(::flock(lock, LOCK_UN));
+  unused(::close(lock));
+}
+
 fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
 {
   LOG(Debug, "writing %zu bytes into an anonymous temp file", content.count());
@@ -2041,9 +2080,11 @@ fn wait_for_measured_child(pid_t child_pid, i64 &status_out,
 
 } /* namespace */
 
-fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
+fn run_measured(const ArrayList<String> &argv, bool suppress_output,
+                Maybe<descriptor> inherited_handle) throws
     -> Maybe<measured_result>
 {
+  unused(inherited_handle);
   if (argv.is_empty()) return None;
 
   measured_result result{};
@@ -2204,6 +2245,7 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   if (::lstat(path_string.c_str(), &info) != 0) return false;
   status.device_id = static_cast<u64>(info.st_dev);
   status.file_id = static_cast<u64>(info.st_ino);
+  status.has_file_identity = true;
   status.mode = static_cast<u32>(info.st_mode);
   status.link_count = static_cast<u64>(info.st_nlink);
   status.owner_id = static_cast<u32>(info.st_uid);
@@ -2222,6 +2264,7 @@ fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
   if (::stat(path_string.c_str(), &info) != 0) return false;
   status.device_id = static_cast<u64>(info.st_dev);
   status.file_id = static_cast<u64>(info.st_ino);
+  status.has_file_identity = true;
   status.mode = static_cast<u32>(info.st_mode);
   status.link_count = static_cast<u64>(info.st_nlink);
   status.owner_id = static_cast<u32>(info.st_uid);

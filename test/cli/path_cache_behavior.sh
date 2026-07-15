@@ -94,6 +94,42 @@ PATH=/bin "$BIN" -c \
     'compfunc() { :; }; eval "alias compalias=:"; compgen -c shopt 2>/dev/null; compgen -c compfunc 2>/dev/null; compgen -c compalias 2>/dev/null'
 
 if [ "${OS-}" != Windows_NT ]; then
+    mkdir "$dir/identity-real"
+    /bin/ln -s "$dir/identity-real" "$dir/identity-path"
+    IDENTITY_REAL="$dir/identity-real" PATH="$dir/identity-path:/bin" \
+        "$BIN" -c '
+        compgen -c identity-new >/dev/null 2>&1
+        compgen -f "$IDENTITY_REAL/identity-new" >/dev/null 2>&1
+        printf "#!/bin/sh\n" > "$IDENTITY_REAL/identity-new"
+        /bin/chmod +x "$IDENTITY_REAL/identity-new"
+        file_result=$(compgen -f "$IDENTITY_REAL/identity-new" 2>/dev/null)
+        [ "$file_result" = "$IDENTITY_REAL/identity-new" ] || exit 1
+        printf "identity-alias=%s\n" \
+            "$(compgen -c identity-new 2>/dev/null)"
+    '
+
+    mkdir "$dir/space path"
+    : > "$dir/space path/file name"
+    SPACED_DIRECTORY="$dir/space path" "$BIN" -c '
+        result=$(compgen -f "$SPACED_DIRECTORY/file" 2>/dev/null)
+        [ "$result" = "$SPACED_DIRECTORY/file name" ] && \
+            echo compgen-file-literal-path
+    '
+
+    mkdir "$dir/mode-change"
+    printf '#!/bin/sh\n' > "$dir/mode-change/mode-appeared"
+    printf '#!/bin/sh\n' > "$dir/mode-change/mode-vanished"
+    chmod +x "$dir/mode-change/mode-vanished"
+    MODE_DIRECTORY="$dir/mode-change" PATH="$dir/mode-change:/bin" "$BIN" -c '
+        before=$(compgen -c mode-appeared 2>/dev/null)
+        /bin/chmod +x "$MODE_DIRECTORY/mode-appeared"
+        appeared=$(compgen -c mode-appeared 2>/dev/null)
+        /bin/chmod -x "$MODE_DIRECTORY/mode-vanished"
+        vanished=$(compgen -c mode-vanished 2>/dev/null)
+        printf "mode-before=%s mode-appeared=%s mode-vanished=%s\n" \
+            "$before" "$appeared" "$vanished"
+    '
+
     mkdir "$dir/broken-first" "$dir/broken-second"
     /bin/ln -s "$dir/missing" "$dir/broken-first/brokenprobe"
     printf '#!/bin/sh\necho unbroken\n' > "$dir/broken-second/brokenprobe"

@@ -29,7 +29,7 @@ pipefail       	on
 failglob       	on
 shitbox        	off
 vi             	off
-emacs          	on
+emacs          	off
 posix          	off
 force-warnings 	off
 mimicry        	off

@@ -46,6 +46,13 @@ case "$single_job" in
     *) echo single-make-preserved ;;
 esac
 
+single_job_without_discovery=$(cd .. && \
+    make -n -j1 MAKE_COMMAND_LINE= CPU_COUNT=6 shit 2>/dev/null)
+case "$single_job_without_discovery" in
+    *'-j6 -C src shit'*) echo single-make-fallback-overridden ;;
+    *) echo single-make-fallback-preserved ;;
+esac
+
 windows_jobs=$(cd .. && OS=Windows_NT NUMBER_OF_PROCESSORS=7 \
     make -n shit 2>/dev/null)
 case "$windows_jobs" in

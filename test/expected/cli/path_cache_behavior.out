@@ -14,6 +14,9 @@ analysis-shadowed-no-path-scan
 shopt
 compfunc
 compalias
+identity-alias=identity-new
+compgen-file-literal-path
+mode-before= mode-appeared=mode-appeared mode-vanished=
 broken-symlink
 suffix-priority
 sourced-non-runnable

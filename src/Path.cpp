@@ -153,6 +153,8 @@ cold fn Path::normalized() const throws -> Path
 fn Path::to_absolute() const throws -> Path
 {
   if (is_absolute()) return normalized();
+  if (let native = os::resolve_drive_relative_path(m_text.view()))
+    return native->normalized();
   let result = current_directory();
   result.push_component(m_text);
   return result.normalized();

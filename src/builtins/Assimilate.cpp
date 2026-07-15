@@ -20,19 +20,27 @@ namespace shit {
 namespace {
 
 constexpr char REMOTE_TRANSACTION_TEXT[] = R"SH(set -eu
+umask 077
 upload=$1
 candidate=
 target=
 lock=
+backup=
+lock_owned=0
 lock_published=0
 had_target=0
 rollback_active=0
 committed=0
 cleanup() {
-  transaction_status=${1-$?}
+  transaction_status=$?
+  [ "$#" -eq 0 ] || transaction_status=$1
+  if [ "$rollback_active" -eq 1 ] && [ "$committed" -eq 0 ] &&
+     [ "$transaction_status" -eq 0 ]; then
+    transaction_status=1
+  fi
   cleanup_failed=0
   trap - 0 1 2 15
-  if [ -n "$lock" ]; then
+  if [ "$lock_owned" -eq 1 ]; then
     [ -n "$candidate" ] || [ ! -r "$lock/candidate" ] || candidate=$(shitbox cat "$lock/candidate")
     [ -n "$upload" ] || [ ! -r "$lock/upload" ] || upload=$(shitbox cat "$lock/upload")
     if [ "$rollback_active" -eq 1 ] && [ "$committed" -eq 0 ]; then
@@ -45,84 +53,106 @@ cleanup() {
       fi
     fi
     [ -z "$candidate" ] || shitbox rm -f "$candidate" || cleanup_failed=1
-    shitbox rm -f "$upload" || cleanup_failed=1
+    [ -z "$upload" ] || shitbox rm -f "$upload" || cleanup_failed=1
     if [ "$committed" -eq 1 ] || [ "$rollback_active" -eq 0 ]; then
-      shitbox rm -f "$backup" || cleanup_failed=1
+      [ -z "$backup" ] || shitbox rm -f "$backup" || cleanup_failed=1
     fi
     if [ "$cleanup_failed" -eq 0 ]; then
       shitbox rm -f "$lock/upload" "$lock/candidate" \
-        "$lock/had-target" "$lock/rollback" "$lock/committed"
+        "$lock/had-target" "$lock/rollback" "$lock/committed" || cleanup_failed=1
       [ "$lock_published" -eq 0 ] || shitbox rm -f "$lock_path" || cleanup_failed=1
       if [ "$cleanup_failed" -eq 0 ]; then
-        shitbox rm -f "$lock/owner"
-        shitbox rmdir "$lock" || cleanup_failed=1
+        shitbox rm -f "$lock/owner" || cleanup_failed=1
+        [ "$cleanup_failed" -ne 0 ] || shitbox rmdir "$lock" || cleanup_failed=1
       fi
     fi
   else
     [ -z "$candidate" ] || shitbox rm -f "$candidate" || cleanup_failed=1
-    shitbox rm -f "$upload" || cleanup_failed=1
+    [ -z "$upload" ] || shitbox rm -f "$upload" || cleanup_failed=1
   fi
   [ "$cleanup_failed" -eq 0 ] || exit 1
   exit "$transaction_status"
 }
-recover_stale_lock() {
-  lock_record=$(shitbox cat "$lock_path")
+load_stale_lock_record() {
+  stale_owner=${lock_record%%:*}
   stale_lock_name=${lock_record#*:}
-  case $stale_lock_name in
-    .shit-assimilate-*.lock)
-      case $stale_lock_name in */*) exit 1 ;; esac
-      ;;
-    *) exit 1 ;;
-  esac
+  [ "$stale_lock_name" != "$lock_record" ] || return 1
+  case $stale_owner in ''|*[!0-9]*) return 1 ;; esac
+  case $stale_lock_name in .shit-assimilate-*.lock) ;; *) return 1 ;; esac
+  stale_transaction_id=${stale_lock_name#.shit-assimilate-}
+  stale_transaction_id=${stale_transaction_id%.lock}
+  stale_process_id=${stale_transaction_id%%-*}
+  stale_timestamp=${stale_transaction_id#*-}
+  [ "$stale_timestamp" != "$stale_transaction_id" ] || return 1
+  case $stale_process_id in ''|*[!0-9]*) return 1 ;; esac
+  case $stale_timestamp in ''|*[!0-9]*) return 1 ;; esac
+  [ "$stale_transaction_id" = "$stale_process_id-$stale_timestamp" ] || return 1
   stale_lock=$install_dir/$stale_lock_name
+  [ -d "$stale_lock" ] && [ ! -L "$stale_lock" ] || return 1
+  stale_upload=.shit-assimilate-$stale_transaction_id.upload
+  stale_candidate=$install_dir/.shit-assimilate-$stale_transaction_id.candidate
+  [ "${1-0}" -eq 0 ] || return 0
+  [ ! -L "$stale_lock/upload" ] || return 1
+  [ ! -L "$stale_lock/candidate" ] || return 1
+  if [ -e "$stale_lock/upload" ]; then
+    recorded_upload=$(shitbox cat "$stale_lock/upload") || return 1
+    [ "$recorded_upload" = "$stale_upload" ] || return 1
+  fi
+  if [ -e "$stale_lock/candidate" ]; then
+    recorded_candidate=$(shitbox cat "$stale_lock/candidate") || return 1
+    [ "$recorded_candidate" = "$stale_candidate" ] || return 1
+  fi
+}
+recover_stale_lock() {
   stale_backup=$stale_lock/backup
-  stale_upload=
-  stale_candidate=
-  [ ! -r "$stale_lock/upload" ] || stale_upload=$(shitbox cat "$stale_lock/upload")
-  [ ! -r "$stale_lock/candidate" ] || stale_candidate=$(shitbox cat "$stale_lock/candidate")
-  case $stale_upload in
-    .shit-assimilate-*.upload)
-      case $stale_upload in */*) stale_upload= ;; esac
-      ;;
-    *) stale_upload= ;;
-  esac
-  case $stale_candidate in
-    "$install_dir"/.shit-assimilate-*.candidate)
-      stale_candidate_name=${stale_candidate#"$install_dir"/}
-      case $stale_candidate_name in */*) stale_candidate= ;; esac
-      ;;
-    *) stale_candidate= ;;
-  esac
   if [ ! -e "$stale_lock/committed" ] && [ -e "$stale_lock/rollback" ]; then
     if [ -e "$stale_lock/had-target" ]; then
       if [ -e "$stale_backup" ] || [ -L "$stale_backup" ]; then
-        shitbox mv -f "$stale_backup" "$target"
+        shitbox mv -f "$stale_backup" "$target" || return 1
       else
-        [ -e "$target" ] || [ -L "$target" ]
+        [ -e "$target" ] || [ -L "$target" ] || return 1
       fi
     else
-      shitbox rm -f "$target"
+      shitbox rm -f "$target" || return 1
     fi
   fi
-  [ -z "$stale_candidate" ] || shitbox rm -f "$stale_candidate"
-  [ -z "$stale_upload" ] || shitbox rm -f "$stale_upload"
-  shitbox rm -f "$stale_backup"
-  shitbox rm -f "$stale_lock/upload" "$stale_lock/candidate" "$stale_lock/had-target" \
-    "$stale_lock/rollback" "$stale_lock/committed"
-  shitbox rmdir "$stale_lock/recovering"
-  shitbox rm -f "$lock_path"
-  shitbox rm -f "$stale_lock/owner"
-  shitbox rmdir "$stale_lock"
+  shitbox rm -f "$stale_candidate" "$stale_upload" "$stale_backup" || return 1
+  shitbox rm -f "$stale_lock/upload" "$stale_lock/candidate" \
+    "$stale_lock/had-target" "$stale_lock/rollback" \
+    "$stale_lock/committed" || return 1
+  if [ "${1-0}" -eq 1 ]; then
+    current_lock_record=$(shitbox cat "$lock_path") || return 1
+    [ "$current_lock_record" = "$lock_record" ] || return 1
+    shitbox rm -f "$lock_path" || return 1
+  fi
+  shitbox rm -f "$stale_lock/owner" || return 1
+  shitbox rmdir "$stale_lock" || return 1
 }
-lock_owner_is_live() {
-  owner=
-  [ -r "$lock_path" ] || return 1
-  owner=$(shitbox cat "$lock_path")
-  owner=${owner%%:*}
-  case $owner in
-    ''|*[!0-9]*) return 0 ;;
-  esac
-  kill -0 "$owner" 2>&-
+recover_existing_lock() {
+  lock_record=$(shitbox cat "$lock_path") || return 1
+  load_stale_lock_record || return 1
+  recover_stale_lock 1
+}
+recover_orphan_locks() {
+  for orphan_lock in "$install_dir"/.shit-assimilate-*.lock; do
+    [ -d "$orphan_lock" ] || continue
+    [ ! -L "$orphan_lock" ] || return 1
+    if [ ! -e "$orphan_lock/rollback" ] && [ ! -e "$orphan_lock/committed" ]; then
+      lock_record=0:${orphan_lock##*/}
+      load_stale_lock_record 1 || return 1
+    else
+      lock_record=$(shitbox cat "$orphan_lock/owner") || return 1
+      load_stale_lock_record || return 1
+    fi
+    [ "$stale_lock" = "$orphan_lock" ] || return 1
+    recover_stale_lock 0 || return 1
+  done
+}
+recover_all_stale_locks() {
+  if [ -e "$lock_path" ] || [ -L "$lock_path" ]; then
+    recover_existing_lock || return 1
+  fi
+  recover_orphan_locks
 }
 trap cleanup 0
 trap 'exit 129' 1
@@ -146,44 +176,25 @@ done
 candidate=$install_dir/.shit-assimilate-$2.candidate
 target=$install_dir/shit
 lock_path=$install_dir/.shit-assimilate.lock
-[ "${3-}" != recover ] || {
-  if [ -e "$lock_path" ]; then
-    if lock_owner_is_live; then
-      cleanup 1
-    fi
-    lock_record=$(shitbox cat "$lock_path")
-    stale_lock_name=${lock_record#*:}
-    case $stale_lock_name in
-      .shit-assimilate-*.lock) ;;
-      *) cleanup 1 ;;
-    esac
-    shitbox mkdir "$install_dir/$stale_lock_name/recovering" 2>&- || exit 1
-    recover_stale_lock
-  fi
+[ "${4-}" != recover ] || {
+  recover_all_stale_locks
   shitbox rm -f "$upload"
   trap - 0 1 2 15
   exit 0
 }
 [ ! -d "$target" ] || exit 1
+recover_all_stale_locks
 trap '' 1 2 15
-lock=$install_dir/.shit-assimilate-$2.lock
-shitbox mkdir "$lock"
+new_lock=$install_dir/.shit-assimilate-$2.lock
+shitbox mkdir "$new_lock"
+lock=$new_lock
+lock_owned=1
 backup=$lock/backup
 printf '%s:%s\n' "$$" "${lock##*/}" > "$lock/owner"
 printf '%s\n' "$upload" > "$lock/upload"
 printf '%s\n' "$candidate" > "$lock/candidate"
 if ! shitbox ln -s "$lock/owner" "$lock_path"; then
-  if lock_owner_is_live; then
-    cleanup 1
-  fi
-  lock_record=$(shitbox cat "$lock_path")
-  stale_lock_name=${lock_record#*:}
-  case $stale_lock_name in
-    .shit-assimilate-*.lock) ;;
-    *) cleanup 1 ;;
-  esac
-  shitbox mkdir "$install_dir/$stale_lock_name/recovering" 2>&- || exit 1
-  recover_stale_lock
+  recover_existing_lock
   shitbox ln -s "$lock/owner" "$lock_path"
 fi
 lock_published=1
@@ -191,9 +202,10 @@ trap 'exit 129' 1
 trap 'exit 130' 2
 trap 'exit 143' 15
 shitbox mv "$upload" "$candidate"
-if ! candidate_version=$("$candidate" --short-version); then
+if ! candidate_identity=$("$candidate" -p --mood sh -c 'shitbox --binary-identity'); then
   cleanup 1
 fi
+[ -n "$candidate_identity" ] && [ "$candidate_identity" = "$3" ] || cleanup 1
 if [ -e "$target" ] || [ -L "$target" ]; then
   had_target=1
   : > "$lock/had-target"
@@ -203,20 +215,26 @@ rollback_active=1
 [ "$had_target" -eq 0 ] || shitbox mv -f "$target" "$backup"
 shitbox mv -f "$candidate" "$target"
 candidate=
-if ! target_version=$("$target" --short-version); then
+if ! target_identity=$("$target" -p --mood sh -c 'shitbox --binary-identity'); then
   cleanup 1
 fi
+[ -n "$target_identity" ] && [ "$target_identity" = "$candidate_identity" ] || cleanup 1
 trap '' 1 2 15
+if ! : > "$lock/committed"; then
+  cleanup 1
+  exit 1
+fi
 committed=1
-: > "$lock/committed"
 rollback_active=0
 shitbox rm -f "$lock/rollback"
 [ "$had_target" -eq 0 ] || shitbox rm -f "$backup"
 shitbox rm -f "$lock/upload" "$lock/candidate" \
   "$lock/had-target" "$lock/committed"
 shitbox rm -f "$lock_path"
+lock_published=0
 shitbox rm -f "$lock/owner"
 shitbox rmdir "$lock"
+lock_owned=0
 lock=
 shitbox rm -f "$upload"
 trap - 0 1 2 15
@@ -243,45 +261,51 @@ fn resolve_transfer_program(StringView name) throws -> Maybe<Path>
 }
 
 fn remote_command(StringView upload_name, StringView transaction_id,
-                  bool recovery_only, Allocator allocator) throws -> String
+                  StringView expected_identity, bool recovery_only,
+                  Allocator allocator) throws -> String
 {
   let command = String{allocator};
   command += "exec ";
   let const upload_path = String{allocator, "./"} + upload_name;
-  append_shell_quoted_arg(command, upload_path.view());
-  command += ' ';
-  append_shell_quoted_arg(command, "-p");
-  command += ' ';
-  append_shell_quoted_arg(command, "--mood");
-  command += ' ';
-  append_shell_quoted_arg(command, "sh");
-  command += ' ';
-  append_shell_quoted_arg(command, "-c");
-  command += ' ';
-  append_shell_quoted_arg(command, REMOTE_TRANSACTION);
-  command += ' ';
-  append_shell_quoted_arg(command, "shit");
-  command += ' ';
-  append_shell_quoted_arg(command, upload_name);
-  command += ' ';
-  append_shell_quoted_arg(command, transaction_id);
-  if (recovery_only) {
+  let const do_append_argument = [&](StringView argument) throws {
+    append_shell_quoted_arg(command, argument);
     command += ' ';
-    append_shell_quoted_arg(command, "recover");
-  }
+  };
+  do_append_argument(upload_path.view());
+  do_append_argument("-p");
+  do_append_argument("--mood");
+  do_append_argument("sh");
+  do_append_argument("-c");
+  do_append_argument("shitbox --transaction-lock \"$@\"");
+  do_append_argument("shit");
+  do_append_argument(".");
+  do_append_argument(upload_path.view());
+  do_append_argument("-p");
+  do_append_argument("--mood");
+  do_append_argument("sh");
+  do_append_argument("-c");
+  do_append_argument(REMOTE_TRANSACTION);
+  do_append_argument("shit");
+  do_append_argument(upload_name);
+  do_append_argument(transaction_id);
+  do_append_argument(expected_identity);
+  if (recovery_only) do_append_argument("recover");
+  command.pop_back();
 
   return command;
 }
 
 fn cleanup_remote_transaction(const Path &ssh, StringView target,
                               StringView upload_name, StringView transaction_id,
+                              StringView expected_identity,
                               Allocator allocator) throws -> i32
 {
   let arguments = ArrayList<String>{allocator};
   arguments.push(String{"ssh"});
   arguments.push(String{"--"});
   arguments.push(String{target});
-  arguments.push(remote_command(upload_name, transaction_id, true, allocator));
+  arguments.push(remote_command(upload_name, transaction_id, expected_identity,
+                                true, allocator));
   return run_program(ssh, steal(arguments));
 }
 
@@ -303,21 +327,47 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   bool has_invalid_target_character = false;
+  bool is_inside_host_literal = false;
+  bool has_host_literal = false;
+  usize host_literal_start = 0;
   if (arguments.count() == 2) {
     for (usize character_position = 0;
          character_position < arguments[1].count(); character_position++)
     {
       const char character = arguments[1][character_position];
       switch (character) {
-      case ':':
       case ' ':
       case '\t':
       case '\r':
       case '\n': has_invalid_target_character = true; break;
+      case '[':
+        if (has_host_literal || is_inside_host_literal ||
+            (character_position != 0 &&
+             arguments[1][character_position - 1] != '@'))
+        {
+          has_invalid_target_character = true;
+        }
+        has_host_literal = true;
+        is_inside_host_literal = true;
+        host_literal_start = character_position;
+        break;
+      case ']':
+        if (!is_inside_host_literal ||
+            character_position == host_literal_start + 1 ||
+            character_position + 1 != arguments[1].count())
+        {
+          has_invalid_target_character = true;
+        }
+        is_inside_host_literal = false;
+        break;
+      case ':':
+        if (!is_inside_host_literal) has_invalid_target_character = true;
+        break;
       default: break;
       }
     }
   }
+  if (is_inside_host_literal) has_invalid_target_character = true;
 
   if (arguments.count() != 2 || arguments[1].is_empty() ||
       arguments[1][0] == '-' || has_invalid_target_character)
@@ -340,6 +390,13 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let const allocator = cxt.scratch_allocator();
+  let const expected_identity =
+      utils::file_content_identity(Path{*executable}, allocator);
+  if (!expected_identity.has_value()) {
+    report_soft_builtin_error(ec, cxt,
+                              "Cannot identify this shell's executable");
+    return 1;
+  }
   let const transaction_id =
       String::from(static_cast<u64>(os::get_shell_process_id()), allocator) +
       "-" + String::from(os::realtime_microseconds(), allocator);
@@ -357,7 +414,7 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (status != 0) {
     let const cleanup_status = cleanup_remote_transaction(
         *ssh, arguments[1].view(), upload_name.view(), transaction_id.view(),
-        allocator);
+        expected_identity->view(), allocator);
     if (cleanup_status != 0) {
       report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
     }
@@ -369,13 +426,14 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   ssh_arguments.push(String{"--"});
   ssh_arguments.push(arguments[1].clone());
   ssh_arguments.push(remote_command(upload_name.view(), transaction_id.view(),
-                                    false, allocator));
+                                    expected_identity->view(), false,
+                                    allocator));
 
   status = run_program(*ssh, steal(ssh_arguments));
   if (status != 0) {
     let const cleanup_status = cleanup_remote_transaction(
         *ssh, arguments[1].view(), upload_name.view(), transaction_id.view(),
-        allocator);
+        expected_identity->view(), allocator);
     if (cleanup_status != 0) {
       report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
     }

@@ -33,6 +33,9 @@ fn complete(StringView line, usize cursor, EvalContext &context,
 
 fn complete_command_names(StringView token, bool token_is_glob,
                           EvalContext &context) throws -> ArrayList<String>;
+fn complete_filesystem_names(StringView token, EvalContext &context,
+                             const Path &base_directory) throws
+    -> ArrayList<String>;
 
 /* The spans come back sorted by start and non-overlapping. */
 struct highlight_span

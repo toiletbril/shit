@@ -887,6 +887,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       defer { cxt.leave_condition(); };
       condition_status = m_condition->evaluate(cxt);
     }
+    if (cxt.no_exec()) break;
     if (cxt.has_pending_control_flow()) {
       if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
       continue;
@@ -897,6 +898,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (!should_run_body) break;
 
     ret = m_body->evaluate(cxt);
+    if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
@@ -1021,6 +1023,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
        the way a terminal end-of-file does. */
     if (!input) {
       shit::print("\n");
+      ret = 1;
       break;
     }
 
@@ -1046,6 +1049,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     ret = m_body->evaluate(cxt);
+    if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
@@ -1122,6 +1126,7 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   for (let const &value : values) {
     cxt.set_shell_variable(m_variable_name, value);
     ret = m_body->evaluate(cxt);
+    if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);

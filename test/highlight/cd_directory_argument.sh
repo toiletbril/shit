@@ -14,3 +14,18 @@ echo "== cd into a file colors it red:"
 "$BIN" --debug-highlight-at 'cd afile'
 echo "== ls of the same file stays a valid path:"
 "$BIN" --debug-highlight-at 'ls afile'
+
+if [ "${OS-}" = Windows_NT ]; then
+    path_separator='\'
+else
+    path_separator='/'
+fi
+mkdir -p "$dir/native/subdir"
+native_path="native${path_separator}subdir"
+native_result=$("$BIN" --debug-highlight-at "echo $native_path")
+case "$native_result" in
+    *"$native_path"*) ;;
+    *) exit 1 ;;
+esac
+printf '%s\n' "$native_result" | grep -q '\\e\[96m' || exit 1
+echo "== native path separators highlight directories:"

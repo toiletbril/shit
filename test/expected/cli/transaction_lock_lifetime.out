@@ -1,0 +1,2 @@
+transaction child retains the process lock
+the next transaction acquires the released lock

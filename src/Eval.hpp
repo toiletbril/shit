@@ -191,6 +191,15 @@ struct function_definition_info
   bool were_diagnostics_disabled_at_definition{false};
 };
 
+struct function_runtime_state
+{
+  RuntimeState previous;
+  RuntimeState entered;
+  u64 mood_mutation_revision;
+  u64 warning_mutation_revision;
+  u64 diagnostics_mutation_revision;
+};
+
 fn record_directory_access(StringView directory, Allocator allocator) throws
     -> void;
 
@@ -219,7 +228,9 @@ struct eval_state_snapshot
   StringMap<function_definition_info> function_definition_infos;
   StringMap<String> aliases;
   ArrayList<String> positional_params;
-  Path working_directory;
+  ArrayList<String> directory_stack;
+  os::DirectoryReference working_directory;
+  u32 file_creation_mask;
   StringMap<String> traps;
   /* The read-only and integer name sets ride the snapshot too, so a readonly or
      a declare -i inside a subshell dies with the child rather than leaking its
@@ -231,6 +242,12 @@ struct eval_state_snapshot
      point restore_state rewinds the process environment back to. */
   usize environment_undo_mark;
   RuntimeState runtime;
+  u8 init_moods_sourcing;
+  u8 initialized_moods;
+  bool mood_set_explicitly;
+  u64 mood_mutation_revision;
+  u64 warning_mutation_revision;
+  u64 diagnostics_mutation_revision;
 };
 
 struct completion_spec
@@ -529,6 +546,14 @@ public:
   fn clear_functions() wontthrow -> void;
 
   fn function_names() const throws -> HashSet;
+  template <typename Callback>
+  fn for_each_function_name(Callback callback) const throws -> void
+  {
+    m_functions.for_each([&](StringView name, const Expression *body) throws {
+      unused(body);
+      callback(name);
+    });
+  }
 
   fn register_completion_spec(StringView command, completion_spec spec) throws
       -> void;
@@ -625,6 +650,14 @@ public:
   fn get_alias(StringView name) const throws -> Maybe<String>;
   fn alias_definitions() const throws -> ArrayList<String>;
   fn alias_names() const throws -> HashSet;
+  template <typename Callback>
+  fn for_each_alias_name(Callback callback) const throws -> void
+  {
+    m_aliases.for_each([&](StringView name, const String &value) throws {
+      unused(value);
+      callback(name);
+    });
+  }
 
   fn snapshot_state() const throws -> eval_state_snapshot;
   fn restore_state(eval_state_snapshot snapshot) throws -> void;
@@ -704,6 +737,10 @@ public:
       m_runtime.warning_level = 0;
     else if (m_runtime.warning_level < 2)
       m_runtime.warning_level++;
+  }
+  fn note_warning_option_mutation() wontthrow -> void
+  {
+    m_warning_mutation_revision++;
   }
   pure fn warnings_enabled() const wontthrow -> bool
   {
@@ -818,17 +855,17 @@ public:
   fn set_posix_mode_via_option(bool enable) wontthrow -> void
   {
     if (enable) {
+      note_explicit_mood();
       set_mood(mimic_mood::BashPosix);
       apply_strictness_for_mood();
-      note_explicit_mood();
       return;
     }
     if (m_runtime.mood != mimic_mood::Posix &&
         m_runtime.mood != mimic_mood::BashPosix)
       return;
+    note_explicit_mood();
     set_mood(mimic_mood::Bash);
     apply_strictness_for_mood();
-    note_explicit_mood();
   }
 
   fn set_execution_string(StringView text) throws -> void
@@ -880,7 +917,7 @@ public:
 
   friend class RuntimeState;
   fn enter_definition_state(const function_definition_info &info) wontthrow
-      -> RuntimeState
+      -> function_runtime_state
   {
     let const previous = RuntimeState::capture(*this);
     m_runtime.mood = static_cast<mimic_mood>(info.defining_mood);
@@ -888,31 +925,40 @@ public:
     m_runtime.are_diagnostics_disabled =
         info.were_diagnostics_disabled_at_definition;
     apply_strictness_for_mood();
-    return previous;
+    return function_runtime_state{
+        previous, RuntimeState::capture(*this), m_mood_mutation_revision,
+        m_warning_mutation_revision, m_diagnostics_mutation_revision};
   }
 
-  fn leave_definition_state(const RuntimeState &previous,
-                            const RuntimeState &entered) wontthrow -> void
+  fn leave_definition_state(const function_runtime_state &state) wontthrow
+      -> void
   {
     let const finished = RuntimeState::capture(*this);
-    let changed_options = entered.shell_options ^ finished.shell_options;
-    if (entered.error_unset_explicit != finished.error_unset_explicit)
+    let changed_options = state.entered.shell_options ^ finished.shell_options;
+    if (state.entered.error_unset_explicit != finished.error_unset_explicit)
       changed_options |= RuntimeState::option_mask(shell_option_id::Nounset);
-    if (entered.pipefail_explicit != finished.pipefail_explicit)
+    if (state.entered.pipefail_explicit != finished.pipefail_explicit)
       changed_options |= RuntimeState::option_mask(shell_option_id::Pipefail);
-    if (entered.failglob_explicit != finished.failglob_explicit)
+    if (state.entered.failglob_explicit != finished.failglob_explicit)
       changed_options |= RuntimeState::option_mask(shell_option_id::Failglob);
-    let const merged_options = (previous.shell_options & ~changed_options) |
-                               (finished.shell_options & changed_options);
+    let const merged_options =
+        (state.previous.shell_options & ~changed_options) |
+        (finished.shell_options & changed_options);
 
-    previous.restore(*this);
+    state.previous.restore(*this);
     m_runtime.shell_options = merged_options;
-    if (entered.error_unset_explicit != finished.error_unset_explicit)
+    if (state.entered.error_unset_explicit != finished.error_unset_explicit)
       m_runtime.error_unset_explicit = finished.error_unset_explicit;
-    if (entered.pipefail_explicit != finished.pipefail_explicit)
+    if (state.entered.pipefail_explicit != finished.pipefail_explicit)
       m_runtime.pipefail_explicit = finished.pipefail_explicit;
-    if (entered.failglob_explicit != finished.failglob_explicit)
+    if (state.entered.failglob_explicit != finished.failglob_explicit)
       m_runtime.failglob_explicit = finished.failglob_explicit;
+    if (state.mood_mutation_revision != m_mood_mutation_revision)
+      m_runtime.mood = finished.mood;
+    if (state.warning_mutation_revision != m_warning_mutation_revision)
+      m_runtime.warning_level = finished.warning_level;
+    if (state.diagnostics_mutation_revision != m_diagnostics_mutation_revision)
+      m_runtime.are_diagnostics_disabled = finished.are_diagnostics_disabled;
   }
 
   /* The moods whose startup files are being sourced right now, a bit per mood.
@@ -934,7 +980,11 @@ public:
 
   /* set --mood records that the user chose the mood, so the post-rc restore in
      main leaves a mood the rc selected in place. */
-  fn note_explicit_mood() wontthrow -> void { m_mood_set_explicitly = true; }
+  fn note_explicit_mood() wontthrow -> void
+  {
+    m_mood_set_explicitly = true;
+    m_mood_mutation_revision++;
+  }
   pure fn mood_set_explicitly() const wontthrow -> bool
   {
     return m_mood_set_explicitly;
@@ -949,6 +999,11 @@ public:
   pure fn mood_initialized(mimic_mood mood) const wontthrow -> bool
   {
     return (m_initialized_moods & (1U << static_cast<u8>(mood))) != 0;
+  }
+
+  fn note_diagnostics_option_mutation() wontthrow -> void
+  {
+    m_diagnostics_mutation_revision++;
   }
 
   fn set_mimicry(bool enabled) wontthrow -> void
@@ -1409,6 +1464,9 @@ protected:
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   bool m_mood_set_explicitly{false};
+  u64 m_mood_mutation_revision{0};
+  u64 m_warning_mutation_revision{0};
+  u64 m_diagnostics_mutation_revision{0};
   /* One bit per suppressible_warning value. */
   u32 m_suppressed_warnings{0};
   /* The nesting of mimicked scripts, bounded so a script that mimics another

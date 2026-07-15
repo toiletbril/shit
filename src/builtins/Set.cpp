@@ -43,19 +43,36 @@ enum class set_option_behavior : u8
   Rcfile,
 };
 
+struct option_text
+{
+  const char *data{nullptr};
+  usize length{0};
+
+  constexpr option_text() = default;
+  template <usize Count>
+  consteval option_text(const char (&text)[Count])
+      : data(text), length(Count - 1)
+  {}
+  constexpr operator StringView() const wontthrow
+  {
+    return StringView{data, length};
+  }
+  constexpr fn is_empty() const wontthrow -> bool { return length == 0; }
+};
+
 struct set_option_descriptor
 {
   shell_option_id id;
   set_option_behavior behavior;
   char letter;
-  StringView name;
-  StringView help;
-  StringView alias{};
+  option_text name;
+  option_text help;
+  option_text alias{};
   bool is_in_shellopts{false};
   bool is_listed{true};
 };
 
-const set_option_descriptor SET_OPTIONS[] = {
+constexpr set_option_descriptor SET_OPTIONS[] = {
     {shell_option_id::Allexport, set_option_behavior::Stored, 'a', "allexport",
      "Mark every assigned variable for the environment.", "export-all", true},
     {shell_option_id::Notify,
@@ -190,54 +207,174 @@ const set_option_descriptor SET_OPTIONS[] = {
      false, false},
 };
 
-constexpr static_string_entry<u8> SET_OPTION_NAME_ENTRIES[] = {
-    {SSK("allexport"),         0 },
-    {SSK("export-all"),        0 },
-    {SSK("notify"),            1 },
-    {SSK("errexit"),           2 },
-    {SSK("error-exit"),        2 },
-    {SSK("noglob"),            3 },
-    {SSK("no-glob"),           3 },
-    {SSK("hashall"),           4 },
-    {SSK("keyword"),           5 },
-    {SSK("monitor"),           6 },
-    {SSK("noexec"),            7 },
-    {SSK("no-exec"),           7 },
-    {SSK("nounset"),           8 },
-    {SSK("no-unset"),          8 },
-    {SSK("verbose"),           9 },
-    {SSK("xtrace"),            10},
-    {SSK("braceexpand"),       11},
-    {SSK("noclobber"),         12},
-    {SSK("no-clobber"),        12},
-    {SSK("errtrace"),          13},
-    {SSK("physical"),          14},
-    {SSK("functrace"),         15},
-    {SSK("pipefail"),          16},
-    {SSK("failglob"),          17},
-    {SSK("shitbox"),           18},
-    {SSK("vi"),                19},
-    {SSK("emacs"),             20},
-    {SSK("posix"),             21},
-    {SSK("show-ast"),          22},
-    {SSK("show-lexed-words"),  23},
-    {SSK("show-exit-code"),    24},
-    {SSK("force-warnings"),    25},
-    {SSK("mimicry"),           26},
-    {SSK("force-diagnostics"), 27},
-    {SSK("show-stats"),        28},
-    {SSK("no-diagnostics"),    29},
-    {SSK("show-memory"),       30},
-    {SSK("login"),             31},
-    {SSK("rcfile"),            32},
+consteval fn set_option_name_count() wontthrow -> usize
+{
+  usize result = countof(SET_OPTIONS);
+  for (let const &option : SET_OPTIONS)
+    if (!option.alias.is_empty()) result++;
+  return result;
+}
+
+template <usize Count>
+struct set_option_name_table
+{
+  static_string_entry<u8> entries[Count]{};
 };
-constexpr StaticStringMap SET_OPTION_BY_NAME{SET_OPTION_NAME_ENTRIES};
+
+consteval fn make_set_option_name_table() wontthrow
+    -> set_option_name_table<set_option_name_count()>
+{
+  set_option_name_table<set_option_name_count()> result{};
+  usize entry_position = 0;
+  for (usize option_position = 0; option_position < countof(SET_OPTIONS);
+       option_position++)
+  {
+    let const &option = SET_OPTIONS[option_position];
+    result.entries[entry_position++] = {
+        PackedStringKey::from_literal(option.name.data),
+        static_cast<u8>(option_position)};
+    if (!option.alias.is_empty())
+      result.entries[entry_position++] = {
+          PackedStringKey::from_literal(option.alias.data),
+          static_cast<u8>(option_position)};
+  }
+  return result;
+}
+
+consteval fn set_option_descriptors_are_valid() wontthrow -> bool
+{
+  if (countof(SET_OPTIONS) > 0xff) return false;
+  for (usize left = 0; left < countof(SET_OPTIONS); left++) {
+    let const &left_option = SET_OPTIONS[left];
+    if (left_option.name.is_empty() ||
+        left_option.name.length > PackedStringKey::BYTE_CAPACITY)
+      return false;
+    if (!left_option.alias.is_empty() &&
+        left_option.alias.length > PackedStringKey::BYTE_CAPACITY)
+      return false;
+    for (usize right = left + 1; right < countof(SET_OPTIONS); right++)
+      if (left_option.letter != '\0' &&
+          left_option.letter == SET_OPTIONS[right].letter)
+        return false;
+  }
+  let const names = make_set_option_name_table();
+  for (usize left = 0; left < countof(names.entries); left++)
+    for (usize right = left + 1; right < countof(names.entries); right++)
+      if (names.entries[left].key == names.entries[right].key) return false;
+  return true;
+}
+
+static_assert(set_option_descriptors_are_valid());
+constexpr auto SET_OPTION_NAMES = make_set_option_name_table();
+constexpr StaticStringMap SET_OPTION_BY_NAME{SET_OPTION_NAMES.entries};
+
+constexpr u8 INTERACTIVE_COMMENTS_POSITION = countof(SET_OPTIONS);
+
+consteval fn shellopts_position_count() wontthrow -> usize
+{
+  usize result = 1;
+  for (let const &option : SET_OPTIONS)
+    if (option.is_in_shellopts) result++;
+  return result;
+}
+
+template <usize Count>
+struct shellopts_position_table
+{
+  u8 positions[Count]{};
+};
+
+consteval fn shellopts_name(u8 position) wontthrow -> option_text
+{
+  if (position == INTERACTIVE_COMMENTS_POSITION)
+    return option_text{"interactive-comments"};
+  return SET_OPTIONS[position].name;
+}
+
+consteval fn option_text_is_before(option_text left,
+                                   option_text right) wontthrow -> bool
+{
+  let const shared_length =
+      left.length < right.length ? left.length : right.length;
+  for (usize byte_position = 0; byte_position < shared_length; byte_position++)
+    if (left.data[byte_position] != right.data[byte_position])
+      return left.data[byte_position] < right.data[byte_position];
+  return left.length < right.length;
+}
+
+consteval fn make_shellopts_positions() wontthrow
+    -> shellopts_position_table<shellopts_position_count()>
+{
+  shellopts_position_table<shellopts_position_count()> result{};
+  usize output_position = 0;
+  for (usize option_position = 0; option_position < countof(SET_OPTIONS);
+       option_position++)
+    if (SET_OPTIONS[option_position].is_in_shellopts)
+      result.positions[output_position++] = static_cast<u8>(option_position);
+  result.positions[output_position] = INTERACTIVE_COMMENTS_POSITION;
+
+  for (usize position = 1; position < countof(result.positions); position++) {
+    let const moved = result.positions[position];
+    usize slot = position;
+    while (slot > 0 &&
+           option_text_is_before(shellopts_name(moved),
+                                 shellopts_name(result.positions[slot - 1])))
+    {
+      result.positions[slot] = result.positions[slot - 1];
+      slot--;
+    }
+    result.positions[slot] = moved;
+  }
+  return result;
+}
+
+constexpr auto SHELLOPTS_POSITIONS = make_shellopts_positions();
+
+consteval fn shellopts_positions_are_valid() wontthrow -> bool
+{
+  for (usize left = 0; left < countof(SHELLOPTS_POSITIONS.positions); left++) {
+    let const left_position = SHELLOPTS_POSITIONS.positions[left];
+    if (left_position > INTERACTIVE_COMMENTS_POSITION) return false;
+    if (left_position != INTERACTIVE_COMMENTS_POSITION &&
+        !SET_OPTIONS[left_position].is_in_shellopts)
+      return false;
+    if (left > 0 && !option_text_is_before(
+                        shellopts_name(SHELLOPTS_POSITIONS.positions[left - 1]),
+                        shellopts_name(left_position)))
+      return false;
+    for (usize right = left + 1; right < countof(SHELLOPTS_POSITIONS.positions);
+         right++)
+      if (left_position == SHELLOPTS_POSITIONS.positions[right]) return false;
+  }
+  return true;
+}
+
+static_assert(shellopts_positions_are_valid());
+
+struct set_option_letter_table
+{
+  u8 positions[256];
+};
+
+consteval fn make_set_option_letter_table() wontthrow -> set_option_letter_table
+{
+  set_option_letter_table result{};
+  for (usize position = 0; position < countof(result.positions); position++)
+    result.positions[position] = 0xff;
+  for (usize position = 0; position < countof(SET_OPTIONS); position++) {
+    let const letter = SET_OPTIONS[position].letter;
+    if (letter != '\0')
+      result.positions[static_cast<u8>(letter)] = static_cast<u8>(position);
+  }
+  return result;
+}
+
+constexpr auto SET_OPTION_BY_LETTER = make_set_option_letter_table();
 
 fn find_option_by_letter(char letter) throws -> const set_option_descriptor *
 {
-  for (let const &option : SET_OPTIONS)
-    if (option.letter == letter) return &option;
-  return nullptr;
+  let const position = SET_OPTION_BY_LETTER.positions[static_cast<u8>(letter)];
+  return position == 0xff ? nullptr : &SET_OPTIONS[position];
 }
 
 fn find_option_by_name(StringView name) throws -> const set_option_descriptor *
@@ -288,11 +425,16 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
   case set_option_behavior::Posix: cxt.set_posix_mode_via_option(enable); break;
   case set_option_behavior::Vi: cxt.set_vi_mode(enable); break;
   case set_option_behavior::Emacs: cxt.set_emacs_mode(enable); break;
-  case set_option_behavior::Warnings: cxt.set_warnings_enabled(enable); break;
+  case set_option_behavior::Warnings:
+    cxt.note_warning_option_mutation();
+    cxt.set_warnings_enabled(enable);
+    break;
   case set_option_behavior::ForceDiagnostics:
+    cxt.note_diagnostics_option_mutation();
     cxt.set_diagnostics_enabled(enable);
     break;
   case set_option_behavior::NoDiagnostics:
+    cxt.note_diagnostics_option_mutation();
     cxt.set_diagnostics_disabled(enable);
     break;
   case set_option_behavior::Login:
@@ -444,18 +586,12 @@ fn shell_option_letters() throws -> const String &
 
 fn enabled_shell_option_names(const EvalContext &cxt) throws -> String
 {
-  constexpr u8 INTERACTIVE_COMMENTS_POSITION = countof(SET_OPTIONS);
-  constexpr u8 SHELLOPTS_ORDER[] = {
-      0,  11, 20, 2, 13, 17, 15, 4,  INTERACTIVE_COMMENTS_POSITION,
-      5,  6,  12, 7, 3,  1,  8,  14, 16,
-      21, 9,  19, 10};
-
   let joined = String{heap_allocator()};
   let const do_append = [&](StringView name) throws {
     if (!joined.is_empty()) joined.push(':');
     joined.append(name);
   };
-  for (let const position : SHELLOPTS_ORDER) {
+  for (let const position : SHELLOPTS_POSITIONS.positions) {
     if (position == INTERACTIVE_COMMENTS_POSITION) {
       if (cxt.is_shopt_enabled("interactive_comments"))
         do_append("interactive-comments");

@@ -58,7 +58,7 @@ static fn settled_option_value(StringView line, StringView option) throws
 static fn make_target_is_artifact(StringView name, const Path &directory) throws
     -> bool
 {
-  if (name.find_character('/').has_value()) return true;
+  if (os::has_directory_separator(name)) return true;
   if (name == StringView{"GNUmakefile"} || name == StringView{"Makefile"} ||
       name == StringView{"makefile"})
   {
@@ -493,7 +493,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
     break;
   }
   case tool_with_targets_kind::ssh: {
-    if (token.find_character('/').has_value() ||
+    if (os::has_directory_separator(token) ||
         token.find_character(':').has_value())
     {
       return None;
@@ -579,7 +579,6 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
           per_kind_candidates[index]->push(steal(switch_form));
         }
         per_kind_candidates[index]->push(String{"-o"});
-        per_kind_candidates[index]->push(String{"-p"});
       }
     }
     was_per_kind_built[index] = true;
@@ -598,7 +597,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
   /* Matched by basename so both shit and a path to it answer. */
   let shell_binary_name = command;
   for (usize i = command.length; i > 0; i--)
-    if (command[i - 1] == '/') {
+    if (os::is_directory_separator(command[i - 1])) {
       shell_binary_name = command.substring(i);
       break;
     }
@@ -723,7 +722,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     };
 
     if (unsets_function) {
-      context.function_names().for_each(
+      context.for_each_function_name(
           [&](StringView name) { do_add_name(name); });
     } else {
       context.variable_names().for_each(

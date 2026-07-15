@@ -14,3 +14,6 @@
 zz_path_exec
 == a blocked first PATH entry does not hide a later executable
 zz_path_blocked
+== native path separators complete directories
+== native PATH case matching completes commands
+== native filesystem case matching completes globs

@@ -185,6 +185,7 @@ fn append_shell_quoted_arg(String &out, StringView arg) throws -> void;
 fn reset_flags(const ArrayList<Flag *> &flags) throws -> void;
 
 fn show_version() throws -> void;
+fn short_version_string(Allocator allocator) throws -> String;
 fn show_short_version() throws -> void;
 
 fn make_synopsis(StringView program_name,

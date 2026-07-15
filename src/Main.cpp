@@ -197,6 +197,8 @@ static fn run_debug_highlight_driver(StringView driver_line,
 static fn run_debug_ghost_driver(StringView driver_line,
                                  EvalContext &context) throws -> i32
 {
+  let const directory_stat_count_before = utils::debug_directory_stat_count();
+  let const directory_read_count_before = utils::debug_directory_read_count();
   utils::initialize_path_map();
   let const result =
       completion::complete(driver_line, driver_line.length, context,
@@ -206,6 +208,14 @@ static fn run_debug_ghost_driver(StringView driver_line,
         String::from(result.source_candidate_scan_count, heap_allocator()) +
         "\nmaterialized=" +
         String::from(result.materialized_candidate_count, heap_allocator()) +
+        "\ndirectory-stats=" +
+        String::from(utils::debug_directory_stat_count() -
+                         directory_stat_count_before,
+                     heap_allocator()) +
+        "\ndirectory-reads=" +
+        String::from(utils::debug_directory_read_count() -
+                         directory_read_count_before,
+                     heap_allocator()) +
         "\n");
   flush();
   return 0;

@@ -31,6 +31,7 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   set_echo(should_echo);
   set_echo_expanded(should_echo_expanded);
   set_error_exit(should_error_exit);
+  set_emacs_mode(shell_is_interactive);
   set_field_separators(m_field_separators.view());
 
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
@@ -1571,6 +1572,10 @@ fn EvalContext::clear_functions() wontthrow -> void
 
 fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 {
+  let working_directory = os::reference_current_directory();
+  if (!working_directory.is_valid())
+    throw Error{"Could not preserve the current working directory"};
+
   return eval_state_snapshot{m_shell_variables,
                              m_indexed_arrays,
                              m_associative_names,
@@ -1582,13 +1587,21 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_function_definition_infos,
                              m_aliases,
                              m_positional_params,
-                             Path::current_directory(),
+                             m_directory_stack,
+                             steal(working_directory),
+                             os::get_file_creation_mask(),
                              m_traps,
                              m_readonly_names,
                              m_integer_names,
                              m_exported_names,
                              m_environment_undo_log.count(),
-                             RuntimeState::capture(*this)};
+                             RuntimeState::capture(*this),
+                             m_init_moods_sourcing,
+                             m_initialized_moods,
+                             m_mood_set_explicitly,
+                             m_mood_mutation_revision,
+                             m_warning_mutation_revision,
+                             m_diagnostics_mutation_revision};
 }
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
@@ -1605,8 +1618,15 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_function_definition_infos = steal(snapshot.function_definition_infos);
   m_aliases = steal(snapshot.aliases);
   m_positional_params = steal(snapshot.positional_params);
+  m_directory_stack = steal(snapshot.directory_stack);
 
   snapshot.runtime.restore(*this);
+  m_init_moods_sourcing = snapshot.init_moods_sourcing;
+  m_initialized_moods = snapshot.initialized_moods;
+  m_mood_set_explicitly = snapshot.mood_set_explicitly;
+  m_mood_mutation_revision = snapshot.mood_mutation_revision;
+  m_warning_mutation_revision = snapshot.warning_mutation_revision;
+  m_diagnostics_mutation_revision = snapshot.diagnostics_mutation_revision;
 
   m_readonly_names = steal(snapshot.readonly_names);
   m_integer_names = steal(snapshot.integer_names);
@@ -1629,8 +1649,9 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   }
   m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
 
-  if (Path::set_current_directory(snapshot.working_directory).is_error())
+  if (!os::restore_current_directory(snapshot.working_directory))
     LOG(Debug, "the subshell could not restore the working directory");
+  os::set_file_creation_mask(snapshot.file_creation_mask);
 
   /* The logged environment writes revert newest first, before the PATH re-point
      below so an exported PATH reads its restored value. */

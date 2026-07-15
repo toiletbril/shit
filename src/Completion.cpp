@@ -458,6 +458,63 @@ private:
   ArrayList<String> by_tier[MATCH_TIER_COUNT];
 };
 
+class BorrowedStringSet
+{
+public:
+  fn add(StringView value) throws -> bool
+  {
+    if (slots.is_empty() || (entry_count + 1) * 4 >= slots.count() * 3) grow();
+
+    return place(slots, value, hash_bytes(value));
+  }
+
+private:
+  struct slot
+  {
+    StringView value{};
+    u64 hash{0};
+    bool is_occupied{false};
+  };
+
+  fn place(ArrayList<slot> &destination, StringView value, u64 hash) wontthrow
+      -> bool
+  {
+    let const mask = destination.count() - 1;
+    let position = static_cast<usize>(hash) & mask;
+
+    while (destination[position].is_occupied) {
+      if (destination[position].hash == hash &&
+          destination[position].value == value)
+      {
+        return false;
+      }
+      position = (position + 1) & mask;
+    }
+
+    destination[position] = {value, hash, true};
+    entry_count++;
+    return true;
+  }
+
+  fn grow() throws -> void
+  {
+    let fresh = ArrayList<slot>{completion_allocator()};
+    let const capacity = slots.is_empty() ? 16 : slots.count() * 2;
+    fresh.reserve(capacity);
+    for (usize position = 0; position < capacity; position++)
+      fresh.push({});
+
+    entry_count = 0;
+    for (let const &entry : slots)
+      if (entry.is_occupied) place(fresh, entry.value, entry.hash);
+
+    slots = steal(fresh);
+  }
+
+  ArrayList<slot> slots{completion_allocator()};
+  usize entry_count{0};
+};
+
 static fn command_name_match(StringView name, StringView token,
                              bool token_is_glob, bool is_case_sensitive,
                              const Bitset &glob_active) throws
@@ -476,8 +533,6 @@ class CommandListCollector
 public:
   fn add(StringView name, match_tier tier) throws -> void
   {
-    if (seen.contains(name)) return;
-    seen.add(name);
     candidates.add(tier, String{completion_allocator(), name});
     materialized_count++;
   }
@@ -495,10 +550,28 @@ public:
 
 private:
   TieredCandidates candidates{};
-  HashSet seen{completion_allocator()};
   usize source_scan_count{0};
   usize materialized_count{0};
 };
+
+static pure fn common_prefix_length(StringView left, StringView right,
+                                    usize limit) wontthrow -> usize
+{
+  usize shared_length = 0;
+  while (shared_length < limit && shared_length < left.length &&
+         shared_length < right.length &&
+         left[shared_length] == right[shared_length])
+  {
+    shared_length++;
+  }
+  while (shared_length > 0 && shared_length < left.length &&
+         (static_cast<unsigned char>(left[shared_length]) & 0xC0) == 0x80)
+  {
+    shared_length--;
+  }
+
+  return shared_length;
+}
 
 class GhostPrefixCollector
 {
@@ -514,17 +587,8 @@ public:
       return;
     }
 
-    usize shared_length = 0;
-    while (shared_length < prefix.count() && shared_length < name.length &&
-           prefix[shared_length] == name[shared_length])
-    {
-      shared_length++;
-    }
-    while (shared_length > 0 && shared_length < prefix.count() &&
-           (static_cast<unsigned char>(prefix[shared_length]) & 0xC0) == 0x80)
-    {
-      shared_length--;
-    }
+    let const shared_length =
+        common_prefix_length(prefix.view(), name, prefix.count());
     while (prefix.count() > shared_length)
       prefix.pop_back();
     match_count++;
@@ -553,12 +617,25 @@ static fn collect_command_names(StringView token, bool token_is_glob,
   let const is_case_sensitive = token_has_uppercase(token);
   let const glob_active = token_is_glob ? all_active_glob_mask(token.length)
                                         : Bitset{completion_allocator()};
+  let normalized_path_token = String{completion_allocator(), token};
+  unused(os::normalize_program_name(normalized_path_token));
+  let const path_is_case_sensitive =
+      token_has_uppercase(normalized_path_token.view());
+  let seen = BorrowedStringSet{};
 
   let const do_add = [&](StringView name) throws {
     collector.note_source_candidate();
     let const tier = command_name_match(name, token, token_is_glob,
                                         is_case_sensitive, glob_active);
-    if (tier.has_value()) collector.add(name, *tier);
+    if (tier.has_value() && seen.add(name)) collector.add(name, *tier);
+  };
+
+  let const do_add_path = [&](StringView name) throws {
+    collector.note_source_candidate();
+    let const tier =
+        command_name_match(name, normalized_path_token.view(), token_is_glob,
+                           path_is_case_sensitive, glob_active);
+    if (tier.has_value() && seen.add(name)) collector.add(name, *tier);
   };
 
   for (let const &builtin_name : builtin_names())
@@ -568,23 +645,29 @@ static fn collect_command_names(StringView token, bool token_is_glob,
     for (const String &util_name : shitbox::util_names())
       do_add(util_name.view());
 
-  context.function_names().for_each(do_add);
-  context.alias_names().for_each(do_add);
+  context.for_each_function_name(do_add);
+  context.for_each_alias_name(do_add);
 
-  let const &path_names = utils::path_command_names();
+  let const &path_names = utils::path_command_names(
+      token_is_glob ? StringView{} : normalized_path_token.view());
   if (!token_is_glob && !token.is_empty()) {
-    let name_index = utils::path_command_name_lower_bound(token);
-    while (name_index < path_names.count() &&
-           path_names[name_index].view().starts_with(token))
+    let name_index =
+        utils::path_command_name_lower_bound(normalized_path_token.view());
+    while (
+        name_index < path_names.count() &&
+        path_names[name_index].view().starts_with(normalized_path_token.view()))
     {
-      do_add(path_names[name_index].view());
+      do_add_path(path_names[name_index].view());
       name_index++;
     }
   }
 
-  if (!collector.has_exact())
-    for (let const &entry : path_names)
-      do_add(entry.view());
+  if (!collector.has_exact()) {
+    let const &fallback_path_names =
+        token_is_glob ? path_names : utils::path_command_names({});
+    for (let const &entry : fallback_path_names)
+      do_add_path(entry.view());
+  }
 }
 
 static fn complete_command_name_prefix(StringView token, bool token_is_glob,
@@ -605,20 +688,7 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
   usize prefix_length = first.length;
   for (usize i = 1; i < candidates.count(); i++) {
     let const candidate = candidates[i].view();
-    usize shared = 0;
-    while (shared < prefix_length && shared < candidate.length &&
-           first[shared] == candidate[shared])
-    {
-      shared++;
-    }
-    /* The byte-wise match can stop inside a multibyte codepoint, so the cut
-       retracts to the codepoint start. */
-    while (shared > 0 && shared < prefix_length &&
-           (static_cast<unsigned char>(first[shared]) & 0xC0) == 0x80)
-    {
-      shared--;
-    }
-    prefix_length = shared;
+    prefix_length = common_prefix_length(first, candidate, prefix_length);
   }
   return String{candidates.allocator(),
                 first.substring_of_length(0, prefix_length)};
@@ -649,7 +719,9 @@ static fn unescape_path_token(StringView token) throws -> String
   let out = String{completion_allocator()};
   usize i = 0;
   while (i < token.length) {
-    if (token[i] == '\\' && i + 1 < token.length) {
+    if (token[i] == '\\' && os::DIRECTORY_SEPARATOR != '\\' &&
+        i + 1 < token.length)
+    {
       i++;
     }
     out.push(token[i]);
@@ -662,7 +734,7 @@ static pure fn split_path_token(StringView token) wontthrow -> path_token
 {
   let last_separator = token.length;
   for (usize i = 0; i < token.length; i++) {
-    if (token[i] == '/') last_separator = i;
+    if (os::is_directory_separator(token[i])) last_separator = i;
   }
   if (last_separator == token.length) {
     return path_token{StringView{}, token};
@@ -831,7 +903,15 @@ static fn build_filesystem_candidate(StringView directory_part, StringView name,
                                      bool inside_quote) throws -> String
 {
   let entry_name = String{completion_allocator(), name};
-  if (is_directory) entry_name += '/';
+  if (is_directory) {
+    let separator = os::DIRECTORY_SEPARATOR;
+    if (!directory_part.is_empty() &&
+        os::is_directory_separator(directory_part[directory_part.length - 1]))
+    {
+      separator = directory_part[directory_part.length - 1];
+    }
+    entry_name.push(separator);
+  }
 
   let candidate = String{completion_allocator(), directory_part};
   let const is_variable_prefixed =
@@ -860,7 +940,8 @@ collect_filesystem_matches(StringView token, const Path &base_directory,
   let unescaped_backing = String{completion_allocator()};
   if (!inside_quote) unescaped_backing = unescape_path_token(token);
   let parts = split_path_token(inside_quote ? token : unescaped_backing.view());
-  const bool is_case_sensitive = token_has_uppercase(parts.basename_part);
+  const bool is_case_sensitive = os::FILESYSTEM_IS_CASE_SENSITIVE &&
+                                 token_has_uppercase(parts.basename_part);
 
   TRACELN(
       "completing filesystem token '%.*s', dir '%.*s', base '%.*s'",
@@ -921,6 +1002,14 @@ static fn complete_filesystem(StringView token, const Path &base_directory,
   return collector.take();
 }
 
+fn complete_filesystem_names(StringView token, EvalContext &context,
+                             const Path &base_directory) throws
+    -> ArrayList<String>
+{
+  return complete_filesystem(token, base_directory, true, false, false,
+                             context);
+}
+
 static fn
 complete_filesystem_prefix(StringView token, const Path &base_directory,
                            bool inside_quote, bool directories_only,
@@ -955,6 +1044,15 @@ static fn complete_glob(StringView token, const Path &base_directory,
   if (entries == nullptr) return candidates;
 
   let const glob_active = all_active_glob_mask(parts.basename_part.length);
+  let normalized_pattern = String{completion_allocator()};
+  let match_pattern = parts.basename_part;
+  if (!os::FILESYSTEM_IS_CASE_SENSITIVE) {
+    normalized_pattern.reserve(match_pattern.length);
+    for (usize position = 0; position < match_pattern.length; position++)
+      normalized_pattern.push(utils::ascii_to_lower(match_pattern[position]));
+    match_pattern = normalized_pattern.view();
+  }
+  let candidate_name = String{completion_allocator()};
 
   for (let const &entry : *entries) {
     let const name = entry.name.view();
@@ -964,7 +1062,16 @@ static fn complete_glob(StringView token, const Path &base_directory,
       continue;
     }
 
-    if (!utils::glob_matches(parts.basename_part, name, glob_active, 0)) {
+    let match_name = name;
+    if (!os::FILESYSTEM_IS_CASE_SENSITIVE) {
+      candidate_name.clear();
+      candidate_name.reserve(match_name.length);
+      for (usize position = 0; position < match_name.length; position++)
+        candidate_name.push(utils::ascii_to_lower(match_name[position]));
+      match_name = candidate_name.view();
+    }
+
+    if (!utils::glob_matches(match_pattern, match_name, glob_active, 0)) {
       continue;
     }
 
@@ -981,7 +1088,16 @@ static fn complete_glob(StringView token, const Path &base_directory,
 
     let candidate = String{completion_allocator(), parts.directory_part};
     candidate += name;
-    if (is_directory) candidate += '/';
+    if (is_directory) {
+      let separator = os::DIRECTORY_SEPARATOR;
+      if (!parts.directory_part.is_empty() &&
+          os::is_directory_separator(
+              parts.directory_part[parts.directory_part.length - 1]))
+      {
+        separator = parts.directory_part[parts.directory_part.length - 1];
+      }
+      candidate.push(separator);
+    }
 
     candidates.push(steal(candidate));
   }
@@ -997,7 +1113,7 @@ static pure fn token_is_variable(StringView token) wontthrow -> bool
   /* A slash after the reference makes it a variable-prefixed path, which the
      filesystem completion expands to list while keeping the literal prefix. */
   return !token.is_empty() && token[0] == '$' &&
-         !token.find_character('/').has_value();
+         !os::has_directory_separator(token);
 }
 
 static fn complete_variable(StringView token, EvalContext &context) throws
@@ -1047,7 +1163,7 @@ static fn complete_variable(StringView token, EvalContext &context) throws
 static fn token_is_tilde_user_prefix(StringView token) wontthrow -> bool
 {
   return !token.is_empty() && token[0] == '~' &&
-         !token.find_character('/').has_value();
+         !os::has_directory_separator(token);
 }
 
 static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
@@ -1059,7 +1175,7 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
     let candidate = String{completion_allocator()};
     candidate.push('~');
     candidate.append(user.view());
-    candidate.push('/');
+    candidate.push(os::DIRECTORY_SEPARATOR);
     candidates.push(steal(candidate));
   }
   LOG(All, "%zu user names match tilde prefix '%.*s'", candidates.count(),
@@ -1208,12 +1324,13 @@ static pure fn candidate_extension_is_hinted(
     StringView candidate,
     const ArrayList<StringView> &hinted_extensions) wontthrow -> bool
 {
-  if (!candidate.is_empty() && candidate[candidate.length - 1] == '/')
+  if (!candidate.is_empty() &&
+      os::is_directory_separator(candidate[candidate.length - 1]))
     return false;
 
   usize dot = candidate.length;
   for (usize k = candidate.length; k > 0; k--) {
-    if (candidate[k - 1] == '/') break;
+    if (os::is_directory_separator(candidate[k - 1])) break;
     if (candidate[k - 1] == '.') {
       dot = k - 1;
       break;
@@ -1290,7 +1407,8 @@ static fn keep_hinted_extension(ArrayList<String> candidates,
   for (usize i = 0; i < candidates.count(); i++) {
     let const candidate = candidates[i].view();
     let const is_directory =
-        !candidate.is_empty() && candidate[candidate.length - 1] == '/';
+        !candidate.is_empty() &&
+        os::is_directory_separator(candidate[candidate.length - 1]);
     if (is_directory ||
         candidate_extension_is_hinted(candidate, hinted_extensions))
     {
@@ -1351,7 +1469,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
 
   /* A command-position token holding a path separator completes against the
      filesystem rather than the command sets. */
-  let const token_has_path_separator = token.find_character('/').has_value();
+  let const token_has_path_separator = os::has_directory_separator(token);
 
   TRACELN("complete line '%.*s' cursor %zu token '%.*s' command %d",
           static_cast<int>(line.length), line.data, cursor,
@@ -1389,7 +1507,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       for (usize i = 0; i < candidates.count(); i++) {
         if (i > 0) joined += ' ';
         let match = candidates[i].view();
-        if (!match.is_empty() && match[match.length - 1] == '/') {
+        if (!match.is_empty() &&
+            os::is_directory_separator(match[match.length - 1]))
+        {
           match = match.substring_of_length(0, match.length - 1);
         }
         if (path_candidate_needs_quoting(match)) {

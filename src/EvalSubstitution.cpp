@@ -336,9 +336,6 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   LOG(Debug, "running a captured substitution body of %zu bytes",
       source.count());
 
-  /* A cd or an assignment inside the substitution must not leak. */
-  let snapshot = snapshot_state();
-
   /* The inner scratch is reclaimed at the substitution boundary, so a $(...)
      inside a loop does not grow the arena across iterations. The captured
      output is heap and escapes. */
@@ -354,6 +351,67 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
     set_current_source(previous_source, previous_origin);
     m_current_location = previous_location;
   };
+
+#if SHIT_PLATFORM_IS POSIX
+  let const pipe = os::make_pipe();
+  if (!pipe) throw Error{"Could not open a pipe for command substitution"};
+  bool was_pipe_handed_off = false;
+  defer
+  {
+    if (!was_pipe_handed_off) {
+      os::close_fd(pipe->in);
+      os::close_fd(pipe->out);
+    }
+  };
+
+  shit::flush();
+  let const child = os::fork_compound_stage(None, pipe->out, None);
+  was_pipe_handed_off = true;
+  if (child == 0) {
+    os::close_fd(pipe->in);
+    m_shell_is_interactive = false;
+    enter_subshell();
+    clear_inherited_exit_trap();
+    std::exception_ptr error;
+    try {
+      ast->evaluate(*this);
+    } catch (...) {
+      error = std::current_exception();
+    }
+    if (has_pending_control_flow()) {
+      if (pending_control_flow().kind == control_flow::Kind::Exit)
+        set_last_exit_status(static_cast<i32>(pending_control_flow().value));
+      clear_control_flow();
+    }
+    if (!error) {
+      try {
+        run_subshell_exit_trap();
+      } catch (...) {
+        error = std::current_exception();
+      }
+    }
+    if (error) {
+      render_contained_substitution_error(error, source.view());
+      set_last_exit_status(1);
+    }
+    shit::flush();
+    os::exit_process_immediately(last_exit_status());
+  }
+
+  os::close_fd(pipe->out);
+  let captured = os::read_fd_to_string(pipe->in, heap_allocator());
+  os::close_fd(pipe->in);
+  let was_stopped = false;
+  let const status = os::wait_and_monitor_process(child, &was_stopped);
+  unused(was_stopped);
+  set_last_exit_status(status);
+  if (!captured.has_value())
+    throw Error{"Could not read command substitution output"};
+  while (!captured->is_empty() && captured->back() == '\n')
+    captured->pop_back();
+  return steal(*captured);
+#else
+  let snapshot = snapshot_state();
 
   let const pipe = os::make_pipe();
   if (!pipe) throw Error{"Could not open a pipe for command substitution"};
@@ -428,6 +486,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   while (!captured.is_empty() && captured.back() == '\n')
     captured.pop_back();
   return captured;
+#endif
 }
 
 fn EvalContext::capture_function_substitution(const WordSegment &segment) throws

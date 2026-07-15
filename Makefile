@@ -6,8 +6,10 @@ endif
 
 CPU_COUNT := $(shell ./scripts/cpu-count.sh)
 
-MAKE_COMMAND_LINE := $(shell \
-	if command -v ps >/dev/null 2>&1; then \
+MAKE_COMMAND_LINE ?= $(shell \
+	if test -r /proc/$${PPID}/cmdline; then \
+		tr '\000' ' ' < /proc/$${PPID}/cmdline 2>/dev/null; \
+	elif command -v ps >/dev/null 2>&1; then \
 		ps -p $${PPID} -o command= 2>/dev/null; \
 	elif command -v powershell.exe >/dev/null 2>&1; then \
 		powershell.exe -NoProfile -Command \
@@ -15,7 +17,8 @@ MAKE_COMMAND_LINE := $(shell \
 			2>/dev/null; \
 	fi)
 CALLER_JOBS := $(filter -j% --jobs% --jobserver%,$(MAKEFLAGS)) \
-	$(filter -j% --jobs%,$(MAKE_COMMAND_LINE))
+	$(filter -j% --jobs%,$(MAKE_COMMAND_LINE)) \
+	$(if $(filter command line,$(origin MAKE_COMMAND_LINE)),explicit-command-line,)
 AUTO_JOBS = $(if $(strip $(CALLER_JOBS)),,-j$(CPU_COUNT))
 
 MODE ?= dbg

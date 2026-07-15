@@ -5,6 +5,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -52,6 +53,53 @@ fn Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     ec.print_to_stdout(names_output);
     return 0;
+  }
+
+  if (ec.args().count() >= 2 && ec.args()[1] == "--binary-identity") {
+    let const executable = os::current_executable_path();
+    if (!executable.has_value()) return 1;
+    let const identity = utils::file_content_identity(Path{*executable},
+                                                      cxt.scratch_allocator());
+    if (!identity.has_value()) return 1;
+    ec.print_to_stdout(identity->view() + "\n");
+    return 0;
+  }
+
+  if (ec.args().count() >= 2 && ec.args()[1] == "--transaction-lock-held") {
+    if (ec.args().count() < 4) return report_usage_error(ec, cxt, ec.program());
+    let const lock = os::acquire_process_lock(ec.args()[2].view());
+    if (!lock.has_value()) {
+      report_soft_builtin_error(ec, cxt, "Cannot lock the remote transaction");
+      return 1;
+    }
+    defer { os::release_process_lock(*lock); };
+
+    let command = ArrayList<String>{cxt.scratch_allocator()};
+    command.reserve(ec.args().count() - 3);
+    for (usize position = 3; position < ec.args().count(); position++)
+      command.push(ec.args()[position].clone());
+    let const result = os::run_measured(command, false, *lock);
+    return result.has_value() ? static_cast<i32>(result->exit_status) : 126;
+  }
+
+  if (ec.args().count() >= 2 && ec.args()[1] == "--transaction-lock") {
+    if (ec.args().count() < 4) return report_usage_error(ec, cxt, ec.program());
+    let const executable = os::current_executable_path();
+    if (!executable.has_value()) return 126;
+
+    let keeper = ArrayList<String>{cxt.scratch_allocator()};
+    keeper.reserve(ec.args().count() + 5);
+    keeper.push(String{executable->view()});
+    keeper.push(String{"-p"});
+    keeper.push(String{"--mood"});
+    keeper.push(String{"sh"});
+    keeper.push(String{"-c"});
+    keeper.push(String{"shitbox --transaction-lock-held \"$@\""});
+    keeper.push(String{"shit"});
+    for (usize position = 2; position < ec.args().count(); position++)
+      keeper.push(ec.args()[position].clone());
+    let const result = os::run_measured(keeper, false);
+    return result.has_value() ? static_cast<i32>(result->exit_status) : 126;
   }
 
   if (ec.args().count() >= 2 && ec.args()[1] == "--assimilate") {

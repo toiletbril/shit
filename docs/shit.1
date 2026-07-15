@@ -618,7 +618,8 @@ that name. A missing system coreutil is filled in. A PATH binary still takes
 precedence in every mood.
 .TP
 .B nproc
-The bundled nproc utility prints the number of online logical processors. The
+The bundled nproc utility prints the number of logical processors available to
+the current process. The
 .B --all
 option prints the configured processor count. The
 .B --ignore=COUNT
@@ -669,16 +670,18 @@ in the first writable and searchable directory in the remote PATH. The
 candidate is validated before an atomic rename. An existing file or symlink is
 renamed into the transaction lock and restored when a handled validation or
 install step fails. Temporary upload, candidate, and backup paths are removed
-after success and handled failure. Concurrent installs serialize through a
-remote transaction lock, and a later install recovers a stale journal before it
-starts. The local shell can run on any supported platform. The remote host must
-provide a POSIX-compatible SSH login shell that can launch the transferred
-executable. The transferred shell performs the transaction with its bundled
-shitbox utilities. A failed transfer cannot alter the installed target. A
-partial upload can remain when the transferred executable cannot start. A
-remote SIGKILL, power loss, or storage failure can leave a complete target or
-recoverable hidden staging files because the remote cleanup process cannot run
-after it stops.
+after success and handled failure. The candidate SHA-256 identity must match the
+local executable. Concurrent installs serialize through a remote keeper
+process. The keeper holds the transaction lock until the transaction child
+exits, including after its launcher exits. A later install recovers published
+and orphaned journals before it starts.
+The local shell can run on any supported platform. The remote host must provide
+a POSIX-compatible SSH login shell that can launch the transferred executable.
+The transferred shell performs the transaction with its bundled shitbox
+utilities. A failed transfer cannot alter the installed target. A partial upload
+can remain when the transferred executable cannot start. A remote SIGKILL,
+power loss, or storage failure can leave a complete target or recoverable hidden
+staging files because the remote cleanup process cannot run after it stops.
 .TP
 .B bench
 Each command is run repeatedly as a measured child, and a summary of the wall

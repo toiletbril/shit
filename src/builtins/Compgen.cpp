@@ -20,6 +20,7 @@ FLAG(COMPGEN_WORDLIST, String, 'W', "",
      "Expand the word list the way the shell does and filter to the entries "
      "that start with the word.");
 FLAG(COMPGEN_GLOB, String, 'G', "", "Probe the filesystem with the glob.");
+FLAG(COMPGEN_FILE, Bool, 'f', "", "List matching filenames.");
 FLAG(COMPGEN_ACTION, String, 'A', "", "List commands for the command action.");
 FLAG(COMPGEN_PREFIX, String, 'P', "", "Accepted without effect.");
 FLAG(COMPGEN_SUFFIX, String, 'S', "", "Accepted without effect.");
@@ -49,6 +50,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   Maybe<StringView> glob_pattern;
   Maybe<StringView> action;
   bool should_list_commands = false;
+  bool should_list_files = false;
   StringView word{};
   for (usize i = 1; i < args.count();) {
     let const argument = args[i].view();
@@ -83,6 +85,11 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     if (argument == "-c") {
       should_list_commands = true;
+      i++;
+      continue;
+    }
+    if (argument == "-f") {
+      should_list_files = true;
       i++;
       continue;
     }
@@ -130,6 +137,19 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     if (has_any_matched) ec.print_to_stdout(out.view());
     return has_any_matched ? 0 : 1;
+  }
+
+  if (should_list_files) {
+    utils::begin_explicit_completion();
+    let const candidates = completion::complete_filesystem_names(
+        word, cxt, Path::current_directory());
+    let out = String{cxt.scratch_allocator()};
+    for (let const &candidate : candidates) {
+      out.append(candidate.view());
+      out.push('\n');
+    }
+    if (!out.is_empty()) ec.print_to_stdout(out.view());
+    return out.is_empty() ? 1 : 0;
   }
 
   if (!wordlist.has_value()) return 1;

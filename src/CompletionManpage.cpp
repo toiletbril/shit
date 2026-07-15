@@ -391,12 +391,12 @@ fn complete_from_man_subcommands(StringView line, StringView token,
     -> Maybe<ArrayList<String>>
 {
   if (!token.is_empty() && token[0] == '-') return None;
-  if (token.find_character('/').has_value()) return None;
+  if (os::has_directory_separator(token)) return None;
   if (!for_listing && token.is_empty()) return None;
   if (!is_first_argument_token(line, token_start)) return None;
   let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
-      surface_command.find_character('/').has_value())
+      os::has_directory_separator(surface_command))
     return None;
 
   let const resolved_name =
@@ -607,7 +607,7 @@ fn complete_from_manpage(StringView line, StringView token, bool for_listing,
   if (token.is_empty() || token[0] != '-') return None;
   let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
-      surface_command.find_character('/').has_value())
+      os::has_directory_separator(surface_command))
     return None;
 
   let const resolved_name =
@@ -1071,7 +1071,7 @@ fn complete_from_help(StringView line, StringView token, usize token_start,
   if (token.is_empty() || token[0] != '-') return None;
   let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
-      surface_command.find_character('/').has_value())
+      os::has_directory_separator(surface_command))
     return None;
 
   let const resolved_name = resolve_completion_alias(surface_command, context);
@@ -1097,10 +1097,10 @@ fn complete_from_help_subcommands(StringView line, StringView token,
       static_cast<int>(token.length), token.data, for_listing ? 1 : 0);
   if (!for_listing) return None;
   if (!token.is_empty() && token[0] == '-') return None;
-  if (token.find_character('/').has_value()) return None;
+  if (os::has_directory_separator(token)) return None;
   let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
-      surface_command.find_character('/').has_value())
+      os::has_directory_separator(surface_command))
   {
     LOG(Debug, "help subcommands bail because the surface command is empty");
     return None;

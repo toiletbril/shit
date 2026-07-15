@@ -230,6 +230,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
                     m_condition_tokenized, m_condition_simple) != 0))
   {
     ret = m_body->evaluate(cxt);
+    if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
     /* The step runs after the body on every iteration, including one ended by a
        continue. */
@@ -304,9 +305,10 @@ cold fn Subshell::to_ast_string(usize layer) const throws -> String
          m_body->to_ast_string(layer + 1);
 }
 
-fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
+static fn evaluate_subshell_in_process(const Expression *body,
+                                       EvalContext &cxt) throws -> i64
 {
-  ASSERT(m_body != nullptr);
+  ASSERT(body != nullptr);
 
   cxt.set_terminal_exec_allowed(false);
 
@@ -331,7 +333,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.clear_inherited_exit_trap();
   i64 ret = 0;
   try {
-    ret = m_body->evaluate(cxt);
+    ret = body->evaluate(cxt);
   } catch (const ErrorBase &error) {
     /* A script-fatal error is confined to the subshell in every mood, status 1
        the way bash answers it and 2 the way dash does. */
@@ -376,6 +378,37 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.leave_subshell();
   cxt.restore_state(steal(snapshot));
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
+}
+
+fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_body != nullptr);
+
+#if SHIT_PLATFORM_IS POSIX
+  shit::flush();
+  let const child = os::fork_compound_stage(None, None, None);
+  if (child == 0) {
+    i32 status = 1;
+    try {
+      status = static_cast<i32>(evaluate_subshell_in_process(m_body, cxt));
+    } catch (const ErrorBase &error) {
+      let const source = cxt.current_source();
+      show_message(
+          error.to_string(source != nullptr ? source->view() : StringView{}));
+    } catch (...) {
+      LOG(Debug, "the subshell child swallowed an unknown error");
+    }
+    shit::flush();
+    os::exit_process_immediately(status);
+  }
+
+  let was_stopped = false;
+  let const status = os::wait_and_monitor_process(child, &was_stopped);
+  unused(was_stopped);
+  SET_AND_RETURN_EXIT_STATUS(cxt, status);
+#else
+  return evaluate_subshell_in_process(m_body, cxt);
+#endif
 }
 
 cold fn Subshell::analyze(AnalysisContext &actx,

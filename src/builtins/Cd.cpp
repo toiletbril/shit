@@ -27,9 +27,22 @@ pure fn Cd::kind() const wontthrow -> Builtin::Kind { return Kind::Cd; }
  */
 static fn cdpath_search_applies(const String &operand) throws -> bool
 {
-  if (operand.is_empty() || operand[0] == '/') return false;
+  if (operand.is_empty() || os::path_is_absolute(operand.view()) ||
+      os::path_is_drive_relative(operand.view()))
+  {
+    return false;
+  }
   if (operand == "." || operand == "..") return false;
-  if (operand.starts_with("./") || operand.starts_with("../")) return false;
+  if (operand.length() >= 2 && operand[0] == '.' &&
+      os::is_directory_separator(operand[1]))
+  {
+    return false;
+  }
+  if (operand.length() >= 3 && operand[0] == '.' && operand[1] == '.' &&
+      os::is_directory_separator(operand[2]))
+  {
+    return false;
+  }
   return true;
 }
 
@@ -111,7 +124,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       usize start = 0;
       while (start <= entries.length) {
         usize end = start;
-        while (end < entries.length && entries.data[end] != ':')
+        while (end < entries.length && entries.data[end] != os::PATH_DELIMITER)
           end++;
         const StringView entry =
             entries.substring_of_length(start, end - start);
@@ -148,23 +161,24 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      symlink's parent. */
   if (is_physical) {
     if (target.is_relative()) {
-      let current_directory = Path::current_directory();
-      if (current_directory.is_empty())
+      target = target.to_absolute();
+      if (!target.is_absolute())
         throw ErrorWithLocation{
             ec.source_location(),
             StringView{"Unable to resolve '"} + arg_path +
                 "' because the current directory is unavailable"};
-      target = current_directory.push_component(target.text().view());
     }
 
     if (let resolved = os::canonical_path(target)) target = resolved.take();
-  } else if (target.is_absolute()) {
-    target = target.normalized();
+  } else if (target.is_absolute() ||
+             os::path_is_drive_relative(target.text().view()))
+  {
+    target = target.to_absolute().normalized();
   } else {
     let const logical_pwd = cxt.get_variable_value("PWD");
     let logical_target = Path{};
     if (logical_pwd.has_value() && !logical_pwd->is_empty() &&
-        logical_pwd->view()[0] == '/')
+        os::path_is_absolute(logical_pwd->view()))
     {
       logical_target = Path{logical_pwd->view()}
                            .push_component(target.text().view())
@@ -192,7 +206,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const logical_pwd = cxt.get_variable_value("PWD");
     let const old_directory =
         (logical_pwd.has_value() && !logical_pwd->is_empty() &&
-         logical_pwd->view()[0] == '/')
+         os::path_is_absolute(logical_pwd->view()))
             ? Path{logical_pwd->view()}
             : Path::current_directory();
     /* A path that exists can still refuse the move, so the chdir failure throws

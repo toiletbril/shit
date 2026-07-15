@@ -78,11 +78,11 @@ static fn command_word_prefixes_any(StringView word,
     if (has_prefix(builtin_name.view())) return true;
 
   bool was_found = false;
-  context.function_names().for_each([&](StringView name) {
+  context.for_each_function_name([&](StringView name) {
     if (!was_found && has_prefix(name)) was_found = true;
   });
   if (was_found) return true;
-  context.alias_names().for_each([&](StringView name) {
+  context.for_each_alias_name([&](StringView name) {
     if (!was_found && has_prefix(name)) was_found = true;
   });
   if (was_found) return true;
@@ -367,8 +367,11 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
     } else {
       directory = String{bump_allocator(HIGHLIGHT_ARENA), prefix};
     }
-  } else if (word[0] == '/') {
-    directory = String{bump_allocator(HIGHLIGHT_ARENA), "/"};
+  } else if (let const root_length = os::path_root_length(word);
+             root_length > 0)
+  {
+    directory = String{bump_allocator(HIGHLIGHT_ARENA),
+                       word.substring_of_length(0, root_length)};
   } else {
     directory = String{bump_allocator(HIGHLIGHT_ARENA), "."};
   }
@@ -378,8 +381,19 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
       utils::read_directory_cached(listing_directory, true, false);
   if (entries == nullptr) return false;
 
+  let const do_name_starts_with = [&](StringView name) wontthrow {
+    if (name.starts_with(partial)) return true;
+    if (os::FILESYSTEM_IS_CASE_SENSITIVE || name.length < partial.length)
+      return false;
+    for (usize position = 0; position < partial.length; position++)
+      if (utils::ascii_to_lower(name[position]) !=
+          utils::ascii_to_lower(partial[position]))
+        return false;
+    return true;
+  };
+
   for (let const &entry : *entries)
-    if (entry.name.view().starts_with(partial) &&
+    if (do_name_starts_with(entry.name.view()) &&
         (!directories_only ||
          utils::directory_entry_kind(listing_directory, entry) ==
              Path::entry_kind::Directory))
@@ -410,10 +424,10 @@ static fn color_path_argument(usize word_start, StringView word,
 
   let const has_separator = os::has_directory_separator(word);
   let const has_tilde = word[0] == '~';
-  let const has_dot_prefix =
-      word.length >= 2 && word[0] == '.' &&
-      (word[1] == '/' ||
-       (word.length >= 3 && word[1] == '.' && word[2] == '/'));
+  let const has_dot_prefix = word.length >= 2 && word[0] == '.' &&
+                             (os::is_directory_separator(word[1]) ||
+                              (word.length >= 3 && word[1] == '.' &&
+                               os::is_directory_separator(word[2])));
 
   if (Path{word}.has_trailing_separator()) {
     let target = word;
@@ -459,13 +473,16 @@ static fn color_path_argument(usize word_start, StringView word,
         directories_only && !do_prefix_is_valid(word) ? 0 : word.length;
   } else {
     for (usize scan = word.length; scan >= 1; scan--) {
-      let const at_boundary = scan == word.length || word[scan] == '/';
+      let const at_boundary =
+          scan == word.length || os::is_directory_separator(word[scan]);
       if (!at_boundary) continue;
 
       let const typed_prefix = word.substring_of_length(0, scan);
       if (do_prefix_is_valid(typed_prefix)) {
         existing_end =
-            scan < word.length && word[scan] == '/' ? scan + 1 : scan;
+            scan < word.length && os::is_directory_separator(word[scan])
+                ? scan + 1
+                : scan;
         break;
       }
     }
@@ -478,7 +495,8 @@ static fn color_path_argument(usize word_start, StringView word,
   if (existing_end >= word.length) return true;
 
   usize segment_end = existing_end;
-  while (segment_end < word.length && word[segment_end] != '/')
+  while (segment_end < word.length &&
+         !os::is_directory_separator(word[segment_end]))
     segment_end++;
 
   let const partial =

@@ -1,8 +1,4 @@
 success=0 leftovers=0
-scp=user@host
-ssh=user@host
-replace=0 fixed-backup=preserved leftovers=0
-regular-status=1 old=regular-old mode=751 leftovers=0
-symlink=preserved leftovers=0
+identity-status=1 old=identity-old leftovers=0
+rollback-status=1 old=regular-old mode=751 leftovers=0
 transfer-status=23 old=transfer-old leftovers=0
-wrapper=0

@@ -18,6 +18,7 @@
 #include <regex.h>
 #include <spawn.h>
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -96,6 +97,7 @@ namespace os {
 #if SHIT_PLATFORM_IS WIN32
 constexpr char PATH_DELIMITER = ';';
 constexpr char DIRECTORY_SEPARATOR = '\\';
+constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = false;
 
 using process = HANDLE;
 using descriptor = HANDLE;
@@ -111,6 +113,7 @@ using os_args = String;
 #elif SHIT_PLATFORM_IS POSIX
 constexpr char PATH_DELIMITER = ':';
 constexpr char DIRECTORY_SEPARATOR = '/';
+constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = true;
 
 using process = pid_t;
 using descriptor = int;
@@ -253,6 +256,8 @@ enum class file_open_mode : u8
 
 fn open_file_descriptor(StringView path, file_open_mode mode) throws
     -> Maybe<descriptor>;
+fn acquire_process_lock(StringView path) throws -> Maybe<descriptor>;
+fn release_process_lock(descriptor lock) wontthrow -> void;
 
 fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>;
 
@@ -353,6 +358,7 @@ struct file_status
 {
   u64 device_id{0};
   u64 file_id{0};
+  bool has_file_identity{false};
   u32 mode{0};
   u64 link_count{0};
   u32 owner_id{0};
@@ -392,6 +398,45 @@ fn read_fd_to_string(os::descriptor fd, Allocator allocator) throws
 fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32;
 
 fn close_fd(os::descriptor fd) wontthrow -> bool;
+
+class DirectoryReference
+{
+public:
+  DirectoryReference() = default;
+  explicit DirectoryReference(descriptor descriptor) : m_descriptor(descriptor)
+  {}
+  DirectoryReference(const DirectoryReference &) = delete;
+  DirectoryReference &operator=(const DirectoryReference &) = delete;
+  DirectoryReference(DirectoryReference &&other) wontthrow
+      : m_descriptor(other.take())
+  {}
+  DirectoryReference &operator=(DirectoryReference &&other) wontthrow
+  {
+    if (this == &other) return *this;
+    if (is_valid()) close_fd(m_descriptor);
+    m_descriptor = other.take();
+    return *this;
+  }
+  ~DirectoryReference()
+  {
+    if (is_valid()) close_fd(m_descriptor);
+  }
+
+  pure fn is_valid() const wontthrow -> bool
+  {
+    return m_descriptor != SHIT_INVALID_FD;
+  }
+  pure fn get() const wontthrow -> descriptor { return m_descriptor; }
+  fn take() wontthrow -> descriptor
+  {
+    let const result = m_descriptor;
+    m_descriptor = SHIT_INVALID_FD;
+    return result;
+  }
+
+private:
+  descriptor m_descriptor{SHIT_INVALID_FD};
+};
 
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor;
 fn restore_stdout(os::descriptor saved) wontthrow -> void;
@@ -485,6 +530,8 @@ fn compile_search_regex(StringView pattern, bool is_case_insensitive,
 fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool;
 
 pure fn path_is_absolute(StringView path) wontthrow -> bool;
+pure fn path_is_drive_relative(StringView path) wontthrow -> bool;
+fn resolve_drive_relative_path(StringView path) throws -> Maybe<Path>;
 fn temp_directory_path() throws -> String;
 
 cold fn path_exists(StringView path) wontthrow -> bool;
@@ -510,6 +557,9 @@ fn path_is_writable(StringView path) wontthrow -> bool;
 fn path_is_executable(StringView path) wontthrow -> bool;
 cold fn read_current_directory() throws -> Path;
 fn change_current_directory(StringView path) throws -> ErrorOr<Ok>;
+fn reference_current_directory() wontthrow -> DirectoryReference;
+fn restore_current_directory(const DirectoryReference &reference) wontthrow
+    -> bool;
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>;
 cold fn list_directory_typed(StringView dir) throws
     -> Maybe<ArrayList<Path::directory_child>>;
@@ -729,7 +779,8 @@ struct measured_result
   perf_counts perf{};
 };
 
-fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
+fn run_measured(const ArrayList<String> &argv, bool suppress_output,
+                Maybe<descriptor> inherited_handle = {}) throws
     -> Maybe<measured_result>;
 
 /* allow_script_fallback lets a single foreground command report an ENOEXEC file

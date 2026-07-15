@@ -1130,17 +1130,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
          definition_info->warning_level_at_definition != cxt.warning_level() ||
          definition_info->were_diagnostics_disabled_at_definition !=
              cxt.diagnostics_disabled());
-    Maybe<RuntimeState> saved_runtime_state = None;
-    Maybe<RuntimeState> entered_runtime_state = None;
+    Maybe<function_runtime_state> saved_runtime_state = None;
     if (needs_state_swap) {
       saved_runtime_state = cxt.enter_definition_state(*definition_info);
-      entered_runtime_state = RuntimeState::capture(cxt);
     }
     defer
     {
       if (saved_runtime_state.has_value())
-        cxt.leave_definition_state(*saved_runtime_state,
-                                   *entered_runtime_state);
+        cxt.leave_definition_state(*saved_runtime_state);
     };
 
     /* A located error thrown from the body is rendered here while the stack

@@ -9,6 +9,7 @@ keyword-on
 <c>
 <d>
 == vi and emacs can both be off:
+noninteractive-editing-off
 vi-off
 emacs-off
 == command substitution isolates option state:
@@ -16,17 +17,35 @@ notify         	off
 == runtime noexec stops later commands:
 noexec-clean
 nested-noexec-clean
+noexec-loops-stop
 == function option changes survive defining-mood state:
 function-option-persisted
 strict-markers-persisted
+function-runtime-state-persisted
+function-posix-persisted
+function-posix-noop-stayed
+substitution-revisions-isolated
 == command strings publish c in dollar dash:
 command-string
 == interactive state is independent of hashall:
 interactive
+== command substitution isolates startup state:
+startup-state-isolated
+== command substitution preserves directory identity:
+directory-identity-preserved
+== command substitution restores a permission-revoked directory:
+permission-directory-preserved
+== command substitution enters from an execute-only directory:
+execute-only-directory-preserved
 == SHELLOPTS uses the shared option state:
 braceexpand-listed
 hashall-listed
+shellopts-generated-order
 == physical mode resolves a symlinked directory:
 physical=yes
 physical-cdpath=yes
 physical-dotdot=yes
+== cd uses native path syntax:
+native-cdpath
+native-dot-relative
+native-absolute

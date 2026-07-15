@@ -50,8 +50,7 @@ public:
   bool are_diagnostics_disabled{false};
   u64 shell_options{option_mask(shell_option_id::Failglob) |
                     option_mask(shell_option_id::Hashall) |
-                    option_mask(shell_option_id::Braceexpand) |
-                    option_mask(shell_option_id::Emacs)};
+                    option_mask(shell_option_id::Braceexpand)};
   bool error_unset_explicit{false};
   bool pipefail_explicit{false};
   bool failglob_explicit{false};

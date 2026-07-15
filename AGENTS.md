@@ -45,8 +45,9 @@ enters rescue rather than exiting when a flag fails to parse in a login shell,
 the lockout-risk case marked by a dash-prefixed argv[0], while any other
 invocation keeps the usage exit.
 
-Eval snapshots also carry shopt state, so a command substitution restores both
-option families.
+Eval snapshots also carry shopt state, the directory stack, the working
+directory reference, and the file creation mask. An in-process subshell
+restores all of them.
 
 The name-to-mood mapping is shared from `MimicMood.hpp` as the single
 `parse_mood_name` and `mood_name` pair, so the flag parser, `set --mood`, and
@@ -116,13 +117,15 @@ The `assimilate TARGET` builtin copies the running binary through scp and uses
 an SSH transaction to install it as `shit` in the first usable remote PATH
 directory. A hidden candidate is validated before the target is replaced. A
 handled failure restores the prior file or symlink and removes transaction
-files. Concurrent transactions serialize through an atomic remote lock record,
-and a later transaction recovers its stale journal. The local shell supports
-every platform,
-and the remote transaction requires a POSIX-compatible SSH login shell that can
-launch the transferred executable. The transferred shell performs the
-transaction with explicit shitbox utilities. A pre-bootstrap failure cannot
-alter the installed target, but an unusable partial upload can remain.
+files. The candidate SHA-256 identity must match the local executable.
+Concurrent transactions use a keeper process that holds the lock until the
+transaction child exits, including after its launcher exits. A later
+transaction recovers published and orphaned journals. The local shell supports
+every platform. The remote transaction requires a POSIX-compatible SSH login
+shell that can launch the transferred executable. The transferred shell
+performs the transaction with explicit shitbox utilities. A pre-bootstrap
+failure cannot alter the installed target, but an unusable partial upload can
+remain.
 `scripts/shit-scp` is a compatibility wrapper for this builtin.
 
 src/Platform.cpp routes the operating system implementation. POSIX targets use
@@ -136,10 +139,11 @@ and close_process_group releases any retained platform handle. The shared
 get_processor_counts wrapper provides the affinity-limited and configured
 logical CPU counts used by shitbox nproc.
 The remaining platform conditionals outside the platform files and Utils.cpp
-are the fork-based process substitution in EvalSubstitution.cpp and pipeline
-stage in ExpressionsCompound.cpp, which run the shell's own AST in the forked
-child and cannot cross the os boundary, and the Cosmopolitan-only debug flags in
-Main.cpp.
+are the fork-based command and process substitutions in EvalSubstitution.cpp,
+the parenthesized subshell in ExpressionsArith.cpp, and the pipeline stage in
+ExpressionsCompound.cpp. They run the shell's own AST in the forked child and
+cannot cross the os boundary. Main.cpp also holds the Cosmopolitan-only debug
+flags.
 
 src/Completion.cpp drives zero config completion. Completion first slices the
 buffer to the command segment holding the cursor, and the slice is quote aware,

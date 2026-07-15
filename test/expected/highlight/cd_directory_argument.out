@@ -7,3 +7,4 @@ afile	\e[31m
 == ls of the same file stays a valid path:
 ls	\e[34m
 afile	\e[96m
+== native path separators highlight directories:

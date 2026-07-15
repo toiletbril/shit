@@ -1,2 +1,5 @@
 command ghost streams its prefix
+command ghost skips unrelated PATH names
+command ghost deduplicates sources
 filesystem ghost streams its prefix
+directory aliases share one listing

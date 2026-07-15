@@ -152,6 +152,15 @@ public:
     }
   }
 
+  template <class Fn>
+  fn for_each(Fn callback) throws -> void
+  {
+    for (usize i = 0; i < m_capacity; i++) {
+      if (m_slots[i].state == slot::Occupied)
+        callback(m_slots[i].key.view(), m_slots[i].value);
+    }
+  }
+
   fn clear() wontthrow -> void { destroy_all(); }
 
 private:
