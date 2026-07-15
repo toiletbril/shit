@@ -116,9 +116,10 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 #endif
 
 shit::EvalContext *COMPLETION_CONTEXT = nullptr;
+const shit::Path *COMPLETION_BASE_DIRECTORY = nullptr;
 bool HIGHLIGHT_COLOR_ENABLED = false;
 #if !defined NDEBUG
-usize DEBUG_COMPLETION_CWD_FALLBACK_COUNT = 0;
+usize DEBUG_COMPLETION_CWD_CAPTURE_COUNT = 0;
 usize DEBUG_COMPLETION_SOURCE_SCAN_COUNT = 0;
 usize DEBUG_COMPLETION_MATERIALIZED_COUNT = 0;
 #endif
@@ -132,7 +133,9 @@ shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
 fn shit_completion_callback(const char *buffer, size_t cursor,
                             tl_completion *out, int for_listing) -> int
 {
-  if (COMPLETION_CONTEXT == nullptr) return 0;
+  if (COMPLETION_CONTEXT == nullptr || COMPLETION_BASE_DIRECTORY == nullptr) {
+    return 0;
+  }
 
   /* Toiletline calls this through a C function pointer, so a throw unwinding
      past this frame is undefined behavior. The body is guarded and any throw is
@@ -142,15 +145,6 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 
     const usize byte_length = std::strlen(buffer);
     let line = shit::StringView{buffer, byte_length};
-    let const logical_directory = COMPLETION_CONTEXT->get_variable_value("PWD");
-    shit::Path base =
-        logical_directory.has_value() && !logical_directory->is_empty()
-            ? shit::Path{logical_directory->view()}
-            : shit::Path::current_directory();
-#if !defined NDEBUG
-    if (!logical_directory.has_value() || logical_directory->is_empty())
-      DEBUG_COMPLETION_CWD_FALLBACK_COUNT++;
-#endif
 
     const usize byte_cursor =
         toiletline::byte_offset_of_codepoint(buffer, byte_length, cursor);
@@ -159,7 +153,8 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
        disarmed so a later command's message is unaffected. */
     shit::arm_message_leading_newline(true);
     shit::completion::completion_result result = shit::completion::complete(
-        line, byte_cursor, *COMPLETION_CONTEXT, base, for_listing != 0);
+        line, byte_cursor, *COMPLETION_CONTEXT, *COMPLETION_BASE_DIRECTORY,
+        for_listing != 0);
 #if !defined NDEBUG
     DEBUG_COMPLETION_SOURCE_SCAN_COUNT += result.source_candidate_scan_count;
     DEBUG_COMPLETION_MATERIALIZED_COUNT += result.materialized_candidate_count;
@@ -509,11 +504,16 @@ fn get_input(const String &prompt) -> input_result
 {
   utils::begin_interactive_completion();
   HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
+  let const completion_base_directory = Path::current_directory();
+  COMPLETION_BASE_DIRECTORY = &completion_base_directory;
 #if !defined NDEBUG
   let const append_refresh_count_before = ::itl_g_debug_append_refresh_count;
   let const full_refresh_count_before = ::itl_g_debug_full_refresh_count;
   let const metrics_scan_count_before = ::itl_g_debug_metrics_scan_count;
-  let const cwd_fallback_count_before = DEBUG_COMPLETION_CWD_FALLBACK_COUNT;
+  let const line_serialization_count_before =
+      ::itl_g_debug_line_serialization_count;
+  let const history_scan_count_before = ::itl_g_debug_ghost_history_scan_count;
+  let const cwd_capture_count_before = DEBUG_COMPLETION_CWD_CAPTURE_COUNT++;
   let const source_scan_count_before = DEBUG_COMPLETION_SOURCE_SCAN_COUNT;
   let const materialized_count_before = DEBUG_COMPLETION_MATERIALIZED_COUNT;
   let const directory_stat_count_before = utils::debug_directory_stat_count();
@@ -521,42 +521,52 @@ fn get_input(const String &prompt) -> input_result
       utils::debug_executable_probe_count();
 #endif
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
+  COMPLETION_BASE_DIRECTORY = nullptr;
 #if !defined NDEBUG
   if (shit::os::get_environment_variable("SHIT_TEST_EDITOR_STATS").has_value())
   {
-    shit::print_error("editor-refresh append=" +
-                      shit::String::from(::itl_g_debug_append_refresh_count -
-                                             append_refresh_count_before,
-                                         shit::heap_allocator()) +
-                      " full=" +
-                      shit::String::from(::itl_g_debug_full_refresh_count -
-                                             full_refresh_count_before,
-                                         shit::heap_allocator()) +
-                      " metrics=" +
-                      shit::String::from(::itl_g_debug_metrics_scan_count -
-                                             metrics_scan_count_before,
-                                         shit::heap_allocator()) +
-                      " cwd=" +
-                      shit::String::from(DEBUG_COMPLETION_CWD_FALLBACK_COUNT -
-                                             cwd_fallback_count_before,
-                                         shit::heap_allocator()) +
-                      " stats=" +
-                      shit::String::from(utils::debug_directory_stat_count() -
-                                             directory_stat_count_before,
-                                         shit::heap_allocator()) +
-                      " probes=" +
-                      shit::String::from(utils::debug_executable_probe_count() -
-                                             executable_probe_count_before,
-                                         shit::heap_allocator()) +
-                      " scans=" +
-                      shit::String::from(DEBUG_COMPLETION_SOURCE_SCAN_COUNT -
-                                             source_scan_count_before,
-                                         shit::heap_allocator()) +
-                      " materialized=" +
-                      shit::String::from(DEBUG_COMPLETION_MATERIALIZED_COUNT -
-                                             materialized_count_before,
-                                         shit::heap_allocator()) +
-                      "\n");
+    shit::print_error(
+        "editor-refresh append=" +
+        shit::String::from(::itl_g_debug_append_refresh_count -
+                               append_refresh_count_before,
+                           shit::heap_allocator()) +
+        " full=" +
+        shit::String::from(::itl_g_debug_full_refresh_count -
+                               full_refresh_count_before,
+                           shit::heap_allocator()) +
+        " metrics=" +
+        shit::String::from(::itl_g_debug_metrics_scan_count -
+                               metrics_scan_count_before,
+                           shit::heap_allocator()) +
+        " serializations=" +
+        shit::String::from(::itl_g_debug_line_serialization_count -
+                               line_serialization_count_before,
+                           shit::heap_allocator()) +
+        " history-scans=" +
+        shit::String::from(::itl_g_debug_ghost_history_scan_count -
+                               history_scan_count_before,
+                           shit::heap_allocator()) +
+        " cwd=" +
+        shit::String::from(DEBUG_COMPLETION_CWD_CAPTURE_COUNT -
+                               cwd_capture_count_before,
+                           shit::heap_allocator()) +
+        " stats=" +
+        shit::String::from(utils::debug_directory_stat_count() -
+                               directory_stat_count_before,
+                           shit::heap_allocator()) +
+        " probes=" +
+        shit::String::from(utils::debug_executable_probe_count() -
+                               executable_probe_count_before,
+                           shit::heap_allocator()) +
+        " scans=" +
+        shit::String::from(DEBUG_COMPLETION_SOURCE_SCAN_COUNT -
+                               source_scan_count_before,
+                           shit::heap_allocator()) +
+        " materialized=" +
+        shit::String::from(DEBUG_COMPLETION_MATERIALIZED_COUNT -
+                               materialized_count_before,
+                           shit::heap_allocator()) +
+        "\n");
   }
 #endif
   if (code == TL_ERROR) {

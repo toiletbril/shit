@@ -33,9 +33,48 @@ static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
   }
 }
 
+fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
+                                     bool isolated) throws -> i32
+{
+  struct saved_environment_variable
+  {
+    String name;
+    String value;
+  };
+
+  let saved_environment =
+      ArrayList<saved_environment_variable>{heap_allocator()};
+  if (ec.should_use_empty_environment) {
+    let const environment_names = os::environment_names();
+    saved_environment.reserve(environment_names.count());
+    for (let const &name : environment_names) {
+      if (let value = os::get_environment_variable(name.view())) {
+        saved_environment.push(
+            saved_environment_variable{String{name.view()}, value.take()});
+      }
+      os::unset_environment_variable(name.view());
+    }
+  }
+  defer
+  {
+    for (let const &variable : saved_environment)
+      os::set_environment_variable(variable.name.view(), variable.value.view());
+  };
+
+  let fallback_context = EvalContext{false, false, false, false};
+  fallback_context.set_shell_executable_path(shell_executable_path());
+  fallback_context.set_shitbox(shitbox());
+  fallback_context.set_mimicry(mimicry());
+  fallback_context.set_warning_level(warning_level());
+  fallback_context.set_diagnostics_disabled(diagnostics_disabled());
+  return fallback_context.run_mimicked_script(ec, mode, isolated);
+}
+
 fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
                                     bool isolated) throws -> i32
 {
+  defer { ec.close_fds(); };
+
   if (m_mimicry_depth >= MAX_MIMICRY_DEPTH)
     throw ErrorWithLocation{ec.source_location(),
                             "Unable to mimic '" + ec.program() +
@@ -100,7 +139,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const do_restore_pre_parse_state = [&]() {
     m_runtime = previous_runtime;
     m_is_script_run = previous_script_run;
-    ec.close_fds();
   };
 
   const Expression *ast;
@@ -148,11 +186,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     for (usize i = saved_fds.count(); i > 0; i--)
       os::restore_descriptor(saved_fds[i - 1]);
   };
-  /* The context descriptors were dup'd onto the standard fds above, so the
-     originals are closed when this run ends, the way the replaced fork-and-exec
-     would have. */
-  defer { ec.close_fds(); };
-
   let const do_render_error = [&](std::exception_ptr error) {
     try {
       std::rethrow_exception(error);
@@ -167,7 +200,10 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   /* The kernel hands a shebang interpreter the resolved script path, so $0 and
      BASH_SOURCE read that path rather than the word as typed. */
-  m_shell_name = String{heap_allocator(), ec.program_path().text().view()};
+  m_shell_name =
+      String{heap_allocator(), ec.should_use_fallback_argv0
+                                   ? ec.args()[0].view()
+                                   : ec.program_path().text().view()};
   set_current_source(&*contents, String{ec.program().view()});
   m_current_location = SourceLocation{};
   m_mimicry_depth++;
@@ -383,7 +419,6 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
   /* A just-freed buffer can be reissued at the same address and length, so the
      caches keyed on that are dropped to keep them from serving a stale index.
    */
-  invalidate_source_line_index();
   utils::invalidate_line_number_cache();
 
   m_current_source = nullptr;

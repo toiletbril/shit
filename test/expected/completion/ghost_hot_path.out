@@ -2,4 +2,6 @@ command ghost streams its prefix
 command ghost skips unrelated PATH names
 command ghost deduplicates sources
 filesystem ghost streams its prefix
+filesystem ghost skips unrelated directory entries
+filesystem ghost retains fuzzy fallback
 directory aliases share one listing

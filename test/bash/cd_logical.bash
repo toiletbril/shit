@@ -12,4 +12,10 @@ echo "in_link=$([ "$PWD" = "$base/link" ] && echo yes || echo no)"
 echo "physical_differs=$([ "$(pwd -P)" != "$PWD" ] && echo yes || echo no)"
 cd ..
 echo "after_dotdot=$([ "$PWD" = "$base" ] && echo yes || echo no)"
+
+mkdir -p "$base/current/child" "$base/forged/child"
+cd "$base/current"
+PWD="$base/forged"
+cd child
+echo "forged_pwd_ignored=$([ "$(pwd -P)" = "$base/current/child" ] && echo yes || echo no)"
 rm -rf "$base"

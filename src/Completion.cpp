@@ -544,6 +544,11 @@ public:
     return candidates.has(match_tier::exact_prefix);
   }
 
+  pure fn has_prefix() const wontthrow -> bool
+  {
+    return has_exact() || candidates.has(match_tier::prefix);
+  }
+
   fn take() throws -> ArrayList<String> { return candidates.best(); }
   pure fn source_scans() const wontthrow -> usize { return source_scan_count; }
   pure fn materialized() const wontthrow -> usize { return materialized_count; }
@@ -597,6 +602,7 @@ public:
   fn note_source_candidate() wontthrow -> void { source_scan_count++; }
 
   pure fn has_exact() const wontthrow -> bool { return best_tier == 0; }
+  pure fn has_prefix() const wontthrow -> bool { return best_tier <= 1; }
   pure fn count() const wontthrow -> usize { return match_count; }
   pure fn source_scans() const wontthrow -> usize { return source_scan_count; }
   pure fn materialized() const wontthrow -> usize { return 0; }
@@ -956,37 +962,53 @@ collect_filesystem_matches(StringView token, const Path &base_directory,
       utils::read_directory_cached(listing_directory, true, false);
   if (entries == nullptr) return;
 
-  for (let const &entry : *entries) {
+  let const do_add_entry = [&](const Path::directory_child &entry) throws {
     let const name = entry.name.view();
     collector.note_source_candidate();
     let const tier =
         candidate_match(parts.basename_part, name, is_case_sensitive);
-    if (!tier.has_value()) continue;
+    if (!tier.has_value()) return;
 
     let const is_directory =
         utils::directory_entry_kind(listing_directory, entry) ==
         Path::entry_kind::Directory;
-    if (directories_only && !is_directory) continue;
+    if (directories_only && !is_directory) return;
 
     /* A command-position path completes only runnable files, so a plain data
        file is dropped, while directories stay for navigation. */
     if (executables_only && !is_directory &&
         !entry_is_executable(listing_directory, name))
     {
-      continue;
+      return;
     }
 
     /* A dotfile stays hidden unless the user typed a leading dot. */
     if (name.length > 0 && name[0] == '.' &&
         (parts.basename_part.is_empty() || parts.basename_part[0] != '.'))
     {
-      continue;
+      return;
     }
 
     let candidate = build_filesystem_candidate(parts.directory_part, name,
                                                is_directory, inside_quote);
     collector.add(candidate.view(), *tier);
+  };
+
+  let entry_position =
+      utils::directory_entry_name_lower_bound(*entries, parts.basename_part);
+  while (entry_position < entries->count() &&
+         utils::directory_entry_name_has_casefold_prefix(
+             (*entries)[entry_position].name.view(), parts.basename_part))
+  {
+    do_add_entry((*entries)[entry_position]);
+    entry_position++;
   }
+  if (collector.has_prefix()) return;
+
+  for (let const &entry : *entries)
+    if (!utils::directory_entry_name_has_casefold_prefix(entry.name.view(),
+                                                         parts.basename_part))
+      do_add_entry(entry);
 }
 
 static fn complete_filesystem(StringView token, const Path &base_directory,
@@ -1430,8 +1452,10 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   /* When the cursor sits inside a command substitution, completion re-roots to
      the substitution's own command line. The offset maps the replaced token
      span back to the full line for the caller. */
-  let completion_offset = command_substitution_body_start(line, cursor);
-  line = line.substring(completion_offset);
+  let const command_range = command_substitution_range(line, cursor);
+  let completion_offset = command_range.start;
+  line = line.substring_of_length(command_range.start,
+                                  command_range.end - command_range.start);
   cursor -= completion_offset;
 
   let const segment_start = command_segment_start(line, cursor);
@@ -1479,7 +1503,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      matches, even in command position. */
   let const inline_glob = token_is_glob && cursor == token_end;
 
-  let const command_word = is_command ? StringView{} : command_word_of(line);
+  let const command_word =
+      is_command ? StringView{}
+                 : command_word_of(line.substring_of_length(0, cursor));
   let const directories_only = !is_command && command_word == "cd";
   let const executables_only = is_command;
   const char *const extension_hint =

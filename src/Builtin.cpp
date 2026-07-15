@@ -358,13 +358,27 @@ fn parse_directory_stack_rotation(StringView arg, usize ring_count,
   return true;
 }
 
+fn logical_working_directory(EvalContext &cxt) throws -> Path
+{
+  let const physical_directory = Path::current_directory();
+  let const logical_pwd = cxt.get_variable_value("PWD");
+  if (logical_pwd.has_value() && !logical_pwd->is_empty() &&
+      os::path_is_absolute(logical_pwd->view()))
+  {
+    let logical_directory = Path{logical_pwd->view()};
+    if (logical_directory.is_same_file_as(physical_directory))
+      return logical_directory;
+  }
+
+  return physical_directory;
+}
+
 fn print_directory_stack(EvalContext &cxt, const ExecContext &ec,
                          bool one_per_line, bool numbered, bool no_tilde) throws
     -> void
 {
   let const &stack = cxt.directory_stack();
-  let const pwd = cxt.get_variable_value("PWD").value_or(
-      String{cxt.scratch_allocator(), Path::current_directory().text().view()});
+  let const pwd = logical_working_directory(cxt).text().clone();
 
   /* The current directory is index zero, then the saved stack from the top,
      which is its back, down to its front. */

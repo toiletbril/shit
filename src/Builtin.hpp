@@ -9,6 +9,7 @@ namespace shit {
 
 class ExecContext;
 class EvalContext;
+class Path;
 
 class Builtin
 {
@@ -437,6 +438,7 @@ pure fn name_is_valid_identifier(StringView name) wontthrow -> bool;
    with the home directory abbreviated to ~ unless no_tilde is set. */
 fn run_cd_to_directory(EvalContext &cxt, const ExecContext &ec,
                        StringView target) throws -> i32;
+fn logical_working_directory(EvalContext &cxt) throws -> Path;
 fn print_directory_stack(EvalContext &cxt, const ExecContext &ec,
                          bool one_per_line, bool numbered, bool no_tilde) throws
     -> void;

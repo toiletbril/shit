@@ -5,9 +5,10 @@ unset SHIT_FLAGS
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 mkdir -p "$dir/a" "$dir/b" "$dir/c"
+real_dir=$(cd "$dir" && pwd -P)
 
 scrub() {
-    sed "s|$dir|D|g" | awk '
+    sed "s|$real_dir|D|g; s|$dir|D|g" | awk '
     /\^~~~ here\./ {
         print "       |                            ^~~~ here."
         next
@@ -32,6 +33,8 @@ echo "== popd +1 drops a saved entry without a chdir:"
 "$BIN" -c "cd '$dir'; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; popd +1; dirs; echo PWD=\$PWD" 2>&1 | scrub
 echo "== dirs -c clears the stack:"
 "$BIN" -c "cd '$dir'; pushd '$dir/a' >/dev/null; dirs -c; dirs" 2>&1 | scrub
+echo "== a forged PWD does not change the saved directory:"
+"$BIN" -c "cd '$dir/a'; PWD='$dir/c'; pushd '$dir/b' >/dev/null; dirs" 2>&1 | scrub
 echo "== the home directory abbreviates to ~:"
 HOME="$dir" "$BIN" -c "cd '$dir'; pushd '$dir/a'" 2>&1 | scrub
 echo "== popd on an empty stack reports an error:"

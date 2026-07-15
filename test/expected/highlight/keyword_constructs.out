@@ -45,6 +45,7 @@ done	\e[32m
 case	\e[32m
 in	\e[32m
 )	\e[1m
+echo	\e[34m
 ;;	\e[1m
 esac	\e[32m
 == bracket conditional:

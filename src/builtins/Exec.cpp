@@ -180,6 +180,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   command.dup_out_to_err = ec.dup_out_to_err;
   command.dup_out_to_err_came_last = ec.dup_out_to_err_came_last;
   command.should_use_empty_environment = should_use_empty_environment;
+  command.should_use_fallback_argv0 = has_custom_argv0;
 
   /* Inside an in-process subshell, a command substitution, or a pipeline
      stage, the process the exec would replace is that inner scope, not the
@@ -211,16 +212,18 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     saved_descriptors.push(saved_descriptor);
   }
 
-  /* An external command replaces the shell. replace_process returns only by
-     throwing, when the program was found but could not be executed, which ends
-     the shell with 126, the status reserved for a command that is present but
-     not executable. A name that resolves to None yielded 127 above. */
   try {
     os::replace_process(steal(command));
   } catch (const ErrorBase &error) {
     return report_exec_resolution_error(ec, cxt, command_index, error.message(),
                                         126);
   }
+
+  command.in_fd.reset();
+  command.out_fd.reset();
+  command.err_fd.reset();
+  const i32 status = cxt.run_program_fallback(command, cxt.mood(), false);
+  utils::quit(status, false);
 }
 
 } // namespace shit

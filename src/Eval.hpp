@@ -439,6 +439,15 @@ public:
     return m_shell_variables.find(name);
   }
 
+  hot pure fn has_variable_name(StringView name) const wontthrow -> bool
+  {
+    return m_shell_variables.find(name) != nullptr ||
+           m_indexed_arrays.find(name) != nullptr ||
+           m_associative_names.contains(name) ||
+           m_exported_names.contains(name) ||
+           variable_requires_dynamic_lookup(name);
+  }
+
   pure fn positional_params() const wontthrow -> const ArrayList<String> &;
   fn set_positional_params(ArrayList<String> params) wontthrow -> void;
 
@@ -580,6 +589,12 @@ public:
 
   fn variable_names(Allocator result_allocator = heap_allocator()) const throws
       -> HashSet;
+#if !defined NDEBUG
+  pure fn debug_variable_name_enumeration_count() const wontthrow -> usize
+  {
+    return m_debug_variable_name_enumeration_count;
+  }
+#endif
 
   /* A signal condition installs the shell's handler. */
   fn set_trap(StringView condition, StringView action) throws -> void;
@@ -1030,6 +1045,8 @@ public:
      when false the snapshot is skipped. */
   fn run_mimicked_script(ExecContext &ec, mimic_mood mode, bool isolated) throws
       -> i32;
+  fn run_program_fallback(ExecContext &ec, mimic_mood mode,
+                          bool isolated) throws -> i32;
   pure fn extglob_enabled() const wontthrow -> bool
   {
     return m_runtime.mood != mimic_mood::Posix;
@@ -1413,6 +1430,9 @@ protected:
   /* The names currently in the process environment, kept in step with every
      environment write so an assignment tests membership in O(1). */
   HashSet m_exported_names{heap_allocator()};
+#if !defined NDEBUG
+  mutable usize m_debug_variable_name_enumeration_count{0};
+#endif
   ArrayList<process_substitution> m_pending_process_substitutions{
       heap_allocator()};
   /* The temp files a process substitution leaves for the consuming command to
@@ -1637,6 +1657,7 @@ public:
      to the spawn site, where the envp becomes a single null instead of environ.
    */
   bool should_use_empty_environment{false};
+  bool should_use_fallback_argv0{false};
 
   /* Set when a shitbox utility runs from a symlink. Its help names the shit
      binary behind it. */

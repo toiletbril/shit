@@ -63,14 +63,8 @@ fn rewrap_with_prefix(const ErrorWithLocation &error, StringView prefix) throws
     -> ErrorWithLocation
 {
   let const message = prefix + ": " + error.message();
-  if (error.has_note()) {
-    ErrorWithLocationAndDetails rewrapped{error.location(), message.view(),
-                                          error.note().view()};
-    if (error.is_script_fatal()) rewrapped.set_script_fatal();
-    rewrapped.set_command_status(error.command_status());
-    return rewrapped;
-  }
-  ErrorWithLocation rewrapped{error.location(), message.view()};
+  ErrorWithLocation rewrapped{error.location(), message.view(),
+                              error.note().view()};
   if (error.is_script_fatal()) rewrapped.set_script_fatal();
   rewrapped.set_command_status(error.command_status());
   return rewrapped;
@@ -140,6 +134,8 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
 
   try {
     return run_util(*chosen, ec, cxt, ec.args(), ec.arg_locations());
+  } catch (const BrokenPipeExit &) {
+    return 141;
   } catch (const ErrorWithLocation &e) {
     show_message(rewrap_with_prefix(e, util_name)
                      .to_string(utils::merge_args_to_string(ec.args())));

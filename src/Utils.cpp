@@ -268,16 +268,6 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     flush();
     try {
       os::replace_process(steal(ec));
-    } catch (const ExecFormatError &) {
-      LOG(Debug, "swallowed an exec format error, running the "
-                 "file as a shell script in place");
-      /* replace_process already placed the redirections, so the descriptors
-         are cleared to avoid reapplying the now-closed ones. */
-      ec.in_fd.reset();
-      ec.out_fd.reset();
-      ec.err_fd.reset();
-      const mimic_mood mode = cxt.mood();
-      quit(cxt.run_mimicked_script(ec, mode, !can_replace_shell), false);
     } catch (const ErrorWithLocation &error) {
       /* Resolved but unexecutable exits 126, missing exits 127. */
       const String *source = cxt.current_source();
@@ -292,7 +282,12 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
           located.to_string(source != nullptr ? source->view() : StringView{}));
       quit(127, false);
     }
-    unreachable();
+    LOG(Debug, "running the file as a shell script in place");
+    ec.in_fd.reset();
+    ec.out_fd.reset();
+    ec.err_fd.reset();
+    const mimic_mood mode = cxt.mood();
+    quit(cxt.run_program_fallback(ec, mode, !can_replace_shell), false);
   }
 
   LOG(Debug, "spawning the external command '%s'%s", ec.program().c_str(),
@@ -312,17 +307,14 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     if (is_async) command += " &";
   }
 
-  os::process p = SHIT_INVALID_PROCESS;
-  try {
-    let const source = cxt.current_source();
-    p = os::execute_program(steal(ec), !is_async,
-                            /*new_process_group=*/is_foreground_job,
-                            source != nullptr ? source->view() : StringView{});
-  } catch (const ExecFormatError &) {
-    LOG(Debug, "swallowed an exec format error, running the "
-               "file as a shell script in this process");
+  let const source = cxt.current_source();
+  os::process p = os::execute_program(
+      steal(ec), !is_async, /*new_process_group=*/is_foreground_job,
+      source != nullptr ? source->view() : StringView{});
+  if (p == SHIT_INVALID_PROCESS) {
+    LOG(Debug, "running the file as a shell script in this process");
     const mimic_mood mode = cxt.mood();
-    return cxt.run_mimicked_script(ec, mode, !can_replace_shell);
+    return cxt.run_program_fallback(ec, mode, !can_replace_shell);
   }
   if (is_async) {
     cxt.set_last_background_pid(os::process_id_of(p));
@@ -779,8 +771,7 @@ public:
     m_newline_offsets.clear();
   }
 
-  /* The count of newlines at a byte offset strictly less than the position. */
-  pure fn newlines_before(usize position) const wontthrow -> usize
+  pure fn locate(usize position) const wontthrow -> source_line_position
   {
     usize low = 0;
     usize high = m_newline_offsets.count();
@@ -791,7 +782,12 @@ public:
       else
         high = mid;
     }
-    return low;
+
+    const usize line_start = low == 0 ? 0 : m_newline_offsets[low - 1] + 1;
+    const usize line_end = low == m_newline_offsets.count()
+                               ? m_source_length
+                               : m_newline_offsets[low];
+    return source_line_position{low, line_start, line_end};
   }
 
 private:
@@ -802,12 +798,16 @@ private:
 
 static LineNumberCache LINE_NUMBER_CACHE{};
 
-fn line_number_at(StringView source, usize position) throws -> usize
+fn source_line_position_at(StringView source, usize position) throws
+    -> source_line_position
 {
   LINE_NUMBER_CACHE.ensure_built_for(source);
-  /* The first line is line 1, and each newline strictly before the byte starts
-     a new line, so the line number is one more than the newline count. */
-  return LINE_NUMBER_CACHE.newlines_before(position) + 1;
+  return LINE_NUMBER_CACHE.locate(position);
+}
+
+fn line_number_at(StringView source, usize position) throws -> usize
+{
+  return source_line_position_at(source, position).line_number + 1;
 }
 
 fn invalidate_line_number_cache() wontthrow -> void
@@ -1882,6 +1882,7 @@ static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
    into its directories. */
 static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>;
 static fn path_dirs() throws -> const ArrayList<String> &;
+static fn begin_directory_validation_epoch() wontthrow -> void;
 
 /* Append one resolved absolute path under a program name, creating the list on
    the first hit. */
@@ -2010,6 +2011,61 @@ static fn allocate_directory_listing_position() throws -> usize
   return position;
 }
 
+static pure fn directory_entry_folded_name_is_less(StringView left,
+                                                   StringView right) wontthrow
+    -> bool
+{
+  let const shared_length =
+      left.length < right.length ? left.length : right.length;
+  for (usize position = 0; position < shared_length; position++) {
+    let const left_byte = ascii_to_lower(left[position]);
+    let const right_byte = ascii_to_lower(right[position]);
+    if (left_byte != right_byte) return left_byte < right_byte;
+  }
+  if (left.length != right.length) return left.length < right.length;
+
+  return false;
+}
+
+static pure fn directory_entry_name_is_less(StringView left,
+                                            StringView right) wontthrow -> bool
+{
+  if (directory_entry_folded_name_is_less(left, right)) return true;
+  if (directory_entry_folded_name_is_less(right, left)) return false;
+
+  return left < right;
+}
+
+pure fn directory_entry_name_lower_bound(
+    const ArrayList<Path::directory_child> &entries, StringView name) wontthrow
+    -> usize
+{
+  usize lower = 0;
+  usize upper = entries.count();
+  while (lower < upper) {
+    let const middle = lower + (upper - lower) / 2;
+    if (directory_entry_folded_name_is_less(entries[middle].name.view(), name))
+      lower = middle + 1;
+    else
+      upper = middle;
+  }
+
+  return lower;
+}
+
+pure fn directory_entry_name_has_casefold_prefix(StringView name,
+                                                 StringView prefix) wontthrow
+    -> bool
+{
+  if (name.length < prefix.length) return false;
+
+  for (usize position = 0; position < prefix.length; position++)
+    if (ascii_to_lower(name[position]) != ascii_to_lower(prefix[position]))
+      return false;
+
+  return true;
+}
+
 fn read_directory_cached(const Path &directory,
                          bool should_invalidate_path_cache,
                          bool should_validate) throws
@@ -2084,6 +2140,11 @@ fn read_directory_cached(const Path &directory,
     else
       child.kind = Path::entry_kind::Other;
   }
+
+  entries->sort([](const Path::directory_child &left,
+                   const Path::directory_child &right) {
+    return directory_entry_name_is_less(left.name.view(), right.name.view());
+  });
 
   cached_directory_listing fresh{};
   fresh.device_id = has_status ? status.device_id : 0;
@@ -2227,6 +2288,20 @@ fn invalidate_path_cache() throws -> void
   PATH_CACHE_IS_STALE = true;
   PATH_COMMAND_NAMES.clear();
   PATH_COMMAND_NAMES_IS_VALID = false;
+}
+
+fn working_directory_changed() throws -> void
+{
+  begin_directory_validation_epoch();
+  SHOULD_VALIDATE_ALL_PATH_COMMANDS = false;
+
+  for (let const &directory : path_dirs())
+    if (!Path{directory.view()}.is_absolute()) {
+      PATH_CACHE_IS_STALE = true;
+      PATH_COMMAND_NAMES.clear();
+      PATH_COMMAND_NAMES_IS_VALID = false;
+      return;
+    }
 }
 
 fn set_path_for_resolution(Maybe<String> path) throws -> void

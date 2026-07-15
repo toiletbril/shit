@@ -157,9 +157,18 @@ static fn run_debug_completion_driver(StringView driver_line,
                                       EvalContext &context) throws -> i32
 {
   utils::initialize_path_map();
-  let const driver_result =
-      completion::complete(driver_line, driver_line.length, context,
-                           Path::current_directory(), true);
+  usize driver_cursor = driver_line.length;
+  if (let const cursor_text =
+          os::get_environment_variable("SHIT_TEST_COMPLETE_CURSOR");
+      cursor_text.has_value())
+  {
+    let const parsed_cursor = cursor_text->view().to<u64>();
+    if (!parsed_cursor.is_error() &&
+        parsed_cursor.value() <= driver_line.length)
+      driver_cursor = static_cast<usize>(parsed_cursor.value());
+  }
+  let const driver_result = completion::complete(
+      driver_line, driver_cursor, context, Path::current_directory(), true);
   let listing = String{heap_allocator()};
   for (let const &candidate : driver_result.candidates) {
     listing += candidate.view();
@@ -174,6 +183,10 @@ static fn run_debug_completion_driver(StringView driver_line,
 static fn run_debug_highlight_driver(StringView driver_line,
                                      EvalContext &context) throws -> i32
 {
+#if !defined NDEBUG
+  let const variable_name_visit_count_before =
+      context.debug_variable_name_enumeration_count();
+#endif
   let const spans = completion::highlight_line(driver_line, context);
   let listing = String{heap_allocator()};
   for (let const &span : spans) {
@@ -189,6 +202,15 @@ static fn run_debug_highlight_driver(StringView driver_line,
     }
     listing += '\n';
   }
+#if !defined NDEBUG
+  if (os::get_environment_variable("SHIT_TEST_HIGHLIGHT_STATS").has_value()) {
+    listing += "highlight-variable-name-visits=";
+    listing += String::from(context.debug_variable_name_enumeration_count() -
+                                variable_name_visit_count_before,
+                            heap_allocator());
+    listing += '\n';
+  }
+#endif
   print(listing);
   flush();
   return 0;

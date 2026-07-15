@@ -6,4 +6,11 @@ printf 'echo no-shebang-ran\n' > "$d/s"
 chmod +x "$d/s"
 "$d/s"
 echo "exit=$?"
+
+"$d/s" > "$d/redirected"
+cat "$d/redirected"
+
+(exec "$d/s" > "$d/exec-redirected")
+echo "exec-exit=$?"
+cat "$d/exec-redirected"
 rm -rf "$d"

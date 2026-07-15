@@ -261,7 +261,7 @@ fn try_fold_constant_arithmetic(StringView expression) wontthrow -> Maybe<i64>
 
   try {
     return evaluate_constant_arithmetic(expression);
-  } catch (...) {
+  } catch (const ErrorBase &) {
     LOG(All,
         "swallowed an arithmetic error while folding '%.*s', leaving the "
         "segment for the runtime path",
@@ -315,7 +315,7 @@ fn try_fold_arithmetic_with_constants(StringView expression,
       if (!is_constant_arithmetic_byte(rewritten[j])) return None;
     }
     return evaluate_constant_arithmetic(rewritten.view());
-  } catch (...) {
+  } catch (const ErrorBase &) {
     LOG(All,
         "swallowed an arithmetic error while folding '%.*s' with constants",
         static_cast<int>(expression.length), expression.data);
@@ -467,13 +467,7 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
       }
       last_index -= 1;
     }
-    try {
-      return constant_test_verdict(args, 1, last_index - 1, actx);
-    } catch (...) {
-      LOG(All, "swallowed an error while judging the literal "
-               "test, leaving it unfolded");
-      return None;
-    }
+    return constant_test_verdict(args, 1, last_index - 1, actx);
   }
   }
 

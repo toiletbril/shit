@@ -59,6 +59,10 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     report_soft_builtin_error(ec, cxt, error.message());
     return 126;
   }
+
+  report_soft_builtin_error(
+      ec, cxt, "the file is not an executable and has no interpreter");
+  return 126;
 }
 
 } // namespace shit

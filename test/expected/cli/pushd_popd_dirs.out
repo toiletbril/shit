@@ -24,6 +24,8 @@ D/b D
 PWD=D/b
 == dirs -c clears the stack:
 D/a
+== a forged PWD does not change the saved directory:
+D/b D/a
 == the home directory abbreviates to ~:
 ~/a ~
 == popd on an empty stack reports an error:

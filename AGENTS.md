@@ -147,9 +147,12 @@ flags.
 
 src/Completion.cpp drives zero config completion. Completion first slices the
 buffer to the command segment holding the cursor, and the slice is quote aware,
-so a `;`, `|`, `&`, or newline inside quotes does not start a new segment. The
-cascade tries the process arguments of kill and its kin, the builtin flags, the
-registered specs, the build tool targets, the man subcommands, the manpage
+so a `;`, `|`, `&`, or newline inside quotes does not start a new segment.
+Completion also slices to the innermost command substitution containing the
+cursor, stops before its real closer, and skips heredoc bodies while finding
+that range. The cascade tries the process arguments of kill and its kin, the
+builtin flags, the registered specs, the build tool targets, the man subcommands,
+the manpage
 options, the help subcommands, the help options, and finally the filesystem. A
 candidate is matched by smart case and then by subsequence, so an all lowercase
 token matches either case and `fbb` matches `foo_bar_baz`, while an exact prefix
@@ -174,29 +177,42 @@ checks its cached metadata. Later completion and highlighting calls in that
 epoch reuse the entry without another stat. Each interactive input begins an
 epoch. TAB, `compgen -c`, and `compgen -A command` begin another epoch. A
 membership change in a PATH directory invalidates the command-search cache and
-the sorted command index. Symlink target kinds are resolved when each listing
-is used. src/Toiletline.cpp
-bridges the editor to the evaluator, and
-src/toiletline/toiletline.h is the editor. The `--debug-highlight-at` flag, a
+the sorted command index. Each directory listing is sorted once by folded name,
+so filesystem completion and path highlighting binary-search the active prefix.
+Symlink target kinds are resolved when each listing is used. The highlighter
+looks up only variable names that occur on the line, and it colors nested
+command and arithmetic substitutions in one pass. src/Toiletline.cpp bridges
+the editor to the evaluator, and src/toiletline/toiletline.h is the editor. The
+`--debug-highlight-at` flag, a
 debug-only test driver gated behind NDEBUG like `--debug-complete-at`, prints the
 highlight spans for a line so the highlighter is testable without the editor.
+Plain editor appends update the stored byte length and serialized line directly.
+Ghost history caches an unmatched prefix, decodes matching entries as bytes, and
+tracks display width separately from byte length. The physical working directory
+is captured once per input and remains the implicit filesystem completion base
+when the PWD variable is reassigned. A directory change preserves the command
+cache when every PATH component is absolute, while a relative or empty component
+still invalidates it.
 
 src/Errors.cpp renders the located caret and the trailing note, capitalized on
-its own line, with the shellcheck-style messages in src/Diagnostics.hpp. A note
-is baked in at construction through the four detail-carrying classes,
-ErrorWithDetails, WarningWithDetails, ErrorWithLocationAndDetails, and
-WarningWithLocationAndDetails, so the ordinary Error and ErrorWithLocation hold
-none and there is no set_note setter. The relocate_error bridge rewraps an
-unlocated error onto a span, rethrows it, and preserves the note by choosing the
-located-and-details form. The
+its own line, with the shellcheck-style messages in src/Diagnostics.hpp. Error,
+Warning, and their located forms store an optional note directly. The legacy
+note-only names are aliases. ErrorWithLocationAndDetails remains distinct
+because it stores a second source location. The relocate_error bridge rewraps
+an unlocated error onto a span and preserves its note. Diagnostics and LINENO
+share one cached source line index. Executable-format fallback uses an explicit
+invalid-process result. A fresh evaluator runs the fallback script with the
+command environment and argv zero, so caller variables, functions, and traps do
+not leak into it. The
 shell normalizes SIGPIPE, SIG_IGN for the main shell and SIG_DFL in a forked
 child so a producer dies with status 141. The cd builtin resolves a relative
 operand against the logical PWD, the bash -L mode, and cd .. lexically pops the
-last component. A missing explicit directory receives a close sibling
-suggestion when one exists. The pushd, popd, and dirs builtins carry a directory
-stack on EvalContext and route every chdir through the cd builtin, so the
-logical PWD and OLDPWD stay in one place. PIPESTATUS is published after every
-foreground command.
+last component. A logical PWD is accepted only when it is absolute and names the
+physical current directory. A missing explicit directory receives a close
+sibling suggestion when one exists. The pushd, popd, and dirs builtins carry a
+directory stack on EvalContext and route every chdir through the cd builtin, so
+the logical PWD and OLDPWD stay in one place. PIPESTATUS is published after
+every foreground command.
 The condition depth is inherited by a function called from a non-final and-or
 operand or from a negation. The `set -e` option stays suppressed throughout that
 guarded body. An if with no matching branch and no else publishes status zero,

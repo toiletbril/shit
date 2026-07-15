@@ -7,8 +7,6 @@
 
 namespace shit {
 
-static constexpr usize ERROR_CONTEXT_SIZE = 24;
-
 struct SourceLocation
 {
   usize position{0};
@@ -16,22 +14,15 @@ struct SourceLocation
   Maybe<StringView> filename{};
 };
 
-/* Called when a retained source is freed, so a later source allocated at the
-   same address with the same length does not read a stale index. */
-fn invalidate_source_line_index() wontthrow -> void;
-
 class ErrorBase
 {
 public:
-  ErrorBase();
   ErrorBase(StringView message);
   virtual ~ErrorBase();
 
-  operator bool &() throws;
+  pure fn message() const wontthrow -> const String & { return m_message; }
 
-  fn message() const throws -> String;
-
-  virtual fn severity_word() const wontthrow -> String;
+  virtual fn severity_word() const wontthrow -> StringView;
 
   virtual fn to_string(StringView source) const throws -> String;
 
@@ -49,18 +40,13 @@ public:
   }
   pure fn command_status() const wontthrow -> i64 { return m_command_status; }
 
-  fn set_rendered() wontthrow -> void { m_was_rendered = true; }
-  pure fn was_rendered() const wontthrow -> bool { return m_was_rendered; }
-
   pure fn has_note() const wontthrow -> bool { return !m_note.is_empty(); }
-  fn note() const throws -> String { return m_note; }
+  pure fn note() const wontthrow -> const String & { return m_note; }
 
 protected:
   fn note_to_string() const throws -> String;
 
-  bool m_is_active{false};
   bool m_is_script_fatal{false};
-  bool m_was_rendered{false};
   i64 m_command_status{1};
   String m_message{heap_allocator()};
   String m_note{heap_allocator()};
@@ -69,34 +55,25 @@ protected:
 class Error : public ErrorBase
 {
 public:
-  Error();
   Error(StringView message);
+  Error(StringView message, StringView note);
 
   fn to_string() const throws -> String;
   using ErrorBase::to_string;
-
-  operator String() const throws;
 };
 
-class ErrorWithDetails : public Error
-{
-public:
-  ErrorWithDetails(StringView message, StringView note);
-};
+using ErrorWithDetails = Error;
 
 class Warning : public Error
 {
 public:
   Warning(StringView message);
+  Warning(StringView message, StringView note);
 
-  fn severity_word() const wontthrow -> String override;
+  fn severity_word() const wontthrow -> StringView override;
 };
 
-class WarningWithDetails : public Warning
-{
-public:
-  WarningWithDetails(StringView message, StringView note);
-};
+using WarningWithDetails = Warning;
 
 /* The mimic boundary tests this type, never the message text, so a
    program-thrown Error reading "Interrupted" is not mistaken for it. */
@@ -111,15 +88,7 @@ class Note : public Error
 public:
   Note(StringView message);
 
-  fn severity_word() const wontthrow -> String override;
-};
-
-/* Thrown when an exec fails with ENOEXEC, so the runtime runs the file as a
-   shell script, the POSIX fallback. It is always caught and never shown. */
-class ExecFormatError : public Error
-{
-public:
-  ExecFormatError();
+  fn severity_word() const wontthrow -> StringView override;
 };
 
 /* Thrown by print_to_stdout and print_to_stderr when write returns EPIPE,
@@ -135,9 +104,9 @@ public:
 class ErrorWithLocation : public ErrorBase
 {
 public:
-  ErrorWithLocation();
-
   ErrorWithLocation(SourceLocation location, StringView message);
+  ErrorWithLocation(SourceLocation location, StringView message,
+                    StringView note);
 
   virtual fn to_string(StringView source) const throws -> String;
 
@@ -151,9 +120,13 @@ public:
     m_location = location;
   }
 
+  fn set_rendered() wontthrow -> void { m_was_rendered = true; }
+  pure fn was_rendered() const wontthrow -> bool { return m_was_rendered; }
+
 protected:
   SourceLocation m_location;
   usize m_line_offset{0};
+  bool m_was_rendered{false};
 };
 
 class CommandResolutionError : public ErrorWithLocation
@@ -169,34 +142,28 @@ class WarningWithLocation : public ErrorWithLocation
 {
 public:
   WarningWithLocation(SourceLocation location, StringView message);
+  WarningWithLocation(SourceLocation location, StringView message,
+                      StringView note);
 
-  fn severity_word() const wontthrow -> String override;
+  fn severity_word() const wontthrow -> StringView override;
 };
 
-class WarningWithLocationAndDetails : public WarningWithLocation
-{
-public:
-  WarningWithLocationAndDetails(SourceLocation location, StringView message,
-                                StringView note);
-};
+using WarningWithLocationAndDetails = WarningWithLocation;
 
 class TraceWithLocation : public ErrorWithLocation
 {
 public:
   TraceWithLocation(SourceLocation location);
 
-  fn severity_word() const wontthrow -> String override;
+  fn severity_word() const wontthrow -> StringView override;
 };
 
 class ErrorWithLocationAndDetails : public ErrorWithLocation
 {
 public:
-  ErrorWithLocationAndDetails();
-
   ErrorWithLocationAndDetails(SourceLocation location, StringView message,
                               SourceLocation details_location,
                               StringView details_message);
-
   ErrorWithLocationAndDetails(SourceLocation location, StringView message,
                               StringView note);
 
@@ -210,15 +177,8 @@ protected:
 [[noreturn]] inline fn relocate_error(const ErrorBase &error,
                                       SourceLocation location) throws -> void
 {
-  if (error.has_note()) {
-    let relocated = ErrorWithLocationAndDetails{
-        location, error.message().view(), error.note().view()};
-    if (error.is_script_fatal()) relocated.set_script_fatal();
-    relocated.set_command_status(error.command_status());
-    throw relocated;
-  }
-
-  let relocated = ErrorWithLocation{location, error.message().view()};
+  let relocated =
+      ErrorWithLocation{location, error.message().view(), error.note().view()};
   if (error.is_script_fatal()) relocated.set_script_fatal();
   relocated.set_command_status(error.command_status());
   throw relocated;

@@ -143,6 +143,9 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
         names.add(name);
       });
   m_associative_names.for_each([&](StringView name) { names.add(name); });
+#if !defined NDEBUG
+  m_debug_variable_name_enumeration_count += names.count();
+#endif
   return names;
 }
 

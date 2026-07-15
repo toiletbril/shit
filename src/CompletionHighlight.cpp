@@ -328,12 +328,15 @@ constexpr StaticStringMap HIGHLIGHT_KEYWORDS{HIGHLIGHT_KEYWORD_ENTRIES};
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
                                ArrayList<highlight_span> &spans,
-                               HashSet &known_vars) throws -> void;
+                               HashSet &line_variable_names,
+                               bool stop_at_closing_parenthesis = false) throws
+    -> usize;
 
 static fn color_arithmetic(StringView line, usize begin, usize end,
                            EvalContext &context,
                            ArrayList<highlight_span> &spans,
-                           HashSet &known_vars) throws -> void;
+                           HashSet &line_variable_names,
+                           bool stop_at_closing_parentheses) throws -> usize;
 
 static fn word_names_existing_path(StringView word) throws -> bool
 {
@@ -392,7 +395,13 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
     return true;
   };
 
-  for (let const &entry : *entries)
+  let entry_position =
+      utils::directory_entry_name_lower_bound(*entries, partial);
+  while (entry_position < entries->count() &&
+         utils::directory_entry_name_has_casefold_prefix(
+             (*entries)[entry_position].name.view(), partial))
+  {
+    let const &entry = (*entries)[entry_position];
     if (do_name_starts_with(entry.name.view()) &&
         (!directories_only ||
          utils::directory_entry_kind(listing_directory, entry) ==
@@ -400,6 +409,8 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
     {
       return true;
     }
+    entry_position++;
+  }
 
   return false;
 }
@@ -536,70 +547,43 @@ static fn simple_dollar_name(StringView line, usize i,
 
 /* Read without side effect so the highlighter never advances RANDOM or reads
    the clock. */
-static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
-    -> bool
+static fn dollar_name_is_set(StringView name,
+                             const HashSet &line_variable_names,
+                             EvalContext &context) throws -> bool
 {
   if (name.is_empty()) return true;
   if (name.length == 1 && !is_highlight_name_start(name[0])) return true;
 
   if (name.is_all_decimal_digits()) return true;
 
-  if (known_vars.contains(name)) return true;
+  if (line_variable_names.contains(name) || context.has_variable_name(name))
+    return true;
   return os::get_environment_variable(name).has_value();
-}
-
-static fn scan_matching_paren(StringView line, usize open_at, usize end,
-                              usize &close_out) wontthrow -> usize
-{
-  usize depth = 0;
-  close_out = end;
-  usize j = open_at;
-  for (; j < end; j++) {
-    if (line[j] == '(')
-      depth++;
-    else if (line[j] == ')') {
-      depth--;
-      if (depth == 0) {
-        close_out = j;
-        j++;
-        break;
-      }
-    }
-  }
-  return j;
 }
 
 static fn color_dollar(StringView line, usize i, usize end,
                        ArrayList<highlight_span> &spans, EvalContext &context,
-                       HashSet &known_vars) throws -> usize
+                       HashSet &line_variable_names) throws -> usize
 {
   /* $(( ... )) frames an arithmetic expression, so its inside colors as bare
      names, numbers, and operators. */
   if (i + 2 < end && line[i + 1] == '(' && line[i + 2] == '(') {
-    usize close = end;
-    let const j = scan_matching_paren(line, i + 1, end, close);
     let const inner_begin = i + 3 < end ? i + 3 : end;
-    /* An unterminated $(( )) colors through to the end. */
-    let inner_end = close < end && close >= 1 ? close - 1 : end;
-    if (inner_end < inner_begin) inner_end = inner_begin;
-    color_arithmetic(line, inner_begin, inner_end, context, spans, known_vars);
-    return j;
+    return color_arithmetic(line, inner_begin, end, context, spans,
+                            line_variable_names, true);
   }
 
   if (i + 1 < end && line[i + 1] == '(') {
-    usize close = end;
-    let const j = scan_matching_paren(line, i + 1, end, close);
     let const inner_begin = i + 2 < end ? i + 2 : end;
-    let const inner_end = close < inner_begin ? inner_begin : close;
-    scan_highlight_range(line, inner_begin, inner_end, context, spans,
-                         known_vars);
-    return j;
+    return scan_highlight_range(line, inner_begin, end, context, spans,
+                                line_variable_names, true);
   }
   let const expansion_end = scan_dollar_expansion(line, i, end);
   if (expansion_end > i) {
     let sgr = colors::ansi::CYAN;
     if (Maybe<StringView> name = simple_dollar_name(line, i, expansion_end);
-        name.has_value() && !dollar_name_is_set(*name, known_vars))
+        name.has_value() &&
+        !dollar_name_is_set(*name, line_variable_names, context))
       sgr = colors::ansi::BOLD_RED;
     spans.push(highlight_span{i, expansion_end, sgr});
   }
@@ -609,15 +593,37 @@ static fn color_dollar(StringView line, usize i, usize end,
 static fn color_arithmetic(StringView line, usize begin, usize end,
                            EvalContext &context,
                            ArrayList<highlight_span> &spans,
-                           HashSet &known_vars) throws -> void
+                           HashSet &line_variable_names,
+                           bool stop_at_closing_parentheses) throws -> usize
 {
   usize i = begin;
+  usize parenthesis_depth = 0;
   while (i < end) {
     let const c = line[i];
 
     if (c == '$') {
-      let const next = color_dollar(line, i, end, spans, context, known_vars);
+      let const next =
+          color_dollar(line, i, end, spans, context, line_variable_names);
       i = next > i ? next : i + 1;
+      continue;
+    }
+
+    if (c == '(') {
+      parenthesis_depth++;
+      spans.push(highlight_span{i, i + 1, colors::ansi::BOLD});
+      i++;
+      continue;
+    }
+
+    if (c == ')') {
+      if (parenthesis_depth == 0 && stop_at_closing_parentheses &&
+          i + 1 < end && line[i + 1] == ')')
+      {
+        return i + 2;
+      }
+      if (parenthesis_depth > 0) parenthesis_depth--;
+      spans.push(highlight_span{i, i + 1, colors::ansi::BOLD});
+      i++;
       continue;
     }
 
@@ -626,10 +632,11 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
       while (i < end && is_highlight_name_char(line[i]))
         i++;
       let const name = line.substring_of_length(name_start, i - name_start);
-      spans.push(highlight_span{name_start, i,
-                                dollar_name_is_set(name, known_vars)
-                                    ? colors::ansi::CYAN
-                                    : colors::ansi::BOLD_RED});
+      spans.push(
+          highlight_span{name_start, i,
+                         dollar_name_is_set(name, line_variable_names, context)
+                             ? colors::ansi::CYAN
+                             : colors::ansi::BOLD_RED});
       continue;
     }
 
@@ -646,11 +653,14 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
 
     let const operator_start = i;
     while (i < end && line[i] != '$' && !is_highlight_name_start(line[i]) &&
+           line[i] != '(' && line[i] != ')' &&
            !(line[i] >= '0' && line[i] <= '9') &&
            !lexer::is_whitespace(line[i]))
       i++;
     spans.push(highlight_span{operator_start, i, colors::ansi::BOLD});
   }
+
+  return i;
 }
 
 struct heredoc_pending_highlight
@@ -715,7 +725,8 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
                                ArrayList<highlight_span> &spans,
-                               HashSet &known_vars) throws -> void
+                               HashSet &line_variable_names,
+                               bool stop_at_closing_parenthesis) throws -> usize
 {
   let do_push = [&](usize start, usize stop, StringView sgr) throws -> void {
     if (start < stop) spans.push(highlight_span{start, stop, sgr});
@@ -725,7 +736,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       ArrayList<StringView>{bump_allocator(HIGHLIGHT_ARENA)};
   let commit_pending_assignments = [&]() throws -> void {
     for (let const &name : pending_assignment_names)
-      known_vars.add(name);
+      line_variable_names.add(name);
     pending_assignment_names.clear();
   };
 
@@ -738,7 +749,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   let for_variable_pending = false;
   let for_do_expected = false;
   let function_name_pending = false;
+  let case_pattern_expected = false;
   let line_functions = HashSet{bump_allocator(HIGHLIGHT_ARENA)};
+  usize parenthesis_depth = 0;
 
   let i = begin;
   while (i < end) {
@@ -763,8 +776,12 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     }
 
     if (c == '#') {
-      do_push(i, end, colors::ansi::DIM);
-      break;
+      let comment_end = i;
+      while (comment_end < end && line[comment_end] != '\n')
+        comment_end++;
+      do_push(i, comment_end, colors::ansi::DIM);
+      i = comment_end;
+      continue;
     }
 
     /* <<< is a one-line here-string and falls through to the operator scan. */
@@ -838,10 +855,35 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           break;
         }
       }
-      do_push(operator_start, i, colors::ansi::BOLD);
+      let const closes_range = has_closer && parenthesis_depth == 0 &&
+                               stop_at_closing_parenthesis &&
+                               !case_pattern_expected;
+      if (!closes_range) do_push(operator_start, i, colors::ansi::BOLD);
 
       if (has_separator || has_opener || has_closer)
         commit_pending_assignments();
+
+      if (has_opener) parenthesis_depth++;
+      if (has_closer) {
+        if (case_pattern_expected && !stack.is_empty() &&
+            stack.back() == highlight_construct::case_)
+        {
+          case_pattern_expected = false;
+          is_command_position = true;
+        } else if (parenthesis_depth > 0)
+          parenthesis_depth--;
+        else if (stop_at_closing_parenthesis)
+          return i;
+      }
+
+      if (has_separator && operator_start + 1 < i &&
+          line[operator_start] == ';' &&
+          (line[operator_start + 1] == ';' ||
+           line[operator_start + 1] == '&') &&
+          !stack.is_empty() && stack.back() == highlight_construct::case_)
+      {
+        case_pattern_expected = true;
+      }
 
       if (has_opener || (has_separator && !has_redirect)) {
         is_command_position = true;
@@ -876,7 +918,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
             if (i > literal_start)
               word_spans.push(
                   highlight_span{literal_start, i, colors::ansi::YELLOW});
-            i = color_dollar(line, i, end, word_spans, context, known_vars);
+            i = color_dollar(line, i, end, word_spans, context,
+                             line_variable_names);
             literal_start = i;
             continue;
           }
@@ -903,9 +946,10 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         let const inner_end = i;
         if (i < end) i++;
         scan_highlight_range(line, inner_begin, inner_end, context, word_spans,
-                             known_vars);
+                             line_variable_names);
       } else if (d == '$') {
-        i = color_dollar(line, i, end, word_spans, context, known_vars);
+        i = color_dollar(line, i, end, word_spans, context,
+                         line_variable_names);
       } else if (d == '\\' && i + 1 < end) {
         i += 2;
       } else {
@@ -945,6 +989,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       /* A case takes patterns, so this only arms for a for. */
       if (!stack.is_empty() && stack.back() == highlight_construct::for_)
         for_do_expected = true;
+      if (!stack.is_empty() && stack.back() == highlight_construct::case_)
+        case_pattern_expected = true;
       continue;
     }
 
@@ -957,7 +1003,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         do_push(word_start, word_end, colors::ansi::BOLD_RED);
       } else {
         do_push(word_start, word_end, colors::ansi::CYAN);
-        known_vars.add(word);
+        line_variable_names.add(word);
       }
       continue;
     }
@@ -1092,6 +1138,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   }
 
   commit_pending_assignments();
+  return i;
 }
 
 fn highlight_line(StringView line, EvalContext &context) throws
@@ -1100,17 +1147,9 @@ fn highlight_line(StringView line, EvalContext &context) throws
   HIGHLIGHT_ARENA.reset();
   let const arena = bump_allocator(HIGHLIGHT_ARENA);
   let spans = ArrayList<highlight_span>{arena};
-  /* A line with no $ never references a variable, so the walk over the variable
-     store is skipped on the common plain-command keystroke. */
-  let known_vars = HashSet{arena};
-  if (line.find_character('$').has_value()) {
-    known_vars = context.variable_names(arena);
-    let dynamic_names = ArrayList<StringView>{arena};
-    context.append_dynamic_variable_names(dynamic_names);
-    for (let const &name : dynamic_names)
-      known_vars.add(name);
-  }
-  scan_highlight_range(line, 0, line.length, context, spans, known_vars);
+  let line_variable_names = HashSet{arena};
+  scan_highlight_range(line, 0, line.length, context, spans,
+                       line_variable_names);
   return spans;
 }
 

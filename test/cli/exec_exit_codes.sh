@@ -18,3 +18,17 @@ echo "== exec replaces the shell and runs the command:"
 "$BIN" -c 'exec echo replaced'
 echo "== exec in a command substitution runs as a child:"
 "$BIN" -c 'echo "[$(exec echo sub)]"'
+
+echo "== direct no-shebang exec starts a replacement shell:"
+d=$(mktemp -d)
+printf '%s\n' \
+    'if type inherited_function >/dev/null 2>&1; then function=present; else function=unset; fi' \
+    'printf "hidden=%s shown=%s function=%s zero=%s arg=%s\n" "${hidden-unset}" "${shown-unset}" "$function" "$0" "$1"' \
+    > "$d/plain"
+chmod +x "$d/plain"
+"$BIN" -c 'hidden=private; shown=exported; export shown; inherited_function() { :; }; trap "echo stale-exit-trap" EXIT; exec -a custom "$1" value > "$2"' shell "$d/plain" "$d/out"
+cat "$d/out"
+
+echo "== direct no-shebang exec honors an empty environment:"
+"$BIN" -c 'shown=exported; export shown; exec -c -a empty "$1" value' shell "$d/plain"
+[ -n "$d" ] && /bin/rm -rf "$d"

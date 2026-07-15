@@ -783,9 +783,8 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output,
                 Maybe<descriptor> inherited_handle = {}) throws
     -> Maybe<measured_result>;
 
-/* allow_script_fallback lets a single foreground command report an ENOEXEC file
-   to the caller through ExecFormatError. new_process_group puts the child in
-   its own process group so it can own the controlling terminal. */
+/* Script fallback returns SHIT_INVALID_PROCESS when it is allowed and the file
+   has no executable format. */
 fn execute_program(ExecContext &&ec, bool allow_script_fallback = false,
                    bool new_process_group = false,
                    StringView source = {}) throws -> process;
@@ -830,7 +829,7 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
 [[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void;
 
 /* It does not fork, so on success it never returns. */
-[[noreturn]] fn replace_process(ExecContext &&ec) throws -> void;
+fn replace_process(ExecContext &&ec) throws -> void;
 
 fn redirect_self(const ExecContext &ec) throws -> void;
 

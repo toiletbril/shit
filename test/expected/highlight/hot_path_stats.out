@@ -1,0 +1,25 @@
+echo	\e[34m
+$(	\e[31m
+highlight-variable-name-visits=0
+== a substitution comment ends at its newline:
+echo	\e[34m
+true	\e[34m
+# comment	\e[2m
+echo	\e[34m
+== nested command substitution does not close arithmetic:
+echo	\e[34m
++	\e[1m
+printf	\e[34m
+")"	\e[33m
++	\e[1m
+;	\e[1m
+echo	\e[34m
+== a case pattern does not close command highlighting:
+echo	\e[34m
+case	\e[32m
+in	\e[32m
+)	\e[1m
+probecmd	\e[34m
+;;	\e[1m
+esac	\e[32m
+)	\e[1m

@@ -77,8 +77,14 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
                       bool for_listing, EvalContext &context,
                       StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
-fn command_substitution_body_start(StringView line, usize cursor) throws
-    -> usize;
+struct completion_command_range
+{
+  usize start;
+  usize end;
+};
+
+fn command_substitution_range(StringView line, usize cursor) throws
+    -> completion_command_range;
 
 } /* namespace completion */
 

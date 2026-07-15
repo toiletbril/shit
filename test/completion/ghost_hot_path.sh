@@ -52,9 +52,45 @@ echo 'command ghost deduplicates sources'
 filesystem_result=$(PATH=/bin "$BIN" --debug-ghost-at "echo $d/probe")
 printf '%s\n' "$filesystem_result" | grep -q '^count=2$'
 printf '%s\n' "$filesystem_result" | grep -q "^prefix=$d/probe-$"
-printf '%s\n' "$filesystem_result" | grep -q '^source-scans=3$'
+printf '%s\n' "$filesystem_result" | grep -q '^source-scans=2$'
 printf '%s\n' "$filesystem_result" | grep -q '^materialized=0$'
 echo 'filesystem ghost streams its prefix'
+
+mkdir "$d/filesystem-large"
+cp "$d/probe-alpha" "$d/probe-beta" "$d/filesystem-large"
+filesystem_index=0
+while [ "$filesystem_index" -lt 128 ]; do
+    : > "$d/filesystem-large/unrelated-$filesystem_index"
+    filesystem_index=$((filesystem_index + 1))
+done
+filesystem_large_result=$(PATH=/bin "$BIN" \
+    --debug-ghost-at "echo $d/filesystem-large/probe")
+filesystem_small_scan_count=
+filesystem_large_scan_count=
+while IFS='=' read -r field value; do
+    if [ "$field" = source-scans ]; then filesystem_small_scan_count=$value; fi
+done <<EOF
+$filesystem_result
+EOF
+while IFS='=' read -r field value; do
+    if [ "$field" = source-scans ]; then filesystem_large_scan_count=$value; fi
+done <<EOF
+$filesystem_large_result
+EOF
+test "$filesystem_small_scan_count" = "$filesystem_large_scan_count"
+printf '%s\n' "$filesystem_large_result" | grep -q '^count=2$'
+printf '%s\n' "$filesystem_large_result" | \
+    grep -q "^prefix=$d/filesystem-large/probe-$"
+printf '%s\n' "$filesystem_large_result" | grep -q '^materialized=0$'
+echo 'filesystem ghost skips unrelated directory entries'
+
+: > "$d/filesystem-large/foo_bar_baz"
+filesystem_fuzzy_result=$(PATH=/bin "$BIN" \
+    --debug-ghost-at "echo $d/filesystem-large/fbb")
+printf '%s\n' "$filesystem_fuzzy_result" | grep -q '^count=1$'
+printf '%s\n' "$filesystem_fuzzy_result" | \
+    grep -q "^prefix=$d/filesystem-large/foo_bar_baz$"
+echo 'filesystem ghost retains fuzzy fallback'
 
 if [ "${OS-}" != Windows_NT ]; then
     mkdir "$d/identity"

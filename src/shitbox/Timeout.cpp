@@ -200,15 +200,14 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
   let command = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_program(*program_path),
       steal(command_args), steal(command_locations));
-  os::process child = SHIT_INVALID_PROCESS;
-  try {
-    let const source = cxt.current_source();
-    child =
-        os::execute_program(steal(command), true, true,
-                            source != nullptr ? source->view() : StringView{});
-  } catch (const ExecFormatError &) {
+  let const source = cxt.current_source();
+  os::process child =
+      os::execute_program(steal(command), true, true,
+                          source != nullptr ? source->view() : StringView{});
+  if (child == SHIT_INVALID_PROCESS) {
     let const shell_path = os::current_executable_path();
-    if (!shell_path.has_value()) throw;
+    if (!shell_path.has_value())
+      throw Error{"Could not locate the shell for script fallback"};
 
     let fallback_args = ArrayList<String>{cxt.scratch_allocator()};
     let fallback_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
@@ -227,7 +226,6 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
         ec.source_location(),
         ResolvedCommand::from_program(Path{shell_path->view()}),
         steal(fallback_args), steal(fallback_locations));
-    let const source = cxt.current_source();
     child =
         os::execute_program(steal(fallback), false, true,
                             source != nullptr ? source->view() : StringView{});

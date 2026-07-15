@@ -90,8 +90,17 @@ fn format_time_report_custom(StringView format, double real_seconds,
                              double user_seconds, double system_seconds) throws
     -> String;
 
-/* The 1-based line number the byte at position falls on. The newline table is
-   cached on the source pointer and length, holding one source at a time. */
+/* The zero-based line number the byte at position falls on. The newline table
+   is cached on the source pointer and length, holding one source at a time. */
+struct source_line_position
+{
+  usize line_number;
+  usize line_start;
+  usize line_end;
+};
+
+fn source_line_position_at(StringView source, usize position) throws
+    -> source_line_position;
 fn line_number_at(StringView source, usize position) throws -> usize;
 
 /* Dropped when the host frees a retained source, so a later source at the same
@@ -127,6 +136,12 @@ fn read_directory_cached(const Path &directory,
                          bool should_invalidate_path_cache = true,
                          bool should_validate = true) throws
     -> const ArrayList<Path::directory_child> *;
+pure fn directory_entry_name_lower_bound(
+    const ArrayList<Path::directory_child> &entries, StringView name) wontthrow
+    -> usize;
+pure fn directory_entry_name_has_casefold_prefix(StringView name,
+                                                 StringView prefix) wontthrow
+    -> bool;
 fn directory_entry_kind(const Path &directory,
                         const Path::directory_child &entry) throws
     -> Path::entry_kind;
@@ -145,6 +160,7 @@ pure fn debug_executable_probe_count() wontthrow -> usize;
 fn clear_path_map() throws -> void;
 
 fn invalidate_path_cache() throws -> void;
+fn working_directory_changed() throws -> void;
 
 fn file_content_identity(const Path &path, Allocator allocator) throws
     -> Maybe<String>;

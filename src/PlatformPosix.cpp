@@ -1049,7 +1049,7 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
      behavior. The check runs before the fds close so the script keeps them. */
   if (spawn_error == ENOEXEC && allow_script_fallback) {
     was_fds_handed_to_fallback = true;
-    throw shit::ExecFormatError{};
+    return SHIT_INVALID_PROCESS;
   }
 
   ec.close_fds();
@@ -1383,7 +1383,7 @@ fn replace_process(ExecContext &&ec) throws -> void
              : environ);
 
   let const exec_error = errno;
-  if (exec_error == ENOEXEC) throw shit::ExecFormatError{};
+  if (exec_error == ENOEXEC) return;
   /* The reason is read before the concatenation, which allocates and could
      clobber errno. */
   errno = exec_error;

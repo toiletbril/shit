@@ -114,6 +114,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Info, "cd changing directory to '%s'", arg_path.c_str());
 
   let target = Path{arg_path};
+  let old_directory = Path{};
 
   /* An empty CDPATH entry, including one a leading, trailing, or doubled colon
      makes, names the current directory. */
@@ -175,15 +176,10 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   {
     target = target.to_absolute().normalized();
   } else {
-    let const logical_pwd = cxt.get_variable_value("PWD");
-    let logical_target = Path{};
-    if (logical_pwd.has_value() && !logical_pwd->is_empty() &&
-        os::path_is_absolute(logical_pwd->view()))
-    {
-      logical_target = Path{logical_pwd->view()}
-                           .push_component(target.text().view())
-                           .normalized();
-    }
+    old_directory = logical_working_directory(cxt);
+    let logical_target = Path{old_directory.text().view()};
+    logical_target.push_component(target.text().view());
+    logical_target = logical_target.normalized();
 
     if (!logical_target.is_empty() && logical_target.is_directory()) {
       target = steal(logical_target);
@@ -200,15 +196,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (target.exists()) {
-    /* OLDPWD takes the logical PWD so a later cd - returns through the same
-       symlinks. An unset or relative PWD falls back to the physical directory.
-     */
-    let const logical_pwd = cxt.get_variable_value("PWD");
-    let const old_directory =
-        (logical_pwd.has_value() && !logical_pwd->is_empty() &&
-         os::path_is_absolute(logical_pwd->view()))
-            ? Path{logical_pwd->view()}
-            : Path::current_directory();
+    if (old_directory.is_empty())
+      old_directory = logical_working_directory(cxt);
     /* A path that exists can still refuse the move, so the chdir failure throws
        before PWD and OLDPWD are rewritten, leaving them untouched like dash. */
     if (Path::set_current_directory(target).is_error()) {
@@ -219,7 +208,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     /* A relative or empty PATH entry now names a different directory, so a
        cached resolution is marked stale for the next command to re-resolve. */
-    utils::invalidate_path_cache();
+    utils::working_directory_changed();
     if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());

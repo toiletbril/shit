@@ -1192,11 +1192,14 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
       [&]() { startup_info.hStdError = startup_info.hStdOutput; },
       [&]() { startup_info.hStdOutput = startup_info.hStdError; });
 
+  bool were_handles_handed_to_fallback = false;
   defer
   {
-    if (ec.in_fd) CloseHandle(*ec.in_fd);
-    if (ec.out_fd) CloseHandle(*ec.out_fd);
-    if (ec.err_fd) CloseHandle(*ec.err_fd);
+    if (!were_handles_handed_to_fallback) {
+      if (ec.in_fd) CloseHandle(*ec.in_fd);
+      if (ec.out_fd) CloseHandle(*ec.out_fd);
+      if (ec.err_fd) CloseHandle(*ec.err_fd);
+    }
   };
 
   inherited_handle_state input_inheritance{};
@@ -1227,8 +1230,10 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
                      should_inherit_handles, creation_flags, environment_block,
                      nullptr, &startup_info, &process_info) == 0)
   {
-    if (allow_script_fallback && GetLastError() == ERROR_BAD_EXE_FORMAT)
-      throw ExecFormatError{};
+    if (allow_script_fallback && GetLastError() == ERROR_BAD_EXE_FORMAT) {
+      were_handles_handed_to_fallback = true;
+      return SHIT_INVALID_PROCESS;
+    }
     throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
   }
 
@@ -1400,7 +1405,13 @@ fn replace_process(ExecContext &&ec) -> void
      shell exits with its status. */
   LOG(Debug, "running '%s' to completion in place of an exec",
       ec.program_path().c_str());
-  process child = execute_program(steal(ec));
+  process child = execute_program(steal(ec), true);
+  if (child == SHIT_INVALID_PROCESS) {
+    redirect_self(ec);
+    ec.close_fds();
+    return;
+  }
+
   i32 status = wait_and_monitor_process(child);
   ExitProcess(static_cast<UINT>(status));
   unreachable();
@@ -1412,16 +1423,26 @@ fn redirect_self(const ExecContext &ec) -> void
      close of the original handles leaves the shell's new standard handles
      valid for the rest of the session. */
   HANDLE self = GetCurrentProcess();
-  HANDLE duplicate = nullptr;
-  if (ec.in_fd && DuplicateHandle(self, *ec.in_fd, self, &duplicate, 0, TRUE,
-                                  DUPLICATE_SAME_ACCESS))
-    SetStdHandle(STD_INPUT_HANDLE, duplicate);
-  if (ec.out_fd && DuplicateHandle(self, *ec.out_fd, self, &duplicate, 0, TRUE,
-                                   DUPLICATE_SAME_ACCESS))
-    SetStdHandle(STD_OUTPUT_HANDLE, duplicate);
-  if (ec.err_fd && DuplicateHandle(self, *ec.err_fd, self, &duplicate, 0, TRUE,
-                                   DUPLICATE_SAME_ACCESS))
-    SetStdHandle(STD_ERROR_HANDLE, duplicate);
+  let const do_replace_standard_handle = [&](DWORD standard_handle,
+                                             HANDLE source_handle) {
+    HANDLE duplicate_handle = nullptr;
+    if (DuplicateHandle(self, source_handle, self, &duplicate_handle, 0, TRUE,
+                        DUPLICATE_SAME_ACCESS) != 0)
+      SetStdHandle(standard_handle, duplicate_handle);
+  };
+
+  if (ec.in_fd) do_replace_standard_handle(STD_INPUT_HANDLE, *ec.in_fd);
+  if (ec.out_fd) do_replace_standard_handle(STD_OUTPUT_HANDLE, *ec.out_fd);
+  if (ec.err_fd) do_replace_standard_handle(STD_ERROR_HANDLE, *ec.err_fd);
+  ec.apply_dup_routing(
+      [&]() {
+        do_replace_standard_handle(STD_ERROR_HANDLE,
+                                   GetStdHandle(STD_OUTPUT_HANDLE));
+      },
+      [&]() {
+        do_replace_standard_handle(STD_OUTPUT_HANDLE,
+                                   GetStdHandle(STD_ERROR_HANDLE));
+      });
 }
 
 fn make_pipe() wontthrow -> Maybe<Pipe>

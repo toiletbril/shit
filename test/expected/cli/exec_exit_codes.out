@@ -17,3 +17,7 @@ rc=126
 replaced
 == exec in a command substitution runs as a child:
 [sub]
+== direct no-shebang exec starts a replacement shell:
+hidden=unset shown=exported function=unset zero=custom arg=value
+== direct no-shebang exec honors an empty environment:
+hidden=unset shown=unset function=unset zero=empty arg=value
