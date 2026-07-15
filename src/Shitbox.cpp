@@ -202,17 +202,9 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   ec.print_to_stdout(help_text);
 }
 
-fn read_fd_to_string(os::descriptor fd) throws -> String
+fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>
 {
-  String contents{heap_allocator()};
-  char buffer[4096];
-  loop
-  {
-    let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
-    if (!read_count.has_value() || *read_count == 0) break;
-    contents.append(StringView{buffer, *read_count});
-  }
-  return contents;
+  return os::read_fd_to_string(fd, heap_allocator());
 }
 
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws

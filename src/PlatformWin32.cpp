@@ -165,7 +165,10 @@ fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32
 
 fn close_fd(os::descriptor fd) wontthrow -> bool
 {
-  return CloseHandle(fd) != FALSE;
+  const DWORD prior_error = GetLastError();
+  if (CloseHandle(fd) == FALSE) return false;
+  SetLastError(prior_error);
+  return true;
 }
 
 fn TempFileSet::track(Path path) throws -> void { m_paths.push(steal(path)); }
@@ -2002,6 +2005,11 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
    */
   status.blocks = (static_cast<u64>(info.st_size) + 511) / 512;
   return true;
+}
+
+fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
+{
+  return stat_path(path, status);
 }
 
 fn format_mode_string(u32 mode) throws -> String

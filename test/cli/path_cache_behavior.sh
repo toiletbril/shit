@@ -22,6 +22,44 @@ PATH="$dir/blocked:$dir/two:/bin" "$BIN" -c \
 PATH="$dir/blocked:$dir/two:/bin" "$BIN" -c \
     'compgen -c >/dev/null 2>&1; blockedprobe >/dev/null 2>&1; printf "%s\n" "$?"'
 
+mkdir "$dir/warm-first" "$dir/warm-second"
+printf '#!/bin/sh\necho stale-first\n' > "$dir/warm-first/warmprobe"
+printf '#!/bin/sh\necho warm-second\n' > "$dir/warm-second/warmprobe"
+chmod +x "$dir/warm-first/warmprobe" "$dir/warm-second/warmprobe"
+WARM_FIRST="$dir/warm-first/warmprobe" \
+    PATH="$dir/warm-first:$dir/warm-second:/bin" "$BIN" -c \
+    'compgen -c warmprobe >/dev/null 2>&1; /bin/rm -f "$WARM_FIRST"; warmprobe'
+
+mkdir "$dir/blocked-later"
+: > "$dir/blocked-later/recoverprobe"
+printf '#!/bin/sh\necho recovered\n' > "$dir/staged-recover"
+chmod +x "$dir/staged-recover"
+RECOVER_DIRECTORY="$dir/blocked-later" RECOVER_STAGED="$dir/staged-recover" \
+    PATH="$dir/blocked-later:/bin" "$BIN" -c \
+    'recoverprobe >/dev/null 2>&1; /bin/mv "$RECOVER_STAGED" "$RECOVER_DIRECTORY/recoverprobe"; recoverprobe'
+
+mkdir "$dir/completion-refresh"
+printf '#!/bin/sh\n' > "$dir/completion-staged"
+chmod +x "$dir/completion-staged"
+COMPLETION_DIRECTORY="$dir/completion-refresh" \
+    COMPLETION_STAGED="$dir/completion-staged" \
+    PATH="$dir/completion-refresh:/bin" "$BIN" -c \
+    'compgen -c addedprobe 2>/dev/null; /bin/mv "$COMPLETION_STAGED" "$COMPLETION_DIRECTORY/addedprobe"; compgen -c addedprobe 2>/dev/null; /bin/rm -f "$COMPLETION_DIRECTORY/addedprobe"; printf "removed="; compgen -c addedprobe 2>/dev/null'
+
+printf '#!/bin/sh\n' > "$dir/completion-refresh/modeprobe"
+chmod -x "$dir/completion-refresh/modeprobe"
+MODE_PROBE="$dir/completion-refresh/modeprobe" \
+    PATH="$dir/completion-refresh:/bin" "$BIN" -c \
+    'compgen -c modeprobe 2>/dev/null; /bin/chmod +x "$MODE_PROBE"; compgen -c modeprobe 2>/dev/null'
+
+mkdir "$dir/completion-target"
+ln -s "$dir/completion-target" "$dir/completion-link"
+printf '#!/bin/sh\n' > "$dir/symlink-staged"
+chmod +x "$dir/symlink-staged"
+SYMLINK_TARGET="$dir/completion-target" SYMLINK_STAGED="$dir/symlink-staged" \
+    PATH="$dir/completion-link:/bin" "$BIN" -c \
+    'compgen -c linkprobe 2>/dev/null; /bin/mv "$SYMLINK_STAGED" "$SYMLINK_TARGET/linkprobe"; compgen -c linkprobe 2>/dev/null'
+
 CACHE_COMMAND=refreshed CACHE_DIRECTORY="$dir/refresh" \
     CACHE_STAGED="$dir/staged" \
     PATH="$dir/refresh:/bin" "$BIN" -c \
@@ -111,3 +149,17 @@ else
     fi
 fi
 printf 'suffix-priority\n'
+
+mkdir "$dir/source-first" "$dir/source-second"
+printf 'echo sourced-non-runnable\n' > "$dir/source-first/sourceprobe"
+printf '#!/bin/sh\necho wrong-source\n' > "$dir/source-second/sourceprobe"
+chmod +x "$dir/source-second/sourceprobe"
+PATH="$dir/source-first:$dir/source-second:/bin" "$BIN" -c \
+    'source sourceprobe'
+
+mkdir "$dir/all-first" "$dir/all-second"
+printf '#!/bin/sh\n' > "$dir/all-first/allprobe"
+printf '#!/bin/sh\n' > "$dir/all-second/allprobe"
+chmod +x "$dir/all-first/allprobe" "$dir/all-second/allprobe"
+PATH="$dir/all-first:$dir/all-first:$dir/all-second:/bin" "$BIN" -c \
+    'type -a -p allprobe' | sed "s|$dir|DIR|g"

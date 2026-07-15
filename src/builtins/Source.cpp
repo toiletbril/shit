@@ -41,7 +41,8 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let source_path = Path{path.view()};
   if (!path.view().find_character('/').has_value()) {
-    let const path_matches = utils::search_program_path(path.view());
+    let const path_matches = utils::search_program_path(
+        path.view(), false, utils::program_path_requirement::Existing);
     if (!path_matches.is_empty())
       source_path = path_matches[0].clone();
     else if (cxt.is_posix_mode())

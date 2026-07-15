@@ -37,8 +37,13 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
   if (os::INTERRUPT_REQUESTED) return 130;
+  if (!input.has_value()) {
+    report_soft_shitbox_error(
+        ec, cxt, "tee: read failed: " + os::last_system_error_message());
+    return 1;
+  }
 
-  ec.print_to_stdout(input.view());
+  ec.print_to_stdout(input->view());
 
   let const mode = FLAG_TEE_APPEND.is_enabled() ? os::file_open_mode::Append
                                                 : os::file_open_mode::Truncate;
@@ -55,9 +60,9 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
        writes the rest until the whole input lands or a write fails. */
     usize written_count = 0;
     bool did_write_fail = false;
-    while (written_count < input.count()) {
-      let const chunk = os::write_fd(*fd, input.view().data + written_count,
-                                     input.count() - written_count);
+    while (written_count < input->count()) {
+      let const chunk = os::write_fd(*fd, input->view().data + written_count,
+                                     input->count() - written_count);
       if (!chunk.has_value() || *chunk == 0) {
         did_write_fail = true;
         break;

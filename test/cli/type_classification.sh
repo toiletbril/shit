@@ -15,4 +15,6 @@ echo "== default function spelling:"; "$BIN" -c 'f(){ :; }; type f'
 echo "== -a lists a keyword with no file:"; "$BIN" -c 'type -a for'
 echo "== -p stays silent for a builtin:"; "$BIN" -c 'type -p echo'; echo "rc=$?"
 echo "== -t stays silent for a missing name:"; "$BIN" -c 'type -t missing_xyz'; echo "rc=$?"
+echo "== the default mood classifies a missing coreutility fallback:"
+PATH= "$BIN" -c 'type -t calc; command -v calc; shitbox which calc'
 echo "== a missing name reports not found:"; "$BIN" -c 'type missing_xyz'; echo "rc=$?"

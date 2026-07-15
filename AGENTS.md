@@ -106,6 +106,12 @@ no-op since every builtin is always enabled in shit, and accepts the bash
 flags `-n`, `-a`, `-f`, and `-s` so a bash script that toggles builtins
 keeps sourcing.
 
+The `assimilate TARGET` builtin copies the running binary through scp and uses
+an SSH transaction to install it as `shit` in the first usable remote PATH
+directory. A hidden candidate is validated before the target is replaced. A
+handled failure restores the prior file or symlink and removes transaction
+files. `scripts/shit-scp` is a compatibility wrapper for this builtin.
+
 src/Platform.cpp routes the operating system implementation. POSIX targets use
 PlatformPosix.cpp as the base and PlatformPosixExtra.cpp for the Linux and
 Darwin overlays. Windows loads only PlatformWin32.cpp. Platform.hpp owns every

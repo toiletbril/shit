@@ -653,6 +653,17 @@ only when PATH holds none.
 .SH SHIT BUILTINS
 These builtins are unique to shit and have no counterpart in bash or dash.
 .TP
+.B assimilate TARGET
+The running shell is copied through scp to an SSH target and installed as
+.B shit
+in the first writable and searchable directory in the remote PATH. The
+candidate is validated before an atomic rename. An existing file or symlink is
+backed up in the same directory and restored when a handled validation or
+install step fails. Temporary upload, candidate, and backup files are removed
+after success and handled failure. A remote SIGKILL, power loss, or storage
+failure can leave a complete target or recoverable hidden staging files because
+the remote cleanup process cannot run after it stops.
+.TP
 .B bench
 Each command is run repeatedly as a measured child, and a summary of the wall
 time, the peak resident set, and the available perf counters is printed as mean,

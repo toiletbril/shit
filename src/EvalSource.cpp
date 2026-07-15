@@ -44,6 +44,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     throw ErrorWithLocation{ec.source_location(), "Unable to mimic '" +
                                                       ec.program() +
                                                       "' outside of a parse"};
+  let const ast_mark = AST_ARENA->mark();
+  defer { AST_ARENA->release(ast_mark); };
 
   let contents = ec.program_path().read_entire_file();
   if (!contents.has_value())
@@ -307,8 +309,6 @@ fn EvalContext::run_source(StringView source, StringView origin,
         Lexer{String{source}, *AST_ARENA, false, stable_filename, mood()}
     };
 
-    /* Retain the AST before evaluating, so a function it defines outlives this
-       call and a control-flow exception thrown inside still leaves it owned. */
     let const ast = parser.construct_ast();
     ASSERT(ast != nullptr);
     m_retained_source_asts.push(ast);

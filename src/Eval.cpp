@@ -54,7 +54,11 @@ fn EvalContext::add_evaluated_expression() wontthrow -> void
   m_expressions_executed_last++;
 }
 
-fn EvalContext::add_expansion() wontthrow -> void { m_expansions_last++; }
+fn EvalContext::add_expansion() wontthrow -> void
+{
+  if (!m_stats_enabled) return;
+  m_expansions_last++;
+}
 
 fn EvalContext::end_command() wontthrow -> void
 {
@@ -164,10 +168,10 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
 
 fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
 {
-  if (m_local_scopes.count() < 2) return false;
+  if (m_local_scope_depth < 2) return false;
   if (is_local_in_current_scope(name)) return false;
 
-  for (usize frame_index = m_local_scopes.count() - 1; frame_index-- > 0;) {
+  for (usize frame_index = m_local_scope_depth - 1; frame_index-- > 0;) {
     ArrayList<local_binding> &frame = m_local_scopes[frame_index];
     for (usize i = frame.count(); i-- > 0;) {
       let &binding = frame[i];
@@ -241,9 +245,15 @@ fn EvalContext::set_indexed_array(StringView name,
 
 fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 {
-  let single = ArrayList<String>{heap_allocator()};
-  single.push(String::from(status, heap_allocator()));
-  set_indexed_array("PIPESTATUS", steal(single));
+  if (is_readonly("PIPESTATUS"))
+    throw Error{"Unable to assign 'PIPESTATUS' because it is read only"};
+
+  m_shell_variables.erase("PIPESTATUS");
+  clear_sparse_array("PIPESTATUS");
+  let &values = m_indexed_arrays.get_or_create(
+      "PIPESTATUS", ArrayList<String>{heap_allocator()});
+  values.clear();
+  values.push(String::from(status, values.allocator()));
 }
 
 fn EvalContext::append_indexed_array(StringView name,
@@ -610,6 +620,17 @@ constexpr pure fn is_dynamic_first_byte(char c) wontthrow -> bool
   }
 }
 
+pure fn EvalContext::variable_requires_dynamic_lookup(
+    StringView name) const wontthrow -> bool
+{
+  if (name.is_empty() || !is_dynamic_first_byte(name[0])) return false;
+  if (ALWAYS_DYNAMIC.find(name).has_value()) return true;
+  if (name[0] == 'S' && name.starts_with("SHIT_ANSI_")) return true;
+
+  return bash_dynamic_variables_enabled() &&
+         BASH_DYNAMIC.find(name).has_value();
+}
+
 hot fn EvalContext::get_variable_value(StringView name) const throws
     -> Maybe<String>
 {
@@ -685,6 +706,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       if (array->is_empty()) return shit::None;
       return array->front();
     }
+
+  if (is_local_in_current_scope(name)) return shit::None;
 
   /* The store lookup above wins, so IFS= reads back empty while the unset
      default reads back space-tab-newline, keeping the IFS save/restore idiom
@@ -909,26 +932,36 @@ fn EvalContext::take_positional_params() wontthrow -> ArrayList<String>
 
 fn EvalContext::enter_function_scope() throws -> void
 {
-  m_local_scopes.push(ArrayList<local_binding>{heap_allocator()});
+  if (m_local_scope_depth == m_local_scopes.count())
+    m_local_scopes.push(ArrayList<local_binding>{heap_allocator()});
+  ASSERT(m_local_scopes[m_local_scope_depth].is_empty());
+  m_local_scope_depth++;
   LOG(Debug, "entered function scope, local scope depth now %zu",
-      m_local_scopes.count());
+      m_local_scope_depth);
 }
 
 fn EvalContext::leave_function_scope() throws -> void
 {
-  if (m_local_scopes.is_empty()) return;
+  if (m_local_scope_depth == 0) return;
 
   /* Restore each shadowed binding in reverse, so a name declared local twice
      ends with the value it held before the function ran. */
-  ASSERT(!m_local_scopes.is_empty());
-  let &scope = m_local_scopes.back();
+  ASSERT(m_local_scope_depth <= m_local_scopes.count());
+  let &scope = m_local_scopes[m_local_scope_depth - 1];
   LOG(Debug, "leaving function scope, restoring %zu shadowed locals",
       scope.count());
   for (usize i = scope.count(); i > 0; i--) {
     ASSERT(i - 1 < scope.count());
     restore_local_binding(scope[i - 1]);
   }
-  m_local_scopes.pop_back();
+  scope.clear();
+  m_local_scope_depth--;
+  constexpr usize RETAINED_LOCAL_SCOPE_COUNT = 16;
+  if (m_local_scopes.count() > RETAINED_LOCAL_SCOPE_COUNT &&
+      m_local_scopes.count() > m_local_scope_depth)
+  {
+    m_local_scopes.remove(m_local_scopes.count() - 1);
+  }
 }
 
 fn EvalContext::push_function_call_name(StringView name) throws -> void
@@ -1006,14 +1039,14 @@ pure fn EvalContext::funcname_source_at(usize index) const wontthrow
 
 pure fn EvalContext::in_function_scope() const wontthrow -> bool
 {
-  return !m_local_scopes.is_empty();
+  return m_local_scope_depth != 0;
 }
 
 fn EvalContext::is_local_in_current_scope(StringView name) const wontthrow
     -> bool
 {
-  if (m_local_scopes.is_empty()) return false;
-  for (let const &binding : m_local_scopes.back())
+  if (m_local_scope_depth == 0) return false;
+  for (let const &binding : m_local_scopes[m_local_scope_depth - 1])
     if (binding.name.view() == name) return true;
   return false;
 }
@@ -1560,6 +1593,10 @@ fn EvalContext::clear_functions() wontthrow -> void
 fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 {
   return eval_state_snapshot{m_shell_variables,
+                             m_indexed_arrays,
+                             m_associative_names,
+                             m_associative_values,
+                             m_sparse_array_values,
                              m_functions,
                              m_function_sources,
                              m_function_definition_infos,
@@ -1569,6 +1606,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_traps,
                              m_readonly_names,
                              m_integer_names,
+                             m_exported_names,
                              m_error_exit,
                              m_enable_path_expansion,
                              m_enable_echo,
@@ -1583,6 +1621,10 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 {
   LOG(Debug, "restoring the evaluator state after a subshell or substitution");
   m_shell_variables = steal(snapshot.shell_variables);
+  m_indexed_arrays = steal(snapshot.indexed_arrays);
+  m_associative_names = steal(snapshot.associative_names);
+  m_associative_values = steal(snapshot.associative_values);
+  m_sparse_array_values = steal(snapshot.sparse_array_values);
   m_functions = steal(snapshot.functions);
   m_function_sources = steal(snapshot.function_sources);
   m_function_definition_infos = steal(snapshot.function_definition_infos);
@@ -1600,6 +1642,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 
   m_readonly_names = steal(snapshot.readonly_names);
   m_integer_names = steal(snapshot.integer_names);
+  m_exported_names = steal(snapshot.exported_names);
 
   /* A signal the subshell trapped that the parent does not is returned to
      default before the parent's dispositions are reinstalled. */
@@ -1632,8 +1675,6 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
                                    entry.previous_value->view());
     else
       os::unset_environment_variable(entry.name.view());
-    sync_exported_after_restore(entry.name.view(),
-                                entry.previous_value.has_value());
     m_environment_undo_log.pop_back();
   }
 

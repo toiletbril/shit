@@ -94,6 +94,7 @@ inline constexpr static_string_entry<tool_with_targets_kind>
         {SSK("ssh-copy-id"), tool_with_targets_kind::ssh        },
         {SSK("sshfs"),       tool_with_targets_kind::ssh        },
         {SSK("autossh"),     tool_with_targets_kind::ssh        },
+        {SSK("assimilate"),  tool_with_targets_kind::ssh        },
         {SSK("tsh"),         tool_with_targets_kind::teleport   },
 };
 inline constexpr StaticStringMap TOOLS_WITH_TARGETS{TOOL_WITH_TARGETS_ENTRIES};

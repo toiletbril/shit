@@ -209,6 +209,10 @@ class EvalContext;
 struct eval_state_snapshot
 {
   StringMap<String> shell_variables;
+  StringMap<ArrayList<String>> indexed_arrays;
+  HashSet associative_names;
+  StringMap<String> associative_values;
+  StringMap<String> sparse_array_values;
   StringMap<const Expression *> functions;
   StringMap<String> function_sources;
   StringMap<function_definition_info> function_definition_infos;
@@ -221,6 +225,7 @@ struct eval_state_snapshot
      mark to the parent. */
   HashSet readonly_names;
   HashSet integer_names;
+  HashSet exported_names;
   bool error_exit;
   bool is_path_expansion_enabled;
   bool is_echo_enabled;
@@ -413,6 +418,8 @@ public:
   }
   fn get_variable_value(StringView name) const throws -> Maybe<String>;
   fn get_variable_value_checked(StringView name) const throws -> Maybe<String>;
+  pure fn variable_requires_dynamic_lookup(StringView name) const wontthrow
+      -> bool;
 
   fn append_dynamic_variable_names(ArrayList<StringView> &out) const throws
       -> void;
@@ -1117,8 +1124,6 @@ public:
 
   fn clear_retained_sources() wontthrow -> void;
 
-  /* Keeps a top-level command's tree alive past its run, so a function it
-     defined stays callable on the next command. */
   fn retain_ast(Expression *ast) throws -> void;
 
   fn expand_heredoc_body(StringView body) throws -> String;
@@ -1334,12 +1339,10 @@ protected:
      site. Each frame carries the call site and its parent text. */
   ArrayList<source_frame> m_source_frames{heap_allocator()};
 
-  /* ASTs from eval and dot, kept alive until the next top-level command so a
-     function they define survives the rest of the current one. */
   ArrayList<Expression *> m_retained_source_asts{heap_allocator()};
 
-  /* The source text of each eval and dot run, kept alive for as long as the
-     ASTs above. The buffers are heap-owned pointers, not inline elements, so a
+  /* The source text of each eval and dot run is retained for escaped locations.
+     The buffers are heap-owned pointers, not inline elements, so a
      nested run_source that grows the list never moves an earlier buffer and
      leaves m_current_source or a control_flow::source dangling. */
   ArrayList<String *> m_retained_sources{heap_allocator()};
@@ -1384,6 +1387,7 @@ protected:
   /* One entry per active function call, holding the bindings a local shadowed.
    */
   ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};
+  usize m_local_scope_depth{0};
   ArrayList<String> m_function_call_names{heap_allocator()};
   /* The call-site location of each active function call, parallel to
      m_function_call_names, read by BASH_LINENO. */

@@ -18,9 +18,8 @@ namespace shit {
 
 namespace {
 
-/* The stand-in byte for an opaque segment in the brace template, followed by
-   the segment's index. Its braces and commas must not act as brace structure.
- */
+/* The stand-in byte for an opaque segment in the brace template. A doubled
+   marker is literal, while marker-O-decimal-semicolon names a segment. */
 constexpr char BRACE_OPAQUE_MARKER = '\x01';
 
 pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
@@ -49,14 +48,20 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
   const usize digit_start = i;
   if (!text.substring(digit_start).is_all_decimal_digits()) return None;
 
-  i64 magnitude = 0;
+  u64 magnitude = 0;
+  let const maximum_magnitude = text[0] == '-' ? static_cast<u64>(INT64_MAX) + 1
+                                               : static_cast<u64>(INT64_MAX);
   for (usize j = digit_start; j < text.length; j++) {
-    const i64 digit = text[j] - '0';
-    /* A bound past the signed range leaves the brace literal. */
-    if (magnitude > (9223372036854775807LL - digit) / 10) return None;
+    const u64 digit = static_cast<u64>(text[j] - '0');
+    if (magnitude > (maximum_magnitude - digit) / 10) return None;
     magnitude = magnitude * 10 + digit;
   }
-  const i64 value = text[0] == '-' ? -magnitude : magnitude;
+  i64 value;
+  if (text[0] == '-' && magnitude == static_cast<u64>(INT64_MAX) + 1)
+    value = INT64_MIN;
+  else
+    value = text[0] == '-' ? -static_cast<i64>(magnitude)
+                           : static_cast<i64>(magnitude);
   const usize digit_width = text.length - digit_start;
   let const leading_zero = digit_width > 1 && text[digit_start] == '0';
   return sequence_integer{value, text.length, leading_zero};
@@ -94,25 +99,32 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
     step = parsed_step->value;
   }
   if (step == 0) step = 1;
-  const i64 magnitude = step < 0 ? -step : step;
+  const u64 magnitude =
+      step < 0 ? static_cast<u64>(-(step + 1)) + 1 : static_cast<u64>(step);
 
   let const start_int = parse_sequence_integer(parts[0]);
   let const end_int = parse_sequence_integer(parts[1]);
   if (start_int.has_value() && end_int.has_value()) {
     const i64 from = start_int->value;
     const i64 to = end_int->value;
-    const i64 increment = from <= to ? magnitude : -magnitude;
+    const i128 increment = from <= to ? static_cast<i128>(magnitude)
+                                      : -static_cast<i128>(magnitude);
     const bool pad = start_int->has_leading_zero || end_int->has_leading_zero;
     const usize width = pad ? (start_int->field_width > end_int->field_width
                                    ? start_int->field_width
                                    : end_int->field_width)
                             : 0;
     let elements = ArrayList<String>{alloc};
-    elements.reserve(
-        static_cast<usize>((from <= to ? to - from : from - to) / magnitude) +
-        1);
-    for (i64 v = from; increment > 0 ? v <= to : v >= to; v += increment) {
-      String number = String::from(v, heap_allocator());
+    let const distance = from <= to
+                             ? static_cast<u128>(static_cast<i128>(to) - from)
+                             : static_cast<u128>(static_cast<i128>(from) - to);
+    let const element_count = distance / magnitude + 1;
+    if (element_count > static_cast<u128>(static_cast<usize>(-1))) return None;
+    elements.reserve(static_cast<usize>(element_count));
+    for (i128 current = from; increment > 0 ? current <= to : current >= to;
+         current += increment)
+    {
+      String number = String::from(static_cast<i64>(current), heap_allocator());
       if (pad) {
         const bool negative = !number.is_empty() && number.view()[0] == '-';
         const StringView digits = number.view().substring(negative ? 1 : 0);
@@ -139,9 +151,10 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
         (from >= 'a' && from <= 'z') || (from >= 'A' && from <= 'Z');
     const bool to_alpha = (to >= 'a' && to <= 'z') || (to >= 'A' && to <= 'Z');
     if (from_alpha && to_alpha) {
-      const i64 increment = from <= to ? magnitude : -magnitude;
+      const i128 increment = from <= to ? static_cast<i128>(magnitude)
+                                        : -static_cast<i128>(magnitude);
       let elements = ArrayList<String>{alloc};
-      for (i64 c = from; increment > 0 ? c <= to : c >= to; c += increment) {
+      for (i128 c = from; increment > 0 ? c <= to : c >= to; c += increment) {
         let element = String{alloc};
         element.push(static_cast<char>(c));
         elements.push(steal(element));
@@ -258,11 +271,19 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
   let word_template = String{alloc};
   for (const WordSegment &segment : word.segments) {
     if (segment.kind == WordSegment::Kind::UnquotedText) {
-      word_template.append(segment.text.view());
+      for (usize byte_index = 0; byte_index < segment.text.count();
+           byte_index++)
+      {
+        let const byte = segment.text[byte_index];
+        word_template.push(byte);
+        if (byte == BRACE_OPAQUE_MARKER)
+          word_template.push(BRACE_OPAQUE_MARKER);
+      }
     } else {
-      ASSERT(opaque_segments.count() < 256);
       word_template.push(BRACE_OPAQUE_MARKER);
-      word_template.push(static_cast<char>(opaque_segments.count()));
+      word_template.push('O');
+      word_template += String::from(opaque_segments.count(), alloc);
+      word_template.push(';');
       opaque_segments.push(&segment);
     }
   }
@@ -276,19 +297,46 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
     let run = String{alloc};
     for (usize i = 0; i < produced.count(); i++) {
       const char c = produced[i];
-      /* A literal 0x01 byte from $'\x01' is not a marker, so the index bound is
-         checked to avoid reading past the segment list. */
-      const bool is_opaque_marker =
-          c == BRACE_OPAQUE_MARKER && i + 1 < produced.count() &&
-          static_cast<u8>(produced[i + 1]) < opaque_segments.count();
+      if (c == BRACE_OPAQUE_MARKER && i + 1 < produced.count() &&
+          produced[i + 1] == BRACE_OPAQUE_MARKER)
+      {
+        run.push(BRACE_OPAQUE_MARKER);
+        i++;
+        continue;
+      }
+
+      usize marker_end = i + 2;
+      usize opaque_index = 0;
+      bool is_opaque_marker = c == BRACE_OPAQUE_MARKER &&
+                              i + 2 < produced.count() &&
+                              produced[i + 1] == 'O';
+      if (is_opaque_marker) {
+        bool has_digit = false;
+        while (marker_end < produced.count() && produced[marker_end] >= '0' &&
+               produced[marker_end] <= '9')
+        {
+          has_digit = true;
+          let const digit = static_cast<usize>(produced[marker_end] - '0');
+          if (opaque_index > (static_cast<usize>(-1) - digit) / 10) {
+            is_opaque_marker = false;
+            break;
+          }
+          opaque_index = opaque_index * 10 + digit;
+          marker_end++;
+        }
+        is_opaque_marker &= has_digit && marker_end < produced.count() &&
+                            produced[marker_end] == ';' &&
+                            opaque_index < opaque_segments.count();
+      }
+
       if (is_opaque_marker) {
         if (!run.is_empty()) {
           out.segments.push(
               WordSegment{WordSegment::Kind::UnquotedText, steal(run), false});
           run = String{alloc};
         }
-        const u8 index = static_cast<u8>(produced[++i]);
-        out.segments.push(*opaque_segments[index]);
+        out.segments.push(*opaque_segments[opaque_index]);
+        i = marker_end;
       } else {
         run.push(c);
       }
@@ -434,16 +482,8 @@ hot flatten fn EvalContext::process_args(
     const Word &command_word =
         static_cast<const tokens::WordToken *>(args[0])->word();
     if (command_word.plain_literal_kind() != Word::PlainLiteral::NotPlain) {
-      let joined_name = String{scratch_allocator()};
-      StringView name;
-      if (command_word.segments.count() == 1) {
-        name = command_word.segments[0].text.view();
-      } else {
-        for (const WordSegment &segment : command_word.segments)
-          joined_name.append(segment.text.view());
-        name = joined_name.view();
-      }
-      let const flags = DECLARATION_COMMANDS.find(name).value_or(0);
+      let const flags =
+          DECLARATION_COMMANDS.find(command_word.constant_value()).value_or(0);
       is_local_command = (flags & declaration_flag_local) != 0;
       is_declare_command = (flags & declaration_flag_declare) != 0;
       is_declaration_command = (flags & declaration_flag_declaration) != 0;
@@ -482,8 +522,7 @@ hot flatten fn EvalContext::process_args(
   for (const Token *token : args) {
     let const location = token->source_location();
     try {
-      let fallback_word = Word{};
-      fallback_word.segments = ArrayList<WordSegment>{scratch_allocator()};
+      let fallback_word = Maybe<Word>{};
       const Word *word = nullptr;
       if (token->kind() == Token::Kind::Word) {
         word = &static_cast<const tokens::WordToken *>(token)->word();
@@ -530,16 +569,20 @@ hot flatten fn EvalContext::process_args(
         let key_literal = String{assignment_token->key().view()};
         if (assignment_token->is_append()) key_literal += "+";
         key_literal += "=";
-        fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
-                                                steal(key_literal), false});
+        fallback_word = Word{};
+        fallback_word->segments = ArrayList<WordSegment>{scratch_allocator()};
+        fallback_word->segments.push(WordSegment{WordSegment::Kind::LiteralText,
+                                                 steal(key_literal), false});
         let const &value = assignment_token->value_word();
         for (const WordSegment &value_segment : value.segments)
-          fallback_word.segments.push(value_segment);
-        word = &fallback_word;
+          fallback_word->segments.push(value_segment);
+        word = &*fallback_word;
       } else {
-        fallback_word.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
-                                                token->raw_string(), false});
-        word = &fallback_word;
+        fallback_word = Word{};
+        fallback_word->segments = ArrayList<WordSegment>{scratch_allocator()};
+        fallback_word->segments.push(WordSegment{
+            WordSegment::Kind::UnquotedText, token->raw_string(), false});
+        word = &*fallback_word;
       }
 
       if (is_array_literal && word != nullptr &&

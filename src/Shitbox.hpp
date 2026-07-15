@@ -259,7 +259,7 @@ UTILITY_STRUCT(WhoAmI);
 UTILITY_STRUCT(Unlink);
 UTILITY_STRUCT(Calc);
 
-fn read_fd_to_string(os::descriptor fd) throws -> String;
+fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>;
 
 /* Returns false on the first failure with the reason in
    os::last_system_error_message. */

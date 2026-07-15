@@ -16,6 +16,8 @@ echo "== ssh completes a config host by prefix:"
 HOME="$dir" "$BIN" --debug-complete-at 'ssh alpha' </dev/null
 echo "== scp completes the same hosts:"
 HOME="$dir" "$BIN" --debug-complete-at 'scp beta' </dev/null
+echo "== assimilate completes SSH hosts:"
+HOME="$dir" "$BIN" --debug-complete-at 'assimilate alpha' </dev/null
 echo "== sftp and rsync complete hosts too:"
 HOME="$dir" "$BIN" --debug-complete-at 'sftp alpha' </dev/null
 HOME="$dir" "$BIN" --debug-complete-at 'rsync beta' </dev/null

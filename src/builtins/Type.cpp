@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
+#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -83,6 +84,12 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       word = "function";
     } else if (search_builtin(name.view()).has_value()) {
       word = "builtin";
+    } else if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
+               utils::get_program_path_status(name) ==
+                   utils::program_path_status::Missing &&
+               shitbox::find_util(name.view()).has_value())
+    {
+      word = "builtin";
     }
 
     let const do_describe_resolution = [&](StringView type_word) throws {
@@ -111,7 +118,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           do_describe_resolution(word);
         }
       }
-      for (let const &path : utils::search_program_path(name)) {
+      for (let const &path : utils::search_program_path(name, true)) {
         has_any = true;
         if (want_word) {
           out += "file\n";

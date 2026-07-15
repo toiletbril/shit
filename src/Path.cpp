@@ -301,19 +301,9 @@ fn Path::read_entire_file() const throws -> Maybe<String>
   let const file =
       os::open_file_descriptor(text().view(), os::file_open_mode::Read);
   if (!file) return None;
+  defer { os::close_fd(*file); };
 
-  let contents = String{heap_allocator()};
-  char buffer[4096];
-  loop
-  {
-    Maybe<usize> read_count = os::read_fd(*file, buffer, sizeof(buffer));
-    if (!read_count || *read_count == 0) break;
-    contents.append(StringView{buffer, *read_count});
-  }
-
-  os::close_fd(*file);
-
-  return contents;
+  return os::read_fd_to_string(*file, heap_allocator());
 }
 
 fn Path::canonicalize(StringView path) throws -> Maybe<Path>

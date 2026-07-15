@@ -1,7 +1,12 @@
 one
 two
-126
-126
+0
+0
+warm-second
+recovered
+addedprobe
+removed=modeprobe
+linkprobe
 refreshed
 appeared
 analysis-shadowed-no-path-scan
@@ -10,3 +15,7 @@ compfunc
 compalias
 broken-symlink
 suffix-priority
+sourced-non-runnable
+DIR/all-first/allprobe
+DIR/all-first/allprobe
+DIR/all-second/allprobe

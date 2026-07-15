@@ -139,10 +139,18 @@ fn invalidate_path_cache() throws -> void;
 /* None restores the search to the process environment's PATH. */
 fn set_path_for_resolution(Maybe<String> path) throws -> void;
 
+enum class program_path_requirement : u8
+{
+  Existing,
+  Runnable,
+};
+
 /* The first resolved location is cached under the name until the cache is
    invalidated. With find_all the search skips the cache and returns every
    match, for which -a. */
-fn search_program_path(StringView program_name, bool find_all = false) throws
+fn search_program_path(StringView program_name, bool find_all = false,
+                       program_path_requirement requirement =
+                           program_path_requirement::Runnable) throws
     -> ArrayList<Path>;
 
 fn path_command_names() throws -> const ArrayList<String> &;

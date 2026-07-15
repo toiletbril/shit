@@ -56,6 +56,15 @@ _shit_complete()
 
 complete -o filenames -F _shit_complete shit
 
+_shit_assimilate_complete()
+{
+    if declare -F _known_hosts_real >/dev/null; then
+        _known_hosts_real "${COMP_WORDS[COMP_CWORD]}"
+    fi
+}
+
+complete -F _shit_assimilate_complete assimilate
+
 _shitbox_utils="basename calc cat cp dirname du env find grep head killall ln \
 ls make mkdir mv pkill ps realpath rm rmdir seq sleep sort tail tee timeout touch tr \
 uniq unlink wc which whoami yes"

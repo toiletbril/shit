@@ -289,6 +289,7 @@ fn parse_count_flag(const FlagString &flag, StringView flag_name) throws -> u64
 }
 
 constexpr u64 PROGRESS_INTERVAL_NANOS = 16ULL * 1000000ULL;
+const StringView CLEAR_PROGRESS_LINE{"\r\x1b[2K"};
 
 fn progress_is_enabled() throws -> bool { return colors::stderr_wants_color(); }
 
@@ -296,7 +297,8 @@ fn draw_progress(StringView command, u64 percent, Allocator allocator) throws
     -> void
 {
   let line = String{allocator};
-  line += "\rBenchmarking '";
+  line += CLEAR_PROGRESS_LINE;
+  line += "Benchmarking '";
   line.append(command);
   line += "' ";
   line += String::from(percent > 100 ? 100 : percent, allocator);
@@ -304,10 +306,7 @@ fn draw_progress(StringView command, u64 percent, Allocator allocator) throws
   print_error(line.view());
 }
 
-fn clear_progress() throws -> void
-{
-  print_error(StringView{"\r                                        \r"});
-}
+fn clear_progress() throws -> void { print_error(CLEAR_PROGRESS_LINE); }
 
 fn sample_command(StringView shell_binary, StringView command,
                   Maybe<u64> run_limit, u64 duration_millis,
@@ -592,7 +591,6 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     if (did_command_fail) {
-      if (should_show_progress) clear_progress();
       let const operand_location = i < operand_locations.count()
                                        ? operand_locations[i]
                                        : ec.source_location();

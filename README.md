@@ -63,6 +63,7 @@ every builtin from `bash` and POSIX standard, with the addition of:
 - `bench`, built-in benchmark infrastructure inspired by Performance
   Optimizer Observation Platform ([poop](https://github.com/andrewrk/poop) for
   short)
+- `assimilate`, a transactional installer for an SSH target
 - and more
 
 It also bundles a busybox-style set of little coreutilities behind the
@@ -117,6 +118,11 @@ $ export PREFIX=/usr/local
 $ make install
 $ make uninstall
 ```
+
+The running binary can install itself on an SSH target with
+`assimilate user@host`. The first writable and searchable directory in the
+remote PATH receives `shit`. An existing binary or symlink is restored when a
+handled transfer, validation, or install step fails.
 
 ## Roadmap
 

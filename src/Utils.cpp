@@ -1395,15 +1395,18 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
 
   usize s = 0;
   usize g = 0;
+  usize star_glob_position = static_cast<usize>(-1);
+  usize star_string_position = 0;
 
-  while (g < glob.count() && s < str.count()) {
+  while (s < str.count()) {
+    if (g >= glob.count()) goto retry_star;
     ASSERT(g < glob.count() && s < str.count());
 
     if (!is_glob_char_active(glob_active, mask_offset + g)) {
-      if (glob[g++] != str[s++])
-        return false;
-      else
-        continue;
+      if (glob[g] != str[s]) goto retry_star;
+      g++;
+      s++;
+      continue;
     }
 
     switch (glob[g]) {
@@ -1413,16 +1416,12 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
     } break;
 
     case '*': {
-      /* A star at the end of the glob matches the entire rest of the string, so
-         there is no need to try every split. This keeps a plain * component,
-         the common case, linear in the string instead of quadratic. */
-      if (g + 1 >= glob.count()) return true;
-      if (glob_matches(glob.substring(g + 1), str.substring(s), glob_active,
-                       mask_offset + g + 1))
-      {
-        return true;
-      }
-      s++;
+      while (g < glob.count() && glob[g] == '*' &&
+             is_glob_char_active(glob_active, mask_offset + g))
+        g++;
+      if (g >= glob.count()) return true;
+      star_glob_position = g;
+      star_string_position = s;
     } break;
 
     case '[': {
@@ -1504,7 +1503,7 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
         close_scan++;
       }
       if (!has_closing_bracket) {
-        if (byte_at(glob, g) != byte_at(str, s)) return false;
+        if (byte_at(glob, g) != byte_at(str, s)) goto retry_star;
         g++;
         s++;
         break;
@@ -1524,11 +1523,9 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
       }
 
       /* The first member bypasses the close check, so a leading ] is a plain
-         member, and a class never opens a range, so a - after one is a plain
-         member too. */
-      u8 prev_glob_ch = 0;
+         member. A range is consumed as one atom, so its first endpoint does not
+         also match by itself and a later hyphen remains a literal member. */
       bool is_first_member = true;
-      bool prev_member_was_class = false;
       while (g < glob.count() && (is_first_member || !is_close_at(g))) {
         if (Maybe<usize> past_class = class_end_past(g); past_class.has_value())
         {
@@ -1536,30 +1533,21 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
               glob.substring_of_length(g + 2, *past_class - g - 4);
           is_matched |= byte_is_in_posix_class(class_name, byte_at(str, s));
           g = *past_class;
-          prev_member_was_class = true;
           is_first_member = false;
           continue;
         }
-        if (!is_first_member && !prev_member_was_class && glob[g] == '-' &&
-            is_active(g))
+        if (glob[g] != '-' && g + 2 < glob.count() && glob[g + 1] == '-' &&
+            is_active(g + 1) && !is_close_at(g + 2) &&
+            !class_end_past(g + 2).has_value())
         {
-          g++;
-          if (g >= glob.count()) GLOB_GROUP_ERR();
-
-          if (is_close_at(g)) {
-            is_matched |= ('-' == byte_at(str, s));
-          } else {
-            is_matched |= (prev_glob_ch <= byte_at(str, s) &&
-                           byte_at(str, s) <= byte_at(glob, g));
-            prev_glob_ch = byte_at(glob, g);
-            g++;
-          }
+          let const lower = byte_at(glob, g);
+          let const upper = byte_at(glob, g + 2);
+          is_matched |= lower <= byte_at(str, s) && byte_at(str, s) <= upper;
+          g += 3;
         } else {
-          prev_glob_ch = byte_at(glob, g);
-          is_matched |= (prev_glob_ch == byte_at(str, s));
+          is_matched |= byte_at(glob, g) == byte_at(str, s);
           g++;
         }
-        prev_member_was_class = false;
         is_first_member = false;
       }
 
@@ -1567,15 +1555,26 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
         GLOB_GROUP_ERR();
       }
       if (should_negate) is_matched = !is_matched;
-      if (!is_matched) return false;
+      if (!is_matched) goto retry_star;
 
       g++;
       s++;
     } break;
 
     default:
-      if (glob[g++] != str[s++]) return false;
+      if (glob[g] != str[s]) goto retry_star;
+      g++;
+      s++;
     }
+    continue;
+
+retry_star:
+    if (star_glob_position == static_cast<usize>(-1) ||
+        star_string_position >= str.count())
+      return false;
+    star_string_position++;
+    s = star_string_position;
+    g = star_glob_position;
   }
 
   if (s >= str.count()) {
@@ -1702,7 +1701,7 @@ static bool PATH_COMMAND_NAMES_IS_VALID = false;
 static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
 /* Defined below, declared here so the cache rebuild can split the current PATH
-   into its deduplicated directories. */
+   into its directories. */
 static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>;
 static fn path_dirs() throws -> const ArrayList<String> &;
 
@@ -1714,8 +1713,13 @@ static fn cache_resolved_path(StringView name, const Path &full_path,
     -> void
 {
   let &entry = PATH_CACHE.get_or_create(name, program_path_cache_entry{});
-  if (is_bare_result && !entry.bare_path_position.has_value())
-    entry.bare_path_position = entry.paths.count();
+  if (is_bare_result) {
+    if (!entry.bare_path_position.has_value() ||
+        (!entry.paths[*entry.bare_path_position].is_runnable && is_runnable))
+    {
+      entry.bare_path_position = entry.paths.count();
+    }
+  }
   entry.paths.push({full_path, extension, is_runnable});
   entry.is_complete |= is_complete;
 }
@@ -1732,13 +1736,14 @@ static fn find_cached_program_path(const program_path_cache_entry &entry,
     return &cached.path;
   }
 
+  const Path *blocked_path = nullptr;
   for (let const &cached : entry.paths) {
     if (cached.extension != wanted_extension) continue;
-    if (require_runnable && !cached.is_runnable) return nullptr;
-    return &cached.path;
+    if (cached.is_runnable) return &cached.path;
+    if (blocked_path == nullptr) blocked_path = &cached.path;
   }
 
-  return nullptr;
+  return require_runnable ? nullptr : blocked_path;
 }
 
 fn read_directory_cached(const Path &directory,
@@ -1747,7 +1752,7 @@ fn read_directory_cached(const Path &directory,
 {
   let const key = directory.text().view();
   os::file_status status{};
-  let const has_status = os::stat_path(key, status);
+  let const has_status = os::stat_path_following(key, status);
   const cached_directory_listing *cached = DIR_LISTING_CACHE.find(key);
   if (cached != nullptr && cached->is_valid && has_status &&
       cached->modification_time == status.modification_time &&
@@ -1927,32 +1932,22 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
   let dirs = ArrayList<String>{heap_allocator()};
   let current = String{heap_allocator()};
 
-  /* A directory that appears more than once in PATH is kept only on its first
-     occurrence, so the cache rebuild and the per-command resolve do not read it
-     and re-resolve its files twice. The first occurrence keeps the search order
-     unchanged. The directory count is small, so a linear check beats a set. */
-  let const do_push_unique = [&](String dir) throws -> void {
-    for (let const &seen : dirs)
-      if (seen.view() == dir.view()) return;
-    dirs.push(steal(dir));
-  };
-
   for (usize i = 0; i < path_var.length; i++) {
     const char ch = path_var.data[i];
     if (ch == os::PATH_DELIMITER) {
-      do_push_unique(current.is_empty() ? String{"."} : String{current.view()});
+      dirs.push(current.is_empty() ? String{"."} : String{current.view()});
       current.clear();
     } else {
       current.push(ch);
     }
   }
-  do_push_unique(current.is_empty() ? String{"."} : String{current.view()});
+  dirs.push(current.is_empty() ? String{"."} : String{current.view()});
 
   return dirs;
 }
 
 /* The split PATH cached against the value it was split from, so a cold command
-   resolution reuses the directory list rather than re-splitting and re-deduping
+   resolution reuses the directory list rather than re-splitting
    PATH on every miss. The cache rebuilds when PATH changes, which a value
    comparison detects. */
 static String CACHED_SPLIT_PATH_VALUE{heap_allocator()};
@@ -1986,6 +1981,28 @@ fn initialize_path_map() throws -> void
 
 static fn prepare_complete_path_cache() throws -> void
 {
+  if (PATH_COMMAND_NAMES_IS_VALID) {
+    for (let const &dir_string : path_dirs()) {
+      read_directory_cached(Path{dir_string.view()}, true);
+      if (PATH_CACHE_IS_STALE) break;
+    }
+
+    if (!PATH_CACHE_IS_STALE) {
+      PATH_CACHE.for_each(
+          [&](StringView, const program_path_cache_entry &entry) {
+            for (let const &cached : entry.paths) {
+              let const is_runnable =
+                  cached.path.is_regular_file() && cached.path.is_executable();
+              if (is_runnable != cached.is_runnable) {
+                PATH_CACHE_IS_STALE = true;
+                PATH_COMMAND_NAMES_IS_VALID = false;
+                return;
+              }
+            }
+          });
+    }
+  }
+
   if (PATH_CACHE_IS_STALE || !PATH_COMMAND_NAMES_IS_VALID)
     initialize_path_map();
 }
@@ -2065,7 +2082,8 @@ fn get_program_path_status(StringView name) throws -> program_path_status
    once. The first hit ends the scan and is cached. With find_all the scan
    collects every match for which -a and does not write the cache, since a
    partial entry would later hide the other matches. */
-static fn resolve_along_path(StringView program_name, bool find_all) throws
+static fn resolve_along_path(StringView program_name, bool find_all,
+                             program_path_requirement requirement) throws
     -> ArrayList<Path>
 {
   /* The search reads MAYBE_PATH, which the shell keeps in step with its PATH
@@ -2084,6 +2102,7 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
   let normalized_name = String{program_name};
   let const name_info = os::normalize_program_name(normalized_name);
   let const key = normalized_name.substring_of_length(0, name_info.stem_length);
+  let blocked = Maybe<cached_program_path>{};
 
   for (let const &dir_string : path_dirs()) {
     let const directory = Path{dir_string.view()};
@@ -2098,26 +2117,48 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
         let const try_path = Path{(full_path.text() + suffix.text).view()};
 
         if (try_path.exists()) {
-          result.push(try_path);
-          if (!find_all) {
-            let const is_runnable =
-                try_path.is_regular_file() && try_path.is_executable();
+          if (requirement == program_path_requirement::Existing) {
+            result.push(try_path);
+            return result;
+          }
+
+          let const is_runnable =
+              try_path.is_regular_file() && try_path.is_executable();
+          if (find_all) {
+            if (is_runnable) result.push(try_path);
+          } else if (is_runnable) {
+            result.push(try_path);
             cache_resolved_path(key, try_path, suffix.extension, is_runnable,
                                 true, false);
             return result;
+          } else if (!blocked.has_value()) {
+            blocked = cached_program_path{try_path, suffix.extension, false};
           }
         }
       }
     } else if (full_path.exists()) {
-      result.push(full_path);
-      if (!find_all) {
-        let const is_runnable =
-            full_path.is_regular_file() && full_path.is_executable();
+      if (requirement == program_path_requirement::Existing) {
+        result.push(full_path);
+        return result;
+      }
+
+      let const is_runnable =
+          full_path.is_regular_file() && full_path.is_executable();
+      if (find_all) {
+        if (is_runnable) result.push(full_path);
+      } else if (is_runnable) {
+        result.push(full_path);
         cache_resolved_path(key, full_path, name_info.extension, is_runnable,
                             false, false);
         return result;
+      } else if (!blocked.has_value()) {
+        blocked = cached_program_path{full_path, name_info.extension, false};
       }
     }
+  }
+
+  if (!find_all && blocked.has_value()) {
+    result.push(blocked->path);
   }
 
   return result;
@@ -2136,14 +2177,18 @@ static fn prepare_path_cache_for_lookup() wontthrow -> void
   }
 }
 
-hot fn search_program_path(StringView program_name, bool find_all) throws
+hot fn search_program_path(StringView program_name, bool find_all,
+                           program_path_requirement requirement) throws
     -> ArrayList<Path>
 {
   prepare_path_cache_for_lookup();
 
+  if (requirement == program_path_requirement::Existing)
+    return resolve_along_path(program_name, false, requirement);
+
   /* which -a wants every match, so it skips the cache and scans PATH in full.
    */
-  if (find_all) return resolve_along_path(program_name, true);
+  if (find_all) return resolve_along_path(program_name, true, requirement);
 
   let normalized_name = String{program_name};
   let const name_info = os::normalize_program_name(normalized_name);
@@ -2154,16 +2199,26 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
       cached != nullptr)
   {
     let result = ArrayList<Path>{heap_allocator()};
+    let const runnable =
+        find_cached_program_path(*cached, name_info.extension, true);
     let const path =
-        find_cached_program_path(*cached, name_info.extension, false);
+        runnable != nullptr ? runnable
+        : cached->is_complete
+            ? nullptr
+            : find_cached_program_path(*cached, name_info.extension, false);
     if (path != nullptr) {
+      if (!path->is_regular_file() || !path->is_executable()) {
+        PATH_CACHE.clear();
+        PATH_COMMAND_NAMES.clear();
+        PATH_COMMAND_NAMES_IS_VALID = false;
+        return resolve_along_path(program_name, false, requirement);
+      }
       result.push(*path);
       return result;
     }
-    if (cached->is_complete) return result;
   }
 
-  return resolve_along_path(program_name, false);
+  return resolve_along_path(program_name, false, requirement);
 }
 
 /* The rolling distance rows are fixed-width stack arrays, so a candidate name
@@ -2318,15 +2373,11 @@ fn suggest_directory_entry(const Path &directory, StringView name) throws
 
 fn read_entire_standard_input() throws -> String
 {
-  let contents = String{heap_allocator()};
-  char buffer[4096];
-  loop
-  {
-    Maybe<usize> read_count = os::read_fd(SHIT_STDIN, buffer, sizeof(buffer));
-    if (!read_count || *read_count == 0) break;
-    contents.append(StringView{buffer, *read_count});
-  }
-  return contents;
+  let contents = os::read_fd_to_string(SHIT_STDIN, heap_allocator());
+  if (!contents.has_value())
+    throw Error{"Unable to read standard input: " +
+                os::last_system_error_message()};
+  return steal(*contents);
 }
 
 fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,

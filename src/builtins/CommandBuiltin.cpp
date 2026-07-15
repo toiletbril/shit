@@ -99,7 +99,9 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
       ec.print_to_stdout(resolved_text);
       return 0;
     }
-    if (cxt.shitbox() && shitbox::find_util(name.view()).has_value()) {
+    if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
+        shitbox::find_util(name.view()).has_value())
+    {
       ec.print_to_stdout(is_verbose ? name + " is a built-in utility\n"
                                     : name + "\n");
       return 0;

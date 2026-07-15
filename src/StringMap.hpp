@@ -3,7 +3,6 @@
 #include "Allocator.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
-#include "PackedStringKey.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
 
@@ -21,7 +20,9 @@ public:
     rehash(other.m_capacity);
     for (usize i = 0; i < other.m_capacity; i++) {
       if (other.m_slots[i].state == slot::Occupied)
-        set_value(other.m_slots[i].key.view(), Value{other.m_slots[i].value});
+        set_value_with_hash(other.m_slots[i].key.view(),
+                            Value{other.m_slots[i].value},
+                            other.m_slots[i].hash);
     }
   }
 
@@ -79,24 +80,8 @@ public:
   hot mustuse pure fn find(StringView key) const wontthrow -> const Value *
   {
     if (m_capacity == 0) return nullptr;
-    let const wanted = PackedStringKey::from_view(key);
-    let const mask = m_capacity - 1;
-    let i = hash_bytes(key) & mask;
-    for (usize probe = 0; probe < m_capacity; probe++) {
-      let const &slot = m_slots[i];
-      if (slot.state == slot::Empty) return nullptr;
-      /* The packed compare holds the first sixteen zero-filled bytes, so for a
-         key that short an equal pack and an equal length already prove equality
-         and the byte compare is skipped. A longer key shares only its prefix in
-         the pack, so it still confirms through the byte compare. */
-      if (slot.state == slot::Occupied && slot_key_matches(slot, key, wanted))
-          [[likely]]
-      {
-        return &slot.value;
-      }
-      i = (i + 1) & mask;
-    }
-    return nullptr;
+    let const found = probe(key, hash_bytes(key)).found;
+    return found == NO_INDEX ? nullptr : &m_slots[found].value;
   }
 
   hot flatten mustuse fn find(StringView key) wontthrow -> Value *
@@ -113,9 +98,10 @@ public:
 
   hot fn get_or_create(StringView key, Value default_value) throws -> Value &
   {
-    if (const Value *existing = find(key))
-      return *const_cast<Value *>(existing);
-    return *set_value(key, steal(default_value));
+    let const hash = hash_bytes(key);
+    let const result = prepare_insertion(key, hash);
+    if (result.found != NO_INDEX) return m_slots[result.found].value;
+    return *place(result.insertion, key, hash, steal(default_value));
   }
 
   /* Store a String value built from a view. An existing slot reuses its String
@@ -124,7 +110,10 @@ public:
      read bytes the clear already truncated. */
   hot fn set(StringView key, StringView value) throws -> void
   {
-    if (Value *existing = find(key)) {
+    let const hash = hash_bytes(key);
+    let const result = prepare_insertion(key, hash);
+    if (result.found != NO_INDEX) {
+      Value *existing = &m_slots[result.found].value;
       /* A buffer that once held a large value and now takes a far smaller one
          is rebuilt at the right size rather than reused, so a name that held a
          big value does not pin that memory for the session. */
@@ -135,32 +124,23 @@ public:
         existing->append(value);
         return;
       }
+      *existing = String{m_allocator, value};
+      return;
     }
-    set_value(key, String{m_allocator, value});
+    place(result.insertion, key, hash, String{m_allocator, value});
   }
 
   hot fn erase(StringView key) throws -> void
   {
     if (m_capacity == 0) return;
-    let const wanted = PackedStringKey::from_view(key);
-    let const mask = m_capacity - 1;
-    let i = hash_bytes(key) & mask;
-    for (usize probe = 0; probe < m_capacity; probe++) {
-      let &slot = m_slots[i];
-      if (slot.state == slot::Empty) return;
-      if (slot.state == slot::Occupied && slot_key_matches(slot, key, wanted)) {
-        /* Free the stored key and value but keep the slot objects alive, so a
-           later place into this tombstone assigns into a live object rather
-           than one whose lifetime already ended. */
-        slot.key = String{m_allocator};
-        slot.value = Value{};
-        slot.state = slot::Tombstone;
-        m_count--;
-        m_tombstones++;
-        return;
-      }
-      i = (i + 1) & mask;
-    }
+    let const found = probe(key, hash_bytes(key)).found;
+    if (found == NO_INDEX) return;
+    let &slot = m_slots[found];
+    slot.key = String{m_allocator};
+    slot.value = Value{};
+    slot.state = slot::Tombstone;
+    m_count--;
+    m_tombstones++;
   }
 
   template <class Fn>
@@ -184,69 +164,95 @@ private:
       Tombstone,
     };
     State state{Empty};
-    PackedStringKey packed{};
+    u64 hash{0};
     String key{};
     Value value{};
   };
 
-  /* A key no longer than the pack proves equality through the pack and the
-     length, while a longer key shares only its prefix and confirms by bytes. */
-  hot mustuse fn slot_key_matches(const slot &probe_slot, StringView key,
-                                  const PackedStringKey &wanted) const wontthrow
-      -> bool
+  static constexpr usize NO_INDEX = static_cast<usize>(-1);
+
+  struct probe_result
   {
-    return probe_slot.packed == wanted &&
-           (key.count() <= PackedStringKey::BYTE_CAPACITY
-                ? probe_slot.key.count() == key.count()
-                : probe_slot.key == key);
+    usize found{NO_INDEX};
+    usize insertion{NO_INDEX};
+  };
+
+  hot mustuse fn probe(StringView key, u64 hash) const wontthrow -> probe_result
+  {
+    ASSERT(m_capacity != 0);
+    let const mask = m_capacity - 1;
+    let index = static_cast<usize>(hash) & mask;
+    let first_tombstone = NO_INDEX;
+
+    for (usize probe_count = 0; probe_count < m_capacity; probe_count++) {
+      let const &candidate = m_slots[index];
+      if (candidate.state == slot::Empty) {
+        return {NO_INDEX,
+                first_tombstone != NO_INDEX ? first_tombstone : index};
+      }
+      if (candidate.state == slot::Occupied && candidate.hash == hash &&
+          candidate.key.view() == key) [[likely]]
+      {
+        return {index, index};
+      }
+      if (candidate.state == slot::Tombstone && first_tombstone == NO_INDEX)
+        first_tombstone = index;
+      index = (index + 1) & mask;
+    }
+
+    return {NO_INDEX, first_tombstone};
+  }
+
+  hot fn prepare_insertion(StringView key, u64 hash) throws -> probe_result
+  {
+    if (m_capacity == 0) {
+      rehash(16);
+    }
+
+    let result = probe(key, hash);
+    ASSERT(result.insertion != NO_INDEX);
+    if (result.found != NO_INDEX ||
+        m_slots[result.insertion].state == slot::Tombstone)
+    {
+      return result;
+    }
+
+    let const maximum_occupied = (m_capacity >> 1) + (m_capacity >> 2);
+    if (m_count + m_tombstones + 1 <= maximum_occupied) return result;
+
+    if (m_count + 1 > maximum_occupied)
+      rehash(m_capacity * 2);
+    else
+      rehash(m_capacity);
+    result = probe(key, hash);
+    return result;
   }
 
   hot fn set_value(StringView key, Value value) throws -> Value *
   {
-    /* Tombstones count toward the load, so the table rehashes before a probe
-       chain fills with deleted slots. That keeps an Empty slot reachable on
-       every chain and an insert is never dropped. */
-    if (m_count + m_tombstones + 1 > (m_capacity >> 1) + (m_capacity >> 2))
-        [[unlikely]]
-      rehash(m_capacity == 0 ? 16 : m_capacity * 2);
-
-    let const wanted = PackedStringKey::from_view(key);
-    let const mask = m_capacity - 1;
-    let i = hash_bytes(key) & mask;
-    let first_tombstone = m_capacity;
-    for (usize probe = 0; probe < m_capacity; probe++) {
-      let &slot = m_slots[i];
-      if (slot.state == slot::Occupied && slot_key_matches(slot, key, wanted)) {
-        slot.value = steal(value);
-        return &slot.value;
-      }
-      if (slot.state == slot::Empty) {
-        let const target = first_tombstone != m_capacity ? first_tombstone : i;
-        if (first_tombstone != m_capacity) m_tombstones--;
-        return place(target, key, wanted, steal(value));
-      }
-      if (slot.state == slot::Tombstone && first_tombstone == m_capacity) {
-        first_tombstone = i;
-      }
-      i = (i + 1) & mask;
-    }
-
-    /* The chain held no Empty slot. The tombstone-aware load above prevents
-       this, but reuse a found tombstone rather than lose the insertion. */
-    if (first_tombstone != m_capacity) {
-      m_tombstones--;
-      return place(first_tombstone, key, wanted, steal(value));
-    }
-    unreachable();
+    return set_value_with_hash(key, steal(value), hash_bytes(key));
   }
 
-  fn place(usize index, StringView key, const PackedStringKey &packed,
-           Value value) throws -> Value *
+  hot fn set_value_with_hash(StringView key, Value value, u64 hash) throws
+      -> Value *
+  {
+    let const result = prepare_insertion(key, hash);
+    if (result.found != NO_INDEX) {
+      m_slots[result.found].value = steal(value);
+      return &m_slots[result.found].value;
+    }
+    ASSERT(result.insertion != NO_INDEX);
+    return place(result.insertion, key, hash, steal(value));
+  }
+
+  fn place(usize index, StringView key, u64 hash, Value value) throws -> Value *
   {
     let &slot = m_slots[index];
+    let const was_tombstone = slot.state == slot::Tombstone;
     slot.key = String{m_allocator, key};
-    slot.packed = packed;
+    slot.hash = hash;
     slot.value = steal(value);
+    if (was_tombstone) m_tombstones--;
     slot.state = slot::Occupied;
     m_count++;
     return &slot.value;
@@ -264,11 +270,21 @@ private:
     m_capacity = new_capacity;
     m_count = 0;
     m_tombstones = 0;
+    let const mask = m_capacity - 1;
 
 #pragma clang loop unroll_count(4)
     for (usize i = 0; i < old_capacity; i++) {
-      if (old_slots[i].state == slot::Occupied)
-        set_value(old_slots[i].key.view(), steal(old_slots[i].value));
+      if (old_slots[i].state == slot::Occupied) {
+        let index = static_cast<usize>(old_slots[i].hash) & mask;
+        while (m_slots[index].state == slot::Occupied)
+          index = (index + 1) & mask;
+        let &destination = m_slots[index];
+        destination.hash = old_slots[i].hash;
+        destination.key = steal(old_slots[i].key);
+        destination.value = steal(old_slots[i].value);
+        destination.state = slot::Occupied;
+        m_count++;
+      }
       old_slots[i].~slot();
     }
     if (old_slots != nullptr) m_allocator.free_array(old_slots, old_capacity);

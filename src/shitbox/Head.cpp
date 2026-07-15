@@ -24,7 +24,7 @@ namespace shitbox {
 /* Stopping at max_lines keeps an endless producer such as yes from running
    forever, since reading to the end would never return. */
 static fn read_up_to_lines(os::descriptor fd, i64 max_lines,
-                           Allocator allocator) throws -> String
+                           Allocator allocator) throws -> Maybe<String>
 {
   String out{allocator};
   i64 line_count = 0;
@@ -32,9 +32,8 @@ static fn read_up_to_lines(os::descriptor fd, i64 max_lines,
   while (line_count < max_lines) {
     if (os::INTERRUPT_REQUESTED) break;
     let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
-    if (!read_count.has_value() || *read_count == 0) {
-      break;
-    }
+    if (!read_count.has_value()) return None;
+    if (*read_count == 0) break;
     usize span_length = 0;
     while (span_length < *read_count && line_count < max_lines) {
       if (buffer[span_length] == '\n') line_count++;
@@ -47,7 +46,7 @@ static fn read_up_to_lines(os::descriptor fd, i64 max_lines,
 }
 
 static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes,
-                           Allocator allocator) throws -> String
+                           Allocator allocator) throws -> Maybe<String>
 {
   String out{allocator};
   i64 byte_count = 0;
@@ -55,9 +54,8 @@ static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes,
   while (byte_count < max_bytes) {
     if (os::INTERRUPT_REQUESTED) break;
     let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
-    if (!read_count.has_value() || *read_count == 0) {
-      break;
-    }
+    if (!read_count.has_value()) return None;
+    if (*read_count == 0) break;
     let const remaining_count = static_cast<usize>(max_bytes - byte_count);
     let const take_count =
         *read_count < remaining_count ? *read_count : remaining_count;
@@ -68,20 +66,11 @@ static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes,
   return out;
 }
 
-static fn read_all(os::descriptor fd, Allocator allocator) throws -> String
+static fn read_all(os::descriptor fd, Allocator allocator) throws
+    -> Maybe<String>
 {
-  String out{allocator};
-  char buffer[4096];
-  while (true) {
-    if (os::INTERRUPT_REQUESTED) break;
-    let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
-    if (!read_count.has_value() || *read_count == 0) {
-      break;
-    }
-    out.append(StringView{buffer, *read_count});
-  }
-
-  return out;
+  if (os::INTERRUPT_REQUESTED) return String{allocator};
+  return os::read_fd_to_string(fd, allocator);
 }
 
 static fn line_prefix_length_dropping_last(StringView text,
@@ -196,13 +185,17 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       was_opened = true;
     }
 
-    String text{cxt.scratch_allocator()};
+    let text = Maybe<String>{};
     if (is_all_but_last) {
       let const whole = read_all(fd, cxt.scratch_allocator());
-      let const keep_length =
-          is_byte_mode ? byte_prefix_length_dropping_last(whole.view(), count)
-                       : line_prefix_length_dropping_last(whole.view(), count);
-      text.append(whole.view().substring_of_length(0, keep_length));
+      if (whole.has_value()) {
+        let const keep_length =
+            is_byte_mode
+                ? byte_prefix_length_dropping_last(whole->view(), count)
+                : line_prefix_length_dropping_last(whole->view(), count);
+        text = String{cxt.scratch_allocator(),
+                      whole->view().substring_of_length(0, keep_length)};
+      }
     } else {
       text = is_byte_mode
                  ? read_up_to_bytes(fd, count, cxt.scratch_allocator())
@@ -212,6 +205,15 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     if (was_opened) os::close_fd(fd);
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
+    if (!text.has_value()) {
+      report_soft_shitbox_error(
+          ec, cxt,
+          "head: cannot read '" +
+              String{cxt.scratch_allocator(), sources[source_index]} +
+              "': " + os::last_system_error_message());
+      status = 1;
+      continue;
+    }
 
     let output = String{cxt.scratch_allocator()};
     if (should_print_headers) {
@@ -220,7 +222,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       output += sources[source_index];
       output += " <==\n";
     }
-    output += text.view();
+    output += text->view();
     ec.print_to_stdout(output);
   }
 

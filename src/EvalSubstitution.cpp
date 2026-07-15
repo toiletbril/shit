@@ -83,6 +83,8 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   i++;
 
   if (AST_ARENA == nullptr) return None;
+  let const ast_mark = AST_ARENA->mark();
+  defer { AST_ARENA->release(ast_mark); };
   let lexer = Lexer{String{source.substring_of_length(i, source.length - i)},
                     *AST_ARENA, false, None, mood()};
   Token *name = lexer.next_shell_token();
@@ -123,6 +125,8 @@ fn EvalContext::capture_command_substitution(const String &source,
      command carets that source rather than a bare unnamed line. */
   if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
+  let const ast_mark = AST_ARENA->mark();
+  defer { AST_ARENA->release(ast_mark); };
 
   enter_substitution();
   defer { leave_substitution(); };
@@ -166,6 +170,8 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
               "could not be spawned: " +
               os::last_system_error_message()};
 #else
+  let const ast_mark = AST_ARENA->mark();
+  defer { AST_ARENA->release(ast_mark); };
   let parser = Parser{
       Lexer{String{text.substring(1)}, *AST_ARENA, false, None, mood()}
   };
@@ -300,7 +306,11 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
 
   /* A cached tree from an earlier arena generation points into reclaimed
      storage, so it is reparsed when the generation no longer matches. */
-  const usize generation = AST_ARENA->reset_generation();
+  let cache_arena = segment.is_substitution_cache_in_function_arena
+                        ? FUNCTION_ARENA
+                        : AST_ARENA;
+  ASSERT(cache_arena != nullptr);
+  const usize generation = cache_arena->reset_generation();
   if (segment.cached_substitution_ast == nullptr ||
       segment.cached_substitution_generation != generation)
   {
@@ -308,7 +318,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
         "command substitution ast cache miss for generation %zu, reparsing",
         generation);
     let parser = Parser{
-        Lexer{String{segment.text.view()}, *AST_ARENA, false, None, mood()}
+        Lexer{String{segment.text.view()}, *cache_arena, false, None, mood()}
     };
     segment.cached_substitution_ast = parser.construct_ast();
     segment.cached_substitution_generation = generation;
@@ -426,7 +436,11 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   if (AST_ARENA == nullptr)
     throw Error{"Function substitution outside of a parse"};
 
-  const usize generation = AST_ARENA->reset_generation();
+  let cache_arena = segment.is_substitution_cache_in_function_arena
+                        ? FUNCTION_ARENA
+                        : AST_ARENA;
+  ASSERT(cache_arena != nullptr);
+  const usize generation = cache_arena->reset_generation();
   if (segment.cached_substitution_ast == nullptr ||
       segment.cached_substitution_generation != generation)
   {
@@ -434,7 +448,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
         "function substitution ast cache miss for generation %zu, reparsing",
         generation);
     let parser = Parser{
-        Lexer{String{segment.text.view()}, *AST_ARENA, false, None, mood()}
+        Lexer{String{segment.text.view()}, *cache_arena, false, None, mood()}
     };
     segment.cached_substitution_ast = parser.construct_ast();
     segment.cached_substitution_generation = generation;

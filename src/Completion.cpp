@@ -526,7 +526,7 @@ fn complete_command_names(StringView token, bool token_is_glob,
                        token_is_glob, is_case_sensitive, glob_active);
   }
 
-  if (context.shitbox()) {
+  if (context.shitbox() || context.mood() == mimic_mood::Default) {
     for (const String &util_name : shitbox::util_names())
       add_unique_command(candidates, seen, util_name.view(), token,
                          token_is_glob, is_case_sensitive, glob_active);

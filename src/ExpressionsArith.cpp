@@ -357,12 +357,12 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
     throw;
   }
 
-  /* An exit ends only the subshell. A break or continue is scoped to a loop
-     inside it and is consumed here. A return stays pending and propagates after
-     the state is restored. */
+  /* Exit and return end only the subshell. A break or continue is scoped to a
+     loop inside it and is consumed here. */
   if (cxt.has_pending_control_flow()) {
     const control_flow::Kind kind = cxt.pending_control_flow().kind;
-    if (kind == control_flow::Kind::Exit) {
+    if (kind == control_flow::Kind::Exit || kind == control_flow::Kind::Return)
+    {
       ret = cxt.pending_control_flow().value;
       cxt.clear_control_flow();
     } else if (kind == control_flow::Kind::Break ||

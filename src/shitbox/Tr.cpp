@@ -188,9 +188,14 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
   if (os::INTERRUPT_REQUESTED) return 130;
+  if (!input.has_value()) {
+    report_soft_shitbox_error(
+        ec, cxt, "tr: read failed: " + os::last_system_error_message());
+    return 1;
+  }
   let output = String{cxt.scratch_allocator()};
-  output.reserve(input.count());
-  let const input_view = input.view();
+  output.reserve(input->count());
+  let const input_view = input->view();
   for (usize i = 0; i < input_view.length; i++) {
     let const c = static_cast<unsigned char>(input_view[i]);
     if (!is_in_set1[c]) {

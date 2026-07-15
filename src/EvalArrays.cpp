@@ -421,14 +421,14 @@ fn EvalContext::unset_array_element(StringView name,
 
 fn EvalContext::declare_local(StringView name) throws -> void
 {
-  if (m_local_scopes.is_empty()) return;
-  ASSERT(!m_local_scopes.is_empty());
+  if (m_local_scope_depth == 0) return;
+  ASSERT(m_local_scope_depth <= m_local_scopes.count());
   /* One binding per scope, the bash rule. A second local of the same name keeps
      the first's saved caller state, so the scope pop restores the true pre-call
      value and the unset peel finds one entry to consume. */
   if (is_local_in_current_scope(name)) return;
   LOG(All, "declaring '%.*s' local in scope depth %zu",
-      static_cast<int>(name.length), name.data, m_local_scopes.count());
+      static_cast<int>(name.length), name.data, m_local_scope_depth);
 
   /* Each caller form of the name is saved so the scope pop restores it. A copy
      is taken since the body may overwrite the stored array in place. */
@@ -472,8 +472,16 @@ fn EvalContext::declare_local(StringView name) throws -> void
      export until the body reassigns the name. */
   let const previous_was_exported = is_exported(name);
 
-  m_local_scopes.back().push(local_binding{
-      String{name}, get_variable_value(name), steal(previous_array),
+  let previous_value = Maybe<String>{};
+  if (let const *scalar = m_shell_variables.find(name); scalar != nullptr)
+    previous_value = *scalar;
+  else if (previous_array.has_value() && !previous_array->is_empty())
+    previous_value = previous_array->front();
+  else if (previous_was_exported || variable_requires_dynamic_lookup(name))
+    previous_value = get_variable_value(name);
+
+  m_local_scopes[m_local_scope_depth - 1].push(local_binding{
+      String{name}, steal(previous_value), steal(previous_array),
       previous_was_associative, steal(previous_keys), steal(previous_values),
       steal(previous_sparse_indices), steal(previous_sparse_values),
       previous_was_integer, previous_was_readonly, previous_was_exported});

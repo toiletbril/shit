@@ -361,6 +361,7 @@ struct file_status
 };
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool;
+fn stat_path_following(StringView path, file_status &status) wontthrow -> bool;
 
 fn format_mode_string(u32 mode) throws -> String;
 
@@ -382,6 +383,8 @@ fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
 fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
+fn read_fd_to_string(os::descriptor fd, Allocator allocator) throws
+    -> Maybe<String>;
 
 fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32;
 

@@ -1284,6 +1284,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   const let actual_cursor_position = m_cursor_position;
   ASSERT(actual_cursor_position <= m_source.length());
 
+  for (let &segment : word.segments)
+    segment.is_substitution_cache_in_function_arena = m_arena == FUNCTION_ARENA;
+
   if (m_should_collect_debug_words &&
       m_cursor_position != m_last_collected_word_position)
   {

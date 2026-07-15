@@ -126,7 +126,13 @@ hot fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow
   }
 }
 
-fn close_fd(os::descriptor fd) wontthrow -> bool { return close(fd) != -1; }
+fn close_fd(os::descriptor fd) wontthrow -> bool
+{
+  const int prior_errno = errno;
+  if (close(fd) == -1) return false;
+  errno = prior_errno;
+  return true;
+}
 
 fn TempFileSet::track(Path path) throws -> void { unused(path); }
 fn TempFileSet::count() const wontthrow -> usize { return 0; }
@@ -2164,6 +2170,22 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   struct stat info{};
   /* lstat does not follow the symlink, so ls shows the l type without -L. */
   if (::lstat(path_string.c_str(), &info) != 0) return false;
+  status.mode = static_cast<u32>(info.st_mode);
+  status.link_count = static_cast<u64>(info.st_nlink);
+  status.owner_id = static_cast<u32>(info.st_uid);
+  status.group_id = static_cast<u32>(info.st_gid);
+  status.size = static_cast<u64>(info.st_size);
+  status.modification_time = static_cast<i64>(info.st_mtime);
+  status.modification_nanoseconds = static_cast<u32>(info.st_mtim.tv_nsec);
+  status.blocks = static_cast<u64>(info.st_blocks);
+  return true;
+}
+
+fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
+{
+  const String path_string{path};
+  struct stat info{};
+  if (::stat(path_string.c_str(), &info) != 0) return false;
   status.mode = static_cast<u32>(info.st_mode);
   status.link_count = static_cast<u64>(info.st_nlink);
   status.owner_id = static_cast<u32>(info.st_uid);

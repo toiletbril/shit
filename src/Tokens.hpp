@@ -46,6 +46,7 @@ public:
   String text;
   bool is_in_double_quotes{false};
   bool is_greedy_name{false};
+  bool is_substitution_cache_in_function_arena{false};
 
   mutable Maybe<i64> folded_arithmetic_result{};
 

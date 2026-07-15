@@ -62,6 +62,18 @@ static bool is_man_subcommand_index_built = false;
    the prompt never freezes and the command is not forked again this session. */
 static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
 
+static fn
+capture_completion_program_output(const ArrayList<String> &arguments) wontthrow
+    -> Maybe<String>
+{
+  for (usize attempt_count = 0; attempt_count < 3; attempt_count++) {
+    let output = os::capture_program_output(arguments, HELP_FORK_TIMEOUT_NANOS);
+    if (output.has_value()) return output;
+  }
+
+  return None;
+}
+
 /* An empty $MANPATH segment stands for the system defaults at that position,
    the manpath(1) reading. */
 static fn manpage_section1_directories() throws -> ArrayList<Path>;
@@ -88,16 +100,14 @@ static fn manpath_command_output() throws -> StringView
   if (manpath_present) {
     let argv = ArrayList<String>{heap_allocator()};
     argv.push(String{man_paths[0].text().view()});
-    if (Maybe<String> output =
-            os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
+    if (Maybe<String> output = capture_completion_program_output(argv);
         output.has_value())
       cached = steal(*output);
   } else if (man_present) {
     let argv = ArrayList<String>{heap_allocator()};
     argv.push(String{manbin_paths[0].text().view()});
     argv.push(String{"--path"});
-    if (Maybe<String> output =
-            os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
+    if (Maybe<String> output = capture_completion_program_output(argv);
         output.has_value())
       cached = steal(*output);
   }
@@ -584,8 +594,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   let argv = ArrayList<String>{heap_allocator()};
   argv.push(String{man_paths[0].text().view()});
   argv.push(String{page_name});
-  if (Maybe<String> page =
-          os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
+  if (Maybe<String> page = capture_completion_program_output(argv);
       page.has_value())
     parsed_options = parse_manpage_option_entries(page->view());
   MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
@@ -697,8 +706,7 @@ static fn help_text_for(StringView command, StringView subcommand = {}) throws
     }
     LOG(Debug, "forking '%.*s' for its --help text",
         static_cast<int>(command.length), command.data);
-    if (Maybe<String> output =
-            os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
+    if (Maybe<String> output = capture_completion_program_output(argv);
         output.has_value())
     {
       LOG(Debug, "the --help fork for '%.*s' produced %zu bytes",

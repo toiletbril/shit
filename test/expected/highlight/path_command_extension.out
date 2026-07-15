@@ -2,4 +2,4 @@ EXPLICIT-PROBE.EXE	\e[34m
 EXPLICIT-P	\e[94m
 collision.exe	\e[31m
 directory.exe	\e[31m
-blocked.exe	\e[31m
+blocked.exe	\e[34m

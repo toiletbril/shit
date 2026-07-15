@@ -2,6 +2,8 @@
 alpha-box
 == scp completes the same hosts:
 beta-box
+== assimilate completes SSH hosts:
+alpha-box
 == sftp and rsync complete hosts too:
 alpha-box
 beta-box

@@ -60,7 +60,9 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
           output += '\n';
         }
       }
-    } else if (cxt.shitbox() && find_util(program_name.view()).has_value()) {
+    } else if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
+               find_util(program_name.view()).has_value())
+    {
       if (!is_quiet) {
         output += program_name;
         output += '\n';
