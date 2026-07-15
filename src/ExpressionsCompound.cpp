@@ -121,8 +121,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
           }
           error.set_rendered();
         }
-        cxt.set_last_exit_status(static_cast<i32>(error.command_status()));
-        return error.command_status();
+        SET_AND_RETURN_EXIT_STATUS(cxt, error.command_status());
       } catch (const ErrorBase &error) {
         if (!cxt.is_bash_compatible() || error.is_script_fatal()) {
           throw;
@@ -133,8 +132,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         const String *source = cxt.current_source();
         show_message(
             error.to_string(source != nullptr ? source->view() : StringView{}));
-        cxt.set_last_exit_status(static_cast<i32>(error.command_status()));
-        return error.command_status();
+        SET_AND_RETURN_EXIT_STATUS(cxt, error.command_status());
       }
     };
     switch (n->kind()) {
@@ -512,8 +510,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   LOG(Debug, "the pipeline stages were reaped, %s status is %d",
       cxt.pipefail() ? "the pipefail" : "the last stage's", ret);
 
-  cxt.set_last_exit_status(ret);
-  return ret;
+  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
 hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
@@ -548,9 +545,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   if (!has_compound_stage && cxt.has_functions()) {
     for (let const stage : m_commands) {
-      const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
+      let const *simple = static_cast<const SimpleCommand *>(stage);
       if (simple->args().is_empty()) continue;
-      const Token *first = simple->args()[0];
+      let const *first = simple->args()[0];
       if (first->kind() != Token::Kind::Word) continue;
       const Word &word = static_cast<const tokens::WordToken *>(first)->word();
       if (word.plain_literal_kind() == Word::PlainLiteral::NotPlain ||
@@ -644,8 +641,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
      all-simple fast path otherwise returns without recording it. */
   const i64 ret =
       utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
-  cxt.set_last_exit_status(static_cast<i32>(ret));
-  return ret;
+  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
 CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
@@ -705,8 +701,7 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   if (m_is_fully_eliminated) {
     LOG(Debug, "running the fully eliminated if as a no-op");
-    cxt.set_last_exit_status(0);
-    return 0;
+    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
   /* An index past the last branch means every condition failed, so the else
@@ -718,7 +713,7 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (*m_folded_branch < m_branches.count())
       return m_branches[*m_folded_branch].body->evaluate(cxt);
     if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
-    return 0;
+    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
   for (let const &[ condition, body ] : m_branches) {
@@ -738,7 +733,7 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
 
-  return 0;
+  SET_AND_RETURN_EXIT_STATUS(cxt, 0);
 }
 
 cold fn IfClause::analyze(AnalysisContext &actx,
@@ -874,8 +869,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       m_folded_to_skip ? ", folded to skip the body" : "");
 
   if (m_folded_to_skip || m_is_fully_eliminated) {
-    cxt.set_last_exit_status(0);
-    return 0;
+    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
   cxt.enter_loop();
@@ -905,8 +899,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     ret = m_body->evaluate(cxt);
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
-  cxt.set_last_exit_status(static_cast<i32>(ret));
-  return ret;
+  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
 cold fn WhileLoop::analyze(AnalysisContext &actx,
@@ -1055,8 +1048,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     ret = m_body->evaluate(cxt);
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
-  cxt.set_last_exit_status(static_cast<i32>(ret));
-  return ret;
+  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
 ForLoop::ForLoop(SourceLocation location, StringView variable_name,
@@ -1095,8 +1087,7 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_terminal_exec_allowed(false);
 
   if (m_is_fully_eliminated) {
-    cxt.set_last_exit_status(0);
-    return 0;
+    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
   cxt.set_current_location(source_location());
@@ -1133,8 +1124,7 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     ret = m_body->evaluate(cxt);
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
-  cxt.set_last_exit_status(static_cast<i32>(ret));
-  return ret;
+  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
 cold fn ForLoop::analyze(AnalysisContext &actx,
@@ -1406,8 +1396,7 @@ fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_terminal_exec_allowed(false);
 
   if (m_is_fully_eliminated) {
-    cxt.set_last_exit_status(0);
-    return 0;
+    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
   return m_body->evaluate(cxt);

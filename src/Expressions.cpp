@@ -567,8 +567,7 @@ fn DummyExpression::is_dummy() const wontthrow -> bool { return true; }
 
 fn DummyExpression::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  unused(cxt);
-  return 0;
+  SET_AND_RETURN_EXIT_STATUS(cxt, 0);
 }
 
 cold fn DummyExpression::to_string() const throws -> String { return "Dummy"; }

@@ -165,7 +165,9 @@ logical PWD and OLDPWD stay in one place. PIPESTATUS is published after every
 foreground command.
 The condition depth is inherited by a function called from a non-final and-or
 operand or from a negation. The `set -e` option stays suppressed throughout that
-guarded body. A command path ending in a directory separator is rejected with
+guarded body. An if with no matching branch and no else publishes status zero,
+including at the end of a sourced file. A command path ending in a directory
+separator is rejected with
 status 126 when the normalized target is not a directory, and the highlighter
 colors the whole path red.
 

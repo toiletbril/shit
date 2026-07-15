@@ -1184,8 +1184,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
     }
 
-    cxt.set_last_exit_status(static_cast<i32>(function_ret));
-    return function_ret;
+    SET_AND_RETURN_EXIT_STATUS(cxt, function_ret);
   }
 
   if (cxt.should_retitle_for_command())

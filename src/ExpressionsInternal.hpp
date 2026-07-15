@@ -8,6 +8,10 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
+#define SET_AND_RETURN_EXIT_STATUS(cxt, status)                                \
+  return ::shit::expressions::set_and_return_exit_status(                      \
+      (cxt), static_cast<i64>(status))
+
 namespace shit {
 
 fn indent_for_layer(usize layer) throws -> String;
@@ -22,6 +26,13 @@ fn window_function_body_error(EvalContext &cxt,
     -> Maybe<StringView>;
 
 namespace expressions {
+
+forceinline fn set_and_return_exit_status(EvalContext &cxt,
+                                          i64 status) wontthrow -> i64
+{
+  cxt.set_last_exit_status(static_cast<i32>(status));
+  return status;
+}
 
 enum class redirection_outcome
 {

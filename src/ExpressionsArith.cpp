@@ -51,8 +51,7 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
   LOG(Debug, "the [[ ]] conditional yielded status %lld",
       static_cast<long long>(status));
-  cxt.set_last_exit_status(static_cast<i32>(status));
-  return status;
+  SET_AND_RETURN_EXIT_STATUS(cxt, status);
 }
 
 ArithmeticCommand::ArithmeticCommand(SourceLocation location, String expression)
@@ -88,8 +87,7 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_current_location(source_location());
 
   if (is_blank_clause(m_expression.view())) {
-    cxt.set_last_exit_status(1);
-    return 1;
+    SET_AND_RETURN_EXIT_STATUS(cxt, 1);
   }
 
   /* A non-zero value is success and zero is failure, the opposite of the
@@ -105,8 +103,7 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     relocate_error(e, source_location());
   }
   const i64 status = value != 0 ? 0 : 1;
-  cxt.set_last_exit_status(static_cast<i32>(status));
-  return status;
+  SET_AND_RETURN_EXIT_STATUS(cxt, status);
 }
 
 cold fn ArithmeticCommand::analyze(AnalysisContext &actx,
@@ -185,8 +182,7 @@ fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   LOG(Debug, "assigning %zu elements to the array '%s'", values.count(),
       m_name.c_str());
   cxt.assign_indexed_array_elements(m_name.view(), steal(values), m_is_append);
-  cxt.set_last_exit_status(0);
-  return 0;
+  SET_AND_RETURN_EXIT_STATUS(cxt, 0);
 }
 
 cold fn ArrayAssignCommand::analyze(AnalysisContext &actx,
@@ -206,8 +202,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   if (m_is_fully_eliminated) {
     LOG(Debug, "running the fully eliminated c-style for as a no-op");
-    cxt.set_last_exit_status(0);
-    return 0;
+    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
   cxt.set_current_location(source_location());
@@ -243,8 +238,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
                                             m_step_tokenized, m_step_simple);
     }
   }
-  cxt.set_last_exit_status(static_cast<i32>(ret));
-  return ret;
+  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
 cold fn CStyleForLoop::analyze(AnalysisContext &actx,
@@ -381,8 +375,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.run_subshell_exit_trap();
   cxt.leave_subshell();
   cxt.restore_state(steal(snapshot));
-  cxt.set_last_exit_status(static_cast<i32>(ret));
-  return ret;
+  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
 cold fn Subshell::analyze(AnalysisContext &actx,
@@ -456,8 +449,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
       definition_text.is_empty() ? " without recorded definition text" : "");
   cxt.register_function(m_name, m_body, definition_text.view(),
                         m_body->source_location().position, source_location());
-  cxt.set_last_exit_status(0);
-  return 0;
+  SET_AND_RETURN_EXIT_STATUS(cxt, 0);
 }
 
 cold fn FunctionDefinition::analyze(AnalysisContext &actx,
