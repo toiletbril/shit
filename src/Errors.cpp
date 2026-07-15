@@ -498,15 +498,22 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   return result;
 }
 
-CommandNotFound::CommandNotFound(SourceLocation location, StringView message)
+CommandResolutionError::CommandResolutionError(SourceLocation location,
+                                               StringView message,
+                                               i64 command_status)
     : ErrorWithLocation(steal(location), message)
-{}
+{
+  set_command_status(command_status);
+}
 
-CommandNotFound::CommandNotFound(SourceLocation location, StringView message,
-                                 StringView note)
+CommandResolutionError::CommandResolutionError(SourceLocation location,
+                                               StringView message,
+                                               StringView note,
+                                               i64 command_status)
     : ErrorWithLocation(steal(location), message)
 {
   m_note = note;
+  set_command_status(command_status);
 }
 
 WarningWithLocation::WarningWithLocation(SourceLocation location,

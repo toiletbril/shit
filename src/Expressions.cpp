@@ -166,10 +166,9 @@ cold fn AnalysisContext::note_variable_read(
   reads_before_assignment.set(name, location);
 }
 
-/* A command-not-found at runtime is non-fatal. The located diagnostic prints
-   to stderr against the running source, so 2>/dev/null still suppresses it. */
-cold fn report_command_not_found(EvalContext &cxt,
-                                 const CommandNotFound &e) throws -> void
+cold fn report_command_resolution_error(EvalContext &cxt,
+                                        const CommandResolutionError &e) throws
+    -> void
 {
   const String *source = cxt.current_source();
   show_message(e.to_string(source != nullptr ? source->view() : StringView{}));
@@ -290,10 +289,19 @@ fn command_resolves(const String &name) throws -> bool
      its shitbox implementation, so a shitbox name resolves without a PATH
      binary. */
   if (shitbox::find_util(name.view()).has_value()) return true;
-  if (name.find_character('/').has_value()) {
-    if (let const expanded = utils::expand_leading_tilde_path(name.view()))
-      return Path::canonicalize(expanded->view()).has_value();
-    return Path::canonicalize(name.view()).has_value();
+  if (os::has_directory_separator(name.view())) {
+    let target = name.view();
+    let expanded = String{heap_allocator()};
+    if (let const home_expanded = utils::expand_leading_tilde_path(name.view());
+        home_expanded.has_value())
+    {
+      expanded = steal(*home_expanded);
+      target = expanded.view();
+    }
+    let const typed_path = Path{target};
+    if (typed_path.has_trailing_separator())
+      return typed_path.normalized().exists();
+    return Path::canonicalize(target).has_value();
   }
 
   const bool was_resolved =
@@ -1535,10 +1543,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   }
 
   if (name.has_value() && !actx.should_silence_unresolved_commands &&
-      !command_resolves(*name) &&
-      !actx.defined_functions.contains(
-          StringView{name->data(), name->count()}) &&
-      !actx.known_aliases.contains(StringView{name->data(), name->count()}))
+      !command_is_shadowed && !command_resolves(*name))
   {
     let const message = StringView{"Command '"} + StringView{*name} +
                         StringView{"' was not found"};

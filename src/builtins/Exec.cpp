@@ -30,25 +30,25 @@ Exec::Exec() = default;
 
 pure fn Exec::kind() const wontthrow -> Builtin::Kind { return Kind::Exec; }
 
-static fn report_exec_command_not_found(ExecContext &ec, EvalContext &cxt,
-                                        const String &command_name,
-                                        usize command_index) throws -> i32
+static fn report_exec_resolution_error(ExecContext &ec, EvalContext &cxt,
+                                       usize command_index, StringView message,
+                                       i32 command_status) throws -> i32
 {
-  const CommandNotFound not_found{ec.arg_location_at(command_index),
-                                  StringView{"Command '"} + command_name +
-                                      "' was not found"};
+  let error = ErrorWithLocation{ec.arg_location_at(command_index), message};
+  error.set_command_status(command_status);
   const String *source = cxt.current_source();
   show_message(
-      not_found.to_string(source != nullptr ? source->view() : StringView{}));
+      error.to_string(source != nullptr ? source->view() : StringView{}));
 
   if (cxt.in_subshell() || cxt.is_in_pipeline_stage()) {
-    if (cxt.in_subshell()) cxt.request_exit(127, ec.source_location());
-    return 127;
+    if (cxt.in_subshell())
+      cxt.request_exit(command_status, ec.source_location());
+    return command_status;
   }
 
-  if (cxt.shell_is_interactive()) return 127;
+  if (cxt.shell_is_interactive()) return command_status;
 
-  utils::quit(127, true);
+  utils::quit(command_status, true);
 }
 
 fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
@@ -129,17 +129,29 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Info, "exec replacing the shell with '%s'", command_name.c_str());
 
   let program_path = Path{};
-  if (command_name.find_character('/').has_value()) {
-    let resolved = Path::canonicalize(command_name);
+  if (os::has_directory_separator(command_name.view())) {
+    let const typed_program_path = Path{command_name.view()};
+    let resolved = typed_program_path.has_trailing_separator()
+                       ? Maybe<Path>{typed_program_path.normalized()}
+                       : Path::canonicalize(command_name);
+    if (resolved.has_value() && !resolved->exists()) resolved = None;
     if (!resolved)
-      return report_exec_command_not_found(ec, cxt, command_name,
-                                           command_index);
+      return report_exec_resolution_error(
+          ec, cxt, command_index,
+          StringView{"Command '"} + command_name + "' was not found", 127);
+    if (typed_program_path.has_trailing_separator() &&
+        !resolved->is_directory())
+    {
+      return report_exec_resolution_error(ec, cxt, command_index,
+                                          "This file is not a directory", 126);
+    }
     program_path = resolved.take();
   } else {
     let const found = utils::search_program_path(command_name);
     if (found.count() == 0)
-      return report_exec_command_not_found(ec, cxt, command_name,
-                                           command_index);
+      return report_exec_resolution_error(
+          ec, cxt, command_index,
+          StringView{"Command '"} + command_name + "' was not found", 127);
 
     program_path = found[0];
   }

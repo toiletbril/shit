@@ -43,26 +43,26 @@ run_ref "$ASH"   "$(basename "$ASH")"   "$BENCH" "$G"
 run_ref "$YASH"  "$(basename "$YASH")"  "$BENCH" "$L"
 printf "  %-16s" "$(basename "$BIN")";  ( time SCALE=$SCALE $BIN --mood sh $BENCH >"$S" 2>&1 ) 2>&1
 compare "$D" "$S" "dash"
-printf "  %-16s" "$(basename "$BIN")+opt"; ( time SCALE=$SCALE $BIN $BENCH >"$S" 2>/dev/null ) 2>&1
-compare "$D" "$S" "dash with the optimizer on"
+printf "  %-16s" "$(basename "$BIN")+analysis"; ( time SCALE=$SCALE $BIN --mood sh -W $BENCH >"$S" 2>/dev/null ) 2>&1
+compare "$D" "$S" "dash with analysis"
 
 echo "configure.bash, wall-clock seconds at SCALE=$SCALE, lower is better:"
 printf "  %-16s" "$(basename "$BASHP")"; ( time SCALE=$SCALE $BASHP $BENCH_BASH >"$BB" 2>&1 ) 2>&1
 printf "  %-16s" "$(basename "$BIN")";  ( time SCALE=$SCALE $BIN --mood bash $BENCH_BASH >"$SB" 2>&1 ) 2>&1
 compare "$BB" "$SB" "bash"
-printf "  %-16s" "$(basename "$BIN")+opt"; ( time SCALE=$SCALE $BIN $BENCH_BASH >"$SB" 2>/dev/null ) 2>&1
-compare "$BB" "$SB" "bash with the optimizer on"
+printf "  %-16s" "$(basename "$BIN")+analysis"; ( time SCALE=$SCALE $BIN --mood bash -W $BENCH_BASH >"$SB" 2>/dev/null ) 2>&1
+compare "$BB" "$SB" "bash with analysis"
 
 echo "configure.shit, wall-clock seconds at SCALE=$SCALE, lower is better:"
 printf "  %-16s" "$(basename "$BASHP")"; ( time SCALE=$SCALE $BASHP $BENCH_SHIT >"$ZB" 2>&1 ) 2>&1
-printf "  %-16s" "$(basename "$BIN")+opt"; ( time SCALE=$SCALE $BIN $BENCH_SHIT >"$ZS" 2>/dev/null ) 2>&1
-compare "$ZB" "$ZS" "bash with the optimizer on"
+printf "  %-16s" "$(basename "$BIN")+analysis"; ( time SCALE=$SCALE $BIN $BENCH_SHIT >"$ZS" 2>/dev/null ) 2>&1
+compare "$ZB" "$ZS" "bash with analysis"
 
 echo "primes.bash, wall-clock seconds up to LIMIT=$PRIMES_LIMIT, lower is better:"
 printf "  %-16s" "python3"; ( time python3 $PRIMES_PY $PRIMES_LIMIT >"$PP" 2>&1 ) 2>&1
 printf "  %-16s" "$(basename "$BASHP")"; ( time $BASHP $PRIMES $PRIMES_LIMIT >"$PB" 2>&1 ) 2>&1
 printf "  %-16s" "$(basename "$BIN")";  ( time $BIN --mood bash $PRIMES $PRIMES_LIMIT >"$PS" 2>&1 ) 2>&1
 compare "$PB" "$PS" "bash"
-printf "  %-16s" "$(basename "$BIN")+opt"; ( time $BIN $PRIMES $PRIMES_LIMIT >"$PS" 2>/dev/null ) 2>&1
-compare "$PB" "$PS" "bash with the optimizer on"
+printf "  %-16s" "$(basename "$BIN")+analysis"; ( time $BIN --mood bash -W $PRIMES $PRIMES_LIMIT >"$PS" 2>/dev/null ) 2>&1
+compare "$PB" "$PS" "bash with analysis"
 compare "$PB" "$PP" "python"

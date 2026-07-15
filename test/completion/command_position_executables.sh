@@ -20,3 +20,10 @@ echo "== argument position still offers every file:"
 "$BIN" --debug-complete-at 'cat ./' </dev/null
 echo "== PATH command completion offers only the executable"
 "$BIN" --debug-complete-at 'zz_path_' </dev/null
+echo "== a blocked first PATH entry does not hide a later executable"
+/bin/mkdir "$dir/blocked-first" "$dir/blocked-second"
+: > "$dir/blocked-first/zz_path_blocked"
+printf '#!/bin/sh\n' > "$dir/blocked-second/zz_path_blocked"
+/bin/chmod +x "$dir/blocked-second/zz_path_blocked"
+PATH="$dir/blocked-first:$dir/blocked-second" \
+    "$BIN" --debug-complete-at 'zz_path_b' </dev/null

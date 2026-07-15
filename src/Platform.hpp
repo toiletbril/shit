@@ -608,6 +608,17 @@ fn is_fd_a_tty(descriptor fd) wontthrow -> bool;
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool;
 
 pure fn is_directory_separator(char c) wontthrow -> bool;
+pure inline fn has_directory_separator(StringView path) wontthrow -> bool
+{
+#if SHIT_PLATFORM_IS WIN32
+  return path.find_character('/').has_value() ||
+         path.find_character('\\').has_value();
+#else
+  return path.find_character('/').has_value();
+#endif
+}
+
+pure fn path_root_length(StringView path) wontthrow -> usize;
 
 fn make_fd_inheritable(descriptor fd) wontthrow -> void;
 

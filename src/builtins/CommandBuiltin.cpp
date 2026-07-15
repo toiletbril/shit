@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
+#include "../Platform.hpp"
 #include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
@@ -49,9 +50,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     let const is_verbose = FLAG_SHOW_VERBOSE.is_enabled();
-    /* A name that carries a slash is a pathname, so it resolves against the
-       filesystem directly and never a keyword, alias, or builtin. */
-    if (name.find_character('/').has_value()) {
+    if (os::has_directory_separator(name.view())) {
       let const candidate = Path{name.view()};
       if (candidate.exists() && !candidate.is_directory() &&
           candidate.is_executable())
@@ -127,20 +126,18 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
       utils::set_path_for_resolution(cxt.get_variable_value("PATH"));
   };
 
-  /* An unresolved operand returns 127 here rather than letting the not-found
-     error unwind and abort the shell. */
   Maybe<ExecContext> sub;
   try {
     sub = ExecContext::make_from(ec.source_location(), steal(operand_args),
                                  cxt.mood(), cxt.shitbox(),
                                  steal(operand_arg_locations));
-  } catch (const CommandNotFound &not_found) {
-    LOG(Debug, "command swallowed a not-found error: %s",
-        not_found.message().c_str());
+  } catch (const CommandResolutionError &resolution_error) {
+    LOG(Debug, "command handled a resolution error: %s",
+        resolution_error.message().c_str());
     const String *source = cxt.current_source();
-    show_message(
-        not_found.to_string(source != nullptr ? source->view() : StringView{}));
-    return 127;
+    show_message(resolution_error.to_string(source != nullptr ? source->view()
+                                                              : StringView{}));
+    return static_cast<i32>(resolution_error.command_status());
   }
   return utils::execute_context(steal(*sub), cxt, false);
 }

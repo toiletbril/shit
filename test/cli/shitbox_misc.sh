@@ -13,6 +13,8 @@ echo "--- sleep accepts representable subnormal values ---"
 echo "minimum=$?"
 "$BIN" -c 'shitbox sleep 1e-323'
 echo "subnormal=$?"
+"$BIN" -c 'shitbox sleep 1e-4000' 2>&1
+echo "underflow=$?"
 
 echo "--- sleep bad duration ---"
 "$BIN" -c 'shitbox sleep abc' 2>&1

@@ -161,6 +161,11 @@ operand against the logical PWD, the bash -L mode, and cd .. lexically pops the
 last component. The pushd, popd, and dirs builtins carry a directory stack on
 EvalContext and route every chdir through the cd builtin, so the logical PWD and
 OLDPWD stay in one place. PIPESTATUS is published after every foreground command.
+The condition depth is inherited by a function called from a non-final and-or
+operand or from a negation. The `set -e` option stays suppressed throughout that
+guarded body. A command path ending in a directory separator is rejected with
+status 126 when the normalized target is not a directory, and the highlighter
+colors the whole path red.
 
 ## Header factoring and value-type methods
 
@@ -195,6 +200,8 @@ the names to run as arguments, so a bare NAME or a cli_NAME target runs one test
 through the same script. The dashdiff, bashdiff, and mimicrydiff scripts compare
 through process substitution. macOS diverges on a few tests, and the harness
 carries alternate goldens.
+The benchmark uses `+analysis` for analysis-enabled runs. Its compatibility
+rows retain their mood and enable the analysis stage through `-W`.
 
 Every rm test runs the shitbox rm through `--dry-run`, so a test verifies what
 rm would remove without ever deleting a real file. This is the rule for

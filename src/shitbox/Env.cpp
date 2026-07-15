@@ -117,11 +117,11 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
     sub = ExecContext::make_from(ec.source_location(), steal(env_args),
                                  cxt.mood(), cxt.shitbox(),
                                  steal(env_arg_locations));
-  } catch (const CommandNotFound &not_found) {
+  } catch (const CommandResolutionError &resolution_error) {
     const String *source = cxt.current_source();
-    show_message(
-        not_found.to_string(source != nullptr ? source->view() : StringView{}));
-    return 127;
+    show_message(resolution_error.to_string(source != nullptr ? source->view()
+                                                              : StringView{}));
+    return static_cast<i32>(resolution_error.command_status());
   }
 
   return utils::execute_context(steal(*sub), cxt, false);

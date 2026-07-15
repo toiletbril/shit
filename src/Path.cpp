@@ -17,6 +17,11 @@ hot fn Path::count() const wontthrow -> usize { return m_text.count(); }
 
 hot fn Path::is_empty() const wontthrow -> bool { return m_text.is_empty(); }
 
+hot fn Path::has_trailing_separator() const wontthrow -> bool
+{
+  return !m_text.is_empty() && os::is_directory_separator(m_text.back());
+}
+
 fn Path::is_absolute() const wontthrow -> bool
 {
   return os::path_is_absolute(m_text.view());
@@ -98,10 +103,11 @@ cold fn Path::normalized() const throws -> Path
 {
   LOG(Debug, "normalizing the path '%s'", m_text.c_str());
 
-  let const is_absolute_path = is_absolute();
+  let const root_length = os::path_root_length(m_text.view());
+  let const is_absolute_path = root_length > 0;
 
   let components = ArrayList<StringView>{heap_allocator()};
-  usize i = 0;
+  usize i = root_length;
   while (i < m_text.count()) {
     if (os::is_directory_separator(m_text[i])) {
       i++;
@@ -127,14 +133,20 @@ cold fn Path::normalized() const throws -> Path
   }
 
   let normalized_text = String{heap_allocator()};
-  if (is_absolute_path) normalized_text.push(os::DIRECTORY_SEPARATOR);
+  normalized_text.append(m_text.substring_of_length(0, root_length));
+  if (!normalized_text.is_empty() && !components.is_empty() &&
+      !os::is_directory_separator(normalized_text.back()))
+  {
+    normalized_text.push(os::DIRECTORY_SEPARATOR);
+  }
   for (usize i = 0; i < components.count(); i++) {
     if (i > 0) normalized_text.push(os::DIRECTORY_SEPARATOR);
     normalized_text.append(components[i]);
   }
   if (normalized_text.is_empty())
-    normalized_text.append(is_absolute_path ? StringView{"/"}
-                                            : StringView{"."});
+    normalized_text.append(is_absolute_path
+                               ? StringView{&os::DIRECTORY_SEPARATOR, 1}
+                               : StringView{"."});
   return Path{normalized_text};
 }
 
@@ -311,7 +323,7 @@ fn Path::canonicalize(StringView path) throws -> Maybe<Path>
 
   let candidate = Path{path};
 
-  if (candidate.is_relative() && path.find_character('/').has_value()) {
+  if (candidate.is_relative() && os::has_directory_separator(path)) {
     candidate = candidate.to_absolute();
   }
 

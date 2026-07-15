@@ -80,9 +80,19 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* set -e keys off the command that actually produced the status, not one
        carried over from a short-circuited sibling. */
     bool did_execute = false;
+    const bool is_end_of_and_or_chain =
+        index + 1 >= m_nodes.count() ||
+        m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
+    const bool should_ignore_errexit =
+        !is_end_of_and_or_chain || n->is_negated();
     /* In bash mood an evaluation error fails the command and the list goes on,
        while a script-fatal error still aborts the run. */
     let do_run_node = [&]() throws -> i64 {
+      if (should_ignore_errexit) cxt.enter_condition();
+      defer
+      {
+        if (should_ignore_errexit) cxt.leave_condition();
+      };
       try {
         return n->evaluate(cxt);
       } catch (const InterruptError &) {
@@ -155,12 +165,9 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* POSIX exempts set -e for a command that is an operand of && or || and not
        the last of the and-or list, and for a command the ! reserved word
        negates. */
-    const bool ends_and_or_chain =
-        index + 1 >= m_nodes.count() ||
-        m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
     const bool command_failed_uncaught =
         !cxt.in_condition() && did_execute && !n->is_negated() &&
-        ends_and_or_chain && ret != 0 && ret != NOTHING_WAS_EXECUTED;
+        is_end_of_and_or_chain && ret != 0 && ret != NOTHING_WAS_EXECUTED;
 
     if (command_failed_uncaught && !cxt.is_posix_mode()) {
       cxt.set_last_exit_status(static_cast<i32>(ret));
@@ -596,18 +603,19 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     /* A stage whose command does not resolve becomes a no-op context that
-       closes its pipe to give the next stage EOF and contributes 127 only under
-       pipefail. */
+       closes its pipe to give the next stage EOF. */
     Maybe<ExecContext> stage_ec;
     try {
       stage_ec = ExecContext::make_from(e->source_location(), steal(stage_args),
                                         cxt.mood(), cxt.shitbox(),
                                         steal(stage_arg_locations));
-    } catch (const CommandNotFound &not_found) {
-      report_command_not_found(cxt, not_found);
+    } catch (const CommandResolutionError &resolution_error) {
+      report_command_resolution_error(cxt, resolution_error);
       /* The stage still applies its own redirections. A > onto its stdout takes
          the slot ahead of the pipe, so the next stage still sees EOF. */
-      let unresolved = ExecContext::make_unresolved(e->source_location());
+      let unresolved = ExecContext::make_unresolved(
+          e->source_location(),
+          static_cast<i32>(resolution_error.command_status()));
       bool was_unresolved_handed_off = false;
       defer
       {

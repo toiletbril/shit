@@ -13,16 +13,13 @@ public:
   {
     Builtin,
     Program,
-    /* A command that did not resolve to a builtin or a program, built only for
-       a pipeline stage whose command was not found, so the stage yields 127
-       while the rest of the pipeline still runs. The single-command path throws
-       CommandNotFound instead. */
     Unresolved,
   };
 
   Kind kind{Kind::Program};
   Builtin::Kind builtin_kind{};
   Path program_path{};
+  i32 unresolved_status{127};
 
   mustuse static ResolvedCommand from_builtin(Builtin::Kind chosen_builtin)
   {
@@ -40,10 +37,11 @@ public:
     return resolved;
   }
 
-  mustuse static ResolvedCommand from_unresolved()
+  mustuse static ResolvedCommand from_unresolved(i32 resolution_status)
   {
     ResolvedCommand resolved{};
     resolved.kind = Kind::Unresolved;
+    resolved.unresolved_status = resolution_status;
     return resolved;
   }
 

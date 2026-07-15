@@ -106,9 +106,15 @@ static fn finish_interrupted_supervision(os::process child) throws -> i32
 
 static fn resolve_timeout_program(StringView program_name) throws -> Maybe<Path>
 {
-  for (usize byte_index = 0; byte_index < program_name.length; byte_index++)
-    if (os::is_directory_separator(program_name[byte_index]))
-      return Path::canonicalize(program_name);
+  if (os::has_directory_separator(program_name)) {
+    let const typed_program_path = Path{program_name};
+    if (typed_program_path.has_trailing_separator()) {
+      let const normalized_program_path = typed_program_path.normalized();
+      if (!normalized_program_path.exists()) return None;
+      return normalized_program_path;
+    }
+    return Path::canonicalize(program_name);
+  }
 
   let const matches = utils::search_program_path(program_name);
   if (matches.is_empty()) return None;
@@ -150,11 +156,20 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
                 String::from(timeout_signal, cxt.scratch_allocator()) +
                 " on this platform"};
 
+  let const typed_program_path = Path{operands[1].view()};
   let const program_path = resolve_timeout_program(operands[1].view());
   if (!program_path.has_value()) {
     ec.print_to_stderr("timeout: command '" + operands[1] +
                        "' was not found\n");
     return 127;
+  }
+  if (typed_program_path.has_trailing_separator() &&
+      !program_path->is_directory())
+  {
+    let error =
+        ErrorWithLocation{operand_locations[1], "This file is not a directory"};
+    error.set_command_status(126);
+    throw error;
   }
 
   let command_args = ArrayList<String>{cxt.scratch_allocator()};

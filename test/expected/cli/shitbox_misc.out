@@ -3,6 +3,11 @@ rc=0
 --- sleep accepts representable subnormal values ---
 minimum=0
 subnormal=0
+shit: 1:1: error: sleep: invalid duration '1e-4000'.
+     1 |  shitbox sleep 1e-4000
+       |  ^~~~~~~~~~~~~~~~~~~~~ here.
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, e.g. `sleep 5`.
+underflow=1
 --- sleep bad duration ---
 shit: 1:1: error: sleep: invalid duration 'abc'.
      1 |  shitbox sleep abc

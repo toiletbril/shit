@@ -582,6 +582,18 @@ pure fn path_is_absolute(StringView path) wontthrow -> bool
   return path.length >= 2 && path.data[1] == ':';
 }
 
+pure fn path_root_length(StringView path) wontthrow -> usize
+{
+  if (path.length >= 2 && is_directory_separator(path[0]) &&
+      is_directory_separator(path[1]))
+  {
+    return 2;
+  }
+  if (path.length >= 2 && path[1] == ':') return 2;
+  if (path.length >= 1 && is_directory_separator(path[0])) return 1;
+  return 0;
+}
+
 fn temp_directory_path() throws -> String
 {
   if (const char *from_env = std::getenv("TEMP"); from_env != nullptr)

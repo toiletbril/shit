@@ -12,3 +12,5 @@
 ./zz_path_exec
 == PATH command completion offers only the executable
 zz_path_exec
+== a blocked first PATH entry does not hide a later executable
+zz_path_blocked

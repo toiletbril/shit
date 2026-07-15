@@ -156,13 +156,13 @@ protected:
   usize m_line_offset{0};
 };
 
-/* The simple command boundary catches it, prints it, and yields status 127 so
-   evaluation continues instead of aborting the shell. */
-class CommandNotFound : public ErrorWithLocation
+class CommandResolutionError : public ErrorWithLocation
 {
 public:
-  CommandNotFound(SourceLocation location, StringView message);
-  CommandNotFound(SourceLocation location, StringView message, StringView note);
+  CommandResolutionError(SourceLocation location, StringView message,
+                         i64 command_status = 127);
+  CommandResolutionError(SourceLocation location, StringView message,
+                         StringView note, i64 command_status = 127);
 };
 
 class WarningWithLocation : public ErrorWithLocation

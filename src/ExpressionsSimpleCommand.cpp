@@ -1202,11 +1202,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     resolved_ec = ExecContext::make_from(source_location(), steal(program_args),
                                          cxt.mood(), cxt.shitbox(),
                                          steal(program_arg_locations));
-  } catch (const CommandNotFound &e) {
-    report_command_not_found(cxt, e);
-    cxt.set_last_exit_status(127);
-    cxt.publish_single_pipe_status(127);
-    return 127;
+  } catch (const CommandResolutionError &e) {
+    report_command_resolution_error(cxt, e);
+    let const status = e.command_status();
+    cxt.set_last_exit_status(static_cast<i32>(status));
+    cxt.publish_single_pipe_status(static_cast<i32>(status));
+    return status;
   }
   let ec = resolved_ec.take();
 

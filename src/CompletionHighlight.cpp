@@ -29,7 +29,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
 
   /* A path word resolves against the filesystem with a leading tilde expanded
      first. */
-  if (word.find_character('/').has_value()) {
+  if (os::has_directory_separator(word)) {
     let target = word;
     Maybe<String> expanded;
     if (!word.is_empty() && word[0] == '~') {
@@ -68,7 +68,7 @@ static fn command_word_prefixes_any(StringView word,
                                     EvalContext &context) throws -> bool
 {
   if (word.is_empty()) return false;
-  if (word.find_character('/').has_value()) return false;
+  if (os::has_directory_separator(word)) return false;
 
   let const has_prefix = [&](StringView name) -> bool {
     return name.starts_with(word);
@@ -407,12 +407,30 @@ static fn color_path_argument(usize word_start, StringView word,
 {
   if (word.is_empty() || word[0] == '-') return false;
 
-  let const has_slash = word.find_character('/').has_value();
+  let const has_separator = os::has_directory_separator(word);
   let const has_tilde = word[0] == '~';
   let const has_dot_prefix =
       word.length >= 2 && word[0] == '.' &&
       (word[1] == '/' ||
        (word.length >= 3 && word[1] == '.' && word[2] == '/'));
+
+  if (Path{word}.has_trailing_separator()) {
+    let target = word;
+    let expanded = String{bump_allocator(HIGHLIGHT_ARENA)};
+    if (has_tilde) {
+      Maybe<String> home = utils::expand_leading_tilde_path(word);
+      if (home.has_value()) {
+        expanded = steal(*home);
+        target = expanded.view();
+      }
+    }
+    let const normalized = Path{target}.normalized();
+    if (normalized.exists() && !normalized.is_directory()) {
+      spans.push(highlight_span{word_start, word_start + word.length,
+                                colors::ansi::RED});
+      return true;
+    }
+  }
 
   let do_prefix_is_valid = [&](StringView prefix) throws -> bool {
     StringView target = prefix;
@@ -428,7 +446,7 @@ static fn color_path_argument(usize word_start, StringView word,
                             : Path{target}.exists();
   };
 
-  let const has_no_path_shape = !has_slash && !has_tilde && !has_dot_prefix;
+  let const has_no_path_shape = !has_separator && !has_tilde && !has_dot_prefix;
   if (has_no_path_shape && !directories_only && !word_names_existing_path(word))
   {
     return false;
@@ -1010,7 +1028,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       let const is_word_terminated =
           word_is_terminated_by_separator(line, word_end, end);
       highlight_command_word = word;
-      if (word.find_character('/').has_value()) {
+      if (os::has_directory_separator(word)) {
         color_path_argument(word_start, word, is_word_terminated, false, spans);
       } else if (word_defines_function(line, word_end, end)) {
         do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);

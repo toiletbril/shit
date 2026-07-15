@@ -1887,6 +1887,12 @@ pure fn ExecContext::is_unresolved() const wontthrow -> bool
   return m_kind.is_unresolved();
 }
 
+pure fn ExecContext::get_unresolved_status() const wontthrow -> i32
+{
+  ASSERT(is_unresolved());
+  return m_kind.unresolved_status;
+}
+
 pure fn ExecContext::program_path() const wontthrow -> const Path &
 {
   ASSERT(!is_builtin());
@@ -1949,7 +1955,7 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
   Maybe<Builtin::Kind> resolved_builtin;
   Maybe<Path> resolved_program_path;
 
-  if (!program.find_character('/').has_value()) {
+  if (!os::has_directory_separator(program.view())) {
     resolved_builtin = search_builtin(program.view());
 
     /* let is a bash extension absent from POSIX sh, the sh mood reports it not
@@ -1964,7 +1970,21 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
         resolved_program_path = steal(program_search_paths[0]);
     }
   } else {
-    resolved_program_path = Path::canonicalize(program.view());
+    let const typed_program_path = Path{program.view()};
+    if (typed_program_path.has_trailing_separator()) {
+      let const normalized_program_path = typed_program_path.normalized();
+      if (normalized_program_path.exists())
+        resolved_program_path = normalized_program_path;
+    } else {
+      resolved_program_path = Path::canonicalize(program.view());
+    }
+    if (resolved_program_path.has_value() &&
+        typed_program_path.has_trailing_separator() &&
+        !resolved_program_path->is_directory())
+    {
+      throw CommandResolutionError{location, "This file is not a directory",
+                                   126};
+    }
   }
 
   ResolvedCommand kind;
@@ -1986,9 +2006,9 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
               program.view(), ArrayList<String>{heap_allocator()}))
       {
         let const hint = "Did you mean `" + *suggestion + "`?";
-        throw CommandNotFound{location, message.view(), hint.view()};
+        throw CommandResolutionError{location, message.view(), hint.view()};
       }
-      throw CommandNotFound{location, message.view()};
+      throw CommandResolutionError{location, message.view()};
     }
   } else {
     LOG(Debug, "resolved '%s' to a builtin", program.c_str());
@@ -2007,14 +2027,15 @@ fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
   return {location, steal(kind), steal(args), steal(arg_locations)};
 }
 
-fn ExecContext::make_unresolved(SourceLocation location) throws -> ExecContext
+fn ExecContext::make_unresolved(SourceLocation location,
+                                i32 resolution_status) throws -> ExecContext
 {
   let args = ArrayList<String>{heap_allocator()};
   args.push(String{heap_allocator()});
   let arg_locations = ArrayList<SourceLocation>{heap_allocator()};
   arg_locations.push(location);
-  return {location, ResolvedCommand::from_unresolved(), steal(args),
-          steal(arg_locations)};
+  return {location, ResolvedCommand::from_unresolved(resolution_status),
+          steal(args), steal(arg_locations)};
 }
 
 } /* namespace shit */

@@ -1512,10 +1512,8 @@ public:
                           ArrayList<SourceLocation> &&arg_locations) throws
       -> ExecContext;
 
-  /* Build a stage whose command did not resolve, so it runs nothing in the
-     pipeline, closes its descriptors to give the next stage EOF, and reports
-     127. The single-command path throws CommandNotFound instead. */
-  static fn make_unresolved(SourceLocation location) throws -> ExecContext;
+  static fn make_unresolved(SourceLocation location,
+                            i32 resolution_status) throws -> ExecContext;
 
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
@@ -1541,6 +1539,7 @@ public:
 
   pure fn is_builtin() const wontthrow -> bool;
   pure fn is_unresolved() const wontthrow -> bool;
+  pure fn get_unresolved_status() const wontthrow -> i32;
 
   pure fn args() const wontthrow -> const ArrayList<String> &;
   pure fn program() const wontthrow -> const String &;

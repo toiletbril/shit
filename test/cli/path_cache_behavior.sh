@@ -32,8 +32,22 @@ CACHE_COMMAND=appeared CACHE_DIRECTORY="$dir/appeared" \
     PATH="$dir/appeared:/bin" "$BIN" -c \
     'command -v "$CACHE_COMMAND" >/dev/null 2>&1; /bin/mv "$CACHE_STAGED" "$CACHE_DIRECTORY/appeared"; "$CACHE_COMMAND"'
 
-PATH="$dir/blocked:$dir/two:/bin" "$BIN" \
-    --debug-complete-at 'blockedpr' 2>/dev/null
+analysis_log="$dir/analysis.log"
+if "$BIN" -X all -c ':' >/dev/null 2>&1; then
+    if ! PATH=/usr/bin:/bin "$BIN" --mood sh -W -X all -c \
+        'known_function() { :; }; alias known_alias=:; known_function; known_alias; uname >/dev/null' \
+        >/dev/null 2> "$analysis_log"
+    then
+        exit 1
+    fi
+    if grep -F "scanning PATH for 'known_function'" "$analysis_log" >/dev/null || \
+        grep -F "scanning PATH for 'known_alias'" "$analysis_log" >/dev/null || \
+        ! grep -F "scanning PATH for 'uname'" "$analysis_log" >/dev/null
+    then
+        exit 1
+    fi
+fi
+printf 'analysis-shadowed-no-path-scan\n'
 
 PATH=/bin "$BIN" -c \
     'compfunc() { :; }; eval "alias compalias=:"; compgen -c shopt 2>/dev/null; compgen -c compfunc 2>/dev/null; compgen -c compalias 2>/dev/null'

@@ -250,8 +250,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     }
 
     if (ec.is_unresolved()) {
-      /* Unresolved runs nothing, its slot carries 127 for pipefail. */
-      stage_status[stage_index] = 127;
+      stage_status[stage_index] = ec.get_unresolved_status();
       ec.close_fds();
     } else if (!ec.is_builtin()) {
       let const child = os::execute_program(steal(ec));
@@ -284,10 +283,10 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           const String *source = cxt.current_source();
           shit::show_message(
               e.to_string(source != nullptr ? source->view() : StringView{}));
-          child_status = 1;
+          child_status = static_cast<i32>(e.command_status());
         } catch (const Error &e) {
           shit::show_message(e.to_string());
-          child_status = 1;
+          child_status = static_cast<i32>(e.command_status());
         } catch (...) {
           child_status = 1;
         }
@@ -761,14 +760,16 @@ fn parse_decimal_f64(const String &text) throws -> ErrorOr<f64>
     return Error{"number value out of range"};
   }
   if (__builtin_isfinite(parsed_value) &&
-      (magnitude > static_cast<long double>(__DBL_MAX__) ||
-       (magnitude != 0.0L &&
-        magnitude < static_cast<long double>(__DBL_DENORM_MIN__))))
+      magnitude > static_cast<long double>(__DBL_MAX__))
   {
     return Error{"number value out of range"};
   }
 
-  return static_cast<f64>(parsed_value);
+  let const narrowed_value = static_cast<f64>(parsed_value);
+  if (parsed_value != 0.0L && narrowed_value == 0.0)
+    return Error{"number value out of range"};
+
+  return narrowed_value;
 }
 
 fn format_f64(f64 value, Allocator allocator) throws -> String

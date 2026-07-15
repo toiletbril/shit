@@ -24,6 +24,7 @@ public:
   hot mustuse pure fn c_str() const wontthrow -> const char *;
   hot mustuse pure fn count() const wontthrow -> usize;
   hot mustuse pure fn is_empty() const wontthrow -> bool;
+  hot mustuse pure fn has_trailing_separator() const wontthrow -> bool;
 
   mustuse fn parent() const throws -> Path;
   mustuse pure fn filename() const wontthrow -> StringView;

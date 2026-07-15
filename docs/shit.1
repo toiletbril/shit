@@ -17,6 +17,9 @@ is a fast POSIX and bash compatible shell. An interactive prompt is run when
 standard input is a terminal and no script is given. A script file named on the
 command line is run, or a command string is run when it is given with
 .BR \-c .
+.PP
+A command path ending in a directory separator fails with status 126 when the
+normalized target is not a directory.
 .SH MOODS
 The shell runs under one of four moods. The mood sets how strict the run is.
 The default
@@ -167,6 +170,14 @@ Commands are read from standard input.
 .TP
 .BR \-e ", " \-\-error\-exit
 The shell exits on the first failing command.
+The exemption for a non-final operand of
+.B &&
+or
+.BR || ,
+and for a command negated by
+.BR ! ,
+is inherited by a called function body. An otherwise unguarded function call
+and an otherwise unguarded final operand keep error exit enabled.
 .TP
 .BR \-f ", " \-\-no\-glob
 Pathname expansion is disabled.
