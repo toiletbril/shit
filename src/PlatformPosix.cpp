@@ -899,7 +899,8 @@ fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 
 /* posix_spawn reports an exec failure through its return value with no waitable
    pid, so a child is forked to give the caller the same pid and status. */
-cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
+cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
+                            int spawn_error, StringView source) throws
     -> process
 {
   LOG(Debug, "forking a child to report the spawn failure for '%s'",
@@ -908,12 +909,12 @@ cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
   const pid_t child_pid = check_syscall(fork());
 
   if (child_pid == 0) {
-    String msg{heap_allocator()};
-    msg += program_path.text();
-    msg += ": ";
-    msg += String{strerror(spawn_error)};
-    msg += '\n';
-    (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
+    errno = spawn_error;
+    let error = ErrorWithLocation{steal(location),
+                                  "Unable to execute `" + program_path.text() +
+                                      "`: " + last_system_error_message()};
+    shit::show_message(error.to_string(source));
+    shit::flush();
     /* 127 for a missing file, 126 for a resolved but unexecutable program. */
     _exit(spawn_error == ENOENT ? 127 : 126);
   }
@@ -922,7 +923,8 @@ cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
 }
 
 hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
-                       bool new_process_group) throws -> process
+                       bool new_process_group, StringView source) throws
+    -> process
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
@@ -1009,7 +1011,8 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   ec.close_fds();
 
   if (spawn_error != 0)
-    return spawn_failure_child(ec.program_path(), spawn_error);
+    return spawn_failure_child(ec.source_location(), ec.program_path(),
+                               spawn_error, source);
 
   return child_pid;
 }
@@ -1210,7 +1213,8 @@ fn reclaim_controlling_terminal() wontthrow -> void
 }
 
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                       Maybe<descriptor> err_fd) throws -> process
+                       Maybe<descriptor> err_fd, SourceLocation location,
+                       StringView source) throws -> process
 {
   LOG(Debug, "forking a compound pipeline stage");
 
@@ -1239,9 +1243,9 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
       __lsan_disable();
 #endif
     } catch (const shit::Error &e) {
-      String msg = e.message();
-      msg += '\n';
-      (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
+      shit::show_message(
+          ErrorWithLocation{steal(location), e.message()}.to_string(source));
+      shit::flush();
       exit_process_immediately(1);
     } catch (...) {
       LOG(Debug,

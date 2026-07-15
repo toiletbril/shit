@@ -15,7 +15,7 @@
 
 namespace shit {
 
-static constexpr usize MAX_MIMICRY_DEPTH = 400;
+static constexpr usize MAX_MIMICRY_DEPTH = 64;
 
 /* An InterruptError is re-thrown past the mimic boundary, so the catch-all
    below does not absorb it into a status. */
@@ -37,15 +37,19 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
                                     bool isolated) throws -> i32
 {
   if (m_mimicry_depth >= MAX_MIMICRY_DEPTH)
-    throw Error{"Unable to mimic '" + ec.program() +
-                "' because the script nesting is too deep"};
+    throw ErrorWithLocation{ec.source_location(),
+                            "Unable to mimic '" + ec.program() +
+                                "' because the script nesting is too deep"};
   if (AST_ARENA == nullptr)
-    throw Error{"Unable to mimic '" + ec.program() + "' outside of a parse"};
+    throw ErrorWithLocation{ec.source_location(), "Unable to mimic '" +
+                                                      ec.program() +
+                                                      "' outside of a parse"};
 
   let contents = ec.program_path().read_entire_file();
   if (!contents.has_value())
-    throw Error{"Unable to mimic '" + ec.program() +
-                "' because the script could not be read"};
+    throw ErrorWithLocation{ec.source_location(),
+                            "Unable to mimic '" + ec.program() +
+                                "' because the script could not be read"};
 
   /* A NUL byte in the leading bytes marks a binary file, reported with status
      126. Only the head is sampled, so a script carrying a NUL on a later line
@@ -58,8 +62,12 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   {
     LOG(Debug, "a NUL byte in the leading bytes marks '%s' as a binary file",
         ec.program().c_str());
-    shit::print_error("shit: " + ec.program_path().text() +
-                      ": cannot execute binary file\n");
+    let const source = current_source();
+    show_message(
+        ErrorWithLocation{ec.source_location(),
+                          "Cannot execute the binary file `" +
+                              ec.program_path().text() + "`"}
+            .to_string(source != nullptr ? source->view() : StringView{}));
     return 126;
   }
 

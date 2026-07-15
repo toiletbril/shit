@@ -24,7 +24,6 @@ pure fn Newgrp::kind() const wontthrow -> Builtin::Kind { return Kind::Newgrp; }
 
 fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  unused(cxt);
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
@@ -34,8 +33,8 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
    */
   let const found = utils::search_program_path("newgrp");
   if (found.count() == 0) {
-    show_message(
-        "Unable to run newgrp because the newgrp program was not found");
+    report_soft_builtin_error(
+        ec, cxt, "Unable to run newgrp because its program was not found");
     return 127;
   }
 
@@ -56,8 +55,8 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   try {
     os::replace_process(steal(command));
-  } catch (const Error &error) {
-    show_message(error.to_string());
+  } catch (const ErrorBase &error) {
+    report_soft_builtin_error(ec, cxt, error.message());
     return 126;
   }
 }

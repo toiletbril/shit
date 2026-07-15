@@ -99,7 +99,9 @@
   Variable "?"
 ]
 rm=0
-unalias: missing: not found
+shit: 4:1: error: Builtin 'unalias': The alias 'missing' was not found.
+     4 |  unalias missing 2>&1; echo "miss=$?"
+       |  ^~~~~~~~~~~~~~~ here.
 miss=1
 all=0
 hash=0

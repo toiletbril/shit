@@ -309,29 +309,28 @@ fn append_q_argument(String &out, const String &arg) throws -> void
   }
 }
 
-fn report_invalid_number(ExecContext &ec, const String &arg, bool is_hex,
-                         i32 &exit_status, Allocator allocator) throws -> void
+fn report_invalid_number(ExecContext &ec, EvalContext &cxt, const String &arg,
+                         bool is_hex, i32 &exit_status,
+                         Allocator allocator) throws -> void
 {
-  let message = String{allocator, "shit: printf: "};
-  message += arg.view();
-  message += is_hex ? ": invalid hex number\n" : ": invalid number\n";
-  ec.print_to_stderr(message.view());
+  let message = String{allocator, arg.view()};
+  message += is_hex ? ": invalid hex number" : ": invalid number";
+  report_soft_builtin_error(ec, cxt, message.view());
   exit_status = 1;
 }
 
-fn report_out_of_range(ExecContext &ec, const String &arg, i32 &exit_status,
-                       Allocator allocator) throws -> void
+fn report_out_of_range(ExecContext &ec, EvalContext &cxt, const String &arg,
+                       i32 &exit_status, Allocator allocator) throws -> void
 {
-  let message = String{allocator, "shit: printf: "};
-  message += arg.view();
-  message += ": Numerical result out of range\n";
-  ec.print_to_stderr(message.view());
+  let message = String{allocator, arg.view()};
+  message += ": Numerical result out of range";
+  report_soft_builtin_error(ec, cxt, message.view());
   exit_status = 1;
 }
 
 fn append_conversion(String &out, const String &spec, char conv,
                      const String &arg, bool is_missing_argument,
-                     ExecContext &ec, i32 &exit_status,
+                     ExecContext &ec, EvalContext &cxt, i32 &exit_status,
                      Allocator allocator) throws -> void
 {
   char buffer[256];
@@ -381,9 +380,10 @@ fn append_conversion(String &out, const String &spec, char conv,
   case 'i': {
     let const number = parse_printf_number(arg);
     if (!number.is_valid && !is_missing_argument)
-      report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
+      report_invalid_number(ec, cxt, arg, number.is_hex, exit_status,
+                            allocator);
     else if (number.is_out_of_range && !is_missing_argument)
-      report_out_of_range(ec, arg, exit_status, allocator);
+      report_out_of_range(ec, cxt, arg, exit_status, allocator);
     let const with_ll = spec + "lld";
     do_append_formatted(with_ll.c_str(), static_cast<long long>(number.value));
   } break;
@@ -393,9 +393,10 @@ fn append_conversion(String &out, const String &spec, char conv,
   case 'u': {
     let const number = parse_printf_number(arg);
     if (!number.is_valid && !is_missing_argument)
-      report_invalid_number(ec, arg, number.is_hex, exit_status, allocator);
+      report_invalid_number(ec, cxt, arg, number.is_hex, exit_status,
+                            allocator);
     else if (number.is_out_of_range && !is_missing_argument)
-      report_out_of_range(ec, arg, exit_status, allocator);
+      report_out_of_range(ec, cxt, arg, exit_status, allocator);
     String with_ll = spec + "ll";
     with_ll.push(conv);
     do_append_formatted(with_ll.c_str(),
@@ -532,8 +533,8 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           if (spec == "%")
             out += formatted;
           else
-            append_conversion(out, spec, 's', formatted, false, ec, exit_status,
-                              cxt.scratch_allocator());
+            append_conversion(out, spec, 's', formatted, false, ec, cxt,
+                              exit_status, cxt.scratch_allocator());
           operand_index++;
           has_consumed_a_conversion = true;
           i = close + 1;
@@ -567,7 +568,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (should_stop) break;
         continue;
       }
-      append_conversion(out, spec, conv, arg, is_missing_argument, ec,
+      append_conversion(out, spec, conv, arg, is_missing_argument, ec, cxt,
                         exit_status, cxt.scratch_allocator());
       operand_index++;
       has_consumed_a_conversion = true;

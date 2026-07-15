@@ -89,8 +89,9 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       {
         selected.push(*index);
       } else {
-        show_message("Unable to list the job '" + names[a] +
-                     "' because no such job exists");
+        report_soft_builtin_error(ec, cxt,
+                                  "Unable to list the job '" + names[a] +
+                                      "' because no such job exists");
         status = 1;
       }
     }

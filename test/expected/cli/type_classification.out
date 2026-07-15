@@ -23,5 +23,7 @@ rc=0
 == -t stays silent for a missing name:
 rc=1
 == a missing name reports not found:
-missing_xyz: not found
+shit: 1:1: error: Builtin 'type': The command 'missing_xyz' was not found.
+     1 |  type missing_xyz
+       |  ^~~~~~~~~~~~~~~~ here.
 rc=1

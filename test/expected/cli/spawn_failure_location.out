@@ -1,0 +1,25 @@
+== direct command:
+shit: 1:1: error: Unable to execute `TMPDIR/notexec`: Permission denied.
+     1 |  ./notexec; printf "rc=%s\n" "$?"
+       |  ^~~~~~~~~ here.
+rc=126
+== pipeline stage:
+shit: 1:1: error: Unable to execute `TMPDIR/notexec`: Permission denied.
+     1 |  ./notexec | shitbox cat; printf "pipeline=%s first=%s\n" "$?" "${PIPESTATUS[0]}"
+       |  ^~~~~~~~~ here.
+pipeline=0 first=126
+== exec command:
+shit: 1:6: error: Unable to execute `TMPDIR/notexec`: Permission denied.
+     1 |  exec ./notexec
+       |       ^~~~~~~~~ here.
+rc=126
+== script argument is a directory:
+shit: 1:9: error: Unable to execute `scriptdir` because the file is a directory.
+     1 |  ./shell scriptdir
+       |          ^~~~~~~~~ here.
+rc=126
+== recursive mimicked script:
+shit: TMPDIR/recurse:2:1: error: Unable to mimic 'TMPDIR/recurse' because the script nesting is too deep.
+     2 |  "$0"
+       |  ^~~~ here.
+rc=1

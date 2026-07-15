@@ -65,7 +65,6 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
@@ -101,9 +100,11 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
         did_signal_any = true;
       } else {
         let const reason = os::last_system_error_message();
-        ec.print_to_stderr("pkill: killing pid " +
-                           String::from(process.pid, cxt.scratch_allocator()) +
-                           " failed: " + reason + "\n");
+        report_soft_shitbox_error(
+            ec, cxt,
+            "pkill: killing pid " +
+                String::from(process.pid, cxt.scratch_allocator()) +
+                " failed: " + reason);
       }
     }
   }

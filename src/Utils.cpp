@@ -132,7 +132,11 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
           error.to_string(source != nullptr ? source->view() : StringView{}));
       quit(126, false);
     } catch (const Error &error) {
-      print_error(error.message() + "\n");
+      const String *source = cxt.current_source();
+      let located = ErrorWithLocation{ec.source_location(), error.message()};
+      located.set_command_status(error.command_status());
+      show_message(
+          located.to_string(source != nullptr ? source->view() : StringView{}));
       quit(127, false);
     }
     unreachable();
@@ -157,8 +161,10 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
 
   os::process p = SHIT_INVALID_PROCESS;
   try {
+    let const source = cxt.current_source();
     p = os::execute_program(steal(ec), !is_async,
-                            /*new_process_group=*/is_foreground_job);
+                            /*new_process_group=*/is_foreground_job,
+                            source != nullptr ? source->view() : StringView{});
   } catch (const ExecFormatError &) {
     LOG(Debug, "swallowed an exec format error, running the "
                "file as a shell script in this process");
@@ -253,7 +259,10 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       stage_status[stage_index] = ec.get_unresolved_status();
       ec.close_fds();
     } else if (!ec.is_builtin()) {
-      let const child = os::execute_program(steal(ec));
+      let const source = cxt.current_source();
+      let const child = os::execute_program(steal(ec), false, false,
+                                            source != nullptr ? source->view()
+                                                              : StringView{});
       children.push(child);
       child_stage.push(stage_index);
       last_child = child;
@@ -261,8 +270,10 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 #if SHIT_PLATFORM_IS POSIX
       /* A non-last builtin stage forks, an in-process run deadlocks when it
          fills the pipe buffer before its consumer starts. */
-      const os::process child =
-          os::fork_compound_stage(ec.in_fd, ec.out_fd, ec.err_fd);
+      let const source = cxt.current_source();
+      const os::process child = os::fork_compound_stage(
+          ec.in_fd, ec.out_fd, ec.err_fd, ec.source_location(),
+          source != nullptr ? source->view() : StringView{});
       if (child == 0) {
         /* fork_compound_stage already placed the pipe ends, so the context's
            descriptors are cleared. */

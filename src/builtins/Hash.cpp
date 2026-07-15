@@ -23,8 +23,6 @@ pure fn Hash::kind() const wontthrow -> Builtin::Kind { return Kind::Hash; }
 
 fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  unused(cxt);
-
   let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
@@ -41,7 +39,8 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(Debug, "hash resolving '%s' to remember its location", name.c_str());
 
     if (utils::search_program_path(name).count() == 0) {
-      ec.print_to_stderr("hash: " + name + ": not found\n");
+      report_soft_builtin_error(ec, cxt,
+                                "The command '" + name + "' was not found");
       status = 1;
     }
   }

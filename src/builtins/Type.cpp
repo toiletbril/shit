@@ -45,7 +45,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const force_path = FLAG_TYPE_FORCE_PATH.is_enabled();
 
   let out = String{cxt.scratch_allocator()};
-  let errors = String{cxt.scratch_allocator()};
+  let missing_names = ArrayList<String>{cxt.scratch_allocator()};
   bool did_find_all = true;
 
   for (usize i = 1; i < args.count(); i++) {
@@ -126,10 +126,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         }
       }
       if (!has_any) {
-        if (!want_word && !want_path) {
-          errors += name;
-          errors += ": not found\n";
-        }
+        if (!want_word && !want_path) missing_names.push_managed(name);
         did_find_all = false;
       }
       continue;
@@ -159,17 +156,16 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         out += "\n";
       }
     } else {
-      if (!want_word && !want_path) {
-        errors += name;
-        errors += ": not found\n";
-      }
+      if (!want_word && !want_path) missing_names.push_managed(name);
       did_find_all = false;
     }
   }
 
   ec.print_to_stdout(out);
 
-  if (!errors.is_empty()) ec.print_to_stderr(errors);
+  for (let const &name : missing_names)
+    report_soft_builtin_error(ec, cxt,
+                              "The command '" + name + "' was not found");
 
   return did_find_all ? 0 : 1;
 }

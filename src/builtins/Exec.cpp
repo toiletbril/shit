@@ -201,11 +201,8 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   try {
     os::replace_process(steal(command));
   } catch (const ErrorBase &error) {
-    /* replace_process throws ErrorWithLocation for a found-but-unexecutable
-       file, a sibling of Error under ErrorBase, so the catch spans the base to
-       reach it. */
-    show_message(error.message());
-    utils::quit(126, true);
+    return report_exec_resolution_error(ec, cxt, command_index, error.message(),
+                                        126);
   }
 }
 

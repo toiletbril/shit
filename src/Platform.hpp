@@ -720,7 +720,8 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
    to the caller through ExecFormatError. new_process_group puts the child in
    its own process group so it can own the controlling terminal. */
 fn execute_program(ExecContext &&ec, bool allow_script_fallback = false,
-                   bool new_process_group = false) throws -> process;
+                   bool new_process_group = false,
+                   StringView source = {}) throws -> process;
 
 fn shell_has_controlling_terminal() wontthrow -> bool;
 
@@ -746,7 +747,8 @@ fn give_controlling_terminal_to(process p) wontthrow -> void;
 fn reclaim_controlling_terminal() wontthrow -> void;
 
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                       Maybe<descriptor> err_fd) throws -> process;
+                       Maybe<descriptor> err_fd, SourceLocation location = {},
+                       StringView source = {}) throws -> process;
 
 /* In the child it returns zero so the caller runs the job and exits. */
 fn fork_job_process() throws -> process;

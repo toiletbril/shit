@@ -1009,7 +1009,7 @@ static pure fn is_batch_program(StringView path) wontthrow -> bool
 }
 
 fn execute_program(ExecContext &&ec, bool allow_script_fallback,
-                   bool new_process_group) -> process
+                   bool new_process_group, StringView) -> process
 {
   LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
       ec.args().count());
@@ -1101,6 +1101,11 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   if (new_process_group) {
     try {
       attach_timeout_job(process_info);
+    } catch (const ErrorBase &error) {
+      TerminateProcess(process_info.hProcess, 1);
+      CloseHandle(process_info.hProcess);
+      CloseHandle(process_info.hThread);
+      relocate_error(error, ec.source_location());
     } catch (...) {
       TerminateProcess(process_info.hProcess, 1);
       CloseHandle(process_info.hProcess);
@@ -1112,7 +1117,7 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
       TerminateProcess(process_info.hProcess, 1);
       CloseHandle(process_info.hProcess);
       CloseHandle(process_info.hThread);
-      throw Error{steal(message)};
+      throw ErrorWithLocation{ec.source_location(), steal(message)};
     }
   }
 
@@ -1231,14 +1236,16 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
 }
 
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                       Maybe<descriptor> err_fd) -> process
+                       Maybe<descriptor> err_fd, SourceLocation location,
+                       StringView) -> process
 {
   unused(in_fd);
   unused(out_fd);
   unused(err_fd);
   /* Reached only for a stage whose end position the parser does not yet record.
    */
-  throw shit::Error{
+  throw shit::ErrorWithLocation{
+      steal(location),
       "A compound command in a pipeline is not supported on this platform"};
 }
 

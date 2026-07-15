@@ -51,7 +51,8 @@ fn Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const &name = args[i];
     LOG(All, "unalias removing alias '%s'", name.c_str());
     if (!cxt.remove_alias(name)) {
-      ec.print_to_stderr("unalias: " + name + ": not found\n");
+      report_soft_builtin_error(ec, cxt,
+                                "The alias '" + name + "' was not found");
       status = 1;
     }
   }

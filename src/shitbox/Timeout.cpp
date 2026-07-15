@@ -159,8 +159,8 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
   let const typed_program_path = Path{operands[1].view()};
   let const program_path = resolve_timeout_program(operands[1].view());
   if (!program_path.has_value()) {
-    ec.print_to_stderr("timeout: command '" + operands[1] +
-                       "' was not found\n");
+    report_soft_shitbox_error(
+        ec, cxt, "timeout: command '" + operands[1] + "' was not found");
     return 127;
   }
   if (typed_program_path.has_trailing_separator() &&
@@ -188,7 +188,10 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
       steal(command_args), steal(command_locations));
   os::process child = SHIT_INVALID_PROCESS;
   try {
-    child = os::execute_program(steal(command), true, true);
+    let const source = cxt.current_source();
+    child =
+        os::execute_program(steal(command), true, true,
+                            source != nullptr ? source->view() : StringView{});
   } catch (const ExecFormatError &) {
     let const shell_path = os::current_executable_path();
     if (!shell_path.has_value()) throw;
@@ -210,7 +213,10 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
         ec.source_location(),
         ResolvedCommand::from_program(Path{shell_path->view()}),
         steal(fallback_args), steal(fallback_locations));
-    child = os::execute_program(steal(fallback), false, true);
+    let const source = cxt.current_source();
+    child =
+        os::execute_program(steal(fallback), false, true,
+                            source != nullptr ? source->view() : StringView{});
   }
 
   let const has_controlling_terminal =

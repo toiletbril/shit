@@ -1266,19 +1266,27 @@ fn main(int argc, char **argv) -> int
           }
         } else {
           const shit::String &file_name = file_names[0];
-          LOG(Info, "reading the script file '%s'", file_name.c_str());
-          shit::Maybe<shit::String> contents =
-              shit::Path{file_name.view()}.read_entire_file();
-          if (!contents) {
-            /* The caret points at the operand in the joined invocation. */
-            const usize operand_offset = shit::quoted_argv_offset_until(
-                parse_argc, parse_argv, file_name.view());
+          const usize operand_offset = shit::quoted_argv_offset_until(
+              parse_argc, parse_argv, file_name.view());
+          const shit::SourceLocation operand_location{
+              operand_offset, file_name.count(), shit::None};
+          const shit::Path script_path{file_name.view()};
+
+          if (script_path.is_directory()) {
             shit::show_message(shit::ErrorWithLocation{
-                shit::SourceLocation{operand_offset, file_name.count(),
-                                     shit::None},
+                operand_location, "Unable to execute `" + file_name.view() +
+                                      "` because the file is a directory"}
+                                   .to_string(context.cli_invocation().view()));
+            shit::utils::quit(126, true);
+          }
+
+          LOG(Info, "reading the script file '%s'", file_name.c_str());
+          shit::Maybe<shit::String> contents = script_path.read_entire_file();
+          if (!contents) {
+            shit::show_message(shit::ErrorWithLocation{
+                operand_location,
                 "Could not open '" + file_name.view() +
-                    "': " + shit::os::last_system_error_message()
-            }
+                    "': " + shit::os::last_system_error_message()}
                                    .to_string(context.cli_invocation().view()));
             shit::utils::quit(127, true);
           }
@@ -1287,12 +1295,7 @@ fn main(int argc, char **argv) -> int
           /* A script-file run bottoms FUNCNAME out at "main", while -c and
              stdin runs leave it off. */
           context.set_script_run(true);
-          {
-            const usize operand_offset = shit::quoted_argv_offset_until(
-                parse_argc, parse_argv, file_name.view());
-            root_frame_call_site = shit::SourceLocation{
-                operand_offset, file_name.count(), shit::None};
-          }
+          root_frame_call_site = operand_location;
         }
 
         should_quit = true;

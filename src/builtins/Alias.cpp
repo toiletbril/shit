@@ -67,12 +67,8 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       message += "'\n";
       ec.print_to_stdout(message);
     } else {
-      /* A missing alias reports on stderr so it does not mix into a captured
-         alias listing. */
-      String not_found{cxt.scratch_allocator(), "alias: "};
-      not_found += arg;
-      not_found += ": not found\n";
-      ec.print_to_stderr(not_found);
+      report_soft_builtin_error(ec, cxt,
+                                "The alias '" + arg + "' was not found");
       status = 1;
     }
   }

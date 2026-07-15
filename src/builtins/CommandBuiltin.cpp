@@ -104,7 +104,9 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
                                     : name + "\n");
       return 0;
     }
-    if (is_verbose) ec.print_to_stderr(name + ": not found\n");
+    if (is_verbose)
+      report_soft_builtin_error(ec, cxt,
+                                "The command '" + name + "' was not found");
     return 1;
   }
 
