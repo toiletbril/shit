@@ -68,19 +68,44 @@ cat > "$d/vanishing-command" <<'SH'
 /bin/rm -f "$0"
 SH
 chmod +x "$d/vanishing-command"
+has_typescript=0
 if script -qec true /dev/null >/dev/null 2>&1; then
+    has_typescript=1
     NO_COLOR= TERM=xterm BIN=$BIN script -qec \
         "$BIN -c 'bench --runs 3 --no-shell $d/vanishing-command'" \
         "$d/typescript" >/dev/null 2>&1
 elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
+    has_typescript=1
     NO_COLOR= TERM=xterm BIN=$BIN script -q "$d/typescript" "$BIN" -c \
         "bench --runs 3 --no-shell $d/vanishing-command" \
         >/dev/null 2>&1
 else
-    printf '\r\033[2Kshit: simulated terminal fallback\n' > "$d/typescript"
+    : > "$d/typescript"
 fi
 terminal_hex=$(od -An -tx1 "$d/typescript" | tr -d ' \n')
-case $terminal_hex in
-    *0d1b5b324b736869743a*) echo "progress cleared before error" ;;
-    *) echo "progress clobbered error"; exit 1 ;;
-esac
+if [ "$has_typescript" -eq 1 ]; then
+    [ -n "$terminal_hex" ] || exit 1
+    case $terminal_hex in
+        *0d1b5b324b736869743a*) ;;
+        *) echo "progress clobbered error"; exit 1 ;;
+    esac
+fi
+cat > "$d/progress-driver" <<'SH'
+#!/bin/sh
+exec "$BIN" -c 'bench --runs 2 "sleep 0.12 # deliberately long benchmark label" "sleep 0.12"'
+SH
+chmod +x "$d/progress-driver"
+if script -qec true /dev/null >/dev/null 2>&1; then
+    NO_COLOR= TERM=xterm BIN=$BIN script -qec "$d/progress-driver" \
+        "$d/progress-typescript" >/dev/null 2>&1
+elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
+    NO_COLOR= TERM=xterm BIN=$BIN script -q "$d/progress-typescript" \
+        "$d/progress-driver" >/dev/null 2>&1
+fi
+if [ -e "$d/progress-typescript" ]; then
+    progress_hex=$(od -An -tx1 "$d/progress-typescript" | tr -d ' \n')
+    clear_count=$(printf '%s\n' "$progress_hex" | grep -o '0d1b5b324b' | \
+        wc -l | tr -d ' ')
+    [ "$clear_count" -ge 4 ] || exit 1
+fi
+echo "progress clear check complete"

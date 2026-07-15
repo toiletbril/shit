@@ -107,7 +107,7 @@ inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
    list and is handed back on the next request of that class, so the kernel sees
    a steady working set. The cache is bounded per class so a burst does not pin
    memory. The pool is single threaded, since the evaluator never shares an
-   allocator across threads, and it is audited in docs/globals-audit.md. */
+   allocator across threads. */
 class HeapPool
 {
 public:

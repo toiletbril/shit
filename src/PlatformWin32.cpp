@@ -64,7 +64,12 @@ fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
 {
   DWORD r = -1;
   if (ReadFile(fd, buf, size, &r, 0) == FALSE) { /* NOLINT */
-    if (GetLastError() == ERROR_BROKEN_PIPE) return 0;
+    let const error = GetLastError();
+    if (error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA ||
+        error == ERROR_PIPE_NOT_CONNECTED)
+    {
+      return 0;
+    }
     return shit::None;
   }
   return static_cast<usize>(r);
@@ -282,10 +287,28 @@ fn shell_has_controlling_terminal() wontthrow -> bool { return false; }
 fn give_controlling_terminal_to(process p) wontthrow -> void { unused(p); }
 fn reclaim_controlling_terminal() wontthrow -> void {}
 
-/* Windows resolves a path lazily, so completion uses it as given. */
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
 {
-  return path.clone();
+  let const handle = CreateFileA(
+      path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+      nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+  defer { CloseHandle(handle); };
+
+  char buffer[32768];
+  let const length = GetFinalPathNameByHandleA(
+      handle, buffer, sizeof(buffer), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+  if (length == 0 || length >= sizeof(buffer)) return shit::None;
+
+  let const resolved = StringView{buffer, static_cast<usize>(length)};
+  if (resolved.starts_with(StringView{"\\\\?\\UNC\\"})) {
+    let unc_path = String{"\\\\"};
+    unc_path += resolved.substring(8);
+    return Path{unc_path.view()};
+  }
+  if (resolved.starts_with(StringView{"\\\\?\\"}))
+    return Path{resolved.substring(4)};
+  return Path{resolved};
 }
 
 fn glob_matches(StringView pattern, Allocator allocator) throws
@@ -405,6 +428,39 @@ fn get_hostname() throws -> Maybe<String>
   return shit::None;
 }
 
+fn get_processor_counts() wontthrow -> processor_counts
+{
+  processor_counts counts{};
+  let const online = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+  let const configured = GetMaximumProcessorCount(ALL_PROCESSOR_GROUPS);
+  if (online != 0) counts.online_count = static_cast<usize>(online);
+  if (configured != 0) counts.configured_count = static_cast<usize>(configured);
+  USHORT group_count = 64;
+  USHORT groups[64];
+  if (GetProcessGroupAffinity(GetCurrentProcess(), &group_count, groups)) {
+    usize affinity_count = 0;
+    if (group_count == 1) {
+      DWORD_PTR process_affinity = 0;
+      DWORD_PTR system_affinity = 0;
+      if (GetProcessAffinityMask(GetCurrentProcess(), &process_affinity,
+                                 &system_affinity))
+      {
+        while (process_affinity != 0) {
+          affinity_count += process_affinity & 1;
+          process_affinity >>= 1;
+        }
+      }
+    } else {
+      for (USHORT group_index = 0; group_index < group_count; group_index++)
+        affinity_count += GetActiveProcessorCount(groups[group_index]);
+    }
+    if (affinity_count != 0) counts.online_count = affinity_count;
+  }
+  if (counts.configured_count < counts.online_count)
+    counts.configured_count = counts.online_count;
+  return counts;
+}
+
 fn get_home_directory() -> Maybe<Path>
 {
   if (Maybe<String> home = get_environment_variable("USERPROFILE"))
@@ -467,12 +523,18 @@ fn process_id_of(process p) wontthrow -> i64
   return static_cast<i64>(GetProcessId(p));
 }
 
-fn process_group_of(process p) wontthrow -> process
+fn process_group_of(process p) throws -> process
 {
   HANDLE duplicate = INVALID_HANDLE_VALUE;
   if (DuplicateHandle(GetCurrentProcess(), p, GetCurrentProcess(), &duplicate,
                       0, FALSE, DUPLICATE_SAME_ACCESS) == 0)
-    return nullptr;
+  {
+    let message = last_system_error_message();
+    let const group = reinterpret_cast<process>(reinterpret_cast<uintptr>(p) |
+                                                PROCESS_GROUP_REFERENCE_TAG);
+    signal_process(group, 9);
+    throw Error{"Could not retain the timeout process group: " + message};
+  }
 
   return reinterpret_cast<process>(reinterpret_cast<uintptr>(duplicate) |
                                    PROCESS_GROUP_REFERENCE_TAG);
@@ -1998,6 +2060,21 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   struct stat info{};
   /* Windows has no lstat, so a symlink reports its resolved target. */
   if (::stat(path_string.c_str(), &info) != 0) return false;
+  status.device_id = 0;
+  status.file_id = 0;
+  let const handle =
+      CreateFileA(path_string.c_str(), 0,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (handle != INVALID_HANDLE_VALUE) {
+    BY_HANDLE_FILE_INFORMATION identity{};
+    if (GetFileInformationByHandle(handle, &identity)) {
+      status.device_id = identity.dwVolumeSerialNumber;
+      status.file_id = (static_cast<u64>(identity.nFileIndexHigh) << 32) |
+                       identity.nFileIndexLow;
+    }
+    CloseHandle(handle);
+  }
   status.mode = static_cast<u32>(info.st_mode);
   status.link_count = static_cast<u64>(info.st_nlink);
   status.owner_id = static_cast<u32>(info.st_uid);

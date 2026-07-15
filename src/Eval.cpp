@@ -25,11 +25,12 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          ArrayList<String> positional_params)
     : m_shell_name(steal(shell_name)),
       m_positional_params(steal(positional_params)),
-      m_enable_path_expansion(!should_disable_path_expansion),
-      m_enable_echo(should_echo), m_enable_echo_expanded(should_echo_expanded),
-      m_shell_is_interactive(shell_is_interactive),
-      m_error_exit(should_error_exit)
+      m_shell_is_interactive(shell_is_interactive)
 {
+  set_no_glob(should_disable_path_expansion);
+  set_echo(should_echo);
+  set_echo_expanded(should_echo_expanded);
+  set_error_exit(should_error_exit);
   set_field_separators(m_field_separators.view());
 
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
@@ -50,13 +51,13 @@ fn RuntimeState::restore(EvalContext &context) const wontthrow -> void
 
 fn EvalContext::add_evaluated_expression() wontthrow -> void
 {
-  if (!m_stats_enabled) return;
+  if (!stats_enabled()) return;
   m_expressions_executed_last++;
 }
 
 fn EvalContext::add_expansion() wontthrow -> void
 {
-  if (!m_stats_enabled) return;
+  if (!stats_enabled()) return;
   m_expansions_last++;
 }
 
@@ -404,8 +405,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   let const empty_expansion_note =
       "Replace it with ${" + String{name} + "-} if empty expansion is desired";
 
-  if (m_runtime.error_unset &&
-      (m_runtime.error_unset_explicit || !warnings_enabled()))
+  if (error_unset() && (m_runtime.error_unset_explicit || !warnings_enabled()))
   {
     let const message = "Unable to expand '" + String{name} +
                         "' because the parameter is not set";
@@ -424,9 +424,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   }
   if (is_warning_suppressed(suppressible_warning::UnsetTestOperand)) return;
 
-  if (m_runtime.error_unset ||
-      (warnings_enabled() && warnings_reach_every_mood()))
-  {
+  if (error_unset() || (warnings_enabled() && warnings_reach_every_mood())) {
     show_runtime_warning_at(locate_variable_reference(name),
                             "The variable '" + String{name} +
                                 "' is not set, it expands to empty",
@@ -749,32 +747,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                                   m_shell_start_time,
                               heap_allocator());
         case dynamic_var::SHELLOPTS: {
-          struct shellopts_row
-          {
-            const char *option_name;
-            bool (EvalContext::*get)() const;
-          };
-          static const shellopts_row SHELLOPTS_ROWS[] = {
-              {"allexport", &EvalContext::export_all          },
-              {"errexit",   &EvalContext::error_exit          },
-              {"failglob",  &EvalContext::failglob            },
-              {"monitor",   &EvalContext::monitor             },
-              {"noclobber", &EvalContext::no_clobber          },
-              {"noexec",    &EvalContext::no_exec             },
-              {"noglob",    &EvalContext::no_glob             },
-              {"nounset",   &EvalContext::error_unset         },
-              {"pipefail",  &EvalContext::pipefail            },
-              {"posix",     &EvalContext::is_posix_mode       },
-              {"verbose",   &EvalContext::should_echo         },
-              {"xtrace",    &EvalContext::should_echo_expanded},
-          };
-          let joined = String{heap_allocator()};
-          for (let const &row : SHELLOPTS_ROWS) {
-            if (!(this->*(row.get))()) continue;
-            if (!joined.is_empty()) joined.push(':');
-            joined.append(StringView{row.option_name});
-          }
-          return joined;
+          return enabled_shell_option_names(*this);
         }
         case dynamic_var::SRANDOM: {
           let const value = static_cast<u32>(os::realtime_microseconds()) ^
@@ -1354,110 +1327,116 @@ fn EvalContext::leave_parameter_expansion() wontthrow -> void
 fn EvalContext::set_error_exit(bool enabled) wontthrow -> void
 {
   LOG(Info, "the errexit option flips to %s", enabled ? "on" : "off");
-  m_error_exit = enabled;
+  m_runtime.set_option(shell_option_id::Errexit, enabled);
 }
 
 pure fn EvalContext::error_exit() const wontthrow -> bool
 {
-  return m_error_exit;
+  return m_runtime.option_is_enabled(shell_option_id::Errexit);
 }
 
 fn EvalContext::set_echo_expanded(bool enabled) wontthrow -> void
 {
   LOG(Info, "the xtrace option flips to %s", enabled ? "on" : "off");
-  m_enable_echo_expanded = enabled;
+  m_runtime.set_option(shell_option_id::Xtrace, enabled);
 }
 
 fn EvalContext::set_error_unset(bool enabled) wontthrow -> void
 {
   LOG(Info, "the nounset option flips to %s", enabled ? "on" : "off");
-  m_runtime.error_unset = enabled;
+  m_runtime.set_option(shell_option_id::Nounset, enabled);
 }
 
 pure fn EvalContext::error_unset() const wontthrow -> bool
 {
-  return m_runtime.error_unset;
+  return m_runtime.option_is_enabled(shell_option_id::Nounset);
 }
 
 fn EvalContext::set_pipefail(bool enabled) wontthrow -> void
 {
   LOG(Info, "the pipefail option flips to %s", enabled ? "on" : "off");
-  m_runtime.pipefail = enabled;
+  m_runtime.set_option(shell_option_id::Pipefail, enabled);
 }
 
 pure fn EvalContext::pipefail() const wontthrow -> bool
 {
-  return m_runtime.pipefail;
+  return m_runtime.option_is_enabled(shell_option_id::Pipefail);
 }
 
 fn EvalContext::set_no_clobber(bool enabled) wontthrow -> void
 {
   LOG(Info, "the noclobber option flips to %s", enabled ? "on" : "off");
-  m_no_clobber = enabled;
+  m_runtime.set_option(shell_option_id::Noclobber, enabled);
 }
 
 pure fn EvalContext::no_clobber() const wontthrow -> bool
 {
-  return m_no_clobber;
+  return m_runtime.option_is_enabled(shell_option_id::Noclobber);
 }
 
 fn EvalContext::set_export_all(bool enabled) wontthrow -> void
 {
   LOG(Info, "the allexport option flips to %s", enabled ? "on" : "off");
-  m_export_all = enabled;
+  m_runtime.set_option(shell_option_id::Allexport, enabled);
 }
 
 pure fn EvalContext::export_all() const wontthrow -> bool
 {
-  return m_export_all;
+  return m_runtime.option_is_enabled(shell_option_id::Allexport);
 }
 
 fn EvalContext::set_stats_enabled(bool enabled) wontthrow -> void
 {
-  m_stats_enabled = enabled;
+  m_runtime.set_option(shell_option_id::ShowStats, enabled);
 }
 
 pure fn EvalContext::stats_enabled() const wontthrow -> bool
 {
-  return m_stats_enabled;
+  return m_runtime.option_is_enabled(shell_option_id::ShowStats);
 }
 
 fn EvalContext::set_no_glob(bool enabled) wontthrow -> void
 {
   LOG(Info, "the noglob option flips to %s", enabled ? "on" : "off");
-  m_enable_path_expansion = !enabled;
+  m_runtime.set_option(shell_option_id::Noglob, enabled);
 }
 
 pure fn EvalContext::no_glob() const wontthrow -> bool
 {
-  return !m_enable_path_expansion;
+  return m_runtime.option_is_enabled(shell_option_id::Noglob);
 }
 
 fn EvalContext::set_no_exec(bool enabled) wontthrow -> void
 {
   LOG(Info, "the noexec option flips to %s", enabled ? "on" : "off");
-  m_no_exec = enabled;
+  m_runtime.set_option(shell_option_id::Noexec, enabled);
 }
 
-pure fn EvalContext::no_exec() const wontthrow -> bool { return m_no_exec; }
+pure fn EvalContext::no_exec() const wontthrow -> bool
+{
+  return m_runtime.option_is_enabled(shell_option_id::Noexec);
+}
 
 fn EvalContext::set_shitbox(bool enabled) wontthrow -> void
 {
   LOG(Info, "the shitbox option flips to %s", enabled ? "on" : "off");
-  m_shitbox = enabled;
+  m_runtime.set_option(shell_option_id::Shitbox, enabled);
 }
 
-pure fn EvalContext::shitbox() const wontthrow -> bool { return m_shitbox; }
+pure fn EvalContext::shitbox() const wontthrow -> bool
+{
+  return m_runtime.option_is_enabled(shell_option_id::Shitbox);
+}
 
 fn EvalContext::set_failglob(bool enabled) wontthrow -> void
 {
   LOG(Info, "the failglob option flips to %s", enabled ? "on" : "off");
-  m_runtime.failglob = enabled;
+  m_runtime.set_option(shell_option_id::Failglob, enabled);
 }
 
 pure fn EvalContext::failglob() const wontthrow -> bool
 {
-  return m_runtime.failglob;
+  return m_runtime.option_is_enabled(shell_option_id::Failglob);
 }
 
 fn EvalContext::enter_condition() wontthrow -> void { m_condition_depth++; }
@@ -1597,6 +1576,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_associative_names,
                              m_associative_values,
                              m_sparse_array_values,
+                             m_shopt_options,
                              m_functions,
                              m_function_sources,
                              m_function_definition_infos,
@@ -1607,14 +1587,8 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_readonly_names,
                              m_integer_names,
                              m_exported_names,
-                             m_error_exit,
-                             m_enable_path_expansion,
-                             m_enable_echo,
-                             m_enable_echo_expanded,
                              m_environment_undo_log.count(),
-                             RuntimeState::capture(*this),
-                             m_no_clobber,
-                             m_export_all};
+                             RuntimeState::capture(*this)};
 }
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
@@ -1625,20 +1599,14 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_associative_names = steal(snapshot.associative_names);
   m_associative_values = steal(snapshot.associative_values);
   m_sparse_array_values = steal(snapshot.sparse_array_values);
+  m_shopt_options = steal(snapshot.shopt_options);
   m_functions = steal(snapshot.functions);
   m_function_sources = steal(snapshot.function_sources);
   m_function_definition_infos = steal(snapshot.function_definition_infos);
   m_aliases = steal(snapshot.aliases);
   m_positional_params = steal(snapshot.positional_params);
 
-  m_error_exit = snapshot.error_exit;
-  m_enable_path_expansion = snapshot.is_path_expansion_enabled;
-  m_enable_echo = snapshot.is_echo_enabled;
-  m_enable_echo_expanded = snapshot.is_echo_expanded_enabled;
-
   snapshot.runtime.restore(*this);
-  m_no_clobber = snapshot.no_clobber;
-  m_export_all = snapshot.export_all;
 
   m_readonly_names = steal(snapshot.readonly_names);
   m_integer_names = steal(snapshot.integer_names);
@@ -1692,22 +1660,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 
 fn EvalContext::option_flags_string() const throws -> String
 {
-  /* The letters follow bash's own order a e f h u v x B C. hashall and
-     braceexpand are on by default outside the posix mood. */
-  let const bash_flags_on = !is_posix_mode();
-  let flags = String{heap_allocator()};
-  if (export_all()) flags += 'a';
-  if (m_error_exit) flags += 'e';
-  if (!m_enable_path_expansion) flags += 'f';
-  if (bash_flags_on) flags += 'h';
-  if (m_shell_is_interactive) flags += 'i';
-  if (error_unset()) flags += 'u';
-  if (m_enable_echo) flags += 'v';
-  if (m_enable_echo_expanded) flags += 'x';
-  if (bash_flags_on) flags += 'B';
-  if (no_clobber()) flags += 'C';
-
-  return flags;
+  return enabled_shell_option_letters(*this);
 }
 
 fn EvalContext::set_last_exit_status(i32 status) wontthrow -> void
@@ -1767,7 +1720,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 
   const Maybe<String> target = get_variable_value(body);
   if (!target.has_value()) {
-    if (m_runtime.error_unset)
+    if (error_unset())
       throw_script_fatal("Unable to expand '" + body +
                          "' because the parameter is not set");
     return String{scratch_allocator()};
@@ -1836,12 +1789,12 @@ cold fn EvalContext::make_stats_string() const throws -> String
 
 pure fn EvalContext::should_echo() const wontthrow -> bool
 {
-  return m_enable_echo;
+  return m_runtime.option_is_enabled(shell_option_id::Verbose);
 }
 
 pure fn EvalContext::should_echo_expanded() const wontthrow -> bool
 {
-  return m_enable_echo_expanded;
+  return m_runtime.option_is_enabled(shell_option_id::Xtrace);
 }
 
 pure fn EvalContext::shell_is_interactive() const wontthrow -> bool

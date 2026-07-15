@@ -40,7 +40,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  let is_physical = false;
+  let is_physical = cxt.shell_option_state(shell_option_id::Physical);
   usize operand_index = 1;
   while (operand_index < ec.args().count()) {
     const StringView option = ec.args()[operand_index].view();
@@ -118,7 +118,18 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         Path candidate = entry.is_empty()
                              ? Path{arg_path}
                              : Path{entry}.push_component(arg_path.view());
-        let resolved = candidate.to_absolute().normalized();
+        let resolved = candidate;
+        if (is_physical) {
+          if (resolved.is_relative()) {
+            let current_directory = Path::current_directory();
+            if (current_directory.is_empty()) break;
+            resolved = current_directory.push_component(resolved.text().view());
+          }
+          if (let canonical = os::canonical_path(resolved))
+            resolved = canonical.take();
+        } else {
+          resolved = resolved.to_absolute().normalized();
+        }
         if (resolved.is_directory()) {
           LOG(Info, "cd resolved '%s' through CDPATH entry '%.*s'",
               arg_path.c_str(), static_cast<int>(entry.length), entry.data);
@@ -135,7 +146,19 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* A relative operand joins onto the logical PWD when that names a directory,
      the bash -L default, so cd .. out of a symlinked directory returns to the
      symlink's parent. */
-  if (target.is_absolute()) {
+  if (is_physical) {
+    if (target.is_relative()) {
+      let current_directory = Path::current_directory();
+      if (current_directory.is_empty())
+        throw ErrorWithLocation{
+            ec.source_location(),
+            StringView{"Unable to resolve '"} + arg_path +
+                "' because the current directory is unavailable"};
+      target = current_directory.push_component(target.text().view());
+    }
+
+    if (let resolved = os::canonical_path(target)) target = resolved.take();
+  } else if (target.is_absolute()) {
     target = target.normalized();
   } else {
     let const logical_pwd = cxt.get_variable_value("PWD");
@@ -160,10 +183,6 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             StringView{"Unable to resolve '"} + arg_path +
                 "' because the current directory is unavailable"};
     }
-  }
-
-  if (is_physical) {
-    if (let resolved = os::canonical_path(target)) target = resolved.take();
   }
 
   if (target.exists()) {

@@ -924,8 +924,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
        unset variable does not abort the build. */
     let const saved_runtime = RuntimeState::capture(cxt);
     RuntimeState recipe_runtime = saved_runtime;
-    recipe_runtime.failglob = false;
-    recipe_runtime.error_unset = false;
+    recipe_runtime.set_option(shell_option_id::Failglob, false);
+    recipe_runtime.set_option(shell_option_id::Nounset, false);
     recipe_runtime.warning_level = 0;
     recipe_runtime.restore(cxt);
     defer { saved_runtime.restore(cxt); };

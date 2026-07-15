@@ -71,6 +71,8 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.set_terminal_exec_allowed(was_terminal_exec_allowed); };
 
   for (usize index = 0; index < m_nodes.count(); index++) {
+    if (cxt.no_exec()) break;
+
     const CompoundListCondition *n = m_nodes[index];
     ASSERT(n != nullptr);
 
@@ -182,9 +184,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   }
 
-  ASSERT(ret != NOTHING_WAS_EXECUTED);
-
-  return ret;
+  return ret == NOTHING_WAS_EXECUTED ? 0 : ret;
 }
 
 CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,

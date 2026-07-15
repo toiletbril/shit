@@ -4,17 +4,21 @@
 --init-moods
 == set --mood value:
 bash
+bash-posix
 sh
 shit
 == set --init-moods value:
 bash
+bash-posix
 sh
 shit
 == set -M value:
 bash
+bash-posix
 sh
 shit
 == set -L value:
 bash
+bash-posix
 sh
 shit

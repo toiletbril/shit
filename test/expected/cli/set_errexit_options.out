@@ -9,26 +9,28 @@ shit: 1:12: error: Builtin 'set': Unknown --mood value 'badmood', expected 'shit
        |             ^~~~~~~ here.
 rc=1
 == set -o lists the option states:
-errexit        	off
-xtrace         	off
-nounset        	on
-pipefail       	on
 allexport      	off
-noclobber      	off
-noglob         	off
-noexec         	off
-shitbox        	off
-monitor        	off
-failglob       	on
 notify         	off
-posix          	off
+errexit        	off
+noglob         	off
+hashall        	on
+keyword        	off
+monitor        	off
+noexec         	off
+nounset        	on
+verbose        	off
+xtrace         	off
+braceexpand    	on
+noclobber      	off
+errtrace       	off
+physical       	off
+functrace      	off
+pipefail       	on
+failglob       	on
+shitbox        	off
 vi             	off
 emacs          	on
-hashall        	off
-verbose        	off
-keyword        	off
-functrace      	off
-braceexpand    	off
+posix          	off
 force-warnings 	off
 mimicry        	off
 force-diagnostics	on

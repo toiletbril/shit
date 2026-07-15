@@ -719,7 +719,7 @@ hot flatten fn EvalContext::process_args(
           for (glob_field &field : expand_word(expandable)) {
             /* A field with no active glob is its own single result, pushed
                straight in without a directory scan. */
-            if (!m_enable_path_expansion ||
+            if (no_glob() ||
                 !first_active_glob(field.text.view(), field.glob_active,
                                    extglob_enabled())
                      .has_value())
@@ -736,7 +736,10 @@ hot flatten fn EvalContext::process_args(
         }
       };
 
-      if (bash_additions_enabled() && word_has_brace_candidate(*word)) {
+      if (bash_additions_enabled() &&
+          shell_option_state(shell_option_id::Braceexpand) &&
+          word_has_brace_candidate(*word))
+      {
         for (const Word &brace_word : expand_braces(*word, scratch_allocator()))
           do_expand_one_word(brace_word);
       } else {

@@ -134,6 +134,7 @@ fn directory_entry_kind(const Path &directory,
 fn initialize_path_map() throws -> void;
 
 fn begin_interactive_completion() throws -> void;
+fn begin_explicit_completion() throws -> void;
 
 #if !defined NDEBUG
 pure fn debug_directory_stat_count() wontthrow -> usize;

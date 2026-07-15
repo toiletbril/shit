@@ -711,7 +711,7 @@ fn EvalContext::get_variable_value_checked(StringView name) const throws
     -> Maybe<String>
 {
   let current = get_variable_value(name);
-  if (m_runtime.error_unset && !current.has_value())
+  if (error_unset() && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
   return current;

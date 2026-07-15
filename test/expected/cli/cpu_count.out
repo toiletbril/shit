@@ -3,3 +3,11 @@
 8
 4
 1
+default-make-uses-all
+variable-make-uses-all
+explicit-make-preserved
+single-make-preserved
+windows-make-uses-all
+windows-invalid-count-clean
+windows-dry-run-clean
+default-make-builds-shell

@@ -5,8 +5,9 @@ two
 warm-second
 recovered
 hotprobe
-warm=hotprobe
-invalidated=
+removed= added=lateprobe
+vanished=
+atomic-old= atomic-new=newatomicprobe
 refreshed
 appeared
 analysis-shadowed-no-path-scan

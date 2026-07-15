@@ -64,14 +64,14 @@ fn EvalContext::run_completion_function(StringView function_name,
   /* bash-completion reads unset names such as SHELLOPTS freely, so the
      mood-seeded strictness relaxes for the function run. An explicit set -u
      stays fatal. */
-  let const saved_error_unset = m_runtime.error_unset;
-  let const saved_failglob = m_runtime.failglob;
-  if (!m_runtime.error_unset_explicit) m_runtime.error_unset = false;
-  if (!m_runtime.failglob_explicit) m_runtime.failglob = false;
+  let const saved_error_unset = error_unset();
+  let const saved_failglob = failglob();
+  if (!m_runtime.error_unset_explicit) set_error_unset(false);
+  if (!m_runtime.failglob_explicit) set_failglob(false);
   defer
   {
-    m_runtime.error_unset = saved_error_unset;
-    m_runtime.failglob = saved_failglob;
+    set_error_unset(saved_error_unset);
+    set_failglob(saved_failglob);
   };
 
   let comp_words = ArrayList<String>{heap_allocator()};

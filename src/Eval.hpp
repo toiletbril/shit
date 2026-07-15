@@ -213,6 +213,7 @@ struct eval_state_snapshot
   HashSet associative_names;
   StringMap<String> associative_values;
   StringMap<String> sparse_array_values;
+  StringMap<bool> shopt_options;
   StringMap<const Expression *> functions;
   StringMap<String> function_sources;
   StringMap<function_definition_info> function_definition_infos;
@@ -226,19 +227,10 @@ struct eval_state_snapshot
   HashSet readonly_names;
   HashSet integer_names;
   HashSet exported_names;
-  bool error_exit;
-  bool is_path_expansion_enabled;
-  bool is_echo_enabled;
-  bool is_echo_expanded_enabled;
   /* The length of the environment undo log when the snapshot was taken, the
      point restore_state rewinds the process environment back to. */
   usize environment_undo_mark;
-  /* The mood and the strictness toggles, the noclobber flag, and the allexport
-     flag ride the snapshot too, so a set -o or set --mood inside a subshell
-     dies with the child rather than leaking to the parent. */
   RuntimeState runtime;
-  bool no_clobber;
-  bool export_all;
 };
 
 struct completion_spec
@@ -481,10 +473,24 @@ public:
   fn set_notify(bool enabled) wontthrow -> void;
   pure fn notify() const wontthrow -> bool;
 
-  fn set_vi_mode(bool enabled) wontthrow -> void { m_vi_mode = enabled; }
-  pure fn vi_mode() const wontthrow -> bool { return m_vi_mode; }
-  fn set_emacs_mode(bool enabled) wontthrow -> void { m_vi_mode = !enabled; }
-  pure fn emacs_mode() const wontthrow -> bool { return !m_vi_mode; }
+  fn set_vi_mode(bool enabled) wontthrow -> void
+  {
+    m_runtime.set_option(shell_option_id::Vi, enabled);
+    if (enabled) m_runtime.set_option(shell_option_id::Emacs, false);
+  }
+  pure fn vi_mode() const wontthrow -> bool
+  {
+    return m_runtime.option_is_enabled(shell_option_id::Vi);
+  }
+  fn set_emacs_mode(bool enabled) wontthrow -> void
+  {
+    m_runtime.set_option(shell_option_id::Emacs, enabled);
+    if (enabled) m_runtime.set_option(shell_option_id::Vi, false);
+  }
+  pure fn emacs_mode() const wontthrow -> bool
+  {
+    return m_runtime.option_is_enabled(shell_option_id::Emacs);
+  }
 
   fn register_function(StringView name, const Expression *body,
                        StringView definition_text, usize body_start_position,
@@ -654,6 +660,16 @@ public:
 
   fn set_current_location(SourceLocation location) wontthrow -> void;
 
+  fn set_shell_option_state(shell_option_id option, bool enabled) wontthrow
+      -> void
+  {
+    m_runtime.set_option(option, enabled);
+  }
+  pure fn shell_option_state(shell_option_id option) const wontthrow -> bool
+  {
+    return m_runtime.option_is_enabled(option);
+  }
+
   fn set_error_exit(bool enabled) wontthrow -> void;
   pure fn error_exit() const wontthrow -> bool;
   fn set_echo_expanded(bool enabled) wontthrow -> void;
@@ -818,6 +834,11 @@ public:
   fn set_execution_string(StringView text) throws -> void
   {
     m_execution_string = String{heap_allocator(), text};
+    m_has_execution_string = true;
+  }
+  pure fn has_execution_string() const wontthrow -> bool
+  {
+    return m_has_execution_string;
   }
 
   fn set_cli_invocation(String text) wontthrow -> void
@@ -857,10 +878,6 @@ public:
     if (!m_runtime.failglob_explicit) set_failglob(strict);
   }
 
-  /* Enter the mood and diagnostic state a function was defined in, deriving the
-     strictness from that mood, and return the previous RuntimeState so a defer
-     restores it. RuntimeState reads and writes the toggles, so it is a friend.
-   */
   friend class RuntimeState;
   fn enter_definition_state(const function_definition_info &info) wontthrow
       -> RuntimeState
@@ -872,6 +889,30 @@ public:
         info.were_diagnostics_disabled_at_definition;
     apply_strictness_for_mood();
     return previous;
+  }
+
+  fn leave_definition_state(const RuntimeState &previous,
+                            const RuntimeState &entered) wontthrow -> void
+  {
+    let const finished = RuntimeState::capture(*this);
+    let changed_options = entered.shell_options ^ finished.shell_options;
+    if (entered.error_unset_explicit != finished.error_unset_explicit)
+      changed_options |= RuntimeState::option_mask(shell_option_id::Nounset);
+    if (entered.pipefail_explicit != finished.pipefail_explicit)
+      changed_options |= RuntimeState::option_mask(shell_option_id::Pipefail);
+    if (entered.failglob_explicit != finished.failglob_explicit)
+      changed_options |= RuntimeState::option_mask(shell_option_id::Failglob);
+    let const merged_options = (previous.shell_options & ~changed_options) |
+                               (finished.shell_options & changed_options);
+
+    previous.restore(*this);
+    m_runtime.shell_options = merged_options;
+    if (entered.error_unset_explicit != finished.error_unset_explicit)
+      m_runtime.error_unset_explicit = finished.error_unset_explicit;
+    if (entered.pipefail_explicit != finished.pipefail_explicit)
+      m_runtime.pipefail_explicit = finished.pipefail_explicit;
+    if (entered.failglob_explicit != finished.failglob_explicit)
+      m_runtime.failglob_explicit = finished.failglob_explicit;
   }
 
   /* The moods whose startup files are being sourced right now, a bit per mood.
@@ -910,8 +951,14 @@ public:
     return (m_initialized_moods & (1U << static_cast<u8>(mood))) != 0;
   }
 
-  fn set_mimicry(bool enabled) wontthrow -> void { m_mimicry = enabled; }
-  pure fn mimicry() const wontthrow -> bool { return m_mimicry; }
+  fn set_mimicry(bool enabled) wontthrow -> void
+  {
+    m_runtime.set_option(shell_option_id::Mimicry, enabled);
+  }
+  pure fn mimicry() const wontthrow -> bool
+  {
+    return m_runtime.option_is_enabled(shell_option_id::Mimicry);
+  }
 
   /* The positive spelling of the analysis toggle, so set -o force-diagnostics
      enables the stage the way --no-diagnostics disables it. */
@@ -1143,7 +1190,10 @@ public:
                                  bool strip_escaped_literals) throws -> String;
 
   pure fn should_echo() const wontthrow -> bool;
-  fn set_echo(bool enabled) wontthrow -> void { m_enable_echo = enabled; }
+  fn set_echo(bool enabled) wontthrow -> void
+  {
+    m_runtime.set_option(shell_option_id::Verbose, enabled);
+  }
   pure fn should_echo_expanded() const wontthrow -> bool;
   pure fn shell_is_interactive() const wontthrow -> bool;
 
@@ -1160,30 +1210,39 @@ public:
   fn set_stats_enabled(bool enabled) wontthrow -> void;
   pure fn stats_enabled() const wontthrow -> bool;
 
-  fn set_show_ast(bool enabled) wontthrow -> void { m_show_ast = enabled; }
-  pure fn show_ast() const wontthrow -> bool { return m_show_ast; }
+  fn set_show_ast(bool enabled) wontthrow -> void
+  {
+    m_runtime.set_option(shell_option_id::ShowAst, enabled);
+  }
+  pure fn show_ast() const wontthrow -> bool
+  {
+    return m_runtime.option_is_enabled(shell_option_id::ShowAst);
+  }
   fn set_show_lexed_words(bool enabled) wontthrow -> void
   {
-    m_show_lexed_words = enabled;
+    m_runtime.set_option(shell_option_id::ShowLexedWords, enabled);
   }
   pure fn show_lexed_words() const wontthrow -> bool
   {
-    return m_show_lexed_words;
+    return m_runtime.option_is_enabled(shell_option_id::ShowLexedWords);
   }
   fn set_show_exit_code(bool enabled) wontthrow -> void
   {
-    m_show_exit_code = enabled;
+    m_runtime.set_option(shell_option_id::ShowExitCode, enabled);
   }
-  pure fn show_exit_code() const wontthrow -> bool { return m_show_exit_code; }
+  pure fn show_exit_code() const wontthrow -> bool
+  {
+    return m_runtime.option_is_enabled(shell_option_id::ShowExitCode);
+  }
 
   /* The granular memory report at exit, requested by --show-memory. */
   fn set_memory_stats_enabled(bool enabled) wontthrow -> void
   {
-    m_memory_stats_enabled = enabled;
+    m_runtime.set_option(shell_option_id::ShowMemory, enabled);
   }
   pure fn memory_stats_enabled() const wontthrow -> bool
   {
-    return m_memory_stats_enabled;
+    return m_runtime.option_is_enabled(shell_option_id::ShowMemory);
   }
 
   /* The --no-diagnostics skip, so set -o no-diagnostics flips the per-chunk
@@ -1223,11 +1282,6 @@ public:
   pure fn peak_ast_arena_bytes() const wontthrow -> usize;
 
 protected:
-  bool m_stats_enabled{false};
-  bool m_show_ast{false};
-  bool m_show_lexed_words{false};
-  bool m_show_exit_code{false};
-  bool m_memory_stats_enabled{false};
   bool m_is_login_shell{false};
   bool m_has_custom_rcfile{false};
   usize m_expressions_executed_last{0};
@@ -1270,6 +1324,7 @@ protected:
   String m_shell_executable_path{heap_allocator()};
   String m_last_argument{heap_allocator()};
   String m_execution_string{heap_allocator()};
+  bool m_has_execution_string{false};
   String m_cli_invocation{heap_allocator()};
   String m_current_command{heap_allocator()};
   bool m_make_shell_suppressed{false};
@@ -1350,16 +1405,12 @@ protected:
   /* The mood and the diagnostic and strictness toggles, grouped as one runtime
      state so a scope that swaps them saves and restores the whole set with one
      RuntimeState copy. failglob defaults on, the other toggles default off. */
-  RuntimeState m_runtime{.failglob = true};
+  RuntimeState m_runtime{};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   bool m_mood_set_explicitly{false};
-  bool m_no_clobber{false};
-  bool m_export_all{false};
   /* One bit per suppressible_warning value. */
   u32 m_suppressed_warnings{0};
-  bool m_no_exec{false};
-  bool m_mimicry{false};
   /* The nesting of mimicked scripts, bounded so a script that mimics another
      cannot recurse without limit. */
   usize m_mimicry_depth{0};
@@ -1399,15 +1450,7 @@ protected:
 
   ArrayList<job> m_jobs{heap_allocator()};
   i32 m_next_job_id{1};
-  bool m_monitor{false};
-  bool m_notify{false};
-  bool m_vi_mode{false};
-  bool m_enable_path_expansion;
-  bool m_shitbox{false};
-  bool m_enable_echo;
-  bool m_enable_echo_expanded;
   bool m_shell_is_interactive;
-  bool m_error_exit;
 
   fn option_flags_string() const throws -> String;
 

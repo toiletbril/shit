@@ -263,6 +263,20 @@ fn get_hostname() throws -> Maybe<String>
   return String{buffer};
 }
 
+fn get_processor_counts() wontthrow -> processor_counts
+{
+  let const online = sysconf(_SC_NPROCESSORS_ONLN);
+  let const configured = sysconf(_SC_NPROCESSORS_CONF);
+  processor_counts counts{};
+  if (online > 0) counts.online_count = static_cast<usize>(online);
+  if (configured > 0) counts.configured_count = static_cast<usize>(configured);
+  counts.online_count =
+      affinity_processor_count(counts.online_count, counts.configured_count);
+  if (counts.configured_count < counts.online_count)
+    counts.configured_count = counts.online_count;
+  return counts;
+}
+
 fn get_home_directory() throws -> Maybe<Path>
 {
   if (let const home = get_environment_variable("HOME"); home.has_value())
@@ -332,7 +346,7 @@ fn is_running_setuid() wontthrow -> bool
 }
 
 fn process_id_of(process p) wontthrow -> i64 { return static_cast<i64>(p); }
-fn process_group_of(process p) wontthrow -> process { return -p; }
+fn process_group_of(process p) throws -> process { return -p; }
 fn close_process_group(process group) wontthrow -> void { unused(group); }
 fn process_has_id(process p, i64 id) wontthrow -> bool
 {
@@ -2188,6 +2202,8 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   struct stat info{};
   /* lstat does not follow the symlink, so ls shows the l type without -L. */
   if (::lstat(path_string.c_str(), &info) != 0) return false;
+  status.device_id = static_cast<u64>(info.st_dev);
+  status.file_id = static_cast<u64>(info.st_ino);
   status.mode = static_cast<u32>(info.st_mode);
   status.link_count = static_cast<u64>(info.st_nlink);
   status.owner_id = static_cast<u32>(info.st_uid);
@@ -2204,6 +2220,8 @@ fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
   const String path_string{path};
   struct stat info{};
   if (::stat(path_string.c_str(), &info) != 0) return false;
+  status.device_id = static_cast<u64>(info.st_dev);
+  status.file_id = static_cast<u64>(info.st_ino);
   status.mode = static_cast<u32>(info.st_mode);
   status.link_count = static_cast<u64>(info.st_nlink);
   status.owner_id = static_cast<u32>(info.st_uid);

@@ -14,7 +14,7 @@ if is_positive_count "${NUMBER_OF_PROCESSORS:-}"; then
 fi
 
 if command -v nproc >/dev/null 2>&1; then
-    count=$(nproc 2>/dev/null)
+    count=$(nproc --all 2>/dev/null)
     if is_positive_count "$count"; then
         printf '%s\n' "$count"
         exit 0

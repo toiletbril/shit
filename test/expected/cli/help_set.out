@@ -2,10 +2,12 @@ DESCRIPTION
   The set builtin sets the shell options and the positional parameters.
 
 SYNOPSIS
-  set [-aAbBCeEfGhIkmMnSTuvWx] [+aAbBCeEfGhIkmMnSTuvWx] [-o name] [+o name] [-p] [--] [arg ...]
+  set [-abefhkmnuvxBCEPTARWISG] [+abefhkmnuvxBCEPTARWISG] [-o name] [+o name] [--options] [--] [arg ...]
 
 OPTIONS
       --help              Display help.
+      --options           Display every option with its current state and
+                          description.
   -M, --mood=<...>        Set the runtime mood to shit, bash, or sh, or print it
                           with no value.
   -L, --init-moods=<.., ..>
@@ -15,44 +17,46 @@ OPTION SWITCHES
   A letter after a minus enables the option and after a plus disables it.
   -o NAME and +o NAME do the same by long name.
 
-  -e  errexit, error-exit           Exit on the first command that fails.
-  -x  xtrace                        Print each command after expansion before it runs.
-  -u  nounset, no-unset             Treat an unset variable as an error.
-      pipefail                      Report a pipeline's status as the rightmost stage that failed.
   -a  allexport, export-all         Mark every assigned variable for the environment.
-  -C  noclobber, no-clobber         Refuse to overwrite an existing file through '>'.
-  -f  noglob, no-glob               Disable pathname expansion.
-  -n  noexec, no-exec               Read and parse commands but do not run them.
-      shitbox                       Resolve the bundled shitbox utility names directly as commands.
-  -m  monitor                       Run background jobs in their own process group with notifications.
-      failglob                      Fail a command whose glob matches nothing.
   -b  notify                        Report a background job's completion immediately when it finishes.
-      posix                         Switch to the POSIX mood, the bash set -o posix form.
+  -e  errexit, error-exit           Exit on the first command that fails.
+  -f  noglob, no-glob               Disable pathname expansion.
+  -h  hashall                       Retain command hashing mode for compatible option queries.
+  -k  keyword                       Retain keyword assignment mode for compatible option queries.
+  -m  monitor                       Run background jobs in their own process group with notifications.
+  -n  noexec, no-exec               Read and parse commands but do not run them.
+  -u  nounset, no-unset             Treat an unset variable as an error.
+  -v  verbose                       Write input to standard error as it is read.
+  -x  xtrace                        Print each command after expansion before it runs.
+  -B  braceexpand                   Enable brace expansion.
+  -C  noclobber, no-clobber         Refuse to overwrite an existing file through '>'.
+  -E  errtrace                      Retain ERR trap inheritance mode for compatible option queries.
+  -P  physical                      Resolve symbolic links while changing directories.
+  -T  functrace                     Retain DEBUG and RETURN inheritance mode for compatible option queries.
+      pipefail                      Report a pipeline's status as the rightmost stage that failed.
+      failglob                      Fail a command whose glob matches nothing.
+      shitbox                       Resolve the bundled shitbox utility names directly as commands.
       vi                            Use vi-style command-line editing.
-      emacs                         Use emacs-style command-line editing, the default.
-  -h  hashall                       Accepted without effect.
-  -v  verbose                       Write input to standard error as it is read, the -v flag.
-  -k  keyword                       Accepted without effect.
-  -T  functrace                     Accepted without effect.
-  -B  braceexpand                   Accepted without effect.
+      emacs                         Use emacs-style command-line editing.
+      posix                         Switch to the bash posix mood.
   -A  show-ast                      Print the AST before each command runs.
   -R  show-lexed-words              Print the escape bitmap after each parse.
-  -E  show-exit-code                Print the exit code after each command.
-  -W  force-warnings                Report a strict runtime error as a warning and let the run proceed, the -W flag.
-  -I  mimicry                       Mimic the shell a script's shebang names, the -I flag.
-      force-diagnostics             Run the analysis stage before each chunk, the inverse of no-diagnostics.
+      show-exit-code                Print the exit code after each command.
+  -W  force-warnings                Report strict runtime errors as warnings and continue.
+  -I  mimicry                       Mimic the shell named by a script's shebang.
+      force-diagnostics             Run the analysis stage before each chunk.
   -S  show-stats                    Print evaluation statistics after each run.
       no-diagnostics                Skip the analysis stage before each chunk runs.
-  -G  show-memory                   Print a granular memory report at exit, the --show-memory flag.
+  -G  show-memory                   Print a granular memory report at exit.
       login                         Whether the shell started as a login shell, fixed at startup.
       rcfile                        Whether a custom rc file was named at startup, fixed at startup.
 
   The -o long names:
-    errexit, error-exit, xtrace, nounset, no-unset, pipefail, allexport,
-    export-all, noclobber, no-clobber, noglob, no-glob, noexec, no-exec,
-    shitbox, monitor, failglob, notify, posix, vi, emacs, hashall, verbose,
-    keyword, functrace, braceexpand, show-ast, show-lexed-words, show-exit-code,
-    force-warnings, mimicry, force-diagnostics, show-stats, no-diagnostics,
-    show-memory, login, rcfile
+    allexport, export-all, notify, errexit, error-exit, noglob, no-glob,
+    hashall, keyword, monitor, noexec, no-exec, nounset, no-unset, verbose,
+    xtrace, braceexpand, noclobber, no-clobber, errtrace, physical, functrace,
+    pipefail, failglob, shitbox, vi, emacs, posix, show-ast, show-lexed-words,
+    show-exit-code, force-warnings, mimicry, force-diagnostics, show-stats,
+    no-diagnostics, show-memory, login, rcfile
 
 rc=0

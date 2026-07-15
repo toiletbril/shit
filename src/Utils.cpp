@@ -1676,14 +1676,18 @@ static StringMap<program_path_cache_entry> PATH_CACHE{heap_allocator()};
 
 struct cached_directory_listing
 {
+  u64 device_id{0};
+  u64 file_id{0};
   i64 modification_time{0};
   u32 modification_nanoseconds{0};
   u64 size{0};
+  u64 validation_epoch{0};
   bool is_valid{false};
   ArrayList<Path::directory_child> entries{heap_allocator()};
 };
 
 static StringMap<cached_directory_listing> DIR_LISTING_CACHE{heap_allocator()};
+static u64 DIRECTORY_VALIDATION_EPOCH = 0;
 #if !defined NDEBUG
 static usize DEBUG_DIRECTORY_STAT_COUNT = 0;
 #endif
@@ -1693,13 +1697,11 @@ static fn clear_directory_listing_cache() throws -> void
   DIR_LISTING_CACHE.clear();
 }
 
-/* A cd and hash -r set this so the next lookup drops the cache and re-resolves,
-   the way dash rehashes lazily. While it is false a hit returns the stored path
-   with no stat. */
 static bool PATH_CACHE_IS_STALE = false;
 
 static ArrayList<String> PATH_COMMAND_NAMES{heap_allocator()};
 static bool PATH_COMMAND_NAMES_IS_VALID = false;
+static u64 PATH_COMMAND_NAMES_VALIDATION_EPOCH = 0;
 
 static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
@@ -1755,8 +1757,12 @@ fn read_directory_cached(const Path &directory,
     -> const ArrayList<Path::directory_child> *
 {
   let const key = directory.text().view();
-  const cached_directory_listing *cached = DIR_LISTING_CACHE.find(key);
-  if (!should_validate && cached != nullptr) return &cached->entries;
+  cached_directory_listing *cached = DIR_LISTING_CACHE.find(key);
+  if (!should_validate && cached != nullptr &&
+      cached->validation_epoch == DIRECTORY_VALIDATION_EPOCH)
+  {
+    return &cached->entries;
+  }
 
 #if !defined NDEBUG
   DEBUG_DIRECTORY_STAT_COUNT++;
@@ -1764,13 +1770,22 @@ fn read_directory_cached(const Path &directory,
   os::file_status status{};
   let const has_status = os::stat_path_following(key, status);
   if (cached != nullptr && cached->is_valid && has_status &&
+      cached->device_id == status.device_id &&
+      cached->file_id == status.file_id &&
       cached->modification_time == status.modification_time &&
       cached->modification_nanoseconds == status.modification_nanoseconds &&
       cached->size == status.size)
   {
+    cached->validation_epoch = DIRECTORY_VALIDATION_EPOCH;
     return &cached->entries;
   }
   let const had_cached_listing = cached != nullptr;
+  if (had_cached_listing && should_invalidate_path_cache &&
+      path_dirs().find(key).has_value())
+  {
+    PATH_CACHE_IS_STALE = true;
+    PATH_COMMAND_NAMES_IS_VALID = false;
+  }
 
   let entries = Path::read_directory_typed(directory);
   if (!entries.has_value()) return nullptr;
@@ -1789,20 +1804,16 @@ fn read_directory_cached(const Path &directory,
   }
 
   cached_directory_listing fresh{};
+  fresh.device_id = has_status ? status.device_id : 0;
+  fresh.file_id = has_status ? status.file_id : 0;
   fresh.modification_time = has_status ? status.modification_time : 0;
   fresh.modification_nanoseconds =
       has_status ? status.modification_nanoseconds : 0;
   fresh.size = has_status ? status.size : 0;
+  fresh.validation_epoch = DIRECTORY_VALIDATION_EPOCH;
   fresh.is_valid = has_status;
   fresh.entries = steal(*entries);
   DIR_LISTING_CACHE.set(key, steal(fresh));
-
-  if (had_cached_listing && should_invalidate_path_cache &&
-      path_dirs().find(key).has_value())
-  {
-    PATH_CACHE_IS_STALE = true;
-    PATH_COMMAND_NAMES_IS_VALID = false;
-  }
 
   return &DIR_LISTING_CACHE.find(key)->entries;
 }
@@ -1836,7 +1847,7 @@ static fn rebuild_path_cache() throws -> void
 
   for (let const &dir_string : path_dirs) {
     let const directory = Path{dir_string.view()};
-    let const entries = read_directory_cached(directory, false);
+    let const entries = read_directory_cached(directory, false, false);
     if (entries == nullptr) continue;
 
     struct program_candidate
@@ -1988,9 +1999,19 @@ fn initialize_path_map() throws -> void
   rebuild_path_cache();
 }
 
+static fn begin_directory_validation_epoch() wontthrow -> void
+{
+  DIRECTORY_VALIDATION_EPOCH++;
+}
+
 fn begin_interactive_completion() throws -> void
 {
-  clear_directory_listing_cache();
+  begin_directory_validation_epoch();
+}
+
+fn begin_explicit_completion() throws -> void
+{
+  begin_directory_validation_epoch();
 }
 
 #if !defined NDEBUG
@@ -2000,8 +2021,19 @@ pure fn debug_directory_stat_count() wontthrow -> usize
 }
 #endif
 
+static fn validate_path_command_names() throws -> void
+{
+  if (PATH_COMMAND_NAMES_VALIDATION_EPOCH == DIRECTORY_VALIDATION_EPOCH) return;
+
+  for (let const &directory_text : path_dirs())
+    read_directory_cached(Path{directory_text.view()}, true, false);
+
+  PATH_COMMAND_NAMES_VALIDATION_EPOCH = DIRECTORY_VALIDATION_EPOCH;
+}
+
 static fn prepare_complete_path_cache() throws -> void
 {
+  validate_path_command_names();
   if (PATH_CACHE_IS_STALE || !PATH_COMMAND_NAMES_IS_VALID)
     initialize_path_map();
 }

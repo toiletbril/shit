@@ -7,16 +7,18 @@ under src/toiletline.
 
 ## Build
 
-The Makefile is src/Makefile. `make MODE=rel` writes the optimized binary to
-../shit, `make MODE=dbg` writes ../shit-dbg with AddressSanitizer and the
-UndefinedBehaviorSanitizer, and `make MODE=cov` writes ../shit-cov. The default
-mode is dbg. A bare `make` builds the shell into its object tree from a clean
-checkout, since the object directories are created as an order-only prerequisite
-and the default goal is the shit target. The completion suite needs the debug
-binary, since `--debug-complete-at` is gated behind NDEBUG. Prefer a make target
-over a raw compiler call, and clean a stale artifact with `make clean`, never a
-bare `rm` of ../shit. The full MODE catalog, the cross-compilation targets, and
-the install with its PREFIX are documented in the README.
+The top-level Makefile delegates to src/Makefile and supplies the configured
+logical CPU count when the caller did not select a parallel job count. `make
+MODE=rel` writes the optimized binary to ./shit, `make MODE=dbg` writes
+./shit-dbg with AddressSanitizer and the UndefinedBehaviorSanitizer, and `make
+MODE=cov` writes ./shit-cov. The default mode is dbg. A bare `make` builds the
+shell into its object tree from a clean checkout, since the object directories
+are created as an order-only prerequisite and the default goal is the shit
+target. The completion suite needs the debug binary, since
+`--debug-complete-at` is gated behind NDEBUG. Prefer a make target over a raw
+compiler call, and clean a stale artifact with `make clean`, never a bare `rm`
+of ./shit. The full MODE catalog, the cross-compilation targets, and the install
+with its PREFIX are documented in the README.
 
 ## Moods
 
@@ -35,11 +37,16 @@ down to bash only when already in `bash-posix` or the `sh` mood, since the
 prior mood is not a stack. A glob in command position is fatal in the default
 mood and a warning in a compatibility mood, checked in
 SimpleCommand::evaluate_impl through command_word_is_glob. The mood, the
-diagnostics toggles, and the three strictness toggles with their explicit marks
-live in one `runtime_state` struct (Eval.hpp), which capture and restore copy
-whole. Main.cpp enters rescue rather than exiting when a flag fails to parse in
-a login shell, the lockout-risk case marked by a dash-prefixed argv[0], while
-any other invocation keeps the usage exit.
+diagnostics toggles, the explicit strictness marks, and the stored shell option
+bits live in one RuntimeState. Capture and restore copy it whole. The set
+builtin uses one descriptor table for mutation, queries, help, completion,
+SHELLOPTS, and `$-`. Its compile-time name map retains binary search. Main.cpp
+enters rescue rather than exiting when a flag fails to parse in a login shell,
+the lockout-risk case marked by a dash-prefixed argv[0], while any other
+invocation keeps the usage exit.
+
+Eval snapshots also carry shopt state, so a command substitution restores both
+option families.
 
 The name-to-mood mapping is shared from `MimicMood.hpp` as the single
 `parse_mood_name` and `mood_name` pair, so the flag parser, `set --mood`, and
@@ -77,11 +84,10 @@ and a nested type are CamelCase. File operations take a Path, not a String or a
 StringView.
 
 State threads through EvalContext and through constructors. The codebase holds no
-mutable global for per-executor state, beyond a small audited set in
-docs/globals-audit.md. New abstractions, file splits or merges, and dependency
-upgrades wait for approval. Before implementing anything new, search for an
-existing function, parser, or helper and reuse it rather than writing a second
-copy.
+mutable global for per-executor state. New abstractions, file splits or merges,
+and dependency upgrades wait for approval. Before implementing anything new,
+search for an existing function, parser, or helper and reuse it rather than
+writing a second copy.
 
 ## Architecture
 
@@ -110,13 +116,25 @@ The `assimilate TARGET` builtin copies the running binary through scp and uses
 an SSH transaction to install it as `shit` in the first usable remote PATH
 directory. A hidden candidate is validated before the target is replaced. A
 handled failure restores the prior file or symlink and removes transaction
-files. `scripts/shit-scp` is a compatibility wrapper for this builtin.
+files. Concurrent transactions serialize through an atomic remote lock record,
+and a later transaction recovers its stale journal. The local shell supports
+every platform,
+and the remote transaction requires a POSIX-compatible SSH login shell that can
+launch the transferred executable. The transferred shell performs the
+transaction with explicit shitbox utilities. A pre-bootstrap failure cannot
+alter the installed target, but an unusable partial upload can remain.
+`scripts/shit-scp` is a compatibility wrapper for this builtin.
 
 src/Platform.cpp routes the operating system implementation. POSIX targets use
 PlatformPosix.cpp as the base and PlatformPosixExtra.cpp for the Linux and
 Darwin overlays. Windows loads only PlatformWin32.cpp. Platform.hpp owns every
 platform header. Every platform call and type lives behind an os:: wrapper, so a
 non-platform source names no syscall, no platform header, and no platform macro.
+A closed pipe is reported as EOF by read_fd on every platform. A process-group
+reference used by timeout remains valid after polling closes the leader process,
+and close_process_group releases any retained platform handle. The shared
+get_processor_counts wrapper provides the affinity-limited and configured
+logical CPU counts used by shitbox nproc.
 The remaining platform conditionals outside the platform files and Utils.cpp
 are the fork-based process substitution in EvalSubstitution.cpp and pipeline
 stage in ExpressionsCompound.cpp, which run the shell's own AST in the forked
@@ -145,9 +163,15 @@ src/CompletionHighlight.cpp, with shared helpers in src/CompletionInternal.hpp.
 The per-program policy tables, the --help allowlist,
 the extension hints, the custom-completer routing, and the transparent prefixes,
 live in src/CompletionPolicy.hpp, so a program absent from every table falls
-through to the manpage and the filesystem. The highlighter and TAB completion
-share one cache of directory listings keyed by path and invalidated by mtime.
-Symlink target kinds are resolved when each listing is used. src/Toiletline.cpp
+through to the manpage and the filesystem. The highlighter, ghost completion,
+TAB completion, and the PATH command index share one directory-listing cache
+keyed by path. The first use of a directory in a completion validation epoch
+checks its cached metadata. Later completion and highlighting calls in that
+epoch reuse the entry without another stat. Each interactive input begins an
+epoch. TAB, `compgen -c`, and `compgen -A command` begin another epoch. A
+membership change in a PATH directory invalidates the command-search cache and
+the sorted command index. Symlink target kinds are resolved when each listing
+is used. src/Toiletline.cpp
 bridges the editor to the evaluator, and
 src/toiletline/toiletline.h is the editor. The `--debug-highlight-at` flag, a
 debug-only test driver gated behind NDEBUG like `--debug-complete-at`, prints the
@@ -221,9 +245,9 @@ guard, never the shitbox rm under test.
 
 The bashdiff and mimicrydiff bash comparisons require a bash 5.3 or newer
 reference, since the goldens encode bash 5.x behavior, and both scripts skip the
-bash comparison loudly when `$BASH` is older. The macOS system `/bin/bash` is
-bash 3.2, so a macOS run passes the modern bash through `BASH`, as in `make -C
-test bashdiff BASH=/opt/homebrew/bin/bash`.
+bash comparison loudly when `$BASHP` is older. The macOS system `/bin/bash` is
+bash 3.2, so a macOS run passes the modern bash through `BASHP`, as in `make -C
+test bashdiff BASHP=/opt/zerobrew/bin/bash`.
 
 ## Finishing a change
 

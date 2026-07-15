@@ -4,21 +4,30 @@ root=$(mktemp -d)
 trap '[ -n "$root" ] && /bin/rm -rf "$root"' EXIT
 transport=$root/transport
 remote=$root/remote
-first=$remote/first
-second=$remote/second
+install=$remote/bin
 log=$root/transport.log
 binary=$(cd "$(dirname "$BIN")" && pwd)/$(basename "$BIN")
-/bin/mkdir -p "$transport" "$remote" "$first" "$second"
+/bin/mkdir -p "$transport" "$install"
+
+payload_runner=$root/payload-runner
+cat > "$payload_runner" <<'SH'
+#!/bin/sh
+case $0 in
+    *.upload) exec "$ASSIMILATE_RUNNER" "$@" ;;
+    *) exec "$ASSIMILATE_PAYLOAD" "$@" ;;
+esac
+SH
+chmod +x "$payload_runner"
 
 cat > "$transport/scp" <<'SH'
 #!/bin/sh
+[ "$1" = -p ] && shift
 [ "$1" = -- ] && shift
-source=$1
 destination=$2
-target=${destination%%:*}
-remote_name=${destination#*:}
-printf 'scp-target=%s\n' "$target" >> "$ASSIMILATE_LOG"
-/bin/cp "${ASSIMILATE_PAYLOAD-$source}" "$ASSIMILATE_REMOTE/$remote_name"
+printf 'scp=%s\n' "${destination%%:*}" >> "$ASSIMILATE_LOG"
+source=$1
+[ -z "${ASSIMILATE_PAYLOAD-}" ] || source=$ASSIMILATE_PAYLOAD_RUNNER
+/bin/cp -p "$source" "$ASSIMILATE_REMOTE/${destination#*:}"
 [ "${ASSIMILATE_FAIL_SCP-0}" -eq 0 ] || exit 23
 SH
 chmod +x "$transport/scp"
@@ -28,214 +37,85 @@ cat > "$transport/ssh" <<'SH'
 [ "$1" = -- ] && shift
 target=$1
 shift
-printf 'ssh-target=%s args=%s\n' "$target" "$#" >> "$ASSIMILATE_LOG"
-if [ "${ASSIMILATE_FAIL_SSH_START-0}" -eq 1 ]; then
-    case $1 in
-        *" recover") ;;
-        *) exit 31 ;;
-    esac
-fi
-if [ "${ASSIMILATE_FAIL_CLEANUP-0}" -eq 1 ]; then
-    case $1 in
-        *" recover") exit 42 ;;
-    esac
-fi
+case $1 in
+    *'/bin/'*) exit 43 ;;
+    "exec ./.shit-assimilate-"*.upload*) ;;
+    "exec './.shit-assimilate-"*.upload*) ;;
+    *) exit 44 ;;
+esac
+printf 'ssh=%s\n' "$target" >> "$ASSIMILATE_LOG"
 cd "$ASSIMILATE_REMOTE" || exit 1
+umask 077
 PATH=$ASSIMILATE_REMOTE_PATH /bin/sh -c "$1"
 SH
 chmod +x "$transport/ssh"
 
+leftovers()
+{
+    find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' '
+}
+
+file_mode()
+{
+    stat -f %Lp "$1" 2>/dev/null || stat -c %a "$1"
+}
+
 export ASSIMILATE_LOG=$log
 export ASSIMILATE_REMOTE=$remote
-export ASSIMILATE_REMOTE_PATH="$remote/missing:$first:$second:/bin:/usr/bin"
+export ASSIMILATE_REMOTE_PATH="$remote/missing:$install"
+export ASSIMILATE_PAYLOAD_RUNNER=$payload_runner
+export ASSIMILATE_RUNNER=$binary
 PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate user@host' >/dev/null
-cmp "$BIN" "$first/shit" >/dev/null && [ -x "$first/shit" ]
-printf 'success=%s\n' "$?"
+cmp "$BIN" "$install/shit" >/dev/null && [ -x "$install/shit" ]
+printf 'success=%s leftovers=%s\n' "$?" "$(leftovers)"
 cat "$log"
 
-printf 'old-install\n' > "$first/shit"
+printf 'old\n' > "$install/shit"
+: > "$install/.shit-assimilate.backup"
 PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null
-cmp "$BIN" "$first/shit" >/dev/null && [ -x "$first/shit" ]
-printf 'replace=%s leftovers=%s\n' "$?" \
-    "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
+cmp "$BIN" "$install/shit" >/dev/null
+replace_status=$?
+fixed_backup=$([ -e "$install/.shit-assimilate.backup" ] && \
+    echo preserved || echo removed)
+/bin/rm -f "$install/.shit-assimilate.backup"
+printf 'replace=%s fixed-backup=%s leftovers=%s\n' "$replace_status" \
+    "$fixed_backup" "$(leftovers)"
 
-printf 'old-install\n' > "$first/shit"
+failing_payload=$root/failing-payload
+printf '#!/bin/sh\nexit 1\n' > "$failing_payload"
+chmod +x "$failing_payload"
+export ASSIMILATE_PAYLOAD=$failing_payload
+/bin/rm -f "$install/shit"
+printf 'regular-old\n' > "$install/shit"
+chmod 751 "$install/shit"
+PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
+printf 'regular-status=%s old=%s mode=%s leftovers=%s\n' "$?" \
+    "$(cat "$install/shit")" "$(file_mode "$install/shit")" "$(leftovers)"
+
+old_target=$remote/old-target
+printf 'symlink-old\n' > "$old_target"
+/bin/rm -f "$install/shit"
+ln -s "$old_target" "$install/shit"
+PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
+if [ -L "$install/shit" ] && [ "$(readlink "$install/shit")" = "$old_target" ]; then
+    symlink_status=preserved
+else
+    symlink_status=damaged
+fi
+printf 'symlink=%s leftovers=%s\n' "$symlink_status" "$(leftovers)"
+unset ASSIMILATE_PAYLOAD
+
+/bin/rm -f "$install/shit"
+printf 'transfer-old\n' > "$install/shit"
 export ASSIMILATE_FAIL_SCP=1
 PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-printf 'upload-status=%s old=%s leftovers=%s\n' "$?" \
-    "$(cat "$first/shit")" \
-    "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
+printf 'transfer-status=%s old=%s leftovers=%s\n' "$?" \
+    "$(cat "$install/shit")" "$(leftovers)"
 unset ASSIMILATE_FAIL_SCP
 
-export ASSIMILATE_FAIL_SSH_START=1
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-printf 'ssh-start-status=%s old=%s leftovers=%s\n' "$?" \
-    "$(cat "$first/shit")" \
-    "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
-unset ASSIMILATE_FAIL_SSH_START
-
-export ASSIMILATE_FAIL_SCP=1
-export ASSIMILATE_FAIL_CLEANUP=1
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-printf 'cleanup-failure-status=%s\n' "$?"
-unset ASSIMILATE_FAIL_SCP ASSIMILATE_FAIL_CLEANUP
-/bin/rm -f "$remote"/.shit-assimilate-*.upload
-
-export ASSIMILATE_REMOTE_PATH=$remote/missing
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-printf 'no-path-status=%s old=%s leftovers=%s\n' "$?" \
-    "$(cat "$first/shit")" \
-    "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
-
-payload=$root/failing-payload
-cat > "$payload" <<'SH'
-#!/bin/sh
-case $0 in
-    */shit) exit 1 ;;
-    *) exit 0 ;;
-esac
-SH
-chmod +x "$payload"
-old_target=$remote/old-target
-printf 'old-target\n' > "$old_target"
-/bin/rm -f "$first/shit"
-ln -s "$old_target" "$first/shit"
-export ASSIMILATE_REMOTE_PATH="$first:/bin:/usr/bin"
-export ASSIMILATE_PAYLOAD=$payload
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-rollback_status=$?
-if [ -L "$first/shit" ] && [ "$(readlink "$first/shit")" = "$old_target" ]; then
-    rollback=restored
-else
-    rollback=damaged
-fi
-printf 'rollback-status=%s symlink=%s leftovers=%s\n' "$rollback_status" \
-    "$rollback" \
-    "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
-unset ASSIMILATE_PAYLOAD
-
-printf 'old-regular\n' > "$first/shit"
-export ASSIMILATE_PAYLOAD=$payload
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-regular_rollback_status=$?
-printf 'regular-rollback-status=%s old=%s\n' "$regular_rollback_status" \
-    "$(cat "$first/shit")"
-
-/bin/rm -f "$first/shit"
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-absent_rollback_status=$?
-if [ -e "$first/shit" ] || [ -L "$first/shit" ]; then
-    absent_rollback=damaged
-else
-    absent_rollback=restored
-fi
-printf 'absent-rollback-status=%s target=%s\n' "$absent_rollback_status" \
-    "$absent_rollback"
-unset ASSIMILATE_PAYLOAD
-
-locking_payload=$root/locking-payload
-cat > "$locking_payload" <<'SH'
-#!/bin/sh
-case $0 in
-    */shit)
-        : > "$ASSIMILATE_FIRST_ENTERED"
-        while [ ! -e "$ASSIMILATE_RELEASE_FIRST" ]; do /bin/sleep 0.01; done
-        ;;
-esac
-exit 0
-SH
-chmod +x "$locking_payload"
-third_payload=$root/third-payload
-cat > "$third_payload" <<'SH'
-#!/bin/sh
-case $0 in
-    */shit) : > "$ASSIMILATE_THIRD_ENTERED" ;;
-esac
-exit 0
-SH
-chmod +x "$third_payload"
-export ASSIMILATE_FIRST_ENTERED=$root/first-entered
-export ASSIMILATE_RELEASE_FIRST=$root/release-first
-export ASSIMILATE_THIRD_ENTERED=$root/third-entered
-/bin/rm -f "$first/shit"
-ASSIMILATE_PAYLOAD=$locking_payload \
-    PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' \
-    >/dev/null 2>&1 &
-first_assimilate_pid=$!
-wait_iteration=0
-while [ ! -e "$ASSIMILATE_FIRST_ENTERED" ] && [ "$wait_iteration" -lt 500 ]; do
-    /bin/sleep 0.01
-    wait_iteration=$((wait_iteration + 1))
-done
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-second_assimilate_status=$?
-if [ -d "$first/.shit-assimilate.lock" ]; then
-    lock_after_second=owned
-else
-    lock_after_second=lost
-fi
-ASSIMILATE_PAYLOAD=$third_payload \
-    PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' \
-    >/dev/null 2>&1
-third_assimilate_status=$?
-: > "$ASSIMILATE_RELEASE_FIRST"
-wait "$first_assimilate_pid"
-first_assimilate_status=$?
-if [ -e "$ASSIMILATE_THIRD_ENTERED" ]; then
-    third_entered=yes
-else
-    third_entered=no
-fi
-printf 'concurrent-first=%s second=%s lock=%s third=%s entered=%s leftovers=%s\n' \
-    "$first_assimilate_status" "$second_assimilate_status" \
-    "$lock_after_second" "$third_assimilate_status" "$third_entered" \
-    "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
-
-precommit_payload=$root/precommit-payload
-printf '#!/bin/sh\nexit 1\n' > "$precommit_payload"
-chmod +x "$precommit_payload"
-printf 'old-install\n' > "$first/shit"
-export ASSIMILATE_PAYLOAD=$precommit_payload
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-printf 'precommit-status=%s old=%s leftovers=%s\n' "$?" \
-    "$(cat "$first/shit")" \
-    "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
-unset ASSIMILATE_PAYLOAD
-
-printf 'stale-old\n' > "$first/.shit-assimilate.backup"
-printf 'stale-rejected\n' > "$first/shit"
-/bin/mkdir "$first/.shit-assimilate.lock"
-printf '99999999\n' > "$first/.shit-assimilate.lock/owner"
-printf '%s\n' "$remote/stale.upload" > "$first/.shit-assimilate.lock/upload"
-printf '%s\n' "$first/stale.candidate" > "$first/.shit-assimilate.lock/candidate"
-: > "$first/.shit-assimilate.lock/had-target"
-: > "$first/.shit-assimilate.lock/rollback"
-: > "$remote/stale.upload"
-: > "$first/stale.candidate"
-export ASSIMILATE_PAYLOAD=$precommit_payload
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-printf 'stale-recovery-status=%s old=%s leftovers=%s\n' "$?" \
-    "$(cat "$first/shit")" \
-    "$(find "$remote" -name '.shit-assimilate*' | wc -l | tr -d ' ')"
-unset ASSIMILATE_PAYLOAD
-
-/bin/rm -f "$first/shit"
-/bin/mkdir "$first/shit"
-printf 'directory-marker\n' > "$first/shit/marker"
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate host' >/dev/null 2>&1
-printf 'directory-status=%s marker=%s leftovers=%s\n' "$?" \
-    "$(cat "$first/shit/marker")" \
-    "$(find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' ')"
-
-: > "$log"
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate' >/dev/null 2>&1
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate --bad' >/dev/null 2>&1
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate one two' >/dev/null 2>&1
-printf 'invalid-transport-lines=%s\n' "$(wc -l < "$log" | tr -d ' ')"
-
-/bin/rm -rf "$first/shit"
+/bin/rm -f "$install/shit"
 /bin/mkdir -p "$root/shellbin"
 ln -s "$binary" "$root/shellbin/shit"
 PATH="$root/shellbin:$transport:/bin:/usr/bin" ../scripts/shit-scp host >/dev/null
-cmp "$BIN" "$first/shit" >/dev/null && [ -x "$first/shit" ]
+cmp "$BIN" "$install/shit" >/dev/null && [ -x "$install/shit" ]
 printf 'wrapper=%s\n' "$?"

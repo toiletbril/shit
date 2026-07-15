@@ -56,6 +56,7 @@ public:
     Which,
     WhoAmI,
     Unlink,
+    Nproc,
     Calc,
   };
 
@@ -106,6 +107,7 @@ inline constexpr static_string_entry<Utility::Kind> SHITBOX_ENTRIES[] = {
     {SSK("which"),    Utility::Kind::Which   },
     {SSK("whoami"),   Utility::Kind::WhoAmI  },
     {SSK("unlink"),   Utility::Kind::Unlink  },
+    {SSK("nproc"),    Utility::Kind::Nproc   },
     {SSK("calc"),     Utility::Kind::Calc    },
 };
 
@@ -208,6 +210,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Which);                                                               \
   U_CASE(WhoAmI);                                                              \
   U_CASE(Unlink);                                                              \
+  U_CASE(Nproc);                                                               \
   U_CASE(Calc)
 
 #define UTILITY_STRUCT(u)                                                      \
@@ -257,6 +260,7 @@ UTILITY_STRUCT(Find);
 UTILITY_STRUCT(Which);
 UTILITY_STRUCT(WhoAmI);
 UTILITY_STRUCT(Unlink);
+UTILITY_STRUCT(Nproc);
 UTILITY_STRUCT(Calc);
 
 fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>;

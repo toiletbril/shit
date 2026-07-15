@@ -2,8 +2,21 @@ ifndef VERBOSE
 MAKEFLAGS += -s
 endif
 
+.DEFAULT_GOAL := shit
+
 CPU_COUNT := $(shell ./scripts/cpu-count.sh)
-MAKEFLAGS += -j$(CPU_COUNT)
+
+MAKE_COMMAND_LINE := $(shell \
+	if command -v ps >/dev/null 2>&1; then \
+		ps -p $${PPID} -o command= 2>/dev/null; \
+	elif command -v powershell.exe >/dev/null 2>&1; then \
+		powershell.exe -NoProfile -Command \
+			"(Get-CimInstance Win32_Process -Filter 'ProcessId=$${PPID}').CommandLine" \
+			2>/dev/null; \
+	fi)
+CALLER_JOBS := $(filter -j% --jobs% --jobserver%,$(MAKEFLAGS)) \
+	$(filter -j% --jobs%,$(MAKE_COMMAND_LINE))
+AUTO_JOBS = $(if $(strip $(CALLER_JOBS)),,-j$(CPU_COUNT))
 
 MODE ?= dbg
 
@@ -20,35 +33,35 @@ all: shit test
 
 shit:
 	echo Creating shit...
-	$(MAKE) -C src shit
+	$(MAKE) $(AUTO_JOBS) -C src shit
 
 install:
 	echo Installing...
-	$(MAKE) -C src install
+	$(MAKE) $(AUTO_JOBS) -C src install
 
 uninstall:
 	echo Uninstalling...
-	$(MAKE) -C src uninstall
+	$(MAKE) $(AUTO_JOBS) -C src uninstall
 
 tidy:
 	echo Launching '$$'CLANG_TIDY...
-	$(MAKE) -C src tidy
+	$(MAKE) $(AUTO_JOBS) -C src tidy
 
 fmt:
 	echo Launching '$$'CLANG_FMT...
-	$(MAKE) -C src fmt
+	$(MAKE) $(AUTO_JOBS) -C src fmt
 
 test: shit
 	echo Launching tests...
-	$(MAKE) -C test test
+	$(MAKE) $(AUTO_JOBS) -C test test
 
 refill_tests: shit
 	echo Refilling tests...
-	$(MAKE) -C test refill
+	$(MAKE) $(AUTO_JOBS) -C test refill
 
 clean:
 	echo Cleaning up...
-	$(MAKE) -C src clean
-	$(MAKE) -C test clean
+	$(MAKE) $(AUTO_JOBS) -C src clean
+	$(MAKE) $(AUTO_JOBS) -C test clean
 
 .PHONY: all shit install uninstall tidy fmt test refill_tests clean

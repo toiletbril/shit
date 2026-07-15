@@ -3,6 +3,7 @@
 #include "../Completion.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -99,6 +100,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (should_list_commands || (action.has_value() && *action == "command")) {
+    utils::begin_explicit_completion();
     let out = String{cxt.scratch_allocator()};
     let has_any_matched = false;
     for (let const &candidate :

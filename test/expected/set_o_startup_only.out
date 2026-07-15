@@ -1,7 +1,7 @@
 [CompoundList]
   [CompoundListCondition, None]
     [Pipeline]
-      [SimpleCommand "set" "-p"]
+      [SimpleCommand "set" "--options"]
       [SimpleCommand "grep" "-E" "login|rcfile"]
   [CompoundListCondition, None]
     [SimpleCommand "set" "-o" "login"]
@@ -11,7 +11,7 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "-p"
+  Unquoted "--options"
 ]
 [Word
   Unquoted "grep"

@@ -241,7 +241,16 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     if (has_controlling_terminal) os::reclaim_controlling_terminal();
   };
 
-  let const process_group = os::process_group_of(child);
+  os::process process_group = SHIT_INVALID_PROCESS;
+  try {
+    process_group = os::process_group_of(child);
+  } catch (...) {
+    os::signal_process(child, 9);
+    try {
+      os::reap_process_quietly(child);
+    } catch (...) {}
+    throw;
+  }
   defer { os::close_process_group(process_group); };
 
   i32 status = 0;

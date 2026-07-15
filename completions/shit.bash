@@ -65,14 +65,49 @@ _shit_assimilate_complete()
 
 complete -F _shit_assimilate_complete assimilate
 
+_shit_set_complete()
+{
+    local current_word=${COMP_WORDS[COMP_CWORD]}
+    local previous_word=${COMP_WORDS[COMP_CWORD - 1]}
+    local moods="shit bash sh bash-posix"
+    local option_names="allexport export-all notify errexit error-exit noglob no-glob \
+hashall keyword monitor noexec no-exec nounset no-unset verbose xtrace braceexpand \
+noclobber no-clobber errtrace physical functrace pipefail failglob shitbox vi emacs \
+posix show-ast show-lexed-words show-exit-code force-warnings mimicry \
+force-diagnostics show-stats no-diagnostics show-memory login rcfile"
+    local switches="--help --options --mood --init-moods -o +o -M -L \
+-a -b -e -f -h -k -m -n -u -v -x -B -C -E -P -T -A -R -W -I -S -G \
++a +b +e +f +h +k +m +n +u +v +x +B +C +E +P +T +A +R +W +I +S +G"
+
+    case $previous_word in
+        -o|+o)
+            COMPREPLY=( $(compgen -W "$option_names" -- "$current_word") )
+            return
+            ;;
+        -M|--mood)
+            COMPREPLY=( $(compgen -W "$moods" -- "$current_word") )
+            return
+            ;;
+        -L|--init-moods)
+            COMPREPLY=( $(compgen -W "$moods" -- "$current_word") )
+            return
+            ;;
+    esac
+
+    COMPREPLY=( $(compgen -W "$switches" -- "$current_word") )
+}
+
+complete -F _shit_set_complete set
+
 _shitbox_utils="basename calc cat cp dirname du env find grep head killall ln \
-ls make mkdir mv pkill ps realpath rm rmdir seq sleep sort tail tee timeout touch tr \
+ls make mkdir mv nproc pkill ps realpath rm rmdir seq sleep sort tail tee timeout touch tr \
 uniq unlink wc which whoami yes"
 
 _shitbox_util_flags()
 {
     case $1 in
         ls)            echo "-a -1 -l -h" ;;
+        nproc)         echo "--all --ignore=" ;;
         ln)            echo "-s -f" ;;
         rm)            echo "-r -R -f" ;;
         mkdir)         echo "-p" ;;

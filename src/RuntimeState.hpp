@@ -7,6 +7,38 @@ namespace shit {
 
 class EvalContext;
 
+enum class shell_option_id : u8
+{
+  Errexit,
+  Xtrace,
+  Nounset,
+  Pipefail,
+  Allexport,
+  Noclobber,
+  Noglob,
+  Noexec,
+  Shitbox,
+  Monitor,
+  Failglob,
+  Notify,
+  Vi,
+  Emacs,
+  Hashall,
+  Verbose,
+  Keyword,
+  Errtrace,
+  Functrace,
+  Braceexpand,
+  Physical,
+  Mimicry,
+  ShowAst,
+  ShowLexedWords,
+  ShowExitCode,
+  ShowStats,
+  ShowMemory,
+  Count,
+};
+
 /* A snapshot of the mood and the diagnostic and strictness toggles, captured
    and restored as a unit so a scope that runs a body under a different mood
    saves and puts back the whole set with one call. */
@@ -16,14 +48,31 @@ public:
   mimic_mood mood{mimic_mood::Default};
   u8 warning_level{0};
   bool are_diagnostics_disabled{false};
-  bool error_unset{false};
-  bool pipefail{false};
-  bool failglob{false};
-  /* The explicit marks ride with their values, so a set -u inside a
-     mood-swapped scope does not leave the mark set after the value reverts. */
+  u64 shell_options{option_mask(shell_option_id::Failglob) |
+                    option_mask(shell_option_id::Hashall) |
+                    option_mask(shell_option_id::Braceexpand) |
+                    option_mask(shell_option_id::Emacs)};
   bool error_unset_explicit{false};
   bool pipefail_explicit{false};
   bool failglob_explicit{false};
+
+  pure static constexpr fn option_mask(shell_option_id option) wontthrow -> u64
+  {
+    return u64{1} << static_cast<u8>(option);
+  }
+
+  pure fn option_is_enabled(shell_option_id option) const wontthrow -> bool
+  {
+    return (shell_options & option_mask(option)) != 0;
+  }
+
+  fn set_option(shell_option_id option, bool enabled) wontthrow -> void
+  {
+    if (enabled)
+      shell_options |= option_mask(option);
+    else
+      shell_options &= ~option_mask(option);
+  }
 
   mustuse static fn capture(const EvalContext &context) wontthrow
       -> RuntimeState;

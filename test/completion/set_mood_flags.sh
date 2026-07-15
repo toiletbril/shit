@@ -1,6 +1,3 @@
-# The set builtin completes its --mood and --init-moods long flags and offers
-# the three mood names as the value after either flag, including the -M and -L
-# short forms.
 echo "== set --m:"
 "$BIN" --debug-complete-at 'set --m' </dev/null
 echo "== set --i:"

@@ -456,6 +456,35 @@ fn platform_peak_rss_bytes(long peak_rss) wontthrow -> u64
 
 } /* namespace */
 
+fn affinity_processor_count(usize online_count,
+                            usize configured_count) wontthrow -> usize
+{
+#if defined __linux__
+  usize affinity_capacity = configured_count;
+  if (affinity_capacity < CPU_SETSIZE) affinity_capacity = CPU_SETSIZE;
+  for (usize attempt_count = 0; attempt_count < 8; attempt_count++) {
+    let const affinity_size = CPU_ALLOC_SIZE(affinity_capacity);
+    cpu_set_t *affinity = CPU_ALLOC(affinity_capacity);
+    if (affinity == nullptr) break;
+    CPU_ZERO_S(affinity_size, affinity);
+    let const affinity_result = sched_getaffinity(0, affinity_size, affinity);
+    let const affinity_error = errno;
+    if (affinity_result == 0) {
+      let const affinity_count = CPU_COUNT_S(affinity_size, affinity);
+      CPU_FREE(affinity);
+      if (affinity_count > 0) return static_cast<usize>(affinity_count);
+      break;
+    }
+    CPU_FREE(affinity);
+    if (affinity_error != EINVAL) break;
+    affinity_capacity *= 2;
+  }
+#else
+  unused(configured_count);
+#endif
+  return online_count;
+}
+
 fn current_executable_path() wontthrow -> Maybe<String>
 {
 #if defined __APPLE__

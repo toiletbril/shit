@@ -477,7 +477,7 @@ hot fn EvalContext::expand_path(glob_field field,
 
   /* Fast path. A field with no glob is its own single result. */
   let const has_glob =
-      m_enable_path_expansion &&
+      !no_glob() &&
       first_active_glob(field.text.view(), field.glob_active, extglob_enabled())
           .has_value();
 
@@ -509,8 +509,7 @@ hot fn EvalContext::expand_path(glob_field field,
      literal fallback with failglob off. A test or [ command is exempt so a glob
      probing for a file keeps its literal text. */
   if (values.count() == 0) {
-    let const failglob_is_on =
-        m_runtime.failglob || is_shopt_enabled("failglob");
+    let const failglob_is_on = failglob() || is_shopt_enabled("failglob");
     let const failglob_is_explicit =
         m_runtime.failglob_explicit || is_shopt_enabled("failglob");
     if (!m_glob_exempt_for_test)

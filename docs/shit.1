@@ -552,8 +552,9 @@ effective user, GROUPS is the real group, and HOSTNAME, HOSTTYPE, MACHTYPE, and
 OSTYPE name the host and the platform. They resolve in every mood but sh.
 .TP
 .B "SHELLOPTS, BASH_SUBSHELL, BASH_ARGV0, BASH_EXECUTION_STRING, BASH_MONOSECONDS"
-These report shell state on each read. SHELLOPTS lists the enabled set \-o
-options, BASH_SUBSHELL counts the subshell depth, BASH_ARGV0 is the shell name,
+These report shell state on each read. SHELLOPTS is a colon-separated list of
+the enabled set \-o options and reflects later set changes. BASH_SUBSHELL counts
+the subshell depth, BASH_ARGV0 is the shell name,
 BASH_EXECUTION_STRING is the argument of \-c, and BASH_MONOSECONDS is a
 monotonic millisecond counter. They resolve in every mood but sh.
 .TP
@@ -616,6 +617,14 @@ utility name also falls back to the bundled utility when PATH holds no binary of
 that name. A missing system coreutil is filled in. A PATH binary still takes
 precedence in every mood.
 .TP
+.B nproc
+The bundled nproc utility prints the number of online logical processors. The
+.B --all
+option prints the configured processor count. The
+.B --ignore=COUNT
+option excludes a count from the result. The result has a minimum of one, and a
+platform query failure also reports one.
+.TP
 .B timeout
 The bundled timeout utility runs a command until its duration expires. A
 duration accepts seconds and the s, m, h, or d suffix. The default signal is
@@ -658,11 +667,18 @@ The running shell is copied through scp to an SSH target and installed as
 .B shit
 in the first writable and searchable directory in the remote PATH. The
 candidate is validated before an atomic rename. An existing file or symlink is
-backed up in the same directory and restored when a handled validation or
-install step fails. Temporary upload, candidate, and backup files are removed
-after success and handled failure. A remote SIGKILL, power loss, or storage
-failure can leave a complete target or recoverable hidden staging files because
-the remote cleanup process cannot run after it stops.
+renamed into the transaction lock and restored when a handled validation or
+install step fails. Temporary upload, candidate, and backup paths are removed
+after success and handled failure. Concurrent installs serialize through a
+remote transaction lock, and a later install recovers a stale journal before it
+starts. The local shell can run on any supported platform. The remote host must
+provide a POSIX-compatible SSH login shell that can launch the transferred
+executable. The transferred shell performs the transaction with its bundled
+shitbox utilities. A failed transfer cannot alter the installed target. A
+partial upload can remain when the transferred executable cannot start. A
+remote SIGKILL, power loss, or storage failure can leave a complete target or
+recoverable hidden staging files because the remote cleanup process cannot run
+after it stops.
 .TP
 .B bench
 Each command is run repeatedly as a measured child, and a summary of the wall
@@ -693,6 +709,17 @@ is matched by case insensitive substring.
 .SH BASH BUILTIN EXTENSIONS
 These builtins follow bash semantics rather than being unique to shit. They are
 present so a bash script that probes or calls them keeps sourcing.
+.TP
+.B set [OPTION] [ARG ...]
+A minus enables a shell option and a plus disables it. set \-o NAME and set +o
+NAME select the same state by long name. With no name, set \-o prints the
+current states, and set +o prints reusable commands. set \-\-options prints
+every option with its state and description. set \-E controls errtrace, set \-P
+makes cd resolve symbolic links, set \-T controls functrace, and set \-B
+controls brace expansion. Runtime set \-n stops later commands in the current
+parsed list.
+Changes made in a command substitution are restored when the substitution ends.
+SHELLOPTS, $\-, [[ \-o NAME ]], and completion report the shared state.
 .TP
 .B bind
 A no-op stub. The flags and the operands are accepted without effect, and the

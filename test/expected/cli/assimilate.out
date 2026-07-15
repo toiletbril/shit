@@ -1,17 +1,8 @@
-success=0
-scp-target=user@host
-ssh-target=user@host args=1
-replace=0 leftovers=0
-upload-status=23 old=old-install leftovers=0
-ssh-start-status=31 old=old-install leftovers=0
-cleanup-failure-status=42
-no-path-status=1 old=old-install leftovers=0
-rollback-status=1 symlink=restored leftovers=0
-regular-rollback-status=1 old=old-regular
-absent-rollback-status=1 target=restored
-concurrent-first=0 second=1 lock=owned third=1 entered=no leftovers=0
-precommit-status=1 old=old-install leftovers=0
-stale-recovery-status=1 old=stale-old leftovers=0
-directory-status=1 marker=directory-marker leftovers=0
-invalid-transport-lines=0
+success=0 leftovers=0
+scp=user@host
+ssh=user@host
+replace=0 fixed-backup=preserved leftovers=0
+regular-status=1 old=regular-old mode=751 leftovers=0
+symlink=preserved leftovers=0
+transfer-status=23 old=transfer-old leftovers=0
 wrapper=0

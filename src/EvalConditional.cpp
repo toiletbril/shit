@@ -238,10 +238,7 @@ struct conditional_evaluator
     if (op == "-k") return path.has_sticky_bit();
     if (op == "-O") return path.is_owned_by_effective_user();
     if (op == "-G") return path.is_owned_by_effective_group();
-    /* The emacs line-editing pseudo-option has no set toggle, so it answers
-       on. An unknown name reads off. */
     if (op == "-o") {
-      if (operand == "emacs") return true;
       return query_shell_option(cxt, operand).value_or(false);
     }
     return path.exists();

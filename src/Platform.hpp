@@ -32,6 +32,7 @@
 #endif
 #if defined __linux__
 #include <linux/perf_event.h>
+#include <sched.h>
 #include <sys/syscall.h>
 #endif
 #if defined __GLIBC__
@@ -350,6 +351,8 @@ fn current_executable_path() wontthrow -> Maybe<String>;
 /* The mode carries the type and permission bits in the POSIX st_mode layout. */
 struct file_status
 {
+  u64 device_id{0};
+  u64 file_id{0};
   u32 mode{0};
   u64 link_count{0};
   u32 owner_id{0};
@@ -602,7 +605,7 @@ fn is_running_setuid() wontthrow -> bool;
 fn reopen_terminal_as_stdin() wontthrow -> bool;
 
 fn process_id_of(process p) wontthrow -> i64;
-fn process_group_of(process p) wontthrow -> process;
+fn process_group_of(process p) throws -> process;
 fn close_process_group(process group) wontthrow -> void;
 fn process_has_id(process p, i64 id) wontthrow -> bool;
 
@@ -632,6 +635,14 @@ fn normalize_program_name(String &program_name) throws -> program_name_info;
 fn get_current_user() throws -> Maybe<String>;
 
 fn get_hostname() throws -> Maybe<String>;
+
+struct processor_counts
+{
+  usize online_count{1};
+  usize configured_count{1};
+};
+
+fn get_processor_counts() wontthrow -> processor_counts;
 
 fn get_home_directory() throws -> Maybe<Path>;
 
@@ -730,7 +741,6 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback = false,
 
 fn shell_has_controlling_terminal() wontthrow -> bool;
 
-/* On Windows it returns the input unchanged. */
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>;
 
 /* On Windows the wildcard applies to the last path component the way

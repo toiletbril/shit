@@ -138,6 +138,8 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
      past this frame is undefined behavior. The body is guarded and any throw is
      swallowed. */
   try {
+    if (for_listing != 0) shit::utils::begin_explicit_completion();
+
     const usize byte_length = std::strlen(buffer);
     let line = shit::StringView{buffer, byte_length};
     let const logical_directory = COMPLETION_CONTEXT->get_variable_value("PWD");

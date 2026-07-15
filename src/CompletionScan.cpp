@@ -7,6 +7,7 @@
 #include "Debug.hpp"
 #include "HashSet.hpp"
 #include "Lexer.hpp"
+#include "MimicMood.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "Shitbox.hpp"
@@ -660,9 +661,9 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     if (previous == "--mood" || previous == "-M" ||
         previous == "--init-moods" || previous == "-L")
     {
-      for (let const name :
-           {StringView{"shit"}, StringView{"bash"}, StringView{"sh"}})
-        do_push_matching(name);
+      for (mimic_mood mood : {mimic_mood::Default, mimic_mood::Bash,
+                              mimic_mood::Posix, mimic_mood::BashPosix})
+        do_push_matching(mood_name(mood));
       if (!candidates.is_empty()) return candidates;
       return None;
     }

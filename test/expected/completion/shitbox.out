@@ -21,6 +21,10 @@ mv
 -k
 -p
 -s
+== nproc flags through shitbox:
+--all
+--help
+--ignore
 == shitbox own flags:
 --assimilate
 --help

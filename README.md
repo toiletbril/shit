@@ -34,6 +34,10 @@ default is `shit`. A binary symlinked as `sh`, `dash`, or `bash` will pick the
 matching mood and disable diagnostics. `set --mood` changes the mood at
 runtime. `-W` keeps the diagnostics but turns every error into a warning.
 
+The `set` builtin owns the mutable shell option state. Standard short flags,
+long option names, `SHELLOPTS`, and `$-` read the same stored values. An option
+changed by a function remains changed after the function returns.
+
 `-I` is mimicry. **shit** will detect `sh`, `dash`, `bash` shebangs and run the
 script inside itself in the matching mood. The in-process run keeps speed and
 diagnostics.
@@ -70,8 +74,9 @@ It also bundles a busybox-style set of little coreutilities behind the
 `shitbox` builtin, such as:
 - `cp`, `mv`, `ln`, `rm` and other fileutils
 - `find` and `grep`
-- `pkill`, `killall`, `ps` and `timeout`
+- `killall`, `pkill`, `ps`, `timeout` and `nproc`
 - minimal `calc` and `make`
+- and more
 
 # Development
 
@@ -96,6 +101,11 @@ The `MODE` variable controls build type:
   toolchain.
 * `cosmo_dbg` is a debug Cosmopolitan build.
 
+`TARGET` defaults to the host and accepts `Linux`, `Windows_NT`, or `Darwin`.
+A non-Windows host cross-compiles `TARGET=Windows_NT` with MinGW. A non-Darwin
+host cross-compiles `TARGET=Darwin ARCH=arm64` with osxcross. Linux is a native
+target.
+
 The `$CXXFLAGS` environment variable can be used to append new flags to the
 build commands.
 
@@ -103,6 +113,8 @@ An example of the build process is shown below. Make uses every logical CPU and
 shares the bounded job pool with recursive builds.
 ```bash
 $ make MODE=<rel/prof/dbg/cov/cosmo/cosmo_dbg>
+$ make MODE=rel TARGET=Windows_NT
+$ make MODE=rel TARGET=Darwin ARCH=arm64
 $ ./shit --help
 ```
 
@@ -122,7 +134,9 @@ $ make uninstall
 The running binary can install itself on an SSH target with
 `assimilate user@host`. The first writable and searchable directory in the
 remote PATH receives `shit`. An existing binary or symlink is restored when a
-handled transfer, validation, or install step fails.
+handled transfer, validation, or install step fails. Concurrent installs share
+a remote transaction lock, and a later install recovers an abandoned journal.
+The transferred shell performs the transaction with bundled shitbox utilities.
 
 ## Roadmap
 

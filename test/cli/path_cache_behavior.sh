@@ -3,15 +3,25 @@
 dir=$(mktemp -d)
 trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 
-mkdir "$dir/one" "$dir/two" "$dir/blocked" "$dir/refresh" "$dir/appeared"
+mkdir "$dir/one" "$dir/two" "$dir/blocked" "$dir/refresh" "$dir/appeared" \
+    "$dir/completion-hot" "$dir/completion-late" "$dir/vanished" \
+    "$dir/atomic" "$dir/atomic-replacement"
 printf '#!/bin/sh\necho one\n' > "$dir/one/cacheprobe"
 printf '#!/bin/sh\necho two\n' > "$dir/two/cacheprobe"
 printf '#!/bin/sh\nexit 0\n' > "$dir/two/blockedprobe"
 printf '#!/bin/sh\necho refreshed\n' > "$dir/staged"
 printf '#!/bin/sh\necho appeared\n' > "$dir/staged-appeared"
+printf '#!/bin/sh\necho late\n' > "$dir/staged-late"
 chmod +x "$dir/one/cacheprobe" "$dir/two/cacheprobe"
-chmod +x "$dir/two/blockedprobe" "$dir/staged" "$dir/staged-appeared"
+chmod +x "$dir/two/blockedprobe" "$dir/staged" "$dir/staged-appeared" \
+    "$dir/staged-late"
 : > "$dir/blocked/blockedprobe"
+printf '#!/bin/sh\n' > "$dir/vanished/vanishprobe"
+chmod +x "$dir/vanished/vanishprobe"
+printf '#!/bin/sh\n' > "$dir/atomic/oldatomicprobe"
+printf '#!/bin/sh\n' > "$dir/atomic-replacement/newatomicprobe"
+chmod +x "$dir/atomic/oldatomicprobe" \
+    "$dir/atomic-replacement/newatomicprobe"
 
 CACHE_SECOND="$dir/two" PATH="$dir/one:/bin" "$BIN" -c \
     'for iteration in 1 2; do cacheprobe; PATH="$CACHE_SECOND:/bin"; done'
@@ -38,12 +48,20 @@ RECOVER_DIRECTORY="$dir/blocked-later" RECOVER_STAGED="$dir/staged-recover" \
     PATH="$dir/blocked-later:/bin" "$BIN" -c \
     'recoverprobe >/dev/null 2>&1; /bin/mv "$RECOVER_STAGED" "$RECOVER_DIRECTORY/recoverprobe"; recoverprobe'
 
-mkdir "$dir/completion-hot"
 printf '#!/bin/sh\n' > "$dir/completion-hot/hotprobe"
 chmod +x "$dir/completion-hot/hotprobe"
 HOT_PROBE="$dir/completion-hot/hotprobe" \
-    PATH="$dir/completion-hot:/bin" "$BIN" -c \
-    'compgen -c hotprobe 2>/dev/null; /bin/rm -f "$HOT_PROBE"; printf "warm="; compgen -c hotprobe 2>/dev/null; hash -r; invalidated=$(compgen -c hotprobe 2>/dev/null); printf "invalidated=%s\n" "$invalidated"'
+    LATE_DIRECTORY="$dir/completion-late" LATE_STAGED="$dir/staged-late" \
+    PATH="$dir/completion-hot:$dir/completion-late:/bin" "$BIN" -c \
+    'compgen -c hotprobe 2>/dev/null; /bin/rm -f "$HOT_PROBE"; removed=$(compgen -c hotprobe 2>/dev/null); compgen -c lateprobe >/dev/null 2>&1 || :; /bin/mv "$LATE_STAGED" "$LATE_DIRECTORY/lateprobe"; added=$(compgen -c lateprobe 2>/dev/null); printf "removed=%s added=%s\n" "$removed" "$added"'
+
+VANISHED_DIRECTORY="$dir/vanished" PATH="$dir/vanished:/bin" "$BIN" -c \
+    'compgen -c vanishprobe >/dev/null 2>&1; /bin/rm -rf "$VANISHED_DIRECTORY"; vanished=$(compgen -c vanishprobe 2>/dev/null); printf "vanished=%s\n" "$vanished"'
+
+/usr/bin/touch -r "$dir/atomic" "$dir/atomic-replacement"
+ATOMIC_DIRECTORY="$dir/atomic" ATOMIC_REPLACEMENT="$dir/atomic-replacement" \
+    PATH="$dir/atomic:/bin" "$BIN" -c \
+    'compgen -c oldatomicprobe >/dev/null 2>&1; /bin/mv "$ATOMIC_DIRECTORY" "$ATOMIC_DIRECTORY-old"; /bin/mv "$ATOMIC_REPLACEMENT" "$ATOMIC_DIRECTORY"; old=$(compgen -c oldatomicprobe 2>/dev/null); new=$(compgen -c newatomicprobe 2>/dev/null); printf "atomic-old=%s atomic-new=%s\n" "$old" "$new"'
 
 CACHE_COMMAND=refreshed CACHE_DIRECTORY="$dir/refresh" \
     CACHE_STAGED="$dir/staged" \
