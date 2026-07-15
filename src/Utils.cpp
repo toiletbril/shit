@@ -2220,23 +2220,39 @@ static pure fn bounded_osa_distance(StringView a, StringView b,
   return previous[b_length];
 }
 
-fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
-    -> Maybe<String>
+class NameSuggestion
 {
-  if (name.is_empty()) return None;
+public:
+  explicit NameSuggestion(StringView name)
+      : m_name(name), m_max_distance(name.length <= 3 ? 1 : 2),
+        m_best_distance(m_max_distance + 1)
+  {}
 
-  /* A typo is usually one or two edits, so the search stays within two and a
-     shorter name allows only one, which keeps a wild miss silent. */
-  const usize max_distance = name.length <= 3 ? 1 : 2;
-  usize best_distance = max_distance + 1;
-  bool best_is_anagram = false;
-  let best = String{heap_allocator()};
+  fn consider(StringView candidate) throws -> void
+  {
+    if (candidate.is_empty() || candidate == m_name) return;
+    const usize distance =
+        bounded_osa_distance(m_name, candidate, m_max_distance);
+    if (distance > m_best_distance) return;
+    const bool is_candidate_anagram = is_anagram(m_name, candidate);
+    if (distance < m_best_distance ||
+        (is_candidate_anagram && !m_best_is_anagram))
+    {
+      m_best_distance = distance;
+      m_best_is_anagram = is_candidate_anagram;
+      m_best = String{candidate};
+    }
+  }
 
-  /* Same length and same character multiset, so the candidate is a pure
-     transposition of the typed name, the most likely typo. Used to break a tie
-     in favor of git over gtf for the input gti. */
-  let const do_check_anagram = [](StringView a, StringView b)
-                                   wontthrow -> bool {
+  fn take_suggestion() throws -> Maybe<String>
+  {
+    if (m_best_distance > m_max_distance) return None;
+    return steal(m_best);
+  }
+
+private:
+  static fn is_anagram(StringView a, StringView b) wontthrow -> bool
+  {
     if (a.length != b.length) return false;
     i32 counts[256] = {0};
     for (usize i = 0; i < a.length; i++) {
@@ -2246,37 +2262,58 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     for (let const count : counts)
       if (count != 0) return false;
     return true;
-  };
+  }
 
-  let const do_consider = [&](StringView candidate) throws -> void {
-    if (candidate.is_empty() || candidate == name) return;
-    const usize distance = bounded_osa_distance(name, candidate, max_distance);
-    if (distance > best_distance) return;
-    const bool is_anagram = do_check_anagram(name, candidate);
-    if (distance < best_distance || (is_anagram && !best_is_anagram)) {
-      best_distance = distance;
-      best_is_anagram = is_anagram;
-      best = String{candidate};
-    }
-  };
+  StringView m_name;
+  usize m_max_distance;
+  usize m_best_distance;
+  bool m_best_is_anagram{false};
+  String m_best{heap_allocator()};
+};
+
+fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
+    -> Maybe<String>
+{
+  if (name.is_empty()) return None;
+
+  let suggestion = NameSuggestion{name};
 
   for (let const &local : local_names)
-    do_consider(local.view());
+    suggestion.consider(local.view());
   for (let const &builtin : builtin_names())
-    do_consider(builtin.view());
+    suggestion.consider(builtin.view());
   if (MAYBE_PATH.has_value()) {
     for (let const &dir_string : path_dirs()) {
       if (Maybe<ArrayList<String>> entries =
               Path::read_directory(Path{dir_string.view()}))
       {
         for (let const &entry : *entries)
-          do_consider(entry.view());
+          suggestion.consider(entry.view());
       }
     }
   }
 
-  if (best_distance > max_distance) return None;
-  return best;
+  return suggestion.take_suggestion();
+}
+
+fn suggest_directory_entry(const Path &directory, StringView name) throws
+    -> Maybe<String>
+{
+  if (name.is_empty()) return None;
+
+  let const entries = read_directory_cached(directory, false);
+  if (entries == nullptr) return None;
+
+  let directory_names = ArrayList<StringView>{heap_allocator()};
+  for (let const &entry : *entries)
+    if (directory_entry_kind(directory, entry) == Path::entry_kind::Directory)
+      directory_names.push(entry.name.view());
+  directory_names.sort();
+
+  let suggestion = NameSuggestion{name};
+  for (let const directory_name : directory_names)
+    suggestion.consider(directory_name);
+  return suggestion.take_suggestion();
 }
 
 fn read_entire_standard_input() throws -> String

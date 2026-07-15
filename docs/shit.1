@@ -447,7 +447,9 @@ The shell nesting depth, read from the environment, incremented, and set back. A
 child shell counts one deeper.
 .TP
 .B CDPATH
-The colon\-separated search path cd consults for a relative operand.
+The colon\-separated search path cd consults for a relative operand. When an
+explicit directory is missing, cd suggests a close sibling directory when one
+exists.
 .TP
 .B IFS
 The field separator for word splitting and the join of $*, a space, a tab, and a

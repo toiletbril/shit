@@ -158,9 +158,11 @@ located-and-details form. The
 shell normalizes SIGPIPE, SIG_IGN for the main shell and SIG_DFL in a forked
 child so a producer dies with status 141. The cd builtin resolves a relative
 operand against the logical PWD, the bash -L mode, and cd .. lexically pops the
-last component. The pushd, popd, and dirs builtins carry a directory stack on
-EvalContext and route every chdir through the cd builtin, so the logical PWD and
-OLDPWD stay in one place. PIPESTATUS is published after every foreground command.
+last component. A missing explicit directory receives a close sibling
+suggestion when one exists. The pushd, popd, and dirs builtins carry a directory
+stack on EvalContext and route every chdir through the cd builtin, so the
+logical PWD and OLDPWD stay in one place. PIPESTATUS is published after every
+foreground command.
 The condition depth is inherited by a function called from a non-final and-or
 operand or from a negation. The `set -e` option stays suppressed throughout that
 guarded body. A command path ending in a directory separator is rejected with

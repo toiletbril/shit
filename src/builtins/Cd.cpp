@@ -1,4 +1,5 @@
 #include "../Builtin.hpp"
+#include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
@@ -196,10 +197,23 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
+  let details = String{cxt.scratch_allocator(),
+                       "Check the spelling or create it with `mkdir -p`"};
+  if (!is_to_previous && operand_count > 0) {
+    if (let const suggested_name =
+            utils::suggest_directory_entry(target.parent(), target.filename()))
+    {
+      let suggested_path = Path{arg_path.view()}.normalized().parent();
+      suggested_path.push_component(suggested_name->view());
+      let quoted_path = String{cxt.scratch_allocator()};
+      append_shell_quoted_arg(quoted_path, suggested_path.text().view());
+      details = "Did you mean `" + quoted_path + "`?";
+    }
+  }
+
   throw ErrorWithLocationAndDetails{
       ec.source_location(),
-      StringView{"The directory '"} + arg_path + "' does not exist",
-      "Check the spelling or create it with `mkdir -p`"};
+      StringView{"The directory '"} + arg_path + "' does not exist", details};
 }
 
 } // namespace shit

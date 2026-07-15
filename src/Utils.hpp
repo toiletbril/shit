@@ -104,6 +104,8 @@ fn parse_integer_in_base_u64(StringView text, int_base base) throws
 
 fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     -> Maybe<String>;
+fn suggest_directory_entry(const Path &directory, StringView name) throws
+    -> Maybe<String>;
 
 /* The current git branch read from .git/HEAD without forking git, walking up
    from the working directory to the filesystem root. Empty outside a
