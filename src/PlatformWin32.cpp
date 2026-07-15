@@ -1478,6 +1478,25 @@ fn signal_process(process p, i32 signal_number) wontthrow -> bool
   return did_terminate;
 }
 
+fn process_group_has_members(process group) wontthrow -> bool
+{
+  if (!process_is_group_reference(group)) return false;
+
+  let const process_handle = process_from_group_reference(group);
+  char job_name[64];
+  if (!timeout_job_name(process_handle, job_name)) return false;
+
+  let const job = OpenJobObjectA(JOB_OBJECT_QUERY, FALSE, job_name);
+  if (job == nullptr) return false;
+
+  JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting{};
+  let const did_query =
+      QueryInformationJobObject(job, JobObjectBasicAccountingInformation,
+                                &accounting, sizeof(accounting), nullptr);
+  CloseHandle(job);
+  return did_query != FALSE && accounting.ActiveProcesses > 0;
+}
+
 fn is_process_signal_supported(i32 signal_number) wontthrow -> bool
 {
   return signal_number == 9 || signal_number == 15;

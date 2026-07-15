@@ -301,6 +301,7 @@ enum class process_state : u8
 fn poll_process(process p, i32 &status_out) wontthrow -> process_state;
 
 fn signal_process(process p, i32 signal_number) wontthrow -> bool;
+fn process_group_has_members(process group) wontthrow -> bool;
 fn is_process_signal_supported(i32 signal_number) wontthrow -> bool;
 
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>;

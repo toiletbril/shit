@@ -1535,7 +1535,10 @@ fn reap_process_quietly(process pid) throws -> i32
 fn poll_process(process p, i32 &status_out) wontthrow -> process_state
 {
   i32 status = 0;
-  const pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
+  pid_t result;
+  do {
+    result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
+  } while (result == -1 && errno == EINTR);
 
   if (result == 0) return process_state::Unchanged;
   if (result == -1) {
@@ -1556,6 +1559,12 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
 fn signal_process(process p, i32 signal_number) wontthrow -> bool
 {
   return kill(p, signal_number) == 0;
+}
+
+fn process_group_has_members(process group) wontthrow -> bool
+{
+  if (kill(group, 0) == 0) return true;
+  return errno == EPERM;
 }
 
 fn is_process_signal_supported(i32 signal_number) wontthrow -> bool

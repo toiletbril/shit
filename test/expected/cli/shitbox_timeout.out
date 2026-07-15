@@ -29,6 +29,8 @@ invalid=1
 invalid=1
 --- timeout kills process group descendants ---
 contained
+--- kill-after closes inherited descendant descriptors ---
+contained
 --- an interrupt stops the supervisor and descendants ---
 rc=130
 contained

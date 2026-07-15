@@ -98,6 +98,33 @@ else
     echo contained
 fi
 
+echo "--- kill-after closes inherited descendant descriptors ---"
+if [ "${OS-}" = Windows_NT ]; then
+    echo contained
+else
+    mkfifo "$d/query"
+    /bin/cat "$d/query" >/dev/null &
+    query_reader_pid=$!
+    "$BIN" -c "exec 3>'$d/query'; shitbox timeout -k 0.02s 0.02s /bin/sh -c 'echo \$\$ > '$d/group-pid'; trap \"exit 0\" TERM; (trap \"\" TERM; while :; do :; done) & while :; do :; done'; exec 3>&-" \
+        >/dev/null 2>&1
+    waited=0
+    while kill -0 "$query_reader_pid" 2>/dev/null && [ "$waited" -lt 100 ]; do
+        /bin/sleep 0.01
+        waited=$((waited + 1))
+    done
+    if kill -0 "$query_reader_pid" 2>/dev/null; then
+        echo leaked
+    else
+        echo contained
+    fi
+    if [ -s "$d/group-pid" ]; then
+        group_pid=$(cat "$d/group-pid")
+        kill -KILL -"$group_pid" 2>/dev/null || true
+    fi
+    kill -KILL "$query_reader_pid" 2>/dev/null || true
+    wait "$query_reader_pid" 2>/dev/null
+fi
+
 echo "--- an interrupt stops the supervisor and descendants ---"
 "$BIN" -c "shitbox timeout 0 /bin/sh -c 'echo \$\$ > '$d/child-pid'; (sleep 0.1; echo leaked > '$d/interrupt-marker') & while :; do :; done'" \
     >/dev/null 2>&1 &

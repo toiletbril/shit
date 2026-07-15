@@ -54,17 +54,27 @@ enum class supervision_wait_result : u8
 };
 
 static fn wait_for_process_until(os::process child, u64 timeout_nanos,
-                                 i32 &status) throws -> supervision_wait_result
+                                 i32 &status,
+                                 bool wait_for_process_group = false) throws
+    -> supervision_wait_result
 {
   let const has_deadline = timeout_nanos != 0 && timeout_nanos != UINT64_MAX;
   let const started_at_nanos = os::monotonic_nanos();
+  let has_child_exited = false;
   loop
   {
     if (os::INTERRUPT_REQUESTED) return supervision_wait_result::Interrupted;
 
-    let const state = os::poll_process(child, status);
-    if (state == os::process_state::Exited)
+    if (!has_child_exited) {
+      let const state = os::poll_process(child, status);
+      has_child_exited = state == os::process_state::Exited;
+    }
+    if (has_child_exited &&
+        (!wait_for_process_group ||
+         !os::process_group_has_members(os::process_group_of(child))))
+    {
       return supervision_wait_result::Exited;
+    }
 
     u64 sleep_nanos = 10000000;
     if (has_deadline) {
@@ -249,7 +259,8 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   wait_result = wait_for_process_until(
-      child, kill_after_nanos == 0 ? UINT64_MAX : kill_after_nanos, status);
+      child, kill_after_nanos == 0 ? UINT64_MAX : kill_after_nanos, status,
+      kill_after_nanos != 0);
   if (wait_result == supervision_wait_result::Interrupted)
     return finish_interrupted_supervision(child);
 
