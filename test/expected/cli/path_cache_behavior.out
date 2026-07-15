@@ -4,9 +4,9 @@ two
 0
 warm-second
 recovered
-addedprobe
-removed=modeprobe
-linkprobe
+hotprobe
+warm=hotprobe
+invalidated=
 refreshed
 appeared
 analysis-shadowed-no-path-scan

@@ -38,27 +38,12 @@ RECOVER_DIRECTORY="$dir/blocked-later" RECOVER_STAGED="$dir/staged-recover" \
     PATH="$dir/blocked-later:/bin" "$BIN" -c \
     'recoverprobe >/dev/null 2>&1; /bin/mv "$RECOVER_STAGED" "$RECOVER_DIRECTORY/recoverprobe"; recoverprobe'
 
-mkdir "$dir/completion-refresh"
-printf '#!/bin/sh\n' > "$dir/completion-staged"
-chmod +x "$dir/completion-staged"
-COMPLETION_DIRECTORY="$dir/completion-refresh" \
-    COMPLETION_STAGED="$dir/completion-staged" \
-    PATH="$dir/completion-refresh:/bin" "$BIN" -c \
-    'compgen -c addedprobe 2>/dev/null; /bin/mv "$COMPLETION_STAGED" "$COMPLETION_DIRECTORY/addedprobe"; compgen -c addedprobe 2>/dev/null; /bin/rm -f "$COMPLETION_DIRECTORY/addedprobe"; printf "removed="; compgen -c addedprobe 2>/dev/null'
-
-printf '#!/bin/sh\n' > "$dir/completion-refresh/modeprobe"
-chmod -x "$dir/completion-refresh/modeprobe"
-MODE_PROBE="$dir/completion-refresh/modeprobe" \
-    PATH="$dir/completion-refresh:/bin" "$BIN" -c \
-    'compgen -c modeprobe 2>/dev/null; /bin/chmod +x "$MODE_PROBE"; compgen -c modeprobe 2>/dev/null'
-
-mkdir "$dir/completion-target"
-ln -s "$dir/completion-target" "$dir/completion-link"
-printf '#!/bin/sh\n' > "$dir/symlink-staged"
-chmod +x "$dir/symlink-staged"
-SYMLINK_TARGET="$dir/completion-target" SYMLINK_STAGED="$dir/symlink-staged" \
-    PATH="$dir/completion-link:/bin" "$BIN" -c \
-    'compgen -c linkprobe 2>/dev/null; /bin/mv "$SYMLINK_STAGED" "$SYMLINK_TARGET/linkprobe"; compgen -c linkprobe 2>/dev/null'
+mkdir "$dir/completion-hot"
+printf '#!/bin/sh\n' > "$dir/completion-hot/hotprobe"
+chmod +x "$dir/completion-hot/hotprobe"
+HOT_PROBE="$dir/completion-hot/hotprobe" \
+    PATH="$dir/completion-hot:/bin" "$BIN" -c \
+    'compgen -c hotprobe 2>/dev/null; /bin/rm -f "$HOT_PROBE"; printf "warm="; compgen -c hotprobe 2>/dev/null; hash -r; invalidated=$(compgen -c hotprobe 2>/dev/null); printf "invalidated=%s\n" "$invalidated"'
 
 CACHE_COMMAND=refreshed CACHE_DIRECTORY="$dir/refresh" \
     CACHE_STAGED="$dir/staged" \

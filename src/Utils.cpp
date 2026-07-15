@@ -1981,28 +1981,6 @@ fn initialize_path_map() throws -> void
 
 static fn prepare_complete_path_cache() throws -> void
 {
-  if (PATH_COMMAND_NAMES_IS_VALID) {
-    for (let const &dir_string : path_dirs()) {
-      read_directory_cached(Path{dir_string.view()}, true);
-      if (PATH_CACHE_IS_STALE) break;
-    }
-
-    if (!PATH_CACHE_IS_STALE) {
-      PATH_CACHE.for_each(
-          [&](StringView, const program_path_cache_entry &entry) {
-            for (let const &cached : entry.paths) {
-              let const is_runnable =
-                  cached.path.is_regular_file() && cached.path.is_executable();
-              if (is_runnable != cached.is_runnable) {
-                PATH_CACHE_IS_STALE = true;
-                PATH_COMMAND_NAMES_IS_VALID = false;
-                return;
-              }
-            }
-          });
-    }
-  }
-
   if (PATH_CACHE_IS_STALE || !PATH_COMMAND_NAMES_IS_VALID)
     initialize_path_map();
 }
