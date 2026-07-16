@@ -59,7 +59,8 @@ The interactive mode is modern and heavily inspired by
 [fish](https://github.com/fish-shell/fish-shell). It has syntax highlighting,
 sensible word-jumps and controls, full UTF-8 support, wide character (CJK and
 emoji) width handling, multiline editing, history search, and persistent
-history.
+history. Ghost text uses prefix matches, while Tab also offers smart-case and
+subsequence matches.
 
 **shit** has more than 50 builtins, each with `--help`. That includes
 every builtin from `bash` and POSIX standard, with the addition of:

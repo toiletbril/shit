@@ -135,7 +135,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     sub = ExecContext::make_from(ec.source_location(), steal(operand_args),
                                  cxt.mood(), cxt.shitbox(),
                                  steal(operand_arg_locations));
-  } catch (const CommandResolutionError &resolution_error) {
+  } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     LOG(Debug, "command handled a resolution error: %s",
         resolution_error.message().c_str());
     const String *source = cxt.current_source();

@@ -341,14 +341,13 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
 static fn word_names_existing_path(StringView word) throws -> bool
 {
   if (word.is_empty()) return false;
-  /* A dash word is an option, never a path. */
-  if (word[0] == '-') return false;
   if (word[0] == '~') {
     if (Maybe<String> expanded = utils::expand_leading_tilde_path(word);
         expanded.has_value())
       return Path{expanded->view()}.exists();
     return false;
   }
+
   return Path{word}.exists();
 }
 

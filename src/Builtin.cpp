@@ -156,8 +156,8 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
     return SHIT_BROKEN_PIPE_EXIT_STATUS;
   } catch (const Error &e) {
     if (cxt.is_bash_compatible()) {
-      if (e.has_note())
-        report_soft_builtin_error(ec, cxt, e.message(), e.note());
+      if (!e.detail_message().is_empty())
+        report_soft_builtin_error(ec, cxt, e.message(), e.detail_message());
       else
         report_soft_builtin_error(ec, cxt, e.message());
       return 1;
@@ -165,9 +165,9 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
 
     let const prefixed =
         StringView{"Builtin '"} + ec.program() + "': " + e.message();
-    if (e.has_note()) {
+    if (!e.detail_message().is_empty()) {
       throw ErrorWithLocationAndDetails{ec.source_location(), prefixed.view(),
-                                        e.note()};
+                                        e.detail_message()};
     }
     throw ErrorWithLocation{ec.source_location(), prefixed.view()};
   }

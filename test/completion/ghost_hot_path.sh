@@ -43,6 +43,25 @@ printf '%s\n' "$large_result" | grep -q '^prefix=probe-$'
 printf '%s\n' "$large_result" | grep -q '^materialized=0$'
 echo 'command ghost skips unrelated PATH names'
 
+small_miss_result=$(PATH="$d" "$BIN" --debug-ghost-at 'zzzz-missing')
+large_miss_result=$(PATH="$d/large" "$BIN" \
+    --debug-ghost-at 'zzzz-missing')
+small_miss_scan_count=
+large_miss_scan_count=
+while IFS='=' read -r field value; do
+    if [ "$field" = source-scans ]; then small_miss_scan_count=$value; fi
+done <<EOF
+$small_miss_result
+EOF
+while IFS='=' read -r field value; do
+    if [ "$field" = source-scans ]; then large_miss_scan_count=$value; fi
+done <<EOF
+$large_miss_result
+EOF
+test "$small_miss_scan_count" = "$large_miss_scan_count"
+printf '%s\n' "$large_miss_result" | grep -q '^count=0$'
+echo 'command ghost misses skip unrelated PATH names'
+
 duplicate_result=$(PATH=/bin "$BIN" --debug-ghost-at 'ec')
 printf '%s\n' "$duplicate_result" | grep -q '^count=1$'
 printf '%s\n' "$duplicate_result" | grep -q '^prefix=echo$'
@@ -87,10 +106,12 @@ echo 'filesystem ghost skips unrelated directory entries'
 : > "$d/filesystem-large/foo_bar_baz"
 filesystem_fuzzy_result=$(PATH=/bin "$BIN" \
     --debug-ghost-at "echo $d/filesystem-large/fbb")
-printf '%s\n' "$filesystem_fuzzy_result" | grep -q '^count=1$'
-printf '%s\n' "$filesystem_fuzzy_result" | \
-    grep -q "^prefix=$d/filesystem-large/foo_bar_baz$"
-echo 'filesystem ghost retains fuzzy fallback'
+printf '%s\n' "$filesystem_fuzzy_result" | grep -q '^count=0$'
+filesystem_fuzzy_tab_result=$(PATH=/bin "$BIN" \
+    --debug-complete-at "echo $d/filesystem-large/fbb")
+printf '%s\n' "$filesystem_fuzzy_tab_result" | \
+    grep -q "$d/filesystem-large/foo_bar_baz"
+echo 'filesystem ghost leaves fuzzy matching to tab'
 
 if [ "${OS-}" != Windows_NT ]; then
     mkdir "$d/identity"

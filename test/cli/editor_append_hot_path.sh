@@ -72,9 +72,46 @@ test "$path_serializations" -le 6 || exit 1
 case $path_metrics in *' materialized=0'*) ;; *) exit 1 ;; esac
 echo 'PATH ghost completion stays bounded while typing'
 
+mkdir "$d/tab-path"
+printf '#!/bin/sh\n' > "$d/tab-path/probe-alpha"
+printf '#!/bin/sh\n' > "$d/tab-path/probe-beta"
+chmod +x "$d/tab-path/probe-alpha" "$d/tab-path/probe-beta"
+send_post_tab_input()
+{
+    for character in p r o b e; do
+        printf %s "$character"
+        sleep 0.03
+    done
+    printf '\t'
+    sleep 0.03
+    for character in a l p h a; do
+        printf %s "$character"
+        sleep 0.03
+    done
+    printf '\nexit\n'
+}
+if "$script_command" --version >/dev/null 2>&1; then
+    send_post_tab_input | PATH="$d/tab-path" SHIT_TEST_EDITOR_STATS=1 \
+        SHIT_HISTORY="$d/tab-history" BIN="$BIN" "$script_command" -q -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        "$d/tab-typescript" >/dev/null 2>&1
+else
+    send_post_tab_input | PATH="$d/tab-path" SHIT_TEST_EDITOR_STATS=1 \
+        SHIT_HISTORY="$d/tab-history" BIN="$BIN" "$script_command" -q \
+        "$d/tab-typescript" /bin/sh -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        >/dev/null 2>&1
+fi
+tab_metrics=$(strings "$d/tab-typescript" | \
+    grep 'editor-refresh append=' | head -1) || exit 1
+tab_validations=${tab_metrics#* validations=}
+tab_validations=${tab_validations%% *}
+test "$tab_validations" -le 2 || exit 1
+echo 'TAB validation ends before the next key'
+
 history_index=0
 while [ "$history_index" -lt 1000 ]; do
-    printf 'alpha-history-%s\n' "$history_index"
+    printf 'zzzz-invalid-history-command-%s\n' "$history_index"
     history_index=$((history_index + 1))
 done > "$d/miss-history"
 send_missing_history_input()
@@ -102,7 +139,7 @@ fi
 history_metrics=$(strings "$d/history-typescript" | \
     grep 'editor-refresh append=7 ') || exit 1
 case $history_metrics in *' history-scans=1000 '*) ;; *) exit 1 ;; esac
-echo 'missing history prefixes scan once'
+echo 'rejected history prefixes scan once'
 
 mkdir "$d/absolute-path" "$d/next-directory"
 printf '#!/bin/sh\n' > "$d/absolute-path/echo-probe"
@@ -156,3 +193,41 @@ else
 fi
 strings "$d/pwd-typescript" | grep -q actual-cwd-completion || exit 1
 echo 'clobbered PWD completion uses the actual directory'
+
+mkdir "$d/menu-bin"
+cat > "$d/menu-bin/tailscale" <<'SH'
+#!/bin/sh
+printf '%s\n' \
+    'SUBCOMMANDS' \
+    '  alpha        Keep this first long completion description intact' \
+    '  beta         Keep this second long completion description intact'
+SH
+chmod +x "$d/menu-bin/tailscale"
+send_completion_menu_input()
+{
+    printf 'tailscale \t'
+    sleep 0.2
+    printf '\003exit\n'
+}
+if "$script_command" --version >/dev/null 2>&1; then
+    send_completion_menu_input | \
+        ASAN_OPTIONS=detect_stack_use_after_return=1 \
+        MANPATH= PATH="$d/menu-bin:/bin:/usr/bin" \
+        SHIT_HISTORY="$d/menu-history" BIN="$BIN" \
+        "$script_command" -q -c \
+        '/bin/stty cols 100 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        "$d/menu-typescript" >/dev/null 2>&1
+else
+    send_completion_menu_input | \
+        ASAN_OPTIONS=detect_stack_use_after_return=1 \
+        MANPATH= PATH="$d/menu-bin:/bin:/usr/bin" \
+        SHIT_HISTORY="$d/menu-history" BIN="$BIN" \
+        "$script_command" -q "$d/menu-typescript" /bin/sh -c \
+        '/bin/stty cols 100 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        >/dev/null 2>&1
+fi
+strings "$d/menu-typescript" | \
+    grep -q 'Keep this first long completion description intact' || exit 1
+strings "$d/menu-typescript" | \
+    grep -q 'Keep this second long completion description intact' || exit 1
+echo 'completion menu keeps callback-owned strings alive'

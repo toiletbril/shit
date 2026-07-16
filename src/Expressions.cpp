@@ -166,8 +166,8 @@ cold fn AnalysisContext::note_variable_read(
   reads_before_assignment.set(name, location);
 }
 
-cold fn report_command_resolution_error(EvalContext &cxt,
-                                        const CommandResolutionError &e) throws
+cold fn report_command_resolution_error(
+    EvalContext &cxt, const CommandResolutionErrorWithLocation &e) throws
     -> void
 {
   const String *source = cxt.current_source();

@@ -108,6 +108,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (should_list_commands || (action.has_value() && *action == "command")) {
     utils::begin_explicit_completion();
+    defer { utils::end_explicit_completion(); };
     let out = String{cxt.scratch_allocator()};
     let has_any_matched = false;
     for (let const &candidate :
@@ -141,6 +142,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (should_list_files) {
     utils::begin_explicit_completion();
+    defer { utils::end_explicit_completion(); };
     let const candidates = completion::complete_filesystem_names(
         word, cxt, Path::current_directory());
     let out = String{cxt.scratch_allocator()};

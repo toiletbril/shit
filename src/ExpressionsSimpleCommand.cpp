@@ -1203,7 +1203,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     resolved_ec = ExecContext::make_from(source_location(), steal(program_args),
                                          cxt.mood(), cxt.shitbox(),
                                          steal(program_arg_locations));
-  } catch (const CommandResolutionError &e) {
+  } catch (const CommandResolutionErrorWithLocation &e) {
     report_command_resolution_error(cxt, e);
     let const status = e.command_status();
     cxt.set_last_exit_status(static_cast<i32>(status));

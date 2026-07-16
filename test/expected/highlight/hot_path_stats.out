@@ -1,6 +1,9 @@
 echo	\e[34m
 $(	\e[31m
 highlight-variable-name-visits=0
+== a bare argument does not enumerate its directory:
+echo	\e[34m
+highlight-directory-reads=0
 == a substitution comment ends at its newline:
 echo	\e[34m
 true	\e[34m

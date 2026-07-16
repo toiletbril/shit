@@ -1859,6 +1859,7 @@ static u64 DIRECTORY_LISTING_GENERATION = 0;
 static usize DEBUG_DIRECTORY_STAT_COUNT = 0;
 static usize DEBUG_DIRECTORY_READ_COUNT = 0;
 static usize DEBUG_EXECUTABLE_PROBE_COUNT = 0;
+static usize DEBUG_PATH_VALIDATION_VISIT_COUNT = 0;
 #endif
 
 static fn clear_directory_listing_cache() throws -> void
@@ -2391,6 +2392,11 @@ fn begin_explicit_completion() throws -> void
   SHOULD_VALIDATE_ALL_PATH_COMMANDS = true;
 }
 
+fn end_explicit_completion() wontthrow -> void
+{
+  SHOULD_VALIDATE_ALL_PATH_COMMANDS = false;
+}
+
 #if !defined NDEBUG
 pure fn debug_directory_stat_count() wontthrow -> usize
 {
@@ -2406,6 +2412,11 @@ pure fn debug_executable_probe_count() wontthrow -> usize
 {
   return DEBUG_EXECUTABLE_PROBE_COUNT;
 }
+
+pure fn debug_path_validation_visit_count() wontthrow -> usize
+{
+  return DEBUG_PATH_VALIDATION_VISIT_COUNT;
+}
 #endif
 
 static fn validate_path_command_names(StringView prefix) throws -> void
@@ -2417,6 +2428,9 @@ static fn validate_path_command_names(StringView prefix) throws -> void
     read_directory_cached(Path{directory_text.view()}, true, false);
 
   PATH_CACHE.for_each([&](StringView name, program_path_cache_entry &entry) {
+#if !defined NDEBUG
+    DEBUG_PATH_VALIDATION_VISIT_COUNT++;
+#endif
     if (prefix.is_empty() || name.starts_with(prefix))
       validate_cached_program_paths(entry);
   });

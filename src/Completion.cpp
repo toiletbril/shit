@@ -549,6 +549,8 @@ public:
     return has_exact() || candidates.has(match_tier::prefix);
   }
 
+  pure fn allows_fuzzy_fallback() const wontthrow -> bool { return true; }
+
   fn take() throws -> ArrayList<String> { return candidates.best(); }
   pure fn source_scans() const wontthrow -> usize { return source_scan_count; }
   pure fn materialized() const wontthrow -> usize { return materialized_count; }
@@ -603,6 +605,7 @@ public:
 
   pure fn has_exact() const wontthrow -> bool { return best_tier == 0; }
   pure fn has_prefix() const wontthrow -> bool { return best_tier <= 1; }
+  pure fn allows_fuzzy_fallback() const wontthrow -> bool { return false; }
   pure fn count() const wontthrow -> usize { return match_count; }
   pure fn source_scans() const wontthrow -> usize { return source_scan_count; }
   pure fn materialized() const wontthrow -> usize { return 0; }
@@ -668,7 +671,7 @@ static fn collect_command_names(StringView token, bool token_is_glob,
     }
   }
 
-  if (!collector.has_exact()) {
+  if (collector.allows_fuzzy_fallback() && !collector.has_exact()) {
     let const &fallback_path_names =
         token_is_glob ? path_names : utils::path_command_names({});
     for (let const &entry : fallback_path_names)
@@ -1003,7 +1006,7 @@ collect_filesystem_matches(StringView token, const Path &base_directory,
     do_add_entry((*entries)[entry_position]);
     entry_position++;
   }
-  if (collector.has_prefix()) return;
+  if (collector.has_prefix() || !collector.allows_fuzzy_fallback()) return;
 
   for (let const &entry : *entries)
     if (!utils::directory_entry_name_has_casefold_prefix(entry.name.view(),

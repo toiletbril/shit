@@ -128,12 +128,15 @@ shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{
     shit::heap_allocator()};
 shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
     shit::heap_allocator()};
+shit::completion::completion_result *COMPLETION_RESULT = nullptr;
 
 /* Toiletline edits in codepoints while the completion engine works in bytes. */
 fn shit_completion_callback(const char *buffer, size_t cursor,
                             tl_completion *out, int for_listing) -> int
 {
-  if (COMPLETION_CONTEXT == nullptr || COMPLETION_BASE_DIRECTORY == nullptr) {
+  if (COMPLETION_CONTEXT == nullptr || COMPLETION_BASE_DIRECTORY == nullptr ||
+      COMPLETION_RESULT == nullptr)
+  {
     return 0;
   }
 
@@ -141,7 +144,12 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
      past this frame is undefined behavior. The body is guarded and any throw is
      swallowed. */
   try {
-    if (for_listing != 0) shit::utils::begin_explicit_completion();
+    const bool is_explicit_completion = for_listing != 0;
+    if (is_explicit_completion) shit::utils::begin_explicit_completion();
+    defer
+    {
+      if (is_explicit_completion) shit::utils::end_explicit_completion();
+    };
 
     const usize byte_length = std::strlen(buffer);
     let line = shit::StringView{buffer, byte_length};
@@ -152,9 +160,13 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     /* A completion diagnostic is armed to break onto its own line, then
        disarmed so a later command's message is unaffected. */
     shit::arm_message_leading_newline(true);
-    shit::completion::completion_result result = shit::completion::complete(
+    COMPLETION_RESULT->candidates.clear();
+    COMPLETION_RESULT->descriptions.clear();
+    COMPLETION_RESULT->longest_common_prefix.clear();
+    *COMPLETION_RESULT = shit::completion::complete(
         line, byte_cursor, *COMPLETION_CONTEXT, *COMPLETION_BASE_DIRECTORY,
         for_listing != 0);
+    let const &result = *COMPLETION_RESULT;
 #if !defined NDEBUG
     DEBUG_COMPLETION_SOURCE_SCAN_COUNT += result.source_candidate_scan_count;
     DEBUG_COMPLETION_MATERIALIZED_COUNT += result.materialized_candidate_count;
@@ -505,7 +517,18 @@ fn get_input(const String &prompt) -> input_result
   utils::begin_interactive_completion();
   HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
   let const completion_base_directory = Path::current_directory();
+  let completion_result = shit::completion::completion_result{
+      shit::ArrayList<shit::String>{shit::heap_allocator()},
+      shit::StringMap<shit::String>{shit::heap_allocator()},
+      shit::String{shit::heap_allocator()},
+      0,
+      0,
+      0,
+      0,
+      0,
+      false};
   COMPLETION_BASE_DIRECTORY = &completion_base_directory;
+  COMPLETION_RESULT = &completion_result;
 #if !defined NDEBUG
   let const append_refresh_count_before = ::itl_g_debug_append_refresh_count;
   let const full_refresh_count_before = ::itl_g_debug_full_refresh_count;
@@ -519,9 +542,12 @@ fn get_input(const String &prompt) -> input_result
   let const directory_stat_count_before = utils::debug_directory_stat_count();
   let const executable_probe_count_before =
       utils::debug_executable_probe_count();
+  let const path_validation_visit_count_before =
+      utils::debug_path_validation_visit_count();
 #endif
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   COMPLETION_BASE_DIRECTORY = nullptr;
+  COMPLETION_RESULT = nullptr;
 #if !defined NDEBUG
   if (shit::os::get_environment_variable("SHIT_TEST_EDITOR_STATS").has_value())
   {
@@ -557,6 +583,10 @@ fn get_input(const String &prompt) -> input_result
         " probes=" +
         shit::String::from(utils::debug_executable_probe_count() -
                                executable_probe_count_before,
+                           shit::heap_allocator()) +
+        " validations=" +
+        shit::String::from(utils::debug_path_validation_visit_count() -
+                               path_validation_visit_count_before,
                            shit::heap_allocator()) +
         " scans=" +
         shit::String::from(DEBUG_COMPLETION_SOURCE_SCAN_COUNT -

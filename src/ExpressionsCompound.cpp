@@ -606,7 +606,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
       stage_ec = ExecContext::make_from(e->source_location(), steal(stage_args),
                                         cxt.mood(), cxt.shitbox(),
                                         steal(stage_arg_locations));
-    } catch (const CommandResolutionError &resolution_error) {
+    } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       report_command_resolution_error(cxt, resolution_error);
       /* The stage still applies its own redirections. A > onto its stdout takes
          the slot ahead of the pipe, so the next stage still sees EOF. */

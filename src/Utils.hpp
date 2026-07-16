@@ -150,11 +150,13 @@ fn initialize_path_map() throws -> void;
 
 fn begin_interactive_completion() throws -> void;
 fn begin_explicit_completion() throws -> void;
+fn end_explicit_completion() wontthrow -> void;
 
 #if !defined NDEBUG
 pure fn debug_directory_stat_count() wontthrow -> usize;
 pure fn debug_directory_read_count() wontthrow -> usize;
 pure fn debug_executable_probe_count() wontthrow -> usize;
+pure fn debug_path_validation_visit_count() wontthrow -> usize;
 #endif
 
 fn clear_path_map() throws -> void;

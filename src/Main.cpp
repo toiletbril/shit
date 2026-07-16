@@ -186,6 +186,7 @@ static fn run_debug_highlight_driver(StringView driver_line,
 #if !defined NDEBUG
   let const variable_name_visit_count_before =
       context.debug_variable_name_enumeration_count();
+  let const directory_read_count_before = utils::debug_directory_read_count();
 #endif
   let const spans = completion::highlight_line(driver_line, context);
   let listing = String{heap_allocator()};
@@ -207,6 +208,15 @@ static fn run_debug_highlight_driver(StringView driver_line,
     listing += "highlight-variable-name-visits=";
     listing += String::from(context.debug_variable_name_enumeration_count() -
                                 variable_name_visit_count_before,
+                            heap_allocator());
+    listing += '\n';
+  }
+  if (os::get_environment_variable("SHIT_TEST_HIGHLIGHT_DIRECTORY_STATS")
+          .has_value())
+  {
+    listing += "highlight-directory-reads=";
+    listing += String::from(utils::debug_directory_read_count() -
+                                directory_read_count_before,
                             heap_allocator());
     listing += '\n';
   }

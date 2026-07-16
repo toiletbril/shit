@@ -212,19 +212,19 @@ ErrorBase::ErrorBase(StringView message) : m_message(heap_allocator(), message)
 
 ErrorBase::~ErrorBase() = default;
 
-cold fn ErrorBase::note_to_string() const throws -> String
+cold fn ErrorBase::trailing_details_to_string() const throws -> String
 {
-  if (m_note.is_empty()) return String{heap_allocator()};
+  let const note = detail_message();
+  if (note.is_empty()) return String{heap_allocator()};
 
   let const color = diagnostic_colors_for(StringView{"note"});
 
+  let const final_byte = note[note.length - 1];
   let const note_period =
-      (m_note.back() == '.' || m_note.back() == '?' || m_note.back() == '!')
-          ? ""
-          : ".";
+      (final_byte == '.' || final_byte == '?' || final_byte == '!') ? "" : ".";
 
   return String{"\n"} + color.severity + "note" + color.reset + ": " +
-         color.message + m_note + note_period + color.reset;
+         color.message + note + note_period + color.reset;
 }
 
 cold fn ErrorBase::severity_word() const wontthrow -> StringView
@@ -234,10 +234,9 @@ cold fn ErrorBase::severity_word() const wontthrow -> StringView
 
 Error::Error(StringView message) : ErrorBase(message) {}
 
-Error::Error(StringView message, StringView note) : ErrorBase(message)
-{
-  m_note = note;
-}
+ErrorWithDetails::ErrorWithDetails(StringView message, StringView note)
+    : Error(message), m_note(note)
+{}
 
 cold fn ErrorBase::to_string(StringView source) const throws -> String
 {
@@ -245,7 +244,7 @@ cold fn ErrorBase::to_string(StringView source) const throws -> String
   let const severity = severity_word();
   let const color = diagnostic_colors_for(severity);
   return color.severity + severity + color.reset + ": " + color.message +
-         message() + "." + color.reset + note_to_string();
+         message() + "." + color.reset + trailing_details_to_string();
 }
 
 fn Error::to_string() const throws -> String
@@ -255,7 +254,9 @@ fn Error::to_string() const throws -> String
 
 Warning::Warning(StringView message) : Error(message) {}
 
-Warning::Warning(StringView message, StringView note) : Error(message, note) {}
+WarningWithDetails::WarningWithDetails(StringView message, StringView note)
+    : Warning(message), m_note(note)
+{}
 
 InterruptError::InterruptError() : Error("Interrupted") {}
 
@@ -276,13 +277,6 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
 {
   LOG(Debug, "locating the error at byte %zu spanning %zu bytes",
       m_location.position, m_location.length);
-}
-
-ErrorWithLocation::ErrorWithLocation(SourceLocation location,
-                                     StringView message, StringView note)
-    : ErrorWithLocation(steal(location), message)
-{
-  m_note = note;
 }
 
 cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
@@ -352,36 +346,35 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
 
   result += get_context_pointing_to(source, byte_position, byte_count,
                                     line_position, StringView{"here"}, color);
-  result += note_to_string();
+  result += trailing_details_to_string();
   return result;
 }
 
-CommandResolutionError::CommandResolutionError(SourceLocation location,
-                                               StringView message,
-                                               i64 command_status)
+CommandResolutionErrorWithLocation::CommandResolutionErrorWithLocation(
+    SourceLocation location, StringView message, i64 command_status)
     : ErrorWithLocation(steal(location), message)
 {
   set_command_status(command_status);
 }
 
-CommandResolutionError::CommandResolutionError(SourceLocation location,
-                                               StringView message,
-                                               StringView note,
-                                               i64 command_status)
-    : ErrorWithLocation(steal(location), message)
-{
-  m_note = note;
-  set_command_status(command_status);
-}
+CommandResolutionErrorWithLocationAndDetails::
+    CommandResolutionErrorWithLocationAndDetails(SourceLocation location,
+                                                 StringView message,
+                                                 StringView note,
+                                                 i64 command_status)
+    : CommandResolutionErrorWithLocation(steal(location), message,
+                                         command_status),
+      m_note(note)
+{}
 
 WarningWithLocation::WarningWithLocation(SourceLocation location,
                                          StringView message)
     : ErrorWithLocation(steal(location), message)
 {}
 
-WarningWithLocation::WarningWithLocation(SourceLocation location,
-                                         StringView message, StringView note)
-    : ErrorWithLocation(steal(location), message, note)
+WarningWithLocationAndDetails::WarningWithLocationAndDetails(
+    SourceLocation location, StringView message, StringView note)
+    : WarningWithLocation(steal(location), message), m_note(note)
 {}
 
 cold fn WarningWithLocation::severity_word() const wontthrow -> StringView
@@ -408,8 +401,8 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
     SourceLocation location, StringView message, StringView note)
-    : ErrorWithLocation(steal(location), message, note),
-      m_details_message(heap_allocator())
+    : ErrorWithLocation(steal(location), message),
+      m_details_message(heap_allocator()), m_note(note)
 {}
 
 cold fn ErrorWithLocationAndDetails::details_to_string(

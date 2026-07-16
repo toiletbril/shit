@@ -1997,8 +1997,8 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
         typed_program_path.has_trailing_separator() &&
         !resolved_program_path->is_directory())
     {
-      throw CommandResolutionError{location, "This file is not a directory",
-                                   126};
+      throw CommandResolutionErrorWithLocation{
+          location, "This file is not a directory", 126};
     }
   }
 
@@ -2021,9 +2021,10 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
               program.view(), ArrayList<String>{heap_allocator()}))
       {
         let const hint = "Did you mean `" + *suggestion + "`?";
-        throw CommandResolutionError{location, message.view(), hint.view()};
+        throw CommandResolutionErrorWithLocationAndDetails{
+            location, message.view(), hint.view()};
       }
-      throw CommandResolutionError{location, message.view()};
+      throw CommandResolutionErrorWithLocation{location, message.view()};
     }
   } else {
     LOG(Debug, "resolved '%s' to a builtin", program.c_str());

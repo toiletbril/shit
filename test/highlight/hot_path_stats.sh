@@ -2,6 +2,10 @@ SHIT_TEST_HIGHLIGHT_STATS=1 "$BIN" \
     -c 'alpha=1; beta=2; gamma=3' \
     --debug-highlight-at 'echo $($($($($(' </dev/null
 
+echo '== a bare argument does not enumerate its directory:'
+SHIT_TEST_HIGHLIGHT_DIRECTORY_STATS=1 "$BIN" \
+    --debug-highlight-at 'echo definitely-not-an-existing-path' </dev/null
+
 echo '== a substitution comment ends at its newline:'
 line='echo $(true # comment
 echo inner) outer'

@@ -156,9 +156,11 @@ the manpage
 options, the help subcommands, the help options, and finally the filesystem. A
 candidate is matched by smart case and then by subsequence, so an all lowercase
 token matches either case and `fbb` matches `foo_bar_baz`, while an exact prefix
-always ranks first. A command-position path offers only runnable files and the
-directories, and a known utility floats the files whose extension it operates on
-ahead of the rest. A leading `~` or a `$NAME/` prefix on a path token is
+always ranks first. Ghost completion stops after the prefix range, while an
+explicit TAB also considers subsequence matches. A command-position path offers
+only runnable files and the directories, and a known utility floats the files
+whose extension it operates on ahead of the rest. A leading `~` or a `$NAME/`
+prefix on a path token is
 expanded only to list the real directory, while the offered candidate keeps the
 literal prefix so it still expands at run time, and only a glob pattern is
 expanded into its matches. A command forks its `--help` at most once per cache key,
@@ -178,29 +180,35 @@ epoch reuse the entry without another stat. Each interactive input begins an
 epoch. TAB, `compgen -c`, and `compgen -A command` begin another epoch. A
 membership change in a PATH directory invalidates the command-search cache and
 the sorted command index. Each directory listing is sorted once by folded name,
-so filesystem completion and path highlighting binary-search the active prefix.
-Symlink target kinds are resolved when each listing is used. The highlighter
-looks up only variable names that occur on the line, and it colors nested
-command and arithmetic substitutions in one pass. src/Toiletline.cpp bridges
-the editor to the evaluator, and src/toiletline/toiletline.h is the editor. The
+so filesystem completion and partial-path highlighting binary-search the active
+prefix. Symlink target kinds are resolved when each listing is used. The
+highlighter probes a complete bare path directly and does not enumerate its
+siblings. Explicit PATH validation ends with the TAB callback or compgen
+invocation that began it. The highlighter looks up only variable names that
+occur on the line, and it colors nested command and arithmetic substitutions in
+one pass. src/Toiletline.cpp bridges the editor to the evaluator, and
+src/toiletline/toiletline.h is the editor. The
 `--debug-highlight-at` flag, a
 debug-only test driver gated behind NDEBUG like `--debug-complete-at`, prints the
 highlight spans for a line so the highlighter is testable without the editor.
 Plain editor appends update the stored byte length and serialized line directly.
-Ghost history caches an unmatched prefix, decodes matching entries as bytes, and
-tracks display width separately from byte length. The physical working directory
-is captured once per input and remains the implicit filesystem completion base
-when the PWD variable is reassigned. A directory change preserves the command
-cache when every PATH component is absolute, while a relative or empty component
-still invalidates it.
+Ghost history caches a prefix that produces no valid suggestion, decodes
+matching entries as bytes, and tracks display width separately from byte length.
+The completion bridge keeps its last result alive until the editor consumes the
+returned pointers. The physical working directory is captured once per input
+and remains the implicit filesystem completion base when the PWD variable is
+reassigned. A directory change preserves the command cache when every PATH
+component is absolute, while a relative or empty component still invalidates
+it.
 
 src/Errors.cpp renders the located caret and the trailing note, capitalized on
-its own line, with the shellcheck-style messages in src/Diagnostics.hpp. Error,
-Warning, and their located forms store an optional note directly. The legacy
-note-only names are aliases. ErrorWithLocationAndDetails remains distinct
-because it stores a second source location. The relocate_error bridge rewraps
-an unlocated error onto a span and preserves its note. Diagnostics and LINENO
-share one cached source line index. Executable-format fallback uses an explicit
+its own line, with the shellcheck-style messages in src/Diagnostics.hpp. Only a
+type whose name contains WithLocation owns or inherits a source location. Only
+a type whose name contains WithDetails owns a trailing note. The semantic
+classes remain distinct for catch routing. ErrorWithLocationAndDetails can also
+store a second source location. The relocate_error bridge rewraps an unlocated
+error onto a span and preserves its details. Diagnostics and LINENO share one
+cached source line index. Executable-format fallback uses an explicit
 invalid-process result. A fresh evaluator runs the fallback script with the
 command environment and argv zero, so caller variables, functions, and traps do
 not leak into it. The

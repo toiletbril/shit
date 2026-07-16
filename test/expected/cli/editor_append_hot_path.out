@@ -1,5 +1,7 @@
 single-row typing uses incremental refresh
 PATH ghost completion stays bounded while typing
-missing history prefixes scan once
+TAB validation ends before the next key
+rejected history prefixes scan once
 absolute PATH survives a directory change
 clobbered PWD completion uses the actual directory
+completion menu keeps callback-owned strings alive

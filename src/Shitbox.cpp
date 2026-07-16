@@ -59,15 +59,34 @@ fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
   unreachable("unhandled shitbox utility of kind %d", ENUM(chosen));
 }
 
-fn rewrap_with_prefix(const ErrorWithLocation &error, StringView prefix) throws
-    -> ErrorWithLocation
+[[noreturn]] fn rethrow_with_prefix(const ErrorWithLocation &error,
+                                    StringView prefix) throws -> void
 {
   let const message = prefix + ": " + error.message();
-  ErrorWithLocation rewrapped{error.location(), message.view(),
-                              error.note().view()};
+  if (!error.detail_message().is_empty()) {
+    let rewrapped = ErrorWithLocationAndDetails{
+        error.location(), message.view(), error.detail_message()};
+    if (error.is_script_fatal()) rewrapped.set_script_fatal();
+    rewrapped.set_command_status(error.command_status());
+    throw rewrapped;
+  }
+
+  let rewrapped = ErrorWithLocation{error.location(), message.view()};
   if (error.is_script_fatal()) rewrapped.set_script_fatal();
   rewrapped.set_command_status(error.command_status());
-  return rewrapped;
+  throw rewrapped;
+}
+
+fn render_with_prefix(const ErrorWithLocation &error, StringView prefix,
+                      StringView source) throws -> String
+{
+  let const message = prefix + ": " + error.message();
+  if (!error.detail_message().is_empty())
+    return ErrorWithLocationAndDetails{error.location(), message.view(),
+                                       error.detail_message()}
+        .to_string(source);
+
+  return ErrorWithLocation{error.location(), message.view()}.to_string(source);
 }
 
 fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
@@ -94,7 +113,7 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
       let const invocation_name = ec.is_multicall
                                       ? String{heap_allocator(), name}
                                       : String{"shitbox "} + name;
-      throw rewrap_with_prefix(e, invocation_name);
+      rethrow_with_prefix(e, invocation_name);
     } catch (const Error &error) {
       relocate_error(error, ec.source_location());
     }
@@ -137,8 +156,8 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   } catch (const BrokenPipeExit &) {
     return 141;
   } catch (const ErrorWithLocation &e) {
-    show_message(rewrap_with_prefix(e, util_name)
-                     .to_string(utils::merge_args_to_string(ec.args())));
+    show_message(render_with_prefix(e, util_name,
+                                    utils::merge_args_to_string(ec.args())));
     return 1;
   } catch (const Error &e) {
     show_message(e.to_string());

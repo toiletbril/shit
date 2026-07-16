@@ -21,6 +21,7 @@ public:
   virtual ~ErrorBase();
 
   pure fn message() const wontthrow -> const String & { return m_message; }
+  virtual pure fn detail_message() const wontthrow -> StringView { return {}; }
 
   virtual fn severity_word() const wontthrow -> StringView;
 
@@ -40,40 +41,58 @@ public:
   }
   pure fn command_status() const wontthrow -> i64 { return m_command_status; }
 
-  pure fn has_note() const wontthrow -> bool { return !m_note.is_empty(); }
-  pure fn note() const wontthrow -> const String & { return m_note; }
-
 protected:
-  fn note_to_string() const throws -> String;
+  fn trailing_details_to_string() const throws -> String;
 
   bool m_is_script_fatal{false};
   i64 m_command_status{1};
   String m_message{heap_allocator()};
-  String m_note{heap_allocator()};
 };
 
 class Error : public ErrorBase
 {
 public:
   Error(StringView message);
-  Error(StringView message, StringView note);
 
   fn to_string() const throws -> String;
   using ErrorBase::to_string;
 };
 
-using ErrorWithDetails = Error;
+class ErrorWithDetails : public Error
+{
+public:
+  ErrorWithDetails(StringView message, StringView note);
+
+  pure fn detail_message() const wontthrow -> StringView override
+  {
+    return m_note.view();
+  }
+
+private:
+  String m_note{heap_allocator()};
+};
 
 class Warning : public Error
 {
 public:
   Warning(StringView message);
-  Warning(StringView message, StringView note);
 
   fn severity_word() const wontthrow -> StringView override;
 };
 
-using WarningWithDetails = Warning;
+class WarningWithDetails : public Warning
+{
+public:
+  WarningWithDetails(StringView message, StringView note);
+
+  pure fn detail_message() const wontthrow -> StringView override
+  {
+    return m_note.view();
+  }
+
+private:
+  String m_note{heap_allocator()};
+};
 
 /* The mimic boundary tests this type, never the message text, so a
    program-thrown Error reading "Interrupted" is not mistaken for it. */
@@ -105,8 +124,6 @@ class ErrorWithLocation : public ErrorBase
 {
 public:
   ErrorWithLocation(SourceLocation location, StringView message);
-  ErrorWithLocation(SourceLocation location, StringView message,
-                    StringView note);
 
   virtual fn to_string(StringView source) const throws -> String;
 
@@ -129,26 +146,54 @@ protected:
   bool m_was_rendered{false};
 };
 
-class CommandResolutionError : public ErrorWithLocation
+class CommandResolutionErrorWithLocation : public ErrorWithLocation
 {
 public:
-  CommandResolutionError(SourceLocation location, StringView message,
-                         i64 command_status = 127);
-  CommandResolutionError(SourceLocation location, StringView message,
-                         StringView note, i64 command_status = 127);
+  CommandResolutionErrorWithLocation(SourceLocation location,
+                                     StringView message,
+                                     i64 command_status = 127);
+};
+
+class CommandResolutionErrorWithLocationAndDetails
+    : public CommandResolutionErrorWithLocation
+{
+public:
+  CommandResolutionErrorWithLocationAndDetails(SourceLocation location,
+                                               StringView message,
+                                               StringView note,
+                                               i64 command_status = 127);
+
+  pure fn detail_message() const wontthrow -> StringView override
+  {
+    return m_note.view();
+  }
+
+private:
+  String m_note{heap_allocator()};
 };
 
 class WarningWithLocation : public ErrorWithLocation
 {
 public:
   WarningWithLocation(SourceLocation location, StringView message);
-  WarningWithLocation(SourceLocation location, StringView message,
-                      StringView note);
 
   fn severity_word() const wontthrow -> StringView override;
 };
 
-using WarningWithLocationAndDetails = WarningWithLocation;
+class WarningWithLocationAndDetails : public WarningWithLocation
+{
+public:
+  WarningWithLocationAndDetails(SourceLocation location, StringView message,
+                                StringView note);
+
+  pure fn detail_message() const wontthrow -> StringView override
+  {
+    return m_note.view();
+  }
+
+private:
+  String m_note{heap_allocator()};
+};
 
 class TraceWithLocation : public ErrorWithLocation
 {
@@ -167,18 +212,36 @@ public:
   ErrorWithLocationAndDetails(SourceLocation location, StringView message,
                               StringView note);
 
+  pure fn detail_message() const wontthrow -> StringView override
+  {
+    return m_note.view();
+  }
+
   fn details_to_string(StringView source) const throws -> String;
 
 protected:
   SourceLocation m_details_location;
   String m_details_message;
+  String m_note{heap_allocator()};
 };
+
+static_assert(!std::is_same_v<ErrorWithDetails, Error>);
+static_assert(!std::is_same_v<WarningWithDetails, Warning>);
+static_assert(
+    !std::is_same_v<WarningWithLocationAndDetails, WarningWithLocation>);
 
 [[noreturn]] inline fn relocate_error(const ErrorBase &error,
                                       SourceLocation location) throws -> void
 {
-  let relocated =
-      ErrorWithLocation{location, error.message().view(), error.note().view()};
+  if (!error.detail_message().is_empty()) {
+    let relocated = ErrorWithLocationAndDetails{
+        location, error.message().view(), error.detail_message()};
+    if (error.is_script_fatal()) relocated.set_script_fatal();
+    relocated.set_command_status(error.command_status());
+    throw relocated;
+  }
+
+  let relocated = ErrorWithLocation{location, error.message().view()};
   if (error.is_script_fatal()) relocated.set_script_fatal();
   relocated.set_command_status(error.command_status());
   throw relocated;

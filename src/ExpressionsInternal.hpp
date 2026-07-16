@@ -15,8 +15,8 @@
 namespace shit {
 
 fn indent_for_layer(usize layer) throws -> String;
-fn report_command_resolution_error(EvalContext &cxt,
-                                   const CommandResolutionError &e) throws
+fn report_command_resolution_error(
+    EvalContext &cxt, const CommandResolutionErrorWithLocation &e) throws
     -> void;
 
 /* The returned view is the windowed source, or None when no window applies and
