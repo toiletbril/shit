@@ -33,5 +33,5 @@ emacs          	off
 posix          	off
 force-warnings 	off
 mimicry        	off
-force-diagnostics	on
+force-diagnostics	off
 no-diagnostics 	off

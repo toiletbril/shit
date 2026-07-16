@@ -42,9 +42,9 @@ OPTION SWITCHES
   -A  show-ast                      Print the AST before each command runs.
   -R  show-lexed-words              Print the escape bitmap after each parse.
       show-exit-code                Print the exit code after each command.
-  -W  force-warnings                Report strict runtime errors as warnings and continue.
+  -W  force-warnings                Use diagnostic warning level one, the same as -W.
   -I  mimicry                       Mimic the shell named by a script's shebang.
-      force-diagnostics             Run the analysis stage before each chunk.
+  -WW force-diagnostics             Use diagnostic warning level two, the same as -WW.
   -S  show-stats                    Print evaluation statistics after each run.
       no-diagnostics                Skip the analysis stage before each chunk runs.
   -G  show-memory                   Print a granular memory report at exit.

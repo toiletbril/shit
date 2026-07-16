@@ -42,7 +42,7 @@ _shit_complete()
 --show-optimizer-state --show-exit-code --show-lexed-words --show-stats --show-memory \
 --debug-logging --debug-logging-file"
 
-    local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -p -M -L -I -W \
+    local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -p -M -L -I -W -WW \
 -T -A -E -R -X"
 
     if [[ $current_word == --* ]]; then
@@ -76,8 +76,8 @@ noclobber no-clobber errtrace physical functrace pipefail failglob shitbox vi em
 posix show-ast show-lexed-words show-exit-code force-warnings mimicry \
 force-diagnostics show-stats no-diagnostics show-memory login rcfile"
     local switches="--help --options --mood --init-moods -o +o -M -L \
--a -b -e -f -h -k -m -n -u -v -x -B -C -E -P -T -A -R -W -I -S -G \
-+a +b +e +f +h +k +m +n +u +v +x +B +C +E +P +T +A +R +W +I +S +G"
+-a -b -e -f -h -k -m -n -u -v -x -B -C -E -P -T -A -R -W -WW -I -S -G \
++a +b +e +f +h +k +m +n +u +v +x +B +C +E +P +T +A +R +W +WW +I +S +G"
 
     case $previous_word in
         -o|+o)

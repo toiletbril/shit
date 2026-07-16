@@ -1,0 +1,13 @@
+== command flag ordering:
+level-one-after-command
+level-two-after-command
+== set diagnostic levels:
+default-level
+named-level-one
+named-level-two
+disabled-level-two
+short-level-two
+disabled-short-level
+level-one-strict=1
+level-two-strict=0
+runtime-level-two-warnings=1

@@ -1030,16 +1030,6 @@ public:
     return m_runtime.option_is_enabled(shell_option_id::Mimicry);
   }
 
-  /* The positive spelling of the analysis toggle, so set -o force-diagnostics
-     enables the stage the way --no-diagnostics disables it. */
-  fn set_diagnostics_enabled(bool enabled) wontthrow -> void
-  {
-    m_runtime.are_diagnostics_disabled = !enabled;
-  }
-  pure fn diagnostics_enabled() const wontthrow -> bool
-  {
-    return !m_runtime.are_diagnostics_disabled;
-  }
   /* Run the script at the resolved program in-process in the matching mode.
      When isolated is true the run is contained in a snapshotted subshell, and
      when false the snapshot is skipped. */

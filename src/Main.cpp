@@ -429,7 +429,7 @@ static fn run_script_contents(const String &script_contents,
         precompiled_ast == nullptr &&
         (FLAG_SHOW_OPTIMIZER_STATE.is_enabled() ||
          ((!(context.is_bash_compatible() || context.is_posix_mode()) ||
-           FLAG_WARNINGS.count() > 0) &&
+           context.warnings_enabled()) &&
           !context.diagnostics_disabled()));
     LOG(Debug, "the analysis stage %s for this chunk",
         run_analysis ? "runs" : "is skipped");
@@ -440,7 +440,7 @@ static fn run_script_contents(const String &script_contents,
         run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
                      context.alias_names(), &context, context.warning_level(),
-                     FLAG_WARNINGS.count() > 0 &&
+                     context.warnings_enabled() &&
                          context.shell_is_interactive(),
                      FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
     if (!analysis_failed && out_ast != nullptr) {

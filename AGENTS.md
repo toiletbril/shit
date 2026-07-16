@@ -40,7 +40,9 @@ SimpleCommand::evaluate_impl through command_word_is_glob. The mood, the
 diagnostics toggles, the explicit strictness marks, and the stored shell option
 bits live in one RuntimeState. Capture and restore copy it whole. The set
 builtin uses one descriptor table for mutation, queries, help, completion,
-SHELLOPTS, and `$-`. Its compile-time name map retains binary search. Main.cpp
+SHELLOPTS, and `$-`. `force-warnings` selects level one, `force-diagnostics`
+selects level two and matches `-WW`, and `no-diagnostics` suppresses the stage.
+Its compile-time name map retains binary search. Main.cpp
 enters rescue rather than exiting when a flag fails to parse in a login shell,
 the lockout-risk case marked by a dash-prefixed argv[0], while any other
 invocation keeps the usage exit.

@@ -36,8 +36,8 @@ enum class set_option_behavior : u8
   Posix,
   Vi,
   Emacs,
-  Warnings,
-  ForceDiagnostics,
+  WarningLevelOne,
+  WarningLevelTwo,
   NoDiagnostics,
   Login,
   Rcfile,
@@ -177,12 +177,12 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      '\0', "show-exit-code",
      "Print the exit code after each command.", {},
      false, false},
-    {shell_option_id::Count, set_option_behavior::Warnings, 'W',
-     "force-warnings", "Report strict runtime errors as warnings and continue."},
+    {shell_option_id::Count, set_option_behavior::WarningLevelOne, 'W',
+     "force-warnings", "Use diagnostic warning level one, the same as -W."},
     {shell_option_id::Mimicry, set_option_behavior::Stored, 'I', "mimicry",
      "Mimic the shell named by a script's shebang."},
-    {shell_option_id::Count, set_option_behavior::ForceDiagnostics, '\0',
-     "force-diagnostics", "Run the analysis stage before each chunk."},
+    {shell_option_id::Count, set_option_behavior::WarningLevelTwo, '\0',
+     "force-diagnostics", "Use diagnostic warning level two, the same as -WW."},
     {shell_option_id::ShowStats,
      set_option_behavior::Stored,
      'S', "show-stats",
@@ -391,8 +391,8 @@ fn option_is_on(const EvalContext &cxt,
   case set_option_behavior::Posix: return cxt.is_posix_option_on();
   case set_option_behavior::Vi: return cxt.vi_mode();
   case set_option_behavior::Emacs: return cxt.emacs_mode();
-  case set_option_behavior::Warnings: return cxt.warnings_enabled();
-  case set_option_behavior::ForceDiagnostics: return cxt.diagnostics_enabled();
+  case set_option_behavior::WarningLevelOne: return cxt.warning_level() == 1;
+  case set_option_behavior::WarningLevelTwo: return cxt.warning_level() == 2;
   case set_option_behavior::NoDiagnostics: return cxt.diagnostics_disabled();
   case set_option_behavior::Login: return cxt.is_login_shell();
   case set_option_behavior::Rcfile: return cxt.has_custom_rcfile();
@@ -407,7 +407,8 @@ fn option_is_startup_fact(const set_option_descriptor &option) throws -> bool
 }
 
 fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
-                          bool enable) throws -> void
+                          bool enable,
+                          bool should_step_warning_level = false) throws -> void
 {
   if (option_is_startup_fact(option))
     throw Error{
@@ -425,13 +426,16 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
   case set_option_behavior::Posix: cxt.set_posix_mode_via_option(enable); break;
   case set_option_behavior::Vi: cxt.set_vi_mode(enable); break;
   case set_option_behavior::Emacs: cxt.set_emacs_mode(enable); break;
-  case set_option_behavior::Warnings:
+  case set_option_behavior::WarningLevelOne:
     cxt.note_warning_option_mutation();
-    cxt.set_warnings_enabled(enable);
+    if (should_step_warning_level)
+      cxt.set_warnings_enabled(enable);
+    else
+      cxt.set_warning_level(enable ? 1 : 0);
     break;
-  case set_option_behavior::ForceDiagnostics:
-    cxt.note_diagnostics_option_mutation();
-    cxt.set_diagnostics_enabled(enable);
+  case set_option_behavior::WarningLevelTwo:
+    cxt.note_warning_option_mutation();
+    cxt.set_warning_level(enable ? 2 : 0);
     break;
   case set_option_behavior::NoDiagnostics:
     cxt.note_diagnostics_option_mutation();
@@ -499,13 +503,15 @@ fn format_option_table(const EvalContext *cxt,
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
     out += "  ";
-    if (option.letter != '\0') {
+    if (option.behavior == set_option_behavior::WarningLevelTwo) {
+      out += "-WW ";
+    } else if (option.letter != '\0') {
       out.push('-');
       out.push(option.letter);
-    } else {
       out += "  ";
+    } else {
+      out += "    ";
     }
-    out += "  ";
     let name_cell = String{option.name};
     if (include_alias_spellings && !option.alias.is_empty()) {
       name_cell += ", ";
@@ -608,6 +614,12 @@ fn enabled_shell_option_letters(const EvalContext &cxt) throws -> String
   let letters = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
     if (option.letter == 'h' && cxt.shell_is_interactive()) letters.push('i');
+    if (option.behavior == set_option_behavior::WarningLevelOne) {
+      for (u8 warning_level = 0; warning_level < cxt.warning_level();
+           warning_level++)
+        letters.push('W');
+      continue;
+    }
     if (option.letter == '\0' || !option_is_on(cxt, option)) continue;
     letters.push(option.letter);
   }
@@ -781,7 +793,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           throw make_error_for_arg(
               ec, i, StringView{"Unknown option '"} + invalid_option + "'");
         }
-        apply_or_reject_option(cxt, *option, enable);
+        apply_or_reject_option(cxt, *option, enable, true);
       }
       continue;
     }

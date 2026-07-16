@@ -32,7 +32,8 @@ warning at that stage is called a diagnostic.
 `--mood`, short `-M`, selects the mood, one of `shit`, `bash`, or `sh`. The
 default is `shit`. A binary symlinked as `sh`, `dash`, or `bash` will pick the
 matching mood and disable diagnostics. `set --mood` changes the mood at
-runtime. `-W` keeps the diagnostics but turns every error into a warning.
+runtime. `-W` demotes lenient diagnostics to warnings. `-WW` demotes strict
+diagnostics too and reports runtime warnings in every mood.
 
 The `set` builtin owns the mutable shell option state. Standard short flags,
 long option names, `SHELLOPTS`, and `$-` read the same stored values. An option

@@ -309,7 +309,8 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           const char *probe_value = nullptr;
           if (find_flag(flags, token_offset, is_long_token, &probe_flag,
                         &probe_value) &&
-              probe_flag->kind() == Flag::Kind::Bool)
+              (probe_flag->kind() == Flag::Kind::Bool ||
+               probe_flag->kind() == Flag::Kind::RepeatedBool))
           {
             next_is_known_bool_flag = true;
           }
