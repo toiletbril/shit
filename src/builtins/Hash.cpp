@@ -38,7 +38,10 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     LOG(Debug, "hash resolving '%s' to remember its location", name.c_str());
 
-    if (utils::search_program_path(name).count() == 0) {
+    if (utils::search_program_path(
+            name, false, utils::program_path_requirement::Runnable, true)
+            .count() == 0)
+    {
       report_soft_builtin_error(ec, cxt,
                                 "The command '" + name + "' was not found");
       status = 1;

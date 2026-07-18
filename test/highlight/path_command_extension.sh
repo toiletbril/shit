@@ -20,3 +20,7 @@ printf '#!/bin/sh\n' > "$dir/blocker-second/blocked.exe"
 chmod +x "$dir/blocker-second/blocked.exe"
 PATH="$dir/blocker-first:$dir/blocker-second" \
     "$BIN" --debug-highlight-at 'blocked.exe'
+: > "$dir/foo"
+printf '#!/bin/sh\n' > "$dir/foobar"
+chmod +x "$dir/foobar"
+PATH="$dir" "$BIN" --debug-highlight-at 'foo'

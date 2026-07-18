@@ -658,8 +658,7 @@ static fn collect_command_names(StringView token, bool token_is_glob,
   context.for_each_function_name(do_add);
   context.for_each_alias_name(do_add);
 
-  let const &path_names = utils::path_command_names(
-      token_is_glob ? StringView{} : normalized_path_token.view());
+  let const &path_names = utils::path_command_names();
   if (!token_is_glob && !token.is_empty()) {
     let name_index =
         utils::path_command_name_lower_bound(normalized_path_token.view());
@@ -673,8 +672,7 @@ static fn collect_command_names(StringView token, bool token_is_glob,
   }
 
   if (collector.allows_fuzzy_fallback() && !collector.has_exact()) {
-    let const &fallback_path_names =
-        token_is_glob ? path_names : utils::path_command_names({});
+    let const &fallback_path_names = path_names;
     for (let const &entry : fallback_path_names)
       do_add_path(entry.view());
   }

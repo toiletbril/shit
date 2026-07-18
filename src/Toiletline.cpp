@@ -542,8 +542,8 @@ fn get_input(const String &prompt) -> input_result
   let const directory_stat_count_before = utils::debug_directory_stat_count();
   let const executable_probe_count_before =
       utils::debug_executable_probe_count();
-  let const path_validation_visit_count_before =
-      utils::debug_path_validation_visit_count();
+  let const program_path_candidate_count_before =
+      utils::debug_program_path_candidate_count();
 #endif
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   COMPLETION_BASE_DIRECTORY = nullptr;
@@ -584,9 +584,9 @@ fn get_input(const String &prompt) -> input_result
         shit::String::from(utils::debug_executable_probe_count() -
                                executable_probe_count_before,
                            shit::heap_allocator()) +
-        " validations=" +
-        shit::String::from(utils::debug_path_validation_visit_count() -
-                               path_validation_visit_count_before,
+        " resolutions=" +
+        shit::String::from(utils::debug_program_path_candidate_count() -
+                               program_path_candidate_count_before,
                            shit::heap_allocator()) +
         " scans=" +
         shit::String::from(DEBUG_COMPLETION_SOURCE_SCAN_COUNT -

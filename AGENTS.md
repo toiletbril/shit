@@ -191,17 +191,22 @@ TAB completion, and the PATH command index share one directory-listing cache
 keyed by path. The first use of a directory in a completion validation epoch
 checks its cached metadata. Later completion and highlighting calls in that
 epoch reuse the entry without another stat. Each interactive input begins an
-epoch. TAB, `compgen -c`, and `compgen -A command` begin another epoch. A
-membership change in a PATH directory invalidates the command-search cache and
-the sorted command index. Each directory listing is sorted once by folded name,
-so filesystem completion and partial-path highlighting binary-search the active
-prefix. Symlink target kinds are resolved when each listing is used. The
+epoch. A stale command index is rebuilt after PROMPT_COMMAND and before the
+editor accepts a key. TAB, `compgen -c`, and `compgen -A command` begin nested
+explicit validation epochs. The sorted runnable-name index and the existing
+regular-file index are derived from directory listings and never populate the
+execution hash. Only actual execution and the hash builtin remember a resolved
+program path. A membership change in a PATH directory invalidates both derived
+indexes and the execution hash. Each directory listing is sorted once by folded
+name, so filesystem completion and partial-path highlighting binary-search the
+active prefix. Symlink target kinds are resolved when each listing is used. The
 highlighter probes a complete bare path directly and does not enumerate its
-siblings. Explicit PATH validation ends with the TAB callback or compgen
-invocation that began it. The highlighter looks up only variable names that
-occur on the line, and it colors nested command and arithmetic substitutions in
-one pass. src/Toiletline.cpp bridges the editor to the evaluator, and
-src/toiletline/toiletline.h is the editor. The
+siblings. The highlighter and history validation classify a warm command name
+without filesystem access. Explicit PATH validation ends with the TAB callback
+or compgen invocation that began it. The highlighter looks up only variable
+names that occur on the line, and it colors nested command and arithmetic
+substitutions in one pass. src/Toiletline.cpp bridges the editor to the
+evaluator, and src/toiletline/toiletline.h is the editor. The
 `--debug-highlight-at` flag, a
 debug-only test driver gated behind NDEBUG like `--debug-complete-at`, prints the
 highlight spans for a line so the highlighter is testable without the editor.

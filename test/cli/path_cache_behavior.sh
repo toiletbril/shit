@@ -73,6 +73,73 @@ CACHE_COMMAND=appeared CACHE_DIRECTORY="$dir/appeared" \
     PATH="$dir/appeared:/bin" "$BIN" -c \
     'command -v "$CACHE_COMMAND" >/dev/null 2>&1; /bin/mv "$CACHE_STAGED" "$CACHE_DIRECTORY/appeared"; "$CACHE_COMMAND"'
 
+mkdir "$dir/query-first" "$dir/query-second"
+printf '#!/bin/sh\necho compgen-first\n' > "$dir/compgen-staged"
+printf '#!/bin/sh\necho compgen-second\n' > \
+    "$dir/query-second/compgenprobe"
+chmod +x "$dir/compgen-staged" "$dir/query-second/compgenprobe"
+QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/compgen-staged" \
+    PATH="$dir/query-first:$dir/query-second:/bin" "$BIN" -c \
+    'compgen -c compgenprobe >/dev/null 2>&1; /bin/mv "$QUERY_STAGED" "$QUERY_FIRST/compgenprobe"; compgenprobe'
+
+printf '#!/bin/sh\necho command-first\n' > "$dir/command-staged"
+printf '#!/bin/sh\necho command-second\n' > \
+    "$dir/query-second/commandprobe"
+chmod +x "$dir/command-staged" "$dir/query-second/commandprobe"
+QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/command-staged" \
+    PATH="$dir/query-first:$dir/query-second:/bin" "$BIN" -c \
+    'command -v commandprobe >/dev/null; /bin/mv "$QUERY_STAGED" "$QUERY_FIRST/commandprobe"; commandprobe'
+
+printf '#!/bin/sh\necho type-first\n' > "$dir/type-staged"
+printf '#!/bin/sh\necho type-second\n' > "$dir/query-second/typeprobe"
+chmod +x "$dir/type-staged" "$dir/query-second/typeprobe"
+QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/type-staged" \
+    PATH="$dir/query-first:$dir/query-second:/bin" "$BIN" -c \
+    'type typeprobe >/dev/null; /bin/mv "$QUERY_STAGED" "$QUERY_FIRST/typeprobe"; typeprobe'
+
+printf '#!/bin/sh\necho optimizer-first\n' > "$dir/optimizer-staged"
+printf '#!/bin/sh\necho optimizer-second\n' > \
+    "$dir/query-second/optimizerprobe"
+chmod +x "$dir/optimizer-staged" "$dir/query-second/optimizerprobe"
+QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/optimizer-staged" \
+    PATH="$dir/query-first:$dir/query-second:/bin" "$BIN" -c \
+    '/bin/mv "$QUERY_STAGED" "$QUERY_FIRST/optimizerprobe"; optimizerprobe'
+
+printf '#!/bin/sh\necho execution-first\n' > "$dir/execution-staged"
+printf '#!/bin/sh\necho execution-second\n' > \
+    "$dir/query-second/executionprobe"
+chmod +x "$dir/execution-staged" "$dir/query-second/executionprobe"
+QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/execution-staged" \
+    PATH="$dir/query-first:$dir/query-second:/bin" "$BIN" -c \
+    'executionprobe; /bin/mv "$QUERY_STAGED" "$QUERY_FIRST/executionprobe"; executionprobe'
+
+printf '#!/bin/sh\necho hash-first\n' > "$dir/hash-staged"
+printf '#!/bin/sh\necho hash-second\n' > "$dir/query-second/hashprobe"
+chmod +x "$dir/hash-staged" "$dir/query-second/hashprobe"
+QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/hash-staged" \
+    PATH="$dir/query-first:$dir/query-second:/bin" "$BIN" -c \
+    'hash hashprobe; /bin/mv "$QUERY_STAGED" "$QUERY_FIRST/hashprobe"; hashprobe'
+
+printf '#!/bin/sh\necho mode-first\n' > "$dir/query-first/modeprobe"
+printf '#!/bin/sh\necho mode-second\n' > "$dir/query-second/modeprobe"
+chmod +x "$dir/query-second/modeprobe"
+QUERY_FIRST="$dir/query-first" \
+    PATH="$dir/query-first:$dir/query-second:/bin" "$BIN" -c \
+    'compgen -c modeprobe >/dev/null 2>&1; /bin/chmod +x "$QUERY_FIRST/modeprobe"; modeprobe'
+
+mkdir "$dir/query-directory" "$dir/query-directory/directoryprobe"
+: > "$dir/query-directory/regularprobe"
+PATH="$dir/query-directory:/bin" "$BIN" -c '
+    type -p directoryprobe >/dev/null; printf "type-directory=%s " "$?"
+    command -v directoryprobe >/dev/null
+    printf "command-directory=%s " "$?"
+    shitbox which directoryprobe >/dev/null
+    printf "which-directory=%s\n" "$?"
+    type -p regularprobe >/dev/null; printf "type-regular=%s " "$?"
+    command -v regularprobe >/dev/null
+    printf "command-regular=%s\n" "$?"
+'
+
 analysis_log="$dir/analysis.log"
 if "$BIN" -X all -c ':' >/dev/null 2>&1; then
     if ! PATH=/usr/bin:/bin "$BIN" --mood sh -W -X all -c \

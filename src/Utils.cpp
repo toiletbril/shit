@@ -1818,15 +1818,12 @@ struct cached_program_path
 {
   Path path;
   os::program_extension extension{os::program_extension::None};
-  u64 executable_validation_epoch{0};
-  bool is_runnable{false};
 };
 
 struct program_path_cache_entry
 {
   ArrayList<cached_program_path> paths{heap_allocator()};
   Maybe<usize> bare_path_position{};
-  bool is_complete{false};
 };
 
 static StringMap<program_path_cache_entry> PATH_CACHE{heap_allocator()};
@@ -1841,7 +1838,6 @@ struct cached_directory_listing
   u64 generation{0};
   usize alias_count{0};
   bool has_file_identity{false};
-  bool is_valid{false};
   ArrayList<Path::directory_child> entries{heap_allocator()};
 };
 
@@ -1862,7 +1858,7 @@ static u64 DIRECTORY_LISTING_GENERATION = 0;
 static usize DEBUG_DIRECTORY_STAT_COUNT = 0;
 static usize DEBUG_DIRECTORY_READ_COUNT = 0;
 static usize DEBUG_EXECUTABLE_PROBE_COUNT = 0;
-static usize DEBUG_PATH_VALIDATION_VISIT_COUNT = 0;
+static usize DEBUG_PROGRAM_PATH_CANDIDATE_COUNT = 0;
 #endif
 
 static fn clear_directory_listing_cache() throws -> void
@@ -1876,87 +1872,59 @@ static fn clear_directory_listing_cache() throws -> void
 static bool PATH_CACHE_IS_STALE = false;
 
 static ArrayList<String> PATH_COMMAND_NAMES{heap_allocator()};
+static ArrayList<String> PATH_EXISTING_COMMAND_NAMES{heap_allocator()};
 static bool PATH_COMMAND_NAMES_IS_VALID = false;
 static u64 PATH_COMMAND_NAMES_VALIDATION_EPOCH = 0;
-static bool SHOULD_VALIDATE_ALL_PATH_COMMANDS = false;
+static usize EXPLICIT_COMPLETION_DEPTH = 0;
 
 static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
+static ArrayList<String> CACHED_PATH_DIRS{heap_allocator()};
+static bool CACHED_PATH_DIRS_VALID = false;
 
 /* Defined below, declared here so the cache rebuild can split the current PATH
    into its directories. */
 static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>;
 static fn path_dirs() throws -> const ArrayList<String> &;
 static fn begin_directory_validation_epoch() wontthrow -> void;
+static fn mark_path_cache_stale() throws -> void;
 
 /* Append one resolved absolute path under a program name, creating the list on
    the first hit. */
 static fn cache_resolved_path(StringView name, const Path &full_path,
-                              os::program_extension extension, bool is_runnable,
-                              bool is_bare_result, bool is_complete) throws
-    -> void
+                              os::program_extension extension,
+                              bool is_bare_result) throws -> void
 {
   let &entry = PATH_CACHE.get_or_create(name, program_path_cache_entry{});
+  for (usize position = 0; position < entry.paths.count(); position++) {
+    let &cached = entry.paths[position];
+    if (cached.extension != extension) continue;
+    cached.path = full_path;
+    if (is_bare_result) entry.bare_path_position = position;
+    return;
+  }
+
   if (is_bare_result) {
-    if (!entry.bare_path_position.has_value() ||
-        (!entry.paths[*entry.bare_path_position].is_runnable && is_runnable))
-    {
-      entry.bare_path_position = entry.paths.count();
-    }
+    entry.bare_path_position = entry.paths.count();
   }
-  entry.paths.push(
-      {full_path, extension, DIRECTORY_VALIDATION_EPOCH, is_runnable});
-  entry.is_complete |= is_complete;
+  entry.paths.push({full_path, extension});
 }
 
-static fn validate_cached_program_paths(program_path_cache_entry &entry) throws
-    -> bool
-{
-  bool did_change = false;
-
-  for (let &cached : entry.paths) {
-    if (cached.executable_validation_epoch == DIRECTORY_VALIDATION_EPOCH)
-      continue;
-
-#if !defined NDEBUG
-    DEBUG_EXECUTABLE_PROBE_COUNT++;
-#endif
-    let const is_runnable =
-        cached.path.is_regular_file() && cached.path.is_executable();
-    cached.executable_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
-    if (cached.is_runnable == is_runnable) continue;
-
-    cached.is_runnable = is_runnable;
-    did_change = true;
-  }
-
-  if (did_change) {
-    PATH_CACHE_IS_STALE = true;
-    PATH_COMMAND_NAMES_IS_VALID = false;
-  }
-
-  return did_change;
-}
-
-static fn find_cached_program_path(const program_path_cache_entry &entry,
-                                   os::program_extension wanted_extension,
-                                   bool require_runnable) wontthrow
+static fn
+find_cached_program_path(const program_path_cache_entry &entry,
+                         os::program_extension wanted_extension) wontthrow
     -> const Path *
 {
   if (wanted_extension == os::program_extension::None) {
     if (!entry.bare_path_position.has_value()) return nullptr;
-    let const &cached = entry.paths[*entry.bare_path_position];
-    if (require_runnable && !cached.is_runnable) return nullptr;
+    return &entry.paths[*entry.bare_path_position].path;
+  }
+
+  for (let const &cached : entry.paths) {
+    if (cached.extension != wanted_extension) continue;
     return &cached.path;
   }
 
-  const Path *blocked_path = nullptr;
-  for (let const &cached : entry.paths) {
-    if (cached.extension != wanted_extension) continue;
-    if (cached.is_runnable) return &cached.path;
-    if (blocked_path == nullptr) blocked_path = &cached.path;
-  }
-
-  return require_runnable ? nullptr : blocked_path;
+  return nullptr;
 }
 
 static fn directory_identity_key(u64 device_id, u64 file_id) throws -> String
@@ -2110,8 +2078,7 @@ fn read_directory_cached(const Path &directory,
       if (did_observe_new_generation && should_invalidate_path_cache &&
           path_dirs().find(key).has_value())
       {
-        PATH_CACHE_IS_STALE = true;
-        PATH_COMMAND_NAMES_IS_VALID = false;
+        mark_path_cache_stale();
       }
       set_directory_listing_alias(key, *physical_position);
       return &cached.entries;
@@ -2122,8 +2089,7 @@ fn read_directory_cached(const Path &directory,
   if (had_cached_listing && should_invalidate_path_cache &&
       path_dirs().find(key).has_value())
   {
-    PATH_CACHE_IS_STALE = true;
-    PATH_COMMAND_NAMES_IS_VALID = false;
+    mark_path_cache_stale();
   }
 
 #if !defined NDEBUG
@@ -2159,7 +2125,6 @@ fn read_directory_cached(const Path &directory,
   fresh.size = has_status ? status.size : 0;
   fresh.generation = ++DIRECTORY_LISTING_GENERATION;
   fresh.has_file_identity = has_status && status.has_file_identity;
-  fresh.is_valid = has_status;
   fresh.entries = steal(*entries);
   if (physical_position.has_value()) {
     fresh.alias_count = DIR_LISTINGS[*physical_position].alias_count;
@@ -2192,80 +2157,71 @@ fn directory_entry_kind(const Path &directory,
   return Path::entry_kind::Other;
 }
 
-/* Rebuild the program cache in PATH order so the first copy of a name wins. */
-static fn rebuild_path_cache() throws -> void
+static fn sort_and_deduplicate_names(ArrayList<String> &names) throws -> void
 {
-  PATH_CACHE.clear();
-  PATH_CACHE_IS_STALE = false;
+  names.sort();
+  for (usize name_index = 1; name_index < names.count();) {
+    if (names[name_index - 1].view() == names[name_index].view())
+      names.remove(name_index);
+    else
+      name_index++;
+  }
+}
+
+/* The completion index is read-only discovery state. It never populates the
+   execution hash, since inspecting commands must not remember one for later
+   execution. */
+static fn rebuild_path_command_index() throws -> void
+{
+  if (MAYBE_PATH.has_value())
+    for (let const &dir_string : path_dirs())
+      read_directory_cached(Path{dir_string.view()}, true, false);
+
   PATH_COMMAND_NAMES.clear();
+  PATH_EXISTING_COMMAND_NAMES.clear();
   PATH_COMMAND_NAMES_IS_VALID = false;
   if (!MAYBE_PATH.has_value()) {
     PATH_COMMAND_NAMES_IS_VALID = true;
     return;
   }
 
-  let const path_dirs = split_path_dirs(*MAYBE_PATH);
-
-  for (let const &dir_string : path_dirs) {
+  for (let const &dir_string : path_dirs()) {
     let const directory = Path{dir_string.view()};
     let const entries = read_directory_cached(directory, false, false);
     if (entries == nullptr) continue;
 
-    struct program_candidate
-    {
-      Path path;
-      String normalized_name;
-      os::program_name_info name_info;
-      bool is_runnable{false};
-    };
-
-    let program_candidates = ArrayList<program_candidate>{heap_allocator()};
-    program_candidates.reserve(entries->count());
-
     for (let const &entry : *entries) {
       let full_path = directory.clone();
       full_path.push_component(entry.name.view());
-      if (entry.kind == Path::entry_kind::Symlink && !full_path.exists()) {
+      if (entry.kind == Path::entry_kind::Symlink && !full_path.exists())
         continue;
-      }
+
+      if (directory_entry_kind(directory, entry) != Path::entry_kind::Regular)
+        continue;
+
       let normalized_name = entry.name.clone();
       let const name_info = os::normalize_program_name(normalized_name);
-      let is_runnable = false;
-      if (directory_entry_kind(directory, entry) == Path::entry_kind::Regular) {
+      let const stem =
+          normalized_name.substring_of_length(0, name_info.stem_length);
+      PATH_EXISTING_COMMAND_NAMES.push(String{normalized_name.view()});
+      if (stem.length != normalized_name.length())
+        PATH_EXISTING_COMMAND_NAMES.push(String{stem});
+
 #if !defined NDEBUG
-        DEBUG_EXECUTABLE_PROBE_COUNT++;
+      DEBUG_EXECUTABLE_PROBE_COUNT++;
 #endif
-        is_runnable = full_path.is_executable();
-      }
-      program_candidates.push(
-          {steal(full_path), steal(normalized_name), name_info, is_runnable});
-    }
-
-    for (let const &suffix : os::PROGRAM_SUFFIXES) {
-      for (let const &program : program_candidates) {
-        if (program.name_info.extension != suffix.extension) continue;
-
-        let const stem = program.normalized_name.substring_of_length(
-            0, program.name_info.stem_length);
-        cache_resolved_path(stem, program.path, program.name_info.extension,
-                            program.is_runnable, true, true);
-        if (!program.is_runnable) continue;
-        PATH_COMMAND_NAMES.push(String{program.normalized_name.view()});
-        if (stem.length != program.normalized_name.length())
-          PATH_COMMAND_NAMES.push(String{stem});
-      }
+      let const is_runnable = full_path.is_executable();
+      if (!is_runnable) continue;
+      if (stem.length != entry.name.length())
+        PATH_COMMAND_NAMES.push(String{stem});
+      PATH_COMMAND_NAMES.push(steal(normalized_name));
     }
   }
 
-  PATH_COMMAND_NAMES.sort();
-  for (usize name_index = 1; name_index < PATH_COMMAND_NAMES.count();) {
-    if (PATH_COMMAND_NAMES[name_index - 1].view() ==
-        PATH_COMMAND_NAMES[name_index].view())
-      PATH_COMMAND_NAMES.remove(name_index);
-    else
-      name_index++;
-  }
+  sort_and_deduplicate_names(PATH_COMMAND_NAMES);
+  sort_and_deduplicate_names(PATH_EXISTING_COMMAND_NAMES);
   PATH_COMMAND_NAMES_IS_VALID = true;
+  PATH_COMMAND_NAMES_VALIDATION_EPOCH = DIRECTORY_VALIDATION_EPOCH;
 }
 
 fn clear_path_map() throws -> void
@@ -2276,8 +2232,18 @@ fn clear_path_map() throws -> void
   PATH_CACHE.clear();
   clear_directory_listing_cache();
   PATH_COMMAND_NAMES.clear();
+  PATH_EXISTING_COMMAND_NAMES.clear();
   PATH_COMMAND_NAMES_IS_VALID = false;
   PATH_CACHE_IS_STALE = false;
+  CACHED_PATH_DIRS_VALID = false;
+}
+
+static fn mark_path_cache_stale() throws -> void
+{
+  PATH_CACHE_IS_STALE = true;
+  PATH_COMMAND_NAMES.clear();
+  PATH_EXISTING_COMMAND_NAMES.clear();
+  PATH_COMMAND_NAMES_IS_VALID = false;
 }
 
 fn invalidate_path_cache() throws -> void
@@ -2289,21 +2255,16 @@ fn invalidate_path_cache() throws -> void
      nothing. */
   LOG(Info, "invalidate_path_cache marking the program cache stale");
   clear_directory_listing_cache();
-  PATH_CACHE_IS_STALE = true;
-  PATH_COMMAND_NAMES.clear();
-  PATH_COMMAND_NAMES_IS_VALID = false;
+  mark_path_cache_stale();
 }
 
 fn working_directory_changed() throws -> void
 {
   begin_directory_validation_epoch();
-  SHOULD_VALIDATE_ALL_PATH_COMMANDS = false;
 
   for (let const &directory : path_dirs())
     if (!Path{directory.view()}.is_absolute()) {
-      PATH_CACHE_IS_STALE = true;
-      PATH_COMMAND_NAMES.clear();
-      PATH_COMMAND_NAMES_IS_VALID = false;
+      mark_path_cache_stale();
       return;
     }
 }
@@ -2318,9 +2279,8 @@ fn set_path_for_resolution(Maybe<String> path) throws -> void
     return;
 
   MAYBE_PATH = steal(path);
-  PATH_CACHE_IS_STALE = true;
-  PATH_COMMAND_NAMES.clear();
-  PATH_COMMAND_NAMES_IS_VALID = false;
+  CACHED_PATH_DIRS_VALID = false;
+  mark_path_cache_stale();
 }
 
 /* Split PATH into its directory components. The last component carries no
@@ -2345,29 +2305,14 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
   return dirs;
 }
 
-/* The split PATH cached against the value it was split from, so a cold command
-   resolution reuses the directory list rather than re-splitting
-   PATH on every miss. The cache rebuilds when PATH changes, which a value
-   comparison detects. */
-static String CACHED_SPLIT_PATH_VALUE{heap_allocator()};
-static ArrayList<String> CACHED_PATH_DIRS{heap_allocator()};
-static bool CACHED_PATH_DIRS_VALID = false;
-
 static fn path_dirs() throws -> const ArrayList<String> &
 {
-  if (!MAYBE_PATH.has_value()) {
-    CACHED_PATH_DIRS = ArrayList<String>{heap_allocator()};
-    CACHED_PATH_DIRS_VALID = false;
-    return CACHED_PATH_DIRS;
-  }
+  if (CACHED_PATH_DIRS_VALID) return CACHED_PATH_DIRS;
 
-  if (!CACHED_PATH_DIRS_VALID ||
-      CACHED_SPLIT_PATH_VALUE.view() != MAYBE_PATH->view())
-  {
-    CACHED_PATH_DIRS = split_path_dirs(*MAYBE_PATH);
-    CACHED_SPLIT_PATH_VALUE = String{MAYBE_PATH->view()};
-    CACHED_PATH_DIRS_VALID = true;
-  }
+  CACHED_PATH_DIRS = MAYBE_PATH.has_value()
+                         ? split_path_dirs(*MAYBE_PATH)
+                         : ArrayList<String>{heap_allocator()};
+  CACHED_PATH_DIRS_VALID = true;
 
   return CACHED_PATH_DIRS;
 }
@@ -2375,7 +2320,7 @@ static fn path_dirs() throws -> const ArrayList<String> &
 fn initialize_path_map() throws -> void
 {
   LOG(Info, "scanning every PATH directory to seed the program cache");
-  rebuild_path_cache();
+  rebuild_path_command_index();
 }
 
 static fn begin_directory_validation_epoch() wontthrow -> void
@@ -2386,18 +2331,20 @@ static fn begin_directory_validation_epoch() wontthrow -> void
 fn begin_interactive_completion() throws -> void
 {
   begin_directory_validation_epoch();
-  SHOULD_VALIDATE_ALL_PATH_COMMANDS = false;
+  ASSERT(EXPLICIT_COMPLETION_DEPTH == 0);
+  if (!PATH_COMMAND_NAMES_IS_VALID) initialize_path_map();
 }
 
 fn begin_explicit_completion() throws -> void
 {
   begin_directory_validation_epoch();
-  SHOULD_VALIDATE_ALL_PATH_COMMANDS = true;
+  EXPLICIT_COMPLETION_DEPTH++;
 }
 
 fn end_explicit_completion() wontthrow -> void
 {
-  SHOULD_VALIDATE_ALL_PATH_COMMANDS = false;
+  ASSERT(EXPLICIT_COMPLETION_DEPTH > 0);
+  EXPLICIT_COMPLETION_DEPTH--;
 }
 
 #if !defined NDEBUG
@@ -2416,44 +2363,26 @@ pure fn debug_executable_probe_count() wontthrow -> usize
   return DEBUG_EXECUTABLE_PROBE_COUNT;
 }
 
-pure fn debug_path_validation_visit_count() wontthrow -> usize
+pure fn debug_program_path_candidate_count() wontthrow -> usize
 {
-  return DEBUG_PATH_VALIDATION_VISIT_COUNT;
+  return DEBUG_PROGRAM_PATH_CANDIDATE_COUNT;
 }
 #endif
 
-static fn validate_path_command_names(StringView prefix) throws -> void
+static fn prepare_complete_path_cache() throws -> void
 {
-  if (!SHOULD_VALIDATE_ALL_PATH_COMMANDS) return;
-  if (PATH_COMMAND_NAMES_VALIDATION_EPOCH == DIRECTORY_VALIDATION_EPOCH) return;
-
-  for (let const &directory_text : path_dirs())
-    read_directory_cached(Path{directory_text.view()}, true, false);
-
-  PATH_CACHE.for_each([&](StringView name, program_path_cache_entry &entry) {
-#if !defined NDEBUG
-    DEBUG_PATH_VALIDATION_VISIT_COUNT++;
-#endif
-    if (prefix.is_empty() || name.starts_with(prefix))
-      validate_cached_program_paths(entry);
-  });
-
-  if (prefix.is_empty())
-    PATH_COMMAND_NAMES_VALIDATION_EPOCH = DIRECTORY_VALIDATION_EPOCH;
-}
-
-static fn prepare_complete_path_cache(StringView validation_prefix) throws
-    -> void
-{
-  validate_path_command_names(validation_prefix);
-  if (PATH_CACHE_IS_STALE || !PATH_COMMAND_NAMES_IS_VALID)
+  if (EXPLICIT_COMPLETION_DEPTH > 0 &&
+      PATH_COMMAND_NAMES_VALIDATION_EPOCH != DIRECTORY_VALIDATION_EPOCH)
+  {
     initialize_path_map();
+    return;
+  }
+  if (!PATH_COMMAND_NAMES_IS_VALID) initialize_path_map();
 }
 
-fn path_command_names(StringView validation_prefix) throws
-    -> const ArrayList<String> &
+fn path_command_names() throws -> const ArrayList<String> &
 {
-  prepare_complete_path_cache(validation_prefix);
+  prepare_complete_path_cache();
 
   return PATH_COMMAND_NAMES;
 }
@@ -2482,25 +2411,10 @@ pure fn path_command_name_lower_bound(StringView name) wontthrow -> usize
 
 fn path_command_name_has_prefix(StringView prefix) throws -> bool
 {
-  prepare_complete_path_cache(prefix);
+  prepare_complete_path_cache();
   let normalized_prefix = String{prefix};
-  let const name_info = os::normalize_program_name(normalized_prefix);
-  let const stem =
-      normalized_prefix.substring_of_length(0, name_info.stem_length);
-  if (let *cached_entry = PATH_CACHE.find(stem); cached_entry != nullptr)
-    validate_cached_program_paths(*cached_entry);
-  if (PATH_CACHE_IS_STALE) initialize_path_map();
-
+  unused(os::normalize_program_name(normalized_prefix));
   let const &names = PATH_COMMAND_NAMES;
-  if (let const *cached_entry = PATH_CACHE.find(stem);
-      cached_entry != nullptr &&
-      find_cached_program_path(*cached_entry, name_info.extension, false) !=
-          nullptr &&
-      find_cached_program_path(*cached_entry, name_info.extension, true) ==
-          nullptr)
-  {
-    return false;
-  }
   let const lower =
       path_command_name_lower_bound_in(names, normalized_prefix.view());
 
@@ -2508,8 +2422,27 @@ fn path_command_name_has_prefix(StringView prefix) throws -> bool
          names[lower].view().starts_with(normalized_prefix.view());
 }
 
+static pure fn sorted_command_names_contain(const ArrayList<String> &names,
+                                            StringView name) wontthrow -> bool
+{
+  let const position = path_command_name_lower_bound_in(names, name);
+  return position < names.count() && names[position].view() == name;
+}
+
 fn get_program_path_status(StringView name) throws -> program_path_status
 {
+  if (PATH_COMMAND_NAMES_IS_VALID) {
+    let normalized_name = String{name};
+    unused(os::normalize_program_name(normalized_name));
+    if (sorted_command_names_contain(PATH_COMMAND_NAMES,
+                                     normalized_name.view()))
+      return program_path_status::Runnable;
+    if (sorted_command_names_contain(PATH_EXISTING_COMMAND_NAMES,
+                                     normalized_name.view()))
+      return program_path_status::Blocked;
+    return program_path_status::Missing;
+  }
+
   let const paths = search_program_path(name);
   if (paths.is_empty()) return program_path_status::Missing;
   if (paths[0].is_regular_file() && paths[0].is_executable())
@@ -2522,8 +2455,8 @@ fn get_program_path_status(StringView name) throws -> program_path_status
    collects every match for which -a and does not write the cache, since a
    partial entry would later hide the other matches. */
 static fn resolve_along_path(StringView program_name, bool find_all,
-                             program_path_requirement requirement) throws
-    -> ArrayList<Path>
+                             program_path_requirement requirement,
+                             bool remember_result) throws -> ArrayList<Path>
 {
   /* The search reads MAYBE_PATH, which the shell keeps in step with its PATH
      variable, so a plain PATH=... assignment that the store holds but the
@@ -2555,6 +2488,9 @@ static fn resolve_along_path(StringView program_name, bool find_all,
       for (let const &suffix : os::PROGRAM_SUFFIXES) {
         let const try_path = Path{(full_path.text() + suffix.text).view()};
 
+#if !defined NDEBUG
+        DEBUG_PROGRAM_PATH_CANDIDATE_COUNT++;
+#endif
         if (try_path.exists()) {
           if (requirement == program_path_requirement::Existing) {
             result.push(try_path);
@@ -2567,15 +2503,19 @@ static fn resolve_along_path(StringView program_name, bool find_all,
             if (is_runnable) result.push(try_path);
           } else if (is_runnable) {
             result.push(try_path);
-            cache_resolved_path(key, try_path, suffix.extension, is_runnable,
-                                true, false);
+            if (remember_result)
+              cache_resolved_path(key, try_path, suffix.extension, true);
             return result;
-          } else if (!blocked.has_value()) {
-            blocked = cached_program_path{try_path, suffix.extension, 0, false};
+          } else if (!blocked.has_value() && try_path.is_regular_file()) {
+            blocked = cached_program_path{try_path, suffix.extension};
           }
         }
       }
-    } else if (full_path.exists()) {
+    } else {
+#if !defined NDEBUG
+      DEBUG_PROGRAM_PATH_CANDIDATE_COUNT++;
+#endif
+      if (!full_path.exists()) continue;
       if (requirement == program_path_requirement::Existing) {
         result.push(full_path);
         return result;
@@ -2587,11 +2527,11 @@ static fn resolve_along_path(StringView program_name, bool find_all,
         if (is_runnable) result.push(full_path);
       } else if (is_runnable) {
         result.push(full_path);
-        cache_resolved_path(key, full_path, name_info.extension, is_runnable,
-                            false, false);
+        if (remember_result)
+          cache_resolved_path(key, full_path, name_info.extension, false);
         return result;
-      } else if (!blocked.has_value()) {
-        blocked = cached_program_path{full_path, name_info.extension, 0, false};
+      } else if (!blocked.has_value() && full_path.is_regular_file()) {
+        blocked = cached_program_path{full_path, name_info.extension};
       }
     }
   }
@@ -2611,23 +2551,22 @@ static fn prepare_path_cache_for_lookup() wontthrow -> void
     LOG(Info, "search_program_path clearing stale cache before resolving");
     PATH_CACHE.clear();
     PATH_CACHE_IS_STALE = false;
-    PATH_COMMAND_NAMES.clear();
-    PATH_COMMAND_NAMES_IS_VALID = false;
   }
 }
 
 hot fn search_program_path(StringView program_name, bool find_all,
-                           program_path_requirement requirement) throws
-    -> ArrayList<Path>
+                           program_path_requirement requirement,
+                           bool remember_result) throws -> ArrayList<Path>
 {
   prepare_path_cache_for_lookup();
 
   if (requirement == program_path_requirement::Existing)
-    return resolve_along_path(program_name, false, requirement);
+    return resolve_along_path(program_name, false, requirement, false);
 
   /* which -a wants every match, so it skips the cache and scans PATH in full.
    */
-  if (find_all) return resolve_along_path(program_name, true, requirement);
+  if (find_all)
+    return resolve_along_path(program_name, true, requirement, false);
 
   let normalized_name = String{program_name};
   let const name_info = os::normalize_program_name(normalized_name);
@@ -2638,26 +2577,22 @@ hot fn search_program_path(StringView program_name, bool find_all,
       cached != nullptr)
   {
     let result = ArrayList<Path>{heap_allocator()};
-    let const runnable =
-        find_cached_program_path(*cached, name_info.extension, true);
-    let const path =
-        runnable != nullptr ? runnable
-        : cached->is_complete
-            ? nullptr
-            : find_cached_program_path(*cached, name_info.extension, false);
+    let const path = find_cached_program_path(*cached, name_info.extension);
     if (path != nullptr) {
       if (!path->is_regular_file() || !path->is_executable()) {
         PATH_CACHE.clear();
         PATH_COMMAND_NAMES.clear();
+        PATH_EXISTING_COMMAND_NAMES.clear();
         PATH_COMMAND_NAMES_IS_VALID = false;
-        return resolve_along_path(program_name, false, requirement);
+        return resolve_along_path(program_name, false, requirement,
+                                  remember_result);
       }
       result.push(*path);
       return result;
     }
   }
 
-  return resolve_along_path(program_name, false, requirement);
+  return resolve_along_path(program_name, false, requirement, remember_result);
 }
 
 /* The rolling distance rows are fixed-width stack arrays, so a candidate name

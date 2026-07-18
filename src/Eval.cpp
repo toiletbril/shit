@@ -1997,7 +1997,9 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
     }
 
     if (!resolved_builtin.has_value()) {
-      let program_search_paths = utils::search_program_path(program.view());
+      let program_search_paths = utils::search_program_path(
+          program.view(), false, utils::program_path_requirement::Runnable,
+          true);
       if (program_search_paths.count() > 0)
         resolved_program_path = steal(program_search_paths[0]);
     }

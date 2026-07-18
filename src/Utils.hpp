@@ -156,7 +156,7 @@ fn end_explicit_completion() wontthrow -> void;
 pure fn debug_directory_stat_count() wontthrow -> usize;
 pure fn debug_directory_read_count() wontthrow -> usize;
 pure fn debug_executable_probe_count() wontthrow -> usize;
-pure fn debug_path_validation_visit_count() wontthrow -> usize;
+pure fn debug_program_path_candidate_count() wontthrow -> usize;
 #endif
 
 fn clear_path_map() throws -> void;
@@ -176,16 +176,15 @@ enum class program_path_requirement : u8
   Runnable,
 };
 
-/* The first resolved location is cached under the name until the cache is
-   invalidated. With find_all the search skips the cache and returns every
-   match, for which -a. */
-fn search_program_path(StringView program_name, bool find_all = false,
-                       program_path_requirement requirement =
-                           program_path_requirement::Runnable) throws
-    -> ArrayList<Path>;
+/* A remembered search keeps the first resolved location until invalidation.
+   Actual execution and hash request this behavior; read-only queries do not.
+   With find_all the search skips the cache and returns every match. */
+fn search_program_path(
+    StringView program_name, bool find_all = false,
+    program_path_requirement requirement = program_path_requirement::Runnable,
+    bool remember_result = false) throws -> ArrayList<Path>;
 
-fn path_command_names(StringView validation_prefix = {}) throws
-    -> const ArrayList<String> &;
+fn path_command_names() throws -> const ArrayList<String> &;
 
 pure fn path_command_name_lower_bound(StringView name) wontthrow -> usize;
 

@@ -104,9 +104,9 @@ else
 fi
 tab_metrics=$(strings "$d/tab-typescript" | \
     grep 'editor-refresh append=' | head -1) || exit 1
-tab_validations=${tab_metrics#* validations=}
-tab_validations=${tab_validations%% *}
-test "$tab_validations" -le 2 || exit 1
+tab_probes=${tab_metrics#* probes=}
+tab_probes=${tab_probes%% *}
+test "$tab_probes" -le 2 || exit 1
 echo 'TAB validation ends before the next key'
 
 history_index=0
@@ -140,6 +140,50 @@ history_metrics=$(strings "$d/history-typescript" | \
     grep 'editor-refresh append=7 ') || exit 1
 case $history_metrics in *' history-scans=1000 '*) ;; *) exit 1 ;; esac
 echo 'rejected history prefixes scan once'
+history_resolutions=${history_metrics#* resolutions=}
+history_resolutions=${history_resolutions%% *}
+test "$history_resolutions" -eq 0 || exit 1
+echo 'history validation does not walk PATH'
+
+mkdir "$d/prompt-initial" "$d/prompt-path"
+prompt_index=0
+while [ "$prompt_index" -lt 256 ]; do
+    printf '#!/bin/sh\n' > "$d/prompt-path/prompt-command-$prompt_index"
+    chmod +x "$d/prompt-path/prompt-command-$prompt_index"
+    prompt_index=$((prompt_index + 1))
+done
+send_prompt_path_input()
+{
+    printf z
+    sleep 0.1
+    printf '\003exit\n'
+}
+if "$script_command" --version >/dev/null 2>&1; then
+    send_prompt_path_input | \
+        PATH="$d/prompt-initial:/bin" \
+        PROMPT_COMMAND="PATH=$d/prompt-path" \
+        SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/prompt-history" \
+        BIN="$BIN" "$script_command" -q -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        "$d/prompt-typescript" >/dev/null 2>&1
+else
+    send_prompt_path_input | \
+        PATH="$d/prompt-initial:/bin" \
+        PROMPT_COMMAND="PATH=$d/prompt-path" \
+        SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/prompt-history" \
+        BIN="$BIN" "$script_command" -q "$d/prompt-typescript" /bin/sh -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        >/dev/null 2>&1
+fi
+prompt_metrics=$(strings "$d/prompt-typescript" | \
+    grep 'editor-refresh append=' | head -1) || exit 1
+prompt_probes=${prompt_metrics#* probes=}
+prompt_probes=${prompt_probes%% *}
+prompt_resolutions=${prompt_metrics#* resolutions=}
+prompt_resolutions=${prompt_resolutions%% *}
+test "$prompt_probes" -eq 0 || exit 1
+test "$prompt_resolutions" -eq 0 || exit 1
+echo 'prompt PATH changes finish before the first key'
 
 mkdir "$d/absolute-path" "$d/next-directory"
 printf '#!/bin/sh\n' > "$d/absolute-path/echo-probe"
