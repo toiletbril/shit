@@ -152,7 +152,8 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
   try {
     const bool is_explicit_completion = for_listing != 0;
     if (is_explicit_completion)
-      COMPLETION_CONTEXT->get_program_resolver().begin_explicit_completion();
+      COMPLETION_CONTEXT->get_program_resolver().begin_explicit_completion(
+          shit::ProgramResolver::CompletionRefresh::Cached);
     defer
     {
       if (is_explicit_completion)
@@ -524,9 +525,38 @@ fn exit() -> void
 
 fn get_input(const String &prompt) -> input_result
 {
+#if !defined NDEBUG
+  let const preprompt_directory_stat_count_before =
+      utils::debug_directory_stat_count();
+  let const preprompt_directory_read_count_before =
+      utils::debug_directory_read_count();
+  let const preprompt_executable_probe_count_before =
+      utils::debug_executable_probe_count();
+  let const preprompt_program_path_candidate_count_before =
+      utils::debug_program_path_candidate_count();
+  let const preprompt_history_buffer_load_count_before =
+      ::itl_g_debug_history_buffer_load_count;
+#endif
   if (COMPLETION_CONTEXT != nullptr)
     COMPLETION_CONTEXT->get_program_resolver().begin_interactive_completion();
   unused(::itl_history_ensure_read_buffer());
+#if !defined NDEBUG
+  let const preprompt_directory_stat_count =
+      utils::debug_directory_stat_count() -
+      preprompt_directory_stat_count_before;
+  let const preprompt_directory_read_count =
+      utils::debug_directory_read_count() -
+      preprompt_directory_read_count_before;
+  let const preprompt_executable_probe_count =
+      utils::debug_executable_probe_count() -
+      preprompt_executable_probe_count_before;
+  let const preprompt_program_path_candidate_count =
+      utils::debug_program_path_candidate_count() -
+      preprompt_program_path_candidate_count_before;
+  let const preprompt_history_buffer_load_count =
+      ::itl_g_debug_history_buffer_load_count -
+      preprompt_history_buffer_load_count_before;
+#endif
   HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
   let const completion_base_directory = Path::current_directory();
   let completion_result = shit::completion::completion_result{
@@ -554,6 +584,7 @@ fn get_input(const String &prompt) -> input_result
   let const source_scan_count_before = DEBUG_COMPLETION_SOURCE_SCAN_COUNT;
   let const materialized_count_before = DEBUG_COMPLETION_MATERIALIZED_COUNT;
   let const directory_stat_count_before = utils::debug_directory_stat_count();
+  let const directory_read_count_before = utils::debug_directory_read_count();
   let const executable_probe_count_before =
       utils::debug_executable_probe_count();
   let const program_path_candidate_count_before =
@@ -590,6 +621,21 @@ fn get_input(const String &prompt) -> input_result
         shit::String::from(::itl_g_debug_history_buffer_load_count -
                                history_buffer_load_count_before,
                            shit::heap_allocator()) +
+        " preprompt-stats=" +
+        shit::String::from(preprompt_directory_stat_count,
+                           shit::heap_allocator()) +
+        " preprompt-reads=" +
+        shit::String::from(preprompt_directory_read_count,
+                           shit::heap_allocator()) +
+        " preprompt-probes=" +
+        shit::String::from(preprompt_executable_probe_count,
+                           shit::heap_allocator()) +
+        " preprompt-resolutions=" +
+        shit::String::from(preprompt_program_path_candidate_count,
+                           shit::heap_allocator()) +
+        " preprompt-history-loads=" +
+        shit::String::from(preprompt_history_buffer_load_count,
+                           shit::heap_allocator()) +
         " cwd=" +
         shit::String::from(DEBUG_COMPLETION_CWD_CAPTURE_COUNT -
                                cwd_capture_count_before,
@@ -597,6 +643,10 @@ fn get_input(const String &prompt) -> input_result
         " stats=" +
         shit::String::from(utils::debug_directory_stat_count() -
                                directory_stat_count_before,
+                           shit::heap_allocator()) +
+        " reads=" +
+        shit::String::from(utils::debug_directory_read_count() -
+                               directory_read_count_before,
                            shit::heap_allocator()) +
         " probes=" +
         shit::String::from(utils::debug_executable_probe_count() -

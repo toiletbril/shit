@@ -1,6 +1,8 @@
 single-row typing uses incremental refresh
 PATH ghost completion stays bounded while typing
 TAB validation ends before the next key
+warm prompts perform no synchronous PATH or history work
+warm TAB performs no PATH validation or executable probes
 rejected history prefixes scan once
 first history key reads memory only
 history validation does not walk PATH

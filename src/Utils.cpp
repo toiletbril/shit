@@ -2327,18 +2327,19 @@ fn ProgramResolver::begin_interactive_completion() throws -> void
 {
   begin_directory_validation_epoch();
   ASSERT(m_explicit_completion_depth == 0);
-  if (!m_command_names_are_valid || validate_path_directory_generations()) {
+  if (!m_command_names_are_valid) {
     rebuild_path_command_index();
     return;
   }
 
-  revalidate_command_prefix({});
   m_command_names_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
 }
 
-fn ProgramResolver::begin_explicit_completion() throws -> void
+fn ProgramResolver::begin_explicit_completion(CompletionRefresh refresh) throws
+    -> void
 {
-  if (m_explicit_completion_depth == 0) begin_directory_validation_epoch();
+  if (m_explicit_completion_depth == 0 && refresh == CompletionRefresh::Fresh)
+    begin_directory_validation_epoch();
   m_explicit_completion_depth++;
 }
 

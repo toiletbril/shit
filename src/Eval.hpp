@@ -283,6 +283,12 @@ public:
     All,
   };
 
+  enum class CompletionRefresh : u8
+  {
+    Cached,
+    Fresh,
+  };
+
   ProgramResolver();
   explicit ProgramResolver(Maybe<String> path);
 
@@ -292,7 +298,7 @@ public:
   fn working_directory_changed() throws -> void;
   fn initialize_path_map() throws -> void;
   fn begin_interactive_completion() throws -> void;
-  fn begin_explicit_completion() throws -> void;
+  fn begin_explicit_completion(CompletionRefresh refresh) throws -> void;
   fn end_explicit_completion() wontthrow -> void;
   fn search(StringView program_name, SearchMode search_mode = SearchMode::First,
             Requirement requirement = Requirement::Runnable,

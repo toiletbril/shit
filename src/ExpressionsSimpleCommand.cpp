@@ -992,6 +992,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      the first such prefix and restored on exit. */
   bool ifs_was_assigned = false;
   String saved_ifs_separators{cxt.scratch_allocator()};
+  Maybe<ProgramResolver> saved_program_resolver{};
   /* The assignments apply left to right, each committed before the next is
      expanded, so a later value reads an earlier same-line one. */
   for (let const &var : m_local_vars) {
@@ -1023,8 +1024,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     cxt.mark_exported(name);
     /* The resolver reads its own MAYBE_PATH, so a prefix PATH=... must update
        it for the environment write to change the search order. */
-    if (name == "PATH")
+    if (name == "PATH") {
+      if (!saved_program_resolver.has_value())
+        saved_program_resolver =
+            Maybe<ProgramResolver>{cxt.get_program_resolver()};
       cxt.get_program_resolver().assign_path(String{expanded_value.view()});
+    }
     /* The value before the first IFS prefix is saved once, so a name repeated
        on the line still reverts to where it began. */
     if (name == "IFS") {
@@ -1040,10 +1045,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   {
     /* The restore runs newest first, so a name spelled more than once restores
        to the value it held before the first of its assignments. */
-    bool path_was_assigned = false;
     for (usize i = saved_env.count(); i > 0; i--) {
       const saved_env_var &restore = saved_env[i - 1];
-      if (restore.name == "PATH") path_was_assigned = true;
       if (restore.previous_value)
         os::set_environment_variable(restore.name.view(),
                                      restore.previous_value->view());
@@ -1052,8 +1055,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       cxt.sync_exported_after_restore(restore.name.view(),
                                       restore.previous_value.has_value());
     }
-    if (path_was_assigned)
-      cxt.get_program_resolver().restore_path(cxt.get_variable_value("PATH"));
+    if (saved_program_resolver.has_value())
+      cxt.get_program_resolver() = steal(*saved_program_resolver);
     if (ifs_was_assigned) cxt.set_field_separators(saved_ifs_separators.view());
   };
 

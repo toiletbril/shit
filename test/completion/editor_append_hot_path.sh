@@ -109,6 +109,48 @@ tab_probes=${tab_probes%% *}
 test "$tab_probes" -le 2 || exit 1
 echo 'TAB validation ends before the next key'
 
+send_warm_tab_input()
+{
+    printf 'PATH=/bin true\n'
+    sleep 0.1
+    printf 'probe-a\t\n'
+    sleep 0.1
+    printf 'exit\n'
+}
+if "$script_command" --version >/dev/null 2>&1; then
+    send_warm_tab_input | PATH="$d/tab-path" SHIT_TEST_EDITOR_STATS=1 \
+        SHIT_HISTORY="$d/warm-tab-history" BIN="$BIN" "$script_command" -q -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        "$d/warm-tab-typescript" >/dev/null 2>&1
+else
+    send_warm_tab_input | PATH="$d/tab-path" SHIT_TEST_EDITOR_STATS=1 \
+        SHIT_HISTORY="$d/warm-tab-history" BIN="$BIN" "$script_command" -q \
+        "$d/warm-tab-typescript" /bin/sh -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        >/dev/null 2>&1
+fi
+warm_tab_metrics=$(strings "$d/warm-tab-typescript" | \
+    grep 'editor-refresh append=' | tail -n +2 | head -1) || exit 1
+case $warm_tab_metrics in
+    *' preprompt-stats=0 preprompt-reads=0 preprompt-probes=0 preprompt-resolutions=0 preprompt-history-loads=0 '*)
+        ;;
+    *) exit 1 ;;
+esac
+echo 'warm prompts perform no synchronous PATH or history work'
+warm_tab_stats=${warm_tab_metrics#* stats=}
+warm_tab_stats=${warm_tab_stats%% *}
+warm_tab_reads=${warm_tab_metrics#* reads=}
+warm_tab_reads=${warm_tab_reads%% *}
+warm_tab_probes=${warm_tab_metrics#* probes=}
+warm_tab_probes=${warm_tab_probes%% *}
+warm_tab_resolutions=${warm_tab_metrics#* resolutions=}
+warm_tab_resolutions=${warm_tab_resolutions%% *}
+test "$warm_tab_stats" -eq 0 || exit 1
+test "$warm_tab_reads" -eq 0 || exit 1
+test "$warm_tab_probes" -eq 0 || exit 1
+test "$warm_tab_resolutions" -eq 0 || exit 1
+echo 'warm TAB performs no PATH validation or executable probes'
+
 history_index=0
 while [ "$history_index" -lt 1000 ]; do
     printf 'zzzz-invalid-history-command-%s\n' "$history_index"
@@ -212,7 +254,7 @@ else
 fi
 cd_metrics=$(strings "$d/cd-typescript" | \
     grep 'editor-refresh append=1 ') || exit 1
-case $cd_metrics in *' stats=0 probes=0 '*) ;; *) exit 1 ;; esac
+case $cd_metrics in *' stats=0 reads=0 probes=0 '*) ;; *) exit 1 ;; esac
 echo 'absolute PATH survives a directory change'
 
 printf '#!/bin/sh\nprintf "actual-cwd-completion\\n"\n' > \
