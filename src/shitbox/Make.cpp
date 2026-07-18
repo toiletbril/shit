@@ -939,7 +939,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     let subshell_command = String{cxt.scratch_allocator(), "(\n"};
     subshell_command += command.view();
     subshell_command += "\n)";
-    let const status = cxt.run_source(subshell_command.view(), "make", true,
+    let const status = cxt.run_source(subshell_command.view(), "make",
+                                      return_handling::Consume,
                                       ec.source_location(), StringView{"make"});
     if (status != 0 && !should_ignore_errors) {
       throw Error{

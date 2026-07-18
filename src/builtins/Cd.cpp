@@ -208,7 +208,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     /* A relative or empty PATH entry now names a different directory, so a
        cached resolution is marked stale for the next command to re-resolve. */
-    utils::working_directory_changed();
+    cxt.get_program_resolver().working_directory_changed();
     if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());

@@ -82,7 +82,7 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   LOG(All, "assigning variable '%.*s' to a value of %zu bytes",
       static_cast<int>(name.length), name.data, value.length);
   if (name == "IFS") set_field_separators(value);
-  if (name == "PATH") utils::set_path_for_resolution(String{value});
+  if (name == "PATH") m_program_resolver.assign_path(String{value});
   m_shell_variables.set(name, value);
   if (m_exported_names.contains(name)) {
     if (m_subshell_depth > 0)
@@ -476,7 +476,7 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
   unmark_exported(name);
   if (name == "IFS") set_field_separators(" \t\n");
   if (name == "PATH")
-    utils::set_path_for_resolution(os::get_environment_variable("PATH"));
+    m_program_resolver.assign_path(os::get_environment_variable("PATH"));
 }
 
 fn EvalContext::record_environment_change(StringView name) throws -> void
@@ -1613,6 +1613,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_exported_names,
                              m_environment_undo_log.count(),
                              RuntimeState::capture(*this),
+                             m_program_resolver,
                              m_init_moods_sourcing,
                              m_initialized_moods,
                              m_mood_set_explicitly,
@@ -1638,6 +1639,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_directory_stack = steal(snapshot.directory_stack);
 
   snapshot.runtime.restore(*this);
+  m_program_resolver = steal(snapshot.program_resolver);
   m_init_moods_sourcing = snapshot.init_moods_sourcing;
   m_initialized_moods = snapshot.initialized_moods;
   m_mood_set_explicitly = snapshot.mood_set_explicitly;
@@ -1689,8 +1691,6 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
     set_field_separators(ifs->view());
   else
     set_field_separators(" \t\n");
-
-  utils::set_path_for_resolution(get_variable_value("PATH"));
 
   /* The exit status is intentionally not restored, a subshell propagates its
      last command's status to the parent. */
@@ -1977,6 +1977,7 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
 
 fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
                           mimic_mood mood, bool is_shitbox_enabled,
+                          ProgramResolver &program_resolver,
                           ArrayList<SourceLocation> &&arg_locations) throws
     -> ExecContext
 {
@@ -1997,9 +1998,10 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
     }
 
     if (!resolved_builtin.has_value()) {
-      let program_search_paths = utils::search_program_path(
-          program.view(), false, utils::program_path_requirement::Runnable,
-          true);
+      let program_search_paths = program_resolver.search(
+          program.view(), ProgramResolver::SearchMode::First,
+          ProgramResolver::Requirement::Execution,
+          ProgramResolver::CachePolicy::Remember);
       if (program_search_paths.count() > 0)
         resolved_program_path = steal(program_search_paths[0]);
     }
@@ -2037,7 +2039,8 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
       let const message = "Program `" + program + "` wasn't found";
       if (Maybe<String> suggestion = utils::suggest_command(
-              program.view(), ArrayList<String>{heap_allocator()}))
+              program.view(), ArrayList<String>{heap_allocator()},
+              &program_resolver))
       {
         let const hint = "Did you mean `" + *suggestion + "`?";
         throw CommandResolutionErrorWithLocationAndDetails{

@@ -9,6 +9,7 @@ printf '#!/bin/sh\n' > "$dir/$executable_name"
 chmod +x "$dir/$executable_name"
 PATH="$dir" "$BIN" --debug-highlight-at 'EXPLICIT-PROBE.EXE'
 PATH="$dir" "$BIN" --debug-highlight-at 'EXPLICIT-P'
+PATH="$dir" "$BIN" --debug-highlight-at 'explicit-p'
 printf '#!/bin/sh\n' > "$dir/collision.com"
 chmod +x "$dir/collision.com"
 PATH="$dir" "$BIN" --debug-highlight-at 'collision.exe'

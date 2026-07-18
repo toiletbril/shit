@@ -584,11 +584,11 @@ fn collate_compare(const String &left, const String &right) wontthrow -> int
   return right < left ? 1 : 0;
 }
 
-fn compile_regex(StringView pattern, bool is_case_insensitive,
+fn compile_regex(StringView pattern, case_sensitivity sensitivity,
                  compiled_regex &out) throws -> regex_compile_result
 {
   unused(pattern);
-  unused(is_case_insensitive);
+  unused(sensitivity);
   unused(out);
   return regex_compile_result::Invalid;
 }
@@ -607,11 +607,11 @@ fn execute_regex(compiled_regex &compiled, StringView subject,
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void { unused(compiled); }
 
-fn compile_search_regex(StringView pattern, bool is_case_insensitive,
+fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
                         compiled_regex &out) throws -> regex_compile_result
 {
   out.pattern = String{heap_allocator(), pattern};
-  out.is_case_insensitive = is_case_insensitive;
+  out.is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
   return regex_compile_result::Ok;
 }
 
@@ -1142,11 +1142,14 @@ static pure fn is_batch_program(StringView path) wontthrow -> bool
          utils::ascii_to_lower(suffix[3]) == 't';
 }
 
-fn execute_program(ExecContext &&ec, bool allow_script_fallback,
-                   bool new_process_group, StringView,
-                   bool should_hand_off_controlling_terminal_before_start)
-    -> process
+fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
+                   process_group_mode process_group, StringView,
+                   terminal_handoff handoff) -> process
 {
+  let const allow_script_fallback = fallback == script_fallback_policy::Allow;
+  let const new_process_group = process_group == process_group_mode::New;
+  let const should_hand_off_controlling_terminal_before_start =
+      handoff == terminal_handoff::BeforeStart;
   LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
       ec.args().count());
 
@@ -1413,7 +1416,7 @@ fn replace_process(ExecContext &&ec) -> void
      shell exits with its status. */
   LOG(Debug, "running '%s' to completion in place of an exec",
       ec.program_path().c_str());
-  process child = execute_program(steal(ec), true);
+  process child = execute_program(steal(ec), script_fallback_policy::Allow);
   if (child == SHIT_INVALID_PROCESS) {
     redirect_self(ec);
     ec.close_fds();
@@ -1869,8 +1872,9 @@ static fn handle_interrupt(int s) -> void
   signal(SIGINT, handle_interrupt);
 }
 
-fn set_default_signal_handlers(bool is_interactive) -> void
+fn set_default_signal_handlers(signal_profile profile) -> void
 {
+  let const is_interactive = profile == signal_profile::Interactive;
   /* The interactive shell ignores SIGTERM so a stray terminate does not close
      the prompt. */
   if (is_interactive && signal(SIGTERM, SIG_IGN) == SIG_ERR) {
@@ -1997,10 +2001,11 @@ fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
   return false;
 }
 
-fn run_measured(const ArrayList<String> &argv, bool suppress_output,
+fn run_measured(const ArrayList<String> &argv, measured_output output,
                 Maybe<descriptor> inherited_handle) throws
     -> Maybe<measured_result>
 {
+  let const suppress_output = output == measured_output::Suppress;
   if (argv.is_empty()) return None;
 
   /* Windows has no hardware perf counters, only wall time and peak working set.
@@ -2203,6 +2208,7 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   status.group_id = static_cast<u32>(info.st_gid);
   status.size = static_cast<u64>(info.st_size);
   status.modification_time = static_cast<i64>(info.st_mtime);
+  status.change_time = status.modification_time;
   WIN32_FILE_ATTRIBUTE_DATA attributes{};
   if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard,
                            &attributes) != 0)
@@ -2212,6 +2218,7 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
     modification_ticks.HighPart = attributes.ftLastWriteTime.dwHighDateTime;
     status.modification_nanoseconds =
         static_cast<u32>(modification_ticks.QuadPart % 10000000ULL * 100ULL);
+    status.change_nanoseconds = status.modification_nanoseconds;
   }
   /* Windows stat has no block count, so 512-byte blocks are derived from size.
    */
@@ -2268,12 +2275,11 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
   Sleep(static_cast<DWORD>(seconds * 1000.0));
 }
 
-fn enumerate_processes(bool include_resource_stats) throws
-    -> ArrayList<process_entry>
+fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
 {
   /* The snapshot has no per-process resource stats, so the BSD columns stay
    * zero. */
-  unused(include_resource_stats);
+  unused(detail);
   ArrayList<process_entry> processes{heap_allocator()};
   HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   if (snapshot == INVALID_HANDLE_VALUE) return processes;

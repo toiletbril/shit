@@ -52,7 +52,7 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const start_nanos = os::monotonic_nanos();
 
-  let const status = cxt.run_source(command, "time", false,
+  let const status = cxt.run_source(command, "time", return_handling::Propagate,
                                     ec.source_location(), StringView{"time"});
 
   let const elapsed_nanos = os::monotonic_nanos() - start_nanos;

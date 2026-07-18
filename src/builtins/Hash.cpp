@@ -29,7 +29,7 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_RESET.is_enabled()) {
     LOG(Info, "hash forgetting every remembered command location");
-    utils::invalidate_path_cache();
+    cxt.get_program_resolver().invalidate();
   }
 
   i32 status = 0;
@@ -38,8 +38,12 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     LOG(Debug, "hash resolving '%s' to remember its location", name.c_str());
 
-    if (utils::search_program_path(
-            name, false, utils::program_path_requirement::Runnable, true)
+    if (os::has_directory_separator(name.view())) continue;
+
+    if (cxt.get_program_resolver()
+            .search(name, ProgramResolver::SearchMode::First,
+                    ProgramResolver::Requirement::Runnable,
+                    ProgramResolver::CachePolicy::Remember)
             .count() == 0)
     {
       report_soft_builtin_error(ec, cxt,

@@ -2,6 +2,7 @@ single-row typing uses incremental refresh
 PATH ghost completion stays bounded while typing
 TAB validation ends before the next key
 rejected history prefixes scan once
+first history key reads memory only
 history validation does not walk PATH
 prompt PATH changes finish before the first key
 absolute PATH survives a directory change

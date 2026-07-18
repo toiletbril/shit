@@ -537,9 +537,9 @@ static fn process_state_letter(char state) wontthrow -> char
   }
 }
 
-fn enumerate_processes(bool include_resource_stats) throws
-    -> ArrayList<process_entry>
+fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
 {
+  let const include_resource_stats = detail == process_detail::ResourceStats;
   ArrayList<process_entry> processes{heap_allocator()};
   int name_mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0};
   usize byte_length = 0;
@@ -615,9 +615,9 @@ static donteliminate fn nth_space_field(StringView text, usize index) wontthrow
   return StringView{};
 }
 
-fn enumerate_processes(bool include_resource_stats) throws
-    -> ArrayList<process_entry>
+fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
 {
+  let const include_resource_stats = detail == process_detail::ResourceStats;
   ArrayList<process_entry> processes{heap_allocator()};
   DIR *proc_directory = ::opendir("/proc");
   if (proc_directory == nullptr) return processes;
@@ -736,7 +736,7 @@ fn enumerate_processes(bool include_resource_stats) throws
 
 #else
 
-fn enumerate_processes(bool) throws -> ArrayList<process_entry>
+fn enumerate_processes(process_detail) throws -> ArrayList<process_entry>
 {
   return ArrayList<process_entry>{heap_allocator()};
 }

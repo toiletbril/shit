@@ -94,6 +94,48 @@ class ExecContext;
 
 namespace os {
 
+enum class process_detail : u8
+{
+  Basic,
+  ResourceStats,
+};
+
+enum class case_sensitivity : u8
+{
+  Sensitive,
+  Insensitive,
+};
+
+enum class signal_profile : u8
+{
+  NonInteractive,
+  Interactive,
+};
+
+enum class measured_output : u8
+{
+  Inherit,
+  Suppress,
+};
+
+enum class script_fallback_policy : u8
+{
+  Reject,
+  Allow,
+};
+
+enum class process_group_mode : u8
+{
+  Inherit,
+  New,
+};
+
+enum class terminal_handoff : u8
+{
+  Keep,
+  BeforeStart,
+};
+
 #if SHIT_PLATFORM_IS WIN32
 constexpr char PATH_DELIMITER = ';';
 constexpr char DIRECTORY_SEPARATOR = '\\';
@@ -339,7 +381,7 @@ struct process_entry
 /* Every process the current user can see, for the shitbox pkill and killall
    utilities to match a name against. Empty on a platform with no process
    listing. The resource stats are read only when asked. */
-fn enumerate_processes(bool include_resource_stats = false) throws
+fn enumerate_processes(process_detail detail = process_detail::Basic) throws
     -> ArrayList<process_entry>;
 
 fn make_directory(StringView path, u32 mode) wontthrow -> bool;
@@ -366,6 +408,8 @@ struct file_status
   u64 size{0};
   i64 modification_time{0};
   u32 modification_nanoseconds{0};
+  i64 change_time{0};
+  u32 change_nanoseconds{0};
   u64 blocks{0};
 };
 
@@ -512,7 +556,7 @@ enum class regex_match_result : u8
    unsupported rather than matching. */
 constexpr bool HAS_REGEX_ENGINE = ((SHIT_SUPPORT_VECTOR) &POSIX) != 0;
 
-fn compile_regex(StringView pattern, bool is_case_insensitive,
+fn compile_regex(StringView pattern, case_sensitivity sensitivity,
                  compiled_regex &out) throws -> regex_compile_result;
 
 fn execute_regex(compiled_regex &compiled, StringView subject,
@@ -524,7 +568,7 @@ fn free_regex(compiled_regex &compiled) wontthrow -> void;
 /* Compiles a search pattern for a line-at-a-time grep. On POSIX it is a basic
    regex with no capture, on a platform with no engine it is a literal
    substring. */
-fn compile_search_regex(StringView pattern, bool is_case_insensitive,
+fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
                         compiled_regex &out) throws -> regex_compile_result;
 
 fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool;
@@ -703,7 +747,7 @@ fn enumerate_users() throws -> ArrayList<String>;
 /* The interactive shell blocks the terminal-generated signals, a
    non-interactive script leaves those at their default. SIGINT routes to the
    polled handler in both modes. */
-fn set_default_signal_handlers(bool is_interactive) throws -> void;
+fn set_default_signal_handlers(signal_profile profile) throws -> void;
 
 fn reset_signal_handlers() throws -> void;
 
@@ -779,16 +823,18 @@ struct measured_result
   perf_counts perf{};
 };
 
-fn run_measured(const ArrayList<String> &argv, bool suppress_output,
+fn run_measured(const ArrayList<String> &argv, measured_output output,
                 Maybe<descriptor> inherited_handle = {}) throws
     -> Maybe<measured_result>;
 
 /* Script fallback returns SHIT_INVALID_PROCESS when it is allowed and the file
    has no executable format. */
-fn execute_program(ExecContext &&ec, bool allow_script_fallback = false,
-                   bool new_process_group = false, StringView source = {},
-                   bool should_hand_off_controlling_terminal_before_start =
-                       false) throws -> process;
+fn execute_program(
+    ExecContext &&ec,
+    script_fallback_policy fallback = script_fallback_policy::Reject,
+    process_group_mode process_group = process_group_mode::Inherit,
+    StringView source = {},
+    terminal_handoff handoff = terminal_handoff::Keep) throws -> process;
 
 fn shell_has_controlling_terminal() wontthrow -> bool;
 

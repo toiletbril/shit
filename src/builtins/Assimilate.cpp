@@ -27,6 +27,18 @@ namespace shit {
 
 namespace {
 
+enum class trace_output : u8
+{
+  Disabled,
+  Enabled,
+};
+
+enum class remote_transaction_mode : u8
+{
+  Install,
+  Recovery,
+};
+
 constexpr char REMOTE_TRANSACTION_TEXT[] = R"SH(set -eu
 [ "${5-0}" -eq 0 ] || set -x
 umask 077
@@ -329,21 +341,25 @@ constexpr StringView REMOTE_TRANSACTION{REMOTE_TRANSACTION_TEXT,
 
 fn run_program(ArrayList<String> arguments) throws -> i32
 {
-  let const result = os::run_measured(arguments, false);
+  let const result = os::run_measured(arguments, os::measured_output::Inherit);
   if (!result.has_value()) return 126;
 
   return static_cast<i32>(result->exit_status);
 }
 
-fn resolve_transfer_program(StringView name) throws -> Maybe<Path>
+fn resolve_transfer_program(StringView name, ProgramResolver &resolver) throws
+    -> Maybe<Path>
 {
-  let const matches = utils::search_program_path(name);
+  let const matches = resolver.search(name, ProgramResolver::SearchMode::First,
+                                      ProgramResolver::Requirement::Runnable,
+                                      ProgramResolver::CachePolicy::Bypass);
   if (matches.is_empty()) return None;
 
   return matches[0].clone();
 }
 
-fn parse_transport_command(StringView spelling, Allocator allocator) throws
+fn parse_transport_command(StringView spelling, ProgramResolver &resolver,
+                           Allocator allocator) throws
     -> Maybe<ArrayList<String>>
 {
   let arguments = ArrayList<String>{allocator};
@@ -361,7 +377,7 @@ fn parse_transport_command(StringView spelling, Allocator allocator) throws
   }
   if (arguments.is_empty()) return None;
 
-  let const program = resolve_transfer_program(arguments[0].view());
+  let const program = resolve_transfer_program(arguments[0].view(), resolver);
   if (!program.has_value()) return None;
   arguments[0] = program->text();
 
@@ -377,9 +393,11 @@ fn append_arguments(ArrayList<String> &destination,
 
 fn remote_command(StringView upload_name, StringView transaction_id,
                   StringView expected_identity, StringView link_moods,
-                  bool should_trace, bool recovery_only,
+                  trace_output trace, remote_transaction_mode mode,
                   Allocator allocator) throws -> String
 {
+  let const should_trace = trace == trace_output::Enabled;
+  let const recovery_only = mode == remote_transaction_mode::Recovery;
   let command = String{allocator};
   command += "exec ";
   let const upload_path = String{allocator, "./"} + upload_name;
@@ -417,7 +435,7 @@ fn cleanup_remote_transaction(const ArrayList<String> &ssh_command,
                               StringView target, StringView upload_name,
                               StringView transaction_id,
                               StringView expected_identity,
-                              StringView link_moods, bool should_trace,
+                              StringView link_moods, trace_output trace,
                               Allocator allocator) throws -> i32
 {
   let arguments = ArrayList<String>{allocator};
@@ -425,7 +443,8 @@ fn cleanup_remote_transaction(const ArrayList<String> &ssh_command,
   arguments.push(String{"--"});
   arguments.push(String{target});
   arguments.push(remote_command(upload_name, transaction_id, expected_identity,
-                                link_moods, should_trace, true, allocator));
+                                link_moods, trace,
+                                remote_transaction_mode::Recovery, allocator));
   return run_program(steal(arguments));
 }
 
@@ -502,10 +521,10 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const allocator = cxt.scratch_allocator();
   let const scp_command = parse_transport_command(
       FLAG_SCP_COMMAND.is_set() ? FLAG_SCP_COMMAND.value() : StringView{"scp"},
-      allocator);
+      cxt.get_program_resolver(), allocator);
   let const ssh_command = parse_transport_command(
       FLAG_SSH_COMMAND.is_set() ? FLAG_SSH_COMMAND.value() : StringView{"ssh"},
-      allocator);
+      cxt.get_program_resolver(), allocator);
   if (!scp_command.has_value() || !ssh_command.has_value()) {
     report_soft_builtin_error(ec, cxt, "Cannot find both scp and ssh in PATH");
     return 127;
@@ -562,7 +581,9 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const cleanup_status = cleanup_remote_transaction(
         *ssh_command, arguments[1].view(), upload_name.view(),
         transaction_id.view(), expected_identity->view(), link_moods.view(),
-        FLAG_TRACE.is_enabled(), allocator);
+        FLAG_TRACE.is_enabled() ? trace_output::Enabled
+                                : trace_output::Disabled,
+        allocator);
     if (cleanup_status != 0) {
       report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
     }
@@ -575,14 +596,18 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   ssh_arguments.push(arguments[1].clone());
   ssh_arguments.push(remote_command(
       upload_name.view(), transaction_id.view(), expected_identity->view(),
-      link_moods.view(), FLAG_TRACE.is_enabled(), false, allocator));
+      link_moods.view(),
+      FLAG_TRACE.is_enabled() ? trace_output::Enabled : trace_output::Disabled,
+      remote_transaction_mode::Install, allocator));
 
   status = run_program(steal(ssh_arguments));
   if (status != 0) {
     let const cleanup_status = cleanup_remote_transaction(
         *ssh_command, arguments[1].view(), upload_name.view(),
         transaction_id.view(), expected_identity->view(), link_moods.view(),
-        FLAG_TRACE.is_enabled(), allocator);
+        FLAG_TRACE.is_enabled() ? trace_output::Enabled
+                                : trace_output::Disabled,
+        allocator);
     if (cleanup_status != 0) {
       report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
     }

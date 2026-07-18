@@ -15,6 +15,36 @@
 
 namespace shit {
 
+enum class argument_lifetime : u8
+{
+  Persistent,
+  Transient,
+};
+
+enum class argument_context : u8
+{
+  Command,
+  ArrayLiteral,
+};
+
+enum class execution_mode : u8
+{
+  Foreground,
+  Background,
+};
+
+enum class script_isolation : u8
+{
+  Shared,
+  Isolated,
+};
+
+enum class return_handling : u8
+{
+  Propagate,
+  Consume,
+};
+
 /* A candidate argument after variable expansion and field splitting. The
    parallel mask marks which characters may act as glob metacharacters. */
 struct glob_field
@@ -215,6 +245,128 @@ enum class suppressible_warning : u8
 
 class EvalContext;
 
+namespace utils {
+
+class ProgramResolver
+{
+public:
+  enum class Requirement : u8
+  {
+    Regular,
+    Runnable,
+    Execution,
+  };
+
+  enum class CachePolicy : u8
+  {
+    Bypass,
+    ReadOnly,
+    Remember,
+  };
+
+  enum class Status : u8
+  {
+    Missing,
+    Blocked,
+    Runnable,
+  };
+
+  enum class SearchMode : u8
+  {
+    First,
+    All,
+  };
+
+  enum class ValidationScope : u8
+  {
+    Prefix,
+    All,
+  };
+
+  ProgramResolver();
+  explicit ProgramResolver(Maybe<String> path);
+
+  fn assign_path(Maybe<String> path) throws -> void;
+  fn restore_path(Maybe<String> path) throws -> void;
+  fn invalidate() throws -> void;
+  fn working_directory_changed() throws -> void;
+  fn initialize_path_map() throws -> void;
+  fn begin_interactive_completion() throws -> void;
+  fn begin_explicit_completion() throws -> void;
+  fn end_explicit_completion() wontthrow -> void;
+  fn search(StringView program_name, SearchMode search_mode = SearchMode::First,
+            Requirement requirement = Requirement::Runnable,
+            CachePolicy cache_policy = CachePolicy::Bypass,
+            Maybe<StringView> path_override = None) throws -> ArrayList<Path>;
+  fn get_status(StringView name) throws -> Status;
+  fn get_command_names(
+      StringView validation_prefix = {},
+      ValidationScope validation_scope = ValidationScope::Prefix) throws
+      -> const ArrayList<String> &;
+  pure fn get_command_name_lower_bound(StringView name) const wontthrow
+      -> usize;
+  fn command_name_has_prefix(StringView prefix) throws -> bool;
+  pure fn has_valid_command_names() const wontthrow -> bool;
+  fn for_each_command_name(auto callback) const throws -> void
+  {
+    for (let const &name : m_command_names)
+      callback(name);
+  }
+
+private:
+  struct CachedPath
+  {
+    Path path;
+    os::program_extension extension{os::program_extension::None};
+  };
+
+  struct CacheEntry
+  {
+    ArrayList<CachedPath> paths{heap_allocator()};
+    Maybe<usize> bare_path_position{};
+  };
+
+  fn clear_derived_indexes() wontthrow -> void;
+  fn split_path_dirs(StringView path) throws -> ArrayList<String>;
+  fn get_path_dirs() throws -> const ArrayList<String> &;
+  fn rebuild_path_command_index() throws -> void;
+  fn prepare_complete_path_cache(StringView validation_prefix,
+                                 ValidationScope validation_scope) throws
+      -> void;
+  fn validate_path_directory_generations() throws -> bool;
+  fn revalidate_command_prefix(StringView prefix) throws -> void;
+  fn resolve_along_path(StringView program_name, SearchMode search_mode,
+                        Requirement requirement, CachePolicy cache_policy,
+                        Maybe<StringView> path_override) throws
+      -> ArrayList<Path>;
+  fn cache_resolved_path(StringView name, const Path &full_path,
+                         os::program_extension extension,
+                         bool is_bare_result) throws -> void;
+  pure fn find_cached_program_path(
+      const CacheEntry &entry,
+      os::program_extension wanted_extension) const wontthrow -> const Path *;
+  pure fn command_name_lower_bound_in(const ArrayList<String> &names,
+                                      StringView name) const wontthrow -> usize;
+
+  StringMap<CacheEntry> m_execution_cache{heap_allocator()};
+  ArrayList<String> m_command_names{heap_allocator()};
+  ArrayList<String> m_regular_names{heap_allocator()};
+  Maybe<String> m_path;
+  ArrayList<String> m_path_dirs{heap_allocator()};
+  ArrayList<u64> m_path_directory_generations{heap_allocator()};
+  String m_validated_prefix{heap_allocator()};
+  bool m_path_dirs_are_valid{false};
+  bool m_command_names_are_valid{false};
+  u64 m_path_directories_validation_epoch{0};
+  u64 m_command_names_validation_epoch{0};
+  u64 m_prefix_validation_epoch{0};
+  usize m_explicit_completion_depth{0};
+};
+
+} // namespace utils
+
+using ProgramResolver = utils::ProgramResolver;
+
 struct eval_state_snapshot
 {
   StringMap<String> shell_variables;
@@ -242,6 +394,7 @@ struct eval_state_snapshot
      point restore_state rewinds the process environment back to. */
   usize environment_undo_mark;
   RuntimeState runtime;
+  ProgramResolver program_resolver;
   u8 init_moods_sourcing;
   u8 initialized_moods;
   bool mood_set_explicitly;
@@ -316,11 +469,11 @@ public:
      with the returned strings, so each field carries the source_location of
      the token it expanded from. A token that splits into many fields
      contributes one location per field. */
-  fn process_args(
-      const ArrayList<const Token *> &args, bool args_are_transient = false,
-      bool is_array_literal = false,
-      ArrayList<SourceLocation> *expanded_locations = nullptr) throws
-      -> ArrayList<String>;
+  fn process_args(const ArrayList<const Token *> &args,
+                  argument_lifetime lifetime = argument_lifetime::Persistent,
+                  argument_context context = argument_context::Command,
+                  ArrayList<SourceLocation> *expanded_locations =
+                      nullptr) throws -> ArrayList<String>;
 
   fn scratch_allocator() const wontthrow -> Allocator
   {
@@ -337,6 +490,15 @@ public:
   fn reset_scratch_arena() wontthrow -> void { m_scratch_arena.reset(); }
 
   fn set_shell_variable(StringView name, StringView value) throws -> void;
+
+  fn get_program_resolver() wontthrow -> ProgramResolver &
+  {
+    return m_program_resolver;
+  }
+  pure fn get_program_resolver() const wontthrow -> const ProgramResolver &
+  {
+    return m_program_resolver;
+  }
 
   fn seed_shell_identity_variables(bool bash_identity) throws -> void;
 
@@ -1034,10 +1196,10 @@ public:
   /* Run the script at the resolved program in-process in the matching mode.
      When isolated is true the run is contained in a snapshotted subshell, and
      when false the snapshot is skipped. */
-  fn run_mimicked_script(ExecContext &ec, mimic_mood mode, bool isolated) throws
-      -> i32;
+  fn run_mimicked_script(ExecContext &ec, mimic_mood mode,
+                         script_isolation isolation) throws -> i32;
   fn run_program_fallback(ExecContext &ec, mimic_mood mode,
-                          bool isolated) throws -> i32;
+                          script_isolation isolation) throws -> i32;
   pure fn extglob_enabled() const wontthrow -> bool
   {
     return m_runtime.mood != mimic_mood::Posix;
@@ -1211,7 +1373,7 @@ public:
      the top of the chunk and ends there, an eval leaves it pending, so
      consume_return is false for eval. */
   fn run_source(StringView source, StringView origin = "a sourced command",
-                bool consume_return = true,
+                return_handling handling = return_handling::Consume,
                 Maybe<SourceLocation> call_site = None,
                 Maybe<StringView> filename = None) throws -> i32;
 
@@ -1474,6 +1636,7 @@ protected:
      state so a scope that swaps them saves and restores the whole set with one
      RuntimeState copy. failglob defaults on, the other toggles default off. */
   RuntimeState m_runtime{};
+  ProgramResolver m_program_resolver{};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   bool m_mood_set_explicitly{false};
@@ -1620,6 +1783,7 @@ class ExecContext
 public:
   static fn make_from(SourceLocation location, ArrayList<String> &&args,
                       mimic_mood mood, bool is_shitbox_enabled,
+                      ProgramResolver &program_resolver,
                       ArrayList<SourceLocation> &&arg_locations) throws
       -> ExecContext;
 
@@ -1673,7 +1837,7 @@ public:
   fn print_to_stdout(StringView s) const throws -> void;
   fn print_to_stderr(StringView s) const throws -> void;
 
-  fn execute(bool is_async) throws -> i32;
+  fn execute(execution_mode mode) throws -> i32;
 
   pure fn program_path() const wontthrow -> const Path &;
   pure fn builtin_kind() const wontthrow -> const Builtin::Kind &;

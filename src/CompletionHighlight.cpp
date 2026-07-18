@@ -54,11 +54,11 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   if (context.find_function(word) != nullptr) return true;
   if (context.get_alias(word).has_value()) return true;
 
-  let const path_status = utils::get_program_path_status(word);
-  let const resolves = path_status == utils::program_path_status::Runnable;
+  let const path_status = context.get_program_resolver().get_status(word);
+  let const resolves = path_status == ProgramResolver::Status::Runnable;
   LOG(All, "the path search resolves '%.*s' to %s",
       static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
-  if (path_status != utils::program_path_status::Missing) return resolves;
+  if (path_status != ProgramResolver::Status::Missing) return resolves;
 
   return (context.shitbox() || context.mood() == mimic_mood::Default) &&
          shitbox::find_util(word).has_value();
@@ -71,7 +71,7 @@ static fn command_word_prefixes_any(StringView word,
   if (os::has_directory_separator(word)) return false;
 
   let const has_prefix = [&](StringView name) -> bool {
-    return name.starts_with(word);
+    return utils::smart_case_prefix_matches(name, word);
   };
 
   for (let const &builtin_name : builtin_names())
@@ -87,7 +87,7 @@ static fn command_word_prefixes_any(StringView word,
   });
   if (was_found) return true;
 
-  if (utils::path_command_name_has_prefix(word)) return true;
+  if (context.get_program_resolver().command_name_has_prefix(word)) return true;
 
   return false;
 }
@@ -379,8 +379,8 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
   }
 
   let const listing_directory = Path{directory.view()};
-  let const entries =
-      utils::read_directory_cached(listing_directory, true, false);
+  let const entries = utils::read_directory_cached(
+      listing_directory, utils::directory_validation::Cached);
   if (entries == nullptr) return false;
 
   let const do_name_starts_with = [&](StringView name) wontthrow {

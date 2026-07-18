@@ -392,7 +392,7 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
   ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
   target_tokens.push(redir.target);
   const ArrayList<String> target =
-      cxt.process_args(target_tokens, /*args_are_transient=*/true);
+      cxt.process_args(target_tokens, argument_lifetime::Transient);
   if (target.count() != 1) {
     if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
     throw ErrorWithLocation{redir.target->source_location(),
@@ -658,8 +658,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   let program_arg_locations =
       ArrayList<SourceLocation>{cxt.scratch_allocator()};
   let program_args =
-      cxt.process_args(m_args, /*args_are_transient=*/true,
-                       /*is_array_literal=*/false, &program_arg_locations);
+      cxt.process_args(m_args, argument_lifetime::Transient,
+                       argument_context::Command, &program_arg_locations);
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args, program_arg_locations);
 
@@ -948,7 +948,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* Bare array assignments apply after the scalars in source order. */
     for (let const &assignment : m_array_args) {
       ArrayList<String> values =
-          cxt.process_args(assignment.elements, false, true);
+          cxt.process_args(assignment.elements, argument_lifetime::Persistent,
+                           argument_context::ArrayLiteral);
       cxt.assign_indexed_array_elements(assignment.name, steal(values),
                                         assignment.is_append);
     }
@@ -1023,7 +1024,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* The resolver reads its own MAYBE_PATH, so a prefix PATH=... must update
        it for the environment write to change the search order. */
     if (name == "PATH")
-      utils::set_path_for_resolution(String{expanded_value.view()});
+      cxt.get_program_resolver().assign_path(String{expanded_value.view()});
     /* The value before the first IFS prefix is saved once, so a name repeated
        on the line still reverts to where it began. */
     if (name == "IFS") {
@@ -1052,7 +1053,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                                       restore.previous_value.has_value());
     }
     if (path_was_assigned)
-      utils::set_path_for_resolution(cxt.get_variable_value("PATH"));
+      cxt.get_program_resolver().restore_path(cxt.get_variable_value("PATH"));
     if (ifs_was_assigned) cxt.set_field_separators(saved_ifs_separators.view());
   };
 
@@ -1200,9 +1201,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   Maybe<ExecContext> resolved_ec;
   try {
-    resolved_ec = ExecContext::make_from(source_location(), steal(program_args),
-                                         cxt.mood(), cxt.shitbox(),
-                                         steal(program_arg_locations));
+    resolved_ec = ExecContext::make_from(
+        source_location(), steal(program_args), cxt.mood(), cxt.shitbox(),
+        cxt.get_program_resolver(), steal(program_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &e) {
     report_command_resolution_error(cxt, e);
     let const status = e.command_status();
@@ -1217,7 +1218,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (redirect_in_fd) ec.in_fd = redirect_in_fd;
   was_redirect_in_fd_handed_off = true;
 
-  const i64 ret = utils::execute_context(steal(ec), cxt, is_async());
+  const i64 ret = utils::execute_context(
+      steal(ec), cxt,
+      is_async() ? execution_mode::Background : execution_mode::Foreground);
   cxt.set_last_argument(last_argument.view());
 
   /* An assignment builtin with NAME=(...) array arguments applies them after it
@@ -1254,7 +1257,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         cxt.declare_local(assignment.name);
       }
       ArrayList<String> values =
-          cxt.process_args(assignment.elements, false, true);
+          cxt.process_args(assignment.elements, argument_lifetime::Persistent,
+                           argument_context::ArrayLiteral);
       if (is_associative_request) {
         /* A bare element with no bracketed key becomes a key with an empty
            value. */

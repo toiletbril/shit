@@ -113,11 +113,13 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
     env_args.push_managed(operands[i]);
 
   let env_arg_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let environment_resolver =
+      ProgramResolver{os::get_environment_variable("PATH")};
   Maybe<ExecContext> sub;
   try {
-    sub = ExecContext::make_from(ec.source_location(), steal(env_args),
-                                 cxt.mood(), cxt.shitbox(),
-                                 steal(env_arg_locations));
+    sub = ExecContext::make_from(
+        ec.source_location(), steal(env_args), cxt.mood(), cxt.shitbox(),
+        environment_resolver, steal(env_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     const String *source = cxt.current_source();
     show_message(resolution_error.to_string(source != nullptr ? source->view()
@@ -125,7 +127,7 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
     return static_cast<i32>(resolution_error.command_status());
   }
 
-  return utils::execute_context(steal(*sub), cxt, false);
+  return utils::execute_context(steal(*sub), cxt, execution_mode::Foreground);
 }
 
 } // namespace shitbox

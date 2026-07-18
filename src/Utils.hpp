@@ -36,11 +36,11 @@ fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool;
 
 fn decode_ansi_c_escapes(String &out, StringView body) throws -> void;
 
-fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
-    -> i32;
+fn execute_context(ExecContext &&ec, EvalContext &cxt,
+                   execution_mode mode) throws -> i32;
 
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
-                               bool is_async) throws -> i32;
+                               execution_mode mode) throws -> i32;
 
 pure fn strip_sig_prefix(StringView name) wontthrow -> StringView;
 
@@ -49,6 +49,10 @@ pure forceinline fn ascii_to_lower(char ch) wontthrow -> char
   if (ch >= 'A' && ch <= 'Z') return static_cast<char>(ch - 'A' + 'a');
   return ch;
 }
+
+pure fn token_has_uppercase(StringView token) wontthrow -> bool;
+pure fn smart_case_prefix_matches(StringView candidate,
+                                  StringView prefix) wontthrow -> bool;
 
 fn split_lines(StringView text) throws -> ArrayList<StringView>;
 
@@ -111,7 +115,8 @@ fn parse_integer_in_base(StringView text, int_base base,
 fn parse_integer_in_base_u64(StringView text, int_base base) throws
     -> ErrorOr<u64>;
 
-fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
+fn suggest_command(StringView name, const ArrayList<String> &local_names,
+                   const ProgramResolver *resolver = nullptr) throws
     -> Maybe<String>;
 fn suggest_directory_entry(const Path &directory, StringView name) throws
     -> Maybe<String>;
@@ -132,10 +137,17 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
                      Allocator allocator = heap_allocator()) throws
     -> Maybe<String>;
 
-fn read_directory_cached(const Path &directory,
-                         bool should_invalidate_path_cache = true,
-                         bool should_validate = true) throws
+enum class directory_validation : u8
+{
+  Cached,
+  Validate,
+};
+
+fn read_directory_cached(
+    const Path &directory,
+    directory_validation validation = directory_validation::Validate) throws
     -> const ArrayList<Path::directory_child> *;
+pure fn directory_listing_generation(const Path &directory) wontthrow -> u64;
 pure fn directory_entry_name_lower_bound(
     const ArrayList<Path::directory_child> &entries, StringView name) wontthrow
     -> usize;
@@ -146,12 +158,6 @@ fn directory_entry_kind(const Path &directory,
                         const Path::directory_child &entry) throws
     -> Path::entry_kind;
 
-fn initialize_path_map() throws -> void;
-
-fn begin_interactive_completion() throws -> void;
-fn begin_explicit_completion() throws -> void;
-fn end_explicit_completion() wontthrow -> void;
-
 #if !defined NDEBUG
 pure fn debug_directory_stat_count() wontthrow -> usize;
 pure fn debug_directory_read_count() wontthrow -> usize;
@@ -159,45 +165,8 @@ pure fn debug_executable_probe_count() wontthrow -> usize;
 pure fn debug_program_path_candidate_count() wontthrow -> usize;
 #endif
 
-fn clear_path_map() throws -> void;
-
-fn invalidate_path_cache() throws -> void;
-fn working_directory_changed() throws -> void;
-
 fn file_content_identity(const Path &path, Allocator allocator) throws
     -> Maybe<String>;
-
-/* None restores the search to the process environment's PATH. */
-fn set_path_for_resolution(Maybe<String> path) throws -> void;
-
-enum class program_path_requirement : u8
-{
-  Existing,
-  Runnable,
-};
-
-/* A remembered search keeps the first resolved location until invalidation.
-   Actual execution and hash request this behavior; read-only queries do not.
-   With find_all the search skips the cache and returns every match. */
-fn search_program_path(
-    StringView program_name, bool find_all = false,
-    program_path_requirement requirement = program_path_requirement::Runnable,
-    bool remember_result = false) throws -> ArrayList<Path>;
-
-fn path_command_names() throws -> const ArrayList<String> &;
-
-pure fn path_command_name_lower_bound(StringView name) wontthrow -> usize;
-
-fn path_command_name_has_prefix(StringView prefix) throws -> bool;
-
-enum class program_path_status : u8
-{
-  Missing,
-  Blocked,
-  Runnable,
-};
-
-fn get_program_path_status(StringView name) throws -> program_path_status;
 
 /* glob_active reads which bytes act as metacharacters. With extglob set the
    bash extended-glob groups ?(..), *(..), +(..), @(..), and !(..) are
@@ -207,7 +176,15 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
 
 fn set_quit_context(const EvalContext *context) wontthrow -> void;
 
-[[noreturn]] fn quit(i32 code, bool should_goodbye = false) throws -> void;
+enum class farewell_policy : u8
+{
+  Silent,
+  Goodbye,
+};
+
+[[noreturn]] fn quit(i32 code,
+                     farewell_policy farewell = farewell_policy::Silent) throws
+    -> void;
 
 } /* namespace utils */
 

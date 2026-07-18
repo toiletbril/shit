@@ -41,8 +41,11 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_invert = FLAG_GREP_INVERT.is_enabled();
 
   os::compiled_regex compiled;
-  if (os::compile_search_regex(pattern, should_ignore_case, compiled) !=
-      os::regex_compile_result::Ok)
+  if (os::compile_search_regex(pattern,
+                               should_ignore_case
+                                   ? os::case_sensitivity::Insensitive
+                                   : os::case_sensitivity::Sensitive,
+                               compiled) != os::regex_compile_result::Ok)
   {
     report_soft_shitbox_error(ec, cxt,
                               "grep: the pattern '" + operands[0] +

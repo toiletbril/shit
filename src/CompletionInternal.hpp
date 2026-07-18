@@ -45,36 +45,36 @@ fn split_completion_words(StringView line, usize cursor, usize &cword) throws
 /* Defined in CompletionManpage.cpp. */
 fn second_word_of(StringView line) wontthrow -> Maybe<StringView>;
 fn complete_from_man_subcommands(StringView line, StringView token,
-                                 usize token_start, bool for_listing,
+                                 usize token_start, completion_mode mode,
                                  EvalContext &context) throws
     -> Maybe<ArrayList<String>>;
-fn complete_from_manpage(StringView line, StringView token, bool for_listing,
-                         EvalContext &context,
+fn complete_from_manpage(StringView line, StringView token,
+                         completion_mode mode, EvalContext &context,
                          StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_help(StringView line, StringView token, usize token_start,
-                      bool for_listing, EvalContext &context,
+                      completion_mode mode, EvalContext &context,
                       StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_help_subcommands(StringView line, StringView token,
-                                  usize token_start, bool for_listing,
+                                  usize token_start, completion_mode mode,
                                   EvalContext &context,
                                   StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
 
 /* Defined in CompletionScan.cpp. */
 fn complete_from_process_arguments(StringView line, StringView token,
-                                   bool for_listing) throws
+                                   completion_mode mode) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_tools_with_targets(StringView line, StringView token,
-                                    usize token_start, bool for_listing,
+                                    usize token_start, completion_mode mode,
                                     EvalContext &context) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_builtin_flags(StringView line, StringView token,
                                usize token_start, EvalContext &context) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_spec(StringView line, StringView token, usize cursor,
-                      bool for_listing, EvalContext &context,
+                      completion_mode mode, EvalContext &context,
                       StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
 struct completion_command_range

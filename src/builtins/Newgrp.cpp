@@ -31,7 +31,10 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* The group change must outlive this command, so it re-execs system newgrp.
    */
-  let const found = utils::search_program_path("newgrp");
+  let const found = cxt.get_program_resolver().search(
+      "newgrp", ProgramResolver::SearchMode::First,
+      ProgramResolver::Requirement::Runnable,
+      ProgramResolver::CachePolicy::Bypass);
   if (found.count() == 0) {
     report_soft_builtin_error(
         ec, cxt, "Unable to run newgrp because its program was not found");

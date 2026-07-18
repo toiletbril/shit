@@ -32,7 +32,7 @@ static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
 }
 
 fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
-                                     bool isolated) throws -> i32
+                                     script_isolation isolation) throws -> i32
 {
   struct saved_environment_variable
   {
@@ -65,12 +65,13 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
   fallback_context.set_mimicry(mimicry());
   fallback_context.set_warning_level(warning_level());
   fallback_context.set_diagnostics_disabled(diagnostics_disabled());
-  return fallback_context.run_mimicked_script(ec, mode, isolated);
+  return fallback_context.run_mimicked_script(ec, mode, isolation);
 }
 
 fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
-                                    bool isolated) throws -> i32
+                                    script_isolation isolation) throws -> i32
 {
+  let const isolated = isolation == script_isolation::Isolated;
   defer { ec.close_fds(); };
 
   if (m_mimicry_depth >= MAX_MIMICRY_DEPTH)
@@ -298,9 +299,11 @@ pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
 }
 
 fn EvalContext::run_source(StringView source, StringView origin,
-                           bool consume_return, Maybe<SourceLocation> call_site,
+                           return_handling handling,
+                           Maybe<SourceLocation> call_site,
                            Maybe<StringView> filename) throws -> i32
 {
+  let const consume_return = handling == return_handling::Consume;
   if (AST_ARENA == nullptr) throw Error{"Cannot run source outside of a parse"};
 
   LOG(Debug, "running source '%.*s' of %zu bytes at depth %zu",

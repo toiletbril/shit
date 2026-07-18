@@ -53,12 +53,20 @@ enum class supervision_wait_result : u8
   Interrupted,
 };
 
+enum class wait_completion : u8
+{
+  ChildExited,
+  ProcessGroupEmpty,
+};
+
 static fn wait_for_process_until(os::process child, os::process process_group,
                                  u64 timeout_nanos, i32 &status,
                                  bool &has_child_exited,
-                                 bool wait_for_process_group = false) throws
+                                 wait_completion completion) throws
     -> supervision_wait_result
 {
+  let const wait_for_process_group =
+      completion == wait_completion::ProcessGroupEmpty;
   let const has_deadline = timeout_nanos != 0 && timeout_nanos != UINT64_MAX;
   let const started_at_nanos = os::monotonic_nanos();
   loop
@@ -118,7 +126,8 @@ static fn finish_interrupted_supervision(os::process child,
   return 130;
 }
 
-static fn resolve_timeout_program(StringView program_name) throws -> Maybe<Path>
+static fn resolve_timeout_program(StringView program_name,
+                                  EvalContext &cxt) throws -> Maybe<Path>
 {
   if (os::has_directory_separator(program_name)) {
     let const typed_program_path = Path{program_name};
@@ -130,7 +139,10 @@ static fn resolve_timeout_program(StringView program_name) throws -> Maybe<Path>
     return Path::canonicalize(program_name);
   }
 
-  let const matches = utils::search_program_path(program_name);
+  let const matches = cxt.get_program_resolver().search(
+      program_name, ProgramResolver::SearchMode::First,
+      ProgramResolver::Requirement::Runnable,
+      ProgramResolver::CachePolicy::Bypass);
   if (matches.is_empty()) return None;
   return matches[0];
 }
@@ -171,7 +183,7 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
                 " on this platform"};
 
   let const typed_program_path = Path{operands[1].view()};
-  let const program_path = resolve_timeout_program(operands[1].view());
+  let const program_path = resolve_timeout_program(operands[1].view(), cxt);
   if (!program_path.has_value()) {
     report_soft_shitbox_error(
         ec, cxt, "timeout: command '" + operands[1] + "' was not found");
@@ -209,10 +221,12 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     if (has_controlling_terminal) os::reclaim_controlling_terminal();
   };
 
-  os::process child =
-      os::execute_program(steal(command), true, true,
-                          source != nullptr ? source->view() : StringView{},
-                          has_controlling_terminal);
+  os::process child = os::execute_program(
+      steal(command), os::script_fallback_policy::Allow,
+      os::process_group_mode::New,
+      source != nullptr ? source->view() : StringView{},
+      has_controlling_terminal ? os::terminal_handoff::BeforeStart
+                               : os::terminal_handoff::Keep);
   if (child == SHIT_INVALID_PROCESS) {
     let const shell_path = os::current_executable_path();
     if (!shell_path.has_value())
@@ -235,10 +249,12 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
         ec.source_location(),
         ResolvedCommand::from_program(Path{shell_path->view()}),
         steal(fallback_args), steal(fallback_locations));
-    child =
-        os::execute_program(steal(fallback), false, true,
-                            source != nullptr ? source->view() : StringView{},
-                            has_controlling_terminal);
+    child = os::execute_program(
+        steal(fallback), os::script_fallback_policy::Reject,
+        os::process_group_mode::New,
+        source != nullptr ? source->view() : StringView{},
+        has_controlling_terminal ? os::terminal_handoff::BeforeStart
+                                 : os::terminal_handoff::Keep);
   }
 
   os::process process_group = SHIT_INVALID_PROCESS;
@@ -255,8 +271,9 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
   let has_child_exited = false;
-  let wait_result = wait_for_process_until(child, process_group, timeout_nanos,
-                                           status, has_child_exited);
+  let wait_result =
+      wait_for_process_until(child, process_group, timeout_nanos, status,
+                             has_child_exited, wait_completion::ChildExited);
   if (wait_result == supervision_wait_result::Exited) return status;
   if (wait_result == supervision_wait_result::Interrupted)
     return finish_interrupted_supervision(child, process_group,
@@ -287,7 +304,9 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
   wait_result = wait_for_process_until(
       child, process_group,
       kill_after_nanos == 0 ? UINT64_MAX : kill_after_nanos, status,
-      has_child_exited, kill_after_nanos != 0);
+      has_child_exited,
+      kill_after_nanos != 0 ? wait_completion::ProcessGroupEmpty
+                            : wait_completion::ChildExited);
   if (wait_result == supervision_wait_result::Interrupted)
     return finish_interrupted_supervision(child, process_group,
                                           has_child_exited);

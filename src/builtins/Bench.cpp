@@ -386,7 +386,9 @@ fn sample_command(StringView shell_binary, StringView command,
       draw_progress(command, percent, allocator);
     }
 
-    let const measured = os::run_measured(child_argv, should_suppress_output);
+    let const measured = os::run_measured(
+        child_argv, should_suppress_output ? os::measured_output::Suppress
+                                           : os::measured_output::Inherit);
     if (!measured.has_value())
       throw Error{StringView{"Unable to run '"} + command +
                   "': " + os::last_system_error_message()};

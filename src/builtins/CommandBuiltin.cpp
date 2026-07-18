@@ -44,72 +44,94 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (args.count() < 2) return 0;
 
-  let const &name = args[1];
-
-  LOG(Debug, "command resolving '%s' past shell functions", name.c_str());
+  let default_resolver = ProgramResolver{String{"/usr/bin:/bin"}};
+  let &resolver = FLAG_COMMAND_DEFAULT_PATH.is_enabled()
+                      ? default_resolver
+                      : cxt.get_program_resolver();
 
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     let const is_verbose = FLAG_SHOW_VERBOSE.is_enabled();
-    if (os::has_directory_separator(name.view())) {
-      let const candidate = Path{name.view()};
-      if (candidate.exists() && !candidate.is_directory() &&
-          candidate.is_executable())
-      {
-        ec.print_to_stdout(is_verbose ? name + " is " + name + "\n"
+    bool did_find_any = false;
+
+    for (usize argument_index = 1; argument_index < args.count();
+         argument_index++)
+    {
+      let const &name = args[argument_index];
+      LOG(Debug, "command resolving '%s' past shell functions", name.c_str());
+
+      if (os::has_directory_separator(name.view())) {
+        let const paths =
+            resolver.search(name, ProgramResolver::SearchMode::First,
+                            ProgramResolver::Requirement::Runnable,
+                            ProgramResolver::CachePolicy::Bypass);
+        if (!paths.is_empty()) {
+          ec.print_to_stdout(is_verbose ? name + " is " + name + "\n"
+                                        : name + "\n");
+          did_find_any = true;
+        } else if (is_verbose) {
+          ec.print_to_stdout(name + ": not found\n");
+        }
+        continue;
+      }
+
+      if (utils::is_posix_reserved_word(name.view())) {
+        ec.print_to_stdout(is_verbose ? name + " is a shell keyword\n"
                                       : name + "\n");
-        return 0;
+        did_find_any = true;
+        continue;
       }
-      if (is_verbose) ec.print_to_stdout(name + ": not found\n");
-      return 1;
-    }
-    if (utils::is_posix_reserved_word(name.view())) {
-      ec.print_to_stdout(is_verbose ? name + " is a shell keyword\n"
-                                    : name + "\n");
-      return 0;
-    }
-    if (let const alias = cxt.get_alias(name.view()); alias.has_value()) {
-      if (is_verbose)
-        ec.print_to_stdout(name + " is aliased to `" + *alias + "'\n");
-      else
-        ec.print_to_stdout("alias " + name + "='" + *alias + "'\n");
-      return 0;
-    }
-    if (cxt.has_functions() && cxt.find_function(name.view()) != nullptr) {
-      ec.print_to_stdout(is_verbose ? name + " is a function\n" : name + "\n");
-      return 0;
-    }
-    if (search_builtin(name.view()).has_value()) {
-      ec.print_to_stdout(is_verbose ? name + " is a shell builtin\n"
-                                    : name + "\n");
-      return 0;
-    }
-    if (const ArrayList<Path> paths = utils::search_program_path(name);
-        paths.count() != 0)
-    {
-      let resolved_text = String{cxt.scratch_allocator()};
+      if (let const alias = cxt.get_alias(name.view()); alias.has_value()) {
+        if (is_verbose)
+          ec.print_to_stdout(name + " is aliased to `" + *alias + "'\n");
+        else
+          ec.print_to_stdout("alias " + name + "='" + *alias + "'\n");
+        did_find_any = true;
+        continue;
+      }
+      if (cxt.has_functions() && cxt.find_function(name.view()) != nullptr) {
+        ec.print_to_stdout(is_verbose ? name + " is a function\n"
+                                      : name + "\n");
+        did_find_any = true;
+        continue;
+      }
+      if (search_builtin(name.view()).has_value()) {
+        ec.print_to_stdout(is_verbose ? name + " is a shell builtin\n"
+                                      : name + "\n");
+        did_find_any = true;
+        continue;
+      }
+      if (let const paths =
+              resolver.search(name, ProgramResolver::SearchMode::First,
+                              ProgramResolver::Requirement::Regular,
+                              ProgramResolver::CachePolicy::ReadOnly);
+          !paths.is_empty())
+      {
+        let resolved_text = String{cxt.scratch_allocator()};
+        if (is_verbose) {
+          resolved_text += name;
+          resolved_text += " is ";
+        }
+        resolved_text += paths[0].text();
+        resolved_text += "\n";
+        ec.print_to_stdout(resolved_text);
+        did_find_any = true;
+        continue;
+      }
+      if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
+          shitbox::find_util(name.view()).has_value())
+      {
+        ec.print_to_stdout(is_verbose ? name + " is a built-in utility\n"
+                                      : name + "\n");
+        did_find_any = true;
+        continue;
+      }
       if (is_verbose) {
-        resolved_text += name;
-        resolved_text += " is ";
-        resolved_text += paths[0].text();
-        resolved_text += "\n";
-      } else {
-        resolved_text += paths[0].text();
-        resolved_text += "\n";
+        report_soft_builtin_error(ec, cxt,
+                                  "The command '" + name + "' was not found");
       }
-      ec.print_to_stdout(resolved_text);
-      return 0;
     }
-    if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
-        shitbox::find_util(name.view()).has_value())
-    {
-      ec.print_to_stdout(is_verbose ? name + " is a built-in utility\n"
-                                    : name + "\n");
-      return 0;
-    }
-    if (is_verbose)
-      report_soft_builtin_error(ec, cxt,
-                                "The command '" + name + "' was not found");
-    return 1;
+
+    return did_find_any ? 0 : 1;
   }
 
   let operand_args = ArrayList<String>{heap_allocator()};
@@ -119,21 +141,10 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     operand_arg_locations.push(ec.arg_location_at(i));
   }
 
-  /* The default PATH is in force only while make_from resolves the program,
-     then the resolver reverts to the shell's own PATH. */
-  let const should_use_default_path = FLAG_COMMAND_DEFAULT_PATH.is_enabled();
-  if (should_use_default_path)
-    utils::set_path_for_resolution(String{"/usr/bin:/bin"});
-  defer
-  {
-    if (should_use_default_path)
-      utils::set_path_for_resolution(cxt.get_variable_value("PATH"));
-  };
-
   Maybe<ExecContext> sub;
   try {
     sub = ExecContext::make_from(ec.source_location(), steal(operand_args),
-                                 cxt.mood(), cxt.shitbox(),
+                                 cxt.mood(), cxt.shitbox(), resolver,
                                  steal(operand_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     LOG(Debug, "command handled a resolution error: %s",
@@ -143,7 +154,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
                                                               : StringView{}));
     return static_cast<i32>(resolution_error.command_status());
   }
-  return utils::execute_context(steal(*sub), cxt, false);
+  return utils::execute_context(steal(*sub), cxt, execution_mode::Foreground);
 }
 
 } // namespace shit

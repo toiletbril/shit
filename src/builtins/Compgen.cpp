@@ -107,12 +107,12 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (should_list_commands || (action.has_value() && *action == "command")) {
-    utils::begin_explicit_completion();
-    defer { utils::end_explicit_completion(); };
+    cxt.get_program_resolver().begin_explicit_completion();
+    defer { cxt.get_program_resolver().end_explicit_completion(); };
     let out = String{cxt.scratch_allocator()};
     let has_any_matched = false;
-    for (let const &candidate :
-         completion::complete_command_names(word, false, cxt))
+    for (let const &candidate : completion::complete_command_names(
+             word, completion::command_match_mode::Prefix, cxt))
     {
       out.append(candidate.view());
       out.push('\n');
@@ -141,8 +141,8 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (should_list_files) {
-    utils::begin_explicit_completion();
-    defer { utils::end_explicit_completion(); };
+    cxt.get_program_resolver().begin_explicit_completion();
+    defer { cxt.get_program_resolver().end_explicit_completion(); };
     let const candidates = completion::complete_filesystem_names(
         word, cxt, Path::current_directory());
     let out = String{cxt.scratch_allocator()};

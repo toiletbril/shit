@@ -50,8 +50,12 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
         if (os::is_stdout_a_tty()) output += ": Shell builtin";
         output += '\n';
       }
-    } else if (let const paths = utils::search_program_path(
-                   program_name, FLAG_ALL.is_enabled());
+    } else if (let const paths = cxt.get_program_resolver().search(
+                   program_name,
+                   FLAG_ALL.is_enabled() ? ProgramResolver::SearchMode::All
+                                         : ProgramResolver::SearchMode::First,
+                   ProgramResolver::Requirement::Runnable,
+                   ProgramResolver::CachePolicy::Bypass);
                paths.count() != 0)
     {
       if (!is_quiet) {

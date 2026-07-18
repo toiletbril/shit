@@ -15,6 +15,12 @@
 
 namespace toiletline {
 
+enum class edit_mode : u8
+{
+  Emacs,
+  Vi,
+};
+
 fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
                             usize codepoint_index) -> usize
 {
@@ -145,10 +151,12 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
      swallowed. */
   try {
     const bool is_explicit_completion = for_listing != 0;
-    if (is_explicit_completion) shit::utils::begin_explicit_completion();
+    if (is_explicit_completion)
+      COMPLETION_CONTEXT->get_program_resolver().begin_explicit_completion();
     defer
     {
-      if (is_explicit_completion) shit::utils::end_explicit_completion();
+      if (is_explicit_completion)
+        COMPLETION_CONTEXT->get_program_resolver().end_explicit_completion();
     };
 
     const usize byte_length = std::strlen(buffer);
@@ -165,7 +173,8 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     COMPLETION_RESULT->longest_common_prefix.clear();
     *COMPLETION_RESULT = shit::completion::complete(
         line, byte_cursor, *COMPLETION_CONTEXT, *COMPLETION_BASE_DIRECTORY,
-        for_listing != 0);
+        for_listing != 0 ? shit::completion::completion_mode::Listing
+                         : shit::completion::completion_mode::Ghost);
     let const &result = *COMPLETION_RESULT;
 #if !defined NDEBUG
     DEBUG_COMPLETION_SOURCE_SCAN_COUNT += result.source_candidate_scan_count;
@@ -456,9 +465,10 @@ fn set_highlight_enabled(bool enabled) -> void
   ::tl_set_highlight_callback(enabled ? shit_highlight_callback : nullptr);
 }
 
-fn set_edit_mode(bool is_vi) -> void
+fn set_edit_mode(edit_mode mode) -> void
 {
-  ::tl_set_edit_mode(is_vi ? TL_EDIT_MODE_VI_INSERT : TL_EDIT_MODE_EMACS);
+  ::tl_set_edit_mode(mode == edit_mode::Vi ? TL_EDIT_MODE_VI_INSERT
+                                           : TL_EDIT_MODE_EMACS);
 }
 
 fn utf8_strlen(const String &s, usize count) -> usize
@@ -514,7 +524,9 @@ fn exit() -> void
 
 fn get_input(const String &prompt) -> input_result
 {
-  utils::begin_interactive_completion();
+  if (COMPLETION_CONTEXT != nullptr)
+    COMPLETION_CONTEXT->get_program_resolver().begin_interactive_completion();
+  unused(::itl_history_ensure_read_buffer());
   HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
   let const completion_base_directory = Path::current_directory();
   let completion_result = shit::completion::completion_result{
@@ -536,6 +548,8 @@ fn get_input(const String &prompt) -> input_result
   let const line_serialization_count_before =
       ::itl_g_debug_line_serialization_count;
   let const history_scan_count_before = ::itl_g_debug_ghost_history_scan_count;
+  let const history_buffer_load_count_before =
+      ::itl_g_debug_history_buffer_load_count;
   let const cwd_capture_count_before = DEBUG_COMPLETION_CWD_CAPTURE_COUNT++;
   let const source_scan_count_before = DEBUG_COMPLETION_SOURCE_SCAN_COUNT;
   let const materialized_count_before = DEBUG_COMPLETION_MATERIALIZED_COUNT;
@@ -571,6 +585,10 @@ fn get_input(const String &prompt) -> input_result
         " history-scans=" +
         shit::String::from(::itl_g_debug_ghost_history_scan_count -
                                history_scan_count_before,
+                           shit::heap_allocator()) +
+        " history-loads=" +
+        shit::String::from(::itl_g_debug_history_buffer_load_count -
+                               history_buffer_load_count_before,
                            shit::heap_allocator()) +
         " cwd=" +
         shit::String::from(DEBUG_COMPLETION_CWD_CAPTURE_COUNT -
@@ -1143,7 +1161,7 @@ fn set_ghost_enabled(bool enabled) -> void { unused(enabled); }
 
 fn set_highlight_enabled(bool enabled) -> void { unused(enabled); }
 
-fn set_edit_mode(bool is_vi) -> void { unused(is_vi); }
+fn set_edit_mode(edit_mode mode) -> void { unused(mode); }
 
 fn utf8_strlen(const String &s, usize count) -> usize
 {

@@ -6,7 +6,8 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[--transaction-held-lock] directory command [argument ...]");
+HELP_SYNOPSIS_DECL(
+    "[--transaction-held-lock] directory command [argument ...]");
 
 HELP_DESCRIPTION_DECL(
     "The flock utility runs a command while holding a directory lock.");
@@ -23,10 +24,7 @@ namespace shitbox {
 
 Flock::Flock() = default;
 
-pure fn Flock::kind() const wontthrow -> Utility::Kind
-{
-  return Kind::Flock;
-}
+pure fn Flock::kind() const wontthrow -> Utility::Kind { return Kind::Flock; }
 
 fn Flock::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<String> &args,
@@ -38,8 +36,7 @@ fn Flock::execute(const ExecContext &ec, EvalContext &cxt,
       parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.count() < 2)
-    return report_usage_error(ec, cxt, args[0].view());
+  if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
   if (FLAG_TRANSACTION_HELD_LOCK.is_enabled()) {
     let const executable = os::current_executable_path();
@@ -58,7 +55,7 @@ fn Flock::execute(const ExecContext &ec, EvalContext &cxt,
       keeper.push(operand.clone());
 
     unused(cxt.materialize_shit_identity());
-    let const result = os::run_measured(keeper, false);
+    let const result = os::run_measured(keeper, os::measured_output::Inherit);
     return result.has_value() ? static_cast<i32>(result->exit_status) : 126;
   }
 
@@ -76,10 +73,11 @@ fn Flock::execute(const ExecContext &ec, EvalContext &cxt,
     command.push(operands[position].clone());
 
   unused(cxt.materialize_shit_identity());
-  let const result = os::run_measured(command, false, *lock);
+  let const result =
+      os::run_measured(command, os::measured_output::Inherit, *lock);
   return result.has_value() ? static_cast<i32>(result->exit_status) : 126;
 }
 
-}
+} // namespace shitbox
 
-}
+} // namespace shit

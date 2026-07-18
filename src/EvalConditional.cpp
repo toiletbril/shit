@@ -458,8 +458,10 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws
       static_cast<int>(pattern.length), pattern.data);
   let const pattern_text = String{scratch_allocator(), pattern};
   os::compiled_regex compiled;
-  if (os::compile_regex(pattern_text.view(), is_case_insensitive, compiled) !=
-      os::regex_compile_result::Ok)
+  if (os::compile_regex(pattern_text.view(),
+                        is_case_insensitive ? os::case_sensitivity::Insensitive
+                                            : os::case_sensitivity::Sensitive,
+                        compiled) != os::regex_compile_result::Ok)
   {
     let reason = String{scratch_allocator()};
     reason += "The regular expression '";

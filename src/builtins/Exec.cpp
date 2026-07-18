@@ -48,7 +48,7 @@ static fn report_exec_resolution_error(ExecContext &ec, EvalContext &cxt,
 
   if (cxt.shell_is_interactive()) return command_status;
 
-  utils::quit(command_status, true);
+  utils::quit(command_status, utils::farewell_policy::Goodbye);
 }
 
 fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
@@ -147,7 +147,10 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     program_path = resolved.take();
   } else {
-    let const found = utils::search_program_path(command_name);
+    let const found = cxt.get_program_resolver().search(
+        command_name, ProgramResolver::SearchMode::First,
+        ProgramResolver::Requirement::Execution,
+        ProgramResolver::CachePolicy::ReadOnly);
     if (found.count() == 0)
       return report_exec_resolution_error(
           ec, cxt, command_index,
@@ -190,7 +193,8 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (cxt.in_subshell() || cxt.is_in_pipeline_stage()) {
     LOG(Info, "exec runs '%s' as a child rather than replacing the shell",
         command_name.c_str());
-    let const status = utils::execute_context(steal(command), cxt, false);
+    let const status =
+        utils::execute_context(steal(command), cxt, execution_mode::Foreground);
     if (cxt.in_subshell()) cxt.request_exit(status, ec.source_location());
     return status;
   }
@@ -223,8 +227,9 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   command.in_fd.reset();
   command.out_fd.reset();
   command.err_fd.reset();
-  const i32 status = cxt.run_program_fallback(command, cxt.mood(), false);
-  utils::quit(status, false);
+  const i32 status =
+      cxt.run_program_fallback(command, cxt.mood(), script_isolation::Shared);
+  utils::quit(status, utils::farewell_policy::Silent);
 }
 
 } // namespace shit

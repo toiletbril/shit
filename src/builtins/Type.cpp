@@ -55,14 +55,22 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(Debug, "type classifying '%s' in resolution order", name.c_str());
 
     if (force_path) {
-      if (let const paths = utils::search_program_path(name);
-          paths.count() != 0)
-      {
-        if (want_word)
-          out += "file";
-        else
-          out += paths[0].text();
-        out += "\n";
+      let const paths = cxt.get_program_resolver().search(
+          name,
+          FLAG_TYPE_ALL.is_enabled() ? ProgramResolver::SearchMode::All
+                                     : ProgramResolver::SearchMode::First,
+          FLAG_TYPE_ALL.is_enabled() ? ProgramResolver::Requirement::Runnable
+                                     : ProgramResolver::Requirement::Regular,
+          FLAG_TYPE_ALL.is_enabled() ? ProgramResolver::CachePolicy::Bypass
+                                     : ProgramResolver::CachePolicy::ReadOnly);
+      if (paths.count() != 0) {
+        for (let const &path : paths) {
+          if (want_word)
+            out += "file";
+          else
+            out += path.text();
+          out += "\n";
+        }
       } else {
         did_find_all = false;
       }
@@ -86,8 +94,8 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       word = "builtin";
     } else if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
                shitbox::find_util(name.view()).has_value() &&
-               utils::get_program_path_status(name) ==
-                   utils::program_path_status::Missing)
+               cxt.get_program_resolver().get_status(name) ==
+                   ProgramResolver::Status::Missing)
     {
       word = "builtin";
     }
@@ -118,7 +126,11 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           do_describe_resolution(word);
         }
       }
-      for (let const &path : utils::search_program_path(name, true)) {
+      for (let const &path : cxt.get_program_resolver().search(
+               name, ProgramResolver::SearchMode::All,
+               ProgramResolver::Requirement::Runnable,
+               ProgramResolver::CachePolicy::Bypass))
+      {
         has_any = true;
         if (want_word) {
           out += "file\n";
@@ -149,7 +161,11 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    if (let const paths = utils::search_program_path(name); paths.count() != 0)
+    if (let const paths = cxt.get_program_resolver().search(
+            name, ProgramResolver::SearchMode::First,
+            ProgramResolver::Requirement::Regular,
+            ProgramResolver::CachePolicy::ReadOnly);
+        paths.count() != 0)
     {
       if (want_word) {
         out += "file\n";

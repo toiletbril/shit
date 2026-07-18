@@ -281,7 +281,8 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
   return name;
 }
 
-fn command_resolves(const String &name) throws -> bool
+fn command_resolves(const String &name, const AnalysisContext &actx) throws
+    -> bool
 {
   if (name.is_empty()) return false;
   if (search_builtin(name.view()).has_value()) return true;
@@ -304,8 +305,16 @@ fn command_resolves(const String &name) throws -> bool
     return Path::canonicalize(target).has_value();
   }
 
+  let resolver =
+      ProgramResolver{actx.eval_context != nullptr
+                          ? actx.eval_context->get_variable_value("PATH")
+                          : os::get_environment_variable("PATH")};
   const bool was_resolved =
-      utils::search_program_path(name.view()).count() != 0;
+      resolver
+          .search(name.view(), ProgramResolver::SearchMode::First,
+                  ProgramResolver::Requirement::Regular,
+                  ProgramResolver::CachePolicy::Bypass)
+          .count() != 0;
   LOG(Debug, "scanning PATH for '%s', the command was %s", name.c_str(),
       was_resolved ? "found" : "not found");
   return was_resolved;
@@ -1536,7 +1545,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   }
 
   if (name.has_value() && !actx.should_silence_unresolved_commands &&
-      !command_is_shadowed && !command_resolves(*name))
+      !command_is_shadowed && !command_resolves(*name, actx))
   {
     let const message = StringView{"Command '"} + StringView{*name} +
                         StringView{"' was not found"};

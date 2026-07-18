@@ -138,7 +138,9 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
   for (const String &operand : operands)
     if (operand.view() == "aux") should_show_aux = true;
 
-  let const processes = os::enumerate_processes(should_show_aux);
+  let const processes = os::enumerate_processes(
+      should_show_aux ? os::process_detail::ResourceStats
+                      : os::process_detail::Basic);
 
   let output = String{cxt.scratch_allocator()};
   if (should_show_aux) {

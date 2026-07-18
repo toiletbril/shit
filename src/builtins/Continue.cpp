@@ -54,7 +54,7 @@ fn Continue::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         }
 
         cxt.run_exit_trap();
-        utils::quit(2, true);
+        utils::quit(2, utils::farewell_policy::Goodbye);
       }
 
       cxt.request_break(static_cast<i64>(cxt.loop_depth()),

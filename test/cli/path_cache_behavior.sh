@@ -278,3 +278,105 @@ printf '#!/bin/sh\n' > "$dir/all-second/allprobe"
 chmod +x "$dir/all-first/allprobe" "$dir/all-second/allprobe"
 PATH="$dir/all-first:$dir/all-first:$dir/all-second:/bin" "$BIN" -c \
     'type -a -p allprobe' | sed "s|$dir|DIR|g"
+
+mkdir "$dir/hash-blocked"
+: > "$dir/hash-blocked/hashblocked"
+PATH="$dir/hash-blocked:/bin" "$BIN" -c \
+    'hash hashblocked >/dev/null 2>&1; printf "hash-blocked=%s\n" "$?"'
+
+mkdir "$dir/source-directory-first" "$dir/source-file-second" \
+    "$dir/source-directory-first/source-directory-probe"
+printf 'echo source-skipped-directory\n' > \
+    "$dir/source-file-second/source-directory-probe"
+PATH="$dir/source-directory-first:$dir/source-file-second:/bin" "$BIN" -c \
+    'source source-directory-probe'
+
+mkdir "$dir/which-first" "$dir/which-second"
+: > "$dir/which-first/whichblocked"
+PATH="$dir/which-first:/bin" "$BIN" -c \
+    'shitbox which whichblocked >/dev/null 2>&1
+    printf "which-blocked=%s\n" "$?"'
+printf '#!/bin/sh\necho which-first\n' > "$dir/which-staged"
+printf '#!/bin/sh\necho which-second\n' > "$dir/which-second/whichprobe"
+chmod +x "$dir/which-staged" "$dir/which-second/whichprobe"
+WHICH_FIRST="$dir/which-first" WHICH_STAGED="$dir/which-staged" \
+    PATH="$dir/which-first:$dir/which-second:/bin" "$BIN" -c \
+    'whichprobe >/dev/null
+    /bin/mv "$WHICH_STAGED" "$WHICH_FIRST/whichprobe"
+    shitbox which whichprobe' | sed "s|$dir|DIR|g"
+
+mkdir "$dir/command-p-first" "$dir/command-p-second"
+printf '#!/bin/sh\necho command-p-first\n' > "$dir/command-p-staged"
+printf '#!/bin/sh\necho command-p-second\n' > \
+    "$dir/command-p-second/commandpprobe"
+chmod +x "$dir/command-p-staged" "$dir/command-p-second/commandpprobe"
+COMMAND_P_FIRST="$dir/command-p-first" \
+    COMMAND_P_STAGED="$dir/command-p-staged" \
+    PATH="$dir/command-p-first:$dir/command-p-second:/bin" "$BIN" -c \
+    'commandpprobe
+    command -p true
+    /bin/mv "$COMMAND_P_STAGED" "$COMMAND_P_FIRST/commandpprobe"
+    commandpprobe'
+
+mkdir "$dir/equal-first" "$dir/equal-second"
+printf '#!/bin/sh\necho equal-first\n' > "$dir/equal-staged"
+printf '#!/bin/sh\necho equal-second\n' > "$dir/equal-second/equalprobe"
+chmod +x "$dir/equal-staged" "$dir/equal-second/equalprobe"
+EQUAL_FIRST="$dir/equal-first" EQUAL_STAGED="$dir/equal-staged" \
+    PATH="$dir/equal-first:$dir/equal-second:/bin" "$BIN" -c \
+    'equalprobe
+    PATH="$PATH"
+    /bin/mv "$EQUAL_STAGED" "$EQUAL_FIRST/equalprobe"
+    equalprobe'
+
+mkdir "$dir/mimic-first" "$dir/mimic-second"
+printf '#!/bin/sh\necho mimic-first\n' > "$dir/mimic-staged"
+printf '#!/bin/sh\necho mimic-second\n' > "$dir/mimic-second/mimicprobe"
+chmod +x "$dir/mimic-staged" "$dir/mimic-second/mimicprobe"
+printf '#!/bin/bash\nhash -r\n/bin/mv "%s" "%s"\n' \
+    "$dir/mimic-staged" "$dir/mimic-first/mimicprobe" > "$dir/mimic-script"
+chmod +x "$dir/mimic-script"
+MIMIC_SCRIPT="$dir/mimic-script" \
+    PATH="$dir/mimic-first:$dir/mimic-second:/bin" "$BIN" -I --mood bash -c \
+    'mimicprobe
+    "$MIMIC_SCRIPT"
+    mimicprobe'
+
+mkdir "$dir/default-path"
+printf '#!/bin/sh\n' > "$dir/default-path/onlycustom"
+printf '#!/bin/sh\n' > "$dir/default-path/ls"
+chmod +x "$dir/default-path/onlycustom" "$dir/default-path/ls"
+PATH="$dir/default-path" "$BIN" --mood bash -c \
+    'command -p -v onlycustom >/dev/null
+    printf "command-p-custom=%s\n" "$?"
+    command -p -v ls' | sed "s|^/usr/bin/ls$|DEFAULT-LS|;s|^/bin/ls$|DEFAULT-LS|"
+
+"$BIN" --mood bash -c \
+    'command -v missing-command-xyz echo printf
+    printf "command-multiple=%s\n" "$?"'
+
+mkdir "$dir/type-all-first" "$dir/type-all-second"
+printf '#!/bin/sh\n' > "$dir/type-all-first/typeallprobe"
+printf '#!/bin/sh\n' > "$dir/type-all-second/typeallprobe"
+chmod +x "$dir/type-all-first/typeallprobe" \
+    "$dir/type-all-second/typeallprobe"
+PATH="$dir/type-all-first:$dir/type-all-second:/bin" "$BIN" --mood bash -c \
+    'type -a -P typeallprobe' | sed "s|$dir|DIR|g"
+
+if [ "${OS-}" != Windows_NT ]; then
+    mkdir "$dir/slash-path"
+    printf '#!/bin/sh\n' > "$dir/slash-path/slashprobe"
+    chmod +x "$dir/slash-path/slashprobe"
+    (
+        cd "$dir/slash-path" || exit 1
+        PATH=/bin "$BIN" --mood bash -c '
+            type -p ./slashprobe
+            type -P ./slashprobe
+            shitbox which ./slashprobe
+            hash ./slashprobe
+            printf "hash-slash=%s\n" "$?"
+            hash ./missing
+            printf "hash-missing-slash=%s\n" "$?"
+        '
+    )
+fi

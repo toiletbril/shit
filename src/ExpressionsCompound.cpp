@@ -180,7 +180,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         cxt.request_exit(ret, source_location());
         break;
       }
-      utils::quit(static_cast<i32>(ret), true);
+      utils::quit(static_cast<i32>(ret), utils::farewell_policy::Goodbye);
     }
   }
 
@@ -591,8 +591,8 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     let stage_arg_locations =
         ArrayList<SourceLocation>{cxt.scratch_allocator()};
     let stage_args =
-        cxt.process_args(e->args(), /*args_are_transient=*/true,
-                         /*is_array_literal=*/false, &stage_arg_locations);
+        cxt.process_args(e->args(), argument_lifetime::Transient,
+                         argument_context::Command, &stage_arg_locations);
 
     if (stage_args.is_empty()) {
       throw ErrorWithLocation{e->source_location(),
@@ -603,9 +603,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
        closes its pipe to give the next stage EOF. */
     Maybe<ExecContext> stage_ec;
     try {
-      stage_ec = ExecContext::make_from(e->source_location(), steal(stage_args),
-                                        cxt.mood(), cxt.shitbox(),
-                                        steal(stage_arg_locations));
+      stage_ec = ExecContext::make_from(
+          e->source_location(), steal(stage_args), cxt.mood(), cxt.shitbox(),
+          cxt.get_program_resolver(), steal(stage_arg_locations));
     } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       report_command_resolution_error(cxt, resolution_error);
       /* The stage still applies its own redirections. A > onto its stdout takes
@@ -639,8 +639,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* The status is committed here so $? reads it from the store, since the
      all-simple fast path otherwise returns without recording it. */
-  const i64 ret =
-      utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
+  const i64 ret = utils::execute_contexts_with_pipes(
+      steal(ecs), cxt,
+      is_async() ? execution_mode::Background : execution_mode::Foreground);
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 

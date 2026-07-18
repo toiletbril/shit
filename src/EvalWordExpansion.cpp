@@ -906,7 +906,8 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     let expansion_source = String{"t__wordlist_fields=("};
     expansion_source.append(wordlist);
     expansion_source.push(')');
-    run_source(expansion_source.view(), "a -W word list", false);
+    run_source(expansion_source.view(), "a -W word list",
+               return_handling::Propagate);
     if (const ArrayList<String> *expanded =
             lookup_indexed_array("t__wordlist_fields");
         expanded != nullptr)

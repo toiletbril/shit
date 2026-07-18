@@ -156,7 +156,7 @@ fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &
 static fn run_debug_completion_driver(StringView driver_line,
                                       EvalContext &context) throws -> i32
 {
-  utils::initialize_path_map();
+  context.get_program_resolver().initialize_path_map();
   usize driver_cursor = driver_line.length;
   if (let const cursor_text =
           os::get_environment_variable("SHIT_TEST_COMPLETE_CURSOR");
@@ -168,7 +168,8 @@ static fn run_debug_completion_driver(StringView driver_line,
       driver_cursor = static_cast<usize>(parsed_cursor.value());
   }
   let const driver_result = completion::complete(
-      driver_line, driver_cursor, context, Path::current_directory(), true);
+      driver_line, driver_cursor, context, Path::current_directory(),
+      completion::completion_mode::Listing);
   let listing = String{heap_allocator()};
   for (let const &candidate : driver_result.candidates) {
     listing += candidate.view();
@@ -231,10 +232,10 @@ static fn run_debug_ghost_driver(StringView driver_line,
 {
   let const directory_stat_count_before = utils::debug_directory_stat_count();
   let const directory_read_count_before = utils::debug_directory_read_count();
-  utils::initialize_path_map();
-  let const result =
-      completion::complete(driver_line, driver_line.length, context,
-                           Path::current_directory(), false);
+  context.get_program_resolver().initialize_path_map();
+  let const result = completion::complete(driver_line, driver_line.length,
+                                          context, Path::current_directory(),
+                                          completion::completion_mode::Ghost);
   print("count=" + String::from(result.candidate_count, heap_allocator()) +
         "\nprefix=" + result.longest_common_prefix.view() + "\nsource-scans=" +
         String::from(result.source_candidate_scan_count, heap_allocator()) +
@@ -352,7 +353,7 @@ static fn report_escaped_control_flow(EvalContext &context,
       i32 return_status = static_cast<i32>(control.value);
       context.clear_control_flow();
       context.run_exit_trap();
-      utils::quit(return_status, true);
+      utils::quit(return_status, utils::farewell_policy::Goodbye);
     }
     what = "'return' used outside of a function or a sourced script";
     break;
@@ -569,7 +570,7 @@ static fn source_file(const Path &path, EvalContext &context,
      set --init-moods inside a sourced rc reaches here while that rc's tree is
      live and a reset would free the node mid-walk. */
   unused(ast_arena);
-  context.run_source(*contents, path.text().view(), /*consume_return=*/true,
+  context.run_source(*contents, path.text().view(), return_handling::Consume,
                      /*call_site=*/None, path.text().view());
   return true;
 }
@@ -751,9 +752,8 @@ fn main(int argc, char **argv) -> int
     if (shit::shitbox::find_util(invocation).has_value()) {
       LOG(Info, "acting as the shitbox utility '%.*s' from argv[0]",
           static_cast<int>(invocation.length), invocation.data);
-      shit::os::set_default_signal_handlers(false);
-      shit::utils::clear_path_map();
-
+      shit::os::set_default_signal_handlers(
+          shit::os::signal_profile::NonInteractive);
       let ast_arena = shit::BumpArena{};
       shit::AST_ARENA = &ast_arena;
       let function_arena = shit::BumpArena{};
@@ -1247,8 +1247,9 @@ fn main(int argc, char **argv) -> int
 
   /* The path map is reset rather than seeded here, since the eager scan pays
      off only in interactive mode. */
-  shit::utils::clear_path_map();
-  shit::os::set_default_signal_handlers(should_be_interactive);
+  shit::os::set_default_signal_handlers(
+      should_be_interactive ? shit::os::signal_profile::Interactive
+                            : shit::os::signal_profile::NonInteractive);
   LOG(Info, "installed the default signal handlers");
 
   /* The parse arena holds the AST and its tokens for one command, reset between
@@ -1345,7 +1346,7 @@ fn main(int argc, char **argv) -> int
                 operand_location, "Unable to execute `" + file_name.view() +
                                       "` because the file is a directory"}
                                    .to_string(context.cli_invocation().view()));
-            shit::utils::quit(126, true);
+            shit::utils::quit(126, shit::utils::farewell_policy::Goodbye);
           }
 
           LOG(Info, "reading the script file '%s'", file_name.c_str());
@@ -1356,7 +1357,7 @@ fn main(int argc, char **argv) -> int
                 "Could not open '" + file_name.view() +
                     "': " + shit::os::last_system_error_message()}
                                    .to_string(context.cli_invocation().view()));
-            shit::utils::quit(127, true);
+            shit::utils::quit(127, shit::utils::farewell_policy::Goodbye);
           }
           script_contents = steal(*contents);
           source_filename = file_name.view();
@@ -1404,7 +1405,7 @@ fn main(int argc, char **argv) -> int
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
           LOG(Info, "initializing the line editor and the path map");
-          shit::utils::initialize_path_map();
+          context.get_program_resolver().initialize_path_map();
           toiletline::initialize();
           /* The set -b wake hook registers even under -T, since job reporting
              is not completion. */
@@ -1465,7 +1466,9 @@ fn main(int argc, char **argv) -> int
 
         shit::String prompt = toiletline::build_prompt(context);
 
-        toiletline::set_edit_mode(context.vi_mode());
+        toiletline::set_edit_mode(context.vi_mode()
+                                      ? toiletline::edit_mode::Vi
+                                      : toiletline::edit_mode::Emacs);
 
         loop
         {
@@ -1484,7 +1487,8 @@ fn main(int argc, char **argv) -> int
               shit::print("^D");
               shit::flush();
               toiletline::emit_newlines(input);
-              shit::utils::quit(exit_code, true);
+              shit::utils::quit(exit_code,
+                                shit::utils::farewell_policy::Goodbye);
             } else {
               toiletline::set_input(input);
               continue;
@@ -1492,7 +1496,7 @@ fn main(int argc, char **argv) -> int
             break;
           case TL_PRESSED_QUIT:
             toiletline::emit_newlines(input);
-            shit::utils::quit(exit_code, true);
+            shit::utils::quit(exit_code, shit::utils::farewell_policy::Goodbye);
             break;
           case TL_PRESSED_INTERRUPT:
             shit::print("^C");
@@ -1592,7 +1596,9 @@ fn main(int argc, char **argv) -> int
 #endif
       LOG(Info, "exiting after the final chunk with code %d", exit_code);
       if (!shit::os::is_child_process()) context.run_exit_trap();
-      shit::utils::quit(exit_code, FLAG_ERROR_EXIT.is_enabled());
+      shit::utils::quit(exit_code, FLAG_ERROR_EXIT.is_enabled()
+                                       ? shit::utils::farewell_policy::Goodbye
+                                       : shit::utils::farewell_policy::Silent);
     }
   }
 

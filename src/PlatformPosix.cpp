@@ -374,9 +374,10 @@ fn collate_compare(const String &left, const String &right) wontthrow -> int
   return strcoll(left.c_str(), right.c_str());
 }
 
-fn compile_regex(StringView pattern, bool is_case_insensitive,
+fn compile_regex(StringView pattern, case_sensitivity sensitivity,
                  compiled_regex &out) throws -> regex_compile_result
 {
+  let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
   let const pattern_text = String{heap_allocator(), pattern};
   int compile_flags = REG_EXTENDED;
   if (is_case_insensitive) compile_flags |= REG_ICASE;
@@ -424,9 +425,10 @@ fn free_regex(compiled_regex &compiled) wontthrow -> void
   regfree(&compiled.re);
 }
 
-fn compile_search_regex(StringView pattern, bool is_case_insensitive,
+fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
                         compiled_regex &out) throws -> regex_compile_result
 {
+  let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
   const String pattern_text{heap_allocator(), pattern};
   int compile_flags = REG_NOSUB;
   if (is_case_insensitive) compile_flags |= REG_ICASE;
@@ -966,11 +968,14 @@ cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
   return child_pid;
 }
 
-hot fn execute_program(
-    ExecContext &&ec, bool allow_script_fallback, bool new_process_group,
-    StringView source,
-    bool should_hand_off_controlling_terminal_before_start) throws -> process
+hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
+                       process_group_mode process_group, StringView source,
+                       terminal_handoff handoff) throws -> process
 {
+  let const allow_script_fallback = fallback == script_fallback_policy::Allow;
+  let const new_process_group = process_group == process_group_mode::New;
+  let const should_hand_off_controlling_terminal_before_start =
+      handoff == terminal_handoff::BeforeStart;
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
   LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
@@ -1877,8 +1882,9 @@ static fn handle_interrupt(int s) wontthrow -> void
   INTERRUPT_REQUESTED = 1;
 }
 
-fn set_default_signal_handlers(bool is_interactive) throws -> void
+fn set_default_signal_handlers(signal_profile profile) throws -> void
 {
+  let const is_interactive = profile == signal_profile::Interactive;
   LOG(Info, "installing the shell signal handlers, interactive %d",
       is_interactive ? 1 : 0);
 
@@ -2059,7 +2065,7 @@ fn transfer_barrier_byte(int descriptor, bool should_write) wontthrow -> bool
   return transfer_count == 1;
 }
 
-fn spawn_measured_child(const ArrayList<String> &argv, bool suppress_output,
+fn spawn_measured_child(const ArrayList<String> &argv, measured_output output,
                         measured_child &child_out) wontthrow -> bool
 {
   let const raw_argv = make_os_args(argv);
@@ -2087,7 +2093,7 @@ fn spawn_measured_child(const ArrayList<String> &argv, bool suppress_output,
     close(ready_descriptors[0]);
     close(start_descriptors[1]);
     signal(SIGPIPE, SIG_DFL);
-    if (suppress_output) {
+    if (output == measured_output::Suppress) {
       const int null_fd = open("/dev/null", O_WRONLY);
       if (null_fd != -1) {
         dup2(null_fd, STDOUT_FILENO);
@@ -2160,7 +2166,7 @@ fn wait_for_measured_child(pid_t child_pid, i64 &status_out,
 
 } /* namespace */
 
-fn run_measured(const ArrayList<String> &argv, bool suppress_output,
+fn run_measured(const ArrayList<String> &argv, measured_output output,
                 Maybe<descriptor> inherited_handle) throws
     -> Maybe<measured_result>
 {
@@ -2170,7 +2176,7 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output,
   measured_result result{};
 
   measured_child child{};
-  if (!spawn_measured_child(argv, suppress_output, child)) return None;
+  if (!spawn_measured_child(argv, output, child)) return None;
 
   PlatformPerfSession perf_session;
   bool has_perf = perf_session.prepare(child.pid);
@@ -2333,6 +2339,8 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   status.size = static_cast<u64>(info.st_size);
   status.modification_time = static_cast<i64>(info.st_mtime);
   status.modification_nanoseconds = static_cast<u32>(info.st_mtim.tv_nsec);
+  status.change_time = static_cast<i64>(info.st_ctime);
+  status.change_nanoseconds = static_cast<u32>(info.st_ctim.tv_nsec);
   status.blocks = static_cast<u64>(info.st_blocks);
   return true;
 }
@@ -2352,6 +2360,8 @@ fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
   status.size = static_cast<u64>(info.st_size);
   status.modification_time = static_cast<i64>(info.st_mtime);
   status.modification_nanoseconds = static_cast<u32>(info.st_mtim.tv_nsec);
+  status.change_time = static_cast<i64>(info.st_ctime);
+  status.change_nanoseconds = static_cast<u32>(info.st_ctim.tv_nsec);
   status.blocks = static_cast<u64>(info.st_blocks);
   return true;
 }

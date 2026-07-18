@@ -64,8 +64,7 @@ The interactive mode is modern and heavily inspired by
 [fish](https://github.com/fish-shell/fish-shell). It has syntax highlighting,
 sensible word-jumps and controls, full UTF-8 support, wide character (CJK and
 emoji) width handling, multiline editing, history search, and persistent
-history. Ghost text uses prefix matches, while Tab also offers smart-case and
-subsequence matches.
+history.
 
 **shit** has more than 50 builtins, each with `--help`. That includes
 every builtin from `bash` and POSIX standard, with the addition of:
@@ -137,14 +136,8 @@ $ make install
 $ make uninstall
 ```
 
-The running binary can install itself on an SSH target with
-`assimilate user@host`. The first writable and searchable directory in the
-remote PATH receives `shit`. An existing binary or symlink is restored when a
-handled transfer, validation, or install step fails. A remote keeper process
-holds the transaction lock until the transaction child exits, including after
-its launcher exits. A later install recovers published and orphaned journals.
-The candidate SHA-256 identity must match the local executable. The transferred
-shell performs the transaction with bundled shitbox utilities.
+The running binary can install itself on an SSH target with `assimilate
+user@host`.
 
 ## Roadmap
 

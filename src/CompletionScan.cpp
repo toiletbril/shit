@@ -306,9 +306,10 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
 }
 
 fn complete_from_process_arguments(StringView line, StringView token,
-                                   bool for_listing) throws
+                                   completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
+  let const for_listing = mode == completion_mode::Listing;
   if (!for_listing) return None;
 
   let const command = command_word_of(line);
@@ -345,10 +346,11 @@ fn complete_from_process_arguments(StringView line, StringView token,
 }
 
 fn complete_from_tools_with_targets(StringView line, StringView token,
-                                    usize token_start, bool for_listing,
+                                    usize token_start, completion_mode mode,
                                     EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
+  let const for_listing = mode == completion_mode::Listing;
   if (!for_listing) return None;
   if (!token.is_empty() && token[0] == '-') return None;
   let const command = command_word_of(line);
@@ -365,7 +367,10 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   let const capture = [&](const ArrayList<String> &probe_argv)
                           throws -> String {
     if (probe_argv.is_empty()) return String{heap_allocator()};
-    let const resolved = utils::search_program_path(probe_argv[0].view());
+    let const resolved = context.get_program_resolver().search(
+        probe_argv[0].view(), ProgramResolver::SearchMode::First,
+        ProgramResolver::Requirement::Runnable,
+        ProgramResolver::CachePolicy::Bypass);
     if (resolved.is_empty()) return String{heap_allocator()};
     let argv = ArrayList<String>{heap_allocator()};
     argv.push(String{resolved[0].text().view()});
@@ -616,8 +621,8 @@ fn complete_from_builtin_flags(StringView line, StringView token,
         util_for_flags = shitbox::find_util(*second);
       }
     } else if (!completes_shell_binary && context.shitbox() &&
-               utils::get_program_path_status(command) ==
-                   utils::program_path_status::Missing)
+               context.get_program_resolver().get_status(command) ==
+                   ProgramResolver::Status::Missing)
     {
       util_for_flags = shitbox::find_util(command);
     }
@@ -777,10 +782,11 @@ static fn push_spec_candidate(StringView entry, ArrayList<String> &candidates,
 }
 
 fn complete_from_spec(StringView line, StringView token, usize cursor,
-                      bool for_listing, EvalContext &context,
+                      completion_mode mode, EvalContext &context,
                       StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
+  let const for_listing = mode == completion_mode::Listing;
   let const command = command_word_of(line.substring_of_length(0, cursor));
   if (command.is_empty()) return None;
 

@@ -49,7 +49,13 @@ void set_ghost_enabled(bool enabled);
 
 void set_highlight_enabled(bool enabled);
 
-void set_edit_mode(bool is_vi);
+enum class edit_mode : u8
+{
+  Emacs,
+  Vi,
+};
+
+void set_edit_mode(edit_mode mode);
 
 usize utf8_strlen(const String &s, usize byte_count = static_cast<usize>(-1));
 

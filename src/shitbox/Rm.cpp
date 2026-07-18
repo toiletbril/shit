@@ -24,15 +24,16 @@ namespace shit {
 
 namespace shitbox {
 
-fn remove_path(StringView path, bool is_recursive) throws -> bool
+fn remove_path(StringView path, removal_mode mode) throws -> bool
 {
+  let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};
   if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
     Maybe<ArrayList<String>> names = Path::read_directory(target);
     if (names.has_value())
       for (const String &name : *names) {
         let const child = PathBuilder{path}.append(name.view()).build();
-        if (!remove_path(child.text().view(), is_recursive)) return false;
+        if (!remove_path(child.text().view(), mode)) return false;
       }
     return os::remove_directory(path);
   }
@@ -40,9 +41,10 @@ fn remove_path(StringView path, bool is_recursive) throws -> bool
 }
 
 static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
-                                 StringView path, bool is_recursive) throws
+                                 StringView path, removal_mode mode) throws
     -> void
 {
+  let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};
   if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
     if (Maybe<ArrayList<String>> names = Path::read_directory(target);
@@ -50,7 +52,7 @@ static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
     {
       for (const String &name : *names) {
         let const child = PathBuilder{path}.append(name.view()).build();
-        report_dry_run_removal(ec, cxt, child.text().view(), is_recursive);
+        report_dry_run_removal(ec, cxt, child.text().view(), mode);
       }
     }
   }
@@ -138,11 +140,15 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
     if (is_dry_run) {
-      report_dry_run_removal(ec, cxt, operand.view(), is_recursive);
+      report_dry_run_removal(ec, cxt, operand.view(),
+                             is_recursive ? removal_mode::Recursive
+                                          : removal_mode::SinglePath);
       continue;
     }
 
-    if (!remove_path(operand.view(), is_recursive)) {
+    if (!remove_path(operand.view(), is_recursive ? removal_mode::Recursive
+                                                  : removal_mode::SinglePath))
+    {
       report_soft_shitbox_error(ec, cxt,
                                 "rm: cannot remove '" + operand +
                                     "': " + os::last_system_error_message());

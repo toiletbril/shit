@@ -178,7 +178,9 @@ fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   cxt.set_current_location(source_location());
 
-  ArrayList<String> values = cxt.process_args(m_elements, false, true);
+  ArrayList<String> values =
+      cxt.process_args(m_elements, argument_lifetime::Persistent,
+                       argument_context::ArrayLiteral);
   LOG(Debug, "assigning %zu elements to the array '%s'", values.count(),
       m_name.c_str());
   cxt.assign_indexed_array_elements(m_name.view(), steal(values), m_is_append);

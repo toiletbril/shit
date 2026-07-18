@@ -11,6 +11,18 @@ namespace shit {
 
 namespace completion {
 
+enum class completion_mode : u8
+{
+  Ghost,
+  Listing,
+};
+
+enum class command_match_mode : u8
+{
+  Prefix,
+  Glob,
+};
+
 struct completion_result
 {
   ArrayList<String> candidates;
@@ -28,10 +40,11 @@ struct completion_result
 };
 
 fn complete(StringView line, usize cursor, EvalContext &context,
-            const Path &base_directory, bool for_listing = false) throws
+            const Path &base_directory,
+            completion_mode mode = completion_mode::Ghost) throws
     -> completion_result;
 
-fn complete_command_names(StringView token, bool token_is_glob,
+fn complete_command_names(StringView token, command_match_mode match_mode,
                           EvalContext &context) throws -> ArrayList<String>;
 fn complete_filesystem_names(StringView token, EvalContext &context,
                              const Path &base_directory) throws

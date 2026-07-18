@@ -271,7 +271,13 @@ fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>;
 
 /* Returns false on the first failure with the reason in
    os::last_system_error_message. */
-fn remove_path(StringView path, bool is_recursive) throws -> bool;
+enum class removal_mode : u8
+{
+  SinglePath,
+  Recursive,
+};
+
+fn remove_path(StringView path, removal_mode mode) throws -> bool;
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
     -> Maybe<String>;
 

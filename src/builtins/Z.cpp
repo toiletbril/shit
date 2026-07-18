@@ -237,7 +237,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw make_error_for_arg(ec, 1,
                              StringView{"Unable to change directory to '"} +
                                  target.text() + "'");
-  utils::working_directory_changed();
+  cxt.get_program_resolver().working_directory_changed();
   if (!old_directory.is_empty())
     cxt.set_shell_variable("OLDPWD", old_directory.text());
   cxt.set_shell_variable("PWD", target.text());

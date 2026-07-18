@@ -192,7 +192,8 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     /* The unset above pointed the resolver at the now-removed environment PATH,
        so an export PATH=... refreshes it to the value just placed in the
        environment. */
-    if (name == "PATH") utils::set_path_for_resolution(String{value.view()});
+    if (name == "PATH")
+      cxt.get_program_resolver().assign_path(String{value.view()});
   }
 
   return has_error ? 1 : 0;

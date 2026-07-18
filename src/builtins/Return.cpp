@@ -60,7 +60,7 @@ fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
       if (!cxt.shell_is_interactive()) {
         cxt.run_exit_trap();
-        utils::quit(1, true);
+        utils::quit(1, utils::farewell_policy::Goodbye);
       }
 
       return 1;

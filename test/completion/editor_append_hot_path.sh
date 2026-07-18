@@ -140,6 +140,8 @@ history_metrics=$(strings "$d/history-typescript" | \
     grep 'editor-refresh append=7 ') || exit 1
 case $history_metrics in *' history-scans=1000 '*) ;; *) exit 1 ;; esac
 echo 'rejected history prefixes scan once'
+case $history_metrics in *' history-loads=0 '*) ;; *) exit 1 ;; esac
+echo 'first history key reads memory only'
 history_resolutions=${history_metrics#* resolutions=}
 history_resolutions=${history_resolutions%% *}
 test "$history_resolutions" -eq 0 || exit 1

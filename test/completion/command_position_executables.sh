@@ -57,6 +57,11 @@ case "$mixed_result" in
     *"$mixed_expected"*) ;;
     *) exit 1 ;;
 esac
+mixed_lower_result=$("$BIN" --debug-complete-at 'mixedp' </dev/null)
+case "$mixed_lower_result" in
+    *"$mixed_expected"*) ;;
+    *) exit 1 ;;
+esac
 echo "== native PATH case matching completes commands"
 
 if [ "${OS-}" = Windows_NT ]; then

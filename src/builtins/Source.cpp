@@ -41,8 +41,10 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let source_path = Path{path.view()};
   if (!path.view().find_character('/').has_value()) {
-    let const path_matches = utils::search_program_path(
-        path.view(), false, utils::program_path_requirement::Existing);
+    let const path_matches = cxt.get_program_resolver().search(
+        path.view(), ProgramResolver::SearchMode::First,
+        ProgramResolver::Requirement::Regular,
+        ProgramResolver::CachePolicy::Bypass);
     if (!path_matches.is_empty())
       source_path = path_matches[0].clone();
     else if (cxt.is_posix_mode())
@@ -76,7 +78,8 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (has_extra_args) cxt.set_positional_params(steal(saved_params));
   };
 
-  return cxt.run_source(*contents, "the file '" + path + "'", true,
+  return cxt.run_source(*contents, "the file '" + path + "'",
+                        return_handling::Consume,
                         ec.arg_location_at(path_index), StringView{path});
 }
 

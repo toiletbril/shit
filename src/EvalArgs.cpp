@@ -439,10 +439,12 @@ constexpr static_string_entry<u8> DECLARATION_COMMAND_ENTRIES[] = {
 constexpr StaticStringMap DECLARATION_COMMANDS{DECLARATION_COMMAND_ENTRIES};
 
 hot flatten fn EvalContext::process_args(
-    const ArrayList<const Token *> &args, bool args_are_transient,
-    bool is_array_literal, ArrayList<SourceLocation> *expanded_locations) throws
-    -> ArrayList<String>
+    const ArrayList<const Token *> &args, argument_lifetime lifetime,
+    argument_context context,
+    ArrayList<SourceLocation> *expanded_locations) throws -> ArrayList<String>
 {
+  let const args_are_transient = lifetime == argument_lifetime::Transient;
+  let const is_array_literal = context == argument_context::ArrayLiteral;
   LOG(Debug, "expanding %zu argument tokens", args.count());
   /* A transient request lives on the caller's scratch region and leaves its
      fields for the caller, so only the heap form releases them on return. */

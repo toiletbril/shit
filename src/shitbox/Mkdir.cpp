@@ -25,9 +25,24 @@ namespace shit {
 
 namespace shitbox {
 
-static fn make_one(StringView path, u32 mode, bool should_set_exact_mode,
-                   bool should_ignore_existing) throws -> bool
+enum class mode_application : u8
 {
+  RespectUmask,
+  Exact,
+};
+
+enum class existing_directory_policy : u8
+{
+  Reject,
+  Accept,
+};
+
+static fn make_one(StringView path, u32 mode, mode_application application,
+                   existing_directory_policy existing_policy) throws -> bool
+{
+  let const should_set_exact_mode = application == mode_application::Exact;
+  let const should_ignore_existing =
+      existing_policy == existing_directory_policy::Accept;
   if (os::make_directory(path, mode)) {
     if (should_set_exact_mode && !os::set_file_mode(path, mode)) {
       return false;
@@ -85,7 +100,9 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
       let const text = operand.view();
 
       if (text.is_empty()) {
-        if (!make_one(text, intermediate_mode, false, true)) {
+        if (!make_one(text, intermediate_mode, mode_application::RespectUmask,
+                      existing_directory_policy::Accept))
+        {
           report_soft_shitbox_error(
               ec, cxt,
               "mkdir: cannot create directory '" + operand +
@@ -103,7 +120,11 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
         let const mode = is_named_directory ? named_mode : intermediate_mode;
         let const should_set_exact_mode =
             !is_named_directory || FLAG_MKDIR_MODE.is_set();
-        if (!make_one(prefix, mode, should_set_exact_mode, true)) {
+        if (!make_one(prefix, mode,
+                      should_set_exact_mode ? mode_application::Exact
+                                            : mode_application::RespectUmask,
+                      existing_directory_policy::Accept))
+        {
           report_soft_shitbox_error(
               ec, cxt,
               "mkdir: cannot create directory '" +
@@ -113,8 +134,11 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
           break;
         }
       }
-    } else if (!make_one(operand.view(), named_mode, FLAG_MKDIR_MODE.is_set(),
-                         false))
+    } else if (!make_one(operand.view(), named_mode,
+                         FLAG_MKDIR_MODE.is_set()
+                             ? mode_application::Exact
+                             : mode_application::RespectUmask,
+                         existing_directory_policy::Reject))
     {
       report_soft_shitbox_error(ec, cxt,
                                 "mkdir: cannot create directory '" + operand +
