@@ -58,8 +58,20 @@ complete -o filenames -F _shit_complete shit
 
 _shit_assimilate_complete()
 {
+    local current_word=${COMP_WORDS[COMP_CWORD]}
+    local previous_word=${COMP_WORDS[COMP_CWORD - 1]}
+    local flags="-x --trace --ssh-command --scp-command --link-mood --help"
+
+    if [[ $previous_word == --link-mood ]]; then
+        COMPREPLY=( $(compgen -W "bash dash sh shit" -- "$current_word") )
+        return
+    fi
+    if [[ $current_word == -* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$current_word") )
+        return
+    fi
     if declare -F _known_hosts_real >/dev/null; then
-        _known_hosts_real "${COMP_WORDS[COMP_CWORD]}"
+        _known_hosts_real "$current_word"
     fi
 }
 
@@ -99,7 +111,7 @@ force-diagnostics show-stats no-diagnostics show-memory login rcfile"
 
 complete -F _shit_set_complete set
 
-_shitbox_utils="basename calc cat cp dirname du env find grep head killall ln \
+_shitbox_utils="basename calc cat cp dirname du env find flock grep head killall ln \
 ls make mkdir mv nproc pkill ps realpath rm rmdir seq sleep sort tail tee timeout touch tr \
 uniq unlink wc which whoami yes"
 
@@ -127,6 +139,7 @@ _shitbox_util_flags()
         pkill|killall) echo "-s -l" ;;
         make)          echo "-f" ;;
         find)          echo "-name -type -maxdepth -mindepth -print" ;;
+        flock)         echo "--transaction-held-lock" ;;
         *)             echo "" ;;
     esac
 }

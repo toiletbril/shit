@@ -29,7 +29,7 @@
 echo is a shell builtin
 cd is a shell builtin
 cd is /usr/bin/cd
-shit: 4:1: error: Builtin 'type': The command 'nope' was not found.
+shit: 4:1: error: Builtin `type`: The command 'nope' was not found.
      4 |  type nope
        |  ^~~~~~~~~ here.
 [Code 1]

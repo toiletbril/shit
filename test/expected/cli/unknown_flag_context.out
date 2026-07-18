@@ -1,5 +1,5 @@
 == builtin unknown flag carries the Builtin prefix:
-shit: 1:8: error: Builtin 'enable': Unknown flag '--badflag'.
+shit: 1:8: error: Builtin `enable`: Unknown flag '--badflag'.
      1 |  enable --badflag
        |         ^~~~~~~~~ here.
 note: Use `--` before an operand that begins with a dash.

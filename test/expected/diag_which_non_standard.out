@@ -24,9 +24,5 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:1: warning: The which command is non-standard.
-     2 |  which ls >/dev/null 2>&1
-       |  ^~~~~ here.
-note: Use command -v for a portable lookup.
 after
 [Code 0]

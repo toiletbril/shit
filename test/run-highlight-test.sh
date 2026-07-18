@@ -5,10 +5,7 @@
 # FAILED_LIST and the highlight test files as arguments.
 
 if ! "$BIN" --debug-highlight-at '' </dev/null >/dev/null 2>&1; then
-    for f in "$@"; do
-        name=$(basename "$f" .sh)
-        printf "\t%-64s skipped, release binary\n" "highlight/$name.sh"
-    done
+    printf "\t%-64s skipped, release binary\n" highlight
     exit 0
 fi
 

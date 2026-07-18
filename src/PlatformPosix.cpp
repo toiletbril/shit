@@ -966,9 +966,10 @@ cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
   return child_pid;
 }
 
-hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
-                       bool new_process_group, StringView source) throws
-    -> process
+hot fn execute_program(
+    ExecContext &&ec, bool allow_script_fallback, bool new_process_group,
+    StringView source,
+    bool should_hand_off_controlling_terminal_before_start) throws -> process
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
@@ -980,6 +981,79 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   {
     if (!was_fds_handed_to_fallback) ec.close_fds();
   };
+
+  if (should_hand_off_controlling_terminal_before_start) {
+    let const start_pipe = os::make_pipe();
+    let const outcome_pipe = os::make_pipe();
+    if (!start_pipe.has_value() || !outcome_pipe.has_value()) {
+      if (start_pipe.has_value()) {
+        os::close_fd(start_pipe->in);
+        os::close_fd(start_pipe->out);
+      }
+      if (outcome_pipe.has_value()) {
+        os::close_fd(outcome_pipe->in);
+        os::close_fd(outcome_pipe->out);
+      }
+      throw ErrorWithLocation{ec.source_location(),
+                              "Could not open the program start gate"};
+    }
+
+    shit::flush();
+    let const child = os::fork_job_process();
+    if (child == 0) {
+      os::close_fd(start_pipe->out);
+      os::close_fd(outcome_pipe->in);
+      char start_byte = 0;
+      let const start_read = os::read_fd(start_pipe->in, &start_byte, 1);
+      os::close_fd(start_pipe->in);
+      if (!start_read.has_value() || *start_read == 0)
+        os::exit_process_immediately(1);
+
+      try {
+        os::replace_process(steal(ec));
+        unused(os::write_fd(outcome_pipe->out, "f", 1));
+        os::close_fd(outcome_pipe->out);
+        os::exit_process_immediately(0);
+      } catch (const ErrorBase &error) {
+        show_message(error.to_string(source));
+        flush();
+        os::exit_process_immediately(static_cast<i32>(error.command_status()));
+      } catch (...) {
+        os::exit_process_immediately(1);
+      }
+    }
+
+    os::close_fd(start_pipe->in);
+    os::close_fd(outcome_pipe->out);
+    os::give_controlling_terminal_to(child);
+    let const start_write = os::write_fd(start_pipe->out, "x", 1);
+    os::close_fd(start_pipe->out);
+    if (!start_write.has_value()) {
+      unused(os::signal_process(child, 9));
+      os::reap_process_quietly(child);
+      os::close_fd(outcome_pipe->in);
+      throw ErrorWithLocation{ec.source_location(),
+                              "Could not release the program start gate"};
+    }
+
+    char outcome = 0;
+    let const outcome_read = os::read_fd(outcome_pipe->in, &outcome, 1);
+    os::close_fd(outcome_pipe->in);
+    if (!outcome_read.has_value()) {
+      unused(os::signal_process(child, 9));
+      os::reap_process_quietly(child);
+      throw ErrorWithLocation{ec.source_location(),
+                              "Could not read the program start outcome"};
+    }
+    if (*outcome_read == 1 && outcome == 'f' && allow_script_fallback) {
+      os::reap_process_quietly(child);
+      was_fds_handed_to_fallback = true;
+      return SHIT_INVALID_PROCESS;
+    }
+
+    ec.close_fds();
+    return child;
+  }
 
   let const child_args = make_os_args(ec.args());
 
@@ -1357,14 +1431,17 @@ fn replace_process(ExecContext &&ec) throws -> void
 
   sigset_t saved_signal_mask;
   struct sigaction saved_sigchild_action = {};
+  struct sigaction saved_sigint_action = {};
   struct sigaction saved_sigpipe_action = {};
   let const saved_interrupt_requested = INTERRUPT_REQUESTED;
   check_syscall(sigprocmask(SIG_SETMASK, nullptr, &saved_signal_mask));
   check_syscall(sigaction(SIGCHLD, nullptr, &saved_sigchild_action));
+  check_syscall(sigaction(SIGINT, nullptr, &saved_sigint_action));
   check_syscall(sigaction(SIGPIPE, nullptr, &saved_sigpipe_action));
   defer
   {
     sigaction(SIGCHLD, &saved_sigchild_action, nullptr);
+    sigaction(SIGINT, &saved_sigint_action, nullptr);
     sigaction(SIGPIPE, &saved_sigpipe_action, nullptr);
     INTERRUPT_REQUESTED = saved_interrupt_requested;
     sigprocmask(SIG_SETMASK, &saved_signal_mask, nullptr);
@@ -1388,9 +1465,11 @@ fn replace_process(ExecContext &&ec) throws -> void
      clobber errno. */
   errno = exec_error;
   let const reason = last_system_error_message();
-  throw shit::ErrorWithLocation{ec.source_location(),
-                                "Unable to execute `" +
-                                    ec.program_path().text() + "`: " + reason};
+  let error = shit::ErrorWithLocation{
+      ec.source_location(),
+      "Unable to execute `" + ec.program_path().text() + "`: " + reason};
+  error.set_command_status(exec_error == ENOENT ? 127 : 126);
+  throw error;
 }
 
 fn redirect_self(const ExecContext &ec) throws -> void
@@ -1782,6 +1861,7 @@ fn reset_signal_handlers() throws -> void
   struct sigaction sa = {};
   sa.sa_handler = SIG_DFL;
   check_syscall(sigaction(SIGCHLD, &sa, nullptr));
+  check_syscall(sigaction(SIGINT, &sa, nullptr));
 
   /* The shell ignores SIGPIPE, the child restores the default so a producer
      dies on a broken pipe. */

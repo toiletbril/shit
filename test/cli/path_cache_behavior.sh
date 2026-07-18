@@ -90,6 +90,15 @@ if "$BIN" -X all -c ':' >/dev/null 2>&1; then
 fi
 printf 'analysis-shadowed-no-path-scan\n'
 
+noninteractive_log="$dir/noninteractive.log"
+PATH="$dir/one:/bin" "$BIN" -X all -c 'missing_command_xyz' \
+    >/dev/null 2>"$noninteractive_log"
+if grep -F 'scanning every PATH directory to seed the program cache' \
+    "$noninteractive_log" >/dev/null; then
+    exit 1
+fi
+printf 'noninteractive-no-path-index\n'
+
 PATH=/bin "$BIN" -c \
     'compfunc() { :; }; eval "alias compalias=:"; compgen -c shopt 2>/dev/null; compgen -c compfunc 2>/dev/null; compgen -c compalias 2>/dev/null'
 

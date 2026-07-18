@@ -48,7 +48,7 @@ fn Nproc::execute(const ExecContext &ec, EvalContext &cxt,
     if (parsed.is_error())
       throw ErrorWithLocation{
           FLAG_NPROC_IGNORE.value_location(),
-          "nproc: invalid number '" +
+          "invalid number '" +
               String{cxt.scratch_allocator(), FLAG_NPROC_IGNORE.value()}
               + "'"
       };

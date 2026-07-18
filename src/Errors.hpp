@@ -94,14 +94,6 @@ private:
   String m_note{heap_allocator()};
 };
 
-/* The mimic boundary tests this type, never the message text, so a
-   program-thrown Error reading "Interrupted" is not mistaken for it. */
-class InterruptError : public Error
-{
-public:
-  InterruptError();
-};
-
 class Note : public Error
 {
 public:
@@ -144,6 +136,14 @@ protected:
   SourceLocation m_location;
   usize m_line_offset{0};
   bool m_was_rendered{false};
+};
+
+/* The mimic boundary tests this type, never the message text, so a
+   program-thrown Error reading "Interrupted" is not mistaken for it. */
+class InterruptErrorWithLocation : public ErrorWithLocation
+{
+public:
+  explicit InterruptErrorWithLocation(SourceLocation location);
 };
 
 class CommandResolutionErrorWithLocation : public ErrorWithLocation

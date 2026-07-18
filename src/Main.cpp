@@ -1121,6 +1121,8 @@ fn main(int argc, char **argv) -> int
         shit::StringView{file_names[i].data(), file_names[i].count()}
     });
 
+  shit::os::unset_environment_variable("SHIT_IDENTITY");
+
   let context = shit::EvalContext{FLAG_DISABLE_EXPANSION.is_enabled(),
                                   FLAG_VERBOSE.is_enabled(),
                                   FLAG_EXPAND_VERBOSE.is_enabled(),
@@ -1166,6 +1168,8 @@ fn main(int argc, char **argv) -> int
   /* BASH names the path used to invoke this shell, the symlink spelling such as
      /usr/local/bin/bash when shit is symlinked to bash. */
   context.set_shell_executable_path(executable_path);
+  context.mark_exported("SHIT_IDENTITY");
+  context.mark_readonly("SHIT_IDENTITY");
   /* SHELL is owned by login, getty, or the display manager, so an inherited
      value is left untouched. Only a shell that received no SHELL seeds its own
      invocation path. */

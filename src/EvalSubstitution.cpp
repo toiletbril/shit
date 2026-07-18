@@ -354,7 +354,9 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
 
 #if SHIT_PLATFORM_IS POSIX
   let const pipe = os::make_pipe();
-  if (!pipe) throw Error{"Could not open a pipe for command substitution"};
+  if (!pipe)
+    throw ErrorWithLocation{previous_location,
+                            "Could not open a pipe for command substitution"};
   bool was_pipe_handed_off = false;
   defer
   {
@@ -365,7 +367,9 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   };
 
   shit::flush();
-  let const child = os::fork_compound_stage(None, pipe->out, None);
+  let const child = os::fork_compound_stage(
+      None, pipe->out, None, previous_location,
+      previous_source != nullptr ? previous_source->view() : StringView{});
   was_pipe_handed_off = true;
   if (child == 0) {
     os::close_fd(pipe->in);
@@ -399,14 +403,42 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   }
 
   os::close_fd(pipe->out);
+  bool is_input_open = true;
+  bool has_reaped_child = false;
+  defer
+  {
+    if (is_input_open) os::close_fd(pipe->in);
+    if (!has_reaped_child) {
+      unused(os::signal_process(child, 9));
+      os::reap_process_quietly(child);
+    }
+  };
+
   let captured = os::read_fd_to_string(pipe->in, heap_allocator());
+  let const was_read_interrupted =
+      !captured.has_value() && os::INTERRUPT_REQUESTED;
   os::close_fd(pipe->in);
+  is_input_open = false;
+  if (was_read_interrupted) {
+    unused(os::signal_process(child, 2));
+    os::reap_process_quietly(child);
+    has_reaped_child = true;
+    os::INTERRUPT_REQUESTED = 0;
+    throw InterruptErrorWithLocation{previous_location};
+  }
+
   let was_stopped = false;
   let const status = os::wait_and_monitor_process(child, &was_stopped);
+  has_reaped_child = true;
   unused(was_stopped);
+  if (os::INTERRUPT_REQUESTED) {
+    os::INTERRUPT_REQUESTED = 0;
+    throw InterruptErrorWithLocation{previous_location};
+  }
   set_last_exit_status(status);
   if (!captured.has_value())
-    throw Error{"Could not read command substitution output"};
+    throw ErrorWithLocation{previous_location,
+                            "Could not read command substitution output"};
   while (!captured->is_empty() && captured->back() == '\n')
     captured->pop_back();
   return steal(*captured);

@@ -11,6 +11,7 @@ atomic-old= atomic-new=newatomicprobe
 refreshed
 appeared
 analysis-shadowed-no-path-scan
+noninteractive-no-path-index
 shopt
 compfunc
 compalias

@@ -1048,7 +1048,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   try {
     for (const String &goal : goals)
       build_target(ec, cxt, mk, goal.view(), visiting, built);
-  } catch (const InterruptError &) {
+  } catch (const InterruptErrorWithLocation &) {
     throw;
   } catch (Error &error) {
     error.set_command_status(2);

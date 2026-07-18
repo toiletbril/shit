@@ -341,6 +341,9 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
                             const ArrayList<StringView> &synopsis_lines,
                             const ArrayList<Flag *> &flags,
                             StringView extra_sections = {}) throws;
+fn builtin_error_context(StringView program) throws -> String;
+fn builtin_error_message(StringView program, StringView message) throws
+    -> String;
 
 #define SHOW_BUILTIN_HELP_AND_RETURN(ec)                                       \
   do {                                                                         \
@@ -358,7 +361,7 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
 #define PARSE_BUILTIN_ARGS(ec)                                                 \
   parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,         \
                   nullptr, &ec.arg_locations(), nullptr,                       \
-                  StringView{"Builtin '"} + ec.program() + "'");               \
+                  builtin_error_context(ec.program()));                        \
   defer { reset_flags(FLAG_LIST); }
 
 /* The same parse, but it also fills operand_locations with the source span of
@@ -368,7 +371,7 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
 #define PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations)               \
   parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,         \
                   nullptr, &ec.arg_locations(), &(operand_locations),          \
-                  StringView{"Builtin '"} + ec.program() + "'");               \
+                  builtin_error_context(ec.program()));                        \
   defer { reset_flags(FLAG_LIST); }
 
 i32 execute_builtin(ExecContext &&ec, EvalContext &cxt) throws;

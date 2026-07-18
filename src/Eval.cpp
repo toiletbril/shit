@@ -155,6 +155,19 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
   force_unset_shell_variable("BASH");
 }
 
+fn EvalContext::materialize_shit_identity() const throws -> Maybe<String>
+{
+  if (!m_shit_identity_was_attempted) {
+    m_shit_identity_was_attempted = true;
+    m_shit_identity = utils::file_content_identity(
+        Path{m_shell_executable_path.view()}, heap_allocator());
+    if (m_shit_identity.has_value())
+      os::set_environment_variable("SHIT_IDENTITY", m_shit_identity->view());
+  }
+
+  return m_shit_identity;
+}
+
 fn EvalContext::unset_shell_variable(StringView name) throws -> void
 {
   if (is_readonly(name))
@@ -539,6 +552,7 @@ enum class dynamic_var : u8
   IFS,
   LINENO,
   SHIT_GIT_BRANCH,
+  SHIT_IDENTITY,
 
   RANDOM,
   SECONDS,
@@ -569,6 +583,7 @@ constexpr static_string_entry<dynamic_var> ALWAYS_DYNAMIC_ENTRIES[] = {
     {SSK("IFS"),             dynamic_var::IFS            },
     {SSK("LINENO"),          dynamic_var::LINENO         },
     {SSK("SHIT_GIT_BRANCH"), dynamic_var::SHIT_GIT_BRANCH},
+    {SSK("SHIT_IDENTITY"),   dynamic_var::SHIT_IDENTITY  },
 };
 constexpr StaticStringMap ALWAYS_DYNAMIC{ALWAYS_DYNAMIC_ENTRIES};
 
@@ -721,6 +736,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         return String::from(line_number_at_location(m_current_location),
                             heap_allocator());
       case dynamic_var::SHIT_GIT_BRANCH: return utils::current_git_branch();
+      case dynamic_var::SHIT_IDENTITY: return materialize_shit_identity();
       default: break;
       }
     }
@@ -847,6 +863,7 @@ fn EvalContext::append_dynamic_variable_names(
   out.push(StringView{"IFS"});
   out.push(StringView{"LINENO"});
   out.push(StringView{"SHIT_GIT_BRANCH"});
+  out.push(StringView{"SHIT_IDENTITY"});
 
   for (let const &color : SHIT_ANSI_COLORS)
     out.push(StringView{color.name});

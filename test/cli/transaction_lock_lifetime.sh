@@ -1,9 +1,16 @@
 directory=$(mktemp -d)
 trap 'test -n "$directory" && /bin/rm -rf "$directory"' EXIT
 
+"$BIN" -p --mood sh -c '
+    shitbox flock "$1" /bin/sh -c "printf held > \"\$1\"" shell "$2"
+' shell "$directory" "$directory/normal"
+printf 'normal=%s help=%s list=%s\n' "$(cat "$directory/normal")" \
+    "$("$BIN" -c 'shitbox flock --help' | grep -c transaction-held-lock)" \
+    "$("$BIN" -c 'shitbox --list' | grep -c '^flock$')"
+
 LOCK_DIRECTORY=$directory STATE_DIRECTORY=$directory SHELL_BINARY=$BIN \
     "$BIN" -p --mood sh -c '
-    shitbox --transaction-lock "$LOCK_DIRECTORY" "$SHELL_BINARY" \
+    shitbox flock --transaction-held-lock "$LOCK_DIRECTORY" "$SHELL_BINARY" \
         -p --mood sh -c '\''shitbox touch "$STATE_DIRECTORY/started"
         shitbox sleep 0.5
         shitbox touch "$STATE_DIRECTORY/finished"'\''
@@ -20,7 +27,7 @@ wait "$wrapper_process" 2>/dev/null || :
 
 LOCK_DIRECTORY=$directory STATE_DIRECTORY=$directory SHELL_BINARY=$BIN \
     "$BIN" -p --mood sh -c '
-    shitbox --transaction-lock "$LOCK_DIRECTORY" "$SHELL_BINARY" \
+    shitbox flock --transaction-held-lock "$LOCK_DIRECTORY" "$SHELL_BINARY" \
         -p --mood sh -c '\''shitbox touch "$STATE_DIRECTORY/acquired"'\''
 ' &
 second_process=$!

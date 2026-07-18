@@ -58,7 +58,7 @@ hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
      control returns to the prompt. */
   if (os::INTERRUPT_REQUESTED) {
     os::INTERRUPT_REQUESTED = 0;
-    throw InterruptError{};
+    throw InterruptErrorWithLocation{source_location()};
   }
   /* A trapped signal runs its action here at the command boundary. */
   if (os::SIGNAL_PENDING) cxt.run_pending_traps();
@@ -1042,12 +1042,6 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                   "inject format directives",
                   "Use printf '%s' to print it");
     }
-  }
-
-  /* which is not in POSIX and varies across systems, shellcheck SC2230. */
-  if (command_literal == "which" && !command_is_shadowed) {
-    actx.warn(m_args[0]->source_location(), "The which command is non-standard",
-              "Use command -v for a portable lookup");
   }
 
   /* An unquoted command substitution splits on IFS and globs each field,

@@ -5,7 +5,7 @@ shit: 1:1: warning: A local outside a function has no scope to bind.
 note: Declare the variable plainly or move it into a function.
 shit: 1:0: trace location:
      1 |  SHIT -c 'local x=5'
-shit: 1:1: error: Builtin 'local': Unable to declare a local variable outside a function.
+shit: 1:1: error: Builtin `local`: Unable to declare a local variable outside a function.
      1 |  local x=5
        |  ^~~~~~~~~ here.
 note: `local` only works inside a function body.

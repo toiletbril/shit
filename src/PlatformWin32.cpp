@@ -1143,7 +1143,9 @@ static pure fn is_batch_program(StringView path) wontthrow -> bool
 }
 
 fn execute_program(ExecContext &&ec, bool allow_script_fallback,
-                   bool new_process_group, StringView) -> process
+                   bool new_process_group, StringView,
+                   bool should_hand_off_controlling_terminal_before_start)
+    -> process
 {
   LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
       ec.args().count());
@@ -1220,8 +1222,10 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   LPVOID environment_block =
       ec.should_use_empty_environment ? empty_environment_block : nullptr;
 
-  let const creation_flags =
-      new_process_group ? CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED : 0;
+  DWORD creation_flags = new_process_group ? CREATE_NEW_PROCESS_GROUP : 0;
+  if (new_process_group || should_hand_off_controlling_terminal_before_start) {
+    creation_flags |= CREATE_SUSPENDED;
+  }
 
   /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
    */
@@ -1251,6 +1255,10 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
       CloseHandle(process_info.hThread);
       throw;
     }
+  }
+  if (should_hand_off_controlling_terminal_before_start)
+    give_controlling_terminal_to(process_info.hProcess);
+  if ((creation_flags & CREATE_SUSPENDED) != 0) {
     if (ResumeThread(process_info.hThread) == static_cast<DWORD>(-1)) {
       let const message = last_system_error_message();
       TerminateProcess(process_info.hProcess, 1);
@@ -1547,7 +1555,7 @@ fn acquire_process_lock(StringView path) throws -> Maybe<descriptor>
       StringView{absolute_path, static_cast<usize>(length)}
   };
   if (!is_directory_separator(lock_path.back())) lock_path += '\\';
-  lock_path += ".shit-assimilate.process.lock";
+  lock_path += ".shit-flock.lock";
   SECURITY_ATTRIBUTES attributes{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
   loop
   {

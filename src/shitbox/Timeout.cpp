@@ -201,9 +201,18 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
       ec.source_location(), ResolvedCommand::from_program(*program_path),
       steal(command_args), steal(command_locations));
   let const source = cxt.current_source();
+  let const has_controlling_terminal =
+      cxt.shell_is_interactive() && os::shell_has_controlling_terminal();
+  unused(cxt.materialize_shit_identity());
+  defer
+  {
+    if (has_controlling_terminal) os::reclaim_controlling_terminal();
+  };
+
   os::process child =
       os::execute_program(steal(command), true, true,
-                          source != nullptr ? source->view() : StringView{});
+                          source != nullptr ? source->view() : StringView{},
+                          has_controlling_terminal);
   if (child == SHIT_INVALID_PROCESS) {
     let const shell_path = os::current_executable_path();
     if (!shell_path.has_value())
@@ -228,16 +237,9 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
         steal(fallback_args), steal(fallback_locations));
     child =
         os::execute_program(steal(fallback), false, true,
-                            source != nullptr ? source->view() : StringView{});
+                            source != nullptr ? source->view() : StringView{},
+                            has_controlling_terminal);
   }
-
-  let const has_controlling_terminal =
-      cxt.shell_is_interactive() && os::shell_has_controlling_terminal();
-  if (has_controlling_terminal) os::give_controlling_terminal_to(child);
-  defer
-  {
-    if (has_controlling_terminal) os::reclaim_controlling_terminal();
-  };
 
   os::process process_group = SHIT_INVALID_PROCESS;
   try {

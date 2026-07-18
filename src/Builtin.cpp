@@ -13,6 +13,17 @@
 
 namespace shit {
 
+fn builtin_error_context(StringView program) throws -> String
+{
+  return StringView{"Builtin `"} + program + "`";
+}
+
+fn builtin_error_message(StringView program, StringView message) throws
+    -> String
+{
+  return builtin_error_context(program) + ": " + message;
+}
+
 cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
                                const ArrayList<StringView> &synopsis_lines,
                                const ArrayList<Flag *> &flags,
@@ -163,8 +174,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
       return 1;
     }
 
-    let const prefixed =
-        StringView{"Builtin '"} + ec.program() + "': " + e.message();
+    let const prefixed = builtin_error_message(ec.program(), e.message());
     if (!e.detail_message().is_empty()) {
       throw ErrorWithLocationAndDetails{ec.source_location(), prefixed.view(),
                                         e.detail_message()};
@@ -178,13 +188,11 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void
 {
   const ErrorWithLocation located{ec.source_location(),
-                                  StringView{"Builtin '"} + ec.program() +
-                                      "': " + message};
+                                  builtin_error_message(ec.program(), message)};
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view()));
   else
-    print_error(StringView{"shit: Builtin '"} + ec.program() + "': " + message +
-                "\n");
+    print_error("shit: " + builtin_error_message(ec.program(), message) + "\n");
 }
 
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
@@ -198,13 +206,12 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              SourceLocation location, StringView message) throws
     -> void
 {
-  const ErrorWithLocation located{location, StringView{"Builtin '"} +
-                                                ec.program() + "': " + message};
+  const ErrorWithLocation located{location,
+                                  builtin_error_message(ec.program(), message)};
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view()));
   else
-    print_error(StringView{"shit: Builtin '"} + ec.program() + "': " + message +
-                "\n");
+    print_error("shit: " + builtin_error_message(ec.program(), message) + "\n");
 }
 
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
@@ -252,14 +259,14 @@ fn report_usage_error(EvalContext &cxt, SourceLocation location,
 fn make_error_for_arg(const ExecContext &ec, usize index,
                       StringView message) throws -> ErrorWithLocation
 {
-  let const prefixed = StringView{"Builtin '"} + ec.program() + "': " + message;
+  let const prefixed = builtin_error_message(ec.program(), message);
   return ErrorWithLocation{ec.arg_location_at(index), prefixed.view()};
 }
 
 fn make_error_for_arg(const ExecContext &ec, usize index, StringView message,
                       StringView note) throws -> ErrorWithLocationAndDetails
 {
-  let const prefixed = StringView{"Builtin '"} + ec.program() + "': " + message;
+  let const prefixed = builtin_error_message(ec.program(), message);
   return ErrorWithLocationAndDetails{ec.arg_location_at(index), prefixed.view(),
                                      note};
 }

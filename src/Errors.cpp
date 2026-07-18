@@ -258,7 +258,9 @@ WarningWithDetails::WarningWithDetails(StringView message, StringView note)
     : Warning(message), m_note(note)
 {}
 
-InterruptError::InterruptError() : Error("Interrupted") {}
+InterruptErrorWithLocation::InterruptErrorWithLocation(SourceLocation location)
+    : ErrorWithLocation(location, "Interrupted")
+{}
 
 cold fn Warning::severity_word() const wontthrow -> StringView
 {

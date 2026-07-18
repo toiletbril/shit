@@ -44,6 +44,7 @@ static fn is_assignment(StringView text) wontthrow -> bool
 static fn print_environment(const ExecContext &ec, EvalContext &cxt) throws
     -> void
 {
+  unused(cxt.materialize_shit_identity());
   let output = String{cxt.scratch_allocator()};
   for (let const &name : os::environment_names()) {
     let const value = os::get_environment_variable(name.view());

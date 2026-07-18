@@ -348,6 +348,7 @@ public:
   {
     return m_shell_executable_path.view();
   }
+  fn materialize_shit_identity() const throws -> Maybe<String>;
 
   fn unset_shell_variable(StringView name) throws -> void;
 
@@ -1384,6 +1385,8 @@ protected:
 
   String m_shell_name{heap_allocator()};
   String m_shell_executable_path{heap_allocator()};
+  mutable Maybe<String> m_shit_identity{};
+  mutable bool m_shit_identity_was_attempted{false};
   String m_last_argument{heap_allocator()};
   String m_execution_string{heap_allocator()};
   bool m_has_execution_string{false};

@@ -22,13 +22,15 @@ PATH="$d" "$detector"
 /bin/rm -f "$d/getconf"
 PATH="$d" "$detector"
 
-default_jobs=$(cd .. && make -n CPU_COUNT=6 shit 2>/dev/null)
+default_jobs=$(cd .. && MAKEFLAGS= MFLAGS= MAKELEVEL=0 \
+    make -n CPU_COUNT=6 shit 2>/dev/null)
 case "$default_jobs" in
     *'-j6 -C src shit'*) echo default-make-uses-all ;;
     *) echo default-make-missed ;;
 esac
 
-variable_jobs=$(cd .. && make -n CPU_COUNT=6 LABEL=project shit 2>/dev/null)
+variable_jobs=$(cd .. && MAKEFLAGS= MFLAGS= MAKELEVEL=0 \
+    make -n CPU_COUNT=6 LABEL=project shit 2>/dev/null)
 case "$variable_jobs" in
     *'-j6 -C src shit'*) echo variable-make-uses-all ;;
     *) echo variable-make-missed ;;
@@ -53,7 +55,8 @@ case "$single_job_without_discovery" in
     *) echo single-make-fallback-preserved ;;
 esac
 
-windows_jobs=$(cd .. && OS=Windows_NT NUMBER_OF_PROCESSORS=7 \
+windows_jobs=$(cd .. && MAKEFLAGS= MFLAGS= MAKELEVEL=0 \
+    OS=Windows_NT NUMBER_OF_PROCESSORS=7 \
     make -n shit 2>/dev/null)
 case "$windows_jobs" in
     *'-j7 -C src shit'*) echo windows-make-uses-all ;;
@@ -61,7 +64,7 @@ case "$windows_jobs" in
 esac
 
 for invalid_count in 0 invalid; do
-    windows_jobs=$(cd .. && OS=Windows_NT \
+    windows_jobs=$(cd .. && MAKEFLAGS= MFLAGS= MAKELEVEL=0 OS=Windows_NT \
         NUMBER_OF_PROCESSORS=$invalid_count make -n shit 2>/dev/null)
     case "$windows_jobs" in
         *"-j$invalid_count -C src shit"*)

@@ -97,7 +97,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
       };
       try {
         return n->evaluate(cxt);
-      } catch (const InterruptError &) {
+      } catch (const InterruptErrorWithLocation &) {
         throw;
       } catch (ErrorWithLocation &error) {
         if (!cxt.is_bash_compatible() || error.is_script_fatal()) {

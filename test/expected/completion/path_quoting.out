@@ -8,3 +8,33 @@ plainfile.txt
 spacey file.txt
 == inside a double quote the space match completes bare within it:
 spacey file.txt
+== a closed quoted directory continues through an unquoted slash:
+'PATH'/'space file.txt'
+'PATH'/plain.txt
+'PATH'/star-one.txt
+'PATH'/tool
+== a partial basename follows a closed quoted directory:
+'PATH'/plain.txt
+== a quoted directory that contains a space keeps its spelling:
+'space dir'/mixed.txt
+== adjacent quoted and unquoted directory bytes are decoded together:
+P'A'TH/plain.txt
+== an escaped directory keeps its spelling:
+space\ dir/mixed.txt
+== a double-quoted variable directory remains active:
+"$HOME"/home.txt
+== a single-quoted variable directory remains literal:
+'$HOME'/literal-variable.txt
+== an open single-quoted variable directory remains literal:
+$HOME/literal-variable.txt
+== an open double-quoted variable directory remains active:
+$HOME/home.txt
+== an active tilde directory expands:
+~/home.txt
+== a quoted tilde directory remains literal:
+'~'/literal-tilde.txt
+== a quoted glob remains literal:
+== an unquoted glob after a quoted directory expands:
+'PATH'/plain.txt 'PATH'/'space file.txt' 'PATH'/star-one.txt
+== command position keeps only runnable files:
+'PATH'/tool

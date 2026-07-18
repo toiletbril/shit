@@ -92,7 +92,14 @@ completion_%: expected/completion/%.out
 		rm -f $$out; \
 	fi
 
-completion_tests: $(COMPLETION_NAMES)
+completion_tests: $(BIN)
+	@if ! $(BIN) --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
+		printf "	%-64s skipped, release binary\n" completion; \
+	else \
+		$(MAKE) --no-print-directory $(COMPLETION_NAMES) \
+			BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' \
+			FAILED_LIST='$(FAILED_LIST)'; \
+	fi
 
 
 HIGHLIGHT_INPUT := $(wildcard highlight/*.sh)
@@ -102,7 +109,9 @@ highlight_%: expected/highlight/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-highlight-test.sh highlight/$*.sh
 
-highlight_tests: $(BIN) $(HIGHLIGHT_NAMES)
+highlight_tests: $(BIN)
+	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
+		$(SHELL) run-highlight-test.sh $(HIGHLIGHT_INPUT)
 
 
 REFILL ?=

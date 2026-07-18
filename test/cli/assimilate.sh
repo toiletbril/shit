@@ -26,6 +26,10 @@ chmod +x "$failure_runner"
 
 cat > "$transport/scp" <<'SH'
 #!/bin/sh
+if [ "${1-}" = scp-prefix ]; then
+    printf 'scp-prefix\n' >> "$ASSIMILATE_TRANSPORT_LOG"
+    shift
+fi
 [ "$1" = -p ] || exit 40
 shift
 [ "$1" = -- ] || exit 41
@@ -46,6 +50,10 @@ chmod +x "$transport/scp"
 
 cat > "$transport/ssh" <<'SH'
 #!/bin/sh
+if [ "${1-}" = ssh-prefix ]; then
+    printf 'ssh-prefix\n' >> "$ASSIMILATE_TRANSPORT_LOG"
+    shift
+fi
 [ "$1" = -- ] || exit 40
 shift
 [ "$1" = 'user@[2001:db8::1]' ] || exit 41
@@ -60,7 +68,7 @@ case $command in
 esac
 cd "$ASSIMILATE_REMOTE" || exit 1
 umask 077
-PATH=$ASSIMILATE_REMOTE_PATH /bin/sh -c "$command"
+HOME=$ASSIMILATE_REMOTE_HOME PATH=$ASSIMILATE_REMOTE_PATH /bin/sh -c "$command"
 SH
 chmod +x "$transport/ssh"
 
@@ -71,18 +79,24 @@ leftovers()
 
 file_mode()
 {
-    stat -f %Lp "$1" 2>/dev/null || stat -c %a "$1"
+    mode=$(stat -c %a "$1" 2>/dev/null)
+    case "$mode" in
+        ''|*[!0-9]*) mode=$(stat -f %Lp "$1" 2>/dev/null) ;;
+    esac
+    printf '%s\n' "$mode"
 }
 
 run_assimilate()
 {
-    PATH="$transport:/bin:/usr/bin" "$BIN" -c \
-        "assimilate 'user@[2001:db8::1]'" \
+    PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate "$@"' shit \
+        "$@" 'user@[2001:db8::1]' \
         >/dev/null 2>&1
 }
 
 export ASSIMILATE_REMOTE=$remote
 export ASSIMILATE_REMOTE_PATH="$remote/missing:$install"
+export ASSIMILATE_REMOTE_HOME=$remote/home
+export ASSIMILATE_TRANSPORT_LOG=$root/transport.log
 export ASSIMILATE_FAILURE_RUNNER=$failure_runner
 export ASSIMILATE_RUNNER=$binary
 run_assimilate
@@ -132,3 +146,46 @@ run_assimilate
 transfer_status=$?
 printf 'transfer-status=%s old=%s leftovers=%s\n' "$transfer_status" \
     "$(cat "$install/shit")" "$(leftovers)"
+unset ASSIMILATE_FAIL_SCP
+
+/bin/mkdir -p "$ASSIMILATE_REMOTE_HOME/.local/bin" "$remote/sbin"
+printf 'local-collision\n' > "$ASSIMILATE_REMOTE_HOME/.local/bin/bash"
+export ASSIMILATE_REMOTE_PATH="$remote/sbin:$install:$ASSIMILATE_REMOTE_HOME/.local/bin"
+: > "$ASSIMILATE_TRANSPORT_LOG"
+trace_output=$root/trace.out
+PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate "$@"' shit \
+    -x --ssh-command 'ssh ssh-prefix' --scp-command 'scp scp-prefix' \
+    --link-mood bash,dash --link-mood sh 'user@[2001:db8::1]' \
+    >"$trace_output" 2>&1
+option_status=$?
+if [ -L "$install/bash" ] && [ "$install/bash" -ef "$install/shit" ] &&
+    [ -L "$install/dash" ] && [ "$install/dash" -ef "$install/shit" ] &&
+    [ -L "$install/sh" ] && [ "$install/sh" -ef "$install/shit" ]; then
+    link_status=0
+else
+    link_status=1
+fi
+if grep -q '^scp-prefix$' "$ASSIMILATE_TRANSPORT_LOG" &&
+    grep -q '^ssh-prefix$' "$ASSIMILATE_TRANSPORT_LOG"; then
+    command_status=0
+else
+    command_status=1
+fi
+if grep -q '^+ umask 077$' "$trace_output"; then
+    trace_status=0
+else
+    trace_status=1
+fi
+if [ ! -e "$remote/sbin/shit" ]; then
+    sbin_status=0
+else
+    sbin_status=1
+fi
+if [ "$(cat "$ASSIMILATE_REMOTE_HOME/.local/bin/bash")" = local-collision ]; then
+    collision_status=0
+else
+    collision_status=1
+fi
+printf 'options=%s links=%s commands=%s trace=%s sbin=%s collision=%s leftovers=%s\n' \
+    "$option_status" "$link_status" "$command_status" "$trace_status" \
+    "$sbin_status" "$collision_status" "$(leftovers)"

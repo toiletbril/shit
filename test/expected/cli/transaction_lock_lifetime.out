@@ -1,2 +1,3 @@
+normal=held help=2 list=1
 transaction child retains the process lock
 the next transaction acquires the released lock

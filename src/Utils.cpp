@@ -266,6 +266,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
         "execute_context replacing the shell with the terminal command '%s'",
         ec.program().c_str());
     flush();
+    unused(cxt.materialize_shit_identity());
     try {
       os::replace_process(steal(ec));
     } catch (const ErrorWithLocation &error) {
@@ -308,6 +309,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
   }
 
   let const source = cxt.current_source();
+  unused(cxt.materialize_shit_identity());
   os::process p = os::execute_program(
       steal(ec), !is_async, /*new_process_group=*/is_foreground_job,
       source != nullptr ? source->view() : StringView{});
@@ -405,6 +407,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       ec.close_fds();
     } else if (!ec.is_builtin()) {
       let const source = cxt.current_source();
+      unused(cxt.materialize_shit_identity());
       let const child = os::execute_program(steal(ec), false, false,
                                             source != nullptr ? source->view()
                                                               : StringView{});
@@ -2507,31 +2510,11 @@ fn path_command_name_has_prefix(StringView prefix) throws -> bool
 
 fn get_program_path_status(StringView name) throws -> program_path_status
 {
-  let normalized_name = String{name};
-  let const name_info = os::normalize_program_name(normalized_name);
-  let const stem =
-      normalized_name.substring_of_length(0, name_info.stem_length);
-  prepare_complete_path_cache(stem);
-  if (let *cached_entry = PATH_CACHE.find(stem); cached_entry != nullptr)
-    validate_cached_program_paths(*cached_entry);
-  if (PATH_CACHE_IS_STALE) initialize_path_map();
-
-  let const *cached_entry = PATH_CACHE.find(stem);
-  if (cached_entry == nullptr) return program_path_status::Missing;
-
-  if (find_cached_program_path(*cached_entry, name_info.extension, true) !=
-      nullptr)
-  {
+  let const paths = search_program_path(name);
+  if (paths.is_empty()) return program_path_status::Missing;
+  if (paths[0].is_regular_file() && paths[0].is_executable())
     return program_path_status::Runnable;
-  }
-
-  if (find_cached_program_path(*cached_entry, name_info.extension, false) !=
-      nullptr)
-  {
-    return program_path_status::Blocked;
-  }
-
-  return program_path_status::Missing;
+  return program_path_status::Blocked;
 }
 
 /* Stat dir/name along PATH until a match, the way dash stats each candidate
@@ -2793,8 +2776,9 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     suggestion.consider(local.view());
   for (let const &builtin : builtin_names())
     suggestion.consider(builtin.view());
-  for (let const &entry : path_command_names({}))
-    suggestion.consider(entry.view());
+  if (PATH_COMMAND_NAMES_IS_VALID && !PATH_CACHE_IS_STALE)
+    for (let const &entry : PATH_COMMAND_NAMES)
+      suggestion.consider(entry.view());
 
   return suggestion.take_suggestion();
 }

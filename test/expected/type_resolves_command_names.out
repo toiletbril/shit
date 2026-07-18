@@ -52,7 +52,7 @@
 echo is a shell builtin
 g is a shell function
 true is a shell builtin
-shit: 6:1: error: Builtin 'type': The command 'nonexistent_xyz' was not found.
+shit: 6:1: error: Builtin `type`: The command 'nonexistent_xyz' was not found.
      6 |  type nonexistent_xyz
        |  ^~~~~~~~~~~~~~~~~~~~ here.
 [Code 1]

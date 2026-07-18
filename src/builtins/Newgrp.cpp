@@ -54,6 +54,7 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Info, "newgrp handing the shell off to '%s'", found[0].text().c_str());
 
   try {
+    unused(cxt.materialize_shit_identity());
     os::replace_process(steal(command));
   } catch (const ErrorBase &error) {
     report_soft_builtin_error(ec, cxt, error.message());

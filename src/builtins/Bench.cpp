@@ -544,6 +544,8 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw Error{StringView{"No command given"}};
   }
 
+  unused(cxt.materialize_shit_identity());
+
   Maybe<u64> run_limit = None;
   if (FLAG_bench_runs.is_set())
     run_limit = parse_count_flag(FLAG_bench_runs, StringView{"runs"});

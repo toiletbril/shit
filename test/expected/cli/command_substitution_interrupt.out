@@ -1,0 +1,5 @@
+status=1
+shit: 1:1: error: Interrupted.
+     1 |  value=$(echo ready > "$1"; while :; do :; done)
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+clean-interrupt

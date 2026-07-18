@@ -38,7 +38,7 @@ shit: 1:9: error: shitbox has no utility named 'kill'.
        |          ^~~~ here.
 rc=1
 --- kill with a non-numeric pid ---
-shit: 1:6: error: Builtin 'kill': 'notapid' is not a valid job or process id.
+shit: 1:6: error: Builtin `kill`: 'notapid' is not a valid job or process id.
      1 |  kill notapid
        |       ^~~~~~~ here.
 rc=1
@@ -46,4 +46,4 @@ rc=1
   PID CMD
 rc=0
 --- list prints the utility count ---
-36
+37

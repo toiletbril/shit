@@ -3,14 +3,22 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("target");
+HELP_SYNOPSIS_DECL("[option ...] target");
 HELP_DESCRIPTION_DECL(
     "The assimilate builtin installs this shell on a remote SSH target.");
 
+FLAG(TRACE, Bool, 'x', "trace", "Trace the remote installation commands.");
+FLAG(SSH_COMMAND, String, '\0', "ssh-command",
+     "Use this space-separated command instead of ssh.");
+FLAG(SCP_COMMAND, String, '\0', "scp-command",
+     "Use this space-separated command instead of scp.");
+FLAG(LINK_MOOD, ManyStrings, '\0', "link-mood",
+     "Link this binary as bash, dash, sh, or shit. Commas are accepted.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Assimilate);
@@ -20,8 +28,10 @@ namespace shit {
 namespace {
 
 constexpr char REMOTE_TRANSACTION_TEXT[] = R"SH(set -eu
+[ "${5-0}" -eq 0 ] || set -x
 umask 077
 upload=$1
+link_moods=${4-}
 candidate=
 target=
 lock=
@@ -31,6 +41,14 @@ lock_published=0
 had_target=0
 rollback_active=0
 committed=0
+remove_recorded_links() {
+  links_file=$1
+  [ ! -r "$links_file" ] || while IFS= read -r link_name; do
+    case $link_name in bash|dash|sh) ;; *) return 1 ;; esac
+    link_path=${links_file%/*}/../$link_name
+    [ ! -L "$link_path" ] || shitbox rm -f "$link_path" || return 1
+  done < "$links_file"
+}
 cleanup() {
   transaction_status=$?
   [ "$#" -eq 0 ] || transaction_status=$1
@@ -44,6 +62,7 @@ cleanup() {
     [ -n "$candidate" ] || [ ! -r "$lock/candidate" ] || candidate=$(shitbox cat "$lock/candidate")
     [ -n "$upload" ] || [ ! -r "$lock/upload" ] || upload=$(shitbox cat "$lock/upload")
     if [ "$rollback_active" -eq 1 ] && [ "$committed" -eq 0 ]; then
+      remove_recorded_links "$lock/links" || cleanup_failed=1
       if [ "$had_target" -eq 1 ] && { [ -e "$backup" ] || [ -L "$backup" ]; }; then
         shitbox mv -f "$backup" "$target" || cleanup_failed=1
       elif [ "$had_target" -eq 1 ]; then
@@ -59,7 +78,8 @@ cleanup() {
     fi
     if [ "$cleanup_failed" -eq 0 ]; then
       shitbox rm -f "$lock/upload" "$lock/candidate" \
-        "$lock/had-target" "$lock/rollback" "$lock/committed" || cleanup_failed=1
+        "$lock/had-target" "$lock/rollback" "$lock/committed" \
+        "$lock/links" || cleanup_failed=1
       [ "$lock_published" -eq 0 ] || shitbox rm -f "$lock_path" || cleanup_failed=1
       if [ "$cleanup_failed" -eq 0 ]; then
         shitbox rm -f "$lock/owner" || cleanup_failed=1
@@ -106,6 +126,7 @@ load_stale_lock_record() {
 recover_stale_lock() {
   stale_backup=$stale_lock/backup
   if [ ! -e "$stale_lock/committed" ] && [ -e "$stale_lock/rollback" ]; then
+    remove_recorded_links "$stale_lock/links" || return 1
     if [ -e "$stale_lock/had-target" ]; then
       if [ -e "$stale_backup" ] || [ -L "$stale_backup" ]; then
         shitbox mv -f "$stale_backup" "$target" || return 1
@@ -119,7 +140,7 @@ recover_stale_lock() {
   shitbox rm -f "$stale_candidate" "$stale_upload" "$stale_backup" || return 1
   shitbox rm -f "$stale_lock/upload" "$stale_lock/candidate" \
     "$stale_lock/had-target" "$stale_lock/rollback" \
-    "$stale_lock/committed" || return 1
+    "$stale_lock/committed" "$stale_lock/links" || return 1
   if [ "${1-0}" -eq 1 ]; then
     current_lock_record=$(shitbox cat "$lock_path") || return 1
     [ "$current_lock_record" = "$lock_record" ] || return 1
@@ -154,29 +175,76 @@ recover_all_stale_locks() {
   fi
   recover_orphan_locks
 }
+path_contains_directory() {
+  wanted_directory=$1
+  remaining_path=${PATH-}
+  while :; do
+    case $remaining_path in
+      *:*) path_entry=${remaining_path%%:*}; remaining_path=${remaining_path#*:}; has_more=1 ;;
+      *) path_entry=$remaining_path; has_more=0 ;;
+    esac
+    [ -n "$path_entry" ] || path_entry=.
+    [ "$path_entry" != "$wanted_directory" ] || return 0
+    [ "$has_more" -eq 1 ] || return 1
+  done
+}
+directory_accepts_links() {
+  remaining_moods=$link_moods
+  while [ -n "$remaining_moods" ]; do
+    case $remaining_moods in
+      *,*) link_name=${remaining_moods%%,*}; remaining_moods=${remaining_moods#*,} ;;
+      *) link_name=$remaining_moods; remaining_moods= ;;
+    esac
+    [ "$link_name" = shit ] && continue
+    link_path=$install_dir/$link_name
+    if [ -e "$link_path" ] || [ -L "$link_path" ]; then
+      [ -L "$link_path" ] && [ "$link_path" -ef "$target" ] || return 1
+    fi
+  done
+}
+try_install_directory() {
+  proposed_directory=$1
+  case $proposed_directory in *sbin*) return 1 ;; esac
+  [ -d "$proposed_directory" ] && [ -w "$proposed_directory" ] &&
+    [ -x "$proposed_directory" ] || return 1
+  install_dir=$(cd "$proposed_directory" && pwd -P) || return 1
+  target=$install_dir/shit
+  lock_path=$install_dir/.shit-assimilate.lock
+  recover_all_stale_locks || return 1
+  directory_accepts_links || return 1
+}
 trap cleanup 0
 trap 'exit 129' 1
 trap 'exit 130' 2
 trap 'exit 143' 15
-rest=${PATH-}
 install_dir=
-while :; do
-  case $rest in
-    *:*) path_entry=${rest%%:*}; rest=${rest#*:}; has_more=1 ;;
-    *) path_entry=$rest; has_more=0 ;;
+if path_contains_directory /usr/local/bin; then
+  try_install_directory /usr/local/bin || install_dir=
+fi
+if [ -z "$install_dir" ] && [ -n "${HOME-}" ] &&
+   path_contains_directory "$HOME/.local/bin"; then
+  try_install_directory "$HOME/.local/bin" || install_dir=
+fi
+remaining_path=${PATH-}
+while [ -z "$install_dir" ]; do
+  case $remaining_path in
+    *:*) path_entry=${remaining_path%%:*}; remaining_path=${remaining_path#*:}; has_more=1 ;;
+    *) path_entry=$remaining_path; has_more=0 ;;
   esac
   [ -n "$path_entry" ] || path_entry=.
-  if [ -d "$path_entry" ] && [ -w "$path_entry" ] && [ -x "$path_entry" ]; then
-    install_dir=$(cd "$path_entry" && pwd -P)
+  case $path_entry in
+    /usr/local/bin) ;;
+    "${HOME-}/.local/bin") ;;
+    *) try_install_directory "$path_entry" || install_dir= ;;
+  esac
+  if [ -n "$install_dir" ]; then
     break
   fi
   [ "$has_more" -eq 1 ] || break
 done
 [ -n "$install_dir" ] || exit 1
 candidate=$install_dir/.shit-assimilate-$2.candidate
-target=$install_dir/shit
-lock_path=$install_dir/.shit-assimilate.lock
-[ "${4-}" != recover ] || {
+[ "${6-}" != recover ] || {
   recover_all_stale_locks
   shitbox rm -f "$upload"
   trap - 0 1 2 15
@@ -193,6 +261,7 @@ backup=$lock/backup
 printf '%s:%s\n' "$$" "${lock##*/}" > "$lock/owner"
 printf '%s\n' "$upload" > "$lock/upload"
 printf '%s\n' "$candidate" > "$lock/candidate"
+: > "$lock/links"
 if ! shitbox ln -s "$lock/owner" "$lock_path"; then
   recover_existing_lock
   shitbox ln -s "$lock/owner" "$lock_path"
@@ -202,7 +271,7 @@ trap 'exit 129' 1
 trap 'exit 130' 2
 trap 'exit 143' 15
 shitbox mv "$upload" "$candidate"
-if ! candidate_identity=$("$candidate" -p --mood sh -c 'shitbox --binary-identity'); then
+if ! candidate_identity=$("$candidate" -p --mood sh -c 'printf "%s\n" "$SHIT_IDENTITY"'); then
   cleanup 1
 fi
 [ -n "$candidate_identity" ] && [ "$candidate_identity" = "$3" ] || cleanup 1
@@ -215,10 +284,25 @@ rollback_active=1
 [ "$had_target" -eq 0 ] || shitbox mv -f "$target" "$backup"
 shitbox mv -f "$candidate" "$target"
 candidate=
-if ! target_identity=$("$target" -p --mood sh -c 'shitbox --binary-identity'); then
+if ! target_identity=$("$target" -p --mood sh -c 'printf "%s\n" "$SHIT_IDENTITY"'); then
   cleanup 1
 fi
 [ -n "$target_identity" ] && [ "$target_identity" = "$candidate_identity" ] || cleanup 1
+remaining_moods=$link_moods
+while [ -n "$remaining_moods" ]; do
+  case $remaining_moods in
+    *,*) link_name=${remaining_moods%%,*}; remaining_moods=${remaining_moods#*,} ;;
+    *) link_name=$remaining_moods; remaining_moods= ;;
+  esac
+  [ "$link_name" = shit ] && continue
+  link_path=$install_dir/$link_name
+  if [ -e "$link_path" ] || [ -L "$link_path" ]; then
+    [ -L "$link_path" ] && [ "$link_path" -ef "$target" ] || cleanup 1
+  else
+    shitbox ln -s shit "$link_path" || cleanup 1
+    printf '%s\n' "$link_name" >> "$lock/links"
+  fi
+done
 trap '' 1 2 15
 if ! : > "$lock/committed"; then
   cleanup 1
@@ -229,7 +313,7 @@ rollback_active=0
 shitbox rm -f "$lock/rollback"
 [ "$had_target" -eq 0 ] || shitbox rm -f "$backup"
 shitbox rm -f "$lock/upload" "$lock/candidate" \
-  "$lock/had-target" "$lock/committed"
+  "$lock/had-target" "$lock/committed" "$lock/links"
 shitbox rm -f "$lock_path"
 lock_published=0
 shitbox rm -f "$lock/owner"
@@ -243,9 +327,8 @@ printf '%s\n' "$target"
 constexpr StringView REMOTE_TRANSACTION{REMOTE_TRANSACTION_TEXT,
                                         sizeof(REMOTE_TRANSACTION_TEXT) - 1};
 
-fn run_program(const Path &program, ArrayList<String> arguments) throws -> i32
+fn run_program(ArrayList<String> arguments) throws -> i32
 {
-  arguments[0] = program.text();
   let const result = os::run_measured(arguments, false);
   if (!result.has_value()) return 126;
 
@@ -260,8 +343,41 @@ fn resolve_transfer_program(StringView name) throws -> Maybe<Path>
   return matches[0].clone();
 }
 
+fn parse_transport_command(StringView spelling, Allocator allocator) throws
+    -> Maybe<ArrayList<String>>
+{
+  let arguments = ArrayList<String>{allocator};
+  usize position = 0;
+  while (position < spelling.count()) {
+    while (position < spelling.count() && spelling[position] == ' ')
+      position++;
+    if (position == spelling.count()) break;
+
+    let const start = position;
+    while (position < spelling.count() && spelling[position] != ' ')
+      position++;
+    arguments.push(String{
+        allocator, spelling.substring_of_length(start, position - start)});
+  }
+  if (arguments.is_empty()) return None;
+
+  let const program = resolve_transfer_program(arguments[0].view());
+  if (!program.has_value()) return None;
+  arguments[0] = program->text();
+
+  return arguments;
+}
+
+fn append_arguments(ArrayList<String> &destination,
+                    const ArrayList<String> &source) throws -> void
+{
+  for (let const &argument : source)
+    destination.push(argument.clone());
+}
+
 fn remote_command(StringView upload_name, StringView transaction_id,
-                  StringView expected_identity, bool recovery_only,
+                  StringView expected_identity, StringView link_moods,
+                  bool should_trace, bool recovery_only,
                   Allocator allocator) throws -> String
 {
   let command = String{allocator};
@@ -276,7 +392,7 @@ fn remote_command(StringView upload_name, StringView transaction_id,
   do_append_argument("--mood");
   do_append_argument("sh");
   do_append_argument("-c");
-  do_append_argument("shitbox --transaction-lock \"$@\"");
+  do_append_argument("shitbox flock --transaction-held-lock \"$@\"");
   do_append_argument("shit");
   do_append_argument(".");
   do_append_argument(upload_path.view());
@@ -289,24 +405,28 @@ fn remote_command(StringView upload_name, StringView transaction_id,
   do_append_argument(upload_name);
   do_append_argument(transaction_id);
   do_append_argument(expected_identity);
+  do_append_argument(recovery_only ? StringView{} : link_moods);
+  do_append_argument(should_trace ? StringView{"1"} : StringView{"0"});
   if (recovery_only) do_append_argument("recover");
   command.pop_back();
 
   return command;
 }
 
-fn cleanup_remote_transaction(const Path &ssh, StringView target,
-                              StringView upload_name, StringView transaction_id,
+fn cleanup_remote_transaction(const ArrayList<String> &ssh_command,
+                              StringView target, StringView upload_name,
+                              StringView transaction_id,
                               StringView expected_identity,
+                              StringView link_moods, bool should_trace,
                               Allocator allocator) throws -> i32
 {
   let arguments = ArrayList<String>{allocator};
-  arguments.push(String{"ssh"});
+  append_arguments(arguments, ssh_command);
   arguments.push(String{"--"});
   arguments.push(String{target});
   arguments.push(remote_command(upload_name, transaction_id, expected_identity,
-                                true, allocator));
-  return run_program(ssh, steal(arguments));
+                                link_moods, should_trace, true, allocator));
+  return run_program(steal(arguments));
 }
 
 } /* namespace */
@@ -320,11 +440,8 @@ pure fn Assimilate::kind() const wontthrow -> Builtin::Kind
 
 fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const &arguments = ec.args();
-  ASSERT(!arguments.is_empty());
-
-  if (arguments.count() > 1 && arguments[1] == "--help")
-    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  let const arguments = PARSE_BUILTIN_ARGS(ec);
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   bool has_invalid_target_character = false;
   bool is_inside_host_literal = false;
@@ -382,16 +499,46 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 1;
   }
 
-  let const scp = resolve_transfer_program("scp");
-  let const ssh = resolve_transfer_program("ssh");
-  if (!scp.has_value() || !ssh.has_value()) {
+  let const allocator = cxt.scratch_allocator();
+  let const scp_command = parse_transport_command(
+      FLAG_SCP_COMMAND.is_set() ? FLAG_SCP_COMMAND.value() : StringView{"scp"},
+      allocator);
+  let const ssh_command = parse_transport_command(
+      FLAG_SSH_COMMAND.is_set() ? FLAG_SSH_COMMAND.value() : StringView{"ssh"},
+      allocator);
+  if (!scp_command.has_value() || !ssh_command.has_value()) {
     report_soft_builtin_error(ec, cxt, "Cannot find both scp and ssh in PATH");
     return 127;
   }
 
-  let const allocator = cxt.scratch_allocator();
-  let const expected_identity =
-      utils::file_content_identity(Path{*executable}, allocator);
+  constexpr static_string_entry<bool> LINK_MOOD_ENTRIES[] = {
+      {SSK("bash"), true},
+      {SSK("dash"), true},
+      {SSK("sh"),   true},
+      {SSK("shit"), true},
+  };
+  constexpr StaticStringMap LINK_MOODS{LINK_MOOD_ENTRIES};
+  let link_moods = String{allocator};
+  for (usize flag_position = 0; flag_position < FLAG_LINK_MOOD.count();
+       flag_position++)
+  {
+    let const spelling = FLAG_LINK_MOOD.get(flag_position);
+    usize mood_start = 0;
+    while (mood_start <= spelling.count()) {
+      let const comma = spelling.substring(mood_start).find_character(',');
+      let const mood_length =
+          comma.has_value() ? *comma : spelling.count() - mood_start;
+      let const mood = spelling.substring_of_length(mood_start, mood_length);
+      if (mood.is_empty() || !LINK_MOODS.find(mood).has_value())
+        return report_usage_error(ec, cxt, ec.program());
+      if (!link_moods.is_empty()) link_moods += ',';
+      link_moods += mood;
+      if (!comma.has_value()) break;
+      mood_start += mood_length + 1;
+    }
+  }
+
+  let const expected_identity = cxt.materialize_shit_identity();
   if (!expected_identity.has_value()) {
     report_soft_builtin_error(ec, cxt,
                               "Cannot identify this shell's executable");
@@ -405,16 +552,17 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const destination = arguments[1].view() + ":" + upload_name;
 
   let scp_arguments = ArrayList<String>{allocator};
-  scp_arguments.push(String{"scp"});
+  append_arguments(scp_arguments, *scp_command);
   scp_arguments.push(String{"-p"});
   scp_arguments.push(String{"--"});
   scp_arguments.push(String{*executable});
   scp_arguments.push(String{destination.view()});
-  let status = run_program(*scp, steal(scp_arguments));
+  let status = run_program(steal(scp_arguments));
   if (status != 0) {
     let const cleanup_status = cleanup_remote_transaction(
-        *ssh, arguments[1].view(), upload_name.view(), transaction_id.view(),
-        expected_identity->view(), allocator);
+        *ssh_command, arguments[1].view(), upload_name.view(),
+        transaction_id.view(), expected_identity->view(), link_moods.view(),
+        FLAG_TRACE.is_enabled(), allocator);
     if (cleanup_status != 0) {
       report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
     }
@@ -422,18 +570,19 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let ssh_arguments = ArrayList<String>{allocator};
-  ssh_arguments.push(String{"ssh"});
+  append_arguments(ssh_arguments, *ssh_command);
   ssh_arguments.push(String{"--"});
   ssh_arguments.push(arguments[1].clone());
-  ssh_arguments.push(remote_command(upload_name.view(), transaction_id.view(),
-                                    expected_identity->view(), false,
-                                    allocator));
+  ssh_arguments.push(remote_command(
+      upload_name.view(), transaction_id.view(), expected_identity->view(),
+      link_moods.view(), FLAG_TRACE.is_enabled(), false, allocator));
 
-  status = run_program(*ssh, steal(ssh_arguments));
+  status = run_program(steal(ssh_arguments));
   if (status != 0) {
     let const cleanup_status = cleanup_remote_transaction(
-        *ssh, arguments[1].view(), upload_name.view(), transaction_id.view(),
-        expected_identity->view(), allocator);
+        *ssh_command, arguments[1].view(), upload_name.view(),
+        transaction_id.view(), expected_identity->view(), link_moods.view(),
+        FLAG_TRACE.is_enabled(), allocator);
     if (cleanup_status != 0) {
       report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
     }

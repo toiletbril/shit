@@ -786,8 +786,9 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output,
 /* Script fallback returns SHIT_INVALID_PROCESS when it is allowed and the file
    has no executable format. */
 fn execute_program(ExecContext &&ec, bool allow_script_fallback = false,
-                   bool new_process_group = false,
-                   StringView source = {}) throws -> process;
+                   bool new_process_group = false, StringView source = {},
+                   bool should_hand_off_controlling_terminal_before_start =
+                       false) throws -> process;
 
 fn shell_has_controlling_terminal() wontthrow -> bool;
 

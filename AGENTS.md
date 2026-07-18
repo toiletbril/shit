@@ -117,7 +117,11 @@ keeps sourcing.
 
 The `assimilate TARGET` builtin copies the running binary through scp and uses
 an SSH transaction to install it as `shit` in the first usable remote PATH
-directory. A hidden candidate is validated before the target is replaced. A
+directory. Directories containing sbin are skipped. /usr/local/bin and
+$HOME/.local/bin are preferred when they occur in PATH. Requested bash, dash,
+sh, and shit links are placed beside the binary without clobbering an existing
+path. Custom SSH and SCP command strings are split at literal spaces. A hidden
+candidate is validated before the target is replaced. A
 handled failure restores the prior file or symlink and removes transaction
 files. The candidate SHA-256 identity must match the local executable.
 Concurrent transactions use a keeper process that holds the lock until the
@@ -130,6 +134,10 @@ failure cannot alter the installed target, but an unusable partial upload can
 remain.
 `scripts/shit-scp` is a compatibility wrapper for this builtin.
 
+SHIT_IDENTITY is a read-only exported dynamic variable. Its lowercase SHA-256
+value is computed once on the first read or before a child program starts. An
+inherited value is removed before the evaluator starts.
+
 src/Platform.cpp routes the operating system implementation. POSIX targets use
 PlatformPosix.cpp as the base and PlatformPosixExtra.cpp for the Linux and
 Darwin overlays. Windows loads only PlatformWin32.cpp. Platform.hpp owns every
@@ -140,6 +148,8 @@ reference used by timeout remains valid after polling closes the leader process,
 and close_process_group releases any retained platform handle. The shared
 get_processor_counts wrapper provides the affinity-limited and configured
 logical CPU counts used by shitbox nproc.
+An interactive timeout child waits behind a start pipe until its process group
+owns the controlling terminal.
 The remaining platform conditionals outside the platform files and Utils.cpp
 are the fork-based command and process substitutions in EvalSubstitution.cpp,
 the parenthesized subshell in ExpressionsArith.cpp, and the pipeline stage in
@@ -165,8 +175,10 @@ whose extension it operates on ahead of the rest. A leading `~` or a `$NAME/`
 prefix on a path token is
 expanded only to list the real directory, while the offered candidate keeps the
 literal prefix so it still expands at run time, and only a glob pattern is
-expanded into its matches. A command forks its `--help` at most once per cache key,
-behind an allowlist and a trusted directory gate, and the subcommand walk stops
+expanded into its matches. Quoted and escaped directory spelling is preserved
+across a later unquoted slash. A command forks its `--help` at most once per
+cache key, behind an allowlist and a trusted directory gate, and the subcommand
+walk stops
 at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The
 cascade splits across src/Completion.cpp, src/CompletionManpage.cpp,
 src/CompletionScan.cpp, and the per-keystroke highlighter in

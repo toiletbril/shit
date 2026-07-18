@@ -1,4 +1,4 @@
-.TH SHIT 1 "2026-06-15" "shit" "User Commands"
+.TH SHIT 1 "2026-07-17" "shit" "User Commands"
 .SH NAME
 shit \- a fast POSIX and bash compatible shell
 .SH SYNOPSIS
@@ -20,6 +20,10 @@ command line is run, or a command string is run when it is given with
 .PP
 A command path ending in a directory separator fails with status 126 when the
 normalized target is not a directory.
+.PP
+shit is designed to work without absolutely no config whatsoever. shit's Linux
+binary is static. shit also works without coreutils, using it's own shitbox
+utilities instead. all so you can copy shit to any machine and enjoy the shell.
 .SH MOODS
 The shell runs under one of four moods. The mood sets how strict the run is.
 The default
@@ -357,6 +361,8 @@ and the emacs default is restored by
 .BR "set \-o emacs" .
 Ghost text uses prefix matches from completion and history. Tab also offers
 smart-case and subsequence matches.
+Quoted, escaped, variable, and tilde directory prefixes remain in their typed
+form when a later unquoted slash or basename is completed.
 In vi mode each line begins in insert mode. Escape enters command mode. Command
 mode provides the motions, the operators with counts, the named registers, the
 change repeat, and a visual selection. The visual selection is charwise from
@@ -532,6 +538,11 @@ The branch around the working directory, read from .git without forking git.
 The short commit hash is read on a detached head, and an empty value outside a
 repository. A stored assignment wins.
 .TP
+.B SHIT_IDENTITY
+The lowercase SHA-256 identity of the running executable. The value is computed
+on its first read or before a child program starts, then cached, exported, and
+marked read-only. An inherited value is discarded.
+.TP
 .B NO_COLOR
 Color is turned off in the prompt and the diagnostics when the variable is set.
 .TP
@@ -632,6 +643,13 @@ option prints the configured processor count. The
 option excludes a count from the result. The result has a minimum of one, and a
 platform query failure also reports one.
 .TP
+.B flock
+The bundled flock utility runs a command while holding a lock for a directory.
+The
+.B --transaction-held-lock
+option launches a keeper whose lifetime follows the transaction child. The lock
+remains held when the process that launched the transaction exits.
+.TP
 .B timeout
 The bundled timeout utility runs a command until its duration expires. A
 duration accepts seconds and the s, m, h, or d suffix. The default signal is
@@ -646,6 +664,8 @@ default, 125 when supervision fails, 126 when the command cannot execute, and
 127 when the command cannot be found. On Windows, timeout supports TERM and
 KILL. Both signals terminate the supervised job immediately, so kill-after does
 not add a grace period after TERM on that platform.
+An interactive child is held before execution until its process group owns the
+controlling terminal.
 .TP
 .B calc
 The bundled calc utility evaluates each argument as an arithmetic expression and
@@ -672,7 +692,21 @@ These builtins are unique to shit and have no counterpart in bash or dash.
 .B assimilate TARGET
 The running shell is copied through scp to an SSH target and installed as
 .B shit
-in the first writable and searchable directory in the remote PATH. The
+in one writable and searchable directory in the remote PATH. A directory whose
+path contains sbin is skipped. /usr/local/bin and $HOME/.local/bin are preferred
+when they occur in PATH. Every requested link and the binary are installed in
+one directory, and a directory is skipped when an existing path would be
+clobbered. The
+.B --link-mood=MOOD
+option requests a relative link named bash, dash, sh, or shit. The option can be
+repeated, and each value can contain comma-separated moods. The
+.BR -x " or " --trace
+option prints remote installation progress. The
+.B --ssh-command=COMMAND
+and
+.B --scp-command=COMMAND
+options replace ssh and scp. COMMAND is split into arguments at literal spaces.
+The
 candidate is validated before an atomic rename. An existing file or symlink is
 renamed into the transaction lock and restored when a handled validation or
 install step fails. Temporary upload, candidate, and backup paths are removed

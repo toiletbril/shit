@@ -17,8 +17,6 @@ namespace shit {
 
 static constexpr usize MAX_MIMICRY_DEPTH = 64;
 
-/* An InterruptError is re-thrown past the mimic boundary, so the catch-all
-   below does not absorb it into a status. */
 static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
     -> bool
 {
@@ -26,7 +24,7 @@ static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
 
   try {
     std::rethrow_exception(error);
-  } catch (const InterruptError &) {
+  } catch (const InterruptErrorWithLocation &) {
     return true;
   } catch (...) {
     return false;
@@ -222,7 +220,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     m_mimicry_depth--;
     do_restore_fds();
     if (error) {
-      if (mimicked_error_is_interrupt(error)) throw InterruptError{};
+      if (mimicked_error_is_interrupt(error))
+        throw InterruptErrorWithLocation{previous_location};
 
       do_render_error(error);
       return 1;
@@ -268,7 +267,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   m_shell_name = steal(previous_shell_name);
 
   if (error) {
-    if (mimicked_error_is_interrupt(error)) throw InterruptError{};
+    if (mimicked_error_is_interrupt(error))
+      throw InterruptErrorWithLocation{previous_location};
 
     do_render_error(error);
     return 1;

@@ -13,6 +13,10 @@ Shit is a cross-platform shell compatible with Bash and POSIX. It runs at least
 3 times faster than Bash. The UX, the errors, and the interactive experience are
 opinionated.
 
+shit is designed to work without absolutely no config whatsoever. shit's Linux
+binary is static. shit also works without coreutils, using it's own shitbox
+utilities instead. all so you can copy shit to any machine and enjoy the shell.
+
 **The project is in early stage**. There's no gurantee that it will not blow
 you computer up upon the first start. Bug reports are greatly appreciated.
 

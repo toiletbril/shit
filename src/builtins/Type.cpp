@@ -85,9 +85,9 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     } else if (search_builtin(name.view()).has_value()) {
       word = "builtin";
     } else if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
+               shitbox::find_util(name.view()).has_value() &&
                utils::get_program_path_status(name) ==
-                   utils::program_path_status::Missing &&
-               shitbox::find_util(name.view()).has_value())
+                   utils::program_path_status::Missing)
     {
       word = "builtin";
     }
