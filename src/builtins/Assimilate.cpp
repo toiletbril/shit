@@ -33,12 +33,6 @@ enum class trace_output : u8
   Enabled,
 };
 
-enum class remote_transaction_mode : u8
-{
-  Install,
-  Recovery,
-};
-
 constexpr char REMOTE_TRANSACTION_TEXT[] = R"SH(set -eu
 [ "${5-0}" -eq 0 ] || set -x
 umask 077
@@ -256,12 +250,6 @@ while [ -z "$install_dir" ]; do
 done
 [ -n "$install_dir" ] || exit 1
 candidate=$install_dir/.shit-assimilate-$2.candidate
-[ "${6-}" != recover ] || {
-  recover_all_stale_locks
-  shitbox rm -f "$upload"
-  trap - 0 1 2 15
-  exit 0
-}
 [ ! -d "$target" ] || exit 1
 recover_all_stale_locks
 trap '' 1 2 15
@@ -339,8 +327,54 @@ printf '%s\n' "$target"
 constexpr StringView REMOTE_TRANSACTION{REMOTE_TRANSACTION_TEXT,
                                         sizeof(REMOTE_TRANSACTION_TEXT) - 1};
 
-fn run_program(ArrayList<String> arguments) throws -> i32
+constexpr char REMOTE_PREFLIGHT_TEXT[] = R"SH(set -eu
+[ "$1" -eq 0 ] || set -x
+expected_system=$2
+expected_machine=$3
+if ! remote_system=$(uname -s 2>/dev/null); then
+  printf '%s\n' 'shit: assimilate: Cannot determine the remote operating system.' >&2
+  exit 125
+fi
+if ! remote_machine=$(uname -m 2>/dev/null); then
+  printf '%s\n' 'shit: assimilate: Cannot determine the remote architecture.' >&2
+  exit 125
+fi
+case $expected_machine in
+  arm64|aarch64) expected_machine=arm64 ;;
+  x86_64|amd64) expected_machine=x86_64 ;;
+esac
+case $remote_machine in
+  arm64|aarch64) remote_machine=arm64 ;;
+  x86_64|amd64) remote_machine=x86_64 ;;
+esac
+system_matches=0
+machine_matches=0
+[ "$expected_system" = any ] || [ "$expected_system" = "$remote_system" ] || system_matches=1
+[ "$expected_machine" = any ] || [ "$expected_machine" = "$remote_machine" ] || machine_matches=1
+if [ "$system_matches" -ne 0 ] || [ "$machine_matches" -ne 0 ]; then
+  printf 'shit: assimilate: Cannot install a %s/%s binary on %s/%s.\n' \
+    "$expected_system" "$expected_machine" "$remote_system" "$remote_machine" >&2
+  exit 126
+fi
+)SH";
+constexpr StringView REMOTE_PREFLIGHT{REMOTE_PREFLIGHT_TEXT,
+                                      sizeof(REMOTE_PREFLIGHT_TEXT) - 1};
+
+fn trace_stage(const ExecContext &ec, trace_output trace,
+               StringView stage) throws -> void
 {
+  if (trace != trace_output::Enabled) return;
+
+  let message = String{heap_allocator(), "+ assimilate: "};
+  message += stage;
+  message += '\n';
+  ec.print_to_stderr(message.view());
+}
+
+fn run_program(ArrayList<String> arguments, const ExecContext &ec,
+               trace_output trace, StringView stage) throws -> i32
+{
+  trace_stage(ec, trace, stage);
   let const result = os::run_measured(arguments, os::measured_output::Inherit);
   if (!result.has_value()) return 126;
 
@@ -393,11 +427,9 @@ fn append_arguments(ArrayList<String> &destination,
 
 fn remote_command(StringView upload_name, StringView transaction_id,
                   StringView expected_identity, StringView link_moods,
-                  trace_output trace, remote_transaction_mode mode,
-                  Allocator allocator) throws -> String
+                  trace_output trace, Allocator allocator) throws -> String
 {
   let const should_trace = trace == trace_output::Enabled;
-  let const recovery_only = mode == remote_transaction_mode::Recovery;
   let command = String{allocator};
   command += "exec ";
   let const upload_path = String{allocator, "./"} + upload_name;
@@ -423,29 +455,29 @@ fn remote_command(StringView upload_name, StringView transaction_id,
   do_append_argument(upload_name);
   do_append_argument(transaction_id);
   do_append_argument(expected_identity);
-  do_append_argument(recovery_only ? StringView{} : link_moods);
+  do_append_argument(link_moods);
   do_append_argument(should_trace ? StringView{"1"} : StringView{"0"});
-  if (recovery_only) do_append_argument("recover");
   command.pop_back();
 
   return command;
 }
 
-fn cleanup_remote_transaction(const ArrayList<String> &ssh_command,
-                              StringView target, StringView upload_name,
-                              StringView transaction_id,
-                              StringView expected_identity,
-                              StringView link_moods, trace_output trace,
-                              Allocator allocator) throws -> i32
+fn preflight_command(StringView executable_system,
+                     StringView executable_machine, trace_output trace,
+                     Allocator allocator) throws -> String
 {
-  let arguments = ArrayList<String>{allocator};
-  append_arguments(arguments, ssh_command);
-  arguments.push(String{"--"});
-  arguments.push(String{target});
-  arguments.push(remote_command(upload_name, transaction_id, expected_identity,
-                                link_moods, trace,
-                                remote_transaction_mode::Recovery, allocator));
-  return run_program(steal(arguments));
+  let command = String{allocator, "set -- "};
+  append_shell_quoted_arg(command, trace == trace_output::Enabled
+                                       ? StringView{"1"}
+                                       : StringView{"0"});
+  command += ' ';
+  append_shell_quoted_arg(command, executable_system);
+  command += ' ';
+  append_shell_quoted_arg(command, executable_machine);
+  command += "; ";
+  command += REMOTE_PREFLIGHT;
+
+  return command;
 }
 
 } /* namespace */
@@ -519,6 +551,8 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let const allocator = cxt.scratch_allocator();
+  let const trace =
+      FLAG_TRACE.is_enabled() ? trace_output::Enabled : trace_output::Disabled;
   let const scp_command = parse_transport_command(
       FLAG_SCP_COMMAND.is_set() ? FLAG_SCP_COMMAND.value() : StringView{"scp"},
       cxt.get_program_resolver(), allocator);
@@ -563,6 +597,18 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                               "Cannot identify this shell's executable");
     return 1;
   }
+
+  let const executable_system = os::executable_system_name();
+  let const executable_machine = os::executable_machine_name();
+  let preflight_arguments = ArrayList<String>{allocator};
+  append_arguments(preflight_arguments, *ssh_command);
+  preflight_arguments.push(String{"--"});
+  preflight_arguments.push(arguments[1].clone());
+  preflight_arguments.push(preflight_command(
+      executable_system.view(), executable_machine.view(), trace, allocator));
+  let status = run_program(steal(preflight_arguments), ec, trace, "preflight");
+  if (status != 0) return status;
+
   let const transaction_id =
       String::from(static_cast<u64>(os::get_shell_process_id()), allocator) +
       "-" + String::from(os::realtime_microseconds(), allocator);
@@ -576,42 +622,18 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   scp_arguments.push(String{"--"});
   scp_arguments.push(String{*executable});
   scp_arguments.push(String{destination.view()});
-  let status = run_program(steal(scp_arguments));
-  if (status != 0) {
-    let const cleanup_status = cleanup_remote_transaction(
-        *ssh_command, arguments[1].view(), upload_name.view(),
-        transaction_id.view(), expected_identity->view(), link_moods.view(),
-        FLAG_TRACE.is_enabled() ? trace_output::Enabled
-                                : trace_output::Disabled,
-        allocator);
-    if (cleanup_status != 0) {
-      report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
-    }
-    return status;
-  }
+  status = run_program(steal(scp_arguments), ec, trace, "upload");
+  if (status != 0) return status;
 
   let ssh_arguments = ArrayList<String>{allocator};
   append_arguments(ssh_arguments, *ssh_command);
   ssh_arguments.push(String{"--"});
   ssh_arguments.push(arguments[1].clone());
-  ssh_arguments.push(remote_command(
-      upload_name.view(), transaction_id.view(), expected_identity->view(),
-      link_moods.view(),
-      FLAG_TRACE.is_enabled() ? trace_output::Enabled : trace_output::Disabled,
-      remote_transaction_mode::Install, allocator));
+  ssh_arguments.push(remote_command(upload_name.view(), transaction_id.view(),
+                                    expected_identity->view(),
+                                    link_moods.view(), trace, allocator));
 
-  status = run_program(steal(ssh_arguments));
-  if (status != 0) {
-    let const cleanup_status = cleanup_remote_transaction(
-        *ssh_command, arguments[1].view(), upload_name.view(),
-        transaction_id.view(), expected_identity->view(), link_moods.view(),
-        FLAG_TRACE.is_enabled() ? trace_output::Enabled
-                                : trace_output::Disabled,
-        allocator);
-    if (cleanup_status != 0) {
-      report_soft_builtin_error(ec, cxt, "Remote transaction cleanup failed");
-    }
-  }
+  status = run_program(steal(ssh_arguments), ec, trace, "install");
 
   return status;
 }

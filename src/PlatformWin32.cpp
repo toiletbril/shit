@@ -1957,6 +1957,19 @@ fn child_max() wontthrow -> i64 { return 0; }
 
 fn machine_type() throws -> String { return String{"x86_64"}; }
 
+fn executable_system_name() throws -> String { return String{"Windows"}; }
+
+fn executable_machine_name() throws -> String
+{
+#if defined _M_ARM64 || defined __aarch64__
+  return String{"arm64"};
+#elif defined _M_X64 || defined __x86_64__
+  return String{"x86_64"};
+#else
+  return machine_type();
+#endif
+}
+
 fn realtime_microseconds() wontthrow -> u64
 {
   FILETIME file_time;

@@ -1,4 +1,5 @@
 success=0 leftovers=0
+architecture-status=126 result=0 leftovers=0
 identity-status=1 old=identity-old leftovers=0
 rollback-status=1 old=regular-old mode=751 leftovers=0
 transfer-status=23 old=transfer-old leftovers=0

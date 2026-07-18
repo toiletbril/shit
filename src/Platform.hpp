@@ -680,6 +680,8 @@ fn get_real_group_id() wontthrow -> i64;
 fn child_max() wontthrow -> i64;
 
 fn machine_type() throws -> String;
+fn executable_system_name() throws -> String;
+fn executable_machine_name() throws -> String;
 
 inline fn ostype_name() wontthrow -> StringView
 {

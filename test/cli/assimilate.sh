@@ -6,6 +6,7 @@ transport=$root/transport
 remote=$root/remote
 install=$remote/bin
 binary=$(cd "$(dirname "$BIN")" && pwd)/$(basename "$BIN")
+real_uname=$(command -v uname)
 /bin/mkdir -p "$transport" "$install"
 
 failure_runner=$root/failure-runner
@@ -26,6 +27,7 @@ chmod +x "$failure_runner"
 
 cat > "$transport/scp" <<'SH'
 #!/bin/sh
+printf 'scp-run\n' >> "$ASSIMILATE_TRANSPORT_LOG"
 if [ "${1-}" = scp-prefix ]; then
     printf 'scp-prefix\n' >> "$ASSIMILATE_TRANSPORT_LOG"
     shift
@@ -38,18 +40,39 @@ shift
 destination=$2
 source=$1
 [ "${ASSIMILATE_FAILURE-}" != rollback ] || source=$ASSIMILATE_FAILURE_RUNNER
+[ "${ASSIMILATE_FAIL_SCP-0}" -eq 0 ] || exit 23
 case $destination in
     *']:'*) remote_name=${destination#*]:} ;;
     *) remote_name=${destination#*:} ;;
 esac
 /bin/cp -p "$source" "$ASSIMILATE_REMOTE/$remote_name"
 [ "${ASSIMILATE_FAILURE-}" != identity ] || printf x >> "$ASSIMILATE_REMOTE/$remote_name"
-[ "${ASSIMILATE_FAIL_SCP-0}" -eq 0 ] || exit 23
 SH
 chmod +x "$transport/scp"
 
+cat > "$transport/uname" <<'SH'
+#!/bin/sh
+case ${1-} in
+    -s)
+        if [ -n "${ASSIMILATE_REMOTE_SYSTEM-}" ]; then
+            printf '%s\n' "$ASSIMILATE_REMOTE_SYSTEM"
+            exit
+        fi
+        ;;
+    -m)
+        if [ -n "${ASSIMILATE_REMOTE_MACHINE-}" ]; then
+            printf '%s\n' "$ASSIMILATE_REMOTE_MACHINE"
+            exit
+        fi
+        ;;
+esac
+exec "$ASSIMILATE_REAL_UNAME" "$@"
+SH
+chmod +x "$transport/uname"
+
 cat > "$transport/ssh" <<'SH'
 #!/bin/sh
+printf 'ssh-run\n' >> "$ASSIMILATE_TRANSPORT_LOG"
 if [ "${1-}" = ssh-prefix ]; then
     printf 'ssh-prefix\n' >> "$ASSIMILATE_TRANSPORT_LOG"
     shift
@@ -61,6 +84,10 @@ shift
 [ "$#" -eq 1 ] || exit 42
 command=$1
 case $command in
+    "set -- "*"expected_system="*)
+        PATH=$ASSIMILATE_TRANSPORT /bin/sh -c "$command"
+        exit
+        ;;
     *'/bin/'*) exit 43 ;;
     "exec ./.shit-assimilate-"*.upload*) ;;
     "exec './.shit-assimilate-"*.upload*) ;;
@@ -97,6 +124,8 @@ export ASSIMILATE_REMOTE=$remote
 export ASSIMILATE_REMOTE_PATH="$remote/missing:$install"
 export ASSIMILATE_REMOTE_HOME=$remote/home
 export ASSIMILATE_TRANSPORT_LOG=$root/transport.log
+export ASSIMILATE_TRANSPORT=$transport
+export ASSIMILATE_REAL_UNAME=$real_uname
 export ASSIMILATE_FAILURE_RUNNER=$failure_runner
 export ASSIMILATE_RUNNER=$binary
 run_assimilate
@@ -108,6 +137,28 @@ else
     success_status=1
 fi
 printf 'success=%s leftovers=%s\n' "$success_status" "$(leftovers)"
+
+printf 'architecture-old\n' > "$install/shit"
+: > "$ASSIMILATE_TRANSPORT_LOG"
+export ASSIMILATE_REMOTE_SYSTEM=MismatchOS
+export ASSIMILATE_REMOTE_MACHINE=mismatch-arch
+architecture_output=$root/architecture.out
+PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate --trace "$@"' shit \
+    'user@[2001:db8::1]' >"$architecture_output" 2>&1
+architecture_status=$?
+if [ "$architecture_status" -ne 0 ] &&
+    [ "$(cat "$install/shit")" = architecture-old ] &&
+    grep -q '^+ assimilate: preflight$' "$architecture_output" &&
+    grep -q 'Cannot install a .* binary on MismatchOS/mismatch-arch' \
+        "$architecture_output" &&
+    ! grep -q '^scp-run$' "$ASSIMILATE_TRANSPORT_LOG"; then
+    architecture_result=0
+else
+    architecture_result=1
+fi
+printf 'architecture-status=%s result=%s leftovers=%s\n' \
+    "$architecture_status" "$architecture_result" "$(leftovers)"
+unset ASSIMILATE_REMOTE_SYSTEM ASSIMILATE_REMOTE_MACHINE
 
 stale_id=999999-1
 stale_lock=$install/.shit-assimilate-$stale_id.lock
@@ -171,7 +222,10 @@ if grep -q '^scp-prefix$' "$ASSIMILATE_TRANSPORT_LOG" &&
 else
     command_status=1
 fi
-if grep -q '^+ umask 077$' "$trace_output"; then
+if grep -q '^+ assimilate: preflight$' "$trace_output" &&
+    grep -q '^+ assimilate: upload$' "$trace_output" &&
+    grep -q '^+ assimilate: install$' "$trace_output" &&
+    grep -q '^+ umask 077$' "$trace_output"; then
     trace_status=0
 else
     trace_status=1

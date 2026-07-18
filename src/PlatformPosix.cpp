@@ -1994,6 +1994,36 @@ fn machine_type() throws -> String
   return cached;
 }
 
+fn executable_system_name() throws -> String
+{
+#if SHIT_PLATFORM_IS COSMO
+  return String{"any"};
+#elif defined __APPLE__
+  return String{"Darwin"};
+#elif defined __linux__
+  return String{"Linux"};
+#else
+  struct utsname info{};
+  if (uname(&info) != 0) return String{"unknown"};
+  return String{
+      StringView{info.sysname, std::strlen(info.sysname)}
+  };
+#endif
+}
+
+fn executable_machine_name() throws -> String
+{
+#if SHIT_PLATFORM_IS COSMO
+  return String{"any"};
+#elif defined __aarch64__ || defined __arm64__
+  return String{"arm64"};
+#elif defined __x86_64__ || defined __amd64__
+  return String{"x86_64"};
+#else
+  return machine_type();
+#endif
+}
+
 fn realtime_microseconds() wontthrow -> u64
 {
   struct timespec now{};
