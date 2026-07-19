@@ -2,8 +2,14 @@ d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 script_command=$(command -v script)
 
+wait_for_editor()
+{
+    sleep 0.5
+}
+
 send_input()
 {
+    wait_for_editor
     for character in e c h o ' ' h e l l o; do
         printf %s "$character"
         sleep 0.03
@@ -37,6 +43,7 @@ printf '#!/bin/sh\n' > "$d/probe-beta"
 chmod +x "$d/probe-alpha" "$d/probe-beta"
 send_path_input()
 {
+    wait_for_editor
     for character in p r o b e; do
         printf %s "$character"
         sleep 0.03
@@ -88,6 +95,7 @@ while [ "$tab_unrelated_index" -lt 256 ]; do
 done
 send_post_tab_input()
 {
+    wait_for_editor
     for character in p r o b e; do
         printf %s "$character"
         sleep 0.03
@@ -121,6 +129,7 @@ echo 'TAB validation ends before the next key'
 
 send_warm_tab_input()
 {
+    wait_for_editor
     printf 'compgen -c >/dev/null 2>&1\n'
     sleep 0.1
     printf 'probe-a\t\n'
@@ -168,6 +177,7 @@ while [ "$history_index" -lt 1000 ]; do
 done > "$d/miss-history"
 send_missing_history_input()
 {
+    wait_for_editor
     for character in z z z z z z z; do
         printf %s "$character"
         sleep 0.03
@@ -210,6 +220,7 @@ while [ "$prompt_index" -lt 256 ]; do
 done
 send_prompt_path_input()
 {
+    wait_for_editor
     printf z
     sleep 0.1
     printf '\003exit\n'
@@ -255,6 +266,7 @@ printf '#!/bin/sh\n' > "$d/absolute-path/echo-probe"
 chmod +x "$d/absolute-path/echo-probe"
 send_cd_input()
 {
+    wait_for_editor
     printf 'cd %s\n' "$d/next-directory"
     sleep 0.1
     printf 'e\n'
@@ -283,6 +295,7 @@ printf '#!/bin/sh\nprintf "actual-cwd-completion\\n"\n' > \
 chmod +x "$d/actual-cwd-probe"
 send_clobbered_pwd_input()
 {
+    wait_for_editor
     printf 'PWD=312312321\n'
     sleep 0.1
     printf './actual-cwd-\t\n'
@@ -314,6 +327,7 @@ SH
 chmod +x "$d/menu-bin/tailscale"
 send_completion_menu_input()
 {
+    wait_for_editor
     printf 'tailscale \t'
     sleep 0.2
     printf '\003exit\n'
