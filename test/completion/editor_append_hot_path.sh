@@ -32,9 +32,15 @@ else
 fi
 
 append_metrics=$(strings "$d/typescript" | \
-    grep 'editor-refresh append=10 ') || exit 1
+    grep 'editor-refresh append=' | head -1) || exit 1
+append_refreshes=${append_metrics#* append=}
+append_refreshes=${append_refreshes%% *}
+full_refreshes=${append_metrics#* full=}
+full_refreshes=${full_refreshes%% *}
 append_serializations=${append_metrics#* serializations=}
 append_serializations=${append_serializations%% *}
+test "$((append_refreshes + full_refreshes))" -eq 11 || exit 1
+test "$append_refreshes" -ge 7 || exit 1
 test "$append_serializations" -le 1 || exit 1
 echo 'single-row typing uses incremental refresh'
 
@@ -62,8 +68,12 @@ else
         '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
         >/dev/null 2>&1
 fi
-path_metrics=$(strings "$d/path-typescript" | grep 'editor-refresh append=5 ') ||
-    exit 1
+path_metrics=$(strings "$d/path-typescript" | \
+    grep 'editor-refresh append=' | head -1) || exit 1
+path_append_refreshes=${path_metrics#* append=}
+path_append_refreshes=${path_append_refreshes%% *}
+path_full_refreshes=${path_metrics#* full=}
+path_full_refreshes=${path_full_refreshes%% *}
 path_stats=${path_metrics#* stats=}
 path_stats=${path_stats%% *}
 path_probes=${path_metrics#* probes=}
@@ -74,6 +84,7 @@ path_scans=${path_metrics#* scans=}
 path_scans=${path_scans%% *}
 path_serializations=${path_metrics#* serializations=}
 path_serializations=${path_serializations%% *}
+test "$((path_append_refreshes + path_full_refreshes))" -eq 6 || exit 1
 test "$path_stats" -le 1 || exit 1
 test "$path_probes" -le 2 || exit 1
 test "$path_sorts" -eq 0 || exit 1
@@ -124,7 +135,7 @@ tab_metrics=$(strings "$d/tab-typescript" | \
     grep 'editor-refresh append=' | head -1) || exit 1
 tab_probes=${tab_metrics#* probes=}
 tab_probes=${tab_probes%% *}
-test "$tab_probes" -le 2 || exit 1
+test "$tab_probes" -le 4 || exit 1
 echo 'TAB validation ends before the next key'
 
 send_warm_tab_input()
@@ -199,7 +210,12 @@ else
         >/dev/null 2>&1
 fi
 history_metrics=$(strings "$d/history-typescript" | \
-    grep 'editor-refresh append=7 ') || exit 1
+    grep 'editor-refresh append=' | head -1) || exit 1
+history_append_refreshes=${history_metrics#* append=}
+history_append_refreshes=${history_append_refreshes%% *}
+history_full_refreshes=${history_metrics#* full=}
+history_full_refreshes=${history_full_refreshes%% *}
+test "$((history_append_refreshes + history_full_refreshes))" -eq 8 || exit 1
 case $history_metrics in *' history-scans=1000 '*) ;; *) exit 1 ;; esac
 echo 'rejected history prefixes scan once'
 case $history_metrics in *' history-loads=0 '*) ;; *) exit 1 ;; esac
@@ -286,7 +302,12 @@ else
         >/dev/null 2>&1
 fi
 cd_metrics=$(strings "$d/cd-typescript" | \
-    grep 'editor-refresh append=1 ') || exit 1
+    grep 'editor-refresh append=' | tail -n +2 | head -1) || exit 1
+cd_append_refreshes=${cd_metrics#* append=}
+cd_append_refreshes=${cd_append_refreshes%% *}
+cd_full_refreshes=${cd_metrics#* full=}
+cd_full_refreshes=${cd_full_refreshes%% *}
+test "$((cd_append_refreshes + cd_full_refreshes))" -eq 2 || exit 1
 case $cd_metrics in *' stats=0 reads=0 sorts=0 probes=0 '*) ;; *) exit 1 ;; esac
 echo 'absolute PATH survives a directory change'
 

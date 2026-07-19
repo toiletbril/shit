@@ -2629,7 +2629,7 @@ fn ProgramResolver::get_status(StringView name, StatusLookup lookup) throws
     -> Status
 {
   if (lookup == StatusLookup::Authoritative) {
-    let const paths = search(name, SearchMode::First, Requirement::Regular,
+    let const paths = search(name, SearchMode::First, Requirement::Execution,
                              CachePolicy::Bypass);
     if (paths.is_empty()) return Status::Missing;
     if (paths[0].is_executable()) return Status::Runnable;

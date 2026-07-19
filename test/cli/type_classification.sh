@@ -17,4 +17,18 @@ echo "== -p stays silent for a builtin:"; "$BIN" -c 'type -p echo'; echo "rc=$?"
 echo "== -t stays silent for a missing name:"; "$BIN" -c 'type -t missing_xyz'; echo "rc=$?"
 echo "== the default mood classifies a missing coreutility fallback:"
 PATH= "$BIN" -c 'type -t calc; command -v calc; shitbox which calc'
+type_path=$(mktemp -d)
+mkdir "$type_path/blocked" "$type_path/runnable"
+printf '#!/bin/sh\n' > "$type_path/blocked/path-order-probe"
+printf '#!/bin/sh\n' > "$type_path/runnable/path-order-probe"
+chmod +x "$type_path/runnable/path-order-probe"
+resolved_path=$(PATH="$type_path/blocked:$type_path/runnable" \
+    "$BIN" -c 'type -P path-order-probe')
+echo "== type skips a blocked candidate before a runnable candidate:"
+if test "$resolved_path" = "$type_path/runnable/path-order-probe"; then
+    echo runnable
+else
+    echo blocked
+fi
+test -n "$type_path" && /bin/rm -rf "$type_path"
 echo "== a missing name reports not found:"; "$BIN" -c 'type missing_xyz'; echo "rc=$?"

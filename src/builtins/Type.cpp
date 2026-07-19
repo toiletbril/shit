@@ -60,7 +60,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           FLAG_TYPE_ALL.is_enabled() ? ProgramResolver::SearchMode::All
                                      : ProgramResolver::SearchMode::First,
           FLAG_TYPE_ALL.is_enabled() ? ProgramResolver::Requirement::Runnable
-                                     : ProgramResolver::Requirement::Regular,
+                                     : ProgramResolver::Requirement::Execution,
           FLAG_TYPE_ALL.is_enabled() ? ProgramResolver::CachePolicy::Bypass
                                      : ProgramResolver::CachePolicy::ReadOnly);
       if (paths.count() != 0) {
@@ -164,7 +164,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     if (let const paths = cxt.get_program_resolver().search(
             name, ProgramResolver::SearchMode::First,
-            ProgramResolver::Requirement::Regular,
+            ProgramResolver::Requirement::Execution,
             ProgramResolver::CachePolicy::ReadOnly);
         paths.count() != 0)
     {
