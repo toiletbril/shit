@@ -73,6 +73,21 @@ CACHE_COMMAND=appeared CACHE_DIRECTORY="$dir/appeared" \
     PATH="$dir/appeared:/bin" "$BIN" -c \
     'command -v "$CACHE_COMMAND" >/dev/null 2>&1; /bin/mv "$CACHE_STAGED" "$CACHE_DIRECTORY/appeared"; "$CACHE_COMMAND"'
 
+mkdir "$dir/validation-first" "$dir/validation-second"
+printf '#!/bin/sh\necho validation-first\n' > "$dir/validation-staged"
+printf '#!/bin/sh\necho validation-second\n' > \
+    "$dir/validation-second/validationprobe"
+chmod +x "$dir/validation-staged" \
+    "$dir/validation-second/validationprobe"
+VALIDATION_FIRST="$dir/validation-first" \
+    VALIDATION_STAGED="$dir/validation-staged" \
+    PATH="$dir/validation-first:$dir/validation-second:/bin" "$BIN" -c '
+    validationprobe
+    /bin/mv "$VALIDATION_STAGED" "$VALIDATION_FIRST/validationprobe"
+    compgen -c validationprobe >/dev/null 2>&1
+    validationprobe
+'
+
 mkdir "$dir/query-first" "$dir/query-second"
 printf '#!/bin/sh\necho compgen-first\n' > "$dir/compgen-staged"
 printf '#!/bin/sh\necho compgen-second\n' > \
@@ -160,11 +175,32 @@ printf 'analysis-shadowed-no-path-scan\n'
 noninteractive_log="$dir/noninteractive.log"
 PATH="$dir/one:/bin" "$BIN" -X all -c 'missing_command_xyz' \
     >/dev/null 2>"$noninteractive_log"
-if grep -F 'scanning every PATH directory to seed the program cache' \
+if grep -F 'unique PATH directories to seed the program cache' \
     "$noninteractive_log" >/dev/null; then
     exit 1
 fi
 printf 'noninteractive-no-path-index\n'
+
+path_update_log="$dir/path-update.log"
+if "$BIN" -X all -c ':' >/dev/null 2>&1; then
+    PATH="$dir/one:$dir/one:/bin:$dir/one" "$BIN" -X info \
+        --debug-complete-at cacheprobe >/dev/null 2>"$path_update_log" ||
+        exit 1
+    grep -F 'scanning 2 unique PATH directories' "$path_update_log" \
+        >/dev/null || exit 1
+fi
+printf 'path-directories-deduplicated\n'
+
+if "$BIN" -X all -c ':' >/dev/null 2>&1; then
+    FIRST_DIRECTORY="$dir/one" PATH="$dir/one:/bin" "$BIN" -X info -c '
+        compgen -c >/dev/null
+        PATH="$PATH:$FIRST_DIRECTORY"
+        compgen -c >/dev/null
+    ' >/dev/null 2>"$path_update_log" || exit 1
+    [ "$(grep -c 'unique PATH directories' "$path_update_log")" -eq 1 ] ||
+        exit 1
+fi
+printf 'duplicate-only-path-update-preserves-index\n'
 
 PATH=/bin "$BIN" -c \
     'compfunc() { :; }; eval "alias compalias=:"; compgen -c shopt 2>/dev/null; compgen -c compfunc 2>/dev/null; compgen -c compalias 2>/dev/null'
@@ -204,6 +240,15 @@ if [ "${OS-}" != Windows_NT ]; then
         vanished=$(compgen -c mode-vanished 2>/dev/null)
         printf "mode-before=%s mode-appeared=%s mode-vanished=%s\n" \
             "$before" "$appeared" "$vanished"
+    '
+
+    mkdir "$dir/full-mode-change"
+    printf '#!/bin/sh\n' > "$dir/full-mode-change/full-mode-probe"
+    FULL_MODE_DIRECTORY="$dir/full-mode-change" \
+        PATH="$dir/full-mode-change:/bin" "$BIN" -c '
+        compgen -c >/dev/null 2>&1
+        /bin/chmod +x "$FULL_MODE_DIRECTORY/full-mode-probe"
+        compgen -c full-mode-probe 2>/dev/null
     '
 
     mkdir "$dir/broken-first" "$dir/broken-second"

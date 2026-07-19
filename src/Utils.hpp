@@ -143,9 +143,16 @@ enum class directory_validation : u8
   Validate,
 };
 
+enum class directory_listing_order : u8
+{
+  Unsorted,
+  FoldedName,
+};
+
 fn read_directory_cached(
     const Path &directory,
-    directory_validation validation = directory_validation::Validate) throws
+    directory_validation validation = directory_validation::Validate,
+    directory_listing_order order = directory_listing_order::Unsorted) throws
     -> const ArrayList<Path::directory_child> *;
 pure fn directory_listing_generation(const Path &directory) wontthrow -> u64;
 pure fn directory_entry_name_lower_bound(
@@ -161,6 +168,7 @@ fn directory_entry_kind(const Path &directory,
 #if !defined NDEBUG
 pure fn debug_directory_stat_count() wontthrow -> usize;
 pure fn debug_directory_read_count() wontthrow -> usize;
+pure fn debug_directory_sort_count() wontthrow -> usize;
 pure fn debug_executable_probe_count() wontthrow -> usize;
 pure fn debug_program_path_candidate_count() wontthrow -> usize;
 #endif

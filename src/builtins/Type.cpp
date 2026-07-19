@@ -94,7 +94,8 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       word = "builtin";
     } else if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
                shitbox::find_util(name.view()).has_value() &&
-               cxt.get_program_resolver().get_status(name) ==
+               cxt.get_program_resolver().get_status(
+                   name, ProgramResolver::StatusLookup::Authoritative) ==
                    ProgramResolver::Status::Missing)
     {
       word = "builtin";

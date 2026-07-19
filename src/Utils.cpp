@@ -1866,6 +1866,7 @@ struct cached_directory_listing
   u64 generation{0};
   usize alias_count{0};
   bool has_file_identity{false};
+  bool is_sorted{false};
   ArrayList<Path::directory_child> entries{heap_allocator()};
 };
 
@@ -1885,6 +1886,7 @@ static u64 DIRECTORY_LISTING_GENERATION = 0;
 #if !defined NDEBUG
 static usize DEBUG_DIRECTORY_STAT_COUNT = 0;
 static usize DEBUG_DIRECTORY_READ_COUNT = 0;
+static usize DEBUG_DIRECTORY_SORT_COUNT = 0;
 static usize DEBUG_EXECUTABLE_PROBE_COUNT = 0;
 static usize DEBUG_PROGRAM_PATH_CANDIDATE_COUNT = 0;
 #endif
@@ -2046,10 +2048,28 @@ pure fn directory_entry_name_has_casefold_prefix(StringView name,
   return true;
 }
 
-fn read_directory_cached(const Path &directory,
-                         directory_validation validation) throws
+fn read_directory_cached(const Path &directory, directory_validation validation,
+                         directory_listing_order order) throws
     -> const ArrayList<Path::directory_child> *
 {
+  let const do_apply_order =
+      [&](cached_directory_listing &listing)
+          throws -> const ArrayList<Path::directory_child> * {
+    if (order == directory_listing_order::FoldedName && !listing.is_sorted) {
+#if !defined NDEBUG
+      DEBUG_DIRECTORY_SORT_COUNT++;
+#endif
+      listing.entries.sort([](const Path::directory_child &left,
+                              const Path::directory_child &right) {
+        return directory_entry_name_is_less(left.name.view(),
+                                            right.name.view());
+      });
+      listing.is_sorted = true;
+    }
+
+    return &listing.entries;
+  };
+
   let const key = directory.text().view();
   let *alias = DIR_LISTING_ALIASES.find(key);
   if (validation == directory_validation::Cached && alias != nullptr &&
@@ -2057,7 +2077,7 @@ fn read_directory_cached(const Path &directory,
       alias->observed_generation ==
           DIR_LISTINGS[alias->listing_position].generation)
   {
-    return &DIR_LISTINGS[alias->listing_position].entries;
+    return do_apply_order(DIR_LISTINGS[alias->listing_position]);
   }
 
 #if !defined NDEBUG
@@ -2082,7 +2102,7 @@ fn read_directory_cached(const Path &directory,
         cached.size == status.size)
     {
       set_directory_listing_alias(key, *physical_position);
-      return &cached.entries;
+      return do_apply_order(cached);
     }
   }
 
@@ -2104,11 +2124,6 @@ fn read_directory_cached(const Path &directory,
     else
       child.kind = Path::entry_kind::Other;
   }
-
-  entries->sort([](const Path::directory_child &left,
-                   const Path::directory_child &right) {
-    return directory_entry_name_is_less(left.name.view(), right.name.view());
-  });
 
   cached_directory_listing fresh{};
   fresh.device_id = has_status ? status.device_id : 0;
@@ -2137,7 +2152,7 @@ fn read_directory_cached(const Path &directory,
   }
   set_directory_listing_alias(key, *physical_position);
 
-  return &DIR_LISTINGS[*physical_position].entries;
+  return do_apply_order(DIR_LISTINGS[*physical_position]);
 }
 
 fn directory_entry_kind(const Path &directory,
@@ -2162,13 +2177,21 @@ pure fn directory_listing_generation(const Path &directory) wontthrow -> u64
 
 static fn sort_and_deduplicate_names(ArrayList<String> &names) throws -> void
 {
-  names.sort();
-  for (usize name_index = 1; name_index < names.count();) {
-    if (names[name_index - 1].view() == names[name_index].view())
-      names.remove(name_index);
-    else
-      name_index++;
-  }
+  let positions = ArrayList<usize>{names.allocator()};
+  positions.reserve(names.count());
+  for (usize position = 0; position < names.count(); position++)
+    positions.push(position);
+  positions.sort([&](usize left, usize right) {
+    return names[left].view() < names[right].view();
+  });
+
+  let sorted_names = ArrayList<String>{names.allocator()};
+  sorted_names.reserve(names.count());
+  for (let const position : positions)
+    if (sorted_names.is_empty() ||
+        sorted_names.back().view() != names[position].view())
+      sorted_names.push(steal(names[position]));
+  names = steal(sorted_names);
 }
 
 static fn begin_directory_validation_epoch() wontthrow -> void
@@ -2182,23 +2205,44 @@ ProgramResolver::ProgramResolver()
 
 ProgramResolver::ProgramResolver(Maybe<String> path) : m_path(steal(path)) {}
 
-fn ProgramResolver::clear_derived_indexes() wontthrow -> void
+fn ProgramResolver::clear_command_name_indexes() wontthrow -> void
 {
   m_command_names.clear();
   m_regular_names.clear();
+  m_validated_prefix.clear();
   m_command_names_are_valid = false;
+  m_command_names_validation_epoch = 0;
+  m_prefix_validation_epoch = 0;
+}
+
+fn ProgramResolver::clear_derived_indexes() wontthrow -> void
+{
+  clear_command_name_indexes();
+  m_path_directory_generations.clear();
+  m_path_directory_generations_are_valid = false;
+  m_path_directories_validation_epoch = 0;
 }
 
 fn ProgramResolver::assign_path(Maybe<String> path) throws -> void
 {
-  let const path_changed = m_path.has_value() != path.has_value() ||
-                           (m_path.has_value() && path.has_value() &&
-                            m_path->view() != path->view());
-  m_path = steal(path);
-  m_execution_cache.clear();
-  if (!path_changed) return;
+  if (m_path.has_value() == path.has_value() &&
+      (!m_path.has_value() || m_path->view() == path->view()))
+  {
+    m_execution_cache.clear();
+    return;
+  }
 
-  m_path_dirs_are_valid = false;
+  let path_dirs = path.has_value() ? split_path_dirs(path->view())
+                                   : ArrayList<String>{heap_allocator()};
+  let index_path_dirs = deduplicate_path_dirs(path_dirs);
+  let const path_search_changed = get_index_path_dirs() != index_path_dirs;
+  m_path = steal(path);
+  m_path_dirs = steal(path_dirs);
+  m_index_path_dirs = steal(index_path_dirs);
+  m_path_dirs_are_valid = true;
+  m_execution_cache.clear();
+  if (!path_search_changed) return;
+
   clear_derived_indexes();
 }
 
@@ -2234,22 +2278,41 @@ fn ProgramResolver::split_path_dirs(StringView path) throws -> ArrayList<String>
   return directories;
 }
 
+fn ProgramResolver::deduplicate_path_dirs(
+    const ArrayList<String> &directories) throws -> ArrayList<String>
+{
+  let unique_directories = ArrayList<String>{heap_allocator()};
+  for (let const &directory : directories)
+    if (!unique_directories.find(directory.view()).has_value())
+      unique_directories.push(String{directory.view()});
+
+  return unique_directories;
+}
+
 fn ProgramResolver::get_path_dirs() throws -> const ArrayList<String> &
 {
   if (m_path_dirs_are_valid) return m_path_dirs;
 
   m_path_dirs = m_path.has_value() ? split_path_dirs(m_path->view())
                                    : ArrayList<String>{heap_allocator()};
+  m_index_path_dirs = deduplicate_path_dirs(m_path_dirs);
   m_path_dirs_are_valid = true;
 
   return m_path_dirs;
+}
+
+fn ProgramResolver::get_index_path_dirs() throws -> const ArrayList<String> &
+{
+  unused(get_path_dirs());
+
+  return m_index_path_dirs;
 }
 
 fn ProgramResolver::working_directory_changed() throws -> void
 {
   begin_directory_validation_epoch();
 
-  for (let const &directory : get_path_dirs())
+  for (let const &directory : get_index_path_dirs())
     if (!Path{directory.view()}.is_absolute()) {
       m_execution_cache.clear();
       clear_derived_indexes();
@@ -2257,10 +2320,29 @@ fn ProgramResolver::working_directory_changed() throws -> void
     }
 }
 
-fn ProgramResolver::rebuild_path_command_index() throws -> void
+fn ProgramResolver::refresh_path_directory_generations() throws -> void
 {
-  clear_derived_indexes();
   m_path_directory_generations.clear();
+  for (let const &directory_text : get_index_path_dirs()) {
+    let const directory = Path{directory_text.view()};
+    let const entries =
+        read_directory_cached(directory, directory_validation::Validate);
+    m_path_directory_generations.push(
+        entries == nullptr ? 0 : directory_listing_generation(directory));
+  }
+  m_path_directory_generations_are_valid = true;
+  m_path_directories_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
+}
+
+fn ProgramResolver::rebuild_path_command_index(CompletionRefresh refresh) throws
+    -> void
+{
+  if (refresh == CompletionRefresh::Fresh) {
+    clear_derived_indexes();
+  } else {
+    ASSERT(m_path_directory_generations_are_valid);
+    clear_command_name_indexes();
+  }
   if (!m_path.has_value()) {
     m_command_names_are_valid = true;
     m_command_names_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
@@ -2270,13 +2352,9 @@ fn ProgramResolver::rebuild_path_command_index() throws -> void
     return;
   }
 
-  for (let const &directory_text : get_path_dirs()) {
-    let const directory = Path{directory_text.view()};
-    read_directory_cached(directory, directory_validation::Validate);
-    m_path_directory_generations.push(directory_listing_generation(directory));
-  }
+  if (refresh == CompletionRefresh::Fresh) refresh_path_directory_generations();
 
-  for (let const &directory_text : get_path_dirs()) {
+  for (let const &directory_text : get_index_path_dirs()) {
     let const directory = Path{directory_text.view()};
     let const entries =
         read_directory_cached(directory, directory_validation::Cached);
@@ -2319,20 +2397,9 @@ fn ProgramResolver::rebuild_path_command_index() throws -> void
 
 fn ProgramResolver::initialize_path_map() throws -> void
 {
-  LOG(Info, "scanning every PATH directory to seed the program cache");
-  rebuild_path_command_index();
-}
-
-fn ProgramResolver::begin_interactive_completion() throws -> void
-{
-  begin_directory_validation_epoch();
-  ASSERT(m_explicit_completion_depth == 0);
-  if (!m_command_names_are_valid) {
-    rebuild_path_command_index();
-    return;
-  }
-
-  m_command_names_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
+  LOG(Info, "scanning %zu unique PATH directories to seed the program cache",
+      get_index_path_dirs().count());
+  rebuild_path_command_index(CompletionRefresh::Fresh);
 }
 
 fn ProgramResolver::begin_explicit_completion(CompletionRefresh refresh) throws
@@ -2360,6 +2427,11 @@ pure fn debug_directory_read_count() wontthrow -> usize
   return DEBUG_DIRECTORY_READ_COUNT;
 }
 
+pure fn debug_directory_sort_count() wontthrow -> usize
+{
+  return DEBUG_DIRECTORY_SORT_COUNT;
+}
+
 pure fn debug_executable_probe_count() wontthrow -> usize
 {
   return DEBUG_EXECUTABLE_PROBE_COUNT;
@@ -2373,23 +2445,32 @@ pure fn debug_program_path_candidate_count() wontthrow -> usize
 
 fn ProgramResolver::validate_path_directory_generations() throws -> bool
 {
-  if (m_path_directories_validation_epoch == DIRECTORY_VALIDATION_EPOCH)
+  if (m_path_directory_generations_are_valid &&
+      m_path_directories_validation_epoch == DIRECTORY_VALIDATION_EPOCH)
     return false;
 
   bool did_change =
-      m_path_directory_generations.count() != get_path_dirs().count();
+      !m_path_directory_generations_are_valid ||
+      m_path_directory_generations.count() != get_index_path_dirs().count();
+  let observed_generations = ArrayList<u64>{heap_allocator()};
+  observed_generations.reserve(get_index_path_dirs().count());
   usize directory_position = 0;
-  for (let const &directory_text : get_path_dirs()) {
+  for (let const &directory_text : get_index_path_dirs()) {
     let const directory = Path{directory_text.view()};
-    read_directory_cached(directory, directory_validation::Validate);
-    let const generation = directory_listing_generation(directory);
+    let const entries =
+        read_directory_cached(directory, directory_validation::Validate);
+    let const generation =
+        entries == nullptr ? 0 : directory_listing_generation(directory);
     if (directory_position >= m_path_directory_generations.count() ||
         m_path_directory_generations[directory_position] != generation)
     {
       did_change = true;
     }
+    observed_generations.push(generation);
     directory_position++;
   }
+  m_path_directory_generations = steal(observed_generations);
+  m_path_directory_generations_are_valid = true;
   m_path_directories_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
 
   return did_change;
@@ -2397,15 +2478,9 @@ fn ProgramResolver::validate_path_directory_generations() throws -> bool
 
 fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
 {
-  for (usize name_position = 0; name_position < m_command_names.count();) {
-    if (smart_case_prefix_matches(m_command_names[name_position].view(),
-                                  prefix))
-      m_command_names.remove(name_position);
-    else
-      name_position++;
-  }
+  clear_command_name_indexes();
 
-  for (let const &directory_text : get_path_dirs()) {
+  for (let const &directory_text : get_index_path_dirs()) {
     let const directory = Path{directory_text.view()};
     let const entries =
         read_directory_cached(directory, directory_validation::Cached);
@@ -2429,6 +2504,10 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
       if (directory_entry_kind(directory, entry) != Path::entry_kind::Regular)
         continue;
 
+      if (stem_matches) m_regular_names.push(String{stem});
+      if (full_name_matches)
+        m_regular_names.push(String{normalized_name.view()});
+
 #if !defined NDEBUG
       DEBUG_EXECUTABLE_PROBE_COUNT++;
 #endif
@@ -2439,6 +2518,7 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
   }
 
   sort_and_deduplicate_names(m_command_names);
+  sort_and_deduplicate_names(m_regular_names);
   m_validated_prefix = String{prefix};
   m_prefix_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
 }
@@ -2447,27 +2527,54 @@ fn ProgramResolver::prepare_complete_path_cache(
     StringView validation_prefix, ValidationScope validation_scope) throws
     -> void
 {
+  if (!m_command_names_are_valid && !m_path_directory_generations_are_valid &&
+      m_explicit_completion_depth == 0)
+    return;
+
   if (!m_command_names_are_valid) {
-    initialize_path_map();
+    if (validation_scope == ValidationScope::All ||
+        validation_prefix.is_empty())
+    {
+      if (m_path_directory_generations_are_valid &&
+          m_path_directories_validation_epoch == DIRECTORY_VALIDATION_EPOCH)
+        rebuild_path_command_index(CompletionRefresh::Cached);
+      else
+        initialize_path_map();
+      return;
+    }
+
+    if (!m_path_directory_generations_are_valid) {
+      refresh_path_directory_generations();
+      m_execution_cache.clear();
+    } else if (m_path_directories_validation_epoch !=
+               DIRECTORY_VALIDATION_EPOCH)
+    {
+      if (validate_path_directory_generations()) {
+        m_execution_cache.clear();
+        clear_command_name_indexes();
+      }
+    }
+
+    if (!m_validated_prefix.is_empty() &&
+        m_prefix_validation_epoch == DIRECTORY_VALIDATION_EPOCH &&
+        validation_prefix.starts_with(m_validated_prefix.view()))
+      return;
+
+    revalidate_command_prefix(validation_prefix);
     return;
   }
   if (m_explicit_completion_depth == 0) return;
   if (m_command_names_validation_epoch == DIRECTORY_VALIDATION_EPOCH) return;
 
-  if (validate_path_directory_generations()) {
-    initialize_path_map();
-    return;
-  }
-  if (validation_scope == ValidationScope::All || validation_prefix.is_empty())
+  if (validate_path_directory_generations()) m_execution_cache.clear();
+  if (validation_scope == ValidationScope::Prefix &&
+      !validation_prefix.is_empty())
   {
-    initialize_path_map();
+    m_command_names_are_valid = false;
+    revalidate_command_prefix(validation_prefix);
     return;
   }
-  if (m_prefix_validation_epoch == DIRECTORY_VALIDATION_EPOCH &&
-      validation_prefix.starts_with(m_validated_prefix.view()))
-    return;
-
-  revalidate_command_prefix(validation_prefix);
+  rebuild_path_command_index(CompletionRefresh::Cached);
 }
 
 fn ProgramResolver::get_command_names(StringView validation_prefix,
@@ -2518,30 +2625,35 @@ pure fn ProgramResolver::has_valid_command_names() const wontthrow -> bool
   return m_command_names_are_valid;
 }
 
-fn ProgramResolver::get_status(StringView name) throws -> Status
+fn ProgramResolver::get_status(StringView name, StatusLookup lookup) throws
+    -> Status
 {
-  if (m_command_names_are_valid) {
-    let normalized_name = String{name};
-    unused(os::normalize_program_name(normalized_name));
-    let const runnable_position =
-        command_name_lower_bound_in(m_command_names, normalized_name.view());
-    if (runnable_position < m_command_names.count() &&
-        m_command_names[runnable_position].view() == normalized_name.view())
-      return Status::Runnable;
-    let const regular_position =
-        command_name_lower_bound_in(m_regular_names, normalized_name.view());
-    if (regular_position < m_regular_names.count() &&
-        m_regular_names[regular_position].view() == normalized_name.view())
-      return Status::Blocked;
-    return Status::Missing;
+  if (lookup == StatusLookup::Authoritative) {
+    let const paths = search(name, SearchMode::First, Requirement::Regular,
+                             CachePolicy::Bypass);
+    if (paths.is_empty()) return Status::Missing;
+    if (paths[0].is_executable()) return Status::Runnable;
+    return Status::Blocked;
   }
 
-  let const paths = search(name, SearchMode::First, Requirement::Regular,
-                           CachePolicy::Bypass);
-  if (paths.is_empty()) return Status::Missing;
-  if (paths[0].is_regular_file() && paths[0].is_executable())
+  let normalized_name = String{name};
+  unused(os::normalize_program_name(normalized_name));
+  if (!m_command_names_are_valid && !normalized_name.is_empty())
+    prepare_complete_path_cache(normalized_name.substring_of_length(0, 1),
+                                ValidationScope::Prefix);
+
+  let const runnable_position =
+      command_name_lower_bound_in(m_command_names, normalized_name.view());
+  if (runnable_position < m_command_names.count() &&
+      m_command_names[runnable_position].view() == normalized_name.view())
     return Status::Runnable;
-  return Status::Blocked;
+  let const regular_position =
+      command_name_lower_bound_in(m_regular_names, normalized_name.view());
+  if (regular_position < m_regular_names.count() &&
+      m_regular_names[regular_position].view() == normalized_name.view())
+    return Status::Blocked;
+
+  return Status::Missing;
 }
 
 fn ProgramResolver::resolve_along_path(StringView program_name,

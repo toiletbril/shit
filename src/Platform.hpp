@@ -48,7 +48,7 @@
 #include <sys/sysctl.h>
 #endif
 #if defined __SANITIZE_ADDRESS__
-#include <sanitizer/lsan_interface.h>
+extern "C" void __lsan_disable(void);
 #define SHIT_HAS_ADDRESS_SANITIZER 1
 #endif
 #if defined __COSMOPOLITAN__

@@ -61,12 +61,15 @@ path_stats=${path_metrics#* stats=}
 path_stats=${path_stats%% *}
 path_probes=${path_metrics#* probes=}
 path_probes=${path_probes%% *}
+path_sorts=${path_metrics#* sorts=}
+path_sorts=${path_sorts%% *}
 path_scans=${path_metrics#* scans=}
 path_scans=${path_scans%% *}
 path_serializations=${path_metrics#* serializations=}
 path_serializations=${path_serializations%% *}
 test "$path_stats" -le 1 || exit 1
 test "$path_probes" -le 2 || exit 1
+test "$path_sorts" -eq 0 || exit 1
 test "$path_scans" -le 64 || exit 1
 test "$path_serializations" -le 6 || exit 1
 case $path_metrics in *' materialized=0'*) ;; *) exit 1 ;; esac
@@ -76,6 +79,13 @@ mkdir "$d/tab-path"
 printf '#!/bin/sh\n' > "$d/tab-path/probe-alpha"
 printf '#!/bin/sh\n' > "$d/tab-path/probe-beta"
 chmod +x "$d/tab-path/probe-alpha" "$d/tab-path/probe-beta"
+tab_unrelated_index=0
+while [ "$tab_unrelated_index" -lt 256 ]; do
+    printf '#!/bin/sh\n' > \
+        "$d/tab-path/unrelated-command-$tab_unrelated_index"
+    chmod +x "$d/tab-path/unrelated-command-$tab_unrelated_index"
+    tab_unrelated_index=$((tab_unrelated_index + 1))
+done
 send_post_tab_input()
 {
     for character in p r o b e; do
@@ -111,7 +121,7 @@ echo 'TAB validation ends before the next key'
 
 send_warm_tab_input()
 {
-    printf 'PATH=/bin true\n'
+    printf 'compgen -c >/dev/null 2>&1\n'
     sleep 0.1
     printf 'probe-a\t\n'
     sleep 0.1
@@ -132,7 +142,7 @@ fi
 warm_tab_metrics=$(strings "$d/warm-tab-typescript" | \
     grep 'editor-refresh append=' | tail -n +2 | head -1) || exit 1
 case $warm_tab_metrics in
-    *' preprompt-stats=0 preprompt-reads=0 preprompt-probes=0 preprompt-resolutions=0 preprompt-history-loads=0 '*)
+    *' preprompt-stats=0 preprompt-reads=0 preprompt-sorts=0 preprompt-probes=0 preprompt-resolutions=0 preprompt-history-loads=0 '*)
         ;;
     *) exit 1 ;;
 esac
@@ -145,11 +155,11 @@ warm_tab_probes=${warm_tab_metrics#* probes=}
 warm_tab_probes=${warm_tab_probes%% *}
 warm_tab_resolutions=${warm_tab_metrics#* resolutions=}
 warm_tab_resolutions=${warm_tab_resolutions%% *}
-test "$warm_tab_stats" -eq 0 || exit 1
-test "$warm_tab_reads" -eq 0 || exit 1
-test "$warm_tab_probes" -eq 0 || exit 1
+test "$warm_tab_stats" -le 2 || exit 1
+test "$warm_tab_reads" -le 1 || exit 1
+test "$warm_tab_probes" -le 2 || exit 1
 test "$warm_tab_resolutions" -eq 0 || exit 1
-echo 'warm TAB performs no PATH validation or executable probes'
+echo 'warm TAB reuses prefix probes after metadata validation'
 
 history_index=0
 while [ "$history_index" -lt 1000 ]; do
@@ -189,11 +199,13 @@ history_resolutions=${history_resolutions%% *}
 test "$history_resolutions" -eq 0 || exit 1
 echo 'history validation does not walk PATH'
 
-mkdir "$d/prompt-initial" "$d/prompt-path"
+mkdir "$d/prompt-initial" "$d/prompt-path-one" "$d/prompt-path-two" \
+    "$d/prompt-path-three" "$d/prompt-path-four"
 prompt_index=0
 while [ "$prompt_index" -lt 256 ]; do
-    printf '#!/bin/sh\n' > "$d/prompt-path/prompt-command-$prompt_index"
-    chmod +x "$d/prompt-path/prompt-command-$prompt_index"
+    printf '#!/bin/sh\n' > \
+        "$d/prompt-path-one/prompt-command-$prompt_index"
+    chmod +x "$d/prompt-path-one/prompt-command-$prompt_index"
     prompt_index=$((prompt_index + 1))
 done
 send_prompt_path_input()
@@ -205,7 +217,7 @@ send_prompt_path_input()
 if "$script_command" --version >/dev/null 2>&1; then
     send_prompt_path_input | \
         PATH="$d/prompt-initial:/bin" \
-        PROMPT_COMMAND="PATH=$d/prompt-path" \
+        PROMPT_COMMAND="PATH=$d/prompt-path-one:$d/prompt-path-two:$d/prompt-path-three:$d/prompt-path-four" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/prompt-history" \
         BIN="$BIN" "$script_command" -q -c \
         '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
@@ -213,7 +225,7 @@ if "$script_command" --version >/dev/null 2>&1; then
 else
     send_prompt_path_input | \
         PATH="$d/prompt-initial:/bin" \
-        PROMPT_COMMAND="PATH=$d/prompt-path" \
+        PROMPT_COMMAND="PATH=$d/prompt-path-one:$d/prompt-path-two:$d/prompt-path-three:$d/prompt-path-four" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/prompt-history" \
         BIN="$BIN" "$script_command" -q "$d/prompt-typescript" /bin/sh -c \
         '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
@@ -221,13 +233,22 @@ else
 fi
 prompt_metrics=$(strings "$d/prompt-typescript" | \
     grep 'editor-refresh append=' | head -1) || exit 1
+prompt_stats=${prompt_metrics#* stats=}
+prompt_stats=${prompt_stats%% *}
+prompt_reads=${prompt_metrics#* reads=}
+prompt_reads=${prompt_reads%% *}
 prompt_probes=${prompt_metrics#* probes=}
 prompt_probes=${prompt_probes%% *}
+prompt_sorts=${prompt_metrics#* sorts=}
+prompt_sorts=${prompt_sorts%% *}
 prompt_resolutions=${prompt_metrics#* resolutions=}
 prompt_resolutions=${prompt_resolutions%% *}
+test "$prompt_stats" -eq 0 || exit 1
+test "$prompt_reads" -eq 0 || exit 1
 test "$prompt_probes" -eq 0 || exit 1
+test "$prompt_sorts" -eq 0 || exit 1
 test "$prompt_resolutions" -eq 0 || exit 1
-echo 'prompt PATH changes finish before the first key'
+echo 'prompt PATH changes defer first-key filesystem work'
 
 mkdir "$d/absolute-path" "$d/next-directory"
 printf '#!/bin/sh\n' > "$d/absolute-path/echo-probe"
@@ -254,7 +275,7 @@ else
 fi
 cd_metrics=$(strings "$d/cd-typescript" | \
     grep 'editor-refresh append=1 ') || exit 1
-case $cd_metrics in *' stats=0 reads=0 probes=0 '*) ;; *) exit 1 ;; esac
+case $cd_metrics in *' stats=0 reads=0 sorts=0 probes=0 '*) ;; *) exit 1 ;; esac
 echo 'absolute PATH survives a directory change'
 
 printf '#!/bin/sh\nprintf "actual-cwd-completion\\n"\n' > \

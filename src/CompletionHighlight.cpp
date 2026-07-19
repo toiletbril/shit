@@ -380,7 +380,8 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
 
   let const listing_directory = Path{directory.view()};
   let const entries = utils::read_directory_cached(
-      listing_directory, utils::directory_validation::Cached);
+      listing_directory, utils::directory_validation::Cached,
+      utils::directory_listing_order::FoldedName);
   if (entries == nullptr) return false;
 
   let const do_name_starts_with = [&](StringView name) wontthrow {

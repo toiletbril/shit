@@ -10,6 +10,8 @@ vanished=
 atomic-old= atomic-new=newatomicprobe
 refreshed
 appeared
+validation-second
+validation-first
 compgen-first
 command-first
 type-first
@@ -22,12 +24,15 @@ type-directory=1 command-directory=1 which-directory=1
 type-regular=0 command-regular=0
 analysis-shadowed-no-path-scan
 noninteractive-no-path-index
+path-directories-deduplicated
+duplicate-only-path-update-preserves-index
 shopt
 compfunc
 compalias
 identity-alias=identity-new
 compgen-file-literal-path
 mode-before= mode-appeared=mode-appeared mode-vanished=
+full-mode-probe
 broken-symlink
 suffix-priority
 sourced-non-runnable

@@ -975,7 +975,8 @@ static fn collect_filesystem_matches(
                                 decoded_word.leading_variable_is_active);
 
   let const entries = utils::read_directory_cached(
-      listing_directory, utils::directory_validation::Cached);
+      listing_directory, utils::directory_validation::Cached,
+      utils::directory_listing_order::FoldedName);
   if (entries == nullptr) return;
 
   let const do_add_entry = [&](const Path::directory_child &entry) throws {
@@ -1082,7 +1083,8 @@ static fn complete_glob(StringView token, const Path &base_directory,
                                 decoded_word.leading_variable_is_active);
 
   let const entries = utils::read_directory_cached(
-      listing_directory, utils::directory_validation::Cached);
+      listing_directory, utils::directory_validation::Cached,
+      utils::directory_listing_order::FoldedName);
   if (entries == nullptr) return candidates;
 
   let glob_active = Bitset{completion_allocator()};

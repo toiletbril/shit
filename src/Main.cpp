@@ -189,6 +189,9 @@ static fn run_debug_highlight_driver(StringView driver_line,
       context.debug_variable_name_enumeration_count();
   let const directory_read_count_before = utils::debug_directory_read_count();
 #endif
+  context.get_program_resolver().begin_explicit_completion(
+      ProgramResolver::CompletionRefresh::Fresh);
+  defer { context.get_program_resolver().end_explicit_completion(); };
   let const spans = completion::highlight_line(driver_line, context);
   let listing = String{heap_allocator()};
   for (let const &span : spans) {
@@ -1404,8 +1407,7 @@ fn main(int argc, char **argv) -> int
         if (FLAG_COMMAND.at_end()) should_quit = true;
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
-          LOG(Info, "initializing the line editor and the path map");
-          context.get_program_resolver().initialize_path_map();
+          LOG(Info, "initializing the line editor");
           toiletline::initialize();
           /* The set -b wake hook registers even under -T, since job reporting
              is not completion. */

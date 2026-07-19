@@ -271,6 +271,12 @@ public:
     Runnable,
   };
 
+  enum class StatusLookup : u8
+  {
+    Cached,
+    Authoritative,
+  };
+
   enum class SearchMode : u8
   {
     First,
@@ -297,14 +303,14 @@ public:
   fn invalidate() throws -> void;
   fn working_directory_changed() throws -> void;
   fn initialize_path_map() throws -> void;
-  fn begin_interactive_completion() throws -> void;
   fn begin_explicit_completion(CompletionRefresh refresh) throws -> void;
   fn end_explicit_completion() wontthrow -> void;
   fn search(StringView program_name, SearchMode search_mode = SearchMode::First,
             Requirement requirement = Requirement::Runnable,
             CachePolicy cache_policy = CachePolicy::Bypass,
             Maybe<StringView> path_override = None) throws -> ArrayList<Path>;
-  fn get_status(StringView name) throws -> Status;
+  fn get_status(StringView name,
+                StatusLookup lookup = StatusLookup::Cached) throws -> Status;
   fn get_command_names(
       StringView validation_prefix = {},
       ValidationScope validation_scope = ValidationScope::Prefix) throws
@@ -332,10 +338,15 @@ private:
     Maybe<usize> bare_path_position{};
   };
 
+  fn clear_command_name_indexes() wontthrow -> void;
   fn clear_derived_indexes() wontthrow -> void;
   fn split_path_dirs(StringView path) throws -> ArrayList<String>;
+  fn deduplicate_path_dirs(const ArrayList<String> &directories) throws
+      -> ArrayList<String>;
   fn get_path_dirs() throws -> const ArrayList<String> &;
-  fn rebuild_path_command_index() throws -> void;
+  fn get_index_path_dirs() throws -> const ArrayList<String> &;
+  fn refresh_path_directory_generations() throws -> void;
+  fn rebuild_path_command_index(CompletionRefresh refresh) throws -> void;
   fn prepare_complete_path_cache(StringView validation_prefix,
                                  ValidationScope validation_scope) throws
       -> void;
@@ -359,9 +370,11 @@ private:
   ArrayList<String> m_regular_names{heap_allocator()};
   Maybe<String> m_path;
   ArrayList<String> m_path_dirs{heap_allocator()};
+  ArrayList<String> m_index_path_dirs{heap_allocator()};
   ArrayList<u64> m_path_directory_generations{heap_allocator()};
   String m_validated_prefix{heap_allocator()};
   bool m_path_dirs_are_valid{false};
+  bool m_path_directory_generations_are_valid{false};
   bool m_command_names_are_valid{false};
   u64 m_path_directories_validation_epoch{0};
   u64 m_command_names_validation_epoch{0};

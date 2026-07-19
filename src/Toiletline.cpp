@@ -153,7 +153,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     const bool is_explicit_completion = for_listing != 0;
     if (is_explicit_completion)
       COMPLETION_CONTEXT->get_program_resolver().begin_explicit_completion(
-          shit::ProgramResolver::CompletionRefresh::Cached);
+          shit::ProgramResolver::CompletionRefresh::Fresh);
     defer
     {
       if (is_explicit_completion)
@@ -530,6 +530,8 @@ fn get_input(const String &prompt) -> input_result
       utils::debug_directory_stat_count();
   let const preprompt_directory_read_count_before =
       utils::debug_directory_read_count();
+  let const preprompt_directory_sort_count_before =
+      utils::debug_directory_sort_count();
   let const preprompt_executable_probe_count_before =
       utils::debug_executable_probe_count();
   let const preprompt_program_path_candidate_count_before =
@@ -537,8 +539,6 @@ fn get_input(const String &prompt) -> input_result
   let const preprompt_history_buffer_load_count_before =
       ::itl_g_debug_history_buffer_load_count;
 #endif
-  if (COMPLETION_CONTEXT != nullptr)
-    COMPLETION_CONTEXT->get_program_resolver().begin_interactive_completion();
   unused(::itl_history_ensure_read_buffer());
 #if !defined NDEBUG
   let const preprompt_directory_stat_count =
@@ -547,6 +547,9 @@ fn get_input(const String &prompt) -> input_result
   let const preprompt_directory_read_count =
       utils::debug_directory_read_count() -
       preprompt_directory_read_count_before;
+  let const preprompt_directory_sort_count =
+      utils::debug_directory_sort_count() -
+      preprompt_directory_sort_count_before;
   let const preprompt_executable_probe_count =
       utils::debug_executable_probe_count() -
       preprompt_executable_probe_count_before;
@@ -585,6 +588,7 @@ fn get_input(const String &prompt) -> input_result
   let const materialized_count_before = DEBUG_COMPLETION_MATERIALIZED_COUNT;
   let const directory_stat_count_before = utils::debug_directory_stat_count();
   let const directory_read_count_before = utils::debug_directory_read_count();
+  let const directory_sort_count_before = utils::debug_directory_sort_count();
   let const executable_probe_count_before =
       utils::debug_executable_probe_count();
   let const program_path_candidate_count_before =
@@ -627,6 +631,9 @@ fn get_input(const String &prompt) -> input_result
         " preprompt-reads=" +
         shit::String::from(preprompt_directory_read_count,
                            shit::heap_allocator()) +
+        " preprompt-sorts=" +
+        shit::String::from(preprompt_directory_sort_count,
+                           shit::heap_allocator()) +
         " preprompt-probes=" +
         shit::String::from(preprompt_executable_probe_count,
                            shit::heap_allocator()) +
@@ -647,6 +654,10 @@ fn get_input(const String &prompt) -> input_result
         " reads=" +
         shit::String::from(utils::debug_directory_read_count() -
                                directory_read_count_before,
+                           shit::heap_allocator()) +
+        " sorts=" +
+        shit::String::from(utils::debug_directory_sort_count() -
+                               directory_sort_count_before,
                            shit::heap_allocator()) +
         " probes=" +
         shit::String::from(utils::debug_executable_probe_count() -
