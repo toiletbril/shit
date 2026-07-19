@@ -60,6 +60,8 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
   };
 
   let fallback_context = EvalContext{false, false, false, false};
+  fallback_context.set_current_source(
+      current_source(), String{heap_allocator(), current_origin().view()});
   fallback_context.set_shell_executable_path(shell_executable_path());
   fallback_context.set_shitbox(shitbox());
   fallback_context.set_mimicry(mimicry());

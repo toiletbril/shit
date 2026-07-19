@@ -288,7 +288,8 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
 
   /* The location can name a byte in a source other than the one rendered, so
      the caret would read out of bounds and the message renders unlocated. */
-  if (byte_position > source.count()) return ErrorBase::to_string(source);
+  if (source.data == nullptr || byte_position > source.count())
+    return ErrorBase::to_string(source);
 
   LOG_VARS(Debug, byte_position, byte_count);
   let const severity = severity_word();

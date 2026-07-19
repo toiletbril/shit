@@ -3,6 +3,11 @@ shit: 1:1: error: Unable to execute `TMPDIR/notexec`: Permission denied.
      1 |  ./notexec; printf "rc=%s\n" "$?"
        |  ^~~~~~~~~ here.
 rc=126
+== foreign binary:
+shit: 1:1: error: Cannot execute the binary file `TMPDIR/foreign`.
+     1 |  ./foreign; printf "rc=%s\n" "$?"
+       |  ^~~~~~~~~ here.
+rc=126
 == pipeline stage:
 shit: 1:1: error: Unable to execute `TMPDIR/notexec`: Permission denied.
      1 |  ./notexec | shitbox cat; printf "pipeline=%s first=%s\n" "$?" "${PIPESTATUS[0]}"
