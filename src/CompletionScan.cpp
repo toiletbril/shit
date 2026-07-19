@@ -831,13 +831,14 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
     if (!for_listing) return None;
     const completion_spec *def = context.default_completion_spec();
     if (def == nullptr || def->function_name.is_empty()) return None;
+    let const default_spec = def->clone(heap_allocator());
     usize default_cword = 0;
     let const default_words =
         split_completion_words(line, cursor, default_cword);
     i32 status = 0;
     let const reply = context.run_completion_function(
-        def->function_name.view(), default_words, default_cword, line, cursor,
-        &status);
+        default_spec.function_name.view(), default_words, default_cword, line,
+        cursor, &status);
     if (status != 124) {
       let const wants_dash_entries = !token.is_empty() && token[0] == '-';
       let loaded = ArrayList<String>{heap_allocator()};
@@ -855,14 +856,22 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
     if (spec == nullptr) return None;
   }
 
+  let const active_spec = spec->clone(heap_allocator());
   let candidates = ArrayList<String>{heap_allocator()};
 
   let const should_offer_dash_words = !token.is_empty() && token[0] == '-';
 
-  if (!spec->word_list.is_empty()) {
+  if (!active_spec.word_list.is_empty()) {
     /* The -W list expands through the same shared path compgen -W reads. */
-    for (let const &word :
-         context.expand_wordlist_to_fields(spec->word_list.view(), for_listing))
+    let const saved_runtime_state =
+        context.enter_definition_state(active_spec.defining_runtime);
+    defer
+    {
+      context.leave_definition_state(saved_runtime_state,
+                                     definition_state_exit::RestoreCaller);
+    };
+    for (let const &word : context.expand_wordlist_to_fields(
+             active_spec.word_list.view(), for_listing))
     {
       if (entry_is_unrequested_dash_word(word.view(), should_offer_dash_words))
         continue;
@@ -872,11 +881,11 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
 
   /* COMPREPLY is already filtered to the current word, so its entries are taken
      as they are under the same dash gate. */
-  if (for_listing && !spec->function_name.is_empty()) {
+  if (for_listing && !active_spec.function_name.is_empty()) {
     usize cword = 0;
     let const words = split_completion_words(line, cursor, cword);
     let const reply = context.run_completion_function(
-        spec->function_name.view(), words, cword, line, cursor);
+        active_spec.function_name.view(), words, cword, line, cursor);
     for (let const &entry : reply) {
       if (entry_is_unrequested_dash_word(entry.view(), should_offer_dash_words))
         continue;

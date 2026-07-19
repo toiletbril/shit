@@ -1129,14 +1129,15 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         cxt.function_definition_info_of(program_name.view());
     let const needs_state_swap =
         definition_info != nullptr &&
-        (static_cast<mimic_mood>(definition_info->defining_mood) !=
-             cxt.mood() ||
-         definition_info->warning_level_at_definition != cxt.warning_level() ||
-         definition_info->were_diagnostics_disabled_at_definition !=
+        (definition_info->defining_runtime.mood != cxt.mood() ||
+         definition_info->defining_runtime.warning_level !=
+             cxt.warning_level() ||
+         definition_info->defining_runtime.are_diagnostics_disabled !=
              cxt.diagnostics_disabled());
     Maybe<function_runtime_state> saved_runtime_state = None;
     if (needs_state_swap) {
-      saved_runtime_state = cxt.enter_definition_state(*definition_info);
+      saved_runtime_state =
+          cxt.enter_definition_state(definition_info->defining_runtime);
     }
     defer
     {

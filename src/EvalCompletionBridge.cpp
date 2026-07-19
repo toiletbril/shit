@@ -54,24 +54,20 @@ fn EvalContext::run_completion_function(StringView function_name,
       static_cast<int>(function_name.length), function_name.data, words.count(),
       cword);
 
-  /* A completion function is bash code reading and writing COMP_WORDS and
-     COMPREPLY, so the call evaluates in bash mode whatever the session's mode.
-   */
-  let const saved_mood = m_runtime.mood;
-  m_runtime.mood = mimic_mood::Bash;
-  defer { m_runtime.mood = saved_mood; };
+  set_completion_function_running(true);
+  defer { set_completion_function_running(false); };
 
-  /* bash-completion reads unset names such as SHELLOPTS freely, so the
-     mood-seeded strictness relaxes for the function run. An explicit set -u
-     stays fatal. */
-  let const saved_error_unset = error_unset();
-  let const saved_failglob = failglob();
-  if (!m_runtime.error_unset_explicit) set_error_unset(false);
-  if (!m_runtime.failglob_explicit) set_failglob(false);
+  let defining_runtime = RuntimeState::capture(*this);
+  if (let const *definition_info = function_definition_info_of(function_name);
+      definition_info != nullptr)
+    defining_runtime = definition_info->defining_runtime;
+  else
+    defining_runtime.mood = mimic_mood::Bash;
+  let const saved_runtime_state = enter_definition_state(defining_runtime);
   defer
   {
-    set_error_unset(saved_error_unset);
-    set_failglob(saved_failglob);
+    leave_definition_state(saved_runtime_state,
+                           definition_state_exit::RestoreCaller);
   };
 
   let comp_words = ArrayList<String>{heap_allocator()};
@@ -124,8 +120,6 @@ fn EvalContext::run_completion_function(StringView function_name,
   let const saved_terminal_exec = terminal_exec_allowed();
   set_terminal_exec_allowed(false);
   defer { set_terminal_exec_allowed(saved_terminal_exec); };
-  set_completion_function_running(true);
-  defer { set_completion_function_running(false); };
 
   /* A completion function that errors must not abort the prompt, so any error
      is swallowed and a stray break or return is consumed. */

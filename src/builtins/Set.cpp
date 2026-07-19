@@ -421,6 +421,7 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
       enable ? "on" : "off");
   switch (option.behavior) {
   case set_option_behavior::Stored:
+    cxt.note_shell_option_mutation(option.id);
     cxt.set_shell_option_state(option.id, enable);
     break;
   case set_option_behavior::Posix: cxt.set_posix_mode_via_option(enable); break;

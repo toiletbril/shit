@@ -158,6 +158,7 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     spec.function_name = String{heap_allocator(), function_name};
     spec.word_list = String{heap_allocator(), word_list};
     spec.should_use_default = should_use_default;
+    spec.defining_runtime = RuntimeState::capture(cxt);
     return spec;
   };
 

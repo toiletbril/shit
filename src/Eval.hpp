@@ -211,23 +211,43 @@ struct function_definition_info
   usize header_length{0};
   usize line_offset{0};
   String filename{heap_allocator()};
-  const String *defining_instance{nullptr};
-  /* The mood and diagnostics state when the function was defined, so the body
-     runs in its defining mood regardless of the mood at the call. The mood
-     rides as a byte so this struct need not order the mimic_mood enum before
-     it. */
-  u8 defining_mood{0};
-  u8 warning_level_at_definition{0};
-  bool were_diagnostics_disabled_at_definition{false};
+  RuntimeState defining_runtime;
+};
+
+struct shell_option_mutations
+{
+  u64 revision{0};
+  u64 last_revision[static_cast<usize>(shell_option_id::Count)]{};
+
+  fn note(shell_option_id option) wontthrow -> void
+  {
+    revision++;
+    last_revision[static_cast<usize>(option)] = revision;
+  }
+
+  pure fn touched_since(shell_option_id option,
+                        u64 prior_revision) const wontthrow -> bool
+  {
+    return last_revision[static_cast<usize>(option)] > prior_revision;
+  }
+};
+
+enum class definition_state_exit : u8
+{
+  PropagateMutations,
+  RestoreCaller,
 };
 
 struct function_runtime_state
 {
   RuntimeState previous;
   RuntimeState entered;
+  shell_option_mutations previous_shell_option_mutations;
+  u64 shell_option_mutation_revision;
   u64 mood_mutation_revision;
   u64 warning_mutation_revision;
   u64 diagnostics_mutation_revision;
+  bool was_mood_set_explicitly;
 };
 
 fn record_directory_access(StringView directory, Allocator allocator) throws
@@ -420,6 +440,7 @@ struct eval_state_snapshot
   u64 mood_mutation_revision;
   u64 warning_mutation_revision;
   u64 diagnostics_mutation_revision;
+  shell_option_mutations option_mutations;
 };
 
 struct completion_spec
@@ -427,6 +448,17 @@ struct completion_spec
   String function_name{heap_allocator()};
   String word_list{heap_allocator()};
   bool should_use_default{false};
+  RuntimeState defining_runtime;
+
+  fn clone(Allocator allocator) const throws -> completion_spec
+  {
+    let copy = completion_spec{};
+    copy.function_name = String{allocator, function_name.view()};
+    copy.word_list = String{allocator, word_list.view()};
+    copy.should_use_default = should_use_default;
+    copy.defining_runtime = defining_runtime;
+    return copy;
+  }
 };
 
 /* Owns one compiled regex and frees it on destruction, so the regex cache
@@ -895,6 +927,10 @@ public:
   {
     m_runtime.set_option(option, enabled);
   }
+  fn note_shell_option_mutation(shell_option_id option) wontthrow -> void
+  {
+    m_shell_option_mutations.note(option);
+  }
   pure fn shell_option_state(shell_option_id option) const wontthrow -> bool
   {
     return m_runtime.option_is_enabled(option);
@@ -1107,48 +1143,77 @@ public:
   fn apply_strictness_for_mood() wontthrow -> void
   {
     let const strict = m_runtime.mood == mimic_mood::Default;
-    if (!m_runtime.error_unset_explicit) set_error_unset(strict);
+    if (!m_runtime.error_unset_explicit)
+      set_error_unset(strict && !is_completion_function_running());
     if (!m_runtime.pipefail_explicit) set_pipefail(strict);
-    if (!m_runtime.failglob_explicit) set_failglob(strict);
+    if (!m_runtime.failglob_explicit)
+      set_failglob(strict && !is_completion_function_running());
   }
 
   friend class RuntimeState;
-  fn enter_definition_state(const function_definition_info &info) wontthrow
+  fn enter_definition_state(const RuntimeState &defining_runtime) wontthrow
       -> function_runtime_state
   {
     let const previous = RuntimeState::capture(*this);
-    m_runtime.mood = static_cast<mimic_mood>(info.defining_mood);
-    set_warning_level(info.warning_level_at_definition);
+    m_runtime.mood = defining_runtime.mood;
+    set_warning_level(defining_runtime.warning_level);
     m_runtime.are_diagnostics_disabled =
-        info.were_diagnostics_disabled_at_definition;
+        defining_runtime.are_diagnostics_disabled;
     apply_strictness_for_mood();
-    return function_runtime_state{
-        previous, RuntimeState::capture(*this), m_mood_mutation_revision,
-        m_warning_mutation_revision, m_diagnostics_mutation_revision};
+    return function_runtime_state{previous,
+                                  RuntimeState::capture(*this),
+                                  m_shell_option_mutations,
+                                  m_shell_option_mutations.revision,
+                                  m_mood_mutation_revision,
+                                  m_warning_mutation_revision,
+                                  m_diagnostics_mutation_revision,
+                                  m_mood_set_explicitly};
   }
 
-  fn leave_definition_state(const function_runtime_state &state) wontthrow
-      -> void
+  fn leave_definition_state(
+      const function_runtime_state &state,
+      definition_state_exit exit =
+          definition_state_exit::PropagateMutations) wontthrow -> void
   {
+    if (exit == definition_state_exit::RestoreCaller) {
+      state.previous.restore(*this);
+      m_shell_option_mutations = state.previous_shell_option_mutations;
+      m_mood_mutation_revision = state.mood_mutation_revision;
+      m_warning_mutation_revision = state.warning_mutation_revision;
+      m_diagnostics_mutation_revision = state.diagnostics_mutation_revision;
+      m_mood_set_explicitly = state.was_mood_set_explicitly;
+      return;
+    }
+
     let const finished = RuntimeState::capture(*this);
     let changed_options = state.entered.shell_options ^ finished.shell_options;
-    if (state.entered.error_unset_explicit != finished.error_unset_explicit)
+    if (state.mood_mutation_revision != m_mood_mutation_revision) {
       changed_options |= RuntimeState::option_mask(shell_option_id::Nounset);
-    if (state.entered.pipefail_explicit != finished.pipefail_explicit)
       changed_options |= RuntimeState::option_mask(shell_option_id::Pipefail);
-    if (state.entered.failglob_explicit != finished.failglob_explicit)
       changed_options |= RuntimeState::option_mask(shell_option_id::Failglob);
+    }
+    for (u8 option = 0; option < static_cast<u8>(shell_option_id::Count);
+         option++)
+    {
+      let const option_id = static_cast<shell_option_id>(option);
+      if (m_shell_option_mutations.touched_since(
+              option_id, state.shell_option_mutation_revision))
+        changed_options |= RuntimeState::option_mask(option_id);
+    }
     let const merged_options =
         (state.previous.shell_options & ~changed_options) |
         (finished.shell_options & changed_options);
 
     state.previous.restore(*this);
     m_runtime.shell_options = merged_options;
-    if (state.entered.error_unset_explicit != finished.error_unset_explicit)
+    if (m_shell_option_mutations.touched_since(
+            shell_option_id::Nounset, state.shell_option_mutation_revision))
       m_runtime.error_unset_explicit = finished.error_unset_explicit;
-    if (state.entered.pipefail_explicit != finished.pipefail_explicit)
+    if (m_shell_option_mutations.touched_since(
+            shell_option_id::Pipefail, state.shell_option_mutation_revision))
       m_runtime.pipefail_explicit = finished.pipefail_explicit;
-    if (state.entered.failglob_explicit != finished.failglob_explicit)
+    if (m_shell_option_mutations.touched_since(
+            shell_option_id::Failglob, state.shell_option_mutation_revision))
       m_runtime.failglob_explicit = finished.failglob_explicit;
     if (state.mood_mutation_revision != m_mood_mutation_revision)
       m_runtime.mood = finished.mood;
@@ -1662,6 +1727,7 @@ protected:
   u64 m_mood_mutation_revision{0};
   u64 m_warning_mutation_revision{0};
   u64 m_diagnostics_mutation_revision{0};
+  shell_option_mutations m_shell_option_mutations{};
   /* One bit per suppressible_warning value. */
   u32 m_suppressed_warnings{0};
   /* The nesting of mimicked scripts, bounded so a script that mimics another

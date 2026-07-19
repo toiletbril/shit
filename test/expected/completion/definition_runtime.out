@@ -1,0 +1,17 @@
+== callback keeps definition diagnostics:
+warning-clean
+ok
+== callback keeps definition mood:
+shit
+== word list keeps registration mood:
+bash-posix
+== callback can replace its spec:
+stable
+== compgen exclusion filter:
+apple.c
+apple.txt
+apple.c
+ax
+aax
+ba
+a*foo

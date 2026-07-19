@@ -3,4 +3,13 @@
 ok
 == shit-defined function stays strict when called from bash mood:
 is not set
+== sourced function keeps its source mood:
+inside=bash unset=[]
+outside=shit
+== idempotent strictness changes survive the defining mood:
+nounset=off
+pipefail=off
+failglob=off
+== propagated mood carries its strictness:
+mood=sh unset=[]
 rc-done

@@ -29,13 +29,7 @@ fn EvalContext::register_function(StringView name, const Expression *body,
   }
   if (definition_location.filename.has_value())
     info.filename = String{*definition_location.filename};
-  info.defining_instance = m_current_source;
-  /* The mood is captured so a function defined in bash mood runs bash after a
-     later set --mood. */
-  info.defining_mood = static_cast<u8>(m_runtime.mood);
-  info.warning_level_at_definition = m_runtime.warning_level;
-  info.were_diagnostics_disabled_at_definition =
-      m_runtime.are_diagnostics_disabled;
+  info.defining_runtime = RuntimeState::capture(*this);
   m_function_definition_infos.set(name, steal(info));
 }
 

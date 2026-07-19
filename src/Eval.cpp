@@ -444,6 +444,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
     error.set_script_fatal();
     throw error;
   }
+  if (is_completion_function_running()) return;
   if (is_warning_suppressed(suppressible_warning::UnsetTestOperand)) return;
 
   if (error_unset() || (warnings_enabled() && warnings_reach_every_mood())) {
@@ -462,6 +463,7 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
     if (note.is_empty()) throw ErrorWithLocation{location, message};
     throw ErrorWithLocationAndDetails{location, message, note};
   }
+  if (is_completion_function_running()) return;
   if ((fatal || (warnings_enabled() && warnings_reach_every_mood())) &&
       !diagnostics_disabled() && m_current_source != nullptr)
   {
@@ -1627,7 +1629,8 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_mood_set_explicitly,
                              m_mood_mutation_revision,
                              m_warning_mutation_revision,
-                             m_diagnostics_mutation_revision};
+                             m_diagnostics_mutation_revision,
+                             m_shell_option_mutations};
 }
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
@@ -1654,6 +1657,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_mood_mutation_revision = snapshot.mood_mutation_revision;
   m_warning_mutation_revision = snapshot.warning_mutation_revision;
   m_diagnostics_mutation_revision = snapshot.diagnostics_mutation_revision;
+  m_shell_option_mutations = snapshot.option_mutations;
 
   m_readonly_names = steal(snapshot.readonly_names);
   m_integer_names = steal(snapshot.integer_names);

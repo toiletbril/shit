@@ -24,7 +24,9 @@ FLAG(COMPGEN_FILE, Bool, 'f', "", "List matching filenames.");
 FLAG(COMPGEN_ACTION, String, 'A', "", "List commands for the command action.");
 FLAG(COMPGEN_PREFIX, String, 'P', "", "Accepted without effect.");
 FLAG(COMPGEN_SUFFIX, String, 'S', "", "Accepted without effect.");
-FLAG(COMPGEN_FILTER, String, 'X', "", "Accepted without effect.");
+FLAG(COMPGEN_FILTER, String, 'X', "",
+     "Remove matching candidates, with leading ! reversing the filter and "
+     "unescaped & expanding to the completion word.");
 FLAG(COMPGEN_FUNCTION, String, 'F', "", "Accepted without effect.");
 FLAG(COMPGEN_COMMAND, String, 'C', "", "Accepted without effect.");
 
@@ -33,6 +35,56 @@ REGISTER_BUILTIN_FLAGS(Compgen);
 namespace shit {
 
 Compgen::Compgen() = default;
+
+struct compgen_filter
+{
+  explicit compgen_filter(Allocator allocator)
+      : pattern(allocator), active(allocator)
+  {}
+
+  String pattern;
+  Bitset active;
+  bool is_negated{false};
+};
+
+static fn compile_filter(StringView raw_filter, StringView word,
+                         Allocator allocator) throws -> compgen_filter
+{
+  let compiled = compgen_filter{allocator};
+  usize position = 0;
+  if (!raw_filter.is_empty() && raw_filter[0] == '!') {
+    compiled.is_negated = true;
+    position++;
+  }
+
+  while (position < raw_filter.length) {
+    let const character = raw_filter[position++];
+    if (character == '\\' && position < raw_filter.length) {
+      compiled.pattern.push(raw_filter[position++]);
+      compiled.active.push(false);
+      continue;
+    }
+    if (character == '&') {
+      compiled.pattern.append(word);
+      for (usize i = 0; i < word.length; i++)
+        compiled.active.push(false);
+      continue;
+    }
+    compiled.pattern.push(character);
+    compiled.active.push(character != '\\');
+  }
+  return compiled;
+}
+
+static fn candidate_is_excluded(StringView candidate,
+                                const compgen_filter &filter,
+                                const EvalContext &cxt) throws -> bool
+{
+  let const matches =
+      utils::glob_matches(filter.pattern.view(), candidate, filter.active, 0,
+                          cxt.extglob_enabled());
+  return filter.is_negated ? !matches : matches;
+}
 
 pure fn Compgen::kind() const wontthrow -> Builtin::Kind
 {
@@ -49,6 +101,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   Maybe<StringView> wordlist;
   Maybe<StringView> glob_pattern;
   Maybe<StringView> action;
+  Maybe<StringView> filter_pattern;
   bool should_list_commands = false;
   bool should_list_files = false;
   StringView word{};
@@ -83,6 +136,14 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       continue;
     }
+    if (argument == "-X") {
+      i++;
+      if (i < args.count()) {
+        filter_pattern = args[i].view();
+        i++;
+      }
+      continue;
+    }
     if (argument == "-c") {
       should_list_commands = true;
       i++;
@@ -94,8 +155,8 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
     if (argument.length >= 2 && argument[0] == '-') {
-      if (argument == "-P" || argument == "-S" || argument == "-X" ||
-          argument == "-F" || argument == "-C" || argument == "-o")
+      if (argument == "-P" || argument == "-S" || argument == "-F" ||
+          argument == "-C" || argument == "-o")
       {
         i++;
       }
@@ -106,6 +167,10 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     i++;
   }
 
+  Maybe<compgen_filter> filter = None;
+  if (filter_pattern.has_value())
+    filter = compile_filter(*filter_pattern, word, cxt.scratch_allocator());
+
   if (should_list_commands || (action.has_value() && *action == "command")) {
     cxt.get_program_resolver().begin_explicit_completion(
         ProgramResolver::CompletionRefresh::Fresh);
@@ -115,6 +180,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     for (let const &candidate : completion::complete_command_names(
              word, completion::command_match_mode::Prefix, cxt))
     {
+      if (filter.has_value() &&
+          candidate_is_excluded(candidate.view(), *filter, cxt))
+        continue;
       out.append(candidate.view());
       out.push('\n');
       has_any_matched = true;
@@ -132,6 +200,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let has_any_matched = false;
     for (let const &match : cxt.expand_glob_lenient(*glob_pattern)) {
       if (!match.view().starts_with(word)) continue;
+      if (filter.has_value() &&
+          candidate_is_excluded(match.view(), *filter, cxt))
+        continue;
       out.append(match.view());
       out.push('\n');
       has_any_matched = true;
@@ -149,6 +220,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         word, cxt, Path::current_directory());
     let out = String{cxt.scratch_allocator()};
     for (let const &candidate : candidates) {
+      if (filter.has_value() &&
+          candidate_is_excluded(candidate.view(), *filter, cxt))
+        continue;
       out.append(candidate.view());
       out.push('\n');
     }
@@ -165,6 +239,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let has_any_matched = false;
   for (let const &candidate : cxt.expand_wordlist_to_fields(*wordlist)) {
     if (!candidate.view().starts_with(word)) continue;
+    if (filter.has_value() &&
+        candidate_is_excluded(candidate.view(), *filter, cxt))
+      continue;
     out.append(candidate.view());
     out.push('\n');
     has_any_matched = true;
