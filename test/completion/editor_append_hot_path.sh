@@ -340,6 +340,41 @@ fi
 strings "$d/pwd-typescript" | grep -q actual-cwd-completion || exit 1
 echo 'clobbered PWD completion uses the actual directory'
 
+mkdir "$d/startup-before" "$d/startup-after"
+printf '#!/bin/sh\n' > "$d/startup-after/git"
+chmod +x "$d/startup-after/git"
+printf '%s\n' \
+    "PS1='> '" \
+    "PROMPT_COMMAND='PATH=\"\$STARTUP_AFTER\"; unset PROMPT_COMMAND'" \
+    > "$d/startup-rc"
+send_startup_highlight_input()
+{
+    wait_for_editor
+    printf 'git '
+    printf '\177'
+    sleep 0.1
+    printf '\003exit\n'
+}
+if "$script_command" --version >/dev/null 2>&1; then
+    send_startup_highlight_input | \
+        TERM=xterm-256color NO_COLOR= PATH="$d/startup-before" \
+        STARTUP_AFTER="$d/startup-after" SHIT_HISTORY="$d/startup-history" \
+        RCFILE="$d/startup-rc" BIN="$BIN" "$script_command" -q -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
+        "$d/startup-typescript" >/dev/null 2>&1
+else
+    send_startup_highlight_input | \
+        TERM=xterm-256color NO_COLOR= PATH="$d/startup-before" \
+        STARTUP_AFTER="$d/startup-after" SHIT_HISTORY="$d/startup-history" \
+        RCFILE="$d/startup-rc" BIN="$BIN" "$script_command" -q \
+        "$d/startup-typescript" /bin/sh -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
+        >/dev/null 2>&1
+fi
+LC_ALL=C grep -Fq "$(printf '\033[34mgit')" "$d/startup-typescript" ||
+    exit 1
+echo 'startup PATH commands highlight before TAB'
+
 mkdir "$d/menu-bin"
 cat > "$d/menu-bin/tailscale" <<'SH'
 #!/bin/sh

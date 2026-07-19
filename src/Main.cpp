@@ -1308,6 +1308,7 @@ fn main(int argc, char **argv) -> int
 
   /* A plain return must not be used past this point, since toiletline needs its
      own cleanup that utils::quit() runs. */
+  bool did_seed_interactive_path_map = false;
   loop
   {
     ASSERT(!shit::os::is_child_process());
@@ -1435,6 +1436,13 @@ fn main(int argc, char **argv) -> int
         /* The PROMPT_COMMAND hook runs before the template is expanded, so a
            framework that assigns PS1 inside it is in place by then. */
         run_prompt_command(context, ast_arena);
+
+        if (!did_seed_interactive_path_map && !is_rescue_mode &&
+            !FLAG_NO_COMPLETION.is_enabled())
+        {
+          context.get_program_resolver().initialize_path_map();
+          did_seed_interactive_path_map = true;
+        }
 
         /* A command whose output did not end in a newline leaves the cursor off
            the first column. A marker, spaces to the line width, and a carriage
