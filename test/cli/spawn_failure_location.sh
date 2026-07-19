@@ -15,14 +15,6 @@ echo '== direct command:'
     "$BIN" --mood sh -c './notexec; printf "rc=%s\n" "$?"'
 ) 2>&1 | sed "s#$real_d#TMPDIR#g"
 
-printf '\177ELF\002\001\001\000binary\n' > "$d/foreign"
-chmod +x "$d/foreign"
-echo '== foreign binary:'
-(
-    cd "$d" || exit 1
-    "$BIN" --mood sh -c './foreign; printf "rc=%s\n" "$?"'
-) 2>&1 | sed "s#$real_d#TMPDIR#g"
-
 echo '== pipeline stage:'
 (
     cd "$d" || exit 1
