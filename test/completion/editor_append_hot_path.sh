@@ -141,9 +141,9 @@ echo 'TAB validation ends before the next key'
 send_warm_tab_input()
 {
     wait_for_editor
-    printf 'compgen -c >/dev/null 2>&1\n'
+    printf 'compgen -c >/dev/null 2>&1; cd /\n'
     sleep 0.1
-    printf 'probe-a\t\n'
+    printf 'probe\t\t\n'
     sleep 0.1
     printf 'exit\n'
 }
@@ -171,15 +171,18 @@ warm_tab_stats=${warm_tab_metrics#* stats=}
 warm_tab_stats=${warm_tab_stats%% *}
 warm_tab_reads=${warm_tab_metrics#* reads=}
 warm_tab_reads=${warm_tab_reads%% *}
+warm_tab_sorts=${warm_tab_metrics#* sorts=}
+warm_tab_sorts=${warm_tab_sorts%% *}
 warm_tab_probes=${warm_tab_metrics#* probes=}
 warm_tab_probes=${warm_tab_probes%% *}
 warm_tab_resolutions=${warm_tab_metrics#* resolutions=}
 warm_tab_resolutions=${warm_tab_resolutions%% *}
-test "$warm_tab_stats" -le 2 || exit 1
-test "$warm_tab_reads" -le 1 || exit 1
-test "$warm_tab_probes" -le 3 || exit 1
+test "$warm_tab_stats" -eq 0 || exit 1
+test "$warm_tab_reads" -eq 0 || exit 1
+test "$warm_tab_sorts" -eq 0 || exit 1
+test "$warm_tab_probes" -eq 0 || exit 1
 test "$warm_tab_resolutions" -eq 0 || exit 1
-echo 'warm TAB reuses prefix probes after metadata validation'
+echo 'repeated warm TAB performs no PATH work'
 
 history_index=0
 while [ "$history_index" -lt 1000 ]; do

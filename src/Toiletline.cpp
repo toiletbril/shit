@@ -153,7 +153,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     const bool is_explicit_completion = for_listing != 0;
     if (is_explicit_completion)
       COMPLETION_CONTEXT->get_program_resolver().begin_explicit_completion(
-          shit::ProgramResolver::CompletionRefresh::Fresh);
+          shit::ProgramResolver::CompletionRefresh::Cached);
     defer
     {
       if (is_explicit_completion)

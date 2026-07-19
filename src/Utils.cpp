@@ -2405,8 +2405,18 @@ fn ProgramResolver::initialize_path_map() throws -> void
 fn ProgramResolver::begin_explicit_completion(CompletionRefresh refresh) throws
     -> void
 {
-  if (m_explicit_completion_depth == 0 && refresh == CompletionRefresh::Fresh)
-    begin_directory_validation_epoch();
+  if (m_explicit_completion_depth == 0) {
+    switch (refresh) {
+    case CompletionRefresh::Cached:
+      m_path_directories_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
+      m_command_names_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
+      m_prefix_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
+      break;
+    case CompletionRefresh::Fresh:
+      begin_directory_validation_epoch();
+      break;
+    }
+  }
   m_explicit_completion_depth++;
 }
 
