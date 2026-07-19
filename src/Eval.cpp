@@ -159,8 +159,16 @@ fn EvalContext::materialize_shit_identity() const throws -> Maybe<String>
 {
   if (!m_shit_identity_was_attempted) {
     m_shit_identity_was_attempted = true;
-    m_shit_identity = utils::file_content_identity(
-        Path{m_shell_executable_path.view()}, heap_allocator());
+    if (let const executable = os::current_executable_path();
+        executable.has_value())
+    {
+      m_shit_identity = utils::file_content_identity(Path{executable->view()},
+                                                     heap_allocator());
+    }
+    if (!m_shit_identity.has_value()) {
+      m_shit_identity = utils::file_content_identity(
+          Path{m_shell_executable_path.view()}, heap_allocator());
+    }
     if (m_shit_identity.has_value())
       os::set_environment_variable("SHIT_IDENTITY", m_shit_identity->view());
   }

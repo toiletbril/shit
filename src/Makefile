@@ -33,18 +33,39 @@ endif
 endif
 endif
 
-# Cross-compilation is supported only to Windows_NT through mingw and to Darwin
-# through osxcross. A target that differs from the host and is neither is
-# rejected, so a Linux target stays native-only.
 ifneq ($(TARGET), $(HOST_OS))
 ifneq ($(TARGET), Windows_NT)
 ifneq ($(TARGET), Darwin)
-$(error Cross-compilation to '$(TARGET)' from '$(HOST_OS)' is not supported, only Windows_NT and Darwin are cross-compile targets)
+ifneq ($(TARGET), Linux)
+$(error Cross-compilation to '$(TARGET)' from '$(HOST_OS)' is not supported)
+endif
 endif
 endif
 endif
 
+ifeq ($(TARGET), Linux)
+ifneq ($(HOST_OS), Linux)
+ifneq ($(MODE), rel)
+$(error Linux cross-compilation only supports MODE=rel)
+endif
+ifeq ($(ARCH), arm64)
+LINUX_ZIG_ARCH := aarch64
+else ifeq ($(ARCH), aarch64)
+LINUX_ZIG_ARCH := aarch64
+else ifeq ($(ARCH), x86_64)
+LINUX_ZIG_ARCH := x86_64
+else
+$(error Linux cross-compilation does not support ARCH='$(ARCH)')
+endif
+LINUX_CROSS_COMPILATION := 1
+endif
+endif
+
+ifeq ($(LINUX_CROSS_COMPILATION), 1)
+OBJ_DIR := o/$(TARGET)/$(LINUX_ZIG_ARCH)/$(MODE)
+else
 OBJ_DIR := o/$(TARGET)/$(MODE)
+endif
 
 OBJECTS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 DEPS := $(OBJECTS:.o=.d)
@@ -56,6 +77,13 @@ else ifeq ($(TARGET), Windows_NT)
 OUT := ../shit$(MODE_SUFFIX).exe
 else
 OUT := ../shit$(MODE_SUFFIX)
+endif
+
+LINKED_OUT := $(OUT)
+ifeq ($(MODE), rel)
+ifneq ($(TARGET), Windows_NT)
+LINKED_OUT := $(OBJ_DIR)/shit
+endif
 endif
 
 # Cosmopolitan/Clang.
@@ -77,6 +105,12 @@ CXX := x86_64-w64-mingw32-g++
 endif
 endif
 
+ifeq ($(TARGET), Linux)
+ifneq ($(HOST_OS), Linux)
+CXX := zig c++ -target $(LINUX_ZIG_ARCH)-linux-musl
+endif
+endif
+
 ifeq ($(TARGET), Darwin)
 ifneq ($(HOST_OS), Darwin)
 ifeq ($(CXX_ORIGIN), default)
@@ -95,6 +129,8 @@ LIBC_INFO := cosmopolitan libc
 else ifeq ($(MODE), cosmo_dbg)
 OS_INFO := "unknown-cosmo-dbg"
 LIBC_INFO := cosmopolitan libc
+else ifeq ($(LINUX_CROSS_COMPILATION), 1)
+OS_INFO := Linux $(LINUX_ZIG_ARCH) cross
 else
 OS_INFO := $(shell test -f /etc/os-release && . /etc/os-release 2>/dev/null; printf '%s%s' "$${PRETTY_NAME:+$$PRETTY_NAME }" "$$(uname -rvom 2>/dev/null || echo '<no uname>')")
 endif
@@ -104,6 +140,8 @@ ifeq ($(TARGET), Windows_NT)
 LIBC_INFO := mingw msvcrt
 else ifeq ($(TARGET), Darwin)
 LIBC_INFO := Apple libSystem
+else ifneq ($(TARGET), $(HOST_OS))
+LIBC_INFO := zig musl libc++
 else
 LIBC_INFO := $(shell getconf GNU_LIBC_VERSION 2>/dev/null || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | head -n 1; } || echo 'unknown libc')
 endif
@@ -143,6 +181,10 @@ CXXFLAGS := \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
+ifeq ($(LINUX_CROSS_COMPILATION), 1)
+CXXFLAGS += -Wno-date-time
+endif
+
 ifeq ($(TARGET), Linux)
 CXXFLAGS += -Wl,-Bsymbolic
 endif
@@ -178,11 +220,14 @@ ifneq ($(TARGET), Windows_NT)
 CXXFLAGS += -flto
 endif
 ifeq ($(TARGET), Linux)
-# macOS ld64 has no fully static link, so static-pie stays Linux-only.
+ifeq ($(LINUX_CROSS_COMPILATION), 1)
+CXXFLAGS += -static
+else
 CXXFLAGS += \
 	-static-pie \
 	-nostdlib++
 LINK_LIBS += -lsupc++
+endif
 endif
 # MODE=dbg
 else ifeq ($(MODE), dbg)
@@ -296,8 +341,8 @@ $(OBJ_DIR)/%.o: %.cpp Makefile
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $(CWD)$@
 
 # Linking.
-$(OUT): $(OBJECTS)
-	printf "\tLinking $(OUT)... %-64s\r" ' '
+$(LINKED_OUT): $(OBJECTS)
+	printf "\tLinking $(LINKED_OUT)... %-64s\r" ' '
 	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) $(LINK_LIBS) -o $@
 
 dirs: $(DIRS)
@@ -305,7 +350,10 @@ dirs: $(DIRS)
 	for source_dir in $(DIRS); do mkdir -p $(OBJ_DIR)/$$source_dir; done
 
 shit: dirs
-	$(MAKE) $(OUT)
+	$(MAKE) $(LINKED_OUT)
+ifneq ($(LINKED_OUT), $(OUT))
+	cp $(LINKED_OUT) $(OUT)
+endif
 
 # INSTALL_MOOD_SYMLINKS="sh bash dash".
 PREFIX ?= /usr/local
