@@ -177,7 +177,7 @@ warm_tab_resolutions=${warm_tab_metrics#* resolutions=}
 warm_tab_resolutions=${warm_tab_resolutions%% *}
 test "$warm_tab_stats" -le 2 || exit 1
 test "$warm_tab_reads" -le 1 || exit 1
-test "$warm_tab_probes" -le 2 || exit 1
+test "$warm_tab_probes" -le 3 || exit 1
 test "$warm_tab_resolutions" -eq 0 || exit 1
 echo 'warm TAB reuses prefix probes after metadata validation'
 

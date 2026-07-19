@@ -19,13 +19,20 @@ echo "== the default mood classifies a missing coreutility fallback:"
 PATH= "$BIN" -c 'type -t calc; command -v calc; shitbox which calc'
 type_path=$(mktemp -d)
 mkdir "$type_path/blocked" "$type_path/runnable"
-printf '#!/bin/sh\n' > "$type_path/blocked/path-order-probe"
-printf '#!/bin/sh\n' > "$type_path/runnable/path-order-probe"
-chmod +x "$type_path/runnable/path-order-probe"
+printf '#!/bin/sh\n' > "$type_path/blocked/calc"
+printf '#!/bin/sh\n' > "$type_path/runnable/calc"
+chmod +x "$type_path/runnable/calc"
+resolved_default=$(PATH="$type_path/blocked:$type_path/runnable" \
+    "$BIN" -c 'type calc')
 resolved_path=$(PATH="$type_path/blocked:$type_path/runnable" \
-    "$BIN" -c 'type -P path-order-probe')
+    "$BIN" -c 'type -p calc')
+resolved_forced_path=$(PATH="$type_path/blocked:$type_path/runnable" \
+    "$BIN" -c 'type -P calc')
 echo "== type skips a blocked candidate before a runnable candidate:"
-if test "$resolved_path" = "$type_path/runnable/path-order-probe"; then
+if test "$resolved_default" = "calc is $type_path/runnable/calc" &&
+    test "$resolved_path" = "$type_path/runnable/calc" &&
+    test "$resolved_forced_path" = "$type_path/runnable/calc"
+then
     echo runnable
 else
     echo blocked
