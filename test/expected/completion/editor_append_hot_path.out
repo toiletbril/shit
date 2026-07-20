@@ -11,3 +11,4 @@ absolute PATH survives a directory change
 clobbered PWD completion uses the actual directory
 startup PATH commands highlight before TAB
 completion menu keeps callback-owned strings alive
+mixed PATH keeps stale absolute commands highlighted after cd

@@ -2205,22 +2205,34 @@ ProgramResolver::ProgramResolver()
 
 ProgramResolver::ProgramResolver(Maybe<String> path) : m_path(steal(path)) {}
 
-fn ProgramResolver::clear_command_name_indexes() wontthrow -> void
+fn ProgramResolver::mark_command_name_indexes_stale() wontthrow -> void
 {
-  m_command_names.clear();
-  m_regular_names.clear();
   m_validated_prefix.clear();
   m_command_names_are_valid = false;
   m_command_names_validation_epoch = 0;
   m_prefix_validation_epoch = 0;
 }
 
-fn ProgramResolver::clear_derived_indexes() wontthrow -> void
+fn ProgramResolver::clear_command_name_indexes() wontthrow -> void
 {
-  clear_command_name_indexes();
+  m_command_names.clear();
+  m_regular_names.clear();
+  mark_command_name_indexes_stale();
+}
+
+fn ProgramResolver::mark_derived_indexes_stale() wontthrow -> void
+{
+  mark_command_name_indexes_stale();
   m_path_directory_generations.clear();
   m_path_directory_generations_are_valid = false;
   m_path_directories_validation_epoch = 0;
+}
+
+fn ProgramResolver::clear_derived_indexes() wontthrow -> void
+{
+  m_command_names.clear();
+  m_regular_names.clear();
+  mark_derived_indexes_stale();
 }
 
 fn ProgramResolver::assign_path(Maybe<String> path) throws -> void
@@ -2315,7 +2327,7 @@ fn ProgramResolver::working_directory_changed() throws -> void
   for (let const &directory : get_index_path_dirs())
     if (!Path{directory.view()}.is_absolute()) {
       m_execution_cache.clear();
-      clear_derived_indexes();
+      mark_derived_indexes_stale();
       return;
     }
 }

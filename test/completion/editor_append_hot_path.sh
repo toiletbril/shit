@@ -413,3 +413,43 @@ strings "$d/menu-typescript" | \
 strings "$d/menu-typescript" | \
     grep -q 'Keep this second long completion description intact' || exit 1
 echo 'completion menu keeps callback-owned strings alive'
+
+mkdir "$d/mixed-absolute-path"
+printf '#!/bin/sh\n' > "$d/mixed-absolute-path/after-cd-probe"
+chmod +x "$d/mixed-absolute-path/after-cd-probe"
+send_mixed_path_cd_input()
+{
+    wait_for_editor
+    printf 'cd %s\n' "$d/next-directory"
+    sleep 0.1
+    printf 'after-cd-probe\014\n'
+    sleep 0.1
+    printf 'exit\n'
+}
+if "$script_command" --version >/dev/null 2>&1; then
+    send_mixed_path_cd_input |
+        env -u NO_COLOR TERM=xterm-256color \
+        PATH="$d/mixed-absolute-path::/bin" \
+        SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/mixed-cd-history" BIN="$BIN" \
+        "$script_command" -q -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        "$d/mixed-cd-typescript" >/dev/null 2>&1
+else
+    send_mixed_path_cd_input |
+        env -u NO_COLOR TERM=xterm-256color \
+        PATH="$d/mixed-absolute-path::/bin" \
+        SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/mixed-cd-history" BIN="$BIN" \
+        "$script_command" -q "$d/mixed-cd-typescript" /bin/sh -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        >/dev/null 2>&1
+fi
+blue_after_cd_probe=$(printf '\033[34mafter-cd-probe\033[0m')
+LC_ALL=C grep -F "$blue_after_cd_probe" "$d/mixed-cd-typescript" \
+    >/dev/null || exit 1
+mixed_cd_metrics=$(strings "$d/mixed-cd-typescript" |
+    grep 'editor-refresh append=' | tail -n +2 | head -1) || exit 1
+case $mixed_cd_metrics in
+    *' stats=0 reads=0 sorts=0 probes=0 '*) ;;
+    *) exit 1 ;;
+esac
+echo 'mixed PATH keeps stale absolute commands highlighted after cd'

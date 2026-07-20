@@ -358,7 +358,9 @@ private:
     Maybe<usize> bare_path_position{};
   };
 
+  fn mark_command_name_indexes_stale() wontthrow -> void;
   fn clear_command_name_indexes() wontthrow -> void;
+  fn mark_derived_indexes_stale() wontthrow -> void;
   fn clear_derived_indexes() wontthrow -> void;
   fn split_path_dirs(StringView path) throws -> ArrayList<String>;
   fn deduplicate_path_dirs(const ArrayList<String> &directories) throws
