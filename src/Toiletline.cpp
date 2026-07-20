@@ -109,6 +109,8 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 #define TL_ASSERT           ASSERT
 #define TL_HISTORY_MAX_SIZE (1024 * 4)
 
+} /* namespace */
+
 #define TOILETLINE_IMPLEMENTATION
 /* A release build makes TL_ASSERT a no-op, leaving some vendored helpers
  * unused. */
@@ -120,6 +122,8 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 #if defined __clang__ || defined __GNUC__
 #pragma GCC diagnostic pop
 #endif
+
+namespace {
 
 shit::EvalContext *COMPLETION_CONTEXT = nullptr;
 const shit::Path *COMPLETION_BASE_DIRECTORY = nullptr;

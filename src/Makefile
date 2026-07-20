@@ -93,7 +93,9 @@ CXX := cosmoc++
 else ifeq ($(MODE), cosmo_dbg)
 CXX := cosmoc++
 else ifeq ($(OS), Windows_NT)
+ifeq ($(CXX_ORIGIN), default)
 CXX := clang++
+endif
 else ifeq ($(CXX_ORIGIN), default)
 CXX := clang++
 endif
@@ -104,6 +106,10 @@ ifneq ($(OS), Windows_NT)
 CXX := x86_64-w64-mingw32-g++
 endif
 endif
+
+WINDOWS_COMPILER_TARGET := $(shell $(CXX) -dumpmachine 2>/dev/null)
+WINDOWS_GNU_ABI := $(or $(findstring mingw,$(WINDOWS_COMPILER_TARGET)),\
+	$(findstring windows-gnu,$(WINDOWS_COMPILER_TARGET)))
 
 ifeq ($(TARGET), Linux)
 ifneq ($(HOST_OS), Linux)
@@ -137,7 +143,11 @@ endif
 
 ifndef LIBC_INFO
 ifeq ($(TARGET), Windows_NT)
+ifneq ($(WINDOWS_GNU_ABI),)
 LIBC_INFO := mingw msvcrt
+else
+LIBC_INFO := msvc
+endif
 else ifeq ($(TARGET), Darwin)
 LIBC_INFO := Apple libSystem
 else ifneq ($(TARGET), $(HOST_OS))
@@ -190,6 +200,12 @@ CXXFLAGS += -Wl,-Bsymbolic
 endif
 
 LINK_LIBS := # nothing
+
+ifeq ($(TARGET), Windows_NT)
+ifeq ($(WINDOWS_GNU_ABI),)
+LINK_LIBS += --rtlib=compiler-rt
+endif
+endif
 
 ifeq ($(TARGET), Windows_NT)
 ifneq ($(shell command -v ld.lld)$(shell command -v lld),)
@@ -320,11 +336,14 @@ endif
 
 ifeq ($(TARGET), Windows_NT)
 CXXFLAGS += \
-	-Wno-unknown-pragmas \
+	-Wno-unknown-pragmas
+ifneq ($(WINDOWS_GNU_ABI),)
+CXXFLAGS += \
 	-mconsole \
 	-static \
 	-static-libgcc \
 	-static-libstdc++
+endif
 endif
 
 # A bare `make` builds the shell, the same as `make shit`, rather than the first

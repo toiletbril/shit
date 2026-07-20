@@ -436,8 +436,19 @@ fn get_processor_counts() wontthrow -> processor_counts
   if (online != 0) counts.online_count = static_cast<usize>(online);
   if (configured != 0) counts.configured_count = static_cast<usize>(configured);
   ULONG cpu_set_count = 0;
-  unused(GetProcessDefaultCpuSets(GetCurrentProcess(), nullptr, 0,
-                                  &cpu_set_count));
+  using get_process_default_cpu_sets_fn =
+      BOOL(WINAPI *)(HANDLE, PULONG, ULONG, PULONG);
+  let const get_process_default_cpu_sets_address = GetProcAddress(
+      GetModuleHandleA("kernel32.dll"), "GetProcessDefaultCpuSets");
+  get_process_default_cpu_sets_fn get_process_default_cpu_sets = nullptr;
+  static_assert(sizeof(get_process_default_cpu_sets) ==
+                sizeof(get_process_default_cpu_sets_address));
+  __builtin_memcpy(&get_process_default_cpu_sets,
+                   &get_process_default_cpu_sets_address,
+                   sizeof(get_process_default_cpu_sets));
+  if (get_process_default_cpu_sets != nullptr)
+    unused(get_process_default_cpu_sets(GetCurrentProcess(), nullptr, 0,
+                                        &cpu_set_count));
   if (cpu_set_count != 0) {
     let const selected_count = static_cast<usize>(cpu_set_count);
     if (selected_count < counts.online_count)
@@ -1491,7 +1502,7 @@ fn thread_trampoline(LPVOID raw_context) -> DWORD
   let const start = static_cast<thread_start_context *>(raw_context);
   let const entry = start->entry;
   let const context = start->context;
-  delete start;
+  os::free_aligned(start);
   entry(context);
   return 0;
 }
@@ -1499,11 +1510,14 @@ fn thread_trampoline(LPVOID raw_context) -> DWORD
 fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow
     -> Maybe<thread>
 {
-  let const start = new thread_start_context{entry, context};
+  let const storage = os::allocate_aligned(sizeof(thread_start_context),
+                                           alignof(thread_start_context));
+  if (storage == nullptr) return shit::None;
+  let const start = new (storage) thread_start_context{entry, context};
   HANDLE handle =
       CreateThread(nullptr, 0, thread_trampoline, start, 0, nullptr);
   if (handle == nullptr) {
-    delete start;
+    os::free_aligned(start);
     return shit::None;
   }
   return thread{handle};

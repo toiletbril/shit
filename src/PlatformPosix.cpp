@@ -1521,7 +1521,7 @@ fn thread_trampoline(opaque *raw_context) wontthrow -> opaque *
   let const start = static_cast<thread_start_context *>(raw_context);
   let const entry = start->entry;
   let const context = start->context;
-  delete start;
+  os::free_aligned(start);
   entry(context);
   return nullptr;
 }
@@ -1529,10 +1529,13 @@ fn thread_trampoline(opaque *raw_context) wontthrow -> opaque *
 fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow
     -> Maybe<thread>
 {
-  let const start = new thread_start_context{entry, context};
+  let const storage = os::allocate_aligned(sizeof(thread_start_context),
+                                           alignof(thread_start_context));
+  if (storage == nullptr) return shit::None;
+  let const start = new (storage) thread_start_context{entry, context};
   pthread_t handle{};
   if (pthread_create(&handle, nullptr, thread_trampoline, start) != 0) {
-    delete start;
+    os::free_aligned(start);
     return shit::None;
   }
   return thread{handle};

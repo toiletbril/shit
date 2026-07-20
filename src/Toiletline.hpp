@@ -3,11 +3,7 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
-namespace {
-
 #include "toiletline/toiletline.h"
-
-} /* namespace */
 
 namespace shit {
 class EvalContext;

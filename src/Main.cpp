@@ -1132,6 +1132,7 @@ fn main(int argc, char **argv) -> int
   let const is_privileged =
       FLAG_PRIVILEGED.is_enabled() || has_elevated_identity;
   LOG(Info, "privileged mode is %s", is_privileged ? "on" : "off");
+  unused(is_privileged);
 
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
     bool is_tty = shit::os::is_stdin_a_tty();
