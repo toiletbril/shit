@@ -47,6 +47,22 @@ enters rescue rather than exiting when a flag fails to parse in a login shell,
 the lockout-risk case marked by a dash-prefixed argv[0], while any other
 invocation keeps the usage exit.
 
+The bash startup flags share one selected rc path. `--init-file` and `--rcfile`
+are aliases whose last occurrence wins, while `--norc` suppresses either and
+the normal interactive bash rc. A noninteractive bash mood expands and sources
+BASH_ENV once. Bash-posix does not source it.
+The privileged shell option suppresses BASH_ENV and ENV. An unequal-id shell
+skips startup files and drops its elevated ids unless privileged mode was
+requested.
+
+`--restricted`, `-r`, and an rbash basename request restricted mode. The context
+exposes that identity while startup files run and activates its guards when
+startup finishes. Variable changes, directory changes, slash-bearing command
+and source operands, output redirections, exec, command -p, enable loading,
+history paths, and hash -p use shared restriction state. Numeric descriptor
+duplication remains available. An executed shell script clears restriction for
+its run, while a sourced script retains it.
+
 Eval snapshots also carry shopt state, the directory stack, the working
 directory reference, and the file creation mask. An in-process subshell
 restores all of them.
@@ -112,7 +128,7 @@ src/ExpressionsArith.cpp. Shared free helpers declare in
 src/ExpressionsInternal.hpp. The builtins live under src/builtins, and the
 busybox-style coreutils live under src/shitbox. The `enable` builtin is a
 no-op since every builtin is always enabled in shit, and accepts the bash
-flags `-n`, `-a`, `-f`, and `-s` so a bash script that toggles builtins
+flags `-n`, `-a`, `-d`, `-f`, and `-s` so a bash script that toggles builtins
 keeps sourcing.
 
 The `assimilate TARGET` builtin copies the running binary through scp and uses

@@ -287,6 +287,7 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const &name = names[n];
       let const arg_index = name_arg_indices[n];
       if (do_reject_unknown(name, arg_index)) continue;
+      if (name == "restricted_shell") continue;
       LOG(Info, "shopt setting '%.*s' to %s", static_cast<int>(name.length),
           name.data, should_enable ? "on" : "off");
       cxt.set_shopt_option(name, should_enable);

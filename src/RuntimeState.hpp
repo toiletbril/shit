@@ -31,6 +31,8 @@ enum class shell_option_id : u8
   Braceexpand,
   Physical,
   Mimicry,
+  Privileged,
+  Restricted,
   ShowAst,
   ShowLexedWords,
   ShowExitCode,

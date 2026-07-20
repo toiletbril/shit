@@ -6,7 +6,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] [-n] [-f filename] [-s] [name ...]");
+HELP_SYNOPSIS_DECL("[-a] [-d] [-n] [-f filename] [-s] [name ...]");
 HELP_DESCRIPTION_DECL(
     "The enable builtin lists and toggles shell builtins. In shit every "
     "builtin is always enabled, so toggling is accepted without effect and "
@@ -15,6 +15,7 @@ HELP_DESCRIPTION_DECL(
 FLAG(ALL, Bool, 'a', "", "List every builtin.");
 FLAG(DISABLE, Bool, 'n', "", "Accepted without effect.");
 FLAG(LOAD_FILE, String, 'f', "", "Accepted without effect.");
+FLAG(DELETE_FILE, Bool, 'd', "", "Accepted without effect.");
 FLAG(SILENT, Bool, 's', "", "Accepted without effect.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -34,6 +35,12 @@ fn Enable::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   ASSERT(!args.is_empty());
+
+  if (cxt.restricted_enforcement_active() &&
+      (FLAG_LOAD_FILE.is_set() || FLAG_DELETE_FILE.is_enabled()))
+    throw ErrorWithLocation{
+        ec.source_location(),
+        "Loading or deleting builtins is forbidden in a restricted shell"};
 
   if (FLAG_ALL.is_enabled()) {
     let out = String{cxt.scratch_allocator()};

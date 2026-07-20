@@ -61,9 +61,14 @@ FLAG(IGNORED2, Bool, 'm', "\0", Posix, "Ignored, left for compatibility.");
 
 FLAG(RCFILE, String, '\0', "rcfile", Bash,
      "Source FILE as the interactive rc in place of the mood default.");
+FLAG(INIT_FILE, String, '\0', "init-file", Bash,
+     "Alias for --rcfile, with the last occurrence taking precedence.");
+FLAG(NORC, Bool, '\0', "norc", Bash,
+     "Do not source the interactive bash rc or a custom rc file.");
+FLAG(RESTRICTED, Bool, 'r', "restricted", Bash,
+     "Start a restricted shell after the startup files finish.");
 FLAG(PRIVILEGED, Bool, 'p', "privileged", Bash,
-     "Run privileged and skip every startup file, on automatically when the "
-     "effective and real ids differ.");
+     "Run privileged, suppressing BASH_ENV. Unequal ids skip startup files.");
 FLAG(CLEAN, Bool, '\0', "clean", Shit,
      "Start clean, reading no startup file and setting a minimal PATH.");
 FLAG(POSIX_COMPAT, Bool, '\0', "posix", Bash,
@@ -555,13 +560,25 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   context.set_last_command_duration_ns(saved_command_duration_ns);
 }
 
-/* A missing file is not an error, since a login shell sources profiles that may
-   not exist. Returns whether the file existed and ran. */
-static fn source_file(const Path &path, EvalContext &context,
-                      BumpArena &ast_arena) -> bool
+enum class startup_file_requirement : u8
+{
+  Optional,
+  Explicit,
+};
+
+static fn source_file(
+    const Path &path, EvalContext &context, BumpArena &ast_arena,
+    startup_file_requirement requirement = startup_file_requirement::Optional)
+    -> bool
 {
   Maybe<String> contents = path.read_entire_file();
   if (!contents) {
+    let const is_missing = os::last_system_error_is_missing_file();
+    let const reason = os::last_system_error_message();
+    if (requirement == startup_file_requirement::Explicit && !is_missing)
+      show_message(
+          Error{"Unable to read startup file '" + path.text() + "': " + reason}
+              .to_string());
     LOG(Info, "skipping '%s' because the file is missing or unreadable",
         path.c_str());
     return false;
@@ -576,6 +593,43 @@ static fn source_file(const Path &path, EvalContext &context,
   context.run_source(*contents, path.text().view(), return_handling::Consume,
                      /*call_site=*/None, path.text().view());
   return true;
+}
+
+static pure fn selected_rcfile() wontthrow -> Maybe<StringView>
+{
+  if (!FLAG_RCFILE.is_set() && !FLAG_INIT_FILE.is_set()) return None;
+  if (!FLAG_RCFILE.is_set() ||
+      (FLAG_INIT_FILE.is_set() &&
+       FLAG_INIT_FILE.position() > FLAG_RCFILE.position()))
+    return FLAG_INIT_FILE.value();
+  return FLAG_RCFILE.value();
+}
+
+static fn source_custom_rcfile(StringView name, EvalContext &context,
+                               BumpArena &ast_arena) throws -> void
+{
+  let path = String{context.scratch_allocator(), name};
+  if (let home_expanded = utils::expand_leading_tilde_path(path.view());
+      home_expanded.has_value())
+    path = home_expanded.take();
+  source_file(Path{path.view()}, context, ast_arena,
+              startup_file_requirement::Explicit);
+}
+
+static fn source_environment_file(StringView variable_name,
+                                  EvalContext &context,
+                                  BumpArena &ast_arena) throws -> void
+{
+  let const value = context.get_variable_value(variable_name);
+  if (!value.has_value() || value->is_empty()) return;
+
+  let expanded = context.expand_modifier_word(value->view(), false);
+  if (expanded.is_empty()) return;
+  if (let home_expanded = utils::expand_leading_tilde_path(expanded.view());
+      home_expanded.has_value())
+    expanded = home_expanded.take();
+  source_file(Path{expanded.view()}, context, ast_arena,
+              startup_file_requirement::Explicit);
 }
 
 static fn source_home_file(StringView name, EvalContext &context,
@@ -659,6 +713,7 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
   /* Each mood sources under its own grammar, so a bash rc parses with the bash
      grammar and a posix profile with the dash grammar. */
   bool did_source_bash_rc = false;
+  bool did_source_bash_env = false;
   for (let flavor : moods) {
     /* A mood already on the sourcing stack is skipped, so a set --init-moods
        inside the rc this is sourcing cannot recurse to overflow. */
@@ -683,8 +738,8 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
       /* A --rcfile replaces the shit rc with the named file. */
       if (is_login_shell) source_posix_login_files(context, ast_arena);
       if (should_be_interactive) {
-        if (FLAG_RCFILE.is_set()) {
-          source_file(Path{FLAG_RCFILE.value()}, context, ast_arena);
+        if (let const rcfile = selected_rcfile(); rcfile.has_value()) {
+          source_custom_rcfile(*rcfile, context, ast_arena);
         } else {
           source_file(Path{"/etc/shitrc"}, context, ast_arena);
           source_home_file(".shitrc", context, ast_arena);
@@ -693,7 +748,9 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
       break;
     case mimic_mood::Posix:
       if (is_login_shell) source_posix_login_files(context, ast_arena);
-      if (should_be_interactive) {
+      if (should_be_interactive &&
+          !context.shell_option_state(shell_option_id::Privileged))
+      {
         if (Maybe<String> env = context.get_variable_value("ENV");
             env.has_value() && !env->is_empty())
           source_file(Path{env->view()}, context, ast_arena);
@@ -704,11 +761,19 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
       /* bash runs the system rc first even under --rcfile, so the order mirrors
          that. BashPosix falls through so --posix finds the bash integration. */
       if (is_login_shell) source_bash_login_files(context, ast_arena);
-      if (should_be_interactive) {
+      if (flavor == mimic_mood::Bash &&
+          !context.shell_option_state(shell_option_id::Privileged) &&
+          !should_be_interactive && !context.startup_finished() &&
+          !did_source_bash_env)
+      {
+        source_environment_file("BASH_ENV", context, ast_arena);
+        did_source_bash_env = true;
+      }
+      if (should_be_interactive && !is_login_shell && !FLAG_NORC.is_enabled()) {
         did_source_bash_rc = true;
         source_bash_system_rc(context, ast_arena);
-        if (FLAG_RCFILE.is_set())
-          source_file(Path{FLAG_RCFILE.value()}, context, ast_arena);
+        if (let const rcfile = selected_rcfile(); rcfile.has_value())
+          source_custom_rcfile(*rcfile, context, ast_arena);
         else
           source_home_file(".bashrc", context, ast_arena);
       }
@@ -762,6 +827,12 @@ fn main(int argc, char **argv) -> int
     }
 
     if (shit::shitbox::find_util(invocation).has_value()) {
+      if (shit::os::is_running_setuid() && !shit::os::drop_elevated_identity())
+      {
+        shit::show_message("Unable to drop elevated ids: " +
+                           shit::os::last_system_error_message());
+        return 1;
+      }
       LOG(Info, "acting as the shitbox utility '%.*s' from argv[0]",
           static_cast<int>(invocation.length), invocation.data);
       shit::os::set_default_signal_handlers(
@@ -880,6 +951,15 @@ fn main(int argc, char **argv) -> int
     do_enter_rescue();
   }
 
+  let const has_elevated_identity = shit::os::is_running_setuid();
+  if (has_elevated_identity && !FLAG_PRIVILEGED.is_enabled() &&
+      !shit::os::drop_elevated_identity())
+  {
+    shit::show_message("Unable to drop elevated ids: " +
+                       shit::os::last_system_error_message());
+    return 1;
+  }
+
   /* --dumb enables -T and --no-diagnostics and turns color off. The sh mood is
      selected by resolve_session_mood. */
   if (FLAG_DUMB.is_enabled()) {
@@ -979,8 +1059,11 @@ fn main(int argc, char **argv) -> int
   const shit::mimic_mood invocation_mood =
       (program_basename == "sh" || program_basename == "dash")
           ? shit::mimic_mood::Posix
-      : program_basename == "bash" ? shit::mimic_mood::Bash
-                                   : shit::mimic_mood::Default;
+      : program_basename == "bash" || program_basename == "rbash"
+          ? shit::mimic_mood::Bash
+          : shit::mimic_mood::Default;
+  let const is_restricted_shell =
+      FLAG_RESTRICTED.is_enabled() || program_basename == "rbash";
   LOG(Info, "invocation basename is '%.*s'",
       static_cast<int>(program_basename.length), program_basename.data);
   let const session_mood = shit::resolve_session_mood(invocation_mood);
@@ -1045,11 +1128,9 @@ fn main(int argc, char **argv) -> int
 
   if (init_moods.is_empty()) init_moods.push(session_mood);
 
-  /* A privileged shell skips every startup config file, so a profile a
-     less-privileged user controls cannot run with the raised privileges. A
-     setuid or setgid invocation turns it on. */
+  /* A shell with unequal ids skips config controlled by the real user. */
   let const is_privileged =
-      FLAG_PRIVILEGED.is_enabled() || shit::os::is_running_setuid();
+      FLAG_PRIVILEGED.is_enabled() || has_elevated_identity;
   LOG(Info, "privileged mode is %s", is_privileged ? "on" : "off");
 
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
@@ -1153,8 +1234,11 @@ fn main(int argc, char **argv) -> int
   context.set_show_exit_code(FLAG_EXIT_CODE.is_enabled());
   context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
   context.set_diagnostics_disabled(FLAG_SUPPRESS_DIAGNOSTICS.is_enabled());
+  context.set_shell_option_state(shit::shell_option_id::Privileged,
+                                 FLAG_PRIVILEGED.is_enabled());
   context.set_login_shell(is_login_shell);
-  context.set_custom_rcfile(FLAG_RCFILE.is_set());
+  context.set_custom_rcfile(shit::selected_rcfile().has_value());
+  if (is_restricted_shell) context.request_restricted_shell();
   /* The startup files source with strictness off, since they read unset
      variables such as $BASH_VERSION on the /etc/profile path. The session
      strictness is applied at the seam below once the config has loaded. */
@@ -1274,9 +1358,8 @@ fn main(int argc, char **argv) -> int
   let function_arena = shit::BumpArena{};
   shit::FUNCTION_ARENA = &function_arena;
 
-  /* A privileged shell sources nothing, and --clean skips the startup files
-     too. */
-  if (is_privileged || is_rescue_mode || FLAG_CLEAN.is_enabled()) {
+  /* A shell with unequal ids, rescue, and --clean source nothing. */
+  if (has_elevated_identity || is_rescue_mode || FLAG_CLEAN.is_enabled()) {
     LOG(Info, "skipping every startup config file in %s mode",
         is_rescue_mode            ? "rescue"
         : FLAG_CLEAN.is_enabled() ? "clean"

@@ -26,7 +26,7 @@ _shit_complete()
             COMPREPLY=( $(compgen -W "$log_levels" -- "$current_word") )
             return
             ;;
-        --rcfile|--debug-logging-file)
+        --rcfile|--init-file|--debug-logging-file)
             COMPREPLY=( $(compgen -f -- "$current_word") )
             return
             ;;
@@ -34,7 +34,8 @@ _shit_complete()
 
     local long_flags="--version --short-version --help --interactive --stdin \
 --command --error-exit --no-glob --one-command --verbose --xtrace --export-all \
---no-clobber --no-exec --no-unset --login --rcfile --privileged --clean --posix --mood \
+--no-clobber --no-exec --no-unset --login --rcfile --init-file --norc \
+--restricted --privileged --clean --posix --mood \
 --init-moods --mimicry --dumb --list-diagnostics \
 --no-diagnostics --no-init-diagnostics --no-completion --no-syntax-highlighting \
 --enable-shitbox \
@@ -42,7 +43,7 @@ _shit_complete()
 --show-optimizer-state --show-exit-code --show-lexed-words --show-stats --show-memory \
 --debug-logging --debug-logging-file"
 
-    local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -p -M -L -I -W -WW \
+    local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -r -p -M -L -I -W -WW \
 -T -A -E -R -X"
 
     if [[ $current_word == --* ]]; then

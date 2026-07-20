@@ -8,6 +8,13 @@
 
 namespace shit {
 
+namespace {
+
+constexpr const char *RESTRICTED_READONLY_NAMES[] = {
+    "SHELL", "PATH", "HISTFILE", "ENV", "BASH_ENV"};
+
+}
+
 fn EvalContext::register_function(StringView name, const Expression *body,
                                   StringView definition_text,
                                   usize body_start_position,
@@ -285,14 +292,21 @@ fn EvalContext::unmark_readonly(StringView name) throws -> void
 
 fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 {
+  if (restricted_enforcement_active())
+    for (let const restricted_name : RESTRICTED_READONLY_NAMES)
+      if (name == restricted_name) return true;
   return m_readonly_names.contains(name);
 }
 
 fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
-  out.reserve(m_readonly_names.count());
+  out.reserve(m_readonly_names.count() + countof(RESTRICTED_READONLY_NAMES));
   m_readonly_names.for_each([&](StringView name) { out.push_managed(name); });
+  if (restricted_enforcement_active())
+    for (let const restricted_name : RESTRICTED_READONLY_NAMES)
+      if (!m_readonly_names.contains(restricted_name))
+        out.push_managed(restricted_name);
   out.sort();
   return out;
 }

@@ -52,6 +52,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (cxt.restricted_enforcement_active())
+    throw ErrorWithLocation{ec.source_location(),
+                            "cd is forbidden in a restricted shell"};
 
   let is_physical = cxt.shell_option_state(shell_option_id::Physical);
   usize operand_index = 1;

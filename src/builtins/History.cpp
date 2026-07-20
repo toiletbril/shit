@@ -143,6 +143,10 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HISTORY_READ.is_enabled() || FLAG_HISTORY_READ_NEW.is_enabled()) {
     LOG(Debug, "history reading the file into the list");
 
+    if (args.count() > 1)
+      cxt.guard_restricted_path(args[1].view(), ec.arg_location_at(1),
+                                restricted_path_use::History);
+
     if (args.count() > 1 &&
         !append_file_into_history(cxt, Path{args[1].view()}))
     {
@@ -162,6 +166,8 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(Debug, "history writing the list to the file");
 
     if (args.count() > 1) {
+      cxt.guard_restricted_path(args[1].view(), ec.arg_location_at(1),
+                                restricted_path_use::History);
       let const target = Path{args[1].view()};
       if (!write_history_to_file(cxt, target)) {
         report_soft_builtin_error(

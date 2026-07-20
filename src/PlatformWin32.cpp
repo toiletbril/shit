@@ -524,6 +524,7 @@ fn is_child_process() wontthrow -> bool
 
 /* Windows has no setuid or setgid notion. */
 fn is_running_setuid() wontthrow -> bool { return false; }
+fn drop_elevated_identity() wontthrow -> bool { return true; }
 
 fn process_id_of(process p) wontthrow -> i64
 {
@@ -1863,6 +1864,12 @@ cold fn last_system_error_message() throws -> String
   }
 
   return err;
+}
+
+fn last_system_error_is_missing_file() wontthrow -> bool
+{
+  let const error = GetLastError();
+  return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
 }
 
 static fn handle_interrupt(int s) -> void

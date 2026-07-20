@@ -125,6 +125,9 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let const &command_name = args[command_index];
+  if (cxt.restricted_enforcement_active())
+    throw ErrorWithLocation{ec.arg_location_at(command_index),
+                            "exec is forbidden in a restricted shell"};
 
   LOG(Info, "exec replacing the shell with '%s'", command_name.c_str());
 

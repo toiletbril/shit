@@ -17,6 +17,7 @@ hashall        	on
 keyword        	off
 monitor        	off
 noexec         	off
+privileged     	off
 nounset        	on
 verbose        	off
 xtrace         	off

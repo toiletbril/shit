@@ -45,6 +45,14 @@ enum class return_handling : u8
   Consume,
 };
 
+enum class restricted_path_use : u8
+{
+  Command,
+  Source,
+  History,
+  Hash,
+};
+
 /* A candidate argument after variable expansion and field splitting. The
    parallel mask marks which characters may act as glob metacharacters. */
 struct glob_field
@@ -321,6 +329,7 @@ public:
   fn assign_path(Maybe<String> path) throws -> void;
   fn restore_path(Maybe<String> path) throws -> void;
   fn invalidate() throws -> void;
+  fn remember_path(StringView name, const Path &path) throws -> void;
   fn working_directory_changed() throws -> void;
   fn initialize_path_map() throws -> void;
   fn begin_explicit_completion(CompletionRefresh refresh) throws -> void;
@@ -543,7 +552,6 @@ public:
   fn reset_scratch_arena() wontthrow -> void { m_scratch_arena.reset(); }
 
   fn set_shell_variable(StringView name, StringView value) throws -> void;
-
   fn get_program_resolver() wontthrow -> ProgramResolver &
   {
     return m_program_resolver;
@@ -629,6 +637,7 @@ public:
 
   fn mark_exported(StringView name) throws -> void;
   fn unmark_exported(StringView name) throws -> void;
+  fn unexport_shell_variable(StringView name) throws -> void;
   pure fn is_exported(StringView name) const wontthrow -> bool;
 
   fn sync_exported_after_restore(StringView name, bool has_value) throws
@@ -1309,6 +1318,7 @@ public:
   }
   pure fn is_shopt_enabled(StringView name) const wontthrow -> bool
   {
+    if (name == "restricted_shell") return is_restricted_shell();
     /* A name never set falls back to the bash default table. */
     const bool *value = m_shopt_options.find(name);
     if (value != nullptr) return *value;
@@ -1514,7 +1524,29 @@ public:
   {
     return m_startup_finished;
   }
-  fn set_startup_finished() wontthrow -> void { m_startup_finished = true; }
+  fn set_startup_finished() wontthrow -> void
+  {
+    m_startup_finished = true;
+    if (m_is_restricted_shell) activate_restricted_mode();
+  }
+  fn request_restricted_shell() wontthrow -> void
+  {
+    m_is_restricted_shell = true;
+  }
+  pure fn is_restricted_shell() const wontthrow -> bool
+  {
+    return m_is_restricted_shell;
+  }
+  fn activate_restricted_mode() wontthrow -> void
+  {
+    m_runtime.set_option(shell_option_id::Restricted, true);
+  }
+  pure fn restricted_enforcement_active() const wontthrow -> bool
+  {
+    return m_runtime.option_is_enabled(shell_option_id::Restricted);
+  }
+  fn guard_restricted_path(StringView path, SourceLocation location,
+                           restricted_path_use use) const throws -> void;
 
   fn make_stats_string() const throws -> String;
 
@@ -1595,6 +1627,7 @@ public:
 protected:
   bool m_is_login_shell{false};
   bool m_has_custom_rcfile{false};
+  bool m_is_restricted_shell{false};
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};
   usize m_expansions_last{0};

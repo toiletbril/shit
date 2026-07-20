@@ -97,16 +97,37 @@ The flags
 are applied together.
 .TP
 .BR \-p ", " \-\-privileged
-Every startup config file is skipped. The flag is turned on automatically in the
-setuid or setgid case.
+BASH_ENV is not sourced. Interactive rc files and login profiles are still
+sourced when the real and effective ids are equal. Every startup file is
+skipped in the setuid or setgid case. Without this flag, elevated ids are
+dropped before execution. The privileged state is exposed through
+.BR $- ,
+.BR SHELLOPTS ,
+and
+.BR "set -o privileged" .
 .TP
 .B \-\-clean
 A clean shell is started. No startup file is read in any mood, and PATH is set
 to a minimal default.
 .TP
-.BI \-\-rcfile= FILE
-FILE is sourced as the interactive rc. The shit mood sources it in place of
-/etc/shitrc and ~/.shitrc, and the bash mood in place of ~/.bashrc.
+.BR \-\-init\-file " " \fIFILE\fR ", " \-\-rcfile " " \fIFILE\fR
+FILE is sourced as the interactive rc. The two spellings are aliases, and the
+last occurrence selects the file. The shit mood sources it in place of
+/etc/shitrc and ~/.shitrc. A non-login bash mood sources it in place of
+~/.bashrc. A leading tilde is expanded.
+.TP
+.B \-\-norc
+The interactive bash rc and a file named by
+.B \-\-rcfile
+or
+.B \-\-init\-file
+are skipped. Login profiles and noninteractive BASH_ENV startup are unchanged.
+.TP
+.BR \-r ", " \-\-restricted
+Restricted mode is requested. Startup files run before its restrictions become
+active. A basename of
+.B rbash
+requests the same mode and selects the bash mood.
 .TP
 .B \-\-posix
 The bash-posix mood is selected, the same as
@@ -114,6 +135,21 @@ The bash-posix mood is selected, the same as
 A terminal that re-execs the shell with
 .B \-\-posix
 to inject its integration through the bash rc is honored.
+.SS Restricted shell
+A restricted shell rejects directory changes and changes to SHELL, PATH,
+HISTFILE, ENV, and BASH_ENV. A command name may not contain a directory
+separator. A source path, a history path, and a hash \-p path may not contain a
+directory separator.
+.PP
+The output redirections >, >|, <>, >>, &>, &>>, and output redirection through
+>& are rejected. Numeric descriptor duplication remains available. The exec
+builtin, command \-p, and enable \-f or \-d are rejected. Restricted mode
+cannot be disabled with set +r. Changes to the restricted_shell shopt value
+are accepted without effect.
+.PP
+The restrictions become active after startup files finish. A sourced script
+keeps them. A shell script found through PATH and executed as a command runs
+without them, matching bash.
 .SS Diagnostics
 .TP
 .B \-W[W...]
@@ -436,6 +472,13 @@ The interactive calc REPL history file, ~/.shit_calc_history by default.
 .B ENV
 The startup file sourced in sh mood.
 .TP
+.B BASH_ENV
+The startup file sourced by a noninteractive bash mood before its command,
+standard input, or script runs. Parameter expansion, command substitution,
+arithmetic expansion, and a leading tilde are expanded in its value. PATH is
+not searched. Interactive, bash-posix, clean, privileged, and rescue sessions
+do not source it.
+.TP
 .B PATH
 The colon\-separated command search path. The \-\-clean flag resets it to a
 minimal default.
@@ -626,66 +669,131 @@ the utility names resolve directly as commands without the prefix. A utility
 is used when PATH holds no program of that name. A binary whose name is a
 utility, such as a symlink named ls, acts as that utility, and the utility's own
 flags reach its parser. A symlinked utility prints the shit version on
-\-\-version. The binary behind the name is visible, and its help names the shit
-shell.
+\-\-version. Every utility supports \-\-help. The binary behind the name is
+visible, and its help names the shit shell.
 .B "shitbox \-\-assimilate DIR"
 installs one such symlink per utility into DIR. In the default shit mood a bare
 utility name also falls back to the bundled utility when PATH holds no binary of
 that name. A missing system coreutil is filled in. A PATH binary still takes
 precedence in every mood.
 .TP
-.B nproc
-The bundled nproc utility prints the number of logical processors available to
-the current process. The
-.B --all
-option prints the configured processor count. The
-.B --ignore=COUNT
-option excludes a count from the result. The result has a minimum of one, and a
-platform query failure also reports one.
-.TP
-.B flock
-The bundled flock utility runs a command while holding a lock for a directory.
-The
-.B --transaction-held-lock
-option launches a keeper whose lifetime follows the transaction child. The lock
-remains held when the process that launched the transaction exits.
-.TP
-.B timeout
-The bundled timeout utility runs a command until its duration expires. A
-duration accepts seconds and the s, m, h, or d suffix. The default signal is
-TERM. The
-.B --signal
-option selects another signal, and
-.B --kill-after
-sends KILL after an additional duration. The
-.B --preserve-status
-option returns the command status after a timeout. A timeout returns 124 by
-default, 125 when supervision fails, 126 when the command cannot execute, and
-127 when the command cannot be found. On Windows, timeout supports TERM and
-KILL. Both signals terminate the supervised job immediately, so kill-after does
-not add a grace period after TERM on that platform.
-An interactive child is held before execution until its process group owns the
-controlling terminal.
+.B basename
+Prints the final path component and supports an optional suffix operand.
 .TP
 .B calc
-The bundled calc utility evaluates each argument as an arithmetic expression and
-prints the value of the last one, with the same operators and located errors the
-shell arithmetic uses. In the default mood the value is computed in 128 bits. A
-result wider than a signed 64-bit integer prints in full. The Bash and POSIX
-moods keep the 64-bit wrap. With no expression on a terminal, or with
-.BR \-i ,
-expressions are read and evaluated interactively through the line editor, with
-the shell completion and the highlighter turned off and the history kept in
-~/.shit_calc_history. With
-.BR \-p ,
-the expressions are read from standard input one per line with no prompt and no
-line editor, so a script pipes a batch through calc. An interactive line of the
-form name=value binds the
-variable to its right-side expression unevaluated, recomputed lazily on each
-later read, and an assignment inside an expression, such as
-.BR "(x = 5) + 1" ,
-returns its value. A calc binary on PATH is preferred. The bundled utility runs
-only when PATH holds none.
+Evaluates arithmetic arguments or reads expressions with \-i or \-p.
+.TP
+.B cat
+Concatenates files or standard input and supports line numbering with \-n.
+.TP
+.B cp
+Copies files or directory trees and supports \-r, \-R, and \-v.
+.TP
+.B dirname
+Prints the directory portion of one path.
+.TP
+.B du
+Totals path sizes without following symlinks and supports \-s and \-h.
+.TP
+.B env
+Applies temporary assignments, runs a command, or prints the environment.
+.TP
+.B find
+Walks sorted trees and supports \-name, \-type, \-maxdepth, \-mindepth, and
+\-print.
+.TP
+.B flock
+Runs a command under a directory lock and supports \-\-transaction\-held\-lock.
+.TP
+.B grep
+Prints regular-expression matches and supports \-i and \-v.
+.TP
+.B head
+Prints the first ten lines by default and supports \-n and \-c counts.
+.TP
+.B killall
+Signals processes by exact name and supports \-s, \-\-signal, \-l, and \-\-list.
+.TP
+.B ln
+Creates symbolic links and supports \-s and \-f.
+.TP
+.B ls
+Lists sorted entries and supports \-a, \-A, \-1, \-l, and \-h.
+.TP
+.B make
+Runs compact make rules and supports \-f, \-\-file, \-C, and \-\-directory
+while accepting unused \-B and \-k and ignoring \-j.
+.TP
+.B mkdir
+Creates directories and supports \-p and an octal \-m mode.
+.TP
+.B mv
+Renames sources and supports \-f and \-v.
+.TP
+.B nproc
+Prints available logical processors and supports \-\-all and \-\-ignore=COUNT.
+.TP
+.B pkill
+Signals processes whose names match a pattern and supports \-s, \-\-signal,
+\-l, and \-\-list.
+.TP
+.B ps
+Lists processes and supports \-a, \-u, \-x, and the accepted \-w flag.
+.TP
+.B realpath
+Prints the canonical absolute form of each path.
+.TP
+.B rm
+Removes paths and supports \-r, \-R, \-f, and \-\-dry\-run while refusing
+root, dot, and dot-dot.
+.TP
+.B rmdir
+Removes empty directories.
+.TP
+.B seq
+Prints signed integer sequences with a nonzero step.
+.TP
+.B sleep
+Pauses for summed durations with optional s, m, h, or d suffixes.
+.TP
+.B sort
+Sorts input lines in byte order and supports \-r.
+.TP
+.B tail
+Prints the last ten lines by default and supports \-n and \-c counts.
+.TP
+.B tee
+Copies standard input to output files and supports append mode with \-a.
+.TP
+.B timeout
+Supervises a command for a suffixed duration and supports \-s, \-\-signal,
+\-k, \-\-kill\-after, \-p, and \-\-preserve\-status.
+.TP
+.B touch
+Updates file times and supports \-c to avoid creating missing files.
+.TP
+.B tr
+Translates input bytes with ranges and character classes and supports deletion
+with \-d.
+.TP
+.B uniq
+Collapses adjacent equal lines and supports run counts with \-c.
+.TP
+.B unlink
+Removes one non-directory path.
+.TP
+.B wc
+Counts lines, words, and bytes and supports \-l, \-w, and \-c.
+.TP
+.B which
+Resolves builtins, PATH programs, and shitbox utilities and supports \-a,
+\-\-all, \-q, and \-\-quiet.
+.TP
+.B whoami
+Prints the current user name.
+.TP
+.B yes
+Repeats its joined operands or y until output closes.
 .SH SHIT BUILTINS
 These builtins are unique to shit and have no counterpart in bash or dash.
 .TP
@@ -760,9 +868,18 @@ current states, and set +o prints reusable commands. set \-\-options prints
 every option with its state and description. set \-E controls errtrace, set \-P
 makes cd resolve symbolic links, set \-T controls functrace, and set \-B
 controls brace expansion. Runtime set \-n stops later commands in the current
-parsed list.
+parsed list. Runtime set \-r enables restricted mode and cannot disable it
+again with set +r.
 Changes made in a command substitution are restored when the substitution ends.
 SHELLOPTS, $\-, [[ \-o NAME ]], and completion report the shared state.
+.TP
+.B enable [\-a] [\-d] [\-n] [\-f FILE] [\-s] [NAME ...]
+Every builtin remains enabled. The \-d, \-n, \-f, and \-s compatibility flags
+are accepted without effect, and \-a lists every builtin.
+.TP
+.B hash [\-r] [\-p PATH] [NAME ...]
+Resolved command locations are remembered or listed. The \-r flag clears the
+cache. The \-p flag records PATH as the location of each NAME.
 .TP
 .B bind
 A no-op stub. The flags and the operands are accepted without effect, and the

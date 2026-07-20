@@ -2,12 +2,13 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
 #include "../Trace.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-abefhkmnuvxBCEPTARWISG] [+abefhkmnuvxBCEPTARWISG] "
+HELP_SYNOPSIS_DECL("[-abefhkmnruvxBCEPTARWISG] [+abefhkmnuvxBCEPTARWISG] "
                    "[-o name] [+o name] [--options] [--] [arg ...]");
 
 HELP_DESCRIPTION_DECL(
@@ -101,6 +102,11 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      true},
     {shell_option_id::Noexec, set_option_behavior::Stored, 'n', "noexec",
      "Read and parse commands but do not run them.", "no-exec", true},
+    {shell_option_id::Privileged,
+     set_option_behavior::Stored,
+     'p', "privileged",
+     "Retain elevated ids and suppress environment startup files.", {},
+     true},
     {shell_option_id::Nounset, set_option_behavior::Stored, 'u', "nounset",
      "Treat an unset variable as an error.", "no-unset", true},
     {shell_option_id::Verbose,
@@ -421,6 +427,10 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
       enable ? "on" : "off");
   switch (option.behavior) {
   case set_option_behavior::Stored:
+    if (option.id == shell_option_id::Privileged && !enable &&
+        os::is_running_setuid() && !os::drop_elevated_identity())
+      throw Error{"Unable to drop elevated ids: " +
+                  os::last_system_error_message()};
     cxt.note_shell_option_mutation(option.id);
     cxt.set_shell_option_state(option.id, enable);
     break;
@@ -584,8 +594,10 @@ fn shell_option_letters() throws -> const String &
 {
   static String letters = [] throws {
     let collected = String{heap_allocator()};
-    for (let const &option : SET_OPTIONS)
+    for (let const &option : SET_OPTIONS) {
       if (option.letter != '\0') collected.push(option.letter);
+      if (option.letter == 'h') collected.push('r');
+    }
     return collected;
   }();
   return letters;
@@ -614,7 +626,12 @@ fn enabled_shell_option_letters(const EvalContext &cxt) throws -> String
 {
   let letters = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
-    if (option.letter == 'h' && cxt.shell_is_interactive()) letters.push('i');
+    if (option.letter == 'h') {
+      if (option_is_on(cxt, option)) letters.push('h');
+      if (cxt.restricted_enforcement_active()) letters.push('r');
+      if (cxt.shell_is_interactive()) letters.push('i');
+      continue;
+    }
     if (option.behavior == set_option_behavior::WarningLevelOne) {
       for (u8 warning_level = 0; warning_level < cxt.warning_level();
            warning_level++)
@@ -784,6 +801,13 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (letter == 'o') {
           apply_long_option_by_name(ec, cxt, args, i, enable);
           break;
+        }
+        if (letter == 'r') {
+          if (!enable && cxt.restricted_enforcement_active())
+            throw make_error_for_arg(ec, i,
+                                     "Restricted mode cannot be disabled");
+          if (enable) cxt.activate_restricted_mode();
+          continue;
         }
 
         let const option = find_option_by_letter(letter);

@@ -2270,6 +2270,12 @@ fn ProgramResolver::invalidate() throws -> void
   clear_directory_listing_cache();
 }
 
+fn ProgramResolver::remember_path(StringView name, const Path &path) throws
+    -> void
+{
+  cache_resolved_path(name, path, os::program_extension::None, true);
+}
+
 fn ProgramResolver::split_path_dirs(StringView path) throws -> ArrayList<String>
 {
   let directories = ArrayList<String>{heap_allocator()};
@@ -2424,9 +2430,7 @@ fn ProgramResolver::begin_explicit_completion(CompletionRefresh refresh) throws
       m_command_names_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
       m_prefix_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
       break;
-    case CompletionRefresh::Fresh:
-      begin_directory_validation_epoch();
-      break;
+    case CompletionRefresh::Fresh: begin_directory_validation_epoch(); break;
     }
   }
   m_explicit_completion_depth++;

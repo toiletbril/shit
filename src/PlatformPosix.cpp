@@ -345,6 +345,14 @@ fn is_running_setuid() wontthrow -> bool
   return geteuid() != getuid() || getegid() != getgid();
 }
 
+fn drop_elevated_identity() wontthrow -> bool
+{
+  let const real_group_id = getgid();
+  let const real_user_id = getuid();
+  if (setregid(real_group_id, real_group_id) != 0) return false;
+  return setreuid(real_user_id, real_user_id) == 0;
+}
+
 fn process_id_of(process p) wontthrow -> i64 { return static_cast<i64>(p); }
 fn process_group_of(process p) throws -> process { return -p; }
 fn close_process_group(process group) wontthrow -> void { unused(group); }
@@ -1827,6 +1835,11 @@ hot fn make_os_args(const ArrayList<String> &args) throws -> os_args
 cold fn last_system_error_message() throws -> String
 {
   return String{strerror(errno)};
+}
+
+fn last_system_error_is_missing_file() wontthrow -> bool
+{
+  return errno == ENOENT;
 }
 
 static fn make_sigset_impl(int first, ...) wontthrow -> sigset_t

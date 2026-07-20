@@ -330,6 +330,7 @@ fn set_file_creation_mask(u32 mask) wontthrow -> void;
 fn make_os_args(const ArrayList<String> &args) throws -> os_args;
 
 fn last_system_error_message() throws -> String;
+fn last_system_error_is_missing_file() wontthrow -> bool;
 
 fn wait_and_monitor_process(process p, bool *was_stopped = nullptr) throws
     -> i32;
@@ -697,6 +698,7 @@ inline fn ostype_name() wontthrow -> StringView
 /* The shell skips its startup config files in the setuid or setgid case, so a
    file an attacker controls cannot run with the raised privileges. */
 fn is_running_setuid() wontthrow -> bool;
+fn drop_elevated_identity() wontthrow -> bool;
 
 fn reopen_terminal_as_stdin() wontthrow -> bool;
 

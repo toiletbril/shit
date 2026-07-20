@@ -6,11 +6,12 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-r] [name ...]");
+HELP_SYNOPSIS_DECL("[-r] [-p pathname] [name ...]");
 HELP_DESCRIPTION_DECL(
     "The hash builtin manages the cache of resolved command locations.");
 
 FLAG(RESET, Bool, 'r', "", "Forget remembered command locations.");
+FLAG(PATHNAME, String, 'p', "", "Remember each name at pathname.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Hash);
@@ -30,6 +31,16 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_RESET.is_enabled()) {
     LOG(Info, "hash forgetting every remembered command location");
     cxt.get_program_resolver().invalidate();
+  }
+
+  if (FLAG_PATHNAME.is_set()) {
+    cxt.guard_restricted_path(FLAG_PATHNAME.value(),
+                              FLAG_PATHNAME.value_location(),
+                              restricted_path_use::Hash);
+    for (usize i = 1; i < args.count(); i++)
+      cxt.get_program_resolver().remember_path(args[i].view(),
+                                               Path{FLAG_PATHNAME.value()});
+    return 0;
   }
 
   i32 status = 0;

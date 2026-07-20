@@ -111,6 +111,9 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
                                               const ArrayList<String> &elements,
                                               bool is_append) throws -> void
 {
+  if (is_readonly(name))
+    throw Error{"Unable to assign '" + name + "' because it is read only"};
+
   /* POSIX mode has no arrays, so a bash array literal stands in as an empty
      scalar. */
   if (is_posix_mode()) [[unlikely]] {
@@ -309,6 +312,9 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
 
 fn EvalContext::declare_associative_array(StringView name) throws -> void
 {
+  if (is_readonly(name))
+    throw Error{"Unable to assign '" + name + "' because it is read only"};
+
   LOG(Debug, "declaring '%.*s' as an associative array",
       static_cast<int>(name.length), name.data);
   m_associative_names.add(name);
@@ -318,6 +324,9 @@ fn EvalContext::declare_associative_array(StringView name) throws -> void
 fn EvalContext::set_associative_element(StringView name, StringView key,
                                         StringView value) throws -> void
 {
+  if (is_readonly(name))
+    throw Error{"Unable to assign '" + name + "' because it is read only"};
+
   if (!is_associative_array(name)) {
     m_associative_names.add(name);
     m_shell_variables.erase(name);
@@ -422,6 +431,8 @@ fn EvalContext::unset_array_element(StringView name,
 fn EvalContext::declare_local(StringView name) throws -> void
 {
   if (m_local_scope_depth == 0) return;
+  if (is_readonly(name))
+    throw Error{"Unable to assign '" + name + "' because it is read only"};
   ASSERT(m_local_scope_depth <= m_local_scopes.count());
   /* One binding per scope, the bash rule. A second local of the same name keeps
      the first's saved caller state, so the scope pop restores the true pre-call

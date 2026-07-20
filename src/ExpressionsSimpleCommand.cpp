@@ -331,11 +331,33 @@ static fn redirection_open_mode(Redirection::Kind kind,
    open_or_stage_failed is set true only for the open, stage, and
    ambiguous-target failures the simple-command path recovers from, so a
    duplication-resolve or word-expansion error stays fatal. */
+[[noreturn]] fn
+reject_restricted_output_redirection(const Redirection &redir,
+                                     SourceLocation fallback_location,
+                                     bool *open_or_stage_failed) throws -> void
+{
+  if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
+  throw ErrorWithLocation{
+      redir.target != nullptr ? redir.target->source_location()
+                              : fallback_location,
+      "Output redirection is forbidden in a restricted shell"};
+}
+
 fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
                        SourceLocation fallback_location,
                        bool *open_or_stage_failed,
                        bool allow_fd_memoization) throws -> resolved_redirection
 {
+  if (cxt.restricted_enforcement_active() &&
+      (redir.kind == Redirection::Kind::TruncateOutput ||
+       redir.kind == Redirection::Kind::TruncateOutputOverride ||
+       redir.kind == Redirection::Kind::AppendOutput ||
+       redir.kind == Redirection::Kind::ReadWrite))
+  {
+    reject_restricted_output_redirection(redir, fallback_location,
+                                         open_or_stage_failed);
+  }
+
   if (redir.kind == Redirection::Kind::Heredoc ||
       redir.kind == Redirection::Kind::HereString)
   {
@@ -369,6 +391,10 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
   {
     let resolved_dup = resolve_duplication(redir, cxt);
     if (resolved_dup.both_streams_file.has_value()) {
+      if (cxt.restricted_enforcement_active()) {
+        reject_restricted_output_redirection(redir, fallback_location,
+                                             open_or_stage_failed);
+      }
       let opened = os::open_file_descriptor(
           *resolved_dup.both_streams_file,
           redirection_open_mode(Redirection::Kind::TruncateOutput,
@@ -663,6 +689,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args, program_arg_locations);
 
+  if (!program_args.is_empty())
+    cxt.guard_restricted_path(program_args[0].view(),
+                              program_arg_locations.is_empty()
+                                  ? source_location()
+                                  : program_arg_locations[0],
+                              restricted_path_use::Command);
+
   LOG(Info, "dispatching the command '%s' with %zu words",
       program_args.is_empty() ? "" : program_args[0].c_str(),
       program_args.count());
@@ -947,6 +980,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     /* Bare array assignments apply after the scalars in source order. */
     for (let const &assignment : m_array_args) {
+      if (cxt.is_readonly(assignment.name))
+        throw Error{"Unable to assign '" + assignment.name +
+                    "' because it is read only"};
       ArrayList<String> values =
           cxt.process_args(assignment.elements, argument_lifetime::Persistent,
                            argument_context::ArrayLiteral);
@@ -997,6 +1033,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      expanded, so a later value reads an earlier same-line one. */
   for (let const &var : m_local_vars) {
     const StringView name = var.name.view();
+    if (cxt.is_readonly(name))
+      throw Error{"Unable to assign '" + name + "' because it is read only"};
     Maybe<String> previous = os::get_environment_variable(name);
     let expanded_value = String{cxt.scratch_allocator()};
     try {

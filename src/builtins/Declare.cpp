@@ -65,6 +65,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let should_be_global = false;
 
   usize i = 1;
+  i32 status = 0;
   for (; i < args.count(); i++) {
     let const arg = args[i].view();
     if (arg.length < 1 || (arg[0] != '-' && arg[0] != '+')) {
@@ -170,6 +171,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     {
       let line = String{cxt.scratch_allocator(), "declare -a"};
       if (cxt.is_integer_variable(name)) line += 'i';
+      if (cxt.is_readonly(name)) line += 'r';
       line += ' ';
       line.append(name);
       line += "=(";
@@ -193,6 +195,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const values = cxt.associative_values(name);
       let line = String{cxt.scratch_allocator(), "declare -A"};
       if (cxt.is_integer_variable(name)) line += 'i';
+      if (cxt.is_readonly(name)) line += 'r';
       line += ' ';
       line.append(name);
       line += "=(";
@@ -211,6 +214,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (const Maybe<String> value = cxt.get_variable_value(name)) {
       let attribute = String{cxt.scratch_allocator(), "-"};
       if (cxt.is_integer_variable(name)) attribute += 'i';
+      if (cxt.is_readonly(name)) attribute += 'r';
       if (os::get_environment_variable(name).has_value()) attribute += 'x';
       if (attribute.count() == 1) attribute += '-';
       let line = String{cxt.scratch_allocator(), "declare "};
@@ -226,6 +230,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     if (cxt.is_integer_variable(name)) {
       let line = String{cxt.scratch_allocator(), "declare -i"};
+      if (cxt.is_readonly(name)) line += 'r';
       if (os::get_environment_variable(name).has_value()) line += 'x';
       line += ' ';
       line.append(name);
@@ -311,6 +316,15 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                       : StringView{};
     if (has_subscript) name = name.substring_of_length(0, *bracket);
 
+    if ((should_mark_integer_attribute || should_unmark_integer_attribute) &&
+        cxt.is_readonly(name))
+    {
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                StringView{"'"} + name + "' is read-only");
+      status = 1;
+      continue;
+    }
+
     if (!should_be_global) cxt.declare_local(name);
 
     /* The attribute applies before the assignment, so declare -i x+=3 already
@@ -363,7 +377,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (should_mark_readonly) cxt.mark_readonly(name);
   }
 
-  return 0;
+  return status;
 }
 
 } // namespace shit

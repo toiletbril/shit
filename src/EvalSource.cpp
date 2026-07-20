@@ -114,8 +114,14 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   }
 
   let const previous_runtime = m_runtime;
+  let const was_restricted_shell = m_is_restricted_shell;
 
   m_runtime.mood = mode;
+  m_runtime.set_option(shell_option_id::Restricted, false);
+  m_is_restricted_shell = false;
+  let const do_restore_restricted_shell = [&]() {
+    m_is_restricted_shell = was_restricted_shell;
+  };
   LOG(Debug, "mimicking the script '%s'%s", ec.program().c_str(),
       isolated ? " in an isolated subshell" : "");
   let const previous_script_run = m_is_script_run;
@@ -139,6 +145,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   let const do_restore_pre_parse_state = [&]() {
     m_runtime = previous_runtime;
+    do_restore_restricted_shell();
     m_is_script_run = previous_script_run;
   };
 
@@ -222,6 +229,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     }
     m_mimicry_depth--;
     do_restore_fds();
+    do_restore_restricted_shell();
     if (error) {
       if (mimicked_error_is_interrupt(error))
         throw InterruptErrorWithLocation{previous_location};
@@ -266,6 +274,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   set_current_source(previous_source, previous_origin);
   m_current_location = previous_location;
   previous_runtime.restore(*this);
+  do_restore_restricted_shell();
   m_is_script_run = previous_script_run;
   m_shell_name = steal(previous_shell_name);
 

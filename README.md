@@ -50,6 +50,11 @@ diagnostics.
 `--init-moods`/`-L` accepts a comma-separated list of moods to steal and use
 init files from. It defaults to the value of `--mood`.
 
+Bash startup compatibility includes `--norc` and the `--init-file` or
+`--rcfile` aliases. A noninteractive Bash mood expands and sources `BASH_ENV`.
+`--restricted` or `-r` enables restricted operation, while `--privileged` or
+`-p` preserves an elevated identity and suppresses environment startup files.
+
 The `SHIT_FLAGS` environment variable may be used to specify flags. The
 recommended set is `-W -I --init-moods=shit,bash`. A flag on the command line
 still wins.

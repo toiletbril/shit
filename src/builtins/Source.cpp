@@ -37,6 +37,8 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return report_usage_error(ec, cxt, ec.program());
 
   let const path = ec.args()[path_index].clone();
+  cxt.guard_restricted_path(path.view(), ec.arg_location_at(path_index),
+                            restricted_path_use::Source);
   LOG(Info, "source running file '%s' in the current shell", path.c_str());
 
   let source_path = Path{path.view()};

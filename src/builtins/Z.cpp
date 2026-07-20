@@ -232,15 +232,8 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   LOG(Info, "z changing directory to '%s'", target.text().c_str());
 
-  let const old_directory = Path::current_directory();
-  if (Path::set_current_directory(target).is_error())
-    throw make_error_for_arg(ec, 1,
-                             StringView{"Unable to change directory to '"} +
-                                 target.text() + "'");
-  cxt.get_program_resolver().working_directory_changed();
-  if (!old_directory.is_empty())
-    cxt.set_shell_variable("OLDPWD", old_directory.text());
-  cxt.set_shell_variable("PWD", target.text());
+  let const status = run_cd_to_directory(cxt, ec, target.text());
+  if (status != 0) return status;
   record_directory_access(target.text().view(), cxt.scratch_allocator());
 
   ec.print_to_stdout(target.text() + "\n");

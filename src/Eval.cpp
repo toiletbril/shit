@@ -112,6 +112,38 @@ hot pure fn EvalContext::is_field_separator(char c) const wontthrow -> bool
   return m_field_separator_table[static_cast<u8>(c)];
 }
 
+fn EvalContext::guard_restricted_path(StringView path, SourceLocation location,
+                                      restricted_path_use use) const throws
+    -> void
+{
+  if (!restricted_enforcement_active() || !os::has_directory_separator(path))
+    return;
+
+  switch (use) {
+  case restricted_path_use::Command:
+    throw ErrorWithLocation{
+        location,
+        "Command names containing a directory separator are forbidden in a "
+        "restricted shell"};
+  case restricted_path_use::Source:
+    throw ErrorWithLocation{
+        location,
+        "Source paths containing a directory separator are forbidden in a "
+        "restricted shell"};
+  case restricted_path_use::History:
+    throw ErrorWithLocation{
+        location,
+        "History paths containing a directory separator are forbidden in a "
+        "restricted shell"};
+  case restricted_path_use::Hash:
+    throw ErrorWithLocation{
+        location,
+        "hash -p paths containing a directory separator are forbidden in a "
+        "restricted shell"};
+  }
+  unreachable("Unhandled restricted path use");
+}
+
 hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
     -> void
 {
@@ -225,6 +257,17 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
                          steal(*binding.previous_indexed_array));
   else
     m_indexed_arrays.erase(binding.name.view());
+  let const was_restricted = restricted_enforcement_active();
+  m_runtime.set_option(shell_option_id::Restricted, false);
+  m_readonly_names.remove(binding.name.view());
+  defer
+  {
+    m_runtime.set_option(shell_option_id::Restricted, was_restricted);
+    if (binding.previous_was_readonly)
+      m_readonly_names.add(binding.name.view());
+    else
+      m_readonly_names.remove(binding.name.view());
+  };
   clear_sparse_array(binding.name.view());
   for (usize i = 0; i < binding.previous_sparse_indices.count(); i++)
     set_array_element(binding.name.view(), binding.previous_sparse_indices[i],
@@ -239,10 +282,6 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     m_integer_names.add(binding.name.view());
   else
     m_integer_names.remove(binding.name.view());
-  if (binding.previous_was_readonly)
-    m_readonly_names.add(binding.name.view());
-  else
-    m_readonly_names.remove(binding.name.view());
 
   if (binding.previous_was_exported) {
     m_exported_names.add(binding.name.view());
@@ -506,6 +545,22 @@ fn EvalContext::mark_exported(StringView name) throws -> void
 fn EvalContext::unmark_exported(StringView name) throws -> void
 {
   m_exported_names.remove(name);
+}
+
+fn EvalContext::unexport_shell_variable(StringView name) throws -> void
+{
+  let const has_shell_binding = m_shell_variables.find(name) != nullptr ||
+                                m_indexed_arrays.find(name) != nullptr ||
+                                m_associative_names.contains(name) ||
+                                is_local_in_current_scope(name) ||
+                                variable_requires_dynamic_lookup(name);
+  let const environment_value =
+      has_shell_binding ? Maybe<String>{} : os::get_environment_variable(name);
+  record_environment_change(name);
+  os::unset_environment_variable(name);
+  unmark_exported(name);
+  if (environment_value.has_value())
+    assign_variable(name, environment_value->view());
 }
 
 pure fn EvalContext::is_exported(StringView name) const wontthrow -> bool
