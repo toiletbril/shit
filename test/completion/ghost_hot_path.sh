@@ -62,7 +62,10 @@ test "$small_miss_scan_count" = "$large_miss_scan_count"
 printf '%s\n' "$large_miss_result" | grep -q '^count=0$'
 echo 'command ghost misses skip unrelated PATH names'
 
-duplicate_result=$(PATH=/bin "$BIN" --debug-ghost-at 'ec')
+mkdir "$d/duplicate"
+printf '#!/bin/sh\n' > "$d/duplicate/echo"
+chmod +x "$d/duplicate/echo"
+duplicate_result=$(PATH="$d/duplicate" "$BIN" --debug-ghost-at 'ec')
 printf '%s\n' "$duplicate_result" | grep -q '^count=1$'
 printf '%s\n' "$duplicate_result" | grep -q '^prefix=echo$'
 printf '%s\n' "$duplicate_result" | grep -q '^materialized=0$'

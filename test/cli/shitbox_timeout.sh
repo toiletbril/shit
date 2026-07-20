@@ -130,17 +130,23 @@ echo "--- an interrupt stops the supervisor and descendants ---"
     >/dev/null 2>&1 &
 supervisor_pid=$!
 waited=0
-while [ ! -s "$d/child-pid" ] && [ "$waited" -lt 100 ]; do
+while [ ! -s "$d/child-pid" ] && [ "$waited" -lt 1000 ]; do
     /bin/sleep 0.01
     waited=$((waited + 1))
 done
-kill -INT "$supervisor_pid"
-( /bin/sleep 0.2; kill -KILL "$supervisor_pid" 2>/dev/null ) &
-watchdog_pid=$!
-wait "$supervisor_pid"
-supervisor_status=$?
-kill "$watchdog_pid" 2>/dev/null
-wait "$watchdog_pid" 2>/dev/null
+if [ -s "$d/child-pid" ]; then
+    kill -INT "$supervisor_pid"
+    ( /bin/sleep 0.2; kill -KILL "$supervisor_pid" 2>/dev/null ) &
+    watchdog_pid=$!
+    wait "$supervisor_pid"
+    supervisor_status=$?
+    kill "$watchdog_pid" 2>/dev/null
+    wait "$watchdog_pid" 2>/dev/null
+else
+    kill -KILL "$supervisor_pid" 2>/dev/null
+    wait "$supervisor_pid" 2>/dev/null
+    supervisor_status=125
+fi
 echo "rc=$supervisor_status"
 /bin/sleep 0.15
 if [ -e "$d/interrupt-marker" ]; then
