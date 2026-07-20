@@ -168,13 +168,13 @@ elif script -qec true /dev/null >/dev/null 2>&1; then
         { /bin/sleep 0.2; printf '%s\n' \
             "shitbox timeout 1 /bin/sh -c 'read value; echo received-\$value'"; \
           /bin/sleep 0.1; printf '%s\n' probe exit; /bin/sleep 0.2; } |
-            script -qec "$BIN" /dev/null 2>/dev/null)
+            script -qec "$BIN --clean" /dev/null 2>/dev/null)
 else
     terminal_output=$(
         { /bin/sleep 0.2; printf '%s\n' \
             "shitbox timeout 1 /bin/sh -c 'read value; echo received-\$value'"; \
           /bin/sleep 0.1; printf '%s\n' probe exit; /bin/sleep 0.2; } |
-            script -q /dev/null "$BIN" 2>/dev/null)
+            script -q /dev/null "$BIN" --clean 2>/dev/null)
 fi
 case $(printf '%s\n' "$terminal_output" | tr -d '\r') in
     *received-probe*) echo passed ;;
