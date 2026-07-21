@@ -534,6 +534,8 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
     return;
   }
 
+  command->normalize_crlf_line_endings();
+
   LOG(Info, "running the PROMPT_COMMAND hook, %zu bytes", command->count());
 
   const i32 saved_exit_status = context.last_exit_status();
@@ -1673,6 +1675,7 @@ fn main(int argc, char **argv) -> int
       if (root_frame_call_site.has_value()) context.pop_root_source_frame();
     };
 
+    script_contents.normalize_crlf_line_endings();
     exit_code = run_script_contents(script_contents, context, ast_arena,
                                     source_filename);
 

@@ -1,0 +1,46 @@
+dir=$(mktemp -d)
+trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
+
+script="$dir/named.shit"
+{
+    printf 'if true; then\r\n'
+    printf '  echo named\r\n'
+    printf 'fi\r\n'
+    printf 'printf "joined=%%s\\n" foo\\\r\n'
+    printf 'bar\r\n'
+    printf 'value="alpha\r\nomega"\r\n'
+    printf 'printf "quoted=%%s\\n" "${#value}"\r\n'
+    printf 'value=$(cat <<EOF\r\n'
+    printf 'body\r\n'
+    printf 'EOF\r\n'
+    printf ')\r\n'
+    printf 'printf "heredoc=%%s:%%s\\n" "${#value}" "$value"\r\n'
+} > "$script"
+"$BIN" "$script"
+
+printf 'echo stdin\r\n' | "$BIN" -s
+
+source_script="$dir/source.shit"
+printf 'echo sourced\r\n' > "$source_script"
+"$BIN" -c '. "$1"' crlf-driver "$source_script"
+
+eval_text=$(printf 'echo eval-one\r\necho eval-two\r\n')
+"$BIN" -c 'eval "$1"' crlf-driver "$eval_text"
+
+fallback_script="$dir/fallback.ps1"
+printf 'echo fallback\r\n' > "$fallback_script"
+/bin/chmod +x "$fallback_script"
+"$BIN" -c '"$1"' crlf-driver "$fallback_script"
+
+lone_carriage_return=$(printf 'a\rb')
+"$BIN" -c 'value=$1; printf "lone=%s\n" "${#value}"' crlf-driver \
+    "$lone_carriage_return"
+
+invalid_script="$dir/invalid.shit"
+printf 'echo first\r\nmissing_crlf_probe\r\n' > "$invalid_script"
+diagnostic=$("$BIN" "$invalid_script" 2>&1) && exit 1
+case "$diagnostic" in
+    *:2:1:*) ;;
+    *) exit 1 ;;
+esac
+echo 'diagnostic=clean'

@@ -113,6 +113,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     return 126;
   }
 
+  contents->normalize_crlf_line_endings();
+
   let const previous_runtime = m_runtime;
   let const was_restricted_shell = m_is_restricted_shell;
 
@@ -314,6 +316,10 @@ fn EvalContext::run_source(StringView source, StringView origin,
                            Maybe<SourceLocation> call_site,
                            Maybe<StringView> filename) throws -> i32
 {
+  let normalized_source = String{source};
+  normalized_source.normalize_crlf_line_endings();
+  source = normalized_source.view();
+
   let const consume_return = handling == return_handling::Consume;
   if (AST_ARENA == nullptr) throw Error{"Cannot run source outside of a parse"};
 
@@ -366,8 +372,9 @@ fn EvalContext::run_source(StringView source, StringView origin,
     /* Keep a copy of the source alive for as long as the AST, so a control-flow
        jump made inside it can point a caret at the right text after this call
        returns. */
-    let const retained_source = new String{source};
+    let const retained_source = new String{steal(normalized_source)};
     m_retained_sources.push(retained_source);
+    source = retained_source->view();
 
     let const previous_source = m_current_source;
     let const previous_origin = m_current_origin;

@@ -131,13 +131,17 @@ fn EvalContext::capture_command_substitution(const String &source,
   enter_substitution();
   defer { leave_substitution(); };
 
+  let normalized_source = source.clone();
+  normalized_source.normalize_crlf_line_endings();
+
   let parser = Parser{
-      Lexer{String{source.view()}, *AST_ARENA, false, filename, mood()}
+      Lexer{String{normalized_source.view()}, *AST_ARENA, false, filename,
+            mood()}
   };
   let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);
 
-  return run_captured_substitution(ast, source);
+  return run_captured_substitution(ast, normalized_source);
 }
 
 fn EvalContext::setup_process_substitution(StringView text) throws -> String

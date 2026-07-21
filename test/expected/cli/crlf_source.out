@@ -1,0 +1,11 @@
+named
+joined=foobar
+quoted=11
+heredoc=4:body
+stdin
+sourced
+eval-one
+eval-two
+fallback
+lone=3
+diagnostic=clean

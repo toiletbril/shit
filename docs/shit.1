@@ -21,6 +21,9 @@ command line is run, or a command string is run when it is given with
 A command path ending in a directory separator fails with status 126 when the
 normalized target is not a directory.
 .PP
+Shell source accepts LF and CRLF line endings. A CRLF pair is read as one
+newline. A lone carriage return remains part of the source text.
+.PP
 shit is designed to work without absolutely no config whatsoever. shit's Linux
 binary is static. shit also works without coreutils, using it's own shitbox
 utilities instead. all so you can copy shit to any machine and enjoy the shell.

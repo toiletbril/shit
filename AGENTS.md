@@ -122,6 +122,11 @@ condition folds to zero drops the whole loop only when its init clause is blank,
 since a non-blank init runs once before the condition the way C semantics
 require.
 
+Owned shell source normalizes CRLF pairs before lexing, analysis, evaluation,
+and diagnostics. Named files, stdin, command strings, sourced text, and
+executable fallback all use the same normalized bytes. Lone carriage returns
+remain data.
+
 Evaluation spreads across src/Eval.cpp and the Eval prefixed files, which split
 substitution, word expansion, parameter expansion, globbing, arithmetic, arrays,
 source, jobs, and functions into their own units. src/Expressions.cpp holds the

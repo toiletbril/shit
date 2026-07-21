@@ -110,6 +110,25 @@ public:
         byte = static_cast<char>(byte - 'A' + 'a');
     }
   }
+  hot fn normalize_crlf_line_endings() wontthrow -> void
+  {
+    usize output_position = 0;
+
+    for (usize input_position = 0; input_position < m_length;
+         input_position++)
+    {
+      if (m_data[input_position] == '\r' && input_position + 1 < m_length &&
+          m_data[input_position + 1] == '\n')
+      {
+        continue;
+      }
+
+      m_data[output_position++] = m_data[input_position];
+    }
+
+    m_length = output_position;
+    m_data[m_length] = '\0';
+  }
   hot mustuse pure fn view() const wontthrow -> StringView
   {
     return StringView{m_data, m_length};
