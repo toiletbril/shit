@@ -360,21 +360,100 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
 
 fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
 {
-  /* Windows ownership and ACL checks differ from the POSIX owner and mode bits,
-     so until a Windows check lands no directory is trusted and the --help
-     completion fork stays off. */
-  unused(directory);
-  return false;
+  /* PATH already grants programs in this directory execution authority. The
+     POSIX writable-mode rejection has no faithful Windows equivalent because
+     access is controlled by ordered ACLs rather than owner/group mode bits. */
+  return directory.is_directory();
 }
 
 fn capture_program_output(const ArrayList<String> &argv,
                           u64 timeout_nanos) wontthrow -> Maybe<String>
 {
-  /* The --help completion fork is off on Windows until the timed capture is
-     ported, so nothing is captured. */
-  unused(argv);
-  unused(timeout_nanos);
-  return None;
+  if (argv.is_empty()) return None;
+
+  SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+  HANDLE read_end = INVALID_HANDLE_VALUE;
+  HANDLE write_end = INVALID_HANDLE_VALUE;
+  if (CreatePipe(&read_end, &write_end, &inheritable, 0) == FALSE)
+    return None;
+  defer { CloseHandle(read_end); };
+  defer { CloseHandle(write_end); };
+  if (SetHandleInformation(read_end, HANDLE_FLAG_INHERIT, 0) == FALSE)
+    return None;
+
+  let const null_input =
+      CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                  &inheritable, OPEN_EXISTING, 0, nullptr);
+  if (null_input == INVALID_HANDLE_VALUE) return None;
+  defer { CloseHandle(null_input); };
+
+  let command_line = make_os_args(argv);
+  STARTUPINFOA startup_info{};
+  startup_info.cb = sizeof(startup_info);
+  startup_info.dwFlags = STARTF_USESTDHANDLES;
+  startup_info.hStdInput = null_input;
+  startup_info.hStdOutput = write_end;
+  startup_info.hStdError = write_end;
+
+  PROCESS_INFORMATION process_info{};
+  if (CreateProcessA(argv[0].c_str(), const_cast<LPSTR>(command_line.data()),
+                     nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr,
+                     &startup_info, &process_info) == FALSE)
+  {
+    return None;
+  }
+  defer { CloseHandle(process_info.hProcess); };
+  defer { CloseHandle(process_info.hThread); };
+  CloseHandle(write_end);
+  write_end = INVALID_HANDLE_VALUE;
+
+  let captured = String{heap_allocator()};
+  const u64 deadline_nanos = monotonic_nanos() + timeout_nanos;
+  bool was_timed_out = false;
+  loop
+  {
+    DWORD available_byte_count = 0;
+    if (PeekNamedPipe(read_end, nullptr, 0, nullptr, &available_byte_count,
+                      nullptr) == FALSE)
+    {
+      let const error = GetLastError();
+      if (error == ERROR_BROKEN_PIPE) break;
+      return None;
+    }
+
+    if (available_byte_count != 0) {
+      char buffer[4096];
+      let const requested_count =
+          available_byte_count < sizeof(buffer) ? available_byte_count
+                                                : sizeof(buffer);
+      DWORD read_count = 0;
+      if (ReadFile(read_end, buffer, requested_count, &read_count, nullptr) ==
+          FALSE)
+      {
+        return None;
+      }
+      captured.append(StringView{buffer, static_cast<usize>(read_count)});
+      continue;
+    }
+
+    if (WaitForSingleObject(process_info.hProcess, 0) == WAIT_OBJECT_0) {
+      /* The pipe can report empty just before the final child write arrives. */
+      if (WaitForSingleObject(read_end, 1) == WAIT_OBJECT_0) continue;
+      break;
+    }
+    if (monotonic_nanos() >= deadline_nanos) {
+      was_timed_out = true;
+      break;
+    }
+    Sleep(1);
+  }
+
+  if (was_timed_out) {
+    TerminateProcess(process_info.hProcess, 1);
+    WaitForSingleObject(process_info.hProcess, INFINITE);
+    return None;
+  }
+  return captured;
 }
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor

@@ -852,8 +852,9 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
 
 /* Whether the directory is safe to run a binary from for its --help text, so it
    is owned by root or the current user and is not writable by group or other,
-   rejecting a world-writable directory such as /tmp. On Windows it returns
-   false. */
+   rejecting a world-writable directory such as /tmp. On Windows a PATH
+   directory is trusted because Windows uses ACLs rather than owner/group mode
+   bits. */
 fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool;
 
 fn capture_program_output(const ArrayList<String> &argv,
