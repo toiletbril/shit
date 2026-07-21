@@ -9,13 +9,14 @@ Have you ever seen warnings from software that uses Bison as its parsing
 engine? Did you encounter any of the coreutils' error messages? Have you spent a
 day debugging a Bash script?
 
-Shit is a cross-platform shell compatible with Bash and POSIX. It runs at least
-3 times faster than Bash. The UX, the errors, and the interactive experience are
-opinionated.
+**Shit** is a cross-platform shell compatible with Bash and POSIX. It runs at
+least 3 times faster than Bash. The UX, the errors, and the interactive
+experience are opinionated.
 
-shit is designed to work without absolutely no config whatsoever. shit's Linux
-binary is static. shit also works without coreutils, using it's own shitbox
-utilities instead. all so you can copy shit to any machine and enjoy the shell.
+**Shit** is designed to work without absolutely no config whatsoever. **shit**'s
+Linux binary is static. **shit** also works without coreutils, using it's own
+shitbox utilities instead. All so you can copy shit to any machine and enjoy the
+shell.
 
 **The project is in early stage**. There's no gurantee that it will not blow
 you computer up upon the first start. Bug reports are greatly appreciated.
@@ -39,21 +40,12 @@ matching mood and disable diagnostics. `set --mood` changes the mood at
 runtime. `-W` demotes lenient diagnostics to warnings. `-WW` demotes strict
 diagnostics too and reports runtime warnings in every mood.
 
-The `set` builtin owns the mutable shell option state. Standard short flags,
-long option names, `SHELLOPTS`, and `$-` read the same stored values. An option
-changed by a function remains changed after the function returns.
-
 `-I` is mimicry. **shit** will detect `sh`, `dash`, `bash` shebangs and run the
 script inside itself in the matching mood. The in-process run keeps speed and
 diagnostics.
 
 `--init-moods`/`-L` accepts a comma-separated list of moods to steal and use
 init files from. It defaults to the value of `--mood`.
-
-Bash startup compatibility includes `--norc` and the `--init-file` or
-`--rcfile` aliases. A noninteractive Bash mood expands and sources `BASH_ENV`.
-`--restricted` or `-r` enables restricted operation, while `--privileged` or
-`-p` preserves an elevated identity and suppresses environment startup files.
 
 The `SHIT_FLAGS` environment variable may be used to specify flags. The
 recommended set is `-W -I --init-moods=shit,bash`. A flag on the command line
