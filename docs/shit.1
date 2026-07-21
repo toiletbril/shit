@@ -531,7 +531,9 @@ size.
 A command run before each interactive prompt is drawn.
 .TP
 .B TERM
-The terminal type, read to decide whether color is supported.
+The terminal type, read on POSIX systems to decide whether color and interactive
+decorations are supported. Native Windows consoles use their enabled virtual
+terminal mode instead and do not require this variable for ghost suggestions.
 .TP
 .B MANPATH
 The manual search path, read by completion to offer a subcommand and an option

@@ -240,6 +240,8 @@ highlight spans for a line so the highlighter is testable without the editor.
 Plain editor appends update the stored byte length and serialized line directly.
 Ghost history caches a prefix that produces no valid suggestion, decodes
 matching entries as bytes, and tracks display width separately from byte length.
+On Windows, successful virtual-terminal console initialization enables editor
+decorations without requiring the normally absent TERM environment variable.
 The completion bridge keeps its last result alive until the editor consumes the
 returned pointers. The physical working directory is captured once per input
 and remains the implicit filesystem completion base when the PWD variable is
