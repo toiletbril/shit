@@ -45,25 +45,28 @@ namespace os {
 fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>
 {
-  DWORD w = -1;
-  if (WriteFile(fd, buf, size, &w, 0) == FALSE) /* NOLINT */
+  let const requested_size =
+      size > MAXDWORD ? MAXDWORD : static_cast<DWORD>(size);
+  DWORD written_size = 0;
+  if (WriteFile(fd, buf, requested_size, &written_size, nullptr) == FALSE)
     return shit::None;
-  return static_cast<usize>(w);
+  return static_cast<usize>(written_size);
 }
 
 fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>
 {
-  let const handle = reinterpret_cast<os::descriptor>(
-      _get_osfhandle(static_cast<int>(fd_number)));
+  let const handle = descriptor_from_fd_number(fd_number);
   if (handle == INVALID_HANDLE_VALUE) return shit::None;
   return write_fd(handle, buf, size);
 }
 
 fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
 {
-  DWORD r = -1;
-  if (ReadFile(fd, buf, size, &r, 0) == FALSE) { /* NOLINT */
+  let const requested_size =
+      size > MAXDWORD ? MAXDWORD : static_cast<DWORD>(size);
+  DWORD read_size = 0;
+  if (ReadFile(fd, buf, requested_size, &read_size, nullptr) == FALSE) {
     let const error = GetLastError();
     if (error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA ||
         error == ERROR_PIPE_NOT_CONNECTED)
@@ -72,7 +75,7 @@ fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
     }
     return shit::None;
   }
-  return static_cast<usize>(r);
+  return static_cast<usize>(read_size);
 }
 
 fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32
@@ -82,7 +85,7 @@ fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32
   if (file_type == FILE_TYPE_DISK) return 1;
 
   let const has_timeout = timeout_nanos >= 0;
-  let const started_at = monotonic_nanos();
+  let const started_at = has_timeout ? monotonic_nanos() : 0;
   let const timeout = has_timeout ? static_cast<u64>(timeout_nanos) : 0;
   INPUT_RECORD *console_events = nullptr;
   DWORD console_event_capacity = 0;
@@ -231,13 +234,14 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     return result;
   }
 
-  if (target == INVALID_HANDLE_VALUE) {
+  if (target == nullptr || target == INVALID_HANDLE_VALUE) {
     result.is_dup2_ok = false;
     return result;
   }
 
   result.saved = GetStdHandle(*slot);
-  result.was_open = result.saved != INVALID_HANDLE_VALUE;
+  result.was_open =
+      result.saved != nullptr && result.saved != INVALID_HANDLE_VALUE;
 
   /* SetStdHandle does not copy, so the target is duplicated here and the dup
      stays valid until restore_descriptor closes it. */
@@ -248,7 +252,11 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     result.is_dup2_ok = false;
     return result;
   }
-  SetStdHandle(*slot, duplicate);
+  if (SetStdHandle(*slot, duplicate) == FALSE) {
+    CloseHandle(duplicate);
+    result.is_dup2_ok = false;
+    return result;
+  }
   result.replacement = duplicate;
   result.is_dup2_ok = true;
   return result;
@@ -258,9 +266,15 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
   if (!slot.has_value()) return;
-  SetStdHandle(*slot, saved.was_open ? saved.saved : INVALID_HANDLE_VALUE);
-  if (saved.is_dup2_ok && saved.replacement != INVALID_HANDLE_VALUE)
+  if (SetStdHandle(*slot,
+                   saved.was_open ? saved.saved : INVALID_HANDLE_VALUE) ==
+      FALSE)
+    return;
+  if (saved.is_dup2_ok && saved.replacement != nullptr &&
+      saved.replacement != INVALID_HANDLE_VALUE)
+  {
     CloseHandle(saved.replacement);
+  }
 }
 
 fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
@@ -273,7 +287,8 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
     return result;
   }
   result.saved = GetStdHandle(*slot);
-  result.was_open = result.saved != INVALID_HANDLE_VALUE;
+  result.was_open =
+      result.saved != nullptr && result.saved != INVALID_HANDLE_VALUE;
   result.replacement = INVALID_HANDLE_VALUE;
   result.is_dup2_ok = true;
   return result;
@@ -366,7 +381,8 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) return SHIT_INVALID_FD;
-  return GetStdHandle(*slot);
+  let const handle = GetStdHandle(*slot);
+  return handle != nullptr ? handle : SHIT_INVALID_FD;
 }
 
 fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
@@ -379,9 +395,8 @@ fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) return false;
-  if (target == INVALID_HANDLE_VALUE) return false;
-  SetStdHandle(*slot, target);
-  return true;
+  if (target == nullptr || target == INVALID_HANDLE_VALUE) return false;
+  return SetStdHandle(*slot, target) != FALSE;
 }
 
 fn close_shell_fd(i32 shell_fd) wontthrow -> bool
@@ -389,8 +404,8 @@ fn close_shell_fd(i32 shell_fd) wontthrow -> bool
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) return false;
   const os::descriptor handle = GetStdHandle(*slot);
-  SetStdHandle(*slot, INVALID_HANDLE_VALUE);
-  if (handle == INVALID_HANDLE_VALUE) return false;
+  if (handle == nullptr || handle == INVALID_HANDLE_VALUE) return false;
+  if (SetStdHandle(*slot, INVALID_HANDLE_VALUE) == FALSE) return false;
   return CloseHandle(handle) != FALSE;
 }
 
@@ -438,14 +453,14 @@ fn get_processor_counts() wontthrow -> processor_counts
   ULONG cpu_set_count = 0;
   using get_process_default_cpu_sets_fn =
       BOOL(WINAPI *)(HANDLE, PULONG, ULONG, PULONG);
-  let const get_process_default_cpu_sets_address = GetProcAddress(
-      GetModuleHandleA("kernel32.dll"), "GetProcessDefaultCpuSets");
-  get_process_default_cpu_sets_fn get_process_default_cpu_sets = nullptr;
-  static_assert(sizeof(get_process_default_cpu_sets) ==
-                sizeof(get_process_default_cpu_sets_address));
-  __builtin_memcpy(&get_process_default_cpu_sets,
-                   &get_process_default_cpu_sets_address,
-                   sizeof(get_process_default_cpu_sets));
+  static let const get_process_default_cpu_sets = [] {
+    let const address = GetProcAddress(GetModuleHandleA("kernel32.dll"),
+                                       "GetProcessDefaultCpuSets");
+    get_process_default_cpu_sets_fn function = nullptr;
+    static_assert(sizeof(function) == sizeof(address));
+    __builtin_memcpy(&function, &address, sizeof(function));
+    return function;
+  }();
   if (get_process_default_cpu_sets != nullptr)
     unused(get_process_default_cpu_sets(GetCurrentProcess(), nullptr, 0,
                                         &cpu_set_count));
@@ -627,13 +642,6 @@ fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
   return regex_compile_result::Ok;
 }
 
-static fn lower_ascii(char character) wontthrow -> char
-{
-  return (character >= 'A' && character <= 'Z')
-             ? static_cast<char>(character - 'A' + 'a')
-             : character;
-}
-
 fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
 {
   const StringView needle = compiled.pattern.view();
@@ -663,7 +671,9 @@ fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
   for (usize start = 0; start + needle.length <= subject.length; start++) {
     bool is_matched = true;
     for (usize k = 0; k < needle.length; k++) {
-      if (lower_ascii(subject[start + k]) != lower_ascii(needle[k])) {
+      if (utils::ascii_to_lower(subject[start + k]) !=
+          utils::ascii_to_lower(needle[k]))
+      {
         is_matched = false;
         break;
       }
@@ -722,8 +732,9 @@ pure fn path_root_length(StringView path) wontthrow -> usize
 
 fn temp_directory_path() throws -> String
 {
-  if (const char *from_env = std::getenv("TEMP"); from_env != nullptr)
-    return String{from_env};
+  if (let from_environment = get_environment_variable("TEMP");
+      from_environment.has_value())
+    return from_environment.take();
   return String{"C:\\Windows\\Temp"};
 }
 
@@ -824,9 +835,13 @@ fn path_modification_time(StringView path) wontthrow -> Maybe<i64>
   if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard, &data) ==
       0)
     return None;
-  return static_cast<i64>(
+  let const windows_ticks =
       (static_cast<u64>(data.ftLastWriteTime.dwHighDateTime) << 32) |
-      data.ftLastWriteTime.dwLowDateTime);
+      data.ftLastWriteTime.dwLowDateTime;
+  constexpr u64 WINDOWS_TO_UNIX_EPOCH_TICKS = 116444736000000000ULL;
+  if (windows_ticks < WINDOWS_TO_UNIX_EPOCH_TICKS) return i64{0};
+  return static_cast<i64>((windows_ticks - WINDOWS_TO_UNIX_EPOCH_TICKS) /
+                          10000000ULL);
 }
 
 fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool
@@ -876,17 +891,7 @@ fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool
 
 fn path_is_older_than(StringView first, StringView second) wontthrow -> bool
 {
-  const String first_string{first};
-  const String second_string{second};
-  WIN32_FILE_ATTRIBUTE_DATA first_data{}, second_data{};
-  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard,
-                           &first_data) == 0)
-    return false;
-  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard,
-                           &second_data) == 0)
-    return false;
-  return CompareFileTime(&first_data.ftLastWriteTime,
-                         &second_data.ftLastWriteTime) < 0;
+  return path_is_newer_than(second, first);
 }
 
 fn path_is_readable(StringView path) wontthrow -> bool
@@ -904,7 +909,7 @@ fn path_is_writable(StringView path) wontthrow -> bool
 fn path_is_executable(StringView path) wontthrow -> bool
 {
   /* Windows has no execute permission bit, so an existing file is runnable. */
-  return path_exists(path);
+  return path_is_regular_file(path);
 }
 
 cold fn read_current_directory() throws -> Path
@@ -947,23 +952,12 @@ fn restore_current_directory(const DirectoryReference &reference) wontthrow
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
 {
   const String dir_string{dir};
-  let pattern = dir_string.clone();
-  pattern.push(DIRECTORY_SEPARATOR);
-  pattern.push('*');
-
-  WIN32_FIND_DATAA data{};
-  let const handle = FindFirstFileA(pattern.c_str(), &data);
-  if (handle == INVALID_HANDLE_VALUE) return None;
-
+  let entries = list_directory_typed(dir);
+  if (!entries.has_value()) return None;
   let names = ArrayList<String>{heap_allocator()};
-  do {
-    let const name = StringView{data.cFileName};
-    if (name == StringView{"."} || name == StringView{".."}) {
-      continue;
-    }
-    names.push(String{name});
-  } while (FindNextFileA(handle, &data) != 0);
-  FindClose(handle);
+  names.reserve(entries->count());
+  for (let &entry : *entries)
+    names.push(steal(entry.name));
   LOG(All, "read %zu entries from the directory '%s'", names.count(),
       dir_string.c_str());
   return names;
@@ -972,14 +966,28 @@ cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
 cold fn list_directory_typed(StringView dir) throws
     -> Maybe<ArrayList<Path::directory_child>>
 {
-  /* Windows carries no readdir type, so each child is left Unknown. */
-  Maybe<ArrayList<String>> names = list_directory(dir);
-  if (!names.has_value()) return None;
+  const String dir_string{dir};
+  let pattern = dir_string.clone();
+  pattern.push(DIRECTORY_SEPARATOR);
+  pattern.push('*');
+
+  WIN32_FIND_DATAA data{};
+  let const handle = FindFirstFileA(pattern.c_str(), &data);
+  if (handle == INVALID_HANDLE_VALUE) return None;
+  defer { FindClose(handle); };
 
   let entries = ArrayList<Path::directory_child>{heap_allocator()};
-  entries.reserve(names->count());
-  for (String &name : *names)
-    entries.push(Path::directory_child{steal(name), Path::entry_kind::Unknown});
+  do {
+    let const name = StringView{data.cFileName};
+    if (name == StringView{"."} || name == StringView{".."}) continue;
+
+    Path::entry_kind kind = Path::entry_kind::Regular;
+    if ((data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+      kind = Path::entry_kind::Symlink;
+    else if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+      kind = Path::entry_kind::Directory;
+    entries.push(Path::directory_child{String{name}, kind});
+  } while (FindNextFileA(handle, &data) != 0);
   return entries;
 }
 
@@ -1024,15 +1032,32 @@ fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
   return true;
 }
 
-constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
-
 fn get_environment_variable(StringView key) -> Maybe<String>
 {
   String key_string{key};
-  char buffer[WIN32_MAX_ENV_SIZE] = {0};
-  if (GetEnvironmentVariableA(key_string.c_str(), buffer, sizeof(buffer)) == 0)
-    return shit::None;
-  return String{buffer};
+  char inline_buffer[256];
+  SetLastError(ERROR_SUCCESS);
+  let required_size = GetEnvironmentVariableA(
+      key_string.c_str(), inline_buffer,
+      static_cast<DWORD>(countof(inline_buffer)));
+  if (required_size == 0) {
+    return GetLastError() == ERROR_ENVVAR_NOT_FOUND
+               ? Maybe<String>{}
+               : Maybe<String>{String{heap_allocator()}};
+  }
+  if (required_size < countof(inline_buffer))
+    return String{
+        StringView{inline_buffer, static_cast<usize>(required_size)}
+    };
+
+  let buffer = ArrayList<char>{heap_allocator()};
+  buffer.reserve(static_cast<usize>(required_size));
+  let const value_length = GetEnvironmentVariableA(
+      key_string.c_str(), buffer.begin(), required_size);
+  if (value_length == 0 || value_length >= required_size) return shit::None;
+  return String{
+      StringView{buffer.begin(), static_cast<usize>(value_length)}
+  };
 }
 
 fn set_environment_variable(StringView key, StringView value) -> void
@@ -1053,6 +1078,7 @@ fn environment_names() -> ArrayList<String>
   ArrayList<String> names{heap_allocator()};
   char *block = GetEnvironmentStringsA();
   if (block == nullptr) return names;
+  defer { FreeEnvironmentStringsA(block); };
   for (char *entry = block; *entry != '\0';) {
     StringView pair{entry};
     let const equals = pair.find_character('=');
@@ -1063,7 +1089,6 @@ fn environment_names() -> ArrayList<String>
     names.push(String{split});
     entry += pair.length + 1;
   }
-  FreeEnvironmentStringsA(block);
   return names;
 }
 
@@ -1165,7 +1190,8 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
       ec.args().count());
 
-  String application_path{heap_allocator(), ec.program_path().text().view()};
+  let application_path = ec.program_path().c_str();
+  String application_path_storage{heap_allocator()};
   String command_line = make_os_args(ec.args());
   if (is_batch_program(ec.program_path().text().view())) {
     let batch_command = String{heap_allocator()};
@@ -1179,10 +1205,12 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
     }
 
     let const command_processor = std::getenv("COMSPEC");
-    application_path =
+    application_path_storage =
         String{command_processor != nullptr ? command_processor : "cmd.exe"};
+    application_path = application_path_storage.c_str();
     let processor_command_line = String{heap_allocator()};
-    append_windows_quoted_arg(processor_command_line, application_path.view());
+    append_windows_quoted_arg(processor_command_line,
+                              application_path_storage.view());
     processor_command_line += " /d /s /c \"";
     processor_command_line += batch_command;
     processor_command_line += '"';
@@ -1212,11 +1240,7 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   bool were_handles_handed_to_fallback = false;
   defer
   {
-    if (!were_handles_handed_to_fallback) {
-      if (ec.in_fd) CloseHandle(*ec.in_fd);
-      if (ec.out_fd) CloseHandle(*ec.out_fd);
-      if (ec.err_fd) CloseHandle(*ec.err_fd);
-    }
+    if (!were_handles_handed_to_fallback) ec.close_fds();
   };
 
   inherited_handle_state input_inheritance{};
@@ -1244,7 +1268,7 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
 
   /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
    */
-  if (CreateProcessA(application_path.c_str(),
+  if (CreateProcessA(application_path,
                      const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
                      should_inherit_handles, creation_flags, environment_block,
                      nullptr, &startup_info, &process_info) == 0)
@@ -1293,23 +1317,30 @@ fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
   /* Windows has no fork, so <(cmd) spawns a fresh shell that writes its output
      into a temp file the consumer reads by path. The whole output is written
      before the path returns. */
-  char module_path[MAX_PATH];
-  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
-    return shit::None;
+  let const module_path = current_executable_path();
+  if (!module_path.has_value()) return shit::None;
 
   char temp_dir[MAX_PATH];
-  if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::None;
+  let const temp_directory_length = GetTempPathA(MAX_PATH, temp_dir);
+  if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH)
+    return shit::None;
   char temp_path[MAX_PATH];
   if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0) return shit::None;
+  bool should_delete_temp_path = true;
+  defer
+  {
+    if (should_delete_temp_path) DeleteFileA(temp_path);
+  };
 
   SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
   const HANDLE temp_file =
       CreateFileA(temp_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
                   CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
   if (temp_file == INVALID_HANDLE_VALUE) return shit::None;
+  defer { CloseHandle(temp_file); };
 
   let arguments = ArrayList<String>{heap_allocator()};
-  arguments.push(String{heap_allocator(), StringView{module_path}});
+  arguments.push(String{heap_allocator(), module_path->view()});
   if (bash_compatible) {
     arguments.push(String{heap_allocator(), StringView{"--mood"}});
     arguments.push(String{heap_allocator(), StringView{"bash"}});
@@ -1332,23 +1363,21 @@ fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
   defer { restore_handle_inheritance(error_inheritance); };
 
   PROCESS_INFORMATION process_info{};
-  if (CreateProcessA(module_path, const_cast<LPSTR>(command_line.data()),
-                     nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup_info,
+  if (CreateProcessA(module_path->c_str(),
+                     const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
+                     TRUE, 0, nullptr, nullptr, &startup_info,
                      &process_info) == 0)
-  {
-    CloseHandle(temp_file);
     return shit::None;
-  }
+  defer { CloseHandle(process_info.hProcess); };
+  defer { CloseHandle(process_info.hThread); };
   WaitForSingleObject(process_info.hProcess, INFINITE);
-  CloseHandle(process_info.hProcess);
-  CloseHandle(process_info.hThread);
-  CloseHandle(temp_file);
 
   /* A backslash would read as an escape in the target word, so slashes are
      returned, which CreateFile accepts the same. */
   let result = String{heap_allocator()};
   for (const char *byte = temp_path; *byte != '\0'; byte++)
     result += *byte == '\\' ? '/' : *byte;
+  should_delete_temp_path = false;
   return result;
 }
 
@@ -1358,12 +1387,11 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
 {
   /* Windows has no fork, so a compound pipeline stage re-parses its source in a
      fresh shell, returned unwaited for the pipeline to reap. */
-  char module_path[MAX_PATH];
-  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
-    return shit::None;
+  let const module_path = current_executable_path();
+  if (!module_path.has_value()) return shit::None;
 
   let arguments = ArrayList<String>{heap_allocator()};
-  arguments.push(String{heap_allocator(), StringView{module_path}});
+  arguments.push(String{heap_allocator(), module_path->view()});
   if (bash_compatible) {
     arguments.push(String{heap_allocator(), StringView{"--mood"}});
     arguments.push(String{heap_allocator(), StringView{"bash"}});
@@ -1389,8 +1417,9 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
   defer { restore_handle_inheritance(error_inheritance); };
 
   PROCESS_INFORMATION process_info{};
-  if (CreateProcessA(module_path, const_cast<LPSTR>(command_line.data()),
-                     nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup_info,
+  if (CreateProcessA(module_path->c_str(),
+                     const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
+                     TRUE, 0, nullptr, nullptr, &startup_info,
                      &process_info) == 0)
     return shit::None;
   CloseHandle(process_info.hThread);
@@ -1450,8 +1479,10 @@ fn redirect_self(const ExecContext &ec) -> void
                                              HANDLE source_handle) {
     HANDLE duplicate_handle = nullptr;
     if (DuplicateHandle(self, source_handle, self, &duplicate_handle, 0, TRUE,
-                        DUPLICATE_SAME_ACCESS) != 0)
-      SetStdHandle(standard_handle, duplicate_handle);
+                        DUPLICATE_SAME_ACCESS) == 0)
+      return;
+    if (SetStdHandle(standard_handle, duplicate_handle) == FALSE)
+      CloseHandle(duplicate_handle);
   };
 
   if (ec.in_fd) do_replace_standard_handle(STD_INPUT_HANDLE, *ec.in_fd);
@@ -1534,6 +1565,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
 {
   DWORD access = (mode == file_open_mode::Read) ? GENERIC_READ : GENERIC_WRITE;
   if (mode == file_open_mode::ReadWrite) access = GENERIC_READ | GENERIC_WRITE;
+  if (mode == file_open_mode::Append) access = FILE_APPEND_DATA;
   DWORD disposition = OPEN_EXISTING;
   switch (mode) {
   case file_open_mode::Truncate: disposition = CREATE_ALWAYS; break;
@@ -1554,9 +1586,6 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
                               FILE_SHARE_READ | FILE_SHARE_WRITE, &att,
                               disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (handle == INVALID_HANDLE_VALUE) return shit::None;
-
-  if (mode == file_open_mode::Append)
-    SetFilePointer(handle, 0, nullptr, FILE_END);
 
   return handle;
 }
@@ -1591,13 +1620,15 @@ fn acquire_process_lock(StringView path) throws -> Maybe<descriptor>
 
 fn release_process_lock(descriptor lock) wontthrow -> void
 {
-  unused(CloseHandle(lock));
+  unused(close_fd(lock));
 }
 
 fn write_to_temp_file(StringView content) -> Maybe<descriptor>
 {
   char temp_dir[MAX_PATH];
-  if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::None;
+  let const temp_directory_length = GetTempPathA(MAX_PATH, temp_dir);
+  if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH)
+    return shit::None;
 
   char temp_path[MAX_PATH];
   if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0) return shit::None;
@@ -1605,17 +1636,28 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   HANDLE handle = CreateFileA(
       temp_path, GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
       FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
-  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+  if (handle == INVALID_HANDLE_VALUE) {
+    DeleteFileA(temp_path);
+    return shit::None;
+  }
 
-  DWORD written = 0;
-  if (WriteFile(handle, content.data, static_cast<DWORD>(content.count()),
-                &written, nullptr) == 0)
-  {
+  usize written_size = 0;
+  while (written_size < content.count()) {
+    let const write_size = write_fd(
+        handle, content.data + written_size, content.count() - written_size);
+    if (!write_size.has_value() || *write_size == 0) {
+      close_fd(handle);
+      return shit::None;
+    }
+    written_size += *write_size;
+  }
+
+  LARGE_INTEGER beginning{};
+  if (SetFilePointerEx(handle, beginning, nullptr, FILE_BEGIN) == FALSE) {
     close_fd(handle);
     return shit::None;
   }
 
-  SetFilePointer(handle, 0, nullptr, FILE_BEGIN);
   return handle;
 }
 
@@ -1669,7 +1711,7 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
 
 fn signal_process(process p, i32 signal_number) wontthrow -> bool
 {
-  if (signal_number != 9 && signal_number != 15) return false;
+  if (!is_process_signal_supported(signal_number)) return false;
 
   if (process_is_group_reference(p)) {
     let const process_handle = process_from_group_reference(p);
@@ -1736,6 +1778,8 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
   let const bare = utils::strip_sig_prefix(name);
 
   static constexpr static_string_entry<i32> NAME_ENTRIES[] = {
+      {SSK("HUP"),  1 },
+      {SSK("QUIT"), 3 },
       {SSK("KILL"), 9 },
       {SSK("TERM"), 15},
       {SSK("INT"),  2 },
@@ -1746,11 +1790,14 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
 
 fn signal_name_from_number(i32 number) -> Maybe<String>
 {
-  if (number == 1) return String{"HUP"};
-  if (number == 2) return String{"INT"};
-  if (number == 3) return String{"QUIT"};
-  if (number == 9) return String{"KILL"};
-  if (number == 15) return String{"TERM"};
+  switch (number) {
+  case 1: return String{"HUP"};
+  case 2: return String{"INT"};
+  case 3: return String{"QUIT"};
+  case 9: return String{"KILL"};
+  case 15: return String{"TERM"};
+  }
+
   return None;
 }
 
@@ -1842,8 +1889,9 @@ cold fn last_system_error_message() throws -> String
   if (ret == 0) {
     return String::from(win_errno, heap_allocator()) +
            StringView{" (Error message could not be processed due to "
-                      "a FormatMessage() failure)"};
+                       "a FormatMessage() failure)"};
   }
+  defer { LocalFree(errno_str); };
 
   StringView view{static_cast<char *>(errno_str)};
   /* FormatMessage ends with a period, spacing, and a CRLF, trimmed here. */
@@ -1867,8 +1915,6 @@ cold fn last_system_error_message() throws -> String
     }
     err.push(view[i]);
   }
-
-  LocalFree(errno_str);
 
   if (err.length() > 0) {
     String capitalized{heap_allocator()};
@@ -1953,9 +1999,13 @@ fn clear_trap_handler(i32 signal_number) -> void
 
 fn monotonic_nanos() wontthrow -> u64
 {
-  LARGE_INTEGER frequency;
+  static const LARGE_INTEGER frequency = [] {
+    LARGE_INTEGER value{};
+    QueryPerformanceFrequency(&value);
+    return value;
+  }();
   LARGE_INTEGER counter;
-  if (QueryPerformanceFrequency(&frequency) == 0) return 0;
+  if (frequency.QuadPart == 0) return 0;
   if (QueryPerformanceCounter(&counter) == 0) return 0;
   /* The counter is scaled to nanoseconds through the frequency, splitting the
      whole seconds from the remainder so the multiply never overflows the way a
@@ -2071,7 +2121,6 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
   };
 
   PROCESS_INFORMATION process_info{};
-  String mutable_command_line = command_line;
   let const should_inherit_handles =
       inherited_handle.has_value() ||
       (suppress_output && null_handle != INVALID_HANDLE_VALUE);
@@ -2086,19 +2135,22 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
 
   const u64 start_nanos = monotonic_nanos();
 
-  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
-   */
-  if (CreateProcessA(nullptr, const_cast<LPSTR>(mutable_command_line.data()),
+  /* CreateProcessA may rewrite lpCommandLine in place. */
+  if (CreateProcessA(nullptr, const_cast<LPSTR>(command_line.data()),
                      nullptr, nullptr, should_inherit_handles, 0, nullptr,
                      nullptr, &startup, &process_info) == 0)
     return None;
+  defer { CloseHandle(process_info.hProcess); };
+  defer { CloseHandle(process_info.hThread); };
 
-  WaitForSingleObject(process_info.hProcess, INFINITE);
+  if (WaitForSingleObject(process_info.hProcess, INFINITE) != WAIT_OBJECT_0)
+    return None;
 
   result.wall_nanos = monotonic_nanos() - start_nanos;
 
   DWORD exit_code = 0;
-  GetExitCodeProcess(process_info.hProcess, &exit_code);
+  if (GetExitCodeProcess(process_info.hProcess, &exit_code) == FALSE)
+    return None;
   result.exit_status = static_cast<i64>(exit_code);
 
   PROCESS_MEMORY_COUNTERS memory_counters{};
@@ -2107,9 +2159,6 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
                            sizeof(memory_counters)) != 0)
     result.peak_rss_bytes =
         static_cast<u64>(memory_counters.PeakWorkingSetSize);
-
-  CloseHandle(process_info.hProcess);
-  CloseHandle(process_info.hThread);
 
   return result;
 }
@@ -2203,13 +2252,8 @@ fn current_executable_path() wontthrow -> Maybe<String>
   if (module_path_length == 0 || module_path_length == MAX_PATH)
     return shit::None;
 
-  char full_path[MAX_PATH];
-  let const full_path_length =
-      GetFullPathNameA(module_path, MAX_PATH, full_path, nullptr);
-  if (full_path_length == 0 || full_path_length >= MAX_PATH) return shit::None;
-
   return String{
-      StringView{full_path, full_path_length}
+      StringView{module_path, module_path_length}
   };
 }
 
