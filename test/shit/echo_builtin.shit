@@ -1,6 +1,6 @@
 #!/bin/env shit
 echo -n no-newline; echo
 echo -e "tab\tnl\nff\f"
-echo "stop\cafter"
+echo -e "stop\cafter"
 echo -E "raw\tkept"
 echo -e "esc\eX"

@@ -6,7 +6,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "-e" "tab\tnl\nff\f"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "stop\cafter"]
+    [SimpleCommand "echo" "-e" "stop\cafter"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "-E" "raw\tkept"]
   [CompoundListCondition, None]
@@ -34,6 +34,9 @@
 ]
 [Word
   Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
 ]
 [Word
   DoubleQuoted "stop\cafter"

@@ -657,11 +657,14 @@ static fn collect_command_names(StringView token, command_match_mode match_mode,
       token_is_glob || token.is_empty()
           ? ProgramResolver::ValidationScope::All
           : ProgramResolver::ValidationScope::Prefix);
-  if (!token_is_glob && !token.is_empty())
+  if (!token_is_glob &&
+      (!token.is_empty() || collector.allows_fuzzy_fallback()))
+  {
     for (let const &path_name : path_names)
       if (utils::smart_case_prefix_matches(path_name.view(),
                                            normalized_path_token.view()))
         do_add_path(path_name.view());
+  }
 
   if (collector.allows_fuzzy_fallback() && !collector.has_exact()) {
     let const &fallback_path_names =

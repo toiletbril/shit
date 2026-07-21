@@ -1,4 +1,4 @@
-.TH SHIT 1 "2026-07-17" "shit" "User Commands"
+.TH SHIT 1 "2026-07-21" "shit" "User Commands"
 .SH NAME
 shit \- a fast POSIX and bash compatible shell
 .SH SYNOPSIS
@@ -41,6 +41,14 @@ with
 to inject its integration finds the bash identity and the bash rc rather than
 the dash-like sh mood. The nounset, pipefail, and failglob strictness, the
 analysis stage, and the parser features are all driven by the mood.
+.PP
+On Windows,
+.B echo
+in the default mood leaves backslash escapes literal. The
+.B \-e
+option enables them. The
+.B sh
+mood retains dash-style default escape handling.
 .PP
 A binary named or symlinked to
 .BR sh ", " dash ", or " bash
@@ -397,6 +405,8 @@ and the emacs default is restored by
 .BR "set \-o emacs" .
 Ghost text uses prefix matches from completion and history. Tab also offers
 smart-case and subsequence matches.
+An empty command position includes builtins, functions, aliases, shitbox
+utilities, and programs from PATH.
 Quoted, escaped, variable, and tilde directory prefixes remain in their typed
 form when a later unquoted slash or basename is completed.
 In vi mode each line begins in insert mode. Escape enters command mode. Command

@@ -55,6 +55,10 @@ The privileged shell option suppresses BASH_ENV and ENV. An unequal-id shell
 skips startup files and drops its elevated ids unless privileged mode was
 requested.
 
+On Windows the default mood leaves `echo` backslashes literal. Native paths
+cannot emit terminal controls. An explicit `echo -e` and the sh mood retain
+escape decoding.
+
 `--restricted`, `-r`, and an rbash basename request restricted mode. The context
 exposes that identity while startup files run and activates its guards when
 startup finishes. Variable changes, directory changes, slash-bearing command
@@ -185,8 +189,10 @@ options, the help subcommands, the help options, and finally the filesystem. A
 candidate is matched by smart case and then by subsequence, so an all lowercase
 token matches either case and `fbb` matches `foo_bar_baz`, while an exact prefix
 always ranks first. Ghost completion stops after the prefix range, while an
-explicit TAB also considers subsequence matches. A command-position path offers
-only runnable files and the directories, and a known utility floats the files
+explicit TAB also considers subsequence matches. An explicit TAB at an empty
+command position includes programs from PATH while empty ghost completion
+avoids that scan. A command-position path offers only runnable files and the
+directories, and a known utility floats the files
 whose extension it operates on ahead of the rest. A leading `~` or a `$NAME/`
 prefix on a path token is
 expanded only to list the real directory, while the offered candidate keeps the

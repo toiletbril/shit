@@ -41,9 +41,10 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   usize start = 1;
   let should_suppress_newline = false;
-  /* The shit default interprets the escapes the way dash does, yet still reads
-     -e, -E, and -n the way bash does. */
-  let should_interpret_escapes = !cxt.is_bash_compatible();
+  let const is_windows_default = cxt.mood() == mimic_mood::Default &&
+                                 os::DIRECTORY_SEPARATOR == '\\';
+  let should_interpret_escapes =
+      !cxt.is_bash_compatible() && !is_windows_default;
 
   if (!cxt.is_posix_mode()) {
     while (start < args.count()) {
