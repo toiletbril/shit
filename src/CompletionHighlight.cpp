@@ -426,6 +426,24 @@ static fn word_is_terminated_by_separator(StringView line, usize word_end,
          next_byte == ';' || next_byte == '|' || next_byte == '&';
 }
 
+/* Path coloring receives source spelling rather than an expanded word. On
+   Windows an unquoted backslash looks like a native separator but the shell
+   grammar removes it when it escapes an ordinary byte. */
+static fn word_has_erased_directory_separator(StringView word) wontthrow
+    -> bool
+{
+  for (usize position = 0; position + 1 < word.length; position++) {
+    if (word[position] != '\\') continue;
+    if (os::is_directory_separator(word[position]) &&
+        !os::is_directory_separator(word[position + 1]))
+    {
+      return true;
+    }
+    position++;
+  }
+  return false;
+}
+
 /* Returns whether the word was treated as a path. */
 static fn color_path_argument(usize word_start, StringView word,
                               bool word_is_terminated, bool directories_only,
@@ -1091,7 +1109,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       let const is_word_terminated =
           word_is_terminated_by_separator(line, word_end, end);
       highlight_command_word = word;
-      if (os::has_directory_separator(word)) {
+      if (os::has_directory_separator(word) &&
+          !word_has_erased_directory_separator(word))
+      {
         color_path_argument(word_start, word, is_word_terminated, false, spans);
       } else if (word_defines_function(line, word_end, end)) {
         do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
@@ -1125,8 +1145,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       } else {
         let const is_word_terminated =
             word_is_terminated_by_separator(line, word_end, end);
-        color_path_argument(word_start, word, is_word_terminated,
-                            highlight_command_word == "cd", spans);
+        if (!word_has_erased_directory_separator(word))
+          color_path_argument(word_start, word, is_word_terminated,
+                              highlight_command_word == "cd", spans);
       }
     }
     for (let const &inner : word_spans)

@@ -24,6 +24,12 @@ normalized target is not a directory.
 Shell source accepts LF and CRLF line endings. A CRLF pair is read as one
 newline. A lone carriage return remains part of the source text.
 .PP
+The shell grammar is the same on every operating system. In particular, an
+unquoted backslash is an escape even on Windows, so a native Windows path uses
+a quoted backslash, an escaped backslash, or the portable forward slash. After
+quote removal, Windows path operations accept both slash forms and recognize
+drive and UNC roots; POSIX path operations accept only the forward slash.
+.PP
 shit is designed to work without absolutely no config whatsoever. shit's Linux
 binary is static. shit also works without coreutils, using it's own shitbox
 utilities instead. all so you can copy shit to any machine and enjoy the shell.
