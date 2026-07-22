@@ -31,6 +31,8 @@ fn Flock::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
+  defer { reset_flags(FLAG_LIST); };
+
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   let const operands =
       parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
@@ -78,6 +80,6 @@ fn Flock::execute(const ExecContext &ec, EvalContext &cxt,
   return result.has_value() ? static_cast<i32>(result->exit_status) : 126;
 }
 
-} // namespace shitbox
+} /* namespace shitbox */
 
-} // namespace shit
+} /* namespace shit */

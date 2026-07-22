@@ -981,7 +981,7 @@ hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
                        terminal_handoff handoff) throws -> process
 {
   let const allow_script_fallback = fallback == script_fallback_policy::Allow;
-  let const new_process_group = process_group == process_group_mode::New;
+  let const new_process_group = process_group != process_group_mode::Inherit;
   let const should_hand_off_controlling_terminal_before_start =
       handoff == terminal_handoff::BeforeStart;
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");

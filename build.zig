@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
         .root_module = module,
     });
 
-    var flags = std.ArrayList([]const u8){};
+    var flags: std.ArrayList([]const u8) = .empty;
     defer flags.deinit(b.allocator);
 
     const common_flags = [_][]const u8{
@@ -70,37 +70,38 @@ pub fn build(b: *std.Build) void {
 }
 
 fn gitCommitHash(b: *std.Build) []const u8 {
-    const result = std.process.Child.run(.{
-        .allocator = b.allocator,
+    const result = std.process.run(b.allocator, b.graph.io, .{
         .argv = &.{ "git", "rev-parse", "HEAD" },
-        .cwd = b.build_root.path orelse ".",
+        .cwd = .{ .path = b.build_root.path orelse "." },
     }) catch return "<no git>";
-    if (result.term != .Exited or result.term.Exited != 0) return "<no git>";
+    if (result.term != .exited or result.term.exited != 0) return "<no git>";
     return std.mem.trim(u8, result.stdout, " \n\r\t");
 }
 
 fn systemInfo(b: *std.Build) []const u8 {
-    const result = std.process.Child.run(.{
-        .allocator = b.allocator,
+    const result = std.process.run(b.allocator, b.graph.io, .{
         .argv = &.{ "uname", "-srvom" },
-        .cwd = b.build_root.path orelse ".",
+        .cwd = .{ .path = b.build_root.path orelse "." },
     }) catch return @tagName(@import("builtin").target.os.tag);
-    if (result.term != .Exited or result.term.Exited != 0)
+    if (result.term != .exited or result.term.exited != 0)
         return @tagName(@import("builtin").target.os.tag);
     return std.mem.trim(u8, result.stdout, " \n\r\t");
 }
 
 fn collectSources(b: *std.Build) []const []const u8 {
-    var sources = std.ArrayList([]const u8){};
+    var sources: std.ArrayList([]const u8) = .empty;
 
-    var dir = b.build_root.handle.openDir("src", .{ .iterate = true }) catch
-        @panic("unable to open the src directory");
-    defer dir.close();
+    var dir = b.build_root.handle.openDir(
+        b.graph.io,
+        "src",
+        .{ .iterate = true },
+    ) catch @panic("unable to open the src directory");
+    defer dir.close(b.graph.io);
 
     var walker = dir.walk(b.allocator) catch @panic("out of memory");
     defer walker.deinit();
 
-    while (walker.next() catch @panic("unable to walk src")) |entry| {
+    while (walker.next(b.graph.io) catch @panic("unable to walk src")) |entry| {
         if (entry.kind != .file) continue;
         if (!std.mem.endsWith(u8, entry.path, ".cpp")) continue;
         if (std.mem.eql(u8, entry.path, "PlatformPosix.cpp")) continue;

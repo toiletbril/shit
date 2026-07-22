@@ -7,9 +7,11 @@ d=$(mktemp -d) || exit 1
 query_reader_pid=
 descendant_pid=
 descriptor_pid=
+preserve_pid=
 cleanup()
 {
-    for cleanup_pid in "$query_reader_pid" "$descendant_pid" "$descriptor_pid"; do
+    for cleanup_pid in "$query_reader_pid" "$descendant_pid" "$descriptor_pid" \
+        "$preserve_pid"; do
         if [ -n "$cleanup_pid" ]; then
             kill -KILL "$cleanup_pid" 2>/dev/null || true
             wait "$cleanup_pid" 2>/dev/null || true
@@ -23,6 +25,8 @@ trap cleanup EXIT
 
 printf '#!/bin/sh\nexit 0\n' > "$d/noexec"
 printf 'echo fallback-script\n' > "$d/plain-script"
+printf 'finish()\n{\n  exit 23\n}\ntrap finish TERM\nprintf "%%s\n" "$$" > "$2"\nprintf armed > "$1"\nkill -STOP "$$"\nwhile :; do :; done\n' \
+    > "$d/preserve.sh"
 printf 'stopped_result=$1\nstopped_ready=$2\nterm_received=no\nresume()\n{\n  term_received=yes\n}\ntrap resume TERM\nprintf armed > "$stopped_ready"\nkill -STOP "$$"\nprintf resumed > "$stopped_result"\nwhile [ "$term_received" = no ]; do :; done\n' \
     > "$d/stopped.sh"
 printf '(printf ready > "$1"; exec /bin/sleep 10) &\ndescendant_pid=$!\nprintf "%%s\\n" "$descendant_pid" > "$2"\nwhile [ ! -s "$1" ]; do :; done\nprintf ready > "$3"\nwait "$descendant_pid"\n' \
@@ -42,15 +46,38 @@ echo "--- timeout returns its timeout status ---"
 echo "rc=$?"
 
 echo "--- timeout preserves the selected signal status ---"
-"$BIN" -c "shitbox timeout -p -s TERM 0.02s /bin/sleep 1" \
-    >/dev/null 2>&1
+if [ "${OS-}" = Windows_NT ]; then
+    "$BIN" -c "shitbox timeout -p -s TERM 0.02s /bin/sleep 1" \
+        >/dev/null 2>&1
+else
+    "$BIN" -c \
+        "shitbox timeout -p -s TERM -k 1s 1s /bin/sh '$d/preserve.sh' '$d/preserve-ready' '$d/preserve-pid'" \
+        >/dev/null 2>&1
+fi
 preserved_status=$?
+if [ -s "$d/preserve-pid" ]; then
+    preserve_pid=$(cat "$d/preserve-pid")
+fi
+preserve_ready=missing
+if [ -s "$d/preserve-ready" ]; then
+    preserve_ready=$(cat "$d/preserve-ready")
+fi
+preserve_is_alive=no
+if [ -n "$preserve_pid" ] && kill -0 "$preserve_pid" 2>/dev/null; then
+    preserve_is_alive=yes
+fi
 if { [ "${OS-}" = Windows_NT ] && [ "$preserved_status" -eq 1 ]; } ||
-    { [ "${OS-}" != Windows_NT ] && [ "$preserved_status" -eq 143 ]; }; then
+    { [ "${OS-}" != Windows_NT ] && [ "$preserved_status" -eq 23 ] &&
+      [ "$preserve_ready" = armed ] && [ "$preserve_is_alive" = no ]; }; then
     echo passed
 else
     echo "failed=$preserved_status"
 fi
+if [ "$preserve_is_alive" = yes ]; then
+    kill -KILL "$preserve_pid" 2>/dev/null || true
+    wait "$preserve_pid" 2>/dev/null || true
+fi
+preserve_pid=
 
 echo "--- KILL timeout always reports signal status ---"
 for kill_options in '-s KILL' '-p -s KILL' '-k 1s -s KILL' '-p -k 1s -s KILL'; do

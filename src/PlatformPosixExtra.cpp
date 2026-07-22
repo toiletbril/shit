@@ -4,6 +4,13 @@
 #define st_ctim st_ctimespec
 #endif
 
+#if defined __GLIBC__
+#if __GLIBC_PREREQ(2, 33)
+#define SHIT_HAS_MALLINFO2 1
+#pragma weak mallinfo2
+#endif
+#endif
+
 namespace shit {
 namespace os {
 namespace {
@@ -746,10 +753,24 @@ fn enumerate_processes(process_detail) throws -> ArrayList<process_entry>
 fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
 {
 #if defined __GLIBC__
-  let const info = mallinfo2();
-  stats.bytes_in_use = static_cast<usize>(info.uordblks);
-  stats.arena_bytes = static_cast<usize>(info.arena);
-  stats.mapped_bytes = static_cast<usize>(info.hblkhd);
+#if defined SHIT_HAS_MALLINFO2
+  if (mallinfo2 != nullptr) {
+    let const info = mallinfo2();
+    stats.bytes_in_use = static_cast<usize>(info.uordblks);
+    stats.arena_bytes = static_cast<usize>(info.arena);
+    stats.mapped_bytes = static_cast<usize>(info.hblkhd);
+  } else
+#endif
+  {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    let const info = mallinfo();
+#pragma GCC diagnostic pop
+    stats.bytes_in_use =
+        info.uordblks < 0 ? 0 : static_cast<usize>(info.uordblks);
+    stats.arena_bytes = info.arena < 0 ? 0 : static_cast<usize>(info.arena);
+    stats.mapped_bytes = info.hblkhd < 0 ? 0 : static_cast<usize>(info.hblkhd);
+  }
   return true;
 #else
   unused(stats);

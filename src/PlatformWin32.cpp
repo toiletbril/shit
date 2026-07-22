@@ -1225,8 +1225,14 @@ static fn timeout_job_name(HANDLE process_handle, char (&name)[64]) wontthrow
   return true;
 }
 
-static fn attach_timeout_job(const PROCESS_INFORMATION &process_info) throws
-    -> void
+enum class timeout_job_lifetime : u8
+{
+  DescendantOwned,
+  LeaderOwned,
+};
+
+static fn attach_timeout_job(const PROCESS_INFORMATION &process_info,
+                             timeout_job_lifetime lifetime) throws -> void
 {
   char job_name[64];
   if (!timeout_job_name(process_info.hProcess, job_name))
@@ -1237,12 +1243,22 @@ static fn attach_timeout_job(const PROCESS_INFORMATION &process_info) throws
   if (GetLastError() == ERROR_ALREADY_EXISTS)
     throw Error{"timeout job already exists"};
 
+  if (lifetime == timeout_job_lifetime::LeaderOwned) {
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION job_limits{};
+    job_limits.BasicLimitInformation.LimitFlags =
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if (SetInformationJobObject(job, JobObjectExtendedLimitInformation,
+                                &job_limits, sizeof(job_limits)) == FALSE)
+      throw Error{last_system_error_message()};
+  }
+
   if (AssignProcessToJobObject(job, process_info.hProcess) == FALSE)
     throw Error{last_system_error_message()};
 
   HANDLE child_job_handle = nullptr;
   if (DuplicateHandle(GetCurrentProcess(), job, process_info.hProcess,
-                      &child_job_handle, 0, TRUE,
+                      &child_job_handle, 0,
+                      lifetime == timeout_job_lifetime::DescendantOwned,
                       DUPLICATE_SAME_ACCESS) == FALSE)
     throw Error{last_system_error_message()};
 }
@@ -1263,7 +1279,10 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
                    terminal_handoff handoff) -> process
 {
   let const allow_script_fallback = fallback == script_fallback_policy::Allow;
-  let const new_process_group = process_group == process_group_mode::New;
+  let const new_process_group = process_group != process_group_mode::Inherit;
+  let const job_lifetime = process_group == process_group_mode::NewLeaderOwned
+                               ? timeout_job_lifetime::LeaderOwned
+                               : timeout_job_lifetime::DescendantOwned;
   let const should_hand_off_controlling_terminal_before_start =
       handoff == terminal_handoff::BeforeStart;
   LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
@@ -1361,7 +1380,7 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
 
   if (new_process_group) {
     try {
-      attach_timeout_job(process_info);
+      attach_timeout_job(process_info, job_lifetime);
     } catch (const ErrorBase &error) {
       TerminateProcess(process_info.hProcess, 1);
       CloseHandle(process_info.hProcess);
@@ -2095,7 +2114,30 @@ fn monotonic_nanos() wontthrow -> u64
          (remainder * 1000000000ULL) / static_cast<u64>(frequency.QuadPart);
 }
 
-fn get_parent_process_id() wontthrow -> i64 { return 0; }
+static fn query_parent_process_id() wontthrow -> i64
+{
+  let const snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (snapshot == INVALID_HANDLE_VALUE) return 0;
+  defer { CloseHandle(snapshot); };
+
+  PROCESSENTRY32 entry{};
+  entry.dwSize = sizeof(entry);
+  if (Process32First(snapshot, &entry) == FALSE) return 0;
+
+  let const process_id = GetCurrentProcessId();
+  do {
+    if (entry.th32ProcessID == process_id)
+      return static_cast<i64>(entry.th32ParentProcessID);
+  } while (Process32Next(snapshot, &entry) != FALSE);
+
+  return 0;
+}
+
+fn get_parent_process_id() wontthrow -> i64
+{
+  static const i64 parent_process_id = query_parent_process_id();
+  return parent_process_id;
+}
 
 fn get_real_user_id() wontthrow -> i64 { return 0; }
 

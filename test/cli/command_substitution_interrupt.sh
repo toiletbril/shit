@@ -25,13 +25,16 @@ trap cleanup EXIT
 shell_pid=$!
 
 waited=0
-while [ ! -s "$d/ready" ] && [ "$waited" -lt 200 ]; do
+while [ ! -s "$d/ready" ] && [ "$waited" -lt 1000 ]; do
     /bin/sleep 0.01
     waited=$((waited + 1))
 done
+test -s "$d/ready" || exit 1
 
 kill -INT "$shell_pid"
-( /bin/sleep 3; kill -KILL "$shell_pid" 2>/dev/null ) &
+"$BIN" -p --mood sh -c \
+    'shitbox sleep 10; kill -KILL "$1" 2>/dev/null' \
+    shell "$shell_pid" &
 watchdog_pid=$!
 wait "$shell_pid"
 status=$?

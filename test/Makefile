@@ -125,8 +125,16 @@ refill:
 	for f in $${REFILL:-$(CLI_INPUT:cli/%.sh=%)}; do \
 		[ -f cli/$$f.sh ] || continue; \
 		printf "	%-64s cli/$$f.out\n" cli/$$f.sh; \
-		BIN=$(BIN) sh cli/$$f.sh > expected/cli/$$f.out 2>&1; \
-	done || true
+		case $$f in \
+		command_substitution_interrupt|shitbox_timeout|transaction_lock_lifetime) \
+			output=$$(mktemp "expected/cli/.$$f.out.XXXXXX") || exit; \
+			BIN=$(BIN) ./.run-bounded-cli-fixture.sh cli/$$f.sh \
+				> "$$output" 2>&1 && \
+				mv "$$output" "expected/cli/$$f.out" || \
+				{ status=$$?; rm -f "$$output"; exit $$status; } ;; \
+		*) BIN=$(BIN) sh cli/$$f.sh > expected/cli/$$f.out 2>&1 ;; \
+		esac; \
+	done
 	for f in $(COMPLETION_INPUT:completion/%.sh=%); do \
 		printf "	%-64s $$f.out\n" completion/$$f.sh; \
 		BIN=$(BIN) sh completion/$$f.sh > expected/completion/$$f.out 2>/dev/null; \

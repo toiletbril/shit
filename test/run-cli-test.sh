@@ -7,7 +7,18 @@
 for f in "$@"; do
     name=$(basename "$f" .sh)
     out=$(mktemp)
-    BIN=$BIN sh "$f" > "$out" 2>&1
+    case $name in
+    command_substitution_interrupt|shitbox_timeout|transaction_lock_lifetime)
+        BIN=$BIN ./.run-bounded-cli-fixture.sh "$f" > "$out" 2>&1
+        driver_status=$?
+        if [ "$driver_status" -ne 0 ]; then
+            printf 'fixture exited with status %s\n' "$driver_status" >> "$out"
+        fi
+        ;;
+    *)
+        BIN=$BIN sh "$f" > "$out" 2>&1
+        ;;
+    esac
     if diff $DIFF_FLAGS "expected/cli/$name.out" "$out" >/dev/null 2>&1; then
         printf "\t%-64s ok\033[K\r" "cli/$name.sh"
     else
