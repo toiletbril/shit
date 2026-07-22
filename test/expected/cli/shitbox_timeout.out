@@ -5,6 +5,11 @@ rc=7
 rc=124
 --- timeout preserves the selected signal status ---
 passed
+--- KILL timeout always reports signal status ---
+rc=137
+rc=137
+rc=137
+rc=137
 --- timeout forces a kill after the grace period ---
 passed
 --- timeout zero allows completion ---

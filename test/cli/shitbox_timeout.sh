@@ -4,12 +4,31 @@ unset SHIT_FLAGS
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 
 d=$(mktemp -d) || exit 1
-trap '[ -n "$d" ] && /bin/rm -rf "$d"' EXIT
+query_reader_pid=
+descendant_pid=
+descriptor_pid=
+cleanup()
+{
+    for cleanup_pid in "$query_reader_pid" "$descendant_pid" "$descriptor_pid"; do
+        if [ -n "$cleanup_pid" ]; then
+            kill -KILL "$cleanup_pid" 2>/dev/null || true
+            wait "$cleanup_pid" 2>/dev/null || true
+        fi
+    done
+    if [ -n "$d" ]; then
+        /bin/rm -rf "$d"
+    fi
+}
+trap cleanup EXIT
 
-printf 'trap "exit 23" TERM\nwhile :; do :; done\n' > "$d/preserve.sh"
-printf 'trap "" TERM\nwhile :; do :; done\n' > "$d/ignore.sh"
 printf '#!/bin/sh\nexit 0\n' > "$d/noexec"
 printf 'echo fallback-script\n' > "$d/plain-script"
+printf 'stopped_result=$1\nstopped_ready=$2\nterm_received=no\nresume()\n{\n  term_received=yes\n}\ntrap resume TERM\nprintf armed > "$stopped_ready"\nkill -STOP "$$"\nprintf resumed > "$stopped_result"\nwhile [ "$term_received" = no ]; do :; done\n' \
+    > "$d/stopped.sh"
+printf '(printf ready > "$1"; exec /bin/sleep 10) &\ndescendant_pid=$!\nprintf "%%s\\n" "$descendant_pid" > "$2"\nwhile [ ! -s "$1" ]; do :; done\nprintf ready > "$3"\nwait "$descendant_pid"\n' \
+    > "$d/descendant.sh"
+printf 'finish()\n{\n  exit 0\n}\ntrap finish TERM\n(trap "" TERM; printf "descriptor-ready\\n" >&3; printf ready > "$1"; exec /bin/sleep 10) &\ndescendant_pid=$!\nprintf "%%s\\n" "$descendant_pid" > "$2"\nwhile [ ! -s "$1" ]; do :; done\nprintf ready > "$3"\nwait "$descendant_pid"\n' \
+    > "$d/descriptor.sh"
 chmod 644 "$d/noexec"
 chmod +x "$d/plain-script"
 
@@ -23,19 +42,31 @@ echo "--- timeout returns its timeout status ---"
 echo "rc=$?"
 
 echo "--- timeout preserves the selected signal status ---"
-"$BIN" -c "shitbox timeout -p -s TERM 0.02s /bin/sh '$d/preserve.sh'" \
+"$BIN" -c "shitbox timeout -p -s TERM 0.02s /bin/sleep 1" \
     >/dev/null 2>&1
 preserved_status=$?
 if { [ "${OS-}" = Windows_NT ] && [ "$preserved_status" -eq 1 ]; } ||
-    { [ "${OS-}" != Windows_NT ] && [ "$preserved_status" -eq 23 ]; }; then
+    { [ "${OS-}" != Windows_NT ] && [ "$preserved_status" -eq 143 ]; }; then
     echo passed
 else
     echo "failed=$preserved_status"
 fi
 
+echo "--- KILL timeout always reports signal status ---"
+for kill_options in '-s KILL' '-p -s KILL' '-k 1s -s KILL' '-p -k 1s -s KILL'; do
+    "$BIN" -c "shitbox timeout $kill_options 0.02s /bin/sleep 1" \
+        >/dev/null 2>&1
+    echo "rc=$?"
+done
+
 echo "--- timeout forces a kill after the grace period ---"
-"$BIN" -c "shitbox timeout -k 0.02s 0.02s /bin/sh '$d/ignore.sh'" \
-    >/dev/null 2>&1
+if [ "${OS-}" = Windows_NT ]; then
+    "$BIN" -c 'shitbox timeout -k 0.02s 0.02s /bin/sleep 1' \
+        >/dev/null 2>&1
+else
+    "$BIN" -c 'shitbox timeout -s 0 -k 0.02s 0.02s /bin/sleep 1' \
+        >/dev/null 2>&1
+fi
 kill_after_status=$?
 if { [ "${OS-}" = Windows_NT ] && [ "$kill_after_status" -eq 124 ]; } ||
     { [ "${OS-}" != Windows_NT ] && [ "$kill_after_status" -eq 137 ]; }; then
@@ -54,7 +85,7 @@ echo "rc=$?"
 if [ "${OS-}" = Windows_NT ]; then
     echo kill-after-passed
 else
-    "$BIN" -c 'shitbox timeout -k 0.0000000001 0.0000000001 /bin/sh -c "trap \"\" TERM; /bin/sleep 0.2"' \
+    "$BIN" -c 'shitbox timeout -s 0 -k 0.0000000001 0.0000000001 /bin/sleep 0.2' \
         >/dev/null 2>&1
     subnanosecond_kill_status=$?
     if [ "$subnanosecond_kill_status" -eq 137 ]; then
@@ -78,9 +109,29 @@ echo "rc=$?"
 echo "wrapped=$?"
 
 echo "--- timeout resumes a stopped child to finish supervision ---"
-"$BIN" -c 'shitbox timeout 0.02s /bin/sh -c "kill -STOP \$\$"' \
-    >/dev/null 2>&1
-echo "rc=$?"
+if [ "${OS-}" = Windows_NT ]; then
+    "$BIN" -c 'shitbox timeout 0.02s /bin/sh -c "kill -STOP \$\$"' \
+        >/dev/null 2>&1
+    echo "rc=$?"
+else
+    "$BIN" -c "shitbox timeout -k 0.2s 1s /bin/sh '$d/stopped.sh' '$d/stopped-result' '$d/stopped-ready'" \
+        >/dev/null 2>&1
+    stopped_status=$?
+    stopped_result=missing
+    if [ -s "$d/stopped-result" ]; then
+        stopped_result=$(cat "$d/stopped-result")
+    fi
+    stopped_ready=missing
+    if [ -s "$d/stopped-ready" ]; then
+        stopped_ready=$(cat "$d/stopped-ready")
+    fi
+    if [ "$stopped_status" -eq 124 ] && [ "$stopped_ready" = armed ] &&
+        [ "$stopped_result" = resumed ]; then
+        echo rc=124
+    else
+        echo "failed=$stopped_status ready=$stopped_ready result=$stopped_result"
+    fi
+fi
 
 echo "--- timeout rejects invalid durations ---"
 for duration in abc -1 nan 0x1 1q; do
@@ -89,13 +140,32 @@ for duration in abc -1 nan 0x1 1q; do
 done
 
 echo "--- timeout kills process group descendants ---"
-"$BIN" -c "shitbox timeout 0.02s /bin/sh -c '(sleep 0.1; echo leaked > '$d/marker') & while :; do :; done'" \
+"$BIN" -c "shitbox timeout 1s /bin/sh '$d/descendant.sh' '$d/descendant-ready' '$d/descendant-pid' '$d/leader-ready'" \
     >/dev/null 2>&1
-/bin/sleep 0.15
-if [ -e "$d/marker" ]; then
+descendant_status=$?
+descendant_pid=
+if [ -s "$d/descendant-pid" ]; then
+    descendant_pid=$(cat "$d/descendant-pid")
+fi
+waited=0
+while [ -n "$descendant_pid" ] && kill -0 "$descendant_pid" 2>/dev/null &&
+    [ "$waited" -lt 100 ]; do
+    /bin/sleep 0.01
+    waited=$((waited + 1))
+done
+if [ "$descendant_status" -ne 124 ]; then
+    echo "bad-status=$descendant_status"
+elif [ ! -s "$d/descendant-ready" ] || [ ! -s "$d/leader-ready" ] ||
+    [ -z "$descendant_pid" ]; then
+    echo setup-failed
+elif kill -0 "$descendant_pid" 2>/dev/null; then
     echo leaked
 else
     echo contained
+fi
+if [ -n "$descendant_pid" ]; then
+    kill -KILL "$descendant_pid" 2>/dev/null || true
+    descendant_pid=
 fi
 
 echo "--- kill-after closes inherited descendant descriptors ---"
@@ -103,26 +173,49 @@ if [ "${OS-}" = Windows_NT ]; then
     echo contained
 else
     mkfifo "$d/query"
-    /bin/cat "$d/query" >/dev/null &
+    (/bin/cat "$d/query" > "$d/query-output" &&
+        printf closed > "$d/query-closed") &
     query_reader_pid=$!
-    "$BIN" -c "exec 3>'$d/query'; shitbox timeout -k 0.02s 0.02s /bin/sh -c 'echo \$\$ > '$d/group-pid'; trap \"exit 0\" TERM; (trap \"\" TERM; while :; do :; done) & while :; do :; done'; exec 3>&-" \
+    "$BIN" -c "exec 3>'$d/query'; shitbox timeout -k 0.1s 1s /bin/sh '$d/descriptor.sh' '$d/descriptor-ready' '$d/descriptor-pid' '$d/descriptor-leader-ready'; timeout_status=\$?; exec 3>&-; exit \$timeout_status" \
         >/dev/null 2>&1
+    descriptor_status=$?
     waited=0
-    while kill -0 "$query_reader_pid" 2>/dev/null && [ "$waited" -lt 100 ]; do
+    while [ ! -s "$d/query-closed" ] && [ "$waited" -lt 100 ]; do
         /bin/sleep 0.01
         waited=$((waited + 1))
     done
-    if kill -0 "$query_reader_pid" 2>/dev/null; then
+    reader_closed=no
+    if [ -s "$d/query-closed" ]; then
+        wait "$query_reader_pid"
+        query_reader_status=$?
+        query_reader_pid=
+        if [ "$query_reader_status" -eq 0 ]; then
+            reader_closed=yes
+        fi
+    fi
+    descriptor_pid=
+    if [ -s "$d/descriptor-pid" ]; then
+        descriptor_pid=$(cat "$d/descriptor-pid")
+    fi
+    if [ "$descriptor_status" -ne 137 ]; then
+        echo "bad-status=$descriptor_status"
+    elif [ ! -s "$d/descriptor-ready" ] ||
+        [ ! -s "$d/descriptor-leader-ready" ] ||
+        [ -z "$descriptor_pid" ] ||
+        [ "$(cat "$d/query-output")" != descriptor-ready ]; then
+        echo setup-failed
+    elif [ "$reader_closed" != yes ] || kill -0 "$descriptor_pid" 2>/dev/null; then
         echo leaked
     else
         echo contained
     fi
-    if [ -s "$d/group-pid" ]; then
-        group_pid=$(cat "$d/group-pid")
-        kill -KILL -"$group_pid" 2>/dev/null || true
+    if [ -n "$descriptor_pid" ]; then
+        kill -KILL "$descriptor_pid" 2>/dev/null || true
+        descriptor_pid=
     fi
     kill -KILL "$query_reader_pid" 2>/dev/null || true
     wait "$query_reader_pid" 2>/dev/null
+    query_reader_pid=
 fi
 
 echo "--- an interrupt stops the supervisor and descendants ---"

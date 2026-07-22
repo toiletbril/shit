@@ -8,8 +8,10 @@ cleanup()
 }
 trap cleanup EXIT
 
-printf 'printf bashrc-marker\n' > "$directory/.bashrc"
-printf 'printf profile-marker\n' > "$directory/.bash_profile"
+printf 'if [ "${profile_loaded-}" = yes ]; then printf login-bashrc-marker; else printf bashrc-marker; fi\n' \
+  > "$directory/.bashrc"
+printf 'profile_loaded=yes\nprintf profile-marker\n' \
+  > "$directory/.bash_profile"
 printf 'printf custom-marker\n' > "$directory/custom"
 printf 'printf init-marker\n' > "$directory/init"
 printf 'printf tilde-marker\n' > "$directory/.custom"
@@ -69,7 +71,7 @@ if [ -n "$script_mode" ]; then
       "$BIN --mood bash --login --rcfile $directory/custom -i")
   case "$output" in
     *profile-marker*)
-      case "$output" in *bashrc-marker*|*custom-marker*) login=broken ;; esac
+      case "$output" in *login-bashrc-marker*|*custom-marker*) login=broken ;; esac
       ;;
     *) login=broken ;;
   esac

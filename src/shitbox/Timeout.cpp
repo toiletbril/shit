@@ -106,6 +106,14 @@ static fn signal_supervised_process(os::process child,
   return os::signal_process(child, signal_number);
 }
 
+static fn timeout_expiration_status(i32 command_status,
+                                    i32 timeout_signal) wontthrow -> i32
+{
+  if (timeout_signal == 9) return 137;
+  if (FLAG_TIMEOUT_PRESERVE_STATUS.is_enabled()) return command_status;
+  return 124;
+}
+
 static fn finish_interrupted_supervision(os::process child,
                                          os::process process_group,
                                          bool has_child_exited) throws -> i32
@@ -317,7 +325,7 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
           os::poll_process(child, status) == os::process_state::Exited)
       {
         has_child_exited = true;
-        return FLAG_TIMEOUT_PRESERVE_STATUS.is_enabled() ? status : 124;
+        return timeout_expiration_status(status, timeout_signal);
       }
       return 125;
     }
@@ -325,7 +333,7 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     return 137;
   }
 
-  return FLAG_TIMEOUT_PRESERVE_STATUS.is_enabled() ? status : 124;
+  return timeout_expiration_status(status, timeout_signal);
 }
 
 } /* namespace shitbox */

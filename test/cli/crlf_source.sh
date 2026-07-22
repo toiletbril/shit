@@ -24,7 +24,8 @@ source_script="$dir/source.shit"
 printf 'echo sourced\r\n' > "$source_script"
 "$BIN" -c '. "$1"' crlf-driver "$source_script"
 
-eval_text=$(printf 'echo eval-one\r\necho eval-two\r\n')
+eval_text=$(printf 'echo eval-one\r\necho eval-two\r\n_')
+eval_text=${eval_text%_}
 "$BIN" -c 'eval "$1"' crlf-driver "$eval_text"
 
 fallback_script="$dir/fallback.ps1"
