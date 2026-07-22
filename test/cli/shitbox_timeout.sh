@@ -8,10 +8,12 @@ query_reader_pid=
 descendant_pid=
 descriptor_pid=
 preserve_pid=
+supervisor_pid=
+watchdog_pid=
 cleanup()
 {
     for cleanup_pid in "$query_reader_pid" "$descendant_pid" "$descriptor_pid" \
-        "$preserve_pid"; do
+        "$preserve_pid" "$supervisor_pid" "$watchdog_pid"; do
         if [ -n "$cleanup_pid" ]; then
             kill -KILL "$cleanup_pid" 2>/dev/null || true
             wait "$cleanup_pid" 2>/dev/null || true
@@ -256,15 +258,20 @@ while [ ! -s "$d/child-pid" ] && [ "$waited" -lt 1000 ]; do
 done
 if [ -s "$d/child-pid" ]; then
     kill -INT "$supervisor_pid"
-    ( /bin/sleep 0.2; kill -KILL "$supervisor_pid" 2>/dev/null ) &
+    "$BIN" -p --mood sh -c \
+        'shitbox sleep 10; kill -KILL "$1" 2>/dev/null' \
+        shell "$supervisor_pid" &
     watchdog_pid=$!
     wait "$supervisor_pid"
     supervisor_status=$?
+    supervisor_pid=
     kill "$watchdog_pid" 2>/dev/null
     wait "$watchdog_pid" 2>/dev/null
+    watchdog_pid=
 else
     kill -KILL "$supervisor_pid" 2>/dev/null
     wait "$supervisor_pid" 2>/dev/null
+    supervisor_pid=
     supervisor_status=125
 fi
 echo "rc=$supervisor_status"
