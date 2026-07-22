@@ -127,8 +127,11 @@ refill:
 		printf "	%-64s cli/$$f.out\n" cli/$$f.sh; \
 		case $$f in \
 		command_substitution_interrupt|shitbox_timeout|transaction_lock_lifetime) \
+			fixture_timeout_seconds=60; \
+			[ "$$f" != shitbox_timeout ] || fixture_timeout_seconds=120; \
 			output=$$(mktemp "expected/cli/.$$f.out.XXXXXX") || exit; \
-			BIN=$(BIN) ./.run-bounded-cli-fixture.sh cli/$$f.sh \
+			CLI_TEST_TIMEOUT_SECONDS=$${CLI_TEST_TIMEOUT_SECONDS:-$$fixture_timeout_seconds} \
+				BIN=$(BIN) ./.run-bounded-cli-fixture.sh cli/$$f.sh \
 				> "$$output" 2>&1 && \
 				mv "$$output" "expected/cli/$$f.out" || \
 				{ status=$$?; rm -f "$$output"; exit $$status; } ;; \

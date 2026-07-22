@@ -9,7 +9,12 @@ for f in "$@"; do
     out=$(mktemp)
     case $name in
     command_substitution_interrupt|shitbox_timeout|transaction_lock_lifetime)
-        BIN=$BIN ./.run-bounded-cli-fixture.sh "$f" > "$out" 2>&1
+        fixture_timeout_seconds=60
+        if [ "$name" = shitbox_timeout ]; then
+            fixture_timeout_seconds=120
+        fi
+        CLI_TEST_TIMEOUT_SECONDS=${CLI_TEST_TIMEOUT_SECONDS:-$fixture_timeout_seconds} \
+            BIN=$BIN ./.run-bounded-cli-fixture.sh "$f" > "$out" 2>&1
         driver_status=$?
         if [ "$driver_status" -ne 0 ]; then
             printf 'fixture exited with status %s\n' "$driver_status" >> "$out"
