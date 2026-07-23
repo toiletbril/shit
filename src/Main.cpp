@@ -1671,7 +1671,8 @@ fn main(int argc, char **argv) -> int
 
     if (root_frame_call_site.has_value()) {
       context.push_root_source_frame(&context.cli_invocation(),
-                                     *root_frame_call_site);
+                                     *root_frame_call_site,
+                                     FLAG_COMMAND.count() <= 1);
     }
     defer
     {

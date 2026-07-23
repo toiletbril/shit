@@ -203,8 +203,12 @@ then restored for the prompt. The flag pairs with
 .BR \-W .
 .TP
 .B \-\-no\-traces
-Source backtraces are suppressed for errors, warnings, and diagnostics. The
-primary message, source caret, note, and detail location remain visible.
+A direct input with one root source omits its source backtrace when no eval or
+source indirection exists. An invocation with multiple
+.B \-c
+sources traces the source that produced each message. This flag suppresses
+every source backtrace for errors, warnings, and diagnostics. The primary
+message, source caret, note, and detail location remain visible.
 .TP
 .B \-\-list\-diagnostics
 The shellcheck-style checks the analysis stage reports are listed, then the

@@ -1282,13 +1282,14 @@ pure fn EvalContext::current_origin() const wontthrow -> const String &
 }
 
 fn EvalContext::push_root_source_frame(const String *parent_source,
-                                       SourceLocation call_site) throws -> void
+                                       SourceLocation call_site,
+                                       bool is_only_root_source) throws -> void
 {
   m_source_frames.push(source_frame{
       String{heap_allocator(), StringView{"the command line"}},
       call_site,
       parent_source, String{heap_allocator()},
-      true
+      true, is_only_root_source
   });
 }
 
@@ -1317,13 +1318,15 @@ fn EvalContext::print_source_backtrace(
     return frame.parent_source != nullptr && !do_frame_repeat_error(frame);
   };
 
-  let has_real_source_frame = false;
+  let has_traceable_source_frame = false;
   for (let const &frame : m_source_frames)
-    if (!frame.is_cli_root && frame.parent_source != nullptr) {
-      has_real_source_frame = true;
+    if (frame.parent_source != nullptr &&
+        (!frame.is_cli_root || !frame.is_only_root_source))
+    {
+      has_traceable_source_frame = true;
       break;
     }
-  if (!has_real_source_frame) return;
+  if (!has_traceable_source_frame) return;
 
   for (usize i = m_source_frames.count(); i > 0; i--) {
     let const &frame = m_source_frames[i - 1];

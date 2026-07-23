@@ -18,6 +18,11 @@ printf 'eval traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace( location)?:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
 
+out=$("$BIN" -c no_such_first_root_xyz -c no_such_second_root_xyz 2>&1)
+printf 'multi-root traces=%s errors=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace( location)?:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')"
+
 recursive='if ((depth)); then let depth-=1; eval "$recursive"; else no_such_recursive_xyz; fi'
 out=$("$BIN" -c 'recursive=$1; depth=5; eval "$recursive"' trace-driver "$recursive" 2>&1)
 printf 'recursive traces=%s errors=%s\n' \
@@ -26,6 +31,11 @@ printf 'recursive traces=%s errors=%s\n' \
 
 out=$("$BIN" --no-traces -c "eval 'no_such_suppressed_xyz'" 2>&1)
 printf 'disabled-runtime traces=%s errors=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace( location)?:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')"
+
+out=$("$BIN" --no-traces -c no_such_first_root_xyz -c no_such_second_root_xyz 2>&1)
+printf 'disabled-multi-root traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace( location)?:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
 

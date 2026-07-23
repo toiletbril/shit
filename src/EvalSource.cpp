@@ -341,7 +341,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
       parent_source,
       filename.has_value() ? String{*filename}
       : String{heap_allocator()},
-      false
+      false, false
   });
   let const frame_is_sourced_file =
       filename.has_value() && !filename->is_empty();

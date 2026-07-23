@@ -125,10 +125,10 @@ struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
                const String *parent_source, String source_path,
-               bool is_cli_root)
+               bool is_cli_root, bool is_only_root_source)
       : origin(steal(origin)), call_site(call_site),
         parent_source(parent_source), source_path(steal(source_path)),
-        is_cli_root(is_cli_root)
+        is_cli_root(is_cli_root), is_only_root_source(is_only_root_source)
   {}
 
   String origin;
@@ -136,6 +136,7 @@ struct source_frame
   const String *parent_source;
   String source_path;
   bool is_cli_root;
+  bool is_only_root_source;
 };
 
 /* A variable binding saved when a local shadows it. A None previous value means
@@ -880,7 +881,8 @@ public:
      a sourced file to return from even outside a function. */
   pure fn is_sourcing() const wontthrow -> bool { return m_source_depth > 0; }
   fn push_root_source_frame(const String *parent_source,
-                            SourceLocation call_site) throws -> void;
+                            SourceLocation call_site,
+                            bool is_only_root_source) throws -> void;
   fn pop_root_source_frame() wontthrow -> void;
   fn declare_local(StringView name) throws -> void;
   mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;

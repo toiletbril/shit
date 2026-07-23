@@ -1,8 +1,10 @@
 named traces=0 errors=1
 stdin traces=0 errors=1
 eval traces=2 errors=1
+multi-root traces=2 errors=2
 recursive traces=3 errors=1
 disabled-runtime traces=0 errors=1
+disabled-multi-root traces=0 errors=2
 disabled-warning traces=0 warnings=1
 disabled-parse traces=0 errors=1
 disabled-fallback traces=0 errors=1

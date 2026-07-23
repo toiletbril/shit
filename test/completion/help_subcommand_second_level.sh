@@ -3,9 +3,8 @@
 # options and sub-subcommands. Completion forks the second level when the
 # settled second word names a parsed subcommand. A fake binary named for an
 # allowlisted command keeps the candidates stable across machines.
-dir=/tmp/shit_help_second_level
-rm -rf "$dir"
-mkdir -p "$dir"
+dir=$(mktemp -d) || exit 1
+trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 chmod 755 "$dir"
 cat > "$dir/tailscale" <<'SH'
 #!/bin/sh
@@ -42,4 +41,3 @@ echo "== second-level sub-subcommands from 'tailscale debug --help':"
 PATH="$dir:$PATH" "$BIN" --debug-complete-at 'tailscale debug ' </dev/null
 echo "== an unknown second word does not fork:"
 PATH="$dir:$PATH" "$BIN" --debug-complete-at 'tailscale bogus --' </dev/null
-rm -rf "$dir"
