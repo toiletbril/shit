@@ -40,11 +40,6 @@ matching mood and disable diagnostics. `set --mood` changes the mood at
 runtime. `-W` demotes lenient diagnostics to warnings. `-WW` demotes strict
 diagnostics too and reports runtime warnings in every mood.
 
-Source backtraces are omitted when direct input has one root source and no eval
-or source indirection. An invocation with multiple `-c` sources traces the
-source that produced each message. `--no-traces` suppresses every source
-backtrace. The primary message, source caret, and note remain visible.
-
 `-I` is mimicry. **shit** will detect `sh`, `dash`, `bash` shebangs and run the
 script inside itself in the matching mood. The in-process run keeps speed and
 diagnostics.
