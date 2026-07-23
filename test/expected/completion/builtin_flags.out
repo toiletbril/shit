@@ -42,6 +42,8 @@ noglob
 notify
 nounset
 == shit binary flags:
+== shit no-traces flag:
+--no-traces
 == declare letters:
 --help
 -A

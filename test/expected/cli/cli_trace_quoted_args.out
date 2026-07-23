@@ -1,3 +1,3 @@
-     1 |  SHIT -c 'echo hi' -c no_such_command_xyz
+     1 |  SHIT -c 'echo hi' -c 'eval no_such_command_xyz'
 quoted_and_second_c=ok
-rc=1
+rc=127

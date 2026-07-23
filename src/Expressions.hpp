@@ -213,6 +213,7 @@ struct array_builtin_assignment
 {
   String name;
   ArrayList<const Token *> elements;
+  SourceLocation location;
   bool is_append;
 };
 

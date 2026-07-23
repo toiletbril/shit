@@ -5,12 +5,6 @@ shit: 1:1: error: getopts: Not enough arguments.
 shit: note: Try `getopts --help` for more info.
 rc=2
 --- builtin let with no expression ---
-shit: 1:1: warning: A let runs arithmetic as a command.
-     1 |  let
-       |  ^~~ here.
-note: Use the ((...)) compound so the operands need no quoting.
-shit: 1:0: trace location:
-     1 |  SHIT -c let
 shit: 1:1: error: Builtin `let`: expression expected.
      1 |  let
        |  ^~~ here.

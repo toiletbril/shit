@@ -37,8 +37,27 @@ fn Let::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       ec.args().count() - 1);
 
   i64 last_value = 0;
-  for (usize i = 1; i < ec.args().count(); i++)
-    last_value = cxt.evaluate_arithmetic(ec.args()[i].view());
+  for (usize i = 1; i < ec.args().count(); i++) {
+    try {
+      last_value = cxt.evaluate_arithmetic(ec.args()[i].view());
+    } catch (const Error &error) {
+      if (cxt.is_bash_compatible()) {
+        if (error.detail_message().is_empty())
+          report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                    error.message().view());
+        else
+          report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                    error.message().view(),
+                                    error.detail_message());
+        return 1;
+      }
+
+      if (error.detail_message().is_empty())
+        throw make_error_for_arg(ec, i, error.message().view());
+      throw make_error_for_arg(ec, i, error.message().view(),
+                               error.detail_message());
+    }
+  }
 
   return last_value != 0 ? 0 : 1;
 }

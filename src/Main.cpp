@@ -98,6 +98,8 @@ FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Shit,
 FLAG(SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
      "Suppress diagnostics only while the startup files source, then restore "
      "them for the prompt.");
+FLAG(NO_TRACES, Bool, '\0', "no-traces", Shit,
+     "Suppress source backtraces for errors and warnings.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
      "Disable interactive tab completion and ghost-text.");
 FLAG(NO_SYNTAX_HIGHLIGHTING, Bool, '\0', "no-syntax-highlighting", Shit,
@@ -1237,6 +1239,7 @@ fn main(int argc, char **argv) -> int
   context.set_show_exit_code(FLAG_EXIT_CODE.is_enabled());
   context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
   context.set_diagnostics_disabled(FLAG_SUPPRESS_DIAGNOSTICS.is_enabled());
+  context.set_source_traces_enabled(!FLAG_NO_TRACES.is_enabled());
   context.set_shell_option_state(shit::shell_option_id::Privileged,
                                  FLAG_PRIVILEGED.is_enabled());
   context.set_login_shell(is_login_shell);

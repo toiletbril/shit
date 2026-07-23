@@ -1,4 +1,4 @@
-.TH SHIT 1 "2026-07-21" "shit" "User Commands"
+.TH SHIT 1 "2026-07-23" "shit" "User Commands"
 .SH NAME
 shit \- a fast POSIX and bash compatible shell
 .SH SYNOPSIS
@@ -201,6 +201,10 @@ The analysis stage is skipped. No warning or pre-run diagnostic is reported.
 Diagnostics and warnings are suppressed only while the startup files source,
 then restored for the prompt. The flag pairs with
 .BR \-W .
+.TP
+.B \-\-no\-traces
+Source backtraces are suppressed for errors, warnings, and diagnostics. The
+primary message, source caret, note, and detail location remain visible.
 .TP
 .B \-\-list\-diagnostics
 The shellcheck-style checks the analysis stage reports are listed, then the

@@ -37,7 +37,7 @@ _shit_complete()
 --no-clobber --no-exec --no-unset --login --rcfile --init-file --norc \
 --restricted --privileged --clean --posix --mood \
 --init-moods --mimicry --dumb --list-diagnostics \
---no-diagnostics --no-init-diagnostics --no-completion --no-syntax-highlighting \
+--no-diagnostics --no-init-diagnostics --no-traces --no-completion --no-syntax-highlighting \
 --enable-shitbox \
 --show-ast \
 --show-optimizer-state --show-exit-code --show-lexed-words --show-stats --show-memory \

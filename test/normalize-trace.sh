@@ -9,5 +9,5 @@
 #
 # Usage: ... | normalize-trace.sh "$BIN"
 BIN=$1
-sed "s|$BIN|SHIT|; s/\(shit: [0-9]*\):[0-9]*: trace location:/\1:0: trace location:/" \
+sed "s|$BIN|SHIT|; s/\(shit: [0-9]*\):[0-9]*: trace:/\1:0: trace:/" \
   | awk '/SHIT -/{print; skip=1; next} skip{skip=0; next} {print}'

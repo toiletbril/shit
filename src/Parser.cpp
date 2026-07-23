@@ -1046,8 +1046,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
           let const command_name = args_accumulator[0]->raw_string();
           if (is_assignment_builtin_name(command_name.view())) {
             ArrayList<const Token *> elements = consume_bash_array_assignment();
-            array_args.push(array_builtin_assignment{
-                a->key().clone(), steal(elements), a->is_append()});
+            array_args.push(
+                array_builtin_assignment{a->key().clone(), steal(elements),
+                                         a->source_location(), a->is_append()});
             break;
           }
         }
@@ -1059,8 +1060,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
          downgrades it to an empty scalar at evaluation. */
       if (is_array_assignment) {
         ArrayList<const Token *> elements = consume_bash_array_assignment();
-        array_args.push(array_builtin_assignment{
-            a->key().clone(), steal(elements), a->is_append()});
+        array_args.push(
+            array_builtin_assignment{a->key().clone(), steal(elements),
+                                     a->source_location(), a->is_append()});
         break;
       }
 

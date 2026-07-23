@@ -12,8 +12,6 @@ shit: 1:8: error: Program `seq` wasn't found.
      1 |  PATH=; seq 3
        |         ^~~~~ here.
 note: Did you mean `set`?
-shit: 1:0: trace location:
-     1 |  SHIT --mood sh -c 'PATH=; seq 3'
 rc=127
 === set -o shitbox turns bare names on ===
 1

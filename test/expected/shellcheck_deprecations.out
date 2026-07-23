@@ -171,10 +171,6 @@ shit: 7:3: warning: An expr forks for arithmetic the shell does natively.
      7 |    expr 1 + 2
        |    ^~~~ here.
 note: Use $((...)) for the calculation.
-shit: 8:3: warning: A let runs arithmetic as a command.
-     8 |    let counter=counter+1
-       |    ^~~ here.
-note: Use the ((...)) compound so the operands need no quoting.
 shit: 9:3: warning: An echo of a command substitution prints what the command already prints.
      9 |    echo "$(date)"
        |    ^~~~ here.

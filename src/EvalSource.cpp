@@ -67,6 +67,7 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
   fallback_context.set_mimicry(mimicry());
   fallback_context.set_warning_level(warning_level());
   fallback_context.set_diagnostics_disabled(diagnostics_disabled());
+  fallback_context.set_source_traces_enabled(should_print_source_traces());
   return fallback_context.run_mimicked_script(ec, mode, isolation);
 }
 
@@ -339,7 +340,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
       call_site ? *call_site : SourceLocation{0, 0},
       parent_source,
       filename.has_value() ? String{*filename}
-      : String{heap_allocator()}
+      : String{heap_allocator()},
+      false
   });
   let const frame_is_sourced_file =
       filename.has_value() && !filename->is_empty();

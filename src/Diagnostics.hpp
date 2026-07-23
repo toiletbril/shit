@@ -51,7 +51,6 @@ inline const shellcheck_check SHELLCHECK_CHECKS[] = {
     {"SC2196", "egrep is deprecated, use grep -E"                            },
     {"SC2197", "fgrep is deprecated, use grep -F"                            },
     {"SC2003", "expr forks for arithmetic the shell does natively"           },
-    {"SC2219", "let runs arithmetic as a command, use ((...))"               },
     {"SC2168", "local outside a function has no scope to bind"               },
     {"SC2005", "echo of a command substitution is redundant"                 },
     {"SC2009", "grepping ps output races the table, use pgrep"               },
@@ -88,8 +87,8 @@ inline const strictness_warning STRICTNESS_WARNINGS[] = {
      "a top-level read of a variable assigned only later sees an empty "
      "value, the read errors in the strict default and -W reports it"       },
     {"arith-assign",
-     "an assignment whose whole value is an arithmetic expansion reads as a "
-     "let, NAME=$((...)) is suggested as let NAME=..."                      },
+     "an arithmetic assignment uses let, including NAME=$((...)) and the "
+     "mistaken array form NAME=((...))"                                     },
     {"typeset-spelling",
      "typeset is the ksh name of declare, the declare spelling is clearer"  },
     {"unquoted-test",

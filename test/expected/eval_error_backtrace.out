@@ -10,7 +10,7 @@
 shit: eval:1:1: error: Program `badcmd_xyzzy` wasn't found.
      1 |  badcmd_xyzzy
        |  ^~~~~~~~~~~~ here.
-shit: 2:1: trace location:
+shit: 2:1: trace:
      2 |  eval 'badcmd_xyzzy'
        |  ^~~~~~~~~~~~~~~~~~~ here.
 [Code 127]

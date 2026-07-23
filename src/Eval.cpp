@@ -1287,7 +1287,8 @@ fn EvalContext::push_root_source_frame(const String *parent_source,
   m_source_frames.push(source_frame{
       String{heap_allocator(), StringView{"the command line"}},
       call_site,
-      parent_source, String{heap_allocator()}
+      parent_source, String{heap_allocator()},
+      true
   });
 }
 
@@ -1299,27 +1300,53 @@ fn EvalContext::pop_root_source_frame() wontthrow -> void
 fn EvalContext::print_source_backtrace(
     Maybe<SourceLocation> error_location) const throws -> void
 {
+  if (!m_should_print_source_traces) return;
+
+  let const do_location_match = [](SourceLocation left, SourceLocation right) {
+    let const same_file =
+        left.filename.has_value() == right.filename.has_value() &&
+        (!left.filename.has_value() || *left.filename == *right.filename);
+    return same_file && left.position == right.position &&
+           left.length == right.length;
+  };
+  let const do_frame_repeat_error = [&](const source_frame &frame) {
+    return error_location.has_value() &&
+           do_location_match(frame.call_site, *error_location);
+  };
+  let const do_frame_render = [&](const source_frame &frame) {
+    return frame.parent_source != nullptr && !do_frame_repeat_error(frame);
+  };
+
+  let has_real_source_frame = false;
+  for (let const &frame : m_source_frames)
+    if (!frame.is_cli_root && frame.parent_source != nullptr) {
+      has_real_source_frame = true;
+      break;
+    }
+  if (!has_real_source_frame) return;
+
   for (usize i = m_source_frames.count(); i > 0; i--) {
     let const &frame = m_source_frames[i - 1];
-    if (frame.parent_source != nullptr) {
-      /* Two sources can share a byte offset and length while pointing at
-         unrelated text, so the file must match before a duplicate caret is
-         dropped. */
-      let const &call_file = frame.call_site.filename;
-      let const &error_file =
-          error_location.has_value() ? error_location->filename : call_file;
-      let const same_file =
-          call_file.has_value() == error_file.has_value() &&
-          (!call_file.has_value() || *call_file == *error_file);
-      if (error_location.has_value() && same_file &&
-          frame.call_site.position == error_location->position &&
-          frame.call_site.length == error_location->length)
+    if (!do_frame_render(frame)) continue;
+
+    let is_repeated_frame = false;
+    for (usize other_index = m_source_frames.count(); other_index > i;
+         other_index--)
+    {
+      let const &other = m_source_frames[other_index - 1];
+      if (!do_frame_render(other) || frame.is_cli_root != other.is_cli_root ||
+          !do_location_match(frame.call_site, other.call_site) ||
+          frame.parent_source->view() != other.parent_source->view())
       {
         continue;
       }
-      let const sourced_here = TraceWithLocation{frame.call_site};
-      show_message(sourced_here.to_string(*frame.parent_source));
+      is_repeated_frame = true;
+      break;
     }
+    if (is_repeated_frame) continue;
+
+    let const sourced_here = TraceWithLocation{frame.call_site};
+    show_message(sourced_here.to_string(*frame.parent_source));
   }
 }
 

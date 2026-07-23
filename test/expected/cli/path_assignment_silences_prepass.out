@@ -4,6 +4,4 @@ ran
 error: Command 'definitely_absent_cmd' was not found.
      1 |  FOO=1; definitely_absent_cmd
        |         ^~~~~~~~~~~~~~~~~~~~~ here.
-trace location:
-     1 |  SHIT -c 'FOO=1; definitely_absent_cmd'
 rc=0

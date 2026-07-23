@@ -767,7 +767,77 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     if (var.name.view() == "PATH")
       actx.should_silence_unresolved_commands = true;
 
-  if (m_args.is_empty()) return;
+  if (m_args.is_empty()) {
+    for (let const &assignment : m_array_args) {
+      if (assignment.elements.count() < 2) continue;
+
+      let const first = assignment.elements[0];
+      let const last = assignment.elements.back();
+      if (first->kind() != Token::Kind::LeftParen ||
+          last->kind() != Token::Kind::RightParen)
+      {
+        continue;
+      }
+
+      let const outer_open_position =
+          assignment.location.position + assignment.location.length;
+      let const expression_start_position =
+          first->source_location().position + first->source_location().length;
+      let const expression_end_position = last->source_location().position;
+      let const outer_close_position =
+          last->source_location().position + last->source_location().length;
+      if (outer_open_position >= actx.source.length ||
+          outer_close_position >= actx.source.length ||
+          actx.source[outer_open_position] != '(' ||
+          first->source_location().position != outer_open_position + 1 ||
+          actx.source[outer_close_position] != ')')
+      {
+        continue;
+      }
+
+      usize parenthesis_depth = 0;
+      let has_single_wrapping_pair = true;
+      for (usize i = 0; i < assignment.elements.count(); i++) {
+        let const kind = assignment.elements[i]->kind();
+        if (kind == Token::Kind::LeftParen) {
+          parenthesis_depth++;
+        } else if (kind == Token::Kind::RightParen) {
+          if (parenthesis_depth == 0) {
+            has_single_wrapping_pair = false;
+            break;
+          }
+          parenthesis_depth--;
+          if (parenthesis_depth == 0 && i + 1 != assignment.elements.count()) {
+            has_single_wrapping_pair = false;
+            break;
+          }
+        }
+      }
+      if (!has_single_wrapping_pair || parenthesis_depth != 0) continue;
+
+      let expression = actx.source.substring_of_length(
+          expression_start_position,
+          expression_end_position - expression_start_position);
+      while (!expression.is_empty() &&
+             (expression[0] == ' ' || expression[0] == '\t'))
+        expression = expression.substring(1);
+      while (!expression.is_empty() &&
+             (expression[expression.length - 1] == ' ' ||
+              expression[expression.length - 1] == '\t'))
+        expression = expression.substring_of_length(0, expression.length - 1);
+      if (expression.is_empty()) continue;
+
+      let location = assignment.location;
+      location.length = outer_close_position + 1 - location.position;
+      actx.warn(location,
+                StringView{"The assignment of '"} + assignment.name +
+                    "' uses array syntax instead of arithmetic",
+                StringView{"Use `let '"} + assignment.name + "=" + expression +
+                    "'` to evaluate and assign it");
+    }
+
+    return;
+  }
 
   ASSERT(m_args[0] != nullptr);
   let const name = static_command_name(m_args[0]);
@@ -943,9 +1013,6 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                 "to bash");
   }
 
-  /* The deprecated-tool and native-form lints. egrep and fgrep are SC2196 and
-     SC2197, expr is SC2003, let is SC2219, local outside a function is SC2168,
-     echo of a command substitution is SC2005. */
   if (!command_is_shadowed) {
     if (command_literal == "egrep")
       actx.warn(m_args[0]->source_location(), "The egrep command is deprecated",
@@ -957,10 +1024,6 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.warn(m_args[0]->source_location(),
                 "An expr forks for arithmetic the shell does natively",
                 "Use $((...)) for the calculation");
-    else if (command_literal == "let")
-      actx.warn(m_args[0]->source_location(),
-                "A let runs arithmetic as a command",
-                "Use the ((...)) compound so the operands need no quoting");
     else if (command_literal == "local" && actx.function_scope_depth == 0)
       actx.warn(m_args[0]->source_location(),
                 "A local outside a function has no scope to bind",

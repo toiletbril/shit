@@ -255,8 +255,11 @@ type whose name contains WithLocation owns or inherits a source location. Only
 a type whose name contains WithDetails owns a trailing note. The semantic
 classes remain distinct for catch routing. ErrorWithLocationAndDetails can also
 store a second source location. The relocate_error bridge rewraps an unlocated
-error onto a span and preserves its details. Diagnostics and LINENO share one
-cached source line index. Executable-format fallback uses an explicit
+error onto a span and preserves its details. A source backtrace is omitted when
+only the synthetic command-line root remains. Identical frames are printed
+once. The `--no-traces` flag suppresses every source backtrace, including in a
+fresh executable-fallback evaluator. Diagnostics and LINENO share one cached
+source line index. Executable-format fallback uses an explicit
 invalid-process result. A fresh evaluator runs the fallback script with the
 command environment and argv zero, so caller variables, functions, and traps do
 not leak into it. The

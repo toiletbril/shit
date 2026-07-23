@@ -343,7 +343,7 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
 
     result += color.reset;
   } else {
-    result += " location:";
+    result += ':';
   }
   result += '\n';
 

@@ -124,15 +124,18 @@ struct control_flow
 struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
-               const String *parent_source, String source_path)
+               const String *parent_source, String source_path,
+               bool is_cli_root)
       : origin(steal(origin)), call_site(call_site),
-        parent_source(parent_source), source_path(steal(source_path))
+        parent_source(parent_source), source_path(steal(source_path)),
+        is_cli_root(is_cli_root)
   {}
 
   String origin;
   SourceLocation call_site;
   const String *parent_source;
   String source_path;
+  bool is_cli_root;
 };
 
 /* A variable binding saved when a local shadows it. A None previous value means
@@ -876,9 +879,6 @@ public:
   /* True while a dot-source or eval run is on the stack, so return knows it has
      a sourced file to return from even outside a function. */
   pure fn is_sourcing() const wontthrow -> bool { return m_source_depth > 0; }
-  /* A -c body or script-file run has no sourcing frame, so a synthetic root
-     frame pointing at the joined command line is pushed so the analysis and
-     runtime backtraces name the invocation that produced the error. */
   fn push_root_source_frame(const String *parent_source,
                             SourceLocation call_site) throws -> void;
   fn pop_root_source_frame() wontthrow -> void;
@@ -927,6 +927,14 @@ public:
   /* A frame at error_location is dropped. */
   fn print_source_backtrace(
       Maybe<SourceLocation> error_location = None) const throws -> void;
+  fn set_source_traces_enabled(bool enabled) wontthrow -> void
+  {
+    m_should_print_source_traces = enabled;
+  }
+  pure fn should_print_source_traces() const wontthrow -> bool
+  {
+    return m_should_print_source_traces;
+  }
 
   fn render_contained_substitution_error(std::exception_ptr error,
                                          StringView source) throws -> void;
@@ -1742,6 +1750,7 @@ protected:
      one running now, so an error deep in a nested source prints every call
      site. Each frame carries the call site and its parent text. */
   ArrayList<source_frame> m_source_frames{heap_allocator()};
+  bool m_should_print_source_traces{true};
 
   ArrayList<Expression *> m_retained_source_asts{heap_allocator()};
 

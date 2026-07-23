@@ -234,14 +234,6 @@ shit: 18:32: warning: The assignment of 'sum' wraps an arithmetic expansion.
     18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
        |                                 ^~~~~~~~~~~~~~~~ here.
 note: Use `let sum='sum + i'`.
-shit: 21:1: warning: A let runs arithmetic as a command.
-    21 |  let "fact = 1"
-       |  ^~~ here.
-note: Use the ((...)) compound so the operands need no quoting.
-shit: 22:32: warning: A let runs arithmetic as a command.
-    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
-       |                                 ^~~ here.
-note: Use the ((...)) compound so the operands need no quoting.
 1024
 4
 512
