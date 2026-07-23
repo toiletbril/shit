@@ -208,7 +208,7 @@ endif
 endif
 
 ifeq ($(TARGET), Windows_NT)
-ifneq ($(shell command -v ld.lld)$(shell command -v lld),)
+ifneq ($(shell command -v ld.lld 2>/dev/null || command -v lld 2>/dev/null),)
 USE_LD := -fuse-ld=lld
 else
 USE_LD :=
@@ -217,9 +217,9 @@ else ifeq ($(TARGET), Darwin)
 # mold is ELF-only and lld-as-Mach-O is rare on macOS, so the system ld64
 # links directly with no -fuse-ld flag.
 USE_LD :=
-else ifneq ($(shell command -v mold),)
+else ifneq ($(shell command -v mold 2>/dev/null),)
 USE_LD := -fuse-ld=mold
-else ifneq ($(shell command -v ld.lld)$(shell command -v lld),)
+else ifneq ($(shell command -v ld.lld 2>/dev/null || command -v lld 2>/dev/null),)
 USE_LD := -fuse-ld=lld
 else
 USE_LD :=
