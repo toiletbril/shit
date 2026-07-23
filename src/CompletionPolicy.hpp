@@ -376,6 +376,7 @@ inline constexpr static_string_entry<const char *> HELP_ALLOWLIST_ENTRIES[] = {
     {SSK("waydroid"),            "--help"     },
     {SSK("weechat"),             "--help"     },
     {SSK("wget"),                "--help"     },
+    {SSK("winget"),              "--help"     },
     {SSK("wmctrl"),              "--help"     },
     {SSK("xdotool"),             "--help"     },
     {SSK("xh"),                  "--help"     },

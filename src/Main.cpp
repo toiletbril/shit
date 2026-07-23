@@ -191,11 +191,9 @@ static fn run_debug_completion_driver(StringView driver_line,
 static fn run_debug_highlight_driver(StringView driver_line,
                                      EvalContext &context) throws -> i32
 {
-#if !defined NDEBUG
   let const variable_name_visit_count_before =
       context.debug_variable_name_enumeration_count();
   let const directory_read_count_before = utils::debug_directory_read_count();
-#endif
   context.get_program_resolver().begin_explicit_completion(
       ProgramResolver::CompletionRefresh::Fresh);
   defer { context.get_program_resolver().end_explicit_completion(); };
@@ -214,7 +212,6 @@ static fn run_debug_highlight_driver(StringView driver_line,
     }
     listing += '\n';
   }
-#if !defined NDEBUG
   if (os::get_environment_variable("SHIT_TEST_HIGHLIGHT_STATS").has_value()) {
     listing += "highlight-variable-name-visits=";
     listing += String::from(context.debug_variable_name_enumeration_count() -
@@ -231,7 +228,6 @@ static fn run_debug_highlight_driver(StringView driver_line,
                             heap_allocator());
     listing += '\n';
   }
-#endif
   print(listing);
   flush();
   return 0;
@@ -263,7 +259,7 @@ static fn run_debug_ghost_driver(StringView driver_line,
   flush();
   return 0;
 }
-#endif
+#endif /* NDEBUG */
 
 /* The session mood, from --mood when given, then the invocation mood, then the
    strict default. --dumb forces the sh mood when --mood is absent, and --posix
