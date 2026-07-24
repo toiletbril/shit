@@ -249,10 +249,14 @@ fn Expression::try_static_condition_verdict(
   return shit::None;
 }
 
-namespace {
+fn Expression::can_evaluate_in_process_substitution(
+    const EvalContext &cxt, HashSet &active_functions) const throws -> bool
+{
+  unused(cxt);
+  unused(active_functions);
+  return false;
+}
 
-/* The literal name of a command when it is statically known, None when a
-   variable reference or a live glob metacharacter makes it dynamic. */
 fn static_command_name(const Token *token) throws -> Maybe<String>
 {
   ASSERT(token != nullptr);
@@ -280,6 +284,8 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
   }
   return name;
 }
+
+namespace {
 
 fn command_resolves(const String &name, const AnalysisContext &actx) throws
     -> bool

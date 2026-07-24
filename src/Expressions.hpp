@@ -148,6 +148,9 @@ public:
   virtual fn register_defined_functions(AnalysisContext &actx) const throws
       -> void;
 
+  virtual fn can_evaluate_in_process_substitution(
+      const EvalContext &cxt, HashSet &active_functions) const throws -> bool;
+
   /* Some(true) means the condition always succeeds with no side effect,
      Some(false) means it always fails, and None means the result is only known
      at run time. */
@@ -267,6 +270,10 @@ public:
 
   fn as_assign_command() const wontthrow -> const AssignCommand * override;
 
+  fn can_evaluate_in_process_substitution(
+      const EvalContext &cxt, HashSet &active_functions) const throws
+      -> bool override;
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
@@ -340,6 +347,10 @@ public:
 
   fn as_simple_command() const wontthrow -> const SimpleCommand * override;
 
+  fn can_evaluate_in_process_substitution(
+      const EvalContext &cxt, HashSet &active_functions) const throws
+      -> bool override;
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
@@ -381,6 +392,10 @@ public:
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
       -> Maybe<bool> override;
 
+  fn can_evaluate_in_process_substitution(
+      const EvalContext &cxt, HashSet &active_functions) const throws
+      -> bool override;
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
@@ -407,6 +422,10 @@ public:
       -> void override;
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
       -> Maybe<bool> override;
+
+  fn can_evaluate_in_process_substitution(
+      const EvalContext &cxt, HashSet &active_functions) const throws
+      -> bool override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -487,6 +506,10 @@ public:
   pure fn folded_branch_index() const wontthrow -> usize;
 
   fn as_if_clause() const wontthrow -> const IfClause * override;
+
+  fn can_evaluate_in_process_substitution(
+      const EvalContext &cxt, HashSet &active_functions) const throws
+      -> bool override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -614,6 +637,10 @@ public:
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
 
+  fn can_evaluate_in_process_substitution(
+      const EvalContext &cxt, HashSet &active_functions) const throws
+      -> bool override;
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
@@ -664,6 +691,10 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
+
+  fn can_evaluate_in_process_substitution(
+      const EvalContext &cxt, HashSet &active_functions) const throws
+      -> bool override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;

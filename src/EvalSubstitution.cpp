@@ -356,98 +356,118 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
     m_current_location = previous_location;
   };
 
+  Maybe<eval_state_snapshot> in_process_snapshot;
 #if SHIT_PLATFORM_IS POSIX
-  let const pipe = os::make_pipe();
-  if (!pipe)
-    throw ErrorWithLocation{previous_location,
-                            "Could not open a pipe for command substitution"};
-  bool was_pipe_handed_off = false;
-  defer
-  {
-    if (!was_pipe_handed_off) {
-      os::close_fd(pipe->in);
-      os::close_fd(pipe->out);
-    }
-  };
-
-  shit::flush();
-  let const child = os::fork_compound_stage(
-      None, pipe->out, None, previous_location,
-      previous_source != nullptr ? previous_source->view() : StringView{});
-  was_pipe_handed_off = true;
-  if (child == 0) {
-    os::close_fd(pipe->in);
-    m_shell_is_interactive = false;
-    enter_subshell();
-    clear_inherited_exit_trap();
-    std::exception_ptr error;
+  let active_functions = HashSet{scratch_allocator()};
+  bool can_evaluate_in_process =
+      !shell_is_interactive() && get_substitution_depth() <= 16 &&
+      traps().count() == 0 &&
+      ast->can_evaluate_in_process_substitution(*this, active_functions);
+  if (can_evaluate_in_process) {
     try {
-      ast->evaluate(*this);
-    } catch (...) {
-      error = std::current_exception();
+      in_process_snapshot = snapshot_state();
+    } catch (const Error &) {
+      can_evaluate_in_process = false;
     }
-    if (has_pending_control_flow()) {
-      if (pending_control_flow().kind == control_flow::Kind::Exit)
-        set_last_exit_status(static_cast<i32>(pending_control_flow().value));
-      clear_control_flow();
-    }
-    if (!error) {
+  }
+  if (!can_evaluate_in_process) {
+    LOG(Debug, "running the captured substitution in a child process");
+    let const pipe = os::make_pipe();
+    if (!pipe)
+      throw ErrorWithLocation{previous_location,
+                              "Could not open a pipe for command substitution"};
+    bool was_pipe_handed_off = false;
+    defer
+    {
+      if (!was_pipe_handed_off) {
+        os::close_fd(pipe->in);
+        os::close_fd(pipe->out);
+      }
+    };
+
+    shit::flush();
+    let const child = os::fork_compound_stage(
+        None, pipe->out, None, previous_location,
+        previous_source != nullptr ? previous_source->view() : StringView{});
+    was_pipe_handed_off = true;
+    if (child == 0) {
+      os::close_fd(pipe->in);
+      m_shell_is_interactive = false;
+      enter_subshell();
+      clear_inherited_exit_trap();
+      std::exception_ptr error;
       try {
-        run_subshell_exit_trap();
+        ast->evaluate(*this);
       } catch (...) {
         error = std::current_exception();
       }
+      if (has_pending_control_flow()) {
+        if (pending_control_flow().kind == control_flow::Kind::Exit)
+          set_last_exit_status(static_cast<i32>(pending_control_flow().value));
+        clear_control_flow();
+      }
+      if (!error) {
+        try {
+          run_subshell_exit_trap();
+        } catch (...) {
+          error = std::current_exception();
+        }
+      }
+      if (error) {
+        render_contained_substitution_error(error, source.view());
+        set_last_exit_status(1);
+      }
+      shit::flush();
+      os::exit_process_immediately(last_exit_status());
     }
-    if (error) {
-      render_contained_substitution_error(error, source.view());
-      set_last_exit_status(1);
-    }
-    shit::flush();
-    os::exit_process_immediately(last_exit_status());
-  }
 
-  os::close_fd(pipe->out);
-  bool is_input_open = true;
-  bool has_reaped_child = false;
-  defer
-  {
-    if (is_input_open) os::close_fd(pipe->in);
-    if (!has_reaped_child) {
-      unused(os::signal_process(child, 9));
+    os::close_fd(pipe->out);
+    bool is_input_open = true;
+    bool has_reaped_child = false;
+    defer
+    {
+      if (is_input_open) os::close_fd(pipe->in);
+      if (!has_reaped_child) {
+        unused(os::signal_process(child, 9));
+        os::reap_process_quietly(child);
+      }
+    };
+
+    let captured = os::read_fd_to_string(pipe->in, heap_allocator());
+    let const was_read_interrupted =
+        !captured.has_value() && os::INTERRUPT_REQUESTED;
+    os::close_fd(pipe->in);
+    is_input_open = false;
+    if (was_read_interrupted) {
+      unused(os::signal_process(child, 2));
       os::reap_process_quietly(child);
+      has_reaped_child = true;
+      os::INTERRUPT_REQUESTED = 0;
+      throw InterruptErrorWithLocation{previous_location};
     }
-  };
 
-  let captured = os::read_fd_to_string(pipe->in, heap_allocator());
-  let const was_read_interrupted =
-      !captured.has_value() && os::INTERRUPT_REQUESTED;
-  os::close_fd(pipe->in);
-  is_input_open = false;
-  if (was_read_interrupted) {
-    unused(os::signal_process(child, 2));
-    os::reap_process_quietly(child);
+    let was_stopped = false;
+    let const status = os::wait_and_monitor_process(child, &was_stopped);
     has_reaped_child = true;
-    os::INTERRUPT_REQUESTED = 0;
-    throw InterruptErrorWithLocation{previous_location};
+    unused(was_stopped);
+    if (os::INTERRUPT_REQUESTED) {
+      os::INTERRUPT_REQUESTED = 0;
+      throw InterruptErrorWithLocation{previous_location};
+    }
+    set_last_exit_status(status);
+    if (!captured.has_value())
+      throw ErrorWithLocation{previous_location,
+                              "Could not read command substitution output"};
+    while (!captured->is_empty() && captured->back() == '\n')
+      captured->pop_back();
+    return steal(*captured);
   }
-
-  let was_stopped = false;
-  let const status = os::wait_and_monitor_process(child, &was_stopped);
-  has_reaped_child = true;
-  unused(was_stopped);
-  if (os::INTERRUPT_REQUESTED) {
-    os::INTERRUPT_REQUESTED = 0;
-    throw InterruptErrorWithLocation{previous_location};
-  }
-  set_last_exit_status(status);
-  if (!captured.has_value())
-    throw ErrorWithLocation{previous_location,
-                            "Could not read command substitution output"};
-  while (!captured->is_empty() && captured->back() == '\n')
-    captured->pop_back();
-  return steal(*captured);
 #else
-  let snapshot = snapshot_state();
+  in_process_snapshot = snapshot_state();
+#endif
+  LOG(Debug, "running the captured substitution in process");
+  ASSERT(in_process_snapshot.has_value());
+  let snapshot = steal(*in_process_snapshot);
 
   let const pipe = os::make_pipe();
   if (!pipe) throw Error{"Could not open a pipe for command substitution"};
@@ -522,7 +542,6 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   while (!captured.is_empty() && captured.back() == '\n')
     captured.pop_back();
   return captured;
-#endif
 }
 
 fn EvalContext::capture_function_substitution(const WordSegment &segment) throws

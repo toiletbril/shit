@@ -1421,6 +1421,11 @@ fn EvalContext::leave_substitution() wontthrow -> void
   m_substitution_depth--;
 }
 
+pure fn EvalContext::get_substitution_depth() const wontthrow -> usize
+{
+  return m_substitution_depth;
+}
+
 fn EvalContext::enter_parameter_expansion() throws -> void
 {
   if (m_parameter_expansion_depth >= MAX_PARAMETER_EXPANSION_DEPTH) {

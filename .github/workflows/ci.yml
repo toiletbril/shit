@@ -81,7 +81,7 @@ jobs:
               'BEGIN { exit !(s + 0 > 0 && s + 0 < d + 0) }' \
             || { echo "shit is not faster than dash"; exit 1; }
 
-      - name: Assert shit is faster than bash by at least 3 times
+      - name: Assert shit is faster than bash by at least 5 times
         if: '!cancelled()'
         shell: bash
         run: |

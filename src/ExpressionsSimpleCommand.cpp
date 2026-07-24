@@ -20,6 +20,57 @@ namespace shit {
 
 namespace expressions {
 
+static pure fn is_process_dynamic_name(StringView text,
+                                       usize position) wontthrow -> bool
+{
+  static const StringView PROCESS_DYNAMIC_NAMES[] = {
+      "BASHPID",
+      "PPID",
+      "RANDOM",
+      "SRANDOM",
+  };
+  for (let const name : PROCESS_DYNAMIC_NAMES) {
+    if (position + name.length > text.length ||
+        text.substring_of_length(position, name.length) != name)
+    {
+      continue;
+    }
+
+    const usize end_position = position + name.length;
+    const bool has_name_before =
+        position > 0 && lexer::is_variable_name(text[position - 1]);
+    const bool has_name_after = end_position < text.length &&
+                                lexer::is_variable_name(text[end_position]);
+    if (!has_name_before && !has_name_after) return true;
+  }
+
+  return false;
+}
+
+static fn word_is_safe_for_in_process_substitution(const Word &word) wontthrow
+    -> bool
+{
+  for (let const &segment : word.segments) {
+    if (segment.kind == WordSegment::Kind::ProcessSubstitution ||
+        segment.kind == WordSegment::Kind::FunctionSubstitution)
+    {
+      return false;
+    }
+
+    if (segment.kind == WordSegment::Kind::VariableReference) {
+      if (!segment.text.is_empty() && segment.text[0] == '!') return false;
+      if (is_process_dynamic_name(segment.text.view(), 0)) return false;
+    }
+
+    if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
+      for (usize position = 0; position < segment.text.count(); position++)
+        if (is_process_dynamic_name(segment.text.view(), position))
+          return false;
+  }
+
+  return true;
+}
+
 AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
     : Command(location), m_assignment(a)
 {}
@@ -216,6 +267,15 @@ cold fn AssignCommand::to_string() const throws -> String
   return "Assign " + m_assignment->to_ast_string();
 }
 
+fn AssignCommand::can_evaluate_in_process_substitution(
+    const EvalContext &cxt, HashSet &active_functions) const throws -> bool
+{
+  unused(cxt);
+  unused(active_functions);
+  return !is_async() && !is_timed() &&
+         word_is_safe_for_in_process_substitution(m_assignment->value_word());
+}
+
 SimpleCommand::SimpleCommand(SourceLocation location,
                              ArrayList<const Token *> &&args)
     : Command(location), m_args(steal(args))
@@ -232,6 +292,43 @@ SimpleCommand::SimpleCommand(SourceLocation location,
 }
 
 SimpleCommand::~SimpleCommand() = default;
+
+fn SimpleCommand::can_evaluate_in_process_substitution(
+    const EvalContext &cxt, HashSet &active_functions) const throws -> bool
+{
+  if (is_async() || is_timed() || !m_redirections.is_empty() ||
+      !m_array_args.is_empty() || cxt.has_aliases() || m_args.is_empty())
+  {
+    return false;
+  }
+
+  for (let const argument : m_args) {
+    if (argument->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(argument)->word();
+    if (!word_is_safe_for_in_process_substitution(word)) return false;
+  }
+
+  let const command_name = static_command_name(m_args[0]);
+  if (!command_name.has_value()) return false;
+
+  if (let const function_body = cxt.find_function(command_name->view());
+      function_body != nullptr)
+  {
+    if (active_functions.contains(command_name->view())) return true;
+
+    active_functions.add(command_name->view());
+    defer { active_functions.remove(command_name->view()); };
+    return function_body->can_evaluate_in_process_substitution(
+        cxt, active_functions);
+  }
+
+  constexpr PackedStringKey SAFE_BUILTIN_KEYS[] = {
+      SSK(":"),     SSK("echo"),   SSK("false"),  SSK("let"),
+      SSK("local"), SSK("printf"), SSK("return"), SSK("true"),
+  };
+  constexpr StaticStringSet SAFE_BUILTINS{SAFE_BUILTIN_KEYS};
+  return SAFE_BUILTINS.contains(command_name->view());
+}
 
 fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     -> void

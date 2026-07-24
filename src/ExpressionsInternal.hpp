@@ -25,6 +25,8 @@ fn window_function_body_error(EvalContext &cxt,
                               ErrorWithLocation &error) wontthrow
     -> Maybe<StringView>;
 
+fn static_command_name(const Token *token) throws -> Maybe<String>;
+
 namespace expressions {
 
 forceinline fn set_and_return_exit_status(EvalContext &cxt,

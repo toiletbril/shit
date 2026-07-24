@@ -60,6 +60,14 @@ ArithmeticCommand::ArithmeticCommand(SourceLocation location, String expression)
 
 ArithmeticCommand::~ArithmeticCommand() = default;
 
+fn ArithmeticCommand::can_evaluate_in_process_substitution(
+    const EvalContext &cxt, HashSet &active_functions) const throws -> bool
+{
+  unused(cxt);
+  unused(active_functions);
+  return !is_async() && !is_timed();
+}
+
 cold fn ArithmeticCommand::to_string() const throws -> String
 {
   return "ArithmeticCommand";

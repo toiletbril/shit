@@ -24,6 +24,16 @@ CompoundList::CompoundList() : Expression({0, 0}) {}
 
 CompoundList::~CompoundList() = default;
 
+fn CompoundList::can_evaluate_in_process_substitution(
+    const EvalContext &cxt, HashSet &active_functions) const throws -> bool
+{
+  for (let const node : m_nodes)
+    if (!node->can_evaluate_in_process_substitution(cxt, active_functions))
+      return false;
+
+  return true;
+}
+
 pure fn CompoundList::is_empty() const wontthrow -> bool
 {
   return m_nodes.is_empty();
@@ -193,6 +203,13 @@ CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
 {}
 
 CompoundListCondition::~CompoundListCondition() = default;
+
+fn CompoundListCondition::can_evaluate_in_process_substitution(
+    const EvalContext &cxt, HashSet &active_functions) const throws -> bool
+{
+  return m_cmd != nullptr && !m_cmd->is_async() &&
+         m_cmd->can_evaluate_in_process_substitution(cxt, active_functions);
+}
 
 pure fn CompoundListCondition::kind() const wontthrow -> Kind { return m_kind; }
 
@@ -674,6 +691,24 @@ IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
 {}
 
 IfClause::~IfClause() = default;
+
+fn IfClause::can_evaluate_in_process_substitution(
+    const EvalContext &cxt, HashSet &active_functions) const throws -> bool
+{
+  for (let const &branch : m_branches) {
+    if (!branch.condition->can_evaluate_in_process_substitution(
+            cxt, active_functions) ||
+        !branch.body->can_evaluate_in_process_substitution(cxt,
+                                                           active_functions))
+    {
+      return false;
+    }
+  }
+
+  return m_otherwise == nullptr ||
+         m_otherwise->can_evaluate_in_process_substitution(cxt,
+                                                           active_functions);
+}
 
 cold fn IfClause::to_string() const throws -> String { return "IfClause"; }
 
@@ -1383,6 +1418,13 @@ BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
 {}
 
 BraceGroup::~BraceGroup() = default;
+
+fn BraceGroup::can_evaluate_in_process_substitution(
+    const EvalContext &cxt, HashSet &active_functions) const throws -> bool
+{
+  return m_body != nullptr &&
+         m_body->can_evaluate_in_process_substitution(cxt, active_functions);
+}
 
 cold fn BraceGroup::to_string() const throws -> String { return "BraceGroup"; }
 

@@ -1490,6 +1490,7 @@ public:
   fn leave_function_call() wontthrow -> void;
   fn enter_substitution() throws -> void;
   fn leave_substitution() wontthrow -> void;
+  pure fn get_substitution_depth() const wontthrow -> usize;
   fn enter_parameter_expansion() throws -> void;
   fn leave_parameter_expansion() wontthrow -> void;
 
