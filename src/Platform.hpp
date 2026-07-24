@@ -100,7 +100,7 @@ hot forceinline fn pack_little_endian_bytes(u64 *words, const char *bytes,
 #endif
 }
 
-} // namespace shit::os
+} /* namespace shit::os */
 
 #include "ArrayList.hpp"
 #include "Maybe.hpp"
