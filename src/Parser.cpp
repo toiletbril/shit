@@ -1868,21 +1868,19 @@ hot fn Parser::parse_conditional_command() throws -> Command *
       }
       elements.push({Kind::Operand, t});
 
-      /* The right side of =~ is a regex where (, ), and | are ordinary, so the
-         lexer's split into paren and word tokens is rejoined here. A single
-         token is left alone so its expansion still happens. */
       if (word_literal == "=~") {
         Token *peek = m_lexer.peek_shell_token();
         if (peek != nullptr && !is_unquoted_word(peek, "]]") &&
-            peek->kind() != Token::Kind::EndOfFile)
+            peek->kind() != Token::Kind::EndOfFile &&
+            peek->kind() != Token::Kind::DoubleAmpersand &&
+            peek->kind() != Token::Kind::DoublePipe &&
+            peek->kind() != Token::Kind::RightParen)
         {
           m_lexer.advance_past_last_peek();
           Token *const first = peek;
           usize end_position = first->source_location().position +
                                first->source_location().length;
-          /* Segments are carried over rather than the raw source span, so a
-             ${var} still expands while a (, ), or | from unquoted text stays a
-             live regex metacharacter. */
+          usize regex_parenthesis_depth = 0;
           Word regex_word{};
           let const do_append_segments = [&](Token *tok) throws {
             if (tok->kind() == Token::Kind::Word) {
@@ -1892,6 +1890,13 @@ hot fn Parser::parse_conditional_command() throws -> Command *
             } else {
               regex_word.segments.push(WordSegment{
                   WordSegment::Kind::UnquotedText, tok->raw_string(), false});
+            }
+            if (tok->kind() == Token::Kind::LeftParen)
+              ++regex_parenthesis_depth;
+            if (tok->kind() == Token::Kind::RightParen &&
+                regex_parenthesis_depth > 0)
+            {
+              --regex_parenthesis_depth;
             }
           };
           do_append_segments(first);
@@ -1903,15 +1908,32 @@ hot fn Parser::parse_conditional_command() throws -> Command *
             {
               break;
             }
-            if (next->source_location().position != end_position) break;
+            if (regex_parenthesis_depth == 0 &&
+                (next->kind() == Token::Kind::DoubleAmpersand ||
+                 next->kind() == Token::Kind::DoublePipe ||
+                 next->kind() == Token::Kind::RightParen))
+            {
+              break;
+            }
+            if (next->source_location().position != end_position) {
+              if (regex_parenthesis_depth == 0) break;
+              regex_word.segments.push(WordSegment{
+                  WordSegment::Kind::UnquotedText,
+                  m_lexer.source().substring_of_length(
+                      end_position,
+                      next->source_location().position - end_position),
+                  false});
+            }
             m_lexer.advance_past_last_peek();
             end_position = next->source_location().position +
                            next->source_location().length;
             do_append_segments(next);
           }
-          elements.push({Kind::Operand,
-                         m_lexer.arena().create<tokens::WordToken>(
-                             first->source_location(), steal(regex_word))});
+          SourceLocation regex_location = first->source_location();
+          regex_location.length = end_position - regex_location.position;
+          elements.push(
+              {Kind::Operand, m_lexer.arena().create<tokens::WordToken>(
+                                  regex_location, steal(regex_word))});
         }
       }
       break;

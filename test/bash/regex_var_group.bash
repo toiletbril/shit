@@ -10,3 +10,10 @@ v=x
 [[ xy =~ ${v}(y) ]] && echo "grp=${BASH_REMATCH[1]}"
 [[ axb =~ a"."b ]] && echo "quoted-dot-literal-matched" || echo "quoted-dot-literal-no-match"
 [[ a.b =~ a"."b ]] && echo "quoted-dot-exact-matched"
+PROMPT_COMMAND='alpha; shell_session_history_check ; omega'
+if [[ $PROMPT_COMMAND =~ (.*)(; *shell_session_history_check *| *shell_session_history_check *; *)(.*) ]]; then
+    printf 'apple=%s|%s|%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+fi
+[[ 'a b' =~ (a b|c) ]] && echo 'spaced-group'
+[[ ab =~ a(b) && ab == ab ]] && echo 'and-boundary'
+[[ ab == ab && ( ab =~ a(b) ) ]] && echo 'paren-boundary'
