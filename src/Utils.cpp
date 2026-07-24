@@ -206,7 +206,6 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
     {
       LOG(Debug, "execute_context mimicking the shell for '%s'",
           ec.program().c_str());
-#if SHIT_PLATFORM_IS POSIX
       if (cxt.shell_is_interactive() && os::shell_has_controlling_terminal()) {
         let const command = String{ec.program().view()};
 
@@ -215,47 +214,56 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
         let const sync_pipe = os::make_pipe();
 
         shit::flush();
-        let const child = os::fork_job_process();
-        if (os::process_id_of(child) == 0) {
+        let const forked_child = os::try_fork_job_process();
+        if (forked_child.has_value()) {
+          const os::process child = *forked_child;
+          if (os::process_id_of(child) == 0) {
+            if (sync_pipe.has_value()) {
+              /* The child drops its write end so the read unblocks on EOF if
+                 the parent dies before the handoff. */
+              os::close_fd(sync_pipe->out);
+              char handoff_byte = 0;
+              (void) os::read_fd(sync_pipe->in, &handoff_byte, 1);
+              os::close_fd(sync_pipe->in);
+            }
+            i32 status = 1;
+            try {
+              status =
+                  cxt.run_mimicked_script(ec, *mode, script_isolation::Shared);
+            } catch (const ErrorBase &error) {
+              const String *source = cxt.current_source();
+              show_message(error.to_string(source != nullptr ? source->view()
+                                                             : StringView{}));
+              status = static_cast<i32>(error.command_status());
+            } catch (...) {}
+            os::exit_process_immediately(status);
+          }
+
           if (sync_pipe.has_value()) {
-            /* The child drops its write end so the read unblocks on EOF if
-               the parent dies before the handoff. */
-            os::close_fd(sync_pipe->out);
-            char handoff_byte = 0;
-            (void) os::read_fd(sync_pipe->in, &handoff_byte, 1);
             os::close_fd(sync_pipe->in);
           }
-          i32 status = 1;
-          try {
-            status =
-                cxt.run_mimicked_script(ec, *mode, script_isolation::Shared);
-          } catch (const ErrorBase &error) {
-            const String *source = cxt.current_source();
-            show_message(error.to_string(source != nullptr ? source->view()
-                                                           : StringView{}));
-            status = static_cast<i32>(error.command_status());
-          } catch (...) {}
-          os::exit_process_immediately(status);
+          os::give_controlling_terminal_to(child);
+          if (sync_pipe.has_value()) {
+            (void) os::write_fd(sync_pipe->out, "x", 1);
+            os::close_fd(sync_pipe->out);
+          }
+
+          let was_stopped = false;
+          const i32 status = os::wait_and_monitor_process(child, &was_stopped);
+          os::reclaim_controlling_terminal();
+
+          if (was_stopped) {
+            const i32 id = cxt.register_stopped_job(child, command, status);
+            cxt.notify_stopped_job(id, command.view());
+          }
+          return status;
         }
 
-        if (sync_pipe.has_value()) os::close_fd(sync_pipe->in);
-        os::give_controlling_terminal_to(child);
         if (sync_pipe.has_value()) {
-          (void) os::write_fd(sync_pipe->out, "x", 1);
+          os::close_fd(sync_pipe->in);
           os::close_fd(sync_pipe->out);
         }
-
-        let was_stopped = false;
-        const i32 status = os::wait_and_monitor_process(child, &was_stopped);
-        os::reclaim_controlling_terminal();
-
-        if (was_stopped) {
-          const i32 id = cxt.register_stopped_job(child, command, status);
-          cxt.notify_stopped_job(id, command.view());
-        }
-        return status;
       }
-#endif
       return cxt.run_mimicked_script(ec, *mode,
                                      can_replace_shell
                                          ? script_isolation::Shared
@@ -433,57 +441,49 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       child_stage.push(stage_index);
       last_child = child;
     } else if (!is_last) {
-#if SHIT_PLATFORM_IS POSIX
-      /* A non-last builtin stage forks, an in-process run deadlocks when it
-         fills the pipe buffer before its consumer starts. */
       let const source = cxt.current_source();
-      const os::process child = os::fork_compound_stage(
+      let const forked_child = os::try_fork_compound_stage(
           ec.in_fd, ec.out_fd, ec.err_fd, ec.source_location(),
           source != nullptr ? source->view() : StringView{});
-      if (child == 0) {
-        /* fork_compound_stage already placed the pipe ends, so the context's
-           descriptors are cleared. */
-        ec.in_fd = shit::None;
-        ec.out_fd = shit::None;
-        ec.err_fd = shit::None;
-        /* A forked builtin never execs, so it closes the read end by hand or a
-           write never sees the reader leave. */
-        if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
+      if (!forked_child.has_value()) {
         cxt.set_in_pipeline_stage(true);
-        cxt.enter_subshell();
-        i32 child_status = 0;
-        try {
-          child_status = execute_builtin(steal(ec), cxt);
-        } catch (const BrokenPipeExit &) {
-          child_status = SHIT_BROKEN_PIPE_EXIT_STATUS;
-        } catch (const ErrorWithLocation &e) {
-          const String *source = cxt.current_source();
-          shit::show_message(
-              e.to_string(source != nullptr ? source->view() : StringView{}));
-          child_status = static_cast<i32>(e.command_status());
-        } catch (const Error &e) {
-          shit::show_message(e.to_string());
-          child_status = static_cast<i32>(e.command_status());
-        } catch (...) {
-          child_status = 1;
+        defer { cxt.set_in_pipeline_stage(false); };
+        ret = execute_builtin(steal(ec), cxt);
+        stage_status[stage_index] = ret;
+      } else {
+        const os::process child = *forked_child;
+        if (os::process_id_of(child) == 0) {
+          ec.in_fd = shit::None;
+          ec.out_fd = shit::None;
+          ec.err_fd = shit::None;
+          if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
+          cxt.set_in_pipeline_stage(true);
+          cxt.enter_subshell();
+          i32 child_status = 0;
+          try {
+            child_status = execute_builtin(steal(ec), cxt);
+          } catch (const BrokenPipeExit &) {
+            child_status = SHIT_BROKEN_PIPE_EXIT_STATUS;
+          } catch (const ErrorWithLocation &e) {
+            const String *source = cxt.current_source();
+            shit::show_message(
+                e.to_string(source != nullptr ? source->view() : StringView{}));
+            child_status = static_cast<i32>(e.command_status());
+          } catch (const Error &e) {
+            shit::show_message(e.to_string());
+            child_status = static_cast<i32>(e.command_status());
+          } catch (...) {
+            child_status = 1;
+          }
+          shit::flush();
+          os::exit_process_immediately(child_status);
         }
-        shit::flush();
-        os::exit_process_immediately(child_status);
+
+        ec.close_fds();
+        children.push(child);
+        child_stage.push(stage_index);
+        last_child = child;
       }
-      /* The parent keeps no copy of the pipe ends, or the reader never sees the
-         writer close. */
-      ec.close_fds();
-      children.push(child);
-      child_stage.push(stage_index);
-      last_child = child;
-#else
-      /* Windows has no fork, a non-last builtin stage runs in process and can
-         block when it fills the pipe buffer. */
-      cxt.set_in_pipeline_stage(true);
-      defer { cxt.set_in_pipeline_stage(false); };
-      ret = execute_builtin(steal(ec), cxt);
-      stage_status[stage_index] = ret;
-#endif
     } else {
       /* The last builtin stage runs in this process so a cd affects the shell.
          The flag makes exec spawn a child rather than replace the shell. */

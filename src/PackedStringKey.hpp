@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "Platform.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
 
@@ -33,15 +34,7 @@ public:
     PackedStringKey key{};
     let const count =
         text.count() < BYTE_CAPACITY ? text.count() : BYTE_CAPACITY;
-#if defined __BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    /* The little-endian byte layout is exactly what from_literal builds, so one
-       copy replaces the per-byte shift and div/mod on this hot lookup path. */
-    __builtin_memcpy(reinterpret_cast<char *>(key.words), text.data, count);
-#else
-    for (usize i = 0; i < count; i++)
-      key.words[i / 8] |= static_cast<u64>(static_cast<u8>(text[i]))
-                          << (8 * (i % 8));
-#endif
+    os::pack_little_endian_bytes(key.words, text.data, count);
     return key;
   }
 

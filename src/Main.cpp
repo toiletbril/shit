@@ -145,13 +145,6 @@ FLAG(DEBUG_GHOST_AT, String, '\0', "debug-ghost-at", Debug,
      "Print the ghost completion result and operation counts, then exit.");
 #endif
 
-#if SHIT_PLATFORM_IS COSMO
-FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", Debug,
-     "Trace functions under Cosmopolitan.");
-FLAG(COSMO_STRACE, Bool, '\0', "strace", Debug,
-     "Trace system calls under Cosmopolitan.");
-#endif
-
 namespace shit {
 
 fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &
@@ -808,11 +801,8 @@ pure fn quoted_argv_offset_until(int argc, const char *const *argv,
 
 fn main(int argc, char **argv) -> int
 {
-#if SHIT_PLATFORM_IS COSMO
-  ShowCrashReports();
-  unused(FLAG_COSMO_FTRACE);
-  unused(FLAG_COSMO_STRACE);
-#endif
+  shit::os::initialize_platform_runtime();
+  shit::os::register_platform_flags(FLAG_LIST);
 
   /* A symlink or rename to a shitbox utility name runs that utility directly,
      before any flag parsing, so `ls -l` reaches ls and its own flag parser. */

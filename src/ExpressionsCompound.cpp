@@ -394,35 +394,25 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       }
       if (!is_first) stage_in = last_stdin;
 
-#if SHIT_PLATFORM_IS WIN32
-      /* Windows has no fork. A stage whose full source span the parser recorded
-         re-execs in a fresh shell with the pipe ends as its stdin and stdout. A
-         stage without a recorded span falls through to fork_compound_stage,
-         which reports it unsupported. */
-      const SourceLocation stage_location = stage->source_location();
-      const String *stage_source = cxt.current_source();
-      os::process child = SHIT_INVALID_PROCESS;
+      let const stage_location = stage->source_location();
+      let const stage_source = cxt.current_source();
+      let stage_text = StringView{};
       if (stage_source != nullptr &&
           stage->source_end_position() >
               stage_location.position + stage_location.length)
       {
-        const StringView stage_text = stage_source->view().substring_of_length(
+        stage_text = stage_source->view().substring_of_length(
             stage_location.position,
             stage->source_end_position() - stage_location.position);
-        Maybe<os::process> spawned_stage = os::spawn_subshell_stage(
-            stage_text, stage_in, stage_out, cxt.is_bash_compatible());
-        if (!spawned_stage.has_value())
-          throw ErrorWithLocation{
-              stage_location, "Could not spawn the compound pipeline stage"};
-        child = *spawned_stage;
-      } else {
-        child = os::fork_compound_stage(stage_in, stage_out, {});
       }
-#else
-      const os::process child =
-          os::fork_compound_stage(stage_in, stage_out, {});
 
-      if (child == 0) {
+      let const launch = os::launch_compound_stage(
+          stage_text, stage_in, stage_out, cxt.is_bash_compatible(),
+          stage_location,
+          stage_source != nullptr ? stage_source->view() : StringView{});
+      let const child = launch.child;
+
+      if (launch.should_evaluate_child) {
         /* This child inherited the read end of its own output pipe. A stage
            that runs its command as a grandchild would otherwise keep the pipe
            open and a producer in this stage would never see its consumer
@@ -458,7 +448,6 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         shit::flush();
         os::exit_process_immediately(stage_status);
       }
-#endif
 
       /* The parent keeps neither pipe end open past the stage that owns it,
          otherwise a reader never sees the writer close. */

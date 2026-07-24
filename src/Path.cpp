@@ -1,5 +1,6 @@
 #include "Path.hpp"
 
+#include "MimicMood.hpp"
 #include "PackedStringKey.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"

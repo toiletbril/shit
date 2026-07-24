@@ -266,9 +266,8 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
   if (!slot.has_value()) return;
-  if (SetStdHandle(*slot,
-                   saved.was_open ? saved.saved : INVALID_HANDLE_VALUE) ==
-      FALSE)
+  if (SetStdHandle(*slot, saved.was_open ? saved.saved
+                                         : INVALID_HANDLE_VALUE) == FALSE)
     return;
   if (saved.is_dup2_ok && saved.replacement != nullptr &&
       saved.replacement != INVALID_HANDLE_VALUE)
@@ -374,8 +373,7 @@ fn capture_program_output(const ArrayList<String> &argv,
   SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
   HANDLE read_end = INVALID_HANDLE_VALUE;
   HANDLE write_end = INVALID_HANDLE_VALUE;
-  if (CreatePipe(&read_end, &write_end, &inheritable, 0) == FALSE)
-    return None;
+  if (CreatePipe(&read_end, &write_end, &inheritable, 0) == FALSE) return None;
   defer { CloseHandle(read_end); };
   defer { CloseHandle(write_end); };
   if (SetHandleInformation(read_end, HANDLE_FLAG_INHERIT, 0) == FALSE)
@@ -423,9 +421,9 @@ fn capture_program_output(const ArrayList<String> &argv,
 
     if (available_byte_count != 0) {
       char buffer[4096];
-      let const requested_count =
-          available_byte_count < sizeof(buffer) ? available_byte_count
-                                                : sizeof(buffer);
+      let const requested_count = available_byte_count < sizeof(buffer)
+                                      ? available_byte_count
+                                      : sizeof(buffer);
       DWORD read_count = 0;
       if (ReadFile(read_end, buffer, requested_count, &read_count, nullptr) ==
           FALSE)
@@ -1116,9 +1114,9 @@ fn get_environment_variable(StringView key) -> Maybe<String>
   String key_string{key};
   char inline_buffer[256];
   SetLastError(ERROR_SUCCESS);
-  let required_size = GetEnvironmentVariableA(
-      key_string.c_str(), inline_buffer,
-      static_cast<DWORD>(countof(inline_buffer)));
+  let required_size =
+      GetEnvironmentVariableA(key_string.c_str(), inline_buffer,
+                              static_cast<DWORD>(countof(inline_buffer)));
   if (required_size == 0) {
     return GetLastError() == ERROR_ENVVAR_NOT_FOUND
                ? Maybe<String>{}
@@ -1366,10 +1364,10 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
 
   /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
    */
-  if (CreateProcessA(application_path,
-                     const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
-                     should_inherit_handles, creation_flags, environment_block,
-                     nullptr, &startup_info, &process_info) == 0)
+  if (CreateProcessA(application_path, const_cast<LPSTR>(command_line.data()),
+                     nullptr, nullptr, should_inherit_handles, creation_flags,
+                     environment_block, nullptr, &startup_info,
+                     &process_info) == 0)
   {
     if (allow_script_fallback && GetLastError() == ERROR_BAD_EXE_FORMAT) {
       were_handles_handed_to_fallback = true;
@@ -1409,8 +1407,8 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   return process_info.hProcess;
 }
 
-fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
-    -> Maybe<String>
+static fn run_substitution_to_temp(StringView source,
+                                   bool bash_compatible) throws -> Maybe<String>
 {
   /* Windows has no fork, so <(cmd) spawns a fresh shell that writes its output
      into a temp file the consumer reads by path. The whole output is written
@@ -1479,9 +1477,29 @@ fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
   return result;
 }
 
-fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
-                        Maybe<descriptor> out_fd, bool bash_compatible) throws
-    -> Maybe<process>
+fn launch_process_substitution(StringView source, bool command_writes_pipe,
+                               bool bash_compatible) throws
+    -> process_substitution_launch
+{
+  if (!command_writes_pipe)
+    throw Error{"Unable to run a >(cmd) process substitution because it is not "
+                "supported on this platform"};
+
+  let path = run_substitution_to_temp(source, bash_compatible);
+  if (!path.has_value())
+    throw Error{"Unable to run the process substitution because the inner "
+                "shell could not be spawned: " +
+                last_system_error_message()};
+
+  return process_substitution_launch{
+      .path = steal(*path),
+      .is_temporary_file = true,
+  };
+}
+
+static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
+                               Maybe<descriptor> out_fd,
+                               bool bash_compatible) throws -> Maybe<process>
 {
   /* Windows has no fork, so a compound pipeline stage re-parses its source in a
      fresh shell, returned unwaited for the pipeline to reap. */
@@ -1524,23 +1542,43 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
   return process_info.hProcess;
 }
 
-fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                       Maybe<descriptor> err_fd, SourceLocation location,
-                       StringView) -> process
+fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+                           Maybe<descriptor> err_fd, SourceLocation location,
+                           StringView source) -> Maybe<process>
 {
   unused(in_fd);
   unused(out_fd);
   unused(err_fd);
-  /* Reached only for a stage whose end position the parser does not yet record.
-   */
-  throw shit::ErrorWithLocation{
-      steal(location),
-      "A compound command in a pipeline is not supported on this platform"};
+  unused(location);
+  unused(source);
+  return shit::None;
 }
 
-fn fork_job_process() -> process
+fn try_fork_job_process() -> Maybe<process> { return shit::None; }
+
+fn can_fork_evaluator() wontthrow -> bool { return false; }
+
+fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
+                         Maybe<descriptor> out_fd, bool bash_compatible,
+                         SourceLocation location,
+                         StringView diagnostic_source) throws
+    -> compound_stage_launch
 {
-  throw shit::Error{"Job control is not supported on this platform"};
+  unused(diagnostic_source);
+  if (source.is_empty())
+    throw ErrorWithLocation{
+        steal(location),
+        "A compound command in a pipeline is not supported on this platform"};
+
+  let child = spawn_subshell_stage(source, in_fd, out_fd, bash_compatible);
+  if (!child.has_value())
+    throw ErrorWithLocation{steal(location),
+                            "Could not spawn the compound pipeline stage"};
+
+  return compound_stage_launch{
+      .child = *child,
+      .should_evaluate_child = false,
+  };
 }
 
 [[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void
@@ -1741,8 +1779,8 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
 
   usize written_size = 0;
   while (written_size < content.count()) {
-    let const write_size = write_fd(
-        handle, content.data + written_size, content.count() - written_size);
+    let const write_size = write_fd(handle, content.data + written_size,
+                                    content.count() - written_size);
     if (!write_size.has_value() || *write_size == 0) {
       close_fd(handle);
       return shit::None;
@@ -1987,7 +2025,7 @@ cold fn last_system_error_message() throws -> String
   if (ret == 0) {
     return String::from(win_errno, heap_allocator()) +
            StringView{" (Error message could not be processed due to "
-                       "a FormatMessage() failure)"};
+                      "a FormatMessage() failure)"};
   }
   defer { LocalFree(errno_str); };
 
@@ -2257,9 +2295,9 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
   const u64 start_nanos = monotonic_nanos();
 
   /* CreateProcessA may rewrite lpCommandLine in place. */
-  if (CreateProcessA(nullptr, const_cast<LPSTR>(command_line.data()),
-                     nullptr, nullptr, should_inherit_handles, 0, nullptr,
-                     nullptr, &startup, &process_info) == 0)
+  if (CreateProcessA(nullptr, const_cast<LPSTR>(command_line.data()), nullptr,
+                     nullptr, should_inherit_handles, 0, nullptr, nullptr,
+                     &startup, &process_info) == 0)
     return None;
   defer { CloseHandle(process_info.hProcess); };
   defer { CloseHandle(process_info.hThread); };
@@ -2541,6 +2579,13 @@ fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
 {
   return fd == descriptor_for_shell_fd(shell_fd);
 }
+
+fn register_platform_flags(ArrayList<Flag *> &flags) throws -> void
+{
+  unused(flags);
+}
+
+fn initialize_platform_runtime() wontthrow -> void {}
 
 } /* namespace os */
 } /* namespace shit */

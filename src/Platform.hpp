@@ -86,6 +86,22 @@ extern "C" void __lsan_disable(void);
 extern char **environ;
 #endif
 
+namespace shit::os {
+
+hot forceinline fn pack_little_endian_bytes(u64 *words, const char *bytes,
+                                            usize count) wontthrow -> void
+{
+#if defined __BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  __builtin_memcpy(reinterpret_cast<char *>(words), bytes, count);
+#else
+  for (usize index = 0; index < count; index++)
+    words[index / 8] |= static_cast<u64>(static_cast<u8>(bytes[index]))
+                        << (8 * (index % 8));
+#endif
+}
+
+} // namespace shit::os
+
 #include "ArrayList.hpp"
 #include "Maybe.hpp"
 #include "Path.hpp"
@@ -94,6 +110,7 @@ extern char **environ;
 namespace shit {
 
 class ExecContext;
+class Flag;
 
 namespace os {
 
@@ -322,11 +339,6 @@ private:
   ArrayList<Path> m_paths{heap_allocator()};
 #endif
 };
-
-#if SHIT_PLATFORM_IS WIN32
-fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
-    -> Maybe<String>;
-#endif
 
 fn get_file_creation_mask() wontthrow -> u32;
 fn set_file_creation_mask(u32 mask) wontthrow -> void;
@@ -867,18 +879,42 @@ fn capture_program_output(const ArrayList<String> &argv,
 fn give_controlling_terminal_to(process p) wontthrow -> void;
 fn reclaim_controlling_terminal() wontthrow -> void;
 
-fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                       Maybe<descriptor> err_fd, SourceLocation location = {},
-                       StringView source = {}) throws -> process;
+struct process_substitution_launch
+{
+  String path{heap_allocator()};
+  Maybe<descriptor> retained_fd{};
+  Maybe<descriptor> child_close_fd{};
+  process child{SHIT_INVALID_PROCESS};
+  bool should_evaluate_child{false};
+  bool is_temporary_file{false};
+};
 
-/* In the child it returns zero so the caller runs the job and exits. */
-fn fork_job_process() throws -> process;
+fn launch_process_substitution(StringView source, bool command_writes_pipe,
+                               bool bash_compatible) throws
+    -> process_substitution_launch;
 
-#if SHIT_PLATFORM_IS WIN32
-fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
-                        Maybe<descriptor> out_fd, bool bash_compatible) throws
-    -> Maybe<process>;
-#endif
+fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+                           Maybe<descriptor> err_fd,
+                           SourceLocation location = {},
+                           StringView source = {}) throws -> Maybe<process>;
+
+fn try_fork_job_process() throws -> Maybe<process>;
+fn can_fork_evaluator() wontthrow -> bool;
+
+struct compound_stage_launch
+{
+  process child{SHIT_INVALID_PROCESS};
+  bool should_evaluate_child{false};
+};
+
+fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
+                         Maybe<descriptor> out_fd, bool bash_compatible,
+                         SourceLocation location = {},
+                         StringView diagnostic_source = {}) throws
+    -> compound_stage_launch;
+
+fn register_platform_flags(ArrayList<Flag *> &flags) throws -> void;
+fn initialize_platform_runtime() wontthrow -> void;
 
 /* A forked pipeline-stage child calls this so it never runs the parent's
    cleanup inside the duplicated process. */

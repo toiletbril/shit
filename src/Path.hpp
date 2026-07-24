@@ -4,11 +4,12 @@
 #include "Common.hpp"
 #include "ErrorOr.hpp"
 #include "Maybe.hpp"
-#include "MimicMood.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
 
 namespace shit {
+
+enum class mimic_mood : u8;
 
 /* A forward slash is always accepted on input, even on Windows, so a script
    written for POSIX keeps working. */

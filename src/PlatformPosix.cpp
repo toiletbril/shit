@@ -42,6 +42,8 @@ namespace shit {
 
 namespace os {
 
+static fn fork_job_process() throws -> process;
+
 hot fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>
 {
@@ -1012,7 +1014,7 @@ hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
     }
 
     shit::flush();
-    let const child = os::fork_job_process();
+    let const child = fork_job_process();
     if (child == 0) {
       os::close_fd(start_pipe->out);
       os::close_fd(outcome_pipe->in);
@@ -1343,9 +1345,10 @@ fn reclaim_controlling_terminal() wontthrow -> void
   signal(SIGTTOU, previous);
 }
 
-fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                       Maybe<descriptor> err_fd, SourceLocation location,
-                       StringView source) throws -> process
+static fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+                              Maybe<descriptor> err_fd,
+                              SourceLocation location = {},
+                              StringView source = {}) throws -> process
 {
   LOG(Debug, "forking a compound pipeline stage");
 
@@ -1388,7 +1391,7 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   return child_pid;
 }
 
-fn fork_job_process() throws -> process
+static fn fork_job_process() throws -> process
 {
   LOG(Debug, "forking a mimicked job into its own process group");
 
@@ -1410,6 +1413,84 @@ fn fork_job_process() throws -> process
 
   (void) setpgid(child_pid, child_pid);
   return child_pid;
+}
+
+fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+                           Maybe<descriptor> err_fd, SourceLocation location,
+                           StringView source) throws -> Maybe<process>
+{
+  return fork_compound_stage(in_fd, out_fd, err_fd, location, source);
+}
+
+fn try_fork_job_process() throws -> Maybe<process>
+{
+  return fork_job_process();
+}
+
+fn can_fork_evaluator() wontthrow -> bool { return true; }
+
+fn launch_process_substitution(StringView source, bool command_writes_pipe,
+                               bool bash_compatible) throws
+    -> process_substitution_launch
+{
+  unused(source);
+  unused(bash_compatible);
+
+  let const pipe = make_pipe();
+  if (!pipe.has_value())
+    throw Error{"Could not open a pipe for the process substitution: " +
+                last_system_error_message()};
+
+  bool was_pipe_handed_off = false;
+  defer
+  {
+    if (!was_pipe_handed_off) {
+      close_fd(pipe->in);
+      close_fd(pipe->out);
+    }
+  };
+
+  const process child = command_writes_pipe
+                            ? fork_compound_stage(None, pipe->out, None)
+                            : fork_compound_stage(pipe->in, None, None);
+  was_pipe_handed_off = true;
+
+  if (child == 0) {
+    return process_substitution_launch{
+        .child_close_fd = command_writes_pipe ? Maybe<descriptor>{pipe->in}
+                                              : Maybe<descriptor>{pipe->out},
+        .child = child,
+        .should_evaluate_child = true,
+    };
+  }
+
+  const descriptor retained_fd = command_writes_pipe ? pipe->in : pipe->out;
+  close_fd(command_writes_pipe ? pipe->out : pipe->in);
+  make_fd_inheritable(retained_fd);
+
+  let path = String{"/dev/fd/"};
+  path += String::from(static_cast<i64>(retained_fd), heap_allocator());
+  return process_substitution_launch{
+      .path = steal(path),
+      .retained_fd = retained_fd,
+      .child = child,
+  };
+}
+
+fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
+                         Maybe<descriptor> out_fd, bool bash_compatible,
+                         SourceLocation location,
+                         StringView diagnostic_source) throws
+    -> compound_stage_launch
+{
+  unused(source);
+  unused(bash_compatible);
+  const process child =
+      fork_compound_stage(in_fd, out_fd, None, location, diagnostic_source);
+  return compound_stage_launch{
+      .child = child,
+      .should_evaluate_child = child == 0,
+  };
 }
 
 [[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void
@@ -2536,6 +2617,27 @@ fn set_file_creation_mask(u32 mask) wontthrow -> void { SHIT_UMASK(mask); }
 fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
 {
   return fd == descriptor_for_shell_fd(shell_fd);
+}
+
+fn register_platform_flags(ArrayList<Flag *> &flags) throws -> void
+{
+#if SHIT_PLATFORM_IS COSMO
+  static FlagBool ftrace{'\0', "ftrace", flag_section::Debug,
+                         "Trace functions under Cosmopolitan."};
+  static FlagBool strace{'\0', "strace", flag_section::Debug,
+                         "Trace system calls under Cosmopolitan."};
+  flags.push(&ftrace);
+  flags.push(&strace);
+#else
+  unused(flags);
+#endif
+}
+
+fn initialize_platform_runtime() wontthrow -> void
+{
+#if SHIT_PLATFORM_IS COSMO
+  ShowCrashReports();
+#endif
 }
 
 } /* namespace os */

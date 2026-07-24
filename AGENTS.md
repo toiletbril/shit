@@ -175,12 +175,11 @@ get_processor_counts wrapper provides the affinity-limited and configured
 logical CPU counts used by shitbox nproc.
 An interactive timeout child waits behind a start pipe until its process group
 owns the controlling terminal.
-The remaining platform conditionals outside the platform files and Utils.cpp
-are the fork-based command and process substitutions in EvalSubstitution.cpp,
-the parenthesized subshell in ExpressionsArith.cpp, and the pipeline stage in
-ExpressionsCompound.cpp. They run the shell's own AST in the forked child and
-cannot cross the os boundary. Main.cpp also holds the Cosmopolitan-only debug
-flags.
+Fork-backed evaluator launches are routed through os wrappers. The POSIX
+implementation evaluates the inherited AST in the child. The Windows
+implementation selects an in-process fallback or starts a fresh shell from the
+recorded source. Platform-specific flags and runtime initialization are also
+registered through os wrappers.
 
 src/Completion.cpp drives zero config completion. Completion first slices the
 buffer to the command segment holding the cursor, and the slice is quote aware,

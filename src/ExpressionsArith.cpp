@@ -394,10 +394,13 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
-#if SHIT_PLATFORM_IS POSIX
   shit::flush();
-  let const child = os::fork_compound_stage(None, None, None);
-  if (child == 0) {
+  let const forked_child = os::try_fork_compound_stage(None, None, None);
+  if (!forked_child.has_value())
+    return evaluate_subshell_in_process(m_body, cxt);
+
+  const os::process child = *forked_child;
+  if (os::process_id_of(child) == 0) {
     i32 status = 1;
     try {
       status = static_cast<i32>(evaluate_subshell_in_process(m_body, cxt));
@@ -416,9 +419,6 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const status = os::wait_and_monitor_process(child, &was_stopped);
   unused(was_stopped);
   SET_AND_RETURN_EXIT_STATUS(cxt, status);
-#else
-  return evaluate_subshell_in_process(m_body, cxt);
-#endif
 }
 
 cold fn Subshell::analyze(AnalysisContext &actx,
