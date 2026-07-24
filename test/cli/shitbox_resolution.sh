@@ -18,8 +18,10 @@ echo "=== default mood, empty PATH, falls back to shitbox ==="
 echo "rc=$?"
 
 echo "=== sh mood, empty PATH, not found ==="
-"$BIN" --mood sh -c 'PATH=; seq 3' 2>&1 | ./normalize-trace.sh "$BIN"; rc=${PIPESTATUS[0]}
-echo "rc=$rc"
+{
+    "$BIN" --mood sh -c 'PATH=; seq 3' 2>&1
+    printf 'rc=%s\n' "$?"
+} | ./normalize-trace.sh "$BIN"
 
 echo "=== set -o shitbox turns bare names on ==="
 "$BIN" -c 'PATH=; set -o shitbox; seq 3'

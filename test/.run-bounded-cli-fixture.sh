@@ -17,6 +17,20 @@ esac
 
 list_fixture_session_processes()
 {
+    if [ "$host_system" = Linux ]; then
+        for process_stat_path in /proc/[0-9]*/stat; do
+            [ -r "$process_stat_path" ] || continue
+            IFS= read -r process_stat < "$process_stat_path" || continue
+            process_fields=${process_stat##*) }
+            set -- $process_fields
+            [ "$#" -ge 4 ] || continue
+            [ "$4" = "$fixture_session" ] || continue
+            process_id=${process_stat_path#/proc/}
+            printf '%s\n' "${process_id%/stat}"
+        done
+        return
+    fi
+
     if [ "$host_system" = Darwin ]; then
         process_ids=$(ps -Ao pid= 2>/dev/null) || return 1
         printf '%s\n' "$process_ids" | perl -e '

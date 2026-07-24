@@ -1,3 +1,5 @@
 unset SHIT_FLAGS
-"$BIN" -c 'local --help' 2>&1 | ./normalize-trace.sh "$BIN"
-echo "rc=${PIPESTATUS[0]}"
+{
+    "$BIN" -c 'local --help' 2>&1
+    printf 'rc=%s\n' "$?"
+} | ./normalize-trace.sh "$BIN"

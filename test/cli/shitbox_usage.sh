@@ -7,7 +7,10 @@ unset SHIT_FLAGS
 echo "--- builtin getopts with no arguments ---"
 "$BIN" -c 'getopts' 2>&1; echo "rc=$?"
 echo "--- builtin let with no expression ---"
-"$BIN" -c 'let' 2>&1 | ./normalize-trace.sh "$BIN"; echo "rc=${PIPESTATUS[0]}"
+{
+    "$BIN" -c 'let' 2>&1
+    printf 'rc=%s\n' "$?"
+} | ./normalize-trace.sh "$BIN"
 echo "--- calc with no expression ---"
 "$BIN" -c 'shitbox calc' 2>&1; echo "rc=$?"
 echo "--- shitbox cp with one operand ---"

@@ -15,7 +15,6 @@ echo "== --dry-run prints without deleting a file:"
 [ -e keep.txt ] && echo "keep.txt still present"
 echo "== --dry-run -r lists a tree in removal order without deleting it:"
 mkdir -p tree/sub
-: > tree/a
 : > tree/sub/b
 "$BIN" -c 'shitbox rm -r --dry-run tree' 2>&1
 [ -e tree ] && echo "tree still present"

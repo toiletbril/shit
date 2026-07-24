@@ -1,15 +1,24 @@
 d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 script_command=$(command -v script)
+RCFILE="$d/editor-rc"
+export RCFILE
+printf 'printf ready > "$EDITOR_READY_FILE"\n' > "$RCFILE"
 
 wait_for_editor()
 {
-    sleep 0.5
+    ready_file=$1
+    attempt_count=0
+    while ! grep -F ready "$ready_file" >/dev/null 2>&1; do
+        [ "$attempt_count" -lt 1000 ] || return 1
+        sleep 0.01
+        attempt_count=$((attempt_count + 1))
+    done
 }
 
 send_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/editor-ready" || exit 1
     for character in e c h o ' ' h e l l o; do
         printf %s "$character"
         sleep 0.03
@@ -18,16 +27,18 @@ send_input()
 }
 
 if "$script_command" --version >/dev/null 2>&1; then
-    send_input | TERM=xterm-256color SHIT_TEST_EDITOR_STATS=1 \
-        SHIT_HISTORY="$d/history" \
+    send_input | TERM=xterm-256color \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/editor-ready" SHIT_HISTORY="$d/history" \
         BIN="$BIN" "$script_command" -q -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/typescript" >/dev/null 2>&1
 else
-    send_input | TERM=xterm-256color SHIT_TEST_EDITOR_STATS=1 \
-        SHIT_HISTORY="$d/history" \
+    send_input | TERM=xterm-256color \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/editor-ready" SHIT_HISTORY="$d/history" \
         BIN="$BIN" "$script_command" -q "$d/typescript" /bin/sh -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 
@@ -49,7 +60,7 @@ printf '#!/bin/sh\n' > "$d/probe-beta"
 chmod +x "$d/probe-alpha" "$d/probe-beta"
 send_path_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/path-ready" || exit 1
     for character in p r o b e; do
         printf %s "$character"
         sleep 0.03
@@ -57,15 +68,19 @@ send_path_input()
     printf '\nexit\n'
 }
 if "$script_command" --version >/dev/null 2>&1; then
-    send_path_input | PATH="$d" SHIT_TEST_EDITOR_STATS=1 \
-        SHIT_HISTORY="$d/path-history" BIN="$BIN" "$script_command" -q -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+    send_path_input | PATH="$d" \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/path-ready" SHIT_HISTORY="$d/path-history" \
+        BIN="$BIN" "$script_command" -q -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/path-typescript" >/dev/null 2>&1
 else
-    send_path_input | PATH="$d" SHIT_TEST_EDITOR_STATS=1 \
-        SHIT_HISTORY="$d/path-history" BIN="$BIN" "$script_command" -q \
+    send_path_input | PATH="$d" \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/path-ready" SHIT_HISTORY="$d/path-history" \
+        BIN="$BIN" "$script_command" -q \
         "$d/path-typescript" /bin/sh -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 path_metrics=$(strings "$d/path-typescript" | \
@@ -106,7 +121,7 @@ while [ "$tab_unrelated_index" -lt 256 ]; do
 done
 send_post_tab_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/tab-ready" || exit 1
     for character in p r o b e; do
         printf %s "$character"
         sleep 0.03
@@ -120,15 +135,19 @@ send_post_tab_input()
     printf '\nexit\n'
 }
 if "$script_command" --version >/dev/null 2>&1; then
-    send_post_tab_input | PATH="$d/tab-path" SHIT_TEST_EDITOR_STATS=1 \
-        SHIT_HISTORY="$d/tab-history" BIN="$BIN" "$script_command" -q -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+    send_post_tab_input | PATH="$d/tab-path" \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/tab-ready" SHIT_HISTORY="$d/tab-history" \
+        BIN="$BIN" "$script_command" -q -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/tab-typescript" >/dev/null 2>&1
 else
-    send_post_tab_input | PATH="$d/tab-path" SHIT_TEST_EDITOR_STATS=1 \
-        SHIT_HISTORY="$d/tab-history" BIN="$BIN" "$script_command" -q \
+    send_post_tab_input | PATH="$d/tab-path" \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/tab-ready" SHIT_HISTORY="$d/tab-history" \
+        BIN="$BIN" "$script_command" -q \
         "$d/tab-typescript" /bin/sh -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 tab_metrics=$(strings "$d/tab-typescript" | \
@@ -140,7 +159,7 @@ echo 'TAB validation ends before the next key'
 
 send_warm_tab_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/warm-tab-ready" || exit 1
     printf 'compgen -c >/dev/null 2>&1; cd /\n'
     sleep 0.1
     printf 'probe\t\t\n'
@@ -148,15 +167,19 @@ send_warm_tab_input()
     printf 'exit\n'
 }
 if "$script_command" --version >/dev/null 2>&1; then
-    send_warm_tab_input | PATH="$d/tab-path" SHIT_TEST_EDITOR_STATS=1 \
+    send_warm_tab_input | PATH="$d/tab-path" \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/warm-tab-ready" \
         SHIT_HISTORY="$d/warm-tab-history" BIN="$BIN" "$script_command" -q -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/warm-tab-typescript" >/dev/null 2>&1
 else
-    send_warm_tab_input | PATH="$d/tab-path" SHIT_TEST_EDITOR_STATS=1 \
+    send_warm_tab_input | PATH="$d/tab-path" \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/warm-tab-ready" \
         SHIT_HISTORY="$d/warm-tab-history" BIN="$BIN" "$script_command" -q \
         "$d/warm-tab-typescript" /bin/sh -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 warm_tab_metrics=$(strings "$d/warm-tab-typescript" | \
@@ -191,7 +214,7 @@ while [ "$history_index" -lt 1000 ]; do
 done > "$d/miss-history"
 send_missing_history_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/history-ready" || exit 1
     for character in z z z z z z z; do
         printf %s "$character"
         sleep 0.03
@@ -200,16 +223,16 @@ send_missing_history_input()
 }
 if "$script_command" --version >/dev/null 2>&1; then
     send_missing_history_input | TERM=xterm-256color PATH="$d" \
-        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/history-ready" SHIT_TEST_EDITOR_STATS=1 \
         SHIT_HISTORY="$d/miss-history" BIN="$BIN" "$script_command" -q -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/history-typescript" >/dev/null 2>&1
 else
     send_missing_history_input | TERM=xterm-256color PATH="$d" \
-        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/history-ready" SHIT_TEST_EDITOR_STATS=1 \
         SHIT_HISTORY="$d/miss-history" BIN="$BIN" "$script_command" -q \
         "$d/history-typescript" /bin/sh -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 history_metrics=$(strings "$d/history-typescript" | \
@@ -239,7 +262,7 @@ while [ "$prompt_index" -lt 256 ]; do
 done
 send_prompt_path_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/prompt-ready" || exit 1
     printf z
     sleep 0.1
     printf '\003exit\n'
@@ -247,18 +270,20 @@ send_prompt_path_input()
 if "$script_command" --version >/dev/null 2>&1; then
     send_prompt_path_input | \
         PATH="$d/prompt-initial:/bin" \
+        EDITOR_READY_FILE="$d/prompt-ready" \
         PROMPT_COMMAND="PATH=$d/prompt-path-one:$d/prompt-path-two:$d/prompt-path-three:$d/prompt-path-four" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/prompt-history" \
         BIN="$BIN" "$script_command" -q -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/prompt-typescript" >/dev/null 2>&1
 else
     send_prompt_path_input | \
         PATH="$d/prompt-initial:/bin" \
+        EDITOR_READY_FILE="$d/prompt-ready" \
         PROMPT_COMMAND="PATH=$d/prompt-path-one:$d/prompt-path-two:$d/prompt-path-three:$d/prompt-path-four" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/prompt-history" \
         BIN="$BIN" "$script_command" -q "$d/prompt-typescript" /bin/sh -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 prompt_metrics=$(strings "$d/prompt-typescript" | \
@@ -285,7 +310,7 @@ printf '#!/bin/sh\n' > "$d/absolute-path/echo-probe"
 chmod +x "$d/absolute-path/echo-probe"
 send_cd_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/cd-ready" || exit 1
     printf 'cd %s\n' "$d/next-directory"
     sleep 0.1
     printf 'e\n'
@@ -293,15 +318,19 @@ send_cd_input()
     printf 'exit\n'
 }
 if "$script_command" --version >/dev/null 2>&1; then
-    send_cd_input | PATH="$d/absolute-path" SHIT_TEST_EDITOR_STATS=1 \
-        SHIT_HISTORY="$d/cd-history" BIN="$BIN" "$script_command" -q -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+    send_cd_input | PATH="$d/absolute-path" \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/cd-ready" SHIT_HISTORY="$d/cd-history" \
+        BIN="$BIN" "$script_command" -q -c \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/cd-typescript" >/dev/null 2>&1
 else
-    send_cd_input | PATH="$d/absolute-path" SHIT_TEST_EDITOR_STATS=1 \
-        SHIT_HISTORY="$d/cd-history" BIN="$BIN" "$script_command" -q \
+    send_cd_input | PATH="$d/absolute-path" \
+        SHIT_TEST_EDITOR_STATS=1 \
+        EDITOR_READY_FILE="$d/cd-ready" SHIT_HISTORY="$d/cd-history" \
+        BIN="$BIN" "$script_command" -q \
         "$d/cd-typescript" /bin/sh -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 cd_metrics=$(strings "$d/cd-typescript" | \
@@ -319,7 +348,7 @@ printf '#!/bin/sh\nprintf "actual-cwd-completion\\n"\n' > \
 chmod +x "$d/actual-cwd-probe"
 send_clobbered_pwd_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/pwd-ready" || exit 1
     printf 'PWD=312312321\n'
     sleep 0.1
     printf './actual-cwd-\t\n'
@@ -327,14 +356,16 @@ send_clobbered_pwd_input()
     printf 'exit\n'
 }
 if "$script_command" --version >/dev/null 2>&1; then
-    send_clobbered_pwd_input | TEST_CWD="$d" SHIT_HISTORY="$d/pwd-history" \
+    send_clobbered_pwd_input | EDITOR_READY_FILE="$d/pwd-ready" TEST_CWD="$d" \
+        SHIT_HISTORY="$d/pwd-history" \
         BIN="$BIN" "$script_command" -q -c \
-        '/bin/stty cols 80 rows 24; cd "$TEST_CWD"; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; cd "$TEST_CWD"; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/pwd-typescript" >/dev/null 2>&1
 else
-    send_clobbered_pwd_input | TEST_CWD="$d" SHIT_HISTORY="$d/pwd-history" \
+    send_clobbered_pwd_input | EDITOR_READY_FILE="$d/pwd-ready" TEST_CWD="$d" \
+        SHIT_HISTORY="$d/pwd-history" \
         BIN="$BIN" "$script_command" -q "$d/pwd-typescript" /bin/sh -c \
-        '/bin/stty cols 80 rows 24; cd "$TEST_CWD"; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; cd "$TEST_CWD"; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 strings "$d/pwd-typescript" | grep -q actual-cwd-completion || exit 1
@@ -345,11 +376,12 @@ printf '#!/bin/sh\n' > "$d/startup-after/git"
 chmod +x "$d/startup-after/git"
 printf '%s\n' \
     "PS1='> '" \
+    'printf ready > "$EDITOR_READY_FILE"' \
     "PROMPT_COMMAND='PATH=\"\$STARTUP_AFTER\"; unset PROMPT_COMMAND'" \
     > "$d/startup-rc"
 send_startup_highlight_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/startup-ready" || exit 1
     printf 'git '
     printf '\177'
     sleep 0.1
@@ -358,6 +390,7 @@ send_startup_highlight_input()
 if "$script_command" --version >/dev/null 2>&1; then
     send_startup_highlight_input | \
         TERM=xterm-256color NO_COLOR= PATH="$d/startup-before" \
+        EDITOR_READY_FILE="$d/startup-ready" \
         STARTUP_AFTER="$d/startup-after" SHIT_HISTORY="$d/startup-history" \
         RCFILE="$d/startup-rc" BIN="$BIN" "$script_command" -q -c \
         '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
@@ -365,6 +398,7 @@ if "$script_command" --version >/dev/null 2>&1; then
 else
     send_startup_highlight_input | \
         TERM=xterm-256color NO_COLOR= PATH="$d/startup-before" \
+        EDITOR_READY_FILE="$d/startup-ready" \
         STARTUP_AFTER="$d/startup-after" SHIT_HISTORY="$d/startup-history" \
         RCFILE="$d/startup-rc" BIN="$BIN" "$script_command" -q \
         "$d/startup-typescript" /bin/sh -c \
@@ -386,7 +420,7 @@ SH
 chmod +x "$d/menu-bin/tailscale"
 send_completion_menu_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/menu-ready" || exit 1
     printf 'tailscale \t'
     sleep 0.2
     printf '\003exit\n'
@@ -394,18 +428,20 @@ send_completion_menu_input()
 if "$script_command" --version >/dev/null 2>&1; then
     send_completion_menu_input | \
         ASAN_OPTIONS=detect_stack_use_after_return=1 \
-        MANPATH= PATH="$d/menu-bin:/bin:/usr/bin" \
+        EDITOR_READY_FILE="$d/menu-ready" MANPATH= \
+        PATH="$d/menu-bin:/bin:/usr/bin" \
         SHIT_HISTORY="$d/menu-history" BIN="$BIN" \
         "$script_command" -q -c \
-        '/bin/stty cols 100 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 100 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/menu-typescript" >/dev/null 2>&1
 else
     send_completion_menu_input | \
         ASAN_OPTIONS=detect_stack_use_after_return=1 \
-        MANPATH= PATH="$d/menu-bin:/bin:/usr/bin" \
+        EDITOR_READY_FILE="$d/menu-ready" MANPATH= \
+        PATH="$d/menu-bin:/bin:/usr/bin" \
         SHIT_HISTORY="$d/menu-history" BIN="$BIN" \
         "$script_command" -q "$d/menu-typescript" /bin/sh -c \
-        '/bin/stty cols 100 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 100 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 strings "$d/menu-typescript" | \
@@ -419,7 +455,7 @@ printf '#!/bin/sh\n' > "$d/mixed-absolute-path/after-cd-probe"
 chmod +x "$d/mixed-absolute-path/after-cd-probe"
 send_mixed_path_cd_input()
 {
-    wait_for_editor
+    wait_for_editor "$d/mixed-cd-ready" || exit 1
     printf 'cd %s\n' "$d/next-directory"
     sleep 0.1
     printf 'after-cd-probe\014\n'
@@ -429,18 +465,20 @@ send_mixed_path_cd_input()
 if "$script_command" --version >/dev/null 2>&1; then
     send_mixed_path_cd_input |
         env -u NO_COLOR TERM=xterm-256color \
+        EDITOR_READY_FILE="$d/mixed-cd-ready" \
         PATH="$d/mixed-absolute-path::/bin" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/mixed-cd-history" BIN="$BIN" \
         "$script_command" -q -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/mixed-cd-typescript" >/dev/null 2>&1
 else
     send_mixed_path_cd_input |
         env -u NO_COLOR TERM=xterm-256color \
+        EDITOR_READY_FILE="$d/mixed-cd-ready" \
         PATH="$d/mixed-absolute-path::/bin" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/mixed-cd-history" BIN="$BIN" \
         "$script_command" -q "$d/mixed-cd-typescript" /bin/sh -c \
-        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile /dev/null' \
+        '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         >/dev/null 2>&1
 fi
 blue_after_cd_probe=$(printf '\033[34mafter-cd-probe\033[0m')
