@@ -12,7 +12,7 @@ fi
 for f in "$@"; do
     name=$(basename "$f" .sh)
     out=$(mktemp)
-    BIN=$BIN sh "$f" > "$out" 2>/dev/null
+    BIN="$BIN" sh "$f" > "$out" 2>/dev/null
     if diff $DIFF_FLAGS "expected/highlight/$name.out" "$out" >/dev/null 2>&1; then
         printf "\t%-64s ok\033[K\r" "highlight/$name.sh"
     else

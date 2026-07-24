@@ -269,18 +269,18 @@ send_prompt_path_input()
 }
 if "$script_command" --version >/dev/null 2>&1; then
     send_prompt_path_input | \
-        PATH="$d/prompt-initial:/bin" \
+        PATH="$d/prompt-initial${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
         EDITOR_READY_FILE="$d/prompt-ready" \
-        PROMPT_COMMAND="PATH=$d/prompt-path-one:$d/prompt-path-two:$d/prompt-path-three:$d/prompt-path-four" \
+        PROMPT_COMMAND="PATH=$d/prompt-path-one${TEST_PATH_SEPARATOR}$d/prompt-path-two${TEST_PATH_SEPARATOR}$d/prompt-path-three${TEST_PATH_SEPARATOR}$d/prompt-path-four" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/prompt-history" \
         BIN="$BIN" "$script_command" -q -c \
         '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/prompt-typescript" >/dev/null 2>&1
 else
     send_prompt_path_input | \
-        PATH="$d/prompt-initial:/bin" \
+        PATH="$d/prompt-initial${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
         EDITOR_READY_FILE="$d/prompt-ready" \
-        PROMPT_COMMAND="PATH=$d/prompt-path-one:$d/prompt-path-two:$d/prompt-path-three:$d/prompt-path-four" \
+        PROMPT_COMMAND="PATH=$d/prompt-path-one${TEST_PATH_SEPARATOR}$d/prompt-path-two${TEST_PATH_SEPARATOR}$d/prompt-path-three${TEST_PATH_SEPARATOR}$d/prompt-path-four" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/prompt-history" \
         BIN="$BIN" "$script_command" -q "$d/prompt-typescript" /bin/sh -c \
         '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
@@ -429,7 +429,7 @@ if "$script_command" --version >/dev/null 2>&1; then
     send_completion_menu_input | \
         ASAN_OPTIONS=detect_stack_use_after_return=1 \
         EDITOR_READY_FILE="$d/menu-ready" MANPATH= \
-        PATH="$d/menu-bin:/bin:/usr/bin" \
+        PATH="$d/menu-bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
         SHIT_HISTORY="$d/menu-history" BIN="$BIN" \
         "$script_command" -q -c \
         '/bin/stty cols 100 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
@@ -438,7 +438,7 @@ else
     send_completion_menu_input | \
         ASAN_OPTIONS=detect_stack_use_after_return=1 \
         EDITOR_READY_FILE="$d/menu-ready" MANPATH= \
-        PATH="$d/menu-bin:/bin:/usr/bin" \
+        PATH="$d/menu-bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
         SHIT_HISTORY="$d/menu-history" BIN="$BIN" \
         "$script_command" -q "$d/menu-typescript" /bin/sh -c \
         '/bin/stty cols 100 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
@@ -462,20 +462,21 @@ send_mixed_path_cd_input()
     sleep 0.1
     printf 'exit\n'
 }
+unset NO_COLOR
 if "$script_command" --version >/dev/null 2>&1; then
     send_mixed_path_cd_input |
-        env -u NO_COLOR TERM=xterm-256color \
+        TERM=xterm-256color \
         EDITOR_READY_FILE="$d/mixed-cd-ready" \
-        PATH="$d/mixed-absolute-path::/bin" \
+        PATH="$d/mixed-absolute-path${TEST_PATH_SEPARATOR}${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/mixed-cd-history" BIN="$BIN" \
         "$script_command" -q -c \
         '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \
         "$d/mixed-cd-typescript" >/dev/null 2>&1
 else
     send_mixed_path_cd_input |
-        env -u NO_COLOR TERM=xterm-256color \
+        TERM=xterm-256color \
         EDITOR_READY_FILE="$d/mixed-cd-ready" \
-        PATH="$d/mixed-absolute-path::/bin" \
+        PATH="$d/mixed-absolute-path${TEST_PATH_SEPARATOR}${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
         SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/mixed-cd-history" BIN="$BIN" \
         "$script_command" -q "$d/mixed-cd-typescript" /bin/sh -c \
         '/bin/stty cols 80 rows 24; exec "$BIN" -i --rcfile "$RCFILE"' \

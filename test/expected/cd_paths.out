@@ -1,40 +1,62 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "/"]
+    [Assign start=$PWD]
   [CompoundListCondition, None]
-    [SimpleCommand "pwd"]
+    [SimpleCommand "shitbox" "mkdir" "-p" ".test-work/cd-paths/parent/child"]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "/tmp"]
+    [SimpleCommand "cd" ".test-work/cd-paths/parent/child"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "basename" "$PWD"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" ".."]
   [CompoundListCondition, None]
-    [SimpleCommand "pwd"]
+    [SimpleCommand "shitbox" "basename" "$PWD"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "-"]
   [CompoundListCondition, None]
-    [SimpleCommand "pwd"]
+    [SimpleCommand "shitbox" "basename" "$PWD"]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "/"]
+    [SimpleCommand "cd" "../.."]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "parent"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "cdpath=$?"]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "/nonexistent-xyz-dir"]
+    [SimpleCommand "cd" "$start"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" ".test-work/nonexistent-xyz-dir"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "miss=$?"]
 [Word
+  Unquoted "start="
+  Variable "PWD"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted ".test-work/cd-paths/parent/child"
+]
+[Word
   Unquoted "cd"
 ]
 [Word
-  Unquoted "/"
+  Unquoted ".test-work/cd-paths/parent/child"
 ]
 [Word
-  Unquoted "pwd"
+  Unquoted "shitbox"
 ]
 [Word
-  Unquoted "cd"
+  Unquoted "basename"
 ]
 [Word
-  Unquoted "/tmp"
+  Variable "PWD"
 ]
 [Word
   Unquoted "cd"
@@ -43,7 +65,13 @@
   Unquoted ".."
 ]
 [Word
-  Unquoted "pwd"
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "basename"
+]
+[Word
+  Variable "PWD"
 ]
 [Word
   Unquoted "cd"
@@ -52,16 +80,35 @@
   Unquoted "-"
 ]
 [Word
-  Unquoted "pwd"
+  Unquoted "../cd-output"
 ]
 [Word
-  Unquoted "CDPATH=:"
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "basename"
+]
+[Word
+  Variable "PWD"
 ]
 [Word
   Unquoted "cd"
 ]
 [Word
-  Unquoted "/"
+  Unquoted "../.."
+]
+[Word
+  Unquoted "CDPATH="
+  Variable "TEST_PATH_SEPARATOR"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "parent"
+]
+[Word
+  Unquoted "cd-output"
 ]
 [Word
   Unquoted "echo"
@@ -74,13 +121,19 @@
   Unquoted "cd"
 ]
 [Word
-  Unquoted "/nonexistent-xyz-dir"
+  Variable "start"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted ".test-work/nonexistent-xyz-dir"
 ]
 [Word
   Unquoted "2"
 ]
 [Word
-  Unquoted "1"
+  Unquoted "-"
 ]
 [Word
   Unquoted "echo"
@@ -89,12 +142,11 @@
   DoubleQuoted "miss="
   Variable "?"
 ]
-/
-/
-/tmp
-/tmp
+child
+parent
+child
 cdpath=0
-shit: 6:1: error: The directory '/nonexistent-xyz-dir' does not exist.
-     6 |  cd /nonexistent-xyz-dir 2>&1; echo "miss=$?"
-       |  ^~~~~~~~~~~~~~~~~~~~~~~ here.
+shit: 14:1: error: The directory '.test-work/nonexistent-xyz-dir' does not exist.
+    14 |  cd .test-work/nonexistent-xyz-dir 2>&-
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 note: Check the spelling or create it with `mkdir -p`.

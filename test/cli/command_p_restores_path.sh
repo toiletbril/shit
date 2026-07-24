@@ -6,7 +6,10 @@ dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 printf '#!/bin/sh\necho probe-ran\n' > "$dir/probecmd"
 chmod +x "$dir/probecmd"
+export COMMAND_P_OUTPUT=$dir/command-p-output
 
-PATH="$dir:$PATH" "$BIN" -c 'command -p nonexistent_xyz 2>/dev/null; probecmd'
-PATH="$dir:$PATH" "$BIN" -c 'command -p ls >/dev/null; probecmd'
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+    "$BIN" -c 'command -p nonexistent_xyz 2>&-; probecmd'
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+    "$BIN" -c 'command -p ls > "$COMMAND_P_OUTPUT"; probecmd'
 echo "rc=$?"

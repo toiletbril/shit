@@ -5,12 +5,8 @@ unset SHIT_FLAGS
 # verbatim the way bash does. The login shell is built through a dash-prefixed
 # symlink the way login starts one, and the output is filtered to the two markers
 # so a sourced profile cannot perturb it.
-dir=$(mktemp -d)
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
-ln -s "$BIN" "$dir/-shit"
 echo "== SHELL is runnable while \$0 keeps the login dash:"
-PATH="$dir:$PATH" "-shit" -c '
+"$BIN" -c 'exec -a -shit "$1" -c '\''
   case "$SHELL" in -*) echo "SHELL=dashed" ;; *) echo "SHELL=runnable" ;; esac
   case "$0" in -*) echo "zero=dashed" ;; *) echo "zero=runnable" ;; esac
-' 2>/dev/null | grep -E "^(SHELL|zero)="
-rm -rf "$dir"
+'\''' test-login "$BIN" 2>/dev/null | grep -E "^(SHELL|zero)="

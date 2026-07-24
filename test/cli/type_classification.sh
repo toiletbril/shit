@@ -19,14 +19,14 @@ echo "== the default mood classifies a missing coreutility fallback:"
 PATH= "$BIN" -c 'type -t calc; command -v calc; shitbox which calc'
 type_path=$(mktemp -d)
 mkdir "$type_path/blocked" "$type_path/runnable"
-printf '#!/bin/sh\n' > "$type_path/blocked/calc"
+mkdir "$type_path/blocked/calc"
 printf '#!/bin/sh\n' > "$type_path/runnable/calc"
 chmod +x "$type_path/runnable/calc"
-resolved_default=$(PATH="$type_path/blocked:$type_path/runnable" \
+resolved_default=$(PATH="$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
     "$BIN" -c 'type calc')
-resolved_path=$(PATH="$type_path/blocked:$type_path/runnable" \
+resolved_path=$(PATH="$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
     "$BIN" -c 'type -p calc')
-resolved_forced_path=$(PATH="$type_path/blocked:$type_path/runnable" \
+resolved_forced_path=$(PATH="$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
     "$BIN" -c 'type -P calc')
 echo "== type skips a blocked candidate before a runnable candidate:"
 if test "$resolved_default" = "calc is $type_path/runnable/calc" &&
@@ -37,5 +37,5 @@ then
 else
     echo blocked
 fi
-test -n "$type_path" && /bin/rm -rf "$type_path"
+test -n "$type_path" && rm -rf "$type_path"
 echo "== a missing name reports not found:"; "$BIN" -c 'type missing_xyz'; echo "rc=$?"

@@ -18,7 +18,7 @@ test -n "$out" && echo announce_nonempty
 
 # An empty entry names the current directory and stays silent.
 cd "$base" >/dev/null 2>&1
-CDPATH=:$base
+CDPATH="$TEST_PATH_SEPARATOR$base"
 out=$(cd sub)
 test -z "$out" && echo cwd_entry_silent
 

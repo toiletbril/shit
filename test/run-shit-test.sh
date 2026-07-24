@@ -8,7 +8,7 @@
 for name in "$@"; do
     [ -f "shit/$name.shit" ] || continue
     out=$(mktemp)
-    cat "shit/$name.shit" | $BIN $BIN_FLAGS - > "$out" 2>&1
+    "$BIN" $BIN_FLAGS - < "shit/$name.shit" > "$out" 2>&1
     if diff $DIFF_FLAGS "expected/$name.out" "$out" >/dev/null 2>&1 || \
        { [ -f "expected/${name}_1.out" ] && \
          diff $DIFF_FLAGS "expected/${name}_1.out" "$out" >/dev/null 2>&1; }; then

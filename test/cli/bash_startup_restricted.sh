@@ -161,7 +161,7 @@ esac
 printf 'bash-env-not-directory=%s\n' "$output"
 mkdir "$directory/blocked"
 printf 'printf leaked' > "$directory/blocked/env"
-if [ "$(id -u)" = 0 ]; then
+if [ "${OS-}" = Windows_NT ] || [ "$(id -u)" = 0 ]; then
   output=ok
 else
   chmod 000 "$directory/blocked"
@@ -182,7 +182,7 @@ output=$("$BIN" --mood bash -c \
   'set -p; case "$-" in *p*) printf on ;; esac; set +p; case "$-" in *p*) printf leaked ;; *) printf off ;; esac')
 printf 'runtime-privileged=%s\n' "$output"
 
-printf 'PATH=/bin\ncd /\nprintf "startup=%%s:" "$PWD"\n' \
+printf 'PATH="$TEST_SYSTEM_PATH"\ncd ..\nprintf "startup=%%s:" "$?"\n' \
   > "$directory/restricted-env"
 output=$(BASH_ENV="$directory/restricted-env" \
   "$BIN" --mood bash --restricted -c 'printf body')
@@ -191,12 +191,12 @@ printf 'restricted-startup=%s\n' "$output"
 printf '%s\n' \
   'case "$-" in *r*) printf r ;; *) printf no-r ;; esac' \
   'shopt -q restricted_shell; printf ":%s:" "$?"' \
-  'cd /; printf "%s" "$?"' > "$directory/restricted-state-env"
+  'cd ..; printf "%s" "$?"' > "$directory/restricted-state-env"
 output=$(BASH_ENV="$directory/restricted-state-env" \
   "$BIN" --mood bash --restricted -c ':' 2>/dev/null)
 printf 'restricted-startup-state=%s\n' "$output"
 
-printf 'set -r\ncd /\n' > "$directory/set-r-env"
+printf 'set -r\ncd ..\n' > "$directory/set-r-env"
 output=$(cd "$directory" &&
   BASH_ENV="$directory/set-r-env" \
     "$BIN" --mood bash -c 'printf "%s" "$PWD"' 2>/dev/null)
@@ -221,8 +221,15 @@ output=$("$BIN" --mood bash --restricted -c \
   'shopt -u restricted_shell; printf "%s:" "$?"; shopt -q restricted_shell; printf "%s" "$?"')
 printf 'restricted-shopt-fixed=%s\n' "$output"
 
-ln -s "$BIN" "$directory/rbash"
-output=$("$directory/rbash" -c \
+if [ "${OS-}" = Windows_NT ]; then
+  "$BIN" -c 'shitbox cp "$1" "$2"' \
+    test-copy "$BIN" "$directory/rbash.exe"
+  rbash=$directory/rbash.exe
+else
+  ln -s "$BIN" "$directory/rbash"
+  rbash=$directory/rbash
+fi
+output=$("$rbash" -c \
   'case "$-" in *r*) printf flags ;; esac; shopt -q restricted_shell && printf shopt')
 printf 'rbash-identity=%s\n' "$output"
 
@@ -370,12 +377,14 @@ output=$(SHIT_DIRECTORY_HISTORY="$directory/z-store" \
   2>/dev/null)
 printf 'z=%s\n' "$output"
 
-printf '#!/bin/bash\ncd /\nprintf "script-cd=%%s" "$?"\n' \
+printf '#!/bin/bash\ncd ..\nprintf "script-cd=%%s" "$?"\n' \
   > "$directory/restricted-script"
 chmod +x "$directory/restricted-script"
-output=$(PATH="$directory:/bin" "$BIN" --mood bash --restricted -I -c \
+output=$(PATH="$directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+  "$BIN" --mood bash --restricted -I -c \
   'restricted-script')
 printf 'executed=%s\n' "$output"
-output=$(PATH="$directory:/bin" "$BIN" --mood bash --restricted -c \
+output=$(PATH="$directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+  "$BIN" --mood bash --restricted -c \
   '. restricted-script' 2>/dev/null)
 printf 'sourced=%s\n' "$output"

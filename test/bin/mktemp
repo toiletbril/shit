@@ -1,0 +1,70 @@
+#!/bin/sh
+
+is_directory=0
+template=
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        -d)
+            is_directory=1
+            ;;
+        -t)
+            shift
+            template=${1-}
+            ;;
+        --)
+            shift
+            template=${1-}
+            break
+            ;;
+        -*)
+            exit 1
+            ;;
+        *)
+            template=$1
+            ;;
+    esac
+    shift
+done
+
+workspace=.test-work
+candidate_directory=$workspace
+candidate_prefix=temp-
+case $template in
+    */*)
+        candidate_directory=${template%/*}
+        candidate_name=${template##*/}
+        candidate_prefix=${candidate_name%XXXXXX}
+        ;;
+    ?*)
+        candidate_prefix=${template%XXXXXX}
+        candidate_prefix=${candidate_prefix%XXX}
+        ;;
+esac
+
+"$BIN" --mood sh -c 'shitbox mkdir -p "$1"' test-mktemp "$workspace" ||
+    exit 1
+
+attempt_count=0
+while [ "$attempt_count" -lt 100 ]; do
+    candidate="$candidate_directory/$candidate_prefix${PPID-0}-$$-$attempt_count"
+    if [ "$is_directory" -eq 1 ]; then
+        if "$BIN" --mood sh -c 'shitbox mkdir "$1"' test-mktemp "$candidate"
+        then
+            "$BIN" --mood sh -c \
+                'shitbox realpath "$1" | shitbox tr "\\" "/"' \
+                test-mktemp "$candidate"
+            exit 0
+        fi
+    elif [ ! -e "$candidate" ]; then
+        if "$BIN" --mood sh -c 'shitbox touch "$1"' test-mktemp "$candidate"
+        then
+            "$BIN" --mood sh -c \
+                'shitbox realpath "$1" | shitbox tr "\\" "/"' \
+                test-mktemp "$candidate"
+            exit 0
+        fi
+    fi
+    attempt_count=$((attempt_count + 1))
+done
+
+exit 1

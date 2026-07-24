@@ -4,16 +4,19 @@
 # other. A fake binary named for an allowlisted command (cargo) drives the
 # probe deterministically. The same binary under a name shit does not recognize,
 # or in a world-writable directory, is never forked.
-trusted=/tmp/shit_help_trusted
-untrusted=/tmp/shit_help_untrusted
-rm -rf "$trusted" "$untrusted"
+workspace=$(mktemp -d) || exit 1
+trap 'test -n "$workspace" && rm -rf "$workspace"' EXIT
+trusted=$workspace/trusted
+untrusted=$workspace/untrusted
+marker=$workspace/marker
 mkdir -p "$trusted" "$untrusted"
 chmod 755 "$trusted"
 chmod 777 "$untrusted"
+export SHIT_HELP_MARKER=$marker
 write_probe() {
   cat > "$1" <<'SH'
 #!/bin/sh
-echo forked >> /tmp/shit_help_marker
+echo forked >> "$SHIT_HELP_MARKER"
 echo "  --marker-option   a probe option"
 SH
   chmod +x "$1"
@@ -22,33 +25,31 @@ write_probe "$trusted/cargo"
 write_probe "$trusted/helpprobe"
 write_probe "$untrusted/cargo"
 
-rm -f /tmp/shit_help_marker
+rm -f "$marker"
 echo "== allowlisted command in a trusted directory offers its --help options:"
-PATH="$trusted:$PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
+PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
 echo "== and was forked:"
-if [ -f /tmp/shit_help_marker ]; then echo "forked"; else echo "not forked"; fi
+if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
 
-rm -f /tmp/shit_help_marker
+rm -f "$marker"
 echo "== a command not on the allowlist is never forked, even when trusted:"
-PATH="$trusted:$PATH" "$BIN" --debug-complete-at 'helpprobe --mark' </dev/null
+PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'helpprobe --mark' </dev/null
 echo "== and was never forked:"
-if [ -f /tmp/shit_help_marker ]; then echo "forked"; else echo "not forked"; fi
+if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
 
-rm -f /tmp/shit_help_marker
+rm -f "$marker"
 echo "== an allowlisted command in a world-writable directory is never forked:"
-PATH="$untrusted:$PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
+PATH="$untrusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
 echo "== and was never forked:"
-if [ -f /tmp/shit_help_marker ]; then echo "forked"; else echo "not forked"; fi
+if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
 
 cat > "$trusted/cargo" <<'SH'
 #!/bin/sh
-echo attempted >> /tmp/shit_help_marker
+echo attempted >> "$SHIT_HELP_MARKER"
 sleep 2
 SH
 chmod +x "$trusted/cargo"
-rm -f /tmp/shit_help_marker
+rm -f "$marker"
 echo "== a timed out help command is attempted once:"
-PATH="$trusted:$PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
-test "$(wc -l < /tmp/shit_help_marker)" -eq 1 && echo "attempted once"
-
-rm -rf "$trusted" "$untrusted" /tmp/shit_help_marker
+PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
+test "$(wc -l < "$marker")" -eq 1 && echo "attempted once"

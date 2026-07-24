@@ -34,10 +34,10 @@ fi
 SH
 chmod +x "$dir/tailscale"
 echo "== base subcommands:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'tailscale ' </dev/null
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'tailscale ' </dev/null
 echo "== second-level options from 'tailscale set --help':"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'tailscale set --' </dev/null
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'tailscale set --' </dev/null
 echo "== second-level sub-subcommands from 'tailscale debug --help':"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'tailscale debug ' </dev/null
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'tailscale debug ' </dev/null
 echo "== an unknown second word does not fork:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'tailscale bogus --' </dev/null
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'tailscale bogus --' </dev/null

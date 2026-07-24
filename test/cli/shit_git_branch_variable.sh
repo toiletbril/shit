@@ -3,7 +3,8 @@ unset SHIT_FLAGS
 # .git/HEAD without forking git. The probe builds the repository shapes by
 # hand, the attached ref, the detached hash, the worktree gitdir pointer,
 # and the walk up from a subdirectory, so no git binary is needed.
-root=$(mktemp -d)
+root=../../shit-git-branch-${PPID-0}-$$
+trap 'test -n "$root" && rm -rf "$root"' EXIT
 mkdir -p "$root/repo/.git" "$root/repo/sub/dir"
 printf 'ref: refs/heads/probe-branch\n' > "$root/repo/.git/HEAD"
 "$BIN" -c "cd '$root/repo'; echo \"attached=\$SHIT_GIT_BRANCH\""

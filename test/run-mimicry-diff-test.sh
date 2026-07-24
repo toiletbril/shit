@@ -13,12 +13,12 @@
 mimic_one() {
     local ref=$1 file=$2 suffix=$3 label=$4
     local s d alt r1
-    s="$($BIN -I -c "$file" 2>/dev/null; printf X)"; s="${s%X}"
-    d="$($ref "$file" 2>/dev/null; printf X)"; d="${d%X}"
+    s="$("$BIN" -I -c "$file" 2>/dev/null; printf X)"; s="${s%X}"
+    d="$("$ref" "$file" 2>/dev/null; printf X)"; d="${d%X}"
     alt="${file%$suffix}_1$suffix"
     if [ "$s" = "$d" ]; then
         printf "\t%-64s mimic ok\033[K\r" "$file"
-    elif [ -f "$alt" ] && r1="$($ref "$alt" 2>/dev/null; printf X)" && [ "$s" = "${r1%X}" ]; then
+    elif [ -f "$alt" ] && r1="$("$ref" "$alt" 2>/dev/null; printf X)" && [ "$s" = "${r1%X}" ]; then
         printf "\t%-64s mimic ok (flaky alternative)\n" "$file"
     else
         diff $DIFF_FLAGS --label "$file (shit -I)" --label "$file ($label)" \
@@ -28,10 +28,10 @@ mimic_one() {
 }
 
 bash_skip_reason=""
-if ! command -v $BASHP >/dev/null 2>&1; then
+if ! command -v "$BASHP" >/dev/null 2>&1; then
     bash_skip_reason="no $BASHP"
 else
-    bash_version=$($BASHP -c 'printf "%s.%s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"' 2>/dev/null)
+    bash_version=$("$BASHP" -c 'printf "%s.%s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"' 2>/dev/null)
     bash_major=${bash_version%%.*}
     bash_minor=${bash_version#*.}
     if [ -z "$bash_major" ] || [ "$bash_major" -lt 5 ] || { [ "$bash_major" -eq 5 ] && [ "$bash_minor" -lt 3 ]; }; then
@@ -47,7 +47,7 @@ else
     printf "\t%-64s skipped, %s\n" mimicrydiff "$bash_skip_reason"
 fi
 
-if command -v $DASH >/dev/null 2>&1; then
+if command -v "$DASH" >/dev/null 2>&1; then
     for f in $SH_COMPAT; do
         mimic_one "$DASH" "$f" .sh dash
     done

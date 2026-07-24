@@ -3,8 +3,8 @@
 # recognized and a blank line after the header no longer closes the section,
 # so go subcommands complete. A fake binary named go in a trusted directory
 # keeps the candidates stable across machines.
-dir=/tmp/shit_go_sub
-rm -rf "$dir"
+dir=$(mktemp -d) || exit 1
+trap 'test -n "$dir" && rm -rf "$dir"' EXIT
 mkdir -p "$dir"
 chmod 755 "$dir"
 cat > "$dir/go" <<'SH'
@@ -27,7 +27,6 @@ HELP
 SH
 chmod +x "$dir/go"
 echo "== subcommands in subcommand position:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'go bu' </dev/null
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'go bu' </dev/null
 echo "== subcommands with no prefix:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'go ' </dev/null
-rm -rf "$dir"
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'go ' </dev/null

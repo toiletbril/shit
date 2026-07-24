@@ -121,8 +121,8 @@ trap 'request_exit 129' HUP
 if [ "${OS-}" = Windows_NT ]; then
     BIN=$BIN SHIT_TEST_TIMEOUT_JOB_LIFETIME=leader \
         "$BIN" -p --mood sh -c \
-        'shitbox timeout 0 /bin/sh -c '\''unset SHIT_TEST_TIMEOUT_JOB_LIFETIME; /bin/sh "$1"'\'' shell "$1"' \
-        shell "$fixture" &
+        'shitbox timeout 0 "$1" --mood sh "$2"' \
+        shell "$BIN" "$fixture" &
 elif command -v setsid >/dev/null 2>&1; then
     BIN=$BIN setsid /bin/sh "$fixture" &
 elif command -v perl >/dev/null 2>&1; then

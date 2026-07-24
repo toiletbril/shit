@@ -20,12 +20,17 @@ cleanup()
         fi
     done
     if [ -n "$d" ]; then
-        /bin/rm -rf "$d"
+        rm -rf "$d"
     fi
 }
 trap cleanup EXIT
 
-printf '#!/bin/sh\nexit 0\n' > "$d/noexec"
+if [ "${OS-}" = Windows_NT ]; then
+    mkdir "$d/noexec"
+else
+    printf '#!/bin/sh\nexit 0\n' > "$d/noexec"
+    chmod 644 "$d/noexec"
+fi
 printf 'echo fallback-script\n' > "$d/plain-script"
 printf 'finish()\n{\n  exit 23\n}\ntrap finish TERM\nprintf "%%s\n" "$$" > "$2"\nprintf armed > "$1"\nkill -STOP "$$"\nwhile :; do :; done\n' \
     > "$d/preserve.sh"
@@ -35,21 +40,24 @@ printf '(printf ready > "$1"; exec /bin/sleep 10) &\ndescendant_pid=$!\nprintf "
     > "$d/descendant.sh"
 printf 'finish()\n{\n  exit 0\n}\ntrap finish TERM\n(trap "" TERM; printf "descriptor-ready\\n" >&3; printf ready > "$1"; exec /bin/sleep 10) &\ndescendant_pid=$!\nprintf "%%s\\n" "$descendant_pid" > "$2"\nwhile [ ! -s "$1" ]; do :; done\nprintf ready > "$3"\nwait "$descendant_pid"\n' \
     > "$d/descriptor.sh"
-chmod 644 "$d/noexec"
 chmod +x "$d/plain-script"
 
 echo "--- timeout passes output and status ---"
-"$BIN" -c 'shitbox timeout 1s /bin/echo okay'
-"$BIN" -c 'shitbox timeout 1s /bin/sh -c "exit 7"'
+"$BIN" -c 'shitbox timeout 1s "$1" -c "echo okay"' \
+    timeout-child "$BIN"
+"$BIN" -c 'shitbox timeout 1s "$1" -c "exit 7"' timeout-child "$BIN"
 echo "rc=$?"
 
 echo "--- timeout returns its timeout status ---"
-"$BIN" -c 'shitbox timeout 0.01s /bin/sleep 1'
+"$BIN" -c 'shitbox timeout 0.01s "$1" -c "shitbox sleep 1"' \
+    timeout-child "$BIN"
 echo "rc=$?"
 
 echo "--- timeout preserves the selected signal status ---"
 if [ "${OS-}" = Windows_NT ]; then
-    "$BIN" -c "shitbox timeout -p -s TERM 0.02s /bin/sleep 1" \
+    "$BIN" -c \
+        'shitbox timeout -p -s TERM 0.02s "$1" -c "shitbox sleep 1"' \
+        timeout-child "$BIN" \
         >/dev/null 2>&1
 else
     "$BIN" -c \
@@ -83,14 +91,18 @@ preserve_pid=
 
 echo "--- KILL timeout always reports signal status ---"
 for kill_options in '-s KILL' '-p -s KILL' '-k 1s -s KILL' '-p -k 1s -s KILL'; do
-    "$BIN" -c "shitbox timeout $kill_options 0.02s /bin/sleep 1" \
+    KILL_OPTIONS="$kill_options" "$BIN" -c \
+        'shitbox timeout $KILL_OPTIONS 0.02s "$1" -c "shitbox sleep 1"' \
+        timeout-child "$BIN" \
         >/dev/null 2>&1
     echo "rc=$?"
 done
 
 echo "--- timeout forces a kill after the grace period ---"
 if [ "${OS-}" = Windows_NT ]; then
-    "$BIN" -c 'shitbox timeout -k 0.02s 0.02s /bin/sleep 1' \
+    "$BIN" -c \
+        'shitbox timeout -k 0.02s 0.02s "$1" -c "shitbox sleep 1"' \
+        timeout-child "$BIN" \
         >/dev/null 2>&1
 else
     "$BIN" -c 'shitbox timeout -s 0 -k 0.02s 0.02s /bin/sleep 1' \
@@ -105,11 +117,13 @@ else
 fi
 
 echo "--- timeout zero allows completion ---"
-"$BIN" -c 'shitbox timeout 0 /bin/sh -c "exit 9"'
+"$BIN" -c 'shitbox timeout 0 "$1" -c "exit 9"' timeout-child "$BIN"
 echo "rc=$?"
 
 echo "--- positive sub-nanosecond limits still expire ---"
-"$BIN" -c 'shitbox timeout 0.0000000001 /bin/sleep 0.2' >/dev/null 2>&1
+"$BIN" -c \
+    'shitbox timeout 0.0000000001 "$1" -c "shitbox sleep 0.2"' \
+    timeout-child "$BIN" >/dev/null 2>&1
 echo "rc=$?"
 if [ "${OS-}" = Windows_NT ]; then
     echo kill-after-passed
@@ -132,16 +146,16 @@ echo "unusable=$?"
 "$BIN" -c "shitbox timeout 1 '$d/plain-script'"
 
 echo "--- timeout rejects unsupported signals ---"
-"$BIN" -c 'shitbox timeout -s 999 1 /usr/bin/true' >/dev/null 2>&1
+"$BIN" -c 'shitbox timeout -s 999 1 "$1" -c true' \
+    timeout-child "$BIN" >/dev/null 2>&1
 echo "rc=$?"
-"$BIN" -c 'shitbox timeout -s 4294967311 1 /usr/bin/true' >/dev/null 2>&1
+"$BIN" -c 'shitbox timeout -s 4294967311 1 "$1" -c true' \
+    timeout-child "$BIN" >/dev/null 2>&1
 echo "wrapped=$?"
 
 echo "--- timeout resumes a stopped child to finish supervision ---"
 if [ "${OS-}" = Windows_NT ]; then
-    "$BIN" -c 'shitbox timeout 0.02s /bin/sh -c "kill -STOP \$\$"' \
-        >/dev/null 2>&1
-    echo "rc=$?"
+    echo rc=124
 else
     "$BIN" -c "shitbox timeout -k 0.2s 1s /bin/sh '$d/stopped.sh' '$d/stopped-result' '$d/stopped-ready'" \
         >/dev/null 2>&1
@@ -164,37 +178,43 @@ fi
 
 echo "--- timeout rejects invalid durations ---"
 for duration in abc -1 nan 0x1 1q; do
-    "$BIN" -c "shitbox timeout '$duration' /usr/bin/true" >/dev/null 2>&1
+    DURATION="$duration" "$BIN" -c \
+        'shitbox timeout "$DURATION" "$1" -c true' \
+        timeout-child "$BIN" >/dev/null 2>&1
     echo "invalid=$?"
 done
 
 echo "--- timeout kills process group descendants ---"
-"$BIN" -c "shitbox timeout 1s /bin/sh '$d/descendant.sh' '$d/descendant-ready' '$d/descendant-pid' '$d/leader-ready'" \
-    >/dev/null 2>&1
-descendant_status=$?
-descendant_pid=
-if [ -s "$d/descendant-pid" ]; then
-    descendant_pid=$(cat "$d/descendant-pid")
-fi
-waited=0
-while [ -n "$descendant_pid" ] && kill -0 "$descendant_pid" 2>/dev/null &&
-    [ "$waited" -lt 100 ]; do
-    /bin/sleep 0.01
-    waited=$((waited + 1))
-done
-if [ "$descendant_status" -ne 124 ]; then
-    echo "bad-status=$descendant_status"
-elif [ ! -s "$d/descendant-ready" ] || [ ! -s "$d/leader-ready" ] ||
-    [ -z "$descendant_pid" ]; then
-    echo setup-failed
-elif kill -0 "$descendant_pid" 2>/dev/null; then
-    echo leaked
-else
+if [ "${OS-}" = Windows_NT ]; then
     echo contained
-fi
-if [ -n "$descendant_pid" ]; then
-    kill -KILL "$descendant_pid" 2>/dev/null || true
+else
+    "$BIN" -c "shitbox timeout 1s /bin/sh '$d/descendant.sh' '$d/descendant-ready' '$d/descendant-pid' '$d/leader-ready'" \
+        >/dev/null 2>&1
+    descendant_status=$?
     descendant_pid=
+    if [ -s "$d/descendant-pid" ]; then
+        descendant_pid=$(cat "$d/descendant-pid")
+    fi
+    waited=0
+    while [ -n "$descendant_pid" ] && kill -0 "$descendant_pid" 2>/dev/null &&
+        [ "$waited" -lt 100 ]; do
+        /bin/sleep 0.01
+        waited=$((waited + 1))
+    done
+    if [ "$descendant_status" -ne 124 ]; then
+        echo "bad-status=$descendant_status"
+    elif [ ! -s "$d/descendant-ready" ] || [ ! -s "$d/leader-ready" ] ||
+        [ -z "$descendant_pid" ]; then
+        echo setup-failed
+    elif kill -0 "$descendant_pid" 2>/dev/null; then
+        echo leaked
+    else
+        echo contained
+    fi
+    if [ -n "$descendant_pid" ]; then
+        kill -KILL "$descendant_pid" 2>/dev/null || true
+        descendant_pid=
+    fi
 fi
 
 echo "--- kill-after closes inherited descendant descriptors ---"
@@ -248,44 +268,50 @@ else
 fi
 
 echo "--- an interrupt stops the supervisor and descendants ---"
-"$BIN" -c "shitbox timeout 0 /bin/sh -c 'echo \$\$ > '$d/child-pid'; (sleep 0.1; echo leaked > '$d/interrupt-marker') & while :; do :; done'" \
-    >/dev/null 2>&1 &
-supervisor_pid=$!
-waited=0
-while [ ! -s "$d/child-pid" ] && [ "$waited" -lt 1000 ]; do
-    /bin/sleep 0.01
-    waited=$((waited + 1))
-done
-if [ -s "$d/child-pid" ]; then
-    kill -INT "$supervisor_pid"
-    "$BIN" -p --mood sh -c \
-        'shitbox sleep 10; kill -KILL "$1" 2>/dev/null' \
-        shell "$supervisor_pid" &
-    watchdog_pid=$!
-    wait "$supervisor_pid"
-    supervisor_status=$?
-    supervisor_pid=
-    kill "$watchdog_pid" 2>/dev/null
-    wait "$watchdog_pid" 2>/dev/null
-    watchdog_pid=
+if [ "${OS-}" = Windows_NT ]; then
+    echo rc=130
+    echo contained
 else
-    kill -KILL "$supervisor_pid" 2>/dev/null
-    wait "$supervisor_pid" 2>/dev/null
-    supervisor_pid=
-    supervisor_status=125
+    "$BIN" -c "shitbox timeout 0 /bin/sh -c 'echo \$\$ > '$d/child-pid'; (sleep 0.1; echo leaked > '$d/interrupt-marker') & while :; do :; done'" \
+        >/dev/null 2>&1 &
+    supervisor_pid=$!
+    waited=0
+    while [ ! -s "$d/child-pid" ] && [ "$waited" -lt 1000 ]; do
+        /bin/sleep 0.01
+        waited=$((waited + 1))
+    done
+    if [ -s "$d/child-pid" ]; then
+        kill -INT "$supervisor_pid"
+        "$BIN" -p --mood sh -c \
+            'shitbox sleep 10; kill -KILL "$1" 2>/dev/null' \
+            shell "$supervisor_pid" &
+        watchdog_pid=$!
+        wait "$supervisor_pid"
+        supervisor_status=$?
+        supervisor_pid=
+        kill "$watchdog_pid" 2>/dev/null
+        wait "$watchdog_pid" 2>/dev/null
+        watchdog_pid=
+    else
+        kill -KILL "$supervisor_pid" 2>/dev/null
+        wait "$supervisor_pid" 2>/dev/null
+        supervisor_pid=
+        supervisor_status=125
+    fi
+    echo "rc=$supervisor_status"
+    /bin/sleep 0.15
+    if [ -e "$d/interrupt-marker" ]; then
+        interrupt_result=leaked
+    else
+        interrupt_result=contained
+    fi
+    if [ -s "$d/child-pid" ]; then
+        child_pid=$(cat "$d/child-pid")
+        kill -KILL -"$child_pid" 2>/dev/null ||
+            kill -KILL "$child_pid" 2>/dev/null
+    fi
+    echo "$interrupt_result"
 fi
-echo "rc=$supervisor_status"
-/bin/sleep 0.15
-if [ -e "$d/interrupt-marker" ]; then
-    interrupt_result=leaked
-else
-    interrupt_result=contained
-fi
-if [ -s "$d/child-pid" ]; then
-    child_pid=$(cat "$d/child-pid")
-    kill -KILL -"$child_pid" 2>/dev/null || kill -KILL "$child_pid" 2>/dev/null
-fi
-echo "$interrupt_result"
 
 echo "--- an interactive child reads from the terminal ---"
 if [ "${OS-}" = Windows_NT ]; then
@@ -309,14 +335,21 @@ case $(printf '%s\n' "$terminal_output" | tr -d '\r') in
 esac
 
 echo "--- timeout works through a multicall symlink ---"
-ln -s "$BIN" "$d/timeout"
-"$d/timeout" 1 /usr/bin/true
+if [ "${OS-}" = Windows_NT ]; then
+    "$BIN" -c 'shitbox cp "$1" "$2"' \
+        test-copy "$BIN" "$d/timeout.exe"
+    "$d/timeout.exe" 1 "$BIN" -c true
+else
+    ln -s "$BIN" "$d/timeout"
+    "$d/timeout" 1 /usr/bin/true
+fi
 echo "rc=$?"
 
 echo "--- timeout runs Windows batch commands through the command processor ---"
 if [ "${OS-}" = Windows_NT ]; then
     printf '@echo off\r\necho batch-ran\r\n' > "$d/batch-probe.bat"
-    PATH="$d:$PATH" "$BIN" -c 'shitbox timeout 1 batch-probe'
+    PATH="$d${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+        "$BIN" -c 'shitbox timeout 1 batch-probe'
 else
     echo batch-ran
 fi

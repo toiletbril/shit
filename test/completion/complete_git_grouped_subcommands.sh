@@ -6,8 +6,8 @@
 # keeps an open section intact. A fake binary named go in a trusted directory
 # reuses the allowlisted help-fork path, and a git-shaped help body keeps the
 # candidates stable across machines.
-dir=/tmp/shit_git_grouped
-rm -rf "$dir"
+dir=$(mktemp -d) || exit 1
+trap 'test -n "$dir" && rm -rf "$dir"' EXIT
 mkdir -p "$dir"
 chmod 755 "$dir"
 cat > "$dir/go" <<'SH'
@@ -34,7 +34,6 @@ HELP
 SH
 chmod +x "$dir/go"
 echo "== grouped subcommands with no prefix:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'go ' </dev/null
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'go ' </dev/null
 echo "== grouped subcommands with a prefix:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'go di' </dev/null
-rm -rf "$dir"
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'go di' </dev/null

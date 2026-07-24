@@ -1,5 +1,5 @@
 dir=$(mktemp -d)
-trap '/bin/rm -rf "$dir"' EXIT
+trap 'rm -rf "$dir"' EXIT
 if [ "${OS-}" = Windows_NT ]; then
     executable_name=explicit-probe.exe
 else
@@ -19,9 +19,13 @@ mkdir "$dir/blocker-first" "$dir/blocker-second"
 mkdir "$dir/blocker-first/blocked.exe"
 printf '#!/bin/sh\n' > "$dir/blocker-second/blocked.exe"
 chmod +x "$dir/blocker-second/blocked.exe"
-PATH="$dir/blocker-first:$dir/blocker-second" \
+PATH="$dir/blocker-first${TEST_PATH_SEPARATOR}$dir/blocker-second" \
     "$BIN" --debug-highlight-at 'blocked.exe'
-: > "$dir/foo"
+if [ "${OS-}" = Windows_NT ]; then
+    mkdir "$dir/foo"
+else
+    : > "$dir/foo"
+fi
 printf '#!/bin/sh\n' > "$dir/foobar"
 chmod +x "$dir/foobar"
 PATH="$dir" "$BIN" --debug-highlight-at 'foo'

@@ -4,7 +4,8 @@ unset SHIT_FLAGS
 # rotates or drops an entry. The home directory abbreviates to ~.
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
-mkdir -p "$dir/a" "$dir/b" "$dir/c"
+mkdir -p "$dir/a" "$dir/b" "$dir/c" "$dir/home"
+export HOME=$dir/home
 real_dir=$(cd "$dir" && pwd -P)
 
 scrub() {

@@ -2,10 +2,9 @@
 # bare SUBCOMMANDS header with no colon, the shape tailscale uses without a
 # manpage, completes those subcommands in subcommand position. A fake binary
 # named for an allowlisted command keeps the candidates stable across machines.
-dir=/tmp/shit_help_sub_no_colon
-trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
-/bin/rm -rf "$dir"
-/bin/mkdir -p "$dir"
+dir=$(mktemp -d) || exit 1
+trap '[ -n "$dir" ] && rm -rf "$dir"' EXIT
+mkdir -p "$dir"
 chmod 755 "$dir"
 cat > "$dir/tailscale" <<'SH'
 #!/bin/sh
@@ -28,7 +27,7 @@ chmod +x "$dir/tailscale"
 echo "== subcommands under a colon-less header:"
 attempt_count=0
 while [ "$attempt_count" -lt 3 ]; do
-    subcommands=$(PATH="$dir:$PATH" "$BIN" --debug-complete-at 'tailscale ' </dev/null)
+    subcommands=$(PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'tailscale ' </dev/null)
     case $subcommands in
         *down*) break ;;
     esac
@@ -36,4 +35,4 @@ while [ "$attempt_count" -lt 3 ]; do
 done
 printf '%s\n' "$subcommands"
 echo "== a flags header at the margin ends the section:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'tailscale -' </dev/null
+PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'tailscale -' </dev/null

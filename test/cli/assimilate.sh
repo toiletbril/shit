@@ -115,7 +115,8 @@ file_mode()
 
 run_assimilate()
 {
-    PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate "$@"' shit \
+    PATH="$transport${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+        "$BIN" -c 'assimilate "$@"' shit \
         "$@" 'user@[2001:db8::1]' \
         >/dev/null 2>&1
 }
@@ -143,7 +144,8 @@ printf 'architecture-old\n' > "$install/shit"
 export ASSIMILATE_REMOTE_SYSTEM=MismatchOS
 export ASSIMILATE_REMOTE_MACHINE=mismatch-arch
 architecture_output=$root/architecture.out
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate --trace "$@"' shit \
+PATH="$transport${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+    "$BIN" -c 'assimilate --trace "$@"' shit \
     'user@[2001:db8::1]' >"$architecture_output" 2>&1
 architecture_status=$?
 if [ "$architecture_status" -ne 0 ] &&
@@ -204,7 +206,8 @@ printf 'local-collision\n' > "$ASSIMILATE_REMOTE_HOME/.local/bin/bash"
 export ASSIMILATE_REMOTE_PATH="$remote/sbin:$install:$ASSIMILATE_REMOTE_HOME/.local/bin"
 : > "$ASSIMILATE_TRANSPORT_LOG"
 trace_output=$root/trace.out
-PATH="$transport:/bin:/usr/bin" "$BIN" -c 'assimilate "$@"' shit \
+PATH="$transport${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+    "$BIN" -c 'assimilate "$@"' shit \
     -x --ssh-command 'ssh ssh-prefix' --scp-command 'scp scp-prefix' \
     --link-mood bash,dash --link-mood sh 'user@[2001:db8::1]' \
     >"$trace_output" 2>&1

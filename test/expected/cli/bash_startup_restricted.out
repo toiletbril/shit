@@ -14,7 +14,7 @@ bash-env-not-directory=ok
 bash-env-permission=ok
 privileged-identity=flagoptionshellopts
 runtime-privileged=onoff
-restricted-startup=startup=/:body
+restricted-startup=startup=0:body
 restricted-startup-state=no-r:0:0
 startup-set-r=blocked
 restricted-identity=flagsshopt

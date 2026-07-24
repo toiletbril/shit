@@ -1,9 +1,21 @@
+ifeq ($(OS), Windows_NT)
+SHELL := bash
+else
+SHELL := /bin/bash
+endif
+
 DIFF_FLAGS := -u
 MODE ?= dbg
 ifeq ($(OS), Windows_NT)
 TARGET ?= Windows_NT
 else
 TARGET ?= $(shell uname -s)
+endif
+
+ifeq ($(TARGET), Windows_NT)
+export TEST_PATH_SEPARATOR := ;
+else
+export TEST_PATH_SEPARATOR := :
 endif
 
 MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
@@ -30,17 +42,25 @@ override BIN := $(shell \
 		found=$$(command -v "$(BIN)"); \
 		echo "$$(cd "$$(dirname "$$found")" && pwd)/$$(basename "$$found")"; \
 	else echo "$(BIN)"; fi)
+export BIN
 
 BIN_FLAGS := -AER
 
 export SHIT_HISTORY := $(CURDIR)/.test_history
 export SHIT_DIRECTORY_HISTORY := $(CURDIR)/.test_directory_history
+ifeq ($(TARGET), Windows_NT)
+export TEST_SYSTEM_PATH := .test-work/system-path
+export TEST_UNAME_DIRECTORY := .test-work/system-path
+else
+export TEST_SYSTEM_PATH := $(shell \
+	shell_path=$$(command -v sh); printf '%s' "$${shell_path%/*}")
+export TEST_UNAME_DIRECTORY := $(shell \
+	uname_path=$$(command -v uname); printf '%s' "$${uname_path%/*}")
+endif
+export PATH := $(CURDIR)/bin:$(PATH)
 
 FAILED_LIST := failed.diff
 INPUT_FILES := $(wildcard shit/*.shit)
-
-SHELL := /bin/bash
-
 
 TEST_NAMES := $(INPUT_FILES:shit/%.shit=%)
 
@@ -50,9 +70,12 @@ TEST_NAMES := $(INPUT_FILES:shit/%.shit=%)
 
 clean:
 	@rm -f $(FAILED_LIST) $(SHIT_HISTORY) $(SHIT_DIRECTORY_HISTORY)
+	@test -n "$(CURDIR)/.test-work" && rm -rf "$(CURDIR)/.test-work"
 
-TEST_SUITES := shit_tests cli_tests completion_tests highlight_tests \
-		dashdiff bashdiff mimicrydiff
+TEST_SUITES := shit_tests cli_tests completion_tests highlight_tests
+ifneq ($(TARGET), Windows_NT)
+TEST_SUITES += dashdiff bashdiff mimicrydiff
+endif
 
 test: $(BIN)
 	@$(MAKE) clean
@@ -90,6 +113,24 @@ completion_%: expected/completion/%.out
 		fi; \
 		rm -f $$out; \
 	fi
+
+ifeq ($(TARGET), Windows_NT)
+cli_assimilate:
+	@printf "	%-64s skipped, remote transaction requires POSIX\n" "cli/assimilate.sh"
+
+WINDOWS_SKIPPED_COMPLETION_NAMES := \
+	completion_complete_git_grouped_subcommands \
+	completion_complete_go_subcommands \
+	completion_complete_help_subcommands \
+	completion_editor_append_hot_path \
+	completion_help_options_trusted_dir_only \
+	completion_help_subcommand_second_level \
+	completion_help_subcommand_third_level \
+	completion_help_subcommands_no_colon
+
+$(WINDOWS_SKIPPED_COMPLETION_NAMES):
+	@printf "	%-64s skipped, needs a POSIX helper executable\n" "$@"
+endif
 
 completion_tests: $(BIN)
 	@if ! $(BIN) --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
