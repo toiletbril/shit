@@ -10,6 +10,7 @@ y=temp true
 echo "regular=[$y]"
 foo=bar export baz=1
 echo "export_prefix=[$foo][$baz]"
-cat < /no/such/directory/file 2>/dev/null
-echo "redirect_status=$?"
+"$BIN" -c 'cat < "$TEST_TEMP_DIRECTORY/no/such/directory/file"' 2>/dev/null
+redirect_status=$?
+echo "redirect_status=$redirect_status"
 echo still_here

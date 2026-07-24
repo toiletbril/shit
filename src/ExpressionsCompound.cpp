@@ -397,13 +397,14 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       let const stage_location = stage->source_location();
       let const stage_source = cxt.current_source();
       let stage_text = StringView{};
-      if (stage_source != nullptr &&
-          stage->source_end_position() >
-              stage_location.position + stage_location.length)
-      {
+      if (stage_source != nullptr) {
+        let stage_end_position =
+            stage_location.position + stage_location.length;
+        if (stage->source_end_position() > stage_end_position)
+          stage_end_position = stage->source_end_position();
         stage_text = stage_source->view().substring_of_length(
             stage_location.position,
-            stage->source_end_position() - stage_location.position);
+            stage_end_position - stage_location.position);
       }
 
       let const launch = os::launch_compound_stage(

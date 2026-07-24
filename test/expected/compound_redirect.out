@@ -1,12 +1,16 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+  [CompoundListCondition, None]
+    [Assign redirect_file=$TEST_TEMP_DIRECTORY/compound-redirect]
+  [CompoundListCondition, None]
     [RedirectedCommand]
       [Subshell]
         [CompoundList]
           [CompoundListCondition, None]
             [SimpleCommand "echo" "hi"]
   [CompoundListCondition, None]
-    [SimpleCommand "cat" "/tmp/shit_compound_redir.txt"]
+    [SimpleCommand "cat" "$redirect_file"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "back"]
   [CompoundListCondition, None]
@@ -28,7 +32,7 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "$n"]
   [CompoundListCondition, None]
-    [SimpleCommand "cat" "/tmp/shit_compound_redir.txt"]
+    [SimpleCommand "cat" "$redirect_file"]
   [CompoundListCondition, None]
     [RedirectedCommand]
       [IfClause]
@@ -39,7 +43,24 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "y"]
   [CompoundListCondition, None]
-    [SimpleCommand "rm" "-f" "/tmp/shit_compound_redir.txt"]
+    [SimpleCommand "shitbox" "unlink" "$redirect_file"]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+]
+[Word
+  Unquoted "redirect_file="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/compound-redirect"
+]
 [Word
   Unquoted "echo"
 ]
@@ -47,13 +68,13 @@
   Unquoted "hi"
 ]
 [Word
-  Unquoted "/tmp/shit_compound_redir.txt"
+  Variable "redirect_file"
 ]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Unquoted "/tmp/shit_compound_redir.txt"
+  Variable "redirect_file"
 ]
 [Word
   Unquoted "echo"
@@ -80,7 +101,7 @@
   Unquoted "}"
 ]
 [Word
-  Unquoted "/tmp/shit_compound_redir.txt"
+  Variable "redirect_file"
 ]
 [Word
   Unquoted "wc"
@@ -89,7 +110,7 @@
   Unquoted "-l"
 ]
 [Word
-  Unquoted "/tmp/shit_compound_redir.txt"
+  Variable "redirect_file"
 ]
 [Word
   Unquoted "tr"
@@ -131,13 +152,13 @@
   Unquoted "done"
 ]
 [Word
-  Unquoted "/tmp/shit_compound_redir.txt"
+  Variable "redirect_file"
 ]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Unquoted "/tmp/shit_compound_redir.txt"
+  Variable "redirect_file"
 ]
 [Word
   Unquoted "if"
@@ -164,13 +185,13 @@
   Unquoted "/dev/null"
 ]
 [Word
-  Unquoted "rm"
+  Unquoted "shitbox"
 ]
 [Word
-  Unquoted "-f"
+  Unquoted "unlink"
 ]
 [Word
-  Unquoted "/tmp/shit_compound_redir.txt"
+  Variable "redirect_file"
 ]
 hi
 back

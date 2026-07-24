@@ -7,5 +7,5 @@ n=10
 echo first
 true
 echo $((n + 5))
-basename /tmp/whatever >/dev/null
+basename "$TEST_TEMP_DIRECTORY/whatever" >/dev/null
 echo $((n * 2))

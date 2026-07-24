@@ -1,29 +1,57 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "/tmp"]
+    [Assign start=$PWD]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "/"]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/cd-dash/first" "$TEST_TEMP_DIRECTORY/cd-dash/second"]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "-"]
+    [SimpleCommand "cd" "$TEST_TEMP_DIRECTORY/cd-dash/first"]
   [CompoundListCondition, None]
-    [SimpleCommand "pwd"]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "PWD=$PWD OLDPWD=$OLDPWD"]
+    [SimpleCommand "cd" "../second"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "-"]
   [CompoundListCondition, None]
-    [SimpleCommand "pwd"]
+    [SimpleCommand "shitbox" "basename" "$PWD"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "PWD=$(shitbox basename "$PWD") OLDPWD=$(shitbox basename "$OLDPWD")"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "-"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "basename" "$PWD"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$start"]
+[Word
+  Unquoted "start="
+  Variable "PWD"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/cd-dash/first"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/cd-dash/second"
+]
 [Word
   Unquoted "cd"
 ]
 [Word
-  Unquoted "/tmp"
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/cd-dash/first"
 ]
 [Word
   Unquoted "cd"
 ]
 [Word
-  Unquoted "/"
+  Unquoted "../second"
 ]
 [Word
   Unquoted "cd"
@@ -32,16 +60,25 @@
   Unquoted "-"
 ]
 [Word
-  Unquoted "pwd"
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "basename"
+]
+[Word
+  Variable "PWD"
 ]
 [Word
   Unquoted "echo"
 ]
 [Word
   DoubleQuoted "PWD="
-  Variable "PWD"
+  CommandSubstitution "shitbox basename "$PWD""
   DoubleQuoted " OLDPWD="
-  Variable "OLDPWD"
+  CommandSubstitution "shitbox basename "$OLDPWD""
 ]
 [Word
   Unquoted "cd"
@@ -50,11 +87,24 @@
   Unquoted "-"
 ]
 [Word
-  Unquoted "pwd"
+  Unquoted "/dev/null"
 ]
-/tmp
-/tmp
-PWD=/tmp OLDPWD=/
-/
-/
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "basename"
+]
+[Word
+  Variable "PWD"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "start"
+]
+first
+PWD=first OLDPWD=second
+second
 [Code 0]

@@ -8,7 +8,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((n + 5))"]
   [CompoundListCondition, None]
-    [SimpleCommand "basename" "/tmp/whatever"]
+    [SimpleCommand "basename" "$TEST_TEMP_DIRECTORY/whatever"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((n * 2))"]
 [Word
@@ -33,7 +33,8 @@
   Unquoted "basename"
 ]
 [Word
-  Unquoted "/tmp/whatever"
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/whatever"
 ]
 [Word
   Unquoted "/dev/null"

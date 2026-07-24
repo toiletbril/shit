@@ -1,6 +1,13 @@
 unset SHIT_FLAGS
 d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
+if [ "${OS-}" = Windows_NT ]; then
+    BENCH_ECHO=$d/echo.exe
+    "$BIN" -c 'shitbox cp "$1" "$2"' test-copy "$BIN" "$BENCH_ECHO"
+else
+    BENCH_ECHO=/bin/echo
+fi
+export BENCH_ECHO
 # bench forks a shit process per sample and runs the command under it. Only the
 # deterministic lines are checked here, since the timing summary varies per run.
 echo "== bench stops on a non-zero exit code:"
@@ -10,7 +17,10 @@ echo "== the failure sets the exit status:"
 echo "== --ignore-exit-code keeps sampling a failing command:"
 "$BIN" -c 'bench --runs 3 --ignore-exit-code false' 2>&1 | grep 'Benchmark:'
 echo "== --no-shell --show-output forks the command directly:"
-"$BIN" -c 'bench --runs 2 --no-shell --show-output "/bin/echo direct"' 2>&1 | grep -E '^direct$|Benchmark:'
+"$BIN" -c \
+    'bench --runs 2 --no-shell --show-output "$BENCH_ECHO direct"' 2>&1 |
+    sed "s|$BENCH_ECHO|/bin/echo|g" |
+    grep -E '^direct$|Benchmark:'
 echo "== --runs executes exactly one sample:"
 "$BIN" -c 'bench --runs 1 --ignore-exit-code true' 2>&1 | grep 'Benchmark:'
 echo "== invalid sample counts are rejected:"
@@ -32,7 +42,8 @@ echo "== an overflowing duration is rejected:"
 "$BIN" -c 'bench --duration 18446744073710 true' >/dev/null 2>&1
 echo "rc=$?"
 echo "== counter capability keeps one complete sample:"
-counter_output=$("$BIN" -c 'bench --runs 1 --no-shell --show-output "/bin/echo counter-run"' 2>&1)
+counter_output=$("$BIN" -c \
+    'bench --runs 1 --no-shell --show-output "$BENCH_ECHO counter-run"' 2>&1)
 test "$(printf '%s\n' "$counter_output" | grep -c '^counter-run$')" -eq 1
 counter_row_count=$(printf '%s\n' "$counter_output" | grep -Ec '^  (cpu cycles|instructions|cache refs|cache misses|branch misses)')
 case "$counter_row_count" in
@@ -48,17 +59,21 @@ if [ "$(uname -s)" = Linux ] && command -v perf >/dev/null 2>&1 &&
         -- /bin/true >/dev/null 2>&1; then
     test "$counter_row_count" -eq 5
 fi
-printf '%s\n' "$counter_output" | grep -q 'Benchmark: /bin/echo counter-run (1 runs)'
+printf '%s\n' "$counter_output" |
+    grep -Fq "Benchmark: $BENCH_ECHO counter-run (1 runs)"
 echo "counter capability passed"
 echo "== counter fallback keeps one complete sample:"
 if [ "$(uname -s)" = Linux ]; then
     fallback_output=$(
         ulimit -n 8
-        "$BIN" -c 'bench --runs 1 --no-shell --show-output "/bin/echo fallback-run"' 2>&1
+        "$BIN" -c \
+            'bench --runs 1 --no-shell --show-output "$BENCH_ECHO fallback-run"' \
+            2>&1
     )
     test "$(printf '%s\n' "$fallback_output" | grep -c '^fallback-run$')" -eq 1
     test "$(printf '%s\n' "$fallback_output" | grep -Ec '^  (cpu cycles|instructions|cache refs|cache misses|branch misses)')" -eq 0
-    printf '%s\n' "$fallback_output" | grep -q 'Benchmark: /bin/echo fallback-run (1 runs)'
+    printf '%s\n' "$fallback_output" |
+        grep -Fq "Benchmark: $BENCH_ECHO fallback-run (1 runs)"
 fi
 echo "counter fallback passed"
 echo "== a failed later sample clears terminal progress:"

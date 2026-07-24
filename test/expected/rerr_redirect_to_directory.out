@@ -1,6 +1,21 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/redirect-directory"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "hi"]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/redirect-directory"
+]
 [Word
   Unquoted "echo"
 ]
@@ -8,9 +23,10 @@
   Unquoted "hi"
 ]
 [Word
-  Unquoted "/"
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/redirect-directory"
 ]
-shit: 2:11: error: Could not open '/': Is a directory.
-     2 |  echo hi > /
-       |            ^~ here.
+shit: 3:11: error: Could not open '.test-work/redirect-directory': Is a directory.
+     3 |  echo hi > "$TEST_TEMP_DIRECTORY/redirect-directory"
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 [Code 2]

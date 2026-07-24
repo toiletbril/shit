@@ -1,5 +1,9 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+  [CompoundListCondition, None]
+    [Assign amp_file=$TEST_TEMP_DIRECTORY/bash-operators-amp]
+  [CompoundListCondition, None]
     [Pipeline]
       [RedirectedCommand]
         [SimpleCommand "echo" "through"]
@@ -15,13 +19,30 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "both"]
   [CompoundListCondition, None]
-    [SimpleCommand "cat" "/tmp/shit-golden-amp"]
+    [SimpleCommand "cat" "$amp_file"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "more"]
   [CompoundListCondition, None]
-    [SimpleCommand "cat" "/tmp/shit-golden-amp"]
+    [SimpleCommand "cat" "$amp_file"]
   [CompoundListCondition, None]
-    [SimpleCommand "rm" "-f" "/tmp/shit-golden-amp"]
+    [SimpleCommand "shitbox" "unlink" "$amp_file"]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+]
+[Word
+  Unquoted "amp_file="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/bash-operators-amp"
+]
 [Word
   Unquoted "echo"
 ]
@@ -56,13 +77,13 @@
   Unquoted "both"
 ]
 [Word
-  Unquoted "/tmp/shit-golden-amp"
+  Variable "amp_file"
 ]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Unquoted "/tmp/shit-golden-amp"
+  Variable "amp_file"
 ]
 [Word
   Unquoted "echo"
@@ -71,22 +92,22 @@
   Unquoted "more"
 ]
 [Word
-  Unquoted "/tmp/shit-golden-amp"
+  Variable "amp_file"
 ]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Unquoted "/tmp/shit-golden-amp"
+  Variable "amp_file"
 ]
 [Word
-  Unquoted "rm"
+  Unquoted "shitbox"
 ]
 [Word
-  Unquoted "-f"
+  Unquoted "unlink"
 ]
 [Word
-  Unquoted "/tmp/shit-golden-amp"
+  Variable "amp_file"
 ]
 through
 to-err

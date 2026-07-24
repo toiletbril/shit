@@ -4,7 +4,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "~**"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "\\"]
+    [SimpleCommand "printf" "%s\n" "\"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "data/*/*"]
   [CompoundListCondition, None]
@@ -28,10 +28,13 @@
   Literal "~**"
 ]
 [Word
-  Unquoted "echo"
+  Unquoted "printf"
 ]
 [Word
-  Literal "\\"
+  Literal "%s\n"
+]
+[Word
+  Literal "\"
 ]
 [Word
   Unquoted "echo"

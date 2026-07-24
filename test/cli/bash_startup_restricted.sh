@@ -1,4 +1,3 @@
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 directory=$(mktemp -d)
 cleanup()
 {

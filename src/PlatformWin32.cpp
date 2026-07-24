@@ -575,6 +575,8 @@ fn get_processor_counts() wontthrow -> processor_counts
 
 fn get_home_directory() -> Maybe<Path>
 {
+  if (Maybe<String> home = get_environment_variable("HOME"))
+    return Path{StringView{*home}};
   if (Maybe<String> home = get_environment_variable("USERPROFILE"))
     return Path{StringView{*home}};
   return shit::None;
@@ -1717,7 +1719,8 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
   att.bInheritHandle = FALSE;
   att.lpSecurityDescriptor = nullptr; /* NOLINT */
 
-  String path_string{path};
+  String path_string =
+      path == StringView{"/dev/null"} ? String{"NUL"} : String{path};
   HANDLE handle = CreateFileA(path_string.c_str(), access,
                               FILE_SHARE_READ | FILE_SHARE_WRITE, &att,
                               disposition, FILE_ATTRIBUTE_NORMAL, nullptr);

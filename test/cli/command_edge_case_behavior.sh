@@ -13,6 +13,10 @@ OUTER
 echo "== pkill rejects an empty pattern:"
 "$BIN" -c 'shitbox pkill ""' 2>&1
 echo "== cp -r of a directory into itself is refused, not infinite:"
-d=$(mktemp -d); cd "$d" || exit 1; mkdir sub; : > sub/f
+start=$PWD
+d=$(mktemp -d)
+trap 'cd "$start" && rm -rf "$d"' EXIT
+cd "$d" || exit 1
+mkdir sub
+: > sub/f
 "$BIN" -c 'shitbox cp -r sub sub' 2>&1
-cd / || exit 1; rm -rf "$d"

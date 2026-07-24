@@ -16,9 +16,11 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "export_prefix=[$foo][$baz]"]
   [CompoundListCondition, None]
-    [SimpleCommand "cat"]
+    [SimpleCommand "$BIN" "-c" "cat < "$TEST_TEMP_DIRECTORY/no/such/directory/file""]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "redirect_status=$?"]
+    [Assign redirect_status=$?]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "redirect_status=$redirect_status"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "still_here"]
 [Word
@@ -75,10 +77,13 @@
   DoubleQuoted "]"
 ]
 [Word
-  Unquoted "cat"
+  Variable "BIN"
 ]
 [Word
-  Unquoted "/no/such/directory/file"
+  Unquoted "-c"
+]
+[Word
+  Literal "cat < "$TEST_TEMP_DIRECTORY/no/such/directory/file""
 ]
 [Word
   Unquoted "2"
@@ -87,11 +92,15 @@
   Unquoted "/dev/null"
 ]
 [Word
+  Unquoted "redirect_status="
+  Variable "?"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
   DoubleQuoted "redirect_status="
-  Variable "?"
+  Variable "redirect_status"
 ]
 [Word
   Unquoted "echo"
@@ -102,9 +111,6 @@
 special=[after]
 regular=[keep]
 export_prefix=[bar][1]
-shit: 13:7: error: Could not open '/no/such/directory/file': No such file or directory.
-    13 |  cat < /no/such/directory/file 2>/dev/null
-       |        ^~~~~~~~~~~~~~~~~~~~~~~ here.
 redirect_status=2
 still_here
 [Code 0]

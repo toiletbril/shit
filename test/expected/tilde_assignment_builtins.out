@@ -1,6 +1,6 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [Assign HOME=/testhome]
+    [Assign HOME=testhome]
   [CompoundListCondition, None]
     [SimpleCommand "export" "E=~/a:~/b"]
   [CompoundListCondition, None]
@@ -28,7 +28,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$a $b"]
 [Word
-  Unquoted "HOME=/testhome"
+  Unquoted "HOME=testhome"
 ]
 [Word
   Unquoted "export"
@@ -104,9 +104,9 @@
   DoubleQuoted " "
   Variable "b"
 ]
-/testhome/a:/testhome/b
-/testhome/r
-/testhome/z
-/testhome/d
-/testhome/x /testhome/y
+testhome/a:testhome/b
+testhome/r
+testhome/z
+testhome/d
+testhome/x testhome/y
 [Code 0]

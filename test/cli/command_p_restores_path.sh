@@ -9,7 +9,8 @@ chmod +x "$dir/probecmd"
 export COMMAND_P_OUTPUT=$dir/command-p-output
 
 PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-    "$BIN" -c 'command -p nonexistent_xyz 2>&-; probecmd'
+    "$BIN" -c 'command -p nonexistent_xyz; probecmd' \
+    2>"$COMMAND_P_OUTPUT"
 PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
     "$BIN" -c 'command -p ls > "$COMMAND_P_OUTPUT"; probecmd'
 echo "rc=$?"

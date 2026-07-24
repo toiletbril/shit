@@ -1,16 +1,19 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "\101"]
+    [SimpleCommand "echo" "-e" "\101"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "\0101"]
+    [SimpleCommand "echo" "-e" "\0101"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "\1011"]
+    [SimpleCommand "echo" "-e" "\1011"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "\77"]
+    [SimpleCommand "echo" "-e" "\77"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "\8"]
+    [SimpleCommand "echo" "-e" "\8"]
 [Word
   Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
 ]
 [Word
   DoubleQuoted "\101"
@@ -19,10 +22,16 @@
   Unquoted "echo"
 ]
 [Word
+  Unquoted "-e"
+]
+[Word
   DoubleQuoted "\0101"
 ]
 [Word
   Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
 ]
 [Word
   DoubleQuoted "\1011"
@@ -31,10 +40,16 @@
   Unquoted "echo"
 ]
 [Word
+  Unquoted "-e"
+]
+[Word
   DoubleQuoted "\77"
 ]
 [Word
   Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
 ]
 [Word
   DoubleQuoted "\8"

@@ -1,41 +1,58 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "/tmp"]
-  [CompoundListCondition, ||]
-    [SimpleCommand "exit" "1"]
+    [Assign start=$PWD]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/cd-fail-file"]
   [CompoundListCondition, None]
     [SimpleCommand ":"]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "zz_cd_target_xyz"]
+    [SimpleCommand "$BIN" "-c" "cd "$TEST_TEMP_DIRECTORY/cd-fail-file/target""]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "after rc=$?"]
   [CompoundListCondition, None]
-    [SimpleCommand "pwd"]
+    [SimpleCommand "test" "$PWD" "=" "$start"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "cwd=unchanged"]
   [CompoundListCondition, None]
-    [SimpleCommand "rm" "-f" "/tmp/zz_cd_target_xyz"]
+    [SimpleCommand "shitbox" "unlink" "$TEST_TEMP_DIRECTORY/cd-fail-file/target"]
 [Word
-  Unquoted "cd"
+  Unquoted "start="
+  Variable "PWD"
 ]
 [Word
-  Unquoted "/tmp"
+  Unquoted "shitbox"
 ]
 [Word
-  Unquoted "exit"
+  Unquoted "mkdir"
 ]
 [Word
-  Unquoted "1"
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/cd-fail-file"
 ]
 [Word
   Unquoted ":"
 ]
 [Word
-  Unquoted "zz_cd_target_xyz"
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/cd-fail-file/target"
 ]
 [Word
-  Unquoted "cd"
+  Variable "BIN"
 ]
 [Word
-  Unquoted "zz_cd_target_xyz"
+  Unquoted "-c"
+]
+[Word
+  Literal "cd "$TEST_TEMP_DIRECTORY/cd-fail-file/target""
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "/dev/null"
 ]
 [Word
   Unquoted "echo"
@@ -45,17 +62,33 @@
   Variable "?"
 ]
 [Word
-  Unquoted "pwd"
+  Unquoted "test"
 ]
 [Word
-  Unquoted "rm"
+  Variable "PWD"
 ]
 [Word
-  Unquoted "-f"
+  Unquoted "="
 ]
 [Word
-  Unquoted "/tmp/zz_cd_target_xyz"
+  Variable "start"
 ]
-shit: 4:1: error: Unable to change to the directory 'zz_cd_target_xyz': Not a directory.
-     4 |  cd zz_cd_target_xyz
-       |  ^~~~~~~~~~~~~~~~~~~ here.
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cwd=unchanged"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "unlink"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/cd-fail-file/target"
+]
+after rc=1
+cwd=unchanged
+[Code 0]

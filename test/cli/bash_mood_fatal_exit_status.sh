@@ -1,6 +1,7 @@
 unset SHIT_FLAGS
+start=$PWD
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'cd "$start" && rm -rf "$dir"' EXIT
 cd "$dir"
 printf 'set -u\necho "$undefined_variable"\necho after\n' > setu.sh
 printf 'echo "${missing:?is gone}"\necho after\n' > report.sh

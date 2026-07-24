@@ -1,6 +1,6 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [Assign HOME=/testhome]
+    [Assign HOME=testhome]
   [CompoundListCondition, None]
     [Assign p=~/a:~/b:~]
   [CompoundListCondition, None]
@@ -14,7 +14,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$r"]
 [Word
-  Unquoted "HOME=/testhome"
+  Unquoted "HOME=testhome"
 ]
 [Word
   Unquoted "p=~/a:~/b:~"
@@ -43,7 +43,7 @@
 [Word
   Variable "r"
 ]
-/testhome/a:/testhome/b:/testhome
-/testhome/only
-/testhome/x:/testhome/y
+testhome/a:testhome/b:testhome
+testhome/only
+testhome/x:testhome/y
 [Code 0]

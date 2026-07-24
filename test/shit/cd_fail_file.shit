@@ -1,7 +1,8 @@
 #!/bin/env shit
-cd /tmp || exit 1
-: > zz_cd_target_xyz
-cd zz_cd_target_xyz
+start=$PWD
+shitbox mkdir -p "$TEST_TEMP_DIRECTORY/cd-fail-file"
+: > "$TEST_TEMP_DIRECTORY/cd-fail-file/target"
+"$BIN" -c 'cd "$TEST_TEMP_DIRECTORY/cd-fail-file/target"' 2>/dev/null
 echo "after rc=$?"
-pwd
-rm -f /tmp/zz_cd_target_xyz
+test "$PWD" = "$start" && echo "cwd=unchanged"
+shitbox unlink "$TEST_TEMP_DIRECTORY/cd-fail-file/target"

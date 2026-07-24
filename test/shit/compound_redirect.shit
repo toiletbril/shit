@@ -1,10 +1,12 @@
 #!/bin/env shit
-(echo hi) > /tmp/shit_compound_redir.txt
-cat /tmp/shit_compound_redir.txt
+shitbox mkdir -p "$TEST_TEMP_DIRECTORY"
+redirect_file=$TEST_TEMP_DIRECTORY/compound-redirect
+(echo hi) > "$redirect_file"
+cat "$redirect_file"
 echo back
-{ echo a; echo b; } > /tmp/shit_compound_redir.txt
-wc -l < /tmp/shit_compound_redir.txt | tr -d ' '
-for n in 1 2 3; do echo $n; done > /tmp/shit_compound_redir.txt
-cat /tmp/shit_compound_redir.txt
+{ echo a; echo b; } > "$redirect_file"
+wc -l < "$redirect_file" | tr -d ' '
+for n in 1 2 3; do echo $n; done > "$redirect_file"
+cat "$redirect_file"
 if true; then echo y; fi 2>/dev/null
-rm -f /tmp/shit_compound_redir.txt
+shitbox unlink "$redirect_file"

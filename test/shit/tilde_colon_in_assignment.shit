@@ -1,5 +1,5 @@
 #!/bin/env shit
-HOME=/testhome
+HOME=testhome
 p=~/a:~/b:~
 echo "$p"
 q=~/only

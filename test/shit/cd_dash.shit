@@ -1,8 +1,11 @@
 #!/bin/env shit
-cd /tmp
-cd /
-cd -
-pwd
-echo "PWD=$PWD OLDPWD=$OLDPWD"
-cd -
-pwd
+start=$PWD
+shitbox mkdir -p "$TEST_TEMP_DIRECTORY/cd-dash/first" "$TEST_TEMP_DIRECTORY/cd-dash/second"
+cd "$TEST_TEMP_DIRECTORY/cd-dash/first"
+cd ../second
+cd - >/dev/null
+shitbox basename "$PWD"
+echo "PWD=$(shitbox basename "$PWD") OLDPWD=$(shitbox basename "$OLDPWD")"
+cd - >/dev/null
+shitbox basename "$PWD"
+cd "$start"

@@ -1,5 +1,5 @@
 #!/bin/env shit
-f(){ /bin/echo x; }
+f(){ "$BIN" -c 'echo x'; }
 set -- a b c
 f
 echo "$1"

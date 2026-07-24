@@ -26,6 +26,10 @@ zig-out/
 test/failed.diff
 test/.test_history
 test/.test_directory_history
+test/.test-work/
+
+.DS_Store
+._.DS_Store
 
 /shit
 /shit-*

@@ -1,5 +1,5 @@
 #!/bin/env shit
-HOME=/testhome
+HOME=testhome
 export E=~/a:~/b
 echo "$E"
 readonly R=~/r

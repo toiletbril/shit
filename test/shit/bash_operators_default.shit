@@ -1,8 +1,10 @@
 #!/bin/env shit
+shitbox mkdir -p "$TEST_TEMP_DIRECTORY"
+amp_file=$TEST_TEMP_DIRECTORY/bash-operators-amp
 echo through |& cat
 { echo to-err >&2; } |& cat
-echo both &> /tmp/shit-golden-amp
-cat /tmp/shit-golden-amp
-echo more &>> /tmp/shit-golden-amp
-cat /tmp/shit-golden-amp
-rm -f /tmp/shit-golden-amp
+echo both &> "$amp_file"
+cat "$amp_file"
+echo more &>> "$amp_file"
+cat "$amp_file"
+shitbox unlink "$amp_file"

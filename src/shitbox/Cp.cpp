@@ -137,7 +137,8 @@ static fn copy_path(const ExecContext &ec, StringView source,
     let const source_absolute = Path{source}.to_absolute().normalized();
     let const destination_absolute =
         Path{destination}.to_absolute().normalized();
-    let const source_prefix = source_absolute.text() + "/";
+    let source_prefix = source_absolute.text().clone();
+    source_prefix.push(os::DIRECTORY_SEPARATOR);
     if (destination_absolute.text().view() == source_absolute.text().view() ||
         destination_absolute.text().view().starts_with(source_prefix.view()))
     {

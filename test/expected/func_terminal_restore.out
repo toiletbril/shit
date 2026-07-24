@@ -4,7 +4,7 @@
       [BraceGroup]
         [CompoundList]
           [CompoundListCondition, None]
-            [SimpleCommand "/bin/echo" "x"]
+            [SimpleCommand "$BIN" "-c" "echo x"]
   [CompoundListCondition, None]
     [SimpleCommand "set" "--" "a" "b" "c"]
   [CompoundListCondition, None]
@@ -18,10 +18,13 @@
   Unquoted "{"
 ]
 [Word
-  Unquoted "/bin/echo"
+  Variable "BIN"
 ]
 [Word
-  Unquoted "x"
+  Unquoted "-c"
+]
+[Word
+  Literal "echo x"
 ]
 [Word
   Unquoted "}"
