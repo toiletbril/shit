@@ -63,7 +63,6 @@ test: $(BIN)
 
 shit_tests: $(BIN) $(TEST_NAMES)
 
-
 CLI_INPUT := $(wildcard cli/*.sh)
 CLI_NAMES := $(CLI_INPUT:cli/%.sh=cli_%)
 

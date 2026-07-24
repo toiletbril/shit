@@ -18,12 +18,12 @@ inline verbosity LOGGER_VERBOSITY = verbosity::Nothing;
 
 inline std::FILE *LOGGER_OUTPUT = nullptr;
 
-inline std::FILE *log_output_stream()
+inline fn log_output_stream() -> std::FILE *
 {
   return LOGGER_OUTPUT != nullptr ? LOGGER_OUTPUT : stderr;
 }
 
-constexpr const char *verbosity_to_string(verbosity verbosity)
+constexpr fn verbosity_to_string(verbosity verbosity) -> const char *
 {
   switch (verbosity) {
   case verbosity::Nothing: return "OFF";
@@ -36,19 +36,19 @@ constexpr const char *verbosity_to_string(verbosity verbosity)
 
 namespace log_detail {
 
-inline String value_to_log_string(StringView value) { return String{value}; }
+inline fn value_to_log_string(StringView value) -> String { return String{value}; }
 
-inline String value_to_log_string(const char *value)
+inline fn value_to_log_string(const char *value) -> String
 {
   return value != nullptr ? String{value} : String{"(null)"};
 }
 
-inline String value_to_log_string(bool value)
+inline fn value_to_log_string(bool value) -> String
 {
   return value ? String{"true"} : String{"false"};
 }
 
-inline String value_to_log_string(char value)
+inline fn value_to_log_string(char value) -> String
 {
   String out{heap_allocator()};
   out.push(value);
@@ -57,7 +57,7 @@ inline String value_to_log_string(char value)
 
 template <class T>
   requires std::is_integral_v<T>
-String value_to_log_string(T value)
+fn value_to_log_string(T value) -> String
 {
   char buffer[32];
   if constexpr (std::is_signed_v<T>) {
@@ -72,7 +72,7 @@ String value_to_log_string(T value)
 
 template <class T>
   requires std::is_floating_point_v<T>
-String value_to_log_string(T value)
+fn value_to_log_string(T value) -> String
 {
   char buffer[64];
   std::snprintf(buffer, sizeof(buffer), "%g", static_cast<double>(value));
@@ -81,7 +81,7 @@ String value_to_log_string(T value)
 
 template <class T>
   requires std::is_pointer_v<T>
-String value_to_log_string(T value)
+fn value_to_log_string(T value) -> String
 {
   char buffer[32];
   std::snprintf(buffer, sizeof(buffer), "%p",
@@ -90,7 +90,7 @@ String value_to_log_string(T value)
 }
 
 template <class... Args>
-String format_named_values(StringView names, Args &&...args)
+fn format_named_values(StringView names, Args &&...args) -> String
 {
   String out{heap_allocator()};
   usize index = 0;

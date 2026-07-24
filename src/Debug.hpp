@@ -24,35 +24,113 @@ class String;
 /* The string parameter is a template so the body sees a complete ::shit::String
    only at the call site. Debug.hpp can not include String.hpp, since String.hpp
    includes Debug.hpp, so naming String here would close an include cycle. */
-template <class StringT>
-donteliminate void t__strprintf(StringT &s, const char *fmt, ...)
+namespace shit {
+
+template <class P>
+constexpr bool t__is_dumpable_record_pointer()
 {
-  va_list a;
-  va_start(a, fmt);
-  va_list ac;
-  va_copy(ac, a);
-  int written = vsnprintf(nullptr, 0, fmt, ac);
-  if (written < 0) {
-    va_end(ac);
-    va_end(a);
-    return;
+  using Pointer = __remove_cvref(P);
+
+  if constexpr (!__is_pointer(Pointer)) {
+    return false;
+  } else {
+    using Record = __remove_cv(__remove_pointer(Pointer));
+
+    return requires { sizeof(Record); } &&
+           (__is_class(Record) || __is_union(Record));
   }
-  usize formatted_length = static_cast<usize>(written);
-  char *formatted_buffer = new char[formatted_length + 1];
-  unused(vsnprintf(formatted_buffer, formatted_length + 1, fmt, a));
-  s.append(formatted_buffer);
-  delete[] formatted_buffer;
-  va_end(ac);
-  va_end(a);
 }
-template <class StringT, class T>
-StringT t__string_from_struct(const T &x)
+
+template <class StringT>
+struct t__dump_state
 {
-  StringT s{};
-  __builtin_dump_struct(&x, t__strprintf<StringT>, s);
-  return s;
+  StringT output;
+  usize base_indent{0};
+  bool is_at_line_start{true};
+};
+
+template <class StringT>
+fn t__append_dump_text(t__dump_state<StringT> &state, const char *text) throws
+    -> void
+{
+  for (; *text != '\0'; text++) {
+    if (state.is_at_line_start && *text != '\n') {
+      for (usize indent = 0; indent < state.base_indent; indent++)
+        state.output.push(' ');
+
+      state.is_at_line_start = false;
+    }
+
+    state.output.push(*text);
+    if (*text == '\n') state.is_at_line_start = true;
+  }
 }
-#define STRUCT_STRING(x) ::shit::t__string_from_struct<::shit::String>(x)
+
+template <class Last>
+fn t__last_dump_argument(Last &last) wontthrow -> Last &
+{
+  return last;
+}
+
+template <class First, class... Rest>
+  requires(sizeof...(Rest) > 0)
+fn t__last_dump_argument(First &, Rest &...rest) wontthrow -> decltype(auto)
+{
+  return t__last_dump_argument(rest...);
+}
+
+template <class StringT, class... Args>
+fn t__strprintf(t__dump_state<StringT> &state, const char *format,
+                Args &&...args) throws -> void
+{
+  const int written = ::snprintf(nullptr, 0, format, args...);
+  if (written < 0) return;
+
+  const usize formatted_length = static_cast<usize>(written);
+  let allocator = state.output.allocator();
+  char *rendered = allocator.template alloc_array<char>(formatted_length + 1);
+  defer { allocator.free_array(rendered, formatted_length + 1); };
+
+  unused(::snprintf(rendered, formatted_length + 1, format, args...));
+
+  usize clang_indent = 0;
+  while (rendered[clang_indent] == ' ')
+    clang_indent++;
+
+  t__append_dump_text(state, rendered);
+
+  if constexpr (sizeof...(Args) > 0) {
+    let pointer = t__last_dump_argument(args...);
+    using Last = decltype(pointer);
+
+    if constexpr (t__is_dumpable_record_pointer<Last>()) {
+      const bool is_pointer_value = ::strstr(format, "%p") != nullptr;
+      const bool is_unknown_field = ::strstr(format, "*%p") != nullptr;
+
+      if (is_pointer_value && !is_unknown_field && pointer != nullptr) {
+        if (!state.is_at_line_start) t__append_dump_text(state, "\n");
+
+        const usize previous_indent = state.base_indent;
+        state.base_indent += clang_indent + 2;
+        __builtin_dump_struct(pointer, t__strprintf<StringT>, state);
+        state.base_indent = previous_indent;
+      }
+    }
+  }
+}
+
+template <class StringT, class T, class AllocatorT>
+fn t__string_from_struct(const T &value, AllocatorT allocator) throws -> StringT
+{
+  let state = t__dump_state<StringT>{StringT{allocator}, 0, true};
+  __builtin_dump_struct(&value, t__strprintf<StringT>, state);
+  return static_cast<StringT &&>(state.output);
+}
+
+} // namespace shit
+
+#define STRUCT_STRING(x)                                                       \
+  ::shit::t__string_from_struct<::shit::String>(x, ::shit::heap_allocator())
 #endif
 #else /* !NDEBUG */
 #define STRUCT_STRING(...) ::shit::String{"<optimized out>"}
