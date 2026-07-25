@@ -7,11 +7,19 @@ Man, my shell is **shit** (built on top of
 
 Have you ever seen warnings from software that uses Bison as its parsing
 engine? Did you encounter any of the coreutils' error messages? Have you spent a
-day debugging a Bash script?
+day debugging a Bash script? Aren't you tired?
 
-**Shit** is a cross-platform shell compatible with Bash and POSIX. It runs at
-least 3 times faster than Bash. The UX, the errors, and the interactive
-experience are opinionated.
+I invite you to notice the interactive prompt, the speed, and the diagnostics:
+
+| shit analyzing 20K-line shell script in ~0.1s and getting a lot of cool diagnostics |
+| :-: | 
+| ![](assets/demo.gif) |
+
+## What
+
+**Shit** is a cross-platform shell fully compatible with Bash 5.3 and Dash. It
+usually runs at least 5 times faster than Bash. The UX, the errors, and the
+interactive experience are opinionated.
 
 **Shit** is designed to work without absolutely no config whatsoever. **shit**'s
 Linux binary is static. **shit** also works without coreutils, using it's own
