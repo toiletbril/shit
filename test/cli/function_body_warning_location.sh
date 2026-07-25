@@ -2,10 +2,8 @@ unset SHIT_FLAGS
 # A warning from a function body called after its defining source is gone
 # renders against the function's stored definition copy, with the defining
 # file's name, its absolute line numbers, and the caret on the reference.
-# A fixed path rather than mktemp, so the warning column, which counts into the
-# real source path, is the same on every platform and the golden stays
-# portable. mktemp yields a longer path on macOS than on Linux.
-lib=/tmp/shit_fbwl_lib
+lib=$TEST_TEMP_DIRECTORY/function-body-warning
+"$BIN" -c 'shitbox mkdir -p "$1"' setup "$TEST_TEMP_DIRECTORY"
 cat > "$lib" <<'EOF'
 lib_marker=1
 probe_fn() {
@@ -15,5 +13,5 @@ probe_fn() {
 }
 EOF
 "$BIN" -W -c ". $lib; probe_fn" 2>&1 | sed "s|$lib|LIB|" | ./normalize-trace.sh "$BIN"
-rm -f "$lib"
+"$BIN" -c 'shitbox unlink "$1"' cleanup "$lib"
 echo "rc=$?"

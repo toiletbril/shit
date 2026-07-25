@@ -1,11 +1,12 @@
 #!/bin/env shit
 command -v echo
 command -v set
-d=/tmp/shit-command-v-fixture
-mkdir -p "$d"
-: > "$d/probe"
-chmod 755 "$d/probe"
+d=$TEST_TEMP_DIRECTORY/command-v-fixture
+shitbox mkdir -p "$d"
+probe_file=$d/probe
+if [ "${OS-}" = Windows_NT ]; then probe_file=$probe_file.exe; fi
+shitbox cp "$BIN" "$probe_file"
 PATH=$d
 probe() { echo function_probe; }
 command -v probe
-rm -rf "$d"
+shitbox rm -rf "$d"

@@ -4,13 +4,21 @@
   [CompoundListCondition, None]
     [SimpleCommand "command" "-v" "set"]
   [CompoundListCondition, None]
-    [Assign d=/tmp/shit-command-v-fixture]
+    [Assign d=$TEST_TEMP_DIRECTORY/command-v-fixture]
   [CompoundListCondition, None]
-    [SimpleCommand "mkdir" "-p" "$d"]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$d"]
   [CompoundListCondition, None]
-    [SimpleCommand ":"]
+    [Assign probe_file=$d/probe]
   [CompoundListCondition, None]
-    [SimpleCommand "chmod" "755" "$d/probe"]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$OS-" "=" "Windows_NT" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign probe_file=$probe_file.exe]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "cp" "$BIN" "$probe_file"]
   [CompoundListCondition, None]
     [Assign PATH=$d]
   [CompoundListCondition, None]
@@ -22,7 +30,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "command" "-v" "probe"]
   [CompoundListCondition, None]
-    [SimpleCommand "rm" "-rf" "$d"]
+    [SimpleCommand "shitbox" "rm" "-rf" "$d"]
 [Word
   Unquoted "command"
 ]
@@ -42,7 +50,12 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "d=/tmp/shit-command-v-fixture"
+  Unquoted "d="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/command-v-fixture"
+]
+[Word
+  Unquoted "shitbox"
 ]
 [Word
   Unquoted "mkdir"
@@ -54,21 +67,50 @@
   Variable "d"
 ]
 [Word
-  Unquoted ":"
-]
-[Word
+  Unquoted "probe_file="
   Variable "d"
-  DoubleQuoted "/probe"
+  Unquoted "/probe"
 ]
 [Word
-  Unquoted "chmod"
+  Unquoted "if"
 ]
 [Word
-  Unquoted "755"
+  Unquoted "["
 ]
 [Word
-  Variable "d"
-  DoubleQuoted "/probe"
+  Variable "OS-"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "Windows_NT"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "probe_file="
+  Variable "probe_file"
+  Unquoted ".exe"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "cp"
+]
+[Word
+  Variable "BIN"
+]
+[Word
+  Variable "probe_file"
 ]
 [Word
   Unquoted "PATH="
@@ -97,6 +139,9 @@
 ]
 [Word
   Unquoted "probe"
+]
+[Word
+  Unquoted "shitbox"
 ]
 [Word
   Unquoted "rm"

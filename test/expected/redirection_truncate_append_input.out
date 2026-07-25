@@ -1,12 +1,33 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [Assign file=$TEST_TEMP_DIRECTORY/redirection-truncate]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "first"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "second"]
   [CompoundListCondition, None]
     [SimpleCommand "cat"]
   [CompoundListCondition, None]
-    [SimpleCommand "rm" "-f" "/tmp/shit_test_redir.txt"]
+    [SimpleCommand "shitbox" "unlink" "$file"]
+[Word
+  Unquoted "file="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/redirection-truncate"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+]
 [Word
   Unquoted "echo"
 ]
@@ -14,7 +35,7 @@
   Unquoted "first"
 ]
 [Word
-  Unquoted "/tmp/shit_test_redir.txt"
+  Variable "file"
 ]
 [Word
   Unquoted "echo"
@@ -23,22 +44,22 @@
   Unquoted "second"
 ]
 [Word
-  Unquoted "/tmp/shit_test_redir.txt"
+  Variable "file"
 ]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Unquoted "/tmp/shit_test_redir.txt"
+  Variable "file"
 ]
 [Word
-  Unquoted "rm"
+  Unquoted "shitbox"
 ]
 [Word
-  Unquoted "-f"
+  Unquoted "unlink"
 ]
 [Word
-  Unquoted "/tmp/shit_test_redir.txt"
+  Variable "file"
 ]
 first
 second

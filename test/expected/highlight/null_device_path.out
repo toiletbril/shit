@@ -1,0 +1,3 @@
+echo	\e[34m
+>	\e[1m
+/dev/null	\e[96m

@@ -429,6 +429,9 @@ fn EvalContext::resolve_tilde_prefix(StringView name) const throws
   if (name == "+" || name == "-")
     return get_variable_value(name == "+" ? StringView{"PWD"}
                                           : StringView{"OLDPWD"});
+  if (name.is_empty()) {
+    if (let home = get_variable_value("HOME"); home.has_value()) return home;
+  }
   let const home =
       name.is_empty() ? os::get_home_directory() : os::get_home_for_user(name);
   if (!home) return shit::None;

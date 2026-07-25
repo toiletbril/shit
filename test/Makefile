@@ -139,6 +139,26 @@ cli_bash_xtracefd:
 	@printf "	%-64s skipped, numbered descriptors are unsupported on Windows\n" \
 		"cli/bash_xtracefd.sh"
 
+WINDOWS_SKIPPED_CLI_NAMES := \
+	cli_command_substitution_interrupt \
+	cli_command_substitution_strategy \
+	cli_cpu_count \
+	cli_ctrl_c_interrupts_bash_loop \
+	cli_deep_command_substitution_guard \
+	cli_deep_parameter_expansion_guard \
+	cli_diagnostic_levels \
+	cli_disown_running_only \
+	cli_exec_exit_codes \
+	cli_job_state_running_then_stopped \
+	cli_mkdir_mode_umask \
+	cli_path_cache_behavior \
+	cli_regex_error_caret \
+	cli_set_option_state
+
+$(WINDOWS_SKIPPED_CLI_NAMES):
+	@printf "	%-64s skipped, unsupported Windows backend feature\n" \
+		"cli/$(patsubst cli_%,%,$@).sh"
+
 WINDOWS_SKIPPED_COMPLETION_NAMES := \
 	completion_complete_git_grouped_subcommands \
 	completion_complete_go_subcommands \

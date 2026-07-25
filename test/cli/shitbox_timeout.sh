@@ -101,7 +101,7 @@ done
 echo "--- timeout forces a kill after the grace period ---"
 if [ "${OS-}" = Windows_NT ]; then
     "$BIN" -c \
-        'shitbox timeout -k 0.02s 0.02s "$1" -c "shitbox sleep 1"' \
+        'shitbox timeout -s 0 -k 0.02s 0.02s "$1" -c "shitbox sleep 1"' \
         timeout-child "$BIN" \
         >/dev/null 2>&1
 else

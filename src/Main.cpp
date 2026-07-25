@@ -810,11 +810,17 @@ fn main(int argc, char **argv) -> int
     shit::StringView invocation = shit::StringView{argv[0]};
     usize basename_start = 0;
     for (usize i = 0; i < invocation.length; i++)
-      if (invocation[i] == '/') basename_start = i + 1;
+      if (shit::os::is_directory_separator(invocation[i]))
+        basename_start = i + 1;
     invocation = invocation.substring(basename_start);
     if (!invocation.is_empty() && invocation[0] == '-') {
       invocation = invocation.substring(1);
     }
+    let invocation_name = shit::String{invocation};
+    let const invocation_info =
+        shit::os::normalize_program_name(invocation_name);
+    invocation =
+        invocation_name.substring_of_length(0, invocation_info.stem_length);
 
     if (shit::shitbox::find_util(invocation).has_value()) {
       if (shit::os::is_running_setuid() && !shit::os::drop_elevated_identity())
@@ -1021,10 +1027,17 @@ fn main(int argc, char **argv) -> int
 
   /* A basename of sh or dash selects POSIX mode and a basename of bash selects
      bash mode, so a symlink named after a system shell behaves like it. */
-  let const last_slash = program_path.find_last_character('/');
+  usize program_basename_start = 0;
+  for (usize i = 0; i < program_path.length(); i++)
+    if (shit::os::is_directory_separator(program_path[i]))
+      program_basename_start = i + 1;
+  let normalized_program_basename =
+      shit::String{program_path.substring(program_basename_start)};
+  let const program_name_info =
+      shit::os::normalize_program_name(normalized_program_basename);
   shit::StringView program_basename =
-      last_slash.has_value() ? program_path.substring(*last_slash + 1)
-                             : program_path.view();
+      normalized_program_basename.substring_of_length(
+          0, program_name_info.stem_length);
   /* A login shell receives argv[0] prefixed with a dash, such as -bash, and
      exec -l prepends the dash to the whole path, such as -/usr/bin/bash. The
      mark is the first byte of argv[0], not of the basename, so a path whose

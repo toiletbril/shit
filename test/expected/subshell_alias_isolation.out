@@ -8,7 +8,9 @@
     [IfClause]
       [CompoundList]
         [CompoundListCondition, None]
-          [SimpleCommand "alias" "sub_only"]
+          [Pipeline]
+            [SimpleCommand "alias"]
+            [SimpleCommand "shitbox" "grep" "^alias sub_only="]
       [CompoundList]
         [CompoundListCondition, None]
           [SimpleCommand "echo" "leaked from subshell"]
@@ -23,7 +25,9 @@
     [IfClause]
       [CompoundList]
         [CompoundListCondition, None]
-          [SimpleCommand "alias" "cs_only"]
+          [Pipeline]
+            [SimpleCommand "alias"]
+            [SimpleCommand "shitbox" "grep" "^alias cs_only="]
       [CompoundList]
         [CompoundListCondition, None]
           [SimpleCommand "echo" "leaked from cmdsub"]
@@ -44,16 +48,16 @@
   Unquoted "alias"
 ]
 [Word
-  Unquoted "sub_only"
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "^alias sub_only="
 ]
 [Word
   Unquoted "/dev/null"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Unquoted "1"
 ]
 [Word
   Unquoted "then"
@@ -94,16 +98,16 @@
   Unquoted "alias"
 ]
 [Word
-  Unquoted "cs_only"
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "^alias cs_only="
 ]
 [Word
   Unquoted "/dev/null"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Unquoted "1"
 ]
 [Word
   Unquoted "then"

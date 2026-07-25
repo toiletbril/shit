@@ -1,13 +1,28 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/subshell-state"]
+  [CompoundListCondition, None]
     [Subshell]
       [CompoundList]
         [CompoundListCondition, None]
           [SimpleCommand "echo" "inside"]
         [CompoundListCondition, None]
-          [SimpleCommand "cd" "/tmp"]
+          [SimpleCommand "cd" "$TEST_TEMP_DIRECTORY/subshell-state"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "outside"]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/subshell-state"
+]
 [Word
   Unquoted "echo"
 ]
@@ -18,7 +33,8 @@
   Unquoted "cd"
 ]
 [Word
-  Unquoted "/tmp"
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/subshell-state"
 ]
 [Word
   Unquoted "echo"

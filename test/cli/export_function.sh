@@ -6,4 +6,5 @@ echo "== brace-body function serializes:"
 echo "== error on a non-function:"
 "$BIN" -c 'export -f not_a_function' 2>&1
 echo "== an inherited BASH_FUNC is not imported and cannot inject:"
-env 'BASH_FUNC_x%%=() { echo body; }; echo INJECTED' "$BIN" -c 'type x 2>/dev/null || echo x-absent' 2>&1
+env 'BASH_FUNC_x%%=() { echo body; }; echo INJECTED' "$BIN" -c \
+    'type x || echo x-absent' 2>/dev/null

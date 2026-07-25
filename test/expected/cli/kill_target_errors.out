@@ -24,3 +24,8 @@ shit: 1:6: error: Builtin `kill`: 'notanumber' is not a valid job or process id.
      1 |  kill notanumber
        |       ^~~~~~~~~~ here.
 rc=1
+== signal zero probes the current process:
+named=0
+numbered=0
+== signal zero rejects an exited process:
+exited=1

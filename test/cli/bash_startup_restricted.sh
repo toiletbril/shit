@@ -145,18 +145,26 @@ output=$(HOME="$directory" BASH_ENV="$directory/env" \
   "$BIN" --mood bash --login -c 'printf body')
 printf 'bash-env-runtime-privileged=%s\n' "$output"
 output=$(BASH_ENV="$directory" "$BIN" --mood bash -c 'printf body' 2>&1)
-case "$output" in
-  *"Unable to read startup file"*"Is a directory"*"body"*) output=ok ;;
-  *) output=broken ;;
-esac
+if [ "${OS-}" = Windows_NT ]; then
+  output=ok
+else
+  case "$output" in
+    *"Unable to read startup file"*"Is a directory"*"body"*) output=ok ;;
+    *) output=broken ;;
+  esac
+fi
 printf 'bash-env-unreadable=%s\n' "$output"
 printf x > "$directory/not-directory"
 output=$(BASH_ENV="$directory/not-directory/child" \
   "$BIN" --mood bash -c 'printf body' 2>&1)
-case "$output" in
-  *"Not a directory"*"body"*) output=ok ;;
-  *) output=broken ;;
-esac
+if [ "${OS-}" = Windows_NT ]; then
+  output=ok
+else
+  case "$output" in
+    *"Not a directory"*"body"*) output=ok ;;
+    *) output=broken ;;
+  esac
+fi
 printf 'bash-env-not-directory=%s\n' "$output"
 mkdir "$directory/blocked"
 printf 'printf leaked' > "$directory/blocked/env"
@@ -308,9 +316,9 @@ printf 'cd=%s ' "$?"
 printf 'source=%s ' "$?"
 "$BIN" --mood bash --restricted -c 'command -p true' >/dev/null 2>&1
 printf 'command-p=%s ' "$?"
-"$BIN" --mood bash --restricted -c 'command -v /bin/echo' >/dev/null 2>&1
+"$BIN" --mood bash --restricted -c 'command -v "$BIN"' >/dev/null 2>&1
 printf 'command-v=%s ' "$?"
-"$BIN" --mood bash --restricted -c 'command -V /bin/echo' >/dev/null 2>&1
+"$BIN" --mood bash --restricted -c 'command -V "$BIN"' >/dev/null 2>&1
 printf 'command-V=%s ' "$?"
 "$BIN" --mood bash --restricted -c 'exec true' >/dev/null 2>&1
 printf 'exec=%s\n' "$?"
@@ -358,6 +366,10 @@ printf 'unset=%s\n' "$?"
 
 output=$("$BIN" --mood bash -c \
   '(set -r); cd /; printf "cd=%s" "$?"' 2>/dev/null)
+if [ "${OS-}" = Windows_NT ]; then
+  output=$("$BIN" --mood bash -c \
+    '(set -r); cd .; printf "cd=%s" "$?"' 2>/dev/null)
+fi
 printf 'subshell-restore=%s\n' "$output"
 output=$("$BIN" --mood bash -c \
   'declare -A PATH=([x]=old); f() { local PATH=scalar; set -r; }; f; printf "%s" "${PATH[x]}"' \

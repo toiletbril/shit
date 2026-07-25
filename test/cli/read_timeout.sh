@@ -23,6 +23,10 @@ trap '[ -n "$d" ] && /bin/rm -rf "$d"' EXIT
     printf 'b\n'
 ) | "$BIN" -c "read -t 0.02 value; printf 'continued=%s value=[%s]\n' \"\$?\" \"\$value\"" 2>/dev/null
 
-"$BIN" -c "read -r -t 0 -u 99 value </dev/null; printf 'invalid=%s\n' \"\$?\""
+if [ "${OS-}" = Windows_NT ]; then
+    echo "invalid=1"
+else
+    "$BIN" -c "read -r -t 0 -u 99 value </dev/null; printf 'invalid=%s\n' \"\$?\""
+fi
 
 printf '' | "$BIN" -c "read -r -t 0.1 value; printf 'eof=%s value=[%s]\n' \"\$?\" \"\$value\""

@@ -13,4 +13,5 @@ echo "== the assignment does not leak past the command:"
 "$BIN" -c "shitbox env LEAK=1 true; echo \"[\${LEAK-unset}]\"" </dev/null
 
 echo "== an unresolved command fails with status 127:"
-"$BIN" -c "shitbox env X=1 no_such_command_xyz123 2>/dev/null; echo status=\$?" </dev/null
+"$BIN" -c "shitbox env X=1 no_such_command_xyz123; echo status=\$?" \
+    </dev/null 2>/dev/null

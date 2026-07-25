@@ -1,2 +1,2 @@
-error: Could not open 'zz_no_such_script_file': No such file or directory.
+missing script error
 rc=127

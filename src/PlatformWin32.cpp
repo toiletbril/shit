@@ -819,6 +819,7 @@ fn temp_directory_path() throws -> String
 
 cold fn path_exists(StringView path) wontthrow -> bool
 {
+  if (path == StringView{"/dev/null"}) return true;
   const String path_string{path};
   return GetFileAttributesA(path_string.c_str()) != INVALID_FILE_ATTRIBUTES;
 }
@@ -1443,6 +1444,7 @@ static fn run_substitution_to_temp(StringView source,
     arguments.push(String{heap_allocator(), StringView{"--mood"}});
     arguments.push(String{heap_allocator(), StringView{"bash"}});
   }
+  arguments.push(String{heap_allocator(), StringView{"--no-diagnostics"}});
   arguments.push(String{heap_allocator(), StringView{"-c"}});
   arguments.push(String{heap_allocator(), source});
   let command_line = make_os_args(arguments);
@@ -1850,7 +1852,32 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
 
 fn signal_process(process p, i32 signal_number) wontthrow -> bool
 {
-  if (!is_process_signal_supported(signal_number)) return false;
+  if (signal_number == 0) {
+    if (process_is_group_reference(p)) {
+      let const has_members = process_group_has_members(p);
+      if (!has_members) SetLastError(ERROR_NOT_FOUND);
+      return has_members;
+    }
+    if (!process_is_pid_reference(p)) {
+      let const wait_result = WaitForSingleObject(p, 0);
+      if (wait_result == WAIT_TIMEOUT) return true;
+      if (wait_result == WAIT_OBJECT_0) SetLastError(ERROR_NOT_FOUND);
+      return false;
+    }
+
+    let const target = OpenProcess(SYNCHRONIZE, FALSE, pid_from_reference(p));
+    if (target == nullptr) return false;
+    let const wait_result = WaitForSingleObject(target, 0);
+    CloseHandle(target);
+    if (wait_result == WAIT_TIMEOUT) return true;
+    if (wait_result == WAIT_OBJECT_0) SetLastError(ERROR_NOT_FOUND);
+    return false;
+  }
+
+  if (!is_process_signal_supported(signal_number)) {
+    SetLastError(ERROR_NOT_SUPPORTED);
+    return false;
+  }
 
   if (process_is_group_reference(p)) {
     let const process_handle = process_from_group_reference(p);
@@ -1894,7 +1921,7 @@ fn process_group_has_members(process group) wontthrow -> bool
 
 fn is_process_signal_supported(i32 signal_number) wontthrow -> bool
 {
-  return signal_number == 9 || signal_number == 15;
+  return signal_number == 0 || signal_number == 9 || signal_number == 15;
 }
 
 fn process_from_pid(i64 pid) wontthrow -> process

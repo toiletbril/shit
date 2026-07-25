@@ -6,5 +6,5 @@ dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 printf '{\n  echo hi\n' > "$dir/unterminated"
 chmod +x "$dir/unterminated"
-"$BIN" -c "$dir/unterminated" 2>&1 | sed "s|$dir|TMPDIR|g"
+"$BIN" -c "$dir/unterminated" 2>&1 | sed 's|\\|/|g' | sed "s|$dir|TMPDIR|g"
 echo "rc=$?"

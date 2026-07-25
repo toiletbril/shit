@@ -16,7 +16,7 @@ echo "== --dry-run prints without deleting a file:"
 echo "== --dry-run -r lists a tree in removal order without deleting it:"
 mkdir -p tree/sub
 : > tree/sub/b
-"$BIN" -c 'shitbox rm -r --dry-run tree' 2>&1
+"$BIN" -c 'shitbox rm -r --dry-run tree' 2>&1 | sed 's|\\|/|g'
 [ -e tree ] && echo "tree still present"
 echo "== rm refuses '.' and the root directory, before any removal:"
 "$BIN" -c 'shitbox rm --dry-run .' 2>&1

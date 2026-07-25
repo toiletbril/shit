@@ -15,7 +15,7 @@ dir=$(mktemp -d)
 if [ "${OS-}" = Windows_NT ]; then
     "$BIN" -c 'shitbox cp "$1" "$2"' test-copy "$BIN" "$dir/bash.exe"
     bash_invocation=$dir/bash.exe
-    bash_pattern='*/bash.exe'
+    bash_pattern='*bash.exe'
 else
     ln -s "$BIN" "$dir/bash"
     bash_invocation=$dir/bash

@@ -662,8 +662,10 @@ mustuse fn Parser::wrap_with_stderr_to_stdout(Command *command) throws
   ASSERT(command != nullptr);
   let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
   redirections.push(stderr_to_stdout_dup());
-  return m_lexer.arena().create<RedirectedCommand>(
+  let redirected = m_lexer.arena().create<RedirectedCommand>(
       command->source_location(), command, steal(redirections));
+  redirected->set_source_end_position(command->source_end_position());
+  return redirected;
 }
 
 fn Parser::build_heredoc_redirection(

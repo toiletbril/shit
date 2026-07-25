@@ -1,12 +1,14 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "cd" "/tmp"]
-  [CompoundListCondition, &&]
-    [SimpleCommand "rm" "-rf" "shit_glob_dot_t"]
-  [CompoundListCondition, &&]
-    [SimpleCommand "mkdir" "shit_glob_dot_t"]
-  [CompoundListCondition, &&]
-    [SimpleCommand "cd" "shit_glob_dot_t"]
+    [Assign start=$PWD]
+  [CompoundListCondition, None]
+    [Assign directory=$TEST_TEMP_DIRECTORY/glob-dot-slash]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "rm" "-rf" "$directory"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$directory"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$directory"]
   [CompoundListCondition, &&]
     [SimpleCommand ":"]
   [CompoundListCondition, &&]
@@ -15,15 +17,21 @@
     [SimpleCommand "echo" "./*.sh"]
   [CompoundListCondition, &&]
     [SimpleCommand "echo" "*.sh"]
-  [CompoundListCondition, &&]
-    [SimpleCommand "cd" "/tmp"]
-  [CompoundListCondition, &&]
-    [SimpleCommand "rm" "-rf" "shit_glob_dot_t"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$start"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "rm" "-rf" "$directory"]
 [Word
-  Unquoted "cd"
+  Unquoted "start="
+  Variable "PWD"
 ]
 [Word
-  Unquoted "/tmp"
+  Unquoted "directory="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/glob-dot-slash"
+]
+[Word
+  Unquoted "shitbox"
 ]
 [Word
   Unquoted "rm"
@@ -32,19 +40,25 @@
   Unquoted "-rf"
 ]
 [Word
-  Unquoted "shit_glob_dot_t"
+  Variable "directory"
+]
+[Word
+  Unquoted "shitbox"
 ]
 [Word
   Unquoted "mkdir"
 ]
 [Word
-  Unquoted "shit_glob_dot_t"
+  Unquoted "-p"
+]
+[Word
+  Variable "directory"
 ]
 [Word
   Unquoted "cd"
 ]
 [Word
-  Unquoted "shit_glob_dot_t"
+  Variable "directory"
 ]
 [Word
   Unquoted ":"
@@ -74,7 +88,10 @@
   Unquoted "cd"
 ]
 [Word
-  Unquoted "/tmp"
+  Variable "start"
+]
+[Word
+  Unquoted "shitbox"
 ]
 [Word
   Unquoted "rm"
@@ -83,7 +100,7 @@
   Unquoted "-rf"
 ]
 [Word
-  Unquoted "shit_glob_dot_t"
+  Variable "directory"
 ]
 ./a.sh ./b.sh
 a.sh b.sh

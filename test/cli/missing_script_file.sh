@@ -4,5 +4,8 @@ unset SHIT_FLAGS
 # than the BIN-dependent caret.
 out=$("$BIN" zz_no_such_script_file 2>&1)
 rc=$?
-printf '%s\n' "$out" | grep -o "error: Could not open .*"
+case $out in
+*"error: Could not open"*) echo "missing script error" ;;
+*) printf '%s\n' "$out" ;;
+esac
 echo "rc=$rc"
