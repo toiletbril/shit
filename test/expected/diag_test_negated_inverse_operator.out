@@ -37,7 +37,7 @@
 ]
 shit: 2:3: warning: A negated -eq is just -ne.
      2 |  [ ! 3 -eq 4 ] && echo notequal
-       |    ^~ here.
+       |    ^ here.
 note: Drop the ! and use -ne.
 notequal
 after

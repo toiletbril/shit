@@ -1,4 +1,4 @@
-.TH SHIT 1 "2026-07-23" "shit" "User Commands"
+.TH SHIT 1 "2026-07-26" "shit" "User Commands"
 .SH NAME
 shit \- a fast POSIX and bash compatible shell
 .SH SYNOPSIS
@@ -209,6 +209,10 @@ source indirection exists. An invocation with multiple
 sources traces the source that produced each message. This flag suppresses
 every source backtrace for errors, warnings, and diagnostics. The primary
 message, source caret, note, and detail location remain visible.
+.PP
+Each printed source frame begins with trace:. Only an error label, location,
+and message are bold. A warning is plain magenta. A note and a trace are plain
+cyan.
 .TP
 .B \-\-list\-diagnostics
 The shellcheck-style checks the analysis stage reports are listed, then the
@@ -426,6 +430,14 @@ An empty command position includes builtins, functions, aliases, shitbox
 utilities, and programs from PATH.
 Quoted, escaped, variable, and tilde directory prefixes remain in their typed
 form when a later unquoted slash or basename is completed.
+.PP
+Strings and here-documents are bright green. Keywords are bold bright magenta.
+Resolved commands use bold terminal text. Flags are italic, except for a lone
+hyphen. A word that begins with two hyphens remains a flag when it contains an
+equals sign. Unknown commands and invalid paths keep the terminal text color
+with a curly red underline. An unfinished command prefix keeps the terminal
+text color without an underline. Invalid syntax and unset variables are bold
+red with the same underline. A live glob is yellow.
 In vi mode each line begins in insert mode. Escape enters command mode. Command
 mode provides the motions, the operators with counts, the named registers, the
 change repeat, and a visual selection. The visual selection is charwise from
@@ -530,8 +542,9 @@ child shell counts one deeper.
 .TP
 .B CDPATH
 The colon\-separated search path cd consults for a relative operand. When an
-explicit directory is missing, cd suggests a close sibling directory when one
-exists.
+explicit directory is missing, cd reports and underlines its first unavailable
+component. A later unusable suffix is omitted. A close sibling directory is
+suggested when one exists.
 .TP
 .B IFS
 The field separator for word splitting and the join of $*, a space, a tab, and a

@@ -1,14 +1,9 @@
 single-row typing uses incremental refresh
 PATH ghost completion stays bounded while typing
 TAB validation ends before the next key
-warm prompts perform no synchronous PATH or history work
-repeated warm TAB performs no PATH work
-rejected history prefixes scan once
-first history key reads memory only
-history validation does not walk PATH
-prompt PATH changes defer first-key filesystem work
-absolute PATH survives a directory change
-clobbered PWD completion uses the actual directory
-startup PATH commands highlight before TAB
+repeated warm TAB and absolute PATH perform no PATH work after cd
+rejected history prefixes scan once without walking PATH
+prompt PATH changes defer work while startup commands highlight
 completion menu keeps callback-owned strings alive
 mixed PATH keeps stale absolute commands highlighted after cd
+clobbered PWD completion uses the actual directory

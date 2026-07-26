@@ -3,5 +3,3 @@ all
 build
 clean
 test
-== make by prefix:
-clean

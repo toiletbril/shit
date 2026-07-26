@@ -65,7 +65,7 @@
 ]
 shit: 2:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
      2 |  case a in (a) echo match;; esac
-       |       ^~ here.
+       |       ^ here.
 match
 default
 [Code 0]

@@ -1,7 +1,7 @@
 == default mood, literal eval argument ==
 shit: 1:32: warning: Command 'f' was not found.
      1 |  eval "f(){ echo \$((1/0)); }"; f
-       |                                 ^~ here.
+       |                                 ^ here.
 note: Did you mean ':'?
 shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
@@ -17,7 +17,7 @@ rc=1
 == default mood, eval of a variable ==
 shit: 1:61: warning: Command 'h' was not found.
      1 |  code=$(printf "%s" "h(){ echo \$((1/0)); }"); eval "$code"; h
-       |                                                              ^~ here.
+       |                                                              ^ here.
 note: Did you mean ':'?
 shit: eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }

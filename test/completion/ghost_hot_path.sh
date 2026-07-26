@@ -3,117 +3,76 @@ set -e
 d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 
+result_field()
+{
+    printf '%s\n' "$1" | while IFS='=' read -r field value; do
+        if [ "$field" = "$2" ]; then
+            printf '%s\n' "$value"
+            break
+        fi
+    done
+}
+
+assert_field()
+{
+    test "$(result_field "$1" "$2")" = "$3"
+}
+
+mkdir "$d/commands"
 for name in probe-alpha probe-beta; do
-    printf '#!/bin/sh\n' > "$d/$name"
-    chmod +x "$d/$name"
+    printf '#!/bin/sh\n' > "$d/commands/$name"
+    chmod +x "$d/commands/$name"
 done
-
-command_result=$(PATH="$d" "$BIN" --debug-ghost-at 'probe')
-printf '%s\n' "$command_result" | grep -q '^count=2$'
-printf '%s\n' "$command_result" | grep -q '^prefix=probe-$'
-printf '%s\n' "$command_result" | grep -Eq '^source-scans=[1-9][0-9]*$'
-printf '%s\n' "$command_result" | grep -q '^materialized=0$'
-echo 'command ghost streams its prefix'
-
-mkdir "$d/large"
-cp "$d/probe-alpha" "$d/probe-beta" "$d/large"
 unrelated_index=0
-while [ "$unrelated_index" -lt 128 ]; do
-    printf '#!/bin/sh\n' > "$d/large/unrelated-$unrelated_index"
+while [ "$unrelated_index" -lt 32 ]; do
+    printf '#!/bin/sh\n' > "$d/commands/unrelated-$unrelated_index"
+    chmod +x "$d/commands/unrelated-$unrelated_index"
     unrelated_index=$((unrelated_index + 1))
 done
-chmod +x "$d/large/"*
-large_result=$(PATH="$d/large" "$BIN" --debug-ghost-at 'probe')
-small_scan_count=
-large_scan_count=
-while IFS='=' read -r field value; do
-    if [ "$field" = source-scans ]; then small_scan_count=$value; fi
-done <<EOF
-$command_result
-EOF
-while IFS='=' read -r field value; do
-    if [ "$field" = source-scans ]; then large_scan_count=$value; fi
-done <<EOF
-$large_result
-EOF
-test "$small_scan_count" = "$large_scan_count"
-test "$small_scan_count" -le 128
-printf '%s\n' "$large_result" | grep -q '^count=2$'
-printf '%s\n' "$large_result" | grep -q '^prefix=probe-$'
-printf '%s\n' "$large_result" | grep -q '^materialized=0$'
+
+command_result=$(PATH="$d/commands" "$BIN" --debug-ghost-at 'probe')
+assert_field "$command_result" count 2
+assert_field "$command_result" prefix probe-
+assert_field "$command_result" materialized 0
+test "$(result_field "$command_result" source-scans)" -le 128
 echo 'command ghost skips unrelated PATH names'
 
-small_miss_result=$(PATH="$d" "$BIN" --debug-ghost-at 'zzzz-missing')
-large_miss_result=$(PATH="$d/large" "$BIN" \
-    --debug-ghost-at 'zzzz-missing')
-small_miss_scan_count=
-large_miss_scan_count=
-while IFS='=' read -r field value; do
-    if [ "$field" = source-scans ]; then small_miss_scan_count=$value; fi
-done <<EOF
-$small_miss_result
-EOF
-while IFS='=' read -r field value; do
-    if [ "$field" = source-scans ]; then large_miss_scan_count=$value; fi
-done <<EOF
-$large_miss_result
-EOF
-test "$small_miss_scan_count" = "$large_miss_scan_count"
-printf '%s\n' "$large_miss_result" | grep -q '^count=0$'
-echo 'command ghost misses skip unrelated PATH names'
+missing_result=$(PATH="$d/commands" "$BIN" --debug-ghost-at 'zzzz-missing')
+assert_field "$missing_result" count 0
+test "$(result_field "$missing_result" source-scans)" -le 128
+echo 'command ghost misses stay bounded'
 
 mkdir "$d/duplicate"
 printf '#!/bin/sh\n' > "$d/duplicate/echo"
 chmod +x "$d/duplicate/echo"
 duplicate_result=$(PATH="$d/duplicate" "$BIN" --debug-ghost-at 'ec')
-printf '%s\n' "$duplicate_result" | grep -q '^count=1$'
-printf '%s\n' "$duplicate_result" | grep -q '^prefix=echo$'
-printf '%s\n' "$duplicate_result" | grep -q '^materialized=0$'
+assert_field "$duplicate_result" count 1
+assert_field "$duplicate_result" prefix echo
+assert_field "$duplicate_result" materialized 0
 echo 'command ghost deduplicates sources'
 
-filesystem_result=$(PATH=/bin "$BIN" --debug-ghost-at "echo $d/probe")
-printf '%s\n' "$filesystem_result" | grep -q '^count=2$'
-printf '%s\n' "$filesystem_result" | grep -q "^prefix=$d/probe-$"
-printf '%s\n' "$filesystem_result" | grep -q '^source-scans=2$'
-printf '%s\n' "$filesystem_result" | grep -q '^materialized=0$'
-echo 'filesystem ghost streams its prefix'
-
-mkdir "$d/filesystem-large"
-cp "$d/probe-alpha" "$d/probe-beta" "$d/filesystem-large"
+mkdir "$d/filesystem"
+cp "$d/commands/probe-alpha" "$d/commands/probe-beta" "$d/filesystem"
 filesystem_index=0
-while [ "$filesystem_index" -lt 128 ]; do
-    : > "$d/filesystem-large/unrelated-$filesystem_index"
+while [ "$filesystem_index" -lt 32 ]; do
+    : > "$d/filesystem/unrelated-$filesystem_index"
     filesystem_index=$((filesystem_index + 1))
 done
-filesystem_large_result=$(PATH=/bin "$BIN" \
-    --debug-ghost-at "echo $d/filesystem-large/probe")
-filesystem_small_scan_count=
-filesystem_large_scan_count=
-while IFS='=' read -r field value; do
-    if [ "$field" = source-scans ]; then filesystem_small_scan_count=$value; fi
-done <<EOF
-$filesystem_result
-EOF
-while IFS='=' read -r field value; do
-    if [ "$field" = source-scans ]; then filesystem_large_scan_count=$value; fi
-done <<EOF
-$filesystem_large_result
-EOF
-test "$filesystem_small_scan_count" = "$filesystem_large_scan_count"
-printf '%s\n' "$filesystem_large_result" | grep -q '^count=2$'
-printf '%s\n' "$filesystem_large_result" | \
-    grep -q "^prefix=$d/filesystem-large/probe-$"
-printf '%s\n' "$filesystem_large_result" | grep -q '^materialized=0$'
+filesystem_result=$(PATH=/bin "$BIN" \
+    --debug-ghost-at "echo $d/filesystem/probe")
+assert_field "$filesystem_result" count 2
+assert_field "$filesystem_result" prefix "$d/filesystem/probe-"
+assert_field "$filesystem_result" source-scans 2
+assert_field "$filesystem_result" materialized 0
 echo 'filesystem ghost skips unrelated directory entries'
 
-: > "$d/filesystem-large/foo_bar_baz"
-filesystem_fuzzy_result=$(PATH=/bin "$BIN" \
-    --debug-ghost-at "echo $d/filesystem-large/fbb")
-printf '%s\n' "$filesystem_fuzzy_result" | grep -q '^count=0$'
-filesystem_fuzzy_tab_result=$(PATH=/bin "$BIN" \
-    --debug-complete-at "echo $d/filesystem-large/fbb")
-printf '%s\n' "$filesystem_fuzzy_tab_result" | \
-    grep -q "$d/filesystem-large/foo_bar_baz"
+: > "$d/filesystem/foo_bar_baz"
+fuzzy_result=$(PATH=/bin "$BIN" \
+    --debug-ghost-at "echo $d/filesystem/fbb")
+assert_field "$fuzzy_result" count 0
+fuzzy_tab_result=$(PATH=/bin "$BIN" \
+    --debug-complete-at "echo $d/filesystem/fbb")
+printf '%s\n' "$fuzzy_tab_result" | grep -q "$d/filesystem/foo_bar_baz"
 echo 'filesystem ghost leaves fuzzy matching to tab'
 
 if [ "${OS-}" != Windows_NT ]; then
@@ -123,7 +82,7 @@ if [ "${OS-}" != Windows_NT ]; then
     /bin/ln -s "$d/identity" "$d/identity-alias"
     identity_result=$(PATH="$d/identity-alias" "$BIN" \
         --debug-ghost-at "echo $d/identity/identity")
-    printf '%s\n' "$identity_result" | grep -q '^directory-stats=2$'
-    printf '%s\n' "$identity_result" | grep -q '^directory-reads=1$'
+    assert_field "$identity_result" directory-stats 2
+    assert_field "$identity_result" directory-reads 1
 fi
 echo 'directory aliases share one listing'

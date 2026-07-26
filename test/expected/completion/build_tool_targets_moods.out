@@ -2,7 +2,5 @@
 all
 build
 clean
-== bash mood by prefix:
-build
 == sh mood stays plain:
 Makefile

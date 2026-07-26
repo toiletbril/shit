@@ -29,3 +29,6 @@ fi
 printf '#!/bin/sh\n' > "$dir/foobar"
 chmod +x "$dir/foobar"
 PATH="$dir" "$BIN" --debug-highlight-at 'foo'
+PATH=/nonexistent "$BIN" --debug-highlight-at 'npr'
+PATH=/nonexistent "$BIN" --debug-highlight-at 'ech>/tmp/out'
+"$BIN" --debug-highlight-at './shi'

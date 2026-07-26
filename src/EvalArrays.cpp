@@ -41,6 +41,20 @@ static fn for_each_sparse_index(const StringMap<String> &sparse,
   });
 }
 
+static fn sparse_array_has_entries(const StringMap<String> &sparse,
+                                   StringView name, Allocator allocator) throws
+    -> bool
+{
+  let has_entries = false;
+  for_each_sparse_index(sparse, name, allocator,
+                        [&](usize index, const String &value) {
+                          unused(index);
+                          unused(value);
+                          has_entries = true;
+                        });
+  return has_entries;
+}
+
 struct sparse_array_entry
 {
   usize index;
@@ -75,7 +89,7 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
 
 fn EvalContext::clear_sparse_array(StringView name) throws -> void
 {
-  if (m_sparse_array_values.count() == 0) return;
+  if (!m_sparse_array_names.contains(name)) return;
 
   /* The erase runs after the scan so the map is not mutated while walked. */
   let indices = ArrayList<usize>{scratch_allocator()};
@@ -88,6 +102,7 @@ fn EvalContext::clear_sparse_array(StringView name) throws -> void
   for (const usize index : indices)
     m_sparse_array_values.erase(
         sparse_array_key(name, index, scratch_allocator()).view());
+  m_sparse_array_names.remove(name);
 }
 
 static fn parse_explicit_array_index(StringView element,
@@ -215,10 +230,15 @@ fn EvalContext::set_array_element(StringView name, usize index,
       dense->push(String{heap_allocator(), migrated->view()});
       m_sparse_array_values.erase(key.view());
     }
+    if (m_sparse_array_names.contains(name) &&
+        !sparse_array_has_entries(m_sparse_array_values, name,
+                                  scratch_allocator()))
+      m_sparse_array_names.remove(name);
     return;
   }
   LOG(All, "holding element %zu of '%.*s' sparsely past the dense run of %zu",
       index, static_cast<int>(name.length), name.data, dense_count);
+  m_sparse_array_names.add(name);
   m_sparse_array_values.set(
       sparse_array_key(name, index, scratch_allocator()).view(), value);
 }
@@ -412,6 +432,8 @@ fn EvalContext::unset_array_element(StringView name,
        elements after it move to the sparse store under their original
        indices. */
     if (resolved < array_count) {
+      if (static_cast<usize>(resolved) + 1 < array->count())
+        m_sparse_array_names.add(name);
       for (usize i = static_cast<usize>(resolved) + 1;
            i < static_cast<usize>(array_count); i++)
         m_sparse_array_values.set(
@@ -424,6 +446,10 @@ fn EvalContext::unset_array_element(StringView name,
                                                    static_cast<usize>(resolved),
                                                    scratch_allocator())
                                       .view());
+      if (m_sparse_array_names.contains(name) &&
+          !sparse_array_has_entries(m_sparse_array_values, name,
+                                    scratch_allocator()))
+        m_sparse_array_names.remove(name);
     }
   }
 }

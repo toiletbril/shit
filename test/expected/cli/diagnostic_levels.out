@@ -11,3 +11,4 @@ disabled-short-level
 level-one-strict=1
 level-two-strict=0
 runtime-level-two-warnings=1
+diagnostic-colors=ok

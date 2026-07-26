@@ -334,7 +334,7 @@ shit: 13:15: warning: A test with -a or -o is obsolescent.
 note: Join two tests with && or || instead.
 shit: 13:21: warning: The operand is a literal, so this -n test is constant.
     13 |  [ \( a = a \) -a -n x ]; echo "group_and=$?"
-       |                      ^~ here.
+       |                      ^ here.
 note: Test a variable or drop the check.
 paren_eq=0
 paren_single=0

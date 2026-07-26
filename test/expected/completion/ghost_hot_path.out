@@ -1,8 +1,6 @@
-command ghost streams its prefix
 command ghost skips unrelated PATH names
-command ghost misses skip unrelated PATH names
+command ghost misses stay bounded
 command ghost deduplicates sources
-filesystem ghost streams its prefix
 filesystem ghost skips unrelated directory entries
 filesystem ghost leaves fuzzy matching to tab
 directory aliases share one listing

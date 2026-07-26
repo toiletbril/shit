@@ -3,29 +3,20 @@ f	\e[94m
 (	\e[1m
 )	\e[1m
 {	\e[1m
-:	\e[34m
+:	\e[1m
 ;	\e[1m
 }	\e[1m
 ;	\e[1m
-f	\e[34m
+f	\e[1m
 == a call before the definition stays unknown:
-g	\e[31m
+g	\e[4:3;58:5:1m
 ;	\e[1m
 g	\e[94m
 (	\e[1m
 )	\e[1m
 {	\e[1m
-:	\e[34m
+:	\e[1m
 ;	\e[1m
 }	\e[1m
 ;	\e[1m
-g	\e[34m
-== the function keyword form colors the name:
-function	\e[32m
-h	\e[94m
-{	\e[1m
-:	\e[34m
-;	\e[1m
-}	\e[1m
-;	\e[1m
-h	\e[34m
+g	\e[1m

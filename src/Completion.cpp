@@ -166,77 +166,6 @@ static pure fn next_completion_prefix_word(StringView line,
   return line.substring_of_length(start, position - start);
 }
 
-struct decoded_completion_word
-{
-  String text{completion_allocator()};
-  Bitset glob_active{completion_allocator()};
-  usize raw_directory_end{0};
-  usize open_quote_content_start{0};
-  char quote_character{0};
-  bool leading_tilde_is_active{false};
-  bool leading_variable_is_active{false};
-};
-
-static fn decode_completion_word(StringView word) throws
-    -> decoded_completion_word
-{
-  let decoded = decoded_completion_word{};
-
-  char quote_character = 0;
-  for (usize position = 0; position < word.length; position++) {
-    let const byte = word[position];
-    if (quote_character == 0 && (byte == '\'' || byte == '"')) {
-      quote_character = byte;
-      decoded.open_quote_content_start = position + 1;
-      if (!decoded.text.is_empty() &&
-          os::is_directory_separator(decoded.text.back()))
-        decoded.raw_directory_end = position + 1;
-      continue;
-    }
-    if (byte == quote_character) {
-      quote_character = 0;
-      decoded.open_quote_content_start = 0;
-      if (!decoded.text.is_empty() &&
-          os::is_directory_separator(decoded.text.back()))
-        decoded.raw_directory_end = position + 1;
-      continue;
-    }
-    if (byte == '\\' && quote_character != '\'' && position + 1 < word.length) {
-      let const escaped_byte = word[position + 1];
-      if (quote_character != '"' || escaped_byte == '$' ||
-          escaped_byte == '`' || escaped_byte == '"' || escaped_byte == '\\' ||
-          escaped_byte == '\n')
-      {
-        position++;
-        if (escaped_byte == '\n') {
-          if (!decoded.text.is_empty() &&
-              os::is_directory_separator(decoded.text.back()))
-            decoded.raw_directory_end = position + 1;
-          continue;
-        }
-        decoded.text.push(escaped_byte);
-        decoded.glob_active.push(false);
-        if (os::is_directory_separator(escaped_byte))
-          decoded.raw_directory_end = position + 1;
-        continue;
-      }
-    }
-    if (decoded.text.is_empty()) {
-      decoded.leading_tilde_is_active = byte == '~' && quote_character == 0;
-      decoded.leading_variable_is_active =
-          byte == '$' && quote_character != '\'';
-    }
-    decoded.text.push(byte);
-    decoded.glob_active.push(quote_character == 0 &&
-                             (byte == '*' || byte == '?' || byte == '['));
-    if (os::is_directory_separator(byte))
-      decoded.raw_directory_end = position + 1;
-  }
-  decoded.quote_character = quote_character;
-
-  return decoded;
-}
-
 static fn timeout_flag_takes_value(char short_name,
                                    StringView long_name) wontthrow -> bool
 {
@@ -281,7 +210,8 @@ static pure fn timeout_managed_command_start(StringView line,
   {
     let const word = next_completion_prefix_word(line, position);
     if (!word.has_value()) return None;
-    let const decoded_word = decode_completion_word(*word);
+    let const decoded_word =
+        utils::decode_shell_word(*word, completion_allocator());
 
     if (should_skip_value) {
       should_skip_value = false;
@@ -313,7 +243,8 @@ static pure fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
   {
     let const word = next_completion_prefix_word(line, position);
     if (!word.has_value()) return None;
-    let const decoded_word = decode_completion_word(*word);
+    let const decoded_word =
+        utils::decode_shell_word(*word, completion_allocator());
 
     if (decoded_word.text == "timeout")
       return timeout_managed_command_start(line, position);
@@ -321,7 +252,8 @@ static pure fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
     if (decoded_word.text == "shitbox") {
       let const utility = next_completion_prefix_word(line, position);
       if (!utility.has_value()) return None;
-      let const decoded_utility = decode_completion_word(*utility);
+      let const decoded_utility =
+          utils::decode_shell_word(*utility, completion_allocator());
       if (decoded_utility.text == "timeout")
         return timeout_managed_command_start(line, position);
       return None;
@@ -946,10 +878,10 @@ template <typename Collector>
 static fn collect_filesystem_matches(
     StringView token, const Path &base_directory, path_text_mode text_mode,
     filesystem_entry_filter filter, EvalContext &context, Collector &collector,
-    const decoded_completion_word *expansion_source = nullptr) throws -> void
+    const utils::decoded_shell_word *expansion_source = nullptr) throws -> void
 {
   let const inside_quote = text_mode == path_text_mode::Literal;
-  let decoded_word = decode_completion_word(token);
+  let decoded_word = utils::decode_shell_word(token, completion_allocator());
   if (expansion_source != nullptr) {
     decoded_word.leading_tilde_is_active =
         expansion_source->leading_tilde_is_active;
@@ -1036,7 +968,7 @@ static fn collect_filesystem_matches(
 static fn complete_filesystem(
     StringView token, const Path &base_directory, path_text_mode text_mode,
     filesystem_entry_filter filter, EvalContext &context,
-    const decoded_completion_word *expansion_source = nullptr) throws
+    const utils::decoded_shell_word *expansion_source = nullptr) throws
     -> ArrayList<String>
 {
   let collector = CommandListCollector{};
@@ -1057,7 +989,7 @@ fn complete_filesystem_names(StringView token, EvalContext &context,
 static fn complete_filesystem_prefix(
     StringView token, const Path &base_directory, path_text_mode text_mode,
     filesystem_entry_filter filter, EvalContext &context,
-    const decoded_completion_word *expansion_source = nullptr) throws
+    const utils::decoded_shell_word *expansion_source = nullptr) throws
     -> GhostPrefixCollector
 {
   let collector = GhostPrefixCollector{};
@@ -1074,7 +1006,8 @@ static fn complete_glob(StringView token, const Path &base_directory,
 {
   let candidates = ArrayList<String>{completion_allocator()};
 
-  let const decoded_word = decode_completion_word(token);
+  let const decoded_word =
+      utils::decode_shell_word(token, completion_allocator());
   let parts = split_path_token(decoded_word.text.view());
 
   TRACELN("resolving glob token '%.*s'", static_cast<int>(token.length),
@@ -1496,7 +1429,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   let token_start = bounds.start;
   let token_end = bounds.end;
   let token = line.substring_of_length(token_start, token_end - token_start);
-  let const full_decoded_token = decode_completion_word(token);
+  let const full_decoded_token =
+      utils::decode_shell_word(token, completion_allocator());
   let const is_command = is_in_command_position(line, token_start);
 
   /* A cursor inside an open quote completes the bare path within it and is not
@@ -1513,7 +1447,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   if (token_prefix_has_shell_syntax) {
     let const token_prefix =
         line.substring_of_length(token_start, cursor - token_start);
-    let const decoded_prefix = decode_completion_word(token_prefix);
+    let const decoded_prefix =
+        utils::decode_shell_word(token_prefix, completion_allocator());
     if (decoded_prefix.quote_character != 0)
       open_quote_content_start =
           token_start + decoded_prefix.open_quote_content_start;
@@ -1535,7 +1470,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       token = line.substring_of_length(token_start, token_end - token_start);
     }
 
-  let const decoded_token = decode_completion_word(token);
+  let const decoded_token =
+      utils::decode_shell_word(token, completion_allocator());
   let const token_is_glob = decoded_token.glob_active.any();
 
   /* A command-position token holding a path separator completes against the

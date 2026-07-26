@@ -26,7 +26,7 @@ shit: 1:14: error: --runs expects a number, got 'nope'.
        |               ^~~~ here.
 shit: 1:14: error: --runs expects a number from 1 through 100000.
      1 |  bench --runs 0 true
-       |               ^~ here.
+       |               ^ here.
 shit: 1:18: error: --duration is too large.
      1 |  bench --duration 18446744073710 true
        |                   ^~~~~~~~~~~~~~ here.

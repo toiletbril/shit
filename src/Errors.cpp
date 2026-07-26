@@ -27,14 +27,16 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
 {
   if (!colors::stderr_wants_color()) return diagnostic_color{};
 
-  let severity = colors::ansi::BOLD_CYAN;
-  if (severity_word == StringView{"error"})
-    severity = colors::ansi::BOLD_RED;
-  else if (severity_word == StringView{"warning"})
-    severity = colors::ansi::BOLD_MAGENTA;
+  let severity = colors::ansi::CYAN;
+  if (severity_word == StringView{"error"}) {
+    return diagnostic_color{colors::ansi::BOLD_RED, colors::ansi::BOLD,
+                            colors::ansi::BOLD, colors::ansi::BOLD_GREEN,
+                            colors::ansi::RESET};
+  }
+  if (severity_word == StringView{"warning"}) severity = colors::ansi::MAGENTA;
 
-  return diagnostic_color{severity, colors::ansi::BOLD, colors::ansi::BOLD,
-                          colors::ansi::BOLD_GREEN, colors::ansi::RESET};
+  return diagnostic_color{
+      severity, {}, {}, colors::ansi::GREEN, colors::ansi::RESET};
 }
 
 template <class T>
@@ -183,9 +185,9 @@ cold static fn get_context_pointing_to(
     msg += ' ';
 
   msg += color.caret;
-  msg += "^~";
-  if (visible_caret > 2) {
-    for (usize i = 0; i < visible_caret - 2; i++)
+  msg += '^';
+  if (visible_caret > 1) {
+    for (usize i = 0; i < visible_caret - 1; i++)
       msg += '~';
   }
 

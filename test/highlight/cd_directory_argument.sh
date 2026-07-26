@@ -7,6 +7,7 @@ dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 mkdir "$dir/adir"
 : > "$dir/afile"
+ln -s afile "$dir/alink"
 cd "$dir"
 echo "== cd into a directory colors it as a valid path:"
 "$BIN" --debug-highlight-at 'cd adir'
@@ -14,6 +15,12 @@ echo "== cd into a file colors it red:"
 "$BIN" --debug-highlight-at 'cd afile'
 echo "== ls of the same file stays a valid path:"
 "$BIN" --debug-highlight-at 'ls afile'
+echo "== a trailing separator rejects a file:"
+"$BIN" --debug-highlight-at './afile/'
+echo "== a trailing separator rejects a symlink to a file:"
+"$BIN" --debug-highlight-at './alink/'
+echo "== a trailing separator accepts a directory:"
+"$BIN" --debug-highlight-at './adir/'
 
 if [ "${OS-}" = Windows_NT ]; then
     path_separator='\'

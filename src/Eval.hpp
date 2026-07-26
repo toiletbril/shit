@@ -428,6 +428,7 @@ struct eval_state_snapshot
   HashSet associative_names;
   StringMap<String> associative_values;
   StringMap<String> sparse_array_values;
+  HashSet sparse_array_names;
   StringMap<bool> shopt_options;
   StringMap<const Expression *> functions;
   StringMap<String> function_sources;
@@ -1658,6 +1659,7 @@ protected:
      its name and decimal index so a sparse far subscript does not pad a huge
      dense gap. The name still reads as indexed. */
   StringMap<String> m_sparse_array_values{heap_allocator()};
+  HashSet m_sparse_array_names{heap_allocator()};
   StringMap<bool> m_shopt_options{heap_allocator()};
   /* The compiled form of each [[ =~ ]] pattern, keyed by the pattern text, so a
      hot loop with a constant regex compiles it once and reuses it. */

@@ -46,16 +46,20 @@ send_runtime_input()
     sleep 0.1
     printf '%s\n' 'echo "[$LATER_DIAGNOSTIC]"; LATER_DIAGNOSTIC=x'
     sleep 0.1
+    printf '%s\n' 'cd diagnostic-levels-missing'
+    sleep 0.1
+    printf '%s\n' "eval 'diagnostic_levels_missing_command'"
+    sleep 0.1
     printf '%s\n' 'exit'
 }
 if "$script_command" --version >/dev/null 2>&1; then
-    send_runtime_input | TERM=xterm-256color \
+    send_runtime_input | TERM=xterm-256color NO_COLOR= \
         SHIT_HISTORY="$temporary_directory/history" BIN="$BIN" \
         "$script_command" -q -c \
         '/bin/stty cols 100 rows 24; exec "$BIN" -M bash -i --rcfile /dev/null' \
         "$temporary_directory/typescript" >/dev/null 2>&1
 else
-    send_runtime_input | TERM=xterm-256color \
+    send_runtime_input | TERM=xterm-256color NO_COLOR= \
         SHIT_HISTORY="$temporary_directory/history" BIN="$BIN" \
         "$script_command" -q "$temporary_directory/typescript" /bin/sh -c \
         '/bin/stty cols 100 rows 24; exec "$BIN" -M bash -i --rcfile /dev/null' \
@@ -64,3 +68,12 @@ fi
 runtime_warning_count=$(strings "$temporary_directory/typescript" | \
     grep -c "is read before it is assigned")
 echo "runtime-level-two-warnings=$runtime_warning_count"
+grep -Fq "$(printf '\033[35mwarning\033[0m')" \
+    "$temporary_directory/typescript" || exit 1
+grep -Fq "$(printf '\033[1;31merror\033[0m')" \
+    "$temporary_directory/typescript" || exit 1
+grep -Fq "$(printf '\033[36mnote\033[0m')" \
+    "$temporary_directory/typescript" || exit 1
+grep -Fq "$(printf '\033[36mtrace\033[0m')" \
+    "$temporary_directory/typescript" || exit 1
+echo 'diagnostic-colors=ok'

@@ -19,11 +19,11 @@ shit: 1:1: error: The variable 'nope' is not set.
 == an empty assignment is rejected rather than binding an empty value:
 shit: 1:1: error: Assignment to 'z' needs a value.
      1 |  z =
-       |  ^~ here.
+       |  ^ here.
 == a division by zero is a located capitalized error:
 shit: 1:6: error: Division by zero.
      1 |  1 / 0
-       |       ^~ here.
+       |       ^ here.
 note: The right operand evaluated to 0.
 == an unset name inside a stored formula errors when the formula reads:
 shit: error: The variable 'base' is not set.

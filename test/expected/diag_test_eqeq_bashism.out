@@ -46,4 +46,4 @@ shit: 2:5: warning: == is undefined in POSIX test.
 note: Use = for string equality.
 shit: 2:3: error: Builtin `[`: '==' is a bashism, use = for string equality in POSIX mode.
      2 |  [ x == x ] && echo eq || echo neq
-       |    ^~ here.
+       |    ^ here.

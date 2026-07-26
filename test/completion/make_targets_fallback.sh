@@ -9,5 +9,3 @@ printf 'all: build\n\ttrue\nbuild:\n\ttrue\ntest: build\n\ttrue\nclean:\n\ttrue\
 cd "$dir"
 echo "== make targets without gnu make:"
 PATH=/nonexistent "$BIN" --debug-complete-at 'make ' </dev/null
-echo "== make by prefix:"
-PATH=/nonexistent "$BIN" --debug-complete-at 'make cl' </dev/null

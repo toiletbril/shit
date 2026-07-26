@@ -231,14 +231,22 @@ siblings. The highlighter and history validation classify a warm command name
 without filesystem access. Explicit PATH validation ends with the TAB callback
 or compgen invocation that began it. The highlighter looks up only variable
 names that occur on the line, and it colors nested command and arithmetic
-substitutions in one pass. src/Toiletline.cpp bridges the editor to the
+substitutions in one pass. Strings and heredocs are bright green, keywords are bold
+bright magenta, resolved commands are bold in the terminal default color, and
+flags other than a lone dash are italic. A word beginning with two dashes stays
+a flag when it contains an equals sign. Unknown commands and invalid paths keep
+the terminal default color with a curly red underline. An unfinished command
+prefix keeps the terminal default color without an underline. Invalid syntax
+and unset variables are bold red with the same underline. Live globs are yellow.
+src/Toiletline.cpp bridges the editor to the
 evaluator, and src/toiletline/toiletline.h is the editor. The
 `--debug-highlight-at` flag, a
 debug-only test driver gated behind NDEBUG like `--debug-complete-at`, prints the
 highlight spans for a line so the highlighter is testable without the editor.
 Plain editor appends update the stored byte length and serialized line directly.
-Ghost history caches a prefix that produces no valid suggestion, decodes
-matching entries as bytes, and tracks display width separately from byte length.
+Ghost completion and history cache prefixes that produce no valid suggestion.
+Matching history entries are decoded as bytes, and display width is tracked
+separately from byte length.
 On Windows, successful virtual-terminal console initialization enables editor
 decorations without requiring the normally absent TERM environment variable.
 The completion bridge keeps its last result alive until the editor consumes the
@@ -258,7 +266,9 @@ error onto a span and preserves its details. A source backtrace is omitted when
 only one synthetic command-line root exists. Multiple `-c` roots trace the
 source that produced each message. Identical frames are printed once. The
 `--no-traces` flag suppresses every source backtrace, including in a fresh
-executable-fallback evaluator. Diagnostics and LINENO share one cached source
+executable-fallback evaluator. A printed frame begins with `trace:`. Only error
+labels, locations, and messages are bold. Warning labels are plain magenta, and
+note and trace labels are plain cyan. Diagnostics and LINENO share one cached source
 line index. Executable-format fallback uses an explicit
 invalid-process result. A fresh evaluator runs the fallback script with the
 command environment and argv zero, so caller variables, functions, and traps do
@@ -268,17 +278,21 @@ child so a producer dies with status 141. The cd builtin resolves a relative
 operand against the logical PWD, the bash -L mode, and cd .. lexically pops the
 last component. A logical PWD is accepted only when it is absolute and names the
 physical current directory. A missing explicit directory receives a close
-sibling suggestion when one exists. The pushd, popd, and dirs builtins carry a
+sibling suggestion when one exists. Its error names the path through the first
+unavailable component, and its caret covers only that component. The pushd,
+popd, and dirs builtins carry a
 directory stack on EvalContext and route every chdir through the cd builtin, so
 the logical PWD and OLDPWD stay in one place. PIPESTATUS is published after
-every foreground command.
+every foreground command. Sparse indexed array names are tracked separately,
+so a dense array reset does not scan unrelated sparse entries. A one-element
+PIPESTATUS update reuses its dense slot.
 The condition depth is inherited by a function called from a non-final and-or
 operand or from a negation. The `set -e` option stays suppressed throughout that
 guarded body. An if with no matching branch and no else publishes status zero,
 including at the end of a sourced file. A command path ending in a directory
 separator is rejected with
 status 126 when the normalized target is not a directory, and the highlighter
-colors the whole path red.
+keeps the whole path in the terminal default color with a curly red underline.
 
 ## Header factoring and value-type methods
 

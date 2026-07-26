@@ -1,23 +1,9 @@
 Interactive pty harnesses
 =========================
 
-The harnesses here drive shit through a pseudo-terminal, so they cover the
-job-control and signal behavior that needs a real controlling terminal. They are
-run by hand rather than wired into make test, since the defects they guard are
-timing-based and a golden cannot capture them. Each prints PASS or FAIL and exits
-with a matching status.
+These manual checks cover behavior that needs a controlling terminal.
 
-Build the debug binary first with `make -C src MODE=dbg`, then run a harness with
-its path or let it default to ../../shit-dbg.
+Build with `make MODE=dbg`, then run either script with an optional binary path.
 
-mimic_terminal_handoff.py
-    Runs a mimicked foreground command in an interactive session whose terminal
-    has TOSTOP enabled, and checks that the job completes and the prompt returns.
-    It guards the fork synchronization in src/Utils.cpp, where the child blocks on
-    a pipe until the parent hands over the controlling terminal.
-
-long_warning_window.py
-    Renders an error on a source line wider than an 80-column terminal, and checks
-    that the printed line is trimmed to a window with ellipses and stays under the
-    width, with the caret aligned under the offending token. It guards the
-    windowing in src/Errors.cpp, which is skipped when stderr is not a terminal.
+`mimic_terminal_handoff.py` checks foreground handoff and prompt recovery.
+`long_warning_window.py` checks clipped diagnostics and caret alignment.

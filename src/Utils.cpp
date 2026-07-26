@@ -147,6 +147,198 @@ fn finish_sha256(sha256_state &state, Allocator allocator) throws -> String
 
 } // namespace
 
+static fn shell_word_expansion_end(StringView word, usize start) wontthrow
+    -> usize
+{
+  if (start >= word.length) return start;
+
+  if (word[start] == '`') {
+    usize position = start + 1;
+    while (position < word.length) {
+      if (word[position] == '\\' && position + 1 < word.length) {
+        position += 2;
+        continue;
+      }
+      if (word[position] == '`') return position + 1;
+      position++;
+    }
+    return word.length;
+  }
+
+  if (word[start] != '$' || start + 1 >= word.length) return start;
+
+  let const next = word[start + 1];
+  if (next == '{') {
+    usize depth = 1;
+    usize position = start + 2;
+    while (position < word.length) {
+      if (word[position] == '\\' && position + 1 < word.length) {
+        position += 2;
+        continue;
+      }
+      if (word[position] == '{') depth++;
+      if (word[position] == '}' && --depth == 0) return position + 1;
+      position++;
+    }
+    return word.length;
+  }
+
+  if (next == '(') {
+    usize depth = 0;
+    char quote = 0;
+    for (usize position = start + 1; position < word.length; position++) {
+      let const byte = word[position];
+      if (byte == '\\' && quote != '\'' && position + 1 < word.length) {
+        position++;
+        continue;
+      }
+      if ((byte == '\'' || byte == '"') && quote == 0) {
+        quote = byte;
+        continue;
+      }
+      if (byte == quote) {
+        quote = 0;
+        continue;
+      }
+      if (quote != 0) continue;
+      if (byte == '(') depth++;
+      if (byte == ')' && --depth == 0) return position + 1;
+    }
+    return word.length;
+  }
+
+  usize position = start + 1;
+  if ((next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') ||
+      next == '_')
+  {
+    position++;
+    while (position < word.length) {
+      let const byte = word[position];
+      if (!((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
+            (byte >= '0' && byte <= '9') || byte == '_'))
+      {
+        break;
+      }
+      position++;
+    }
+    return position;
+  }
+
+  if ((next >= '0' && next <= '9') || next == '@' || next == '*' ||
+      next == '#' || next == '?' || next == '-' || next == '$' || next == '!')
+  {
+    return start + 2;
+  }
+
+  return start;
+}
+
+fn decode_shell_word(StringView word, Allocator allocator) throws
+    -> decoded_shell_word
+{
+  let decoded = decoded_shell_word{allocator};
+  decoded.raw_positions.push(0);
+
+  char quote_character = 0;
+  for (usize position = 0; position < word.length; position++) {
+    let const byte = word[position];
+    if (quote_character == 0 && (byte == '\'' || byte == '"')) {
+      quote_character = byte;
+      decoded.open_quote_content_start = position + 1;
+      decoded.raw_positions.back() = position + 1;
+      if (!decoded.text.is_empty() &&
+          os::is_directory_separator(decoded.text.back()))
+        decoded.raw_directory_end = position + 1;
+      continue;
+    }
+    if (byte == quote_character) {
+      quote_character = 0;
+      decoded.open_quote_content_start = 0;
+      if (!decoded.text.is_empty() &&
+          os::is_directory_separator(decoded.text.back()))
+        decoded.raw_directory_end = position + 1;
+      continue;
+    }
+    if (byte == '\\' && quote_character != '\'' && position + 1 < word.length) {
+      let const escaped_byte = word[position + 1];
+      if (quote_character != '"' || escaped_byte == '$' ||
+          escaped_byte == '`' || escaped_byte == '"' || escaped_byte == '\\' ||
+          escaped_byte == '\n')
+      {
+        position++;
+        if (escaped_byte == '\n') {
+          decoded.raw_positions.back() = position + 1;
+          if (!decoded.text.is_empty() &&
+              os::is_directory_separator(decoded.text.back()))
+            decoded.raw_directory_end = position + 1;
+          continue;
+        }
+        decoded.text.push(escaped_byte);
+        decoded.glob_active.push(false);
+        decoded.raw_positions.push(position + 1);
+        if (os::is_directory_separator(escaped_byte))
+          decoded.raw_directory_end = position + 1;
+        continue;
+      }
+    }
+    if (decoded.text.is_empty()) {
+      decoded.leading_tilde_is_active = byte == '~' && quote_character == 0;
+      decoded.leading_variable_is_active =
+          byte == '$' && quote_character != '\'';
+    }
+    decoded.text.push(byte);
+    decoded.glob_active.push(quote_character == 0 &&
+                             (byte == '*' || byte == '?' || byte == '['));
+    decoded.raw_positions.push(position + 1);
+    if (os::is_directory_separator(byte))
+      decoded.raw_directory_end = position + 1;
+  }
+  decoded.quote_character = quote_character;
+
+  char scan_quote = 0;
+  for (usize raw_start = 0; raw_start < word.length; raw_start++) {
+    let const byte = word[raw_start];
+    if (scan_quote == 0 && (byte == '\'' || byte == '"')) {
+      scan_quote = byte;
+      continue;
+    }
+    if (byte == scan_quote) {
+      scan_quote = 0;
+      continue;
+    }
+    if (byte == '\\' && scan_quote != '\'' && raw_start + 1 < word.length) {
+      raw_start++;
+      continue;
+    }
+
+    usize raw_end = raw_start;
+    if (raw_start == 0 && byte == '~' && scan_quote == 0)
+      raw_end = raw_start + 1;
+    else if ((byte == '$' && scan_quote != '\'') ||
+             (byte == '`' && scan_quote == 0))
+      raw_end = shell_word_expansion_end(word, raw_start);
+    if (raw_end <= raw_start) continue;
+
+    usize decoded_start = 0;
+    while (decoded_start < decoded.raw_positions.count() &&
+           decoded.raw_positions[decoded_start] < raw_start)
+      decoded_start++;
+    usize decoded_end = decoded_start;
+    while (decoded_end < decoded.raw_positions.count() &&
+           decoded.raw_positions[decoded_end] < raw_end)
+      decoded_end++;
+    if (decoded_end > decoded.text.length())
+      decoded_end = decoded.text.length();
+
+    decoded.opaque_ranges.push(
+        opaque_shell_word_range{decoded_start, decoded_end - decoded_start,
+                                raw_start, raw_end - raw_start});
+    raw_start = raw_end - 1;
+  }
+
+  return decoded;
+}
+
 fn file_content_identity(const Path &path, Allocator allocator) throws
     -> Maybe<String>
 {

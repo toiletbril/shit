@@ -11,20 +11,6 @@ noexec
 noglob
 notify
 nounset
-== signal names through command:
--ABRT
--ALRM
--CONT
--HUP
--INT
--KILL
--PIPE
--QUIT
--STOP
--TERM
--TSTP
--USR1
--USR2
 == command position through timeout:
 export
 == quoted and escaped timeout options stay transparent:

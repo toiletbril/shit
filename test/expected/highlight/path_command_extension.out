@@ -1,7 +1,8 @@
-EXPLICIT-PROBE.EXE	\e[34m
-EXPLICIT-P	\e[94m
-explicit-p	\e[94m
-collision.exe	\e[31m
-directory.exe	\e[31m
-blocked.exe	\e[34m
-foo	\e[94m
+EXPLICIT-PROBE.EXE	\e[1m
+collision.exe	\e[4:3;58:5:1m
+directory.exe	\e[4:3;58:5:1m
+blocked.exe	\e[1m
+ech	\e[4:3;58:5:1m
+>	\e[1m
+/tmp/	\e[96m
+out	\e[4:3;58:5:1m

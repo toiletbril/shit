@@ -3,4 +3,4 @@ shit: 2:1: error: Unterminated for loop.
        |  ^~~ here.
 shit: 2:7: note:
      2 |  for x y
-       |        ^~ Expected 'do', or 'in WORDS' before it; without 'in' the loop walks the positional parameters.
+       |        ^ Expected 'do', or 'in WORDS' before it; without 'in' the loop walks the positional parameters.

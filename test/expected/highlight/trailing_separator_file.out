@@ -1,6 +1,0 @@
---- file ---
-./program/	\e[31m
---- symlink to file ---
-./link/	\e[31m
---- directory ---
-./directory/	\e[96m

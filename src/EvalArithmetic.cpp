@@ -231,7 +231,10 @@ public:
       -> void
   {
     if (precise_base.has_value()) {
-      const SourceLocation location{precise_base->position + pos, 1,
+      let const error_position = pos < source.length ? pos
+                                 : source.is_empty() ? 0
+                                                     : source.length - 1;
+      const SourceLocation location{precise_base->position + error_position, 1,
                                     precise_base->filename};
       if (note.is_empty()) throw ErrorWithLocation{location, message};
       throw ErrorWithLocationAndDetails{location, message, note};

@@ -332,10 +332,26 @@ static fn abbreviate_home_directory(StringView path, Allocator allocator) throws
     let const home_view = home->text().view();
     if (path == home_view) return String{allocator, "~"};
     if (path.length > home_view.length && path.starts_with(home_view) &&
-        path[home_view.length] == '/')
+        os::is_directory_separator(path[home_view.length]))
     {
       let result = String{allocator, "~"};
       result.append(path.substring(home_view.length));
+      return result;
+    }
+
+    let const path_value = Path{path};
+    if (path_value.is_same_file_as(*home)) return String{allocator, "~"};
+
+    for (usize position = os::path_root_length(path); position < path.length;
+         position++)
+    {
+      if (!os::is_directory_separator(path[position])) continue;
+
+      let const prefix = Path{path.substring_of_length(0, position)};
+      if (!prefix.is_same_file_as(*home)) continue;
+
+      let result = String{allocator, "~"};
+      result.append(path.substring(position));
       return result;
     }
   }

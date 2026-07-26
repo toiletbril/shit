@@ -310,6 +310,15 @@ fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
   if (is_readonly("PIPESTATUS"))
     throw Error{"Unable to assign 'PIPESTATUS' because it is read only"};
 
+  if (let *values = m_indexed_arrays.find("PIPESTATUS");
+      values != nullptr && values->count() == 1 &&
+      !m_sparse_array_names.contains("PIPESTATUS"))
+  {
+    m_shell_variables.erase("PIPESTATUS");
+    (*values)[0] = String::from(status, values->allocator());
+    return;
+  }
+
   m_shell_variables.erase("PIPESTATUS");
   clear_sparse_array("PIPESTATUS");
   let &values = m_indexed_arrays.get_or_create(
@@ -1698,6 +1707,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_associative_names,
                              m_associative_values,
                              m_sparse_array_values,
+                             m_sparse_array_names,
                              m_shopt_options,
                              m_functions,
                              m_function_sources,
@@ -1731,6 +1741,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_associative_names = steal(snapshot.associative_names);
   m_associative_values = steal(snapshot.associative_values);
   m_sparse_array_values = steal(snapshot.sparse_array_values);
+  m_sparse_array_names = steal(snapshot.sparse_array_names);
   m_shopt_options = steal(snapshot.shopt_options);
   m_functions = steal(snapshot.functions);
   m_function_sources = steal(snapshot.function_sources);

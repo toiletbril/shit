@@ -3,4 +3,4 @@ shit: 3:1: error: Unterminated string literal.
        |  ^~~~~~~~~~~~~ here.
 shit: 3:14: note:
      3 |  "unterminated
-       |               ^~ Expected " here.
+       |               ^ Expected " here.

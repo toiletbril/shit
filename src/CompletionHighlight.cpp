@@ -89,6 +89,11 @@ static fn command_word_prefixes_any(StringView word,
 
   if (context.get_program_resolver().command_name_has_prefix(word)) return true;
 
+  if (context.shitbox() || context.mood() == mimic_mood::Default) {
+    for (let const &util_name : shitbox::util_names())
+      if (has_prefix(util_name.view())) return true;
+  }
+
   return false;
 }
 
@@ -423,14 +428,15 @@ static fn word_is_terminated_by_separator(StringView line, usize word_end,
 
   let const next_byte = line[word_end];
   return next_byte == ' ' || next_byte == '\t' || next_byte == '\n' ||
-         next_byte == ';' || next_byte == '|' || next_byte == '&';
+         next_byte == ';' || next_byte == '|' || next_byte == '&' ||
+         next_byte == '<' || next_byte == '>' || next_byte == '(' ||
+         next_byte == ')';
 }
 
 /* Path coloring receives source spelling rather than an expanded word. On
    Windows an unquoted backslash looks like a native separator but the shell
    grammar removes it when it escapes an ordinary byte. */
-static fn word_has_erased_directory_separator(StringView word) wontthrow
-    -> bool
+static fn word_has_erased_directory_separator(StringView word) wontthrow -> bool
 {
   for (usize position = 0; position + 1 < word.length; position++) {
     if (word[position] != '\\') continue;
@@ -447,6 +453,7 @@ static fn word_has_erased_directory_separator(StringView word) wontthrow
 /* Returns whether the word was treated as a path. */
 static fn color_path_argument(usize word_start, StringView word,
                               bool word_is_terminated, bool directories_only,
+                              bool should_color_partial,
                               ArrayList<highlight_span> &spans) throws -> bool
 {
   if (word.is_empty() || word[0] == '-') return false;
@@ -471,7 +478,7 @@ static fn color_path_argument(usize word_start, StringView word,
     let const normalized = Path{target}.normalized();
     if (normalized.exists() && !normalized.is_directory()) {
       spans.push(highlight_span{word_start, word_start + word.length,
-                                colors::ansi::RED});
+                                colors::ansi::CURLY_RED_UNDERLINE});
       return true;
     }
   }
@@ -517,7 +524,7 @@ static fn color_path_argument(usize word_start, StringView word,
     }
   }
 
-  if (existing_end > 0)
+  if (existing_end > 0 && should_color_partial)
     spans.push(highlight_span{word_start, word_start + existing_end,
                               colors::ansi::BRIGHT_CYAN});
 
@@ -534,13 +541,17 @@ static fn color_path_argument(usize word_start, StringView word,
       !word_is_terminated &&
       path_partial_prefixes_entry(word, existing_end, partial, has_tilde,
                                   directories_only);
-  let const tail_color =
-      tail_could_complete ? colors::ansi::CYAN : colors::ansi::RED;
+  if (tail_could_complete && !should_color_partial) return true;
+
+  let const tail_color = tail_could_complete
+                             ? colors::ansi::CYAN
+                             : colors::ansi::CURLY_RED_UNDERLINE;
   spans.push(highlight_span{word_start + existing_end, word_start + segment_end,
                             tail_color});
   if (segment_end < word.length)
     spans.push(highlight_span{word_start + segment_end,
-                              word_start + word.length, colors::ansi::RED});
+                              word_start + word.length,
+                              colors::ansi::CURLY_RED_UNDERLINE});
 
   return true;
 }
@@ -602,7 +613,7 @@ static fn color_dollar(StringView line, usize i, usize end,
     if (Maybe<StringView> name = simple_dollar_name(line, i, expansion_end);
         name.has_value() &&
         !dollar_name_is_set(*name, line_variable_names, context))
-      sgr = colors::ansi::BOLD_RED;
+      sgr = colors::ansi::BOLD_RED_CURLY_UNDERLINE;
     spans.push(highlight_span{i, expansion_end, sgr});
   }
   return expansion_end;
@@ -654,7 +665,7 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
           highlight_span{name_start, i,
                          dollar_name_is_set(name, line_variable_names, context)
                              ? colors::ansi::CYAN
-                             : colors::ansi::BOLD_RED});
+                             : colors::ansi::BOLD_RED_CURLY_UNDERLINE});
       continue;
     }
 
@@ -718,7 +729,7 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
       if (content == heredoc.delimiter) {
         if (body_start < line_end)
           spans.push(
-              highlight_span{body_start, line_end, colors::ansi::YELLOW});
+              highlight_span{body_start, line_end, colors::ansi::BRIGHT_GREEN});
         i = next;
         was_closed = true;
         break;
@@ -729,7 +740,7 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
 
     if (!was_closed) {
       if (body_start < end)
-        spans.push(highlight_span{body_start, end, colors::ansi::YELLOW});
+        spans.push(highlight_span{body_start, end, colors::ansi::BRIGHT_GREEN});
       i = end;
       break;
     }
@@ -825,7 +836,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       let const delimiter_word =
           line.substring_of_length(delimiter_start, i - delimiter_start);
       if (!delimiter_word.is_empty()) {
-        do_push(delimiter_start, i, colors::ansi::YELLOW);
+        do_push(delimiter_start, i, colors::ansi::BRIGHT_GREEN);
 
         let delimiter = delimiter_word;
         if (delimiter.length >= 2) {
@@ -921,7 +932,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         while (i < end && line[i] != '\'')
           i++;
         if (i < end) i++;
-        word_spans.push(highlight_span{string_start, i, colors::ansi::YELLOW});
+        word_spans.push(
+            highlight_span{string_start, i, colors::ansi::BRIGHT_GREEN});
       } else if (d == '"') {
         /* literal_start tracks the current yellow run, which resumes after
            every expansion. */
@@ -935,7 +947,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           if (line[i] == '$') {
             if (i > literal_start)
               word_spans.push(
-                  highlight_span{literal_start, i, colors::ansi::YELLOW});
+                  highlight_span{literal_start, i, colors::ansi::BRIGHT_GREEN});
             i = color_dollar(line, i, end, word_spans, context,
                              line_variable_names);
             literal_start = i;
@@ -946,7 +958,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         if (i < end) i++;
         if (i > literal_start)
           word_spans.push(
-              highlight_span{literal_start, i, colors::ansi::YELLOW});
+              highlight_span{literal_start, i, colors::ansi::BRIGHT_GREEN});
       } else if (d == '`') {
         /* Inside a backtick a backslash escapes only a backtick, dollar, or
            backslash. */
@@ -980,6 +992,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     let const plain = word_spans.is_empty();
     let const is_assignment = word_looks_like_assignment(word);
 
+    if (!is_command_position && word.length > 1 && word[0] == '-') {
+      do_push(word_start, word_end, colors::ansi::ITALIC);
+      continue;
+    }
+
     if (is_assignment && is_command_position) {
       let assigned_name =
           word.substring_of_length(0, word.find_character('=').value());
@@ -993,14 +1010,14 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (plain && word == "]]" && !stack.is_empty() &&
         stack.back() == highlight_construct::conditional)
     {
-      do_push(word_start, word_end, colors::ansi::GREEN);
+      do_push(word_start, word_end, colors::ansi::BOLD_BRIGHT_MAGENTA);
       stack.pop_back();
       is_command_position = false;
       continue;
     }
 
     if (expecting_in && plain && word == "in") {
-      do_push(word_start, word_end, colors::ansi::GREEN);
+      do_push(word_start, word_end, colors::ansi::BOLD_BRIGHT_MAGENTA);
       expecting_in = false;
       for_variable_pending = false;
       is_command_position = false;
@@ -1018,7 +1035,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       for_variable_pending = false;
       is_command_position = false;
       if (!plain || !is_plain_identifier(word)) {
-        do_push(word_start, word_end, colors::ansi::BOLD_RED);
+        do_push(word_start, word_end, colors::ansi::BOLD_RED_CURLY_UNDERLINE);
       } else {
         do_push(word_start, word_end, colors::ansi::CYAN);
         line_variable_names.add(word);
@@ -1033,7 +1050,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
         line_functions.add(word);
       } else {
-        do_push(word_start, word_end, colors::ansi::BOLD_RED);
+        do_push(word_start, word_end, colors::ansi::BOLD_RED_CURLY_UNDERLINE);
       }
       continue;
     }
@@ -1043,7 +1060,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (for_do_expected && is_command_position) {
       for_do_expected = false;
       if (word != "do") {
-        do_push(word_start, word_end, colors::ansi::BOLD_RED);
+        do_push(word_start, word_end, colors::ansi::BOLD_RED_CURLY_UNDERLINE);
         is_command_position = false;
         continue;
       }
@@ -1099,7 +1116,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       if (is_keyword) {
         do_push(word_start, word_end,
-                keyword_ok ? colors::ansi::GREEN : colors::ansi::BOLD_RED);
+                keyword_ok ? colors::ansi::BOLD_BRIGHT_MAGENTA
+                           : colors::ansi::BOLD_RED_CURLY_UNDERLINE);
         is_command_position = next_is_command;
         if (opens_in) expecting_in = true;
         if (opens_for_variable) for_variable_pending = true;
@@ -1112,21 +1130,26 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (os::has_directory_separator(word) &&
           !word_has_erased_directory_separator(word))
       {
-        color_path_argument(word_start, word, is_word_terminated, false, spans);
+        if (Path{word}.has_trailing_separator())
+          color_path_argument(word_start, word, is_word_terminated, false,
+                              false, spans);
+        else if (first_word_resolves(word, context))
+          do_push(word_start, word_end, colors::ansi::BOLD);
+        else
+          color_path_argument(word_start, word, is_word_terminated, false,
+                              false, spans);
       } else if (word_defines_function(line, word_end, end)) {
         do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
         line_functions.add(word);
       } else {
-        let command_color = colors::ansi::RED;
         if (first_word_resolves(word, context) || line_functions.contains(word))
         {
-          command_color = colors::ansi::BLUE;
-        } else if (!is_word_terminated &&
-                   command_word_prefixes_any(word, context))
+          do_push(word_start, word_end, colors::ansi::BOLD);
+        } else if (is_word_terminated ||
+                   !command_word_prefixes_any(word, context))
         {
-          command_color = colors::ansi::BRIGHT_BLUE;
+          do_push(word_start, word_end, colors::ansi::CURLY_RED_UNDERLINE);
         }
-        do_push(word_start, word_end, command_color);
       }
       is_command_position = false;
       continue;
@@ -1137,8 +1160,6 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           word_looks_like_ssh_remote_path(word))
       {
         do_push(word_start, word_end, colors::ansi::BOLD_WHITE);
-      } else if (!word.is_empty() && word[0] == '-') {
-        do_push(word_start, word_end, colors::ansi::GRAY);
       } else if (token_has_glob_metacharacter(word)) {
         /* The word is plain here so the metacharacter is live. */
         do_push(word_start, word_end, colors::ansi::YELLOW);
@@ -1147,7 +1168,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
             word_is_terminated_by_separator(line, word_end, end);
         if (!word_has_erased_directory_separator(word))
           color_path_argument(word_start, word, is_word_terminated,
-                              highlight_command_word == "cd", spans);
+                              highlight_command_word == "cd", true, spans);
       }
     }
     for (let const &inner : word_spans)

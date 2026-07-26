@@ -1,6 +1,6 @@
 # shit
 
-[![Shit is at least 3 times faster than Bash](https://github.com/toiletbril/shit/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/shit/actions/workflows/ci.yml)
+[![Shit is at least 5 times faster than Bash](https://github.com/toiletbril/shit/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/shit/actions/workflows/ci.yml)
 
 Man, my shell is **shit** (built on top of
 [toiletline](https://github.com/toiletbril/toiletline))
@@ -70,6 +70,11 @@ The interactive mode is modern and heavily inspired by
 sensible word-jumps and controls, full UTF-8 support, wide character (CJK and
 emoji) width handling, multiline editing, history search, and persistent
 history.
+
+Strings and heredocs are bright green, and keywords are bold bright magenta.
+Resolved commands are bold, and flags are italic. Unknown commands and invalid
+paths keep the terminal text color with a curly red underline. An unfinished
+command prefix keeps the terminal text color without an underline.
 
 **shit** has more than 50 builtins, each with `--help`. That includes
 every builtin from `bash` and POSIX standard, with the addition of:

@@ -1,7 +1,7 @@
 # Option completion from a command's --help text passes two gates. The command
 # is on shit's allowlist of commands safe to fork, and it resolves into a
 # directory the current user or root owns that is not writable by group or
-# other. A fake binary named for an allowlisted command (cargo) drives the
+# other. A fake binary named for an allowlisted command (act) drives the
 # probe deterministically. The same binary under a name shit does not recognize,
 # or in a world-writable directory, is never forked.
 workspace=$(mktemp -d) || exit 1
@@ -21,13 +21,13 @@ echo "  --marker-option   a probe option"
 SH
   chmod +x "$1"
 }
-write_probe "$trusted/cargo"
+write_probe "$trusted/act"
 write_probe "$trusted/helpprobe"
-write_probe "$untrusted/cargo"
+write_probe "$untrusted/act"
 
 rm -f "$marker"
 echo "== allowlisted command in a trusted directory offers its --help options:"
-PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
+PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'act --mark' </dev/null
 echo "== and was forked:"
 if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
 
@@ -39,17 +39,17 @@ if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
 
 rm -f "$marker"
 echo "== an allowlisted command in a world-writable directory is never forked:"
-PATH="$untrusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
+PATH="$untrusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'act --mark' </dev/null
 echo "== and was never forked:"
 if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
 
-cat > "$trusted/cargo" <<'SH'
+cat > "$trusted/act" <<'SH'
 #!/bin/sh
 echo attempted >> "$SHIT_HELP_MARKER"
 sleep 2
 SH
-chmod +x "$trusted/cargo"
+chmod +x "$trusted/act"
 rm -f "$marker"
 echo "== a timed out help command is attempted once:"
-PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'cargo --mark' </dev/null
+PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'act --mark' </dev/null
 test "$(wc -l < "$marker")" -eq 1 && echo "attempted once"

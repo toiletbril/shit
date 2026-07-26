@@ -16,7 +16,9 @@ printf 'pipeline=%s\n' "${PIPESTATUS[*]}"
 true
 printf 'single=%s count=%s\n' "${PIPESTATUS[*]}" "${#PIPESTATUS[@]}"
 PIPESTATUS=scalar
-printf 'scalar=%s count=%s\n' "${PIPESTATUS[*]}" "${#PIPESTATUS[@]}"
+true
+printf 'scalar-reset=%s count=%s direct=%s\n' "${PIPESTATUS[*]}" \
+    "${#PIPESTATUS[@]}" "$PIPESTATUS"
 PIPESTATUS[8]=sparse
 false
 printf 'sparse=%s count=%s\n' "${PIPESTATUS[*]}" "${#PIPESTATUS[@]}"

@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -38,8 +39,42 @@ fn Let::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   i64 last_value = 0;
   for (usize i = 1; i < ec.args().count(); i++) {
+    let expression_base = ec.arg_location_at(i);
+    if (let const source = cxt.current_source();
+        source != nullptr &&
+        expression_base.position + expression_base.length <= source->length())
+    {
+      let const raw_expression = source->view().substring_of_length(
+          expression_base.position, expression_base.length);
+      let const decoded_expression =
+          utils::decode_shell_word(raw_expression, cxt.scratch_allocator());
+      if (decoded_expression.text == ec.args()[i] &&
+          !decoded_expression.raw_positions.is_empty())
+      {
+        expression_base.position += decoded_expression.raw_positions[0];
+      }
+    }
+
     try {
-      last_value = cxt.evaluate_arithmetic(ec.args()[i].view());
+      last_value =
+          cxt.evaluate_arithmetic(ec.args()[i].view(), expression_base);
+    } catch (const ErrorWithLocation &error) {
+      let const message = builtin_error_message(ec.program(), error.message());
+      if (cxt.is_bash_compatible()) {
+        if (error.detail_message().is_empty())
+          report_soft_builtin_error(ec, cxt, error.location(),
+                                    error.message().view());
+        else
+          report_soft_builtin_error(ec, cxt, error.location(),
+                                    error.message().view(),
+                                    error.detail_message());
+        return 1;
+      }
+
+      if (error.detail_message().is_empty())
+        throw ErrorWithLocation{error.location(), message.view()};
+      throw ErrorWithLocationAndDetails{error.location(), message.view(),
+                                        error.detail_message()};
     } catch (const Error &error) {
       if (cxt.is_bash_compatible()) {
         if (error.detail_message().is_empty())

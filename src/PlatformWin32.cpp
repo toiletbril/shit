@@ -69,7 +69,8 @@ fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
   if (ReadFile(fd, buf, requested_size, &read_size, nullptr) == FALSE) {
     let const error = GetLastError();
     if (error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA ||
-        error == ERROR_PIPE_NOT_CONNECTED)
+        error == ERROR_PIPE_NOT_CONNECTED || error == ERROR_NETNAME_DELETED ||
+        error == ERROR_HANDLE_EOF)
     {
       return 0;
     }
@@ -1516,6 +1517,7 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
     arguments.push(String{heap_allocator(), StringView{"--mood"}});
     arguments.push(String{heap_allocator(), StringView{"bash"}});
   }
+  arguments.push(String{heap_allocator(), StringView{"--no-diagnostics"}});
   arguments.push(String{heap_allocator(), StringView{"-c"}});
   arguments.push(String{heap_allocator(), source});
   let command_line = make_os_args(arguments);
@@ -2289,17 +2291,22 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
 
   STARTUPINFOA startup{};
   startup.cb = sizeof(startup);
+  startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+  startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 
   HANDLE null_handle = INVALID_HANDLE_VALUE;
   if (suppress_output) {
     SECURITY_ATTRIBUTES inherit_sa{};
     inherit_sa.nLength = sizeof(inherit_sa);
     inherit_sa.bInheritHandle = TRUE;
-    null_handle = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE,
-                              &inherit_sa, OPEN_EXISTING, 0, nullptr);
+    null_handle = CreateFileA("NUL", GENERIC_READ | GENERIC_WRITE,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, &inherit_sa,
+                              OPEN_EXISTING, 0, nullptr);
     if (null_handle != INVALID_HANDLE_VALUE) {
-      startup.dwFlags |= STARTF_USESTDHANDLES;
-      startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+      if (startup.hStdInput == nullptr ||
+          startup.hStdInput == INVALID_HANDLE_VALUE)
+        startup.hStdInput = null_handle;
       startup.hStdOutput = null_handle;
       startup.hStdError = null_handle;
     }
@@ -2310,19 +2317,36 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
   };
 
   PROCESS_INFORMATION process_info{};
-  let const should_inherit_handles =
-      inherited_handle.has_value() ||
-      (suppress_output && null_handle != INVALID_HANDLE_VALUE);
+  let const standard_handles_are_valid =
+      startup.hStdInput != nullptr &&
+      startup.hStdInput != INVALID_HANDLE_VALUE &&
+      startup.hStdOutput != nullptr &&
+      startup.hStdOutput != INVALID_HANDLE_VALUE &&
+      startup.hStdError != nullptr && startup.hStdError != INVALID_HANDLE_VALUE;
+  let const should_use_standard_handles =
+      standard_handles_are_valid &&
+      (suppress_output || inherited_handle.has_value());
+  if (should_use_standard_handles) startup.dwFlags = STARTF_USESTDHANDLES;
+
   inherited_handle_state input_inheritance{};
   inherited_handle_state output_inheritance{};
-  if (suppress_output && null_handle != INVALID_HANDLE_VALUE) {
+  inherited_handle_state error_inheritance{};
+  inherited_handle_state extra_inheritance{};
+  if (should_use_standard_handles) {
     make_handle_inheritable(startup.hStdInput, input_inheritance);
-    make_handle_inheritable(null_handle, output_inheritance);
+    make_handle_inheritable(startup.hStdOutput, output_inheritance);
+    make_handle_inheritable(startup.hStdError, error_inheritance);
   }
+  if (inherited_handle.has_value())
+    make_handle_inheritable(*inherited_handle, extra_inheritance);
   defer { restore_handle_inheritance(input_inheritance); };
   defer { restore_handle_inheritance(output_inheritance); };
+  defer { restore_handle_inheritance(error_inheritance); };
+  defer { restore_handle_inheritance(extra_inheritance); };
 
   const u64 start_nanos = monotonic_nanos();
+  let const should_inherit_handles =
+      should_use_standard_handles || inherited_handle.has_value();
 
   /* CreateProcessA may rewrite lpCommandLine in place. */
   if (CreateProcessA(nullptr, const_cast<LPSTR>(command_line.data()), nullptr,

@@ -34,11 +34,11 @@
 ]
 shit: 2:3: warning: A negated -z is just -n.
      2 |  [ ! -z x ] && echo nonempty
-       |    ^~ here.
+       |    ^ here.
 note: Test with -n instead.
 shit: 2:8: warning: The operand is a literal, so this -z test is constant.
      2 |  [ ! -z x ] && echo nonempty
-       |         ^~ here.
+       |         ^ here.
 note: Test a variable or drop the check.
 nonempty
 after
