@@ -928,8 +928,8 @@ public:
   pure fn current_source() const wontthrow -> const String *;
   pure fn current_origin() const wontthrow -> const String &;
   /* A frame at error_location is dropped. */
-  fn print_source_backtrace(
-      Maybe<SourceLocation> error_location = None) const throws -> void;
+  fn print_source_backtrace(Maybe<SourceLocation> error_location = None) throws
+      -> void;
   fn set_source_traces_enabled(bool enabled) wontthrow -> void
   {
     m_should_print_source_traces = enabled;

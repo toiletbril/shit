@@ -59,18 +59,18 @@ f	\e[1m
 time	\e[1;95m
 echo	\e[1m
 == misplaced then done fi esac do as a command:
-then	\e[1;31;4:3;58:5:1m
+then	\e[1;31;4:3;58:5:10m
 ;	\e[1m
-done	\e[1;31;4:3;58:5:1m
+done	\e[1;31;4:3;58:5:10m
 ;	\e[1m
-fi	\e[1;31;4:3;58:5:1m
+fi	\e[1;31;4:3;58:5:10m
 ;	\e[1m
-esac	\e[1;31;4:3;58:5:1m
+esac	\e[1;31;4:3;58:5:10m
 ;	\e[1m
-do	\e[1;31;4:3;58:5:1m
+do	\e[1;31;4:3;58:5:10m
 echo	\e[1m
 ;	\e[1m
-in	\e[1;31;4:3;58:5:1m
+in	\e[1;31;4:3;58:5:10m
 == palette and lexical flags:
 echo	\e[1m
 "green"	\e[92m
@@ -78,8 +78,8 @@ echo	\e[1m
 --	\e[3m
 --long=value	\e[3m
 --color="$PATH"	\e[3m
-*.shit	\e[33m
+*.shit	\e[93m
 ./	\e[96m
-shit-highlight-missing-path-xyz	\e[4:3;58:5:1m
+shit-highlight-missing-path-xyz	\e[4:3;58:5:10m
 ;	\e[1m
-shit-highlight-missing-command-xyz	\e[4:3;58:5:1m
+shit-highlight-missing-command-xyz	\e[4:3;58:5:10m

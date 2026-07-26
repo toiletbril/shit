@@ -190,7 +190,7 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
   const ErrorWithLocation located{ec.source_location(),
                                   builtin_error_message(ec.program(), message)};
   if (const String *source = cxt.current_source(); source != nullptr)
-    show_message(located.to_string(source->view()));
+    show_message(located.to_string(source->view(), &cxt));
   else
     print_error("shit: " + builtin_error_message(ec.program(), message) + "\n");
 }
@@ -209,7 +209,7 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
   const ErrorWithLocation located{location,
                                   builtin_error_message(ec.program(), message)};
   if (const String *source = cxt.current_source(); source != nullptr)
-    show_message(located.to_string(source->view()));
+    show_message(located.to_string(source->view(), &cxt));
   else
     print_error("shit: " + builtin_error_message(ec.program(), message) + "\n");
 }
@@ -234,7 +234,7 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
   const ErrorWithLocation located{
       ec.source_location(), String{program_name} + ": Not enough arguments"};
   if (const String *source = cxt.current_source(); source != nullptr)
-    show_message(located.to_string(source->view()));
+    show_message(located.to_string(source->view(), &cxt));
   else
     print_error(String{"shit: "} + program_name + ": Not enough arguments.\n");
   show_message(Note{String{"Try `"} + program_name + " --help` for more info"}
@@ -248,7 +248,7 @@ fn report_usage_error(EvalContext &cxt, SourceLocation location,
   const ErrorWithLocation located{location, String{program_name} +
                                                 ": Not enough arguments"};
   if (const String *source = cxt.current_source(); source != nullptr)
-    show_message(located.to_string(source->view()));
+    show_message(located.to_string(source->view(), &cxt));
   else
     print_error(String{"shit: "} + program_name + ": Not enough arguments.\n");
   show_message(Note{String{"Try `"} + program_name + " --help` for more info"}

@@ -1,5 +1,5 @@
 echo	\e[1m
-$(	\e[4:3;58:5:1m
+$(	\e[4:3;58:5:10m
 highlight-variable-name-visits=0
 == a bare argument does not enumerate its directory:
 echo	\e[1m

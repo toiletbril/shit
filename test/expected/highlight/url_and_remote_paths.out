@@ -5,8 +5,8 @@ user@host:/dir/file	\e[1;37m
 == a local colon path remains a local path:
 echo	\e[1m
 ./	\e[96m
-missing:part	\e[4:3;58:5:1m
+missing:part	\e[4:3;58:5:10m
 == a Windows drive path remains a local path:
 echo	\e[1m
-C:	\e[4:3;58:5:1m
-/missing	\e[4:3;58:5:1m
+C:	\e[4:3;58:5:10m
+/missing	\e[4:3;58:5:10m

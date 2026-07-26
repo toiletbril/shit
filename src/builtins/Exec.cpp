@@ -38,7 +38,7 @@ static fn report_exec_resolution_error(ExecContext &ec, EvalContext &cxt,
   error.set_command_status(command_status);
   const String *source = cxt.current_source();
   show_message(
-      error.to_string(source != nullptr ? source->view() : StringView{}));
+      error.to_string(source != nullptr ? source->view() : StringView{}, &cxt));
 
   if (cxt.in_subshell() || cxt.is_in_pipeline_stage()) {
     if (cxt.in_subshell())

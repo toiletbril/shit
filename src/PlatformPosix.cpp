@@ -873,11 +873,11 @@ fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 
 pure fn is_directory_separator(char c) wontthrow -> bool { return c == '/'; }
 
-fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
+fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
 {
   LOG(Debug, "querying the terminal size");
   struct winsize window{};
-  if (ioctl(SHIT_STDOUT, TIOCGWINSZ, &window) != 0) return false;
+  if (ioctl(output, TIOCGWINSZ, &window) != 0) return false;
   if (window.ws_col == 0 || window.ws_row == 0) return false;
   columns = window.ws_col;
   rows = window.ws_row;

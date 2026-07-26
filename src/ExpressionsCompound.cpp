@@ -125,11 +125,11 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
           if (let const windowed = window_function_body_error(cxt, error);
               windowed.has_value())
           {
-            show_message(error.to_string(*windowed));
+            show_message(error.to_string(*windowed, &cxt));
           } else {
             const String *source = cxt.current_source();
-            show_message(error.to_string(source != nullptr ? source->view()
-                                                           : StringView{}));
+            show_message(error.to_string(
+                source != nullptr ? source->view() : StringView{}, &cxt));
           }
           error.set_rendered();
         }
@@ -142,8 +142,8 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
             static_cast<long long>(error.command_status()),
             error.message().c_str());
         const String *source = cxt.current_source();
-        show_message(
-            error.to_string(source != nullptr ? source->view() : StringView{}));
+        show_message(error.to_string(
+            source != nullptr ? source->view() : StringView{}, &cxt));
         SET_AND_RETURN_EXIT_STATUS(cxt, error.command_status());
       }
     };
@@ -436,8 +436,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
           stage_status = SHIT_BROKEN_PIPE_EXIT_STATUS;
         } catch (const ErrorWithLocation &e) {
           const String *source = cxt.current_source();
-          shit::show_message(
-              e.to_string(source != nullptr ? source->view() : StringView{}));
+          shit::show_message(e.to_string(
+              source != nullptr ? source->view() : StringView{}, &cxt));
           stage_status = 1;
         } catch (const Error &e) {
           shit::show_message(e.to_string());

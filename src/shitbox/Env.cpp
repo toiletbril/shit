@@ -122,8 +122,8 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
         environment_resolver, steal(env_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     const String *source = cxt.current_source();
-    show_message(resolution_error.to_string(source != nullptr ? source->view()
-                                                              : StringView{}));
+    show_message(resolution_error.to_string(
+        source != nullptr ? source->view() : StringView{}, &cxt));
     return static_cast<i32>(resolution_error.command_status());
   }
 

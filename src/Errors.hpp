@@ -7,6 +7,8 @@
 
 namespace shit {
 
+class EvalContext;
+
 struct SourceLocation
 {
   usize position{0};
@@ -25,7 +27,8 @@ public:
 
   virtual fn severity_word() const wontthrow -> StringView;
 
-  virtual fn to_string(StringView source) const throws -> String;
+  virtual fn to_string(StringView source,
+                       EvalContext *context = nullptr) const throws -> String;
 
   /* The command status is 1 for most errors and 2 for a [[ ]] operand error. A
      relocation that rewraps an error must carry both the fatal mark and the
@@ -117,7 +120,8 @@ class ErrorWithLocation : public ErrorBase
 public:
   ErrorWithLocation(SourceLocation location, StringView message);
 
-  virtual fn to_string(StringView source) const throws -> String;
+  virtual fn to_string(StringView source,
+                       EvalContext *context = nullptr) const throws -> String;
 
   /* The line numbering starts this many lines past one, for a source that is a
      window into a larger file. */
@@ -217,7 +221,8 @@ public:
     return m_note.view();
   }
 
-  fn details_to_string(StringView source) const throws -> String;
+  fn details_to_string(StringView source,
+                       EvalContext *context = nullptr) const throws -> String;
 
 protected:
   SourceLocation m_details_location;

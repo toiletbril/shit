@@ -805,7 +805,8 @@ fn realtime_microseconds() wontthrow -> u64;
 /* A negative epoch renders the current time, the bash -1 and -2 forms. */
 fn format_local_time(StringView format, i64 epoch) throws -> String;
 
-fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool;
+fn terminal_size(u32 &columns, u32 &rows,
+                 descriptor output = SHIT_STDOUT) wontthrow -> bool;
 
 /* The user and system seconds this process's children have consumed so far,
    read from RUSAGE_CHILDREN. Windows has no equivalent and reports zero. */

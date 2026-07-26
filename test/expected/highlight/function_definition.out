@@ -9,7 +9,7 @@ f	\e[94m
 ;	\e[1m
 f	\e[1m
 == a call before the definition stays unknown:
-g	\e[4:3;58:5:1m
+g	\e[4:3;58:5:10m
 ;	\e[1m
 g	\e[94m
 (	\e[1m

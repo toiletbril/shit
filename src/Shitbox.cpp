@@ -378,7 +378,7 @@ fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
   /* The fallback line covers the rare case with no source to caret against. */
   const ErrorWithLocation located{ec.source_location(), message};
   if (const String *source = cxt.current_source(); source != nullptr)
-    show_message(located.to_string(source->view()));
+    show_message(located.to_string(source->view(), &cxt));
   else
     print_error("shit: " + String{message} + "\n");
 }

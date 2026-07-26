@@ -1099,11 +1099,10 @@ pure fn is_directory_separator(char c) wontthrow -> bool
   return c == '/' || c == '\\';
 }
 
-fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
+fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
 {
   CONSOLE_SCREEN_BUFFER_INFO info;
-  if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info) == 0)
-    return false;
+  if (GetConsoleScreenBufferInfo(output, &info) == 0) return false;
   const i32 width = info.srWindow.Right - info.srWindow.Left + 1;
   const i32 height = info.srWindow.Bottom - info.srWindow.Top + 1;
   if (width <= 0 || height <= 0) return false;

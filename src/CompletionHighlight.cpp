@@ -356,7 +356,6 @@ static fn word_names_existing_path(StringView word) throws -> bool
   return Path{word}.exists();
 }
 
-/* A path being typed toward a real file colors cyan, an unmatched one red. */
 static fn path_partial_prefixes_entry(StringView word, usize existing_end,
                                       StringView partial, bool has_tilde,
                                       bool directories_only) throws -> bool
@@ -478,7 +477,7 @@ static fn color_path_argument(usize word_start, StringView word,
     let const normalized = Path{target}.normalized();
     if (normalized.exists() && !normalized.is_directory()) {
       spans.push(highlight_span{word_start, word_start + word.length,
-                                colors::ansi::CURLY_RED_UNDERLINE});
+                                colors::ansi::CURLY_GREEN_UNDERLINE});
       return true;
     }
   }
@@ -545,13 +544,13 @@ static fn color_path_argument(usize word_start, StringView word,
 
   let const tail_color = tail_could_complete
                              ? colors::ansi::CYAN
-                             : colors::ansi::CURLY_RED_UNDERLINE;
+                             : colors::ansi::CURLY_GREEN_UNDERLINE;
   spans.push(highlight_span{word_start + existing_end, word_start + segment_end,
                             tail_color});
   if (segment_end < word.length)
     spans.push(highlight_span{word_start + segment_end,
                               word_start + word.length,
-                              colors::ansi::CURLY_RED_UNDERLINE});
+                              colors::ansi::CURLY_GREEN_UNDERLINE});
 
   return true;
 }
@@ -613,7 +612,7 @@ static fn color_dollar(StringView line, usize i, usize end,
     if (Maybe<StringView> name = simple_dollar_name(line, i, expansion_end);
         name.has_value() &&
         !dollar_name_is_set(*name, line_variable_names, context))
-      sgr = colors::ansi::BOLD_RED_CURLY_UNDERLINE;
+      sgr = colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE;
     spans.push(highlight_span{i, expansion_end, sgr});
   }
   return expansion_end;
@@ -665,7 +664,7 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
           highlight_span{name_start, i,
                          dollar_name_is_set(name, line_variable_names, context)
                              ? colors::ansi::CYAN
-                             : colors::ansi::BOLD_RED_CURLY_UNDERLINE});
+                             : colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE});
       continue;
     }
 
@@ -1035,7 +1034,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       for_variable_pending = false;
       is_command_position = false;
       if (!plain || !is_plain_identifier(word)) {
-        do_push(word_start, word_end, colors::ansi::BOLD_RED_CURLY_UNDERLINE);
+        do_push(word_start, word_end,
+                colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
       } else {
         do_push(word_start, word_end, colors::ansi::CYAN);
         line_variable_names.add(word);
@@ -1050,7 +1050,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
         line_functions.add(word);
       } else {
-        do_push(word_start, word_end, colors::ansi::BOLD_RED_CURLY_UNDERLINE);
+        do_push(word_start, word_end,
+                colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
       }
       continue;
     }
@@ -1060,7 +1061,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (for_do_expected && is_command_position) {
       for_do_expected = false;
       if (word != "do") {
-        do_push(word_start, word_end, colors::ansi::BOLD_RED_CURLY_UNDERLINE);
+        do_push(word_start, word_end,
+                colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
         is_command_position = false;
         continue;
       }
@@ -1117,7 +1119,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (is_keyword) {
         do_push(word_start, word_end,
                 keyword_ok ? colors::ansi::BOLD_BRIGHT_MAGENTA
-                           : colors::ansi::BOLD_RED_CURLY_UNDERLINE);
+                           : colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
         is_command_position = next_is_command;
         if (opens_in) expecting_in = true;
         if (opens_for_variable) for_variable_pending = true;
@@ -1148,7 +1150,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         } else if (is_word_terminated ||
                    !command_word_prefixes_any(word, context))
         {
-          do_push(word_start, word_end, colors::ansi::CURLY_RED_UNDERLINE);
+          do_push(word_start, word_end, colors::ansi::CURLY_GREEN_UNDERLINE);
         }
       }
       is_command_position = false;
@@ -1162,7 +1164,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         do_push(word_start, word_end, colors::ansi::BOLD_WHITE);
       } else if (token_has_glob_metacharacter(word)) {
         /* The word is plain here so the metacharacter is live. */
-        do_push(word_start, word_end, colors::ansi::YELLOW);
+        do_push(word_start, word_end, colors::ansi::BRIGHT_YELLOW);
       } else {
         let const is_word_terminated =
             word_is_terminated_by_separator(line, word_end, end);

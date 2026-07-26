@@ -1,16 +1,16 @@
 == use before a standalone assignment, then after:
 echo	\e[1m
-$V	\e[1;31;4:3;58:5:1m
+$V	\e[1;31;4:3;58:5:10m
 ;	\e[1m
 ;	\e[1m
 echo	\e[1m
 $V	\e[36m
 == a prefix assignment leaves the name unset for the same command:
 echo	\e[1m
-$V2	\e[1;31;4:3;58:5:1m
+$V2	\e[1;31;4:3;58:5:10m
 == an array element assignment binds the base name:
 echo	\e[1m
-$arr	\e[1;31;4:3;58:5:1m
+$arr	\e[1;31;4:3;58:5:10m
 ;	\e[1m
 ;	\e[1m
 echo	\e[1m

@@ -388,7 +388,7 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     }
     let warning = WarningWithLocationAndDetails{location, message, note};
     warning.set_line_offset(line_offset);
-    show_message(warning.to_string(resolved_source.text->view()));
+    show_message(warning.to_string(resolved_source.text->view(), this));
     if (!m_source_frames.is_empty()) print_source_backtrace();
   } catch (...) {
     LOG(Debug, "formatting a runtime warning failed, the error is swallowed");
@@ -517,7 +517,7 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
   {
     try {
       let warning = WarningWithLocationAndDetails{location, message, note};
-      show_message(warning.to_string(m_current_source->view()));
+      show_message(warning.to_string(m_current_source->view(), this));
     } catch (...) {
       LOG(Debug, "showing a located warning failed, the error is swallowed");
     }
@@ -1308,7 +1308,7 @@ fn EvalContext::pop_root_source_frame() wontthrow -> void
 }
 
 fn EvalContext::print_source_backtrace(
-    Maybe<SourceLocation> error_location) const throws -> void
+    Maybe<SourceLocation> error_location) throws -> void
 {
   if (!m_should_print_source_traces) return;
 
@@ -1358,7 +1358,7 @@ fn EvalContext::print_source_backtrace(
     if (is_repeated_frame) continue;
 
     let const sourced_here = TraceWithLocation{frame.call_site};
-    show_message(sourced_here.to_string(*frame.parent_source));
+    show_message(sourced_here.to_string(*frame.parent_source, this));
   }
 }
 

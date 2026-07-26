@@ -73,8 +73,9 @@ history.
 
 Strings and heredocs are bright green, and keywords are bold bright magenta.
 Resolved commands are bold, and flags are italic. Unknown commands and invalid
-paths keep the terminal text color with a curly red underline. An unfinished
-command prefix keeps the terminal text color without an underline.
+paths keep the terminal text color with a bright green curly underline. An
+unfinished command prefix keeps the terminal text color without an underline.
+Located diagnostics syntax-highlight their source line on a terminal.
 
 **shit** has more than 50 builtins, each with `--help`. That includes
 every builtin from `bash` and POSIX standard, with the addition of:

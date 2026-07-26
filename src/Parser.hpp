@@ -17,7 +17,8 @@ public:
 
   fn construct_ast() throws -> Expression *;
 
-  fn construct_ast(ArrayList<String> &errors) throws -> Expression *;
+  fn construct_ast(ArrayList<String> &errors, EvalContext *context) throws
+      -> Expression *;
 
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
 

@@ -351,8 +351,8 @@ static fn evaluate_subshell_in_process(const Expression *body,
       LOG(Debug, "the subshell confined a script-fatal error: %s",
           error.message().c_str());
       const String *source = cxt.current_source();
-      show_message(
-          error.to_string(source != nullptr ? source->view() : StringView{}));
+      show_message(error.to_string(
+          source != nullptr ? source->view() : StringView{}, &cxt));
       ret = cxt.is_bash_compatible() ? 1 : 2;
       cxt.set_last_exit_status(static_cast<i32>(ret));
       cxt.clear_control_flow();
@@ -406,8 +406,8 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
       status = static_cast<i32>(evaluate_subshell_in_process(m_body, cxt));
     } catch (const ErrorBase &error) {
       let const source = cxt.current_source();
-      show_message(
-          error.to_string(source != nullptr ? source->view() : StringView{}));
+      show_message(error.to_string(
+          source != nullptr ? source->view() : StringView{}, &cxt));
     } catch (...) {
       LOG(Debug, "the subshell child swallowed an unknown error");
     }

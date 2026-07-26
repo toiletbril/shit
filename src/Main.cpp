@@ -364,7 +364,7 @@ static fn report_escaped_control_flow(EvalContext &context,
   const String *source =
       control.source != nullptr ? control.source : &fallback_source;
   let const located = ErrorWithLocation{control.location, what};
-  show_message(located.to_string(*source));
+  show_message(located.to_string(*source, &context));
 
   context.clear_control_flow();
 }
@@ -400,7 +400,7 @@ static fn run_script_contents(const String &script_contents,
       /* A file with any parse error must not run, so every error is collected
          and reported at once. */
       let parse_errors = ArrayList<shit::String>{heap_allocator()};
-      ast = p.construct_ast(parse_errors);
+      ast = p.construct_ast(parse_errors, &context);
 
       if (!parse_errors.is_empty()) {
         for (let const &e : parse_errors)
@@ -479,14 +479,14 @@ static fn run_script_contents(const String &script_contents,
     /* An error thrown from a function body was already rendered at the call
        boundary against the file that defined it. */
     if (!e.was_rendered()) {
-      show_message(e.to_string(script_contents));
-      show_message(e.details_to_string(script_contents));
+      show_message(e.to_string(script_contents, &context));
+      show_message(e.details_to_string(script_contents, &context));
     }
     exit_code = e.command_status() != 1
                     ? static_cast<i32>(e.command_status())
                     : (context.is_posix_mode() ? 2 : EXIT_FAILURE);
   } catch (const ErrorWithLocation &e) {
-    if (!e.was_rendered()) show_message(e.to_string(script_contents));
+    if (!e.was_rendered()) show_message(e.to_string(script_contents, &context));
     exit_code = e.command_status() != 1
                     ? static_cast<i32>(e.command_status())
                     : (context.is_posix_mode() ? 2 : EXIT_FAILURE);

@@ -424,8 +424,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
                   cxt.run_mimicked_script(ec, *mode, script_isolation::Shared);
             } catch (const ErrorBase &error) {
               const String *source = cxt.current_source();
-              show_message(error.to_string(source != nullptr ? source->view()
-                                                             : StringView{}));
+              show_message(error.to_string(
+                  source != nullptr ? source->view() : StringView{}, &cxt));
               status = static_cast<i32>(error.command_status());
             } catch (...) {}
             os::exit_process_immediately(status);
@@ -477,15 +477,15 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
     } catch (const ErrorWithLocation &error) {
       /* Resolved but unexecutable exits 126, missing exits 127. */
       const String *source = cxt.current_source();
-      show_message(
-          error.to_string(source != nullptr ? source->view() : StringView{}));
+      show_message(error.to_string(
+          source != nullptr ? source->view() : StringView{}, &cxt));
       quit(126, farewell_policy::Silent);
     } catch (const Error &error) {
       const String *source = cxt.current_source();
       let located = ErrorWithLocation{ec.source_location(), error.message()};
       located.set_command_status(error.command_status());
-      show_message(
-          located.to_string(source != nullptr ? source->view() : StringView{}));
+      show_message(located.to_string(
+          source != nullptr ? source->view() : StringView{}, &cxt));
       quit(127, farewell_policy::Silent);
     }
     LOG(Debug, "running the file as a shell script in place");
@@ -658,8 +658,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
             child_status = SHIT_BROKEN_PIPE_EXIT_STATUS;
           } catch (const ErrorWithLocation &e) {
             const String *source = cxt.current_source();
-            shit::show_message(
-                e.to_string(source != nullptr ? source->view() : StringView{}));
+            shit::show_message(e.to_string(
+                source != nullptr ? source->view() : StringView{}, &cxt));
             child_status = static_cast<i32>(e.command_status());
           } catch (const Error &e) {
             shit::show_message(e.to_string());

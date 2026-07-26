@@ -53,7 +53,7 @@ public:
   StringMap<SourceLocation> reads_before_assignment{heap_allocator()};
 
   /* The lookup is lazy, and null in a context with no live shell. */
-  const EvalContext *eval_context{nullptr};
+  EvalContext *eval_context{nullptr};
 
   /* The SC3xxx bashism lints fire only behind this gate, since a shit or bash
      shebang means the bash extension on purpose. */
@@ -92,7 +92,7 @@ public:
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               const EvalContext *eval_context, u8 warning_level,
+               EvalContext *eval_context, u8 warning_level,
                bool silence_unresolved_commands,
                bool show_optimizer_state = false) throws -> bool;
 

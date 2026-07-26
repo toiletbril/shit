@@ -20,11 +20,11 @@ fn EvalContext::render_contained_substitution_error(std::exception_ptr error,
   try {
     std::rethrow_exception(error);
   } catch (const ErrorWithLocationAndDetails &e) {
-    show_message(e.to_string(source));
-    show_message(e.details_to_string(source));
+    show_message(e.to_string(source, this));
+    show_message(e.details_to_string(source, this));
     print_source_backtrace(e.location());
   } catch (const ErrorWithLocation &e) {
-    show_message(e.to_string(source));
+    show_message(e.to_string(source, this));
     print_source_backtrace(e.location());
   } catch (const Error &e) {
     show_message(e.to_string());

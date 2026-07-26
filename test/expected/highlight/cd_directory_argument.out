@@ -3,13 +3,13 @@ cd	\e[1m
 adir	\e[96m
 == cd into a file colors it red:
 cd	\e[1m
-afile	\e[4:3;58:5:1m
+afile	\e[4:3;58:5:10m
 == ls of the same file stays a valid path:
 ls	\e[1m
 afile	\e[96m
 == a trailing separator rejects a file:
-./afile/	\e[4:3;58:5:1m
+./afile/	\e[4:3;58:5:10m
 == a trailing separator rejects a symlink to a file:
-./alink/	\e[4:3;58:5:1m
+./alink/	\e[4:3;58:5:10m
 == a trailing separator accepts a directory:
 == native path separators highlight directories:

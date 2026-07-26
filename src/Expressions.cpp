@@ -77,7 +77,7 @@ cold fn AnalysisContext::warn(SourceLocation location, StringView message,
 {
   let const located =
       WarningWithLocationAndDetails{location, message, suggestion};
-  show_message(located.to_string(source));
+  show_message(located.to_string(source, eval_context));
   print_script_backtrace_if_rooted(location);
 }
 
@@ -97,7 +97,7 @@ cold fn AnalysisContext::trace_eliminated_node(SourceLocation location,
   if (!should_print_optimizer_state) return;
   const WarningWithLocation located{location, message};
   print_error("[optimizer-state] ");
-  print_error(located.to_string(source));
+  print_error(located.to_string(source, eval_context));
   print_error("\n");
 }
 
@@ -120,7 +120,7 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
 
   let const located =
       ErrorWithLocationAndDetails{location, message, suggestion};
-  show_message(located.to_string(source));
+  show_message(located.to_string(source, eval_context));
   print_script_backtrace_if_rooted(location);
   has_fatal = true;
 }
@@ -171,7 +171,8 @@ cold fn report_command_resolution_error(
     -> void
 {
   const String *source = cxt.current_source();
-  show_message(e.to_string(source != nullptr ? source->view() : StringView{}));
+  show_message(
+      e.to_string(source != nullptr ? source->view() : StringView{}, &cxt));
   cxt.print_source_backtrace(e.location());
 }
 
@@ -390,7 +391,7 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               const EvalContext *eval_context, u8 warning_level,
+               EvalContext *eval_context, u8 warning_level,
                bool silence_unresolved_commands,
                bool show_optimizer_state) throws -> bool
 {

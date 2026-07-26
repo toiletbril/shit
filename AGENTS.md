@@ -231,13 +231,14 @@ siblings. The highlighter and history validation classify a warm command name
 without filesystem access. Explicit PATH validation ends with the TAB callback
 or compgen invocation that began it. The highlighter looks up only variable
 names that occur on the line, and it colors nested command and arithmetic
-substitutions in one pass. Strings and heredocs are bright green, keywords are bold
-bright magenta, resolved commands are bold in the terminal default color, and
+substitutions in one pass. Strings and heredocs are bright green, keywords are
+bold bright magenta, resolved commands are bold in the terminal default color, and
 flags other than a lone dash are italic. A word beginning with two dashes stays
 a flag when it contains an equals sign. Unknown commands and invalid paths keep
-the terminal default color with a curly red underline. An unfinished command
-prefix keeps the terminal default color without an underline. Invalid syntax
-and unset variables are bold red with the same underline. Live globs are yellow.
+the terminal default color with a bright green curly underline. An unfinished
+command prefix keeps the terminal default color without an underline. Invalid
+syntax and unset variables are bold red with the same underline. Live globs are
+bright yellow.
 src/Toiletline.cpp bridges the editor to the
 evaluator, and src/toiletline/toiletline.h is the editor. The
 `--debug-highlight-at` flag, a
@@ -267,8 +268,10 @@ only one synthetic command-line root exists. Multiple `-c` roots trace the
 source that produced each message. Identical frames are printed once. The
 `--no-traces` flag suppresses every source backtrace, including in a fresh
 executable-fallback evaluator. A printed frame begins with `trace:`. Only error
-labels, locations, and messages are bold. Warning labels are plain magenta, and
-note and trace labels are plain cyan. Diagnostics and LINENO share one cached source
+labels, locations, and messages are bold. Warning labels are plain bright
+magenta, and note and trace labels are plain cyan. A located diagnostic syntax-highlights
+the complete source line on a terminal before clipping it. Diagnostics and
+LINENO share one cached source
 line index. Executable-format fallback uses an explicit
 invalid-process result. A fresh evaluator runs the fallback script with the
 command environment and argv zero, so caller variables, functions, and traps do
@@ -292,7 +295,8 @@ guarded body. An if with no matching branch and no else publishes status zero,
 including at the end of a sourced file. A command path ending in a directory
 separator is rejected with
 status 126 when the normalized target is not a directory, and the highlighter
-keeps the whole path in the terminal default color with a curly red underline.
+keeps the whole path in the terminal default color with a bright green curly
+underline.
 
 ## Header factoring and value-type methods
 

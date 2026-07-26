@@ -1,6 +1,7 @@
 #include "Errors.hpp"
 
 #include "Colors.hpp"
+#include "Completion.hpp"
 #include "Debug.hpp"
 #include "ErrorOr.hpp"
 #include "Eval.hpp"
@@ -33,7 +34,8 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
                             colors::ansi::BOLD, colors::ansi::BOLD_GREEN,
                             colors::ansi::RESET};
   }
-  if (severity_word == StringView{"warning"}) severity = colors::ansi::MAGENTA;
+  if (severity_word == StringView{"warning"})
+    severity = colors::ansi::BRIGHT_MAGENTA;
 
   return diagnostic_color{
       severity, {}, {}, colors::ansi::GREEN, colors::ansi::RESET};
@@ -54,7 +56,7 @@ cold static fn number_string_length(T value) wontthrow -> usize
 cold static fn get_context_pointing_to(
     StringView source, usize byte_position, usize byte_count,
     const utils::source_line_position &line_position, Maybe<StringView> message,
-    const diagnostic_color &color) throws -> String
+    const diagnostic_color &color, EvalContext *eval_context) throws -> String
 {
   const usize line_number = line_position.line_number;
   LOG(Debug, "assembling the caret context for line %zu", line_number + 1);
@@ -119,6 +121,9 @@ cold static fn get_context_pointing_to(
 
   const char *const line_bytes = display_line.data;
   const usize line_byte_length = display_line.count();
+  let line_highlights = ArrayList<completion::highlight_span>{heap_allocator()};
+  if (eval_context != nullptr && !color.reset.is_empty())
+    line_highlights = completion::highlight_line(display_line, *eval_context);
   const usize display_cells =
       toiletline::utf8_strnlen(line_bytes, line_byte_length);
 
@@ -130,7 +135,7 @@ cold static fn get_context_pointing_to(
   u32 terminal_columns = 0;
   u32 terminal_rows = 0;
   if (display_cells > 24 && os::is_fd_a_tty(SHIT_STDERR) &&
-      os::terminal_size(terminal_columns, terminal_rows) &&
+      os::terminal_size(terminal_columns, terminal_rows, SHIT_STDERR) &&
       terminal_columns > gutter_width + 24 &&
       display_cells > terminal_columns - gutter_width)
   {
@@ -165,8 +170,27 @@ cold static fn get_context_pointing_to(
       line_bytes, line_byte_length, window_end);
 
   if (has_left_ellipsis) msg += "...";
-  msg += display_line.substring_of_length(window_start_byte,
-                                          window_end_byte - window_start_byte);
+  usize rendered_byte_position = window_start_byte;
+  for (let const &span : line_highlights) {
+    if (span.end <= window_start_byte) continue;
+    if (span.start >= window_end_byte) break;
+
+    let const span_start =
+        span.start < window_start_byte ? window_start_byte : span.start;
+    let const span_end =
+        span.end > window_end_byte ? window_end_byte : span.end;
+    if (rendered_byte_position < span_start)
+      msg += display_line.substring_of_length(
+          rendered_byte_position, span_start - rendered_byte_position);
+
+    msg += span.sgr;
+    msg += display_line.substring_of_length(span_start, span_end - span_start);
+    msg += color.reset;
+    rendered_byte_position = span_end;
+  }
+  if (rendered_byte_position < window_end_byte)
+    msg += display_line.substring_of_length(
+        rendered_byte_position, window_end_byte - rendered_byte_position);
   if (has_right_ellipsis) msg += "...";
 
   const usize caret_pad =
@@ -240,9 +264,11 @@ ErrorWithDetails::ErrorWithDetails(StringView message, StringView note)
     : Error(message), m_note(note)
 {}
 
-cold fn ErrorBase::to_string(StringView source) const throws -> String
+cold fn ErrorBase::to_string(StringView source,
+                             EvalContext *context) const throws -> String
 {
   unused(source);
+  unused(context);
   let const severity = severity_word();
   let const color = diagnostic_colors_for(severity);
   return color.severity + severity + color.reset + ": " + color.message +
@@ -283,7 +309,9 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
       m_location.position, m_location.length);
 }
 
-cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
+cold fn ErrorWithLocation::to_string(StringView source,
+                                     EvalContext *context) const throws
+    -> String
 {
   usize byte_position = m_location.position;
   const usize byte_count = m_location.length;
@@ -291,7 +319,7 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   /* The location can name a byte in a source other than the one rendered, so
      the caret would read out of bounds and the message renders unlocated. */
   if (source.data == nullptr || byte_position > source.count())
-    return ErrorBase::to_string(source);
+    return ErrorBase::to_string(source, context);
 
   LOG_VARS(Debug, byte_position, byte_count);
   let const severity = severity_word();
@@ -349,8 +377,9 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   }
   result += '\n';
 
-  result += get_context_pointing_to(source, byte_position, byte_count,
-                                    line_position, StringView{"here"}, color);
+  result +=
+      get_context_pointing_to(source, byte_position, byte_count, line_position,
+                              StringView{"here"}, color, context);
   result += trailing_details_to_string();
   return result;
 }
@@ -411,7 +440,7 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
 {}
 
 cold fn ErrorWithLocationAndDetails::details_to_string(
-    StringView source) const throws -> String
+    StringView source, EvalContext *context) const throws -> String
 {
   if (m_details_message.is_empty()) return String{heap_allocator()};
 
@@ -460,7 +489,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
 
   result += get_context_pointing_to(source, byte_position, byte_count,
                                     details_line_position,
-                                    m_details_message.view(), color);
+                                    m_details_message.view(), color, context);
   return result;
 }
 

@@ -110,7 +110,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
         ErrorWithLocation{ec.source_location(),
                           "Cannot execute the binary file `" +
                               ec.program_path().text() + "`"}
-            .to_string(source != nullptr ? source->view() : StringView{}));
+            .to_string(source != nullptr ? source->view() : StringView{},
+                       this));
     return 126;
   }
 
@@ -157,12 +158,12 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     ast = parser.construct_ast();
   } catch (const ErrorWithLocationAndDetails &detailed_error) {
     do_restore_pre_parse_state();
-    show_message(detailed_error.to_string(contents->view()));
-    show_message(detailed_error.details_to_string(contents->view()));
+    show_message(detailed_error.to_string(contents->view(), this));
+    show_message(detailed_error.details_to_string(contents->view(), this));
     return 1;
   } catch (const ErrorWithLocation &located_error) {
     do_restore_pre_parse_state();
-    show_message(located_error.to_string(contents->view()));
+    show_message(located_error.to_string(contents->view(), this));
     return 1;
   } catch (const Error &caught_error) {
     do_restore_pre_parse_state();
@@ -402,12 +403,12 @@ fn EvalContext::run_source(StringView source, StringView origin,
     }
     return last_exit_status();
   } catch (const ErrorWithLocationAndDetails &detailed_error) {
-    show_message(detailed_error.to_string(source));
-    show_message(detailed_error.details_to_string(source));
+    show_message(detailed_error.to_string(source, this));
+    show_message(detailed_error.details_to_string(source, this));
     print_source_backtrace(detailed_error.location());
     return 1;
   } catch (const ErrorWithLocation &located_error) {
-    show_message(located_error.to_string(source));
+    show_message(located_error.to_string(source, this));
     print_source_backtrace(located_error.location());
     return 1;
   } catch (const Error &caught_error) {

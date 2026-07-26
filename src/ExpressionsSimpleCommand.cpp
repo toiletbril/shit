@@ -1032,8 +1032,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        back. */
     if (command_is_special_builtin) throw;
     const String *source = cxt.current_source();
-    show_message(redirection_error.to_string(source != nullptr ? source->view()
-                                                               : StringView{}));
+    show_message(redirection_error.to_string(
+        source != nullptr ? source->view() : StringView{}, &cxt));
     /* bash reports a redirection failure with status 1 and dash with 2. */
     let const redirection_status = cxt.is_bash_compatible() ? 1 : 2;
     cxt.set_last_exit_status(redirection_status);
@@ -1295,8 +1295,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         if (let const windowed = window_function_body_error(cxt, error);
             windowed.has_value())
         {
-          show_message(error.to_string(*windowed));
-          show_message(error.details_to_string(*windowed));
+          show_message(error.to_string(*windowed, &cxt));
+          show_message(error.details_to_string(*windowed, &cxt));
           error.set_rendered();
         }
       throw;
@@ -1305,7 +1305,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         if (let const windowed = window_function_body_error(cxt, error);
             windowed.has_value())
         {
-          show_message(error.to_string(*windowed));
+          show_message(error.to_string(*windowed, &cxt));
           error.set_rendered();
         }
       throw;

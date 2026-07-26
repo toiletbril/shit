@@ -228,7 +228,8 @@ cold fn Parser::recover_to_next_statement() throws -> void
 
 /* Parse every top-level command, recovering from a syntax error instead of
    aborting at the first. */
-cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
+cold fn Parser::construct_ast(ArrayList<String> &errors,
+                              EvalContext *context) throws -> Expression *
 {
   Expression *first_piece = nullptr;
   let last_location = SourceLocation{};
@@ -249,13 +250,13 @@ cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
          base-class copy. */
       LOG(Debug, "recording a detailed parse error and recovering: %s",
           e.message().c_str());
-      errors.push(e.to_string(m_lexer.source()));
-      errors.push(e.details_to_string(m_lexer.source()));
+      errors.push(e.to_string(m_lexer.source(), context));
+      errors.push(e.details_to_string(m_lexer.source(), context));
       recover_to_next_statement();
     } catch (const ErrorWithLocation &e) {
       LOG(Debug, "recording a parse error and recovering: %s",
           e.message().c_str());
-      errors.push(e.to_string(m_lexer.source()));
+      errors.push(e.to_string(m_lexer.source(), context));
       recover_to_next_statement();
     }
   }
