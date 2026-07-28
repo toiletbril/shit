@@ -131,10 +131,10 @@ endif
 
 ifeq ($(MODE), cosmo)
 OS_INFO := "unknown-cosmo"
-LIBC_INFO := cosmopolitan\\040libc
+LIBC_INFO := cosmopolitan libc
 else ifeq ($(MODE), cosmo_dbg)
 OS_INFO := "unknown-cosmo-dbg"
-LIBC_INFO := cosmopolitan\\040libc
+LIBC_INFO := cosmopolitan libc
 else ifeq ($(LINUX_CROSS_COMPILATION), 1)
 OS_INFO := Linux $(LINUX_ZIG_ARCH) cross
 else
@@ -163,13 +163,20 @@ COMMIT_HASH := $(shell git rev-parse HEAD || echo "<no git>")
 ENVCXXFLAGS := $(CXXFLAGS)
 CXXFLAGS := # nothing
 
+encode_metadata = $(1)
+ifneq ($(filter cosmo cosmo_dbg,$(MODE)),)
+empty :=
+space := $(empty) $(empty)
+encode_metadata = $(subst $(space),\\040,$(1))
+endif
+
 DEFINES := \
-	-DSHIT_COMPILER_COMMAND="\"$(CXX)\"" \
-	-DSHIT_LIBC="\"$(LIBC_INFO)\"" \
-	-DSHIT_OS_INFO="\"$(OS_INFO)\"" \
-	-DSHIT_COMMIT_HASH="\"$(COMMIT_HASH)\"" \
-	-DSHIT_BUILD_MODE="\"$(MODE)\"" \
-	-DSHIT_ENVCXXFLAGS="\"$(ENVCXXFLAGS)\""
+	-DSHIT_COMPILER_COMMAND="\"$(call encode_metadata,$(CXX))\"" \
+	-DSHIT_LIBC="\"$(call encode_metadata,$(LIBC_INFO))\"" \
+	-DSHIT_OS_INFO="\"$(call encode_metadata,$(OS_INFO))\"" \
+	-DSHIT_COMMIT_HASH="\"$(call encode_metadata,$(COMMIT_HASH))\"" \
+	-DSHIT_BUILD_MODE="\"$(call encode_metadata,$(MODE))\"" \
+	-DSHIT_ENVCXXFLAGS="\"$(call encode_metadata,$(ENVCXXFLAGS))\""
 
 CXXFLAGS := \
 	-Wall \
