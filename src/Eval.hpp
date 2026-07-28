@@ -2023,6 +2023,7 @@ public:
   fn execute(execution_mode mode) throws -> i32;
 
   pure fn program_path() const wontthrow -> const Path &;
+  fn set_program_path(Path path) throws -> void;
   pure fn builtin_kind() const wontthrow -> const Builtin::Kind &;
 
   /* Apply the 2>&1 and 1>&2 cross-routing in the order the source wrote them.

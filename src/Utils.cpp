@@ -368,6 +368,7 @@ static fn split_path_source_components(StringView path,
 {
   let components = ArrayList<path_source_component>{allocator};
   usize position = os::path_root_length(path);
+  if (position == 0 && os::path_is_drive_relative(path)) position = 2;
   usize opaque_range_position = 0;
   while (position < path.length) {
     while (position < path.length && os::is_directory_separator(path[position]))

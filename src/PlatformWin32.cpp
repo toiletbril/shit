@@ -922,10 +922,44 @@ fn resolve_drive_relative_path(StringView path) throws -> Maybe<Path>
 
 pure fn path_root_length(StringView path) wontthrow -> usize
 {
+  if (path.length >= 7 && is_directory_separator(path[0]) &&
+      is_directory_separator(path[1]) && path[2] == '?' &&
+      is_directory_separator(path[3]) && path[5] == ':' &&
+      is_directory_separator(path[6]))
+  {
+    return 7;
+  }
+  if (path.length >= 8 && is_directory_separator(path[0]) &&
+      is_directory_separator(path[1]) && path[2] == '?' &&
+      is_directory_separator(path[3]) &&
+      utils::ascii_to_lower(path[4]) == 'u' &&
+      utils::ascii_to_lower(path[5]) == 'n' &&
+      utils::ascii_to_lower(path[6]) == 'c' && is_directory_separator(path[7]))
+  {
+    usize position = 8;
+    while (position < path.length && !is_directory_separator(path[position]))
+      position++;
+    while (position < path.length && is_directory_separator(path[position]))
+      position++;
+    while (position < path.length && !is_directory_separator(path[position]))
+      position++;
+    if (position < path.length && is_directory_separator(path[position]))
+      position++;
+    return position;
+  }
   if (path.length >= 2 && is_directory_separator(path[0]) &&
       is_directory_separator(path[1]))
   {
-    return 2;
+    usize position = 2;
+    while (position < path.length && !is_directory_separator(path[position]))
+      position++;
+    while (position < path.length && is_directory_separator(path[position]))
+      position++;
+    while (position < path.length && !is_directory_separator(path[position]))
+      position++;
+    if (position < path.length && is_directory_separator(path[position]))
+      position++;
+    return position;
   }
   if (path.length >= 3 && path[1] == ':' && is_directory_separator(path[2])) {
     return 3;
@@ -1151,7 +1185,16 @@ fn restore_current_directory(const DirectoryReference &reference) wontthrow
       reference.get(), path, static_cast<DWORD>(countof(path)),
       FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
   if (length == 0 || length >= countof(path)) return false;
-  return SetCurrentDirectoryA(path) != 0;
+  let restored_path = StringView{path, static_cast<usize>(length)};
+  if (restored_path.starts_with(StringView{"\\\\?\\UNC\\"})) {
+    let unc_path = String{"\\\\"};
+    unc_path += restored_path.substring(8);
+    return SetCurrentDirectoryA(unc_path.c_str()) != 0;
+  }
+  if (restored_path.starts_with(StringView{"\\\\?\\"}))
+    restored_path = restored_path.substring(4);
+  let const restored_path_string = String{restored_path};
+  return SetCurrentDirectoryA(restored_path_string.c_str()) != 0;
 }
 
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
@@ -1524,6 +1567,8 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
                      &process_info) == 0)
   {
     if (allow_script_fallback && GetLastError() == ERROR_BAD_EXE_FORMAT) {
+      if (!resolved_program_path_storage.is_empty())
+        ec.set_program_path(Path{resolved_program_path_storage.view()});
       were_handles_handed_to_fallback = true;
       return SHIT_INVALID_PROCESS;
     }
@@ -2659,10 +2704,94 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
 
 fn read_symlink(StringView path) wontthrow -> Maybe<String>
 {
-  /* Reading a reparse point needs a device control call this layer does not
-     wrap, so cp on Windows copies a symlink's contents rather than the link. */
-  unused(path);
-  return shit::None;
+  struct symbolic_link_reparse_data
+  {
+    u32 tag;
+    u16 data_length;
+    u16 reserved;
+    u16 substitute_name_offset;
+    u16 substitute_name_length;
+    u16 print_name_offset;
+    u16 print_name_length;
+    u32 flags;
+    WCHAR path_buffer[1];
+  };
+  struct mount_point_reparse_data
+  {
+    u32 tag;
+    u16 data_length;
+    u16 reserved;
+    u16 substitute_name_offset;
+    u16 substitute_name_length;
+    u16 print_name_offset;
+    u16 print_name_length;
+    WCHAR path_buffer[1];
+  };
+
+  const String path_string{path};
+  let const handle = CreateFileA(
+      path_string.c_str(), 0,
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+      OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+      nullptr);
+  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+  defer { CloseHandle(handle); };
+
+  alignas(void *) u8 buffer[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
+  DWORD bytes_returned = 0;
+  if (DeviceIoControl(handle, FSCTL_GET_REPARSE_POINT, nullptr, 0, buffer,
+                      sizeof(buffer), &bytes_returned, nullptr) == FALSE)
+  {
+    return shit::None;
+  }
+
+  const WCHAR *wide_target = nullptr;
+  usize wide_target_length = 0;
+  let const tag = *reinterpret_cast<const u32 *>(buffer);
+  if (tag == IO_REPARSE_TAG_SYMLINK) {
+    let const *data =
+        reinterpret_cast<const symbolic_link_reparse_data *>(buffer);
+    let const offset = data->print_name_length > 0
+                           ? data->print_name_offset
+                           : data->substitute_name_offset;
+    let const length = data->print_name_length > 0
+                           ? data->print_name_length
+                           : data->substitute_name_length;
+    wide_target = reinterpret_cast<const WCHAR *>(
+        reinterpret_cast<const u8 *>(data->path_buffer) + offset);
+    wide_target_length = length / sizeof(WCHAR);
+  } else if (tag == IO_REPARSE_TAG_MOUNT_POINT) {
+    let const *data =
+        reinterpret_cast<const mount_point_reparse_data *>(buffer);
+    let const offset = data->print_name_length > 0
+                           ? data->print_name_offset
+                           : data->substitute_name_offset;
+    let const length = data->print_name_length > 0
+                           ? data->print_name_length
+                           : data->substitute_name_length;
+    wide_target = reinterpret_cast<const WCHAR *>(
+        reinterpret_cast<const u8 *>(data->path_buffer) + offset);
+    wide_target_length = length / sizeof(WCHAR);
+  } else {
+    return shit::None;
+  }
+
+  if (wide_target_length == 0) return String{StringView{}};
+  let const utf8_length = WideCharToMultiByte(
+      CP_UTF8, 0, wide_target, static_cast<int>(wide_target_length), nullptr, 0,
+      nullptr, nullptr);
+  if (utf8_length <= 0) return shit::None;
+  let utf8_target = ArrayList<char>{heap_allocator()};
+  utf8_target.reserve(static_cast<usize>(utf8_length));
+  if (WideCharToMultiByte(
+          CP_UTF8, 0, wide_target, static_cast<int>(wide_target_length),
+          utf8_target.begin(), utf8_length, nullptr, nullptr) != utf8_length)
+  {
+    return shit::None;
+  }
+  return String{
+      StringView{utf8_target.begin(), static_cast<usize>(utf8_length)}
+  };
 }
 
 fn current_executable_path() wontthrow -> Maybe<String>
@@ -2681,8 +2810,55 @@ fn current_executable_path() wontthrow -> Maybe<String>
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
 {
   const String path_string{path};
+  let const attributes = GetFileAttributesA(path_string.c_str());
+  if (attributes == INVALID_FILE_ATTRIBUTES) return false;
+  if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+    let const target = read_symlink(path);
+    if (!target.has_value()) return false;
+
+    status.device_id = 0;
+    status.file_id = 0;
+    status.has_file_identity = false;
+    status.mode = 0120000u | 0777u;
+    status.link_count = 1;
+    status.owner_id = 0;
+    status.group_id = 0;
+    status.size = target->length();
+    status.modification_time = 0;
+    status.modification_nanoseconds = 0;
+    status.change_time = 0;
+    status.change_nanoseconds = 0;
+    status.blocks = (status.size + 511) / 512;
+
+    let const handle = CreateFileA(
+        path_string.c_str(), 0,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING,
+        FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle != INVALID_HANDLE_VALUE) {
+      BY_HANDLE_FILE_INFORMATION identity{};
+      if (GetFileInformationByHandle(handle, &identity)) {
+        status.device_id = identity.dwVolumeSerialNumber;
+        status.file_id = (static_cast<u64>(identity.nFileIndexHigh) << 32) |
+                         identity.nFileIndexLow;
+        status.has_file_identity = true;
+        status.link_count = identity.nNumberOfLinks;
+        ULARGE_INTEGER modification_ticks{};
+        modification_ticks.LowPart = identity.ftLastWriteTime.dwLowDateTime;
+        modification_ticks.HighPart = identity.ftLastWriteTime.dwHighDateTime;
+        status.modification_time = static_cast<i64>(
+            modification_ticks.QuadPart / 10000000ULL - 11644473600ULL);
+        status.modification_nanoseconds = static_cast<u32>(
+            modification_ticks.QuadPart % 10000000ULL * 100ULL);
+        status.change_time = status.modification_time;
+        status.change_nanoseconds = status.modification_nanoseconds;
+      }
+      CloseHandle(handle);
+    }
+    return true;
+  }
+
   struct stat info{};
-  /* Windows has no lstat, so a symlink reports its resolved target. */
   if (::stat(path_string.c_str(), &info) != 0) return false;
   status.device_id = 0;
   status.file_id = 0;
@@ -2708,13 +2884,13 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   status.size = static_cast<u64>(info.st_size);
   status.modification_time = static_cast<i64>(info.st_mtime);
   status.change_time = status.modification_time;
-  WIN32_FILE_ATTRIBUTE_DATA attributes{};
+  WIN32_FILE_ATTRIBUTE_DATA attribute_data{};
   if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard,
-                           &attributes) != 0)
+                           &attribute_data) != 0)
   {
     ULARGE_INTEGER modification_ticks{};
-    modification_ticks.LowPart = attributes.ftLastWriteTime.dwLowDateTime;
-    modification_ticks.HighPart = attributes.ftLastWriteTime.dwHighDateTime;
+    modification_ticks.LowPart = attribute_data.ftLastWriteTime.dwLowDateTime;
+    modification_ticks.HighPart = attribute_data.ftLastWriteTime.dwHighDateTime;
     status.modification_nanoseconds =
         static_cast<u32>(modification_ticks.QuadPart % 10000000ULL * 100ULL);
     status.change_nanoseconds = status.modification_nanoseconds;
@@ -2767,7 +2943,7 @@ fn format_mode_string(u32 mode) throws -> String
 
 fn file_type_letter(u32 mode) wontthrow -> char
 {
-  /* Windows stat distinguishes only the directory bit from a regular file. */
+  if ((mode & 0170000u) == 0120000u) return 'l';
   return (mode & 0040000u) != 0 ? 'd' : '-';
 }
 

@@ -1,2 +1,2 @@
 #!/bin/env shit
-cat "$TEST_NULL_DEVICE" | cat
+cat data/hello-d | cat

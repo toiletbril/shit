@@ -168,10 +168,9 @@ cold fn Path::first_unavailable_component() const throws
            !os::is_directory_separator(m_text[position]))
       position++;
 
-    let const prefix = m_text.substring_of_length(0, position);
-    let status = os::file_status{};
-    let const is_available = os::stat_path_following(prefix, status);
-    if (!is_available || os::file_type_letter(status.mode) != 'd') {
+    let const prefix = Path{m_text.substring_of_length(0, position)};
+    let const is_available = prefix.exists();
+    if (!is_available || !prefix.is_directory()) {
       usize remaining_component_count = 0;
       usize remaining_position = position;
       while (remaining_position < m_text.count()) {

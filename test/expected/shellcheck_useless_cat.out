@@ -1,19 +1,19 @@
 [CompoundList]
   [CompoundListCondition, None]
     [Pipeline]
-      [SimpleCommand "cat" "$TEST_NULL_DEVICE"]
+      [SimpleCommand "cat" "data/hello-d"]
       [SimpleCommand "cat"]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Variable "TEST_NULL_DEVICE"
+  Unquoted "data/hello-d"
 ]
 [Word
   Unquoted "cat"
 ]
 shit: 2:1: warning: A useless cat.
-     2 |  cat "$TEST_NULL_DEVICE" | cat
+     2 |  cat data/hello-d | cat
        |  ^~~ here.
 note: Give the file to the next command directly instead of piping cat.
 [Code 0]

@@ -63,6 +63,7 @@ extern "C" void __lsan_disable(void);
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <winioctl.h>
 #include <direct.h>
 #include <io.h>
 #include <malloc.h>

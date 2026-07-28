@@ -2081,6 +2081,12 @@ pure fn ExecContext::program_path() const wontthrow -> const Path &
   return m_kind.program_path;
 }
 
+fn ExecContext::set_program_path(Path path) throws -> void
+{
+  ASSERT(!is_builtin());
+  m_kind.program_path = steal(path);
+}
+
 fn ExecContext::close_fds() throws -> void
 {
   if (in_fd.has_value()) {

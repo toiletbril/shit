@@ -31,8 +31,8 @@ echo "--- basename ---"
 "$BIN" -c 'shitbox basename /usr/local/libfoo.so .so'
 echo "--- dirname ---"
 "$BIN" -c 'shitbox dirname /usr/local/libfoo.so'
-echo "--- realpath lexical ---"
-"$BIN" -c 'cd /; shitbox realpath ./usr/../usr/lib'
+echo "--- realpath lexical basename ---"
+"$BIN" -c 'shitbox mkdir -p usr/lib; resolved=$(shitbox realpath ./usr/../usr/lib) || exit; shitbox basename "$resolved"'
 "$BIN" -c 'shitbox rmdir a/b'
 echo "--- ls a after rmdir ---"
 "$BIN" -c 'shitbox ls a'

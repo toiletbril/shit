@@ -202,6 +202,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* A relative operand joins onto the logical PWD when that names a directory,
      the bash -L default, so cd .. out of a symlinked directory returns to the
      symlink's parent. */
+  let is_physical_target_available = true;
   if (is_physical) {
     if (target.is_relative()) {
       target = target.to_absolute_without_normalizing();
@@ -212,7 +213,11 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                 "' because the current directory is unavailable"};
     }
 
-    if (let resolved = os::canonical_path(target)) target = resolved.take();
+    if (let resolved = os::canonical_path(target)) {
+      target = resolved.take();
+    } else {
+      is_physical_target_available = false;
+    }
   } else {
     let raw_logical_target = Path{};
     let logical_operand = target.text().view();
@@ -242,7 +247,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                          : steal(logical_candidate);
   }
 
-  if (is_logical_target_available && target.exists()) {
+  if (is_logical_target_available && is_physical_target_available &&
+      target.exists())
+  {
     if (!target.is_directory())
       throw ErrorWithLocation{ec.arg_location_at(operand_index),
                               StringView{"The path '"} + arg_path +

@@ -17,8 +17,8 @@ sym
 libfoo
 --- dirname ---
 /usr/local
---- realpath lexical ---
-/usr/lib
+--- realpath lexical basename ---
+lib
 --- ls a after rmdir ---
 --- unlink removes a single file ---
 unlink rc=0

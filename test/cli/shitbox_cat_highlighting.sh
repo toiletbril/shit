@@ -3,7 +3,8 @@ set -e
 unset SHIT_FLAGS
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 d=$(mktemp -d) || exit 1
-trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
+starting_directory=$PWD
+trap 'cd "$starting_directory" && test -n "$d" && /bin/rm -rf "$d"' EXIT
 cd "$d" || exit 1
 
 printf 'echo "extension"\n' > extension.sh

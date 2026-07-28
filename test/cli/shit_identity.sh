@@ -41,9 +41,8 @@ SHIT_IDENTITY=forged "$BIN" -c '
         *) [ "${#identity}" -eq 64 ] && valid=1 || valid=0 ;;
     esac
     shitbox env > "$IDENTITY_TEST_DIRECTORY/environment-output"
-    external=$(shitbox grep "^SHIT_IDENTITY=" \
-        "$IDENTITY_TEST_DIRECTORY/environment-output")
-    [ "$external" = "SHIT_IDENTITY=$identity" ] &&
+    shitbox grep "^SHIT_IDENTITY=$identity$" \
+        "$IDENTITY_TEST_DIRECTORY/environment-output" >/dev/null &&
         exported=1 || exported=0
     readonly -p > "$IDENTITY_TEST_DIRECTORY/readonly-output"
     shitbox grep "^readonly SHIT_IDENTITY=" \
