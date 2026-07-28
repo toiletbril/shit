@@ -83,6 +83,17 @@ struct completion_command_range
   usize end;
 };
 
+struct shell_lexical_scan_target
+{
+  usize cursor;
+  completion_command_range range;
+  usize frame_depth{0};
+};
+
+fn advance_shell_lexical_state(
+    StringView source, usize end, shell_lexical_state &state,
+    shell_lexical_scan_target *target = nullptr) throws -> void;
+
 fn command_substitution_range(StringView line, usize cursor) throws
     -> completion_command_range;
 

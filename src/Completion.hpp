@@ -58,6 +58,47 @@ struct highlight_span
   StringView sgr;
 };
 
+enum class shell_lexical_frame_kind : u8
+{
+  command,
+  backtick,
+  arithmetic,
+  parameter,
+};
+
+struct shell_lexical_frame
+{
+  usize body_start;
+  usize group_depth;
+  shell_lexical_frame_kind kind;
+  char parent_quote;
+  usize case_depth{0};
+  bool saw_case_keyword{false};
+  bool case_pattern_expected{false};
+  bool is_command_position{true};
+};
+
+struct shell_pending_heredoc
+{
+  String delimiter;
+  bool should_strip_tabs;
+};
+
+struct shell_lexical_state
+{
+  explicit shell_lexical_state(Allocator allocator)
+      : frames{allocator}, pending_heredocs{allocator}
+  {}
+
+  ArrayList<shell_lexical_frame> frames;
+  ArrayList<shell_pending_heredoc> pending_heredocs;
+  usize source_position{0};
+  usize active_heredoc_index{0};
+  char quote{0};
+  bool is_in_comment{false};
+  bool is_in_heredoc{false};
+};
+
 class diagnostic_highlight_cache
 {
 public:

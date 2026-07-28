@@ -897,181 +897,142 @@ fn complete_from_spec(StringView line, StringView token, usize cursor,
   return candidates;
 }
 
-enum class completion_sub_frame_kind : u8
+static fn consider_shell_lexical_frame(
+    const shell_lexical_frame &frame, usize body_end, usize depth,
+    shell_lexical_scan_target *target) wontthrow -> void
 {
-  command,
-  backtick,
-  arithmetic,
-  parameter,
-};
+  if (target == nullptr) return;
+  if (frame.kind != shell_lexical_frame_kind::command &&
+      frame.kind != shell_lexical_frame_kind::backtick)
+  {
+    return;
+  }
+  if (target->cursor < frame.body_start || target->cursor > body_end) return;
+  if (depth < target->frame_depth) return;
+  target->range = completion_command_range{frame.body_start, body_end};
+  target->frame_depth = depth;
+}
 
-struct completion_sub_frame
+static fn collect_shell_heredoc(StringView source, usize &position, usize end,
+                                shell_lexical_state &state) throws -> void
 {
-  usize body_start;
-  usize group_depth;
-  completion_sub_frame_kind kind;
-  char parent_quote;
-  usize case_depth{0};
-  bool saw_case_keyword{false};
-  bool case_pattern_expected{false};
-  bool is_command_position{true};
-};
+  position += 2;
+  let should_strip_tabs = false;
+  if (position < end && source[position] == '-') {
+    should_strip_tabs = true;
+    position++;
+  }
+  while (position < end &&
+         (source[position] == ' ' || source[position] == '\t'))
+    position++;
 
-struct completion_pending_heredoc
-{
-  String delimiter;
-  bool should_strip_tabs;
-};
-
-static fn completion_heredoc_body_end(StringView line, usize operator_start,
-                                      usize cursor) throws -> Maybe<usize>
-{
-  let pending = ArrayList<completion_pending_heredoc>{completion_allocator()};
-  let i = operator_start;
-  let line_end = operator_start;
-  char quote = 0;
-
-  while (line_end < line.length && line[line_end] != '\n') {
-    let const c = line[line_end];
-    if (quote != 0) {
-      if (c == quote) quote = 0;
-      line_end++;
+  let delimiter = String{state.pending_heredocs.allocator()};
+  char delimiter_quote = 0;
+  while (position < end) {
+    let const delimiter_byte = source[position];
+    if (delimiter_quote != 0) {
+      position++;
+      if (delimiter_byte == delimiter_quote)
+        delimiter_quote = 0;
+      else
+        delimiter.push(delimiter_byte);
       continue;
     }
-    if (c == '\\') {
-      line_end += line_end + 1 < line.length ? 2 : 1;
+    if (delimiter_byte == '\\') {
+      position++;
+      if (position < end) {
+        delimiter.push(source[position]);
+        position++;
+      }
       continue;
     }
-    if (c == '\'' || c == '"') {
-      quote = c;
-      line_end++;
+    if (delimiter_byte == '\'' || delimiter_byte == '"') {
+      delimiter_quote = delimiter_byte;
+      position++;
       continue;
     }
-    if (c != '<' || line_end + 1 >= line.length || line[line_end + 1] != '<' ||
-        (line_end + 2 < line.length && line[line_end + 2] == '<'))
+    if (lexer::is_whitespace(delimiter_byte) ||
+        lexer::is_shell_sentinel(delimiter_byte))
     {
-      line_end++;
-      continue;
+      break;
     }
-
-    line_end += 2;
-    let should_strip_tabs = false;
-    if (line_end < line.length && line[line_end] == '-') {
-      should_strip_tabs = true;
-      line_end++;
-    }
-    while (line_end < line.length &&
-           (line[line_end] == ' ' || line[line_end] == '\t'))
-      line_end++;
-
-    let delimiter = String{completion_allocator()};
-    quote = 0;
-    while (line_end < line.length) {
-      let const delimiter_byte = line[line_end];
-      if (quote != 0) {
-        line_end++;
-        if (delimiter_byte == quote) {
-          quote = 0;
-        } else {
-          delimiter.push(delimiter_byte);
-        }
-        continue;
-      }
-      if (delimiter_byte == '\\') {
-        line_end++;
-        if (line_end < line.length) {
-          delimiter.push(line[line_end]);
-          line_end++;
-        }
-        continue;
-      }
-      if (delimiter_byte == '\'' || delimiter_byte == '"') {
-        quote = delimiter_byte;
-        line_end++;
-        continue;
-      }
-      if (lexer::is_whitespace(delimiter_byte) ||
-          lexer::is_shell_sentinel(delimiter_byte))
-      {
-        break;
-      }
-      delimiter.push(delimiter_byte);
-      line_end++;
-    }
-    if (!delimiter.is_empty())
-      pending.push(
-          completion_pending_heredoc{steal(delimiter), should_strip_tabs});
+    delimiter.push(delimiter_byte);
+    position++;
   }
 
-  if (pending.is_empty() || line_end >= line.length || cursor <= line_end)
-    return None;
+  if (!delimiter.is_empty())
+    state.pending_heredocs.push(
+        shell_pending_heredoc{steal(delimiter), should_strip_tabs});
+}
 
-  i = line_end + 1;
-  for (let const &heredoc : pending) {
-    while (i < line.length) {
-      line_end = i;
-      while (line_end < line.length && line[line_end] != '\n')
+fn advance_shell_lexical_state(StringView source, usize end,
+                               shell_lexical_state &state,
+                               shell_lexical_scan_target *target) throws -> void
+{
+  if (end > source.length) end = source.length;
+  let i = state.source_position;
+
+  while (i < end) {
+    if (state.is_in_heredoc) {
+      let const &heredoc = state.pending_heredocs[state.active_heredoc_index];
+      let line_end = i;
+      while (line_end < end && source[line_end] != '\n')
         line_end++;
+      if (line_end == end && end < source.length) {
+        i = end;
+        break;
+      }
 
       let content_start = i;
       if (heredoc.should_strip_tabs)
-        while (content_start < line_end && line[content_start] == '\t')
+        while (content_start < line_end && source[content_start] == '\t')
           content_start++;
-
       let const content =
-          line.substring_of_length(content_start, line_end - content_start);
-      i = line_end < line.length ? line_end + 1 : line_end;
-      if (content == heredoc.delimiter.view()) break;
+          source.substring_of_length(content_start, line_end - content_start);
+      if (content == heredoc.delimiter.view()) {
+        state.active_heredoc_index++;
+        if (state.active_heredoc_index == state.pending_heredocs.count()) {
+          state.pending_heredocs.clear();
+          state.active_heredoc_index = 0;
+          state.is_in_heredoc = false;
+        }
+      }
+      i = line_end < end ? line_end + 1 : line_end;
+      continue;
     }
-  }
 
-  return i;
-}
+    let const c = source[i];
 
-fn command_substitution_range(StringView line, usize cursor) throws
-    -> completion_command_range
-{
-  let frames = ArrayList<completion_sub_frame>{completion_allocator()};
-  let active = completion_command_range{0, line.length};
-  let active_depth = usize{0};
-  char quote = 0;
-  usize i = 0;
-
-  let const do_consider = [&](const completion_sub_frame &frame, usize body_end,
-                              usize depth) {
-    if (frame.kind != completion_sub_frame_kind::command &&
-        frame.kind != completion_sub_frame_kind::backtick)
-    {
-      return;
+    if (state.is_in_comment) {
+      if (c == '\n') {
+        state.is_in_comment = false;
+        i++;
+        if (!state.pending_heredocs.is_empty()) state.is_in_heredoc = true;
+      } else {
+        i++;
+      }
+      continue;
     }
-    if (cursor < frame.body_start || cursor > body_end) return;
-    if (depth < active_depth) return;
-    active = completion_command_range{frame.body_start, body_end};
-    active_depth = depth;
-  };
 
-  while (i < line.length) {
-    let const c = line[i];
-
-    if (quote == '\'') {
-      if (c == '\'') quote = 0;
+    if (state.quote == '\'') {
+      if (c == '\'') state.quote = 0;
       i++;
       continue;
     }
 
     if (c == '\\') {
-      i += i + 1 < line.length ? 2 : 1;
+      i += i + 1 < end ? 2 : 1;
       continue;
     }
 
-    if (quote != 0) {
-      if (c == quote) {
-        quote = 0;
+    if (state.quote != 0) {
+      if (c == state.quote) {
+        state.quote = 0;
         i++;
         continue;
       }
 
-      if (quote != '"') {
+      if (state.quote != '"') {
         i++;
         continue;
       }
@@ -1083,101 +1044,108 @@ fn command_substitution_range(StringView line, usize cursor) throws
     }
 
     if (c == '\'' || c == '"') {
-      quote = c;
+      state.quote = c;
       i++;
       continue;
     }
 
     if (c == '`') {
-      if (!frames.is_empty() &&
-          frames.back().kind == completion_sub_frame_kind::backtick)
+      if (!state.frames.is_empty() &&
+          state.frames.back().kind == shell_lexical_frame_kind::backtick)
       {
-        let const frame = frames.back();
-        do_consider(frame, i, frames.count());
-        frames.pop_back();
-        quote = frame.parent_quote;
+        let const frame = state.frames.back();
+        consider_shell_lexical_frame(frame, i, state.frames.count(), target);
+        state.frames.pop_back();
+        state.quote = frame.parent_quote;
       } else {
-        frames.push(completion_sub_frame{
-            i + 1, 0, completion_sub_frame_kind::backtick, quote});
-        quote = 0;
+        state.frames.push(shell_lexical_frame{
+            i + 1, 0, shell_lexical_frame_kind::backtick, state.quote});
+        state.quote = 0;
       }
       i++;
       continue;
     }
 
-    if (c == '$' && i + 1 < line.length && line[i + 1] == '(') {
-      if (i + 2 < line.length && line[i + 2] == '(') {
-        frames.push(completion_sub_frame{
-            i + 3, 0, completion_sub_frame_kind::arithmetic, quote});
-        quote = 0;
+    if (c == '$' && i + 1 < end && source[i + 1] == '(') {
+      if (i + 2 < end && source[i + 2] == '(') {
+        state.frames.push(shell_lexical_frame{
+            i + 3, 0, shell_lexical_frame_kind::arithmetic, state.quote});
+        state.quote = 0;
         i += 3;
         continue;
       }
 
-      frames.push(completion_sub_frame{
-          i + 2, 0, completion_sub_frame_kind::command, quote});
-      quote = 0;
+      state.frames.push(shell_lexical_frame{
+          i + 2, 0, shell_lexical_frame_kind::command, state.quote});
+      state.quote = 0;
       i += 2;
       continue;
     }
 
-    if (c == '$' && i + 1 < line.length && line[i + 1] == '{') {
-      frames.push(completion_sub_frame{
-          i + 2, 0, completion_sub_frame_kind::parameter, quote});
-      quote = 0;
+    if (c == '$' && i + 1 < end && source[i + 1] == '{') {
+      state.frames.push(shell_lexical_frame{
+          i + 2, 0, shell_lexical_frame_kind::parameter, state.quote});
+      state.quote = 0;
       i += 2;
       continue;
     }
 
-    if (frames.is_empty()) {
-      i++;
-      continue;
-    }
-
-    if (c == '<' && i + 1 < line.length && line[i + 1] == '<' &&
-        !(i + 2 < line.length && line[i + 2] == '<'))
+    let const is_command_code =
+        state.frames.is_empty() ||
+        state.frames.back().kind == shell_lexical_frame_kind::command ||
+        state.frames.back().kind == shell_lexical_frame_kind::backtick;
+    if (is_command_code && c == '<' && i + 1 < end && source[i + 1] == '<' &&
+        !(i + 2 < end && source[i + 2] == '<'))
     {
-      if (let const body_end = completion_heredoc_body_end(line, i, cursor);
-          body_end.has_value())
-      {
-        i = *body_end;
-        continue;
-      }
+      collect_shell_heredoc(source, i, end, state);
+      continue;
     }
 
-    let &frame = frames.back();
-    if (frame.kind == completion_sub_frame_kind::parameter) {
+    if (!state.frames.is_empty() &&
+        state.frames.back().kind == shell_lexical_frame_kind::parameter)
+    {
+      let &frame = state.frames.back();
       if (c == '}') {
         let const parent_quote = frame.parent_quote;
-        frames.pop_back();
-        quote = parent_quote;
+        state.frames.pop_back();
+        state.quote = parent_quote;
       }
       i++;
       continue;
     }
 
-    if (c == '#' &&
-        (i == frame.body_start || i == 0 || line[i - 1] == ' ' ||
-         line[i - 1] == '\t' || line[i - 1] == '\n' || line[i - 1] == ';' ||
-         line[i - 1] == '&' || line[i - 1] == '|'))
-    {
-      while (i < line.length && line[i] != '\n')
-        i++;
+    let const is_word_boundary =
+        i == 0 || source[i - 1] == ' ' || source[i - 1] == '\t' ||
+        source[i - 1] == '\n' || source[i - 1] == ';' || source[i - 1] == '&' ||
+        source[i - 1] == '|';
+    if (is_command_code && c == '#' && is_word_boundary) {
+      state.is_in_comment = true;
+      i++;
       continue;
     }
 
+    if (state.frames.is_empty()) {
+      if (c == '\n' && !state.pending_heredocs.is_empty())
+        state.is_in_heredoc = true;
+      i++;
+      continue;
+    }
+
+    let &frame = state.frames.back();
+
     let const do_word_matches = [&](StringView word) {
-      if (i + word.length > line.length) return false;
-      if (line.substring_of_length(i, word.length) != word) return false;
+      if (i + word.length > end) return false;
+      if (source.substring_of_length(i, word.length) != word) return false;
       let const word_end = i + word.length;
-      return word_end == line.length || lexer::is_whitespace(line[word_end]) ||
-             lexer::is_shell_sentinel(line[word_end]);
+      return word_end == source.length ||
+             lexer::is_whitespace(source[word_end]) ||
+             lexer::is_shell_sentinel(source[word_end]);
     };
 
     let const is_word_start =
-        i == frame.body_start || lexer::is_whitespace(line[i - 1]) ||
-        line[i - 1] == ';' || line[i - 1] == '&' || line[i - 1] == '|' ||
-        line[i - 1] == '(' || line[i - 1] == ')';
+        i == frame.body_start || lexer::is_whitespace(source[i - 1]) ||
+        source[i - 1] == ';' || source[i - 1] == '&' || source[i - 1] == '|' ||
+        source[i - 1] == '(' || source[i - 1] == ')';
     if (is_word_start) {
       if (frame.is_command_position && do_word_matches("case")) {
         frame.saw_case_keyword = true;
@@ -1200,11 +1168,14 @@ fn command_substitution_range(StringView line, usize cursor) throws
 
     if (c == '\n' || c == '|' || c == '&' || c == ';') {
       frame.is_command_position = true;
-      if (c == ';' && i + 1 < line.length &&
-          (line[i + 1] == ';' || line[i + 1] == '&') && frame.case_depth > 0)
+      if (c == ';' && i + 1 < end &&
+          (source[i + 1] == ';' || source[i + 1] == '&') &&
+          frame.case_depth > 0)
       {
         frame.case_pattern_expected = true;
       }
+      if (c == '\n' && !state.pending_heredocs.is_empty())
+        state.is_in_heredoc = true;
     }
 
     if (c == '(') {
@@ -1213,22 +1184,22 @@ fn command_substitution_range(StringView line, usize cursor) throws
       continue;
     }
 
-    if (c == ')' && frame.kind == completion_sub_frame_kind::arithmetic) {
+    if (c == ')' && frame.kind == shell_lexical_frame_kind::arithmetic) {
       if (frame.group_depth > 0) {
         frame.group_depth--;
         i++;
         continue;
       }
-      if (i + 1 < line.length && line[i + 1] == ')') {
+      if (i + 1 < end && source[i + 1] == ')') {
         let const parent_quote = frame.parent_quote;
-        frames.pop_back();
-        quote = parent_quote;
+        state.frames.pop_back();
+        state.quote = parent_quote;
         i += 2;
         continue;
       }
     }
 
-    if (c == ')' && frame.kind == completion_sub_frame_kind::command) {
+    if (c == ')' && frame.kind == shell_lexical_frame_kind::command) {
       if (frame.group_depth > 0) {
         frame.group_depth--;
         i++;
@@ -1242,9 +1213,10 @@ fn command_substitution_range(StringView line, usize cursor) throws
       }
 
       let const closed_frame = frame;
-      do_consider(closed_frame, i, frames.count());
-      frames.pop_back();
-      quote = closed_frame.parent_quote;
+      consider_shell_lexical_frame(closed_frame, i, state.frames.count(),
+                                   target);
+      state.frames.pop_back();
+      state.quote = closed_frame.parent_quote;
       i++;
       continue;
     }
@@ -1252,10 +1224,21 @@ fn command_substitution_range(StringView line, usize cursor) throws
     i++;
   }
 
-  for (usize frame_index = 0; frame_index < frames.count(); frame_index++)
-    do_consider(frames[frame_index], line.length, frame_index + 1);
+  state.source_position = i;
+}
 
-  return active;
+fn command_substitution_range(StringView line, usize cursor) throws
+    -> completion_command_range
+{
+  let state = shell_lexical_state{completion_allocator()};
+  let target = shell_lexical_scan_target{
+      cursor, completion_command_range{0, line.length}
+  };
+  advance_shell_lexical_state(line, line.length, state, &target);
+  for (usize frame_index = 0; frame_index < state.frames.count(); frame_index++)
+    consider_shell_lexical_frame(state.frames[frame_index], line.length,
+                                 frame_index + 1, &target);
+  return target.range;
 }
 
 } // namespace completion
