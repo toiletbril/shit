@@ -151,6 +151,51 @@ cold fn Path::normalized() const throws -> Path
   return Path{normalized_text};
 }
 
+cold fn Path::first_unavailable_component() const throws
+    -> Maybe<unavailable_path_component>
+{
+  const usize root_length = os::path_root_length(m_text.view());
+  usize component_count = 0;
+  usize position = root_length;
+  while (position < m_text.count()) {
+    while (position < m_text.count() &&
+           os::is_directory_separator(m_text[position]))
+      position++;
+    if (position >= m_text.count()) break;
+
+    component_count++;
+    while (position < m_text.count() &&
+           !os::is_directory_separator(m_text[position]))
+      position++;
+  }
+
+  usize component_index = 0;
+  position = root_length;
+  while (position < m_text.count()) {
+    while (position < m_text.count() &&
+           os::is_directory_separator(m_text[position]))
+      position++;
+    if (position >= m_text.count()) break;
+
+    const usize component_start = position;
+    while (position < m_text.count() &&
+           !os::is_directory_separator(m_text[position]))
+      position++;
+
+    let const prefix = Path{m_text.substring_of_length(0, position)};
+    if (!prefix.exists())
+      return unavailable_path_component{component_start, position,
+                                        component_index, component_count,
+                                        false};
+    if (!prefix.is_directory())
+      return unavailable_path_component{component_start, position,
+                                        component_index, component_count, true};
+    component_index++;
+  }
+
+  return None;
+}
+
 fn Path::to_absolute() const throws -> Path
 {
   if (is_absolute()) return normalized();

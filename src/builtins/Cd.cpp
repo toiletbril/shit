@@ -46,126 +46,6 @@ static fn cdpath_search_applies(const String &operand) throws -> bool
   return true;
 }
 
-struct cd_path_component
-{
-  StringView text;
-  usize decoded_start;
-  usize decoded_end;
-  bool is_opaque;
-};
-
-struct cd_component_owner_range
-{
-  usize first;
-  usize end;
-};
-
-struct cd_unavailable_component
-{
-  Path prefix;
-  usize component_index;
-  usize component_count;
-  bool is_not_directory;
-};
-
-static fn split_cd_path_components(StringView path,
-                                   const utils::decoded_shell_word *decoded,
-                                   Allocator allocator) throws
-    -> ArrayList<cd_path_component>
-{
-  let components = ArrayList<cd_path_component>{allocator};
-  usize position = os::path_root_length(path);
-  while (position < path.length) {
-    while (position < path.length && os::is_directory_separator(path[position]))
-      position++;
-    if (position >= path.length) break;
-
-    let const start = position;
-    while (position < path.length &&
-           !os::is_directory_separator(path[position]))
-      position++;
-
-    let is_opaque = false;
-    if (decoded != nullptr) {
-      for (let const &range : decoded->opaque_ranges) {
-        let const range_end = range.decoded_start + range.decoded_length;
-        if (range.decoded_start < position && range_end > start) {
-          is_opaque = true;
-          break;
-        }
-      }
-    }
-
-    components.push(
-        cd_path_component{path.substring_of_length(start, position - start),
-                          start, position, is_opaque});
-  }
-  return components;
-}
-
-static fn first_unavailable_cd_component(const Path &target,
-                                         Allocator allocator) throws
-    -> Maybe<cd_unavailable_component>
-{
-  let const components =
-      split_cd_path_components(target.text().view(), nullptr, allocator);
-  for (usize component_index = 0; component_index < components.count();
-       component_index++)
-  {
-    let const &component = components[component_index];
-    let const prefix = Path{
-        target.text().view().substring_of_length(0, component.decoded_end)};
-    if (!prefix.exists())
-      return cd_unavailable_component{prefix, component_index,
-                                      components.count(), false};
-    if (!prefix.is_directory())
-      return cd_unavailable_component{prefix, component_index,
-                                      components.count(), true};
-  }
-  return None;
-}
-
-static fn
-cd_component_owner(const ArrayList<cd_path_component> &raw_components,
-                   const ArrayList<cd_path_component> &expanded_components,
-                   usize expanded_component_index) wontthrow
-    -> Maybe<cd_component_owner_range>
-{
-  usize raw_left = 0;
-  usize expanded_left = 0;
-  while (raw_left < raw_components.count() &&
-         expanded_left < expanded_components.count() &&
-         !raw_components[raw_left].is_opaque &&
-         raw_components[raw_left].text ==
-             expanded_components[expanded_left].text)
-  {
-    if (expanded_left == expanded_component_index)
-      return cd_component_owner_range{raw_left, raw_left + 1};
-    raw_left++;
-    expanded_left++;
-  }
-
-  usize raw_right = raw_components.count();
-  usize expanded_right = expanded_components.count();
-  while (raw_right > raw_left && expanded_right > expanded_left &&
-         !raw_components[raw_right - 1].is_opaque &&
-         raw_components[raw_right - 1].text ==
-             expanded_components[expanded_right - 1].text)
-  {
-    if (expanded_right - 1 == expanded_component_index)
-      return cd_component_owner_range{raw_right - 1, raw_right};
-    raw_right--;
-    expanded_right--;
-  }
-
-  if (expanded_component_index >= expanded_left &&
-      expanded_component_index < expanded_right && raw_left < raw_right)
-  {
-    return cd_component_owner_range{raw_left, raw_right};
-  }
-  return None;
-}
-
 fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
@@ -347,15 +227,6 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  let const unavailable =
-      first_unavailable_cd_component(target, cxt.scratch_allocator());
-  if (!unavailable.has_value() || is_to_previous || operand_count == 0) {
-    throw ErrorWithLocationAndDetails{
-        ec.source_location(),
-        StringView{"The directory '"} + arg_path + "' does not exist",
-        "Check the spelling or create it with `mkdir -p`"};
-  }
-
   let operand_location = ec.arg_location_at(operand_index);
   let raw_operand = arg_path.view();
   if (operand_index < ec.arg_locations().count()) {
@@ -368,47 +239,32 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  let const decoded =
-      utils::decode_shell_word(raw_operand, cxt.scratch_allocator());
-  let const raw_components = split_cd_path_components(
-      decoded.text.view(), &decoded, cxt.scratch_allocator());
-  let const normalized_operand = Path{arg_path.view()}.normalized();
-  let const expanded_components = split_cd_path_components(
-      normalized_operand.text().view(), nullptr, cxt.scratch_allocator());
-  let const remaining_component_count =
-      unavailable->component_count - unavailable->component_index - 1;
-  let const expanded_component_index =
-      expanded_components.count() > remaining_component_count
-          ? expanded_components.count() - remaining_component_count - 1
-          : 0;
-  let const owner = cd_component_owner(raw_components, expanded_components,
-                                       expanded_component_index);
-
-  let typed_prefix = arg_path.view();
-  if (owner.has_value()) {
-    let const &first = raw_components[owner->first];
-    let const &last = raw_components[owner->end - 1];
-    typed_prefix = decoded.text.view().substring_of_length(0, last.decoded_end);
-    operand_location.position += decoded.raw_positions[first.decoded_start];
-    operand_location.length = decoded.raw_positions[last.decoded_end] -
-                              decoded.raw_positions[first.decoded_start];
+  let const unavailable = utils::locate_first_unavailable_path_component(
+      target, arg_path.view(), raw_operand, operand_location,
+      cxt.scratch_allocator());
+  if (!unavailable.has_value() || is_to_previous || operand_count == 0) {
+    throw ErrorWithLocationAndDetails{
+        ec.source_location(),
+        StringView{"The directory '"} + arg_path + "' does not exist",
+        "Check the spelling or create it with `mkdir -p`"};
   }
 
   if (unavailable->is_not_directory) {
-    throw ErrorWithLocation{operand_location, StringView{"The path '"} +
-                                                  typed_prefix +
-                                                  "' is not a directory"};
+    throw ErrorWithLocation{unavailable->location,
+                            StringView{"The path '"} +
+                                unavailable->typed_prefix +
+                                "' is not a directory"};
   }
 
   let details = String{cxt.scratch_allocator(),
                        "Check the spelling or create it with `mkdir -p`"};
-  if (owner.has_value() && owner->end == owner->first + 1) {
+  if (unavailable->has_single_raw_component) {
     if (let const suggested_name = utils::suggest_directory_entry(
             unavailable->prefix.parent(), unavailable->prefix.filename()))
     {
       let suggested_path = String{cxt.scratch_allocator()};
-      suggested_path.append(decoded.text.view().substring_of_length(
-          0, raw_components[owner->first].decoded_start));
+      suggested_path.append(unavailable->typed_prefix.view().substring_of_length(
+          0, unavailable->typed_component_start));
       suggested_path.append(suggested_name->view());
       let quoted_path = String{cxt.scratch_allocator()};
       append_shell_quoted_arg(quoted_path, suggested_path.view());
@@ -416,9 +272,10 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  throw ErrorWithLocationAndDetails{operand_location,
+  throw ErrorWithLocationAndDetails{unavailable->location,
                                     StringView{"The directory '"} +
-                                        typed_prefix + "' does not exist",
+                                        unavailable->typed_prefix +
+                                        "' does not exist",
                                     details};
 }
 

@@ -151,9 +151,11 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   Maybe<ExecContext> sub;
   try {
-    sub = ExecContext::make_from(ec.source_location(), steal(operand_args),
-                                 cxt.mood(), cxt.shitbox(), resolver,
-                                 steal(operand_arg_locations));
+    let const *source = cxt.current_source();
+    sub = ExecContext::make_from(
+        ec.source_location(), source != nullptr ? source->view() : StringView{},
+        steal(operand_args), cxt.mood(), cxt.shitbox(), resolver,
+        steal(operand_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     LOG(Debug, "command handled a resolution error: %s",
         resolution_error.message().c_str());

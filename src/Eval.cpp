@@ -2088,8 +2088,9 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
   }
 }
 
-fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
-                          mimic_mood mood, bool is_shitbox_enabled,
+fn ExecContext::make_from(SourceLocation location, StringView source,
+                          ArrayList<String> &&args, mimic_mood mood,
+                          bool is_shitbox_enabled,
                           ProgramResolver &program_resolver,
                           ArrayList<SourceLocation> &&arg_locations) throws
     -> ExecContext
@@ -2097,9 +2098,13 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
   ASSERT(args.count() > 0);
 
   let const &program = args[0];
+  let resolution_location =
+      arg_locations.is_empty() ? location : arg_locations[0];
+  let resolution_program = program.view();
 
   Maybe<Builtin::Kind> resolved_builtin;
   Maybe<Path> resolved_program_path;
+  Maybe<utils::unavailable_path_source_component> unavailable_component;
 
   if (!os::has_directory_separator(program.view())) {
     resolved_builtin = search_builtin(program.view());
@@ -2132,7 +2137,28 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
         !resolved_program_path->is_directory())
     {
       throw CommandResolutionErrorWithLocation{
-          location, "This file is not a directory", 126};
+          resolution_location, "This file is not a directory", 126};
+    }
+    if (!resolved_program_path.has_value()) {
+      let raw_program = program.view();
+      if (resolution_location.position + resolution_location.length <=
+          source.length)
+      {
+        raw_program = source.substring_of_length(resolution_location.position,
+                                                 resolution_location.length);
+      }
+      let const target = typed_program_path.to_absolute();
+      unavailable_component = utils::locate_first_unavailable_path_component(
+          target, program.view(), raw_program, resolution_location,
+          heap_allocator());
+      if (unavailable_component.has_value()) {
+        resolution_location = unavailable_component->location;
+        resolution_program = unavailable_component->typed_prefix.view();
+        if (unavailable_component->is_not_directory) {
+          throw CommandResolutionErrorWithLocation{
+              resolution_location, "This file is not a directory", 126};
+        }
+      }
     }
   }
 
@@ -2150,16 +2176,18 @@ fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
       kind = ResolvedCommand::from_builtin(Builtin::Kind::Shitbox);
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
-      let const message = "Program `" + program + "` wasn't found";
+      let const message =
+          "Program `" + resolution_program + "` wasn't found";
       if (Maybe<String> suggestion = utils::suggest_command(
               program.view(), ArrayList<String>{heap_allocator()},
               &program_resolver))
       {
         let const hint = "Did you mean `" + *suggestion + "`?";
         throw CommandResolutionErrorWithLocationAndDetails{
-            location, message.view(), hint.view()};
+            resolution_location, message.view(), hint.view()};
       }
-      throw CommandResolutionErrorWithLocation{location, message.view()};
+      throw CommandResolutionErrorWithLocation{resolution_location,
+                                               message.view()};
     }
   } else {
     LOG(Debug, "resolved '%s' to a builtin", program.c_str());

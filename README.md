@@ -71,10 +71,12 @@ sensible word-jumps and controls, full UTF-8 support, wide character (CJK and
 emoji) width handling, multiline editing, history search, and persistent
 history.
 
-Strings and heredocs are bright green, and keywords are bold bright magenta.
-Resolved commands are bold, and flags are italic. Unknown commands and invalid
-paths keep the terminal text color with a bright green curly underline. An
-unfinished command prefix keeps the terminal text color without an underline.
+Strings and heredocs are bright green, keywords are bold green, and live globs
+are yellow. Resolved commands are blue, unfinished command prefixes are bright
+blue, and flags are italic. Unknown commands and invalid paths are bright red
+with a bright green curly underline. Invalid syntax is bold bright red with that
+underline, while unset variables are non-bold bright red with it. Existing paths
+are bright cyan, and a completable path tail is cyan.
 Located diagnostics syntax-highlight their source line on a terminal.
 
 **shit** has more than 50 builtins, each with `--help`. That includes

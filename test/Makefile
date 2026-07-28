@@ -75,7 +75,7 @@ clean:
 
 TEST_SUITES := shit_tests cli_tests completion_tests highlight_tests
 ifneq ($(TARGET), Windows_NT)
-TEST_SUITES += dashdiff bashdiff mimicrydiff
+TEST_SUITES += diagnostic_tty_test dashdiff bashdiff mimicrydiff
 endif
 
 test: $(BIN)
@@ -193,6 +193,14 @@ highlight_%: expected/highlight/%.out
 highlight_tests: $(BIN)
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-highlight-test.sh $(HIGHLIGHT_INPUT)
+
+diagnostic_tty_test: $(BIN)
+	@if command -v python3 >/dev/null 2>&1; then \
+		python3 interactive/long_warning_window.py $(BIN); \
+	else \
+		printf "\t%-64s skipped, python3 unavailable\n" \
+			interactive/long_warning_window.py; \
+	fi
 
 
 REFILL ?=

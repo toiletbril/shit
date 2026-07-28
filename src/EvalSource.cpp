@@ -157,12 +157,12 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   try {
     ast = parser.construct_ast();
   } catch (const ErrorWithLocationAndDetails &detailed_error) {
-    do_restore_pre_parse_state();
+    defer { do_restore_pre_parse_state(); };
     show_message(detailed_error.to_string(contents->view(), this));
     show_message(detailed_error.details_to_string(contents->view(), this));
     return 1;
   } catch (const ErrorWithLocation &located_error) {
-    do_restore_pre_parse_state();
+    defer { do_restore_pre_parse_state(); };
     show_message(located_error.to_string(contents->view(), this));
     return 1;
   } catch (const Error &caught_error) {
@@ -202,7 +202,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     try {
       std::rethrow_exception(error);
     } catch (const ErrorWithLocation &located_error) {
-      show_message(located_error.to_string(contents->view()));
+      show_message(located_error.to_string(contents->view(), this));
       print_source_backtrace(located_error.location());
     } catch (const Error &caught_error) {
       show_message(caught_error.to_string());
@@ -274,13 +274,16 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   do_restore_fds();
 
   let const status = last_exit_status();
-  restore_state(steal(snapshot));
-  set_current_source(previous_source, previous_origin);
-  m_current_location = previous_location;
-  previous_runtime.restore(*this);
-  do_restore_restricted_shell();
-  m_is_script_run = previous_script_run;
-  m_shell_name = steal(previous_shell_name);
+  defer
+  {
+    restore_state(steal(snapshot));
+    set_current_source(previous_source, previous_origin);
+    m_current_location = previous_location;
+    previous_runtime.restore(*this);
+    do_restore_restricted_shell();
+    m_is_script_run = previous_script_run;
+    m_shell_name = steal(previous_shell_name);
+  };
 
   if (error) {
     if (mimicked_error_is_interrupt(error))

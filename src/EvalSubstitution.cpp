@@ -239,7 +239,7 @@ fn EvalContext::cleanup_process_substitutions(
           show_message(sub.source.is_empty()
                            ? Warning{text}.to_string()
                            : WarningWithLocation{sub.location, text}.to_string(
-                                 sub.source));
+                                 sub.source, this));
         } catch (...) {
           LOG(Debug, "showing the reap warning failed, the error is swallowed");
         }
@@ -254,7 +254,7 @@ fn EvalContext::cleanup_process_substitutions(
           show_message(sub.source.is_empty()
                            ? Warning{text}.to_string()
                            : WarningWithLocation{sub.location, text}.to_string(
-                                 sub.source));
+                                 sub.source, this));
         } catch (...) {
           LOG(Debug, "showing the fallback reap warning failed, the error is "
                      "swallowed");

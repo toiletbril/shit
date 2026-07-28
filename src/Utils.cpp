@@ -339,6 +339,141 @@ fn decode_shell_word(StringView word, Allocator allocator) throws
   return decoded;
 }
 
+struct path_source_component
+{
+  StringView text;
+  usize decoded_start;
+  usize decoded_end;
+  bool is_opaque;
+};
+
+struct path_component_owner_range
+{
+  usize first;
+  usize end;
+};
+
+static fn split_path_source_components(StringView path,
+                                       const decoded_shell_word *decoded,
+                                       Allocator allocator) throws
+    -> ArrayList<path_source_component>
+{
+  let components = ArrayList<path_source_component>{allocator};
+  usize position = os::path_root_length(path);
+  while (position < path.length) {
+    while (position < path.length && os::is_directory_separator(path[position]))
+      position++;
+    if (position >= path.length) break;
+
+    let const start = position;
+    while (position < path.length &&
+           !os::is_directory_separator(path[position]))
+      position++;
+
+    let is_opaque = false;
+    if (decoded != nullptr) {
+      for (let const &range : decoded->opaque_ranges) {
+        let const range_end = range.decoded_start + range.decoded_length;
+        if (range.decoded_start < position && range_end > start) {
+          is_opaque = true;
+          break;
+        }
+      }
+    }
+
+    components.push(path_source_component{
+        path.substring_of_length(start, position - start), start, position,
+        is_opaque});
+  }
+  return components;
+}
+
+static fn path_component_owner(
+    const ArrayList<path_source_component> &raw_components,
+    const ArrayList<path_source_component> &expanded_components,
+    usize expanded_component_index) wontthrow
+    -> Maybe<path_component_owner_range>
+{
+  usize raw_left = 0;
+  usize expanded_left = 0;
+  while (raw_left < raw_components.count() &&
+         expanded_left < expanded_components.count() &&
+         !raw_components[raw_left].is_opaque &&
+         raw_components[raw_left].text == expanded_components[expanded_left].text)
+  {
+    if (expanded_left == expanded_component_index)
+      return path_component_owner_range{raw_left, raw_left + 1};
+    raw_left++;
+    expanded_left++;
+  }
+
+  usize raw_right = raw_components.count();
+  usize expanded_right = expanded_components.count();
+  while (raw_right > raw_left && expanded_right > expanded_left &&
+         !raw_components[raw_right - 1].is_opaque &&
+         raw_components[raw_right - 1].text ==
+             expanded_components[expanded_right - 1].text)
+  {
+    if (expanded_right - 1 == expanded_component_index)
+      return path_component_owner_range{raw_right - 1, raw_right};
+    raw_right--;
+    expanded_right--;
+  }
+
+  if (expanded_component_index >= expanded_left &&
+      expanded_component_index < expanded_right && raw_left < raw_right)
+  {
+    return path_component_owner_range{raw_left, raw_right};
+  }
+  return None;
+}
+
+fn locate_first_unavailable_path_component(
+    const Path &target, StringView expanded_operand, StringView raw_operand,
+    SourceLocation operand_location, Allocator allocator) throws
+    -> Maybe<unavailable_path_source_component>
+{
+  let const unavailable = target.first_unavailable_component();
+  if (!unavailable.has_value()) return None;
+
+  let const decoded = decode_shell_word(raw_operand, allocator);
+  let const raw_components = split_path_source_components(
+      decoded.text.view(), &decoded, allocator);
+  let const normalized_operand = Path{expanded_operand}.normalized();
+  let const expanded_components = split_path_source_components(
+      normalized_operand.text().view(), nullptr, allocator);
+  const usize remaining_component_count =
+      unavailable->count - unavailable->index - 1;
+  const usize expanded_component_index =
+      expanded_components.count() > remaining_component_count
+          ? expanded_components.count() - remaining_component_count - 1
+          : 0;
+  let const owner = path_component_owner(raw_components, expanded_components,
+                                          expanded_component_index);
+
+  let typed_prefix = String{allocator, expanded_operand};
+  usize typed_component_start = 0;
+  bool has_single_raw_component = false;
+  if (owner.has_value()) {
+    let const &first = raw_components[owner->first];
+    let const &last = raw_components[owner->end - 1];
+    typed_prefix = String{allocator, decoded.text.view().substring_of_length(
+                                        0, last.decoded_end)};
+    operand_location.position += decoded.raw_positions[first.decoded_start];
+    operand_location.length = decoded.raw_positions[last.decoded_end] -
+                              decoded.raw_positions[first.decoded_start];
+    typed_component_start = first.decoded_start;
+    has_single_raw_component = owner->end == owner->first + 1;
+  }
+
+  let const prefix = Path{target.text().view().substring_of_length(
+      0, unavailable->end)};
+  return unavailable_path_source_component{
+      prefix, operand_location, steal(typed_prefix),
+      typed_component_start, unavailable->is_not_directory,
+      has_single_raw_component};
+}
+
 fn file_content_identity(const Path &path, Allocator allocator) throws
     -> Maybe<String>
 {

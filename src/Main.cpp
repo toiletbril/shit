@@ -436,13 +436,37 @@ static fn run_script_contents(const String &script_contents,
     /* An interactive -W chunk runs right away and the runtime reports a missing
        command itself, so the analysis copy stays quiet to avoid a doubled
        error. */
-    let const analysis_failed =
-        run_analysis &&
-        !analyze_ast(ast, script_contents, context.function_names(),
-                     context.alias_names(), &context, context.warning_level(),
-                     context.warnings_enabled() &&
-                         context.shell_is_interactive(),
-                     FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
+    bool analysis_failed = false;
+#if !defined NDEBUG
+    let const diagnostic_highlight_bytes_before =
+        completion::debug_highlight_input_byte_count();
+#endif
+    if (run_analysis) {
+      let highlight_cache =
+          completion::diagnostic_highlight_cache{script_contents.view()};
+      let *previous_highlight_cache =
+          context.set_diagnostic_highlight_cache(&highlight_cache);
+      defer
+      {
+        context.set_diagnostic_highlight_cache(previous_highlight_cache);
+      };
+      analysis_failed = !analyze_ast(
+          ast, script_contents, context.function_names(), context.alias_names(),
+          &context, context.warning_level(),
+          context.warnings_enabled() && context.shell_is_interactive(),
+          FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
+    }
+#if !defined NDEBUG
+    if (os::get_environment_variable("SHIT_TEST_DIAGNOSTIC_HIGHLIGHT_STATS")
+            .has_value())
+    {
+      print_error("diagnostic-highlight-bytes=");
+      print_error(String::from(completion::debug_highlight_input_byte_count() -
+                                   diagnostic_highlight_bytes_before,
+                               heap_allocator()));
+      print_error("\n");
+    }
+#endif
     if (!analysis_failed && out_ast != nullptr) {
       *out_ast = ast;
     }
@@ -1443,21 +1467,23 @@ fn main(int argc, char **argv) -> int
           const shit::Path script_path{file_name.view()};
 
           if (script_path.is_directory()) {
-            shit::show_message(shit::ErrorWithLocation{
-                operand_location, "Unable to execute `" + file_name.view() +
-                                      "` because the file is a directory"}
-                                   .to_string(context.cli_invocation().view()));
+            shit::show_message(
+                shit::ErrorWithLocation{
+                    operand_location, "Unable to execute `" + file_name.view() +
+                                          "` because the file is a directory"}
+                    .to_string(context.cli_invocation().view(), &context));
             shit::utils::quit(126, shit::utils::farewell_policy::Goodbye);
           }
 
           LOG(Info, "reading the script file '%s'", file_name.c_str());
           shit::Maybe<shit::String> contents = script_path.read_entire_file();
           if (!contents) {
-            shit::show_message(shit::ErrorWithLocation{
-                operand_location,
-                "Could not open '" + file_name.view() +
-                    "': " + shit::os::last_system_error_message()}
-                                   .to_string(context.cli_invocation().view()));
+            shit::show_message(
+                shit::ErrorWithLocation{
+                    operand_location,
+                    "Could not open '" + file_name.view() +
+                        "': " + shit::os::last_system_error_message()}
+                    .to_string(context.cli_invocation().view(), &context));
             shit::utils::quit(127, shit::utils::farewell_policy::Goodbye);
           }
           script_contents = steal(*contents);

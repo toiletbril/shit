@@ -610,8 +610,10 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
        closes its pipe to give the next stage EOF. */
     Maybe<ExecContext> stage_ec;
     try {
+      let const *source = cxt.current_source();
       stage_ec = ExecContext::make_from(
-          e->source_location(), steal(stage_args), cxt.mood(), cxt.shitbox(),
+          e->source_location(), source != nullptr ? source->view() : StringView{},
+          steal(stage_args), cxt.mood(), cxt.shitbox(),
           cxt.get_program_resolver(), steal(stage_arg_locations));
     } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       report_command_resolution_error(cxt, resolution_error);

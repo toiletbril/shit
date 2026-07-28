@@ -58,8 +58,26 @@ struct highlight_span
   StringView sgr;
 };
 
+class diagnostic_highlight_cache
+{
+public:
+  explicit diagnostic_highlight_cache(StringView source) : m_source(source) {}
+
+  fn spans_for(StringView source, EvalContext &context) throws
+      -> const ArrayList<highlight_span> *;
+
+private:
+  StringView m_source;
+  bool m_was_built{false};
+  ArrayList<highlight_span> m_spans{heap_allocator()};
+};
+
 fn highlight_line(StringView line, EvalContext &context) throws
     -> ArrayList<highlight_span>;
+
+#if !defined NDEBUG
+pure fn debug_highlight_input_byte_count() wontthrow -> usize;
+#endif
 
 /* The verdicts are cached per word and the cache drops when PATH changes. */
 fn command_word_resolves(StringView line, EvalContext &context) throws -> bool;

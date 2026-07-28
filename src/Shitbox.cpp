@@ -78,15 +78,16 @@ fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
 }
 
 fn render_with_prefix(const ErrorWithLocation &error, StringView prefix,
-                      StringView source) throws -> String
+                      StringView source, EvalContext &context) throws -> String
 {
   let const message = prefix + ": " + error.message();
   if (!error.detail_message().is_empty())
     return ErrorWithLocationAndDetails{error.location(), message.view(),
                                        error.detail_message()}
-        .to_string(source);
+        .to_string(source, &context);
 
-  return ErrorWithLocation{error.location(), message.view()}.to_string(source);
+  return ErrorWithLocation{error.location(), message.view()}.to_string(
+      source, &context);
 }
 
 fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
@@ -156,8 +157,8 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   } catch (const BrokenPipeExit &) {
     return 141;
   } catch (const ErrorWithLocation &e) {
-    show_message(render_with_prefix(e, util_name,
-                                    utils::merge_args_to_string(ec.args())));
+    show_message(render_with_prefix(
+        e, util_name, utils::merge_args_to_string(ec.args()), cxt));
     return 1;
   } catch (const Error &e) {
     show_message(e.to_string());

@@ -11,6 +11,15 @@ namespace shit {
 
 enum class mimic_mood : u8;
 
+struct unavailable_path_component
+{
+  usize start;
+  usize end;
+  usize index;
+  usize count;
+  bool is_not_directory;
+};
+
 /* A forward slash is always accepted on input, even on Windows, so a script
    written for POSIX keeps working. */
 class Path
@@ -35,6 +44,8 @@ public:
   mustuse pure fn is_relative() const wontthrow -> bool;
 
   cold mustuse fn normalized() const throws -> Path;
+  cold mustuse fn first_unavailable_component() const throws
+      -> Maybe<unavailable_path_component>;
 
   mustuse fn to_absolute() const throws -> Path;
 

@@ -42,6 +42,21 @@ struct decoded_shell_word
 fn decode_shell_word(StringView word, Allocator allocator) throws
     -> decoded_shell_word;
 
+struct unavailable_path_source_component
+{
+  Path prefix;
+  SourceLocation location;
+  String typed_prefix;
+  usize typed_component_start;
+  bool is_not_directory;
+  bool has_single_raw_component;
+};
+
+fn locate_first_unavailable_path_component(
+    const Path &target, StringView expanded_operand, StringView raw_operand,
+    SourceLocation operand_location, Allocator allocator) throws
+    -> Maybe<unavailable_path_source_component>;
+
 fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
     -> String;
 

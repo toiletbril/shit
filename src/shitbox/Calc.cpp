@@ -47,7 +47,7 @@ fn evaluate_one(const ExecContext &ec, EvalContext &cxt,
     ec.print_to_stdout(result);
     return 0;
   } catch (const ErrorWithLocation &error) {
-    show_message(error.to_string(expression));
+    show_message(error.to_string(expression, &cxt));
     return 1;
   } catch (const Error &error) {
     show_message(error.to_string());
@@ -207,7 +207,7 @@ fn run_repl(const ExecContext &ec, EvalContext &cxt, bool force_pipe) throws
     try {
       if (try_define(cxt, line->view())) continue;
     } catch (const ErrorWithLocation &error) {
-      show_message(error.to_string(line->view()));
+      show_message(error.to_string(line->view(), &cxt));
       continue;
     } catch (const Error &error) {
       show_message(error.to_string());

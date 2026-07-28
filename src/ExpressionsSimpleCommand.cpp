@@ -1340,8 +1340,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   Maybe<ExecContext> resolved_ec;
   try {
+    let const *source = cxt.current_source();
     resolved_ec = ExecContext::make_from(
-        source_location(), steal(program_args), cxt.mood(), cxt.shitbox(),
+        source_location(), source != nullptr ? source->view() : StringView{},
+        steal(program_args), cxt.mood(), cxt.shitbox(),
         cxt.get_program_resolver(), steal(program_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &e) {
     report_command_resolution_error(cxt, e);

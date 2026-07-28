@@ -70,7 +70,7 @@ runtime_warning_count=$(strings "$temporary_directory/typescript" | \
 echo "runtime-level-two-warnings=$runtime_warning_count"
 grep -Fq "$(printf '\033[95mwarning\033[0m')" \
     "$temporary_directory/typescript" || exit 1
-grep -Fq "$(printf '\033[1;31merror\033[0m')" \
+grep -Fq "$(printf '\033[1;91merror\033[0m')" \
     "$temporary_directory/typescript" || exit 1
 grep -Fq "$(printf '\033[36mnote\033[0m')" \
     "$temporary_directory/typescript" || exit 1

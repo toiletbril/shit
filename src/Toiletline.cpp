@@ -487,6 +487,33 @@ fn utf8_strnlen(const char *bytes, usize byte_count) -> usize
   return ::tl_utf8_strnlen(bytes, byte_count);
 }
 
+fn display_width(const String &text) -> usize
+{
+  return ::itl_cstr_display_width(text.c_str());
+}
+
+fn byte_offset_at_or_before_display_cell(const String &text,
+                                         usize cell_position,
+                                         usize &actual_cell_position) -> usize
+{
+  usize byte_offset = 0;
+  actual_cell_position =
+      ::itl_cstr_width_walk(text.c_str(), cell_position, &byte_offset);
+  if (actual_cell_position <= cell_position) return byte_offset;
+
+  usize previous_byte_offset = byte_offset - 1;
+  while (previous_byte_offset > 0 &&
+         (static_cast<unsigned char>(text[previous_byte_offset]) & 0xC0) ==
+             0x80)
+    previous_byte_offset--;
+
+  let const prefix =
+      String{shit::heap_allocator(),
+             text.view().substring_of_length(0, previous_byte_offset)};
+  actual_cell_position = ::itl_cstr_display_width(prefix.c_str());
+  return previous_byte_offset;
+}
+
 fn is_active() -> bool { return ::itl_g_is_active; }
 
 fn initialize() -> void
@@ -1238,6 +1265,17 @@ fn utf8_strnlen(const char *bytes, usize byte_count) -> usize
 {
   unused(bytes);
   return byte_count;
+}
+
+fn display_width(const String &text) -> usize { return text.count(); }
+
+fn byte_offset_at_or_before_display_cell(const String &text,
+                                         usize cell_position,
+                                         usize &actual_cell_position) -> usize
+{
+  actual_cell_position =
+      cell_position < text.count() ? cell_position : text.count();
+  return actual_cell_position;
 }
 
 fn is_active() -> bool { return false; }

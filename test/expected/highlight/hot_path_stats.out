@@ -1,28 +1,28 @@
-echo	\e[1m
-$(	\e[4:3;58:5:10m
+echo	\e[34m
+$(	\e[91;4:3;58:5:10m
 highlight-variable-name-visits=0
 == a bare argument does not enumerate its directory:
-echo	\e[1m
+echo	\e[34m
 highlight-directory-reads=0
 == a substitution comment ends at its newline:
-echo	\e[1m
-true	\e[1m
+echo	\e[34m
+true	\e[34m
 # comment	\e[2m
-echo	\e[1m
+echo	\e[34m
 == nested command substitution does not close arithmetic:
-echo	\e[1m
+echo	\e[34m
 +	\e[1m
-printf	\e[1m
+printf	\e[34m
 ")"	\e[92m
 +	\e[1m
 ;	\e[1m
-echo	\e[1m
+echo	\e[34m
 == a case pattern does not close command highlighting:
-echo	\e[1m
-case	\e[1;95m
-in	\e[1;95m
+echo	\e[34m
+case	\e[1;32m
+in	\e[1;32m
 )	\e[1m
-probecmd	\e[1m
+probecmd	\e[34m
 ;;	\e[1m
-esac	\e[1;95m
+esac	\e[1;32m
 )	\e[1m

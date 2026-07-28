@@ -28,17 +28,24 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
 {
   if (!colors::stderr_wants_color()) return diagnostic_color{};
 
-  let severity = colors::ansi::CYAN;
   if (severity_word == StringView{"error"}) {
-    return diagnostic_color{colors::ansi::BOLD_RED, colors::ansi::BOLD,
-                            colors::ansi::BOLD, colors::ansi::BOLD_GREEN,
+    return diagnostic_color{colors::ansi::BOLD_BRIGHT_RED, colors::ansi::BOLD,
+                            colors::ansi::BOLD, colors::ansi::BRIGHT_GREEN,
                             colors::ansi::RESET};
   }
-  if (severity_word == StringView{"warning"})
-    severity = colors::ansi::BRIGHT_MAGENTA;
+  if (severity_word == StringView{"warning"}) {
+    return diagnostic_color{colors::ansi::BRIGHT_MAGENTA,
+                            {},
+                            {},
+                            colors::ansi::BRIGHT_GREEN,
+                            colors::ansi::RESET};
+  }
 
-  return diagnostic_color{
-      severity, {}, {}, colors::ansi::GREEN, colors::ansi::RESET};
+  return diagnostic_color{colors::ansi::CYAN,
+                          {},
+                          colors::ansi::CYAN,
+                          colors::ansi::BRIGHT_GREEN,
+                          colors::ansi::RESET};
 }
 
 template <class T>
@@ -88,11 +95,9 @@ cold static fn get_context_pointing_to(
 
   static constexpr usize TAB_WIDTH = 4;
   usize tab_count = 0;
-  usize tabs_before_error = 0;
   for (usize i = 0; i < context.count(); i++) {
     if (context[i] != '\t') continue;
     tab_count++;
-    if (i < caret_byte_position) tabs_before_error++;
   }
 
   let expanded_line = String{heap_allocator()};
@@ -110,22 +115,74 @@ cold static fn get_context_pointing_to(
     display_line = expanded_line.view();
   }
 
+  let const do_expanded_byte_position = [&](usize byte_offset) {
+    usize expanded_byte_position = 0;
+    for (usize i = 0; i < byte_offset; i++)
+      expanded_byte_position += context[i] == '\t' ? TAB_WIDTH : 1;
+
+    return expanded_byte_position;
+  };
+
   const usize caret_limit = line_position.line_end - byte_position;
-  const usize unicode_length = toiletline::utf8_strnlen(
-      source.data + byte_position,
-      byte_count > caret_limit ? caret_limit : byte_count);
+  const usize caret_byte_count =
+      byte_count > caret_limit ? caret_limit : byte_count;
+  const usize expanded_caret_byte_position =
+      do_expanded_byte_position(caret_byte_position);
+  const usize expanded_caret_end_byte_position =
+      do_expanded_byte_position(caret_byte_position + caret_byte_count);
 
-  const usize caret_column =
-      toiletline::utf8_strnlen(context.data, caret_byte_position) +
-      tabs_before_error * (TAB_WIDTH - 1);
+  let const display_text = String{heap_allocator(), display_line};
+  let const caret_prefix =
+      String{heap_allocator(),
+             display_line.substring_of_length(0, expanded_caret_byte_position)};
+  let const caret_text = String{
+      heap_allocator(),
+      display_line.substring_of_length(expanded_caret_byte_position,
+                                       expanded_caret_end_byte_position -
+                                           expanded_caret_byte_position)};
+  const usize caret_column = toiletline::display_width(caret_prefix);
+  const usize caret_width = toiletline::display_width(caret_text);
 
-  const char *const line_bytes = display_line.data;
-  const usize line_byte_length = display_line.count();
   let line_highlights = ArrayList<completion::highlight_span>{heap_allocator()};
-  if (eval_context != nullptr && !color.reset.is_empty())
-    line_highlights = completion::highlight_line(display_line, *eval_context);
-  const usize display_cells =
-      toiletline::utf8_strnlen(line_bytes, line_byte_length);
+  if (eval_context != nullptr && !color.reset.is_empty()) {
+    let generated_highlights =
+        ArrayList<completion::highlight_span>{heap_allocator()};
+    const ArrayList<completion::highlight_span> *source_highlights = nullptr;
+    if (let *cache = eval_context->get_diagnostic_highlight_cache();
+        cache != nullptr)
+      source_highlights = cache->spans_for(source, *eval_context);
+    if (source_highlights == nullptr) {
+      generated_highlights = completion::highlight_line(source, *eval_context);
+      source_highlights = &generated_highlights;
+    }
+
+    usize first_highlight = 0;
+    usize highlight_limit = source_highlights->count();
+    while (first_highlight < highlight_limit) {
+      let const middle =
+          first_highlight + (highlight_limit - first_highlight) / 2;
+      if ((*source_highlights)[middle].end <= line_position.line_start)
+        first_highlight = middle + 1;
+      else
+        highlight_limit = middle;
+    }
+
+    for (usize i = first_highlight; i < source_highlights->count(); i++) {
+      let const &span = (*source_highlights)[i];
+      if (span.start >= line_position.line_end) break;
+
+      let const span_start = span.start < line_position.line_start
+                                 ? line_position.line_start
+                                 : span.start;
+      let const span_end =
+          span.end > line_position.line_end ? line_position.line_end : span.end;
+      line_highlights.push(completion::highlight_span{
+          do_expanded_byte_position(span_start - line_position.line_start),
+          do_expanded_byte_position(span_end - line_position.line_start),
+          span.sgr});
+    }
+  }
+  const usize display_cells = toiletline::display_width(display_text);
 
   usize window_start = 0;
   usize window_end = display_cells;
@@ -140,7 +197,7 @@ cold static fn get_context_pointing_to(
       display_cells > terminal_columns - gutter_width)
   {
     const usize available = terminal_columns - gutter_width;
-    const usize span = unicode_length < 1 ? 1 : unicode_length;
+    const usize span = caret_width < 1 ? 1 : caret_width;
     const usize half = available / 2;
     const usize center = caret_column + span / 2;
     window_start = center > half ? center - half : 0;
@@ -164,10 +221,12 @@ cold static fn get_context_pointing_to(
     has_right_ellipsis = window_end < display_cells;
   }
 
-  const usize window_start_byte = toiletline::byte_offset_of_codepoint(
-      line_bytes, line_byte_length, window_start);
-  const usize window_end_byte = toiletline::byte_offset_of_codepoint(
-      line_bytes, line_byte_length, window_end);
+  const usize window_start_byte =
+      toiletline::byte_offset_at_or_before_display_cell(
+          display_text, window_start, window_start);
+  const usize window_end_byte =
+      toiletline::byte_offset_at_or_before_display_cell(display_text,
+                                                        window_end, window_end);
 
   if (has_left_ellipsis) msg += "...";
   usize rendered_byte_position = window_start_byte;
@@ -183,7 +242,15 @@ cold static fn get_context_pointing_to(
       msg += display_line.substring_of_length(
           rendered_byte_position, span_start - rendered_byte_position);
 
-    msg += span.sgr;
+    let span_sgr = span.sgr;
+    if (span_sgr == colors::ansi::CURLY_GREEN_UNDERLINE)
+      span_sgr = StringView{};
+    else if (span_sgr == colors::ansi::RED_CURLY_GREEN_UNDERLINE)
+      span_sgr = colors::ansi::BRIGHT_RED;
+    else if (span_sgr == colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE)
+      span_sgr = colors::ansi::BOLD_BRIGHT_RED;
+
+    msg += span_sgr;
     msg += display_line.substring_of_length(span_start, span_end - span_start);
     msg += color.reset;
     rendered_byte_position = span_end;
@@ -195,7 +262,7 @@ cold static fn get_context_pointing_to(
 
   const usize caret_pad =
       (has_left_ellipsis ? 3u : 0u) + sub_sat(caret_column, window_start);
-  const usize caret_end = caret_column + unicode_length;
+  const usize caret_end = caret_column + caret_width;
   const usize visible_caret =
       sub_sat(caret_end < window_end ? caret_end : window_end, caret_column);
 

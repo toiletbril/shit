@@ -187,7 +187,7 @@ test "$(metric_field "$startup_metrics" reads)" -eq 0 || exit 1
 test "$(metric_field "$startup_metrics" probes)" -eq 0 || exit 1
 test "$(metric_field "$startup_metrics" sorts)" -eq 0 || exit 1
 test "$(metric_field "$startup_metrics" resolutions)" -le 1 || exit 1
-LC_ALL=C grep -Fq "$(printf '\033[1mgit')" "$d/startup-typescript" || exit 1
+LC_ALL=C grep -Fq "$(printf '\033[34mgit')" "$d/startup-typescript" || exit 1
 echo 'prompt PATH changes defer work while startup commands highlight'
 
 mkdir "$d/menu-bin"
@@ -235,8 +235,8 @@ send_mixed_path_input | TERM=xterm-256color \
     SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/mixed-history" BIN="$BIN" \
     run_editor "$d/mixed-typescript"
 
-bold_after_cd_probe=$(printf '\033[1mafter-cd-probe\033[0m')
-LC_ALL=C grep -Fq "$bold_after_cd_probe" "$d/mixed-typescript" || exit 1
+blue_after_cd_probe=$(printf '\033[34mafter-cd-probe\033[0m')
+LC_ALL=C grep -Fq "$blue_after_cd_probe" "$d/mixed-typescript" || exit 1
 mixed_metrics=$(metric_line "$d/mixed-typescript" 2) || exit 1
 case $mixed_metrics in *' stats=0 reads=0 sorts=0 probes=0 '*) ;; *) exit 1 ;; esac
 echo 'mixed PATH keeps stale absolute commands highlighted after cd'

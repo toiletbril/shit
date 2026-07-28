@@ -109,17 +109,21 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let env_args = ArrayList<String>{cxt.scratch_allocator()};
-  for (usize i = first_command; i < operands.count(); i++)
-    env_args.push_managed(operands[i]);
-
   let env_arg_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  for (usize i = first_command; i < operands.count(); i++) {
+    env_args.push_managed(operands[i]);
+    env_arg_locations.push(ec.arg_location_at(i));
+  }
+
   let environment_resolver =
       ProgramResolver{os::get_environment_variable("PATH")};
   Maybe<ExecContext> sub;
   try {
+    let const *source = cxt.current_source();
     sub = ExecContext::make_from(
-        ec.source_location(), steal(env_args), cxt.mood(), cxt.shitbox(),
-        environment_resolver, steal(env_arg_locations));
+        ec.source_location(), source != nullptr ? source->view() : StringView{},
+        steal(env_args), cxt.mood(), cxt.shitbox(), environment_resolver,
+        steal(env_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     const String *source = cxt.current_source();
     show_message(resolution_error.to_string(

@@ -15,6 +15,10 @@
 
 namespace shit {
 
+namespace completion {
+class diagnostic_highlight_cache;
+} /* namespace completion */
+
 enum class argument_lifetime : u8
 {
   Persistent,
@@ -939,6 +943,21 @@ public:
     return m_should_print_source_traces;
   }
 
+  fn set_diagnostic_highlight_cache(
+      completion::diagnostic_highlight_cache *cache) wontthrow
+      -> completion::diagnostic_highlight_cache *
+  {
+    let *previous = m_diagnostic_highlight_cache;
+    m_diagnostic_highlight_cache = cache;
+    return previous;
+  }
+
+  pure fn get_diagnostic_highlight_cache() const wontthrow
+      -> completion::diagnostic_highlight_cache *
+  {
+    return m_diagnostic_highlight_cache;
+  }
+
   fn render_contained_substitution_error(std::exception_ptr error,
                                          StringView source) throws -> void;
 
@@ -1756,6 +1775,7 @@ protected:
      site. Each frame carries the call site and its parent text. */
   ArrayList<source_frame> m_source_frames{heap_allocator()};
   bool m_should_print_source_traces{true};
+  completion::diagnostic_highlight_cache *m_diagnostic_highlight_cache{nullptr};
 
   ArrayList<Expression *> m_retained_source_asts{heap_allocator()};
 
@@ -1915,8 +1935,9 @@ protected:
 class ExecContext
 {
 public:
-  static fn make_from(SourceLocation location, ArrayList<String> &&args,
-                      mimic_mood mood, bool is_shitbox_enabled,
+  static fn make_from(SourceLocation location, StringView source,
+                      ArrayList<String> &&args, mimic_mood mood,
+                      bool is_shitbox_enabled,
                       ProgramResolver &program_resolver,
                       ArrayList<SourceLocation> &&arg_locations) throws
       -> ExecContext;

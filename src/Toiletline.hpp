@@ -2,7 +2,6 @@
 #include "Path.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
-
 #include "toiletline/toiletline.h"
 
 namespace shit {
@@ -59,6 +58,12 @@ usize utf8_strnlen(const char *bytes, usize byte_count);
 
 usize byte_offset_of_codepoint(const char *bytes, usize byte_length,
                                usize codepoint_index);
+
+usize display_width(const String &text);
+
+usize byte_offset_at_or_before_display_cell(const String &text,
+                                            usize cell_position,
+                                            usize &actual_cell_position);
 
 bool is_active();
 
