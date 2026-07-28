@@ -898,6 +898,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
           word.segments.push(WordSegment{WordSegment::Kind::ArithmeticExpansion,
                                          steal(arithmetic),
                                          is_in_double_quotes});
+          word.segments.back().set_source_span(
+              m_cursor_position + expansion_start + 3,
+              word.segments.back().text.count());
           continue;
         }
 

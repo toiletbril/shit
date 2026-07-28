@@ -34,6 +34,52 @@ printf 'nested substitution traces=%s errors=%s parents=%s sites=%s\n' \
         grep -Fc 'echo ${UNSET_TRACE_POLICY:-$(no_such_nested_substitution_xyz)}')" \
     "$(printf '%s\n' "$out" | grep -c 'shit: 1:28: trace:')"
 
+check_expansion_trace()
+{
+    label=$1
+    site=$2
+    source=$3
+    out=$("$BIN" --no-diagnostics -c "$source" 2>&1)
+    printf '%s traces=%s errors=%s sites=%s\n' \
+        "$label" \
+        "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+        "$(printf '%s\n' "$out" | grep -c 'error:')" \
+        "$(printf '%s\n' "$out" | grep -c "shit: 1:$site: trace:")"
+}
+
+check_expansion_trace pattern 23 \
+    'value=x; echo ${value/$(bad_pattern_xyz)/x}'
+check_expansion_trace replacement 25 \
+    'value=x; echo ${value/x/$(bad_replacement_xyz)}'
+check_expansion_trace case-modification 23 \
+    'value=x; echo ${value^$(bad_case_xyz)}'
+check_expansion_trace array-modifier 23 \
+    'a[0]=x; echo ${a[0]/x/$(bad_array_modifier_xyz)}'
+check_expansion_trace positional-modifier 22 \
+    'set -- x; echo ${1/x/$(bad_positional_xyz)}'
+check_expansion_trace arithmetic 15 \
+    'echo $(( ${X:-$(bad_arithmetic_xyz)} ))'
+check_expansion_trace substring 23 \
+    'value=x; echo ${value:$(bad_substring_xyz)}'
+check_expansion_trace subscript 18 \
+    'a[0]=x; echo ${a[$(bad_subscript_xyz)]}'
+check_expansion_trace indirect 34 \
+    'pointer=target; echo ${!pointer:-$(bad_indirect_xyz)}'
+check_expansion_trace single-field 15 \
+    'echo "${FAST:-$(bad_fast_xyz)}"'
+check_expansion_trace positional-all 23 \
+    'set -- x; echo "${@/x/$(bad_positional_all_xyz)}"'
+check_expansion_trace array-all 23 \
+    'a=(x); echo "${a[@]/x/$(bad_array_all_xyz)}"'
+check_expansion_trace positional-default 20 \
+    'set --; echo "${@:-$(bad_positional_default_xyz)}"'
+check_expansion_trace array-default 21 \
+    'a=(); echo "${a[@]:-$(bad_array_default_xyz)}"'
+check_expansion_trace positional-slice 21 \
+    'set -- x; echo "${@:$(bad_positional_slice_xyz)}"'
+check_expansion_trace array-slice 21 \
+    'a=(x); echo "${a[@]:$(bad_array_slice_xyz)}"'
+
 out=$("$BIN" --no-diagnostics \
     -c 'echo ${ no_such_function_substitution_xyz; }' 2>&1)
 printf 'function substitution traces=%s errors=%s parents=%s sites=%s\n' \
@@ -42,6 +88,13 @@ printf 'function substitution traces=%s errors=%s parents=%s sites=%s\n' \
     "$(printf '%s\n' "$out" |
         grep -Fc 'echo ${ no_such_function_substitution_xyz; }')" \
     "$(printf '%s\n' "$out" | grep -c 'shit: 1:6: trace:')"
+
+out=$("$BIN" --no-diagnostics \
+    -c 'case X=$(no_such_case_copy_xyz) in *) :;; esac' 2>&1)
+printf 'case assignment copy traces=%s errors=%s sites=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')" \
+    "$(printf '%s\n' "$out" | grep -c 'shit: 1:8: trace:')"
 
 out=$("$BIN" --no-diagnostics -c 'echo ${X:-$(if)}' 2>&1)
 printf 'substitution parse traces=%s errors=%s sites=%s\n' \

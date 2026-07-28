@@ -483,10 +483,11 @@ fn EvalContext::retain_ast(Expression *ast) throws -> void
   m_retained_source_asts.push(ast);
 }
 
-fn EvalContext::expand_heredoc_body(StringView body) throws -> String
+fn EvalContext::expand_heredoc_body(
+    StringView body, const SourceLocation *source_location) throws -> String
 {
   LOG(Debug, "expanding a heredoc body of %zu bytes", body.length);
-  return expand_modifier_word(body, false);
+  return expand_modifier_word(body, false, false, source_location);
 }
 
 } // namespace shit

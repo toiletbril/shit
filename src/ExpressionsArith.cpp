@@ -104,7 +104,7 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   try {
     const SourceLocation body_base{source_location().position + 2, 0,
                                    source_location().filename};
-    value = cxt.evaluate_arithmetic(m_expression.view(), body_base);
+    value = cxt.evaluate_arithmetic(m_expression.view(), &body_base);
   } catch (const ErrorWithLocation &) {
     throw;
   } catch (const Error &e) {

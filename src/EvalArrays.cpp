@@ -551,8 +551,9 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
   return base;
 }
 
-fn EvalContext::apply_array_subscript(StringView name,
-                                      StringView subscript) throws -> String
+fn EvalContext::apply_array_subscript(
+    StringView name, StringView subscript,
+    const SourceLocation *source_location) throws -> String
 {
   if (name == "FUNCNAME" && bash_dynamic_variables_enabled()) [[unlikely]] {
     let const depth = funcname_frame_count();
@@ -573,7 +574,7 @@ fn EvalContext::apply_array_subscript(StringView name,
       }
       return out;
     }
-    let const index = evaluate_arithmetic(subscript);
+    let const index = evaluate_arithmetic(subscript, source_location);
     if (index >= 0 && static_cast<usize>(index) < depth) {
       return String{scratch_allocator(),
                     funcname_frame_at(static_cast<usize>(index))};
@@ -600,7 +601,7 @@ fn EvalContext::apply_array_subscript(StringView name,
       return out;
     }
 
-    let const index = evaluate_arithmetic(subscript);
+    let const index = evaluate_arithmetic(subscript, source_location);
     if (index >= 0 && static_cast<usize>(index) < depth) {
       return String{scratch_allocator(),
                     String::from(funcname_line_at(static_cast<usize>(index)),
@@ -630,7 +631,8 @@ fn EvalContext::apply_array_subscript(StringView name,
       }
       return out;
     }
-    const String key = expand_modifier_word(subscript);
+    const String key =
+        expand_modifier_word(subscript, true, true, source_location);
     return String{heap_allocator(), lookup_associative_element(name, key.view())
                                         .value_or(String{scratch_allocator()})
                                         .view()};
@@ -657,7 +659,7 @@ fn EvalContext::apply_array_subscript(StringView name,
     return out;
   }
 
-  i64 index = evaluate_arithmetic(subscript);
+  i64 index = evaluate_arithmetic(subscript, source_location);
   if (array == nullptr) {
     /* A scalar reads as a one-element array, so ${name[0]} is the value and any
        other index is empty. */

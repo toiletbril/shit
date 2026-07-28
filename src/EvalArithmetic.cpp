@@ -1091,7 +1091,7 @@ fn EvalContext::read_array_element_integer(StringView name,
 }
 
 fn EvalContext::evaluate_arithmetic(
-    StringView expression, Maybe<SourceLocation> expression_base) throws -> i64
+    StringView expression, const SourceLocation *expression_base) throws -> i64
 {
   LOG(All, "evaluating the arithmetic expression of %zu bytes",
       expression.length);
@@ -1102,14 +1102,15 @@ fn EvalContext::evaluate_arithmetic(
       !expression.find_character('`').has_value())
   {
     let parser = ArithmeticParser{this, expression, 0};
-    parser.precise_base = expression_base;
+    if (expression_base != nullptr) parser.precise_base = *expression_base;
     return parser.parse();
   }
 
   /* The expanded word owns the bytes the parser views, so it outlives the
      parser. */
   LOG(All, "expanding parameters inside the arithmetic before the parse");
-  let const expanded_word = expand_modifier_word(expression);
+  let const expanded_word =
+      expand_modifier_word(expression, true, true, expression_base);
   let parser = ArithmeticParser{this, expanded_word.view(), 0};
   return parser.parse();
 }
@@ -1117,21 +1118,24 @@ fn EvalContext::evaluate_arithmetic(
 fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
     -> i64
 {
+  let const source_location =
+      segment.get_source_location(m_current_location.filename);
   return evaluate_arithmetic_cached_clause(
       segment.text.view(), segment.cached_arith_tokens, segment.arith_tokenized,
-      segment.arith_simple);
+      segment.arith_simple,
+      source_location.has_value() ? &*source_location : nullptr);
 }
 
 fn EvalContext::evaluate_arithmetic_cached_clause(
     StringView expression, ArrayList<arith_token> &tokens, bool &is_tokenized,
-    bool &is_simple) throws -> i64
+    bool &is_simple, const SourceLocation *source_location) throws -> i64
 {
   /* A parameter or command substitution needs the full expansion path, only a
      substitution-free expression takes the cached token path. */
   if (expression.find_character('$').has_value() ||
       expression.find_character('`').has_value())
   {
-    return evaluate_arithmetic(expression);
+    return evaluate_arithmetic(expression, source_location);
   }
 
   if (!is_tokenized) {
@@ -1142,13 +1146,13 @@ fn EvalContext::evaluate_arithmetic_cached_clause(
       tokens.clear();
       is_tokenized = true;
       is_simple = false;
-      return evaluate_arithmetic(expression);
+      return evaluate_arithmetic(expression, source_location);
     }
     is_tokenized = true;
     is_simple = arith_tokens_are_simple(tokens);
   }
 
-  if (!is_simple) return evaluate_arithmetic(expression);
+  if (!is_simple) return evaluate_arithmetic(expression, source_location);
 
   ArithmeticTokenEvaluator evaluator{this, tokens};
   return evaluator.run();

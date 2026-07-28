@@ -118,7 +118,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
 
 fn EvalContext::capture_command_substitution(
     const String &source, Maybe<StringView> filename,
-    Maybe<SourceLocation> call_site) throws -> String
+    const SourceLocation *call_site) throws -> String
 {
   LOG(Debug, "capturing a command substitution of %zu bytes", source.count());
   if (Maybe<String> file = read_redirect_substitution(source.view());
@@ -139,7 +139,7 @@ fn EvalContext::capture_command_substitution(
   normalized_source.normalize_crlf_line_endings();
 
   let did_push_source_frame = false;
-  if (call_site.has_value())
+  if (call_site != nullptr)
     did_push_source_frame = push_substitution_source_frame(
         *call_site, StringView{"command substitution"});
   defer

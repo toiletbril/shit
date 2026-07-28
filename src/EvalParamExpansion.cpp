@@ -15,6 +15,23 @@ namespace shit {
 
 namespace {
 
+static fn source_location_for_subview(
+    const SourceLocation *source_location, StringView source, StringView part,
+    SourceLocation &storage, usize source_location_offset = 0) wontthrow
+    -> const SourceLocation *
+{
+  if (source_location == nullptr) return nullptr;
+  ASSERT(part.data >= source.data &&
+         part.data + part.length <= source.data + source.length);
+  let const part_offset = static_cast<usize>(part.data - source.data);
+  if (part_offset < source_location_offset) return nullptr;
+  let const mapped_offset = part_offset - source_location_offset;
+  ASSERT(mapped_offset <= source_location->length);
+  ASSERT(part.length <= source_location->length - mapped_offset);
+  storage = source_location->subspan(mapped_offset, part.length);
+  return &storage;
+}
+
 enum class trim_end
 {
   Prefix,
@@ -64,9 +81,11 @@ fn trim_matching(Allocator result_allocator, StringView value,
   return String{result_allocator, value};
 }
 
-static fn trim_value_with_modifier(
-    EvalContext &cxt, StringView value, StringView word, trim_end end,
-    bool longest, Maybe<SourceLocation> source_location = None) throws -> String
+static fn
+trim_value_with_modifier(EvalContext &cxt, StringView value, StringView word,
+                         trim_end end, bool longest,
+                         const SourceLocation *source_location = nullptr) throws
+    -> String
 {
   LOG(All, "trimming a value of %zu bytes with the pattern word '%.*s'",
       value.length, static_cast<int>(word.length), word.data);
@@ -81,7 +100,7 @@ static fn trim_value_with_modifier(
 
 fn EvalContext::expand_modifier_word(
     StringView word, bool remove_quotes, bool strip_escaped_literals,
-    Maybe<SourceLocation> source_location) throws -> String
+    const SourceLocation *source_location) throws -> String
 {
   /* The default, assign, alternate, error, and arithmetic forms never glob, so
      the mask is discarded and the pattern-only unescape stays off. */
@@ -92,7 +111,7 @@ fn EvalContext::expand_modifier_word(
 
 fn EvalContext::expand_modifier_word_masked(
     StringView word, Bitset &active_out, bool remove_quotes,
-    Maybe<SourceLocation> source_location) throws -> String
+    const SourceLocation *source_location) throws -> String
 {
   return expand_modifier_word_worker(word, active_out, remove_quotes, true,
                                      false, source_location);
@@ -101,7 +120,7 @@ fn EvalContext::expand_modifier_word_masked(
 fn EvalContext::expand_modifier_word_worker(
     StringView word, Bitset &active_out, bool remove_quotes,
     bool is_pattern_word, bool strip_escaped_literals,
-    Maybe<SourceLocation> source_location) throws -> String
+    const SourceLocation *source_location) throws -> String
 {
   LOG(All, "expanding a modifier word of %zu bytes", word.length);
   let out = String{scratch_allocator()};
@@ -181,10 +200,13 @@ fn EvalContext::expand_modifier_word_worker(
         if (word[j] == '`') break;
         inner += word[j];
       }
-      let call_site = Maybe<SourceLocation>{};
-      if (source_location.has_value())
+      let call_site = SourceLocation{};
+      const SourceLocation *call_site_pointer = nullptr;
+      if (source_location != nullptr) {
         call_site = source_location->subspan(i, j - i + (j < word.length));
-      do_emit_run(capture_command_substitution(inner, None, call_site),
+        call_site_pointer = &call_site;
+      }
+      do_emit_run(capture_command_substitution(inner, None, call_site_pointer),
                   !is_in_double_quote);
       i = j;
       continue;
@@ -317,10 +339,13 @@ fn EvalContext::expand_modifier_word_worker(
         inner += ch;
         j++;
       }
-      let inner_location = Maybe<SourceLocation>{};
-      if (source_location.has_value())
+      let inner_location = SourceLocation{};
+      const SourceLocation *inner_location_pointer = nullptr;
+      if (source_location != nullptr) {
         inner_location = source_location->subspan(i + 2, inner.count());
-      do_emit_run(apply_parameter_expansion(inner, inner_location),
+        inner_location_pointer = &inner_location;
+      }
+      do_emit_run(apply_parameter_expansion(inner, inner_location_pointer),
                   !is_in_double_quote);
       i = j;
     } else if (lexer::is_variable_name_start(next)) {
@@ -374,7 +399,13 @@ fn EvalContext::expand_modifier_word_worker(
         }
         inner += ch;
       }
-      do_emit_run(String::from(evaluate_arithmetic(inner), scratch_allocator()),
+      let inner_location = SourceLocation{};
+      let const inner_source = word.substring_of_length(i + 3, inner.count());
+      do_emit_run(String::from(evaluate_arithmetic(
+                                   inner, source_location_for_subview(
+                                              source_location, word,
+                                              inner_source, inner_location)),
+                               scratch_allocator()),
                   false);
       i = j - 1;
     } else if (next == '(') {
@@ -410,10 +441,13 @@ fn EvalContext::expand_modifier_word_worker(
         }
         inner += ch;
       }
-      let call_site = Maybe<SourceLocation>{};
-      if (source_location.has_value())
+      let call_site = SourceLocation{};
+      const SourceLocation *call_site_pointer = nullptr;
+      if (source_location != nullptr) {
         call_site = source_location->subspan(i, j - i + (j < word.length));
-      do_emit_run(capture_command_substitution(inner, None, call_site),
+        call_site_pointer = &call_site;
+      }
+      do_emit_run(capture_command_substitution(inner, None, call_site_pointer),
                   !is_in_double_quote);
       i = j;
     } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
@@ -433,7 +467,8 @@ fn EvalContext::expand_modifier_word_worker(
 }
 
 hot fn EvalContext::apply_parameter_expansion(
-    StringView spec, Maybe<SourceLocation> source_location) throws -> String
+    StringView spec, const SourceLocation *source_location,
+    usize source_location_offset) throws -> String
 {
   LOG(All, "applying the parameter expansion '${%.*s}'",
       static_cast<int>(spec.length), spec.data);
@@ -444,15 +479,14 @@ hot fn EvalContext::apply_parameter_expansion(
   defer { leave_parameter_expansion(); };
 
   let const do_source_location_for =
-      [&](StringView part) -> Maybe<SourceLocation> {
-    if (!source_location.has_value()) return None;
-    ASSERT(part.data >= spec.data &&
-           part.data + part.length <= spec.data + spec.length);
-    return source_location->subspan(static_cast<usize>(part.data - spec.data),
-                                    part.length);
+      [&](StringView part, SourceLocation &storage) -> const SourceLocation * {
+    return source_location_for_subview(source_location, spec, part, storage,
+                                       source_location_offset);
   };
   let const do_expand_modifier_word = [&](StringView word) throws -> String {
-    return expand_modifier_word(word, true, true, do_source_location_for(word));
+    let word_location = SourceLocation{};
+    return expand_modifier_word(word, true, true,
+                                do_source_location_for(word, word_location));
   };
 
   if (spec.is_empty()) return String{scratch_allocator()};
@@ -475,13 +509,19 @@ hot fn EvalContext::apply_parameter_expansion(
     {
       let const name = body.substring_of_length(0, name_end);
       let const target = get_variable_value(name);
+      let const target_name = target.has_value() ? target->view() : name;
+      let const suffix = body.substring(name_end);
       let rewritten = String{scratch_allocator()};
-      rewritten.reserve(body.length + name.length);
+      rewritten.reserve(target_name.length + suffix.length);
       /* An unset indirection name stands in for the target so the modifier sees
          the unset state, a fatal error would be harsher than bash. */
-      rewritten.append(target.has_value() ? StringView{target->view()} : name);
-      rewritten.append(body.substring(name_end));
-      return apply_parameter_expansion(rewritten.view());
+      rewritten.append(target_name);
+      rewritten.append(suffix);
+      let suffix_location = SourceLocation{};
+      let const *suffix_location_pointer =
+          do_source_location_for(suffix, suffix_location);
+      return apply_parameter_expansion(
+          rewritten.view(), suffix_location_pointer, target_name.length);
     }
     return apply_indirect_or_name_listing(body);
   }
@@ -515,8 +555,13 @@ hot fn EvalContext::apply_parameter_expansion(
         return String::from(get_variable_value(array_name).has_value() ? 1 : 0,
                             scratch_allocator());
       }
-      return String::from(apply_array_subscript(array_name, subscript).length(),
-                          scratch_allocator());
+      let subscript_location = SourceLocation{};
+      return String::from(
+          apply_array_subscript(
+              array_name, subscript,
+              do_source_location_for(subscript, subscript_location))
+              .length(),
+          scratch_allocator());
     }
 
     if (let const *stored = lookup_shell_variable(name); stored != nullptr)
@@ -549,18 +594,27 @@ hot fn EvalContext::apply_parameter_expansion(
   {
     if (let const close = rest.find_character(']'); close.has_value()) {
       const StringView subscript = rest.substring_of_length(1, *close - 1);
+      let subscript_location = SourceLocation{};
+      let const *subscript_location_pointer =
+          do_source_location_for(subscript, subscript_location);
       if (*close + 1 == rest.length)
-        return apply_array_subscript(name, subscript);
+        return apply_array_subscript(name, subscript,
+                                     subscript_location_pointer);
       /* The / # % ^ , modifiers after the ] modify the one element, a different
          modifier such as :- falls through to the general path. */
       const StringView modifier = rest.substring(*close + 1);
+      let modifier_location = SourceLocation{};
+      let const *modifier_location_pointer =
+          do_source_location_for(modifier, modifier_location);
       const char modifier_op = modifier.is_empty() ? '\0' : modifier[0];
       if (subscript != "@" && subscript != "*" &&
           (modifier_op == '/' || modifier_op == '#' || modifier_op == '%' ||
            modifier_op == '^' || modifier_op == ','))
       {
         return apply_value_modifier(
-            apply_array_subscript(name, subscript).view(), modifier);
+            apply_array_subscript(name, subscript, subscript_location_pointer)
+                .view(),
+            modifier, modifier_location_pointer);
       }
       if (subscript != "@" && subscript != "*" && !modifier.is_empty()) {
         let const is_colon = modifier_op == ':';
@@ -568,15 +622,20 @@ hot fn EvalContext::apply_parameter_expansion(
             is_colon && modifier.length > 1 ? modifier[1] : modifier_op;
         let const is_test_form = is_colon_modifier_operator(after);
         if (is_colon && !is_test_form) {
+          let const substring_body = modifier.substring(1);
+          let substring_location = SourceLocation{};
           return apply_substring_to_value(
-              apply_array_subscript(name, subscript).view(),
-              modifier.substring(1));
+              apply_array_subscript(name, subscript, subscript_location_pointer)
+                  .view(),
+              substring_body,
+              do_source_location_for(substring_body, substring_location));
         }
         if (is_test_form) {
           let const element_is_set = array_element_is_set(name, subscript);
-          let const value = element_is_set
-                                ? apply_array_subscript(name, subscript)
-                                : String{scratch_allocator()};
+          let const value =
+              element_is_set ? apply_array_subscript(name, subscript,
+                                                     subscript_location_pointer)
+                             : String{scratch_allocator()};
           let const treat_as_unset =
               is_colon ? value.is_empty() : !element_is_set;
           let const word = modifier.substring(is_colon ? 2 : 1);
@@ -625,18 +684,26 @@ hot fn EvalContext::apply_parameter_expansion(
     const char after_colon = rest[op_index];
     if (!is_colon_modifier_operator(after_colon) && name != "@" && name != "*")
     {
-      return apply_substring_expansion(name, rest.substring(1));
+      let const substring_body = rest.substring(1);
+      let substring_location = SourceLocation{};
+      return apply_substring_expansion(
+          name, substring_body,
+          do_source_location_for(substring_body, substring_location));
     }
   }
 
   if (!is_colon_form && rest[0] == '/' && name != "@" && name != "*") {
-    return apply_pattern_replacement(name, rest);
+    let rest_location = SourceLocation{};
+    return apply_pattern_replacement(
+        name, rest, do_source_location_for(rest, rest_location));
   }
 
   if (!is_colon_form && (rest[0] == '^' || rest[0] == ',' || rest[0] == '~') &&
       name != "@" && name != "*")
   {
-    return apply_case_modification(name, rest);
+    let rest_location = SourceLocation{};
+    return apply_case_modification(name, rest,
+                                   do_source_location_for(rest, rest_location));
   }
 
   if (!is_colon_form && rest[0] == '@' && rest.length >= 2 &&
@@ -693,15 +760,19 @@ hot fn EvalContext::apply_parameter_expansion(
     return steal(*current);
 
   case '#': {
+    let word_location = SourceLocation{};
     return trim_value_with_modifier(
         *this, current.value_or(String{scratch_allocator()}).view(), word,
-        trim_end::Prefix, is_doubled, do_source_location_for(word));
+        trim_end::Prefix, is_doubled,
+        do_source_location_for(word, word_location));
   }
 
   case '%': {
+    let word_location = SourceLocation{};
     return trim_value_with_modifier(
         *this, current.value_or(String{scratch_allocator()}).view(), word,
-        trim_end::Suffix, is_doubled, do_source_location_for(word));
+        trim_end::Suffix, is_doubled,
+        do_source_location_for(word, word_location));
   }
 
   default: return expand_variable(name);
@@ -743,16 +814,19 @@ fn EvalContext::get_variable_value_checked(StringView name) const throws
   return current;
 }
 
-fn EvalContext::apply_substring_expansion(StringView name,
-                                          StringView body) throws -> String
+fn EvalContext::apply_substring_expansion(
+    StringView name, StringView body,
+    const SourceLocation *source_location) throws -> String
 {
   let const current = get_variable_value_checked(name);
   return apply_substring_to_value(
-      current.value_or(String{scratch_allocator()}).view(), body);
+      current.value_or(String{scratch_allocator()}).view(), body,
+      source_location);
 }
 
-fn EvalContext::apply_substring_to_value(StringView value,
-                                         StringView body) throws -> String
+fn EvalContext::apply_substring_to_value(
+    StringView value, StringView body,
+    const SourceLocation *source_location) throws -> String
 {
   LOG(All, "taking the substring '%.*s' of a value of %zu bytes",
       static_cast<int>(body.length), body.data, value.length);
@@ -760,8 +834,13 @@ fn EvalContext::apply_substring_to_value(StringView value,
 
   let const separator = find_substring_length_separator(body);
   let const offset_text = body.substring_of_length(0, separator);
+  let offset_location = SourceLocation{};
   const i64 offset =
-      offset_text.is_empty() ? 0 : evaluate_arithmetic(offset_text);
+      offset_text.is_empty()
+          ? 0
+          : evaluate_arithmetic(offset_text, source_location_for_subview(
+                                                 source_location, body,
+                                                 offset_text, offset_location));
 
   i64 start = offset < 0 ? value_length + offset : offset;
   if (start < 0) return String{scratch_allocator()};
@@ -770,7 +849,13 @@ fn EvalContext::apply_substring_to_value(StringView value,
   i64 end = value_length;
   if (separator < body.length) {
     let const length_text = body.substring(separator + 1);
-    i64 length = length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
+    let length_location = SourceLocation{};
+    i64 length = length_text.is_empty()
+                     ? 0
+                     : evaluate_arithmetic(length_text,
+                                           source_location_for_subview(
+                                               source_location, body,
+                                               length_text, length_location));
     if (length < 0) {
       end = value_length + length;
     } else {
@@ -833,12 +918,13 @@ static fn longest_pattern_match_at(StringView pattern,
   return None;
 }
 
-fn EvalContext::apply_pattern_replacement(StringView name,
-                                          StringView spec) throws -> String
+fn EvalContext::apply_pattern_replacement(
+    StringView name, StringView spec,
+    const SourceLocation *source_location) throws -> String
 {
   let const current = get_variable_value_checked(name);
   return pattern_replace_value(current.value_or(String{scratch_allocator()}),
-                               spec);
+                               spec, source_location);
 }
 
 /* & reads as the matched span, \& is a literal &, and a backslash before any
@@ -858,8 +944,9 @@ static fn append_pattern_replacement(String &out, StringView replacement,
   }
 }
 
-fn EvalContext::pattern_replace_value(const String &value,
-                                      StringView spec) throws -> String
+fn EvalContext::pattern_replace_value(
+    const String &value, StringView spec,
+    const SourceLocation *source_location) throws -> String
 {
   LOG(All, "applying the pattern replacement '%.*s' to a value of %zu bytes",
       static_cast<int>(spec.length), spec.data, value.count());
@@ -879,13 +966,21 @@ fn EvalContext::pattern_replace_value(const String &value,
   }
 
   const usize separator = find_replacement_separator(remainder);
+  let const pattern_word = remainder.substring_of_length(0, separator);
+  let pattern_location = SourceLocation{};
   let pattern_active = Bitset{scratch_allocator()};
   let const pattern = expand_modifier_word_masked(
-      remainder.substring_of_length(0, separator), pattern_active);
+      pattern_word, pattern_active, true,
+      source_location_for_subview(source_location, spec, pattern_word,
+                                  pattern_location));
+  let replacement_location = SourceLocation{};
   let const replacement =
       separator < remainder.length
-          ? expand_modifier_word(remainder.substring(separator + 1), true,
-                                 false)
+          ? expand_modifier_word(
+                remainder.substring(separator + 1), true, false,
+                source_location_for_subview(source_location, spec,
+                                            remainder.substring(separator + 1),
+                                            replacement_location))
           : String{heap_allocator()};
 
   /* An empty unanchored pattern matches nothing in bash, so the value is
@@ -1057,17 +1152,19 @@ fn EvalContext::apply_parameter_transform_to_value(StringView text, char op,
   }
 }
 
-fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
-    -> String
+fn EvalContext::apply_case_modification(
+    StringView name, StringView spec,
+    const SourceLocation *source_location) throws -> String
 {
   let const current = get_variable_value_checked(name);
   return apply_case_modification_to_value(
-      current.value_or(String{scratch_allocator()}).view(), spec);
+      current.value_or(String{scratch_allocator()}).view(), spec,
+      source_location);
 }
 
-fn EvalContext::apply_case_modification_to_value(StringView value,
-                                                 StringView spec) throws
-    -> String
+fn EvalContext::apply_case_modification_to_value(
+    StringView value, StringView spec,
+    const SourceLocation *source_location) throws -> String
 {
   LOG(All, "applying the case modification '%.*s' to a value of %zu bytes",
       static_cast<int>(spec.length), spec.data, value.length);
@@ -1081,7 +1178,11 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
     pattern = String{scratch_allocator(), "?"};
     pattern_active.push(true);
   } else {
-    pattern = expand_modifier_word_masked(pattern_word, pattern_active);
+    let pattern_location = SourceLocation{};
+    pattern = expand_modifier_word_masked(
+        pattern_word, pattern_active, true,
+        source_location_for_subview(source_location, spec, pattern_word,
+                                    pattern_location));
   }
 
   let const pattern_matches_any = pattern_word.is_empty();
@@ -1112,21 +1213,26 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
   return out;
 }
 
-fn EvalContext::apply_value_modifier(StringView value,
-                                     StringView modifier) throws -> String
+fn EvalContext::apply_value_modifier(
+    StringView value, StringView modifier,
+    const SourceLocation *source_location) throws -> String
 {
   if (modifier.is_empty()) return String{scratch_allocator(), value};
   const char op = modifier[0];
   if (op == '/')
-    return pattern_replace_value(String{scratch_allocator(), value}, modifier);
+    return pattern_replace_value(String{scratch_allocator(), value}, modifier,
+                                 source_location);
   if (op == '^' || op == ',')
-    return apply_case_modification_to_value(value, modifier);
+    return apply_case_modification_to_value(value, modifier, source_location);
   if (op == '#' || op == '%') {
     const bool is_doubled = modifier.length > 1 && modifier[1] == op;
     const StringView pattern_word = modifier.substring(is_doubled ? 2 : 1);
+    let pattern_location = SourceLocation{};
     return trim_value_with_modifier(
         *this, value, pattern_word,
-        op == '#' ? trim_end::Prefix : trim_end::Suffix, is_doubled);
+        op == '#' ? trim_end::Prefix : trim_end::Suffix, is_doubled,
+        source_location_for_subview(source_location, modifier, pattern_word,
+                                    pattern_location));
   }
   return String{scratch_allocator(), value};
 }

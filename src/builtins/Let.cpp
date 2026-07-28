@@ -56,7 +56,7 @@ fn Let::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     try {
       last_value =
-          cxt.evaluate_arithmetic(ec.args()[i].view(), expression_base);
+          cxt.evaluate_arithmetic(ec.args()[i].view(), &expression_base);
     } catch (const ErrorWithLocation &error) {
       let const message = builtin_error_message(ec.program(), error.message());
       if (cxt.is_bash_compatible()) {

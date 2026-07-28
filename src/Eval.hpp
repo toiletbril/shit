@@ -1415,7 +1415,7 @@ public:
   fn expand_word_for_assignment(const Word &word) throws -> String;
 
   fn evaluate_arithmetic(StringView expression,
-                         Maybe<SourceLocation> expression_base = {}) throws
+                         const SourceLocation *expression_base = nullptr) throws
       -> i64;
 
   /* Evaluate an expression for the calc builtin and return its decimal text,
@@ -1433,10 +1433,10 @@ public:
      the caller-owned token store and re-evaluates from it. A complex clause or
      a lexing failure falls back to the char parser, and a clause holding a
      substitution skips the cache. */
-  fn evaluate_arithmetic_cached_clause(StringView expression,
-                                       ArrayList<arith_token> &tokens,
-                                       bool &is_tokenized,
-                                       bool &is_simple) throws -> i64;
+  fn evaluate_arithmetic_cached_clause(
+      StringView expression, ArrayList<arith_token> &tokens, bool &is_tokenized,
+      bool &is_simple, const SourceLocation *source_location = nullptr) throws
+      -> i64;
 
   /* Evaluate a [[ ]] conditional element list and report whether it is true.
      The operands expand without field splitting, == and != glob match their
@@ -1454,10 +1454,9 @@ public:
      newlines stripped. The inner command runs in-process with state
      snapshotted. The filename, when given, backs the source locations the
      parsed AST carries, so its bytes must outlive the parse arena. */
-  fn capture_command_substitution(const String &source,
-                                  Maybe<StringView> filename = None,
-                                  Maybe<SourceLocation> call_site = None) throws
-      -> String;
+  fn capture_command_substitution(
+      const String &source, Maybe<StringView> filename = None,
+      const SourceLocation *call_site = nullptr) throws -> String;
 
   /* Same capture, but the segment caches its parsed inner command so a $(...)
      in a loop body is lexed and parsed once and re-evaluated thereafter. */
@@ -1534,25 +1533,27 @@ public:
 
   fn retain_ast(Expression *ast) throws -> void;
 
-  fn expand_heredoc_body(StringView body) throws -> String;
-
-  fn expand_modifier_word(StringView word, bool remove_quotes = true,
-                          bool strip_escaped_literals = true,
-                          Maybe<SourceLocation> source_location = None) throws
+  fn expand_heredoc_body(StringView body,
+                         const SourceLocation *source_location = nullptr) throws
       -> String;
+
+  fn expand_modifier_word(
+      StringView word, bool remove_quotes = true,
+      bool strip_escaped_literals = true,
+      const SourceLocation *source_location = nullptr) throws -> String;
 
   /* active_out marks which output bytes may act as glob metacharacters, so
      ${x#pat} and ${x%pat} match literally. */
   fn expand_modifier_word_masked(
       StringView word, Bitset &active_out, bool remove_quotes = true,
-      Maybe<SourceLocation> source_location = None) throws -> String;
+      const SourceLocation *source_location = nullptr) throws -> String;
 
   /* is_pattern_word makes a backslash quote the following byte, the # and %
      rule. */
   fn expand_modifier_word_worker(StringView word, Bitset &active_out,
                                  bool remove_quotes, bool is_pattern_word,
                                  bool strip_escaped_literals,
-                                 Maybe<SourceLocation> source_location) throws
+                                 const SourceLocation *source_location) throws
       -> String;
 
   pure fn should_echo() const wontthrow -> bool;
@@ -1876,49 +1877,59 @@ protected:
      the integer mark, shared by the scope pop and the unset peel. */
   fn restore_local_binding(local_binding &binding) throws -> void;
 
-  fn apply_parameter_expansion(
-      StringView spec, Maybe<SourceLocation> source_location = None) throws
+  fn apply_parameter_expansion(StringView spec,
+                               const SourceLocation *source_location = nullptr,
+                               usize source_location_offset = 0) throws
       -> String;
 
   /* Expand the bash substring form ${name:offset:length}, an arithmetic offset
      and an optional arithmetic length, each counting from the end when
      negative. */
-  fn apply_substring_expansion(StringView name, StringView body) throws
-      -> String;
-  fn apply_substring_to_value(StringView value, StringView body) throws
-      -> String;
+  fn apply_substring_expansion(
+      StringView name, StringView body,
+      const SourceLocation *source_location = nullptr) throws -> String;
+  fn apply_substring_to_value(
+      StringView value, StringView body,
+      const SourceLocation *source_location = nullptr) throws -> String;
 
   /* Expand the bash pattern-replacement forms ${name/pat/rep},
      ${name//pat/rep}, ${name/#pat/rep}, and ${name/%pat/rep}. A leading second
      slash replaces every match while # and % anchor the pattern to the start or
      the end. */
-  fn apply_pattern_replacement(StringView name, StringView spec) throws
-      -> String;
+  fn apply_pattern_replacement(
+      StringView name, StringView spec,
+      const SourceLocation *source_location = nullptr) throws -> String;
 
   /* The pattern-replacement core that works on an already-resolved value, so an
      array element ${a[i]/pat/rep} and ${a[@]/pat/rep} reuse it. */
-  fn pattern_replace_value(const String &value, StringView spec) throws
-      -> String;
+  fn pattern_replace_value(
+      const String &value, StringView spec,
+      const SourceLocation *source_location = nullptr) throws -> String;
 
   /* Expand the bash case-modification forms ${name^}, ${name^^}, ${name,}, and
      ${name,,}. A single operator touches the first character, a doubled one
      every character. */
-  fn apply_case_modification(StringView name, StringView spec) throws -> String;
+  fn apply_case_modification(
+      StringView name, StringView spec,
+      const SourceLocation *source_location = nullptr) throws -> String;
 
   fn apply_parameter_transform(StringView name, char op) throws -> String;
   fn apply_parameter_transform_to_value(StringView value, char op,
                                         StringView name) throws -> String;
-  fn apply_case_modification_to_value(StringView value, StringView spec) throws
-      -> String;
+  fn apply_case_modification_to_value(
+      StringView value, StringView spec,
+      const SourceLocation *source_location = nullptr) throws -> String;
   /* Apply one trailing value-transform modifier, the / replacement, the # and %
      trims, or the ^ and , case changes, to a single value. */
-  fn apply_value_modifier(StringView value, StringView modifier) throws
-      -> String;
+  fn apply_value_modifier(
+      StringView value, StringView modifier,
+      const SourceLocation *source_location = nullptr) throws -> String;
 
   /* Expand the bash array element reference ${name[subscript]}. A subscript of
      @ or * yields every element, an arithmetic one a single element. */
-  fn apply_array_subscript(StringView name, StringView subscript) throws
-      -> String;
+  fn apply_array_subscript(
+      StringView name, StringView subscript,
+      const SourceLocation *source_location = nullptr) throws -> String;
   /* One past the highest set index of an array, so a negative subscript counts
      back from the true end. */
   fn array_negative_index_base(StringView name) const throws -> i64;

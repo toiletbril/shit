@@ -232,6 +232,19 @@ hot fn EvalContext::expand_word(const Word &word) throws
           break;
         }
       }
+      let const segment_source_location =
+          segment.get_source_location(m_current_location.filename);
+      let const do_source_location_for =
+          [&](StringView part,
+              SourceLocation &storage) -> const SourceLocation * {
+        if (!segment_source_location.has_value()) return nullptr;
+        ASSERT(part.data >= segment_text.data &&
+               part.data + part.length <=
+                   segment_text.data + segment_text.length);
+        storage = segment_source_location->subspan(
+            static_cast<usize>(part.data - segment_text.data), part.length);
+        return &storage;
+      };
       let const is_positional_word =
           !segment_text.is_empty() &&
           (segment_text[0] == '@' || segment_text[0] == '*');
@@ -269,7 +282,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
                              array_word->is_star);
             return;
           }
-          let const expanded = expand_modifier_word(word);
+          let word_location = SourceLocation{};
+          let const expanded = expand_modifier_word(
+              word, true, true, do_source_location_for(word, word_location));
           if (segment.is_in_double_quotes)
             do_append_run(expanded.view(), false);
           else
@@ -297,7 +312,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
             if (word.is_empty())
               throw_script_fatal("Unable to expand the positional parameters "
                                  "because they are not set or are empty");
-            throw_script_fatal(String{expand_modifier_word(word)});
+            let word_location = SourceLocation{};
+            throw_script_fatal(String{expand_modifier_word(
+                word, true, true,
+                do_source_location_for(word, word_location))});
           }
           do_emit_positional();
           break;
@@ -323,16 +341,26 @@ hot fn EvalContext::expand_word(const Word &word) throws
 
         const usize sep = find_substring_length_separator(slice);
         const StringView offset_text = slice.substring_of_length(0, sep);
+        let offset_location = SourceLocation{};
         const i64 offset =
-            offset_text.is_empty() ? 0 : evaluate_arithmetic(offset_text);
+            offset_text.is_empty()
+                ? 0
+                : evaluate_arithmetic(
+                      offset_text,
+                      do_source_location_for(offset_text, offset_location));
         i64 start = offset < 0 ? total + offset : offset;
         if (start < 0) start = 0;
         if (start > total) start = total;
         i64 end = total;
         if (sep < slice.length) {
           const StringView length_text = slice.substring(sep + 1);
+          let length_location = SourceLocation{};
           i64 length =
-              length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
+              length_text.is_empty()
+                  ? 0
+                  : evaluate_arithmetic(
+                        length_text,
+                        do_source_location_for(length_text, length_location));
           if (length < 0)
             throw Error{"Unable to take the substring because the length names "
                         "a point before the offset"};
@@ -381,11 +409,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
       {
         let const is_star = segment_text[0] == '*';
         let const modifier = segment_text.substring(1);
+        let modifier_location = SourceLocation{};
+        let const *modifier_location_pointer =
+            do_source_location_for(modifier, modifier_location);
         let do_transform = [&](StringView value) -> String {
           if (positional_at_op != '\0')
             return apply_parameter_transform_to_value(value, positional_at_op,
                                                       StringView{});
-          return apply_value_modifier(value, modifier);
+          return apply_value_modifier(value, modifier,
+                                      modifier_location_pointer);
         };
         if (segment.is_in_double_quotes && is_star) {
           let const ifs = m_field_separators.view();
@@ -433,16 +465,26 @@ hot fn EvalContext::expand_word(const Word &word) throws
 
           const usize sep = find_substring_length_separator(slice);
           const StringView offset_text = slice.substring_of_length(0, sep);
+          let offset_location = SourceLocation{};
           const i64 offset =
-              offset_text.is_empty() ? 0 : evaluate_arithmetic(offset_text);
+              offset_text.is_empty()
+                  ? 0
+                  : evaluate_arithmetic(
+                        offset_text,
+                        do_source_location_for(offset_text, offset_location));
           i64 start = offset < 0 ? total + offset : offset;
           if (start < 0) start = 0;
           if (start > total) start = total;
           i64 end = total;
           if (sep < slice.length) {
             const StringView length_text = slice.substring(sep + 1);
+            let length_location = SourceLocation{};
             i64 length =
-                length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
+                length_text.is_empty()
+                    ? 0
+                    : evaluate_arithmetic(
+                          length_text,
+                          do_source_location_for(length_text, length_location));
             if (length < 0)
               throw Error{
                   "Unable to take the substring because the length names "
@@ -499,13 +541,17 @@ hot fn EvalContext::expand_word(const Word &word) throws
         {
           let const array_name = segment_text.substring_of_length(0, name_end);
           let const modifier = segment_text.substring(name_end + 3);
+          let modifier_location = SourceLocation{};
+          let const *modifier_location_pointer =
+              do_source_location_for(modifier, modifier_location);
           let const is_star = segment_text[name_end + 1] == '*';
           let const elements = collect_array_elements(array_name);
           let do_transform = [&](StringView element_value) -> String {
             if (is_mapped_at_op)
               return apply_parameter_transform_to_value(
                   element_value, at_transform_op, array_name);
-            return apply_value_modifier(element_value, modifier);
+            return apply_value_modifier(element_value, modifier,
+                                        modifier_location_pointer);
           };
           if (segment.is_in_double_quotes && is_star) {
             let const ifs = m_field_separators.view();
@@ -577,7 +623,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
                                array_word->is_star);
               break;
             }
-            let const value = expand_modifier_word(modifier_word);
+            let modifier_word_location = SourceLocation{};
+            let const value = expand_modifier_word(
+                modifier_word, true, true,
+                do_source_location_for(modifier_word, modifier_word_location));
             if (segment.is_in_double_quotes)
               do_append_run(value, false);
             else
@@ -635,9 +684,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
             break;
           }
       }
+      let const source_location =
+          segment.get_source_location(m_current_location.filename);
       let const value = apply_parameter_expansion(
           segment.text.view(),
-          segment.get_source_location(m_current_location.filename));
+          source_location.has_value() ? &*source_location : nullptr);
       if (segment.is_in_double_quotes)
         do_append_run(value, false);
       else
@@ -721,11 +772,13 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
   for (const WordSegment &segment : *segments) {
     let const segment_text = segment.text.view();
     switch (segment.kind) {
-    case WordSegment::Kind::VariableReference:
+    case WordSegment::Kind::VariableReference: {
+      let const source_location =
+          segment.get_source_location(m_current_location.filename);
       result += apply_parameter_expansion(
           segment_text,
-          segment.get_source_location(m_current_location.filename));
-      break;
+          source_location.has_value() ? &*source_location : nullptr);
+    } break;
     case WordSegment::Kind::CommandSubstitution:
       result += capture_command_substitution(segment);
       break;
@@ -779,9 +832,11 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       do_emit_run(segment_text, true);
       break;
     case WordSegment::Kind::VariableReference: {
+      let const source_location =
+          segment.get_source_location(m_current_location.filename);
       let const value = apply_parameter_expansion(
           segment_text,
-          segment.get_source_location(m_current_location.filename));
+          source_location.has_value() ? &*source_location : nullptr);
       do_emit_run(value.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::CommandSubstitution: {

@@ -698,7 +698,11 @@ hot flatten fn EvalContext::process_args(
                     value += stored->view();
                     break;
                   }
-                value += apply_parameter_expansion(spec);
+                let const source_location =
+                    segment.get_source_location(m_current_location.filename);
+                value += apply_parameter_expansion(
+                    spec,
+                    source_location.has_value() ? &*source_location : nullptr);
               } break;
               case WordSegment::Kind::ArithmeticExpansion: {
                 let const number = segment.has_folded_arithmetic_result
