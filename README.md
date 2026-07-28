@@ -112,9 +112,51 @@ libc.
 `staging` is the development branch. It may be broken at any time. `master` is
 more stable and should usually pass all tests.
 
-You need Clang 18 or later and GNU Make. Building the executable needs the
-coreutils `rm` and `mkdir`. Running the tests needs `cat`, `diff`, and `printf`.
-Checking the code needs `clang-format` and `clang-tidy`, ideally 18 or newer.
+## Prerequisites
+
+A native build needs the following tools.
+
+* Git checks out the `toiletline` submodule.
+* GNU Make drives the build through a POSIX-compatible recipe shell.
+* Clang 18 or later provides C++23 support. The libc development files and the
+  platform headers must match the target. Linux also needs its kernel headers.
+* The default debug build needs the AddressSanitizer and
+  UndefinedBehaviorSanitizer runtimes from `compiler-rt`.
+* Standard host utilities provide `mkdir`, `rm`, `cp`, and `printf`. LLD and
+  mold are optional. The build can use the system linker.
+
+The complete POSIX test suite also needs the following tools.
+
+* Bash runs the harness, and `/bin/sh` runs the compatibility fixtures.
+* Coreutils and the usual Unix text tools provide `cat`, `cmp`, `diff`, `find`,
+  `grep`, `head`, `sed`, and `strings`. Interactive tests also need `script` and
+  `stty`. Process supervision needs `setsid` or Perl.
+* Python 3 runs the terminal diagnostics. These checks are skipped when it is
+  unavailable.
+* Dash enables the POSIX comparison. Bash 5.3 or later enables the Bash and
+  mimicry comparisons. An older or missing reference shell is reported as a
+  skipped comparison.
+* The completion and highlighting suites need the default `MODE=dbg` binary.
+  Their test drivers are compiled out of release builds.
+
+A complete Alpine setup can be installed with the following package set.
+
+```bash
+apk add --no-cache \
+  git git-doc make build-base musl-dev linux-headers clang llvm lld \
+  compiler-rt bash dash zsh yash busybox coreutils mandoc python3
+```
+
+The benchmark needs Bash, Dash, and Python 3. Zsh, Yash, and BusyBox ash add
+optional comparison rows. Coverage reports need `llvm-profdata` and `llvm-cov`
+from the matching LLVM installation. Documentation checks use `mandoc`.
+Formatting and static checks use `clang-format` and `clang-tidy` from Clang 18
+or later.
+
+Cross-compilation needs its matching toolchain. Zig builds the Zig targets and
+cross-compiles release binaries to Linux. MinGW-w64 targets Windows, osxcross
+with a macOS SDK targets Darwin arm64, and `cosmoc++` builds the Cosmopolitan
+modes.
 
 The `MODE` variable controls build type:
 * `rel` is an optimized build.
