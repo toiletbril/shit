@@ -238,12 +238,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
           [&](StringView part,
               SourceLocation &storage) -> const SourceLocation * {
         if (!segment_source_location.has_value()) return nullptr;
-        ASSERT(part.data >= segment_text.data &&
-               part.data + part.length <=
-                   segment_text.data + segment_text.length);
-        storage = segment_source_location->subspan(
-            static_cast<usize>(part.data - segment_text.data), part.length);
-        return &storage;
+        return segment_source_location->subspan_for_view(segment_text, part,
+                                                         storage);
       };
       let const is_positional_word =
           !segment_text.is_empty() &&

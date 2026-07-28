@@ -21,15 +21,8 @@ static fn source_location_for_subview(
     -> const SourceLocation *
 {
   if (source_location == nullptr) return nullptr;
-  ASSERT(part.data >= source.data &&
-         part.data + part.length <= source.data + source.length);
-  let const part_offset = static_cast<usize>(part.data - source.data);
-  if (part_offset < source_location_offset) return nullptr;
-  let const mapped_offset = part_offset - source_location_offset;
-  ASSERT(mapped_offset <= source_location->length);
-  ASSERT(part.length <= source_location->length - mapped_offset);
-  storage = source_location->subspan(mapped_offset, part.length);
-  return &storage;
+  return source_location->subspan_for_view(source, part, storage,
+                                           source_location_offset);
 }
 
 enum class trim_end
@@ -102,10 +95,7 @@ fn EvalContext::expand_modifier_word(
     StringView word, bool remove_quotes, bool strip_escaped_literals,
     const SourceLocation *source_location) throws -> String
 {
-  /* The default, assign, alternate, error, and arithmetic forms never glob, so
-     the mask is discarded and the pattern-only unescape stays off. */
-  let discarded_mask = Bitset{scratch_allocator()};
-  return expand_modifier_word_worker(word, discarded_mask, remove_quotes, false,
+  return expand_modifier_word_worker(word, nullptr, remove_quotes, false,
                                      strip_escaped_literals, source_location);
 }
 
@@ -113,12 +103,12 @@ fn EvalContext::expand_modifier_word_masked(
     StringView word, Bitset &active_out, bool remove_quotes,
     const SourceLocation *source_location) throws -> String
 {
-  return expand_modifier_word_worker(word, active_out, remove_quotes, true,
+  return expand_modifier_word_worker(word, &active_out, remove_quotes, true,
                                      false, source_location);
 }
 
 fn EvalContext::expand_modifier_word_worker(
-    StringView word, Bitset &active_out, bool remove_quotes,
+    StringView word, Bitset *active_out, bool remove_quotes,
     bool is_pattern_word, bool strip_escaped_literals,
     const SourceLocation *source_location) throws -> String
 {
@@ -127,13 +117,15 @@ fn EvalContext::expand_modifier_word_worker(
 
   let const do_emit_byte = [&](char byte, bool is_active) {
     out += byte;
-    active_out.push(is_active);
+    if (active_out != nullptr) active_out->push(is_active);
   };
 
   let do_emit_run = [&](StringView bytes, bool is_active) {
     out.append(bytes);
-    for (usize k = 0; k < bytes.length; k++)
-      active_out.push(is_active);
+    if (active_out != nullptr) {
+      for (usize k = 0; k < bytes.length; k++)
+        active_out->push(is_active);
+    }
   };
 
   let is_in_single_quote = false;
@@ -717,18 +709,7 @@ hot fn EvalContext::apply_parameter_expansion(
                           rest[op_index + 1] == op && (op == '#' || op == '%'));
   let const word = rest.substring(op_index + (is_doubled ? 2 : 1));
 
-  let current = Maybe<String>{};
-  if (let const bracket = name.find_character('[');
-      bracket.has_value() && name[name.length - 1] == ']')
-  {
-    let const array_name = name.substring_of_length(0, *bracket);
-    let const subscript =
-        name.substring_of_length(*bracket + 1, name.length - *bracket - 2);
-    if (array_element_is_set(array_name, subscript))
-      current = apply_array_subscript(array_name, subscript);
-  } else {
-    current = get_variable_value(name);
-  }
+  let current = get_variable_value(name);
   let const is_set = current.has_value();
   let const is_empty = !is_set || current->is_empty();
   let const treat_as_unset = is_colon_form ? is_empty : !is_set;

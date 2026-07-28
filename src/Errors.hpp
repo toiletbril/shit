@@ -31,6 +31,22 @@ struct SourceLocation
     return SourceLocation{position + relative_position, relative_length,
                           filename};
   }
+
+  pure fn subspan_for_view(StringView source, StringView part,
+                           SourceLocation &storage,
+                           usize source_offset = 0) const wontthrow
+      -> const SourceLocation *
+  {
+    ASSERT(part.data >= source.data &&
+           part.data + part.length <= source.data + source.length);
+    let const part_offset = static_cast<usize>(part.data - source.data);
+    if (part_offset < source_offset) return nullptr;
+    let const mapped_offset = part_offset - source_offset;
+    ASSERT(mapped_offset <= length);
+    ASSERT(part.length <= length - mapped_offset);
+    storage = subspan(mapped_offset, part.length);
+    return &storage;
+  }
 };
 
 class ErrorBase

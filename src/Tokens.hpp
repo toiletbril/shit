@@ -76,6 +76,21 @@ public:
   pure fn has_live_glob_chars() const wontthrow -> bool;
   pure fn is_tilde_candidate() const wontthrow -> bool;
 
+  cold fn clone() const throws -> WordSegment
+  {
+    let copy =
+        WordSegment{kind, text.clone(), is_in_double_quotes, is_greedy_name};
+    copy.is_substitution_cache_in_function_arena =
+        is_substitution_cache_in_function_arena;
+    if (has_folded_arithmetic_result)
+      copy.set_folded_arithmetic_result(get_folded_arithmetic_result());
+    else if (source_length > 0)
+      copy.set_source_span(source_position, source_length);
+    copy.cached_substitution_ast = cached_substitution_ast;
+    copy.cached_substitution_generation = cached_substitution_generation;
+    return copy;
+  }
+
   pure fn get_folded_arithmetic_result() const wontthrow -> i64
   {
     ASSERT(has_folded_arithmetic_result);

@@ -1466,22 +1466,8 @@ static fn word_token_from_assignment(BumpArena &arena,
   prefix += a->is_append() ? "+=" : "=";
   word.segments.push(
       WordSegment{WordSegment::Kind::UnquotedText, steal(prefix), false});
-  for (let const &segment : a->value_word().segments) {
-    WordSegment copy{segment.kind, segment.text.clone(),
-                     segment.is_in_double_quotes};
-    copy.is_greedy_name = segment.is_greedy_name;
-    if (segment.has_folded_arithmetic_result)
-      copy.set_folded_arithmetic_result(segment.get_folded_arithmetic_result());
-    else if (let const location = segment.get_source_location(None);
-             location.has_value())
-      copy.set_source_span(location->position, location->length);
-    copy.is_substitution_cache_in_function_arena =
-        segment.is_substitution_cache_in_function_arena;
-    copy.cached_substitution_ast = segment.cached_substitution_ast;
-    copy.cached_substitution_generation =
-        segment.cached_substitution_generation;
-    word.segments.push(steal(copy));
-  }
+  for (let const &segment : a->value_word().segments)
+    word.segments.push(segment.clone());
   return arena.create<tokens::WordToken>(a->source_location(), steal(word));
 }
 

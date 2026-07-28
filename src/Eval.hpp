@@ -1549,7 +1549,7 @@ public:
 
   /* is_pattern_word makes a backslash quote the following byte, the # and %
      rule. */
-  fn expand_modifier_word_worker(StringView word, Bitset &active_out,
+  fn expand_modifier_word_worker(StringView word, Bitset *active_out,
                                  bool remove_quotes, bool is_pattern_word,
                                  bool strip_escaped_literals,
                                  const SourceLocation *source_location) throws
