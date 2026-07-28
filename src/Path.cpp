@@ -416,51 +416,20 @@ fn Path::detect_mimic_shell() const throws -> Maybe<mimic_mood>
   os::close_fd(*file);
   if (!read_count || *read_count < 3) return None;
 
-  let const head = StringView{buffer, *read_count};
-  if (!head.starts_with("#!")) return None;
+  return detect_mimic_shell_from_source(StringView{buffer, *read_count});
+}
 
-  usize line_end = 2;
-  while (line_end < head.length && head[line_end] != '\n')
-    line_end++;
-  let const line = head.substring_of_length(2, line_end - 2);
-
-  let const do_basename_of = [](StringView token) -> StringView {
-    usize last_slash = token.length;
-    for (usize i = 0; i < token.length; i++)
-      if (token[i] == '/') last_slash = i;
-    return last_slash == token.length ? token : token.substring(last_slash + 1);
+fn Path::is_shell_source(StringView source) const throws -> bool
+{
+  static constexpr static_string_entry<bool> EXTENSION_ENTRIES[] = {
+      {SSK(".bash"), true},
+      {SSK(".dash"), true},
+      {SSK(".sh"),   true},
+      {SSK(".shit"), true},
   };
-  usize i = 0;
-  let const do_next_token = [&]() -> StringView {
-    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
-      i++;
-    usize const start = i;
-    while (i < line.length && line[i] != ' ' && line[i] != '\t')
-      i++;
-    return line.substring_of_length(start, i - start);
-  };
-
-  StringView shell = do_basename_of(do_next_token());
-  /* The env form names the shell as the first non-option token after env. */
-  if (shell == "env") {
-    loop
-    {
-      let const token = do_next_token();
-      if (token.length == 0) return None;
-      if (token[0] == '-') continue;
-      shell = do_basename_of(token);
-      break;
-    }
-  }
-
-  static constexpr static_string_entry<mimic_mood> SHELL_ENTRIES[] = {
-      {SSK("sh"),   mimic_mood::Posix  },
-      {SSK("dash"), mimic_mood::Posix  },
-      {SSK("bash"), mimic_mood::Bash   },
-      {SSK("shit"), mimic_mood::Default},
-  };
-  static constexpr StaticStringMap SHELL_MOODS{SHELL_ENTRIES};
-  return SHELL_MOODS.find(shell);
+  static constexpr StaticStringMap EXTENSIONS{EXTENSION_ENTRIES};
+  return EXTENSIONS.find(extension()).has_value() ||
+         detect_mimic_shell_from_source(source).has_value();
 }
 
 PathBuilder::PathBuilder(StringView root) : m_text(root) {}

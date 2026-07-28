@@ -25,6 +25,8 @@ mv
 --all
 --help
 --ignore
+== cat flags through shitbox:
+--syntax-highlighting
 == shitbox own flags:
 --assimilate
 --help

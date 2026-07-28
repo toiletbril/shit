@@ -17,6 +17,8 @@ echo "== timeout flags through shitbox:"
 "$BIN" --debug-complete-at 'shitbox timeout -' </dev/null
 echo "== nproc flags through shitbox:"
 "$BIN" --debug-complete-at 'shitbox nproc -' </dev/null
+echo "== cat flags through shitbox:"
+"$BIN" --debug-complete-at 'shitbox cat --s' </dev/null
 echo "== shitbox own flags:"
 "$BIN" --debug-complete-at 'shitbox --' </dev/null
 echo "== bare utility flags under set -o shitbox:"

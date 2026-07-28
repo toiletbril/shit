@@ -112,6 +112,7 @@ public:
   mustuse static fn canonicalize(StringView path) throws -> Maybe<Path>;
 
   mustuse fn detect_mimic_shell() const throws -> Maybe<mimic_mood>;
+  mustuse fn is_shell_source(StringView source) const throws -> bool;
 
 private:
   String m_text{heap_allocator()};

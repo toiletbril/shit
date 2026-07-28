@@ -197,6 +197,7 @@ highlight_tests: $(BIN)
 diagnostic_tty_test: $(BIN)
 	@if command -v python3 >/dev/null 2>&1; then \
 		python3 interactive/long_warning_window.py $(BIN); \
+		python3 interactive/cat_syntax_highlighting.py $(BIN); \
 	else \
 		printf "\t%-64s skipped, python3 unavailable\n" \
 			interactive/long_warning_window.py; \

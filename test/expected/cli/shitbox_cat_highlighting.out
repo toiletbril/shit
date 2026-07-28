@@ -1,0 +1,12 @@
+--- redirected shell sources stay plain ---
+echo "extension"
+#!/usr/bin/env bash
+echo "shebang"
+plain
+--- numbering continues through stdin and files ---
+     1	first
+     2	middle
+     3	last
+     1	joinedline
+--- binary shell files remain byte-exact ---
+exact

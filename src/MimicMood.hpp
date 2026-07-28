@@ -20,6 +20,9 @@ enum class mimic_mood : u8
   BashPosix,
 };
 
+fn detect_mimic_shell_from_source(StringView source) throws
+    -> Maybe<mimic_mood>;
+
 inline pure fn parse_mood_name(StringView name) throws -> Maybe<mimic_mood>
 {
   static constexpr static_string_entry<mimic_mood> MOOD_ENTRIES[] = {

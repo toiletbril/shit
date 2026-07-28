@@ -126,7 +126,7 @@ _shitbox_util_flags()
         mkdir)         echo "-p" ;;
         cp)            echo "-r -R -v" ;;
         mv)            echo "-f -v" ;;
-        cat)           echo "-n" ;;
+        cat)           echo "-n --syntax-highlighting" ;;
         tee)           echo "-a" ;;
         touch)         echo "-c" ;;
         du)            echo "-s -h" ;;

@@ -1,16 +1,21 @@
 #include "../Cli.hpp"
+#include "../Colors.hpp"
+#include "../Completion.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Path.hpp"
 #include "../Shitbox.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-n] [file ...]");
+HELP_SYNOPSIS_DECL("[-n] [--syntax-highlighting] [file ...]");
 
 HELP_DESCRIPTION_DECL("The cat utility writes each file to standard output.");
 
 FLAG(CAT_NUMBER, Bool, 'n', "", "Number every output line, starting at one.");
+FLAG(CAT_SYNTAX_HIGHLIGHTING, Bool, '\0', "syntax-highlighting",
+     "Highlight detected shell source on a terminal.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Cat);
@@ -28,6 +33,44 @@ static fn number_prefix(i64 line_number, Allocator allocator) throws -> String
   prefix += digits.view();
   prefix += '\t';
   return prefix;
+}
+
+static fn append_cat_source(String &output, StringView source,
+                            bool should_number, bool should_highlight,
+                            i64 &line_number, bool &is_at_output_line_start,
+                            EvalContext &context) throws -> void
+{
+  if (!should_number && !should_highlight) {
+    output += source;
+    return;
+  }
+
+  let highlight_cache = completion::shell_highlight_cache{};
+  usize line_start = 0;
+  while (line_start < source.length) {
+    let line_end = line_start;
+    while (line_end < source.length && source[line_end] != '\n')
+      line_end++;
+    if (line_end < source.length) line_end++;
+
+    if (should_number && is_at_output_line_start) {
+      output += number_prefix(line_number, context.scratch_allocator());
+      line_number++;
+    }
+
+    let const line =
+        source.substring_of_length(line_start, line_end - line_start);
+    if (should_highlight) {
+      let const *spans =
+          highlight_cache.spans_for(source, line_start, line_end, context);
+      completion::append_highlighted_range(output, line, *spans, 0, line.length,
+                                           colors::SHELL_HIGHLIGHT_THEME);
+    } else {
+      output += line;
+    }
+    is_at_output_line_start = !line.is_empty() && line[line.length - 1] == '\n';
+    line_start = line_end;
+  }
 }
 
 Cat::Cat() = default;
@@ -48,7 +91,10 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
       source_list_from_operands(operands, cxt.scratch_allocator());
 
   let output = String{cxt.scratch_allocator()};
-  let number_buffer = String{cxt.scratch_allocator()};
+  let const should_highlight_output =
+      FLAG_CAT_SYNTAX_HIGHLIGHTING.is_enabled() && colors::stdout_wants_color();
+  i64 line_number = 1;
+  let is_at_output_line_start = true;
   i32 status = 0;
   for (let const &source : sources) {
     let const content = read_named_or_stdin(ec, source);
@@ -61,26 +107,19 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
-    if (!FLAG_CAT_NUMBER.is_enabled()) {
-      output += content->view();
-      continue;
-    }
-    number_buffer += content->view();
-  }
-
-  if (FLAG_CAT_NUMBER.is_enabled()) {
-    i64 line_number = 1;
-    for (let const &line : split_keep_newlines(number_buffer.view())) {
-      output += number_prefix(line_number, cxt.scratch_allocator());
-      output += line;
-      line_number++;
-    }
+    let const should_highlight_source =
+        should_highlight_output &&
+        !content->view().find_character('\0').has_value() &&
+        Path{source}.is_shell_source(content->view());
+    append_cat_source(output, content->view(), FLAG_CAT_NUMBER.is_enabled(),
+                      should_highlight_source, line_number,
+                      is_at_output_line_start, cxt);
   }
 
   ec.print_to_stdout(output);
   return status;
 }
 
-} // namespace shitbox
+} /* namespace shitbox */
 
-} // namespace shit
+} /* namespace shit */
