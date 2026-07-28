@@ -113,7 +113,7 @@ public:
   }
 };
 
-pure forceinline fn hash_bytes(StringView view) wontthrow -> u64
+pure alwaysinline fn hash_bytes(StringView view) wontthrow -> u64
 {
   u64 hash = view.length * 0x9e3779b97f4a7c15ull;
   usize i = 0;

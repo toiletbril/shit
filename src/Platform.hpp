@@ -52,7 +52,8 @@ extern "C" void __lsan_disable(void);
 #define SHIT_HAS_ADDRESS_SANITIZER 1
 #endif
 #if defined __COSMOPOLITAN__
-#include <cosmo.h>
+#include <libc/dce.h>
+#include <libc/runtime/runtime.h>
 #define SHIT_SUPPORT_VECTOR (COSMO | POSIX)
 #else
 #define SHIT_SUPPORT_VECTOR (POSIX)
@@ -89,8 +90,8 @@ extern char **environ;
 
 namespace shit::os {
 
-hot forceinline fn pack_little_endian_bytes(u64 *words, const char *bytes,
-                                            usize count) wontthrow -> void
+hot alwaysinline fn pack_little_endian_bytes(u64 *words, const char *bytes,
+                                             usize count) wontthrow -> void
 {
 #if defined __BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   __builtin_memcpy(reinterpret_cast<char *>(words), bytes, count);

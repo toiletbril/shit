@@ -29,8 +29,8 @@ fn static_command_name(const Token *token) throws -> Maybe<String>;
 
 namespace expressions {
 
-forceinline fn set_and_return_exit_status(EvalContext &cxt,
-                                          i64 status) wontthrow -> i64
+alwaysinline fn set_and_return_exit_status(EvalContext &cxt,
+                                           i64 status) wontthrow -> i64
 {
   cxt.set_last_exit_status(static_cast<i32>(status));
   return status;

@@ -18,12 +18,12 @@ inline fn completion_allocator() wontthrow -> Allocator
   return bump_allocator(COMPLETION_ARENA);
 }
 
-static pure forceinline fn is_blank(char byte) wontthrow -> bool
+static pure alwaysinline fn is_blank(char byte) wontthrow -> bool
 {
   return byte == ' ' || byte == '\t';
 }
 
-static pure forceinline fn skip_blanks(StringView text, usize from) wontthrow
+static pure alwaysinline fn skip_blanks(StringView text, usize from) wontthrow
     -> usize
 {
   while (from < text.length && is_blank(text[from]))

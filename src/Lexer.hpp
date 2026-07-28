@@ -102,7 +102,7 @@ public:
       -> const heredoc_contents *;
 
 protected:
-  pure forceinline fn here(usize position, usize length) const wontthrow
+  pure alwaysinline fn here(usize position, usize length) const wontthrow
       -> SourceLocation
   {
     return SourceLocation{position, length, m_filename};

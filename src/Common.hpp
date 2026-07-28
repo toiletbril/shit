@@ -170,7 +170,7 @@ public:
 #define throws    noexcept(false)
 
 #define donteliminate t__used
-#define forceinline   t__forceinline
+#define alwaysinline  t__forceinline
 
 #if T__HAS_GCC_EXTENSIONS
 #define pure t__pure

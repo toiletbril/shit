@@ -39,7 +39,7 @@ constexpr u32 SHA256_CONSTANTS[64] = {
     0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
     0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
 
-pure forceinline fn rotate_right(u32 value, u32 count) wontthrow -> u32
+pure alwaysinline fn rotate_right(u32 value, u32 count) wontthrow -> u32
 {
   return (value >> count) | (value << (32 - count));
 }

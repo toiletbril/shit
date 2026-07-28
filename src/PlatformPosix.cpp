@@ -1834,37 +1834,6 @@ fn process_from_pid(i64 pid) wontthrow -> process
   return static_cast<process>(pid);
 }
 
-fn signal_number_from_name(StringView name) throws -> Maybe<i32>
-{
-  if (name.is_all_decimal_digits()) {
-    const ErrorOr<i64> parsed_value = name.to<i64>();
-    if (parsed_value.is_error() || parsed_value.value() < INT32_MIN ||
-        parsed_value.value() > INT32_MAX)
-      return shit::None;
-    return static_cast<i32>(parsed_value.value());
-  }
-
-  let const bare = utils::strip_sig_prefix(name);
-
-  static constexpr static_string_entry<i32> NAME_ENTRIES[] = {
-      {SSK("HUP"),  SIGHUP },
-      {SSK("INT"),  SIGINT },
-      {SSK("QUIT"), SIGQUIT},
-      {SSK("KILL"), SIGKILL},
-      {SSK("TERM"), SIGTERM},
-      {SSK("STOP"), SIGSTOP},
-      {SSK("TSTP"), SIGTSTP},
-      {SSK("CONT"), SIGCONT},
-      {SSK("USR1"), SIGUSR1},
-      {SSK("USR2"), SIGUSR2},
-      {SSK("ABRT"), SIGABRT},
-      {SSK("ALRM"), SIGALRM},
-      {SSK("PIPE"), SIGPIPE},
-  };
-  static constexpr StaticStringMap NAMES{NAME_ENTRIES};
-  return NAMES.find(bare);
-}
-
 struct signal_pair
 {
   i32 number;
@@ -1885,6 +1854,23 @@ static const signal_pair SIGNAL_PAIRS[] = {
     {SIGALRM, "ALRM"},
     {SIGPIPE, "PIPE"},
 };
+
+fn signal_number_from_name(StringView name) throws -> Maybe<i32>
+{
+  if (name.is_all_decimal_digits()) {
+    const ErrorOr<i64> parsed_value = name.to<i64>();
+    if (parsed_value.is_error() || parsed_value.value() < INT32_MIN ||
+        parsed_value.value() > INT32_MAX)
+      return shit::None;
+    return static_cast<i32>(parsed_value.value());
+  }
+
+  let const bare = utils::strip_sig_prefix(name);
+
+  for (let const &pair : SIGNAL_PAIRS)
+    if (pair.name == bare) return pair.number;
+  return shit::None;
+}
 
 fn signal_name_from_number(i32 number) throws -> Maybe<String>
 {

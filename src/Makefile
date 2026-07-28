@@ -131,10 +131,10 @@ endif
 
 ifeq ($(MODE), cosmo)
 OS_INFO := "unknown-cosmo"
-LIBC_INFO := cosmopolitan libc
+LIBC_INFO := cosmopolitan\\040libc
 else ifeq ($(MODE), cosmo_dbg)
 OS_INFO := "unknown-cosmo-dbg"
-LIBC_INFO := cosmopolitan libc
+LIBC_INFO := cosmopolitan\\040libc
 else ifeq ($(LINUX_CROSS_COMPILATION), 1)
 OS_INFO := Linux $(LINUX_ZIG_ARCH) cross
 else

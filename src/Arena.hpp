@@ -51,7 +51,7 @@ public:
   fn release(Mark saved) wontthrow -> void;
 
   template <class T, class... Args>
-  flatten forceinline fn create(Args &&...args) throws -> T *
+  flatten alwaysinline fn create(Args &&...args) throws -> T *
   {
     let const storage = allocate(sizeof(T), alignof(T));
     let const object = new (storage) T(std::forward<Args>(args)...);

@@ -444,7 +444,7 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
   return t;
 }
 
-hot flatten forceinline fn Lexer::skip_whitespace() wontthrow -> void
+hot flatten alwaysinline fn Lexer::skip_whitespace() wontthrow -> void
 {
   usize i = 0;
   loop
@@ -468,14 +468,14 @@ hot flatten forceinline fn Lexer::skip_whitespace() wontthrow -> void
   advance_forward(i);
 }
 
-hot forceinline fn Lexer::advance_forward(usize offset) wontthrow -> usize
+hot alwaysinline fn Lexer::advance_forward(usize offset) wontthrow -> usize
 {
   ASSERT(m_cursor_position + offset <= m_source.length());
   m_cursor_position += offset;
   return offset;
 }
 
-hot forceinline fn Lexer::chop_character(usize offset) wontthrow -> char
+hot alwaysinline fn Lexer::chop_character(usize offset) wontthrow -> char
 {
   if (m_cursor_position + offset < m_source.length())
     return m_source[m_cursor_position + offset];
@@ -501,7 +501,7 @@ hot fn Lexer::lex_number() throws -> Token *
   return num;
 }
 
-flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
+flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 {
   let word = Word{};
 
@@ -1349,7 +1349,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
   return t;
 }
 
-hot forceinline fn Lexer::lex_sentinel() throws -> Token *
+hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
 {
   const let ch = chop_character();
   ASSERT(ch != lexer::CEOF);
@@ -1494,7 +1494,7 @@ hot forceinline fn Lexer::lex_sentinel() throws -> Token *
   return tok;
 }
 
-hot forceinline fn Lexer::lex_process_substitution(char direction) throws
+hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
     -> Token *
 {
   let const open_position = m_cursor_position;
