@@ -7,6 +7,14 @@ shit: TMPDIR/unterminated:2:10: note:
 rc=0
 incremental reached
 incremental rc=0
+shit: TMPDIR/error-state:3:1: error: Unterminated subshell.
+     3 |  (
+       |  ^ here.
+shit: TMPDIR/error-state:3:2: note:
+     3 |  (
+       |   ^ Expected ')'.
+trap-status=1
+error-state rc=1
 shit: 1:1: error: Cannot execute `TMPDIR/binary` as a shell script.
      1 |  ./binary
        |  ^~~~~~~~ here.

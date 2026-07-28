@@ -215,6 +215,31 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       print_source_backtrace();
     }
   };
+  let const do_finish_script = [&](std::exception_ptr &error, bool is_subshell)
+                                   throws -> bool {
+    let is_interrupt = mimicked_error_is_interrupt(error);
+    bool was_error_rendered = false;
+    if (error && !is_interrupt) {
+      set_last_exit_status(1);
+      do_render_error(error);
+      was_error_rendered = true;
+    }
+    if (!is_interrupt) {
+      try {
+        if (is_subshell)
+          run_subshell_exit_trap();
+        else
+          run_exit_trap();
+      } catch (...) {
+        if (!error) {
+          error = std::current_exception();
+          is_interrupt = mimicked_error_is_interrupt(error);
+        }
+      }
+    }
+    if (error && !is_interrupt && !was_error_rendered) do_render_error(error);
+    return is_interrupt;
+  };
 
   /* The kernel hands a shebang interpreter the resolved script path, so $0 and
      BASH_SOURCE read that path rather than the word as typed. */
@@ -247,14 +272,13 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     } catch (...) {
       error = std::current_exception();
     }
+    let const is_interrupt = do_finish_script(error, false);
     m_mimicry_depth--;
     do_restore_fds();
     do_restore_restricted_shell();
     if (error) {
-      if (mimicked_error_is_interrupt(error))
-        throw InterruptErrorWithLocation{previous_location};
+      if (is_interrupt) throw InterruptErrorWithLocation{previous_location};
 
-      do_render_error(error);
       return 1;
     }
     return last_exit_status();
@@ -278,13 +302,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       set_last_exit_status(static_cast<i32>(pending_control_flow().value));
     clear_control_flow();
   }
-  if (!error) {
-    try {
-      run_subshell_exit_trap();
-    } catch (...) {
-      error = std::current_exception();
-    }
-  }
+  let const is_interrupt = do_finish_script(error, true);
   leave_subshell();
   m_mimicry_depth--;
   do_restore_fds();
@@ -302,10 +320,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   };
 
   if (error) {
-    if (mimicked_error_is_interrupt(error))
-      throw InterruptErrorWithLocation{previous_location};
+    if (is_interrupt) throw InterruptErrorWithLocation{previous_location};
 
-    do_render_error(error);
     return 1;
   }
   return status;

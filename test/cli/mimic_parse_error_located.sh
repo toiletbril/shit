@@ -15,6 +15,13 @@ chmod +x "$dir/incremental"
 "$BIN" --no-traces -c "$dir/incremental"
 echo "incremental rc=$?"
 
+printf 'trap '\''echo trap-status=$?'\'' EXIT\nexec >"$1" 2>&1\n(\n' > "$dir/error-state"
+chmod +x "$dir/error-state"
+"$BIN" --no-traces -c "$dir/error-state '$dir/error-state-output'" 2> "${TEST_NULL_DEVICE:-/dev/null}"
+error_state_status=$?
+sed 's|\\|/|g' "$dir/error-state-output" | sed "s|$canonical_dir|TMPDIR|g" | sed "s|$dir|TMPDIR|g"
+echo "error-state rc=$error_state_status"
+
 printf '\0binary\n' > "$dir/binary"
 chmod +x "$dir/binary"
 (cd "$dir" && "$BIN" --no-traces -c ./binary) > "$dir/binary-output" 2>&1
