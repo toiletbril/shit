@@ -397,12 +397,13 @@ public:
     write_variable(target.name, value);
   }
 
-  fn prefix_step(i64 delta) throws -> i64
+  fn prefix_step(i64 delta, usize operator_position) throws -> i64
   {
     const lvalue target = read_lvalue();
     if (target.name.is_empty())
-      fail("Expected a variable after '++' or '--'",
-           "'++' and '--' step a variable, not a value");
+      fail_span(operator_position, operator_position + 2,
+                "Expected a variable after '++' or '--'",
+                "'++' and '--' step a variable, not a value");
     const i64 updated = arithmetic_add(read_lvalue_value(target), delta);
     write_lvalue(target, updated);
     return updated;
@@ -672,12 +673,14 @@ public:
     skip_spaces();
     let const first = pos < source.length ? source[pos] : '\0';
     if (first == '+') {
-      if (consume("++")) return prefix_step(1);
+      let const operator_position = pos;
+      if (consume("++")) return prefix_step(1, operator_position);
       pos++;
       return parse_unary();
     }
     if (first == '-') {
-      if (consume("--")) return prefix_step(-1);
+      let const operator_position = pos;
+      if (consume("--")) return prefix_step(-1, operator_position);
       pos++;
       return arithmetic_subtract(0, parse_unary());
     }
