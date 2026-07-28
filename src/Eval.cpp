@@ -4,6 +4,7 @@
 #include "Cli.hpp"
 #include "Colors.hpp"
 #include "Common.hpp"
+#include "Completion.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
@@ -38,6 +39,28 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
 
   for (let const &name : os::environment_names())
     m_exported_names.add(name.view());
+}
+
+EvalContext::~EvalContext() { reset_runtime_diagnostic_highlight_cache(); }
+
+fn EvalContext::get_or_create_diagnostic_highlight_cache() throws
+    -> completion::diagnostic_highlight_cache *
+{
+  if (m_diagnostic_highlight_cache != nullptr)
+    return m_diagnostic_highlight_cache;
+
+  if (m_runtime_diagnostic_highlight_cache == nullptr) {
+    m_runtime_diagnostic_highlight_cache =
+        new completion::diagnostic_highlight_cache{};
+  }
+
+  return m_runtime_diagnostic_highlight_cache;
+}
+
+fn EvalContext::reset_runtime_diagnostic_highlight_cache() wontthrow -> void
+{
+  delete m_runtime_diagnostic_highlight_cache;
+  m_runtime_diagnostic_highlight_cache = nullptr;
 }
 
 fn RuntimeState::capture(const EvalContext &context) wontthrow -> RuntimeState
@@ -1277,6 +1300,7 @@ fn EvalContext::clear_control_flow() wontthrow -> void
 fn EvalContext::set_current_source(const String *source,
                                    String origin) wontthrow -> void
 {
+  reset_runtime_diagnostic_highlight_cache();
   m_current_source = source;
   m_current_origin = steal(origin);
 }

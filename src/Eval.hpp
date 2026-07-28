@@ -533,6 +533,7 @@ public:
               String shell_name = String{heap_allocator()},
               ArrayList<String> positional_params = ArrayList<String>{
                   heap_allocator()});
+  ~EvalContext();
 
   fn add_expansion() wontthrow -> void;
   fn add_evaluated_expression() wontthrow -> void;
@@ -956,11 +957,9 @@ public:
     return previous;
   }
 
-  pure fn get_diagnostic_highlight_cache() const wontthrow
-      -> completion::diagnostic_highlight_cache *
-  {
-    return m_diagnostic_highlight_cache;
-  }
+  fn get_or_create_diagnostic_highlight_cache() throws
+      -> completion::diagnostic_highlight_cache *;
+  fn reset_runtime_diagnostic_highlight_cache() wontthrow -> void;
 
   fn render_contained_substitution_error(std::exception_ptr error,
                                          StringView source) throws -> void;
@@ -1792,6 +1791,8 @@ protected:
   ArrayList<source_frame> m_source_frames{heap_allocator()};
   bool m_should_print_source_traces{true};
   completion::diagnostic_highlight_cache *m_diagnostic_highlight_cache{nullptr};
+  completion::diagnostic_highlight_cache *m_runtime_diagnostic_highlight_cache{
+      nullptr};
 
   ArrayList<Expression *> m_retained_source_asts{heap_allocator()};
 

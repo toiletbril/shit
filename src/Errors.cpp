@@ -144,12 +144,10 @@ cold static fn get_context_pointing_to(
 
   let generated_highlights =
       ArrayList<completion::highlight_span>{heap_allocator()};
-  let local_cache = completion::diagnostic_highlight_cache{};
   const ArrayList<completion::highlight_span> *source_highlights =
       &generated_highlights;
   if (eval_context != nullptr && !color.reset.is_empty()) {
-    let *cache = eval_context->get_diagnostic_highlight_cache();
-    if (cache == nullptr) cache = &local_cache;
+    let *cache = eval_context->get_or_create_diagnostic_highlight_cache();
     source_highlights = cache->spans_for(source, line_position.line_start,
                                          line_position.line_end, *eval_context);
   }
@@ -217,12 +215,14 @@ cold static fn get_context_pointing_to(
     has_right_ellipsis = window_end < display_cells;
   }
 
-  const usize window_start_byte =
-      toiletline::byte_offset_at_or_before_display_cell(
-          display_line, window_start, window_start);
-  const usize window_end_byte =
-      toiletline::byte_offset_at_or_before_display_cell(display_line,
-                                                        window_end, window_end);
+  usize window_start_byte = 0;
+  usize window_end_byte = display_line.length;
+  if (has_left_ellipsis || has_right_ellipsis) {
+    window_start_byte = toiletline::byte_offset_at_or_before_display_cell(
+        display_line, window_start, window_start);
+    window_end_byte = toiletline::byte_offset_at_or_before_display_cell(
+        display_line, window_end, window_end);
+  }
 
   if (has_left_ellipsis) msg += "...";
   usize rendered_byte_position = window_start_byte;

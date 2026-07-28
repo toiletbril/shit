@@ -473,6 +473,7 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
      caches keyed on that are dropped to keep them from serving a stale index.
    */
   utils::invalidate_line_number_cache();
+  reset_runtime_diagnostic_highlight_cache();
 
   m_current_source = nullptr;
   m_current_origin.clear();
