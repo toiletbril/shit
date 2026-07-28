@@ -1,16 +1,7 @@
-== cd into a directory colors it as a valid path:
-cd	\e[34m
-adir	\e[96m
-== cd into a file colors it red:
-cd	\e[34m
-afile	\e[91;4:3;58:5:10m
-== ls of the same file stays a valid path:
-ls	\e[34m
-afile	\e[96m
-== a trailing separator rejects a file:
-./afile/	\e[91;4:3;58:5:10m
-== a trailing separator rejects a symlink to a file:
-./alink/	\e[91;4:3;58:5:10m
-== a trailing separator accepts a directory:
-./adir/	\e[96m
-== native path separators highlight directories:
+adir	existing-path
+afile	invalid-path
+afile	existing-path
+./afile/	invalid-path
+./alink/	invalid-path
+./adir/	existing-path
+native/subdir	existing-path

@@ -142,17 +142,14 @@ cold static fn get_context_pointing_to(
   const usize caret_column = toiletline::display_width(caret_prefix);
   const usize caret_width = toiletline::display_width(caret_text);
 
-  let generated_highlights =
-      ArrayList<completion::highlight_span>{heap_allocator()};
-  const ArrayList<completion::highlight_span> *source_highlights =
-      &generated_highlights;
+  let generated_highlights = ArrayList<highlight_span>{heap_allocator()};
+  const ArrayList<highlight_span> *source_highlights = &generated_highlights;
   if (eval_context != nullptr && !color.reset.is_empty()) {
     let *cache = eval_context->get_or_create_diagnostic_highlight_cache();
     source_highlights = cache->spans_for(source, line_position.line_start,
                                          line_position.line_end, *eval_context);
   }
-  let expanded_highlights =
-      ArrayList<completion::highlight_span>{heap_allocator()};
+  let expanded_highlights = ArrayList<highlight_span>{heap_allocator()};
   let line_highlights = source_highlights;
   if (tab_count != 0 && !source_highlights->is_empty()) {
     expanded_highlights.reserve(source_highlights->count());
@@ -167,9 +164,9 @@ cold static fn get_context_pointing_to(
       return highlight_expanded_position;
     };
     for (let const &span : *source_highlights) {
-      expanded_highlights.push(completion::highlight_span{
-          do_advance_highlight_position(span.start),
-          do_advance_highlight_position(span.end), span.sgr});
+      expanded_highlights.push(
+          highlight_span{do_advance_highlight_position(span.start),
+                         do_advance_highlight_position(span.end), span.role});
     }
     line_highlights = &expanded_highlights;
   }
@@ -225,35 +222,9 @@ cold static fn get_context_pointing_to(
   }
 
   if (has_left_ellipsis) msg += "...";
-  usize rendered_byte_position = window_start_byte;
-  for (let const &span : *line_highlights) {
-    if (span.end <= window_start_byte) continue;
-    if (span.start >= window_end_byte) break;
-
-    let const span_start =
-        span.start < window_start_byte ? window_start_byte : span.start;
-    let const span_end =
-        span.end > window_end_byte ? window_end_byte : span.end;
-    if (rendered_byte_position < span_start)
-      msg += display_line.substring_of_length(
-          rendered_byte_position, span_start - rendered_byte_position);
-
-    let span_sgr = span.sgr;
-    if (span_sgr == colors::ansi::CURLY_GREEN_UNDERLINE)
-      span_sgr = StringView{};
-    else if (span_sgr == colors::ansi::RED_CURLY_GREEN_UNDERLINE)
-      span_sgr = colors::ansi::BRIGHT_RED;
-    else if (span_sgr == colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE)
-      span_sgr = colors::ansi::BOLD_BRIGHT_RED;
-
-    msg += span_sgr;
-    msg += display_line.substring_of_length(span_start, span_end - span_start);
-    msg += color.reset;
-    rendered_byte_position = span_end;
-  }
-  if (rendered_byte_position < window_end_byte)
-    msg += display_line.substring_of_length(
-        rendered_byte_position, window_end_byte - rendered_byte_position);
+  completion::append_highlighted_range(msg, display_line, *line_highlights,
+                                       window_start_byte, window_end_byte,
+                                       colors::DIAGNOSTIC_HIGHLIGHT_THEME);
   if (has_right_ellipsis) msg += "...";
 
   const usize caret_pad =

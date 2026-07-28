@@ -666,11 +666,11 @@ fn process_has_id(process p, i64 id) wontthrow -> bool
   return process_id_of(p) == id;
 }
 
-fn is_stdin_a_tty() wontthrow -> bool { return _isatty(_fileno(stdin)) != 0; }
+fn is_stdin_a_tty() wontthrow -> bool { return is_fd_a_tty(SHIT_STDIN); }
 
-fn is_stdout_a_tty() wontthrow -> bool { return _isatty(_fileno(stdout)) != 0; }
+fn is_stdout_a_tty() wontthrow -> bool { return is_fd_a_tty(SHIT_STDOUT); }
 
-fn is_stderr_a_tty() wontthrow -> bool { return _isatty(_fileno(stderr)) != 0; }
+fn is_stderr_a_tty() wontthrow -> bool { return is_fd_a_tty(SHIT_STDERR); }
 
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool
 {

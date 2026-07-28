@@ -19,6 +19,10 @@ namespace shit {
 
 namespace completion {
 
+#if !defined NDEBUG
+static usize DEBUG_SHELL_LEXICAL_SCAN_BYTE_COUNT = 0;
+#endif
+
 static fn previous_settled_word(StringView line, usize token_start) wontthrow
     -> StringView
 {
@@ -971,6 +975,21 @@ fn advance_shell_lexical_state(StringView source, usize end,
 {
   if (end > source.length) end = source.length;
   let i = state.source_position;
+#if !defined NDEBUG
+  let const scan_start = i;
+#endif
+  let const do_pop_frame = [&]() wontthrow -> shell_lexical_frame {
+    let const frame_depth = state.frames.count();
+    let const frame = state.frames.back();
+    while (!state.constructs.is_empty() &&
+           state.constructs.back().frame_depth >= frame_depth)
+    {
+      state.constructs.pop_back();
+    }
+    state.frames.pop_back();
+    state.quote = frame.parent_quote;
+    return frame;
+  };
 
   while (i < end) {
     if (state.is_in_heredoc) {
@@ -1053,10 +1072,8 @@ fn advance_shell_lexical_state(StringView source, usize end,
       if (!state.frames.is_empty() &&
           state.frames.back().kind == shell_lexical_frame_kind::backtick)
       {
-        let const frame = state.frames.back();
+        let const frame = do_pop_frame();
         consider_shell_lexical_frame(frame, i, state.frames.count(), target);
-        state.frames.pop_back();
-        state.quote = frame.parent_quote;
       } else {
         state.frames.push(shell_lexical_frame{
             i + 1, 0, shell_lexical_frame_kind::backtick, state.quote});
@@ -1104,11 +1121,8 @@ fn advance_shell_lexical_state(StringView source, usize end,
     if (!state.frames.is_empty() &&
         state.frames.back().kind == shell_lexical_frame_kind::parameter)
     {
-      let &frame = state.frames.back();
       if (c == '}') {
-        let const parent_quote = frame.parent_quote;
-        state.frames.pop_back();
-        state.quote = parent_quote;
+        do_pop_frame();
       }
       i++;
       continue;
@@ -1138,8 +1152,8 @@ fn advance_shell_lexical_state(StringView source, usize end,
 
     let const is_word_start =
         i == frame.body_start || lexer::is_whitespace(source[i - 1]) ||
-        source[i - 1] == ';' || source[i - 1] == '&' || source[i - 1] == '|' ||
-        source[i - 1] == '(' || source[i - 1] == ')';
+        source[i - 1] == '\n' || source[i - 1] == ';' || source[i - 1] == '&' ||
+        source[i - 1] == '|' || source[i - 1] == '(' || source[i - 1] == ')';
     if (is_word_start) {
       let word_end = i;
       while (word_end < end && !lexer::is_whitespace(source[word_end]) &&
@@ -1148,7 +1162,50 @@ fn advance_shell_lexical_state(StringView source, usize end,
         word_end++;
       }
       let const word = source.substring_of_length(i, word_end - i);
-      if (frame.is_command_position && do_word_matches("case")) {
+      LOG(All, "scanning word '%.*s' at command position %d",
+          static_cast<int>(word.length), word.data, frame.is_command_position);
+      let active_construct =
+          state.constructs.is_empty() ? nullptr : &state.constructs.back();
+      let const is_active_construct_in_frame =
+          active_construct != nullptr &&
+          active_construct->frame_depth == state.frames.count();
+      if (is_active_construct_in_frame &&
+          active_construct->kind == highlight_construct::conditional &&
+          word == "]]")
+      {
+        state.constructs.pop_back();
+        frame.is_command_position = false;
+      } else if (is_active_construct_in_frame &&
+                 active_construct->kind == highlight_construct::function &&
+                 active_construct->phase ==
+                     highlight_construct_phase::function_name &&
+                 word != "function")
+      {
+        active_construct->phase = highlight_construct_phase::body;
+        frame.is_command_position = false;
+      } else if (is_active_construct_in_frame &&
+                 active_construct->kind == highlight_construct::function &&
+                 active_construct->phase == highlight_construct_phase::body &&
+                 word == "}")
+      {
+        state.constructs.pop_back();
+        frame.is_command_position = false;
+      } else if (is_active_construct_in_frame &&
+                 active_construct->kind == highlight_construct::for_ &&
+                 active_construct->phase ==
+                     highlight_construct_phase::for_variable &&
+                 word != "for")
+      {
+        active_construct->phase = highlight_construct_phase::for_in;
+        frame.is_command_position = false;
+      } else if (is_active_construct_in_frame &&
+                 active_construct->kind == highlight_construct::for_ &&
+                 active_construct->phase == highlight_construct_phase::for_in &&
+                 word == "in")
+      {
+        active_construct->phase = highlight_construct_phase::for_do;
+        frame.is_command_position = false;
+      } else if (frame.is_command_position && do_word_matches("case")) {
         frame.saw_case_keyword = true;
         frame.is_command_position = false;
       } else if (frame.saw_case_keyword && do_word_matches("in")) {
@@ -1165,12 +1222,13 @@ fn advance_shell_lexical_state(StringView source, usize end,
       } else if (frame.is_command_position && word_looks_like_assignment(word))
       {
         frame.is_command_position = true;
-      } else if (frame.is_command_position &&
-                 shell_keyword_starts_command(word))
-      {
-        frame.is_command_position = true;
-      } else if (frame.is_command_position && !lexer::is_shell_sentinel(c)) {
-        frame.is_command_position = false;
+      } else if (frame.is_command_position) {
+        if (let const next_is_command =
+                advance_shell_keyword_state(word, state.frames.count(), state);
+            next_is_command.has_value())
+          frame.is_command_position = *next_is_command;
+        else if (!lexer::is_shell_sentinel(c))
+          frame.is_command_position = false;
       }
     }
 
@@ -1213,9 +1271,7 @@ fn advance_shell_lexical_state(StringView source, usize end,
         continue;
       }
       if (i + 1 < end && source[i + 1] == ')') {
-        let const parent_quote = frame.parent_quote;
-        state.frames.pop_back();
-        state.quote = parent_quote;
+        do_pop_frame();
         i += 2;
         continue;
       }
@@ -1234,11 +1290,9 @@ fn advance_shell_lexical_state(StringView source, usize end,
         continue;
       }
 
-      let const closed_frame = frame;
+      let const closed_frame = do_pop_frame();
       consider_shell_lexical_frame(closed_frame, i, state.frames.count(),
                                    target);
-      state.frames.pop_back();
-      state.quote = closed_frame.parent_quote;
       i++;
       continue;
     }
@@ -1247,7 +1301,17 @@ fn advance_shell_lexical_state(StringView source, usize end,
   }
 
   state.source_position = i;
+#if !defined NDEBUG
+  DEBUG_SHELL_LEXICAL_SCAN_BYTE_COUNT += i - scan_start;
+#endif
 }
+
+#if !defined NDEBUG
+pure fn debug_shell_lexical_scan_byte_count() wontthrow -> usize
+{
+  return DEBUG_SHELL_LEXICAL_SCAN_BYTE_COUNT;
+}
+#endif
 
 fn command_substitution_range(StringView line, usize cursor) throws
     -> completion_command_range
@@ -1263,6 +1327,6 @@ fn command_substitution_range(StringView line, usize cursor) throws
   return target.range;
 }
 
-} // namespace completion
+} /* namespace completion */
 
-} // namespace shit
+} /* namespace shit */

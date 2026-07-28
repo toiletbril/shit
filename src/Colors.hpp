@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "Highlight.hpp"
 #include "StringView.hpp"
 
 namespace shit {
@@ -42,6 +43,10 @@ inline const StringView BOLD_RED_CURLY_GREEN_UNDERLINE =
    NO_COLOR is unset or empty, and TERM is not dumb. */
 fn stdout_wants_color() throws -> bool;
 fn stderr_wants_color() throws -> bool;
+fn terminal_wants_color(bool output_is_terminal) throws -> bool;
+
+extern const highlight_theme SHELL_HIGHLIGHT_THEME;
+extern const highlight_theme DIAGNOSTIC_HIGHLIGHT_THEME;
 
 } /* namespace colors */
 

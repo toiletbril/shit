@@ -1,20 +1,29 @@
-SHIT_TEST_HIGHLIGHT_STATS=1 SHIT_TEST_DIAGNOSTIC_CACHE=1 "$BIN" \
+set -e
+
+tab=$(printf '\t')
+log=$(mktemp)
+trap 'rm -f "$log"' EXIT
+
+"$BIN" -X all --debug-logging-file "$log" \
     -c 'alpha=1; beta=2; gamma=3' \
-    --debug-highlight-at 'echo $($($($($(' </dev/null
+    --debug-highlight-at 'echo $($($($($(' </dev/null >/dev/null
 
-echo '== a bare argument does not enumerate its directory:'
-SHIT_TEST_HIGHLIGHT_DIRECTORY_STATS=1 "$BIN" \
-    --debug-highlight-at 'echo definitely-not-an-existing-path' </dev/null
+"$BIN" -X all --debug-logging-file "$log" \
+    --debug-highlight-at 'echo definitely-not-an-existing-path' \
+    </dev/null >/dev/null
 
-echo '== a substitution comment ends at its newline:'
-line='echo $(true # comment
-echo inner) outer'
-"$BIN" --debug-highlight-at "$line" </dev/null
+grep -E '(highlighting visited 0 variable names|the diagnostic highlight cache is stable 1|highlighting read 0 directories)$' "$log" |
+    sed 's/^.*(): //'
 
-echo '== nested command substitution does not close arithmetic:'
-"$BIN" --debug-highlight-at 'echo $(( 1 + $(printf ")") + 2 )); echo after' \
-    </dev/null
+"$BIN" --debug-highlight-at 'echo $(true # comment
+inner-command) outer' </dev/null |
+    grep -E "^(# comment${tab}comment|inner-command${tab}unknown-command)$"
 
-echo '== a case pattern does not close command highlighting:'
+"$BIN" \
+    --debug-highlight-at 'echo $(( 1 + $(printf ")") + 2 )); echo after' \
+    </dev/null |
+    grep -E "${tab}(resolved-command|string)$"
+
 "$BIN" -c 'probecmd() { :; }' \
-    --debug-highlight-at 'echo $(case x in x) probecmd a;; esac)' </dev/null
+    --debug-highlight-at 'echo $(case x in x) probecmd a;; esac)' </dev/null |
+    grep -E "^(esac${tab}keyword|probecmd${tab}resolved-command)$"

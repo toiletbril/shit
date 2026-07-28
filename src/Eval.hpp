@@ -16,7 +16,7 @@
 namespace shit {
 
 namespace completion {
-class diagnostic_highlight_cache;
+class shell_highlight_cache;
 } /* namespace completion */
 
 enum class argument_lifetime : u8
@@ -948,9 +948,8 @@ public:
     return m_should_print_source_traces;
   }
 
-  fn set_diagnostic_highlight_cache(
-      completion::diagnostic_highlight_cache *cache) wontthrow
-      -> completion::diagnostic_highlight_cache *
+  fn set_diagnostic_highlight_cache(completion::shell_highlight_cache *cache)
+      wontthrow -> completion::shell_highlight_cache *
   {
     let *previous = m_diagnostic_highlight_cache;
     m_diagnostic_highlight_cache = cache;
@@ -958,7 +957,7 @@ public:
   }
 
   fn get_or_create_diagnostic_highlight_cache() throws
-      -> completion::diagnostic_highlight_cache *;
+      -> completion::shell_highlight_cache *;
   fn reset_runtime_diagnostic_highlight_cache() wontthrow -> void;
 
   fn render_contained_substitution_error(std::exception_ptr error,
@@ -1790,8 +1789,8 @@ protected:
      text. */
   ArrayList<source_frame> m_source_frames{heap_allocator()};
   bool m_should_print_source_traces{true};
-  completion::diagnostic_highlight_cache *m_diagnostic_highlight_cache{nullptr};
-  completion::diagnostic_highlight_cache *m_runtime_diagnostic_highlight_cache{
+  completion::shell_highlight_cache *m_diagnostic_highlight_cache{nullptr};
+  completion::shell_highlight_cache *m_runtime_diagnostic_highlight_cache{
       nullptr};
 
   ArrayList<Expression *> m_retained_source_asts{heap_allocator()};

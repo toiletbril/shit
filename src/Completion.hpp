@@ -2,6 +2,7 @@
 
 #include "Common.hpp"
 #include "Eval.hpp"
+#include "Highlight.hpp"
 #include "Path.hpp"
 #include "String.hpp"
 #include "StringMap.hpp"
@@ -51,19 +52,39 @@ fn complete_filesystem_names(StringView token, EvalContext &context,
     -> ArrayList<String>;
 
 /* The spans come back sorted by start and non-overlapping. */
-struct highlight_span
-{
-  usize start;
-  usize end;
-  StringView sgr;
-};
-
 enum class shell_lexical_frame_kind : u8
 {
   command,
   backtick,
   arithmetic,
   parameter,
+};
+
+enum class highlight_construct : u8
+{
+  if_,
+  while_until,
+  for_,
+  case_,
+  function,
+  conditional,
+};
+
+enum class highlight_construct_phase : u8
+{
+  condition,
+  body,
+  for_variable,
+  for_in,
+  for_do,
+  function_name,
+};
+
+struct shell_lexical_construct
+{
+  usize frame_depth;
+  highlight_construct kind;
+  highlight_construct_phase phase;
 };
 
 struct shell_lexical_frame
@@ -87,11 +108,12 @@ struct shell_pending_heredoc
 struct shell_lexical_state
 {
   explicit shell_lexical_state(Allocator allocator)
-      : frames{allocator}, pending_heredocs{allocator}
+      : frames{allocator}, pending_heredocs{allocator}, constructs{allocator}
   {}
 
   ArrayList<shell_lexical_frame> frames;
   ArrayList<shell_pending_heredoc> pending_heredocs;
+  ArrayList<shell_lexical_construct> constructs;
   shell_lexical_frame root_frame{0, 0, shell_lexical_frame_kind::command, 0};
   usize source_position{0};
   usize active_heredoc_index{0};
@@ -100,7 +122,7 @@ struct shell_lexical_state
   bool is_in_heredoc{false};
 };
 
-class diagnostic_highlight_cache
+class shell_highlight_cache
 {
 public:
   fn spans_for(StringView source, usize line_start, usize line_end,
@@ -110,6 +132,7 @@ public:
 private:
   StringView m_source{};
   ArrayList<shell_lexical_state> m_checkpoints{heap_allocator()};
+  shell_lexical_state m_sequential_state{heap_allocator()};
   usize m_next_checkpoint_threshold{0};
   ArrayList<highlight_span> m_spans{heap_allocator()};
 };
@@ -117,8 +140,14 @@ private:
 fn highlight_line(StringView line, EvalContext &context) throws
     -> ArrayList<highlight_span>;
 
+fn append_highlighted_range(String &output, StringView text,
+                            const ArrayList<highlight_span> &spans,
+                            usize range_start, usize range_end,
+                            const highlight_theme &theme) throws -> void;
+
 #if !defined NDEBUG
 pure fn debug_highlight_input_byte_count() wontthrow -> usize;
+pure fn debug_shell_lexical_scan_byte_count() wontthrow -> usize;
 fn debug_diagnostic_cache_is_stable(EvalContext &context) throws -> bool;
 #endif
 

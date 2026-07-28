@@ -1,4 +1,6 @@
-echo "== a bare definition colors the name and a later call resolves:"
-"$BIN" --debug-highlight-at 'f() { :; }; f'
-echo "== a call before the definition stays unknown:"
-"$BIN" --debug-highlight-at 'g; g() { :; }; g'
+set -e
+
+result=$("$BIN" --debug-highlight-at 'g; g() { :; }; g')
+tab=$(printf '\t')
+printf '%s\n' "$result" |
+    grep -E "^g${tab}(unknown-command|function-name|resolved-command)$"

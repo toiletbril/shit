@@ -1,18 +1,30 @@
-echo "== if then elif else fi:"
-"$BIN" --debug-highlight-at 'if true; then echo a; elif false; then echo b; else echo c; fi'
-echo "== while do done:"
-"$BIN" --debug-highlight-at 'while true; do echo x; done'
-echo "== for in do done:"
-"$BIN" --debug-highlight-at 'for q in 1 2; do echo $q; done'
-echo "== case esac:"
-"$BIN" --debug-highlight-at 'case x in y) echo z;; esac'
-echo "== bracket conditional:"
-"$BIN" --debug-highlight-at '[[ -n x ]] && echo y'
-echo "== function keyword:"
-"$BIN" --debug-highlight-at 'function f { :; }; f'
-echo "== time keyword:"
-"$BIN" --debug-highlight-at 'time echo hi'
-echo "== misplaced then done fi esac do as a command:"
-"$BIN" --debug-highlight-at 'then; done; fi; esac; do echo a; in foo'
-echo "== palette and lexical flags:"
-"$BIN" --debug-highlight-at 'echo "green" - -x -- --long=value --color="$PATH" *.shit ./shit-highlight-missing-path-xyz; shit-highlight-missing-command-xyz'
+set -e
+
+tab=$(printf '\t')
+
+"$BIN" --debug-highlight-at \
+    'if true; then :; elif false; then :; else :; fi; while true; do :; done; for q in 1; do :; done' |
+    grep -E "${tab}keyword$"
+
+"$BIN" --debug-highlight-at \
+    'case x in y) :;; esac; [[ -n x ]]; function f { :; }; time echo hi' |
+    grep -E "${tab}(keyword|function-name|flag)$"
+
+"$BIN" --debug-highlight-at 'then; done; fi; esac; do echo a; in foo' |
+    grep -E "${tab}invalid-syntax$"
+
+"$BIN" --debug-highlight-at \
+    'echo "green" - -x -- --long=value --color="$PATH" *.shit ./shit-highlight-missing-path-xyz; shit-highlight-missing-command-xyz' |
+    grep -E "${tab}(string|flag|glob|invalid-path|unknown-command)$"
+
+"$BIN" --debug-highlight-at 'if true
+then echo "$MISSING"
+fi' | grep -E "${tab}(keyword|unset-variable)$"
+
+"$BIN" --debug-highlight-at 'for q
+do :
+done
+for r
+in a
+do :
+done' | grep -E "${tab}(keyword|variable)$"

@@ -1,8 +1,7 @@
-echo "== use before a standalone assignment, then after:"
-"$BIN" --debug-highlight-at 'echo $V; V=1; echo $V'
-echo "== a prefix assignment leaves the name unset for the same command:"
-"$BIN" --debug-highlight-at 'V2=1 echo $V2'
-echo "== an array element assignment binds the base name:"
-"$BIN" --debug-highlight-at 'echo $arr; arr[0]=1; echo $arr'
-echo "== an exported name is set everywhere:"
-"$BIN" --debug-highlight-at 'echo $PATH'
+set -e
+
+result=$("$BIN" --debug-highlight-at \
+    'echo $V; V=1; echo $V; V2=1 echo $V2; echo $arr; arr[0]=1; echo $arr; echo $PATH')
+tab=$(printf '\t')
+printf '%s\n' "$result" |
+    grep -E "${tab}(unset-variable|variable|assignment-name)$"

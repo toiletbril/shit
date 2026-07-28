@@ -44,14 +44,14 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
 EvalContext::~EvalContext() { reset_runtime_diagnostic_highlight_cache(); }
 
 fn EvalContext::get_or_create_diagnostic_highlight_cache() throws
-    -> completion::diagnostic_highlight_cache *
+    -> completion::shell_highlight_cache *
 {
   if (m_diagnostic_highlight_cache != nullptr)
     return m_diagnostic_highlight_cache;
 
   if (m_runtime_diagnostic_highlight_cache == nullptr) {
     m_runtime_diagnostic_highlight_cache =
-        new completion::diagnostic_highlight_cache{};
+        new completion::shell_highlight_cache{};
   }
 
   return m_runtime_diagnostic_highlight_cache;

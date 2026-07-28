@@ -1,22 +1,3 @@
-== a bare definition colors the name and a later call resolves:
-f	\e[94m
-(	\e[1m
-)	\e[1m
-{	\e[1m
-:	\e[34m
-;	\e[1m
-}	\e[1m
-;	\e[1m
-f	\e[34m
-== a call before the definition stays unknown:
-g	\e[91;4:3;58:5:10m
-;	\e[1m
-g	\e[94m
-(	\e[1m
-)	\e[1m
-{	\e[1m
-:	\e[34m
-;	\e[1m
-}	\e[1m
-;	\e[1m
-g	\e[34m
+g	unknown-command
+g	function-name
+g	resolved-command

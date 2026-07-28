@@ -180,7 +180,6 @@ static fn run_debug_completion_driver(StringView driver_line,
   return 0;
 }
 
-/* The escape byte is shown as \e so the golden stays readable. */
 static fn run_debug_highlight_driver(StringView driver_line,
                                      EvalContext &context) throws -> i32
 {
@@ -196,37 +195,17 @@ static fn run_debug_highlight_driver(StringView driver_line,
     listing +=
         driver_line.substring_of_length(span.start, span.end - span.start);
     listing += '\t';
-    for (usize i = 0; i < span.sgr.length; i++) {
-      if (span.sgr[i] == '\x1b') {
-        listing += "\\e";
-      } else {
-        listing.push(span.sgr[i]);
-      }
-    }
+    listing += highlight_role_name(span.role);
     listing += '\n';
   }
-  if (os::get_environment_variable("SHIT_TEST_HIGHLIGHT_STATS").has_value()) {
-    listing += "highlight-variable-name-visits=";
-    listing += String::from(context.debug_variable_name_enumeration_count() -
-                                variable_name_visit_count_before,
-                            heap_allocator());
-    listing += '\n';
-  }
-  if (os::get_environment_variable("SHIT_TEST_DIAGNOSTIC_CACHE").has_value()) {
-    listing += "diagnostic-cache-stable=";
-    listing +=
-        completion::debug_diagnostic_cache_is_stable(context) ? '1' : '0';
-    listing += '\n';
-  }
-  if (os::get_environment_variable("SHIT_TEST_HIGHLIGHT_DIRECTORY_STATS")
-          .has_value())
-  {
-    listing += "highlight-directory-reads=";
-    listing += String::from(utils::debug_directory_read_count() -
-                                directory_read_count_before,
-                            heap_allocator());
-    listing += '\n';
-  }
+  LOG(All, "highlighting visited %zu variable names",
+      context.debug_variable_name_enumeration_count() -
+          variable_name_visit_count_before);
+  LOG(All, "highlighting read %zu directories",
+      utils::debug_directory_read_count() - directory_read_count_before);
+  if (LOGGER_VERBOSITY == verbosity::All)
+    LOG(All, "the diagnostic highlight cache is stable %d",
+        completion::debug_diagnostic_cache_is_stable(context));
   print(listing);
   flush();
   return 0;
@@ -446,9 +425,11 @@ static fn run_script_contents(const String &script_contents,
 #if !defined NDEBUG
     let const diagnostic_highlight_bytes_before =
         completion::debug_highlight_input_byte_count();
+    let const diagnostic_lexical_scan_bytes_before =
+        completion::debug_shell_lexical_scan_byte_count();
 #endif
     if (run_analysis) {
-      let highlight_cache = completion::diagnostic_highlight_cache{};
+      let highlight_cache = completion::shell_highlight_cache{};
       let *previous_highlight_cache =
           context.set_diagnostic_highlight_cache(&highlight_cache);
       defer
@@ -462,15 +443,12 @@ static fn run_script_contents(const String &script_contents,
           FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
     }
 #if !defined NDEBUG
-    if (os::get_environment_variable("SHIT_TEST_DIAGNOSTIC_HIGHLIGHT_STATS")
-            .has_value())
-    {
-      print_error("diagnostic-highlight-bytes=");
-      print_error(String::from(completion::debug_highlight_input_byte_count() -
-                                   diagnostic_highlight_bytes_before,
-                               heap_allocator()));
-      print_error("\n");
-    }
+    LOG(All, "diagnostic highlighting consumed %zu source bytes",
+        completion::debug_highlight_input_byte_count() -
+            diagnostic_highlight_bytes_before);
+    LOG(All, "diagnostic lexical replay consumed %zu source bytes",
+        completion::debug_shell_lexical_scan_byte_count() -
+            diagnostic_lexical_scan_bytes_before);
 #endif
     if (!analysis_failed && out_ast != nullptr) {
       *out_ast = ast;

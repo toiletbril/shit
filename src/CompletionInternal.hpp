@@ -42,7 +42,9 @@ fn resolve_completion_command(StringView command, EvalContext &context) throws
 fn split_completion_words(StringView line, usize cursor, usize &cword) throws
     -> ArrayList<String>;
 pure fn word_looks_like_assignment(StringView word) wontthrow -> bool;
-pure fn shell_keyword_starts_command(StringView word) wontthrow -> bool;
+fn advance_shell_keyword_state(StringView word, usize frame_depth,
+                               shell_lexical_state &state) throws
+    -> Maybe<bool>;
 
 /* Defined in CompletionManpage.cpp. */
 fn second_word_of(StringView line) wontthrow -> Maybe<StringView>;

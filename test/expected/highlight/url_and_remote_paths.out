@@ -1,12 +1,5 @@
-== URLs and SSH remote paths share the URL highlight:
-echo	\e[34m
-https://example.com/a	\e[1;37m
-user@host:/dir/file	\e[1;37m
-== a local colon path remains a local path:
-echo	\e[34m
-./	\e[96m
-missing:part	\e[91;4:3;58:5:10m
-== a Windows drive path remains a local path:
-echo	\e[34m
-C:	\e[91;4:3;58:5:10m
-/missing	\e[91;4:3;58:5:10m
+https://example.com/a	url
+user@host:/dir/file	url
+missing:part	invalid-path
+C:	invalid-path
+/missing	invalid-path

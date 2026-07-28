@@ -1,20 +1,9 @@
-== use before a standalone assignment, then after:
-echo	\e[34m
-$V	\e[91;4:3;58:5:10m
-;	\e[1m
-;	\e[1m
-echo	\e[34m
-$V	\e[36m
-== a prefix assignment leaves the name unset for the same command:
-echo	\e[34m
-$V2	\e[91;4:3;58:5:10m
-== an array element assignment binds the base name:
-echo	\e[34m
-$arr	\e[91;4:3;58:5:10m
-;	\e[1m
-;	\e[1m
-echo	\e[34m
-$arr	\e[36m
-== an exported name is set everywhere:
-echo	\e[34m
-$PATH	\e[36m
+$V	unset-variable
+V	assignment-name
+$V	variable
+V2	assignment-name
+$V2	unset-variable
+$arr	unset-variable
+arr	assignment-name
+$arr	variable
+$PATH	variable

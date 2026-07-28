@@ -244,7 +244,7 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
     const usize byte_length = std::strlen(buffer);
     let line = shit::StringView{buffer, byte_length};
 
-    shit::ArrayList<shit::completion::highlight_span> result =
+    shit::ArrayList<shit::highlight_span> result =
         shit::completion::highlight_line(line, *COMPLETION_CONTEXT);
 
     size_t filled = 0;
@@ -264,7 +264,10 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
         byte_position++;
       }
       out->spans[filled].end = codepoint_position;
-      out->spans[filled].sgr = span.sgr.data;
+      let const style =
+          shit::colors::SHELL_HIGHLIGHT_THEME.style_for(span.role);
+      if (style.is_empty()) continue;
+      out->spans[filled].sgr = style.data;
       filled++;
     }
     out->count = filled;

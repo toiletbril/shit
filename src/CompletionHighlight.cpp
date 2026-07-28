@@ -241,16 +241,6 @@ static pure fn word_looks_like_ssh_remote_path(StringView word) wontthrow
   return true;
 }
 
-enum class highlight_construct : u8
-{
-  if_,
-  while_until,
-  for_,
-  case_,
-  function,
-  conditional,
-};
-
 namespace {
 
 enum class keyword_role : u8
@@ -334,12 +324,61 @@ constexpr StaticStringMap HIGHLIGHT_KEYWORDS{HIGHLIGHT_KEYWORD_ENTRIES};
 
 } /* namespace */
 
-pure fn shell_keyword_starts_command(StringView word) wontthrow -> bool
+fn advance_shell_keyword_state(StringView word, usize frame_depth,
+                               shell_lexical_state &state) throws -> Maybe<bool>
 {
   let const spec = HIGHLIGHT_KEYWORDS.find(word);
-  if (!spec.has_value()) return false;
-  if (spec->role == keyword_role::open) return spec->next_is_command;
-  return spec->role != keyword_role::misplaced_in;
+  if (!spec.has_value()) return None;
+  LOG(All, "advancing the lexical keyword state for '%.*s'",
+      static_cast<int>(word.length), word.data);
+
+  switch (spec->role) {
+  case keyword_role::open: {
+    if (spec->construct == highlight_construct::case_)
+      return spec->next_is_command;
+
+    let phase = highlight_construct_phase::condition;
+    if (spec->construct == highlight_construct::for_)
+      phase = highlight_construct_phase::for_variable;
+    else if (spec->construct == highlight_construct::function)
+      phase = highlight_construct_phase::function_name;
+    else if (spec->construct == highlight_construct::conditional)
+      phase = highlight_construct_phase::body;
+    state.constructs.push(
+        shell_lexical_construct{frame_depth, spec->construct, phase});
+    return spec->next_is_command;
+  }
+
+  case keyword_role::check:
+    if (!state.constructs.is_empty()) {
+      let &top = state.constructs.back();
+      if (top.frame_depth == frame_depth &&
+          (top.kind == spec->construct ||
+           (spec->has_alt && top.kind == spec->construct_alt)))
+      {
+        top.phase = word == "elif" ? highlight_construct_phase::condition
+                                   : highlight_construct_phase::body;
+      }
+    }
+    return true;
+
+  case keyword_role::close:
+    if (!state.constructs.is_empty()) {
+      let const &top = state.constructs.back();
+      if (top.frame_depth == frame_depth &&
+          (top.kind == spec->construct ||
+           (spec->has_alt && top.kind == spec->construct_alt)))
+      {
+        state.constructs.pop_back();
+      }
+    }
+    return true;
+
+  case keyword_role::plain: return true;
+  case keyword_role::misplaced_in: return false;
+  }
+
+  return None;
 }
 
 static fn scan_highlight_range(StringView line, usize begin, usize end,
@@ -520,7 +559,7 @@ static fn color_path_argument(usize word_start, StringView word,
       existing_end = word.length;
     } else if (is_prefix_non_directory) {
       spans.push(highlight_span{word_start, word_start + word.length,
-                                colors::ansi::RED_CURLY_GREEN_UNDERLINE});
+                                highlight_role::invalid_path});
       return true;
     } else {
       usize component_end = os::path_root_length(word);
@@ -541,7 +580,7 @@ static fn color_path_argument(usize word_start, StringView word,
         if (!do_prefix_is_valid(component_end, must_be_directory)) {
           if (is_prefix_non_directory) {
             spans.push(highlight_span{word_start, word_start + word.length,
-                                      colors::ansi::RED_CURLY_GREEN_UNDERLINE});
+                                      highlight_role::invalid_path});
             return true;
           }
           break;
@@ -556,7 +595,7 @@ static fn color_path_argument(usize word_start, StringView word,
 
   if (existing_end > 0)
     spans.push(highlight_span{word_start, word_start + existing_end,
-                              colors::ansi::BRIGHT_CYAN});
+                              highlight_role::existing_path});
 
   if (existing_end >= word.length) return true;
 
@@ -572,15 +611,14 @@ static fn color_path_argument(usize word_start, StringView word,
       path_partial_prefixes_entry(
           word, existing_end, partial, has_tilde, directories_only,
           expanded_tilde_prefix.view(), tilde_prefix_length);
-  let const tail_color = tail_could_complete
-                             ? colors::ansi::CYAN
-                             : colors::ansi::RED_CURLY_GREEN_UNDERLINE;
+  let const tail_role = tail_could_complete ? highlight_role::partial_path
+                                            : highlight_role::invalid_path;
   spans.push(highlight_span{word_start + existing_end, word_start + segment_end,
-                            tail_color});
+                            tail_role});
   if (segment_end < word.length)
     spans.push(highlight_span{word_start + segment_end,
                               word_start + word.length,
-                              colors::ansi::RED_CURLY_GREEN_UNDERLINE});
+                              highlight_role::invalid_path});
 
   return true;
 }
@@ -638,12 +676,12 @@ static fn color_dollar(StringView line, usize i, usize end,
   }
   let const expansion_end = scan_dollar_expansion(line, i, end);
   if (expansion_end > i) {
-    let sgr = colors::ansi::CYAN;
+    let role = highlight_role::variable;
     if (Maybe<StringView> name = simple_dollar_name(line, i, expansion_end);
         name.has_value() &&
         !dollar_name_is_set(*name, line_variable_names, context))
-      sgr = colors::ansi::RED_CURLY_GREEN_UNDERLINE;
-    spans.push(highlight_span{i, expansion_end, sgr});
+      role = highlight_role::unset_variable;
+    spans.push(highlight_span{i, expansion_end, role});
   }
   return expansion_end;
 }
@@ -668,7 +706,7 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
 
     if (c == '(') {
       parenthesis_depth++;
-      spans.push(highlight_span{i, i + 1, colors::ansi::BOLD});
+      spans.push(highlight_span{i, i + 1, highlight_role::operator_});
       i++;
       continue;
     }
@@ -680,7 +718,7 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
         return i + 2;
       }
       if (parenthesis_depth > 0) parenthesis_depth--;
-      spans.push(highlight_span{i, i + 1, colors::ansi::BOLD});
+      spans.push(highlight_span{i, i + 1, highlight_role::operator_});
       i++;
       continue;
     }
@@ -693,8 +731,8 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
       spans.push(
           highlight_span{name_start, i,
                          dollar_name_is_set(name, line_variable_names, context)
-                             ? colors::ansi::CYAN
-                             : colors::ansi::RED_CURLY_GREEN_UNDERLINE});
+                             ? highlight_role::variable
+                             : highlight_role::unset_variable});
       continue;
     }
 
@@ -715,7 +753,7 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
            !(line[i] >= '0' && line[i] <= '9') &&
            !lexer::is_whitespace(line[i]))
       i++;
-    spans.push(highlight_span{operator_start, i, colors::ansi::BOLD});
+    spans.push(highlight_span{operator_start, i, highlight_role::operator_});
   }
 
   return i;
@@ -758,7 +796,7 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
       if (content == heredoc.delimiter) {
         if (body_start < line_end)
           spans.push(
-              highlight_span{body_start, line_end, colors::ansi::BRIGHT_GREEN});
+              highlight_span{body_start, line_end, highlight_role::heredoc});
         i = next;
         was_closed = true;
         break;
@@ -769,7 +807,7 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
 
     if (!was_closed) {
       if (body_start < end)
-        spans.push(highlight_span{body_start, end, colors::ansi::BRIGHT_GREEN});
+        spans.push(highlight_span{body_start, end, highlight_role::heredoc});
       i = end;
       break;
     }
@@ -786,8 +824,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
                                HashSet &line_variable_names,
                                bool stop_at_closing_parenthesis) throws -> usize
 {
-  let do_push = [&](usize start, usize stop, StringView sgr) throws -> void {
-    if (start < stop) spans.push(highlight_span{start, stop, sgr});
+  let do_push = [&](usize start, usize stop, highlight_role role)
+                    throws -> void {
+    if (start < stop) spans.push(highlight_span{start, stop, role});
   };
 
   let pending_assignment_names =
@@ -843,7 +882,6 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         commit_pending_assignments();
         is_command_position = true;
         highlight_command_word = StringView{};
-        expecting_in = false;
         i++;
         if (!pending_heredocs.is_empty()) {
           i = scan_heredoc_bodies(line, i, end, pending_heredocs, spans);
@@ -859,7 +897,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       let comment_end = i;
       while (comment_end < end && line[comment_end] != '\n')
         comment_end++;
-      do_push(i, comment_end, colors::ansi::DIM);
+      do_push(i, comment_end, highlight_role::comment);
       i = comment_end;
       continue;
     }
@@ -875,7 +913,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         should_strip_tabs = true;
         i++;
       }
-      do_push(operator_start, i, colors::ansi::BOLD);
+      do_push(operator_start, i, highlight_role::operator_);
 
       while (i < end && (line[i] == ' ' || line[i] == '\t'))
         i++;
@@ -887,7 +925,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       let const delimiter_word =
           line.substring_of_length(delimiter_start, i - delimiter_start);
       if (!delimiter_word.is_empty()) {
-        do_push(delimiter_start, i, colors::ansi::BRIGHT_GREEN);
+        do_push(delimiter_start, i, highlight_role::heredoc);
 
         let delimiter = delimiter_word;
         if (delimiter.length >= 2) {
@@ -938,7 +976,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       let const closes_range = has_closer && parenthesis_depth == 0 &&
                                stop_at_closing_parenthesis &&
                                !case_pattern_expected;
-      if (!closes_range) do_push(operator_start, i, colors::ansi::BOLD);
+      if (!closes_range) do_push(operator_start, i, highlight_role::operator_);
 
       if (has_separator || has_opener || has_closer)
         commit_pending_assignments();
@@ -984,7 +1022,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           i++;
         if (i < end) i++;
         word_spans.push(
-            highlight_span{string_start, i, colors::ansi::BRIGHT_GREEN});
+            highlight_span{string_start, i, highlight_role::string});
       } else if (d == '"') {
         /* literal_start tracks the current yellow run, which resumes after
            every expansion. */
@@ -998,7 +1036,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           if (line[i] == '$') {
             if (i > literal_start)
               word_spans.push(
-                  highlight_span{literal_start, i, colors::ansi::BRIGHT_GREEN});
+                  highlight_span{literal_start, i, highlight_role::string});
             i = color_dollar(line, i, end, word_spans, context,
                              line_variable_names);
             literal_start = i;
@@ -1007,7 +1045,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           if (line[i] == '`') {
             if (i > literal_start)
               word_spans.push(
-                  highlight_span{literal_start, i, colors::ansi::BRIGHT_GREEN});
+                  highlight_span{literal_start, i, highlight_role::string});
             i = do_color_backtick(i, word_spans);
             literal_start = i;
             continue;
@@ -1017,7 +1055,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         if (i < end) i++;
         if (i > literal_start)
           word_spans.push(
-              highlight_span{literal_start, i, colors::ansi::BRIGHT_GREEN});
+              highlight_span{literal_start, i, highlight_role::string});
       } else if (d == '`') {
         i = do_color_backtick(i, word_spans);
       } else if (d == '$') {
@@ -1036,31 +1074,36 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     let const is_assignment = word_looks_like_assignment(word);
 
     if (!is_command_position && word.length > 1 && word[0] == '-') {
-      do_push(word_start, word_end, colors::ansi::ITALIC);
+      do_push(word_start, word_end, highlight_role::flag);
       continue;
     }
 
     if (is_assignment && is_command_position) {
-      let assigned_name =
-          word.substring_of_length(0, word.find_character('=').value());
+      let assigned_name_end = word.find_character('=').value();
+      if (assigned_name_end > 0 && word[assigned_name_end - 1] == '+')
+        assigned_name_end--;
+      let assigned_name = word.substring_of_length(0, assigned_name_end);
       if (Maybe<usize> bracket = assigned_name.find_character('[');
           bracket.has_value())
         assigned_name = assigned_name.substring_of_length(0, bracket.value());
-      if (is_plain_identifier(assigned_name))
+      if (is_plain_identifier(assigned_name)) {
         pending_assignment_names.push(assigned_name);
+        do_push(word_start, word_start + assigned_name.length,
+                highlight_role::assignment_name);
+      }
     }
 
     if (plain && word == "]]" && !stack.is_empty() &&
         stack.back() == highlight_construct::conditional)
     {
-      do_push(word_start, word_end, colors::ansi::BOLD_GREEN);
+      do_push(word_start, word_end, highlight_role::keyword);
       stack.pop_back();
       is_command_position = false;
       continue;
     }
 
     if (expecting_in && plain && word == "in") {
-      do_push(word_start, word_end, colors::ansi::BOLD_GREEN);
+      do_push(word_start, word_end, highlight_role::keyword);
       expecting_in = false;
       for_variable_pending = false;
       is_command_position = false;
@@ -1078,10 +1121,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       for_variable_pending = false;
       is_command_position = false;
       if (!plain || !is_plain_identifier(word)) {
-        do_push(word_start, word_end,
-                colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
+        do_push(word_start, word_end, highlight_role::invalid_syntax);
       } else {
-        do_push(word_start, word_end, colors::ansi::CYAN);
+        do_push(word_start, word_end, highlight_role::variable);
         line_variable_names.add(word);
       }
       continue;
@@ -1091,11 +1133,10 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       function_name_pending = false;
       is_command_position = false;
       if (plain && is_plain_identifier(word)) {
-        do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
+        do_push(word_start, word_end, highlight_role::function_name);
         line_functions.add(word);
       } else {
-        do_push(word_start, word_end,
-                colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
+        do_push(word_start, word_end, highlight_role::invalid_syntax);
       }
       continue;
     }
@@ -1105,8 +1146,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (for_do_expected && is_command_position) {
       for_do_expected = false;
       if (word != "do") {
-        do_push(word_start, word_end,
-                colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
+        do_push(word_start, word_end, highlight_role::invalid_syntax);
         is_command_position = false;
         continue;
       }
@@ -1162,8 +1202,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       if (is_keyword) {
         do_push(word_start, word_end,
-                keyword_ok ? colors::ansi::BOLD_GREEN
-                           : colors::ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
+                keyword_ok ? highlight_role::keyword
+                           : highlight_role::invalid_syntax);
         is_command_position = next_is_command;
         if (opens_in) expecting_in = true;
         if (opens_for_variable) for_variable_pending = true;
@@ -1178,7 +1218,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       {
         color_path_argument(word_start, word, is_word_terminated, false, spans);
       } else if (word_defines_function(line, word_end, end)) {
-        do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
+        do_push(word_start, word_end, highlight_role::function_name);
         line_functions.add(word);
       } else {
         let const is_command_resolved = first_word_resolves(word, context);
@@ -1187,12 +1227,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
                 ? command_word_prefixes_any(word, context)
                 : false;
         if (is_command_resolved || line_functions.contains(word)) {
-          do_push(word_start, word_end, colors::ansi::BLUE);
+          do_push(word_start, word_end, highlight_role::resolved_command);
         } else if (command_has_prefix) {
-          do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
+          do_push(word_start, word_end, highlight_role::partial_command);
         } else {
-          do_push(word_start, word_end,
-                  colors::ansi::RED_CURLY_GREEN_UNDERLINE);
+          do_push(word_start, word_end, highlight_role::unknown_command);
         }
       }
       is_command_position = false;
@@ -1203,10 +1242,10 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (word_contains_url_scheme(word) ||
           word_looks_like_ssh_remote_path(word))
       {
-        do_push(word_start, word_end, colors::ansi::BOLD_WHITE);
+        do_push(word_start, word_end, highlight_role::url);
       } else if (token_has_glob_metacharacter(word)) {
         /* The word is plain here so the metacharacter is live. */
-        do_push(word_start, word_end, colors::ansi::YELLOW);
+        do_push(word_start, word_end, highlight_role::glob);
       } else {
         let const is_word_terminated =
             word_is_terminated_by_separator(line, word_end, end);
@@ -1216,7 +1255,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       }
     }
     for (let const &inner : word_spans)
-      do_push(inner.start, inner.end, inner.sgr);
+      do_push(inner.start, inner.end, inner.role);
     if (is_command_position && !is_assignment) {
       pending_assignment_names.clear();
       is_command_position = false;
@@ -1241,7 +1280,7 @@ static fn highlight_line_with_lexical_state(
   let line_variable_names = HashSet{arena};
   if (lexical_state != nullptr && lexical_state->is_in_heredoc) {
     if (!line.is_empty())
-      spans.push(highlight_span{0, line.length, colors::ansi::BRIGHT_GREEN});
+      spans.push(highlight_span{0, line.length, highlight_role::heredoc});
     return spans;
   }
 
@@ -1251,6 +1290,47 @@ static fn highlight_line_with_lexical_state(
                                         throws -> void {
     for (usize group_index = 0; group_index < frame.group_depth; group_index++)
       synthetic_line.append("( ");
+  };
+  let const do_append_construct_state = [&](usize frame_depth) throws -> void {
+    for (let const &construct : lexical_state->constructs) {
+      if (construct.frame_depth != frame_depth) continue;
+      switch (construct.kind) {
+      case highlight_construct::if_:
+        synthetic_line.append(construct.phase == highlight_construct_phase::body
+                                  ? "if :; then "
+                                  : "if :; ");
+        break;
+      case highlight_construct::while_until:
+        synthetic_line.append(construct.phase == highlight_construct_phase::body
+                                  ? "while :; do "
+                                  : "while :; ");
+        break;
+      case highlight_construct::for_:
+        switch (construct.phase) {
+        case highlight_construct_phase::for_variable:
+          synthetic_line.append("for ");
+          break;
+        case highlight_construct_phase::for_in:
+          synthetic_line.append("for x\n");
+          break;
+        case highlight_construct_phase::for_do:
+          synthetic_line.append("for x in a; ");
+          break;
+        default: synthetic_line.append("for x; do "); break;
+        }
+        break;
+      case highlight_construct::conditional:
+        synthetic_line.append("[[ x ");
+        break;
+      case highlight_construct::function:
+        synthetic_line.append(construct.phase ==
+                                      highlight_construct_phase::function_name
+                                  ? "function "
+                                  : "function f { ");
+        break;
+      case highlight_construct::case_: break;
+      }
+    }
   };
   let const do_append_frame_semantic_state =
       [&](const shell_lexical_frame &frame) throws -> void {
@@ -1271,6 +1351,7 @@ static fn highlight_line_with_lexical_state(
   };
   if (lexical_state != nullptr &&
       (!lexical_state->frames.is_empty() || lexical_state->quote != 0 ||
+       !lexical_state->constructs.is_empty() ||
        !lexical_state->root_frame.is_command_position ||
        lexical_state->root_frame.group_depth > 0 ||
        lexical_state->root_frame.case_depth > 0 ||
@@ -1278,8 +1359,12 @@ static fn highlight_line_with_lexical_state(
        lexical_state->root_frame.case_pattern_expected))
   {
     do_append_group_state(lexical_state->root_frame);
+    do_append_construct_state(0);
     do_append_frame_semantic_state(lexical_state->root_frame);
-    for (let const &frame : lexical_state->frames) {
+    for (usize frame_index = 0; frame_index < lexical_state->frames.count();
+         frame_index++)
+    {
+      let const &frame = lexical_state->frames[frame_index];
       if (frame.parent_quote != 0) synthetic_line.push(frame.parent_quote);
       switch (frame.kind) {
       case shell_lexical_frame_kind::command:
@@ -1294,6 +1379,7 @@ static fn highlight_line_with_lexical_state(
         break;
       }
       do_append_group_state(frame);
+      do_append_construct_state(frame_index + 1);
       if (frame.kind == shell_lexical_frame_kind::command ||
           frame.kind == shell_lexical_frame_kind::backtick)
       {
@@ -1330,11 +1416,41 @@ fn highlight_line(StringView line, EvalContext &context) throws
   return highlight_line_with_lexical_state(line, context, nullptr);
 }
 
+fn append_highlighted_range(String &output, StringView text,
+                            const ArrayList<highlight_span> &spans,
+                            usize range_start, usize range_end,
+                            const highlight_theme &theme) throws -> void
+{
+  if (range_end > text.length) range_end = text.length;
+  if (range_start > range_end) range_start = range_end;
+
+  let rendered_position = range_start;
+  for (let const &span : spans) {
+    if (span.end <= range_start) continue;
+    if (span.start >= range_end) break;
+
+    let const span_start = span.start < range_start ? range_start : span.start;
+    let const span_end = span.end > range_end ? range_end : span.end;
+    if (rendered_position < span_start)
+      output += text.substring_of_length(rendered_position,
+                                         span_start - rendered_position);
+
+    let const style = theme.style_for(span.role);
+    if (!style.is_empty()) output += style;
+    output += text.substring_of_length(span_start, span_end - span_start);
+    if (!style.is_empty()) output += theme.reset;
+    rendered_position = span_end;
+  }
+
+  if (rendered_position < range_end)
+    output += text.substring_of_length(rendered_position,
+                                       range_end - rendered_position);
+}
+
 static constexpr usize DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL = 4096;
 
-fn diagnostic_highlight_cache::spans_for(StringView source, usize line_start,
-                                         usize line_end,
-                                         EvalContext &context) throws
+fn shell_highlight_cache::spans_for(StringView source, usize line_start,
+                                    usize line_end, EvalContext &context) throws
     -> const ArrayList<highlight_span> *
 {
   let const source_changed =
@@ -1343,52 +1459,76 @@ fn diagnostic_highlight_cache::spans_for(StringView source, usize line_start,
     m_source = source;
     m_checkpoints.clear();
     m_spans.clear();
+    m_sequential_state = shell_lexical_state{heap_allocator()};
 
     let state = shell_lexical_state{heap_allocator()};
     m_checkpoints.push(state);
     m_next_checkpoint_threshold = DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL;
   }
 
-  let state = m_checkpoints.back();
-  while (m_next_checkpoint_threshold < source.length &&
-         m_next_checkpoint_threshold < line_start)
-  {
-    usize checkpoint_position = m_next_checkpoint_threshold;
-    while (checkpoint_position < source.length &&
-           source[checkpoint_position - 1] != '\n')
-      checkpoint_position++;
-    if (checkpoint_position >= source.length) {
-      m_next_checkpoint_threshold = source.length;
-      break;
+  let const do_advance_with_checkpoints = [&](shell_lexical_state &state,
+                                              usize target) throws -> void {
+    while (m_next_checkpoint_threshold < source.length &&
+           m_next_checkpoint_threshold < target)
+    {
+      usize checkpoint_position = m_next_checkpoint_threshold;
+      while (checkpoint_position < source.length &&
+             source[checkpoint_position - 1] != '\n')
+        checkpoint_position++;
+      if (checkpoint_position >= source.length) {
+        m_next_checkpoint_threshold = source.length;
+        break;
+      }
+      if (checkpoint_position > target) break;
+      advance_shell_lexical_state(source, checkpoint_position, state);
+      m_checkpoints.push(state);
+      m_next_checkpoint_threshold =
+          checkpoint_position + DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL;
     }
-    if (checkpoint_position > line_start) break;
-    advance_shell_lexical_state(source, checkpoint_position, state);
-    m_checkpoints.push(state);
-    m_next_checkpoint_threshold =
-        checkpoint_position + DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL;
-  }
+    advance_shell_lexical_state(source, target, state);
+  };
 
-  usize checkpoint_index = 0;
-  usize checkpoint_limit = m_checkpoints.count();
-  while (checkpoint_index + 1 < checkpoint_limit) {
-    let const middle =
-        checkpoint_index + (checkpoint_limit - checkpoint_index) / 2;
-    if (m_checkpoints[middle].source_position <= line_start)
-      checkpoint_index = middle;
-    else
-      checkpoint_limit = middle;
-  }
+  let lexical_state = shell_lexical_state{heap_allocator()};
+  const shell_lexical_state *line_state = &m_sequential_state;
+  if (m_sequential_state.source_position != line_start) {
+    usize checkpoint_index = 0;
+    usize checkpoint_limit = m_checkpoints.count();
+    while (checkpoint_index + 1 < checkpoint_limit) {
+      let const middle =
+          checkpoint_index + (checkpoint_limit - checkpoint_index) / 2;
+      if (m_checkpoints[middle].source_position <= line_start)
+        checkpoint_index = middle;
+      else
+        checkpoint_limit = middle;
+    }
 
-  let lexical_state = m_checkpoints[checkpoint_index];
-  advance_shell_lexical_state(source, line_start, lexical_state);
+    lexical_state = m_checkpoints[checkpoint_index];
+    do_advance_with_checkpoints(lexical_state, line_start);
+    line_state = &lexical_state;
+  }
   let const source_line =
       source.substring_of_length(line_start, line_end - line_start);
+#if !defined NDEBUG
+  LOG(All, "highlighting cached line at %zu with %zu frames and quote %d",
+      line_state->source_position, line_state->frames.count(),
+      line_state->quote);
+  for (let const &construct : line_state->constructs)
+    LOG(All, "reconstructing lexical construct %u in phase %u",
+        static_cast<unsigned>(construct.kind),
+        static_cast<unsigned>(construct.phase));
+#endif
   let const generated =
-      highlight_line_with_lexical_state(source_line, context, &lexical_state);
+      highlight_line_with_lexical_state(source_line, context, line_state);
   m_spans.clear();
   m_spans.reserve(generated.count());
   for (let const &span : generated)
     m_spans.push(span);
+  if (line_state != &m_sequential_state)
+    m_sequential_state = steal(lexical_state);
+  let state_target = line_end;
+  if (state_target < source.length && source[state_target] == '\n')
+    state_target++;
+  do_advance_with_checkpoints(m_sequential_state, state_target);
   return &m_spans;
 }
 
@@ -1400,9 +1540,35 @@ pure fn debug_highlight_input_byte_count() wontthrow -> usize
 
 fn debug_diagnostic_cache_is_stable(EvalContext &context) throws -> bool
 {
-  let cache = diagnostic_highlight_cache{};
-  let const source = String{"value='start\nend'; echo ok"};
-  let const line_start = source.view().find_character('\n').value() + 1;
+  let cache = shell_highlight_cache{};
+  let const source = String{
+      "value=\"$(printf value\n) tail\"\nif true\nthen value='start\nend'; fi"};
+  usize keyword_line_start = 0;
+  usize string_line_start = 0;
+  usize line_index = 0;
+  for (usize position = 0; position < source.count(); position++) {
+    if (source[position] != '\n') continue;
+    line_index++;
+    if (line_index == 3) keyword_line_start = position + 1;
+    if (line_index == 4) string_line_start = position + 1;
+  }
+
+  let keyword_line_end = keyword_line_start;
+  while (keyword_line_end < source.count() && source[keyword_line_end] != '\n')
+    keyword_line_end++;
+  let const *keyword_spans = cache.spans_for(source.view(), keyword_line_start,
+                                             keyword_line_end, context);
+  let has_keyword_span = false;
+  for (let const &span : *keyword_spans) {
+    LOG(All, "the cached diagnostic span covers %zu through %zu as role %u",
+        span.start, span.end, static_cast<unsigned>(span.role));
+    if (span.start == 0 && span.end == 4 &&
+        span.role == highlight_role::keyword)
+      has_keyword_span = true;
+  }
+  if (!has_keyword_span) return false;
+
+  let const line_start = string_line_start;
   let const *first =
       cache.spans_for(source.view(), line_start, source.count(), context);
   let expected = ArrayList<highlight_span>{heap_allocator()};
@@ -1417,7 +1583,7 @@ fn debug_diagnostic_cache_is_stable(EvalContext &context) throws -> bool
   for (usize index = 0; index < expected.count(); index++) {
     if ((*repeated)[index].start != expected[index].start ||
         (*repeated)[index].end != expected[index].end ||
-        (*repeated)[index].sgr != expected[index].sgr)
+        (*repeated)[index].role != expected[index].role)
     {
       return false;
     }
@@ -1426,7 +1592,17 @@ fn debug_diagnostic_cache_is_stable(EvalContext &context) throws -> bool
   let const other_source = String{"echo ok"};
   let const *invalidated =
       cache.spans_for(other_source.view(), 0, other_source.count(), context);
-  return invalidated->count() != expected.count();
+  if (invalidated->count() != expected.count()) return true;
+  for (usize index = 0; index < expected.count(); index++) {
+    if ((*invalidated)[index].start != expected[index].start ||
+        (*invalidated)[index].end != expected[index].end ||
+        (*invalidated)[index].role != expected[index].role)
+    {
+      return true;
+    }
+  }
+
+  return false;
 }
 #endif
 
