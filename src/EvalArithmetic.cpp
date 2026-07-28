@@ -1133,15 +1133,13 @@ fn EvalContext::evaluate_arithmetic_cached_clause(
     StringView expression, ArrayList<arith_token> &tokens, bool &is_tokenized,
     bool &is_simple, const SourceLocation *source_location) throws -> i64
 {
-  /* A parameter or command substitution needs the full expansion path, only a
-     substitution-free expression takes the cached token path. */
-  if (expression.find_character('$').has_value() ||
-      expression.find_character('`').has_value())
-  {
-    return evaluate_arithmetic(expression, source_location);
-  }
-
   if (!is_tokenized) {
+    if (expression.find_character('$').has_value() ||
+        expression.find_character('`').has_value())
+    {
+      return evaluate_arithmetic(expression, source_location);
+    }
+
     tokens.clear();
     try {
       tokenize_arithmetic(expression, tokens);
