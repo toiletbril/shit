@@ -927,6 +927,8 @@ fn unset_environment_variable(StringView key) throws -> void
   unsetenv(key_string.c_str());
 }
 
+fn signal_internal_diagnostic() wontthrow -> void {}
+
 fn environment_names() throws -> ArrayList<String>
 {
   ArrayList<String> names{heap_allocator()};
@@ -1430,11 +1432,13 @@ fn try_fork_job_process() throws -> Maybe<process>
 fn can_fork_evaluator() wontthrow -> bool { return true; }
 
 fn launch_process_substitution(StringView source, bool command_writes_pipe,
-                               bool bash_compatible) throws
+                               bool bash_compatible,
+                               bool source_traces_enabled) throws
     -> process_substitution_launch
 {
   unused(source);
   unused(bash_compatible);
+  unused(source_traces_enabled);
 
   let const pipe = make_pipe();
   if (!pipe.has_value())

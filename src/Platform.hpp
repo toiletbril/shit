@@ -682,6 +682,7 @@ fn allocate_free_shell_fd(i32 floor_fd) wontthrow -> i32;
 fn get_environment_variable(StringView key) throws -> Maybe<String>;
 fn set_environment_variable(StringView key, StringView value) throws -> void;
 fn unset_environment_variable(StringView key) throws -> void;
+fn signal_internal_diagnostic() wontthrow -> void;
 
 fn environment_names() throws -> ArrayList<String>;
 
@@ -886,12 +887,15 @@ struct process_substitution_launch
   Maybe<descriptor> retained_fd{};
   Maybe<descriptor> child_close_fd{};
   process child{SHIT_INVALID_PROCESS};
+  String diagnostic_output{heap_allocator()};
   bool should_evaluate_child{false};
   bool is_temporary_file{false};
+  bool has_shell_diagnostic{false};
 };
 
 fn launch_process_substitution(StringView source, bool command_writes_pipe,
-                               bool bash_compatible) throws
+                               bool bash_compatible,
+                               bool source_traces_enabled) throws
     -> process_substitution_launch;
 
 fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,

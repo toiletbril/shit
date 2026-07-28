@@ -147,13 +147,13 @@ fn finish_sha256(sha256_state &state, Allocator allocator) throws -> String
 
 } // namespace
 
-static fn shell_word_expansion_end(StringView word, usize start) wontthrow
-    -> usize
+static fn shell_word_expansion_end(StringView word,
+                                   usize expansion_start) wontthrow -> usize
 {
-  if (start >= word.length) return start;
+  if (expansion_start >= word.length) return expansion_start;
 
-  if (word[start] == '`') {
-    usize position = start + 1;
+  if (word[expansion_start] == '`') {
+    usize position = expansion_start + 1;
     while (position < word.length) {
       if (word[position] == '\\' && position + 1 < word.length) {
         position += 2;
@@ -165,12 +165,13 @@ static fn shell_word_expansion_end(StringView word, usize start) wontthrow
     return word.length;
   }
 
-  if (word[start] != '$' || start + 1 >= word.length) return start;
+  if (word[expansion_start] != '$' || expansion_start + 1 >= word.length)
+    return expansion_start;
 
-  let const next = word[start + 1];
-  if (next == '{') {
+  let const next_byte = word[expansion_start + 1];
+  if (next_byte == '{') {
     usize depth = 1;
-    usize position = start + 2;
+    usize position = expansion_start + 2;
     while (position < word.length) {
       if (word[position] == '\\' && position + 1 < word.length) {
         position += 2;
@@ -183,33 +184,36 @@ static fn shell_word_expansion_end(StringView word, usize start) wontthrow
     return word.length;
   }
 
-  if (next == '(') {
+  if (next_byte == '(') {
     usize depth = 0;
-    char quote = 0;
-    for (usize position = start + 1; position < word.length; position++) {
+    char quote_character = 0;
+    for (usize position = expansion_start + 1; position < word.length;
+         position++)
+    {
       let const byte = word[position];
-      if (byte == '\\' && quote != '\'' && position + 1 < word.length) {
+      if (byte == '\\' && quote_character != '\'' && position + 1 < word.length)
+      {
         position++;
         continue;
       }
-      if ((byte == '\'' || byte == '"') && quote == 0) {
-        quote = byte;
+      if ((byte == '\'' || byte == '"') && quote_character == 0) {
+        quote_character = byte;
         continue;
       }
-      if (byte == quote) {
-        quote = 0;
+      if (byte == quote_character) {
+        quote_character = 0;
         continue;
       }
-      if (quote != 0) continue;
+      if (quote_character != 0) continue;
       if (byte == '(') depth++;
       if (byte == ')' && --depth == 0) return position + 1;
     }
     return word.length;
   }
 
-  usize position = start + 1;
-  if ((next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') ||
-      next == '_')
+  usize position = expansion_start + 1;
+  if ((next_byte >= 'a' && next_byte <= 'z') ||
+      (next_byte >= 'A' && next_byte <= 'Z') || next_byte == '_')
   {
     position++;
     while (position < word.length) {
@@ -224,20 +228,21 @@ static fn shell_word_expansion_end(StringView word, usize start) wontthrow
     return position;
   }
 
-  if ((next >= '0' && next <= '9') || next == '@' || next == '*' ||
-      next == '#' || next == '?' || next == '-' || next == '$' || next == '!')
+  if ((next_byte >= '0' && next_byte <= '9') || next_byte == '@' ||
+      next_byte == '*' || next_byte == '#' || next_byte == '?' ||
+      next_byte == '-' || next_byte == '$' || next_byte == '!')
   {
-    return start + 2;
+    return expansion_start + 2;
   }
 
-  return start;
+  return expansion_start;
 }
 
-fn decode_shell_word(StringView word, Allocator allocator) throws
-    -> decoded_shell_word
+fn decode_shell_word(StringView word, Allocator allocator,
+                     bool should_map_source) throws -> decoded_shell_word
 {
   let decoded = decoded_shell_word{allocator};
-  decoded.raw_positions.push(0);
+  if (should_map_source) decoded.raw_positions.push(0);
 
   char quote_character = 0;
   for (usize position = 0; position < word.length; position++) {
@@ -245,7 +250,7 @@ fn decode_shell_word(StringView word, Allocator allocator) throws
     if (quote_character == 0 && (byte == '\'' || byte == '"')) {
       quote_character = byte;
       decoded.open_quote_content_start = position + 1;
-      decoded.raw_positions.back() = position + 1;
+      if (should_map_source) decoded.raw_positions.back() = position + 1;
       if (!decoded.text.is_empty() &&
           os::is_directory_separator(decoded.text.back()))
         decoded.raw_directory_end = position + 1;
@@ -267,7 +272,7 @@ fn decode_shell_word(StringView word, Allocator allocator) throws
       {
         position++;
         if (escaped_byte == '\n') {
-          decoded.raw_positions.back() = position + 1;
+          if (should_map_source) decoded.raw_positions.back() = position + 1;
           if (!decoded.text.is_empty() &&
               os::is_directory_separator(decoded.text.back()))
             decoded.raw_directory_end = position + 1;
@@ -275,7 +280,7 @@ fn decode_shell_word(StringView word, Allocator allocator) throws
         }
         decoded.text.push(escaped_byte);
         decoded.glob_active.push(false);
-        decoded.raw_positions.push(position + 1);
+        if (should_map_source) decoded.raw_positions.push(position + 1);
         if (os::is_directory_separator(escaped_byte))
           decoded.raw_directory_end = position + 1;
         continue;
@@ -289,13 +294,16 @@ fn decode_shell_word(StringView word, Allocator allocator) throws
     decoded.text.push(byte);
     decoded.glob_active.push(quote_character == 0 &&
                              (byte == '*' || byte == '?' || byte == '['));
-    decoded.raw_positions.push(position + 1);
+    if (should_map_source) decoded.raw_positions.push(position + 1);
     if (os::is_directory_separator(byte))
       decoded.raw_directory_end = position + 1;
   }
   decoded.quote_character = quote_character;
 
+  if (!should_map_source) return decoded;
+
   char scan_quote = 0;
+  usize decoded_position = 0;
   for (usize raw_start = 0; raw_start < word.length; raw_start++) {
     let const byte = word[raw_start];
     if (scan_quote == 0 && (byte == '\'' || byte == '"')) {
@@ -319,14 +327,14 @@ fn decode_shell_word(StringView word, Allocator allocator) throws
       raw_end = shell_word_expansion_end(word, raw_start);
     if (raw_end <= raw_start) continue;
 
-    usize decoded_start = 0;
-    while (decoded_start < decoded.raw_positions.count() &&
-           decoded.raw_positions[decoded_start] < raw_start)
-      decoded_start++;
-    usize decoded_end = decoded_start;
-    while (decoded_end < decoded.raw_positions.count() &&
-           decoded.raw_positions[decoded_end] < raw_end)
-      decoded_end++;
+    while (decoded_position < decoded.raw_positions.count() &&
+           decoded.raw_positions[decoded_position] < raw_start)
+      decoded_position++;
+    let const decoded_start = decoded_position;
+    while (decoded_position < decoded.raw_positions.count() &&
+           decoded.raw_positions[decoded_position] < raw_end)
+      decoded_position++;
+    usize decoded_end = decoded_position;
     if (decoded_end > decoded.text.length())
       decoded_end = decoded.text.length();
 
@@ -349,8 +357,8 @@ struct path_source_component
 
 struct path_component_owner_range
 {
-  usize first;
-  usize end;
+  usize first_component_index;
+  usize end_component_index;
 };
 
 static fn split_path_source_components(StringView path,
@@ -360,6 +368,7 @@ static fn split_path_source_components(StringView path,
 {
   let components = ArrayList<path_source_component>{allocator};
   usize position = os::path_root_length(path);
+  usize opaque_range_position = 0;
   while (position < path.length) {
     while (position < path.length && os::is_directory_separator(path[position]))
       position++;
@@ -372,12 +381,17 @@ static fn split_path_source_components(StringView path,
 
     let is_opaque = false;
     if (decoded != nullptr) {
-      for (let const &range : decoded->opaque_ranges) {
+      while (opaque_range_position < decoded->opaque_ranges.count()) {
+        let const &range = decoded->opaque_ranges[opaque_range_position];
         let const range_end = range.decoded_start + range.decoded_length;
+        if (range_end <= start) {
+          opaque_range_position++;
+          continue;
+        }
         if (range.decoded_start < position && range_end > start) {
           is_opaque = true;
-          break;
         }
+        break;
       }
     }
 
@@ -394,37 +408,39 @@ static fn path_component_owner(
     usize expanded_component_index) wontthrow
     -> Maybe<path_component_owner_range>
 {
-  usize raw_left = 0;
-  usize expanded_left = 0;
-  while (raw_left < raw_components.count() &&
-         expanded_left < expanded_components.count() &&
-         !raw_components[raw_left].is_opaque &&
-         raw_components[raw_left].text ==
-             expanded_components[expanded_left].text)
+  usize raw_left_index = 0;
+  usize expanded_left_index = 0;
+  while (raw_left_index < raw_components.count() &&
+         expanded_left_index < expanded_components.count() &&
+         !raw_components[raw_left_index].is_opaque &&
+         raw_components[raw_left_index].text ==
+             expanded_components[expanded_left_index].text)
   {
-    if (expanded_left == expanded_component_index)
-      return path_component_owner_range{raw_left, raw_left + 1};
-    raw_left++;
-    expanded_left++;
+    if (expanded_left_index == expanded_component_index)
+      return path_component_owner_range{raw_left_index, raw_left_index + 1};
+    raw_left_index++;
+    expanded_left_index++;
   }
 
-  usize raw_right = raw_components.count();
-  usize expanded_right = expanded_components.count();
-  while (raw_right > raw_left && expanded_right > expanded_left &&
-         !raw_components[raw_right - 1].is_opaque &&
-         raw_components[raw_right - 1].text ==
-             expanded_components[expanded_right - 1].text)
+  usize raw_right_index = raw_components.count();
+  usize expanded_right_index = expanded_components.count();
+  while (raw_right_index > raw_left_index &&
+         expanded_right_index > expanded_left_index &&
+         !raw_components[raw_right_index - 1].is_opaque &&
+         raw_components[raw_right_index - 1].text ==
+             expanded_components[expanded_right_index - 1].text)
   {
-    if (expanded_right - 1 == expanded_component_index)
-      return path_component_owner_range{raw_right - 1, raw_right};
-    raw_right--;
-    expanded_right--;
+    if (expanded_right_index - 1 == expanded_component_index)
+      return path_component_owner_range{raw_right_index - 1, raw_right_index};
+    raw_right_index--;
+    expanded_right_index--;
   }
 
-  if (expanded_component_index >= expanded_left &&
-      expanded_component_index < expanded_right && raw_left < raw_right)
+  if (expanded_component_index >= expanded_left_index &&
+      expanded_component_index < expanded_right_index &&
+      raw_left_index < raw_right_index)
   {
-    return path_component_owner_range{raw_left, raw_right};
+    return path_component_owner_range{raw_left_index, raw_right_index};
   }
   return None;
 }
@@ -439,14 +455,13 @@ fn locate_first_unavailable_path_component(const Path &target,
   let const unavailable = target.first_unavailable_component();
   if (!unavailable.has_value()) return None;
 
-  let const decoded = decode_shell_word(raw_operand, allocator);
+  let const decoded = decode_shell_word(raw_operand, allocator, true);
   let const raw_components =
       split_path_source_components(decoded.text.view(), &decoded, allocator);
-  let const normalized_operand = Path{expanded_operand}.normalized();
-  let const expanded_components = split_path_source_components(
-      normalized_operand.text().view(), nullptr, allocator);
+  let const expanded_components =
+      split_path_source_components(expanded_operand, nullptr, allocator);
   const usize remaining_component_count =
-      unavailable->count - unavailable->index - 1;
+      unavailable->component_count - unavailable->component_index - 1;
   const usize expanded_component_index =
       expanded_components.count() > remaining_component_count
           ? expanded_components.count() - remaining_component_count - 1
@@ -454,26 +469,36 @@ fn locate_first_unavailable_path_component(const Path &target,
   let const owner = path_component_owner(raw_components, expanded_components,
                                          expanded_component_index);
 
-  let typed_prefix = String{allocator, expanded_operand};
+  let reported_prefix = String{allocator};
+  if (expanded_component_index < expanded_components.count()) {
+    reported_prefix.append(expanded_operand.substring_of_length(
+        0, expanded_components[expanded_component_index].decoded_end));
+  } else
+    reported_prefix.append(expanded_operand);
+  let typed_prefix = String{allocator};
   usize typed_component_start = 0;
   bool has_single_raw_component = false;
   if (owner.has_value()) {
-    let const &first = raw_components[owner->first];
-    let const &last = raw_components[owner->end - 1];
-    typed_prefix =
-        String{allocator,
-               decoded.text.view().substring_of_length(0, last.decoded_end)};
-    operand_location.position += decoded.raw_positions[first.decoded_start];
-    operand_location.length = decoded.raw_positions[last.decoded_end] -
-                              decoded.raw_positions[first.decoded_start];
-    typed_component_start = first.decoded_start;
-    has_single_raw_component = owner->end == owner->first + 1;
-  }
+    let const &first_component = raw_components[owner->first_component_index];
+    let const &last_component = raw_components[owner->end_component_index - 1];
+    typed_prefix.append(
+        decoded.text.view().substring_of_length(0, last_component.decoded_end));
+    operand_location.position +=
+        decoded.raw_positions[first_component.decoded_start];
+    operand_location.length =
+        decoded.raw_positions[last_component.decoded_end] -
+        decoded.raw_positions[first_component.decoded_start];
+    typed_component_start = first_component.decoded_start;
+    has_single_raw_component =
+        owner->end_component_index == owner->first_component_index + 1;
+  } else
+    typed_prefix.append(expanded_operand);
 
-  let const prefix =
-      Path{target.text().view().substring_of_length(0, unavailable->end)};
+  let const prefix = Path{
+      target.text().view().substring_of_length(0, unavailable->component_end)};
   return unavailable_path_source_component{prefix,
                                            operand_location,
+                                           steal(reported_prefix),
                                            steal(typed_prefix),
                                            typed_component_start,
                                            unavailable->is_not_directory,

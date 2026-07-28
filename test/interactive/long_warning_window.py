@@ -13,10 +13,11 @@ here = os.path.dirname(os.path.abspath(__file__))
 binary = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "..", "..", "shit-dbg")
 column_count = 80
 wide_character = "\u754c"
-source = 'test "%s" = $UNSET %s\ntest $OTHER = value' % (
+source_line = 'test "%s" = $UNSET %s; test $OTHER = value' % (
     "a" * 119 + wide_character,
     "b" * 120,
 )
+source = '\n' * 2048 + source_line
 
 pid, master = pty.fork()
 if pid == 0:
@@ -43,7 +44,7 @@ os.close(master)
 os.waitpid(pid, 0)
 
 raw_lines = output.replace(b"\r", b"").split(b"\n")
-raw_content = next((line for line in raw_lines if line.startswith(b"     1 |  ")), b"")
+raw_content = next((line for line in raw_lines if b"$UNSET" in line), b"")
 source_highlighted = b"\x1b[" in raw_content
 clipped_string_is_green = b"\x1b[92m" in raw_content
 has_no_ansi_underline = b"4:3" not in raw_content
@@ -53,10 +54,10 @@ content = next((line for line in lines if "$UNSET" in line), "")
 caret = next((line for line in lines if "^" in line), "")
 highlight_byte_match = re.search(r"diagnostic-highlight-bytes=(\d+)", text)
 highlight_bytes = int(highlight_byte_match.group(1)) if highlight_byte_match else 0
-highlight_scan_is_bounded = 0 < highlight_bytes <= len(source.encode()) + 1024
+highlight_scan_is_bounded = 0 < highlight_bytes <= len(source_line.encode()) + 16
 content_width = len(content) + content.count(wide_character)
 within_width = bool(content) and content_width <= column_count
-has_both_ellipses = content.startswith("     1 |  ...") and content.endswith("...")
+has_both_ellipses = "|  ..." in content and content.endswith("...")
 caret_aligned = (
     "$UNSET" in content
     and "^" in caret

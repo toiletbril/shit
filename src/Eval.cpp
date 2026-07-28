@@ -1330,8 +1330,10 @@ fn EvalContext::print_source_backtrace(
            do_location_match(left.call_site, right.call_site) &&
            left.origin == right.origin &&
            left.source_path == right.source_path &&
-           left.parent_source_hash == right.parent_source_hash &&
-           left.parent_source_length == right.parent_source_length;
+           left.parent_source_length == right.parent_source_length &&
+           (left.parent_source == right.parent_source ||
+            (left.parent_source != nullptr && right.parent_source != nullptr &&
+             left.parent_source->view() == right.parent_source->view()));
   };
   let const do_frame_render = [&](const source_frame &frame) {
     return frame.parent_source != nullptr && !do_frame_repeat_error(frame);
@@ -2137,9 +2139,9 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
   } else {
     let const typed_program_path = Path{program.view()};
     if (typed_program_path.has_trailing_separator()) {
-      let const normalized_program_path = typed_program_path.normalized();
-      if (normalized_program_path.exists())
-        resolved_program_path = normalized_program_path;
+      let const raw_program_path =
+          typed_program_path.to_absolute_without_normalizing();
+      if (raw_program_path.exists()) resolved_program_path = raw_program_path;
     } else {
       resolved_program_path = Path::canonicalize(program.view());
     }
@@ -2152,19 +2154,15 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
     }
     if (!resolved_program_path.has_value()) {
       let raw_program = program.view();
-      if (resolution_location.position + resolution_location.length <=
-          source.length)
-      {
-        raw_program = source.substring_of_length(resolution_location.position,
-                                                 resolution_location.length);
-      }
-      let const target = typed_program_path.to_absolute();
+      if (let source_text = resolution_location.get_source_text(source))
+        raw_program = *source_text;
+      let const target = typed_program_path.to_absolute_without_normalizing();
       unavailable_component = utils::locate_first_unavailable_path_component(
           target, program.view(), raw_program, resolution_location,
           heap_allocator());
       if (unavailable_component.has_value()) {
         resolution_location = unavailable_component->location;
-        resolution_program = unavailable_component->typed_prefix.view();
+        resolution_program = unavailable_component->reported_prefix.view();
         if (unavailable_component->is_not_directory) {
           throw CommandResolutionErrorWithLocation{
               resolution_location, "This file is not a directory", 126};
@@ -2187,7 +2185,7 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
       kind = ResolvedCommand::from_builtin(Builtin::Kind::Shitbox);
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
-      let const message = "Program `" + resolution_program + "` wasn't found";
+      let const message = "Command '" + resolution_program + "' was not found";
       if (Maybe<String> suggestion = utils::suggest_command(
               program.view(), ArrayList<String>{heap_allocator()},
               &program_resolver))

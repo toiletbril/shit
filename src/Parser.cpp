@@ -1469,6 +1469,8 @@ static fn word_token_from_assignment(BumpArena &arena,
   for (let const &segment : a->value_word().segments) {
     WordSegment copy{segment.kind, segment.text.clone(),
                      segment.is_in_double_quotes};
+    copy.source_position = segment.source_position;
+    copy.source_length = segment.source_length;
     copy.is_substitution_cache_in_function_arena =
         segment.is_substitution_cache_in_function_arena;
     copy.folded_arithmetic_result = segment.folded_arithmetic_result;

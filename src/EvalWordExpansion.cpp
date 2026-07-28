@@ -635,7 +635,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
             break;
           }
       }
-      let const value = apply_parameter_expansion(segment.text.view());
+      let const value = apply_parameter_expansion(
+          segment.text.view(),
+          segment.get_source_location(m_current_location.filename));
       if (segment.is_in_double_quotes)
         do_append_run(value, false);
       else
@@ -659,7 +661,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
     } break;
 
     case WordSegment::Kind::ProcessSubstitution: {
-      let const path = setup_process_substitution(segment.text.view());
+      let const path = setup_process_substitution(segment);
       do_append_run(path, false);
     } break;
 
@@ -720,7 +722,9 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     let const segment_text = segment.text.view();
     switch (segment.kind) {
     case WordSegment::Kind::VariableReference:
-      result += apply_parameter_expansion(segment_text);
+      result += apply_parameter_expansion(
+          segment_text,
+          segment.get_source_location(m_current_location.filename));
       break;
     case WordSegment::Kind::CommandSubstitution:
       result += capture_command_substitution(segment);
@@ -775,7 +779,9 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       do_emit_run(segment_text, true);
       break;
     case WordSegment::Kind::VariableReference: {
-      let const value = apply_parameter_expansion(segment_text);
+      let const value = apply_parameter_expansion(
+          segment_text,
+          segment.get_source_location(m_current_location.filename));
       do_emit_run(value.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
@@ -787,7 +793,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       do_emit_run(output.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::ProcessSubstitution: {
-      let const path = setup_process_substitution(segment.text.view());
+      let const path = setup_process_substitution(segment);
       do_emit_run(path.view(), false);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {

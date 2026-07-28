@@ -19,13 +19,17 @@ fn EvalContext::render_contained_substitution_error(std::exception_ptr error,
 {
   try {
     std::rethrow_exception(error);
-  } catch (const ErrorWithLocationAndDetails &e) {
+  } catch (ErrorWithLocationAndDetails &e) {
+    if (e.was_rendered()) return;
     show_message(e.to_string(source, this));
     show_message(e.details_to_string(source, this));
     print_source_backtrace(e.location());
-  } catch (const ErrorWithLocation &e) {
+    e.set_rendered();
+  } catch (ErrorWithLocation &e) {
+    if (e.was_rendered()) return;
     show_message(e.to_string(source, this));
     print_source_backtrace(e.location());
+    e.set_rendered();
   } catch (const Error &e) {
     show_message(e.to_string());
     print_source_backtrace();
@@ -112,9 +116,9 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   return result;
 }
 
-fn EvalContext::capture_command_substitution(const String &source,
-                                             Maybe<StringView> filename) throws
-    -> String
+fn EvalContext::capture_command_substitution(
+    const String &source, Maybe<StringView> filename,
+    Maybe<SourceLocation> call_site) throws -> String
 {
   LOG(Debug, "capturing a command substitution of %zu bytes", source.count());
   if (Maybe<String> file = read_redirect_substitution(source.view());
@@ -134,20 +138,38 @@ fn EvalContext::capture_command_substitution(const String &source,
   let normalized_source = source.clone();
   normalized_source.normalize_crlf_line_endings();
 
+  let did_push_source_frame = false;
+  if (call_site.has_value())
+    did_push_source_frame = push_substitution_source_frame(
+        *call_site, StringView{"command substitution"});
+  defer
+  {
+    if (did_push_source_frame) m_source_frames.pop_back();
+  };
+
   let parser = Parser{
       Lexer{String{normalized_source.view()}, *AST_ARENA, false, filename,
             mood()}
   };
-  let const ast = parser.construct_ast();
+  const Expression *ast;
+  try {
+    ast = parser.construct_ast();
+  } catch (...) {
+    render_contained_substitution_error(std::current_exception(),
+                                        normalized_source.view());
+    throw;
+  }
   ASSERT(ast != nullptr);
 
   return run_captured_substitution(ast, normalized_source);
 }
 
-fn EvalContext::setup_process_substitution(StringView text) throws -> String
+fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
+    -> String
 {
   if (AST_ARENA == nullptr)
     throw Error{"Process substitution outside of a parse"};
+  let const text = segment.text.view();
   ASSERT(!text.is_empty());
 
   /* The first byte is the direction marker the lexer wrote. */
@@ -156,24 +178,61 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
   LOG(Debug, "setting up a process substitution where the command %s the pipe",
       command_writes_the_pipe ? "writes" : "reads");
 
+  let const ast_mark = AST_ARENA->mark();
+  defer { AST_ARENA->release(ast_mark); };
+  let const substitution_source = String{heap_allocator(), text.substring(1)};
+  let const did_push_source_frame = push_substitution_source_frame(
+      segment, StringView{"process substitution"});
+  defer
+  {
+    if (did_push_source_frame) m_source_frames.pop_back();
+  };
+  let parser = Parser{
+      Lexer{String{substitution_source.view()}, *AST_ARENA, false, None,
+            mood()}
+  };
+  const Expression *ast;
+  try {
+    ast = parser.construct_ast();
+  } catch (...) {
+    render_contained_substitution_error(std::current_exception(),
+                                        substitution_source.view());
+    throw;
+  }
+  ASSERT(ast != nullptr);
+
+  let const do_launch = [&]() throws -> os::process_substitution_launch {
+    try {
+      return os::launch_process_substitution(
+          substitution_source.view(), command_writes_the_pipe,
+          is_bash_compatible(), should_print_source_traces());
+    } catch (const ErrorBase &error) {
+      let const location =
+          segment.get_source_location(m_current_location.filename);
+      if (!location.has_value() || current_source() == nullptr) throw;
+
+      try {
+        relocate_error(error, *location);
+      } catch (...) {
+        render_contained_substitution_error(std::current_exception(),
+                                            current_source()->view());
+        throw;
+      }
+    }
+  };
+
   if (!os::can_fork_evaluator()) {
-    let launch = os::launch_process_substitution(
-        text.substring(1), command_writes_the_pipe, is_bash_compatible());
+    let launch = do_launch();
     ASSERT(launch.is_temporary_file);
+    if (!launch.diagnostic_output.is_empty()) {
+      print_error(launch.diagnostic_output.view());
+      if (launch.has_shell_diagnostic) print_source_backtrace();
+    }
     m_substitution_temp_files.track(Path{launch.path.view()});
     return steal(launch.path);
   }
 
-  let const ast_mark = AST_ARENA->mark();
-  defer { AST_ARENA->release(ast_mark); };
-  let parser = Parser{
-      Lexer{String{text.substring(1)}, *AST_ARENA, false, None, mood()}
-  };
-  let const ast = parser.construct_ast();
-  ASSERT(ast != nullptr);
-
-  let launch = os::launch_process_substitution(
-      text.substring(1), command_writes_the_pipe, is_bash_compatible());
+  let launch = do_launch();
   if (launch.is_temporary_file) {
     m_substitution_temp_files.track(Path{launch.path.view()});
     return steal(launch.path);
@@ -182,6 +241,15 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
   if (launch.should_evaluate_child) {
     if (launch.child_close_fd.has_value()) os::close_fd(*launch.child_close_fd);
     i32 status = 0;
+    let const previous_source = m_current_source;
+    let const previous_origin = m_current_origin;
+    let const previous_location = m_current_location;
+    set_current_source(&substitution_source, String{"process substitution"});
+    defer
+    {
+      set_current_source(previous_source, previous_origin);
+      m_current_location = previous_location;
+    };
     try {
       ast->evaluate(*this);
       status = last_exit_status();
@@ -189,6 +257,8 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
       LOG(Debug,
           "the process substitution child swallowed an error, exiting with "
           "status 1");
+      render_contained_substitution_error(std::current_exception(),
+                                          substitution_source.view());
       status = 1;
     }
     os::exit_process_immediately(status);
@@ -288,6 +358,12 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
                         : AST_ARENA;
   ASSERT(cache_arena != nullptr);
   const usize generation = cache_arena->reset_generation();
+  let const did_push_source_frame = push_substitution_source_frame(
+      segment, StringView{"command substitution"});
+  defer
+  {
+    if (did_push_source_frame) m_source_frames.pop_back();
+  };
   if (segment.cached_substitution_ast == nullptr ||
       segment.cached_substitution_generation != generation)
   {
@@ -297,13 +373,45 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
     let parser = Parser{
         Lexer{String{segment.text.view()}, *cache_arena, false, None, mood()}
     };
-    segment.cached_substitution_ast = parser.construct_ast();
+    try {
+      segment.cached_substitution_ast = parser.construct_ast();
+    } catch (...) {
+      render_contained_substitution_error(std::current_exception(),
+                                          segment.text.view());
+      throw;
+    }
     segment.cached_substitution_generation = generation;
   }
   ASSERT(segment.cached_substitution_ast != nullptr);
 
   return run_captured_substitution(segment.cached_substitution_ast,
                                    segment.text);
+}
+
+fn EvalContext::push_substitution_source_frame(const WordSegment &segment,
+                                               StringView origin) throws -> bool
+{
+  let const location = segment.get_source_location(m_current_location.filename);
+  if (!location.has_value()) return false;
+  return push_substitution_source_frame(*location, origin);
+}
+
+fn EvalContext::push_substitution_source_frame(SourceLocation location,
+                                               StringView origin) throws -> bool
+{
+  if (!m_should_print_source_traces || current_source() == nullptr ||
+      location.length == 0)
+  {
+    return false;
+  }
+
+  m_source_frames.push(source_frame{
+      String{heap_allocator(), origin},
+      location, current_source(),
+      String{heap_allocator()},
+      false, false
+  });
+  return true;
 }
 
 fn EvalContext::run_captured_substitution(const Expression *ast,
@@ -539,6 +647,12 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
                         : AST_ARENA;
   ASSERT(cache_arena != nullptr);
   const usize generation = cache_arena->reset_generation();
+  let const did_push_source_frame = push_substitution_source_frame(
+      segment, StringView{"function substitution"});
+  defer
+  {
+    if (did_push_source_frame) m_source_frames.pop_back();
+  };
   if (segment.cached_substitution_ast == nullptr ||
       segment.cached_substitution_generation != generation)
   {
@@ -548,7 +662,13 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
     let parser = Parser{
         Lexer{String{segment.text.view()}, *cache_arena, false, None, mood()}
     };
-    segment.cached_substitution_ast = parser.construct_ast();
+    try {
+      segment.cached_substitution_ast = parser.construct_ast();
+    } catch (...) {
+      render_contained_substitution_error(std::current_exception(),
+                                          segment.text.view());
+      throw;
+    }
     segment.cached_substitution_generation = generation;
   }
   ASSERT(segment.cached_substitution_ast != nullptr);

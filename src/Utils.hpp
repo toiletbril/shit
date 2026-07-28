@@ -39,13 +39,15 @@ struct decoded_shell_word
   {}
 };
 
-fn decode_shell_word(StringView word, Allocator allocator) throws
+fn decode_shell_word(StringView word, Allocator allocator,
+                     bool should_map_source = false) throws
     -> decoded_shell_word;
 
 struct unavailable_path_source_component
 {
   Path prefix;
   SourceLocation location;
+  String reported_prefix;
   String typed_prefix;
   usize typed_component_start;
   bool is_not_directory;

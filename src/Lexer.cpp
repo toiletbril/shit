@@ -717,6 +717,7 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
     }
 
     if (ch == '$') {
+      let const expansion_start = byte_count;
       byte_count++;
       char next = chop_character(byte_count);
 
@@ -1053,6 +1054,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         }
         word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
                                        steal(inner), is_in_double_quotes});
+        word.segments.back().source_position =
+            m_cursor_position + expansion_start;
+        word.segments.back().source_length = byte_count - expansion_start;
       } else if (next == '{') {
         byte_count++;
         let name = String{heap_allocator()};
@@ -1195,6 +1199,15 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
             is_function_substitution ? WordSegment::Kind::FunctionSubstitution
                                      : WordSegment::Kind::VariableReference,
             steal(name), is_in_double_quotes});
+        let &expansion_segment = word.segments.back();
+        expansion_segment.source_position =
+            m_cursor_position + expansion_start + 2;
+        expansion_segment.source_length = expansion_segment.text.count();
+        if (is_function_substitution) {
+          expansion_segment.source_position =
+              m_cursor_position + expansion_start;
+          expansion_segment.source_length = byte_count - expansion_start;
+        }
       } else if (lexer::is_variable_name_start(next)) {
         let name = String{heap_allocator()};
         while (lexer::is_variable_name(next = chop_character(byte_count))) {
@@ -1203,6 +1216,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         }
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
                                        steal(name), is_in_double_quotes, true});
+        word.segments.back().source_position =
+            m_cursor_position + expansion_start + 1;
+        word.segments.back().source_length = word.segments.back().text.count();
       } else if (lexer::is_special_parameter_char(next) ||
                  lexer::is_number(next))
       {
@@ -1211,6 +1227,9 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
         special.push(next);
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
                                        steal(special), is_in_double_quotes});
+        word.segments.back().source_position =
+            m_cursor_position + expansion_start + 1;
+        word.segments.back().source_length = 1;
       } else {
         do_append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
                                            : WordSegment::Kind::UnquotedText,
@@ -1254,6 +1273,10 @@ flatten hot forceinline fn Lexer::lex_identifier() throws -> Token *
       }
       word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
                                      steal(inner), is_in_double_quotes});
+      word.segments.back().source_position =
+          m_cursor_position + relative_open_backtick_pos;
+      word.segments.back().source_length =
+          byte_count - relative_open_backtick_pos;
       continue;
     }
 
@@ -1532,6 +1555,8 @@ hot forceinline fn Lexer::lex_process_substitution(char direction) throws
   let word = Word{};
   word.segments.push(
       WordSegment{WordSegment::Kind::ProcessSubstitution, steal(inner), false});
+  word.segments.back().source_position = open_position;
+  word.segments.back().source_length = byte_count;
   let t = m_arena->create<tokens::WordToken>(here(open_position, byte_count),
                                              steal(word));
   m_cached_offset = byte_count;

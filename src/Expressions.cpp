@@ -298,8 +298,9 @@ fn expanded_command_path(StringView name, Allocator allocator) throws -> String
   return String{allocator, name};
 }
 
-fn command_resolves(const String &name, const AnalysisContext &actx) throws
-    -> bool
+fn command_resolves(
+    const String &name, SourceLocation location, const AnalysisContext &actx,
+    Maybe<utils::unavailable_path_source_component> &unavailable) throws -> bool
 {
   if (name.is_empty()) return false;
   if (search_builtin(name.view()).has_value()) return true;
@@ -310,9 +311,19 @@ fn command_resolves(const String &name, const AnalysisContext &actx) throws
   if (os::has_directory_separator(name.view())) {
     let const expanded = expanded_command_path(name.view(), heap_allocator());
     let const typed_path = Path{expanded.view()};
-    if (typed_path.has_trailing_separator())
-      return typed_path.normalized().exists();
-    return Path::canonicalize(expanded.view()).has_value();
+    let const was_resolved =
+        typed_path.has_trailing_separator()
+            ? typed_path.to_absolute_without_normalizing().exists()
+            : Path::canonicalize(expanded.view()).has_value();
+    if (was_resolved) return true;
+
+    let const target = typed_path.to_absolute_without_normalizing();
+    let raw_operand = name.view();
+    if (let source_text = location.get_source_text(actx.source))
+      raw_operand = *source_text;
+    unavailable = utils::locate_first_unavailable_path_component(
+        target, expanded.view(), raw_operand, location, heap_allocator());
+    return false;
   }
 
   let resolver =
@@ -328,23 +339,6 @@ fn command_resolves(const String &name, const AnalysisContext &actx) throws
   LOG(Debug, "scanning PATH for '%s', the command was %s", name.c_str(),
       was_resolved ? "found" : "not found");
   return was_resolved;
-}
-
-fn unavailable_command_path_component(StringView name, SourceLocation location,
-                                      const AnalysisContext &actx) throws
-    -> Maybe<utils::unavailable_path_source_component>
-{
-  if (!os::has_directory_separator(name)) return None;
-
-  let const expanded = expanded_command_path(name, heap_allocator());
-  let const target = Path{expanded.view()}.to_absolute();
-  let raw_operand = name;
-  if (location.position + location.length <= actx.source.length) {
-    raw_operand =
-        actx.source.substring_of_length(location.position, location.length);
-  }
-  return utils::locate_first_unavailable_path_component(
-      target, expanded.view(), raw_operand, location, heap_allocator());
 }
 
 /* Only an unquoted '[' or ']' is active, so a quoted "[" or an escaped \[ stays
@@ -1634,16 +1628,22 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
+  let unavailable = Maybe<utils::unavailable_path_source_component>{};
+  let command_was_resolved = false;
   if (name.has_value() && !actx.should_silence_unresolved_commands &&
-      !command_is_shadowed && !command_resolves(*name, actx))
+      !command_is_shadowed)
+  {
+    command_was_resolved = command_resolves(*name, m_args[0]->source_location(),
+                                            actx, unavailable);
+  }
+  if (name.has_value() && !actx.should_silence_unresolved_commands &&
+      !command_is_shadowed && !command_was_resolved)
   {
     let diagnostic_location = m_args[0]->source_location();
-    let unavailable = unavailable_command_path_component(
-        name->view(), diagnostic_location, actx);
     let reported_name = name->view();
     if (unavailable.has_value()) {
       diagnostic_location = unavailable->location;
-      reported_name = unavailable->typed_prefix.view();
+      reported_name = unavailable->reported_prefix.view();
     }
     let const message =
         StringView{"Command '"} + reported_name + StringView{"' was not found"};

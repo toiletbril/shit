@@ -29,7 +29,7 @@ shit: 1:4: error: The directory 'nowhere-near' does not exist.
        |     ^~~~~~~~~~~~ here.
 note: Check the spelling or create it with `mkdir -p`.
 == first missing expanded component:
-shit: 1:27: error: The directory '$BASE/expanded-parent/miss' does not exist.
+shit: 1:27: error: The directory '<tmp>/expanded-parent/miss' does not exist.
      1 |  cd "$BASE/expanded-parent/miss/tail"
        |                            ^~~~ here.
 note: Check the spelling or create it with `mkdir -p`.
@@ -66,13 +66,54 @@ shit: 1:11: error: Command './project/miss' was not found.
      1 |  ./project/miss/tail
        |            ^~~~ here.
 == runtime command path first missing component:
-shit: 1:11: error: Program `./project/miss` wasn't found.
+shit: 1:11: error: Command './project/miss' was not found.
      1 |  ./project/miss/tail
        |            ^~~~ here.
 == exec command path first missing component:
 shit: 1:16: error: Command './project/miss' was not found.
      1 |  exec ./project/miss/tail
        |                 ^~~~ here.
+== analyzed command path preserves missing dot-dot component:
+shit: 1:3: error: Command './missing' was not found.
+     1 |  ./missing/../other
+       |    ^~~~~~~ here.
+== runtime command path preserves missing dot-dot component:
+shit: 1:3: error: Command './missing' was not found.
+     1 |  ./missing/../other
+       |    ^~~~~~~ here.
+== exec command path preserves missing dot-dot component:
+shit: 1:8: error: Command './missing' was not found.
+     1 |  exec ./missing/../other
+       |         ^~~~~~~ here.
+== cd preserves missing dot-dot component:
+shit: 1:4: error: The directory 'missing' does not exist.
+     1 |  cd missing/../existing
+       |     ^~~~~~~ here.
+note: Check the spelling or create it with `mkdir -p`.
+== logical cd preserves symlink traversal:
+<tmp>/sibling
+== analyzed trailing separator preserves missing dot-dot component:
+shit: 1:3: error: Command './missing' was not found.
+     1 |  ./missing/../existing/
+       |    ^~~~~~~ here.
+== runtime trailing separator preserves missing dot-dot component:
+shit: 1:3: error: Command './missing' was not found.
+     1 |  ./missing/../existing/
+       |    ^~~~~~~ here.
+== exec trailing separator preserves missing dot-dot component:
+shit: 1:8: error: Command './missing' was not found.
+     1 |  exec ./missing/../existing/
+       |         ^~~~~~~ here.
+== command path preserves symlink traversal:
+symlink-target
+== CDPATH logical traversal preserves symlink traversal:
+<tmp>/cdpath/sibling
+raw traversal missing=1 caret=1 executed=0
+== CDPATH physical traversal preserves symlink semantics:
+shit: 1:15: error: The directory 'link/../sibling' does not exist.
+     1 |  cd -P link/../sibling; pwd
+       |                ^~~~~~~ here.
+note: Check the spelling or create it with `mkdir -p`.
 == native separator:
 shit: 1:13: error: The directory 'project/nseted' does not exist.
      1 |  cd 'project/nseted/tail'

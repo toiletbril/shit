@@ -3,6 +3,7 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Platform.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -816,6 +817,8 @@ fn arm_message_leading_newline(bool armed) wontthrow -> void
 cold fn show_message(StringView err) throws -> void
 {
   if (err.is_empty()) return;
+
+  os::signal_internal_diagnostic();
 
   if (MESSAGE_LEADING_NEWLINE_ARMED) {
     print_error("\n");

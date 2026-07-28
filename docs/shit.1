@@ -19,10 +19,10 @@ command line is run, or a command string is run when it is given with
 .BR \-c .
 .PP
 A command path ending in a directory separator fails with status 126 when the
-normalized target is not a directory.
+typed target is not a directory. Its components are resolved in order.
 .PP
-A missing command path is reported through its first unavailable component.
-The source caret covers only that component.
+The reported path ends with its first unavailable component.
+The caret covers only that component.
 .PP
 Shell source accepts LF and CRLF line endings. A CRLF pair is read as one
 newline. A lone carriage return remains part of the source text.
@@ -206,8 +206,9 @@ then restored for the prompt. The flag pairs with
 .BR \-W .
 .TP
 .B \-\-no\-traces
-A direct input with one root source omits its source backtrace when no eval or
-source indirection exists. An invocation with multiple
+A direct input with one root source omits its source backtrace when no eval,
+source, command substitution, function substitution, or process substitution
+indirection exists. An invocation with multiple
 .B \-c
 sources traces the source that produced each message. This flag suppresses
 every source backtrace for errors, warnings, and diagnostics. The primary
@@ -216,8 +217,8 @@ message, source caret, note, and detail location remain visible.
 Each printed source frame begins with trace:. Only an error label, location,
 and message are bold. Only the warning label is plain bright magenta. Its
 message uses the default color. A note and a trace are plain cyan. The caret and
-its trailing text are bright green. A live trace frame is printed once across
-adjacent diagnostics. A located diagnostic syntax-highlights its complete
+its trailing text are bright green. A trace frame is printed once while its
+source frame remains live. A located diagnostic syntax-highlights its complete
 source line when standard error is a terminal, then clips the highlighted line
 to the terminal.
 .TP

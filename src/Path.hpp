@@ -13,10 +13,10 @@ enum class mimic_mood : u8;
 
 struct unavailable_path_component
 {
-  usize start;
-  usize end;
-  usize index;
-  usize count;
+  usize component_start;
+  usize component_end;
+  usize component_index;
+  usize component_count;
   bool is_not_directory;
 };
 
@@ -47,6 +47,7 @@ public:
   cold mustuse fn first_unavailable_component() const throws
       -> Maybe<unavailable_path_component>;
 
+  mustuse fn to_absolute_without_normalizing() const throws -> Path;
   mustuse fn to_absolute() const throws -> Path;
 
   fn push_component(StringView component) throws -> Path &;

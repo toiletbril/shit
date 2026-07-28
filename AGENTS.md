@@ -265,9 +265,12 @@ classes remain distinct for catch routing. ErrorWithLocationAndDetails can also
 store a second source location. The relocate_error bridge rewraps an unlocated
 error onto a span and preserves its details. A source backtrace is omitted when
 only one synthetic command-line root exists. Multiple `-c` roots trace the
-source that produced each message. A live frame is printed once across adjacent
-diagnostics. The `--no-traces` flag suppresses every source backtrace, including in a fresh
-executable-fallback evaluator. A printed frame begins with `trace:`. Only error
+source that produced each message. Eval, command substitution, function
+substitution, and process substitution add their call sites to the trace. A
+trace frame is printed once while its source frame remains live. The
+`--no-traces` flag suppresses every
+source backtrace, including in a fresh executable-fallback evaluator. A printed
+frame begins with `trace:`. Only error
 labels, locations, and messages are bold. Warning labels are plain bright
 magenta, while warning messages use the default color. Note and trace labels and
 messages are plain cyan. The caret and its trailing text are bright green. A
@@ -282,8 +285,8 @@ child so a producer dies with status 141. The cd builtin resolves a relative
 operand against the logical PWD, the bash -L mode, and cd .. lexically pops the
 last component. A logical PWD is accepted only when it is absolute and names the
 physical current directory. A missing explicit directory receives a close
-sibling suggestion when one exists. Its error names the path through the first
-unavailable component, and its caret covers only that component. The pushd,
+sibling suggestion when one exists. The reported path ends with its first
+unavailable component. The caret covers only that component. The pushd,
 popd, and dirs builtins carry a
 directory stack on EvalContext and route every chdir through the cd builtin, so
 the logical PWD and OLDPWD stay in one place. PIPESTATUS is published after
@@ -294,9 +297,9 @@ The condition depth is inherited by a function called from a non-final and-or
 operand or from a negation. The `set -e` option stays suppressed throughout that
 guarded body. An if with no matching branch and no else publishes status zero,
 including at the end of a sourced file. A command path ending in a directory
-separator is rejected with status 126 when the normalized target is not a
-directory. A missing command path is named through its first unavailable
-component, and its caret covers only that component.
+separator is rejected with status 126 when the typed target is not a directory.
+Its components are resolved in order. The reported path ends with its first
+unavailable component. The caret covers only that component.
 
 ## Header factoring and value-type methods
 

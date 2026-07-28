@@ -61,14 +61,11 @@ struct highlight_span
 class diagnostic_highlight_cache
 {
 public:
-  explicit diagnostic_highlight_cache(StringView source) : m_source(source) {}
-
-  fn spans_for(StringView source, EvalContext &context) throws
+  fn spans_for(StringView source_line, EvalContext &context) throws
       -> const ArrayList<highlight_span> *;
 
 private:
-  StringView m_source;
-  bool m_was_built{false};
+  StringView m_source_line{};
   ArrayList<highlight_span> m_spans{heap_allocator()};
 };
 

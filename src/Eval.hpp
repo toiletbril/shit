@@ -132,8 +132,6 @@ struct source_frame
                bool is_cli_root, bool is_only_root_source)
       : origin(steal(origin)), call_site(call_site),
         parent_source(parent_source), source_path(steal(source_path)),
-        parent_source_hash(
-            parent_source != nullptr ? hash_bytes(parent_source->view()) : 0),
         parent_source_length(parent_source != nullptr ? parent_source->length()
                                                       : 0),
         is_cli_root(is_cli_root), is_only_root_source(is_only_root_source)
@@ -143,7 +141,6 @@ struct source_frame
   SourceLocation call_site;
   const String *parent_source;
   String source_path;
-  u64 parent_source_hash;
   usize parent_source_length;
   bool is_cli_root;
   bool is_only_root_source;
@@ -1458,7 +1455,8 @@ public:
      snapshotted. The filename, when given, backs the source locations the
      parsed AST carries, so its bytes must outlive the parse arena. */
   fn capture_command_substitution(const String &source,
-                                  Maybe<StringView> filename = None) throws
+                                  Maybe<StringView> filename = None,
+                                  Maybe<SourceLocation> call_site = None) throws
       -> String;
 
   /* Same capture, but the segment caches its parsed inner command so a $(...)
@@ -1470,6 +1468,10 @@ public:
      shell with no snapshot, so its assignments persist. A break, continue, or
      return is consumed inside it, while an exit stays pending. */
   fn capture_function_substitution(const WordSegment &segment) throws -> String;
+  fn push_substitution_source_frame(const WordSegment &segment,
+                                    StringView origin) throws -> bool;
+  fn push_substitution_source_frame(SourceLocation location,
+                                    StringView origin) throws -> bool;
 
   /* The $(< file) shorthand reads the named file directly, when the
      substitution body is only an input redirection naming one word with no
@@ -1480,7 +1482,7 @@ public:
      command runs in a forked child on one end, and the shell keeps the other
      end open and returns its /dev/fd path. The descriptor and the child are
      recorded for later cleanup. */
-  fn setup_process_substitution(StringView text) throws -> String;
+  fn setup_process_substitution(const WordSegment &segment) throws -> String;
   /* Close the descriptors and reap the children of the process substitutions a
      command opened. Closing first sends SIGPIPE to a producer that has more to
      write, so it ends rather than blocking the reap. */
@@ -1535,18 +1537,23 @@ public:
   fn expand_heredoc_body(StringView body) throws -> String;
 
   fn expand_modifier_word(StringView word, bool remove_quotes = true,
-                          bool strip_escaped_literals = true) throws -> String;
+                          bool strip_escaped_literals = true,
+                          Maybe<SourceLocation> source_location = None) throws
+      -> String;
 
   /* active_out marks which output bytes may act as glob metacharacters, so
      ${x#pat} and ${x%pat} match literally. */
-  fn expand_modifier_word_masked(StringView word, Bitset &active_out,
-                                 bool remove_quotes = true) throws -> String;
+  fn expand_modifier_word_masked(
+      StringView word, Bitset &active_out, bool remove_quotes = true,
+      Maybe<SourceLocation> source_location = None) throws -> String;
 
   /* is_pattern_word makes a backslash quote the following byte, the # and %
      rule. */
   fn expand_modifier_word_worker(StringView word, Bitset &active_out,
                                  bool remove_quotes, bool is_pattern_word,
-                                 bool strip_escaped_literals) throws -> String;
+                                 bool strip_escaped_literals,
+                                 Maybe<SourceLocation> source_location) throws
+      -> String;
 
   pure fn should_echo() const wontthrow -> bool;
   fn set_echo(bool enabled) wontthrow -> void
@@ -1777,9 +1784,10 @@ protected:
      location is kept so the filename the lexer stamped rides into a warning. */
   SourceLocation m_current_location{};
 
-  /* The chain of sourced-file and eval frames from the outermost down to the
-     one running now, so an error deep in a nested source prints every call
-     site. Each frame carries the call site and its parent text. */
+  /* The chain of sourced-file, eval, and substitution frames from the
+     outermost down to the one running now, so an error deep in a nested source
+     prints every call site. Each frame carries the call site and its parent
+     text. */
   ArrayList<source_frame> m_source_frames{heap_allocator()};
   bool m_should_print_source_traces{true};
   completion::diagnostic_highlight_cache *m_diagnostic_highlight_cache{nullptr};
@@ -1868,7 +1876,9 @@ protected:
      the integer mark, shared by the scope pop and the unset peel. */
   fn restore_local_binding(local_binding &binding) throws -> void;
 
-  fn apply_parameter_expansion(StringView spec) throws -> String;
+  fn apply_parameter_expansion(
+      StringView spec, Maybe<SourceLocation> source_location = None) throws
+      -> String;
 
   /* Expand the bash substring form ${name:offset:length}, an arithmetic offset
      and an optional arithmetic length, each counting from the end when

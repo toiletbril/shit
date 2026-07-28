@@ -47,6 +47,8 @@ public:
   bool is_in_double_quotes{false};
   bool is_greedy_name{false};
   bool is_substitution_cache_in_function_arena{false};
+  usize source_position{0};
+  usize source_length{0};
 
   mutable Maybe<i64> folded_arithmetic_result{};
 
@@ -63,6 +65,13 @@ public:
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
   pure fn is_tilde_candidate() const wontthrow -> bool;
+
+  pure fn get_source_location(Maybe<StringView> filename) const wontthrow
+      -> Maybe<SourceLocation>
+  {
+    if (source_length == 0) return None;
+    return SourceLocation{source_position, source_length, filename};
+  }
 
   pure fn has_glob_metacharacter() const wontthrow -> bool;
 };

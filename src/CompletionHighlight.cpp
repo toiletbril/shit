@@ -361,7 +361,9 @@ static fn word_names_existing_path(StringView word) throws -> bool
 
 static fn path_partial_prefixes_entry(StringView word, usize existing_end,
                                       StringView partial, bool has_tilde,
-                                      bool directories_only) throws -> bool
+                                      bool directories_only,
+                                      StringView expanded_tilde_prefix,
+                                      usize tilde_prefix_length) throws -> bool
 {
   if (partial.is_empty()) return false;
 
@@ -369,10 +371,9 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
   if (existing_end > 0) {
     let const prefix = word.substring_of_length(0, existing_end);
     if (has_tilde) {
-      if (Maybe<String> expanded = utils::expand_leading_tilde_path(prefix))
-        directory = steal(*expanded);
-      else
-        return false;
+      if (expanded_tilde_prefix.is_empty()) return false;
+      directory.append(expanded_tilde_prefix);
+      directory.append(prefix.substring(tilde_prefix_length));
     } else {
       directory = String{bump_allocator(HIGHLIGHT_ARENA), prefix};
     }
@@ -393,13 +394,7 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
 
   let const do_name_starts_with = [&](StringView name) wontthrow {
     if (name.starts_with(partial)) return true;
-    if (os::FILESYSTEM_IS_CASE_SENSITIVE || name.length < partial.length)
-      return false;
-    for (usize position = 0; position < partial.length; position++)
-      if (utils::ascii_to_lower(name[position]) !=
-          utils::ascii_to_lower(partial[position]))
-        return false;
-    return true;
+    return !os::FILESYSTEM_IS_CASE_SENSITIVE;
   };
 
   let entry_position =
@@ -465,62 +460,87 @@ static fn color_path_argument(usize word_start, StringView word,
                              (os::is_directory_separator(word[1]) ||
                               (word.length >= 3 && word[1] == '.' &&
                                os::is_directory_separator(word[2])));
-
-  if (Path{word}.has_trailing_separator()) {
-    let target = word;
-    let expanded = String{bump_allocator(HIGHLIGHT_ARENA)};
-    if (has_tilde) {
-      Maybe<String> home = utils::expand_leading_tilde_path(word);
-      if (home.has_value()) {
-        expanded = steal(*home);
-        target = expanded.view();
+  let expanded_tilde_prefix = String{bump_allocator(HIGHLIGHT_ARENA)};
+  usize tilde_prefix_length = word.length;
+  if (has_tilde) {
+    for (usize position = 1; position < word.length; position++)
+      if (os::is_directory_separator(word[position])) {
+        tilde_prefix_length = position;
+        break;
       }
-    }
-    let const normalized = Path{target}.normalized();
-    if (normalized.exists() && !normalized.is_directory()) {
-      spans.push(highlight_span{word_start, word_start + word.length,
-                                colors::ansi::RED_CURLY_GREEN_UNDERLINE});
-      return true;
-    }
+    let const tilde_prefix = word.substring_of_length(0, tilde_prefix_length);
+    if (Maybe<String> expanded = utils::expand_leading_tilde_path(tilde_prefix))
+      expanded_tilde_prefix = steal(*expanded);
+  }
+  let expanded_path = String{bump_allocator(HIGHLIGHT_ARENA)};
+  if (!expanded_tilde_prefix.is_empty()) {
+    expanded_path.append(expanded_tilde_prefix.view());
+    expanded_path.append(word.substring(tilde_prefix_length));
   }
 
-  let do_prefix_is_valid = [&](StringView prefix) throws -> bool {
-    StringView target = prefix;
-    let expanded = String{bump_allocator(HIGHLIGHT_ARENA)};
+  let is_prefix_non_directory = false;
+  let do_prefix_is_valid = [&](usize prefix_end, bool must_be_directory)
+                               throws -> bool {
+    is_prefix_non_directory = false;
+    let target = word.substring_of_length(0, prefix_end);
     if (has_tilde) {
-      Maybe<String> home = utils::expand_leading_tilde_path(prefix);
-      if (!home.has_value()) return false;
-      expanded = steal(*home);
-      target = expanded.view();
+      if (expanded_tilde_prefix.is_empty()) return false;
+      ASSERT(prefix_end >= tilde_prefix_length);
+      target = expanded_path.view().substring_of_length(
+          0, expanded_tilde_prefix.count() + prefix_end - tilde_prefix_length);
     }
 
-    return directories_only ? Path{target}.is_directory()
-                            : Path{target}.exists();
+    let status = os::file_status{};
+    if (!os::stat_path_following(target, status)) return false;
+    is_prefix_non_directory = os::file_type_letter(status.mode) != 'd';
+    return !must_be_directory || !is_prefix_non_directory;
   };
 
   let const has_no_path_shape = !has_separator && !has_tilde && !has_dot_prefix;
 
-  /* The prefix is monotonic on the filesystem, a deeper path cannot exist when
-     a shallower one does not, so the boundaries are walked from the longest
-     down and the first that exists is the answer. */
   usize existing_end = 0;
   if (has_no_path_shape) {
-    if (!directories_only && !word_names_existing_path(word)) return false;
-    existing_end =
-        directories_only && !do_prefix_is_valid(word) ? 0 : word.length;
+    if (!directories_only) {
+      if (!word_names_existing_path(word)) return false;
+      existing_end = word.length;
+    } else {
+      existing_end = do_prefix_is_valid(word.length, true) ? word.length : 0;
+    }
   } else {
-    for (usize scan = word.length; scan >= 1; scan--) {
-      let const at_boundary =
-          scan == word.length || os::is_directory_separator(word[scan]);
-      if (!at_boundary) continue;
-
-      let const typed_prefix = word.substring_of_length(0, scan);
-      if (do_prefix_is_valid(typed_prefix)) {
-        existing_end =
-            scan < word.length && os::is_directory_separator(word[scan])
-                ? scan + 1
-                : scan;
-        break;
+    if (do_prefix_is_valid(word.length, directories_only)) {
+      existing_end = word.length;
+    } else if (is_prefix_non_directory) {
+      spans.push(highlight_span{word_start, word_start + word.length,
+                                colors::ansi::RED_CURLY_GREEN_UNDERLINE});
+      return true;
+    } else {
+      usize component_end = os::path_root_length(word);
+      existing_end = component_end;
+      while (component_end < word.length) {
+        while (component_end < word.length &&
+               os::is_directory_separator(word[component_end]))
+          component_end++;
+        if (component_end >= word.length) {
+          existing_end = word.length;
+          break;
+        }
+        while (component_end < word.length &&
+               !os::is_directory_separator(word[component_end]))
+          component_end++;
+        let const must_be_directory =
+            directories_only || component_end < word.length;
+        if (!do_prefix_is_valid(component_end, must_be_directory)) {
+          if (is_prefix_non_directory) {
+            spans.push(highlight_span{word_start, word_start + word.length,
+                                      colors::ansi::RED_CURLY_GREEN_UNDERLINE});
+            return true;
+          }
+          break;
+        }
+        existing_end = component_end;
+        while (existing_end < word.length &&
+               os::is_directory_separator(word[existing_end]))
+          existing_end++;
       }
     }
   }
@@ -540,8 +560,9 @@ static fn color_path_argument(usize word_start, StringView word,
       word.substring_of_length(existing_end, segment_end - existing_end);
   let const tail_could_complete =
       !word_is_terminated &&
-      path_partial_prefixes_entry(word, existing_end, partial, has_tilde,
-                                  directories_only);
+      path_partial_prefixes_entry(
+          word, existing_end, partial, has_tilde, directories_only,
+          expanded_tilde_prefix.view(), tilde_prefix_length);
   let const tail_color = tail_could_complete
                              ? colors::ansi::CYAN
                              : colors::ansi::RED_CURLY_GREEN_UNDERLINE;
@@ -1137,16 +1158,16 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
         line_functions.add(word);
       } else {
-        if (first_word_resolves(word, context) || line_functions.contains(word))
-        {
+        let const is_command_resolved = first_word_resolves(word, context);
+        let const command_has_prefix =
+            !is_command_resolved && !is_word_terminated
+                ? command_word_prefixes_any(word, context)
+                : false;
+        if (is_command_resolved || line_functions.contains(word)) {
           do_push(word_start, word_end, colors::ansi::BLUE);
-        } else if (!is_word_terminated &&
-                   command_word_prefixes_any(word, context))
-        {
+        } else if (command_has_prefix) {
           do_push(word_start, word_end, colors::ansi::BRIGHT_BLUE);
-        } else if (is_word_terminated ||
-                   !command_word_prefixes_any(word, context))
-        {
+        } else {
           do_push(word_start, word_end,
                   colors::ansi::RED_CURLY_GREEN_UNDERLINE);
         }
@@ -1198,19 +1219,18 @@ fn highlight_line(StringView line, EvalContext &context) throws
   return spans;
 }
 
-fn diagnostic_highlight_cache::spans_for(StringView source,
+fn diagnostic_highlight_cache::spans_for(StringView source_line,
                                          EvalContext &context) throws
     -> const ArrayList<highlight_span> *
 {
-  if (source.data != m_source.data || source.length != m_source.length)
-    return nullptr;
-  if (m_was_built) return &m_spans;
+  if (source_line.data == m_source_line.data &&
+      source_line.length == m_source_line.length)
+  {
+    return &m_spans;
+  }
 
-  let const generated = highlight_line(source, context);
-  m_spans.reserve(generated.count());
-  for (let const &span : generated)
-    m_spans.push(span);
-  m_was_built = true;
+  m_source_line = source_line;
+  m_spans = highlight_line(source_line, context);
   return &m_spans;
 }
 

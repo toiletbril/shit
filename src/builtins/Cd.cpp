@@ -118,6 +118,37 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let target = Path{arg_path};
   let old_directory = Path{};
+  let is_logical_target_available = true;
+  let const do_resolve_logical_target = [](const Path &raw_target,
+                                           bool &did_fail_before_dotdot) {
+    let logical_candidate = Path{raw_target.text().view().substring_of_length(
+        0, os::path_root_length(raw_target.text().view()))};
+    usize component_position = os::path_root_length(raw_target.text().view());
+    while (component_position < raw_target.count()) {
+      while (component_position < raw_target.count() &&
+             os::is_directory_separator(raw_target.text()[component_position]))
+        component_position++;
+      if (component_position >= raw_target.count()) break;
+      let const component_start = component_position;
+      while (component_position < raw_target.count() &&
+             !os::is_directory_separator(raw_target.text()[component_position]))
+        component_position++;
+      let const component = raw_target.text().view().substring_of_length(
+          component_start, component_position - component_start);
+      if (component == StringView{"."}) continue;
+      if (component == StringView{".."}) {
+        if (!logical_candidate.is_directory()) {
+          did_fail_before_dotdot = true;
+          return raw_target.clone();
+        }
+        logical_candidate.push_component(component);
+        logical_candidate = logical_candidate.normalized();
+        continue;
+      }
+      logical_candidate.push_component(component);
+    }
+    return logical_candidate;
+  };
 
   /* An empty CDPATH entry, including one a leading, trailing, or doubled colon
      makes, names the current directory. */
@@ -136,18 +167,26 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                              ? Path{arg_path}
                              : Path{entry}.push_component(arg_path.view());
         let resolved = candidate;
+        let is_candidate_available = true;
         if (is_physical) {
           if (resolved.is_relative()) {
             let current_directory = Path::current_directory();
             if (current_directory.is_empty()) break;
             resolved = current_directory.push_component(resolved.text().view());
           }
-          if (let canonical = os::canonical_path(resolved))
+          if (let canonical = os::canonical_path(resolved)) {
             resolved = canonical.take();
+          } else {
+            is_candidate_available = false;
+          }
         } else {
-          resolved = resolved.to_absolute().normalized();
+          resolved = resolved.to_absolute_without_normalizing();
+          let did_fail_before_dotdot = false;
+          resolved =
+              do_resolve_logical_target(resolved, did_fail_before_dotdot);
+          is_candidate_available = !did_fail_before_dotdot;
         }
-        if (resolved.is_directory()) {
+        if (is_candidate_available && resolved.is_directory()) {
           LOG(Info, "cd resolved '%s' through CDPATH entry '%.*s'",
               arg_path.c_str(), static_cast<int>(entry.length), entry.data);
           target = steal(resolved);
@@ -165,7 +204,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      symlink's parent. */
   if (is_physical) {
     if (target.is_relative()) {
-      target = target.to_absolute();
+      target = target.to_absolute_without_normalizing();
       if (!target.is_absolute())
         throw ErrorWithLocation{
             ec.source_location(),
@@ -174,35 +213,42 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     if (let resolved = os::canonical_path(target)) target = resolved.take();
-  } else if (target.is_absolute() ||
-             os::path_is_drive_relative(target.text().view()))
-  {
-    target = target.to_absolute().normalized();
   } else {
-    old_directory = logical_working_directory(cxt);
-    let logical_target = Path{old_directory.text().view()};
-    logical_target.push_component(target.text().view());
-    logical_target = logical_target.normalized();
-
-    if (!logical_target.is_empty() && logical_target.is_directory()) {
-      target = steal(logical_target);
+    let raw_logical_target = Path{};
+    let logical_operand = target.text().view();
+    if (target.is_absolute() ||
+        os::path_is_drive_relative(target.text().view()))
+    {
+      raw_logical_target = target.to_absolute_without_normalizing();
     } else {
-      target = target.to_absolute().normalized();
-      /* getcwd yields an empty path when the current directory was removed, so
-         the result stays relative and the throw names that failure. */
-      if (!target.is_absolute())
-        throw ErrorWithLocation{
-            ec.source_location(),
-            StringView{"Unable to resolve '"} + arg_path +
-                "' because the current directory is unavailable"};
+      old_directory = logical_working_directory(cxt);
+      raw_logical_target = Path{old_directory.text().view()};
+      raw_logical_target.push_component(logical_operand);
     }
+
+    if (!raw_logical_target.is_absolute())
+      throw ErrorWithLocation{
+          ec.source_location(),
+          StringView{"Unable to resolve '"} + arg_path +
+              "' because the current directory is unavailable"};
+
+    let did_fail_before_dotdot = false;
+    let logical_candidate =
+        do_resolve_logical_target(raw_logical_target, did_fail_before_dotdot);
+    is_logical_target_available =
+        !did_fail_before_dotdot && logical_candidate.is_directory();
+    target = is_logical_target_available ? logical_candidate.normalized()
+             : did_fail_before_dotdot    ? steal(raw_logical_target)
+                                         : steal(logical_candidate);
   }
 
-  if (target.exists()) {
+  if (is_logical_target_available && target.exists()) {
     if (!target.is_directory())
       throw ErrorWithLocation{ec.arg_location_at(operand_index),
                               StringView{"The path '"} + arg_path +
                                   "' is not a directory"};
+
+    if (!is_physical) target = target.normalized();
 
     if (old_directory.is_empty())
       old_directory = logical_working_directory(cxt);
@@ -230,13 +276,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let operand_location = ec.arg_location_at(operand_index);
   let raw_operand = arg_path.view();
   if (operand_index < ec.arg_locations().count()) {
-    if (let const source = cxt.current_source();
-        source != nullptr &&
-        operand_location.position + operand_location.length <= source->length())
-    {
-      raw_operand = source->view().substring_of_length(
-          operand_location.position, operand_location.length);
-    }
+    if (let const source = cxt.current_source(); source != nullptr)
+      if (let source_text = operand_location.get_source_text(source->view()))
+        raw_operand = *source_text;
   }
 
   let const unavailable = utils::locate_first_unavailable_path_component(
@@ -252,7 +294,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (unavailable->is_not_directory) {
     throw ErrorWithLocation{unavailable->location,
                             StringView{"The path '"} +
-                                unavailable->typed_prefix +
+                                unavailable->reported_prefix +
                                 "' is not a directory"};
   }
 
@@ -275,7 +317,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   throw ErrorWithLocationAndDetails{unavailable->location,
                                     StringView{"The directory '"} +
-                                        unavailable->typed_prefix +
+                                        unavailable->reported_prefix +
                                         "' does not exist",
                                     details};
 }

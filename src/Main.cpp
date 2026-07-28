@@ -442,8 +442,7 @@ static fn run_script_contents(const String &script_contents,
         completion::debug_highlight_input_byte_count();
 #endif
     if (run_analysis) {
-      let highlight_cache =
-          completion::diagnostic_highlight_cache{script_contents.view()};
+      let highlight_cache = completion::diagnostic_highlight_cache{};
       let *previous_highlight_cache =
           context.set_diagnostic_highlight_cache(&highlight_cache);
       defer
@@ -1243,6 +1242,10 @@ fn main(int argc, char **argv) -> int
     });
 
   shit::os::unset_environment_variable("SHIT_IDENTITY");
+  let const should_suppress_root_source_trace =
+      shit::os::get_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE")
+          .has_value();
+  shit::os::unset_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE");
 
   let context = shit::EvalContext{FLAG_DISABLE_EXPANSION.is_enabled(),
                                   FLAG_VERBOSE.is_enabled(),
@@ -1694,14 +1697,19 @@ fn main(int argc, char **argv) -> int
       }
     }
 
-    if (root_frame_call_site.has_value()) {
+    if (root_frame_call_site.has_value() && !should_suppress_root_source_trace)
+    {
       context.push_root_source_frame(&context.cli_invocation(),
                                      *root_frame_call_site,
                                      FLAG_COMMAND.count() <= 1);
     }
     defer
     {
-      if (root_frame_call_site.has_value()) context.pop_root_source_frame();
+      if (root_frame_call_site.has_value() &&
+          !should_suppress_root_source_trace)
+      {
+        context.pop_root_source_frame();
+      }
     };
 
     script_contents.normalize_crlf_line_endings();

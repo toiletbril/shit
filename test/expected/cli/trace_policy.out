@@ -1,6 +1,16 @@
 named traces=0 errors=1
 stdin traces=0 errors=1
 eval traces=2 errors=1
+substitution traces=2 errors=1 parents=2 sites=1
+nested substitution traces=2 errors=1 parents=2 sites=1
+function substitution traces=2 errors=1 parents=2 sites=1
+substitution parse traces=2 errors=1 sites=1
+nested parse traces=3 errors=1
+process substitution traces=2 errors=1 sites=1 order=error-first
+process eval traces=3 errors=1 inner-sites=1
+prefixed process eval traces=3 errors=1 prefixes=1
+disabled-substitution traces=0 errors=1
+disabled-process-substitution traces=0 errors=1
 multi-root traces=2 errors=2
 multi-root first=4 second=4
 noexec-batch traces=1 warnings=2

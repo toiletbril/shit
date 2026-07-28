@@ -14,6 +14,23 @@ struct SourceLocation
   usize position{0};
   usize length{0};
   Maybe<StringView> filename{};
+
+  pure fn get_source_text(StringView source) const wontthrow
+      -> Maybe<StringView>
+  {
+    if (position > source.length || length > source.length - position)
+      return None;
+    return source.substring_of_length(position, length);
+  }
+
+  pure fn subspan(usize relative_position,
+                  usize relative_length) const wontthrow -> SourceLocation
+  {
+    ASSERT(relative_position <= length);
+    ASSERT(relative_length <= length - relative_position);
+    return SourceLocation{position + relative_position, relative_length,
+                          filename};
+  }
 };
 
 class ErrorBase

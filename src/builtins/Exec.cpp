@@ -135,28 +135,25 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let program_path = Path{};
   if (os::has_directory_separator(command_name.view())) {
     let const typed_program_path = Path{command_name.view()};
-    let resolved = typed_program_path.has_trailing_separator()
-                       ? Maybe<Path>{typed_program_path.normalized()}
-                       : Path::canonicalize(command_name);
+    let resolved =
+        typed_program_path.has_trailing_separator()
+            ? Maybe<Path>{typed_program_path.to_absolute_without_normalizing()}
+            : Path::canonicalize(command_name);
     if (resolved.has_value() && !resolved->exists()) resolved = None;
     if (!resolved) {
       let error_location = ec.arg_location_at(command_index);
       let reported_program = command_name.view();
       let raw_program = command_name.view();
-      if (let const *source = cxt.current_source();
-          source != nullptr &&
-          error_location.position + error_location.length <= source->length())
-      {
-        raw_program = source->view().substring_of_length(
-            error_location.position, error_location.length);
-      }
-      let const target = typed_program_path.to_absolute();
+      if (let const *source = cxt.current_source(); source != nullptr)
+        if (let source_text = error_location.get_source_text(source->view()))
+          raw_program = *source_text;
+      let const target = typed_program_path.to_absolute_without_normalizing();
       let const unavailable = utils::locate_first_unavailable_path_component(
           target, command_name.view(), raw_program, error_location,
           cxt.scratch_allocator());
       if (unavailable.has_value()) {
         error_location = unavailable->location;
-        reported_program = unavailable->typed_prefix.view();
+        reported_program = unavailable->reported_prefix.view();
       }
       return report_exec_resolution_error(
           ec, cxt, error_location,

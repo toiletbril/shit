@@ -64,43 +64,44 @@ fn trim_matching(Allocator result_allocator, StringView value,
   return String{result_allocator, value};
 }
 
-static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
-                                   StringView word, trim_end end,
-                                   bool longest) throws -> String
+static fn trim_value_with_modifier(
+    EvalContext &cxt, StringView value, StringView word, trim_end end,
+    bool longest, Maybe<SourceLocation> source_location = None) throws -> String
 {
   LOG(All, "trimming a value of %zu bytes with the pattern word '%.*s'",
       value.length, static_cast<int>(word.length), word.data);
   let active = Bitset{cxt.scratch_allocator()};
-  let const pattern = cxt.expand_modifier_word_masked(word, active);
+  let const pattern =
+      cxt.expand_modifier_word_masked(word, active, true, source_location);
   return trim_matching(cxt.scratch_allocator(), value, pattern.view(), active,
                        end, longest, cxt.extglob_enabled());
 }
 
 } // namespace
 
-fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes,
-                                     bool strip_escaped_literals) throws
-    -> String
+fn EvalContext::expand_modifier_word(
+    StringView word, bool remove_quotes, bool strip_escaped_literals,
+    Maybe<SourceLocation> source_location) throws -> String
 {
   /* The default, assign, alternate, error, and arithmetic forms never glob, so
      the mask is discarded and the pattern-only unescape stays off. */
   let discarded_mask = Bitset{scratch_allocator()};
   return expand_modifier_word_worker(word, discarded_mask, remove_quotes, false,
-                                     strip_escaped_literals);
+                                     strip_escaped_literals, source_location);
 }
 
-fn EvalContext::expand_modifier_word_masked(StringView word, Bitset &active_out,
-                                            bool remove_quotes) throws -> String
+fn EvalContext::expand_modifier_word_masked(
+    StringView word, Bitset &active_out, bool remove_quotes,
+    Maybe<SourceLocation> source_location) throws -> String
 {
   return expand_modifier_word_worker(word, active_out, remove_quotes, true,
-                                     false);
+                                     false, source_location);
 }
 
-fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
-                                            bool remove_quotes,
-                                            bool is_pattern_word,
-                                            bool strip_escaped_literals) throws
-    -> String
+fn EvalContext::expand_modifier_word_worker(
+    StringView word, Bitset &active_out, bool remove_quotes,
+    bool is_pattern_word, bool strip_escaped_literals,
+    Maybe<SourceLocation> source_location) throws -> String
 {
   LOG(All, "expanding a modifier word of %zu bytes", word.length);
   let out = String{scratch_allocator()};
@@ -180,7 +181,11 @@ fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
         if (word[j] == '`') break;
         inner += word[j];
       }
-      do_emit_run(capture_command_substitution(inner), !is_in_double_quote);
+      let call_site = Maybe<SourceLocation>{};
+      if (source_location.has_value())
+        call_site = source_location->subspan(i, j - i + (j < word.length));
+      do_emit_run(capture_command_substitution(inner, None, call_site),
+                  !is_in_double_quote);
       i = j;
       continue;
     }
@@ -312,7 +317,11 @@ fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
         inner += ch;
         j++;
       }
-      do_emit_run(apply_parameter_expansion(inner), !is_in_double_quote);
+      let inner_location = Maybe<SourceLocation>{};
+      if (source_location.has_value())
+        inner_location = source_location->subspan(i + 2, inner.count());
+      do_emit_run(apply_parameter_expansion(inner, inner_location),
+                  !is_in_double_quote);
       i = j;
     } else if (lexer::is_variable_name_start(next)) {
       let name = String{scratch_allocator()};
@@ -401,7 +410,11 @@ fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
         }
         inner += ch;
       }
-      do_emit_run(capture_command_substitution(inner), !is_in_double_quote);
+      let call_site = Maybe<SourceLocation>{};
+      if (source_location.has_value())
+        call_site = source_location->subspan(i, j - i + (j < word.length));
+      do_emit_run(capture_command_substitution(inner, None, call_site),
+                  !is_in_double_quote);
       i = j;
     } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
                next == '$' || next == '!' || next == '-' ||
@@ -419,7 +432,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word, Bitset &active_out,
   return out;
 }
 
-hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
+hot fn EvalContext::apply_parameter_expansion(
+    StringView spec, Maybe<SourceLocation> source_location) throws -> String
 {
   LOG(All, "applying the parameter expansion '${%.*s}'",
       static_cast<int>(spec.length), spec.data);
@@ -428,6 +442,18 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
      the depth is capped before the native stack is exhausted. */
   enter_parameter_expansion();
   defer { leave_parameter_expansion(); };
+
+  let const do_source_location_for =
+      [&](StringView part) -> Maybe<SourceLocation> {
+    if (!source_location.has_value()) return None;
+    ASSERT(part.data >= spec.data &&
+           part.data + part.length <= spec.data + spec.length);
+    return source_location->subspan(static_cast<usize>(part.data - spec.data),
+                                    part.length);
+  };
+  let const do_expand_modifier_word = [&](StringView word) throws -> String {
+    return expand_modifier_word(word, true, true, do_source_location_for(word));
+  };
 
   if (spec.is_empty()) return String{scratch_allocator()};
 
@@ -556,14 +582,14 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
           let const word = modifier.substring(is_colon ? 2 : 1);
           switch (after) {
           case '-':
-            if (treat_as_unset) return expand_modifier_word(word);
+            if (treat_as_unset) return do_expand_modifier_word(word);
             return value;
           case '+':
             if (treat_as_unset) return String{scratch_allocator()};
-            return expand_modifier_word(word);
+            return do_expand_modifier_word(word);
           case '=': {
             if (!treat_as_unset) return value;
-            let const assigned = expand_modifier_word(word);
+            let const assigned = do_expand_modifier_word(word);
             assign_array_element(name, subscript, assigned.view(), false);
             return assigned;
           }
@@ -573,7 +599,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
                 throw_script_fatal(
                     "Unable to expand '" + name + "[" + subscript +
                     "]' because the element is not set or is empty");
-              throw_script_fatal(expand_modifier_word(word));
+              throw_script_fatal(do_expand_modifier_word(word));
             }
             return value;
           default: break;
@@ -642,12 +668,12 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   switch (op) {
   case '-':
-    if (treat_as_unset) return expand_modifier_word(word);
+    if (treat_as_unset) return do_expand_modifier_word(word);
     ASSERT(current.has_value());
     return steal(*current);
   case '=':
     if (treat_as_unset) {
-      let const assigned = expand_modifier_word(word);
+      let const assigned = do_expand_modifier_word(word);
       set_shell_variable(name, assigned);
       return assigned;
     }
@@ -655,13 +681,13 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     return steal(*current);
   case '+':
     if (treat_as_unset) return String{scratch_allocator()};
-    return expand_modifier_word(word);
+    return do_expand_modifier_word(word);
   case '?':
     if (treat_as_unset) {
       if (word.is_empty())
         throw_script_fatal("Unable to expand '" + name +
                            "' because the parameter is not set or is empty");
-      throw_script_fatal(expand_modifier_word(word));
+      throw_script_fatal(do_expand_modifier_word(word));
     }
     ASSERT(current.has_value());
     return steal(*current);
@@ -669,13 +695,13 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   case '#': {
     return trim_value_with_modifier(
         *this, current.value_or(String{scratch_allocator()}).view(), word,
-        trim_end::Prefix, is_doubled);
+        trim_end::Prefix, is_doubled, do_source_location_for(word));
   }
 
   case '%': {
     return trim_value_with_modifier(
         *this, current.value_or(String{scratch_allocator()}).view(), word,
-        trim_end::Suffix, is_doubled);
+        trim_end::Suffix, is_doubled, do_source_location_for(word));
   }
 
   default: return expand_variable(name);

@@ -155,22 +155,8 @@ cold fn Path::first_unavailable_component() const throws
     -> Maybe<unavailable_path_component>
 {
   const usize root_length = os::path_root_length(m_text.view());
-  usize component_count = 0;
-  usize position = root_length;
-  while (position < m_text.count()) {
-    while (position < m_text.count() &&
-           os::is_directory_separator(m_text[position]))
-      position++;
-    if (position >= m_text.count()) break;
-
-    component_count++;
-    while (position < m_text.count() &&
-           !os::is_directory_separator(m_text[position]))
-      position++;
-  }
-
   usize component_index = 0;
-  position = root_length;
+  usize position = root_length;
   while (position < m_text.count()) {
     while (position < m_text.count() &&
            os::is_directory_separator(m_text[position]))
@@ -182,27 +168,62 @@ cold fn Path::first_unavailable_component() const throws
            !os::is_directory_separator(m_text[position]))
       position++;
 
-    let const prefix = Path{m_text.substring_of_length(0, position)};
-    if (!prefix.exists())
-      return unavailable_path_component{
-          component_start, position, component_index, component_count, false};
-    if (!prefix.is_directory())
+    let const prefix = m_text.substring_of_length(0, position);
+    let status = os::file_status{};
+    let const is_available = os::stat_path_following(prefix, status);
+    if (!is_available || os::file_type_letter(status.mode) != 'd') {
+      usize remaining_component_count = 0;
+      usize remaining_position = position;
+      while (remaining_position < m_text.count()) {
+        while (remaining_position < m_text.count() &&
+               os::is_directory_separator(m_text[remaining_position]))
+          remaining_position++;
+        if (remaining_position >= m_text.count()) break;
+        remaining_component_count++;
+        while (remaining_position < m_text.count() &&
+               !os::is_directory_separator(m_text[remaining_position]))
+          remaining_position++;
+      }
+      let const component_count =
+          component_index + remaining_component_count + 1;
+      if (!is_available)
+        return unavailable_path_component{
+            component_start, position, component_index, component_count, false};
       return unavailable_path_component{component_start, position,
                                         component_index, component_count, true};
+    }
     component_index++;
   }
 
   return None;
 }
 
+fn Path::to_absolute_without_normalizing() const throws -> Path
+{
+  let result = Path{};
+  if (is_absolute()) {
+    result = clone();
+  } else if (let native = os::resolve_drive_relative_path(m_text.view())) {
+    result = native.take();
+  } else {
+    result = current_directory();
+    let relative = m_text.view();
+    while (relative.length >= 2 && relative[0] == '.' &&
+           os::is_directory_separator(relative[1]))
+      relative = relative.substring(2);
+    if (!relative.is_empty()) result.push_component(relative);
+  }
+
+  let const root_length = os::path_root_length(result.m_text.view());
+  while (result.m_text.count() > root_length &&
+         os::is_directory_separator(result.m_text.back()))
+    result.m_text.pop_back();
+  return result;
+}
+
 fn Path::to_absolute() const throws -> Path
 {
-  if (is_absolute()) return normalized();
-  if (let native = os::resolve_drive_relative_path(m_text.view()))
-    return native->normalized();
-  let result = current_directory();
-  result.push_component(m_text);
-  return result.normalized();
+  return to_absolute_without_normalizing().normalized();
 }
 
 hot fn Path::operator==(const Path &other) const wontthrow -> bool
@@ -361,23 +382,24 @@ fn Path::canonicalize(StringView path) throws -> Maybe<Path>
   let candidate = Path{path};
 
   if (candidate.is_relative() && os::has_directory_separator(path)) {
-    candidate = candidate.to_absolute();
+    candidate = candidate.to_absolute_without_normalizing();
   }
-
-  candidate = candidate.normalized();
 
   /* A name written with a trailing dot gets no suffix added. */
   const bool ends_with_dot =
       path.length > 0 && path.data[path.length - 1] == '.';
+  let does_candidate_exist = candidate.exists();
   if (candidate.extension().is_empty() && !ends_with_dot) {
     usize suffix_index = 0;
-    while (!candidate.exists() && suffix_index < os::PROGRAM_SUFFIXES.count()) {
+    while (!does_candidate_exist && suffix_index < os::PROGRAM_SUFFIXES.count())
+    {
       let const &suffix = os::PROGRAM_SUFFIXES[suffix_index++];
       candidate = candidate.with_extension(suffix.text);
+      does_candidate_exist = candidate.exists();
     }
   }
 
-  if (!candidate.exists()) return shit::None;
+  if (!does_candidate_exist) return shit::None;
 
   return candidate;
 }

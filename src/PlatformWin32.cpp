@@ -782,18 +782,20 @@ fn resolve_drive_relative_path(StringView path) throws -> Maybe<Path>
 {
   if (!path_is_drive_relative(path)) return None;
 
-  const String path_string{path};
+  char drive_current_directory[4]{path[0], ':', '.', '\0'};
   let const required =
-      GetFullPathNameA(path_string.c_str(), 0, nullptr, nullptr);
+      GetFullPathNameA(drive_current_directory, 0, nullptr, nullptr);
   if (required == 0) return None;
   let buffer = ArrayList<char>{heap_allocator()};
   buffer.reserve(static_cast<usize>(required));
-  let const length =
-      GetFullPathNameA(path_string.c_str(), required, buffer.begin(), nullptr);
+  let const length = GetFullPathNameA(drive_current_directory, required,
+                                      buffer.begin(), nullptr);
   if (length == 0 || length >= required) return None;
-  return Path{
+  let result = Path{
       StringView{buffer.begin(), static_cast<usize>(length)}
   };
+  if (path.length > 2) result.push_component(path.substring(2));
+  return result;
 }
 
 pure fn path_root_length(StringView path) wontthrow -> usize
@@ -1153,6 +1155,24 @@ fn unset_environment_variable(StringView key) -> void
   SetEnvironmentVariableA(key_string.c_str(), nullptr);
 }
 
+fn signal_internal_diagnostic() wontthrow -> void
+{
+  char marker_path[MAX_PATH];
+  let const marker_path_length = GetEnvironmentVariableA(
+      "SHIT_INTERNAL_DIAGNOSTIC_MARKER", marker_path, countof(marker_path));
+  if (marker_path_length == 0 || marker_path_length >= countof(marker_path))
+    return;
+
+  let const marker =
+      CreateFileA(marker_path, FILE_APPEND_DATA,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, nullptr);
+  if (marker == INVALID_HANDLE_VALUE) return;
+  DWORD written = 0;
+  WriteFile(marker, "x", 1, &written, nullptr);
+  CloseHandle(marker);
+}
+
 fn environment_names() -> ArrayList<String>
 {
   ArrayList<String> names{heap_allocator()};
@@ -1410,8 +1430,16 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   return process_info.hProcess;
 }
 
-static fn run_substitution_to_temp(StringView source,
-                                   bool bash_compatible) throws -> Maybe<String>
+struct process_substitution_temp_result
+{
+  String path{heap_allocator()};
+  String diagnostic_output{heap_allocator()};
+  bool has_shell_diagnostic{false};
+};
+
+static fn run_substitution_to_temp(StringView source, bool bash_compatible,
+                                   bool source_traces_enabled) throws
+    -> Maybe<process_substitution_temp_result>
 {
   /* Windows has no fork, so <(cmd) spawns a fresh shell that writes its output
      into a temp file the consumer reads by path. The whole output is written
@@ -1438,6 +1466,25 @@ static fn run_substitution_to_temp(StringView source,
   if (temp_file == INVALID_HANDLE_VALUE) return shit::None;
   defer { CloseHandle(temp_file); };
 
+  char diagnostic_path[MAX_PATH];
+  if (GetTempFileNameA(temp_dir, "sht", 0, diagnostic_path) == 0)
+    return shit::None;
+  defer { DeleteFileA(diagnostic_path); };
+  const HANDLE diagnostic_file =
+      CreateFileA(diagnostic_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
+                  CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
+  if (diagnostic_file == INVALID_HANDLE_VALUE) return shit::None;
+  bool is_diagnostic_file_open = true;
+  defer
+  {
+    if (is_diagnostic_file_open) CloseHandle(diagnostic_file);
+  };
+
+  char diagnostic_marker_path[MAX_PATH];
+  if (GetTempFileNameA(temp_dir, "sht", 0, diagnostic_marker_path) == 0)
+    return shit::None;
+  defer { DeleteFileA(diagnostic_marker_path); };
+
   let arguments = ArrayList<String>{heap_allocator()};
   arguments.push(String{heap_allocator(), module_path->view()});
   if (bash_compatible) {
@@ -1445,6 +1492,8 @@ static fn run_substitution_to_temp(StringView source,
     arguments.push(String{heap_allocator(), StringView{"bash"}});
   }
   arguments.push(String{heap_allocator(), StringView{"--no-diagnostics"}});
+  if (!source_traces_enabled)
+    arguments.push(String{heap_allocator(), StringView{"--no-traces"}});
   arguments.push(String{heap_allocator(), StringView{"-c"}});
   arguments.push(String{heap_allocator(), source});
   let command_line = make_os_args(arguments);
@@ -1454,15 +1503,32 @@ static fn run_substitution_to_temp(StringView source,
   startup_info.dwFlags = STARTF_USESTDHANDLES;
   startup_info.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
   startup_info.hStdOutput = temp_file;
-  startup_info.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  startup_info.hStdError = diagnostic_file;
   inherited_handle_state input_inheritance{};
-  inherited_handle_state error_inheritance{};
   make_handle_inheritable(startup_info.hStdInput, input_inheritance);
-  make_handle_inheritable(startup_info.hStdError, error_inheritance);
   defer { restore_handle_inheritance(input_inheritance); };
-  defer { restore_handle_inheritance(error_inheritance); };
 
   PROCESS_INFORMATION process_info{};
+  let const previous_root_trace_marker =
+      get_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE");
+  let const previous_diagnostic_marker =
+      get_environment_variable("SHIT_INTERNAL_DIAGNOSTIC_MARKER");
+  set_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE", "1");
+  set_environment_variable("SHIT_INTERNAL_DIAGNOSTIC_MARKER",
+                           diagnostic_marker_path);
+  defer
+  {
+    if (previous_root_trace_marker.has_value())
+      set_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE",
+                               previous_root_trace_marker->view());
+    else
+      unset_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE");
+    if (previous_diagnostic_marker.has_value())
+      set_environment_variable("SHIT_INTERNAL_DIAGNOSTIC_MARKER",
+                               previous_diagnostic_marker->view());
+    else
+      unset_environment_variable("SHIT_INTERNAL_DIAGNOSTIC_MARKER");
+  };
   if (CreateProcessA(module_path->c_str(),
                      const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
                      TRUE, 0, nullptr, nullptr, &startup_info,
@@ -1472,32 +1538,44 @@ static fn run_substitution_to_temp(StringView source,
   defer { CloseHandle(process_info.hThread); };
   WaitForSingleObject(process_info.hProcess, INFINITE);
 
+  CloseHandle(diagnostic_file);
+  is_diagnostic_file_open = false;
+  let diagnostic_output = Path{diagnostic_path}.read_entire_file();
+
   /* A backslash would read as an escape in the target word, so slashes are
      returned, which CreateFile accepts the same. */
-  let result = String{heap_allocator()};
+  let result = process_substitution_temp_result{};
   for (const char *byte = temp_path; *byte != '\0'; byte++)
-    result += *byte == '\\' ? '/' : *byte;
+    result.path += *byte == '\\' ? '/' : *byte;
+  if (diagnostic_output.has_value())
+    result.diagnostic_output = diagnostic_output.take();
+  let const marker_size = Path{diagnostic_marker_path}.file_size();
+  result.has_shell_diagnostic = marker_size.has_value() && *marker_size != 0;
   should_delete_temp_path = false;
   return result;
 }
 
 fn launch_process_substitution(StringView source, bool command_writes_pipe,
-                               bool bash_compatible) throws
+                               bool bash_compatible,
+                               bool source_traces_enabled) throws
     -> process_substitution_launch
 {
   if (!command_writes_pipe)
     throw Error{"Unable to run a >(cmd) process substitution because it is not "
                 "supported on this platform"};
 
-  let path = run_substitution_to_temp(source, bash_compatible);
-  if (!path.has_value())
+  let result =
+      run_substitution_to_temp(source, bash_compatible, source_traces_enabled);
+  if (!result.has_value())
     throw Error{"Unable to run the process substitution because the inner "
                 "shell could not be spawned: " +
                 last_system_error_message()};
 
   return process_substitution_launch{
-      .path = steal(*path),
+      .path = steal(result->path),
+      .diagnostic_output = steal(result->diagnostic_output),
       .is_temporary_file = true,
+      .has_shell_diagnostic = result->has_shell_diagnostic,
   };
 }
 

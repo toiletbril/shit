@@ -18,6 +18,81 @@ printf 'eval traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
 
+out=$("$BIN" --no-diagnostics -c 'echo $(no_such_substitution_xyz)' 2>&1)
+printf 'substitution traces=%s errors=%s parents=%s sites=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')" \
+    "$(printf '%s\n' "$out" | grep -Fc 'echo $(no_such_substitution_xyz)')" \
+    "$(printf '%s\n' "$out" | grep -c 'shit: 1:6: trace:')"
+
+out=$("$BIN" --no-diagnostics \
+    -c 'echo ${UNSET_TRACE_POLICY:-$(no_such_nested_substitution_xyz)}' 2>&1)
+printf 'nested substitution traces=%s errors=%s parents=%s sites=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')" \
+    "$(printf '%s\n' "$out" |
+        grep -Fc 'echo ${UNSET_TRACE_POLICY:-$(no_such_nested_substitution_xyz)}')" \
+    "$(printf '%s\n' "$out" | grep -c 'shit: 1:28: trace:')"
+
+out=$("$BIN" --no-diagnostics \
+    -c 'echo ${ no_such_function_substitution_xyz; }' 2>&1)
+printf 'function substitution traces=%s errors=%s parents=%s sites=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')" \
+    "$(printf '%s\n' "$out" |
+        grep -Fc 'echo ${ no_such_function_substitution_xyz; }')" \
+    "$(printf '%s\n' "$out" | grep -c 'shit: 1:6: trace:')"
+
+out=$("$BIN" --no-diagnostics -c 'echo ${X:-$(if)}' 2>&1)
+printf 'substitution parse traces=%s errors=%s sites=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')" \
+    "$(printf '%s\n' "$out" | grep -c 'shit: 1:11: trace:')"
+
+out=$("$BIN" --no-diagnostics -c 'echo $(echo ${X:-$(if)})' 2>&1)
+printf 'nested parse traces=%s errors=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')"
+
+out=$("$BIN" --no-diagnostics \
+    -c 'shitbox cat <(no_such_process_substitution_xyz)' 2>&1)
+case "$out" in
+*error:*trace:*) process_order=error-first ;;
+*) process_order=wrong ;;
+esac
+printf 'process substitution traces=%s errors=%s sites=%s order=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')" \
+    "$(printf '%s\n' "$out" | grep -c 'shit: 1:13: trace:')" \
+    "$process_order"
+
+out=$("$BIN" --no-diagnostics \
+    -c 'shitbox cat <(eval no_such_process_eval_xyz)' 2>&1)
+printf 'process eval traces=%s errors=%s inner-sites=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')" \
+    "$(printf '%s\n' "$out" | grep -c 'shit: 1:1: trace:')"
+
+out=$("$BIN" --no-diagnostics \
+    -c 'shitbox cat <(echo prefix >&2; eval no_such_prefixed_process_eval_xyz)' \
+    2>&1)
+printf 'prefixed process eval traces=%s errors=%s prefixes=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')" \
+    "$(printf '%s\n' "$out" | grep -c '^prefix$')"
+
+out=$("$BIN" --no-traces --no-diagnostics \
+    -c 'echo $(no_such_suppressed_substitution_xyz)' 2>&1)
+printf 'disabled-substitution traces=%s errors=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')"
+
+out=$("$BIN" --no-traces --no-diagnostics \
+    -c 'shitbox cat <(eval no_such_suppressed_process_substitution_xyz)' 2>&1)
+printf 'disabled-process-substitution traces=%s errors=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')"
+
 out=$("$BIN" -c no_such_first_root_xyz -c no_such_second_root_xyz 2>&1)
 printf 'multi-root traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \

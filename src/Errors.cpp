@@ -115,74 +115,69 @@ cold static fn get_context_pointing_to(
     display_line = expanded_line.view();
   }
 
-  let const do_expanded_byte_position = [&](usize byte_offset) {
-    usize expanded_byte_position = 0;
-    for (usize i = 0; i < byte_offset; i++)
-      expanded_byte_position += context[i] == '\t' ? TAB_WIDTH : 1;
-
-    return expanded_byte_position;
+  usize caret_source_position = 0;
+  usize caret_expanded_position = 0;
+  let const do_advance_caret_position = [&](usize byte_offset) {
+    while (caret_source_position < byte_offset) {
+      caret_expanded_position +=
+          context[caret_source_position] == '\t' ? TAB_WIDTH : 1;
+      caret_source_position++;
+    }
+    return caret_expanded_position;
   };
 
   const usize caret_limit = line_position.line_end - byte_position;
   const usize caret_byte_count =
       byte_count > caret_limit ? caret_limit : byte_count;
   const usize expanded_caret_byte_position =
-      do_expanded_byte_position(caret_byte_position);
+      do_advance_caret_position(caret_byte_position);
   const usize expanded_caret_end_byte_position =
-      do_expanded_byte_position(caret_byte_position + caret_byte_count);
+      do_advance_caret_position(caret_byte_position + caret_byte_count);
 
-  let const display_text = String{heap_allocator(), display_line};
   let const caret_prefix =
-      String{heap_allocator(),
-             display_line.substring_of_length(0, expanded_caret_byte_position)};
-  let const caret_text = String{
-      heap_allocator(),
-      display_line.substring_of_length(expanded_caret_byte_position,
-                                       expanded_caret_end_byte_position -
-                                           expanded_caret_byte_position)};
+      display_line.substring_of_length(0, expanded_caret_byte_position);
+  let const caret_text = display_line.substring_of_length(
+      expanded_caret_byte_position,
+      expanded_caret_end_byte_position - expanded_caret_byte_position);
   const usize caret_column = toiletline::display_width(caret_prefix);
   const usize caret_width = toiletline::display_width(caret_text);
 
-  let line_highlights = ArrayList<completion::highlight_span>{heap_allocator()};
+  let generated_highlights =
+      ArrayList<completion::highlight_span>{heap_allocator()};
+  const ArrayList<completion::highlight_span> *source_highlights =
+      &generated_highlights;
   if (eval_context != nullptr && !color.reset.is_empty()) {
-    let generated_highlights =
-        ArrayList<completion::highlight_span>{heap_allocator()};
-    const ArrayList<completion::highlight_span> *source_highlights = nullptr;
     if (let *cache = eval_context->get_diagnostic_highlight_cache();
         cache != nullptr)
-      source_highlights = cache->spans_for(source, *eval_context);
-    if (source_highlights == nullptr) {
-      generated_highlights = completion::highlight_line(source, *eval_context);
-      source_highlights = &generated_highlights;
-    }
-
-    usize first_highlight = 0;
-    usize highlight_limit = source_highlights->count();
-    while (first_highlight < highlight_limit) {
-      let const middle =
-          first_highlight + (highlight_limit - first_highlight) / 2;
-      if ((*source_highlights)[middle].end <= line_position.line_start)
-        first_highlight = middle + 1;
-      else
-        highlight_limit = middle;
-    }
-
-    for (usize i = first_highlight; i < source_highlights->count(); i++) {
-      let const &span = (*source_highlights)[i];
-      if (span.start >= line_position.line_end) break;
-
-      let const span_start = span.start < line_position.line_start
-                                 ? line_position.line_start
-                                 : span.start;
-      let const span_end =
-          span.end > line_position.line_end ? line_position.line_end : span.end;
-      line_highlights.push(completion::highlight_span{
-          do_expanded_byte_position(span_start - line_position.line_start),
-          do_expanded_byte_position(span_end - line_position.line_start),
-          span.sgr});
+    {
+      source_highlights = cache->spans_for(context, *eval_context);
+    } else {
+      generated_highlights = completion::highlight_line(context, *eval_context);
     }
   }
-  const usize display_cells = toiletline::display_width(display_text);
+  let expanded_highlights =
+      ArrayList<completion::highlight_span>{heap_allocator()};
+  let line_highlights = source_highlights;
+  if (tab_count != 0 && !source_highlights->is_empty()) {
+    expanded_highlights.reserve(source_highlights->count());
+    usize highlight_source_position = 0;
+    usize highlight_expanded_position = 0;
+    let const do_advance_highlight_position = [&](usize byte_offset) {
+      while (highlight_source_position < byte_offset) {
+        highlight_expanded_position +=
+            context[highlight_source_position] == '\t' ? TAB_WIDTH : 1;
+        highlight_source_position++;
+      }
+      return highlight_expanded_position;
+    };
+    for (let const &span : *source_highlights) {
+      expanded_highlights.push(completion::highlight_span{
+          do_advance_highlight_position(span.start),
+          do_advance_highlight_position(span.end), span.sgr});
+    }
+    line_highlights = &expanded_highlights;
+  }
+  const usize display_cells = toiletline::display_width(display_line);
 
   usize window_start = 0;
   usize window_end = display_cells;
@@ -196,21 +191,24 @@ cold static fn get_context_pointing_to(
       terminal_columns > gutter_width + 24 &&
       display_cells > terminal_columns - gutter_width)
   {
-    const usize available = terminal_columns - gutter_width;
-    const usize span = caret_width < 1 ? 1 : caret_width;
-    const usize half = available / 2;
-    const usize center = caret_column + span / 2;
-    window_start = center > half ? center - half : 0;
-    if (window_start + available > display_cells)
-      window_start = display_cells - available;
-    window_end = window_start + available;
+    const usize available_line_width = terminal_columns - gutter_width;
+    const usize caret_display_width = caret_width < 1 ? 1 : caret_width;
+    const usize half_window_width = available_line_width / 2;
+    const usize caret_center = caret_column + caret_display_width / 2;
+    window_start =
+        caret_center > half_window_width ? caret_center - half_window_width : 0;
+    if (window_start + available_line_width > display_cells)
+      window_start = display_cells - available_line_width;
+    window_end = window_start + available_line_width;
     has_left_ellipsis = window_start > 0;
     has_right_ellipsis = window_end < display_cells;
     window_end = sub_sat(window_end, (has_left_ellipsis ? 3u : 0u) +
                                          (has_right_ellipsis ? 3u : 0u));
     if (window_start > caret_column) window_start = caret_column;
-    if (caret_column + span > window_end && window_end < display_cells) {
-      const usize shift = caret_column + span - window_end;
+    if (caret_column + caret_display_width > window_end &&
+        window_end < display_cells)
+    {
+      const usize shift = caret_column + caret_display_width - window_end;
       window_start = window_start + shift > caret_column ? caret_column
                                                          : window_start + shift;
       window_end += shift;
@@ -223,14 +221,14 @@ cold static fn get_context_pointing_to(
 
   const usize window_start_byte =
       toiletline::byte_offset_at_or_before_display_cell(
-          display_text, window_start, window_start);
+          display_line, window_start, window_start);
   const usize window_end_byte =
-      toiletline::byte_offset_at_or_before_display_cell(display_text,
+      toiletline::byte_offset_at_or_before_display_cell(display_line,
                                                         window_end, window_end);
 
   if (has_left_ellipsis) msg += "...";
   usize rendered_byte_position = window_start_byte;
-  for (let const &span : line_highlights) {
+  for (let const &span : *line_highlights) {
     if (span.end <= window_start_byte) continue;
     if (span.start >= window_end_byte) break;
 
