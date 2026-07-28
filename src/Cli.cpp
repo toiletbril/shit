@@ -542,9 +542,10 @@ pure fn shell_quoted_arg_length(StringView arg) wontthrow -> usize
   return count;
 }
 
-fn append_shell_quoted_arg(String &out, StringView arg) throws -> void
+fn append_shell_quoted_arg(String &out, StringView arg,
+                           bool should_always_quote) throws -> void
 {
-  if (!arg_needs_shell_quoting(arg)) {
+  if (!should_always_quote && !arg_needs_shell_quoting(arg)) {
     out.append(arg);
     return;
   }
@@ -799,8 +800,13 @@ fn print(StringView text) throws -> void
 
 fn print_error(StringView text) throws -> void
 {
-  std::fwrite(text.data, 1, text.count(), stderr);
-  std::fflush(stderr);
+  usize written_count = 0;
+  while (written_count < text.count()) {
+    let const written = os::write_fd(SHIT_STDERR, text.data + written_count,
+                                     text.count() - written_count);
+    if (!written.has_value() || *written == 0) return;
+    written_count += *written;
+  }
 }
 
 fn flush() throws -> void { std::fflush(stdout); }

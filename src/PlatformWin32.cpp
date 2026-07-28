@@ -48,8 +48,17 @@ fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
   let const requested_size =
       size > MAXDWORD ? MAXDWORD : static_cast<DWORD>(size);
   DWORD written_size = 0;
-  if (WriteFile(fd, buf, requested_size, &written_size, nullptr) == FALSE)
+  if (WriteFile(fd, buf, requested_size, &written_size, nullptr) == FALSE) {
+    errno = EIO;
+    switch (GetLastError()) {
+    case ERROR_BROKEN_PIPE:
+    case ERROR_NO_DATA:
+    case ERROR_PIPE_NOT_CONNECTED:
+    case ERROR_NETNAME_DELETED: errno = EPIPE; break;
+    default: break;
+    }
     return shit::None;
+  }
   return static_cast<usize>(written_size);
 }
 
@@ -1757,7 +1766,8 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
 
 static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
                                Maybe<descriptor> out_fd,
-                               bool bash_compatible) throws -> Maybe<process>
+                               Maybe<descriptor> err_fd, mimic_mood mood) throws
+    -> Maybe<process>
 {
   /* Windows has no fork, so a compound pipeline stage re-parses its source in a
      fresh shell, returned unwaited for the pipeline to reap. */
@@ -1766,9 +1776,10 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
 
   let arguments = ArrayList<String>{heap_allocator()};
   arguments.push(String{heap_allocator(), module_path->view()});
-  if (bash_compatible) {
+  arguments.push(String{heap_allocator(), StringView{"--privileged"}});
+  if (mood != mimic_mood::Default) {
     arguments.push(String{heap_allocator(), StringView{"--mood"}});
-    arguments.push(String{heap_allocator(), StringView{"bash"}});
+    arguments.push(String{heap_allocator(), mood_name(mood)});
   }
   arguments.push(String{heap_allocator(), StringView{"--no-diagnostics"}});
   arguments.push(String{heap_allocator(), StringView{"-c"}});
@@ -1780,7 +1791,7 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
   startup_info.dwFlags = STARTF_USESTDHANDLES;
   startup_info.hStdInput = in_fd ? *in_fd : GetStdHandle(STD_INPUT_HANDLE);
   startup_info.hStdOutput = out_fd ? *out_fd : GetStdHandle(STD_OUTPUT_HANDLE);
-  startup_info.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  startup_info.hStdError = err_fd ? *err_fd : GetStdHandle(STD_ERROR_HANDLE);
   inherited_handle_state input_inheritance{};
   inherited_handle_state output_inheritance{};
   inherited_handle_state error_inheritance{};
@@ -1818,8 +1829,8 @@ fn try_fork_job_process() -> Maybe<process> { return shit::None; }
 fn can_fork_evaluator() wontthrow -> bool { return false; }
 
 fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
-                         Maybe<descriptor> out_fd, bool bash_compatible,
-                         SourceLocation location,
+                         Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
+                         mimic_mood mood, SourceLocation location,
                          StringView diagnostic_source) throws
     -> compound_stage_launch
 {
@@ -1829,7 +1840,7 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
         steal(location),
         "A compound command in a pipeline is not supported on this platform"};
 
-  let child = spawn_subshell_stage(source, in_fd, out_fd, bash_compatible);
+  let child = spawn_subshell_stage(source, in_fd, out_fd, err_fd, mood);
   if (!child.has_value())
     throw ErrorWithLocation{steal(location),
                             "Could not spawn the compound pipeline stage"};

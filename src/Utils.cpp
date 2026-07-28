@@ -801,9 +801,106 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       last_child = child;
     } else if (!is_last) {
       let const source = cxt.current_source();
-      let const forked_child = os::try_fork_compound_stage(
+      let forked_child = os::try_fork_compound_stage(
           ec.in_fd, ec.out_fd, ec.err_fd, ec.source_location(),
           source != nullptr ? source->view() : StringView{});
+      if (!forked_child.has_value() &&
+          ec.builtin_kind() == Builtin::Kind::Shitbox)
+      {
+        const usize utility_index = ec.program() == "shitbox" ? 1 : 0;
+        bool should_launch_fresh_stage = false;
+        bool should_restore_environment = false;
+        if (utility_index < ec.args().count()) {
+          let const utility_kind =
+              shitbox::find_util(ec.args()[utility_index].view());
+          if (utility_kind.has_value()) {
+            switch (*utility_kind) {
+            case shitbox::Utility::Kind::Seq:
+            case shitbox::Utility::Kind::Ps:
+            case shitbox::Utility::Kind::Yes:
+              should_launch_fresh_stage = true;
+              break;
+            case shitbox::Utility::Kind::Env:
+              should_launch_fresh_stage = true;
+              should_restore_environment = true;
+              for (usize argument_index = utility_index + 1;
+                   argument_index < ec.args().count(); argument_index++)
+              {
+                if (ec.args()[argument_index] == "--") continue;
+                if (!ec.args()[argument_index]
+                         .view()
+                         .find_character('=')
+                         .has_value())
+                {
+                  should_launch_fresh_stage = false;
+                  break;
+                }
+              }
+              break;
+            default: break;
+            }
+          }
+        }
+
+        if (should_launch_fresh_stage) {
+          let stage_source = String{cxt.scratch_allocator()};
+          if (should_restore_environment) {
+            static const StringView RESTORED_ENVIRONMENT_NAMES[] = {
+                "PWD",
+                "SHIT",
+                "SHIT_VERSION",
+                "SHIT_COMMIT",
+                "SHIT_BUILD_MODE",
+                "SHIT_OS",
+                "BASH_VERSION",
+                "BASH",
+                "SHLVL",
+                "PATH",
+                "NO_COLOR",
+                "SHIT_INTERNAL_SUPPRESS_ROOT_TRACE"};
+            for (let const name : RESTORED_ENVIRONMENT_NAMES) {
+              let const value = os::get_environment_variable(name);
+              if (value.has_value()) {
+                stage_source.append("export ");
+                stage_source.append(name);
+                stage_source.push('=');
+                append_shell_quoted_arg(stage_source, value->view(), true);
+              } else {
+                stage_source.append("unset ");
+                stage_source.append(name);
+              }
+              stage_source.append("; ");
+            }
+          }
+          if (ec.program() != "shitbox") stage_source.append("shitbox ");
+          for (usize argument_index = 0; argument_index < ec.args().count();
+               argument_index++)
+          {
+            if (argument_index > 0) stage_source.push(' ');
+            append_shell_quoted_arg(stage_source, ec.args()[argument_index],
+                                    true);
+          }
+
+          let stage_out = ec.out_fd;
+          let stage_err = ec.err_fd;
+          ec.apply_dup_routing(
+              [&]() { stage_err = stage_out.value_or(SHIT_STDOUT); },
+              [&]() { stage_out = stage_err.value_or(SHIT_STDERR); });
+          try {
+            let const launch = os::launch_compound_stage(
+                stage_source.view(), ec.in_fd, stage_out, stage_err, cxt.mood(),
+                ec.source_location(),
+                source != nullptr ? source->view() : StringView{});
+            forked_child = launch.child;
+          } catch (...) {
+            ec.close_fds();
+            os::close_fd(last_stdin);
+            last_stdin = SHIT_INVALID_FD;
+            throw;
+          }
+        }
+      }
+
       if (!forked_child.has_value()) {
         cxt.set_in_pipeline_stage(true);
         defer { cxt.set_in_pipeline_stage(false); };

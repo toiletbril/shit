@@ -180,7 +180,8 @@ fn join_command_line(int argc, const char *const *argv) throws -> String;
 
 pure fn arg_needs_shell_quoting(StringView arg) wontthrow -> bool;
 pure fn shell_quoted_arg_length(StringView arg) wontthrow -> usize;
-fn append_shell_quoted_arg(String &out, StringView arg) throws -> void;
+fn append_shell_quoted_arg(String &out, StringView arg,
+                           bool should_always_quote = false) throws -> void;
 
 fn reset_flags(const ArrayList<Flag *> &flags) throws -> void;
 

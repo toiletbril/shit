@@ -41,21 +41,24 @@ SHIT_IDENTITY=forged "$BIN" -c '
         *) [ "${#identity}" -eq 64 ] && valid=1 || valid=0 ;;
     esac
     shitbox env > "$IDENTITY_TEST_DIRECTORY/environment-output"
-    shitbox grep "^SHIT_IDENTITY=$identity$" \
-        "$IDENTITY_TEST_DIRECTORY/environment-output" >/dev/null &&
+    exported_line=$(shitbox grep "SHIT_IDENTITY=$identity" \
+        "$IDENTITY_TEST_DIRECTORY/environment-output")
+    [ "$exported_line" = "SHIT_IDENTITY=$identity" ] &&
         exported=1 || exported=0
     readonly -p > "$IDENTITY_TEST_DIRECTORY/readonly-output"
-    shitbox grep "^readonly SHIT_IDENTITY=" \
-        "$IDENTITY_TEST_DIRECTORY/readonly-output" \
-        > "$IDENTITY_TEST_DIRECTORY/identity-output" &&
-        readonly_status=1 || readonly_status=0
+    readonly_line=$(shitbox grep "readonly SHIT_IDENTITY=" \
+        "$IDENTITY_TEST_DIRECTORY/readonly-output")
+    case $readonly_line in
+        "readonly SHIT_IDENTITY="*) readonly_status=1 ;;
+        *) readonly_status=0 ;;
+    esac
     printf "valid=%s exported=%s readonly=%s\n" \
         "$valid" "$exported" "$readonly_status"
 '
 
 if [ "${OS-}" = Windows_NT ]; then
     materialized_environment=$(SHIT_IDENTITY=forged "$BIN" -c \
-        'shitbox timeout 1 cmd.exe /d /c set')
+        'shitbox timeout 1 cmd.exe /d /c set 2>"${TEST_NULL_DEVICE:-/dev/null}"')
 else
     materialized_environment=$(SHIT_IDENTITY=forged "$BIN" -c \
         'shitbox timeout 1 /usr/bin/env')

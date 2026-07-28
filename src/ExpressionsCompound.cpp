@@ -408,8 +408,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       }
 
       let const launch = os::launch_compound_stage(
-          stage_text, stage_in, stage_out, cxt.is_bash_compatible(),
-          stage_location,
+          stage_text, stage_in, stage_out, None, cxt.mood(), stage_location,
           stage_source != nullptr ? stage_source->view() : StringView{});
       let const child = launch.child;
 

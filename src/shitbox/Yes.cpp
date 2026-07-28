@@ -54,9 +54,9 @@ fn Yes::execute(const ExecContext &ec, EvalContext &cxt,
     while (written_count < line.count()) {
       let const chunk = os::write_fd(out_fd, line.view().data + written_count,
                                      line.count() - written_count);
-      if (!chunk.has_value() || *chunk == 0) {
-        return 0;
-      }
+      if (!chunk.has_value())
+        return errno == EPIPE ? SHIT_BROKEN_PIPE_EXIT_STATUS : 0;
+      if (*chunk == 0) return 0;
       written_count += *chunk;
     }
   }

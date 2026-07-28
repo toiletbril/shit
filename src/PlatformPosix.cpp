@@ -1482,15 +1482,15 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
 }
 
 fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
-                         Maybe<descriptor> out_fd, bool bash_compatible,
-                         SourceLocation location,
+                         Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
+                         mimic_mood mood, SourceLocation location,
                          StringView diagnostic_source) throws
     -> compound_stage_launch
 {
   unused(source);
-  unused(bash_compatible);
+  unused(mood);
   const process child =
-      fork_compound_stage(in_fd, out_fd, None, location, diagnostic_source);
+      fork_compound_stage(in_fd, out_fd, err_fd, location, diagnostic_source);
   return compound_stage_launch{
       .child = child,
       .should_evaluate_child = child == 0,

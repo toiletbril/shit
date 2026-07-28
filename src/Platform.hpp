@@ -113,6 +113,7 @@ namespace shit {
 
 class ExecContext;
 class Flag;
+enum class mimic_mood : u8;
 
 namespace os {
 
@@ -915,8 +916,8 @@ struct compound_stage_launch
 };
 
 fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
-                         Maybe<descriptor> out_fd, bool bash_compatible,
-                         SourceLocation location = {},
+                         Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
+                         mimic_mood mood, SourceLocation location = {},
                          StringView diagnostic_source = {}) throws
     -> compound_stage_launch;
 

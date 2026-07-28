@@ -26,6 +26,12 @@ echo "rc=$?"
 
 echo "--- env applies the assignment ---"
 "$BIN" -c 'shitbox env SHITBOX_TESTVAR=present | shitbox grep SHITBOX_TESTVAR'
+bare_pipeline_output=$("$BIN" --mood sh --enable-shitbox -c \
+    'PATH=; seq 1 100000 | head -n 1') || exit 1
+[ "$bare_pipeline_output" = 1 ] || exit 1
+"$BIN" -c \
+    "pipeline_value='\$pipeline'; shitbox env \"PIPELINE_LITERAL=\$pipeline_value\" | shitbox grep 'PIPELINE_LITERAL=\$pipeline'" \
+    > "${TEST_NULL_DEVICE:-/dev/null}" || exit 1
 
 echo "--- pkill with no pattern ---"
 "$BIN" -c 'shitbox pkill' 2>&1
@@ -48,7 +54,7 @@ echo "--- kill with a non-numeric pid ---"
 echo "rc=$?"
 
 echo "--- ps prints the header ---"
-"$BIN" -c 'shitbox ps | shitbox head -n 1'
+"$BIN" --mood sh -c 'shitbox ps | shitbox head -n 1'
 echo "rc=$?"
 
 echo "--- list prints the utility count ---"
