@@ -666,8 +666,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
     } break;
 
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const result = segment.folded_arithmetic_result.has_value()
-                             ? *segment.folded_arithmetic_result
+      let const result = segment.has_folded_arithmetic_result
+                             ? segment.get_folded_arithmetic_result()
                              : evaluate_arithmetic_cached(segment);
       char buffer[24];
       let const value = utils::int_to_text_into(result, buffer, sizeof(buffer));
@@ -733,8 +733,8 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
       result += capture_function_substitution(segment);
       break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const number = segment.folded_arithmetic_result.has_value()
-                             ? *segment.folded_arithmetic_result
+      let const number = segment.has_folded_arithmetic_result
+                             ? segment.get_folded_arithmetic_result()
                              : evaluate_arithmetic_cached(segment);
       char buffer[24];
       result += utils::int_to_text_into(number, buffer, sizeof(buffer));
@@ -797,8 +797,8 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       do_emit_run(path.view(), false);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const number = segment.folded_arithmetic_result.has_value()
-                             ? *segment.folded_arithmetic_result
+      let const number = segment.has_folded_arithmetic_result
+                             ? segment.get_folded_arithmetic_result()
                              : evaluate_arithmetic_cached(segment);
       char buffer[24];
       do_emit_run(utils::int_to_text_into(number, buffer, sizeof(buffer)),

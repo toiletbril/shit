@@ -553,7 +553,7 @@ fn fold_constant_arithmetic_in_word(const Word &word,
   bool did_fold = false;
   for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::ArithmeticExpansion) continue;
-    if (segment.folded_arithmetic_result.has_value()) continue;
+    if (segment.has_folded_arithmetic_result) continue;
 
     if (arithmetic_has_side_effect(segment.text.view())) {
       actx.constant_variables.clear();
@@ -571,7 +571,7 @@ fn fold_constant_arithmetic_in_word(const Word &word,
       LOG(All, "folded the constant arithmetic '%.*s' to %lld",
           static_cast<int>(segment.text.view().length),
           segment.text.view().data, static_cast<long long>(*result));
-      segment.folded_arithmetic_result = result;
+      segment.set_folded_arithmetic_result(*result);
       did_fold = true;
       actx.optimizer_folded_arithmetic++;
       if (actx.should_trace_optimizer)

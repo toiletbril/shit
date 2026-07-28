@@ -42,15 +42,25 @@ public:
     FunctionSubstitution,
   };
 
+  WordSegment(Kind kind, String text, bool is_in_double_quotes = false,
+              bool is_greedy_name = false)
+      : kind{kind}, text{steal(text)}, is_in_double_quotes{is_in_double_quotes},
+        is_greedy_name{is_greedy_name}
+  {}
+
   Kind kind;
   String text;
   bool is_in_double_quotes{false};
   bool is_greedy_name{false};
   bool is_substitution_cache_in_function_arena{false};
-  usize source_position{0};
-  usize source_length{0};
+  mutable bool has_folded_arithmetic_result{false};
 
-  mutable Maybe<i64> folded_arithmetic_result{};
+  union
+  {
+    mutable i64 folded_arithmetic_result{0};
+    mutable usize source_position;
+  };
+  mutable usize source_length{0};
 
   /* The tree lives in AST_ARENA and a function-body segment in FUNCTION_ARENA,
      so the cache records the arena generation it was filled in and a hit from
@@ -66,6 +76,26 @@ public:
   pure fn has_live_glob_chars() const wontthrow -> bool;
   pure fn is_tilde_candidate() const wontthrow -> bool;
 
+  pure fn get_folded_arithmetic_result() const wontthrow -> i64
+  {
+    ASSERT(has_folded_arithmetic_result);
+    return folded_arithmetic_result;
+  }
+
+  fn set_folded_arithmetic_result(i64 result) const wontthrow -> void
+  {
+    folded_arithmetic_result = result;
+    has_folded_arithmetic_result = true;
+    source_length = 0;
+  }
+
+  fn set_source_span(usize position, usize length) wontthrow -> void
+  {
+    source_position = position;
+    source_length = length;
+    has_folded_arithmetic_result = false;
+  }
+
   pure fn get_source_location(Maybe<StringView> filename) const wontthrow
       -> Maybe<SourceLocation>
   {
@@ -75,6 +105,8 @@ public:
 
   pure fn has_glob_metacharacter() const wontthrow -> bool;
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 160);
 
 class Word
 {
