@@ -163,7 +163,14 @@ public:
       m_data[m_length] = '\0';
       return;
     }
+    let const source_address = reinterpret_cast<uintptr>(other.data);
+    let const storage_address = reinterpret_cast<uintptr>(m_data);
+    let const is_aliased = source_address >= storage_address &&
+                           source_address - storage_address < m_length;
+    usize source_offset = 0;
+    if (is_aliased) source_offset = source_address - storage_address;
     reserve(m_length + other.length);
+    if (is_aliased) other.data = m_data + source_offset;
     std::memcpy(m_data + m_length, other.data, other.length);
     m_length += other.length;
     m_data[m_length] = '\0';

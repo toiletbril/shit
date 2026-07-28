@@ -598,7 +598,7 @@ static fn collect_command_names(StringView token, command_match_mode match_mode,
         do_add_path(path_name.view());
   }
 
-  if (collector.allows_fuzzy_fallback() && !collector.has_exact()) {
+  if (collector.allows_fuzzy_fallback() && !collector.has_prefix()) {
     let const &fallback_path_names =
         context.get_program_resolver().get_command_names(
             {}, ProgramResolver::ValidationScope::All);

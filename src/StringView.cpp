@@ -97,14 +97,16 @@ fn StringView::find_character(char wanted) const wontthrow -> Maybe<usize>
 
 fn StringView::substring(usize start) const wontthrow -> StringView
 {
-  if (start >= length) return StringView{data + length, 0};
+  if (start >= length)
+    return StringView{data == nullptr ? nullptr : data + length, 0};
   return StringView{data + start, length - start};
 }
 
 fn StringView::substring_of_length(usize start, usize count) const wontthrow
     -> StringView
 {
-  if (start >= length) return StringView{data + length, 0};
+  if (start >= length)
+    return StringView{data == nullptr ? nullptr : data + length, 0};
   usize remaining = length - start;
 
   return StringView{data + start, count < remaining ? count : remaining};

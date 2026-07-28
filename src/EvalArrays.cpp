@@ -75,15 +75,9 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
                               index, String{allocator, value.view()}
                           });
                         });
-  for (usize i = 1; i < out.count(); i++) {
-    let key = steal(out[i]);
-    usize j = i;
-    while (j > 0 && out[j - 1].index > key.index) {
-      out[j] = steal(out[j - 1]);
-      j--;
-    }
-    out[j] = steal(key);
-  }
+  out.sort([](const sparse_array_entry &left, const sparse_array_entry &right) {
+    return left.index < right.index;
+  });
   return out;
 }
 

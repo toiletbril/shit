@@ -124,7 +124,7 @@ pure alwaysinline fn hash_bytes(StringView view) wontthrow -> u64
     hash = (hash ^ chunk) * 0x100000001b3ull;
   }
   u64 tail = 0;
-  __builtin_memcpy(&tail, view.data + i, view.length - i);
+  if (view.length > i) __builtin_memcpy(&tail, view.data + i, view.length - i);
   hash = (hash ^ tail) * 0x100000001b3ull;
   hash ^= hash >> 31;
   return hash;

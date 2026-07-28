@@ -79,13 +79,10 @@ public:
   {
     return value();
   }
-  hot flatten mustuse pure fn operator->() wontthrow->T *
-  {
-    return &reference();
-  }
+  hot flatten mustuse pure fn operator->() wontthrow->T * { return &value(); }
   hot flatten mustuse pure fn operator->() const wontthrow->const T *
   {
-    return &reference();
+    return &value();
   }
 
   mustuse fn take() throws -> T

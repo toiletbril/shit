@@ -95,11 +95,14 @@ public:
   }
 
   hot mustuse pure fn begin() wontthrow -> T * { return m_data; }
-  hot mustuse pure fn end() wontthrow -> T * { return m_data + m_length; }
+  hot mustuse pure fn end() wontthrow -> T *
+  {
+    return m_data == nullptr ? nullptr : m_data + m_length;
+  }
   hot mustuse pure fn begin() const wontthrow -> const T * { return m_data; }
   hot mustuse pure fn end() const wontthrow -> const T *
   {
-    return m_data + m_length;
+    return m_data == nullptr ? nullptr : m_data + m_length;
   }
 
   template <class Wanted>

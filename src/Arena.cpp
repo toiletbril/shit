@@ -79,10 +79,11 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
 
 hot fn BumpArena::owns(const opaque *pointer) const wontthrow -> bool
 {
-  let const candidate = static_cast<const u8 *>(pointer);
+  let const candidate = reinterpret_cast<uintptr>(pointer);
   for (usize i = m_blocks.count(); i > 0; i--) {
     const block &block = m_blocks[i - 1];
-    if (candidate >= block.base && candidate < block.base + block.size) {
+    let const base = reinterpret_cast<uintptr>(block.base);
+    if (candidate >= base && candidate - base < block.size) {
       return true;
     }
   }
