@@ -63,8 +63,9 @@ static fn append_cat_source(String &output, StringView source,
     if (should_highlight) {
       let const *spans =
           highlight_cache.spans_for(source, line_start, line_end, context);
-      completion::append_highlighted_range(output, line, *spans, 0, line.length,
-                                           colors::SHELL_HIGHLIGHT_THEME);
+      completion::append_highlighted_range(
+          output, line, *spans, 0, line.length,
+          colors::NONINTERACTIVE_HIGHLIGHT_THEME);
     } else {
       output += line;
     }

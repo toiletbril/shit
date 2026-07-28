@@ -46,6 +46,7 @@ fn stderr_wants_color() throws -> bool;
 fn terminal_wants_color(bool output_is_terminal) throws -> bool;
 
 extern const highlight_theme SHELL_HIGHLIGHT_THEME;
+extern const highlight_theme NONINTERACTIVE_HIGHLIGHT_THEME;
 extern const highlight_theme DIAGNOSTIC_HIGHLIGHT_THEME;
 
 } /* namespace colors */

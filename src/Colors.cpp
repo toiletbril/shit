@@ -37,19 +37,27 @@ static fn make_shell_highlight_theme() wontthrow -> highlight_theme
   return theme;
 }
 
-static fn make_diagnostic_highlight_theme() wontthrow -> highlight_theme
+static fn make_noninteractive_highlight_theme() wontthrow -> highlight_theme
 {
   let theme = make_shell_highlight_theme();
   theme.set_style(highlight_role::unset_variable, ansi::BRIGHT_RED);
   theme.set_style(highlight_role::invalid_syntax, ansi::BOLD_BRIGHT_RED);
-  theme.set_style(highlight_role::partial_command, ansi::BRIGHT_RED);
   theme.set_style(highlight_role::unknown_command, ansi::BRIGHT_RED);
-  theme.set_style(highlight_role::partial_path, ansi::BRIGHT_RED);
   theme.set_style(highlight_role::invalid_path, ansi::BRIGHT_RED);
   return theme;
 }
 
+static fn make_diagnostic_highlight_theme() wontthrow -> highlight_theme
+{
+  let theme = make_noninteractive_highlight_theme();
+  theme.set_style(highlight_role::partial_command, ansi::BRIGHT_RED);
+  theme.set_style(highlight_role::partial_path, ansi::BRIGHT_RED);
+  return theme;
+}
+
 const highlight_theme SHELL_HIGHLIGHT_THEME = make_shell_highlight_theme();
+const highlight_theme NONINTERACTIVE_HIGHLIGHT_THEME =
+    make_noninteractive_highlight_theme();
 const highlight_theme DIAGNOSTIC_HIGHLIGHT_THEME =
     make_diagnostic_highlight_theme();
 

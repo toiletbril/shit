@@ -2,6 +2,7 @@
 
 #include "Common.hpp"
 #include "Eval.hpp"
+#include "HashSet.hpp"
 #include "Highlight.hpp"
 #include "Path.hpp"
 #include "String.hpp"
@@ -108,12 +109,14 @@ struct shell_pending_heredoc
 struct shell_lexical_state
 {
   explicit shell_lexical_state(Allocator allocator)
-      : frames{allocator}, pending_heredocs{allocator}, constructs{allocator}
+      : frames{allocator}, pending_heredocs{allocator}, constructs{allocator},
+        known_function_names{allocator}
   {}
 
   ArrayList<shell_lexical_frame> frames;
   ArrayList<shell_pending_heredoc> pending_heredocs;
   ArrayList<shell_lexical_construct> constructs;
+  HashSet known_function_names;
   shell_lexical_frame root_frame{0, 0, shell_lexical_frame_kind::command, 0};
   usize source_position{0};
   usize active_heredoc_index{0};

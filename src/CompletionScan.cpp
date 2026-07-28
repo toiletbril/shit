@@ -1147,7 +1147,9 @@ fn advance_shell_lexical_state(StringView source, usize end,
       let const word_end = i + word.length;
       return word_end == source.length ||
              lexer::is_whitespace(source[word_end]) ||
-             lexer::is_shell_sentinel(source[word_end]);
+             lexer::is_shell_sentinel(source[word_end]) ||
+             (source[word_end] == '\r' && word_end + 1 < source.length &&
+              source[word_end + 1] == '\n');
     };
 
     let const is_word_start =
@@ -1157,7 +1159,9 @@ fn advance_shell_lexical_state(StringView source, usize end,
     if (is_word_start) {
       let word_end = i;
       while (word_end < end && !lexer::is_whitespace(source[word_end]) &&
-             !lexer::is_shell_sentinel(source[word_end]))
+             !lexer::is_shell_sentinel(source[word_end]) &&
+             !(source[word_end] == '\r' && word_end + 1 < end &&
+               source[word_end + 1] == '\n'))
       {
         word_end++;
       }
@@ -1181,6 +1185,8 @@ fn advance_shell_lexical_state(StringView source, usize end,
                      highlight_construct_phase::function_name &&
                  word != "function")
       {
+        if (word_is_plain_identifier(word))
+          state.known_function_names.add(word);
         active_construct->phase = highlight_construct_phase::body;
         frame.is_command_position = false;
       } else if (is_active_construct_in_frame &&
@@ -1222,6 +1228,11 @@ fn advance_shell_lexical_state(StringView source, usize end,
       } else if (frame.is_command_position && word_looks_like_assignment(word))
       {
         frame.is_command_position = true;
+      } else if (frame.is_command_position && word_is_plain_identifier(word) &&
+                 word_defines_function(source, word_end, end))
+      {
+        state.known_function_names.add(word);
+        frame.is_command_position = false;
       } else if (frame.is_command_position) {
         if (let const next_is_command =
                 advance_shell_keyword_state(word, state.frames.count(), state);

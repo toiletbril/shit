@@ -213,9 +213,11 @@ Completion, diagnostic, and shitbox cat highlighting share semantic roles and
 the tolerant lexical state scanner. The shell and diagnostic themes map those
 roles to terminal styles in Colors.cpp. Diagnostic highlighting stores lexical
 checkpoints at line boundaries near 4096-byte intervals. Sequential lines build
-the same checkpoints without copying their lexical containers. A random lookup
-resumes from the nearest checkpoint and highlights only the reported physical
-line. A source identity change invalidates the checkpoints and cached spans.
+the same checkpoints without copying their lexical containers. The checkpoints
+retain function definitions, so later calls resolve across physical lines. A
+random lookup resumes from the nearest checkpoint and highlights only the
+reported physical line. A source identity change invalidates the checkpoints
+and cached spans.
 The per-program policy tables, the --help allowlist,
 the extension hints, the custom-completer routing, and the transparent prefixes,
 live in src/CompletionPolicy.hpp, so a program absent from every table falls
@@ -268,7 +270,7 @@ The shitbox cat `--syntax-highlighting` flag uses the shell theme when standard
 output is a terminal. Shell extensions and known shell shebangs select the
 input. Syntax highlighting is suppressed for files with null bytes and
 redirected output. Line numbering remains continuous across file and standard
-input boundaries.
+input boundaries. Noninteractive highlighting omits underline attributes.
 
 src/Errors.cpp renders the located caret and the trailing note, capitalized on
 its own line, with the shellcheck-style messages in src/Diagnostics.hpp. Only a

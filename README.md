@@ -98,6 +98,10 @@ It also bundles a busybox-style set of little coreutilities behind the
 - minimal `calc` and `make`
 - and more
 
+`shitbox cat --syntax-highlighting` colors shell files when standard output is
+a terminal. Shell extensions and known shell shebangs select the source. The
+output omits underline attributes.
+
 # Development
 
 This software was initially made as a late April Fools joke, and everything is

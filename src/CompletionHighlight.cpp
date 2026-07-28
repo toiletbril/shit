@@ -117,7 +117,7 @@ static pure fn is_highlight_name_char(char c) wontthrow -> bool
   return lexer::is_variable_name(c);
 }
 
-static pure fn is_plain_identifier(StringView word) wontthrow -> bool
+pure fn word_is_plain_identifier(StringView word) wontthrow -> bool
 {
   if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
   for (usize i = 1; i < word.length; i++)
@@ -125,8 +125,8 @@ static pure fn is_plain_identifier(StringView word) wontthrow -> bool
   return true;
 }
 
-static pure fn word_defines_function(StringView line, usize word_end,
-                                     usize end) wontthrow -> bool
+pure fn word_defines_function(StringView line, usize word_end,
+                              usize end) wontthrow -> bool
 {
   let i = word_end;
   while (i < end && (line[i] == ' ' || line[i] == '\t'))
@@ -140,10 +140,13 @@ static pure fn word_defines_function(StringView line, usize word_end,
 }
 
 /* '{' and '}' are left out so a brace word such as a{1,2} stays one word. */
-static pure fn is_highlight_word_break(char c) wontthrow -> bool
+static pure fn position_is_highlight_word_break(StringView line, usize position,
+                                                usize end) wontthrow -> bool
 {
+  let const c = line[position];
   return lexer::is_whitespace(c) || c == '\n' || c == '|' || c == '&' ||
-         c == ';' || c == '<' || c == '>' || c == '(' || c == ')';
+         c == ';' || c == '<' || c == '>' || c == '(' || c == ')' ||
+         (c == '\r' && position + 1 < end && line[position + 1] == '\n');
 }
 
 /* The $(...) form is handled by the caller. */
@@ -385,6 +388,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
                                ArrayList<highlight_span> &spans,
                                HashSet &line_variable_names,
+                               const HashSet *known_function_names,
                                bool stop_at_closing_parenthesis = false) throws
     -> usize;
 
@@ -392,6 +396,7 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
                            EvalContext &context,
                            ArrayList<highlight_span> &spans,
                            HashSet &line_variable_names,
+                           const HashSet *known_function_names,
                            bool stop_at_closing_parentheses) throws -> usize;
 
 static fn word_names_existing_path(StringView word) throws -> bool
@@ -475,7 +480,9 @@ static fn word_is_terminated_by_separator(StringView line, usize word_end,
   return next_byte == ' ' || next_byte == '\t' || next_byte == '\n' ||
          next_byte == ';' || next_byte == '|' || next_byte == '&' ||
          next_byte == '<' || next_byte == '>' || next_byte == '(' ||
-         next_byte == ')';
+         next_byte == ')' ||
+         (next_byte == '\r' && word_end + 1 < line_length &&
+          line[word_end + 1] == '\n');
 }
 
 /* Path coloring receives source spelling rather than an expanded word. On
@@ -659,20 +666,22 @@ static fn dollar_name_is_set(StringView name,
 
 static fn color_dollar(StringView line, usize i, usize end,
                        ArrayList<highlight_span> &spans, EvalContext &context,
-                       HashSet &line_variable_names) throws -> usize
+                       HashSet &line_variable_names,
+                       const HashSet *known_function_names) throws -> usize
 {
   /* $(( ... )) frames an arithmetic expression, so its inside colors as bare
      names, numbers, and operators. */
   if (i + 2 < end && line[i + 1] == '(' && line[i + 2] == '(') {
     let const inner_begin = i + 3 < end ? i + 3 : end;
     return color_arithmetic(line, inner_begin, end, context, spans,
-                            line_variable_names, true);
+                            line_variable_names, known_function_names, true);
   }
 
   if (i + 1 < end && line[i + 1] == '(') {
     let const inner_begin = i + 2 < end ? i + 2 : end;
     return scan_highlight_range(line, inner_begin, end, context, spans,
-                                line_variable_names, true);
+                                line_variable_names, known_function_names,
+                                true);
   }
   let const expansion_end = scan_dollar_expansion(line, i, end);
   if (expansion_end > i) {
@@ -690,6 +699,7 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
                            EvalContext &context,
                            ArrayList<highlight_span> &spans,
                            HashSet &line_variable_names,
+                           const HashSet *known_function_names,
                            bool stop_at_closing_parentheses) throws -> usize
 {
   usize i = begin;
@@ -698,8 +708,8 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
     let const c = line[i];
 
     if (c == '$') {
-      let const next =
-          color_dollar(line, i, end, spans, context, line_variable_names);
+      let const next = color_dollar(line, i, end, spans, context,
+                                    line_variable_names, known_function_names);
       i = next > i ? next : i + 1;
       continue;
     }
@@ -822,6 +832,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
                                ArrayList<highlight_span> &spans,
                                HashSet &line_variable_names,
+                               const HashSet *known_function_names,
                                bool stop_at_closing_parenthesis) throws -> usize
 {
   let do_push = [&](usize start, usize stop, highlight_role role)
@@ -868,7 +879,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     let const inner_end = position;
     if (position < end) position++;
     scan_highlight_range(line, inner_begin, inner_end, context, word_spans,
-                         line_variable_names);
+                         line_variable_names, known_function_names);
     return position;
   };
 
@@ -876,7 +887,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   while (i < end) {
     let const c = line[i];
 
-    if (c == ' ' || c == '\t' || c == '\n') {
+    if (c == ' ' || c == '\t' || c == '\n' ||
+        (c == '\r' && i + 1 < end && line[i + 1] == '\n'))
+    {
       /* A newline ends a command the way a ';' does. */
       if (c == '\n') {
         commit_pending_assignments();
@@ -919,7 +932,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         i++;
 
       let const delimiter_start = i;
-      while (i < end && !is_highlight_word_break(line[i]))
+      while (i < end && !position_is_highlight_word_break(line, i, end))
         i++;
 
       let const delimiter_word =
@@ -1013,7 +1026,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
     let const word_start = i;
     let word_spans = ArrayList<highlight_span>{bump_allocator(HIGHLIGHT_ARENA)};
-    while (i < end && !is_highlight_word_break(line[i])) {
+    while (i < end && !position_is_highlight_word_break(line, i, end)) {
       let const d = line[i];
       if (d == '\'') {
         let const string_start = i;
@@ -1038,7 +1051,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
               word_spans.push(
                   highlight_span{literal_start, i, highlight_role::string});
             i = color_dollar(line, i, end, word_spans, context,
-                             line_variable_names);
+                             line_variable_names, known_function_names);
             literal_start = i;
             continue;
           }
@@ -1059,8 +1072,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       } else if (d == '`') {
         i = do_color_backtick(i, word_spans);
       } else if (d == '$') {
-        i = color_dollar(line, i, end, word_spans, context,
-                         line_variable_names);
+        i = color_dollar(line, i, end, word_spans, context, line_variable_names,
+                         known_function_names);
       } else if (d == '\\' && i + 1 < end) {
         i += 2;
       } else {
@@ -1086,7 +1099,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (Maybe<usize> bracket = assigned_name.find_character('[');
           bracket.has_value())
         assigned_name = assigned_name.substring_of_length(0, bracket.value());
-      if (is_plain_identifier(assigned_name)) {
+      if (word_is_plain_identifier(assigned_name)) {
         pending_assignment_names.push(assigned_name);
         do_push(word_start, word_start + assigned_name.length,
                 highlight_role::assignment_name);
@@ -1120,7 +1133,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (for_variable_pending) {
       for_variable_pending = false;
       is_command_position = false;
-      if (!plain || !is_plain_identifier(word)) {
+      if (!plain || !word_is_plain_identifier(word)) {
         do_push(word_start, word_end, highlight_role::invalid_syntax);
       } else {
         do_push(word_start, word_end, highlight_role::variable);
@@ -1132,7 +1145,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (function_name_pending) {
       function_name_pending = false;
       is_command_position = false;
-      if (plain && is_plain_identifier(word)) {
+      if (plain && word_is_plain_identifier(word)) {
         do_push(word_start, word_end, highlight_role::function_name);
         line_functions.add(word);
       } else {
@@ -1226,7 +1239,12 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
             !is_command_resolved && !is_word_terminated
                 ? command_word_prefixes_any(word, context)
                 : false;
-        if (is_command_resolved || line_functions.contains(word)) {
+        let const is_known_source_function =
+            known_function_names != nullptr &&
+            known_function_names->contains(word);
+        if (is_command_resolved || line_functions.contains(word) ||
+            is_known_source_function)
+        {
           do_push(word_start, word_end, highlight_role::resolved_command);
         } else if (command_has_prefix) {
           do_push(word_start, word_end, highlight_role::partial_command);
@@ -1392,8 +1410,10 @@ static fn highlight_line_with_lexical_state(
     line = synthetic_line.view();
   }
 
-  scan_highlight_range(line, 0, line.length, context, spans,
-                       line_variable_names);
+  scan_highlight_range(
+      line, 0, line.length, context, spans, line_variable_names,
+      lexical_state == nullptr ? nullptr
+                               : &lexical_state->known_function_names);
   if (prefix_length == 0) return spans;
 
   usize retained_span_count = 0;
@@ -1588,6 +1608,20 @@ fn debug_diagnostic_cache_is_stable(EvalContext &context) throws -> bool
       return false;
     }
   }
+
+  let function_cache = shell_highlight_cache{};
+  let const function_source = String{"finish() { :; }\nfinish"};
+  let const function_call_start = function_source.view().find_character('\n');
+  if (!function_call_start.has_value()) return false;
+  let const *function_spans =
+      function_cache.spans_for(function_source.view(), *function_call_start + 1,
+                               function_source.count(), context);
+  let has_resolved_function_call = false;
+  for (let const &span : *function_spans)
+    if (span.start == 0 && span.end == 6 &&
+        span.role == highlight_role::resolved_command)
+      has_resolved_function_call = true;
+  if (!has_resolved_function_call) return false;
 
   let const other_source = String{"echo ok"};
   let const *invalidated =

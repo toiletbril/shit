@@ -11,7 +11,13 @@ import time
 
 binary = sys.argv[1]
 with tempfile.NamedTemporaryFile(delete=False) as source:
-    source.write(b'#!/usr/bin/env bash\r\necho "styled"\r\n')
+    source.write(
+        b'#!/usr/bin/env bash\r\n'
+        b'echo "styled"\r\n'
+        b'finish() { :; }\r\n'
+        b'finish\r\n'
+        b'missing_command\r\n'
+    )
     source_path = source.name
 
 pid, master = pty.fork()
@@ -39,6 +45,15 @@ while time.monotonic() < deadline:
 os.close(master)
 _, status = os.waitpid(pid, 0)
 os.unlink(source_path)
-passed = os.waitstatus_to_exitcode(status) == 0 and b"\x1b[" in output
+function_is_resolved = b"\x1b[34mfinish\x1b[0m" in output
+has_no_underline = b"4:3" not in output
+passed = (
+    os.waitstatus_to_exitcode(status) == 0
+    and b"\x1b[" in output
+    and function_is_resolved
+    and has_no_underline
+)
+print("FUNCTION_RESOLVED:", function_is_resolved)
+print("NO_UNDERLINE:", has_no_underline)
 print("TERMINAL_HIGHLIGHTING:", passed)
 sys.exit(0 if passed else 1)
