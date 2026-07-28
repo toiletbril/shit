@@ -212,6 +212,12 @@ static fn run_debug_highlight_driver(StringView driver_line,
                             heap_allocator());
     listing += '\n';
   }
+  if (os::get_environment_variable("SHIT_TEST_DIAGNOSTIC_CACHE").has_value()) {
+    listing += "diagnostic-cache-stable=";
+    listing +=
+        completion::debug_diagnostic_cache_is_stable(context) ? '1' : '0';
+    listing += '\n';
+  }
   if (os::get_environment_variable("SHIT_TEST_HIGHLIGHT_DIRECTORY_STATS")
           .has_value())
   {

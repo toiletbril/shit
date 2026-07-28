@@ -1,4 +1,4 @@
-SHIT_TEST_HIGHLIGHT_STATS=1 "$BIN" \
+SHIT_TEST_HIGHLIGHT_STATS=1 SHIT_TEST_DIAGNOSTIC_CACHE=1 "$BIN" \
     -c 'alpha=1; beta=2; gamma=3' \
     --debug-highlight-at 'echo $($($($($(' </dev/null
 

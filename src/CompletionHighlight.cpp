@@ -802,6 +802,28 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   let line_functions = HashSet{bump_allocator(HIGHLIGHT_ARENA)};
   usize parenthesis_depth = 0;
 
+  let const do_color_backtick =
+      [&](usize backtick_position, ArrayList<highlight_span> &word_spans)
+          throws -> usize {
+    let const inner_begin = backtick_position + 1;
+    let position = inner_begin;
+    while (position < end && line[position] != '`') {
+      if (line[position] == '\\' && position + 1 < end &&
+          (line[position + 1] == '`' || line[position + 1] == '$' ||
+           line[position + 1] == '\\'))
+      {
+        position += 2;
+      } else {
+        position++;
+      }
+    }
+    let const inner_end = position;
+    if (position < end) position++;
+    scan_highlight_range(line, inner_begin, inner_end, context, word_spans,
+                         line_variable_names);
+    return position;
+  };
+
   let i = begin;
   while (i < end) {
     let const c = line[i];
@@ -973,6 +995,14 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
             literal_start = i;
             continue;
           }
+          if (line[i] == '`') {
+            if (i > literal_start)
+              word_spans.push(
+                  highlight_span{literal_start, i, colors::ansi::BRIGHT_GREEN});
+            i = do_color_backtick(i, word_spans);
+            literal_start = i;
+            continue;
+          }
           i++;
         }
         if (i < end) i++;
@@ -980,23 +1010,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           word_spans.push(
               highlight_span{literal_start, i, colors::ansi::BRIGHT_GREEN});
       } else if (d == '`') {
-        /* Inside a backtick a backslash escapes only a backtick, dollar, or
-           backslash. */
-        let const inner_begin = i + 1;
-        i++;
-        while (i < end && line[i] != '`') {
-          if (line[i] == '\\' && i + 1 < end &&
-              (line[i + 1] == '`' || line[i + 1] == '$' || line[i + 1] == '\\'))
-          {
-            i += 2;
-          } else {
-            i++;
-          }
-        }
-        let const inner_end = i;
-        if (i < end) i++;
-        scan_highlight_range(line, inner_begin, inner_end, context, word_spans,
-                             line_variable_names);
+        i = do_color_backtick(i, word_spans);
       } else if (d == '$') {
         i = color_dollar(line, i, end, word_spans, context,
                          line_variable_names);
@@ -1204,7 +1218,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   return i;
 }
 
-fn highlight_line(StringView line, EvalContext &context) throws
+static fn highlight_line_with_lexical_state(
+    StringView line, EvalContext &context,
+    const shell_lexical_state *lexical_state) throws
     -> ArrayList<highlight_span>
 {
 #if !defined NDEBUG
@@ -1214,23 +1230,119 @@ fn highlight_line(StringView line, EvalContext &context) throws
   let const arena = bump_allocator(HIGHLIGHT_ARENA);
   let spans = ArrayList<highlight_span>{arena};
   let line_variable_names = HashSet{arena};
+  if (lexical_state != nullptr && lexical_state->is_in_heredoc) {
+    if (!line.is_empty())
+      spans.push(highlight_span{0, line.length, colors::ansi::BRIGHT_GREEN});
+    return spans;
+  }
+
+  let synthetic_line = String{arena};
+  usize prefix_length = 0;
+  if (lexical_state != nullptr &&
+      (!lexical_state->frames.is_empty() || lexical_state->quote != 0))
+  {
+    for (let const &frame : lexical_state->frames) {
+      if (frame.parent_quote != 0) synthetic_line.push(frame.parent_quote);
+      switch (frame.kind) {
+      case shell_lexical_frame_kind::command:
+        synthetic_line.append("$(");
+        break;
+      case shell_lexical_frame_kind::backtick: synthetic_line.push('`'); break;
+      case shell_lexical_frame_kind::arithmetic:
+        synthetic_line.append("$((");
+        break;
+      case shell_lexical_frame_kind::parameter:
+        synthetic_line.append("${");
+        break;
+      }
+    }
+    if (lexical_state->quote != 0) synthetic_line.push(lexical_state->quote);
+    prefix_length = synthetic_line.count();
+    synthetic_line.append(line);
+    line = synthetic_line.view();
+  }
+
   scan_highlight_range(line, 0, line.length, context, spans,
                        line_variable_names);
+  if (prefix_length == 0) return spans;
+
+  usize retained_span_count = 0;
+  for (usize span_index = 0; span_index < spans.count(); span_index++) {
+    let span = spans[span_index];
+    if (span.end <= prefix_length) continue;
+    if (span.start < prefix_length) span.start = prefix_length;
+    span.start -= prefix_length;
+    span.end -= prefix_length;
+    spans[retained_span_count++] = span;
+  }
+  while (spans.count() > retained_span_count)
+    spans.pop_back();
   return spans;
 }
 
-fn diagnostic_highlight_cache::spans_for(StringView source_line,
+fn highlight_line(StringView line, EvalContext &context) throws
+    -> ArrayList<highlight_span>
+{
+  return highlight_line_with_lexical_state(line, context, nullptr);
+}
+
+fn diagnostic_highlight_cache::spans_for(StringView source, usize line_start,
+                                         usize line_end,
                                          EvalContext &context) throws
     -> const ArrayList<highlight_span> *
 {
-  if (source_line.data == m_source_line.data &&
-      source_line.length == m_source_line.length)
+  let const source_changed =
+      source.data != m_source.data || source.length != m_source.length;
+  if (source_changed) {
+    m_source = source;
+    m_checkpoints.clear();
+    m_spans.clear();
+    m_has_cached_line = false;
+
+    let state = shell_lexical_state{heap_allocator()};
+    m_checkpoints.push(state);
+    usize checkpoint_threshold = 4096;
+    while (checkpoint_threshold < source.length) {
+      usize checkpoint_position = checkpoint_threshold;
+      while (checkpoint_position < source.length &&
+             source[checkpoint_position - 1] != '\n')
+        checkpoint_position++;
+      if (checkpoint_position >= source.length) break;
+      advance_shell_lexical_state(source, checkpoint_position, state);
+      m_checkpoints.push(state);
+      checkpoint_threshold = checkpoint_position + 4096;
+    }
+  }
+
+  if (m_has_cached_line && line_start == m_line_start && line_end == m_line_end)
   {
     return &m_spans;
   }
 
-  m_source_line = source_line;
-  m_spans = highlight_line(source_line, context);
+  usize checkpoint_index = 0;
+  usize checkpoint_limit = m_checkpoints.count();
+  while (checkpoint_index + 1 < checkpoint_limit) {
+    let const middle =
+        checkpoint_index + (checkpoint_limit - checkpoint_index) / 2;
+    if (m_checkpoints[middle].source_position <= line_start)
+      checkpoint_index = middle;
+    else
+      checkpoint_limit = middle;
+  }
+
+  let lexical_state = m_checkpoints[checkpoint_index];
+  advance_shell_lexical_state(source, line_start, lexical_state);
+  let const source_line =
+      source.substring_of_length(line_start, line_end - line_start);
+  let const generated =
+      highlight_line_with_lexical_state(source_line, context, &lexical_state);
+  m_spans.clear();
+  m_spans.reserve(generated.count());
+  for (let const &span : generated)
+    m_spans.push(span);
+  m_line_start = line_start;
+  m_line_end = line_end;
+  m_has_cached_line = true;
   return &m_spans;
 }
 
@@ -1238,6 +1350,37 @@ fn diagnostic_highlight_cache::spans_for(StringView source_line,
 pure fn debug_highlight_input_byte_count() wontthrow -> usize
 {
   return DEBUG_HIGHLIGHT_INPUT_BYTE_COUNT;
+}
+
+fn debug_diagnostic_cache_is_stable(EvalContext &context) throws -> bool
+{
+  let cache = diagnostic_highlight_cache{};
+  let const source = String{"value='start\nend'; echo ok"};
+  let const line_start = source.view().find_character('\n').value() + 1;
+  let const *first =
+      cache.spans_for(source.view(), line_start, source.count(), context);
+  let expected = ArrayList<highlight_span>{heap_allocator()};
+  expected.reserve(first->count());
+  for (let const &span : *first)
+    expected.push(span);
+
+  unused(highlight_line("printf reset", context));
+  let const *repeated =
+      cache.spans_for(source.view(), line_start, source.count(), context);
+  if (repeated->count() != expected.count()) return false;
+  for (usize index = 0; index < expected.count(); index++) {
+    if ((*repeated)[index].start != expected[index].start ||
+        (*repeated)[index].end != expected[index].end ||
+        (*repeated)[index].sgr != expected[index].sgr)
+    {
+      return false;
+    }
+  }
+
+  let const other_source = String{"echo ok"};
+  let const *invalidated =
+      cache.spans_for(other_source.view(), 0, other_source.count(), context);
+  return invalidated->count() != expected.count();
 }
 #endif
 

@@ -144,16 +144,14 @@ cold static fn get_context_pointing_to(
 
   let generated_highlights =
       ArrayList<completion::highlight_span>{heap_allocator()};
+  let local_cache = completion::diagnostic_highlight_cache{};
   const ArrayList<completion::highlight_span> *source_highlights =
       &generated_highlights;
   if (eval_context != nullptr && !color.reset.is_empty()) {
-    if (let *cache = eval_context->get_diagnostic_highlight_cache();
-        cache != nullptr)
-    {
-      source_highlights = cache->spans_for(context, *eval_context);
-    } else {
-      generated_highlights = completion::highlight_line(context, *eval_context);
-    }
+    let *cache = eval_context->get_diagnostic_highlight_cache();
+    if (cache == nullptr) cache = &local_cache;
+    source_highlights = cache->spans_for(source, line_position.line_start,
+                                         line_position.line_end, *eval_context);
   }
   let expanded_highlights =
       ArrayList<completion::highlight_span>{heap_allocator()};

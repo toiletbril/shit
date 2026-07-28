@@ -102,11 +102,16 @@ struct shell_lexical_state
 class diagnostic_highlight_cache
 {
 public:
-  fn spans_for(StringView source_line, EvalContext &context) throws
+  fn spans_for(StringView source, usize line_start, usize line_end,
+               EvalContext &context) throws
       -> const ArrayList<highlight_span> *;
 
 private:
-  StringView m_source_line{};
+  StringView m_source{};
+  ArrayList<shell_lexical_state> m_checkpoints{heap_allocator()};
+  usize m_line_start{0};
+  usize m_line_end{0};
+  bool m_has_cached_line{false};
   ArrayList<highlight_span> m_spans{heap_allocator()};
 };
 
@@ -115,6 +120,7 @@ fn highlight_line(StringView line, EvalContext &context) throws
 
 #if !defined NDEBUG
 pure fn debug_highlight_input_byte_count() wontthrow -> usize;
+fn debug_diagnostic_cache_is_stable(EvalContext &context) throws -> bool;
 #endif
 
 /* The verdicts are cached per word and the cache drops when PATH changes. */

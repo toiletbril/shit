@@ -1,6 +1,7 @@
 echo	\e[34m
 $(	\e[91;4:3;58:5:10m
 highlight-variable-name-visits=0
+diagnostic-cache-stable=1
 == a bare argument does not enumerate its directory:
 echo	\e[34m
 highlight-directory-reads=0
