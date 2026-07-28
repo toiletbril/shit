@@ -220,7 +220,8 @@ message uses the default color. A note and a trace are plain cyan. The caret and
 its trailing text are bright green. A trace frame is printed once while its
 source frame remains live. A located diagnostic syntax-highlights its complete
 source line when standard error is a terminal, then clips the highlighted line
-to the terminal.
+to the terminal. Multiline strings, substitutions, and heredocs retain their
+lexical colors in the reported line.
 .TP
 .B \-\-list\-diagnostics
 The shellcheck-style checks the analysis stage reports are listed, then the
@@ -439,7 +440,7 @@ utilities, and programs from PATH.
 Quoted, escaped, variable, and tilde directory prefixes remain in their typed
 form when a later unquoted slash or basename is completed.
 .PP
-Strings and here-documents are bright green. Keywords are bold green. Resolved
+Strings and here-documents are bright green. Keywords are bold. Resolved
 commands are blue, and unfinished command prefixes are bright blue. Flags are
 italic, except for a lone hyphen. A word that begins with two hyphens remains a
 flag when it contains an equals sign. Unknown commands and invalid paths are
@@ -638,7 +639,8 @@ on its first read or before a child program starts, then cached, exported, and
 marked read-only. An inherited value is discarded.
 .TP
 .B NO_COLOR
-Color is turned off in the prompt and the diagnostics when the variable is set.
+Color is turned off in the prompt, the diagnostics, and shitbox cat syntax
+highlighting when the variable is set.
 .TP
 .B SHIT_ANSI_*
 A color escape is provided under each of these names. A prompt template carries
@@ -735,7 +737,11 @@ Prints the final path component and supports an optional suffix operand.
 Evaluates arithmetic arguments or reads expressions with \-i or \-p.
 .TP
 .B cat
-Concatenates files or standard input and supports line numbering with \-n.
+Concatenates files or standard input and supports line numbering with \-n. The
+.B \-\-syntax\-highlighting
+flag colors shell source when standard output is a terminal. A shell extension
+or a known shell shebang selects the source. A file that contains a null byte
+is written without highlighting.
 .TP
 .B cp
 Copies files or directory trees and supports \-r, \-R, and \-v.

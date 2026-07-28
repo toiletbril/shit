@@ -209,6 +209,13 @@ at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The
 cascade splits across src/Completion.cpp, src/CompletionManpage.cpp,
 src/CompletionScan.cpp, and the per-keystroke highlighter in
 src/CompletionHighlight.cpp, with shared helpers in src/CompletionInternal.hpp.
+Completion, diagnostic, and shitbox cat highlighting share semantic roles and
+the tolerant lexical state scanner. The shell and diagnostic themes map those
+roles to terminal styles in Colors.cpp. Diagnostic highlighting stores lexical
+checkpoints at line boundaries near 4096-byte intervals. Sequential lines build
+the same checkpoints without copying their lexical containers. A random lookup
+resumes from the nearest checkpoint and highlights only the reported physical
+line. A source identity change invalidates the checkpoints and cached spans.
 The per-program policy tables, the --help allowlist,
 the extension hints, the custom-completer routing, and the transparent prefixes,
 live in src/CompletionPolicy.hpp, so a program absent from every table falls
@@ -232,7 +239,7 @@ without filesystem access. Explicit PATH validation ends with the TAB callback
 or compgen invocation that began it. The highlighter looks up only variable
 names that occur on the line, and it colors nested command and arithmetic
 substitutions in one pass. Strings and heredocs are bright green, keywords are
-bold green, resolved commands are blue, and unfinished command prefixes are
+bold, resolved commands are blue, and unfinished command prefixes are
 bright blue. Flags other than a lone dash are italic. A word beginning with two
 dashes stays a flag when it contains an equals sign. Unknown commands and
 invalid paths are bright red with a bright green curly underline. Invalid
@@ -257,6 +264,12 @@ reassigned. A directory change preserves the command cache when every PATH
 component is absolute, while a relative or empty component still invalidates
 it.
 
+The shitbox cat `--syntax-highlighting` flag uses the shell theme when standard
+output is a terminal. Shell extensions and known shell shebangs select the
+input. Syntax highlighting is suppressed for files with null bytes and
+redirected output. Line numbering remains continuous across file and standard
+input boundaries.
+
 src/Errors.cpp renders the located caret and the trailing note, capitalized on
 its own line, with the shellcheck-style messages in src/Diagnostics.hpp. Only a
 type whose name contains WithLocation owns or inherits a source location. Only
@@ -275,7 +288,13 @@ labels, locations, and messages are bold. Warning labels are plain bright
 magenta, while warning messages use the default color. Note and trace labels and
 messages are plain cyan. The caret and its trailing text are bright green. A
 located diagnostic syntax-highlights the complete source line on a terminal
-before clipping it. Diagnostics and LINENO share one cached source line index.
+before clipping it. Display width and clipping consume borrowed source views.
+Cached highlight spans use heap storage and survive highlighter arena resets.
+Word segment locations remain attached through parameter modifiers, array
+subscripts, arithmetic expressions, and nested substitutions. A contiguous
+heredoc retains its body location. A tab-stripped heredoc has no source mapping
+because its collected bytes are not contiguous. Diagnostics and LINENO share
+one cached source line index.
 Executable-format fallback uses an explicit
 invalid-process result. A fresh evaluator runs the fallback script with the
 command environment and argv zero, so caller variables, functions, and traps do
@@ -320,6 +339,9 @@ The custom allocator and the containers live in Arena.cpp, String.cpp, and the
 headers. ArrayList does not allocate on default construction and grows
 geometrically, String carries a small inline buffer and grows geometrically, and
 a scratch arena follows a mark and release lifetime per scope.
+WordSegment overlays its source position with its folded arithmetic result. A
+folded segment clears its source length, and a source-bearing segment clears the
+folded-result tag. Its 64-bit layout is 160 bytes.
 
 ## Testing
 
