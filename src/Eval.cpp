@@ -2165,7 +2165,7 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
     if (typed_program_path.has_trailing_separator()) {
       let const raw_program_path =
           typed_program_path.to_absolute_without_normalizing();
-      if (raw_program_path.exists()) resolved_program_path = raw_program_path;
+      resolved_program_path = os::canonical_path(raw_program_path);
     } else {
       resolved_program_path = Path::canonicalize(program.view());
     }

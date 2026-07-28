@@ -2,8 +2,7 @@ unset SHIT_FLAGS
 d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 if [ "${OS-}" = Windows_NT ]; then
-    BENCH_ECHO=$d/echo.exe
-    "$BIN" -c 'shitbox cp "$1" "$2"' test-copy "$BIN" "$BENCH_ECHO"
+    BENCH_ECHO='cmd.exe /d /c echo'
 else
     BENCH_ECHO=/bin/echo
 fi
@@ -17,8 +16,12 @@ echo "== the failure sets the exit status:"
 echo "== --ignore-exit-code keeps sampling a failing command:"
 "$BIN" -c 'bench --runs 3 --ignore-exit-code false' 2>&1 | grep 'Benchmark:'
 echo "== --no-shell --show-output forks the command directly:"
-"$BIN" -c \
-    'bench --runs 2 --no-shell --show-output "$BENCH_ECHO direct"' 2>&1 |
+direct_output=$("$BIN" -c \
+    'bench --runs 2 --no-shell --show-output "$BENCH_ECHO direct"' 2>&1)
+if [ "${OS-}" = Windows_NT ]; then
+    direct_output=$(printf '%s\n' "$direct_output" | tr -d '\r')
+fi
+printf '%s\n' "$direct_output" |
     sed "s|$BENCH_ECHO|/bin/echo|g" |
     grep -E '^direct$|Benchmark:'
 echo "== --runs executes exactly one sample:"
@@ -44,6 +47,9 @@ echo "rc=$?"
 echo "== counter capability keeps one complete sample:"
 counter_output=$("$BIN" -c \
     'bench --runs 1 --no-shell --show-output "$BENCH_ECHO counter-run"' 2>&1)
+if [ "${OS-}" = Windows_NT ]; then
+    counter_output=$(printf '%s\n' "$counter_output" | tr -d '\r')
+fi
 test "$(printf '%s\n' "$counter_output" | grep -c '^counter-run$')" -eq 1
 counter_row_count=$(printf '%s\n' "$counter_output" | grep -Ec '^  (cpu cycles|instructions|cache refs|cache misses|branch misses)')
 case "$counter_row_count" in

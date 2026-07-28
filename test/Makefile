@@ -14,8 +14,10 @@ endif
 
 ifeq ($(TARGET), Windows_NT)
 export TEST_PATH_SEPARATOR := ;
+export TEST_NULL_DEVICE := NUL
 else
 export TEST_PATH_SEPARATOR := :
+export TEST_NULL_DEVICE := /dev/null
 endif
 export TEST_TEMP_DIRECTORY := .test-work
 

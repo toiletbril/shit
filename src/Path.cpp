@@ -388,19 +388,18 @@ fn Path::canonicalize(StringView path) throws -> Maybe<Path>
   /* A name written with a trailing dot gets no suffix added. */
   const bool ends_with_dot =
       path.length > 0 && path.data[path.length - 1] == '.';
-  let does_candidate_exist = candidate.exists();
+  let status = os::file_status{};
+  let was_resolved = os::stat_path_following(candidate.text().view(), status);
   if (candidate.extension().is_empty() && !ends_with_dot) {
     usize suffix_index = 0;
-    while (!does_candidate_exist && suffix_index < os::PROGRAM_SUFFIXES.count())
-    {
+    while (!was_resolved && suffix_index < os::PROGRAM_SUFFIXES.count()) {
       let const &suffix = os::PROGRAM_SUFFIXES[suffix_index++];
       candidate = candidate.with_extension(suffix.text);
-      does_candidate_exist = candidate.exists();
+      was_resolved = os::stat_path_following(candidate.text().view(), status);
     }
   }
 
-  if (!does_candidate_exist) return shit::None;
-
+  if (!was_resolved) return shit::None;
   return candidate;
 }
 

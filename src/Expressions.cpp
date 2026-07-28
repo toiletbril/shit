@@ -313,7 +313,8 @@ fn command_resolves(
     let const typed_path = Path{expanded.view()};
     let const was_resolved =
         typed_path.has_trailing_separator()
-            ? typed_path.to_absolute_without_normalizing().exists()
+            ? os::canonical_path(typed_path.to_absolute_without_normalizing())
+                  .has_value()
             : Path::canonicalize(expanded.view()).has_value();
     if (was_resolved) return true;
 

@@ -137,9 +137,9 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const typed_program_path = Path{command_name.view()};
     let resolved =
         typed_program_path.has_trailing_separator()
-            ? Maybe<Path>{typed_program_path.to_absolute_without_normalizing()}
+            ? os::canonical_path(
+                  typed_program_path.to_absolute_without_normalizing())
             : Path::canonicalize(command_name);
-    if (resolved.has_value() && !resolved->exists()) resolved = None;
     if (!resolved) {
       let error_location = ec.arg_location_at(command_index);
       let reported_program = command_name.view();

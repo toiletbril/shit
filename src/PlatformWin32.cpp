@@ -304,26 +304,148 @@ fn reclaim_controlling_terminal() wontthrow -> void {}
 
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
 {
-  let const handle = CreateFileA(
-      path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-      nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-  if (handle == INVALID_HANDLE_VALUE) return shit::None;
-  defer { CloseHandle(handle); };
+  let const do_resolve_direct =
+      [](const Path &candidate, bool should_preserve_extended_prefix)
+          wontthrow -> Maybe<Path> {
+    let const handle = CreateFileA(
+        candidate.c_str(), 0,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return shit::None;
+    defer { CloseHandle(handle); };
 
-  char buffer[32768];
-  let const length = GetFinalPathNameByHandleA(
-      handle, buffer, sizeof(buffer), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-  if (length == 0 || length >= sizeof(buffer)) return shit::None;
+    char buffer[32768];
+    let const length = GetFinalPathNameByHandleA(
+        handle, buffer, sizeof(buffer), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+    if (length == 0 || length >= sizeof(buffer)) return shit::None;
 
-  let const resolved = StringView{buffer, static_cast<usize>(length)};
-  if (resolved.starts_with(StringView{"\\\\?\\UNC\\"})) {
-    let unc_path = String{"\\\\"};
-    unc_path += resolved.substring(8);
-    return Path{unc_path.view()};
+    let const resolved = StringView{buffer, static_cast<usize>(length)};
+    if (should_preserve_extended_prefix) return Path{resolved};
+    if (resolved.starts_with(StringView{"\\\\?\\UNC\\"})) {
+      let unc_path = String{"\\\\"};
+      unc_path += resolved.substring(8);
+      return Path{unc_path.view()};
+    }
+    if (resolved.starts_with(StringView{"\\\\?\\"}))
+      return Path{resolved.substring(4)};
+    return Path{resolved};
+  };
+
+  let const text = path.text().view();
+  if (text.is_empty()) return shit::None;
+  let const has_extended_prefix =
+      text.length >= 4 && is_directory_separator(text[0]) &&
+      is_directory_separator(text[1]) && text[2] == '?' &&
+      is_directory_separator(text[3]);
+
+  let has_dot_component = false;
+  usize scan_position = 0;
+  while (scan_position < text.length) {
+    while (scan_position < text.length &&
+           is_directory_separator(text[scan_position]))
+      scan_position++;
+    let const component_start = scan_position;
+    while (scan_position < text.length &&
+           !is_directory_separator(text[scan_position]))
+      scan_position++;
+    let const component_length = scan_position - component_start;
+    if ((component_length == 1 && text[component_start] == '.') ||
+        (component_length == 2 && text[component_start] == '.' &&
+         text[component_start + 1] == '.'))
+    {
+      has_dot_component = true;
+      break;
+    }
   }
-  if (resolved.starts_with(StringView{"\\\\?\\"}))
-    return Path{resolved.substring(4)};
-  return Path{resolved};
+  if (!has_dot_component) return do_resolve_direct(path, has_extended_prefix);
+
+  char initial_path[32768];
+  usize position = 0;
+  let resolved = Path{};
+  if (text.length >= 7 && is_directory_separator(text[0]) &&
+      is_directory_separator(text[1]) && text[2] == '?' &&
+      is_directory_separator(text[3]) && text[5] == ':' &&
+      is_directory_separator(text[6]))
+  {
+    resolved = Path{text.substring_of_length(0, 7)};
+    position = 7;
+  } else if (text.length >= 8 && is_directory_separator(text[0]) &&
+             is_directory_separator(text[1]) && text[2] == '?' &&
+             is_directory_separator(text[3]) &&
+             utils::ascii_to_lower(text[4]) == 'u' &&
+             utils::ascii_to_lower(text[5]) == 'n' &&
+             utils::ascii_to_lower(text[6]) == 'c' &&
+             is_directory_separator(text[7]))
+  {
+    position = 8;
+    while (position < text.length && !is_directory_separator(text[position]))
+      position++;
+    while (position < text.length && is_directory_separator(text[position]))
+      position++;
+    while (position < text.length && !is_directory_separator(text[position]))
+      position++;
+    resolved = Path{text.substring_of_length(0, position)};
+  } else if (text.length >= 2 && is_directory_separator(text[0]) &&
+             is_directory_separator(text[1]))
+  {
+    position = 2;
+    while (position < text.length && !is_directory_separator(text[position]))
+      position++;
+    while (position < text.length && is_directory_separator(text[position]))
+      position++;
+    while (position < text.length && !is_directory_separator(text[position]))
+      position++;
+    resolved = Path{text.substring_of_length(0, position)};
+  } else if (text.length >= 3 && text[1] == ':' &&
+             is_directory_separator(text[2]))
+  {
+    resolved = Path{text.substring_of_length(0, 3)};
+    position = 3;
+  } else {
+    let initial_length = DWORD{};
+    if (text.length >= 2 && text[1] == ':') {
+      char drive_directory[4]{text[0], ':', '.', '\0'};
+      initial_length = GetFullPathNameA(drive_directory, countof(initial_path),
+                                        initial_path, nullptr);
+      position = 2;
+    } else if (is_directory_separator(text[0])) {
+      char drive_root[2]{text[0], '\0'};
+      initial_length = GetFullPathNameA(drive_root, countof(initial_path),
+                                        initial_path, nullptr);
+      position = 1;
+    } else {
+      initial_length =
+          GetCurrentDirectoryA(countof(initial_path), initial_path);
+    }
+    if (initial_length == 0 || initial_length >= countof(initial_path))
+      return shit::None;
+    resolved = Path{
+        StringView{initial_path, static_cast<usize>(initial_length)}
+    };
+  }
+
+  let initial_resolved = do_resolve_direct(resolved, has_extended_prefix);
+  if (!initial_resolved.has_value()) return shit::None;
+  resolved = initial_resolved.take();
+
+  while (position < text.length) {
+    while (position < text.length && is_directory_separator(text[position]))
+      position++;
+    if (position >= text.length) break;
+
+    let const component_start = position;
+    while (position < text.length && !is_directory_separator(text[position]))
+      position++;
+
+    let candidate = resolved.clone();
+    candidate.push_component(
+        text.substring_of_length(component_start, position - component_start));
+    let component_resolved = do_resolve_direct(candidate, has_extended_prefix);
+    if (!component_resolved.has_value()) return shit::None;
+    resolved = component_resolved.take();
+  }
+
+  return resolved;
 }
 
 fn glob_matches(StringView pattern, Allocator allocator) throws
@@ -1310,11 +1432,20 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
       ec.args().count());
 
   let application_path = ec.program_path().c_str();
+  String resolved_program_path_storage{heap_allocator()};
+  if (let resolved_program_path = canonical_path(ec.program_path())) {
+    resolved_program_path_storage = resolved_program_path->text().clone();
+    application_path = resolved_program_path_storage.c_str();
+  }
+
   String application_path_storage{heap_allocator()};
   String command_line = make_os_args(ec.args());
   if (is_batch_program(ec.program_path().text().view())) {
     let batch_command = String{heap_allocator()};
-    append_windows_quoted_arg(batch_command, ec.program_path().text().view());
+    append_windows_quoted_arg(batch_command,
+                              resolved_program_path_storage.is_empty()
+                                  ? ec.program_path().text().view()
+                                  : resolved_program_path_storage.view());
     for (usize argument_index = 1; argument_index < ec.args().count();
          argument_index++)
     {
@@ -2596,6 +2727,23 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
 
 fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
 {
+  usize position = 0;
+  while (position < path.length) {
+    while (position < path.length && is_directory_separator(path[position]))
+      position++;
+    let const component_start = position;
+    while (position < path.length && !is_directory_separator(path[position]))
+      position++;
+    let const component_length = position - component_start;
+    if ((component_length == 1 && path[component_start] == '.') ||
+        (component_length == 2 && path[component_start] == '.' &&
+         path[component_start + 1] == '.'))
+    {
+      let const resolved = canonical_path(Path{path});
+      return resolved.has_value() && stat_path(resolved->text().view(), status);
+    }
+  }
+
   return stat_path(path, status);
 }
 
