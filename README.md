@@ -31,72 +31,60 @@ you computer up upon the first start. Bug reports are greatly appreciated.
 
 ## Three shells in a trenchcoat
 
-[See the manpage](docs/shit.1) for fuller explanation.
+[See the manual page](docs/shit.1) for a fuller explanation.
 
-**shit** runs in three modes (called moods). The default mood is **shit** being
-itself, a strict superset of Bash, with the analysis and optimization stages
-enabled.
+**shit** runs in four modes, called moods, across three shell identities. The
+default `shit` mood is a strict superset of Bash with analysis and optimization
+enabled. The other moods are `bash`, `bash-posix`, and `sh`. The `bash-posix`
+mood provides Bash behavior with its POSIX mode enabled.
 
-Before a single command runs, **shit** walks the whole parsed tree to optimize
-and analyze it. Default mood prohibits non-deterministic globs, substitutions,
-variables, and any other source of unexpected shell behavior. Every error or
-warning at that stage is called a diagnostic.
+Before it runs a command, **shit** analyzes and optimizes the complete script.
+The default mood reports diagnostics for nondeterministic globs, substitutions,
+variable uses, and other risky shell constructs.
 
-`--mood`, short `-M`, selects the mood, one of `shit`, `bash`, or `sh`. The
-default is `shit`. A binary symlinked as `sh`, `dash`, or `bash` will pick the
-matching mood and disable diagnostics. `set --mood` changes the mood at
-runtime. `-W` demotes lenient diagnostics to warnings. `-WW` demotes strict
-diagnostics too and reports runtime warnings in every mood.
+The `--mood` option, or `-M`, selects `shit`, `bash`, `bash-posix`, or `sh`.
+The default is `shit`. A binary symlinked as `sh`, `dash`, or `bash` selects the
+matching mood and disables diagnostics. `set --mood` changes the mood at
+runtime. `-W` demotes lenient diagnostics to warnings. `-WW` also demotes strict
+diagnostics and reports runtime warnings in every mood.
 
-`-I` is mimicry. **shit** will detect `sh`, `dash`, `bash` shebangs and run the
-script inside itself in the matching mood. The in-process run keeps speed and
-diagnostics.
+The `-I` option enables mimicry. **shit** detects `sh`, `dash`, and `bash`
+shebangs and runs each script in the matching mood. The current diagnostics
+setting is preserved.
 
-`--init-moods`/`-L` accepts a comma-separated list of moods to steal and use
-init files from. It defaults to the value of `--mood`.
+The `--init-moods` option, or `-L`, accepts a comma-separated list of moods whose
+startup files will be used. Its default value is the selected mood.
 
-The `SHIT_FLAGS` environment variable may be used to specify flags. The
-recommended set is `-W -I --init-moods=shit,bash`. A flag on the command line
-still wins.
+The `SHIT_FLAGS` environment variable specifies default flags. A flag on the
+command line still wins.
 
-When encountering broken flags or arguments in `SHIT_FLAGS`, or supplied when
-the binary is launched, **shit** acting as a login shell will skip the rc chain,
-and give you a rescue session to fix the config from.
+When `SHIT_FLAGS` or the command line contains an invalid flag or argument, a
+login shell skips its startup files and opens a rescue session. You can fix the
+configuration from that session.
 
 ## Additional bull**shit**
 
-The interactive mode is modern and heavily inspired by
-[fish](https://github.com/fish-shell/fish-shell). It has syntax highlighting,
-sensible word-jumps and controls, full UTF-8 support, wide character (CJK and
-emoji) width handling, multiline editing, history search, and persistent
+The interactive mode is inspired by
+[fish](https://github.com/fish-shell/fish-shell). It provides syntax
+highlighting, word movement, editing controls, UTF-8 support, display-width
+handling for wide characters, multiline editing, history search, and persistent
 history.
 
-Strings and heredocs are bright green, keywords are bold green, and live globs
-are yellow. Resolved commands are blue, unfinished command prefixes are bright
-blue, and flags are italic. Unknown commands and invalid paths are bright red
-with a bright green curly underline. Invalid syntax is bold bright red with that
-underline, while unset variables are non-bold bright red with it. Existing paths
-are bright cyan, and a completable path tail is cyan.
-Located diagnostics syntax-highlight their source line on a terminal.
-The reported command or directory path ends with its first unavailable
-component. The caret covers only that component.
+**shit** has more than 50 builtins, and each builtin supports `--help`. These
+include Bash and POSIX builtins. The additional builtins include the following
+commands.
 
-**shit** has more than 50 builtins, each with `--help`. That includes
-every builtin from `bash` and POSIX standard, with the addition of:
-- `z`, a port of [zoxide](https://github.com/ajeetdsouza/zoxide)
-- `bench`, built-in benchmark infrastructure inspired by Performance
-  Optimizer Observation Platform ([poop](https://github.com/andrewrk/poop) for
-  short)
-- `assimilate`, a transactional installer for an SSH target
-- and more
+- `z` is a port of [zoxide](https://github.com/ajeetdsouza/zoxide).
+- `bench` provides built-in benchmark infrastructure inspired by Performance
+  Optimizer Observation Platform ([poop](https://github.com/andrewrk/poop)).
+- `assimilate` provides transactional installation on an SSH target.
 
-It also bundles a busybox-style set of little coreutilities behind the
-`shitbox` builtin, such as:
-- `cp`, `mv`, `ln`, `rm` and other fileutils
-- `find` and `grep`
-- `killall`, `pkill`, `ps`, `timeout` and `nproc`
-- minimal `calc` and `make`
-- and more
+The `shitbox` builtin bundles a BusyBox-style set of small core utilities.
+
+- File utilities include `cp`, `mv`, `ln`, and `rm`.
+- Search utilities include `find` and `grep`.
+- Process utilities include `killall`, `pkill`, `ps`, `timeout`, and `nproc`.
+- Minimal implementations of `calc` and `make` are included.
 
 `shitbox cat --syntax-highlighting` colors shell files when standard output is
 a terminal. Shell extensions and known shell shebangs select the source. The
@@ -104,40 +92,28 @@ output omits underline attributes.
 
 # Development
 
-This software was initially made as a late April Fools joke, and everything is
-written from scratch in a heavily macro-modified C++23 dialect I can actually
-stand, and is compiled with `-nostdlib++`. **shit**'s only dependency is the
-libc.
+This software began as a late April Fools' joke. It is written from scratch in a
+macro-heavy C++23 dialect and is compiled with `-nostdlib++`. The executable
+links only to the C library.
 
-`staging` is the development branch. It may be broken at any time. `master` is
-more stable and should usually pass all tests.
+Development occurs on `staging`, and the branch may be broken. The `master`
+branch should pass all tests.
 
 ## Prerequisites
 
 A native build needs the following tools.
 
-* Git checks out the `toiletline` submodule.
-* GNU Make drives the build through a POSIX-compatible recipe shell.
-* Clang 18 or later provides C++23 support. The libc development files and the
-  platform headers must match the target. Linux also needs its kernel headers.
+* Install GNU Make, Clang 18 or later with C++23 support, libc development
+  files, and headers for the target platform. Linux builds also need Linux
+  kernel headers.
 * The default debug build needs the AddressSanitizer and
   UndefinedBehaviorSanitizer runtimes from `compiler-rt`.
-* Standard host utilities provide `mkdir`, `rm`, `cp`, and `printf`. LLD and
-  mold are optional. The build can use the system linker.
-
-The complete POSIX test suite also needs the following tools.
-
-* Bash runs the harness, and `/bin/sh` runs the compatibility fixtures.
-* Coreutils and the usual Unix text tools provide `cat`, `cmp`, `diff`, `find`,
-  `grep`, `head`, `sed`, and `strings`. Interactive tests also need `script` and
-  `stty`. Process supervision needs `setsid` or Perl.
-* Python 3 runs the terminal diagnostics. These checks are skipped when it is
-  unavailable.
-* Dash enables the POSIX comparison. Bash 5.3 or later enables the Bash and
-  mimicry comparisons. An older or missing reference shell is reported as a
-  skipped comparison.
-* The completion and highlighting suites need the default `MODE=dbg` binary.
-  Their test drivers are compiled out of release builds.
+* The test suite needs Bash 5.3, Dash, and Python 3.
+* The build and test scripts need `mkdir`, `rm`, `cp`, and `printf` from the
+  host.
+* The full test suite needs `cat`, `cmp`, `diff`, `find`, `grep`, `head`, `sed`,
+  and `strings`. Interactive tests also need `script` and `stty`. Process
+  supervision needs `setsid` or Perl.
 
 A complete Alpine setup can be installed with the following package set.
 
@@ -147,36 +123,38 @@ apk add --no-cache \
   compiler-rt bash dash zsh yash busybox coreutils mandoc python3
 ```
 
-The benchmark needs Bash, Dash, and Python 3. Zsh, Yash, and BusyBox ash add
-optional comparison rows. Coverage reports need `llvm-profdata` and `llvm-cov`
-from the matching LLVM installation. Documentation checks use `mandoc`.
-Formatting and static checks use `clang-format` and `clang-tidy` from Clang 18
-or later.
+The benchmark needs Bash, Dash, and Python 3. Zsh, Yash, and BusyBox ash provide
+optional comparison rows. The coverage report needs `llvm-profdata` and
+`llvm-cov` from the matching LLVM installation. Documentation checks use
+`mandoc`. Formatting and static checks use `clang-format` and `clang-tidy` from
+Clang 18 or later.
 
-Cross-compilation needs its matching toolchain. Zig builds the Zig targets and
-cross-compiles release binaries to Linux. MinGW-w64 targets Windows, osxcross
-with a macOS SDK targets Darwin arm64, and `cosmoc++` builds the Cosmopolitan
-modes.
+Each cross-compilation target needs its matching toolchain. Zig builds the Zig
+targets and cross-compiles release binaries to Linux. MinGW-w64 targets Windows,
+osxcross with a macOS SDK targets Darwin arm64, and `cosmoc++` builds the
+Cosmopolitan modes.
 
-The `MODE` variable controls build type:
+The `MODE` variable controls the build type.
+
 * `rel` is an optimized build.
 * `prof` is an optimized build with debug symbols for profiling.
 * `cov` is an optimized build with debug symbols for collecting coverage.
-* `dbg` includes all symbols and Asan with Ubsan.
+* `dbg` includes all symbols, AddressSanitizer, and UndefinedBehaviorSanitizer.
 * `cosmo` is an optimized build that uses `cosmoc++` from the Cosmopolitan
   toolchain.
 * `cosmo_dbg` is a debug Cosmopolitan build.
 
-`TARGET` defaults to the host and accepts `Linux`, `Windows_NT`, or `Darwin`.
+`TARGET` defaults to the host platform and accepts `Linux`, `Windows_NT`, or
+`Darwin`.
 A non-Windows host cross-compiles `TARGET=Windows_NT` with MinGW. A non-Darwin
 host cross-compiles `TARGET=Darwin ARCH=arm64` with osxcross. Linux is a native
 target.
 
-The `$CXXFLAGS` environment variable can be used to append new flags to the
-build commands.
+The `$CXXFLAGS` environment variable appends flags to the build commands.
 
-An example of the build process is shown below. Make uses every logical CPU and
-shares the bounded job pool with recursive builds.
+Build with GNU Make as shown below. Make uses every available logical CPU and
+shares its bounded job pool with recursive builds.
+
 ```bash
 $ make MODE=<rel/prof/dbg/cov/cosmo/cosmo_dbg>
 $ make MODE=rel TARGET=Windows_NT
@@ -184,13 +162,15 @@ $ make MODE=rel TARGET=Darwin ARCH=arm64
 $ ./shit --help
 ```
 
-Or use Zig. Zig only supports `dbg` and `rel`:
+Zig can also build the `dbg` and `rel` modes.
+
 ```bash
 $ zig build --release=fast
 $ ./zig-out/bin/shit --help
 ```
 
-And install:
+Install or uninstall the selected build with the following commands.
+
 ```bash
 $ export PREFIX=/usr/local
 $ make install
@@ -203,25 +183,27 @@ user@host`.
 ## Roadmap
 
 Is it usable?
-- [x] Run programs.
-- [x] Work on Linux and Windows.
-- [x] Logical sequences. (`&&`, `||`, `;`)
-- [x] Pipes.
-- [x] Redirections. (`>`/`<`)
-- [x] Shell expansion. (`?`, `[...]`, `*`, `~`)
-- [x] Escaping.
-- [x] Environment variables.
-- [x] Numeric expressions.
+
+- [x] Programs run.
+- [x] Linux and Windows are supported.
+- [x] Logical sequences are supported with `&&`, `||`, and `;`.
+- [x] Pipes are supported.
+- [x] Redirections are supported with `>` and `<`.
+- [x] Shell expansions are supported with `?`, `[...]`, `*`, and `~`.
+- [x] Escapes are supported.
+- [x] Environment variables are supported.
+- [x] Numeric expressions are supported.
 
 Is it good?
-- [x] Background jobs.
-- [x] Scripting capabilities. (flow control keywords)
-- [x] Blocks and functions.
-- [x] `sh`-compatible.
+
+- [x] Background jobs are supported.
+- [x] Scripting constructs include flow-control keywords.
+- [x] Blocks and functions are supported.
+- [x] The shell supports `sh` scripts.
 
 Is it exceptional?
-- [x] `bash`-compatible.
-- [x] Most of shellcheck built-in as warnings.
-- [x] Own bells and whistles.
-- [x] Cross-platform replacement for common Unix programs absent on Windows.
-- [ ] Arbitrary precision numeric expressions.
+
+- [x] The shell supports Bash scripts.
+- [x] ShellCheck-style warnings are built in.
+- [x] Shitbox replaces common Unix programs that are absent from Windows.
+- [ ] Arbitrary-precision numeric expressions are planned.
