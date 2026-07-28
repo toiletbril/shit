@@ -41,8 +41,8 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   usize start = 1;
   let should_suppress_newline = false;
-  let const is_windows_default = cxt.mood() == mimic_mood::Default &&
-                                 os::DIRECTORY_SEPARATOR == '\\';
+  let const is_windows_default =
+      cxt.mood() == mimic_mood::Default && os::DIRECTORY_SEPARATOR == '\\';
   let should_interpret_escapes =
       !cxt.is_bash_compatible() && !is_windows_default;
 

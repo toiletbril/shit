@@ -61,6 +61,18 @@ shit: 1:15: error: The directory 'logical/nseted' does not exist.
      1 |  cd -L logical/nseted/tail
        |                ^~~~~~ here.
 note: Did you mean `logical/nested`?
+== analyzed command path first missing component:
+shit: 1:11: error: Command './project/miss' was not found.
+     1 |  ./project/miss/tail
+       |            ^~~~ here.
+== runtime command path first missing component:
+shit: 1:11: error: Program `./project/miss` wasn't found.
+     1 |  ./project/miss/tail
+       |            ^~~~ here.
+== exec command path first missing component:
+shit: 1:16: error: Command './project/miss' was not found.
+     1 |  exec ./project/miss/tail
+       |                 ^~~~ here.
 == native separator:
 shit: 1:13: error: The directory 'project/nseted' does not exist.
      1 |  cd 'project/nseted/tail'

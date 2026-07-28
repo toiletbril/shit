@@ -381,9 +381,9 @@ static fn split_path_source_components(StringView path,
       }
     }
 
-    components.push(path_source_component{
-        path.substring_of_length(start, position - start), start, position,
-        is_opaque});
+    components.push(
+        path_source_component{path.substring_of_length(start, position - start),
+                              start, position, is_opaque});
   }
   return components;
 }
@@ -399,7 +399,8 @@ static fn path_component_owner(
   while (raw_left < raw_components.count() &&
          expanded_left < expanded_components.count() &&
          !raw_components[raw_left].is_opaque &&
-         raw_components[raw_left].text == expanded_components[expanded_left].text)
+         raw_components[raw_left].text ==
+             expanded_components[expanded_left].text)
   {
     if (expanded_left == expanded_component_index)
       return path_component_owner_range{raw_left, raw_left + 1};
@@ -428,17 +429,19 @@ static fn path_component_owner(
   return None;
 }
 
-fn locate_first_unavailable_path_component(
-    const Path &target, StringView expanded_operand, StringView raw_operand,
-    SourceLocation operand_location, Allocator allocator) throws
+fn locate_first_unavailable_path_component(const Path &target,
+                                           StringView expanded_operand,
+                                           StringView raw_operand,
+                                           SourceLocation operand_location,
+                                           Allocator allocator) throws
     -> Maybe<unavailable_path_source_component>
 {
   let const unavailable = target.first_unavailable_component();
   if (!unavailable.has_value()) return None;
 
   let const decoded = decode_shell_word(raw_operand, allocator);
-  let const raw_components = split_path_source_components(
-      decoded.text.view(), &decoded, allocator);
+  let const raw_components =
+      split_path_source_components(decoded.text.view(), &decoded, allocator);
   let const normalized_operand = Path{expanded_operand}.normalized();
   let const expanded_components = split_path_source_components(
       normalized_operand.text().view(), nullptr, allocator);
@@ -449,7 +452,7 @@ fn locate_first_unavailable_path_component(
           ? expanded_components.count() - remaining_component_count - 1
           : 0;
   let const owner = path_component_owner(raw_components, expanded_components,
-                                          expanded_component_index);
+                                         expanded_component_index);
 
   let typed_prefix = String{allocator, expanded_operand};
   usize typed_component_start = 0;
@@ -457,8 +460,9 @@ fn locate_first_unavailable_path_component(
   if (owner.has_value()) {
     let const &first = raw_components[owner->first];
     let const &last = raw_components[owner->end - 1];
-    typed_prefix = String{allocator, decoded.text.view().substring_of_length(
-                                        0, last.decoded_end)};
+    typed_prefix =
+        String{allocator,
+               decoded.text.view().substring_of_length(0, last.decoded_end)};
     operand_location.position += decoded.raw_positions[first.decoded_start];
     operand_location.length = decoded.raw_positions[last.decoded_end] -
                               decoded.raw_positions[first.decoded_start];
@@ -466,12 +470,14 @@ fn locate_first_unavailable_path_component(
     has_single_raw_component = owner->end == owner->first + 1;
   }
 
-  let const prefix = Path{target.text().view().substring_of_length(
-      0, unavailable->end)};
-  return unavailable_path_source_component{
-      prefix, operand_location, steal(typed_prefix),
-      typed_component_start, unavailable->is_not_directory,
-      has_single_raw_component};
+  let const prefix =
+      Path{target.text().view().substring_of_length(0, unavailable->end)};
+  return unavailable_path_source_component{prefix,
+                                           operand_location,
+                                           steal(typed_prefix),
+                                           typed_component_start,
+                                           unavailable->is_not_directory,
+                                           has_single_raw_component};
 }
 
 fn file_content_identity(const Path &path, Allocator allocator) throws

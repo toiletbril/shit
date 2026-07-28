@@ -21,6 +21,9 @@ command line is run, or a command string is run when it is given with
 A command path ending in a directory separator fails with status 126 when the
 normalized target is not a directory.
 .PP
+A missing command path is reported through its first unavailable component.
+The source caret covers only that component.
+.PP
 Shell source accepts LF and CRLF line endings. A CRLF pair is read as one
 newline. A lone carriage return remains part of the source text.
 .PP
@@ -211,10 +214,12 @@ every source backtrace for errors, warnings, and diagnostics. The primary
 message, source caret, note, and detail location remain visible.
 .PP
 Each printed source frame begins with trace:. Only an error label, location,
-and message are bold. A warning is plain bright magenta. A note and a trace are
-plain cyan. The caret and its trailing text are bright green. A located
-diagnostic syntax-highlights its complete source line when standard error is a
-terminal, then clips the highlighted line to the terminal.
+and message are bold. Only the warning label is plain bright magenta. Its
+message uses the default color. A note and a trace are plain cyan. The caret and
+its trailing text are bright green. A live trace frame is printed once across
+adjacent diagnostics. A located diagnostic syntax-highlights its complete
+source line when standard error is a terminal, then clips the highlighted line
+to the terminal.
 .TP
 .B \-\-list\-diagnostics
 The shellcheck-style checks the analysis stage reports are listed, then the
@@ -433,13 +438,14 @@ utilities, and programs from PATH.
 Quoted, escaped, variable, and tilde directory prefixes remain in their typed
 form when a later unquoted slash or basename is completed.
 .PP
-Strings and here-documents are bright green. Keywords are green. Resolved
+Strings and here-documents are bright green. Keywords are bold green. Resolved
 commands are blue, and unfinished command prefixes are bright blue. Flags are
 italic, except for a lone hyphen. A word that begins with two hyphens remains a
-flag when it contains an equals sign. Unknown commands and invalid paths are red
-with a bright green curly underline. Invalid syntax is bold red with the same
-underline, while unset variables are non-bold red with it. Existing paths are
-bright cyan, and a completable path tail is cyan. A live glob is yellow.
+flag when it contains an equals sign. Unknown commands and invalid paths are
+bright red with a bright green curly underline. Invalid syntax is bold bright
+red with the same underline, while unset variables are non-bold bright red with
+it. Existing paths are bright cyan, and a completable path tail is cyan. A live
+glob is yellow.
 In vi mode each line begins in insert mode. Escape enters command mode. Command
 mode provides the motions, the operators with counts, the named registers, the
 change repeat, and a visual selection. The visual selection is charwise from

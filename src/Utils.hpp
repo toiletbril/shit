@@ -52,9 +52,11 @@ struct unavailable_path_source_component
   bool has_single_raw_component;
 };
 
-fn locate_first_unavailable_path_component(
-    const Path &target, StringView expanded_operand, StringView raw_operand,
-    SourceLocation operand_location, Allocator allocator) throws
+fn locate_first_unavailable_path_component(const Path &target,
+                                           StringView expanded_operand,
+                                           StringView raw_operand,
+                                           SourceLocation operand_location,
+                                           Allocator allocator) throws
     -> Maybe<unavailable_path_source_component>;
 
 fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws

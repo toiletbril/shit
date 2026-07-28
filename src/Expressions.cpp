@@ -288,6 +288,16 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
 
 namespace {
 
+fn expanded_command_path(StringView name, Allocator allocator) throws -> String
+{
+  if (let const expanded = utils::expand_leading_tilde_path(name);
+      expanded.has_value())
+  {
+    return String{allocator, expanded->view()};
+  }
+  return String{allocator, name};
+}
+
 fn command_resolves(const String &name, const AnalysisContext &actx) throws
     -> bool
 {
@@ -298,18 +308,11 @@ fn command_resolves(const String &name, const AnalysisContext &actx) throws
      binary. */
   if (shitbox::find_util(name.view()).has_value()) return true;
   if (os::has_directory_separator(name.view())) {
-    let target = name.view();
-    let expanded = String{heap_allocator()};
-    if (let const home_expanded = utils::expand_leading_tilde_path(name.view());
-        home_expanded.has_value())
-    {
-      expanded = steal(*home_expanded);
-      target = expanded.view();
-    }
-    let const typed_path = Path{target};
+    let const expanded = expanded_command_path(name.view(), heap_allocator());
+    let const typed_path = Path{expanded.view()};
     if (typed_path.has_trailing_separator())
       return typed_path.normalized().exists();
-    return Path::canonicalize(target).has_value();
+    return Path::canonicalize(expanded.view()).has_value();
   }
 
   let resolver =
@@ -325,6 +328,23 @@ fn command_resolves(const String &name, const AnalysisContext &actx) throws
   LOG(Debug, "scanning PATH for '%s', the command was %s", name.c_str(),
       was_resolved ? "found" : "not found");
   return was_resolved;
+}
+
+fn unavailable_command_path_component(StringView name, SourceLocation location,
+                                      const AnalysisContext &actx) throws
+    -> Maybe<utils::unavailable_path_source_component>
+{
+  if (!os::has_directory_separator(name)) return None;
+
+  let const expanded = expanded_command_path(name, heap_allocator());
+  let const target = Path{expanded.view()}.to_absolute();
+  let raw_operand = name;
+  if (location.position + location.length <= actx.source.length) {
+    raw_operand =
+        actx.source.substring_of_length(location.position, location.length);
+  }
+  return utils::locate_first_unavailable_path_component(
+      target, expanded.view(), raw_operand, location, heap_allocator());
 }
 
 /* Only an unquoted '[' or ']' is active, so a quoted "[" or an escaped \[ stays
@@ -1617,8 +1637,16 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   if (name.has_value() && !actx.should_silence_unresolved_commands &&
       !command_is_shadowed && !command_resolves(*name, actx))
   {
-    let const message = StringView{"Command '"} + StringView{*name} +
-                        StringView{"' was not found"};
+    let diagnostic_location = m_args[0]->source_location();
+    let unavailable = unavailable_command_path_component(
+        name->view(), diagnostic_location, actx);
+    let reported_name = name->view();
+    if (unavailable.has_value()) {
+      diagnostic_location = unavailable->location;
+      reported_name = unavailable->typed_prefix.view();
+    }
+    let const message =
+        StringView{"Command '"} + reported_name + StringView{"' was not found"};
     /* A close name is offered as a did-you-mean hint on a trailing note. */
     let local_names = ArrayList<String>{heap_allocator()};
     actx.defined_functions.for_each(
@@ -1635,9 +1663,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
        the command may be defined by code the prepass cannot see, so it is only
        a warning there. */
     if (actx.has_seen_runtime_definer)
-      actx.warn(m_args[0]->source_location(), message, suggestion_note.view());
+      actx.warn(diagnostic_location, message, suggestion_note.view());
     else
-      actx.fail(m_args[0]->source_location(), message, suggestion_note.view(),
+      actx.fail(diagnostic_location, message, suggestion_note.view(),
                 analyze_severity::Lenient);
   }
 

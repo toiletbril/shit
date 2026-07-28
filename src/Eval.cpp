@@ -369,6 +369,7 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
                                              StringView note) wontthrow -> void
 {
   if (diagnostics_disabled()) return;
+  let const trace_location = location;
   /* The stamped view may outlive its buffer once the defining command's sources
      are freed, so a windowed resolution swaps in the definition copy's owned
      filename. */
@@ -389,7 +390,7 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     let warning = WarningWithLocationAndDetails{location, message, note};
     warning.set_line_offset(line_offset);
     show_message(warning.to_string(resolved_source.text->view(), this));
-    if (!m_source_frames.is_empty()) print_source_backtrace();
+    if (!m_source_frames.is_empty()) print_source_backtrace(trace_location);
   } catch (...) {
     LOG(Debug, "formatting a runtime warning failed, the error is swallowed");
   }
@@ -1323,6 +1324,15 @@ fn EvalContext::print_source_backtrace(
     return error_location.has_value() &&
            do_location_match(frame.call_site, *error_location);
   };
+  let const do_frame_identity_match = [&](const source_frame &left,
+                                          const source_frame &right) {
+    return left.is_cli_root == right.is_cli_root &&
+           do_location_match(left.call_site, right.call_site) &&
+           left.origin == right.origin &&
+           left.source_path == right.source_path &&
+           left.parent_source_hash == right.parent_source_hash &&
+           left.parent_source_length == right.parent_source_length;
+  };
   let const do_frame_render = [&](const source_frame &frame) {
     return frame.parent_source != nullptr && !do_frame_repeat_error(frame);
   };
@@ -1338,27 +1348,28 @@ fn EvalContext::print_source_backtrace(
   if (!has_traceable_source_frame) return;
 
   for (usize i = m_source_frames.count(); i > 0; i--) {
-    let const &frame = m_source_frames[i - 1];
-    if (!do_frame_render(frame)) continue;
+    let &frame = m_source_frames[i - 1];
+    if (!do_frame_render(frame) || frame.was_printed) continue;
 
     let is_repeated_frame = false;
     for (usize other_index = m_source_frames.count(); other_index > i;
          other_index--)
     {
       let const &other = m_source_frames[other_index - 1];
-      if (!do_frame_render(other) || frame.is_cli_root != other.is_cli_root ||
-          !do_location_match(frame.call_site, other.call_site) ||
-          frame.parent_source->view() != other.parent_source->view())
-      {
+      if (!do_frame_render(other) || !do_frame_identity_match(frame, other)) {
         continue;
       }
       is_repeated_frame = true;
       break;
     }
-    if (is_repeated_frame) continue;
+    if (is_repeated_frame) {
+      frame.was_printed = true;
+      continue;
+    }
 
     let const sourced_here = TraceWithLocation{frame.call_site};
     show_message(sourced_here.to_string(*frame.parent_source, this));
+    frame.was_printed = true;
   }
 }
 
@@ -2176,8 +2187,7 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
       kind = ResolvedCommand::from_builtin(Builtin::Kind::Shitbox);
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
-      let const message =
-          "Program `" + resolution_program + "` wasn't found";
+      let const message = "Program `" + resolution_program + "` wasn't found";
       if (Maybe<String> suggestion = utils::suggest_command(
               program.view(), ArrayList<String>{heap_allocator()},
               &program_resolver))

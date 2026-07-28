@@ -65,7 +65,9 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
@@ -112,7 +114,7 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
   let env_arg_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   for (usize i = first_command; i < operands.count(); i++) {
     env_args.push_managed(operands[i]);
-    env_arg_locations.push(ec.arg_location_at(i));
+    env_arg_locations.push(operand_locations[i]);
   }
 
   let environment_resolver =

@@ -36,7 +36,10 @@ constexpr fn verbosity_to_string(verbosity verbosity) -> const char *
 
 namespace log_detail {
 
-inline fn value_to_log_string(StringView value) -> String { return String{value}; }
+inline fn value_to_log_string(StringView value) -> String
+{
+  return String{value};
+}
 
 inline fn value_to_log_string(const char *value) -> String
 {

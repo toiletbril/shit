@@ -132,6 +132,10 @@ struct source_frame
                bool is_cli_root, bool is_only_root_source)
       : origin(steal(origin)), call_site(call_site),
         parent_source(parent_source), source_path(steal(source_path)),
+        parent_source_hash(
+            parent_source != nullptr ? hash_bytes(parent_source->view()) : 0),
+        parent_source_length(parent_source != nullptr ? parent_source->length()
+                                                      : 0),
         is_cli_root(is_cli_root), is_only_root_source(is_only_root_source)
   {}
 
@@ -139,8 +143,11 @@ struct source_frame
   SourceLocation call_site;
   const String *parent_source;
   String source_path;
+  u64 parent_source_hash;
+  usize parent_source_length;
   bool is_cli_root;
   bool is_only_root_source;
+  bool was_printed{false};
 };
 
 /* A variable binding saved when a local shadows it. A None previous value means

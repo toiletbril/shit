@@ -233,12 +233,12 @@ or compgen invocation that began it. The highlighter looks up only variable
 names that occur on the line, and it colors nested command and arithmetic
 substitutions in one pass. Strings and heredocs are bright green, keywords are
 bold green, resolved commands are blue, and unfinished command prefixes are
-bright blue. Flags other than a lone dash are italic. A word beginning with two dashes
-stays a flag when it contains an equals sign. Unknown commands and invalid paths
-are bright red with a bright green curly underline. Invalid syntax is bold
-bright red with the same underline, while unset variables are non-bold bright
-red with it. Live globs are yellow. Existing paths are bright cyan, and a
-completable path tail is cyan.
+bright blue. Flags other than a lone dash are italic. A word beginning with two
+dashes stays a flag when it contains an equals sign. Unknown commands and
+invalid paths are bright red with a bright green curly underline. Invalid
+syntax is bold bright red with the same underline, while unset variables are
+non-bold bright red with it. Live globs are yellow. Existing paths are bright
+cyan, and a completable path tail is cyan.
 src/Toiletline.cpp bridges the editor to the
 evaluator, and src/toiletline/toiletline.h is the editor. The
 `--debug-highlight-at` flag, a
@@ -265,14 +265,15 @@ classes remain distinct for catch routing. ErrorWithLocationAndDetails can also
 store a second source location. The relocate_error bridge rewraps an unlocated
 error onto a span and preserves its details. A source backtrace is omitted when
 only one synthetic command-line root exists. Multiple `-c` roots trace the
-source that produced each message. Identical frames are printed once. The
-`--no-traces` flag suppresses every source backtrace, including in a fresh
+source that produced each message. A live frame is printed once across adjacent
+diagnostics. The `--no-traces` flag suppresses every source backtrace, including in a fresh
 executable-fallback evaluator. A printed frame begins with `trace:`. Only error
 labels, locations, and messages are bold. Warning labels are plain bright
 magenta, while warning messages use the default color. Note and trace labels and
-messages are plain cyan. The caret and its trailing text are bright green. A located diagnostic syntax-highlights
-the complete source line on a terminal before clipping it. Diagnostics and
-LINENO share one cached source line index. Executable-format fallback uses an explicit
+messages are plain cyan. The caret and its trailing text are bright green. A
+located diagnostic syntax-highlights the complete source line on a terminal
+before clipping it. Diagnostics and LINENO share one cached source line index.
+Executable-format fallback uses an explicit
 invalid-process result. A fresh evaluator runs the fallback script with the
 command environment and argv zero, so caller variables, functions, and traps do
 not leak into it. The
@@ -293,10 +294,9 @@ The condition depth is inherited by a function called from a non-final and-or
 operand or from a negation. The `set -e` option stays suppressed throughout that
 guarded body. An if with no matching branch and no else publishes status zero,
 including at the end of a sourced file. A command path ending in a directory
-separator is rejected with
-status 126 when the normalized target is not a directory, and the highlighter
-keeps the whole path in the terminal default color with a bright green curly
-underline.
+separator is rejected with status 126 when the normalized target is not a
+directory. A missing command path is named through its first unavailable
+component, and its caret covers only that component.
 
 ## Header factoring and value-type methods
 

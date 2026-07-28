@@ -15,11 +15,11 @@ shit: 1:36: error: shitbox timeout: This file is not a directory.
 refused
 rc=126
 --- command ---
-shit: 1:1: error: This file is not a directory.
+shit: 1:9: error: This file is not a directory.
 refused
 rc=126
 --- env ---
-shit: 1:1: error: This file is not a directory.
+shit: 1:13: error: This file is not a directory.
 refused
 rc=126
 --- symlink ---

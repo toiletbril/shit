@@ -10,6 +10,23 @@ descriptor_pid=
 preserve_pid=
 supervisor_pid=
 watchdog_pid=
+host_system=$(uname -s)
+process_is_alive()
+{
+    process_id=$1
+    kill -0 "$process_id" 2>/dev/null || return 1
+    if [ "$host_system" = Linux ]; then
+        process_stat_path=/proc/$process_id/stat
+        [ -r "$process_stat_path" ] || return 1
+        IFS= read -r process_stat < "$process_stat_path" || return 1
+        process_fields=${process_stat##*) }
+        set -- $process_fields
+        [ "$#" -ge 1 ] || return 1
+        [ "$1" != Z ]
+        return
+    fi
+    return 0
+}
 cleanup()
 {
     for cleanup_pid in "$query_reader_pid" "$descendant_pid" "$descriptor_pid" \
@@ -73,7 +90,7 @@ if [ -s "$d/preserve-ready" ]; then
     preserve_ready=$(cat "$d/preserve-ready")
 fi
 preserve_is_alive=no
-if [ -n "$preserve_pid" ] && kill -0 "$preserve_pid" 2>/dev/null; then
+if [ -n "$preserve_pid" ] && process_is_alive "$preserve_pid"; then
     preserve_is_alive=yes
 fi
 if { [ "${OS-}" = Windows_NT ] && [ "$preserved_status" -eq 1 ]; } ||
@@ -196,7 +213,7 @@ else
         descendant_pid=$(cat "$d/descendant-pid")
     fi
     waited=0
-    while [ -n "$descendant_pid" ] && kill -0 "$descendant_pid" 2>/dev/null &&
+    while [ -n "$descendant_pid" ] && process_is_alive "$descendant_pid" &&
         [ "$waited" -lt 100 ]; do
         /bin/sleep 0.01
         waited=$((waited + 1))
@@ -206,7 +223,7 @@ else
     elif [ ! -s "$d/descendant-ready" ] || [ ! -s "$d/leader-ready" ] ||
         [ -z "$descendant_pid" ]; then
         echo setup-failed
-    elif kill -0 "$descendant_pid" 2>/dev/null; then
+    elif process_is_alive "$descendant_pid"; then
         echo leaked
     else
         echo contained
@@ -253,7 +270,7 @@ else
         [ -z "$descriptor_pid" ] ||
         [ "$(cat "$d/query-output")" != descriptor-ready ]; then
         echo setup-failed
-    elif [ "$reader_closed" != yes ] || kill -0 "$descriptor_pid" 2>/dev/null; then
+    elif [ "$reader_closed" != yes ] || process_is_alive "$descriptor_pid"; then
         echo leaked
     else
         echo contained
@@ -341,7 +358,7 @@ if [ "${OS-}" = Windows_NT ]; then
     "$d/timeout.exe" 1 "$BIN" -c true
 else
     ln -s "$BIN" "$d/timeout"
-    "$d/timeout" 1 /usr/bin/true
+    "$d/timeout" 1 "$BIN" -c true
 fi
 echo "rc=$?"
 

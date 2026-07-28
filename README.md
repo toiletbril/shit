@@ -78,6 +78,8 @@ with a bright green curly underline. Invalid syntax is bold bright red with that
 underline, while unset variables are non-bold bright red with it. Existing paths
 are bright cyan, and a completable path tail is cyan.
 Located diagnostics syntax-highlight their source line on a terminal.
+A missing command path names the path through its first unavailable component,
+and the caret covers only that component.
 
 **shit** has more than 50 builtins, each with `--help`. That includes
 every builtin from `bash` and POSIX standard, with the addition of:

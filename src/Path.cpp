@@ -184,9 +184,8 @@ cold fn Path::first_unavailable_component() const throws
 
     let const prefix = Path{m_text.substring_of_length(0, position)};
     if (!prefix.exists())
-      return unavailable_path_component{component_start, position,
-                                        component_index, component_count,
-                                        false};
+      return unavailable_path_component{
+          component_start, position, component_index, component_count, false};
     if (!prefix.is_directory())
       return unavailable_path_component{component_start, position,
                                         component_index, component_count, true};

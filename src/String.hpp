@@ -114,8 +114,7 @@ public:
   {
     usize output_position = 0;
 
-    for (usize input_position = 0; input_position < m_length;
-         input_position++)
+    for (usize input_position = 0; input_position < m_length; input_position++)
     {
       if (m_data[input_position] == '\r' && input_position + 1 < m_length &&
           m_data[input_position + 1] == '\n')

@@ -263,8 +263,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             unavailable->prefix.parent(), unavailable->prefix.filename()))
     {
       let suggested_path = String{cxt.scratch_allocator()};
-      suggested_path.append(unavailable->typed_prefix.view().substring_of_length(
-          0, unavailable->typed_component_start));
+      suggested_path.append(
+          unavailable->typed_prefix.view().substring_of_length(
+              0, unavailable->typed_component_start));
       suggested_path.append(suggested_name->view());
       let quoted_path = String{cxt.scratch_allocator()};
       append_shell_quoted_arg(quoted_path, suggested_path.view());

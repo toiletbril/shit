@@ -54,6 +54,15 @@ echo '== dot traversal:'
 echo '== logical symlink traversal:'
 "$BIN" -c 'cd -L logical/nseted/tail' 2>&1 | sed 's|\\|/|g'
 
+echo '== analyzed command path first missing component:'
+"$BIN" -c './project/miss/tail' 2>&1 | sed 's|\\|/|g'
+
+echo '== runtime command path first missing component:'
+"$BIN" --no-diagnostics -c './project/miss/tail' 2>&1 | sed 's|\\|/|g'
+
+echo '== exec command path first missing component:'
+"$BIN" --no-diagnostics -c 'exec ./project/miss/tail' 2>&1 | sed 's|\\|/|g'
+
 if [ "${OS-}" = Windows_NT ]; then
     path_separator='\'
 else

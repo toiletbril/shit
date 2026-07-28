@@ -24,6 +24,7 @@ list_fixture_session_processes()
             process_fields=${process_stat##*) }
             set -- $process_fields
             [ "$#" -ge 4 ] || continue
+            [ "$1" = Z ] && continue
             [ "$4" = "$fixture_session" ] || continue
             process_id=${process_stat_path#/proc/}
             printf '%s\n' "${process_id%/stat}"

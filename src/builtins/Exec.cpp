@@ -31,10 +31,11 @@ Exec::Exec() = default;
 pure fn Exec::kind() const wontthrow -> Builtin::Kind { return Kind::Exec; }
 
 static fn report_exec_resolution_error(ExecContext &ec, EvalContext &cxt,
-                                       usize command_index, StringView message,
+                                       SourceLocation location,
+                                       StringView message,
                                        i32 command_status) throws -> i32
 {
-  let error = ErrorWithLocation{ec.arg_location_at(command_index), message};
+  let error = ErrorWithLocation{location, message};
   error.set_command_status(command_status);
   const String *source = cxt.current_source();
   show_message(
@@ -138,14 +139,34 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                        ? Maybe<Path>{typed_program_path.normalized()}
                        : Path::canonicalize(command_name);
     if (resolved.has_value() && !resolved->exists()) resolved = None;
-    if (!resolved)
+    if (!resolved) {
+      let error_location = ec.arg_location_at(command_index);
+      let reported_program = command_name.view();
+      let raw_program = command_name.view();
+      if (let const *source = cxt.current_source();
+          source != nullptr &&
+          error_location.position + error_location.length <= source->length())
+      {
+        raw_program = source->view().substring_of_length(
+            error_location.position, error_location.length);
+      }
+      let const target = typed_program_path.to_absolute();
+      let const unavailable = utils::locate_first_unavailable_path_component(
+          target, command_name.view(), raw_program, error_location,
+          cxt.scratch_allocator());
+      if (unavailable.has_value()) {
+        error_location = unavailable->location;
+        reported_program = unavailable->typed_prefix.view();
+      }
       return report_exec_resolution_error(
-          ec, cxt, command_index,
-          StringView{"Command '"} + command_name + "' was not found", 127);
+          ec, cxt, error_location,
+          StringView{"Command '"} + reported_program + "' was not found", 127);
+    }
     if (typed_program_path.has_trailing_separator() &&
         !resolved->is_directory())
     {
-      return report_exec_resolution_error(ec, cxt, command_index,
+      return report_exec_resolution_error(ec, cxt,
+                                          ec.arg_location_at(command_index),
                                           "This file is not a directory", 126);
     }
     program_path = resolved.take();
@@ -156,7 +177,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         ProgramResolver::CachePolicy::ReadOnly);
     if (found.count() == 0)
       return report_exec_resolution_error(
-          ec, cxt, command_index,
+          ec, cxt, ec.arg_location_at(command_index),
           StringView{"Command '"} + command_name + "' was not found", 127);
 
     program_path = found[0];
@@ -213,7 +234,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const saved_descriptor = os::save_descriptor(shell_fd);
     if (!saved_descriptor.is_dup2_ok) {
       return report_exec_resolution_error(
-          ec, cxt, command_index,
+          ec, cxt, ec.arg_location_at(command_index),
           "Unable to preserve the shell's standard descriptors", 126);
     }
     saved_descriptors.push(saved_descriptor);
@@ -223,8 +244,8 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     unused(cxt.materialize_shit_identity());
     os::replace_process(steal(command));
   } catch (const ErrorBase &error) {
-    return report_exec_resolution_error(ec, cxt, command_index, error.message(),
-                                        126);
+    return report_exec_resolution_error(
+        ec, cxt, ec.arg_location_at(command_index), error.message(), 126);
   }
 
   command.in_fd.reset();

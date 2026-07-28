@@ -10,7 +10,7 @@ rc=0
 === sh mood, empty PATH, not found ===
 shit: 1:8: error: Program `seq` wasn't found.
      1 |  PATH=; seq 3
-       |         ^~~~~ here.
+       |         ^~~ here.
 note: Did you mean `set`?
 rc=127
 === set -o shitbox turns bare names on ===

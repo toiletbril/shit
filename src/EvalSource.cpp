@@ -68,6 +68,25 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
   fallback_context.set_warning_level(warning_level());
   fallback_context.set_diagnostics_disabled(diagnostics_disabled());
   fallback_context.set_source_traces_enabled(should_print_source_traces());
+  fallback_context.m_source_frames.reserve(m_source_frames.count());
+  for (let const &frame : m_source_frames) {
+    fallback_context.m_source_frames.push(
+        source_frame{String{frame.origin.view()}, frame.call_site,
+                     frame.parent_source, String{frame.source_path.view()},
+                     frame.is_cli_root, frame.is_only_root_source});
+    fallback_context.m_source_frames.back().was_printed = frame.was_printed;
+  }
+  defer
+  {
+    let const shared_frame_count =
+        m_source_frames.count() < fallback_context.m_source_frames.count()
+            ? m_source_frames.count()
+            : fallback_context.m_source_frames.count();
+    for (usize frame_index = 0; frame_index < shared_frame_count; frame_index++)
+      m_source_frames[frame_index].was_printed =
+          m_source_frames[frame_index].was_printed ||
+          fallback_context.m_source_frames[frame_index].was_printed;
+  };
   return fallback_context.run_mimicked_script(ec, mode, isolation);
 }
 
@@ -142,6 +161,10 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       is_mimic_strict ? "shit" : "lax");
 
   let const script_filename = ec.program_path().text().view();
+  m_source_frames.push(source_frame{String{ec.program().view()},
+                                    ec.source_location(), current_source(),
+                                    String{script_filename}, false, false});
+  defer { m_source_frames.pop_back(); };
   let parser = Parser{
       Lexer{String{contents->view()}, *AST_ARENA, false, script_filename,
             mood()}
@@ -160,14 +183,17 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     defer { do_restore_pre_parse_state(); };
     show_message(detailed_error.to_string(contents->view(), this));
     show_message(detailed_error.details_to_string(contents->view(), this));
+    print_source_backtrace(detailed_error.location());
     return 1;
   } catch (const ErrorWithLocation &located_error) {
     defer { do_restore_pre_parse_state(); };
     show_message(located_error.to_string(contents->view(), this));
+    print_source_backtrace(located_error.location());
     return 1;
   } catch (const Error &caught_error) {
     do_restore_pre_parse_state();
     show_message(caught_error.to_string());
+    print_source_backtrace();
     return 1;
   }
   ASSERT(ast != nullptr);

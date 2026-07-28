@@ -65,9 +65,8 @@ echo "counter capability passed"
 echo "== counter fallback keeps one complete sample:"
 if [ "$(uname -s)" = Linux ]; then
     fallback_output=$(
-        ulimit -n 8
         "$BIN" -c \
-            'bench --runs 1 --no-shell --show-output "$BENCH_ECHO fallback-run"' \
+            'ulimit -n 8; bench --runs 1 --no-shell --show-output "$BENCH_ECHO fallback-run"' \
             2>&1
     )
     test "$(printf '%s\n' "$fallback_output" | grep -c '^fallback-run$')" -eq 1
