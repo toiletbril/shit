@@ -68,7 +68,9 @@ The interactive mode is inspired by
 [fish](https://github.com/fish-shell/fish-shell). It provides syntax
 highlighting, word movement, editing controls, UTF-8 support, display-width
 handling for wide characters, multiline editing, history search, and persistent
-history.
+history. Styled error underlines are enabled when `TERM` names a terminal type
+with known support. Generic xterm, screen, and tmux types keep syntax colors and
+omit styled underlines.
 
 **shit** has more than 50 builtins, and each builtin supports `--help`. These
 include Bash and POSIX builtins. The additional builtins include the following

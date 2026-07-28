@@ -198,7 +198,8 @@ highlight_tests: $(BIN)
 
 DIAGNOSTIC_TTY_INPUT := \
 	interactive/long_warning_window.py \
-	interactive/cat_syntax_highlighting.py
+	interactive/cat_syntax_highlighting.py \
+	interactive/underline_term_support.py
 
 diagnostic_tty_test: $(BIN)
 	@if command -v python3 >/dev/null 2>&1; then \

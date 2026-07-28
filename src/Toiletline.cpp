@@ -128,6 +128,7 @@ namespace {
 shit::EvalContext *COMPLETION_CONTEXT = nullptr;
 const shit::Path *COMPLETION_BASE_DIRECTORY = nullptr;
 bool HIGHLIGHT_COLOR_ENABLED = false;
+bool HIGHLIGHT_STYLED_UNDERLINES_ENABLED = false;
 #if !defined NDEBUG
 usize DEBUG_COMPLETION_CWD_CAPTURE_COUNT = 0;
 usize DEBUG_COMPLETION_SOURCE_SCAN_COUNT = 0;
@@ -246,6 +247,9 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 
     shit::ArrayList<shit::highlight_span> result =
         shit::completion::highlight_line(line, *COMPLETION_CONTEXT);
+    let const &theme = HIGHLIGHT_STYLED_UNDERLINES_ENABLED
+                           ? shit::colors::SHELL_HIGHLIGHT_THEME
+                           : shit::colors::NONINTERACTIVE_HIGHLIGHT_THEME;
 
     size_t filled = 0;
     usize byte_position = 0;
@@ -264,8 +268,7 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
         byte_position++;
       }
       out->spans[filled].end = codepoint_position;
-      let const style =
-          shit::colors::SHELL_HIGHLIGHT_THEME.style_for(span.role);
+      let const style = theme.style_for(span.role);
       if (style.is_empty()) continue;
       out->spans[filled].sgr = style.data;
       filled++;
@@ -592,6 +595,8 @@ fn get_input(const String &prompt) -> input_result
       preprompt_history_buffer_load_count_before;
 #endif
   HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
+  HIGHLIGHT_STYLED_UNDERLINES_ENABLED =
+      colors::terminal_supports_styled_underlines();
   let const completion_base_directory = Path::current_directory();
   let completion_result = shit::completion::completion_result{
       shit::ArrayList<shit::String>{shit::heap_allocator()},

@@ -244,10 +244,10 @@ substitutions in one pass. Strings and heredocs are bright green, keywords are
 bold, resolved commands are blue, and unfinished command prefixes are
 bright blue. Flags other than a lone dash are italic. A word beginning with two
 dashes stays a flag when it contains an equals sign. Unknown commands and
-invalid paths are bright red with a bright green curly underline. Invalid
-syntax is bold bright red with the same underline, while unset variables are
-non-bold bright red with it. Live globs are yellow. Existing paths are bright
-cyan, and a completable path tail is cyan.
+invalid paths are bright red. Invalid syntax is bold bright red, and unset
+variables are non-bold bright red. A bright green curly underline is added to
+these roles when TERM names a terminal type with known support. Live globs are
+yellow. Existing paths are bright cyan, and a completable path tail is cyan.
 src/Toiletline.cpp bridges the editor to the
 evaluator, and src/toiletline/toiletline.h is the editor. The
 `--debug-highlight-at` flag, a

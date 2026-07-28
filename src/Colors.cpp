@@ -95,6 +95,28 @@ fn terminal_wants_color(bool output_is_terminal) throws -> bool
   return output_is_terminal && !color_is_suppressed_by_environment();
 }
 
+fn terminal_supports_styled_underlines() throws -> bool
+{
+  let const term = os::get_environment_variable("TERM");
+  if (!term.has_value() || term->is_empty()) return false;
+
+  static const StringView SUPPORTED_TERMS[] = {
+      "alacritty",      "alacritty-direct",
+      "contour",        "contour-direct",
+      "foot",           "foot-direct",
+      "foot-extra",     "ghostty",
+      "ghostty-direct", "kitty",
+      "kitty-direct",   "rio",
+      "rio-direct",     "wezterm",
+      "wezterm-direct", "xterm-ghostty",
+      "xterm-kitty",
+  };
+  for (let const supported : SUPPORTED_TERMS)
+    if (term->view() == supported) return true;
+
+  return false;
+}
+
 } /* namespace colors */
 
 pure fn highlight_role_name(highlight_role role) wontthrow -> StringView

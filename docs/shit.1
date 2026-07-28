@@ -390,7 +390,8 @@ Quoted, escaped, variable, and tilde directory prefixes remain in their typed
 form when a later unquoted slash or basename is completed.
 .PP
 Syntax highlighting distinguishes shell syntax, commands, flags, variables,
-paths, and globs. Invalid input is marked in the source line.
+paths, and globs. Invalid input is marked in the source line. Styled error
+underlines are enabled when TERM names a terminal type with known support.
 .PP
 In vi mode each line begins in insert mode. Escape enters command mode. Command
 mode provides the motions, the operators with counts, the named registers, the
@@ -514,7 +515,8 @@ The command in PROMPT_COMMAND runs before each interactive prompt is drawn.
 .TP
 .B TERM
 Color and interactive decorations on POSIX systems use the terminal type named
-by TERM.
+by TERM. Generic xterm, screen, and tmux types retain color and omit styled
+underlines.
 .TP
 .B MANPATH
 Completion searches the manual paths in MANPATH for subcommands and options.
