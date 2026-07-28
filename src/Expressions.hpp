@@ -9,6 +9,7 @@ namespace shit {
 using namespace tokens;
 
 class Token;
+struct heredoc_contents;
 
 namespace expressions {
 class IfClause;
@@ -307,7 +308,7 @@ public:
   /* The literal descriptor to copy from, or DUP_FD_CLOSE for the close form,
      or -1 when the descriptor is a dynamic word held in target. */
   i32 dup_fd;
-  const String *heredoc_body;
+  const heredoc_contents *heredoc;
   bool should_expand_heredoc;
   /* True for a bare >&word outside POSIX mode, where a word that expands to
      neither a number nor a dash is the csh both-streams spelling bash reads

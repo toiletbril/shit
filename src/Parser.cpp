@@ -652,7 +652,7 @@ fn Parser::build_here_string_redirection(
   redir.kind = expressions::Redirection::Kind::HereString;
   redir.target = word;
   redir.dup_fd = -1;
-  redir.heredoc_body = nullptr;
+  redir.heredoc = nullptr;
   redir.should_expand_heredoc = false;
   out.push(redir);
 }
@@ -729,7 +729,7 @@ fn Parser::build_heredoc_redirection(
   redir.kind = expressions::Redirection::Kind::Heredoc;
   redir.target = nullptr;
   redir.dup_fd = -1;
-  redir.heredoc_body = m_lexer.register_heredoc(delimiter, should_strip_tabs);
+  redir.heredoc = m_lexer.register_heredoc(delimiter, should_strip_tabs);
   redir.should_expand_heredoc = should_expand;
   out.push(redir);
 }

@@ -11,11 +11,22 @@ namespace shit {
 
 class BumpArena;
 
+struct heredoc_contents
+{
+  heredoc_contents(Allocator allocator, bool has_contiguous_source)
+      : text{allocator}, has_contiguous_source{has_contiguous_source}
+  {}
+
+  String text;
+  usize source_position{0};
+  bool has_contiguous_source;
+};
+
 struct heredoc_pending
 {
   String delimiter;
   bool should_strip_tabs;
-  String *body;
+  heredoc_contents *contents;
 };
 
 namespace lexer {
@@ -88,7 +99,7 @@ public:
   fn advance_past_last_peek() throws -> usize;
 
   fn register_heredoc(StringView delimiter, bool should_strip_tabs) throws
-      -> const String *;
+      -> const heredoc_contents *;
 
 protected:
   pure forceinline fn here(usize position, usize length) const wontthrow

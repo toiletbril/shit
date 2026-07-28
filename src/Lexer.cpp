@@ -238,19 +238,19 @@ hot fn Lexer::advance_past_last_peek() throws -> usize
 }
 
 cold fn Lexer::register_heredoc(StringView delimiter,
-                                bool should_strip_tabs) throws -> const String *
+                                bool should_strip_tabs) throws
+    -> const heredoc_contents *
 {
-  /* The body lives in the AST arena, since a cached Redirection can outlive the
-     lexer and a lexer-owned heap body freed in ~Lexer would dangle. */
-  let body = m_arena->create<String>(bump_allocator(*m_arena));
-  ASSERT(body != nullptr);
+  let contents = m_arena->create<heredoc_contents>(bump_allocator(*m_arena),
+                                                   !should_strip_tabs);
+  ASSERT(contents != nullptr);
 
   LOG(Debug, "registering a pending heredoc with delimiter '%.*s'",
       static_cast<int>(delimiter.length), delimiter.data);
 
-  m_pending_heredocs.push({String{delimiter}, should_strip_tabs, body});
+  m_pending_heredocs.push({String{delimiter}, should_strip_tabs, contents});
 
-  return body;
+  return contents;
 }
 
 /* A heredoc body is a run of raw text lines terminated by a line that holds the
@@ -300,6 +300,8 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
 
   for (heredoc_pending &pending : m_pending_heredocs) {
     let collected = String{heap_allocator()};
+    ASSERT(pending.contents != nullptr);
+    pending.contents->source_position = m_cursor_position;
     let do_append_body_line = [&](StringView line, bool,
                                   bool is_delimiter) -> bool {
       if (is_delimiter) return false;
@@ -318,8 +320,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
                           pending.should_strip_tabs, do_append_body_line);
     LOG(Debug, "capturing a heredoc body of %zu bytes for delimiter '%s'",
         collected.count(), pending.delimiter.c_str());
-    ASSERT(pending.body != nullptr);
-    *pending.body = steal(collected);
+    pending.contents->text = steal(collected);
   }
   m_pending_heredocs.clear();
 }
