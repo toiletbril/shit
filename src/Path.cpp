@@ -157,6 +157,7 @@ cold fn Path::first_unavailable_component() const throws
   const usize root_length = os::path_root_length(m_text.view());
   usize component_index = 0;
   usize position = root_length;
+  let has_dot_component = false;
   while (position < m_text.count()) {
     while (position < m_text.count() &&
            os::is_directory_separator(m_text[position]))
@@ -168,9 +169,23 @@ cold fn Path::first_unavailable_component() const throws
            !os::is_directory_separator(m_text[position]))
       position++;
 
+    let const component =
+        m_text.substring_of_length(component_start, position - component_start);
+    if (component == StringView{"."} || component == StringView{".."})
+      has_dot_component = true;
+
     let const prefix = Path{m_text.substring_of_length(0, position)};
-    let const is_available = prefix.exists();
-    if (!is_available || !prefix.is_directory()) {
+    let is_available = false;
+    let is_directory = false;
+    if (has_dot_component) {
+      let status = os::file_status{};
+      is_available = os::stat_path_following(prefix.text().view(), status);
+      is_directory = is_available && os::file_type_letter(status.mode) == 'd';
+    } else {
+      is_available = prefix.exists();
+      is_directory = is_available && prefix.is_directory();
+    }
+    if (!is_available || !is_directory) {
       usize remaining_component_count = 0;
       usize remaining_position = position;
       while (remaining_position < m_text.count()) {
