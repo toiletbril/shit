@@ -92,6 +92,7 @@ struct shell_lexical_state
 
   ArrayList<shell_lexical_frame> frames;
   ArrayList<shell_pending_heredoc> pending_heredocs;
+  shell_lexical_frame root_frame{0, 0, shell_lexical_frame_kind::command, 0};
   usize source_position{0};
   usize active_heredoc_index{0};
   char quote{0};
@@ -109,9 +110,7 @@ public:
 private:
   StringView m_source{};
   ArrayList<shell_lexical_state> m_checkpoints{heap_allocator()};
-  usize m_line_start{0};
-  usize m_line_end{0};
-  bool m_has_cached_line{false};
+  usize m_next_checkpoint_threshold{0};
   ArrayList<highlight_span> m_spans{heap_allocator()};
 };
 

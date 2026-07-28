@@ -181,13 +181,14 @@ static pure fn scan_dollar_expansion(StringView line, usize dollar,
   return i;
 }
 
-static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
+pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
 {
   if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
   usize i = 1;
   while (i < word.length && is_highlight_name_char(word[i]))
     i++;
   if (i < word.length && word[i] == '=') return true;
+  if (i + 1 < word.length && word[i] == '+' && word[i + 1] == '=') return true;
   /* The array-element form NAME[subscript]= is also an assignment. */
   if (i < word.length && word[i] == '[') {
     usize depth = 1;
@@ -332,6 +333,14 @@ constexpr static_string_entry<keyword_spec> HIGHLIGHT_KEYWORD_ENTRIES[] = {
 constexpr StaticStringMap HIGHLIGHT_KEYWORDS{HIGHLIGHT_KEYWORD_ENTRIES};
 
 } /* namespace */
+
+pure fn shell_keyword_starts_command(StringView word) wontthrow -> bool
+{
+  let const spec = HIGHLIGHT_KEYWORDS.find(word);
+  if (!spec.has_value()) return false;
+  if (spec->role == keyword_role::open) return spec->next_is_command;
+  return spec->role != keyword_role::misplaced_in;
+}
 
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
@@ -1238,9 +1247,38 @@ static fn highlight_line_with_lexical_state(
 
   let synthetic_line = String{arena};
   usize prefix_length = 0;
+  let const do_append_group_state = [&](const shell_lexical_frame &frame)
+                                        throws -> void {
+    for (usize group_index = 0; group_index < frame.group_depth; group_index++)
+      synthetic_line.append("( ");
+  };
+  let const do_append_frame_semantic_state =
+      [&](const shell_lexical_frame &frame) throws -> void {
+    if (frame.saw_case_keyword) {
+      synthetic_line.append("case x ");
+      return;
+    }
+
+    for (usize case_index = 0; case_index < frame.case_depth; case_index++) {
+      synthetic_line.append("case x in ");
+      if (case_index + 1 < frame.case_depth || !frame.case_pattern_expected) {
+        synthetic_line.append("x) ");
+      }
+    }
+
+    if (!frame.is_command_position && !frame.case_pattern_expected)
+      synthetic_line.append(": ");
+  };
   if (lexical_state != nullptr &&
-      (!lexical_state->frames.is_empty() || lexical_state->quote != 0))
+      (!lexical_state->frames.is_empty() || lexical_state->quote != 0 ||
+       !lexical_state->root_frame.is_command_position ||
+       lexical_state->root_frame.group_depth > 0 ||
+       lexical_state->root_frame.case_depth > 0 ||
+       lexical_state->root_frame.saw_case_keyword ||
+       lexical_state->root_frame.case_pattern_expected))
   {
+    do_append_group_state(lexical_state->root_frame);
+    do_append_frame_semantic_state(lexical_state->root_frame);
     for (let const &frame : lexical_state->frames) {
       if (frame.parent_quote != 0) synthetic_line.push(frame.parent_quote);
       switch (frame.kind) {
@@ -1254,6 +1292,12 @@ static fn highlight_line_with_lexical_state(
       case shell_lexical_frame_kind::parameter:
         synthetic_line.append("${");
         break;
+      }
+      do_append_group_state(frame);
+      if (frame.kind == shell_lexical_frame_kind::command ||
+          frame.kind == shell_lexical_frame_kind::backtick)
+      {
+        do_append_frame_semantic_state(frame);
       }
     }
     if (lexical_state->quote != 0) synthetic_line.push(lexical_state->quote);
@@ -1286,6 +1330,8 @@ fn highlight_line(StringView line, EvalContext &context) throws
   return highlight_line_with_lexical_state(line, context, nullptr);
 }
 
+static constexpr usize DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL = 4096;
+
 fn diagnostic_highlight_cache::spans_for(StringView source, usize line_start,
                                          usize line_end,
                                          EvalContext &context) throws
@@ -1297,26 +1343,29 @@ fn diagnostic_highlight_cache::spans_for(StringView source, usize line_start,
     m_source = source;
     m_checkpoints.clear();
     m_spans.clear();
-    m_has_cached_line = false;
 
     let state = shell_lexical_state{heap_allocator()};
     m_checkpoints.push(state);
-    usize checkpoint_threshold = 4096;
-    while (checkpoint_threshold < source.length) {
-      usize checkpoint_position = checkpoint_threshold;
-      while (checkpoint_position < source.length &&
-             source[checkpoint_position - 1] != '\n')
-        checkpoint_position++;
-      if (checkpoint_position >= source.length) break;
-      advance_shell_lexical_state(source, checkpoint_position, state);
-      m_checkpoints.push(state);
-      checkpoint_threshold = checkpoint_position + 4096;
-    }
+    m_next_checkpoint_threshold = DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL;
   }
 
-  if (m_has_cached_line && line_start == m_line_start && line_end == m_line_end)
+  let state = m_checkpoints.back();
+  while (m_next_checkpoint_threshold < source.length &&
+         m_next_checkpoint_threshold < line_start)
   {
-    return &m_spans;
+    usize checkpoint_position = m_next_checkpoint_threshold;
+    while (checkpoint_position < source.length &&
+           source[checkpoint_position - 1] != '\n')
+      checkpoint_position++;
+    if (checkpoint_position >= source.length) {
+      m_next_checkpoint_threshold = source.length;
+      break;
+    }
+    if (checkpoint_position > line_start) break;
+    advance_shell_lexical_state(source, checkpoint_position, state);
+    m_checkpoints.push(state);
+    m_next_checkpoint_threshold =
+        checkpoint_position + DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL;
   }
 
   usize checkpoint_index = 0;
@@ -1340,9 +1389,6 @@ fn diagnostic_highlight_cache::spans_for(StringView source, usize line_start,
   m_spans.reserve(generated.count());
   for (let const &span : generated)
     m_spans.push(span);
-  m_line_start = line_start;
-  m_line_end = line_end;
-  m_has_cached_line = true;
   return &m_spans;
 }
 

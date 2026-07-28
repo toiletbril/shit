@@ -1114,24 +1114,18 @@ fn advance_shell_lexical_state(StringView source, usize end,
       continue;
     }
 
+    let &frame =
+        state.frames.is_empty() ? state.root_frame : state.frames.back();
     let const is_word_boundary =
-        i == 0 || source[i - 1] == ' ' || source[i - 1] == '\t' ||
-        source[i - 1] == '\n' || source[i - 1] == ';' || source[i - 1] == '&' ||
-        source[i - 1] == '|';
+        i == frame.body_start || source[i - 1] == ' ' ||
+        source[i - 1] == '\t' || source[i - 1] == '\n' ||
+        source[i - 1] == ';' || source[i - 1] == '&' || source[i - 1] == '|' ||
+        source[i - 1] == '(' || source[i - 1] == ')';
     if (is_command_code && c == '#' && is_word_boundary) {
       state.is_in_comment = true;
       i++;
       continue;
     }
-
-    if (state.frames.is_empty()) {
-      if (c == '\n' && !state.pending_heredocs.is_empty())
-        state.is_in_heredoc = true;
-      i++;
-      continue;
-    }
-
-    let &frame = state.frames.back();
 
     let const do_word_matches = [&](StringView word) {
       if (i + word.length > end) return false;
@@ -1147,6 +1141,13 @@ fn advance_shell_lexical_state(StringView source, usize end,
         source[i - 1] == ';' || source[i - 1] == '&' || source[i - 1] == '|' ||
         source[i - 1] == '(' || source[i - 1] == ')';
     if (is_word_start) {
+      let word_end = i;
+      while (word_end < end && !lexer::is_whitespace(source[word_end]) &&
+             !lexer::is_shell_sentinel(source[word_end]))
+      {
+        word_end++;
+      }
+      let const word = source.substring_of_length(i, word_end - i);
       if (frame.is_command_position && do_word_matches("case")) {
         frame.saw_case_keyword = true;
         frame.is_command_position = false;
@@ -1161,6 +1162,13 @@ fn advance_shell_lexical_state(StringView source, usize end,
         frame.case_depth--;
         frame.case_pattern_expected = false;
         frame.is_command_position = false;
+      } else if (frame.is_command_position && word_looks_like_assignment(word))
+      {
+        frame.is_command_position = true;
+      } else if (frame.is_command_position &&
+                 shell_keyword_starts_command(word))
+      {
+        frame.is_command_position = true;
       } else if (frame.is_command_position && !lexer::is_shell_sentinel(c)) {
         frame.is_command_position = false;
       }
@@ -1176,6 +1184,20 @@ fn advance_shell_lexical_state(StringView source, usize end,
       }
       if (c == '\n' && !state.pending_heredocs.is_empty())
         state.is_in_heredoc = true;
+    }
+
+    if (state.frames.is_empty()) {
+      if (c == '(')
+        frame.group_depth++;
+      else if (c == ')' && frame.group_depth > 0)
+        frame.group_depth--;
+      else if (c == ')' && frame.case_depth > 0 && frame.case_pattern_expected)
+      {
+        frame.case_pattern_expected = false;
+        frame.is_command_position = true;
+      }
+      i++;
+      continue;
     }
 
     if (c == '(') {

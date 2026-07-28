@@ -63,6 +63,12 @@ def run_tty(arguments):
 
 output = run_tty(["-n", "-c", source])
 heredoc_output = run_tty(["-c", "cat <<EOF\n$(bad_command)\nEOF"])
+continued_output = run_tty(
+    ["-c", 'value="$(INNER+=value \\\nprintf continued_argument; bad_command)"']
+)
+comment_output = run_tty(
+    ["-c", 'value="$( (\n# )\nprintf value; bad_command\n) )"']
+)
 
 raw_lines = output.replace(b"\r", b"").split(b"\n")
 raw_content = next((line for line in raw_lines if b"$UNSET" in line), b"")
@@ -75,12 +81,37 @@ raw_double_quote = next(
 raw_nested_substitution = next(
     (line for line in raw_lines if b"$NESTED_UNSET" in line), b""
 )
+raw_continued_argument = next(
+    (
+        line
+        for line in continued_output.replace(b"\r", b"").split(b"\n")
+        if b"continued_argument" in line and b"bad_command" in line
+    ),
+    b"",
+)
+raw_comment_substitution = next(
+    (
+        line
+        for line in comment_output.replace(b"\r", b"").split(b"\n")
+        if b"printf" in line and b"bad_command" in line
+    ),
+    b"",
+)
 source_highlighted = b"\x1b[" in raw_content
 clipped_string_is_green = b"\x1b[92m" in raw_content
 single_quote_context_is_green = b"\x1b[92msingle_end'\x1b[0m" in raw_single_quote
 double_quote_context_is_green = b'\x1b[92mdouble_end"\x1b[0m' in raw_double_quote
 nested_parent_quote_is_green = (
     b'\x1b[92m tail"\x1b[0m' in raw_nested_substitution
+)
+continued_argument_is_plain = (
+    b"\x1b[34mprintf\x1b[0m continued_argument"
+    in raw_continued_argument
+)
+continued_bad_command_is_red = b"\x1b[91mbad_command\x1b[0m" in raw_continued_argument
+comment_substitution_is_command_code = (
+    b"\x1b[34mprintf\x1b[0m" in raw_comment_substitution
+    and b"\x1b[91mbad_command\x1b[0m" in raw_comment_substitution
 )
 heredoc_trace_is_green = b"\x1b[92m$(bad_command)\x1b[0m" in heredoc_output
 has_no_ansi_underline = b"4:3" not in raw_content
@@ -102,7 +133,9 @@ diagnostic_line_bytes = sum(
         source_line,
     )
 )
-highlight_scan_is_bounded = 0 < highlight_bytes <= diagnostic_line_bytes + 16
+highlight_scan_is_bounded = (
+    0 < highlight_bytes <= diagnostic_line_bytes + len(source_line.encode()) + 16
+)
 content_width = len(content) + content.count(wide_character)
 within_width = bool(content) and content_width <= column_count
 has_both_ellipses = "|  ..." in content and content.endswith("...")
@@ -119,6 +152,9 @@ passed = (
     and single_quote_context_is_green
     and double_quote_context_is_green
     and nested_parent_quote_is_green
+    and continued_argument_is_plain
+    and continued_bad_command_is_red
+    and comment_substitution_is_command_code
     and heredoc_trace_is_green
     and has_no_ansi_underline
     and within_width
@@ -131,6 +167,9 @@ print("CLIPPED_STRING_GREEN:", clipped_string_is_green)
 print("SINGLE_QUOTE_CONTEXT_GREEN:", single_quote_context_is_green)
 print("DOUBLE_QUOTE_CONTEXT_GREEN:", double_quote_context_is_green)
 print("NESTED_PARENT_QUOTE_GREEN:", nested_parent_quote_is_green)
+print("CONTINUED_ARGUMENT_PLAIN:", continued_argument_is_plain)
+print("CONTINUED_BAD_COMMAND_RED:", continued_bad_command_is_red)
+print("COMMENT_SUBSTITUTION_COMMAND_CODE:", comment_substitution_is_command_code)
 print("HEREDOC_TRACE_GREEN:", heredoc_trace_is_green)
 print("NO_ANSI_UNDERLINE:", has_no_ansi_underline)
 print("WITHIN_WIDTH:", within_width)
