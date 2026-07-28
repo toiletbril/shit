@@ -17,6 +17,8 @@ public:
 
   fn construct_ast() throws -> Expression *;
 
+  fn construct_next_top_level_ast() throws -> Expression *;
+
   fn construct_ast(ArrayList<String> &errors, EvalContext *context) throws
       -> Expression *;
 
@@ -37,6 +39,7 @@ private:
   usize m_recursion_depth{0};
   usize m_if_condition_depth{0};
   usize m_parentheses_depth{0};
+  bool m_should_stop_after_top_level_unit{false};
 
   mustuse fn parse_simple_command() throws -> Command *;
 

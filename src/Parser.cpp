@@ -180,6 +180,17 @@ flatten fn Parser::construct_ast() throws -> Expression *
   return parse_command_list({});
 }
 
+fn Parser::construct_next_top_level_ast() throws -> Expression *
+{
+  if (m_lexer.peek_shell_token()->kind() == Token::Kind::EndOfFile)
+    return nullptr;
+
+  m_should_stop_after_top_level_unit = true;
+  defer { m_should_stop_after_top_level_unit = false; };
+
+  return parse_command_list({});
+}
+
 fn Parser::skip_newlines_after_pipe() throws -> void
 {
   while (m_lexer.peek_shell_token()->kind() == Token::Kind::Newline)
@@ -389,6 +400,14 @@ hot fn Parser::parse_command_list(
       if (lhs != nullptr) {
         do_finish_pending(lhs, token);
         next_cond = get_sequence_kind(token->kind());
+      }
+
+      if (token->kind() == Token::Kind::Newline &&
+          m_should_stop_after_top_level_unit && m_command_depth == 1 &&
+          next_cond == CompoundListCondition::Kind::None &&
+          !compound_list->is_empty())
+      {
+        return compound_list;
       }
 
       if (token->kind() == Token::Kind::EndOfFile) {

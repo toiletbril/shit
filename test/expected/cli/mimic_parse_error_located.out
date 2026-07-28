@@ -5,3 +5,10 @@ shit: TMPDIR/unterminated:2:10: note:
      2 |    echo hi
        |           ^ Expected '}'.
 rc=0
+incremental reached
+incremental rc=0
+shit: 1:1: error: Cannot execute `TMPDIR/binary` as a shell script.
+     1 |  ./binary
+       |  ^~~~~~~~ here.
+note: A NUL byte before the first line break marks the file as binary.
+binary rc=126

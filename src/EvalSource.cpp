@@ -113,24 +113,28 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
                             "Unable to mimic '" + ec.program() +
                                 "' because the script could not be read"};
 
-  /* A NUL byte in the leading bytes marks a binary file, reported with status
-     126. Only the head is sampled, so a script carrying a NUL on a later line
-     still runs. */
   const usize binary_scan_limit = 128;
   let const head = contents->view();
   let const scan_length =
       head.length < binary_scan_limit ? head.length : binary_scan_limit;
-  if (head.substring_of_length(0, scan_length).find_character('\0').has_value())
+  let const sample = head.substring_of_length(0, scan_length);
+  let const first_line_break = sample.find_character('\n');
+  let const first_line_length = first_line_break.value_or(sample.length);
+  if (sample.substring_of_length(0, first_line_length)
+          .find_character('\0')
+          .has_value())
   {
-    LOG(Debug, "a NUL byte in the leading bytes marks '%s' as a binary file",
+    LOG(Debug,
+        "a NUL byte before the first line break marks '%s' as a binary file",
         ec.program().c_str());
     let const source = current_source();
-    show_message(
-        ErrorWithLocation{ec.source_location(),
-                          "Cannot execute the binary file `" +
-                              ec.program_path().text() + "`"}
-            .to_string(source != nullptr ? source->view() : StringView{},
-                       this));
+    show_message(ErrorWithLocationAndDetails{
+        ec.source_location(),
+        "Cannot execute `" + ec.program_path().text() + "` as a shell script.",
+        "A NUL byte before the first line break marks the file as binary."}
+                     .to_string(source != nullptr ? source->view()
+                                                  : StringView{},
+                                this));
     return 126;
   }
 
@@ -170,34 +174,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
             mood()}
   };
 
-  let const do_restore_pre_parse_state = [&]() {
-    m_runtime = previous_runtime;
-    do_restore_restricted_shell();
-    m_is_script_run = previous_script_run;
-  };
-
-  const Expression *ast;
-  try {
-    ast = parser.construct_ast();
-  } catch (const ErrorWithLocationAndDetails &detailed_error) {
-    defer { do_restore_pre_parse_state(); };
-    show_message(detailed_error.to_string(contents->view(), this));
-    show_message(detailed_error.details_to_string(contents->view(), this));
-    print_source_backtrace(detailed_error.location());
-    return 1;
-  } catch (const ErrorWithLocation &located_error) {
-    defer { do_restore_pre_parse_state(); };
-    show_message(located_error.to_string(contents->view(), this));
-    print_source_backtrace(located_error.location());
-    return 1;
-  } catch (const Error &caught_error) {
-    do_restore_pre_parse_state();
-    show_message(caught_error.to_string());
-    print_source_backtrace();
-    return 1;
-  }
-  ASSERT(ast != nullptr);
-
   let previous_shell_name = String{m_shell_name};
   let params = ArrayList<String>{heap_allocator()};
   params.reserve(ec.args().count() - 1);
@@ -227,6 +203,10 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const do_render_error = [&](std::exception_ptr error) {
     try {
       std::rethrow_exception(error);
+    } catch (const ErrorWithLocationAndDetails &detailed_error) {
+      show_message(detailed_error.to_string(contents->view(), this));
+      show_message(detailed_error.details_to_string(contents->view(), this));
+      print_source_backtrace(detailed_error.location());
     } catch (const ErrorWithLocation &located_error) {
       show_message(located_error.to_string(contents->view(), this));
       print_source_backtrace(located_error.location());
@@ -246,6 +226,16 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   m_current_location = SourceLocation{};
   m_mimicry_depth++;
 
+  let const do_evaluate_script = [&]() throws {
+    loop
+    {
+      let const *ast = parser.construct_next_top_level_ast();
+      if (ast == nullptr) break;
+      ast->evaluate(*this);
+      if (has_pending_control_flow()) break;
+    }
+  };
+
   /* The terminal command the shell exits with needs no isolation, so the script
      runs against the current state with no snapshot. */
   if (!isolated) {
@@ -253,7 +243,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     seed_shell_identity_variables(mode == mimic_mood::Bash);
     std::exception_ptr error;
     try {
-      ast->evaluate(*this);
+      do_evaluate_script();
     } catch (...) {
       error = std::current_exception();
     }
@@ -279,7 +269,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   clear_inherited_exit_trap();
   std::exception_ptr error;
   try {
-    ast->evaluate(*this);
+    do_evaluate_script();
   } catch (...) {
     error = std::current_exception();
   }
