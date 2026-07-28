@@ -194,13 +194,28 @@ highlight_tests: $(BIN)
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-highlight-test.sh $(HIGHLIGHT_INPUT)
 
+DIAGNOSTIC_TTY_INPUT := \
+	interactive/long_warning_window.py \
+	interactive/cat_syntax_highlighting.py
+
 diagnostic_tty_test: $(BIN)
 	@if command -v python3 >/dev/null 2>&1; then \
-		python3 interactive/long_warning_window.py $(BIN); \
-		python3 interactive/cat_syntax_highlighting.py $(BIN); \
+		for test_file in $(DIAGNOSTIC_TTY_INPUT); do \
+			output=$$(mktemp) || exit; \
+			if python3 "$$test_file" "$(BIN)" >"$$output" 2>&1; then \
+				printf "\t%-64s ok\033[K\r" "$$test_file"; \
+			else \
+				cat "$$output"; \
+				printf "\t%-64s FAILED :c\n" "$$test_file"; \
+				rm -f "$$output"; \
+				exit 1; \
+			fi; \
+			rm -f "$$output"; \
+		done; \
 	else \
-		printf "\t%-64s skipped, python3 unavailable\n" \
-			interactive/long_warning_window.py; \
+		for test_file in $(DIAGNOSTIC_TTY_INPUT); do \
+			printf "\t%-64s skipped, python3 unavailable\n" "$$test_file"; \
+		done; \
 	fi
 
 
