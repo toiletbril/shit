@@ -458,26 +458,29 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
   if (redir.kind == Redirection::Kind::Heredoc ||
       redir.kind == Redirection::Kind::HereString)
   {
-    let body = String{cxt.scratch_allocator()};
+    let expanded_body = String{cxt.scratch_allocator()};
+    let body = StringView{};
     if (redir.kind == Redirection::Kind::Heredoc) {
       ASSERT(redir.heredoc != nullptr);
-      body = redir.heredoc->text.clone();
+      body = redir.heredoc->text.view();
       if (redir.should_expand_heredoc) {
         let source_location = SourceLocation{};
         const SourceLocation *source_location_pointer = nullptr;
         if (redir.heredoc->has_contiguous_source) {
           source_location =
-              SourceLocation{redir.heredoc->source_position, body.count(),
+              SourceLocation{redir.heredoc->source_position, body.length,
                              fallback_location.filename};
           source_location_pointer = &source_location;
         }
-        body = cxt.expand_heredoc_body(body, source_location_pointer);
+        expanded_body = cxt.expand_heredoc_body(body, source_location_pointer);
+        body = expanded_body.view();
       }
     } else {
       ASSERT(redir.target != nullptr);
-      body = cxt.expand_word_for_assignment(
+      expanded_body = cxt.expand_word_for_assignment(
           static_cast<const tokens::WordToken *>(redir.target)->word());
-      body += "\n";
+      expanded_body += "\n";
+      body = expanded_body.view();
     }
 
     let opened = os::write_to_temp_file(body);
