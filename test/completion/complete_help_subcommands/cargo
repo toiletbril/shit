@@ -1,0 +1,15 @@
+#!/bin/sh
+cat <<'HELP'
+A fake multi-tool
+
+Usage: cargo [OPTIONS] <COMMAND>
+
+Options:
+      --verbose   Be loud
+  -h, --help      Print help
+
+Commands:
+    build, b    Compile the thing
+    check       Check the thing for errors
+    clean       Remove the output directory
+HELP
