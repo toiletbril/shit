@@ -208,7 +208,7 @@ done
 echo "--- timeout kills process group descendants ---"
 if [ "${OS-}" = Windows_NT ]; then
     "$BIN" -c "shitbox timeout 1s sh '$d/windows-descendant.sh' '$d/descendant-pid' '$d/descendant-ready'" \
-        >/dev/null 2>&1
+        >"${TEST_NULL_DEVICE:-/dev/null}" 2>&1
     descendant_status=$?
     descendant_pid=
     if [ -s "$d/descendant-pid" ]; then
