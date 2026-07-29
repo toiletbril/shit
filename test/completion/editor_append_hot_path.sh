@@ -219,6 +219,7 @@ echo 'completion menu keeps callback-owned strings alive'
 
 mkdir "$d/quoted-completion"
 touch "$d/quoted-completion/space name" \
+    "$d/quoted-completion/plain name" \
     "$d/quoted-completion/README-one" \
     "$d/quoted-completion/ReadMe-two"
 
@@ -227,6 +228,9 @@ send_quoted_input()
     wait_for_editor "$d/quoted-ready" || exit 1
     printf "cd '%s'\nprintf '<%%s>\\\\n' 'spX'\033[D\033[D\t\n" \
         "$d/quoted-completion"
+    printf "printf '<%%s>\\\\n' plaX\033[D\t\n"
+    printf "COMPLETION_PROBE=variable-value\n"
+    printf "printf '<%%s>\\\\n' \"\$COMPLETION_PROBX\"\033[D\033[D\t\n"
     printf "printf '<%%s>\\\\n' read\tone\nexit\n"
 }
 
@@ -235,6 +239,8 @@ send_quoted_input | EDITOR_READY_FILE="$d/quoted-ready" \
     run_editor "$d/quoted-typescript"
 
 strings "$d/quoted-typescript" | grep -q '<space name>' || exit 1
+strings "$d/quoted-typescript" | grep -q '<plain name>' || exit 1
+strings "$d/quoted-typescript" | grep -q '<variable-value>' || exit 1
 strings "$d/quoted-typescript" | grep -q '<README-one>' || exit 1
 echo 'quoted replacement and smart-case TAB preserve the completed token'
 

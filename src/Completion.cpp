@@ -1644,6 +1644,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     {
       replacement_token_end = quote_end;
     }
+  } else if (cursor < token_end) {
+    token_end = cursor;
+    token = token_prefix;
   }
 
   /* An option-value word such as --exit-node=host completes only the value
@@ -1717,7 +1720,6 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     if (has_open_quote) {
       token_start += decoded_token.open_quote_content_start;
       token_end = cursor;
-      replacement_token_end = cursor;
     }
   } else if (token_is_tilde_user_prefix(stage_token) &&
              leading_tilde_is_active && !is_posix_completion)
