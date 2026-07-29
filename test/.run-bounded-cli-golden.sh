@@ -1,21 +1,21 @@
 #!/bin/bash
 
-fixture=$1
+golden=$1
 timeout_seconds=${CLI_TEST_TIMEOUT_SECONDS:-60}
-fixture_process=
-fixture_session=
+golden_process=
+golden_session=
 host_system=$(uname -s)
 cleanup_is_armed=yes
 pending_exit_status=
 
 case $timeout_seconds in
 ''|*[!0-9]*)
-    printf 'invalid CLI fixture timeout\n'
+    printf 'invalid CLI golden timeout\n'
     exit 125
     ;;
 esac
 
-list_fixture_session_processes()
+list_golden_session_processes()
 {
     if [ "$host_system" = Linux ]; then
         for process_stat_path in /proc/[0-9]*/stat; do
@@ -25,7 +25,7 @@ list_fixture_session_processes()
             set -- $process_fields
             [ "$#" -ge 4 ] || continue
             [ "$1" = Z ] && continue
-            [ "$4" = "$fixture_session" ] || continue
+            [ "$4" = "$golden_session" ] || continue
             process_id=${process_stat_path#/proc/}
             printf '%s\n' "${process_id%/stat}"
         done
@@ -42,7 +42,7 @@ list_fixture_session_processes()
                 $process_session = syscall(310, $process);
                 print "$process\n" if $process_session == $session;
             }
-        ' "$fixture_session"
+        ' "$golden_session"
         return
     fi
 
@@ -54,54 +54,54 @@ list_fixture_session_processes()
         return 1
     fi
     printf '%s\n' "$process_table" | while read -r process_id process_session; do
-        if [ "$process_session" = "$fixture_session" ]; then
+        if [ "$process_session" = "$golden_session" ]; then
             printf '%s\n' "$process_id"
         fi
     done
 }
 
-terminate_fixture_tree()
+terminate_golden_tree()
 {
     if [ "${OS-}" = Windows_NT ] &&
         command -v taskkill.exe >/dev/null 2>&1; then
-        [ -n "$fixture_process" ] || return
-        windows_process_id=$(ps -p "$fixture_process" -o winpid= 2>/dev/null |
+        [ -n "$golden_process" ] || return
+        windows_process_id=$(ps -p "$golden_process" -o winpid= 2>/dev/null |
             tr -d '[:space:]')
         if [ -n "$windows_process_id" ]; then
             taskkill.exe //PID "$windows_process_id" //T //F \
                 >/dev/null 2>&1 || true
         fi
-        kill -KILL "$fixture_process" 2>/dev/null || true
+        kill -KILL "$golden_process" 2>/dev/null || true
         return
     fi
 
     discovery_failed=no
-    session_processes=$(list_fixture_session_processes) || {
+    session_processes=$(list_golden_session_processes) || {
         discovery_failed=yes
         session_processes=
     }
-    if [ -n "$fixture_process$session_processes" ]; then
-        kill -TERM $fixture_process $session_processes 2>/dev/null || true
+    if [ -n "$golden_process$session_processes" ]; then
+        kill -TERM $golden_process $session_processes 2>/dev/null || true
     fi
     sleep 0.1
-    session_processes=$(list_fixture_session_processes) || {
+    session_processes=$(list_golden_session_processes) || {
         discovery_failed=yes
         session_processes=
     }
-    if [ -n "$fixture_process$session_processes" ]; then
-        kill -KILL $fixture_process $session_processes 2>/dev/null || true
+    if [ -n "$golden_process$session_processes" ]; then
+        kill -KILL $golden_process $session_processes 2>/dev/null || true
     fi
     [ "$discovery_failed" = no ]
 }
 
-cleanup_fixture_tree()
+cleanup_golden_tree()
 {
-    if [ "$cleanup_is_armed" = yes ] && [ -n "$fixture_session" ]; then
-        if ! terminate_fixture_tree; then
-            printf 'fixture session discovery failed\n'
+    if [ "$cleanup_is_armed" = yes ] && [ -n "$golden_session" ]; then
+        if ! terminate_golden_tree; then
+            printf 'golden session discovery failed\n'
         fi
-        if [ -n "$fixture_process" ]; then
-            wait "$fixture_process" 2>/dev/null || true
+        if [ -n "$golden_process" ]; then
+            wait "$golden_process" 2>/dev/null || true
         fi
     fi
 }
@@ -109,68 +109,68 @@ cleanup_fixture_tree()
 request_exit()
 {
     pending_exit_status=$1
-    if [ -n "$fixture_session" ]; then
+    if [ -n "$golden_session" ]; then
         exit "$pending_exit_status"
     fi
 }
 
-trap cleanup_fixture_tree EXIT
+trap cleanup_golden_tree EXIT
 trap 'request_exit 130' INT
 trap 'request_exit 143' TERM
 trap 'request_exit 129' HUP
 
 if [ "${OS-}" = Windows_NT ]; then
-    BIN=$BIN BOUNDED_HOST_SHELL=sh BOUNDED_FIXTURE=$fixture \
+    BIN=$BIN BOUNDED_HOST_SHELL=sh BOUNDED_GOLDEN=$golden \
         SHIT_TEST_TIMEOUT_JOB_LIFETIME=leader \
         "$BIN" -p --mood sh -c \
-        'shitbox timeout 0 "$BIN" --mood sh -c '\''unset SHIT_TEST_TIMEOUT_JOB_LIFETIME; "$BOUNDED_HOST_SHELL" "$BOUNDED_FIXTURE"'\''' &
+        'shitbox timeout 0 "$BIN" --mood sh -c '\''unset SHIT_TEST_TIMEOUT_JOB_LIFETIME; "$BOUNDED_HOST_SHELL" "$BOUNDED_GOLDEN"'\''' &
 elif command -v setsid >/dev/null 2>&1; then
-    BIN=$BIN setsid /bin/sh "$fixture" &
+    BIN=$BIN setsid /bin/sh "$golden" &
 elif command -v perl >/dev/null 2>&1; then
     BIN=$BIN perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' \
-        /bin/sh "$fixture" &
+        /bin/sh "$golden" &
 else
-    printf 'cannot create a CLI fixture session\n'
+    printf 'cannot create a CLI golden session\n'
     exit 125
 fi
-fixture_process=$!
-fixture_session=$fixture_process
+golden_process=$!
+golden_session=$golden_process
 if [ -n "$pending_exit_status" ]; then
     exit "$pending_exit_status"
 fi
 
 attempt_count=0
 attempt_limit=$((timeout_seconds * 10))
-while kill -0 "$fixture_process" 2>/dev/null &&
+while kill -0 "$golden_process" 2>/dev/null &&
     [ "$attempt_count" -lt "$attempt_limit" ]; do
     sleep 0.1
     attempt_count=$((attempt_count + 1))
 done
 
-if kill -0 "$fixture_process" 2>/dev/null; then
-    printf 'fixture timed out\n'
+if kill -0 "$golden_process" 2>/dev/null; then
+    printf 'golden timed out\n'
     termination_status=0
-    terminate_fixture_tree || termination_status=$?
-    wait "$fixture_process" 2>/dev/null || true
-    fixture_process=
+    terminate_golden_tree || termination_status=$?
+    wait "$golden_process" 2>/dev/null || true
+    golden_process=
     cleanup_is_armed=no
     if [ "$termination_status" -ne 0 ]; then
-        printf 'fixture session discovery failed\n'
+        printf 'golden session discovery failed\n'
         exit 125
     fi
     exit 124
 fi
 
-wait "$fixture_process"
-fixture_status=$?
-fixture_process=
+wait "$golden_process"
+golden_status=$?
+golden_process=
 attempt_count=0
 has_living_descendant=yes
 session_discovery_failed=no
 while [ "$has_living_descendant" = yes ] && [ "$attempt_count" -lt 1000 ]; do
     has_living_descendant=no
     if [ "${OS-}" != Windows_NT ]; then
-        session_processes=$(list_fixture_session_processes) || {
+        session_processes=$(list_golden_session_processes) || {
             session_discovery_failed=yes
             break
         }
@@ -187,17 +187,17 @@ while [ "$has_living_descendant" = yes ] && [ "$attempt_count" -lt 1000 ]; do
     fi
 done
 if [ "$session_discovery_failed" = yes ]; then
-    printf 'fixture session discovery failed\n'
-    terminate_fixture_tree 2>/dev/null || true
+    printf 'golden session discovery failed\n'
+    terminate_golden_tree 2>/dev/null || true
     cleanup_is_armed=no
     exit 125
 fi
 if [ "$has_living_descendant" = yes ]; then
-    printf 'fixture leaked processes\n'
-    terminate_fixture_tree
+    printf 'golden leaked processes\n'
+    terminate_golden_tree
     cleanup_is_armed=no
     exit 125
 fi
 
 cleanup_is_armed=no
-exit "$fixture_status"
+exit "$golden_status"

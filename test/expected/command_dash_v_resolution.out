@@ -4,7 +4,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "command" "-v" "set"]
   [CompoundListCondition, None]
-    [Assign d=$TEST_TEMP_DIRECTORY/command-v-fixture]
+    [Assign d=$TEST_TEMP_DIRECTORY/command-v-golden]
   [CompoundListCondition, None]
     [SimpleCommand "shitbox" "mkdir" "-p" "$d"]
   [CompoundListCondition, None]
@@ -52,7 +52,7 @@
 [Word
   Unquoted "d="
   Variable "TEST_TEMP_DIRECTORY"
-  Unquoted "/command-v-fixture"
+  Unquoted "/command-v-golden"
 ]
 [Word
   Unquoted "shitbox"
