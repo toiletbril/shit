@@ -39,7 +39,7 @@ contained
 --- an interrupt stops the supervisor and descendants ---
 rc=130
 contained
---- an interactive child reads from the terminal ---
+--- a supervised child reads input ---
 passed
 --- timeout works through a multicall symlink ---
 rc=0

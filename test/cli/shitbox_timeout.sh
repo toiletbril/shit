@@ -57,6 +57,10 @@ printf '(printf ready > "$1"; exec /bin/sleep 10) &\ndescendant_pid=$!\nprintf "
     > "$d/descendant.sh"
 printf 'finish()\n{\n  exit 0\n}\ntrap finish TERM\n(trap "" TERM; printf "descriptor-ready\\n" >&3; printf ready > "$1"; exec /bin/sleep 10) &\ndescendant_pid=$!\nprintf "%%s\\n" "$descendant_pid" > "$2"\nwhile [ ! -s "$1" ]; do :; done\nprintf ready > "$3"\nwait "$descendant_pid"\n' \
     > "$d/descriptor.sh"
+printf '(sleep 10) &\ndescendant_pid=$!\nprintf "%%s\\n" "$descendant_pid" > "$1"\nprintf ready > "$2"\nwait "$descendant_pid"\n' \
+    > "$d/windows-descendant.sh"
+printf '(sleep 10) &\ndescendant_pid=$!\nprintf "%%s\\n" "$descendant_pid" > "$1"\nprintf "descriptor-ready\\n"\nwait "$descendant_pid"\n' \
+    > "$d/windows-descriptor.sh"
 chmod +x "$d/plain-script"
 
 echo "--- timeout passes output and status ---"
@@ -203,7 +207,28 @@ done
 
 echo "--- timeout kills process group descendants ---"
 if [ "${OS-}" = Windows_NT ]; then
-    echo contained
+    "$BIN" -c "shitbox timeout 1s sh '$d/windows-descendant.sh' '$d/descendant-pid' '$d/descendant-ready'" \
+        >/dev/null 2>&1
+    descendant_status=$?
+    descendant_pid=
+    if [ -s "$d/descendant-pid" ]; then
+        descendant_pid=$(cat "$d/descendant-pid")
+    fi
+    waited=0
+    while [ -n "$descendant_pid" ] && process_is_alive "$descendant_pid" &&
+        [ "$waited" -lt 100 ]; do
+        sleep 0.01
+        waited=$((waited + 1))
+    done
+    if [ "$descendant_status" -ne 124 ]; then
+        echo "bad-status=$descendant_status"
+    elif [ ! -s "$d/descendant-ready" ] || [ -z "$descendant_pid" ]; then
+        echo setup-failed
+    elif process_is_alive "$descendant_pid"; then
+        echo leaked
+    else
+        echo contained
+    fi
 else
     "$BIN" -c "shitbox timeout 1s /bin/sh '$d/descendant.sh' '$d/descendant-ready' '$d/descendant-pid' '$d/leader-ready'" \
         >/dev/null 2>&1
@@ -236,7 +261,24 @@ fi
 
 echo "--- kill-after closes inherited descendant descriptors ---"
 if [ "${OS-}" = Windows_NT ]; then
-    echo contained
+    descriptor_output=$(
+        "$BIN" -c "set +o pipefail; shitbox timeout -k 1s 1s sh '$d/windows-descriptor.sh' '$d/descriptor-pid' | shitbox cat"
+    )
+    descriptor_status=$?
+    descriptor_pid=
+    if [ -s "$d/descriptor-pid" ]; then
+        descriptor_pid=$(cat "$d/descriptor-pid")
+    fi
+    if [ "$descriptor_status" -ne 0 ]; then
+        echo "bad-status=$descriptor_status"
+    elif [ "$descriptor_output" != descriptor-ready ] ||
+        [ -z "$descriptor_pid" ]; then
+        echo setup-failed
+    elif process_is_alive "$descriptor_pid"; then
+        echo leaked
+    else
+        echo contained
+    fi
 else
     mkfifo "$d/query"
     (/bin/cat "$d/query" > "$d/query-output" &&
@@ -330,9 +372,11 @@ else
     echo "$interrupt_result"
 fi
 
-echo "--- an interactive child reads from the terminal ---"
+echo "--- a supervised child reads input ---"
 if [ "${OS-}" = Windows_NT ]; then
-    terminal_output=received-probe
+    terminal_output=$(printf 'probe\n' | "$BIN" -c \
+        'shitbox timeout 1 "$1" -c '\''read value; echo received-$value'\''' \
+        timeout-child "$BIN")
 elif script -qec true /dev/null >/dev/null 2>&1; then
     terminal_output=$(
         { /bin/sleep 0.2; printf '%s\n' \
