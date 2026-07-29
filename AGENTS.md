@@ -18,7 +18,9 @@ target. The completion suite needs the debug binary, since
 `--debug-complete-at` is gated behind NDEBUG. Prefer a make target over a raw
 compiler call, and clean a stale artifact with `make clean`, never a bare `rm`
 of ./shit. The full MODE catalog, the cross-compilation targets, and the install
-with its PREFIX are documented in the README.
+with its PREFIX are documented in the README. The clean target removes the main
+binaries, object trees, and every Cosmopolitan .dbg and architecture ELF
+sidecar.
 
 ## Moods
 
@@ -140,6 +142,10 @@ no-op since every builtin is always enabled in shit, and accepts the bash
 flags `-n`, `-a`, `-d`, `-f`, and `-s` so a bash script that toggles builtins
 keeps sourcing.
 
+An asynchronous pipeline job owns every stage process. The final stage remains
+primary for `$!`, status, and job output. Polling, waiting, foregrounding,
+backgrounding, signaling, and disowning retain or reap the earlier stages.
+
 The `assimilate TARGET` builtin copies the running binary through scp and uses
 an SSH transaction to install it as `shit` in the first usable remote PATH
 directory. Directories containing sbin are skipped. /usr/local/bin and
@@ -178,8 +184,10 @@ owns the controlling terminal.
 Fork-backed evaluator launches are routed through os wrappers. The POSIX
 implementation evaluates the inherited AST in the child. The Windows
 implementation selects an in-process fallback or starts a fresh shell from the
-recorded source. Platform-specific flags and runtime initialization are also
-registered through os wrappers.
+recorded source. When Windows cannot fork a piped evaluator,
+context-independent builtins and valid shitbox utilities start as fresh shell
+stages. Platform-specific flags and runtime initialization are also registered
+through os wrappers.
 
 src/Completion.cpp drives zero config completion. Completion first slices the
 buffer to the command segment holding the cursor, and the slice is quote aware,
@@ -202,9 +210,10 @@ prefix on a path token is
 expanded only to list the real directory, while the offered candidate keeps the
 literal prefix so it still expands at run time, and only a glob pattern is
 expanded into its matches. Quoted and escaped directory spelling is preserved
-across a later unquoted slash. A command forks its `--help` at most once per
-cache key, behind an allowlist and a trusted directory gate, and the subcommand
-walk stops
+across a later unquoted slash. Open quote reconstruction preserves the raw
+bytes before the quote and appends the candidate suffix inside the same quote.
+A command forks its `--help` at most once per cache key, behind an allowlist and
+a trusted directory gate, and the subcommand walk stops
 at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The
 cascade splits across src/Completion.cpp, src/CompletionManpage.cpp,
 src/CompletionScan.cpp, and the per-keystroke highlighter in
@@ -300,7 +309,9 @@ one cached source line index.
 Executable-format fallback uses an explicit
 invalid-process result. A fresh evaluator runs the fallback script with the
 command environment and argv zero, so caller variables, functions, and traps do
-not leak into it. The
+not leak into it. The fallback parser evaluates each completed top-level command
+before it parses the next one. Terminal execution is enabled only when the lexer
+has reached the literal end of the source. The
 shell normalizes SIGPIPE, SIG_IGN for the main shell and SIG_DFL in a forked
 child so a producer dies with status 141. The cd builtin resolves a relative
 operand against the logical PWD, the bash -L mode, and cd .. lexically pops the
