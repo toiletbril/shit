@@ -144,7 +144,10 @@ keeps sourcing.
 
 An asynchronous pipeline job owns every stage process. The final stage remains
 primary for `$!`, status, and job output. Polling, waiting, foregrounding,
-backgrounding, signaling, and disowning retain or reap the earlier stages.
+backgrounding, signaling, and disowning retain or reap the earlier stages. A
+stopped event from any retained stage remains recorded. The wait builtin returns
+that status without waiting for the stopped process again, while fg and bg
+resume every retained stage.
 
 The `assimilate TARGET` builtin copies the running binary through scp and uses
 an SSH transaction to install it as `shit` in the first usable remote PATH
@@ -210,8 +213,11 @@ prefix on a path token is
 expanded only to list the real directory, while the offered candidate keeps the
 literal prefix so it still expands at run time, and only a glob pattern is
 expanded into its matches. Quoted and escaped directory spelling is preserved
-across a later unquoted slash. Open quote reconstruction preserves the raw
-bytes before the quote and appends the candidate suffix inside the same quote.
+across a later unquoted slash. Quote reconstruction preserves the raw bytes
+before the quote and appends the candidate suffix inside the same quote. A
+balanced quote at the end of a token is extended inside that quote. An active
+tilde stays outside quotes. A path suffix after an active variable prefix uses
+backslash escapes, while ordinary path text uses quotes.
 A command forks its `--help` at most once per cache key, behind an allowlist and
 a trusted directory gate, and the subcommand walk stops
 at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The
@@ -397,7 +403,7 @@ flag also updates completions/shit.bash so the completion offers it.
 
 The log macros live in src/Trace.hpp. LOG(level, fmt, ...) prints at or below the
 active verbosity and LOG_VARS dumps named variables, across the levels Nothing,
-Info, Debug, and All. TRACE compiles out of a release build while LOG stays. The
+Info, Debug, and All. LOG and LOG_VARS compile out of a release build. The
 `-X` flag, long `--debug-logging`, turns logging on at a level, and
 `--debug-logging-file` appends it to a file. The `--show-optimizer-state` flag
 traces the prepass decisions and prints a located line for every eliminated node.
