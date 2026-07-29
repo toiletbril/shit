@@ -785,6 +785,22 @@ pure static fn builtin_can_launch_fresh(Builtin::Kind kind) wontthrow -> bool
   }
 }
 
+fn terminate_and_reap_processes(const ArrayList<os::process> &processes,
+                                usize first_process_position) wontthrow -> void
+{
+  for (usize position = first_process_position; position < processes.count();
+       position++)
+    unused(os::signal_process(processes[position], 9));
+
+  for (usize position = first_process_position; position < processes.count();
+       position++)
+  {
+    try {
+      os::wait_and_monitor_process(processes[position]);
+    } catch (...) {}
+  }
+}
+
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                execution_mode mode) throws -> i32
 {
@@ -809,11 +825,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       for (ExecContext &pending_context : ecs)
         pending_context.close_fds();
       if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
-      for (let const child : children) {
-        try {
-          os::wait_and_monitor_process(child);
-        } catch (...) {}
-      }
+      terminate_and_reap_processes(children);
     }
   };
 
@@ -1017,6 +1029,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       cxt.set_last_background_pid(os::process_id_of(last_child));
       const i32 id =
           cxt.register_pipeline_job(children, last_child, "pipeline");
+      should_reap_children_on_unwind = false;
       if (cxt.shell_is_interactive())
         shit::print_error(
             "[" + String::from(id, heap_allocator()) + "] " +
@@ -1024,7 +1037,6 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                          heap_allocator()) +
             "\n");
     }
-    should_reap_children_on_unwind = false;
     return ret;
   }
 
@@ -1034,13 +1046,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       stage_status[child_stage[waited_child_count]] =
           os::wait_and_monitor_process(children[waited_child_count]);
   } catch (...) {
-    for (usize child_position = waited_child_count;
-         child_position < children.count(); child_position++)
-    {
-      try {
-        os::wait_and_monitor_process(children[child_position]);
-      } catch (...) {}
-    }
+    terminate_and_reap_processes(children, waited_child_count);
     should_reap_children_on_unwind = false;
     throw;
   }

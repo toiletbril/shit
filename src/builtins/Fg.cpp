@@ -59,21 +59,30 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       for (let const process : job->earlier_pipeline_processes)
         os::signal_process(process, *cont);
     }
+    job->state = job::State::Running;
   }
 
   ec.print_to_stdout(job->command + "\n");
 
   let const should_reclaim =
       cxt.shell_is_interactive() && os::shell_has_controlling_terminal();
-  if (should_reclaim && job->is_primary_process_active)
-    os::give_controlling_terminal_to(job->pid);
+  let should_reclaim_after_wait =
+      should_reclaim && job->is_primary_process_active;
+  if (should_reclaim_after_wait) os::give_controlling_terminal_to(job->pid);
+  defer
+  {
+    if (should_reclaim_after_wait) os::reclaim_controlling_terminal();
+  };
   let was_stopped = false;
   let const status = cxt.wait_for_job_processes(*job, &was_stopped);
-  if (should_reclaim) os::reclaim_controlling_terminal();
+  if (should_reclaim_after_wait) {
+    os::reclaim_controlling_terminal();
+    should_reclaim_after_wait = false;
+  }
 
   if (was_stopped) {
     job->state = job::State::Stopped;
-    job->last_status = status;
+    job->stopped_status = status;
     cxt.notify_stopped_job(job->id, job->command.view());
     return status;
   }

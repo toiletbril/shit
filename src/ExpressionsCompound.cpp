@@ -465,16 +465,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       os::close_fd(pending_pipe->out);
     }
     if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
-    for (let const child : children) {
-      /* A failure to wait must not mask the original error, so it is swallowed
-         here. */
-      try {
-        os::wait_and_monitor_process(child);
-      } catch (...) {
-        LOG(Debug,
-            "swallowed a wait error while reaping an aborted pipeline child");
-      }
-    }
+    utils::terminate_and_reap_processes(children);
     throw;
   }
 
@@ -484,12 +475,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       let did_register_job = false;
       defer
       {
-        if (!did_register_job)
-          for (let const child : children) {
-            try {
-              os::wait_and_monitor_process(child);
-            } catch (...) {}
-          }
+        if (!did_register_job) utils::terminate_and_reap_processes(children);
       };
       const i32 id =
           cxt.register_pipeline_job(children, last_child, "pipeline");

@@ -181,6 +181,7 @@ struct job
   String command{heap_allocator()};
   State state{State::Running};
   i32 last_status{0};
+  i32 stopped_status{0};
   i64 process_id{0};
   bool is_primary_process_active{true};
   bool has_unreported_state_change{false};
@@ -721,8 +722,8 @@ public:
                            StringView command) throws -> i32;
   fn register_stopped_job(os::process pid, StringView command,
                           i32 status) throws -> i32;
-  fn wait_for_job_processes(job &job,
-                            bool *was_stopped = nullptr) throws -> i32;
+  fn wait_for_job_processes(job &job, bool *was_stopped = nullptr) throws
+      -> i32;
   fn notify_stopped_job(i32 id, StringView command) throws -> void;
   fn update_jobs() throws -> void;
   fn jobs() wontthrow -> ArrayList<job> &;

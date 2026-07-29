@@ -95,6 +95,9 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
 
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                execution_mode mode) throws -> i32;
+fn terminate_and_reap_processes(const ArrayList<os::process> &processes,
+                                usize first_process_position = 0) wontthrow
+    -> void;
 
 pure fn strip_sig_prefix(StringView name) wontthrow -> StringView;
 

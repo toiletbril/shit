@@ -1803,7 +1803,10 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
     return process_state::Exited;
   }
 
-  if (WIFSTOPPED(status)) return process_state::Stopped;
+  if (WIFSTOPPED(status)) {
+    status_out = 128 + WSTOPSIG(status);
+    return process_state::Stopped;
+  }
   if (WIFCONTINUED(status)) return process_state::Running;
   if (WIFSIGNALED(status)) {
     status_out = 128 + WTERMSIG(status);
