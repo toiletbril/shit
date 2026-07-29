@@ -6,8 +6,8 @@ printf 'direct status=%s\n' "$?"
 
 (
     set -e
-    test -f bash/fixtures/errexit_source_inner.bash &&
-        . bash/fixtures/errexit_source_inner.bash
+    test -f bash/goldens/errexit_source_inner.bash &&
+        . bash/goldens/errexit_source_inner.bash
     printf 'envman source continued\n'
 )
 printf 'envman source status=%s\n' "$?"
@@ -22,15 +22,15 @@ printf 'empty source status=%s\n' "$?"
 
 (
     set -e
-    . bash/fixtures/errexit_source_outer.bash
+    . bash/goldens/errexit_source_outer.bash
     printf 'nested source continued\n'
 )
 printf 'nested source status=%s\n' "$?"
 
 (
     set -e
-    test -f bash/fixtures/errexit_source_failure.bash &&
-        . bash/fixtures/errexit_source_failure.bash
+    test -f bash/goldens/errexit_source_failure.bash &&
+        . bash/goldens/errexit_source_failure.bash
     printf 'unreachable failure marker\n'
 )
 printf 'real failure status=%s\n' "$?"
