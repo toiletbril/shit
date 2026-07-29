@@ -142,12 +142,14 @@ no-op since every builtin is always enabled in shit, and accepts the bash
 flags `-n`, `-a`, `-d`, `-f`, and `-s` so a bash script that toggles builtins
 keeps sourcing.
 
-An asynchronous pipeline job owns every stage process in one process group. The
-final stage remains primary for `$!`, status, and job output. Polling, waiting,
-foregrounding, backgrounding, signaling, and disowning retain or reap the
-earlier stages. A stopped event from any retained stage remains recorded. The
-wait builtin returns the first stopped status without waiting for that process
-again, while fg and bg resume every retained stage.
+An asynchronous pipeline job owns every stage process. POSIX stages share one
+process group. The final stage remains primary for `$!`, status, and job output.
+Polling, waiting, foregrounding, backgrounding, signaling, and disowning retain
+or reap the earlier stages. A stopped event from any retained stage remains
+recorded. The wait builtin returns the first stopped status without waiting for
+that process again, while fg and bg resume every retained stage. Forked
+evaluators report their current process through BASHPID, while `$$` retains the
+original shell process.
 
 The `assimilate TARGET` builtin copies the running binary through scp and uses
 an SSH transaction to install it as `shit` in the first usable remote PATH
@@ -184,6 +186,8 @@ get_processor_counts wrapper provides the affinity-limited and configured
 logical CPU counts used by shitbox nproc.
 An interactive timeout child waits behind a start pipe until its process group
 owns the controlling terminal.
+On Windows, a background process receives a fresh console process group without
+a Job Object.
 Fork-backed evaluator launches are routed through os wrappers. The POSIX
 implementation evaluates the inherited AST in the child. The Windows
 implementation selects an in-process fallback or starts a fresh shell from the
@@ -215,10 +219,11 @@ literal prefix so it still expands at run time, and only a glob pattern is
 expanded into its matches. Quoted and escaped directory spelling is preserved
 across a later unquoted slash. Quote reconstruction preserves the raw bytes
 before the quote and appends the candidate suffix inside the same quote. A
-balanced quote at the end of a token is extended inside that quote. An active
-tilde stays outside quotes. A path suffix after an active variable prefix uses
-backslash escapes, while ordinary path text that needs shell protection uses
-quotes.
+balanced quote at the end of a token is extended inside that quote. Completion
+matches the token prefix through the cursor and replaces a stale suffix. An
+active tilde stays outside quotes. A path suffix after an active variable prefix
+uses backslash escapes, while ordinary path text that needs shell protection
+uses quotes.
 A command forks its `--help` at most once per cache key, behind an allowlist and
 a trusted directory gate, and the subcommand walk stops
 at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The
