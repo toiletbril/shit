@@ -191,6 +191,11 @@ fn Parser::construct_next_top_level_ast() throws -> Expression *
   return parse_command_list({});
 }
 
+pure fn Parser::is_at_end() const wontthrow -> bool
+{
+  return m_lexer.is_at_source_end();
+}
+
 fn Parser::skip_newlines_after_pipe() throws -> void
 {
   while (m_lexer.peek_shell_token()->kind() == Token::Kind::Newline)

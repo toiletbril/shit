@@ -7,6 +7,8 @@ shit: TMPDIR/unterminated:2:10: note:
 rc=0
 incremental reached
 incremental rc=0
+complete first
+complete second
 shit: TMPDIR/error-state:3:1: error: Unterminated subshell.
      3 |  (
        |  ^ here.

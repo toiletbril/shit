@@ -15,6 +15,12 @@ chmod +x "$dir/incremental"
 "$BIN" --no-traces -c "$dir/incremental"
 echo "incremental rc=$?"
 
+printf '%s\n' \
+    '"$1" -c '\''printf "complete first\\n"'\''' \
+    'printf "complete second\\n"' > "$dir/complete"
+chmod +x "$dir/complete"
+"$BIN" --no-traces -I -c "$dir/complete '$BIN'"
+
 printf 'trap '\''echo trap-status=$?'\'' EXIT\nexec >"$1" 2>&1\n(\n' > "$dir/error-state"
 chmod +x "$dir/error-state"
 "$BIN" --no-traces -c "$dir/error-state '$dir/error-state-output'" 2> "${TEST_NULL_DEVICE:-/dev/null}"

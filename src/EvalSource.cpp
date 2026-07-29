@@ -252,10 +252,15 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   m_mimicry_depth++;
 
   let const do_evaluate_script = [&]() throws {
+    let const was_terminal_exec_allowed = terminal_exec_allowed();
+    defer { set_terminal_exec_allowed(was_terminal_exec_allowed); };
+
     loop
     {
       let const *ast = parser.construct_next_top_level_ast();
       if (ast == nullptr) break;
+      set_terminal_exec_allowed(was_terminal_exec_allowed &&
+                                parser.is_at_end());
       ast->evaluate(*this);
       if (has_pending_control_flow()) break;
     }

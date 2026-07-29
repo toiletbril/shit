@@ -205,6 +205,11 @@ pure fn Lexer::source() const wontthrow -> StringView
   return m_source.view();
 }
 
+pure fn Lexer::is_at_source_end() const wontthrow -> bool
+{
+  return m_cursor_position >= m_source.length();
+}
+
 pure fn Lexer::debug_words() const wontthrow -> const ArrayList<Word> &
 {
   return m_debug_words;

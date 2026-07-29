@@ -18,6 +18,7 @@ public:
   fn construct_ast() throws -> Expression *;
 
   fn construct_next_top_level_ast() throws -> Expression *;
+  pure fn is_at_end() const wontthrow -> bool;
 
   fn construct_ast(ArrayList<String> &errors, EvalContext *context) throws
       -> Expression *;
