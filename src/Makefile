@@ -433,7 +433,7 @@ fmt:
 clean:
 	rm -rf ./o ../shit ../shit-$(MODE) ../shit.exe ../shit-$(MODE).exe
 	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
-	rm -rf ../shit.com ../shit.com.dbg ../shit.aarch64.elf # Cosmopolitan
+	rm -rf ../shit.com ../shit-cosmo.com ../shit.com.dbg ../shit-cosmo.com.dbg ../shit.aarch64.elf ../shit-cosmo.aarch64.elf # Cosmopolitan
 	rm -rf ../perf*
 	rm -rf ../*.profraw ../*.profdata ../coverage # Coverage
 
