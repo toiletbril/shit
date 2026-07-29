@@ -1,7 +1,7 @@
 #!/bin/env shit
 command -v echo
 command -v set
-d=$TEST_TEMP_DIRECTORY/command-v-fixture
+d=$TEST_TEMP_DIRECTORY/command-v-golden
 shitbox mkdir -p "$d"
 probe_file=$d/probe
 if [ "${OS-}" = Windows_NT ]; then probe_file=$probe_file.exe; fi
