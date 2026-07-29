@@ -202,7 +202,9 @@ chmod +x "$d/menu-bin/tailscale"
 send_menu_input()
 {
     wait_for_editor "$d/menu-ready" || exit 1
-    printf 'tailscale \t\003exit\n'
+    printf 'tailscale '
+    sleep 0.1
+    printf '\t\003exit\n'
 }
 
 send_menu_input | ASAN_OPTIONS=detect_stack_use_after_return=1 \
