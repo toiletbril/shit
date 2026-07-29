@@ -1545,12 +1545,10 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   let const has_command_redirection =
       ec.in_fd.has_value() || ec.out_fd.has_value() || ec.err_fd.has_value() ||
       ec.dup_err_to_out || ec.dup_out_to_err;
-  let const has_redirected_standard_handle =
-      !is_fd_a_tty(startup_info.hStdInput) ||
+  let const should_use_standard_handles =
+      has_command_redirection || !is_fd_a_tty(startup_info.hStdInput) ||
       !is_fd_a_tty(startup_info.hStdOutput) ||
       !is_fd_a_tty(startup_info.hStdError);
-  let const should_use_standard_handles =
-      has_command_redirection || has_redirected_standard_handle;
 
   HANDLE null_handle = INVALID_HANDLE_VALUE;
   defer
