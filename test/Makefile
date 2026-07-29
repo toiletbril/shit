@@ -83,6 +83,7 @@ endif
 test: $(BIN)
 	@$(MAKE) clean
 	@$(MAKE) $(TEST_SUITES)
+	@$(MAKE) $(SERIAL_TEST_NAMES)
 	@touch $(FAILED_LIST)
 	@cat $(FAILED_LIST)
 	@test ! -s $(FAILED_LIST)
@@ -91,12 +92,13 @@ shit_tests: $(BIN) $(TEST_NAMES)
 
 CLI_INPUT := $(wildcard cli/*.sh)
 CLI_NAMES := $(CLI_INPUT:cli/%.sh=cli_%)
+SERIAL_TEST_NAMES := cli_read_timeout
 
 cli_%: expected/cli/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-cli-test.sh cli/$*.sh
 
-cli_tests: $(BIN) $(CLI_NAMES)
+cli_tests: $(BIN) $(filter-out $(SERIAL_TEST_NAMES),$(CLI_NAMES))
 
 
 COMPLETION_INPUT := $(wildcard completion/*.sh)
