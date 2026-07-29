@@ -29,6 +29,8 @@ struct decoded_shell_word
   ArrayList<opaque_shell_word_range> opaque_ranges;
   usize raw_directory_end{0};
   usize open_quote_content_start{0};
+  usize open_quote_decoded_start{0};
+  usize leading_variable_expansion_end{0};
   char quote_character{0};
   bool leading_tilde_is_active{false};
   bool leading_variable_is_active{false};

@@ -5,16 +5,25 @@ plainfile.txt
 == a dollar in the match quotes it:
 'dollar$x.txt'
 == inside a single quote the space match completes bare within it:
-spacey file.txt
+'spacey file.txt
 == inside a double quote the space match completes bare within it:
-spacey file.txt
+"spacey file.txt
 == glob-like bytes stay literal inside open quotes:
-[C] alpha/
-star* alpha/
-question? alpha/
-[C] alpha/
-star* alpha/
-question? alpha/
+'[C] alpha/
+'star* alpha/
+'question? alpha/
+"[C] alpha/
+"star* alpha/
+"question? alpha/
+== an open quote after a directory keeps the full path prefix:
+outer/"[C] alpha/
+== an open quote inside a command keeps the prefix:
+e"cho
+== a fuzzy prefix before an open quote maps into the candidate:
+foo_b"ar_baz
+== open quotes escape bytes that remain active in their quote mode:
+'single'\''quote.txt
+"double\$\"tick\`\\name.txt
 == an adjacent open double quote keeps variable expansion active:
 $QUOTED_COMPLETION_UNIQUE
 == a closed quoted directory continues through an unquoted slash:
@@ -35,13 +44,19 @@ space\ dir/mixed.txt
 == a single-quoted variable directory remains literal:
 '$HOME'/literal-variable.txt
 == an open single-quoted variable directory remains literal:
-$HOME/literal-variable.txt
+'$HOME/literal-variable.txt
 == an open double-quoted variable directory remains active:
-$HOME/home.txt
+"$HOME/home.txt
 == an active tilde directory expands:
 ~/home.txt
 == a quoted tilde directory remains literal:
 '~'/literal-tilde.txt
+== quoted and escaped tilde usernames remain literal:
+~"root"/literal-tilde.txt
+~r\oot/literal-tilde.txt
+== quoted and escaped bytes stop an unbraced variable name:
+$HO"ME"/literal-variable.txt
+$HO\ME/literal-variable.txt
 == a quoted glob remains literal:
 == an unquoted glob after a quoted directory expands:
 'PATH'/plain.txt 'PATH'/'space file.txt' 'PATH'/star-one.txt

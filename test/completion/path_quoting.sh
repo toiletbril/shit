@@ -9,7 +9,13 @@ trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 : > "$dir/dollar\$x.txt"
 : > "$dir/plainfile.txt"
 /bin/mkdir "$dir/PATH" "$dir/space dir" "$dir/home" "$dir/\$HOME" "$dir/~"
-/bin/mkdir "$dir/[C] alpha" "$dir/star* alpha" "$dir/question? alpha"
+/bin/mkdir "$dir/[C] alpha" "$dir/star* alpha" "$dir/question? alpha" \
+    "$dir/outer" "$dir/outer/[C] alpha" "$dir/~root" "$dir/ME"
+: > "$dir/single'quote.txt"
+: > "$dir/double\$\"tick\`\\name.txt"
+: > "$dir/foo_bar_baz"
+: > "$dir/~root/literal-tilde.txt"
+: > "$dir/ME/literal-variable.txt"
 : > "$dir/PATH/plain.txt"
 : > "$dir/PATH/space file.txt"
 : > "$dir/PATH/star-one.txt"
@@ -38,6 +44,15 @@ for quote in "'" '"'; do
         "$BIN" --debug-complete-at "cd $quote$prefix" </dev/null
     done
 done
+echo "== an open quote after a directory keeps the full path prefix:"
+"$BIN" --debug-complete-at 'cd outer/"[C]' </dev/null
+echo "== an open quote inside a command keeps the prefix:"
+"$BIN" --debug-complete-at 'e"c' </dev/null
+echo "== a fuzzy prefix before an open quote maps into the candidate:"
+"$BIN" --debug-complete-at 'cat f_b"z' </dev/null
+echo "== open quotes escape bytes that remain active in their quote mode:"
+"$BIN" --debug-complete-at "cat 'single" </dev/null
+"$BIN" --debug-complete-at 'cat "double' </dev/null
 echo "== an adjacent open double quote keeps variable expansion active:"
 QUOTED_COMPLETION_UNIQUE=1 \
     "$BIN" --debug-complete-at 'cat prefix"$QUOTED_COMPLETION_U' </dev/null
@@ -63,6 +78,12 @@ echo "== an active tilde directory expands:"
 "$BIN" --debug-complete-at 'cat ~/' </dev/null
 echo "== a quoted tilde directory remains literal:"
 "$BIN" --debug-complete-at "cat '~'/" </dev/null
+echo "== quoted and escaped tilde usernames remain literal:"
+"$BIN" --debug-complete-at 'cat ~"root"/lit' </dev/null
+"$BIN" --debug-complete-at 'cat ~r\oot/lit' </dev/null
+echo "== quoted and escaped bytes stop an unbraced variable name:"
+HO= "$BIN" --debug-complete-at 'cat $HO"ME"/lit' </dev/null
+HO= "$BIN" --debug-complete-at 'cat $HO\ME/lit' </dev/null
 echo "== a quoted glob remains literal:"
 "$BIN" --debug-complete-at "cat 'PATH'/'*.txt'" </dev/null
 echo "== an unquoted glob after a quoted directory expands:"

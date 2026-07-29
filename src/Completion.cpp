@@ -637,8 +637,8 @@ fn complete_command_names(StringView token, command_match_mode match_mode,
 {
   let collector = CommandListCollector{};
 
-  TRACELN("completing command position for token '%.*s'",
-          static_cast<int>(token.length), token.data);
+  LOG(Debug, "completing command position for token '%.*s'",
+      static_cast<int>(token.length), token.data);
 
   collect_command_names(token, match_mode, context, collector);
   return collector.take();
@@ -707,6 +707,11 @@ static pure fn path_candidate_needs_quoting(StringView candidate) wontthrow
   return false;
 }
 
+static pure fn byte_needs_double_quote_escape(char byte) wontthrow -> bool
+{
+  return byte == '"' || byte == '\\' || byte == '$' || byte == '`';
+}
+
 static fn quote_path_candidate(StringView candidate) throws -> String
 {
   let quoted = String{completion_allocator()};
@@ -725,9 +730,7 @@ static fn quote_path_candidate(StringView candidate) throws -> String
     quoted.push('"');
     for (usize i = 0; i < candidate.length; i++) {
       const char byte = candidate[i];
-      if (byte == '"' || byte == '\\' || byte == '$' || byte == '`') {
-        quoted.push('\\');
-      }
+      if (byte_needs_double_quote_escape(byte)) quoted.push('\\');
       quoted.push(byte);
     }
     quoted.push('"');
@@ -743,47 +746,129 @@ static fn quote_path_candidate(StringView candidate) throws -> String
   return quoted;
 }
 
+static fn append_open_quote_candidate(String &candidate, StringView text,
+                                      char quote_character) throws -> void
+{
+  for (usize position = 0; position < text.length; position++) {
+    let const byte = text[position];
+    if (quote_character == '\'' && byte == '\'') {
+      candidate.push('\'');
+      candidate.push('\\');
+      candidate.push('\'');
+      candidate.push('\'');
+      continue;
+    }
+    if (quote_character == '"' && byte_needs_double_quote_escape(byte))
+      candidate.push('\\');
+    candidate.push(byte);
+  }
+}
+
+static fn open_quote_candidate_boundary(StringView typed, usize typed_boundary,
+                                        StringView candidate) wontthrow -> usize
+{
+  let const is_case_sensitive = utils::token_has_uppercase(typed);
+  usize typed_position = 0;
+  usize candidate_position = 0;
+  while (candidate_position < candidate.length &&
+         typed_position < typed_boundary)
+  {
+    let const is_equal =
+        is_case_sensitive
+            ? candidate[candidate_position] == typed[typed_position]
+            : utils::ascii_to_lower(candidate[candidate_position]) ==
+                  utils::ascii_to_lower(typed[typed_position]);
+    candidate_position++;
+    if (is_equal) typed_position++;
+  }
+  if (typed_position == typed_boundary) return candidate_position;
+  return typed_boundary < candidate.length ? typed_boundary : candidate.length;
+}
+
+static fn
+rebuild_open_quote_candidate(StringView raw_token,
+                             const utils::decoded_shell_word &decoded_word,
+                             StringView decoded_candidate) throws -> String
+{
+  let candidate = String{completion_allocator()};
+  if (decoded_candidate.starts_with(decoded_word.text.view())) {
+    candidate.append(raw_token);
+    append_open_quote_candidate(
+        candidate, decoded_candidate.substring(decoded_word.text.length()),
+        decoded_word.quote_character);
+    return candidate;
+  }
+
+  let const candidate_boundary = open_quote_candidate_boundary(
+      decoded_word.text.view(), decoded_word.open_quote_decoded_start,
+      decoded_candidate);
+  let const decoded_prefix = decoded_word.text.view().substring_of_length(
+      0, decoded_word.open_quote_decoded_start);
+  let const candidate_prefix =
+      decoded_candidate.substring_of_length(0, candidate_boundary);
+  if (decoded_prefix == candidate_prefix) {
+    candidate.append(raw_token.substring_of_length(
+        0, decoded_word.open_quote_content_start));
+  } else {
+    if (!candidate_prefix.is_empty()) {
+      if (path_candidate_needs_quoting(candidate_prefix))
+        candidate.append(quote_path_candidate(candidate_prefix).view());
+      else
+        candidate.append(candidate_prefix);
+    }
+    candidate.push(decoded_word.quote_character);
+  }
+  append_open_quote_candidate(candidate,
+                              decoded_candidate.substring(candidate_boundary),
+                              decoded_word.quote_character);
+  return candidate;
+}
+
 /* A leading $NAME or ${NAME} in the directory prefix is expanded to its value
    so the listing reads the real directory, while the offered candidate keeps
    the unexpanded prefix. None means no leading variable, so the caller falls
    back to the literal path. */
 static fn expand_leading_variable_path(StringView directory_part,
+                                       usize expansion_end,
                                        EvalContext &context) throws
     -> Maybe<String>
 {
-  if (directory_part.is_empty() || directory_part[0] != '$') return None;
+  if (directory_part.is_empty() || directory_part[0] != '$' ||
+      expansion_end > directory_part.length)
+  {
+    return None;
+  }
+
+  let const expansion = directory_part.substring_of_length(0, expansion_end);
 
   usize name_start = 1;
   let const is_braced =
-      name_start < directory_part.length && directory_part[name_start] == '{';
+      name_start < expansion.length && expansion[name_start] == '{';
   if (is_braced) name_start++;
 
-  usize name_end = name_start;
-  while (name_end < directory_part.length &&
-         lexer::is_variable_name(directory_part[name_end]))
-    name_end++;
+  let name_end = expansion.length;
+  if (is_braced) {
+    if (name_end <= name_start || expansion[name_end - 1] != '}') return None;
+    name_end--;
+  }
 
   let const name =
-      directory_part.substring_of_length(name_start, name_end - name_start);
+      expansion.substring_of_length(name_start, name_end - name_start);
   if (name.is_empty()) return None;
-
-  usize rest_start = name_end;
-  if (is_braced && rest_start < directory_part.length &&
-      directory_part[rest_start] == '}')
-    rest_start++;
 
   let const value = context.get_variable_value(name);
   if (!value.has_value()) return None;
 
   let expanded = String{completion_allocator(), value->view()};
-  expanded.append(directory_part.substring(rest_start));
+  expanded.append(directory_part.substring(expansion_end));
   return expanded;
 }
 
 static fn
 resolve_listing_directory(StringView directory_part, const Path &base_directory,
                           EvalContext &context, bool leading_tilde_is_active,
-                          bool leading_variable_is_active) throws -> Path
+                          bool leading_variable_is_active,
+                          usize leading_variable_expansion_end) throws -> Path
 {
   if (directory_part.is_empty()) return base_directory;
 
@@ -794,8 +879,8 @@ resolve_listing_directory(StringView directory_part, const Path &base_directory,
       return Path{expanded->view()};
 
   if (leading_variable_is_active)
-    if (Maybe<String> expanded =
-            expand_leading_variable_path(directory_part, context);
+    if (Maybe<String> expanded = expand_leading_variable_path(
+            directory_part, leading_variable_expansion_end, context);
         expanded.has_value())
     {
       let const directory = Path{expanded->view()};
@@ -834,10 +919,10 @@ enum class path_text_mode : u8
   Literal,
 };
 
-static fn build_filesystem_candidate(StringView directory_part,
-                                     StringView raw_directory_part,
-                                     StringView name, bool is_directory,
-                                     path_text_mode text_mode) throws -> String
+static fn build_filesystem_candidate(
+    StringView directory_part, StringView raw_directory_part, StringView name,
+    bool is_directory, path_text_mode text_mode, StringView raw_token,
+    const utils::decoded_shell_word &decoded_word) throws -> String
 {
   let const inside_quote = text_mode == path_text_mode::Literal;
   let const preserve_directory_spelling = raw_directory_part != directory_part;
@@ -850,6 +935,13 @@ static fn build_filesystem_candidate(StringView directory_part,
       separator = directory_part[directory_part.length - 1];
     }
     entry_name.push(separator);
+  }
+
+  if (decoded_word.quote_character != 0) {
+    let decoded_candidate =
+        String{completion_allocator(), directory_part} + entry_name;
+    return rebuild_open_quote_candidate(raw_token, decoded_word,
+                                        decoded_candidate.view());
   }
 
   if (preserve_directory_spelling) {
@@ -875,21 +967,15 @@ static fn build_filesystem_candidate(StringView directory_part,
 }
 
 template <typename Collector>
-static fn collect_filesystem_matches(StringView token,
-                                     const Path &base_directory,
-                                     path_text_mode text_mode,
-                                     filesystem_entry_filter filter,
-                                     EvalContext &context, Collector &collector,
-                                     char quote_character = 0) throws -> void
+static fn
+collect_filesystem_matches(StringView token,
+                           const utils::decoded_shell_word &decoded_word,
+                           const Path &base_directory, path_text_mode text_mode,
+                           filesystem_entry_filter filter, EvalContext &context,
+                           Collector &collector) throws -> void
 {
   let const inside_quote = text_mode == path_text_mode::Literal;
-  let decoded_word = utils::decode_shell_word(token, completion_allocator());
-  if (quote_character != 0) {
-    decoded_word.leading_tilde_is_active = false;
-    if (quote_character == '\'')
-      decoded_word.leading_variable_is_active = false;
-  }
-  let parts = split_path_token(inside_quote ? token : decoded_word.text.view());
+  let parts = split_path_token(decoded_word.text.view());
   let raw_directory_part = parts.directory_part;
   if (!inside_quote && decoded_word.raw_directory_end > 0) {
     raw_directory_part =
@@ -899,8 +985,7 @@ static fn collect_filesystem_matches(StringView token,
       os::FILESYSTEM_IS_CASE_SENSITIVE &&
       utils::token_has_uppercase(parts.basename_part);
 
-  TRACELN(
-      "completing filesystem token '%.*s', dir '%.*s', base '%.*s'",
+  LOG(Debug, "completing filesystem token '%.*s', dir '%.*s', base '%.*s'",
       static_cast<int>(token.length), token.data,
       static_cast<int>(parts.directory_part.length), parts.directory_part.data,
       static_cast<int>(parts.basename_part.length), parts.basename_part.data);
@@ -908,7 +993,8 @@ static fn collect_filesystem_matches(StringView token,
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory, context,
                                 decoded_word.leading_tilde_is_active,
-                                decoded_word.leading_variable_is_active);
+                                decoded_word.leading_variable_is_active,
+                                decoded_word.leading_variable_expansion_end);
 
   let const entries = utils::read_directory_cached(
       listing_directory, utils::directory_validation::Cached,
@@ -943,9 +1029,9 @@ static fn collect_filesystem_matches(StringView token,
       return;
     }
 
-    let candidate =
-        build_filesystem_candidate(parts.directory_part, raw_directory_part,
-                                   name, is_directory, text_mode);
+    let candidate = build_filesystem_candidate(
+        parts.directory_part, raw_directory_part, name, is_directory, text_mode,
+        token, decoded_word);
     collector.add(candidate.view(), *tier);
   };
 
@@ -969,12 +1055,21 @@ static fn collect_filesystem_matches(StringView token,
 static fn
 complete_filesystem(StringView token, const Path &base_directory,
                     path_text_mode text_mode, filesystem_entry_filter filter,
-                    EvalContext &context, char quote_character = 0) throws
+                    EvalContext &context,
+                    const utils::decoded_shell_word *decoded = nullptr) throws
     -> ArrayList<String>
 {
+  let decoded_storage = utils::decoded_shell_word{completion_allocator()};
+  if (decoded == nullptr) {
+    if (text_mode == path_text_mode::Literal)
+      decoded_storage.text.append(token);
+    else
+      decoded_storage = utils::decode_shell_word(token, completion_allocator());
+    decoded = &decoded_storage;
+  }
   let collector = CommandListCollector{};
-  collect_filesystem_matches(token, base_directory, text_mode, filter, context,
-                             collector, quote_character);
+  collect_filesystem_matches(token, *decoded, base_directory, text_mode, filter,
+                             context, collector);
 
   return collector.take();
 }
@@ -990,33 +1085,41 @@ fn complete_filesystem_names(StringView token, EvalContext &context,
 static fn complete_filesystem_prefix(
     StringView token, const Path &base_directory, path_text_mode text_mode,
     filesystem_entry_filter filter, EvalContext &context,
-    char quote_character = 0) throws -> GhostPrefixCollector
+    const utils::decoded_shell_word *decoded = nullptr) throws
+    -> GhostPrefixCollector
 {
+  let decoded_storage = utils::decoded_shell_word{completion_allocator()};
+  if (decoded == nullptr) {
+    if (text_mode == path_text_mode::Literal)
+      decoded_storage.text.append(token);
+    else
+      decoded_storage = utils::decode_shell_word(token, completion_allocator());
+    decoded = &decoded_storage;
+  }
   let collector = GhostPrefixCollector{};
-  collect_filesystem_matches(token, base_directory, text_mode, filter, context,
-                             collector, quote_character);
+  collect_filesystem_matches(token, *decoded, base_directory, text_mode, filter,
+                             context, collector);
 
   return collector;
 }
 
 /* Only the trailing component is globbed. */
 static fn complete_glob(StringView token, const Path &base_directory,
-                        filesystem_entry_filter filter,
-                        EvalContext &context) throws -> ArrayList<String>
+                        filesystem_entry_filter filter, EvalContext &context,
+                        const utils::decoded_shell_word &decoded_word) throws
+    -> ArrayList<String>
 {
   let candidates = ArrayList<String>{completion_allocator()};
-
-  let const decoded_word =
-      utils::decode_shell_word(token, completion_allocator());
   let parts = split_path_token(decoded_word.text.view());
 
-  TRACELN("resolving glob token '%.*s'", static_cast<int>(token.length),
-          token.data);
+  LOG(Debug, "resolving glob token '%.*s'", static_cast<int>(token.length),
+      token.data);
 
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory, context,
                                 decoded_word.leading_tilde_is_active,
-                                decoded_word.leading_variable_is_active);
+                                decoded_word.leading_variable_is_active,
+                                decoded_word.leading_variable_expansion_end);
 
   let const entries = utils::read_directory_cached(
       listing_directory, utils::directory_validation::Cached,
@@ -1077,7 +1180,7 @@ static fn complete_glob(StringView token, const Path &base_directory,
             : parts.directory_part;
     let candidate = build_filesystem_candidate(
         parts.directory_part, raw_directory_part, name, is_directory,
-        path_text_mode::ShellSyntax);
+        path_text_mode::ShellSyntax, token, decoded_word);
 
     candidates.push(steal(candidate));
   }
@@ -1105,9 +1208,9 @@ static fn complete_variable(StringView token, EvalContext &context) throws
   usize name_start = has_brace ? 2 : 1;
   let const prefix = token.substring(name_start);
 
-  TRACELN("completing variable token '%.*s', prefix '%.*s', brace %d",
-          static_cast<int>(token.length), token.data,
-          static_cast<int>(prefix.length), prefix.data, has_brace ? 1 : 0);
+  LOG(Debug, "completing variable token '%.*s', prefix '%.*s', brace %d",
+      static_cast<int>(token.length), token.data,
+      static_cast<int>(prefix.length), prefix.data, has_brace ? 1 : 0);
 
   let seen = HashSet{completion_allocator()};
 
@@ -1431,31 +1534,11 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   let token = line.substring_of_length(token_start, token_end - token_start);
   let const is_command = is_in_command_position(line, token_start);
 
-  /* A cursor inside an open quote completes the bare path within it and is not
-     re-quoted. The span leaves any closing quote to the right untouched. */
-  let open_quote_content_start = Maybe<usize>{};
-  char open_quote_character = 0;
-  let token_prefix_has_shell_syntax = false;
-  for (usize position = token_start; position < cursor; position++)
-    if (line[position] == '\'' || line[position] == '"' ||
-        line[position] == '\\')
-    {
-      token_prefix_has_shell_syntax = true;
-      break;
-    }
-  if (token_prefix_has_shell_syntax) {
-    let const token_prefix =
-        line.substring_of_length(token_start, cursor - token_start);
-    let const decoded_prefix =
-        utils::decode_shell_word(token_prefix, completion_allocator());
-    if (decoded_prefix.quote_character != 0) {
-      open_quote_content_start =
-          token_start + decoded_prefix.open_quote_content_start;
-      open_quote_character = decoded_prefix.quote_character;
-    }
-  }
-  if (open_quote_content_start.has_value()) {
-    token_start = *open_quote_content_start;
+  let const token_prefix =
+      line.substring_of_length(token_start, cursor - token_start);
+  let decoded_prefix =
+      utils::decode_shell_word(token_prefix, completion_allocator());
+  if (decoded_prefix.quote_character != 0) {
     token_end = cursor;
     token = line.substring_of_length(token_start, token_end - token_start);
   }
@@ -1464,33 +1547,39 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      after the equals sign, the way bash splits on the equals through
      COMP_WORDBREAKS. A command-position word is left whole, since an assignment
      such as name=value is its own token there. */
-  if (!open_quote_content_start.has_value() && !is_command &&
-      token.length >= 2 && token[0] == '-')
+  if (!is_command && token.length >= 2 && token[0] == '-')
     if (let const equals = token.find_character('='); equals.has_value()) {
       token_start = token_start + *equals + 1;
       token = line.substring_of_length(token_start, token_end - token_start);
     }
 
   let const decoded_token =
-      utils::decode_shell_word(token, completion_allocator());
-  let const token_is_glob =
-      !open_quote_content_start.has_value() && decoded_token.glob_active.any();
+      token.data == token_prefix.data && token.length == token_prefix.length
+          ? steal(decoded_prefix)
+          : utils::decode_shell_word(token, completion_allocator());
+  let const has_open_quote = decoded_token.quote_character != 0;
+  let const open_quote_content_token =
+      has_open_quote ? decoded_token.text.view().substring(
+                           decoded_token.open_quote_decoded_start)
+                     : decoded_token.text.view();
+  let const stage_token = has_open_quote ? decoded_token.text.view() : token;
+  let const token_is_glob = !has_open_quote && decoded_token.glob_active.any();
   let const leading_variable_is_active =
-      open_quote_content_start.has_value()
-          ? open_quote_character == '"' &&
-                decoded_token.leading_variable_is_active
-          : decoded_token.leading_variable_is_active;
-  let const leading_tilde_is_active = !open_quote_content_start.has_value() &&
-                                      decoded_token.leading_tilde_is_active;
+      has_open_quote ? decoded_token.quote_character == '"' &&
+                           !open_quote_content_token.is_empty() &&
+                           open_quote_content_token[0] == '$'
+                     : decoded_token.leading_variable_is_active;
+  let const leading_tilde_is_active =
+      !has_open_quote && decoded_token.leading_tilde_is_active;
 
   /* A command-position token holding a path separator completes against the
      filesystem rather than the command sets. */
   let const token_has_path_separator =
       os::has_directory_separator(decoded_token.text.view());
-
-  TRACELN("complete line '%.*s' cursor %zu token '%.*s' command %d",
-          static_cast<int>(line.length), line.data, cursor,
-          static_cast<int>(token.length), token.data, is_command ? 1 : 0);
+  LOG(Debug, "complete line '%.*s' cursor %zu token '%.*s' command %d",
+      static_cast<int>(line.length), line.data, cursor,
+      static_cast<int>(stage_token.length), stage_token.data,
+      is_command ? 1 : 0);
 
   /* A glob word with the cursor right after it expands inline to its file
      matches, even in command position. */
@@ -1512,20 +1601,25 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   usize ghost_candidate_count = 0;
   usize source_candidate_scan_count = 0;
   usize materialized_candidate_count = 0;
+  let should_rebuild_open_quote_candidates = false;
 
   let const is_posix_completion = context.mood() == mimic_mood::Posix;
 
-  if (token_is_variable(token) && leading_variable_is_active &&
-      !is_posix_completion)
+  if (token_is_variable(open_quote_content_token) &&
+      leading_variable_is_active && !is_posix_completion)
   {
-    candidates = complete_variable(token, context);
-  } else if (token_is_tilde_user_prefix(token) && leading_tilde_is_active &&
-             !is_posix_completion)
+    candidates = complete_variable(open_quote_content_token, context);
+    if (has_open_quote) {
+      token_start += decoded_token.open_quote_content_start;
+      token_end = cursor;
+    }
+  } else if (token_is_tilde_user_prefix(stage_token) &&
+             leading_tilde_is_active && !is_posix_completion)
   {
-    candidates = complete_tilde_user(token);
+    candidates = complete_tilde_user(stage_token);
   } else if (inline_glob) {
-    candidates =
-        complete_glob(token, base_directory, filesystem_filter, context);
+    candidates = complete_glob(token, base_directory, filesystem_filter,
+                               context, decoded_token);
     if (!candidates.is_empty()) {
       let joined = String{arena};
       for (usize i = 0; i < candidates.count(); i++) {
@@ -1542,7 +1636,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       candidates.push(steal(joined));
     } else if (is_command && !token_has_path_separator) {
       candidates = complete_command_names(
-          token,
+          stage_token,
           token_is_glob ? command_match_mode::Glob : command_match_mode::Prefix,
           context);
     }
@@ -1550,16 +1644,16 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     /* An empty command token would enumerate every PATH command on each
        keystroke for the ghost, so command completion runs only once a prefix
        is typed. An explicit tab still lists them all. */
-    if (!token.is_empty() || for_listing) {
+    if (!stage_token.is_empty() || for_listing) {
       if (for_listing) {
         candidates =
-            complete_command_names(token,
+            complete_command_names(stage_token,
                                    token_is_glob ? command_match_mode::Glob
                                                  : command_match_mode::Prefix,
                                    context);
       } else {
         let collector = complete_command_name_prefix(
-            token,
+            stage_token,
             token_is_glob ? command_match_mode::Glob
                           : command_match_mode::Prefix,
             context);
@@ -1568,10 +1662,11 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
         materialized_candidate_count = collector.materialized();
         ghost_prefix = collector.take_prefix();
       }
+      should_rebuild_open_quote_candidates = has_open_quote;
     }
   } else if (token_is_glob) {
-    candidates =
-        complete_glob(token, base_directory, filesystem_filter, context);
+    candidates = complete_glob(token, base_directory, filesystem_filter,
+                               context, decoded_token);
   } else {
     /* The argument cascade runs in the bash and the default moods, the POSIX
        mood goes straight to files. The build tools answer before the man
@@ -1579,53 +1674,69 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
        targets even when a like-named subcommand man page exists. */
     Maybe<ArrayList<String>> from_stage = None;
     if (!is_posix_completion) {
-      from_stage = complete_from_process_arguments(line, token, mode);
+      from_stage = complete_from_process_arguments(line, stage_token, mode);
       if (!from_stage.has_value())
-        from_stage =
-            complete_from_builtin_flags(line, token, token_start, context);
+        from_stage = complete_from_builtin_flags(line, stage_token, token_start,
+                                                 context);
       if (!from_stage.has_value())
-        from_stage = complete_from_spec(line, token, cursor, mode, context,
-                                        descriptions);
+        from_stage = complete_from_spec(line, stage_token, cursor, mode,
+                                        context, descriptions);
       if (!from_stage.has_value())
-        from_stage = complete_from_tools_with_targets(line, token, token_start,
-                                                      mode, context);
+        from_stage = complete_from_tools_with_targets(
+            line, stage_token, token_start, mode, context);
       if (!from_stage.has_value())
-        from_stage = complete_from_man_subcommands(line, token, token_start,
-                                                   mode, context);
+        from_stage = complete_from_man_subcommands(line, stage_token,
+                                                   token_start, mode, context);
       if (!from_stage.has_value())
-        from_stage =
-            complete_from_manpage(line, token, mode, context, descriptions);
+        from_stage = complete_from_manpage(line, stage_token, mode, context,
+                                           descriptions);
       if (!from_stage.has_value())
         from_stage = complete_from_help_subcommands(
-            line, token, token_start, mode, context, descriptions);
+            line, stage_token, token_start, mode, context, descriptions);
       if (!from_stage.has_value())
-        from_stage = complete_from_help(line, token, token_start, mode, context,
-                                        descriptions);
+        from_stage = complete_from_help(line, stage_token, token_start, mode,
+                                        context, descriptions);
     }
     if (from_stage.has_value()) {
       candidates = steal(*from_stage);
-    } else if (for_listing || !split_path_token(token).basename_part.is_empty())
+      should_rebuild_open_quote_candidates = has_open_quote;
+    } else if (for_listing || !split_path_token(decoded_token.text.view())
+                                   .basename_part.is_empty())
     {
       /* A token ending in a slash has an empty basename, so the ghost listing
          runs only once a basename is typed. An explicit tab still lists. */
       if (for_listing) {
         candidates = complete_filesystem(
-            token, base_directory,
-            open_quote_content_start.has_value() ? path_text_mode::Literal
-                                                 : path_text_mode::ShellSyntax,
-            filesystem_filter, context, open_quote_character);
+            token, base_directory, path_text_mode::ShellSyntax,
+            filesystem_filter, context, &decoded_token);
       } else {
         let collector = complete_filesystem_prefix(
-            token, base_directory,
-            open_quote_content_start.has_value() ? path_text_mode::Literal
-                                                 : path_text_mode::ShellSyntax,
-            filesystem_filter, context, open_quote_character);
+            token, base_directory, path_text_mode::ShellSyntax,
+            filesystem_filter, context, &decoded_token);
         ghost_candidate_count = collector.count();
         source_candidate_scan_count = collector.source_scans();
         materialized_candidate_count = collector.materialized();
         ghost_prefix = collector.take_prefix();
       }
     }
+  }
+
+  if (should_rebuild_open_quote_candidates) {
+    let rebuilt_descriptions = StringMap<String>{arena};
+    if (descriptions.count() > 0)
+      rebuilt_descriptions.reserve(descriptions.count());
+    for (let &candidate : candidates) {
+      let const description = descriptions.find(candidate.view());
+      let rebuilt =
+          rebuild_open_quote_candidate(token, decoded_token, candidate.view());
+      if (description != nullptr)
+        rebuilt_descriptions.set(rebuilt.view(), description->view());
+      candidate = steal(rebuilt);
+    }
+    descriptions = steal(rebuilt_descriptions);
+    if (ghost_candidate_count > 0)
+      ghost_prefix = rebuild_open_quote_candidate(token, decoded_token,
+                                                  ghost_prefix.view());
   }
 
   let longest_common_prefix = String{arena};
@@ -1645,14 +1756,14 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       }
       candidates = steal(unique_candidates);
 
-      if (extension_hint != nullptr && token.is_empty())
+      if (extension_hint != nullptr && stage_token.is_empty())
         candidates = keep_hinted_extension(steal(candidates),
                                            StringView{extension_hint});
     }
 
     longest_common_prefix = compute_longest_common_prefix(candidates);
 
-    if (for_listing && extension_hint != nullptr && !token.is_empty())
+    if (for_listing && extension_hint != nullptr && !stage_token.is_empty())
       candidates =
           partition_by_extension(steal(candidates), StringView{extension_hint});
   }

@@ -6,8 +6,8 @@
 == a backslash-escaped paren completes the file:
 'report(1).log'
 == a double-quoted paren completes the file:
-report(1).log
-report(2).log
+"report(1).log
+"report(2).log
 == a single-quoted paren completes the file:
-report(1).log
-report(2).log
+'report(1).log
+'report(2).log

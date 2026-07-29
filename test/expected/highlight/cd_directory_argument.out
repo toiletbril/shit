@@ -16,3 +16,9 @@ chi	partial-path
 'Library'	string
 /	existing-path
 Appl	partial-path
+space\ dir/	existing-path
+chi	partial-path
+./space\ dir/tool	existing-path
+'~'	string
+/	existing-path
+loc	partial-path

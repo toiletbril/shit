@@ -6,6 +6,7 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "Lexer.hpp"
 #include "Platform.hpp"
 #include "Shitbox.hpp"
 #include "Toiletline.hpp"
@@ -245,11 +246,20 @@ fn decode_shell_word(StringView word, Allocator allocator,
   if (should_map_source) decoded.raw_positions.push(0);
 
   char quote_character = 0;
+  let is_scanning_tilde_prefix = false;
+  let is_scanning_leading_variable = false;
+  let leading_variable_is_braced = false;
   for (usize position = 0; position < word.length; position++) {
     let const byte = word[position];
     if (quote_character == 0 && (byte == '\'' || byte == '"')) {
+      if (is_scanning_tilde_prefix) {
+        decoded.leading_tilde_is_active = false;
+        is_scanning_tilde_prefix = false;
+      }
+      is_scanning_leading_variable = false;
       quote_character = byte;
       decoded.open_quote_content_start = position + 1;
+      decoded.open_quote_decoded_start = decoded.text.length();
       if (should_map_source) decoded.raw_positions.back() = position + 1;
       if (!decoded.text.is_empty() &&
           os::is_directory_separator(decoded.text.back()))
@@ -257,8 +267,14 @@ fn decode_shell_word(StringView word, Allocator allocator,
       continue;
     }
     if (byte == quote_character) {
+      if (is_scanning_tilde_prefix) {
+        decoded.leading_tilde_is_active = false;
+        is_scanning_tilde_prefix = false;
+      }
+      is_scanning_leading_variable = false;
       quote_character = 0;
       decoded.open_quote_content_start = 0;
+      decoded.open_quote_decoded_start = 0;
       if (!decoded.text.is_empty() &&
           os::is_directory_separator(decoded.text.back()))
         decoded.raw_directory_end = position + 1;
@@ -270,6 +286,11 @@ fn decode_shell_word(StringView word, Allocator allocator,
           escaped_byte == '`' || escaped_byte == '"' || escaped_byte == '\\' ||
           escaped_byte == '\n')
       {
+        if (is_scanning_tilde_prefix) {
+          decoded.leading_tilde_is_active = false;
+          is_scanning_tilde_prefix = false;
+        }
+        is_scanning_leading_variable = false;
         position++;
         if (escaped_byte == '\n') {
           if (should_map_source) decoded.raw_positions.back() = position + 1;
@@ -290,13 +311,31 @@ fn decode_shell_word(StringView word, Allocator allocator,
       decoded.leading_tilde_is_active = byte == '~' && quote_character == 0;
       decoded.leading_variable_is_active =
           byte == '$' && quote_character != '\'';
+      is_scanning_tilde_prefix = decoded.leading_tilde_is_active;
+      is_scanning_leading_variable = decoded.leading_variable_is_active;
+      if (is_scanning_leading_variable)
+        decoded.leading_variable_expansion_end = 1;
+    } else if (is_scanning_leading_variable) {
+      if (decoded.text.length() == 1 && byte == '{') {
+        leading_variable_is_braced = true;
+        decoded.leading_variable_expansion_end = decoded.text.length() + 1;
+      } else if (lexer::is_variable_name(byte)) {
+        decoded.leading_variable_expansion_end = decoded.text.length() + 1;
+      } else if (leading_variable_is_braced && byte == '}') {
+        decoded.leading_variable_expansion_end = decoded.text.length() + 1;
+        is_scanning_leading_variable = false;
+      } else {
+        is_scanning_leading_variable = false;
+      }
     }
     decoded.text.push(byte);
     decoded.glob_active.push(quote_character == 0 &&
                              (byte == '*' || byte == '?' || byte == '['));
     if (should_map_source) decoded.raw_positions.push(position + 1);
-    if (os::is_directory_separator(byte))
+    if (os::is_directory_separator(byte)) {
       decoded.raw_directory_end = position + 1;
+      is_scanning_tilde_prefix = false;
+    }
   }
   decoded.quote_character = quote_character;
 
@@ -320,10 +359,12 @@ fn decode_shell_word(StringView word, Allocator allocator,
     }
 
     usize raw_end = raw_start;
-    if (raw_start == 0 && byte == '~' && scan_quote == 0)
+    if (raw_start == 0 && byte == '~' && scan_quote == 0 &&
+        decoded.leading_tilde_is_active)
+    {
       raw_end = raw_start + 1;
-    else if ((byte == '$' && scan_quote != '\'') ||
-             (byte == '`' && scan_quote == 0))
+    } else if ((byte == '$' && scan_quote != '\'') ||
+               (byte == '`' && scan_quote == 0))
       raw_end = shell_word_expansion_end(word, raw_start);
     if (raw_end <= raw_start) continue;
 
