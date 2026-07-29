@@ -120,8 +120,7 @@ trap 'request_exit 143' TERM
 trap 'request_exit 129' HUP
 
 if [ "${OS-}" = Windows_NT ]; then
-    host_shell=$(cygpath -am "$BASH") || exit 125
-    BIN=$BIN BOUNDED_HOST_SHELL=$host_shell BOUNDED_FIXTURE=$fixture \
+    BIN=$BIN BOUNDED_HOST_SHELL=sh BOUNDED_FIXTURE=$fixture \
         SHIT_TEST_TIMEOUT_JOB_LIFETIME=leader \
         "$BIN" -p --mood sh -c \
         'shitbox timeout 0 "$BIN" --mood sh -c '\''unset SHIT_TEST_TIMEOUT_JOB_LIFETIME; "$BOUNDED_HOST_SHELL" "$BOUNDED_FIXTURE"'\''' &

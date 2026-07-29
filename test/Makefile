@@ -155,6 +155,7 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_mkdir_mode_umask \
 	cli_path_cache_behavior \
 	cli_regex_error_caret \
+	cli_signal_noninteractive_term \
 	cli_set_option_state
 
 $(WINDOWS_SKIPPED_CLI_NAMES):

@@ -1523,12 +1523,6 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   STARTUPINFOA startup_info{};
 
   startup_info.cb = sizeof(startup_info);
-
-  BOOL should_inherit_handles = ec.in_fd || ec.out_fd || ec.err_fd ||
-                                ec.dup_err_to_out || ec.dup_out_to_err;
-
-  if (should_inherit_handles) startup_info.dwFlags |= STARTF_USESTDHANDLES;
-
   startup_info.hStdInput = ec.in_fd.value_or(GetStdHandle(STD_INPUT_HANDLE));
   startup_info.hStdOutput = ec.out_fd.value_or(GetStdHandle(STD_OUTPUT_HANDLE));
   startup_info.hStdError = ec.err_fd.value_or(GetStdHandle(STD_ERROR_HANDLE));
@@ -1548,7 +1542,49 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   inherited_handle_state input_inheritance{};
   inherited_handle_state output_inheritance{};
   inherited_handle_state error_inheritance{};
-  if (should_inherit_handles) {
+  let const has_command_redirection =
+      ec.in_fd.has_value() || ec.out_fd.has_value() || ec.err_fd.has_value() ||
+      ec.dup_err_to_out || ec.dup_out_to_err;
+  let const has_redirected_standard_handle =
+      !is_fd_a_tty(startup_info.hStdInput) ||
+      !is_fd_a_tty(startup_info.hStdOutput) ||
+      !is_fd_a_tty(startup_info.hStdError);
+  let const should_use_standard_handles =
+      has_command_redirection || has_redirected_standard_handle;
+
+  HANDLE null_handle = INVALID_HANDLE_VALUE;
+  defer
+  {
+    if (null_handle != INVALID_HANDLE_VALUE) CloseHandle(null_handle);
+  };
+  if (should_use_standard_handles) {
+    if (startup_info.hStdInput == nullptr ||
+        startup_info.hStdInput == INVALID_HANDLE_VALUE ||
+        startup_info.hStdOutput == nullptr ||
+        startup_info.hStdOutput == INVALID_HANDLE_VALUE ||
+        startup_info.hStdError == nullptr ||
+        startup_info.hStdError == INVALID_HANDLE_VALUE)
+    {
+      SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr,
+                                      TRUE};
+      null_handle = CreateFileA("NUL", GENERIC_READ | GENERIC_WRITE,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                &inheritable, OPEN_EXISTING, 0, nullptr);
+      if (null_handle == INVALID_HANDLE_VALUE)
+        throw ErrorWithLocation{ec.source_location(),
+                                last_system_error_message()};
+      if (startup_info.hStdInput == nullptr ||
+          startup_info.hStdInput == INVALID_HANDLE_VALUE)
+        startup_info.hStdInput = null_handle;
+      if (startup_info.hStdOutput == nullptr ||
+          startup_info.hStdOutput == INVALID_HANDLE_VALUE)
+        startup_info.hStdOutput = null_handle;
+      if (startup_info.hStdError == nullptr ||
+          startup_info.hStdError == INVALID_HANDLE_VALUE)
+        startup_info.hStdError = null_handle;
+    }
+
+    startup_info.dwFlags = STARTF_USESTDHANDLES;
     make_handle_inheritable(startup_info.hStdInput, input_inheritance);
     make_handle_inheritable(startup_info.hStdOutput, output_inheritance);
     make_handle_inheritable(startup_info.hStdError, error_inheritance);
@@ -1571,8 +1607,8 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
    */
   if (CreateProcessA(application_path, const_cast<LPSTR>(command_line.data()),
-                     nullptr, nullptr, should_inherit_handles, creation_flags,
-                     environment_block, nullptr, &startup_info,
+                     nullptr, nullptr, should_use_standard_handles,
+                     creation_flags, environment_block, nullptr, &startup_info,
                      &process_info) == 0)
   {
     if (allow_script_fallback && GetLastError() == ERROR_BAD_EXE_FORMAT) {

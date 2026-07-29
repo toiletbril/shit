@@ -77,7 +77,7 @@ case "$help" in
     *) echo help-missing ;;
 esac
 
-listed=$(PATH= "$BIN" -c 'shitbox --list | shitbox grep "^nproc$"')
+listed=$(PATH= "$BIN" -c 'shitbox --list | shitbox grep nproc')
 if [ "$listed" = nproc ]; then
     echo listed-once
 else

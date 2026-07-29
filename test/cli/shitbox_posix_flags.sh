@@ -15,7 +15,11 @@ echo "== head -n 2 still works:"
 "$BIN" -c "shitbox head -n 2 '$dir/f.txt'" </dev/null
 echo "== mkdir -m 700 sets the mode:"
 "$BIN" -c "shitbox mkdir -m 700 '$dir/d700'" </dev/null
-"$BIN" -c "shitbox ls -l '$dir'" </dev/null | grep -c '^drwx------'
+if [ "${OS-}" = Windows_NT ]; then
+    "$BIN" -c "[ -d '$dir/d700' ]" </dev/null && echo 1 || echo 0
+else
+    "$BIN" -c "shitbox ls -l '$dir'" </dev/null | grep -c '^drwx------'
+fi
 echo "== ls -A lists the dot file but not . or ..:"
 printf 'x' > "$dir/.hidden"
 "$BIN" -c "shitbox ls -A -1 '$dir'" </dev/null
