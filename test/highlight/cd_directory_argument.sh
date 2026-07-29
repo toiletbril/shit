@@ -22,3 +22,13 @@ mkdir -p "$dir/native/subdir"
 native_path="native${path_separator}subdir"
 "$BIN" --debug-highlight-at "echo $native_path" |
     grep -F "${native_path}${tab}existing-path"
+
+mkdir -p "$dir/[quoted] path/child" "$dir/Library/Application"
+mixed=$(
+    "$BIN" --debug-highlight-at "cd '[quoted] path'/chi"
+    "$BIN" --debug-highlight-at "cd '[quoted] path'/child"
+    "$BIN" --debug-highlight-at "cat '[quoted] path'/*"
+    HOME="$dir" "$BIN" --debug-highlight-at "cat ~/'Library'/Appl"
+)
+printf '%s\n' "$mixed" |
+    grep -E "${tab}(string|existing-path|partial-path|glob)$"

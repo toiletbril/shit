@@ -875,18 +875,19 @@ static fn build_filesystem_candidate(StringView directory_part,
 }
 
 template <typename Collector>
-static fn collect_filesystem_matches(
-    StringView token, const Path &base_directory, path_text_mode text_mode,
-    filesystem_entry_filter filter, EvalContext &context, Collector &collector,
-    const utils::decoded_shell_word *expansion_source = nullptr) throws -> void
+static fn collect_filesystem_matches(StringView token,
+                                     const Path &base_directory,
+                                     path_text_mode text_mode,
+                                     filesystem_entry_filter filter,
+                                     EvalContext &context, Collector &collector,
+                                     char quote_character = 0) throws -> void
 {
   let const inside_quote = text_mode == path_text_mode::Literal;
   let decoded_word = utils::decode_shell_word(token, completion_allocator());
-  if (expansion_source != nullptr) {
-    decoded_word.leading_tilde_is_active =
-        expansion_source->leading_tilde_is_active;
-    decoded_word.leading_variable_is_active =
-        expansion_source->leading_variable_is_active;
+  if (quote_character != 0) {
+    decoded_word.leading_tilde_is_active = false;
+    if (quote_character == '\'')
+      decoded_word.leading_variable_is_active = false;
   }
   let parts = split_path_token(inside_quote ? token : decoded_word.text.view());
   let raw_directory_part = parts.directory_part;
@@ -965,15 +966,15 @@ static fn collect_filesystem_matches(
       do_add_entry(entry);
 }
 
-static fn complete_filesystem(
-    StringView token, const Path &base_directory, path_text_mode text_mode,
-    filesystem_entry_filter filter, EvalContext &context,
-    const utils::decoded_shell_word *expansion_source = nullptr) throws
+static fn
+complete_filesystem(StringView token, const Path &base_directory,
+                    path_text_mode text_mode, filesystem_entry_filter filter,
+                    EvalContext &context, char quote_character = 0) throws
     -> ArrayList<String>
 {
   let collector = CommandListCollector{};
   collect_filesystem_matches(token, base_directory, text_mode, filter, context,
-                             collector, expansion_source);
+                             collector, quote_character);
 
   return collector.take();
 }
@@ -989,12 +990,11 @@ fn complete_filesystem_names(StringView token, EvalContext &context,
 static fn complete_filesystem_prefix(
     StringView token, const Path &base_directory, path_text_mode text_mode,
     filesystem_entry_filter filter, EvalContext &context,
-    const utils::decoded_shell_word *expansion_source = nullptr) throws
-    -> GhostPrefixCollector
+    char quote_character = 0) throws -> GhostPrefixCollector
 {
   let collector = GhostPrefixCollector{};
   collect_filesystem_matches(token, base_directory, text_mode, filter, context,
-                             collector, expansion_source);
+                             collector, quote_character);
 
   return collector;
 }
@@ -1429,13 +1429,12 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   let token_start = bounds.start;
   let token_end = bounds.end;
   let token = line.substring_of_length(token_start, token_end - token_start);
-  let const full_decoded_token =
-      utils::decode_shell_word(token, completion_allocator());
   let const is_command = is_in_command_position(line, token_start);
 
   /* A cursor inside an open quote completes the bare path within it and is not
      re-quoted. The span leaves any closing quote to the right untouched. */
   let open_quote_content_start = Maybe<usize>{};
+  char open_quote_character = 0;
   let token_prefix_has_shell_syntax = false;
   for (usize position = token_start; position < cursor; position++)
     if (line[position] == '\'' || line[position] == '"' ||
@@ -1449,9 +1448,11 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
         line.substring_of_length(token_start, cursor - token_start);
     let const decoded_prefix =
         utils::decode_shell_word(token_prefix, completion_allocator());
-    if (decoded_prefix.quote_character != 0)
+    if (decoded_prefix.quote_character != 0) {
       open_quote_content_start =
           token_start + decoded_prefix.open_quote_content_start;
+      open_quote_character = decoded_prefix.quote_character;
+    }
   }
   if (open_quote_content_start.has_value()) {
     token_start = *open_quote_content_start;
@@ -1472,7 +1473,15 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
 
   let const decoded_token =
       utils::decode_shell_word(token, completion_allocator());
-  let const token_is_glob = decoded_token.glob_active.any();
+  let const token_is_glob =
+      !open_quote_content_start.has_value() && decoded_token.glob_active.any();
+  let const leading_variable_is_active =
+      open_quote_content_start.has_value()
+          ? open_quote_character == '"' &&
+                decoded_token.leading_variable_is_active
+          : decoded_token.leading_variable_is_active;
+  let const leading_tilde_is_active = !open_quote_content_start.has_value() &&
+                                      decoded_token.leading_tilde_is_active;
 
   /* A command-position token holding a path separator completes against the
      filesystem rather than the command sets. */
@@ -1506,12 +1515,12 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
 
   let const is_posix_completion = context.mood() == mimic_mood::Posix;
 
-  if (token_is_variable(token) && decoded_token.leading_variable_is_active &&
+  if (token_is_variable(token) && leading_variable_is_active &&
       !is_posix_completion)
   {
     candidates = complete_variable(token, context);
-  } else if (token_is_tilde_user_prefix(token) &&
-             decoded_token.leading_tilde_is_active && !is_posix_completion)
+  } else if (token_is_tilde_user_prefix(token) && leading_tilde_is_active &&
+             !is_posix_completion)
   {
     candidates = complete_tilde_user(token);
   } else if (inline_glob) {
@@ -1604,17 +1613,13 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
             token, base_directory,
             open_quote_content_start.has_value() ? path_text_mode::Literal
                                                  : path_text_mode::ShellSyntax,
-            filesystem_filter, context,
-            open_quote_content_start.has_value() ? &full_decoded_token
-                                                 : nullptr);
+            filesystem_filter, context, open_quote_character);
       } else {
         let collector = complete_filesystem_prefix(
             token, base_directory,
             open_quote_content_start.has_value() ? path_text_mode::Literal
                                                  : path_text_mode::ShellSyntax,
-            filesystem_filter, context,
-            open_quote_content_start.has_value() ? &full_decoded_token
-                                                 : nullptr);
+            filesystem_filter, context, open_quote_character);
         ghost_candidate_count = collector.count();
         source_candidate_scan_count = collector.source_scans();
         materialized_candidate_count = collector.materialized();

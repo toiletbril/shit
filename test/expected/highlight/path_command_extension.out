@@ -12,3 +12,4 @@ ech	unknown-command
 out	invalid-path
 ./	existing-path
 shi	partial-path
+~	partial-path

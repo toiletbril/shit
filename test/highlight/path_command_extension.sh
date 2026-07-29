@@ -46,3 +46,4 @@ PATH=/nonexistent "$BIN" --debug-highlight-at 'ech>/tmp/out' |
 
 "$BIN" --debug-highlight-at './shi' |
     grep -E "${tab}(existing-path|partial-path)$"
+"$BIN" --debug-highlight-at '~' | grep -Fx "~${tab}partial-path"

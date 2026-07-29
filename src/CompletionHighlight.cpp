@@ -490,15 +490,28 @@ static fn word_is_terminated_by_separator(StringView line, usize word_end,
    grammar removes it when it escapes an ordinary byte. */
 static fn word_has_erased_directory_separator(StringView word) wontthrow -> bool
 {
+  char quote_character = 0;
   for (usize position = 0; position + 1 < word.length; position++) {
-    if (word[position] != '\\') continue;
-    if (os::is_directory_separator(word[position]) &&
-        !os::is_directory_separator(word[position + 1]))
-    {
-      return true;
+    let const byte = word[position];
+    if (byte == '\\' && quote_character != '\'') {
+      let const escaped_byte = word[position + 1];
+      let const is_escape = quote_character != '"' || escaped_byte == '$' ||
+                            escaped_byte == '`' || escaped_byte == '"' ||
+                            escaped_byte == '\\' || escaped_byte == '\n';
+      if (!is_escape) continue;
+      if (os::is_directory_separator(byte) &&
+          !os::is_directory_separator(escaped_byte))
+        return true;
+      position++;
+      continue;
     }
-    position++;
+    if (quote_character == 0 && (byte == '\'' || byte == '"')) {
+      quote_character = byte;
+    } else if (byte == quote_character) {
+      quote_character = 0;
+    }
   }
+
   return false;
 }
 
@@ -1085,6 +1098,88 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         line.substring_of_length(word_start, word_end - word_start);
     let const plain = word_spans.is_empty();
     let const is_assignment = word_looks_like_assignment(word);
+    let const is_word_terminated =
+        word_is_terminated_by_separator(line, word_end, end);
+    let const do_color_mixed_path = [&](bool directories_only) throws -> bool {
+      if (word_has_erased_directory_separator(word)) return false;
+
+      let const decoded =
+          utils::decode_shell_word(word, bump_allocator(HIGHLIGHT_ARENA), true);
+      let path_spans =
+          ArrayList<highlight_span>{bump_allocator(HIGHLIGHT_ARENA)};
+      if (decoded.glob_active.any()) {
+        let mapped_start = word_start;
+        for (let const &inner : word_spans) {
+          if (inner.end <= mapped_start) continue;
+          if (mapped_start < inner.start)
+            path_spans.push(highlight_span{mapped_start, inner.start,
+                                           highlight_role::glob});
+          if (inner.end > mapped_start) mapped_start = inner.end;
+        }
+        if (mapped_start < word_end)
+          path_spans.push(
+              highlight_span{mapped_start, word_end, highlight_role::glob});
+      } else {
+        let has_only_leading_tilde_range =
+            decoded.leading_tilde_is_active &&
+            decoded.opaque_ranges.count() == 1 &&
+            decoded.opaque_ranges[0].decoded_start == 0 &&
+            decoded.opaque_ranges[0].decoded_length == 1 &&
+            decoded.opaque_ranges[0].raw_start == 0 &&
+            decoded.opaque_ranges[0].raw_length == 1;
+        if ((!decoded.opaque_ranges.is_empty() &&
+             !has_only_leading_tilde_range) ||
+            !os::has_directory_separator(decoded.text.view()))
+        {
+          return false;
+        }
+
+        let decoded_path_spans =
+            ArrayList<highlight_span>{bump_allocator(HIGHLIGHT_ARENA)};
+        if (!color_path_argument(0, decoded.text.view(), is_word_terminated,
+                                 directories_only, decoded_path_spans))
+          return false;
+
+        for (let const &decoded_span : decoded_path_spans) {
+          ASSERT(decoded_span.end < decoded.raw_positions.count());
+          let mapped_start =
+              word_start + decoded.raw_positions[decoded_span.start];
+          let const mapped_end =
+              word_start + decoded.raw_positions[decoded_span.end];
+
+          for (let const &inner : word_spans) {
+            if (inner.end <= mapped_start) continue;
+            if (inner.start >= mapped_end) break;
+            if (mapped_start < inner.start)
+              path_spans.push(
+                  highlight_span{mapped_start, inner.start, decoded_span.role});
+            if (inner.end > mapped_start) mapped_start = inner.end;
+            if (mapped_start >= mapped_end) break;
+          }
+          if (mapped_start < mapped_end)
+            path_spans.push(
+                highlight_span{mapped_start, mapped_end, decoded_span.role});
+        }
+      }
+
+      usize path_span_index = 0;
+      usize word_span_index = 0;
+      while (path_span_index < path_spans.count() ||
+             word_span_index < word_spans.count())
+      {
+        if (word_span_index >= word_spans.count() ||
+            (path_span_index < path_spans.count() &&
+             path_spans[path_span_index].start <
+                 word_spans[word_span_index].start))
+        {
+          spans.push(path_spans[path_span_index++]);
+        } else {
+          spans.push(word_spans[word_span_index++]);
+        }
+      }
+
+      return true;
+    };
 
     if (!is_command_position && word.length > 1 && word[0] == '-') {
       do_push(word_start, word_end, highlight_role::flag);
@@ -1165,6 +1260,14 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       }
     }
 
+    if (is_command_position && !plain && !is_assignment &&
+        do_color_mixed_path(false))
+    {
+      pending_assignment_names.clear();
+      is_command_position = false;
+      continue;
+    }
+
     if (is_command_position && plain && !is_assignment) {
       pending_assignment_names.clear();
 
@@ -1223,11 +1326,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         continue;
       }
 
-      let const is_word_terminated =
-          word_is_terminated_by_separator(line, word_end, end);
       highlight_command_word = word;
-      if (os::has_directory_separator(word) &&
-          !word_has_erased_directory_separator(word))
+      if (word == "~" && !is_word_terminated) {
+        do_push(word_start, word_end, highlight_role::partial_path);
+      } else if (os::has_directory_separator(word) &&
+                 !word_has_erased_directory_separator(word))
       {
         color_path_argument(word_start, word, is_word_terminated, false, spans);
       } else if (word_defines_function(line, word_end, end)) {
@@ -1265,13 +1368,14 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         /* The word is plain here so the metacharacter is live. */
         do_push(word_start, word_end, highlight_role::glob);
       } else {
-        let const is_word_terminated =
-            word_is_terminated_by_separator(line, word_end, end);
         if (!word_has_erased_directory_separator(word))
           color_path_argument(word_start, word, is_word_terminated,
                               highlight_command_word == "cd", spans);
       }
     }
+    if (!is_command_position && !plain && !is_assignment &&
+        do_color_mixed_path(highlight_command_word == "cd"))
+      continue;
     for (let const &inner : word_spans)
       do_push(inner.start, inner.end, inner.role);
     if (is_command_position && !is_assignment) {

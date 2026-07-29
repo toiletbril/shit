@@ -9,6 +9,7 @@ trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 : > "$dir/dollar\$x.txt"
 : > "$dir/plainfile.txt"
 /bin/mkdir "$dir/PATH" "$dir/space dir" "$dir/home" "$dir/\$HOME" "$dir/~"
+/bin/mkdir "$dir/[C] alpha" "$dir/star* alpha" "$dir/question? alpha"
 : > "$dir/PATH/plain.txt"
 : > "$dir/PATH/space file.txt"
 : > "$dir/PATH/star-one.txt"
@@ -31,6 +32,15 @@ echo "== inside a single quote the space match completes bare within it:"
 "$BIN" --debug-complete-at "cat 'spacey" </dev/null
 echo "== inside a double quote the space match completes bare within it:"
 "$BIN" --debug-complete-at 'cat "spacey' </dev/null
+echo "== glob-like bytes stay literal inside open quotes:"
+for quote in "'" '"'; do
+    for prefix in '[C]' 'star*' 'question?'; do
+        "$BIN" --debug-complete-at "cd $quote$prefix" </dev/null
+    done
+done
+echo "== an adjacent open double quote keeps variable expansion active:"
+QUOTED_COMPLETION_UNIQUE=1 \
+    "$BIN" --debug-complete-at 'cat prefix"$QUOTED_COMPLETION_U' </dev/null
 echo "== a closed quoted directory continues through an unquoted slash:"
 "$BIN" --debug-complete-at "cat 'PATH'/" </dev/null
 echo "== a partial basename follows a closed quoted directory:"

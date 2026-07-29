@@ -5,3 +5,14 @@ afile	existing-path
 ./alink/	invalid-path
 ./adir/	existing-path
 native/subdir	existing-path
+'[quoted] path'	string
+/	existing-path
+chi	partial-path
+'[quoted] path'	string
+/child	existing-path
+'[quoted] path'	string
+/*	glob
+~/	existing-path
+'Library'	string
+/	existing-path
+Appl	partial-path

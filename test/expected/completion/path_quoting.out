@@ -8,6 +8,15 @@ plainfile.txt
 spacey file.txt
 == inside a double quote the space match completes bare within it:
 spacey file.txt
+== glob-like bytes stay literal inside open quotes:
+[C] alpha/
+star* alpha/
+question? alpha/
+[C] alpha/
+star* alpha/
+question? alpha/
+== an adjacent open double quote keeps variable expansion active:
+$QUOTED_COMPLETION_UNIQUE
 == a closed quoted directory continues through an unquoted slash:
 'PATH'/'space file.txt'
 'PATH'/plain.txt
