@@ -202,9 +202,7 @@ chmod +x "$d/menu-bin/tailscale"
 send_menu_input()
 {
     wait_for_editor "$d/menu-ready" || exit 1
-    printf 'tailscale '
-    sleep 0.1
-    printf '\t\003exit\n'
+    printf 'tailscale \t\003exit\n'
 }
 
 send_menu_input | ASAN_OPTIONS=detect_stack_use_after_return=1 \
@@ -218,6 +216,27 @@ strings "$d/menu-typescript" | \
 strings "$d/menu-typescript" | \
     grep -q 'Keep this second long completion description intact' || exit 1
 echo 'completion menu keeps callback-owned strings alive'
+
+mkdir "$d/quoted-completion"
+touch "$d/quoted-completion/space name" \
+    "$d/quoted-completion/README-one" \
+    "$d/quoted-completion/ReadMe-two"
+
+send_quoted_input()
+{
+    wait_for_editor "$d/quoted-ready" || exit 1
+    printf "cd '%s'\nprintf '<%%s>\\\\n' 'spX'\033[D\033[D\t\n" \
+        "$d/quoted-completion"
+    printf "printf '<%%s>\\\\n' read\tone\nexit\n"
+}
+
+send_quoted_input | EDITOR_READY_FILE="$d/quoted-ready" \
+    SHIT_HISTORY="$d/quoted-history" BIN="$BIN" \
+    run_editor "$d/quoted-typescript"
+
+strings "$d/quoted-typescript" | grep -q '<space name>' || exit 1
+strings "$d/quoted-typescript" | grep -q '<README-one>' || exit 1
+echo 'quoted replacement and smart-case TAB preserve the completed token'
 
 mkdir "$d/mixed-path" "$d/next-directory"
 printf '#!/bin/sh\n' > "$d/mixed-path/after-cd-probe"

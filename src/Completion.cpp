@@ -488,13 +488,21 @@ private:
 };
 
 static pure fn common_prefix_length(StringView left, StringView right,
-                                    usize limit) wontthrow -> usize
+                                    usize limit,
+                                    bool should_ignore_ascii_case) wontthrow
+    -> usize
 {
   usize shared_length = 0;
   while (shared_length < limit && shared_length < left.length &&
-         shared_length < right.length &&
-         left[shared_length] == right[shared_length])
+         shared_length < right.length)
   {
+    let const left_byte = left[shared_length];
+    let const right_byte = right[shared_length];
+    let const bytes_match = should_ignore_ascii_case
+                                ? utils::ascii_to_lower(left_byte) ==
+                                      utils::ascii_to_lower(right_byte)
+                                : left_byte == right_byte;
+    if (!bytes_match) break;
     shared_length++;
   }
   while (shared_length > 0 && shared_length < left.length &&
@@ -520,8 +528,8 @@ public:
       return;
     }
 
-    let const shared_length =
-        common_prefix_length(prefix.view(), name, prefix.count());
+    let const shared_length = common_prefix_length(
+        prefix.view(), name, prefix.count(), tier == match_tier::prefix);
     while (prefix.count() > shared_length)
       prefix.pop_back();
     match_count++;
@@ -617,8 +625,8 @@ static fn complete_command_name_prefix(StringView token,
   return collector;
 }
 
-static fn
-compute_longest_common_prefix(const ArrayList<String> &candidates) throws
+static fn compute_longest_common_prefix(const ArrayList<String> &candidates,
+                                        bool should_ignore_ascii_case) throws
     -> String
 {
   if (candidates.is_empty()) return String{candidates.allocator()};
@@ -626,7 +634,8 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
   usize prefix_length = first.length;
   for (usize i = 1; i < candidates.count(); i++) {
     let const candidate = candidates[i].view();
-    prefix_length = common_prefix_length(first, candidate, prefix_length);
+    prefix_length = common_prefix_length(first, candidate, prefix_length,
+                                         should_ignore_ascii_case);
   }
   return String{candidates.allocator(),
                 first.substring_of_length(0, prefix_length)};
@@ -1615,6 +1624,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   let const bounds = find_token_bounds(line, cursor);
   let token_start = bounds.start;
   let token_end = bounds.end;
+  let replacement_token_end = bounds.end;
   let token = line.substring_of_length(token_start, token_end - token_start);
   let const is_command = is_in_command_position(line, token_start);
 
@@ -1625,6 +1635,15 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   if (decoded_prefix.quote_character != 0) {
     token_end = cursor;
     token = line.substring_of_length(token_start, token_end - token_start);
+    replacement_token_end = cursor;
+    let const quote_start =
+        token_start + decoded_prefix.open_quote_content_start - 1;
+    let const quote_end = quoted_run_end(line, quote_start);
+    if (quote_end >= cursor && quote_end < line.length &&
+        line[quote_end] == decoded_prefix.quote_character)
+    {
+      replacement_token_end = quote_end;
+    }
   }
 
   /* An option-value word such as --exit-node=host completes only the value
@@ -1687,6 +1706,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   usize source_candidate_scan_count = 0;
   usize materialized_candidate_count = 0;
   let should_rebuild_shell_syntax_candidates = false;
+  let should_ignore_common_prefix_case = false;
 
   let const is_posix_completion = context.mood() == mimic_mood::Posix;
 
@@ -1697,6 +1717,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     if (has_open_quote) {
       token_start += decoded_token.open_quote_content_start;
       token_end = cursor;
+      replacement_token_end = cursor;
     }
   } else if (token_is_tilde_user_prefix(stage_token) &&
              leading_tilde_is_active && !is_posix_completion)
@@ -1731,6 +1752,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
        is typed. An explicit tab still lists them all. */
     if (!stage_token.is_empty() || for_listing) {
       if (for_listing) {
+        should_ignore_common_prefix_case =
+            !stage_token.is_empty() && !token_is_glob &&
+            !utils::token_has_uppercase(stage_token);
         candidates =
             complete_command_names(stage_token,
                                    token_is_glob ? command_match_mode::Glob
@@ -1791,6 +1815,11 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       /* A token ending in a slash has an empty basename, so the ghost listing
          runs only once a basename is typed. An explicit tab still lists. */
       if (for_listing) {
+        let const basename =
+            split_path_token(decoded_token.text.view()).basename_part;
+        should_ignore_common_prefix_case =
+            !basename.is_empty() && (!os::FILESYSTEM_IS_CASE_SENSITIVE ||
+                                     !utils::token_has_uppercase(basename));
         candidates = complete_filesystem(
             token, base_directory, path_text_mode::ShellSyntax,
             filesystem_filter, context, &decoded_token);
@@ -1846,7 +1875,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
                                            StringView{extension_hint});
     }
 
-    longest_common_prefix = compute_longest_common_prefix(candidates);
+    longest_common_prefix = compute_longest_common_prefix(
+        candidates, should_ignore_common_prefix_case);
 
     if (for_listing && extension_hint != nullptr && !stage_token.is_empty())
       candidates =
@@ -1863,7 +1893,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       source_candidate_scan_count,
       materialized_candidate_count,
       token_start + completion_offset,
-      token_end + completion_offset,
+      replacement_token_end + completion_offset,
       is_command,
   };
 }
