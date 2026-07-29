@@ -47,7 +47,7 @@ done
 echo "== an open quote after a directory keeps the full path prefix:"
 "$BIN" --debug-complete-at 'cd outer/"[C]' </dev/null
 echo "== an open quote inside a command keeps the prefix:"
-"$BIN" --debug-complete-at 'e"c' </dev/null
+PATH="$dir/PATH" "$BIN" --debug-complete-at 'e"c' </dev/null
 echo "== a fuzzy prefix before an open quote maps into the candidate:"
 "$BIN" --debug-complete-at 'cat f_b"z' </dev/null
 echo "== open quotes escape bytes that remain active in their quote mode:"
