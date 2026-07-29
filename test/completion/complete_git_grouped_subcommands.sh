@@ -6,7 +6,7 @@
 # keeps an open section intact. A fake binary named go in a trusted directory
 # reuses the allowlisted help-fork path, and a git-shaped help body keeps the
 # candidates stable across machines.
-dir=$(pwd)/data/complete_git_grouped_subcommands
+dir=$(pwd)/completion/complete_git_grouped_subcommands
 echo "== grouped subcommands with no prefix:"
 PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'go ' </dev/null
 echo "== grouped subcommands with a prefix:"
