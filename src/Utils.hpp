@@ -30,10 +30,14 @@ struct decoded_shell_word
   usize raw_directory_end{0};
   usize open_quote_content_start{0};
   usize open_quote_decoded_start{0};
+  usize last_quote_content_start{0};
+  usize last_quote_decoded_start{0};
   usize leading_variable_expansion_end{0};
   char quote_character{0};
+  char last_quote_character{0};
   bool leading_tilde_is_active{false};
   bool leading_variable_is_active{false};
+  bool has_shell_syntax{false};
 
   explicit decoded_shell_word(Allocator allocator)
       : text(allocator), glob_active(allocator), raw_positions(allocator),

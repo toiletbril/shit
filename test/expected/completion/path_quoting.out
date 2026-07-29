@@ -19,6 +19,8 @@ plainfile.txt
 outer/"[C] alpha/
 == an open quote inside a command keeps the prefix:
 e"cho
+== a closed quote inside a command keeps the prefix:
+e"cho"
 == a fuzzy prefix before an open quote maps into the candidate:
 foo_b"ar_baz
 == open quotes escape bytes that remain active in their quote mode:
@@ -41,14 +43,21 @@ P'A'TH/plain.txt
 space\ dir/mixed.txt
 == a double-quoted variable directory remains active:
 "$HOME"/home.txt
+"$HOME"/space\ file.txt
 == a single-quoted variable directory remains literal:
 '$HOME'/literal-variable.txt
 == an open single-quoted variable directory remains literal:
 '$HOME/literal-variable.txt
 == an open double-quoted variable directory remains active:
 "$HOME/home.txt
+"$HOME/space file.txt
 == an active tilde directory expands:
+~/'space file.txt'
 ~/home.txt
+== an active tilde stays outside a quoted match:
+~/'space file.txt'
+== an active variable uses escapes for a matched space:
+$HOME/space\ file.txt
 == a quoted tilde directory remains literal:
 '~'/literal-tilde.txt
 == quoted and escaped tilde usernames remain literal:

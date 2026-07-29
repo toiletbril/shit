@@ -1199,6 +1199,23 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       return true;
     };
+    let const command_role = [&](StringView command) throws -> highlight_role {
+      let const is_command_resolved = first_word_resolves(command, context);
+      let const command_has_prefix =
+          !is_command_resolved && !is_word_terminated
+              ? command_word_prefixes_any(command, context)
+              : false;
+      let const is_known_source_function =
+          known_function_names != nullptr &&
+          known_function_names->contains(command);
+      if (is_command_resolved || line_functions.contains(command) ||
+          is_known_source_function)
+      {
+        return highlight_role::resolved_command;
+      }
+      if (command_has_prefix) return highlight_role::partial_command;
+      return highlight_role::unknown_command;
+    };
 
     if (!is_command_position && word.length > 1 && word[0] == '-') {
       do_push(word_start, word_end, highlight_role::flag);
@@ -1287,6 +1304,18 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       continue;
     }
 
+    if (is_command_position && word_spans.is_empty() && word_has_shell_syntax &&
+        !is_assignment)
+    {
+      let const decoded =
+          utils::decode_shell_word(word, bump_allocator(HIGHLIGHT_ARENA));
+      highlight_command_word = decoded.text.view();
+      pending_assignment_names.clear();
+      do_push(word_start, word_end, command_role(decoded.text.view()));
+      is_command_position = false;
+      continue;
+    }
+
     if (is_command_position && plain && !is_assignment) {
       pending_assignment_names.clear();
 
@@ -1357,23 +1386,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         do_push(word_start, word_end, highlight_role::function_name);
         line_functions.add(word);
       } else {
-        let const is_command_resolved = first_word_resolves(word, context);
-        let const command_has_prefix =
-            !is_command_resolved && !is_word_terminated
-                ? command_word_prefixes_any(word, context)
-                : false;
-        let const is_known_source_function =
-            known_function_names != nullptr &&
-            known_function_names->contains(word);
-        if (is_command_resolved || line_functions.contains(word) ||
-            is_known_source_function)
-        {
-          do_push(word_start, word_end, highlight_role::resolved_command);
-        } else if (command_has_prefix) {
-          do_push(word_start, word_end, highlight_role::partial_command);
-        } else {
-          do_push(word_start, word_end, highlight_role::unknown_command);
-        }
+        do_push(word_start, word_end, command_role(word));
       }
       is_command_position = false;
       continue;

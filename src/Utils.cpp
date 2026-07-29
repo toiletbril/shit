@@ -252,6 +252,7 @@ fn decode_shell_word(StringView word, Allocator allocator,
   for (usize position = 0; position < word.length; position++) {
     let const byte = word[position];
     if (quote_character == 0 && (byte == '\'' || byte == '"')) {
+      decoded.has_shell_syntax = true;
       if (is_scanning_tilde_prefix) {
         decoded.leading_tilde_is_active = false;
         is_scanning_tilde_prefix = false;
@@ -260,6 +261,9 @@ fn decode_shell_word(StringView word, Allocator allocator,
       quote_character = byte;
       decoded.open_quote_content_start = position + 1;
       decoded.open_quote_decoded_start = decoded.text.length();
+      decoded.last_quote_content_start = position + 1;
+      decoded.last_quote_decoded_start = decoded.text.length();
+      decoded.last_quote_character = byte;
       if (should_map_source) decoded.raw_positions.back() = position + 1;
       if (!decoded.text.is_empty() &&
           os::is_directory_separator(decoded.text.back()))
@@ -286,6 +290,7 @@ fn decode_shell_word(StringView word, Allocator allocator,
           escaped_byte == '`' || escaped_byte == '"' || escaped_byte == '\\' ||
           escaped_byte == '\n')
       {
+        decoded.has_shell_syntax = true;
         if (is_scanning_tilde_prefix) {
           decoded.leading_tilde_is_active = false;
           is_scanning_tilde_prefix = false;

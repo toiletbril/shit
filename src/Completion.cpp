@@ -716,8 +716,8 @@ static fn quote_path_candidate(StringView candidate) throws -> String
 {
   let quoted = String{completion_allocator()};
 
-  const bool has_single_quote = candidate.find_character('\'').has_value();
-  const bool has_bang = candidate.find_character('!').has_value();
+  let const has_single_quote = candidate.find_character('\'').has_value();
+  let const has_bang = candidate.find_character('!').has_value();
 
   if (!has_single_quote) {
     quoted.push('\'');
@@ -744,6 +744,19 @@ static fn quote_path_candidate(StringView candidate) throws -> String
   }
 
   return quoted;
+}
+
+static fn escape_path_candidate(StringView candidate) throws -> String
+{
+  let escaped = String{completion_allocator()};
+
+  for (usize position = 0; position < candidate.length; position++) {
+    let const byte = candidate[position];
+    if (byte_needs_quoting(byte)) escaped.push('\\');
+    escaped.push(byte);
+  }
+
+  return escaped;
 }
 
 static fn append_open_quote_candidate(String &candidate, StringView text,
@@ -786,29 +799,85 @@ static fn open_quote_candidate_boundary(StringView typed, usize typed_boundary,
 }
 
 static fn
-rebuild_open_quote_candidate(StringView raw_token,
-                             const utils::decoded_shell_word &decoded_word,
-                             StringView decoded_candidate) throws -> String
+append_candidate_suffix(String &candidate, StringView suffix,
+                        const utils::decoded_shell_word &decoded_word) throws
+    -> void
+{
+  if (suffix.is_empty()) return;
+
+  if (decoded_word.leading_variable_is_active) {
+    candidate += escape_path_candidate(suffix);
+    return;
+  }
+
+  if (path_candidate_needs_quoting(suffix))
+    candidate += quote_path_candidate(suffix);
+  else
+    candidate += suffix;
+}
+
+static fn
+rebuild_shell_syntax_candidate(StringView raw_token,
+                               const utils::decoded_shell_word &decoded_word,
+                               StringView decoded_candidate) throws -> String
 {
   let candidate = String{completion_allocator()};
   if (decoded_candidate.starts_with(decoded_word.text.view())) {
-    candidate.append(raw_token);
-    append_open_quote_candidate(
-        candidate, decoded_candidate.substring(decoded_word.text.length()),
-        decoded_word.quote_character);
+    let const suffix = decoded_candidate.substring(decoded_word.text.length());
+    let const can_extend_closed_quote =
+        decoded_word.quote_character == 0 &&
+        decoded_word.last_quote_character != 0 && !raw_token.is_empty() &&
+        raw_token[raw_token.length - 1] == decoded_word.last_quote_character;
+    if (can_extend_closed_quote) {
+      candidate.append(raw_token.substring_of_length(0, raw_token.length - 1));
+      append_open_quote_candidate(candidate, suffix,
+                                  decoded_word.last_quote_character);
+      candidate.push(decoded_word.last_quote_character);
+    } else if (decoded_word.quote_character != 0) {
+      candidate.append(raw_token);
+      append_open_quote_candidate(candidate, suffix,
+                                  decoded_word.quote_character);
+    } else {
+      candidate.append(raw_token);
+      append_candidate_suffix(candidate, suffix, decoded_word);
+    }
+    return candidate;
+  }
+
+  if (decoded_word.last_quote_character == 0) {
+    if (decoded_word.leading_tilde_is_active &&
+        decoded_candidate.starts_with("~"))
+    {
+      candidate.push('~');
+      append_candidate_suffix(candidate, decoded_candidate.substring(1),
+                              decoded_word);
+      return candidate;
+    }
+
+    if (decoded_word.leading_variable_is_active &&
+        decoded_word.leading_variable_expansion_end <= decoded_candidate.length)
+    {
+      candidate.append(raw_token.substring_of_length(
+          0, decoded_word.leading_variable_expansion_end));
+      candidate += escape_path_candidate(decoded_candidate.substring(
+          decoded_word.leading_variable_expansion_end));
+      return candidate;
+    }
+
+    append_candidate_suffix(candidate, decoded_candidate, decoded_word);
     return candidate;
   }
 
   let const candidate_boundary = open_quote_candidate_boundary(
-      decoded_word.text.view(), decoded_word.open_quote_decoded_start,
+      decoded_word.text.view(), decoded_word.last_quote_decoded_start,
       decoded_candidate);
   let const decoded_prefix = decoded_word.text.view().substring_of_length(
-      0, decoded_word.open_quote_decoded_start);
+      0, decoded_word.last_quote_decoded_start);
   let const candidate_prefix =
       decoded_candidate.substring_of_length(0, candidate_boundary);
   if (decoded_prefix == candidate_prefix) {
     candidate.append(raw_token.substring_of_length(
-        0, decoded_word.open_quote_content_start));
+        0, decoded_word.last_quote_content_start));
   } else {
     if (!candidate_prefix.is_empty()) {
       if (path_candidate_needs_quoting(candidate_prefix))
@@ -816,11 +885,13 @@ rebuild_open_quote_candidate(StringView raw_token,
       else
         candidate.append(candidate_prefix);
     }
-    candidate.push(decoded_word.quote_character);
+    candidate.push(decoded_word.last_quote_character);
   }
   append_open_quote_candidate(candidate,
                               decoded_candidate.substring(candidate_boundary),
-                              decoded_word.quote_character);
+                              decoded_word.last_quote_character);
+  if (decoded_word.quote_character == 0)
+    candidate.push(decoded_word.last_quote_character);
   return candidate;
 }
 
@@ -937,16 +1008,24 @@ static fn build_filesystem_candidate(
     entry_name.push(separator);
   }
 
-  if (decoded_word.quote_character != 0) {
+  let const token_ends_with_closed_quote =
+      decoded_word.quote_character == 0 &&
+      decoded_word.last_quote_character != 0 && !raw_token.is_empty() &&
+      raw_token[raw_token.length - 1] == decoded_word.last_quote_character;
+  if (decoded_word.quote_character != 0 || token_ends_with_closed_quote) {
     let decoded_candidate =
         String{completion_allocator(), directory_part} + entry_name;
-    return rebuild_open_quote_candidate(raw_token, decoded_word,
-                                        decoded_candidate.view());
+    return rebuild_shell_syntax_candidate(raw_token, decoded_word,
+                                          decoded_candidate.view());
   }
 
   if (preserve_directory_spelling) {
-    if (!inside_quote && path_candidate_needs_quoting(entry_name.view()))
-      entry_name = quote_path_candidate(entry_name.view());
+    if (!inside_quote && path_candidate_needs_quoting(entry_name.view())) {
+      if (decoded_word.leading_variable_is_active)
+        entry_name = escape_path_candidate(entry_name.view());
+      else
+        entry_name = quote_path_candidate(entry_name.view());
+    }
     return String{completion_allocator(), raw_directory_part} + entry_name;
   }
 
@@ -954,6 +1033,11 @@ static fn build_filesystem_candidate(
   let const is_variable_prefixed =
       !directory_part.is_empty() && directory_part[0] == '$';
   if (is_variable_prefixed && !inside_quote) {
+    if (path_candidate_needs_quoting(entry_name.view()))
+      entry_name = escape_path_candidate(entry_name.view());
+    candidate += entry_name;
+  } else if (decoded_word.leading_tilde_is_active && !inside_quote) {
+    candidate = String{completion_allocator(), raw_directory_part};
     if (path_candidate_needs_quoting(entry_name.view()))
       entry_name = quote_path_candidate(entry_name.view());
     candidate += entry_name;
@@ -1562,7 +1646,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       has_open_quote ? decoded_token.text.view().substring(
                            decoded_token.open_quote_decoded_start)
                      : decoded_token.text.view();
-  let const stage_token = has_open_quote ? decoded_token.text.view() : token;
+  let const stage_token =
+      decoded_token.has_shell_syntax ? decoded_token.text.view() : token;
   let const token_is_glob = !has_open_quote && decoded_token.glob_active.any();
   let const leading_variable_is_active =
       has_open_quote ? decoded_token.quote_character == '"' &&
@@ -1601,7 +1686,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   usize ghost_candidate_count = 0;
   usize source_candidate_scan_count = 0;
   usize materialized_candidate_count = 0;
-  let should_rebuild_open_quote_candidates = false;
+  let should_rebuild_shell_syntax_candidates = false;
 
   let const is_posix_completion = context.mood() == mimic_mood::Posix;
 
@@ -1662,7 +1747,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
         materialized_candidate_count = collector.materialized();
         ghost_prefix = collector.take_prefix();
       }
-      should_rebuild_open_quote_candidates = has_open_quote;
+      should_rebuild_shell_syntax_candidates = decoded_token.has_shell_syntax;
     }
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory, filesystem_filter,
@@ -1699,7 +1784,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     }
     if (from_stage.has_value()) {
       candidates = steal(*from_stage);
-      should_rebuild_open_quote_candidates = has_open_quote;
+      should_rebuild_shell_syntax_candidates = decoded_token.has_shell_syntax;
     } else if (for_listing || !split_path_token(decoded_token.text.view())
                                    .basename_part.is_empty())
     {
@@ -1721,22 +1806,22 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     }
   }
 
-  if (should_rebuild_open_quote_candidates) {
+  if (should_rebuild_shell_syntax_candidates) {
     let rebuilt_descriptions = StringMap<String>{arena};
     if (descriptions.count() > 0)
       rebuilt_descriptions.reserve(descriptions.count());
     for (let &candidate : candidates) {
       let const description = descriptions.find(candidate.view());
-      let rebuilt =
-          rebuild_open_quote_candidate(token, decoded_token, candidate.view());
+      let rebuilt = rebuild_shell_syntax_candidate(token, decoded_token,
+                                                   candidate.view());
       if (description != nullptr)
         rebuilt_descriptions.set(rebuilt.view(), description->view());
       candidate = steal(rebuilt);
     }
     descriptions = steal(rebuilt_descriptions);
     if (ghost_candidate_count > 0)
-      ghost_prefix = rebuild_open_quote_candidate(token, decoded_token,
-                                                  ghost_prefix.view());
+      ghost_prefix = rebuild_shell_syntax_candidate(token, decoded_token,
+                                                    ghost_prefix.view());
   }
 
   let longest_common_prefix = String{arena};

@@ -6,6 +6,7 @@ explicit-p	partial-command
 foo	partial-command
 blocked.exe	resolved-command
 npr	partial-command
+ec\ho	resolved-command
 ech	unknown-command
 >	operator
 /tmp/	existing-path

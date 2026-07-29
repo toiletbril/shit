@@ -21,6 +21,7 @@ trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 : > "$dir/PATH/star-one.txt"
 : > "$dir/space dir/mixed.txt"
 : > "$dir/home/home.txt"
+: > "$dir/home/space file.txt"
 : > "$dir/\$HOME/literal-variable.txt"
 : > "$dir/~/literal-tilde.txt"
 : > "$dir/PATH/tool"
@@ -48,6 +49,8 @@ echo "== an open quote after a directory keeps the full path prefix:"
 "$BIN" --debug-complete-at 'cd outer/"[C]' </dev/null
 echo "== an open quote inside a command keeps the prefix:"
 PATH="$dir/PATH" "$BIN" --debug-complete-at 'e"c' </dev/null
+echo "== a closed quote inside a command keeps the prefix:"
+PATH="$dir/PATH" "$BIN" --debug-complete-at 'e"c"' </dev/null
 echo "== a fuzzy prefix before an open quote maps into the candidate:"
 "$BIN" --debug-complete-at 'cat f_b"z' </dev/null
 echo "== open quotes escape bytes that remain active in their quote mode:"
@@ -76,6 +79,10 @@ echo "== an open double-quoted variable directory remains active:"
 "$BIN" --debug-complete-at 'cat "$HOME/' </dev/null
 echo "== an active tilde directory expands:"
 "$BIN" --debug-complete-at 'cat ~/' </dev/null
+echo "== an active tilde stays outside a quoted match:"
+"$BIN" --debug-complete-at 'cat ~/sp' </dev/null
+echo "== an active variable uses escapes for a matched space:"
+"$BIN" --debug-complete-at 'cat $HOME/sp' </dev/null
 echo "== a quoted tilde directory remains literal:"
 "$BIN" --debug-complete-at "cat '~'/" </dev/null
 echo "== quoted and escaped tilde usernames remain literal:"
