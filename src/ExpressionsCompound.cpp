@@ -363,6 +363,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   let children = ArrayList<os::process>{cxt.scratch_allocator()};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
+  i64 process_group_id = 0;
   let pending_pipe = Maybe<os::Pipe>{};
 
   /* On a make_pipe or fork failure mid-loop the previous read end and the
@@ -407,9 +408,14 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
             stage_end_position - stage_location.position);
       }
 
+      let const process_group = !is_async() ? os::process_group_mode::Inherit
+                                : process_group_id == 0
+                                    ? os::process_group_mode::New
+                                    : os::process_group_mode::Join;
       let const launch = os::launch_compound_stage(
           stage_text, stage_in, stage_out, None, cxt.mood(), stage_location,
-          stage_source != nullptr ? stage_source->view() : StringView{});
+          stage_source != nullptr ? stage_source->view() : StringView{},
+          process_group, process_group_id);
       let const child = launch.child;
 
       if (launch.should_evaluate_child) {
@@ -457,6 +463,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       pending_pipe = None;
 
       children.push(child);
+      if (is_async() && process_group_id == 0)
+        process_group_id = os::process_id_of(child);
       last_child = child;
     }
   } catch (...) {
@@ -477,8 +485,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       {
         if (!did_register_job) utils::terminate_and_reap_processes(children);
       };
-      const i32 id =
-          cxt.register_pipeline_job(children, last_child, "pipeline");
+      const i32 id = cxt.register_pipeline_job(children, last_child, "pipeline",
+                                               process_group_id);
       did_register_job = true;
       if (cxt.shell_is_interactive())
         shit::print_error(
@@ -494,10 +502,17 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   stage_status.reserve(children.count());
   let pipe_status = ArrayList<String>{heap_allocator()};
   pipe_status.reserve(children.count());
-  for (let const child : children) {
-    const i32 status = os::wait_and_monitor_process(child);
-    stage_status.push(status);
-    pipe_status.push(String::from(status, heap_allocator()));
+  usize waited_child_count = 0;
+  try {
+    for (; waited_child_count < children.count(); waited_child_count++) {
+      let const status =
+          os::wait_and_monitor_process(children[waited_child_count]);
+      stage_status.push(status);
+      pipe_status.push(String::from(status, heap_allocator()));
+    }
+  } catch (...) {
+    utils::terminate_and_reap_processes(children, waited_child_count);
+    throw;
   }
   cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
 

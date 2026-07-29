@@ -309,6 +309,11 @@ fn reopen_terminal_as_stdin() wontthrow -> bool { return false; }
 /* Windows has no POSIX process groups, so the terminal handoff is a no-op. */
 fn shell_has_controlling_terminal() wontthrow -> bool { return false; }
 fn give_controlling_terminal_to(process p) wontthrow -> void { unused(p); }
+fn give_controlling_terminal_to_process_group(i64 process_group_id) wontthrow
+    -> void
+{
+  unused(process_group_id);
+}
 fn reclaim_controlling_terminal() wontthrow -> void {}
 
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
@@ -1471,10 +1476,13 @@ static pure fn is_batch_program(StringView path) wontthrow -> bool
 
 fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
                    process_group_mode process_group, StringView,
-                   terminal_handoff handoff) -> process
+                   terminal_handoff handoff, i64 process_group_id) -> process
 {
   let const allow_script_fallback = fallback == script_fallback_policy::Allow;
-  let const new_process_group = process_group != process_group_mode::Inherit;
+  unused(process_group_id);
+  let const new_process_group =
+      process_group == process_group_mode::New ||
+      process_group == process_group_mode::NewLeaderOwned;
   let const job_lifetime = process_group == process_group_mode::NewLeaderOwned
                                ? timeout_job_lifetime::LeaderOwned
                                : timeout_job_lifetime::DescendantOwned;
@@ -1848,13 +1856,16 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
 
 fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                            Maybe<descriptor> err_fd, SourceLocation location,
-                           StringView source) -> Maybe<process>
+                           StringView source, process_group_mode process_group,
+                           i64 process_group_id) -> Maybe<process>
 {
   unused(in_fd);
   unused(out_fd);
   unused(err_fd);
   unused(location);
   unused(source);
+  unused(process_group);
+  unused(process_group_id);
   return shit::None;
 }
 
@@ -1865,8 +1876,9 @@ fn can_fork_evaluator() wontthrow -> bool { return false; }
 fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
                          mimic_mood mood, SourceLocation location,
-                         StringView diagnostic_source) throws
-    -> compound_stage_launch
+                         StringView diagnostic_source,
+                         process_group_mode process_group,
+                         i64 process_group_id) throws -> compound_stage_launch
 {
   unused(diagnostic_source);
   if (source.is_empty())
@@ -1874,6 +1886,8 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
         steal(location),
         "A compound command in a pipeline is not supported on this platform"};
 
+  unused(process_group);
+  unused(process_group_id);
   let child = spawn_subshell_stage(source, in_fd, out_fd, err_fd, mood);
   if (!child.has_value())
     throw ErrorWithLocation{steal(location),
@@ -2102,10 +2116,11 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   return handle;
 }
 
-fn wait_and_monitor_process(process p, bool *was_stopped) -> i32
+fn wait_and_monitor_process(process p, bool *was_stopped, i64 process_group_id,
+                            process *changed_process) -> i32
 {
   unused(was_stopped);
-  defer { CloseHandle(p); };
+  unused(process_group_id);
   if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
     throw Error{"Could not wait for the process to finish: " +
                 last_system_error_message()};
@@ -2115,6 +2130,8 @@ fn wait_and_monitor_process(process p, bool *was_stopped) -> i32
     throw Error{"Could not read the process exit code: " +
                 last_system_error_message()};
 
+  if (changed_process != nullptr) *changed_process = p;
+  CloseHandle(p);
   return code;
 }
 

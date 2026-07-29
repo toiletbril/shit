@@ -732,13 +732,13 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
 
   let const source = cxt.current_source();
   unused(cxt.materialize_shit_identity());
-  os::process p =
-      os::execute_program(steal(ec),
-                          is_async ? os::script_fallback_policy::Reject
-                                   : os::script_fallback_policy::Allow,
-                          is_foreground_job ? os::process_group_mode::New
-                                            : os::process_group_mode::Inherit,
-                          source != nullptr ? source->view() : StringView{});
+  os::process p = os::execute_program(
+      steal(ec),
+      is_async ? os::script_fallback_policy::Reject
+               : os::script_fallback_policy::Allow,
+      is_async || is_foreground_job ? os::process_group_mode::New
+                                    : os::process_group_mode::Inherit,
+      source != nullptr ? source->view() : StringView{});
   if (p == SHIT_INVALID_PROCESS) {
     LOG(Debug, "running the file as a shell script in this process");
     const mimic_mood mode = cxt.mood();
@@ -749,7 +749,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   }
   if (is_async) {
     cxt.set_last_background_pid(os::process_id_of(p));
-    const i32 id = cxt.register_job(p, command);
+    let const process_group_id = os::process_id_of(p);
+    const i32 id = cxt.register_job(p, command, process_group_id);
     if (cxt.shell_is_interactive())
       shit::print_error("[" + String::from(id, heap_allocator()) + "] " +
                         String::from(static_cast<u64>(os::process_id_of(p)),
@@ -765,7 +766,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
       p, is_foreground_job ? &was_stopped : nullptr);
   if (is_foreground_job) os::reclaim_controlling_terminal();
   if (was_stopped) {
-    const i32 id = cxt.register_stopped_job(p, command, foreground_status);
+    const i32 id = cxt.register_stopped_job(p, command, foreground_status,
+                                            os::process_id_of(p));
     cxt.notify_stopped_job(id, command.view());
   }
   return foreground_status;
@@ -818,6 +820,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   let children = ArrayList<os::process>{heap_allocator()};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
+  i64 process_group_id = 0;
   bool should_reap_children_on_unwind = true;
   defer
   {
@@ -878,18 +881,29 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     } else if (!ec.is_builtin()) {
       let const source = cxt.current_source();
       unused(cxt.materialize_shit_identity());
+      let const process_group = !is_async ? os::process_group_mode::Inherit
+                                : process_group_id == 0
+                                    ? os::process_group_mode::New
+                                    : os::process_group_mode::Join;
       let const child = os::execute_program(
-          steal(ec), os::script_fallback_policy::Reject,
-          os::process_group_mode::Inherit,
-          source != nullptr ? source->view() : StringView{});
+          steal(ec), os::script_fallback_policy::Reject, process_group,
+          source != nullptr ? source->view() : StringView{},
+          os::terminal_handoff::Keep, process_group_id);
+      if (is_async && process_group_id == 0)
+        process_group_id = os::process_id_of(child);
       children.push(child);
       child_stage.push(stage_index);
       last_child = child;
     } else if (!is_last || is_async) {
       let const source = cxt.current_source();
+      let const process_group = !is_async ? os::process_group_mode::Inherit
+                                : process_group_id == 0
+                                    ? os::process_group_mode::New
+                                    : os::process_group_mode::Join;
       let forked_child = os::try_fork_compound_stage(
           ec.in_fd, ec.out_fd, ec.err_fd, ec.source_location(),
-          source != nullptr ? source->view() : StringView{});
+          source != nullptr ? source->view() : StringView{}, process_group,
+          process_group_id);
       if (!forked_child.has_value() &&
           builtin_can_launch_fresh(ec.builtin_kind()))
       {
@@ -961,7 +975,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
             let const launch = os::launch_compound_stage(
                 stage_source.view(), ec.in_fd, stage_out, stage_err, cxt.mood(),
                 ec.source_location(),
-                source != nullptr ? source->view() : StringView{});
+                source != nullptr ? source->view() : StringView{},
+                process_group, process_group_id);
             forked_child = launch.child;
           } catch (...) {
             ec.close_fds();
@@ -1006,6 +1021,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           os::exit_process_immediately(child_status);
         }
 
+        if (is_async && process_group_id == 0)
+          process_group_id = os::process_id_of(child);
         ec.close_fds();
         children.push(child);
         child_stage.push(stage_index);
@@ -1027,8 +1044,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   if (is_async) {
     if (last_child != SHIT_INVALID_PROCESS) {
       cxt.set_last_background_pid(os::process_id_of(last_child));
-      const i32 id =
-          cxt.register_pipeline_job(children, last_child, "pipeline");
+      const i32 id = cxt.register_pipeline_job(children, last_child, "pipeline",
+                                               process_group_id);
       should_reap_children_on_unwind = false;
       if (cxt.shell_is_interactive())
         shit::print_error(

@@ -183,6 +183,7 @@ struct job
   i32 last_status{0};
   i32 stopped_status{0};
   i64 process_id{0};
+  i64 process_group_id{0};
   bool is_primary_process_active{true};
   bool has_unreported_state_change{false};
 };
@@ -716,12 +717,13 @@ public:
   /* The job table tracks the background commands started with the & operator.
      register_job adds a running job and returns its id. update_jobs polls every
      job without blocking and marks the ones that finished or stopped. */
-  fn register_job(os::process pid, StringView command) throws -> i32;
+  fn register_job(os::process pid, StringView command,
+                  i64 process_group_id = 0) throws -> i32;
   fn register_pipeline_job(const ArrayList<os::process> &processes,
-                           os::process primary_process,
-                           StringView command) throws -> i32;
-  fn register_stopped_job(os::process pid, StringView command,
-                          i32 status) throws -> i32;
+                           os::process primary_process, StringView command,
+                           i64 process_group_id) throws -> i32;
+  fn register_stopped_job(os::process pid, StringView command, i32 status,
+                          i64 process_group_id = 0) throws -> i32;
   fn wait_for_job_processes(job &job, bool *was_stopped = nullptr) throws
       -> i32;
   fn notify_stopped_job(i32 id, StringView command) throws -> void;

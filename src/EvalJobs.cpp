@@ -12,12 +12,14 @@ fn EvalContext::set_last_background_pid(i64 pid) wontthrow -> void
   m_last_background_pid = pid;
 }
 
-fn EvalContext::register_job(os::process pid, StringView command) throws -> i32
+fn EvalContext::register_job(os::process pid, StringView command,
+                             i64 process_group_id) throws -> i32
 {
   let new_job = job{};
   new_job.id = m_next_job_id++;
   new_job.pid = pid;
   new_job.process_id = os::process_id_of(pid);
+  new_job.process_group_id = process_group_id;
   new_job.command = command;
   new_job.state = job::State::Running;
   m_jobs.push(steal(new_job));
@@ -28,12 +30,14 @@ fn EvalContext::register_job(os::process pid, StringView command) throws -> i32
 
 fn EvalContext::register_pipeline_job(const ArrayList<os::process> &processes,
                                       os::process primary_process,
-                                      StringView command) throws -> i32
+                                      StringView command,
+                                      i64 process_group_id) throws -> i32
 {
   let new_job = job{};
   new_job.id = m_next_job_id++;
   new_job.pid = primary_process;
   new_job.process_id = os::process_id_of(primary_process);
+  new_job.process_group_id = process_group_id;
   new_job.command = command;
   bool did_skip_primary = false;
 
@@ -52,9 +56,10 @@ fn EvalContext::register_pipeline_job(const ArrayList<os::process> &processes,
 }
 
 fn EvalContext::register_stopped_job(os::process pid, StringView command,
-                                     i32 status) throws -> i32
+                                     i32 status, i64 process_group_id) throws
+    -> i32
 {
-  let const id = register_job(pid, command);
+  let const id = register_job(pid, command, process_group_id);
   job &registered = m_jobs.back();
   registered.state = job::State::Stopped;
   registered.stopped_status = status;
@@ -70,7 +75,7 @@ fn EvalContext::notify_stopped_job(i32 id, StringView command) throws -> void
 static fn poll_owned_processes(ArrayList<os::process> &processes) wontthrow
     -> Maybe<i32>
 {
-  Maybe<i32> stopped_status = None;
+  let stopped_status = Maybe<i32>{None};
   for (usize process_position = processes.count(); process_position > 0;
        process_position--)
   {
@@ -148,39 +153,47 @@ fn EvalContext::wait_for_job_processes(job &job, bool *was_stopped) throws
     return job.stopped_status;
   }
 
-  bool primary_was_stopped = false;
-  if (job.is_primary_process_active) {
-    let const primary_status =
-        os::wait_and_monitor_process(job.pid, &primary_was_stopped);
-    if (primary_was_stopped)
-      job.stopped_status = primary_status;
-    else {
-      job.last_status = primary_status;
-      job.is_primary_process_active = false;
-    }
-  }
-
-  bool earlier_process_was_stopped = false;
-  for (usize process_position = job.earlier_pipeline_processes.count();
-       process_position > 0; process_position--)
+  loop
   {
-    bool process_was_stopped = false;
-    let const process_status = os::wait_and_monitor_process(
-        job.earlier_pipeline_processes[process_position - 1],
-        &process_was_stopped);
+    let const fallback_process = job.is_primary_process_active
+                                     ? job.pid
+                                     : job.earlier_pipeline_processes.back();
+    let changed_process = SHIT_INVALID_PROCESS;
+    let process_was_stopped = false;
+    let const process_status =
+        os::wait_and_monitor_process(fallback_process, &process_was_stopped,
+                                     job.process_group_id, &changed_process);
+
     if (process_was_stopped) {
-      earlier_process_was_stopped = true;
-      if (!primary_was_stopped) job.stopped_status = process_status;
+      job.state = job::State::Stopped;
+      job.stopped_status = process_status;
+      if (was_stopped != nullptr) *was_stopped = true;
+      return process_status;
+    }
+
+    if (changed_process == job.pid) {
+      job.last_status = process_status;
+      job.is_primary_process_active = false;
     } else {
-      job.earlier_pipeline_processes.remove(process_position - 1);
+      for (usize process_position = job.earlier_pipeline_processes.count();
+           process_position > 0; process_position--)
+      {
+        if (job.earlier_pipeline_processes[process_position - 1] !=
+            changed_process)
+          continue;
+        job.earlier_pipeline_processes.remove(process_position - 1);
+        break;
+      }
+    }
+
+    if (!job.is_primary_process_active &&
+        job.earlier_pipeline_processes.is_empty())
+    {
+      job.state = job::State::Done;
+      if (was_stopped != nullptr) *was_stopped = false;
+      return job.last_status;
     }
   }
-
-  let const any_process_was_stopped =
-      primary_was_stopped || earlier_process_was_stopped;
-  if (was_stopped != nullptr) *was_stopped = any_process_was_stopped;
-  job.state = any_process_was_stopped ? job::State::Stopped : job::State::Done;
-  return any_process_was_stopped ? job.stopped_status : job.last_status;
 }
 
 fn EvalContext::jobs() wontthrow -> ArrayList<job> & { return m_jobs; }

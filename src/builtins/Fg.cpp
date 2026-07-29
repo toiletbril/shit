@@ -66,9 +66,9 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const should_reclaim =
       cxt.shell_is_interactive() && os::shell_has_controlling_terminal();
-  let should_reclaim_after_wait =
-      should_reclaim && job->is_primary_process_active;
-  if (should_reclaim_after_wait) os::give_controlling_terminal_to(job->pid);
+  let should_reclaim_after_wait = should_reclaim && job->process_group_id > 0;
+  if (should_reclaim_after_wait)
+    os::give_controlling_terminal_to_process_group(job->process_group_id);
   defer
   {
     if (should_reclaim_after_wait) os::reclaim_controlling_terminal();

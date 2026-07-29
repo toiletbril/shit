@@ -958,8 +958,9 @@ fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 /* posix_spawn reports an exec failure through its return value with no waitable
    pid, so a child is forked to give the caller the same pid and status. */
 cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
-                            int spawn_error, StringView source) throws
-    -> process
+                            int spawn_error, StringView source,
+                            process_group_mode process_group,
+                            i64 process_group_id) throws -> process
 {
   LOG(Debug, "forking a child to report the spawn failure for '%s'",
       program_path.c_str());
@@ -967,6 +968,12 @@ cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
   const pid_t child_pid = check_syscall(fork());
 
   if (child_pid == 0) {
+    if (process_group != process_group_mode::Inherit) {
+      let const target_group = process_group == process_group_mode::Join
+                                   ? static_cast<pid_t>(process_group_id)
+                                   : 0;
+      (void) setpgid(0, target_group);
+    }
     errno = spawn_error;
     let error = ErrorWithLocation{steal(location),
                                   "Unable to execute `" + program_path.text() +
@@ -977,12 +984,20 @@ cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
     _exit(spawn_error == ENOENT ? 127 : 126);
   }
 
+  if (process_group != process_group_mode::Inherit) {
+    let const target_group = process_group == process_group_mode::Join
+                                 ? static_cast<pid_t>(process_group_id)
+                                 : child_pid;
+    (void) setpgid(child_pid, target_group);
+  }
+
   return child_pid;
 }
 
 hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
                        process_group_mode process_group, StringView source,
-                       terminal_handoff handoff) throws -> process
+                       terminal_handoff handoff, i64 process_group_id) throws
+    -> process
 {
   let const allow_script_fallback = fallback == script_fallback_policy::Allow;
   let const new_process_group = process_group != process_group_mode::Inherit;
@@ -1122,7 +1137,10 @@ hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
 
   short spawn_flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
   if (new_process_group) {
-    posix_spawnattr_setpgroup(&attr, 0);
+    ASSERT(process_group != process_group_mode::Join || process_group_id > 0);
+    posix_spawnattr_setpgroup(&attr, process_group == process_group_mode::Join
+                                         ? static_cast<pid_t>(process_group_id)
+                                         : 0);
     spawn_flags |= POSIX_SPAWN_SETPGROUP;
   }
   posix_spawnattr_setflags(&attr, spawn_flags);
@@ -1147,7 +1165,8 @@ hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
 
   if (spawn_error != 0)
     return spawn_failure_child(ec.source_location(), ec.program_path(),
-                               spawn_error, source);
+                               spawn_error, source, process_group,
+                               process_group_id);
 
   return child_pid;
 }
@@ -1339,6 +1358,15 @@ fn give_controlling_terminal_to(process p) wontthrow -> void
   signal(SIGTTOU, previous);
 }
 
+fn give_controlling_terminal_to_process_group(i64 process_group_id) wontthrow
+    -> void
+{
+  if (!shell_has_controlling_terminal() || process_group_id <= 0) return;
+  void (*const previous)(int) = signal(SIGTTOU, SIG_IGN);
+  tcsetpgrp(STDIN_FILENO, static_cast<pid_t>(process_group_id));
+  signal(SIGTTOU, previous);
+}
+
 fn reclaim_controlling_terminal() wontthrow -> void
 {
   if (!shell_has_controlling_terminal()) return;
@@ -1347,10 +1375,11 @@ fn reclaim_controlling_terminal() wontthrow -> void
   signal(SIGTTOU, previous);
 }
 
-static fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                              Maybe<descriptor> err_fd,
-                              SourceLocation location = {},
-                              StringView source = {}) throws -> process
+static fn fork_compound_stage(
+    Maybe<descriptor> in_fd, Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
+    SourceLocation location = {}, StringView source = {},
+    process_group_mode process_group = process_group_mode::Inherit,
+    i64 process_group_id = 0) throws -> process
 {
   LOG(Debug, "forking a compound pipeline stage");
 
@@ -1360,6 +1389,15 @@ static fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
     /* A throw would unwind into the parent's evaluator, the child must exit
        directly. */
     try {
+      if (process_group != process_group_mode::Inherit) {
+        ASSERT(process_group != process_group_mode::Join ||
+               process_group_id > 0);
+        let const target_group = process_group == process_group_mode::Join
+                                     ? static_cast<pid_t>(process_group_id)
+                                     : 0;
+        check_syscall(setpgid(0, target_group));
+      }
+
       if (in_fd) {
         check_syscall(dup2(*in_fd, STDIN_FILENO));
         check_syscall(close(*in_fd));
@@ -1388,6 +1426,13 @@ static fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
           "swallowed an unknown error while preparing the forked stage child");
       exit_process_immediately(1);
     }
+  }
+
+  if (process_group != process_group_mode::Inherit) {
+    let const target_group = process_group == process_group_mode::Join
+                                 ? static_cast<pid_t>(process_group_id)
+                                 : child_pid;
+    (void) setpgid(child_pid, target_group);
   }
 
   return child_pid;
@@ -1419,9 +1464,11 @@ static fn fork_job_process() throws -> process
 
 fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                            Maybe<descriptor> err_fd, SourceLocation location,
-                           StringView source) throws -> Maybe<process>
+                           StringView source, process_group_mode process_group,
+                           i64 process_group_id) throws -> Maybe<process>
 {
-  return fork_compound_stage(in_fd, out_fd, err_fd, location, source);
+  return fork_compound_stage(in_fd, out_fd, err_fd, location, source,
+                             process_group, process_group_id);
 }
 
 fn try_fork_job_process() throws -> Maybe<process>
@@ -1484,13 +1531,15 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
 fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
                          mimic_mood mood, SourceLocation location,
-                         StringView diagnostic_source) throws
-    -> compound_stage_launch
+                         StringView diagnostic_source,
+                         process_group_mode process_group,
+                         i64 process_group_id) throws -> compound_stage_launch
 {
   unused(source);
   unused(mood);
   const process child =
-      fork_compound_stage(in_fd, out_fd, err_fd, location, diagnostic_source);
+      fork_compound_stage(in_fd, out_fd, err_fd, location, diagnostic_source,
+                          process_group, process_group_id);
   return compound_stage_launch{
       .child = child,
       .should_evaluate_child = child == 0,
@@ -1712,24 +1761,32 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   return fd;
 }
 
-fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
+fn wait_and_monitor_process(process pid, bool *was_stopped,
+                            i64 process_group_id,
+                            process *changed_process) throws -> i32
 {
   ASSERT(pid >= 0);
 
   LOG(Debug, "waiting on process %lld", static_cast<long long>(pid));
 
   i32 status{};
+  let const wait_target =
+      process_group_id > 0 ? -static_cast<pid_t>(process_group_id) : pid;
   const int wait_flags = was_stopped != nullptr ? WUNTRACED : 0;
+  pid_t changed_pid = 0;
 
   loop
   {
-    let w = waitpid(pid, &status, wait_flags);
+    changed_pid = waitpid(wait_target, &status, wait_flags);
     /* A signal interrupted the wait. Retry instead of failing. */
-    if (w == -1 && errno == EINTR) {
+    if (changed_pid == -1 && errno == EINTR) {
       continue;
     }
-    if (check_syscall(w) == pid) break;
+    check_syscall(changed_pid);
+    break;
   }
+
+  if (changed_process != nullptr) *changed_process = changed_pid;
 
   if (was_stopped != nullptr && WIFSTOPPED(status)) {
     *was_stopped = true;
@@ -1746,9 +1803,9 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
        newline, every other signal prints the located process message. */
     if (sig == SIGPIPE) {
     } else if (sig != SIGINT) {
-      shit::print("[Process " + String::from(pid, heap_allocator()) + ": " +
-                  sig_desc + ", signal " + String::from(sig, heap_allocator()) +
-                  "]\n");
+      shit::print("[Process " + String::from(changed_pid, heap_allocator()) +
+                  ": " + sig_desc + ", signal " +
+                  String::from(sig, heap_allocator()) + "]\n");
     } else {
       shit::print("\n");
     }

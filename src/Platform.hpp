@@ -151,6 +151,7 @@ enum class process_group_mode : u8
 {
   Inherit,
   New,
+  Join,
   NewLeaderOwned,
 };
 
@@ -351,8 +352,9 @@ fn make_os_args(const ArrayList<String> &args) throws -> os_args;
 fn last_system_error_message() throws -> String;
 fn last_system_error_is_missing_file() wontthrow -> bool;
 
-fn wait_and_monitor_process(process p, bool *was_stopped = nullptr) throws
-    -> i32;
+fn wait_and_monitor_process(process p, bool *was_stopped = nullptr,
+                            i64 process_group_id = 0,
+                            process *changed_process = nullptr) throws -> i32;
 
 fn reap_process_quietly(process p) throws -> i32;
 
@@ -858,8 +860,8 @@ fn execute_program(
     ExecContext &&ec,
     script_fallback_policy fallback = script_fallback_policy::Reject,
     process_group_mode process_group = process_group_mode::Inherit,
-    StringView source = {},
-    terminal_handoff handoff = terminal_handoff::Keep) throws -> process;
+    StringView source = {}, terminal_handoff handoff = terminal_handoff::Keep,
+    i64 process_group_id = 0) throws -> process;
 
 fn shell_has_controlling_terminal() wontthrow -> bool;
 
@@ -882,6 +884,8 @@ fn capture_program_output(const ArrayList<String> &argv,
 
 /* Ignores SIGTTOU across the change. A no-op without a controlling terminal. */
 fn give_controlling_terminal_to(process p) wontthrow -> void;
+fn give_controlling_terminal_to_process_group(i64 process_group_id) wontthrow
+    -> void;
 fn reclaim_controlling_terminal() wontthrow -> void;
 
 struct process_substitution_launch
@@ -901,10 +905,11 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
                                bool source_traces_enabled) throws
     -> process_substitution_launch;
 
-fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                           Maybe<descriptor> err_fd,
-                           SourceLocation location = {},
-                           StringView source = {}) throws -> Maybe<process>;
+fn try_fork_compound_stage(
+    Maybe<descriptor> in_fd, Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
+    SourceLocation location = {}, StringView source = {},
+    process_group_mode process_group = process_group_mode::Inherit,
+    i64 process_group_id = 0) throws -> Maybe<process>;
 
 fn try_fork_job_process() throws -> Maybe<process>;
 fn can_fork_evaluator() wontthrow -> bool;
@@ -915,11 +920,12 @@ struct compound_stage_launch
   bool should_evaluate_child{false};
 };
 
-fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
-                         Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
-                         mimic_mood mood, SourceLocation location = {},
-                         StringView diagnostic_source = {}) throws
-    -> compound_stage_launch;
+fn launch_compound_stage(
+    StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+    Maybe<descriptor> err_fd, mimic_mood mood, SourceLocation location = {},
+    StringView diagnostic_source = {},
+    process_group_mode process_group = process_group_mode::Inherit,
+    i64 process_group_id = 0) throws -> compound_stage_launch;
 
 fn register_platform_flags(ArrayList<Flag *> &flags) throws -> void;
 fn initialize_platform_runtime() wontthrow -> void;
