@@ -766,6 +766,20 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   return foreground_status;
 }
 
+pure static fn builtin_can_launch_fresh(Builtin::Kind kind) wontthrow -> bool
+{
+  switch (kind) {
+  case Builtin::Kind::Echo:
+  case Builtin::Kind::Pwd:
+  case Builtin::Kind::True:
+  case Builtin::Kind::False:
+  case Builtin::Kind::Test:
+  case Builtin::Kind::Printf:
+  case Builtin::Kind::Shitbox: return true;
+  default: return false;
+  }
+}
+
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                execution_mode mode) throws -> i32
 {
@@ -783,6 +797,20 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   let children = ArrayList<os::process>{heap_allocator()};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
+  bool should_reap_children_on_unwind = true;
+  defer
+  {
+    if (should_reap_children_on_unwind) {
+      for (ExecContext &pending_context : ecs)
+        pending_context.close_fds();
+      if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
+      for (let const child : children) {
+        try {
+          os::wait_and_monitor_process(child);
+        } catch (...) {}
+      }
+    }
+  };
 
   /* Each stage's status is recorded against its position, so pipefail can
      report the rightmost stage that failed and the plain case can read the last
@@ -840,46 +868,27 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       children.push(child);
       child_stage.push(stage_index);
       last_child = child;
-    } else if (!is_last) {
+    } else if (!is_last || is_async) {
       let const source = cxt.current_source();
       let forked_child = os::try_fork_compound_stage(
           ec.in_fd, ec.out_fd, ec.err_fd, ec.source_location(),
           source != nullptr ? source->view() : StringView{});
       if (!forked_child.has_value() &&
-          ec.builtin_kind() == Builtin::Kind::Shitbox)
+          builtin_can_launch_fresh(ec.builtin_kind()))
       {
         const usize utility_index = ec.program() == "shitbox" ? 1 : 0;
-        bool should_launch_fresh_stage = false;
+        bool should_launch_fresh_stage =
+            ec.builtin_kind() != Builtin::Kind::Shitbox;
         bool should_restore_environment = false;
-        if (utility_index < ec.args().count()) {
+        if (ec.builtin_kind() == Builtin::Kind::Shitbox &&
+            utility_index < ec.args().count())
+        {
           let const utility_kind =
               shitbox::find_util(ec.args()[utility_index].view());
           if (utility_kind.has_value()) {
-            switch (*utility_kind) {
-            case shitbox::Utility::Kind::Seq:
-            case shitbox::Utility::Kind::Ps:
-            case shitbox::Utility::Kind::Yes:
-              should_launch_fresh_stage = true;
-              break;
-            case shitbox::Utility::Kind::Env:
-              should_launch_fresh_stage = true;
-              should_restore_environment = true;
-              for (usize argument_index = utility_index + 1;
-                   argument_index < ec.args().count(); argument_index++)
-              {
-                if (ec.args()[argument_index] == "--") continue;
-                if (!ec.args()[argument_index]
-                         .view()
-                         .find_character('=')
-                         .has_value())
-                {
-                  should_launch_fresh_stage = false;
-                  break;
-                }
-              }
-              break;
-            default: break;
-            }
+            should_launch_fresh_stage = true;
+            should_restore_environment =
+                *utility_kind == shitbox::Utility::Kind::Env;
           }
         }
 
@@ -913,7 +922,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
               stage_source.append("; ");
             }
           }
-          if (ec.program() != "shitbox") stage_source.append("shitbox ");
+          if (ec.builtin_kind() == Builtin::Kind::Shitbox &&
+              ec.program() != "shitbox")
+          {
+            stage_source.append("shitbox ");
+          }
           for (usize argument_index = 0; argument_index < ec.args().count();
                argument_index++)
           {
@@ -997,7 +1010,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   if (is_async) {
     if (last_child != SHIT_INVALID_PROCESS) {
       cxt.set_last_background_pid(os::process_id_of(last_child));
-      const i32 id = cxt.register_job(last_child, "pipeline");
+      const i32 id =
+          cxt.register_pipeline_job(children, last_child, "pipeline");
       if (cxt.shell_is_interactive())
         shit::print_error(
             "[" + String::from(id, heap_allocator()) + "] " +
@@ -1005,11 +1019,27 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                          heap_allocator()) +
             "\n");
     }
+    should_reap_children_on_unwind = false;
     return ret;
   }
 
-  for (usize i = 0; i < children.count(); i++)
-    stage_status[child_stage[i]] = os::wait_and_monitor_process(children[i]);
+  usize waited_child_count = 0;
+  try {
+    for (; waited_child_count < children.count(); waited_child_count++)
+      stage_status[child_stage[waited_child_count]] =
+          os::wait_and_monitor_process(children[waited_child_count]);
+  } catch (...) {
+    for (usize child_position = waited_child_count;
+         child_position < children.count(); child_position++)
+    {
+      try {
+        os::wait_and_monitor_process(children[child_position]);
+      } catch (...) {}
+    }
+    should_reap_children_on_unwind = false;
+    throw;
+  }
+  should_reap_children_on_unwind = false;
 
   let pipe_status = ArrayList<String>{heap_allocator()};
   pipe_status.reserve(stage_count);

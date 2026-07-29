@@ -32,6 +32,16 @@ bare_pipeline_output=$("$BIN" --mood sh --enable-shitbox -c \
 "$BIN" -c \
     "pipeline_value='\$pipeline'; shitbox env \"PIPELINE_LITERAL=\$pipeline_value\" | shitbox grep 'PIPELINE_LITERAL=\$pipeline'" \
     > "${TEST_NULL_DEVICE:-/dev/null}" || exit 1
+large_pipeline_file=$TEST_TEMP_DIRECTORY/large-pipeline
+large_pipeline_count=$(
+    "$BIN" -c 'shitbox seq 1 100000 > "$1"; shitbox cat "$1" | shitbox wc -c' \
+        pipeline-test "$large_pipeline_file"
+) || exit 1
+[ "$large_pipeline_count" -gt 100000 ] || exit 1
+large_builtin_count=$(
+    "$BIN" -c "printf '%100000s' x | shitbox wc -c"
+) || exit 1
+[ "$large_builtin_count" -eq 100000 ] || exit 1
 
 echo "--- pkill with no pattern ---"
 "$BIN" -c 'shitbox pkill' 2>&1

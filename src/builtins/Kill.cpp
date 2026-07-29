@@ -134,7 +134,24 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         status = 1;
         continue;
       }
-      pid = job->pid;
+      bool did_signal_process = false;
+      bool did_signal_fail = false;
+      if (job->is_primary_process_active) {
+        did_signal_process = true;
+        if (!os::signal_process(job->pid, signal_number))
+          did_signal_fail = true;
+      }
+      for (let const process : job->earlier_pipeline_processes) {
+        did_signal_process = true;
+        if (!os::signal_process(process, signal_number)) did_signal_fail = true;
+      }
+      if (!did_signal_process || did_signal_fail) {
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                  StringView{"Cannot signal '"} + target +
+                                      "': " + os::last_system_error_message());
+        status = 1;
+      }
+      continue;
     } else {
       const ErrorOr<i64> parsed_value = target.to<i64>();
       if (parsed_value.is_error()) {

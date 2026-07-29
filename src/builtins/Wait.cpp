@@ -17,23 +17,6 @@ REGISTER_BUILTIN_FLAGS(Wait);
 
 namespace shit {
 
-namespace {
-
-fn wait_for_job(job &job) throws -> i32
-{
-  if (job.state == job::State::Done || job.state == job::State::Stopped) {
-    return job.last_status;
-  }
-
-  let was_stopped = false;
-  let const status = os::wait_and_monitor_process(job.pid, &was_stopped);
-  job.state = was_stopped ? job::State::Stopped : job::State::Done;
-  job.last_status = status;
-  return status;
-}
-
-} // namespace
-
 Wait::Wait() = default;
 
 pure fn Wait::kind() const wontthrow -> Builtin::Kind { return Kind::Wait; }
@@ -50,7 +33,7 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() == 1) {
     LOG(Debug, "wait blocking on every job of %zu", cxt.jobs().count());
     for (job &job : cxt.jobs())
-      wait_for_job(job);
+      cxt.wait_for_job_processes(job);
     cxt.forget_done_jobs();
     return 0;
   }
@@ -64,7 +47,7 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       job *const matched = cxt.find_job_by_spec(target);
 
       if (matched != nullptr) {
-        status = wait_for_job(*matched);
+        status = cxt.wait_for_job_processes(*matched);
       } else {
         report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                   target + ": no such job",
@@ -83,12 +66,17 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
            pid would throw on ECHILD and abort the command. */
         job *matched = nullptr;
         for (job &job : cxt.jobs()) {
-          if (os::process_has_id(job.pid, parsed.value())) {
+          bool is_matching_process = job.process_id == parsed.value();
+          for (let const process : job.earlier_pipeline_processes)
+            if (os::process_has_id(process, parsed.value()))
+              is_matching_process = true;
+          if (is_matching_process) {
             matched = &job;
             break;
           }
         }
-        status = matched != nullptr ? wait_for_job(*matched) : 127;
+        status =
+            matched != nullptr ? cxt.wait_for_job_processes(*matched) : 127;
       }
     }
   }

@@ -177,9 +177,12 @@ struct job
 
   i32 id;
   os::process pid;
+  ArrayList<os::process> earlier_pipeline_processes{heap_allocator()};
   String command{heap_allocator()};
   State state{State::Running};
   i32 last_status{0};
+  i64 process_id{0};
+  bool is_primary_process_active{true};
   bool has_unreported_state_change{false};
 };
 
@@ -713,8 +716,13 @@ public:
      register_job adds a running job and returns its id. update_jobs polls every
      job without blocking and marks the ones that finished or stopped. */
   fn register_job(os::process pid, StringView command) throws -> i32;
+  fn register_pipeline_job(const ArrayList<os::process> &processes,
+                           os::process primary_process,
+                           StringView command) throws -> i32;
   fn register_stopped_job(os::process pid, StringView command,
                           i32 status) throws -> i32;
+  fn wait_for_job_processes(job &job,
+                            bool *was_stopped = nullptr) throws -> i32;
   fn notify_stopped_job(i32 id, StringView command) throws -> void;
   fn update_jobs() throws -> void;
   fn jobs() wontthrow -> ArrayList<job> &;
@@ -1853,6 +1861,7 @@ protected:
   usize m_sourced_file_frames{0};
 
   ArrayList<job> m_jobs{heap_allocator()};
+  ArrayList<os::process> m_detached_job_processes{heap_allocator()};
   i32 m_next_job_id{1};
   bool m_shell_is_interactive;
 

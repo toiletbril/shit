@@ -54,17 +54,21 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* A stopped job cannot finish under the wait until it is resumed. */
   if (job->state == job::State::Stopped) {
-    if (const Maybe<i32> cont = os::signal_number_from_name("CONT"))
-      os::signal_process(job->pid, *cont);
+    if (const Maybe<i32> cont = os::signal_number_from_name("CONT")) {
+      if (job->is_primary_process_active) os::signal_process(job->pid, *cont);
+      for (let const process : job->earlier_pipeline_processes)
+        os::signal_process(process, *cont);
+    }
   }
 
   ec.print_to_stdout(job->command + "\n");
 
   let const should_reclaim =
       cxt.shell_is_interactive() && os::shell_has_controlling_terminal();
-  if (should_reclaim) os::give_controlling_terminal_to(job->pid);
+  if (should_reclaim && job->is_primary_process_active)
+    os::give_controlling_terminal_to(job->pid);
   let was_stopped = false;
-  let const status = os::wait_and_monitor_process(job->pid, &was_stopped);
+  let const status = cxt.wait_for_job_processes(*job, &was_stopped);
   if (should_reclaim) os::reclaim_controlling_terminal();
 
   if (was_stopped) {
@@ -74,8 +78,6 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return status;
   }
 
-  job->state = job::State::Done;
-  job->last_status = status;
   cxt.forget_done_jobs();
 
   return status;

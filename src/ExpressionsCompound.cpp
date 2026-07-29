@@ -481,7 +481,19 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   if (is_async()) {
     if (last_child != SHIT_INVALID_PROCESS) {
       cxt.set_last_background_pid(os::process_id_of(last_child));
-      const i32 id = cxt.register_job(last_child, "pipeline");
+      let did_register_job = false;
+      defer
+      {
+        if (!did_register_job)
+          for (let const child : children) {
+            try {
+              os::wait_and_monitor_process(child);
+            } catch (...) {}
+          }
+      };
+      const i32 id =
+          cxt.register_pipeline_job(children, last_child, "pipeline");
+      did_register_job = true;
       if (cxt.shell_is_interactive())
         shit::print_error(
             "[" + String::from(id, heap_allocator()) + "] " +

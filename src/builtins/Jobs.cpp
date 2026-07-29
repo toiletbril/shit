@@ -117,7 +117,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     job.has_unreported_state_change = false;
 
     if (FLAG_JOBS_PIDS.is_enabled()) {
-      out += String::from(os::process_id_of(job.pid), cxt.scratch_allocator());
+      out += String::from(job.process_id, cxt.scratch_allocator());
       out.push('\n');
       continue;
     }
@@ -127,7 +127,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     out += " ";
 
     if (FLAG_JOBS_LONG.is_enabled()) {
-      out += String::from(os::process_id_of(job.pid), cxt.scratch_allocator());
+      out += String::from(job.process_id, cxt.scratch_allocator());
       out += " ";
     }
 
