@@ -1761,23 +1761,19 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   return fd;
 }
 
-fn wait_and_monitor_process(process pid, bool *was_stopped,
-                            i64 process_group_id,
-                            process *changed_process) throws -> i32
+fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
 {
   ASSERT(pid >= 0);
 
   LOG(Debug, "waiting on process %lld", static_cast<long long>(pid));
 
   i32 status{};
-  let const wait_target =
-      process_group_id > 0 ? -static_cast<pid_t>(process_group_id) : pid;
   const int wait_flags = was_stopped != nullptr ? WUNTRACED : 0;
   pid_t changed_pid = 0;
 
   loop
   {
-    changed_pid = waitpid(wait_target, &status, wait_flags);
+    changed_pid = waitpid(pid, &status, wait_flags);
     /* A signal interrupted the wait. Retry instead of failing. */
     if (changed_pid == -1 && errno == EINTR) {
       continue;
@@ -1785,8 +1781,6 @@ fn wait_and_monitor_process(process pid, bool *was_stopped,
     check_syscall(changed_pid);
     break;
   }
-
-  if (changed_process != nullptr) *changed_process = changed_pid;
 
   if (was_stopped != nullptr && WIFSTOPPED(status)) {
     *was_stopped = true;
@@ -1818,6 +1812,25 @@ fn wait_and_monitor_process(process pid, bool *was_stopped,
   } else {
     return WEXITSTATUS(status);
   }
+}
+
+fn wait_for_child_state_change() wontthrow -> void
+{
+  sigset_t blocked_signals;
+  sigemptyset(&blocked_signals);
+  sigaddset(&blocked_signals, SIGCHLD);
+
+  sigset_t previous_mask;
+  if (sigprocmask(SIG_BLOCK, &blocked_signals, &previous_mask) != 0) return;
+
+  while (CHILD_STATE_CHANGED == 0) {
+    let wait_mask = previous_mask;
+    sigdelset(&wait_mask, SIGCHLD);
+    sigsuspend(&wait_mask);
+  }
+
+  CHILD_STATE_CHANGED = 0;
+  (void) sigprocmask(SIG_SETMASK, &previous_mask, nullptr);
 }
 
 fn reap_process_quietly(process pid) throws -> i32
@@ -2002,9 +2015,17 @@ static fn sigchild_handler(int n, siginfo_t *siginfo, opaque *ctx) wontthrow
   CHILD_STATE_CHANGED = 1;
 }
 
+static fn install_child_state_handler() throws -> void
+{
+  struct sigaction action = {};
+  action.sa_flags = SA_SIGINFO;
+  action.sa_sigaction = sigchild_handler;
+  check_syscall(sigaction(SIGCHLD, &action, nullptr));
+}
+
 fn reset_signal_handlers() throws -> void
 {
-  LOG(Debug, "restoring the default signal dispositions");
+  LOG(Debug, "restoring signal dispositions for a child process");
 
   sigset_t sm;
   sigfillset(&sm);
@@ -2012,7 +2033,7 @@ fn reset_signal_handlers() throws -> void
 
   struct sigaction sa = {};
   sa.sa_handler = SIG_DFL;
-  check_syscall(sigaction(SIGCHLD, &sa, nullptr));
+  install_child_state_handler();
   check_syscall(sigaction(SIGINT, &sa, nullptr));
 
   /* The shell ignores SIGPIPE, the child restores the default so a producer
@@ -2042,10 +2063,7 @@ fn set_default_signal_handlers(signal_profile profile) throws -> void
     check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
   }
 
-  struct sigaction sa = {};
-  sa.sa_flags = SA_SIGINFO;
-  sa.sa_sigaction = sigchild_handler;
-  check_syscall(sigaction(SIGCHLD, &sa, nullptr));
+  install_child_state_handler();
 
   struct sigaction si = {};
   si.sa_handler = handle_interrupt;
@@ -2651,6 +2669,11 @@ namespace os {
 fn get_shell_process_id() wontthrow -> i64
 {
   return static_cast<i64>(PARENT_SHELL_PID);
+}
+
+fn get_current_process_id() wontthrow -> i64
+{
+  return static_cast<i64>(getpid());
 }
 
 fn get_file_creation_mask() wontthrow -> u32

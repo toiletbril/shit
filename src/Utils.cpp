@@ -658,7 +658,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
           os::reclaim_controlling_terminal();
 
           if (was_stopped) {
-            const i32 id = cxt.register_stopped_job(child, command, status);
+            const i32 id = cxt.register_stopped_job(child, command, status,
+                                                    os::process_id_of(child));
             cxt.notify_stopped_job(id, command.view());
           }
           return status;
@@ -732,13 +733,14 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
 
   let const source = cxt.current_source();
   unused(cxt.materialize_shit_identity());
-  os::process p = os::execute_program(
-      steal(ec),
-      is_async ? os::script_fallback_policy::Reject
-               : os::script_fallback_policy::Allow,
-      is_async || is_foreground_job ? os::process_group_mode::New
-                                    : os::process_group_mode::Inherit,
-      source != nullptr ? source->view() : StringView{});
+  os::process p =
+      os::execute_program(steal(ec),
+                          is_async ? os::script_fallback_policy::Reject
+                                   : os::script_fallback_policy::Allow,
+                          is_async ? os::process_group_mode::NewBackground
+                          : is_foreground_job ? os::process_group_mode::New
+                                              : os::process_group_mode::Inherit,
+                          source != nullptr ? source->view() : StringView{});
   if (p == SHIT_INVALID_PROCESS) {
     LOG(Debug, "running the file as a shell script in this process");
     const mimic_mood mode = cxt.mood();
@@ -760,11 +762,19 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   }
 
   LOG(Debug, "waiting for the foreground child to finish");
-  if (is_foreground_job) os::give_controlling_terminal_to(p);
+  let should_reclaim_after_wait = is_foreground_job;
+  if (should_reclaim_after_wait) os::give_controlling_terminal_to(p);
+  defer
+  {
+    if (should_reclaim_after_wait) os::reclaim_controlling_terminal();
+  };
   let was_stopped = false;
   const i32 foreground_status = os::wait_and_monitor_process(
       p, is_foreground_job ? &was_stopped : nullptr);
-  if (is_foreground_job) os::reclaim_controlling_terminal();
+  if (should_reclaim_after_wait) {
+    os::reclaim_controlling_terminal();
+    should_reclaim_after_wait = false;
+  }
   if (was_stopped) {
     const i32 id = cxt.register_stopped_job(p, command, foreground_status,
                                             os::process_id_of(p));
@@ -881,10 +891,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     } else if (!ec.is_builtin()) {
       let const source = cxt.current_source();
       unused(cxt.materialize_shit_identity());
-      let const process_group = !is_async ? os::process_group_mode::Inherit
-                                : process_group_id == 0
-                                    ? os::process_group_mode::New
-                                    : os::process_group_mode::Join;
+      let const process_group =
+          !is_async ? os::process_group_mode::Inherit
+                    : os::background_process_group_mode(process_group_id);
       let const child = os::execute_program(
           steal(ec), os::script_fallback_policy::Reject, process_group,
           source != nullptr ? source->view() : StringView{},
@@ -896,10 +905,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       last_child = child;
     } else if (!is_last || is_async) {
       let const source = cxt.current_source();
-      let const process_group = !is_async ? os::process_group_mode::Inherit
-                                : process_group_id == 0
-                                    ? os::process_group_mode::New
-                                    : os::process_group_mode::Join;
+      let const process_group =
+          !is_async ? os::process_group_mode::Inherit
+                    : os::background_process_group_mode(process_group_id);
       let forked_child = os::try_fork_compound_stage(
           ec.in_fd, ec.out_fd, ec.err_fd, ec.source_location(),
           source != nullptr ? source->view() : StringView{}, process_group,

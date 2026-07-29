@@ -886,7 +886,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         case dynamic_var::EUID:
           return String::from(os::get_effective_user_id(), heap_allocator());
         case dynamic_var::BASHPID:
-          return String::from(os::get_shell_process_id(), heap_allocator());
+          return String::from(os::get_current_process_id(), heap_allocator());
         case dynamic_var::BASH_MONOSECONDS:
           return String::from(
               static_cast<i64>(os::monotonic_nanos() / 1000000ULL),

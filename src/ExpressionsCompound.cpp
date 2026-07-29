@@ -408,10 +408,9 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
             stage_end_position - stage_location.position);
       }
 
-      let const process_group = !is_async() ? os::process_group_mode::Inherit
-                                : process_group_id == 0
-                                    ? os::process_group_mode::New
-                                    : os::process_group_mode::Join;
+      let const process_group =
+          !is_async() ? os::process_group_mode::Inherit
+                      : os::background_process_group_mode(process_group_id);
       let const launch = os::launch_compound_stage(
           stage_text, stage_in, stage_out, None, cxt.mood(), stage_location,
           stage_source != nullptr ? stage_source->view() : StringView{},

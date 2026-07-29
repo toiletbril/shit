@@ -155,6 +155,7 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_diagnostic_levels \
 	cli_disown_running_only \
 	cli_exec_exit_codes \
+	cli_fg_terminal_handoff \
 	cli_job_state_running_then_stopped \
 	cli_mkdir_mode_umask \
 	cli_path_cache_behavior \
@@ -239,7 +240,7 @@ refill:
 		[ -f cli/$$f.sh ] || continue; \
 		printf "	%-64s cli/$$f.out\n" cli/$$f.sh; \
 		case $$f in \
-		command_substitution_interrupt|shitbox_timeout|transaction_lock_lifetime) \
+		command_substitution_interrupt|fg_terminal_handoff|shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job) \
 			golden_timeout_seconds=60; \
 			[ "$$f" != shitbox_timeout ] || golden_timeout_seconds=120; \
 			output=$$(mktemp "expected/cli/.$$f.out.XXXXXX") || exit; \

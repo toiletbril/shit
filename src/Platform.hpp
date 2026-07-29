@@ -151,9 +151,22 @@ enum class process_group_mode : u8
 {
   Inherit,
   New,
+  NewBackground,
   Join,
   NewLeaderOwned,
 };
+
+pure constexpr fn background_process_group_mode(i64 process_group_id) wontthrow
+    -> process_group_mode
+{
+#if SHIT_PLATFORM_IS WIN32
+  unused(process_group_id);
+  return process_group_mode::NewBackground;
+#else
+  return process_group_id == 0 ? process_group_mode::NewBackground
+                               : process_group_mode::Join;
+#endif
+}
 
 enum class terminal_handoff : u8
 {
@@ -165,6 +178,7 @@ enum class terminal_handoff : u8
 constexpr char PATH_DELIMITER = ';';
 constexpr char DIRECTORY_SEPARATOR = '\\';
 constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = false;
+constexpr bool HAS_CHILD_STATE_CHANGE_WAIT = false;
 
 using process = HANDLE;
 using descriptor = HANDLE;
@@ -181,6 +195,7 @@ using os_args = String;
 constexpr char PATH_DELIMITER = ':';
 constexpr char DIRECTORY_SEPARATOR = '/';
 constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = true;
+constexpr bool HAS_CHILD_STATE_CHANGE_WAIT = true;
 
 using process = pid_t;
 using descriptor = int;
@@ -352,9 +367,9 @@ fn make_os_args(const ArrayList<String> &args) throws -> os_args;
 fn last_system_error_message() throws -> String;
 fn last_system_error_is_missing_file() wontthrow -> bool;
 
-fn wait_and_monitor_process(process p, bool *was_stopped = nullptr,
-                            i64 process_group_id = 0,
-                            process *changed_process = nullptr) throws -> i32;
+fn wait_and_monitor_process(process p, bool *was_stopped = nullptr) throws
+    -> i32;
+fn wait_for_child_state_change() wontthrow -> void;
 
 fn reap_process_quietly(process p) throws -> i32;
 
@@ -694,6 +709,7 @@ fn environment_names() throws -> ArrayList<String>;
 fn is_child_process() wontthrow -> bool;
 
 fn get_shell_process_id() wontthrow -> i64;
+fn get_current_process_id() wontthrow -> i64;
 
 fn get_parent_process_id() wontthrow -> i64;
 fn get_real_user_id() wontthrow -> i64;

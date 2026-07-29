@@ -1480,14 +1480,21 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
 {
   let const allow_script_fallback = fallback == script_fallback_policy::Allow;
   unused(process_group_id);
-  let const new_process_group =
+  let const should_create_new_process_group =
       process_group == process_group_mode::New ||
+      process_group == process_group_mode::NewBackground ||
       process_group == process_group_mode::NewLeaderOwned;
+  let const should_attach_timeout_job =
+      should_create_new_process_group &&
+      process_group != process_group_mode::NewBackground;
   let const job_lifetime = process_group == process_group_mode::NewLeaderOwned
                                ? timeout_job_lifetime::LeaderOwned
                                : timeout_job_lifetime::DescendantOwned;
   let const should_hand_off_controlling_terminal_before_start =
       handoff == terminal_handoff::BeforeStart;
+  let const should_start_suspended =
+      should_attach_timeout_job ||
+      should_hand_off_controlling_terminal_before_start;
   LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
       ec.args().count());
 
@@ -1605,10 +1612,9 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   LPVOID environment_block =
       ec.should_use_empty_environment ? empty_environment_block : nullptr;
 
-  DWORD creation_flags = new_process_group ? CREATE_NEW_PROCESS_GROUP : 0;
-  if (new_process_group || should_hand_off_controlling_terminal_before_start) {
-    creation_flags |= CREATE_SUSPENDED;
-  }
+  DWORD creation_flags =
+      should_create_new_process_group ? CREATE_NEW_PROCESS_GROUP : 0;
+  if (should_start_suspended) creation_flags |= CREATE_SUSPENDED;
 
   /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
    */
@@ -1626,7 +1632,7 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
     throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
   }
 
-  if (new_process_group) {
+  if (should_attach_timeout_job) {
     try {
       attach_timeout_job(process_info, job_lifetime);
     } catch (const ErrorBase &error) {
@@ -1643,7 +1649,7 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   }
   if (should_hand_off_controlling_terminal_before_start)
     give_controlling_terminal_to(process_info.hProcess);
-  if ((creation_flags & CREATE_SUSPENDED) != 0) {
+  if (should_start_suspended) {
     if (ResumeThread(process_info.hThread) == static_cast<DWORD>(-1)) {
       let const message = last_system_error_message();
       TerminateProcess(process_info.hProcess, 1);
@@ -1808,7 +1814,8 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
 
 static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
                                Maybe<descriptor> out_fd,
-                               Maybe<descriptor> err_fd, mimic_mood mood) throws
+                               Maybe<descriptor> err_fd, mimic_mood mood,
+                               process_group_mode process_group) throws
     -> Maybe<process>
 {
   /* Windows has no fork, so a compound pipeline stage re-parses its source in a
@@ -1845,9 +1852,12 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
   defer { restore_handle_inheritance(error_inheritance); };
 
   PROCESS_INFORMATION process_info{};
+  let const creation_flags = process_group == process_group_mode::Inherit
+                                 ? static_cast<DWORD>(0)
+                                 : CREATE_NEW_PROCESS_GROUP;
   if (CreateProcessA(module_path->c_str(),
                      const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
-                     TRUE, 0, nullptr, nullptr, &startup_info,
+                     TRUE, creation_flags, nullptr, nullptr, &startup_info,
                      &process_info) == 0)
     return shit::None;
   CloseHandle(process_info.hThread);
@@ -1886,9 +1896,9 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
         steal(location),
         "A compound command in a pipeline is not supported on this platform"};
 
-  unused(process_group);
   unused(process_group_id);
-  let child = spawn_subshell_stage(source, in_fd, out_fd, err_fd, mood);
+  let child =
+      spawn_subshell_stage(source, in_fd, out_fd, err_fd, mood, process_group);
   if (!child.has_value())
     throw ErrorWithLocation{steal(location),
                             "Could not spawn the compound pipeline stage"};
@@ -2116,11 +2126,10 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   return handle;
 }
 
-fn wait_and_monitor_process(process p, bool *was_stopped, i64 process_group_id,
-                            process *changed_process) -> i32
+fn wait_and_monitor_process(process p, bool *was_stopped) -> i32
 {
   unused(was_stopped);
-  unused(process_group_id);
+  defer { CloseHandle(p); };
   if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
     throw Error{"Could not wait for the process to finish: " +
                 last_system_error_message()};
@@ -2130,10 +2139,10 @@ fn wait_and_monitor_process(process p, bool *was_stopped, i64 process_group_id,
     throw Error{"Could not read the process exit code: " +
                 last_system_error_message()};
 
-  if (changed_process != nullptr) *changed_process = p;
-  CloseHandle(p);
   return code;
 }
+
+fn wait_for_child_state_change() wontthrow -> void {}
 
 fn reap_process_quietly(process p) -> i32
 {
@@ -3079,6 +3088,11 @@ namespace os {
 fn get_shell_process_id() wontthrow -> i64
 {
   return static_cast<i64>(PARENT_SHELL_PID);
+}
+
+fn get_current_process_id() wontthrow -> i64
+{
+  return static_cast<i64>(GetCurrentProcessId());
 }
 
 fn get_file_creation_mask() wontthrow -> u32

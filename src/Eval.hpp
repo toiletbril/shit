@@ -723,7 +723,7 @@ public:
                            os::process primary_process, StringView command,
                            i64 process_group_id) throws -> i32;
   fn register_stopped_job(os::process pid, StringView command, i32 status,
-                          i64 process_group_id = 0) throws -> i32;
+                          i64 process_group_id) throws -> i32;
   fn wait_for_job_processes(job &job, bool *was_stopped = nullptr) throws
       -> i32;
   fn notify_stopped_job(i32 id, StringView command) throws -> void;

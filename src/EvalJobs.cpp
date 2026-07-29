@@ -153,16 +153,30 @@ fn EvalContext::wait_for_job_processes(job &job, bool *was_stopped) throws
     return job.stopped_status;
   }
 
+  if constexpr (os::HAS_CHILD_STATE_CHANGE_WAIT) {
+    loop
+    {
+      update_jobs();
+      if (job.state == job::State::Done) {
+        if (was_stopped != nullptr) *was_stopped = false;
+        return job.last_status;
+      }
+      if (job.state == job::State::Stopped) {
+        if (was_stopped != nullptr) *was_stopped = true;
+        return job.stopped_status;
+      }
+      os::wait_for_child_state_change();
+    }
+  }
+
   loop
   {
     let const fallback_process = job.is_primary_process_active
                                      ? job.pid
                                      : job.earlier_pipeline_processes.back();
-    let changed_process = SHIT_INVALID_PROCESS;
     let process_was_stopped = false;
     let const process_status =
-        os::wait_and_monitor_process(fallback_process, &process_was_stopped,
-                                     job.process_group_id, &changed_process);
+        os::wait_and_monitor_process(fallback_process, &process_was_stopped);
 
     if (process_was_stopped) {
       job.state = job::State::Stopped;
@@ -171,7 +185,7 @@ fn EvalContext::wait_for_job_processes(job &job, bool *was_stopped) throws
       return process_status;
     }
 
-    if (changed_process == job.pid) {
+    if (fallback_process == job.pid) {
       job.last_status = process_status;
       job.is_primary_process_active = false;
     } else {
@@ -179,7 +193,7 @@ fn EvalContext::wait_for_job_processes(job &job, bool *was_stopped) throws
            process_position > 0; process_position--)
       {
         if (job.earlier_pipeline_processes[process_position - 1] !=
-            changed_process)
+            fallback_process)
           continue;
         job.earlier_pipeline_processes.remove(process_position - 1);
         break;
