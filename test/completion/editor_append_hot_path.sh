@@ -15,14 +15,15 @@ run_editor()
 {
     transcript=$1
     columns=${2-80}
+    script_error=$transcript.script-error
     if [ "$script_style" = gnu ]; then
         "$script_command" -q -c \
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
-            "$transcript" >/dev/null 2>&1
+            "$transcript" >/dev/null 2>"$script_error"
     else
-        "$script_command" -q "$transcript" /bin/sh -c \
+        "$script_command" -q -t 0 "$transcript" /bin/sh -c \
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
-            >/dev/null 2>&1
+            >/dev/null 2>"$script_error"
     fi
 }
 
@@ -75,7 +76,13 @@ send_typing_input | TERM=xterm-256color PATH="$d/path" \
     SHIT_HISTORY="$d/typing-history" BIN="$BIN" \
     run_editor "$d/typing-typescript"
 
-append_metrics=$(metric_line "$d/typing-typescript" 1) || exit 1
+append_metrics=$(metric_line "$d/typing-typescript" 1) || {
+    printf 'editor metrics missing\n'
+    strings "$d/typing-typescript" || true
+    [ ! -s "$d/typing-typescript.script-error" ] ||
+        /bin/cat "$d/typing-typescript.script-error"
+    exit 1
+}
 append_refreshes=$(metric_field "$append_metrics" append)
 full_refreshes=$(metric_field "$append_metrics" full)
 append_serializations=$(metric_field "$append_metrics" serializations)
