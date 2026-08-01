@@ -169,3 +169,40 @@ jobs:
             echo
             echo '</details>'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  debug-macos:
+    name: Debug tests on macOS
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install the test shells
+        run: brew install bash dash
+
+      - name: Run debug tests
+        run: |
+          BASHP="$(brew --prefix bash)/bin/bash" \
+          DASH="$(brew --prefix dash)/bin/dash" \
+            make MODE=dbg test
+
+  debug-windows:
+    name: Debug tests on Windows
+    runs-on: windows-2025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Add the native shell tools to PATH
+        shell: pwsh
+        run: |
+          "C:\Program Files\Git\bin" |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Run debug tests
+        shell: pwsh
+        run: make.exe MODE=dbg test
