@@ -5,7 +5,15 @@ unset SHIT_FLAGS
 # its own, the symlink spelling such as a bash symlink to shit. The output is
 # filtered to the markers so a sourced profile cannot perturb it.
 echo "== an inherited SHELL is preserved, not clobbered:"
-SHELL=sentinel-shell "$BIN" -c 'case "$SHELL" in sentinel-shell) echo preserved ;; *) echo "clobbered to $SHELL" ;; esac'
+inherited_shell=$PWD/sentinel-shell
+if [ "${OS-}" = Windows_NT ]; then
+    inherited_shell=$(pwd -W)/sentinel-shell
+fi
+SHELL="$inherited_shell" EXPECTED_SHELL="$inherited_shell" "$BIN" -c '
+    normalized_shell=$(printf "%s\n" "$SHELL" | shitbox tr "\\" "/")
+    normalized_expected_shell=$(printf "%s\n" "$EXPECTED_SHELL" | shitbox tr "\\" "/")
+    if [ "$normalized_shell" = "$normalized_expected_shell" ]; then echo preserved; else echo "clobbered to $SHELL"; fi
+'
 
 echo "== an unset SHELL is seeded with the invocation path:"
 (unset SHELL
@@ -22,7 +30,11 @@ else
     bash_pattern='*/bash'
 fi
 echo "== BASH names the invocation symlink while SHELL stays inherited:"
-SHELL=sentinel-shell BASH_PATTERN="$bash_pattern" "$bash_invocation" -c \
-    'case "$BASH" in $BASH_PATTERN) echo bash-is-invocation ;; *) echo "BASH=$BASH" ;; esac; case "$SHELL" in sentinel-shell) echo shell-preserved ;; *) echo "SHELL=$SHELL" ;; esac' \
+SHELL="$inherited_shell" EXPECTED_SHELL="$inherited_shell" \
+    BASH_PATTERN="$bash_pattern" "$bash_invocation" -c \
+    'case "$BASH" in $BASH_PATTERN) echo bash-is-invocation ;; *) echo "BASH=$BASH" ;; esac
+     normalized_shell=$(printf "%s\n" "$SHELL" | shitbox tr "\\" "/")
+     normalized_expected_shell=$(printf "%s\n" "$EXPECTED_SHELL" | shitbox tr "\\" "/")
+     if [ "$normalized_shell" = "$normalized_expected_shell" ]; then echo shell-preserved; else echo "SHELL=$SHELL"; fi' \
     2>/dev/null
 rm -rf "$dir"

@@ -8,7 +8,7 @@ shitbox basename "$PWD"
 cd - > ../cd-output
 shitbox basename "$PWD"
 cd ../..
-CDPATH="$TEST_PATH_SEPARATOR" cd parent > cd-output
+CDPATH="$TEST_NATIVE_PATH_SEPARATOR" cd parent > cd-output
 echo "cdpath=$?"
 cd "$start"
 cd .test-work/nonexistent-xyz-dir 2>&-

@@ -394,7 +394,7 @@ The bashdiff and mimicrydiff bash comparisons require a bash 5.3 or newer
 reference, since the goldens encode bash 5.x behavior, and both scripts skip the
 bash comparison loudly when `$BASHP` is older. The macOS system `/bin/bash` is
 bash 3.2, so a macOS run passes the modern bash through `BASHP`, as in `make -C
-test bashdiff BASHP=/opt/zerobrew/bin/bash`.
+test bashdiff BASHP="$(brew --prefix bash)/bin/bash"`.
 
 ## Finishing a change
 

@@ -1,9 +1,12 @@
 d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 script_command=$(command -v script)
+expect_command=$(command -v expect || :)
 RCFILE="$d/editor-rc"
 export RCFILE
-printf 'printf ready > "$EDITOR_READY_FILE"\n' > "$RCFILE"
+printf '%s\n' \
+    "PROMPT_COMMAND='printf ready > \"\$EDITOR_READY_FILE\"; unset PROMPT_COMMAND'" \
+    > "$RCFILE"
 
 if "$script_command" --version >/dev/null 2>&1; then
     script_style=gnu
@@ -21,8 +24,8 @@ run_editor()
         "$script_command" -q -c \
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
             "$transcript" >/dev/null 2>"$script_error" || recorder_status=$?
-    elif command -v expect >/dev/null 2>&1; then
-        TRANSCRIPT="$transcript" COLUMNS="$columns" expect -c '
+    elif [ -n "$expect_command" ]; then
+        TRANSCRIPT="$transcript" COLUMNS="$columns" "$expect_command" -c '
             set timeout 10
             log_user 0
             log_file -noappend $env(TRANSCRIPT)
@@ -35,33 +38,44 @@ run_editor()
                 wait
                 exit 1
             }]
-            interact timeout 10 {
+            set editor_eof 0
+            interact -nobuffer "\n" { after 200 } \
+                -nobuffer "\003" { after 200 } timeout 10 {
                 puts stderr "editor recorder input was idle for 10 seconds"
                 catch {exec /bin/kill -KILL $editor_pid}
                 close
                 wait
                 exit 1
-            } eof {}
-            expect {
-                eof {}
-                timeout {
-                    puts stderr "editor recorder output was idle for 10 seconds"
-                    catch {exec /bin/kill -KILL $editor_pid}
-                    close
-                    wait
-                    exit 1
+            } eof { return } -o eof {
+                set editor_eof 1
+                return
+            }
+            if {!$editor_eof} {
+                expect {
+                    eof {}
+                    timeout {
+                        puts stderr "editor recorder output was idle for 10 seconds"
+                        catch {exec /bin/kill -KILL $editor_pid}
+                        close
+                        wait
+                        exit 1
+                    }
                 }
             }
             after cancel $wall_timeout
-            catch {wait}
+            set editor_wait [wait]
+            if {[llength $editor_wait] != 4 || [lindex $editor_wait 2] != 0 || [lindex $editor_wait 3] != 0} {
+                puts stderr "editor exited unsuccessfully: $editor_wait"
+                exit 1
+            }
         ' >/dev/null 2>"$script_error" || recorder_status=$?
     else
         "$script_command" -q /dev/null /bin/sh -c \
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
             >"$transcript" 2>"$script_error" || recorder_status=$?
     fi
-    if [ "$recorder_status" -ne 0 ] && [ -s "$script_error" ]; then
-        /bin/cat "$script_error"
+    if [ "$recorder_status" -ne 0 ]; then
+        [ ! -s "$script_error" ] || /bin/cat "$script_error"
         return "$recorder_status"
     fi
 
@@ -113,13 +127,16 @@ send_typing_input()
         printf %s "$character"
         sleep 0.02
     done
-    printf '\nexit\n'
+    printf '\n'
+    sleep 0.2
+    printf 'exit 0\n'
+    sleep 0.5
 }
 
 send_typing_input | TERM=xterm-256color PATH="$d/path" \
     SHIT_TEST_EDITOR_STATS=1 EDITOR_READY_FILE="$d/typing-ready" \
     SHIT_HISTORY="$d/typing-history" BIN="$BIN" \
-    run_editor "$d/typing-typescript" || :
+    run_editor "$d/typing-typescript" || exit 1
 
 append_metrics=$(metric_line "$d/typing-typescript" 1) || {
     printf 'editor metrics missing\n'
@@ -158,21 +175,28 @@ send_tab_input()
 {
     wait_for_editor "$d/tab-ready" || exit 1
     printf 'probe\talpha\n'
-    sleep 0.1
+    sleep 0.5
     printf 'compgen -c >/dev/null 2>&1; cd /\n'
-    sleep 0.1
-    printf 'probe\t\t\nexit\n'
+    sleep 0.5
+    printf 'probe\t\t\nexit 0\n'
+    sleep 0.5
 }
 
 send_tab_input | PATH="$d/path" SHIT_TEST_EDITOR_STATS=1 \
     EDITOR_READY_FILE="$d/tab-ready" SHIT_HISTORY="$d/tab-history" \
-    BIN="$BIN" run_editor "$d/tab-typescript" || :
+    BIN="$BIN" run_editor "$d/tab-typescript" || exit 1
 
 tab_metrics=$(metric_line "$d/tab-typescript" 1) || exit 1
 test "$(metric_field "$tab_metrics" probes)" -le 4 || exit 1
 echo 'TAB validation ends before the next key'
 
-warm_metrics=$(metric_line "$d/tab-typescript" 3) || exit 1
+warm_metrics=$(metric_line "$d/tab-typescript" 3) || {
+    printf 'warm TAB metrics missing\n'
+    strings "$d/tab-typescript" || true
+    [ ! -s "$d/tab-typescript.script-error" ] ||
+        /bin/cat "$d/tab-typescript.script-error"
+    exit 1
+}
 case $warm_metrics in
     *' preprompt-stats=0 preprompt-reads=0 preprompt-sorts=0 preprompt-probes=0 preprompt-resolutions=0 preprompt-history-loads=0 '*) ;;
     *) exit 1 ;;
@@ -193,13 +217,18 @@ done > "$d/miss-history"
 send_history_input()
 {
     wait_for_editor "$d/history-ready" || exit 1
-    printf 'zz\nzzzzzzz\nexit\n'
+    printf 'zz\n'
+    sleep 0.2
+    printf 'zzzzzzz\n'
+    sleep 0.2
+    printf 'exit 0\n'
+    sleep 0.5
 }
 
 send_history_input | TERM=xterm-256color PATH="$d/path" \
     EDITOR_READY_FILE="$d/history-ready" SHIT_TEST_EDITOR_STATS=1 \
     SHIT_HISTORY="$d/miss-history" BIN="$BIN" \
-    run_editor "$d/history-typescript" || :
+    run_editor "$d/history-typescript" || exit 1
 
 history_short_metrics=$(metric_line "$d/history-typescript" 1) || exit 1
 history_metrics=$(metric_line "$d/history-typescript" 2) || exit 1
@@ -218,20 +247,22 @@ printf '#!/bin/sh\n' > "$d/startup-after/git"
 chmod +x "$d/startup-after/git"
 printf '%s\n' \
     "PS1='> '" \
-    'printf ready > "$EDITOR_READY_FILE"' \
-    "PROMPT_COMMAND='PATH=\"\$STARTUP_AFTER\"; unset PROMPT_COMMAND'" \
+    "PROMPT_COMMAND='PATH=\"\$STARTUP_AFTER\"; printf ready > \"\$EDITOR_READY_FILE\"; unset PROMPT_COMMAND'" \
     > "$d/startup-rc"
 
 send_startup_input()
 {
     wait_for_editor "$d/startup-ready" || exit 1
-    printf 'git \177z\003exit\n'
+    printf 'git \177z\003'
+    sleep 0.2
+    printf 'exit 0\n'
+    sleep 0.5
 }
 
 send_startup_input | TERM=xterm-256color NO_COLOR= PATH="$d/startup-before" \
     EDITOR_READY_FILE="$d/startup-ready" STARTUP_AFTER="$d/startup-after" \
     SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/startup-history" \
-    RCFILE="$d/startup-rc" BIN="$BIN" run_editor "$d/startup-typescript" || :
+    RCFILE="$d/startup-rc" BIN="$BIN" run_editor "$d/startup-typescript" || exit 1
 
 startup_metrics=$(metric_line "$d/startup-typescript" 1) || exit 1
 test "$(metric_field "$startup_metrics" stats)" -eq 0 || exit 1
@@ -254,14 +285,19 @@ chmod +x "$d/menu-bin/tailscale"
 send_menu_input()
 {
     wait_for_editor "$d/menu-ready" || exit 1
-    printf 'tailscale \t\003exit\n'
+    printf 'tailscale \t'
+    sleep 0.5
+    printf '\003'
+    sleep 0.2
+    printf 'exit 0\n'
+    sleep 0.5
 }
 
 send_menu_input | ASAN_OPTIONS=detect_stack_use_after_return=1 \
     EDITOR_READY_FILE="$d/menu-ready" MANPATH= \
     PATH="$d/menu-bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
     SHIT_HISTORY="$d/menu-history" BIN="$BIN" \
-    run_editor "$d/menu-typescript" 100 || :
+    run_editor "$d/menu-typescript" 100 || exit 1
 
 strings "$d/menu-typescript" | \
     grep -q 'Keep this first long completion description intact' || exit 1
@@ -278,18 +314,25 @@ touch "$d/quoted-completion/space name" \
 send_quoted_input()
 {
     wait_for_editor "$d/quoted-ready" || exit 1
-    printf "cd '%s'\nprintf '<%%s>\\\\n' 'spX'\033[D\033[D\t\n" \
-        "$d/quoted-completion"
-    printf "printf '<%%s>\\\\n' plaX\033[D\t\n"
-    printf "COMPLETION_PROBE=variable-value\n"
-    printf "printf '<%%s>\\\\n' \"\$COMPLETION_PROBX\"\033[D\033[D\t\n"
-    printf "printf '<%%s>\\\\n' read\tone\nexit\n"
+    printf "cd '%s'\n" "$d/quoted-completion"
     sleep 0.2
+    printf "printf '<%%s>\\\\n' 'spX'\033[D\033[D\t\n"
+    sleep 0.2
+    printf "printf '<%%s>\\\\n' plaX\033[D\t\n"
+    sleep 0.2
+    printf "COMPLETION_PROBE=variable-value\n"
+    sleep 0.2
+    printf "printf '<%%s>\\\\n' \"\$COMPLETION_PROBX\"\033[D\033[D\t\n"
+    sleep 0.2
+    printf "printf '<%%s>\\\\n' read\tone\n"
+    sleep 0.2
+    printf 'exit 0\n'
+    sleep 0.5
 }
 
 send_quoted_input | EDITOR_READY_FILE="$d/quoted-ready" \
     SHIT_HISTORY="$d/quoted-history" BIN="$BIN" \
-    run_editor "$d/quoted-typescript" || :
+    run_editor "$d/quoted-typescript" || exit 1
 
 for quoted_expected_output in \
     '<space name>' '<plain name>' '<variable-value>' '<README-one>'
@@ -311,8 +354,12 @@ chmod +x "$d/mixed-path/after-cd-probe"
 send_mixed_path_input()
 {
     wait_for_editor "$d/mixed-ready" || exit 1
-    printf 'cd %s\nafter-cd-probe\014\nexit\n' "$d/next-directory"
+    printf 'cd %s\n' "$d/next-directory"
     sleep 0.2
+    printf 'after-cd-probe\014\n'
+    sleep 0.2
+    printf 'exit 0\n'
+    sleep 0.5
 }
 
 unset NO_COLOR
@@ -320,7 +367,7 @@ send_mixed_path_input | TERM=xterm-256color \
     EDITOR_READY_FILE="$d/mixed-ready" \
     PATH="$d/mixed-path${TEST_PATH_SEPARATOR}${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
     SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/mixed-history" BIN="$BIN" \
-    run_editor "$d/mixed-typescript" || :
+    run_editor "$d/mixed-typescript" || exit 1
 
 mixed_metrics=$(metric_line "$d/mixed-typescript" 2) || exit 1
 case $mixed_metrics in *' stats=0 reads=0 sorts=0 probes=0 '*) ;; *) exit 1 ;; esac

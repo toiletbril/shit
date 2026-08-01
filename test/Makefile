@@ -24,12 +24,13 @@ endif
 
 ifeq ($(TARGET), Windows_NT)
 TEST_HOST_MAKE_FLAGS := -j1
-export TEST_PATH_SEPARATOR := ;
+export TEST_NATIVE_PATH_SEPARATOR := ;
 export TEST_NULL_DEVICE := NUL
 else
-export TEST_PATH_SEPARATOR := :
+export TEST_NATIVE_PATH_SEPARATOR := :
 export TEST_NULL_DEVICE := /dev/null
 endif
+export TEST_PATH_SEPARATOR := :
 export TEST_TEMP_DIRECTORY := .test-work
 
 MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
@@ -71,7 +72,7 @@ export TEST_SYSTEM_PATH := $(shell \
 export TEST_UNAME_DIRECTORY := $(shell \
 	uname_path=$$(command -v uname); printf '%s' "$${uname_path%/*}")
 endif
-export PATH := $(CURDIR)/bin$(TEST_PATH_SEPARATOR)$(PATH)
+export PATH := $(CURDIR)/bin$(TEST_NATIVE_PATH_SEPARATOR)$(PATH)
 
 FAILED_LIST := failed.diff
 INPUT_FILES := $(wildcard shit/*.shit)

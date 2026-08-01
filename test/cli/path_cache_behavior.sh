@@ -30,7 +30,7 @@ chmod +x "$dir/atomic/oldatomicprobe" \
 
 CACHE_SECOND="$dir/two" \
     PATH="$dir/one${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
-    'for iteration in 1 2; do cacheprobe; PATH="$CACHE_SECOND$TEST_PATH_SEPARATOR$TEST_SYSTEM_PATH"; done'
+    'for iteration in 1 2; do cacheprobe; PATH="$CACHE_SECOND$TEST_NATIVE_PATH_SEPARATOR$TEST_SYSTEM_PATH"; done'
 
 PATH="$dir/blocked${TEST_PATH_SEPARATOR}$dir/two${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'blockedprobe > "$TEST_NULL_OUTPUT" 2>&1; printf "%s\n" "$?"'
@@ -258,7 +258,7 @@ if "$BIN" -X all -c ':' >/dev/null 2>&1; then
     FIRST_DIRECTORY="$dir/one" \
     PATH="$dir/one${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -X info -c '
         compgen -c >/dev/null
-        PATH="$PATH$TEST_PATH_SEPARATOR$FIRST_DIRECTORY"
+        PATH="$PATH$TEST_NATIVE_PATH_SEPARATOR$FIRST_DIRECTORY"
         compgen -c >/dev/null
     ' >/dev/null 2>"$path_update_log" || exit 1
     [ "$(grep -c 'unique PATH directories' "$path_update_log")" -eq 1 ] ||

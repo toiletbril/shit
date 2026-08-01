@@ -7,8 +7,8 @@ trap 'rm -rf "$dir"' EXIT
 printf '#!/bin/sh\necho ran\n' > "$dir/laterprobe"
 chmod +x "$dir/laterprobe"
 
-"$BIN" -c "PATH=\"$dir$TEST_PATH_SEPARATOR\$PATH\"; laterprobe"
-"$BIN" -c "export PATH=\"$dir$TEST_PATH_SEPARATOR\$PATH\"; laterprobe"
-"$BIN" -c "PATH=\"$dir$TEST_PATH_SEPARATOR\$PATH\" laterprobe"
+"$BIN" -c "PATH=\"$dir$TEST_NATIVE_PATH_SEPARATOR\$PATH\"; laterprobe"
+"$BIN" -c "export PATH=\"$dir$TEST_NATIVE_PATH_SEPARATOR\$PATH\"; laterprobe"
+"$BIN" -c "PATH=\"$dir$TEST_NATIVE_PATH_SEPARATOR\$PATH\" laterprobe"
 "$BIN" -c 'FOO=1; definitely_absent_cmd' 2>&1 | sed 's/^shit: [0-9]*:[0-9]*: //' | ./normalize-trace.sh "$BIN"
 echo "rc=$?"

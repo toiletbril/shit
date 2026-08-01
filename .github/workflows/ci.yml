@@ -199,7 +199,6 @@ jobs:
     runs-on: windows-2025
     env:
       MSYS: winsymlinks:nativestrict
-      MSYS2_ENV_CONV_EXCL: "PATH=;SHELL="
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -259,6 +258,11 @@ jobs:
           $shellPlatform = sh.exe -c 'uname -s'
           if ($shellPlatform -notlike 'MSYS_NT-*') {
             throw "Unexpected shell platform: $shellPlatform"
+          }
+          sh.exe -c `
+            'for tool in diff git mkfifo mktemp perl rm script sed strings stty tee; do command -v "$tool" || exit 1; done; test -x /bin/stty'
+          if ($LASTEXITCODE -ne 0) {
+            throw "The MSYS2 golden test toolchain is incomplete"
           }
           $symlinkProbeDirectory = Join-Path ([IO.Path]::GetTempPath()) `
             "shit-symlink-$([guid]::NewGuid())"
