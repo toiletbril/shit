@@ -12,12 +12,6 @@ jobs:
       image: alpine:latest
     continue-on-error: true
     steps:
-      # The toolchain installs first so the checkout action has nodejs and git
-      # inside the musl container, the build uses clang with lld, and dash, bash,
-      # and the coreutils back the benchmark comparisons and the golden tests.
-      # The git-doc pages and the mandoc man reader back the completion golden,
-      # which sources git subcommands from the man1 files and git options from a
-      # man git fork.
       - name: Install the toolchain
         shell: sh
         run: |
@@ -51,7 +45,7 @@ jobs:
 
       - name: Run benchmark
         if: '!cancelled()'
-        run: SCALE=200 make -C test bench
+        run: SCALE=200 make MODE=rel -C test bench
 
       - name: Assert shit is faster than dash
         if: '!cancelled()'
@@ -83,7 +77,7 @@ jobs:
               'BEGIN { exit !(s + 0 > 0 && s + 0 < d + 0) }' \
             || { echo "shit is not faster than dash"; exit 1; }
 
-      - name: Assert shit is faster than bash by at least 5 times
+      - name: Assert release shit is faster than bash by at least 5 times
         if: '!cancelled()'
         shell: bash
         run: |
@@ -113,18 +107,18 @@ jobs:
               'BEGIN { exit !(s + 0 > 0 && s * 5 <= b + 0) }' \
             || { echo "shit is not at least 5 times faster than bash"; exit 1; }
 
-      - name: Build coverage binary
+      - name: Build release binary with code coverage
         if: '!cancelled()'
         run: make clean && make MODE=cov shit
 
-      - name: Run tests under coverage
+      - name: Run tests under release coverage binary
         if: '!cancelled()'
         run: |
           mkdir -p coverage/profraw
           LLVM_PROFILE_FILE="$PWD/coverage/profraw/shit-%p.profraw" \
-            make -C test test BIN=../shit-cov || true
+            make MODE=cov test
 
-      - name: Record coverage
+      - name: Record release binary coverage
         if: always()
         shell: bash
         run: |

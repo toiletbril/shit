@@ -229,6 +229,11 @@ DIAGNOSTIC_TTY_INPUT := \
 diagnostic_tty_test: $(BIN)
 	@if command -v python3 >/dev/null 2>&1; then \
 		for test_file in $(DIAGNOSTIC_TTY_INPUT); do \
+			if [ "$$test_file" = interactive/long_warning_window.py ] && \
+				! '$(BIN)' -X debug -c : </dev/null >/dev/null 2>&1; then \
+				printf "\t%-64s skipped, release binary\n" "$$test_file"; \
+				continue; \
+			fi; \
 			output=$$(mktemp) || exit; \
 			if python3 "$$test_file" "$(BIN)" >"$$output" 2>&1; then \
 				printf "\t%-64s ok\033[K\r" "$$test_file"; \

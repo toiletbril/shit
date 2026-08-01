@@ -6,6 +6,7 @@
 *.ilk
 *.pdb
 *.lib
+*.profraw
 
 *.gch
 *.pch
