@@ -174,13 +174,25 @@ jobs:
           submodules: recursive
 
       - name: Install the test shells
-        run: brew install bash dash
+        run: |
+          brew install bash dash-shell
+          echo "BASHP=$(brew --prefix bash)/bin/bash" >> "$GITHUB_ENV"
+          echo "DASH=$(brew --prefix dash-shell)/bin/dash" >> "$GITHUB_ENV"
+
+      - name: Verify the test toolchain
+        run: |
+          for tool in make clang++ python3 perl script mkfifo strings; do
+            command -v "$tool"
+          done
+          test -x /bin/stty
+          "$BASHP" --version | head -1
+          "$DASH" -c 'echo dash available'
+          make --version | head -1
+          clang++ --version | head -1
+          python3 --version
 
       - name: Run debug tests
-        run: |
-          BASHP="$(brew --prefix bash)/bin/bash" \
-          DASH="$(brew --prefix dash)/bin/dash" \
-            make MODE=dbg test
+        run: make MODE=dbg test
 
   debug-windows:
     name: Debug tests on Windows
@@ -191,12 +203,47 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Add the native shell tools to PATH
+      - name: Install the test toolchain
         shell: pwsh
         run: |
+          if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+            Install-Module -Name Microsoft.WinGet.Client -Force `
+              -Repository PSGallery
+            Repair-WinGetPackageManager -AllUsers
+          }
+          winget install --id GnuWin32.Make --exact --version 3.81 --silent `
+            --accept-package-agreements --accept-source-agreements `
+            --disable-interactivity
+          $makePath = 'C:/Program Files (x86)/GnuWin32/bin/make.exe'
+          if (-not (Test-Path $makePath)) {
+            throw "WinGet did not install GNU Make at $makePath"
+          }
+          'C:\Program Files (x86)\GnuWin32\bin' |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           "C:\Program Files\Git\bin" |
             Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
+      - name: Verify the test toolchain
+        shell: pwsh
+        run: |
+          $makePath = 'C:/Program Files (x86)/GnuWin32/bin/make.exe'
+          $resolvedMakePath = (Get-Command make.exe -ErrorAction Stop).Source `
+            -replace '\\', '/'
+          if ($resolvedMakePath -ne $makePath) {
+            throw "Unexpected make executable at $resolvedMakePath"
+          }
+          $makeVersion = make.exe --version | Select-Object -First 1
+          if ($makeVersion -ne 'GNU Make 3.81') {
+            throw "Unexpected make version: $makeVersion"
+          }
+          Get-Command winget.exe -ErrorAction Stop
+          Get-Command clang++.exe -ErrorAction Stop
+          Get-Command sh.exe -ErrorAction Stop
+          Get-Command python3.exe -ErrorAction Stop
+          clang++ --version | Select-Object -First 1
+          sh --version | Select-Object -First 1
+          python3 --version
+
       - name: Run debug tests
         shell: pwsh
-        run: make.exe MODE=dbg test
+        run: make.exe TEST_HOST_MAKE=make.exe MODE=dbg test
