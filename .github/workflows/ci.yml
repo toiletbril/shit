@@ -165,7 +165,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   debug-macos:
-    name: Debug tests on macOS
+    name: Run debug build tests on macOS
     runs-on: macos-15
     steps:
       - name: Checkout
@@ -195,8 +195,10 @@ jobs:
         run: make MODE=dbg test
 
   debug-windows:
-    name: Debug tests on Windows
+    name: Run debug build tests on Windows
     runs-on: windows-2025
+    env:
+      MSYS: winsymlinks:nativestrict
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -211,6 +213,12 @@ jobs:
               -Repository PSGallery
             Repair-WinGetPackageManager -AllUsers
           }
+          $developerModePath = `
+            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+          New-Item -Path $developerModePath -Force | Out-Null
+          New-ItemProperty -Path $developerModePath `
+            -Name AllowDevelopmentWithoutDevLicense -Value 1 `
+            -PropertyType DWord -Force | Out-Null
           $makeRoot = 'C:\GnuWin32'
           winget install --id GnuWin32.Make --exact --version 3.81 `
             --source winget --location $makeRoot --silent `
@@ -225,7 +233,7 @@ jobs:
           }
           "$makeRoot\bin" |
             Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          "C:\Program Files\Git\bin" |
+          'C:\msys64\usr\bin' |
             Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Verify the test toolchain
@@ -241,9 +249,35 @@ jobs:
           if ($makeVersion -ne 'GNU Make 3.81') {
             throw "Unexpected make version: $makeVersion"
           }
+          $shPath = 'C:/msys64/usr/bin/sh.exe'
+          $resolvedShPath = (Get-Command sh.exe -ErrorAction Stop).Source `
+            -replace '\\', '/'
+          if ($resolvedShPath -ne $shPath) {
+            throw "Unexpected sh executable at $resolvedShPath"
+          }
+          $shellPlatform = sh.exe -c 'uname -s'
+          if ($shellPlatform -notlike 'MSYS_NT-*') {
+            throw "Unexpected shell platform: $shellPlatform"
+          }
+          $symlinkProbeDirectory = Join-Path ([IO.Path]::GetTempPath()) `
+            "shit-symlink-$([guid]::NewGuid())"
+          $symlinkProbePath = $symlinkProbeDirectory -replace '\\', '/'
+          sh.exe -c `
+            'mkdir -p "$1/target" && ln -s target "$1/directory-link" && ln -s missing "$1/dangling-link"' `
+            sh $symlinkProbePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "MSYS2 could not create native test symlinks"
+          }
+          foreach ($linkName in 'directory-link', 'dangling-link') {
+            $link = Get-Item -LiteralPath `
+              (Join-Path $symlinkProbeDirectory $linkName) -Force
+            if ($link.LinkType -ne 'SymbolicLink') {
+              throw "$linkName is not a native symbolic link"
+            }
+          }
+          Remove-Item -LiteralPath $symlinkProbeDirectory -Recurse -Force
           Get-Command winget.exe -ErrorAction Stop
           Get-Command clang++.exe -ErrorAction Stop
-          Get-Command sh.exe -ErrorAction Stop
           Get-Command python3.exe -ErrorAction Stop
           clang++ --version | Select-Object -First 1
           sh --version | Select-Object -First 1
@@ -251,4 +285,4 @@ jobs:
 
       - name: Run debug tests
         shell: pwsh
-        run: make.exe TEST_HOST_MAKE=make.exe MODE=dbg test
+        run: make.exe TEST_HOST_MAKE=make.exe SHELL=C:/msys64/usr/bin/sh.exe MODE=dbg test

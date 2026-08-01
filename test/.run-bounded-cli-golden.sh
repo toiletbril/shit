@@ -34,14 +34,23 @@ list_golden_session_processes()
 
     if [ "$host_system" = Darwin ]; then
         process_ids=$(ps -Ao pid= 2>/dev/null) || return 1
-        printf '%s\n' "$process_ids" | perl -e '
-            $session = shift;
-            exit 1 if syscall(310, 0) < 0;
-            while (<STDIN>) {
-                $process = int($_);
-                $process_session = syscall(310, $process);
-                print "$process\n" if $process_session == $session;
-            }
+        printf '%s\n' "$process_ids" | python3 -c '
+import os
+import sys
+
+session = int(sys.argv[1])
+try:
+    os.getsid(0)
+except (AttributeError, OSError):
+    raise SystemExit(1)
+for line in sys.stdin:
+    process = int(line)
+    try:
+        process_session = os.getsid(process)
+    except OSError:
+        continue
+    if process_session == session:
+        print(process)
         ' "$golden_session"
         return
     fi

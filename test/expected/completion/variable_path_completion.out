@@ -1,4 +1,4 @@
 == ${HOME}/ braced:
 ${HOME}/Documents/
 == a bare variable reference still completes names:
-$HOME
+$VARIABLE_COMPLETION_UNIQUE

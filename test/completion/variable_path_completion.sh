@@ -8,5 +8,5 @@ mkdir -p "$dir/Downloads" "$dir/Documents"
 echo "== \${HOME}/ braced:"
 HOME="$dir" "$BIN" --debug-complete-at 'cat ${HOME}/Doc' </dev/null
 echo "== a bare variable reference still completes names:"
-unset HOMEDRIVE HOMEPATH
-HOME="$dir" "$BIN" --debug-complete-at 'echo $HOM' </dev/null
+VARIABLE_COMPLETION_UNIQUE="$dir" \
+    "$BIN" --debug-complete-at 'echo $VARIABLE_COMPLETION_UNI' </dev/null

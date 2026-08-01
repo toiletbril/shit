@@ -92,7 +92,8 @@ endif
 
 test: $(BIN)
 	+@"$(TEST_HOST_MAKE)" clean
-	+@"$(TEST_HOST_MAKE)" $(TEST_SUITES)
+	+@"$(TEST_HOST_MAKE)" $(filter-out completion_tests,$(TEST_SUITES))
+	+@"$(TEST_HOST_MAKE)" completion_tests
 	+@for serial_test_name in $(SERIAL_TEST_NAMES); do \
 		printf "	%-64s running\n" "$$serial_test_name"; \
 		"$(TEST_HOST_MAKE)" --no-print-directory "$$serial_test_name" || exit 1; \
@@ -116,6 +117,7 @@ cli_tests: $(BIN) $(filter-out $(SERIAL_TEST_NAMES),$(CLI_NAMES))
 
 COMPLETION_INPUT := $(wildcard completion/*.sh)
 COMPLETION_NAMES := $(COMPLETION_INPUT:completion/%.sh=completion_%)
+SERIAL_COMPLETION_TEST_NAMES := completion_editor_append_hot_path
 
 completion_%: expected/completion/%.out
 	@if [ '$(IS_NONDEBUG_BUILD)' = 1 ]; then \
@@ -200,7 +202,7 @@ WINDOWS_UNREPRESENTABLE_COMPLETION_NAMES := \
 	completion_path_quoting
 
 $(WINDOWS_UNREPRESENTABLE_COMPLETION_NAMES):
-	@printf "	%-64s skipped, fixture filenames are unsupported on Windows\n" \
+	@printf "	%-64s skipped, golden test filenames are unsupported on Windows\n" \
 		"$(patsubst completion_%,completion/%,$@).sh"
 endif
 
@@ -208,9 +210,15 @@ completion_tests: $(BIN)
 	+@if [ '$(IS_NONDEBUG_BUILD)' = 1 ]; then \
 		printf "	%-64s skipped, release binary\n" completion; \
 	else \
-		"$(TEST_HOST_MAKE)" --no-print-directory $(COMPLETION_NAMES) \
+		"$(TEST_HOST_MAKE)" --no-print-directory \
+			$(filter-out $(SERIAL_COMPLETION_TEST_NAMES),$(COMPLETION_NAMES)) \
 			BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' \
-			FAILED_LIST='$(FAILED_LIST)'; \
+			FAILED_LIST='$(FAILED_LIST)' || exit 1; \
+		for serial_test_name in $(SERIAL_COMPLETION_TEST_NAMES); do \
+			printf "	%-64s running\n" "$$serial_test_name"; \
+			"$(TEST_HOST_MAKE)" --no-print-directory \
+				"$$serial_test_name" || exit 1; \
+		done; \
 	fi
 
 
