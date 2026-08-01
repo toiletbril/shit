@@ -23,7 +23,7 @@ TARGET ?= $(shell uname -s)
 endif
 
 ifeq ($(TARGET), Windows_NT)
-.NOTPARALLEL:
+TEST_HOST_MAKE_FLAGS := -j1
 export TEST_PATH_SEPARATOR := ;
 export TEST_NULL_DEVICE := NUL
 else
@@ -92,12 +92,14 @@ TEST_SUITES += diagnostic_tty_test dashdiff bashdiff mimicrydiff
 endif
 
 test: $(BIN)
-	+@"$(TEST_HOST_MAKE)" clean
-	+@"$(TEST_HOST_MAKE)" $(filter-out completion_tests,$(TEST_SUITES))
-	+@"$(TEST_HOST_MAKE)" completion_tests
+	+@"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) clean
+	+@"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) \
+		$(filter-out completion_tests,$(TEST_SUITES))
+	+@"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) completion_tests
 	+@for serial_test_name in $(SERIAL_TEST_NAMES); do \
 		printf "	%-64s running\n" "$$serial_test_name"; \
-		"$(TEST_HOST_MAKE)" --no-print-directory "$$serial_test_name" || exit 1; \
+		"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) \
+			--no-print-directory "$$serial_test_name" || exit 1; \
 	done
 	@touch $(FAILED_LIST)
 	@cat $(FAILED_LIST)
@@ -212,13 +214,13 @@ completion_tests: $(BIN)
 	+@if [ '$(IS_NONDEBUG_BUILD)' = 1 ]; then \
 		printf "	%-64s skipped, release binary\n" completion; \
 	else \
-		"$(TEST_HOST_MAKE)" --no-print-directory \
+		"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) --no-print-directory \
 			$(filter-out $(SERIAL_COMPLETION_TEST_NAMES),$(COMPLETION_NAMES)) \
 			BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 			FAILED_LIST='$(FAILED_LIST)' || exit 1; \
 		for serial_test_name in $(SERIAL_COMPLETION_TEST_NAMES); do \
 			printf "	%-64s running\n" "$$serial_test_name"; \
-			"$(TEST_HOST_MAKE)" --no-print-directory \
+			"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) --no-print-directory \
 				"$$serial_test_name" || exit 1; \
 		done; \
 	fi
