@@ -318,7 +318,7 @@ CXXFLAGS += \
 	-O0 \
 	-fprofile-instr-generate \
 	-fcoverage-mapping
-ifneq ($(TARGET), Windows_NT)
+ifeq ($(TARGET), Linux)
 CXXFLAGS += \
 	-static-pie \
 	-nostdlib++

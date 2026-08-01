@@ -125,9 +125,10 @@ apk add --no-cache \
 
 The benchmark needs Bash, Dash, and Python 3. Zsh, Yash, and BusyBox ash provide
 optional comparison rows. The coverage report needs `llvm-profdata` and
-`llvm-cov` from the matching LLVM installation. Documentation checks use
-`mandoc`. Formatting and static checks use `clang-format` and `clang-tidy` from
-Clang 18 or later.
+`llvm-cov` from the matching LLVM installation. On macOS, both tools are run
+through `xcrun`, such as `xcrun llvm-profdata` and `xcrun llvm-cov`.
+Documentation checks use `mandoc`. Formatting and static checks use
+`clang-format` and `clang-tidy` from Clang 18 or later.
 
 Each cross-compilation target needs its matching toolchain. Zig builds the Zig
 targets and cross-compiles release binaries to Linux. MinGW-w64 targets Windows,
