@@ -211,14 +211,19 @@ jobs:
               -Repository PSGallery
             Repair-WinGetPackageManager -AllUsers
           }
-          winget install --id GnuWin32.Make --exact --version 3.81 --silent `
+          $makeRoot = 'C:\GnuWin32'
+          winget install --id GnuWin32.Make --exact --version 3.81 `
+            --source winget --location $makeRoot --silent `
             --accept-package-agreements --accept-source-agreements `
             --disable-interactivity
-          $makePath = 'C:/Program Files (x86)/GnuWin32/bin/make.exe'
-          if (-not (Test-Path $makePath)) {
+          if ($LASTEXITCODE -ne 0) {
+            throw "WinGet failed to install GNU Make, exit $LASTEXITCODE"
+          }
+          $makePath = "$makeRoot\bin\make.exe"
+          if (-not (Test-Path -LiteralPath $makePath)) {
             throw "WinGet did not install GNU Make at $makePath"
           }
-          'C:\Program Files (x86)\GnuWin32\bin' |
+          "$makeRoot\bin" |
             Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           "C:\Program Files\Git\bin" |
             Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
@@ -226,7 +231,7 @@ jobs:
       - name: Verify the test toolchain
         shell: pwsh
         run: |
-          $makePath = 'C:/Program Files (x86)/GnuWin32/bin/make.exe'
+          $makePath = 'C:/GnuWin32/bin/make.exe'
           $resolvedMakePath = (Get-Command make.exe -ErrorAction Stop).Source `
             -replace '\\', '/'
           if ($resolvedMakePath -ne $makePath) {
