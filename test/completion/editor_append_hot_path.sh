@@ -16,14 +16,53 @@ run_editor()
     transcript=$1
     columns=${2-80}
     script_error=$transcript.script-error
+    recorder_status=0
     if [ "$script_style" = gnu ]; then
         "$script_command" -q -c \
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
-            "$transcript" >/dev/null 2>"$script_error" || :
+            "$transcript" >/dev/null 2>"$script_error" || recorder_status=$?
+    elif command -v expect >/dev/null 2>&1; then
+        TRANSCRIPT="$transcript" COLUMNS="$columns" expect -c '
+            set timeout 10
+            log_user 0
+            log_file -noappend $env(TRANSCRIPT)
+            spawn -noecho /bin/sh -c "/bin/stty cols $env(COLUMNS) rows 24; exec \"$env(BIN)\" -i --rcfile \"$env(RCFILE)\""
+            set editor_pid [exp_pid]
+            set wall_timeout [after 30000 {
+                puts stderr "editor recorder exceeded 30 seconds"
+                catch {exec /bin/kill -KILL $editor_pid}
+                close
+                wait
+                exit 1
+            }]
+            interact timeout 10 {
+                puts stderr "editor recorder input was idle for 10 seconds"
+                catch {exec /bin/kill -KILL $editor_pid}
+                close
+                wait
+                exit 1
+            } eof {}
+            expect {
+                eof {}
+                timeout {
+                    puts stderr "editor recorder output was idle for 10 seconds"
+                    catch {exec /bin/kill -KILL $editor_pid}
+                    close
+                    wait
+                    exit 1
+                }
+            }
+            after cancel $wall_timeout
+            catch {wait}
+        ' >/dev/null 2>"$script_error" || recorder_status=$?
     else
         "$script_command" -q /dev/null /bin/sh -c \
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
-            >"$transcript" 2>"$script_error" || :
+            >"$transcript" 2>"$script_error" || recorder_status=$?
+    fi
+    if [ "$recorder_status" -ne 0 ] && [ -s "$script_error" ]; then
+        /bin/cat "$script_error"
+        return "$recorder_status"
     fi
 
     return 0
@@ -245,16 +284,24 @@ send_quoted_input()
     printf "COMPLETION_PROBE=variable-value\n"
     printf "printf '<%%s>\\\\n' \"\$COMPLETION_PROBX\"\033[D\033[D\t\n"
     printf "printf '<%%s>\\\\n' read\tone\nexit\n"
+    sleep 0.2
 }
 
 send_quoted_input | EDITOR_READY_FILE="$d/quoted-ready" \
     SHIT_HISTORY="$d/quoted-history" BIN="$BIN" \
     run_editor "$d/quoted-typescript" || :
 
-strings "$d/quoted-typescript" | grep -q '<space name>' || exit 1
-strings "$d/quoted-typescript" | grep -q '<plain name>' || exit 1
-strings "$d/quoted-typescript" | grep -q '<variable-value>' || exit 1
-strings "$d/quoted-typescript" | grep -q '<README-one>' || exit 1
+for quoted_expected_output in \
+    '<space name>' '<plain name>' '<variable-value>' '<README-one>'
+do
+    strings "$d/quoted-typescript" | grep -q "$quoted_expected_output" || {
+        printf 'quoted completion output missing: %s\n' "$quoted_expected_output"
+        strings "$d/quoted-typescript" || true
+        [ ! -s "$d/quoted-typescript.script-error" ] ||
+            /bin/cat "$d/quoted-typescript.script-error"
+        exit 1
+    }
+done
 echo 'quoted replacement and smart-case TAB preserve the completed token'
 
 mkdir "$d/mixed-path" "$d/next-directory"
@@ -265,6 +312,7 @@ send_mixed_path_input()
 {
     wait_for_editor "$d/mixed-ready" || exit 1
     printf 'cd %s\nafter-cd-probe\014\nexit\n' "$d/next-directory"
+    sleep 0.2
 }
 
 unset NO_COLOR

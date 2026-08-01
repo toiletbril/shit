@@ -181,7 +181,7 @@ jobs:
 
       - name: Verify the test toolchain
         run: |
-          for tool in make clang++ python3 perl script mkfifo strings; do
+          for tool in make clang++ python3 perl script expect mkfifo strings; do
             command -v "$tool"
           done
           test -x /bin/stty
@@ -199,6 +199,7 @@ jobs:
     runs-on: windows-2025
     env:
       MSYS: winsymlinks:nativestrict
+      MSYS2_ENV_CONV_EXCL: "PATH=;SHELL="
     steps:
       - name: Checkout
         uses: actions/checkout@v5
