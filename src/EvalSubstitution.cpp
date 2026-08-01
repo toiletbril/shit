@@ -154,6 +154,11 @@ fn EvalContext::capture_command_substitution(
   const Expression *ast;
   try {
     ast = parser.construct_ast();
+  } catch (ErrorWithLocation &error) {
+    render_contained_substitution_error(std::current_exception(),
+                                        normalized_source.view());
+    error.set_rendered();
+    throw;
   } catch (...) {
     render_contained_substitution_error(std::current_exception(),
                                         normalized_source.view());
@@ -375,6 +380,11 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
     };
     try {
       segment.cached_substitution_ast = parser.construct_ast();
+    } catch (ErrorWithLocation &error) {
+      render_contained_substitution_error(std::current_exception(),
+                                          segment.text.view());
+      error.set_rendered();
+      throw;
     } catch (...) {
       render_contained_substitution_error(std::current_exception(),
                                           segment.text.view());

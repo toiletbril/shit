@@ -4,6 +4,9 @@
 # Makefile passes BIN, DIFF_FLAGS, FAILED_LIST and the cli test files as
 # arguments.
 
+test_shell=$1
+shift
+
 for f in "$@"; do
     name=$(basename "$f" .sh)
     out=$(mktemp)
@@ -15,14 +18,15 @@ for f in "$@"; do
             golden_timeout_seconds=120
         fi
         CLI_TEST_TIMEOUT_SECONDS=${CLI_TEST_TIMEOUT_SECONDS:-$golden_timeout_seconds} \
-            BIN="$BIN" ./.run-bounded-cli-golden.sh "$f" > "$out" 2>&1
+            BIN="$BIN" "$test_shell" ./.run-bounded-cli-golden.sh "$f" \
+            > "$out" 2>&1
         driver_status=$?
         if [ "$driver_status" -ne 0 ]; then
             printf 'golden exited with status %s\n' "$driver_status" >> "$out"
         fi
         ;;
     *)
-        BIN="$BIN" sh "$f" > "$out" 2>&1
+        BIN="$BIN" "$test_shell" "$f" > "$out" 2>&1
         ;;
     esac
     if diff $DIFF_FLAGS "expected/cli/$name.out" "$out" >/dev/null 2>&1; then

@@ -43,8 +43,11 @@ PATH=/nonexistent "$BIN" --debug-highlight-at 'npr' |
     grep -E "${tab}partial-command$"
 PATH=/nonexistent "$BIN" --debug-highlight-at 'ec\ho' |
     grep -E "${tab}resolved-command$"
-PATH=/nonexistent "$BIN" --debug-highlight-at 'ech>/tmp/out' |
-    grep -E "${tab}(unknown-command|operator|existing-path|invalid-path)$"
+mkdir "$dir/existing"
+(
+    cd "$dir"
+    PATH=/nonexistent "$BIN" --debug-highlight-at 'ech>./existing/out'
+) | grep -E "${tab}(unknown-command|operator|existing-path|invalid-path)$"
 
 "$BIN" --debug-highlight-at './shi' |
     grep -E "${tab}(existing-path|partial-path)$"

@@ -130,8 +130,7 @@ else
         >/dev/null 2>&1
 fi
 kill_after_status=$?
-if { [ "${OS-}" = Windows_NT ] && [ "$kill_after_status" -eq 124 ]; } ||
-    { [ "${OS-}" != Windows_NT ] && [ "$kill_after_status" -eq 137 ]; }; then
+if [ "$kill_after_status" -eq 137 ]; then
     echo passed
 else
     echo "failed=$kill_after_status"
@@ -375,7 +374,7 @@ fi
 echo "--- a supervised child reads input ---"
 if [ "${OS-}" = Windows_NT ]; then
     terminal_output=$(printf 'probe\n' | "$BIN" -c \
-        'shitbox timeout 1 "$1" -c '\''read value; echo received-$value'\''' \
+        'shitbox timeout 1 "$1" -c '\''read -r value; echo received-$value'\''' \
         timeout-child "$BIN")
 elif script -qec true /dev/null >/dev/null 2>&1; then
     terminal_output=$(

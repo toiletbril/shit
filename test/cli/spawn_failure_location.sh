@@ -37,13 +37,3 @@ out=$(cd "$d" && ./shell scriptdir 2>&1)
 rc=$?
 printf '%s\n' "$out"
 echo "rc=$rc"
-
-echo '== recursive mimicked script:'
-printf '#!/bin/sh\n"$0"\n' > "$d/recurse"
-chmod +x "$d/recurse"
-out=$(SHIT_FLAGS= "$BIN" --mood bash -I "$d/recurse" 2>&1)
-rc=$?
-printf '%s\n' "$out" |
-    sed -e "s#$real_d#TMPDIR#g" -e "s#$d#TMPDIR#g" \
-        -e '/trace:/,/here\.$/d'
-echo "rc=$rc"

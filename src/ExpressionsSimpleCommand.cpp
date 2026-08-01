@@ -1145,7 +1145,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     const StringView name = var.name.view();
     if (cxt.is_readonly(name))
       throw Error{"Unable to assign '" + name + "' because it is read only"};
-    Maybe<String> previous = os::get_environment_variable(name);
+    const bool is_read_field_separator =
+        name == "IFS" && command_word_function == nullptr &&
+        !program_args.is_empty() && program_args[0] == "read";
+    Maybe<String> previous;
+    if (!is_read_field_separator)
+      previous = os::get_environment_variable(name);
     let expanded_value = String{cxt.scratch_allocator()};
     try {
       expanded_value = cxt.expand_word_for_assignment(var.value);
@@ -1167,9 +1172,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       continue;
     }
 
-    saved_env.push(saved_env_var{String{name}, steal(previous)});
-    os::set_environment_variable(name, expanded_value.view());
-    cxt.mark_exported(name);
+    if (!is_read_field_separator) {
+      saved_env.push(saved_env_var{String{name}, steal(previous)});
+      os::set_environment_variable(name, expanded_value.view());
+      cxt.mark_exported(name);
+    }
     /* The resolver reads its own MAYBE_PATH, so a prefix PATH=... must update
        it for the environment write to change the search order. */
     if (name == "PATH") {

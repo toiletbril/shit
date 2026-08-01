@@ -4,7 +4,6 @@
 # bundled make parser also resolves a $(VAR) target name to its real text. PATH
 # is emptied for the completing invocation so the parser answers rather than a
 # system make.
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 mkdir -p "$dir/src"

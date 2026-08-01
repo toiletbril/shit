@@ -2,7 +2,6 @@
 # single quotes rather than backslash-escaped, while a plain name stays bare. A
 # hermetic temp directory keeps the candidates stable across machines. The typed
 # prefix is one token, the special byte lives in the matched entry.
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 dir=$(mktemp -d)
 trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 : > "$dir/spacey file.txt"

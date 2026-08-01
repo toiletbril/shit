@@ -63,8 +63,8 @@ check_expansion_trace substring 23 \
     'value=x; echo ${value:$(bad_substring_xyz)}'
 check_expansion_trace subscript 18 \
     'a[0]=x; echo ${a[$(bad_subscript_xyz)]}'
-check_expansion_trace indirect 34 \
-    'pointer=target; echo ${!pointer:-$(bad_indirect_xyz)}'
+check_expansion_trace indirect 43 \
+    'target=; pointer=target; echo ${!pointer:-$(bad_indirect_xyz)}'
 check_expansion_trace single-field 15 \
     'echo "${FAST:-$(bad_fast_xyz)}"'
 check_expansion_trace positional-all 23 \

@@ -1,8 +1,14 @@
 ifeq ($(OS), Windows_NT)
-SHELL := bash
+SHELL := sh
 else
 SHELL := /bin/bash
 endif
+
+TEST_HOST_MAKE ?= $(shell command -v "$(MAKE)")
+ifeq ($(strip $(TEST_HOST_MAKE)),)
+$(error The test make '$(MAKE)' could not be resolved)
+endif
+export TEST_HOST_MAKE
 
 DIFF_FLAGS := -u
 MODE ?= dbg
@@ -60,7 +66,7 @@ export TEST_SYSTEM_PATH := $(shell \
 export TEST_UNAME_DIRECTORY := $(shell \
 	uname_path=$$(command -v uname); printf '%s' "$${uname_path%/*}")
 endif
-export PATH := $(CURDIR)/bin:$(PATH)
+export PATH := $(CURDIR)/bin$(TEST_PATH_SEPARATOR)$(PATH)
 
 FAILED_LIST := failed.diff
 INPUT_FILES := $(wildcard shit/*.shit)
@@ -81,10 +87,10 @@ TEST_SUITES += diagnostic_tty_test dashdiff bashdiff mimicrydiff
 endif
 
 test: $(BIN)
-	@$(MAKE) clean
-	@$(MAKE) $(TEST_SUITES)
-	@for serial_test_name in $(SERIAL_TEST_NAMES); do \
-		$(MAKE) --no-print-directory "$$serial_test_name" || exit 1; \
+	+@"$(TEST_HOST_MAKE)" clean
+	+@"$(TEST_HOST_MAKE)" $(TEST_SUITES)
+	+@for serial_test_name in $(SERIAL_TEST_NAMES); do \
+		"$(TEST_HOST_MAKE)" --no-print-directory "$$serial_test_name" || exit 1; \
 	done
 	@touch $(FAILED_LIST)
 	@cat $(FAILED_LIST)
@@ -98,7 +104,7 @@ SERIAL_TEST_NAMES := cli_set_option_state cli_read_timeout
 
 cli_%: expected/cli/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
-		$(SHELL) run-cli-test.sh cli/$*.sh
+		$(SHELL) run-cli-test.sh '$(SHELL)' cli/$*.sh
 
 cli_tests: $(BIN) $(filter-out $(SERIAL_TEST_NAMES),$(CLI_NAMES))
 
@@ -107,11 +113,11 @@ COMPLETION_INPUT := $(wildcard completion/*.sh)
 COMPLETION_NAMES := $(COMPLETION_INPUT:completion/%.sh=completion_%)
 
 completion_%: expected/completion/%.out
-	@if ! $(BIN) --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
+	@if ! '$(BIN)' --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
 		printf "	%-64s skipped, release binary\n" completion/$*.sh; \
 	else \
 		out=$$(mktemp); \
-		BIN=$(BIN) sh completion/$*.sh > $$out 2>/dev/null; \
+		BIN='$(BIN)' '$(SHELL)' completion/$*.sh > $$out 2>/dev/null; \
 		if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
 			printf "	%-64s ok\033[K\r" completion/$*.sh; \
 		else \
@@ -161,7 +167,11 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_path_cache_behavior \
 	cli_regex_error_caret \
 	cli_signal_noninteractive_term \
-	cli_set_option_state
+	cli_set_option_state \
+	cli_spawn_failure_location \
+	cli_stopped_job_survives_poll \
+	cli_suspend_behavior \
+	cli_wait_on_stopped_job
 
 $(WINDOWS_SKIPPED_CLI_NAMES):
 	@printf "	%-64s skipped, unsupported Windows backend feature\n" \
@@ -179,13 +189,21 @@ WINDOWS_SKIPPED_COMPLETION_NAMES := \
 
 $(WINDOWS_SKIPPED_COMPLETION_NAMES):
 	@printf "	%-64s skipped, needs a POSIX helper executable\n" "$@"
+
+WINDOWS_UNREPRESENTABLE_COMPLETION_NAMES := \
+	completion_completion_glob_quoting \
+	completion_path_quoting
+
+$(WINDOWS_UNREPRESENTABLE_COMPLETION_NAMES):
+	@printf "	%-64s skipped, fixture filenames are unsupported on Windows\n" \
+		"$(patsubst completion_%,completion/%,$@).sh"
 endif
 
 completion_tests: $(BIN)
-	@if ! $(BIN) --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
+	+@if ! '$(BIN)' --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
 		printf "	%-64s skipped, release binary\n" completion; \
 	else \
-		$(MAKE) --no-print-directory $(COMPLETION_NAMES) \
+		"$(TEST_HOST_MAKE)" --no-print-directory $(COMPLETION_NAMES) \
 			BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 			FAILED_LIST='$(FAILED_LIST)'; \
 	fi
@@ -196,11 +214,11 @@ HIGHLIGHT_NAMES := $(HIGHLIGHT_INPUT:highlight/%.sh=highlight_%)
 
 highlight_%: expected/highlight/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
-		$(SHELL) run-highlight-test.sh highlight/$*.sh
+		$(SHELL) run-highlight-test.sh '$(SHELL)' highlight/$*.sh
 
 highlight_tests: $(BIN)
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
-		$(SHELL) run-highlight-test.sh $(HIGHLIGHT_INPUT)
+		$(SHELL) run-highlight-test.sh '$(SHELL)' $(HIGHLIGHT_INPUT)
 
 DIAGNOSTIC_TTY_INPUT := \
 	interactive/long_warning_window.py \
@@ -234,7 +252,7 @@ refill:
 	for f in $${REFILL:-$(TEST_NAMES)}; do \
 		[ -f shit/$$f.shit ] || continue; \
 		printf "	%-64s $$f.out\n" $$f.shit; \
-		cat shit/$$f.shit | $(BIN) $(BIN_FLAGS) - > expected/$$f.out 2>&1; \
+		cat shit/$$f.shit | '$(BIN)' $(BIN_FLAGS) - > expected/$$f.out 2>&1; \
 	done || true
 	for f in $${REFILL:-$(CLI_INPUT:cli/%.sh=%)}; do \
 		[ -f cli/$$f.sh ] || continue; \
@@ -245,20 +263,21 @@ refill:
 			[ "$$f" != shitbox_timeout ] || golden_timeout_seconds=120; \
 			output=$$(mktemp "expected/cli/.$$f.out.XXXXXX") || exit; \
 			CLI_TEST_TIMEOUT_SECONDS=$${CLI_TEST_TIMEOUT_SECONDS:-$$golden_timeout_seconds} \
-				BIN=$(BIN) ./.run-bounded-cli-golden.sh cli/$$f.sh \
+				BIN='$(BIN)' '$(SHELL)' \
+				./.run-bounded-cli-golden.sh cli/$$f.sh \
 				> "$$output" 2>&1 && \
 				mv "$$output" "expected/cli/$$f.out" || \
 				{ status=$$?; rm -f "$$output"; exit $$status; } ;; \
-		*) BIN=$(BIN) sh cli/$$f.sh > expected/cli/$$f.out 2>&1 ;; \
+		*) BIN='$(BIN)' '$(SHELL)' cli/$$f.sh > expected/cli/$$f.out 2>&1 ;; \
 		esac; \
 	done
 	for f in $(COMPLETION_INPUT:completion/%.sh=%); do \
 		printf "	%-64s $$f.out\n" completion/$$f.sh; \
-		BIN=$(BIN) sh completion/$$f.sh > expected/completion/$$f.out 2>/dev/null; \
+		BIN='$(BIN)' '$(SHELL)' completion/$$f.sh > expected/completion/$$f.out 2>/dev/null; \
 	done || true
 	for f in $(HIGHLIGHT_INPUT:highlight/%.sh=%); do \
 		printf "	%-64s $$f.out\n" highlight/$$f.sh; \
-		BIN=$(BIN) sh highlight/$$f.sh > expected/highlight/$$f.out 2>/dev/null; \
+		BIN='$(BIN)' '$(SHELL)' highlight/$$f.sh > expected/highlight/$$f.out 2>/dev/null; \
 	done || true
 
 

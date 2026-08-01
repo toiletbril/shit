@@ -1029,8 +1029,7 @@ fn path_is_block_device(StringView path) wontthrow -> bool
 }
 fn path_is_character_device(StringView path) wontthrow -> bool
 {
-  unused(path);
-  return false;
+  return path == StringView{"/dev/null"};
 }
 fn path_is_fifo(StringView path) wontthrow -> bool
 {
@@ -1506,6 +1505,8 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   }
 
   String application_path_storage{heap_allocator()};
+  String working_directory_storage{heap_allocator()};
+  const char *working_directory = nullptr;
   String command_line = make_os_args(ec.args());
   if (is_batch_program(ec.program_path().text().view())) {
     let batch_command = String{heap_allocator()};
@@ -1532,6 +1533,18 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
     processor_command_line += batch_command;
     processor_command_line += '"';
     command_line = steal(processor_command_line);
+
+    let const current_directory = read_current_directory();
+    let current_directory_text = current_directory.text().view();
+    if (current_directory_text.length >= 7 &&
+        current_directory_text.starts_with(StringView{"\\\\?\\"}) &&
+        current_directory_text[5] == ':' &&
+        is_directory_separator(current_directory_text[6]))
+    {
+      current_directory_text = current_directory_text.substring(4);
+      working_directory_storage.append(current_directory_text);
+      working_directory = working_directory_storage.c_str();
+    }
   }
 
   PROCESS_INFORMATION process_info{};
@@ -1620,8 +1633,8 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
    */
   if (CreateProcessA(application_path, const_cast<LPSTR>(command_line.data()),
                      nullptr, nullptr, should_use_standard_handles,
-                     creation_flags, environment_block, nullptr, &startup_info,
-                     &process_info) == 0)
+                     creation_flags, environment_block, working_directory,
+                     &startup_info, &process_info) == 0)
   {
     if (allow_script_fallback && GetLastError() == ERROR_BAD_EXE_FORMAT) {
       if (!resolved_program_path_storage.is_empty())
@@ -2880,6 +2893,13 @@ fn current_executable_path() wontthrow -> Maybe<String>
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
 {
+  if (path == StringView{"/dev/null"}) {
+    status = {};
+    status.mode = 0020666u;
+    status.link_count = 1;
+    return true;
+  }
+
   const String path_string{path};
   let const attributes = GetFileAttributesA(path_string.c_str());
   if (attributes == INVALID_FILE_ATTRIBUTES) return false;
@@ -3015,6 +3035,7 @@ fn format_mode_string(u32 mode) throws -> String
 fn file_type_letter(u32 mode) wontthrow -> char
 {
   if ((mode & 0170000u) == 0120000u) return 'l';
+  if ((mode & 0170000u) == 0020000u) return 'c';
   return (mode & 0040000u) != 0 ? 'd' : '-';
 }
 

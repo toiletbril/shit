@@ -150,6 +150,10 @@ fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
             const ArrayList<String> &args,
             const ArrayList<SourceLocation> &arg_locations) throws -> i32;
 
+fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
+                           usize name_index, SourceLocation &error_location,
+                           String &error_message) throws -> Maybe<i32>;
+
 fn parse_util_operands(
     const ArrayList<Flag *> &flags, const ArrayList<String> &args,
     const ArrayList<SourceLocation> *arg_locations = nullptr,

@@ -1,4 +1,3 @@
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 home=$(mktemp -d)
 trap 'rm -rf "$home"' EXIT
 mkdir -p "$home/.ssh"

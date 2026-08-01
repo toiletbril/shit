@@ -576,7 +576,9 @@ static fn color_path_argument(usize word_start, StringView word,
       existing_end = do_prefix_is_valid(word.length, true) ? word.length : 0;
     }
   } else {
-    if (do_prefix_is_valid(word.length, directories_only)) {
+    let const word_requires_directory =
+        directories_only || os::is_directory_separator(word[word.length - 1]);
+    if (do_prefix_is_valid(word.length, word_requires_directory)) {
       existing_end = word.length;
     } else if (is_prefix_non_directory) {
       spans.push(highlight_span{word_start, word_start + word.length,
@@ -1120,8 +1122,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (word_spans.is_empty() && word_has_erased_directory_separator(word) &&
           !os::has_directory_separator(decoded.text.view()))
       {
-        return color_path_argument(word_start, word, is_word_terminated,
-                                   directories_only, word[0] == '~', spans);
+        return false;
       }
       let path_spans =
           ArrayList<highlight_span>{bump_allocator(HIGHLIGHT_ARENA)};

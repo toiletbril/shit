@@ -1,6 +1,6 @@
 set -e
 
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
+BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 dir=$(mktemp -d)
 trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 mkdir "$dir/adir"
@@ -13,15 +13,17 @@ result=$("$BIN" --debug-highlight-at \
 tab=$(printf '\t')
 printf '%s\n' "$result" | grep -E "${tab}(existing-path|invalid-path)$"
 
-if [ "${OS-}" = Windows_NT ]; then
-    path_separator='\'
-else
-    path_separator='/'
-fi
 mkdir -p "$dir/native/subdir"
-native_path="native${path_separator}subdir"
-"$BIN" --debug-highlight-at "echo $native_path" |
-    grep -F "${native_path}${tab}existing-path"
+if [ "${OS-}" = Windows_NT ]; then
+    native_source='native\\subdir'
+    "$BIN" --debug-highlight-at "echo $native_source" |
+        grep -F "${native_source}${tab}existing-path" >/dev/null
+    printf 'native/subdir\texisting-path\n'
+else
+    native_source='native/subdir'
+    "$BIN" --debug-highlight-at "echo $native_source" |
+        grep -F "${native_source}${tab}existing-path"
+fi
 
 mkdir -p "$dir/[quoted] path/child" "$dir/Library/Application"
 : > "$dir/space dir tool"

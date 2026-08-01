@@ -912,6 +912,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           ec.in_fd, ec.out_fd, ec.err_fd, ec.source_location(),
           source != nullptr ? source->view() : StringView{}, process_group,
           process_group_id);
+      let preflight_status = Maybe<i32>{};
+      let preflight_location = SourceLocation{};
+      let preflight_message = String{cxt.scratch_allocator()};
       if (!forked_child.has_value() &&
           builtin_can_launch_fresh(ec.builtin_kind()))
       {
@@ -926,12 +929,17 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
               shitbox::find_util(ec.args()[utility_index].view());
           if (utility_kind.has_value()) {
             should_launch_fresh_stage = true;
+            if (!is_async && *utility_kind == shitbox::Utility::Kind::Timeout) {
+              preflight_status = shitbox::preflight_timeout_stage(
+                  ec, cxt, utility_index, preflight_location,
+                  preflight_message);
+            }
             should_restore_environment =
                 *utility_kind == shitbox::Utility::Kind::Env;
           }
         }
 
-        if (should_launch_fresh_stage) {
+        if (should_launch_fresh_stage && !preflight_status.has_value()) {
           let stage_source = String{cxt.scratch_allocator()};
           if (should_restore_environment) {
             static const StringView RESTORED_ENVIRONMENT_NAMES[] = {
@@ -995,7 +1003,36 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
         }
       }
 
-      if (!forked_child.has_value()) {
+      if (preflight_status.has_value()) {
+        let const error =
+            ErrorWithLocation{preflight_location, preflight_message.view()};
+        let diagnostic = String{cxt.scratch_allocator(), "shit: "};
+        diagnostic += error.to_string(
+            source != nullptr ? source->view() : StringView{}, &cxt);
+        diagnostic.push('\n');
+        let diagnostic_out = ec.out_fd;
+        let diagnostic_err = ec.err_fd;
+        ec.apply_dup_routing(
+            [&]() { diagnostic_err = diagnostic_out.value_or(SHIT_STDOUT); },
+            [&]() { diagnostic_out = diagnostic_err.value_or(SHIT_STDERR); });
+        os::signal_internal_diagnostic();
+        usize written_count = 0;
+        while (written_count < diagnostic.count()) {
+          let const written = os::write_fd(diagnostic_err.value_or(SHIT_STDERR),
+                                           diagnostic.data() + written_count,
+                                           diagnostic.count() - written_count);
+          if (!written.has_value() || *written == 0) {
+            const i32 saved_errno = errno;
+            if (saved_errno == EPIPE) throw BrokenPipeExit{};
+            throw Error{"Unable to write to stderr: " +
+                        os::last_system_error_message()};
+          }
+          written_count += *written;
+        }
+
+        stage_status[stage_index] = *preflight_status;
+        ec.close_fds();
+      } else if (!forked_child.has_value()) {
         cxt.set_in_pipeline_stage(true);
         defer { cxt.set_in_pipeline_stage(false); };
         ret = execute_builtin(steal(ec), cxt);
@@ -3199,9 +3236,10 @@ pure fn ProgramResolver::get_command_name_lower_bound(
 
 fn ProgramResolver::command_name_has_prefix(StringView prefix) throws -> bool
 {
-  prepare_complete_path_cache(prefix, ValidationScope::Prefix);
   let normalized_prefix = String{prefix};
   unused(os::normalize_program_name(normalized_prefix));
+  prepare_complete_path_cache(normalized_prefix.view(),
+                              ValidationScope::Prefix);
   for (let const &name : m_command_names)
     if (smart_case_prefix_matches(name.view(), normalized_prefix.view()))
       return true;

@@ -155,15 +155,98 @@ static fn resolve_timeout_program(StringView program_name,
   return matches[0];
 }
 
+static fn checked_timeout_program(StringView program_name,
+                                  SourceLocation program_location,
+                                  EvalContext &cxt) throws -> Maybe<Path>
+{
+  let const typed_program_path = Path{program_name};
+  let const program_path = resolve_timeout_program(program_name, cxt);
+  if (!program_path.has_value()) return None;
+
+  if (typed_program_path.has_trailing_separator() &&
+      !program_path->is_directory())
+  {
+    let error =
+        ErrorWithLocation{program_location, "This file is not a directory"};
+    error.set_command_status(126);
+    throw error;
+  }
+  if (program_path->is_directory()) {
+    let error =
+        ErrorWithLocation{program_location, "The command is a directory"};
+    error.set_command_status(126);
+    throw error;
+  }
+
+  return program_path;
+}
+
+fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
+                           usize name_index, SourceLocation &error_location,
+                           String &error_message) throws -> Maybe<i32>
+{
+  let args = ArrayList<String>{cxt.scratch_allocator()};
+  let arg_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  args.reserve(ec.args().count() - name_index);
+  arg_locations.reserve(ec.args().count() - name_index);
+  for (usize argument_index = name_index; argument_index < ec.args().count();
+       argument_index++)
+  {
+    args.push_managed(ec.args()[argument_index]);
+    arg_locations.push(ec.arg_location_at(argument_index));
+  }
+
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  defer { reset_flags(FLAG_LIST); };
+  let operands = ArrayList<String>{cxt.scratch_allocator()};
+  try {
+    operands = parse_util_operands(FLAG_LIST, args, &arg_locations,
+                                   &operand_locations);
+  } catch (const ErrorBase &) {
+    return None;
+  }
+  if (FLAG_HELP.is_enabled() || operands.count() < 2) {
+    return None;
+  }
+  if (!Path{operands[1].view()}.has_trailing_separator()) return None;
+
+  try {
+    unused(parse_shitbox_duration_seconds(
+        operands[0].view(), StringView{"timeout"}, cxt.scratch_allocator()));
+    if (FLAG_TIMEOUT_KILL_AFTER.is_set())
+      unused(parse_shitbox_duration_seconds(FLAG_TIMEOUT_KILL_AFTER.value(),
+                                            StringView{"timeout"},
+                                            cxt.scratch_allocator()));
+    let const timeout_signal = resolve_shitbox_signal(
+        FLAG_TIMEOUT_SIGNAL.is_set() ? FLAG_TIMEOUT_SIGNAL.value()
+                                     : StringView{"TERM"},
+        cxt.scratch_allocator());
+    if (!os::is_process_signal_supported(timeout_signal)) return None;
+  } catch (const ErrorBase &) {
+    return None;
+  }
+
+  try {
+    unused(
+        checked_timeout_program(operands[1].view(), operand_locations[1], cxt));
+  } catch (const ErrorWithLocation &error) {
+    error_location = error.location();
+    error_message = "shitbox timeout: " + error.message();
+    return static_cast<i32>(error.command_status());
+  }
+
+  return None;
+}
+
 fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<String> &args,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  defer { reset_flags(FLAG_LIST); };
   let const operands =
       parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
-  defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -190,20 +273,12 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
                 String::from(timeout_signal, cxt.scratch_allocator()) +
                 " on this platform"};
 
-  let const typed_program_path = Path{operands[1].view()};
-  let const program_path = resolve_timeout_program(operands[1].view(), cxt);
+  let const program_path =
+      checked_timeout_program(operands[1].view(), operand_locations[1], cxt);
   if (!program_path.has_value()) {
     report_soft_shitbox_error(
         ec, cxt, "timeout: command '" + operands[1] + "' was not found");
     return 127;
-  }
-  if (typed_program_path.has_trailing_separator() &&
-      !program_path->is_directory())
-  {
-    let error =
-        ErrorWithLocation{operand_locations[1], "This file is not a directory"};
-    error.set_command_status(126);
-    throw error;
   }
 
   let command_args = ArrayList<String>{cxt.scratch_allocator()};

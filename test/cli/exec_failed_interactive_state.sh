@@ -1,5 +1,4 @@
 unset SHIT_FLAGS
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 input=$(mktemp)
 trap 'rm -f "$input"' EXIT
 printf 'exec . <<EOF\nignored\nEOF\necho input-survived\nkill -PIPE $$\necho signal-survived\nexit\n' > "$input"

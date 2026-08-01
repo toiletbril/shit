@@ -1,7 +1,6 @@
 # A -W word list offers its dash entries only when the token already starts
 # with a dash, the empty argument token completes the plain words, and a list
 # reduced to nothing by the gate falls through to the filesystem.
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 touch "$dir/datafile"

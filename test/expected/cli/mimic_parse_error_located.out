@@ -20,5 +20,9 @@ error-state rc=1
 shit: 1:1: error: Cannot execute `TMPDIR/binary` as a shell script.
      1 |  ./binary
        |  ^~~~~~~~ here.
-note: A NUL byte before the first line break marks the file as binary.
+note: The file is binary and the system has refused execution. Use `file ./binary` to check the file type.
 binary rc=126
+shit: TMPDIR/recurse:2:1: error: Unable to mimic 'TMPDIR/recurse' because the script nesting is too deep.
+     2 |  "$0"
+       |  ^~~~ here.
+recursive rc=1

@@ -71,8 +71,9 @@ probe_directory_lock()
 
 wait_for_lock_release()
 {
+    maximum_attempt_count=${1-1000}
     attempt_count=0
-    while [ "$attempt_count" -lt 1000 ]; do
+    while [ "$attempt_count" -lt "$maximum_attempt_count" ]; do
         probe_directory_lock
         probe_status=$?
         case $probe_status in
@@ -107,14 +108,19 @@ cleanup()
 
 trap cleanup EXIT
 
-"$BIN" -p --mood sh -c '
+SHELL_BINARY=$BIN "$BIN" -p --mood sh -c '
     shitbox flock --help >/dev/null
-    shitbox flock "$1" /bin/sh -c "printf held > \"\$1\"" shell "$2"
+    shitbox flock "$1" "$SHELL_BINARY" -p --mood sh -c \
+        "printf held > \"\$1\"" shell "$2"
 ' shell "$directory" "$directory/normal"
 printf 'normal=%s help=%s list=%s\n' "$(cat "$directory/normal")" \
     "$("$BIN" -c 'shitbox flock --help' | grep -c transaction-held-lock)" \
     "$("$BIN" -c 'shitbox --list' | grep -c '^flock$')"
-probe_directory_lock || exit 1
+if [ "${OS-}" = Windows_NT ]; then
+    wait_for_lock_release 10 || exit 1
+else
+    probe_directory_lock || exit 1
+fi
 
 LOCK_DIRECTORY=$directory STATE_DIRECTORY=$directory SHELL_BINARY=$BIN \
     "$BIN" -p --mood bash -c '

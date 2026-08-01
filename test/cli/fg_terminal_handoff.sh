@@ -1,5 +1,4 @@
 unset SHIT_FLAGS
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 
 d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT

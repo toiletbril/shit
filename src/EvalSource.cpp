@@ -15,7 +15,7 @@
 
 namespace shit {
 
-static constexpr usize MAX_MIMICRY_DEPTH = 64;
+static constexpr usize MAX_MIMICRY_DEPTH = 16;
 
 static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
     -> bool
@@ -62,6 +62,7 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
   let fallback_context = EvalContext{false, false, false, false};
   fallback_context.set_current_source(
       current_source(), String{heap_allocator(), current_origin().view()});
+  fallback_context.m_mimicry_depth = m_mimicry_depth;
   fallback_context.set_shell_executable_path(shell_executable_path());
   fallback_context.set_shitbox(shitbox());
   fallback_context.set_mimicry(mimicry());
@@ -127,11 +128,18 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     LOG(Debug,
         "a NUL byte before the first line break marks '%s' as a binary file",
         ec.program().c_str());
+    let file_command = String{"file "};
+    append_shell_quoted_arg(file_command, ec.program().view());
+    let details =
+        String{"The file is binary and the system has refused execution. "};
+    details += "Use `";
+    details += file_command;
+    details += "` to check the file type.";
     let const source = current_source();
     show_message(ErrorWithLocationAndDetails{
         ec.source_location(),
         "Cannot execute `" + ec.program_path().text() + "` as a shell script.",
-        "A NUL byte before the first line break marks the file as binary."}
+        steal(details)}
                      .to_string(source != nullptr ? source->view()
                                                   : StringView{},
                                 this));

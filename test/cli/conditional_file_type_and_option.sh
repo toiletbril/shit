@@ -5,7 +5,14 @@ plain=$directory/plain
 : > "$plain"
 
 echo "== file-type primaries follow the platform:"
-if "$BIN" -c '[[ -c /dev/null ]]' </dev/null; then
+if [ "${OS-}" = Windows_NT ]; then
+    "$BIN" -c "[[ -c /dev/null && ! -c '$plain' ]]" </dev/null || exit 1
+    "$BIN" -c "[[ ! -p '$plain' && ! -b '$plain' && ! -S '$plain' ]]" \
+        </dev/null || exit 1
+    "$BIN" -c "[[ ! -O '$plain' ]]" </dev/null || exit 1
+    "$BIN" -c "[ ! -p '$plain' ] && [ ! -u '$plain' ] && [ ! -O '$plain' ]" \
+        </dev/null || exit 1
+elif "$BIN" -c '[[ -c /dev/null ]]' </dev/null; then
     fifo=$directory/fifo
     mkfifo "$fifo"
     "$BIN" -c "[[ -p '$fifo' && ! -p '$plain' ]]" </dev/null || exit 1

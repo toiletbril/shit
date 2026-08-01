@@ -1,7 +1,4 @@
-# A command-position path (a token holding a slash in the first word) completes
-# only runnable files and directories, the way fish limits the command word.
-# Plain data files are dropped there but stay in argument position. PATH is
-# pinned to an empty directory so nothing else joins the candidates.
+# Command-position and argument completion retain their matching entry kinds.
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 printf '#!/bin/sh\n' > "$dir/run"
@@ -12,7 +9,6 @@ printf '#!/bin/sh\n' > "$dir/zz_path_exec"
 chmod +x "$dir/zz_path_exec"
 : > "$dir/zz_path_data"
 mkdir "$dir/zz_path_dir"
-export PATH="$dir"
 cd "$dir"
 if [ "${OS-}" = Windows_NT ]; then
     path_separator='\'
@@ -21,21 +17,23 @@ else
     path_separator='/'
     path_delimiter=':'
 fi
-echo "== command position offers the executable and the directory, not the data file:"
-"$BIN" --debug-complete-at './' </dev/null
-echo "== argument position still offers every file:"
-"$BIN" --debug-complete-at 'cat ./' </dev/null
-echo "== PATH command completion offers only the executable"
-"$BIN" --debug-complete-at 'zz_path_' </dev/null
+echo "== command position offers a matching executable:"
+"$BIN" --debug-complete-at './r' </dev/null
+echo "== command position offers a matching directory:"
+"$BIN" --debug-complete-at './s' </dev/null
+echo "== argument position offers a matching data file:"
+"$BIN" --debug-complete-at 'cat ./d' </dev/null
+echo "== PATH command completion offers a matching executable:"
+PATH="$dir" "$BIN" --debug-complete-at 'zz_path_e' </dev/null
 echo "== a blocked first PATH entry does not hide a later executable"
-/bin/mkdir "$dir/blocked-first" "$dir/blocked-second"
+mkdir "$dir/blocked-first" "$dir/blocked-second"
 : > "$dir/blocked-first/zz_path_blocked"
 printf '#!/bin/sh\n' > "$dir/blocked-second/zz_path_blocked"
-/bin/chmod +x "$dir/blocked-second/zz_path_blocked"
+chmod +x "$dir/blocked-second/zz_path_blocked"
 PATH="$dir/blocked-first$path_delimiter$dir/blocked-second" \
     "$BIN" --debug-complete-at 'zz_path_b' </dev/null
 
-/bin/mkdir -p "$dir/native/file-probe"
+mkdir -p "$dir/native/file-probe"
 native_result=$("$BIN" --debug-complete-at \
     "native${path_separator}file" </dev/null)
 case "$native_result" in
@@ -49,15 +47,15 @@ if [ "${OS-}" = Windows_NT ]; then
     mixed_expected=mixedprobe
 else
     printf '#!/bin/sh\n' > "$dir/MIXEDPROBE"
-    /bin/chmod +x "$dir/MIXEDPROBE"
+    chmod +x "$dir/MIXEDPROBE"
     mixed_expected=MIXEDPROBE
 fi
-mixed_result=$("$BIN" --debug-complete-at 'MIXEDP' </dev/null)
+mixed_result=$(PATH="$dir" "$BIN" --debug-complete-at 'MIXEDP' </dev/null)
 case "$mixed_result" in
     *"$mixed_expected"*) ;;
     *) exit 1 ;;
 esac
-mixed_lower_result=$("$BIN" --debug-complete-at 'mixedp' </dev/null)
+mixed_lower_result=$(PATH="$dir" "$BIN" --debug-complete-at 'mixedp' </dev/null)
 case "$mixed_lower_result" in
     *"$mixed_expected"*) ;;
     *) exit 1 ;;

@@ -22,16 +22,17 @@ mkdir "$type_path/blocked" "$type_path/runnable"
 mkdir "$type_path/blocked/calc"
 printf '#!/bin/sh\n' > "$type_path/runnable/calc"
 chmod +x "$type_path/runnable/calc"
+normalized_type_path=$(printf '%s\n' "$type_path" | tr '\\' '/')
 resolved_default=$(PATH="$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
-    "$BIN" -c 'type calc')
+    "$BIN" -c 'type calc' | tr '\\' '/')
 resolved_path=$(PATH="$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
-    "$BIN" -c 'type -p calc')
+    "$BIN" -c 'type -p calc' | tr '\\' '/')
 resolved_forced_path=$(PATH="$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
-    "$BIN" -c 'type -P calc')
+    "$BIN" -c 'type -P calc' | tr '\\' '/')
 echo "== type skips a blocked candidate before a runnable candidate:"
-if test "$resolved_default" = "calc is $type_path/runnable/calc" &&
-    test "$resolved_path" = "$type_path/runnable/calc" &&
-    test "$resolved_forced_path" = "$type_path/runnable/calc"
+if test "$resolved_default" = "calc is $normalized_type_path/runnable/calc" &&
+    test "$resolved_path" = "$normalized_type_path/runnable/calc" &&
+    test "$resolved_forced_path" = "$normalized_type_path/runnable/calc"
 then
     echo runnable
 else

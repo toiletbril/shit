@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Normalize the CLI invocation trace so a golden does not break when the
 # binary moves between rel, dbg, or a different build tree. The trace echoes
 # argv[0], and the Makefile resolves BIN to an absolute path, so the path

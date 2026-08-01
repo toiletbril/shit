@@ -1,16 +1,10 @@
-== command position offers the executable and the directory, not the data file:
+== command position offers a matching executable:
 ./run
+== command position offers a matching directory:
 ./sub/
-./zz_path_dir/
-./zz_path_exec
-== argument position still offers every file:
+== argument position offers a matching data file:
 ./data.txt
-./run
-./sub/
-./zz_path_data
-./zz_path_dir/
-./zz_path_exec
-== PATH command completion offers only the executable
+== PATH command completion offers a matching executable:
 zz_path_exec
 == a blocked first PATH entry does not hide a later executable
 zz_path_blocked

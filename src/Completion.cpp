@@ -1008,7 +1008,7 @@ static fn build_filesystem_candidate(
   let const preserve_directory_spelling = raw_directory_part != directory_part;
   let entry_name = String{completion_allocator(), name};
   if (is_directory) {
-    let separator = os::DIRECTORY_SEPARATOR;
+    let separator = '/';
     if (!directory_part.is_empty() &&
         os::is_directory_separator(directory_part[directory_part.length - 1]))
     {
@@ -1351,7 +1351,7 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
     let candidate = String{completion_allocator()};
     candidate.push('~');
     candidate.append(user.view());
-    candidate.push(os::DIRECTORY_SEPARATOR);
+    candidate.push('/');
     candidates.push(steal(candidate));
   }
   LOG(All, "%zu user names match tilde prefix '%.*s'", candidates.count(),
@@ -1461,7 +1461,12 @@ fn resolve_completion_command(StringView command, EvalContext &context) throws
   if (!located.is_empty()) {
     if (let const canonical = os::canonical_path(located.front());
         canonical.has_value())
-      return String{canonical->filename()};
+    {
+      let resolved_name = String{canonical->filename()};
+      let const name_info = os::normalize_program_name(resolved_name);
+      return String{
+          resolved_name.substring_of_length(0, name_info.stem_length)};
+    }
   }
   return name;
 }

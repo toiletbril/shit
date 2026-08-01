@@ -2,7 +2,6 @@
 # GNU make answers the database probe, so the bundled make still completes
 # targets. PATH is emptied for the completing invocation so the probe finds no
 # system make.
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 printf 'all: build\n\ttrue\nbuild:\n\ttrue\ntest: build\n\ttrue\nclean:\n\ttrue\n.PHONY: clean\n' > "$dir/Makefile"

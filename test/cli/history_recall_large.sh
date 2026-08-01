@@ -9,7 +9,6 @@ if ! script -qec true /dev/null >/dev/null 2>&1; then
   echo "search casefold ok"
   exit 0
 fi
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 hist=$(mktemp)
 search_hist=$(mktemp)
 keys=$(mktemp)

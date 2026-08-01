@@ -34,3 +34,12 @@ chmod +x "$dir/binary"
 binary_status=$?
 sed 's|\\|/|g' "$dir/binary-output" | sed "s|$canonical_dir|TMPDIR|g" | sed "s|$dir|TMPDIR|g"
 echo "binary rc=$binary_status"
+
+printf '#!/bin/sh\n"$0"\n' > "$dir/recurse"
+chmod +x "$dir/recurse"
+out=$(SHIT_FLAGS= "$BIN" --mood bash -I "$dir/recurse" 2>&1)
+recursive_status=$?
+printf '%s\n' "$out" |
+    sed -e "s#$canonical_dir#TMPDIR#g" -e "s#$dir#TMPDIR#g" \
+        -e '/trace:/,/here\.$/d'
+echo "recursive rc=$recursive_status"

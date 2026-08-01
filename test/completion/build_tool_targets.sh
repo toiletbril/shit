@@ -1,7 +1,6 @@
 # The build-tool stage lists make targets through the make database, the npm
 # family's scripts from package.json, and honors -C, hermetically in a
 # temporary directory.
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 printf 'all: build test\n\nbuild:\n\ttrue\n\ntest: build\n\ttrue\n\nclean:\n\ttrue\n\n.PHONY: clean\n' > "$dir/Makefile"

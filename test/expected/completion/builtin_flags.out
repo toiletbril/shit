@@ -60,19 +60,11 @@ nounset
 -u
 -x
 == kill signal names:
--ABRT
--ALRM
--CONT
 -HUP
 -INT
 -KILL
--PIPE
 -QUIT
--STOP
 -TERM
--TSTP
--USR1
--USR2
 == shopt names by prefix:
 globasciiranges
 globskipdots

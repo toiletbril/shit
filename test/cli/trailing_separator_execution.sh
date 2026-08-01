@@ -1,12 +1,8 @@
 unset SHIT_FLAGS
 
-case "$BIN" in
-/*) ;;
-*) BIN=$(pwd)/$BIN ;;
-esac
-
+starting_directory=$PWD
 d=$(mktemp -d) || exit 1
-trap '[ -n "$d" ] && /bin/rm -rf "$d"' EXIT
+trap 'cd "$starting_directory" && [ -n "$d" ] && /bin/rm -rf "$d"' EXIT
 
 printf '#!/bin/sh\nprintf "launched\\n"\n' > "$d/program"
 chmod +x "$d/program"

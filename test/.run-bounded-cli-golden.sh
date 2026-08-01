@@ -9,7 +9,7 @@ cleanup_is_armed=yes
 pending_exit_status=
 
 case $timeout_seconds in
-''|*[!0-9]*)
+''|*[!0-9]*|0)
     printf 'invalid CLI golden timeout\n'
     exit 125
     ;;
@@ -65,12 +65,7 @@ terminate_golden_tree()
     if [ "${OS-}" = Windows_NT ] &&
         command -v taskkill.exe >/dev/null 2>&1; then
         [ -n "$golden_process" ] || return
-        windows_process_id=$(ps -p "$golden_process" -o winpid= 2>/dev/null |
-            tr -d '[:space:]')
-        if [ -n "$windows_process_id" ]; then
-            taskkill.exe //PID "$windows_process_id" //T //F \
-                >/dev/null 2>&1 || true
-        fi
+        taskkill.exe //PID "$golden_process" //T //F >/dev/null 2>&1 || true
         kill -KILL "$golden_process" 2>/dev/null || true
         return
     fi
@@ -120,10 +115,10 @@ trap 'request_exit 143' TERM
 trap 'request_exit 129' HUP
 
 if [ "${OS-}" = Windows_NT ]; then
-    BIN=$BIN BOUNDED_HOST_SHELL=sh BOUNDED_GOLDEN=$golden \
+    BIN=$BIN BOUNDED_GOLDEN=$golden BOUNDED_TIMEOUT_SECONDS=$timeout_seconds \
         SHIT_TEST_TIMEOUT_JOB_LIFETIME=leader \
         "$BIN" -p --mood sh -c \
-        'shitbox timeout 0 "$BIN" --mood sh -c '\''unset SHIT_TEST_TIMEOUT_JOB_LIFETIME; "$BOUNDED_HOST_SHELL" "$BOUNDED_GOLDEN"'\''' &
+        'shitbox timeout "$BOUNDED_TIMEOUT_SECONDS" "$BIN" --mood sh -c '\''unset SHIT_TEST_TIMEOUT_JOB_LIFETIME; sh "$BOUNDED_GOLDEN"'\''' &
 elif command -v setsid >/dev/null 2>&1; then
     BIN=$BIN setsid /bin/sh "$golden" &
 elif command -v perl >/dev/null 2>&1; then
@@ -135,30 +130,30 @@ else
 fi
 golden_process=$!
 golden_session=$golden_process
-golden_probe_process=$golden_process
-case ${OS-} in
-Windows_NT)
-    golden_probe_process=$(ps -p "$golden_process" -o winpid= 2>/dev/null |
-        tr -d '[:space:]')
-    if [ -z "$golden_probe_process" ]; then
-        printf 'cannot resolve the native golden process id\n'
-        exit 125
-    fi
-    ;;
-esac
 if [ -n "$pending_exit_status" ]; then
     exit "$pending_exit_status"
 fi
 
+if [ "${OS-}" = Windows_NT ]; then
+    wait "$golden_process"
+    golden_status=$?
+    golden_process=
+    cleanup_is_armed=no
+    if [ "$golden_status" -eq 124 ]; then
+        printf 'golden timed out\n'
+    fi
+    exit "$golden_status"
+fi
+
 attempt_count=0
 attempt_limit=$((timeout_seconds * 10))
-while kill -0 "$golden_probe_process" 2>/dev/null &&
+while kill -0 "$golden_process" 2>/dev/null &&
     [ "$attempt_count" -lt "$attempt_limit" ]; do
     sleep 0.1
     attempt_count=$((attempt_count + 1))
 done
 
-if kill -0 "$golden_probe_process" 2>/dev/null; then
+if kill -0 "$golden_process" 2>/dev/null; then
     printf 'golden timed out\n'
     termination_status=0
     terminate_golden_tree || termination_status=$?

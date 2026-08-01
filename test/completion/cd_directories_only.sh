@@ -1,6 +1,5 @@
 # The cd builtin completes only directories, never files, while another command
 # still completes both. A hermetic temp directory keeps the candidates stable.
-case "$BIN" in /*) ;; *) BIN=$(pwd)/$BIN ;; esac
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 mkdir "$dir/alpha_dir" "$dir/beta_dir"

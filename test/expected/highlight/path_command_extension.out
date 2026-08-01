@@ -9,7 +9,7 @@ npr	partial-command
 ec\ho	resolved-command
 ech	unknown-command
 >	operator
-/tmp/	existing-path
+./existing/	existing-path
 out	invalid-path
 ./	existing-path
 shi	partial-path

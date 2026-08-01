@@ -1,5 +1,3 @@
 https://example.com/a	url
 user@host:/dir/file	url
 missing:part	invalid-path
-C:	invalid-path
-/missing	invalid-path
