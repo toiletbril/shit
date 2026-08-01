@@ -12,6 +12,8 @@ export TEST_HOST_MAKE
 
 DIFF_FLAGS := -u
 MODE ?= dbg
+IS_NONDEBUG_BUILD := $(if $(filter rel prof cov cosmo,$(MODE)),1,0)
+export IS_NONDEBUG_BUILD
 ifeq ($(OS), Windows_NT)
 TARGET ?= Windows_NT
 else
@@ -114,7 +116,7 @@ COMPLETION_INPUT := $(wildcard completion/*.sh)
 COMPLETION_NAMES := $(COMPLETION_INPUT:completion/%.sh=completion_%)
 
 completion_%: expected/completion/%.out
-	@if ! '$(BIN)' --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
+	@if [ '$(IS_NONDEBUG_BUILD)' = 1 ]; then \
 		printf "	%-64s skipped, release binary\n" completion/$*.sh; \
 	else \
 		out=$$(mktemp); \
@@ -201,7 +203,7 @@ $(WINDOWS_UNREPRESENTABLE_COMPLETION_NAMES):
 endif
 
 completion_tests: $(BIN)
-	+@if ! '$(BIN)' --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
+	+@if [ '$(IS_NONDEBUG_BUILD)' = 1 ]; then \
 		printf "	%-64s skipped, release binary\n" completion; \
 	else \
 		"$(TEST_HOST_MAKE)" --no-print-directory $(COMPLETION_NAMES) \
@@ -230,7 +232,7 @@ diagnostic_tty_test: $(BIN)
 	@if command -v python3 >/dev/null 2>&1; then \
 		for test_file in $(DIAGNOSTIC_TTY_INPUT); do \
 			if [ "$$test_file" = interactive/long_warning_window.py ] && \
-				! '$(BIN)' -X debug -c : </dev/null >/dev/null 2>&1; then \
+				[ '$(IS_NONDEBUG_BUILD)' = 1 ]; then \
 				printf "\t%-64s skipped, release binary\n" "$$test_file"; \
 				continue; \
 			fi; \

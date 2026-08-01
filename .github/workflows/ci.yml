@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: alpine:latest
-    continue-on-error: true
     steps:
       - name: Install the toolchain
         shell: sh
@@ -122,14 +121,15 @@ jobs:
         if: always()
         shell: bash
         run: |
-          llvm-profdata merge -sparse coverage/profraw/*.profraw \
+          ./scripts/llvm-tool.sh llvm-profdata merge -sparse \
+            coverage/profraw/*.profraw \
             -o coverage/shit.profdata
           {
             echo '## Coverage'
             echo
             echo '| File | Line cover | Branch cover |'
             echo '| --- | --- | --- |'
-            llvm-cov report ./shit-cov \
+            ./scripts/llvm-tool.sh llvm-cov report ./shit-cov \
               -instr-profile=coverage/shit.profdata src \
               -ignore-filename-regex='toiletline' \
               | awk 'NF>=13 && $1!="Filename" && $1!~/^-/ \
@@ -139,7 +139,7 @@ jobs:
             echo
             echo '| File | Uncovered lines |'
             echo '| --- | --- |'
-            llvm-cov export ./shit-cov \
+            ./scripts/llvm-tool.sh llvm-cov export ./shit-cov \
               -instr-profile=coverage/shit.profdata src \
               -ignore-filename-regex='toiletline' -format=lcov \
               | awk '

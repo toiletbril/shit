@@ -1156,7 +1156,7 @@ fn advance_shell_lexical_state(StringView source, usize end,
         i == frame.body_start || lexer::is_whitespace(source[i - 1]) ||
         source[i - 1] == '\n' || source[i - 1] == ';' || source[i - 1] == '&' ||
         source[i - 1] == '|' || source[i - 1] == '(' || source[i - 1] == ')';
-    if (is_word_start) {
+    if (is_word_start && lexer::is_part_of_identifier(c)) {
       let word_end = i;
       while (word_end < end && !lexer::is_whitespace(source[word_end]) &&
              !lexer::is_shell_sentinel(source[word_end]) &&

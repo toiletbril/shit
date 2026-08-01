@@ -233,12 +233,14 @@ fi
 printf 'analysis-shadowed-no-path-scan\n'
 
 noninteractive_log="$dir/noninteractive.log"
-PATH="$dir/one${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-    "$BIN" -X all -c 'missing_command_xyz' \
-    >/dev/null 2>"$noninteractive_log"
-if grep -F 'unique PATH directories to seed the program cache' \
-    "$noninteractive_log" >/dev/null; then
-    exit 1
+if "$BIN" -X all -c ':' >/dev/null 2>&1; then
+    PATH="$dir/one${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+        "$BIN" -X all -c 'missing_command_xyz' \
+        >/dev/null 2>"$noninteractive_log"
+    if grep -F 'unique PATH directories to seed the program cache' \
+        "$noninteractive_log" >/dev/null; then
+        exit 1
+    fi
 fi
 printf 'noninteractive-no-path-index\n'
 

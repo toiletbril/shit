@@ -13,6 +13,8 @@ binary = sys.argv[1]
 with tempfile.NamedTemporaryFile(delete=False) as source:
     source.write(
         b'#!/usr/bin/env bash\r\n'
+        b'RESOLVED_VARIABLE=$PATH\r\n'
+        b'for LOOP_VARIABLE in one; do echo "$LOOP_VARIABLE"; done\r\n'
         b'echo "$PATH" ${PATH} $((PATH + 1))\r\n'
         b'echo "styled"\r\n'
         b'finish() { :; }\r\n'
@@ -48,6 +50,8 @@ _, status = os.waitpid(pid, 0)
 os.unlink(source_path)
 function_is_resolved = b"\x1b[34mfinish\x1b[0m" in output
 variable_forms_are_resolved = {
+    "assignment": b"\x1b[34mRESOLVED_VARIABLE" in output,
+    "loop": b"\x1b[34mLOOP_VARIABLE" in output,
     "dollar": b"\x1b[34m$PATH" in output,
     "braced": b"\x1b[34m${PATH}" in output,
     "arithmetic": b"\x1b[34mPATH" in output,

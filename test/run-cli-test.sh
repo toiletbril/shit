@@ -11,7 +11,7 @@ for f in "$@"; do
     name=$(basename "$f" .sh)
     case $name in
     command_substitution_strategy|fg_terminal_handoff)
-        if ! "$BIN" -X debug -c : </dev/null >/dev/null 2>&1; then
+        if [ "${IS_NONDEBUG_BUILD:-0}" = 1 ]; then
             printf "\t%-64s skipped, release binary\n" "cli/$name.sh"
             continue
         fi

@@ -16,7 +16,7 @@ static fn make_shell_highlight_theme() wontthrow -> highlight_theme
   theme.set_style(highlight_role::string, ansi::BRIGHT_GREEN);
   theme.set_style(highlight_role::heredoc, ansi::BRIGHT_GREEN);
   theme.set_style(highlight_role::variable, ansi::BLUE);
-  theme.set_style(highlight_role::assignment_name, ansi::CYAN);
+  theme.set_style(highlight_role::assignment_name, ansi::BLUE);
   theme.set_style(highlight_role::unset_variable,
                   ansi::RED_CURLY_GREEN_UNDERLINE);
   theme.set_style(highlight_role::flag, ansi::ITALIC);

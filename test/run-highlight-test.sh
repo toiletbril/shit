@@ -7,7 +7,7 @@
 test_shell=$1
 shift
 
-if ! "$BIN" --debug-highlight-at '' </dev/null >/dev/null 2>&1; then
+if [ "${IS_NONDEBUG_BUILD:-0}" = 1 ]; then
     printf "\t%-64s skipped, release binary\n" highlight
     exit 0
 fi

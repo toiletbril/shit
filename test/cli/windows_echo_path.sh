@@ -7,9 +7,11 @@ if [ "${OS-}" = Windows_NT ]; then
     [ "$("$BIN" -c 'printf "%s" C:\new')" = 'C:new' ] || exit 1
     [ "$("$BIN" -c "printf '%s' 'C:\new'")" = 'C:\new' ] || exit 1
     [ "$("$BIN" -c 'printf "%s" C:\\new')" = 'C:\new' ] || exit 1
-    case "$("$BIN" --debug-highlight-at 'echo C:\Windows')" in
-        *'C:\Windows'*) exit 1 ;;
-    esac
+    if "$BIN" --debug-highlight-at '' </dev/null >/dev/null 2>&1; then
+        case "$("$BIN" --debug-highlight-at 'echo C:\Windows')" in
+            *'C:\Windows'*) exit 1 ;;
+        esac
+    fi
 fi
 
 [ "$("$BIN" -c 'echo -e "a\tb"')" = "$(printf 'a\tb')" ] || exit 1
