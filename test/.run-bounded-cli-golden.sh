@@ -135,19 +135,30 @@ else
 fi
 golden_process=$!
 golden_session=$golden_process
+golden_probe_process=$golden_process
+case ${OS-} in
+Windows_NT)
+    golden_probe_process=$(ps -p "$golden_process" -o winpid= 2>/dev/null |
+        tr -d '[:space:]')
+    if [ -z "$golden_probe_process" ]; then
+        printf 'cannot resolve the native golden process id\n'
+        exit 125
+    fi
+    ;;
+esac
 if [ -n "$pending_exit_status" ]; then
     exit "$pending_exit_status"
 fi
 
 attempt_count=0
 attempt_limit=$((timeout_seconds * 10))
-while kill -0 "$golden_process" 2>/dev/null &&
+while kill -0 "$golden_probe_process" 2>/dev/null &&
     [ "$attempt_count" -lt "$attempt_limit" ]; do
     sleep 0.1
     attempt_count=$((attempt_count + 1))
 done
 
-if kill -0 "$golden_process" 2>/dev/null; then
+if kill -0 "$golden_probe_process" 2>/dev/null; then
     printf 'golden timed out\n'
     termination_status=0
     terminate_golden_tree || termination_status=$?

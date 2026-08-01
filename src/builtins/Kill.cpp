@@ -178,9 +178,10 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(Debug, "kill sending signal %d to target '%s'", signal_number,
         target.c_str());
     if (!os::signal_process(pid, signal_number)) {
+      let const signal_error = os::last_system_error_message();
       report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                 StringView{"Cannot signal '"} + target +
-                                    "': " + os::last_system_error_message());
+                                    "': " + signal_error);
       status = 1;
     }
   }
