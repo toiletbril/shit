@@ -262,9 +262,9 @@ without filesystem access. Explicit PATH validation ends with the TAB callback
 or compgen invocation that began it. The highlighter looks up only variable
 names that occur on the line, and it colors nested command and arithmetic
 substitutions in one pass. Strings and heredocs are bright green, keywords are
-bold, resolved commands are blue, and unfinished command prefixes are
-bright blue. Flags other than a lone dash are italic. A word beginning with two
-dashes stays a flag when it contains an equals sign. Unknown commands and
+bold, resolved commands and variables are blue, and unfinished command prefixes
+are bright blue. Flags other than a lone dash are italic. A word beginning with
+two dashes stays a flag when it contains an equals sign. Unknown commands and
 invalid paths are bright red. Invalid syntax is bold bright red, and unset
 variables are non-bold bright red. A bright green curly underline is added to
 these roles when TERM names a terminal type with known support. Live globs are
@@ -398,12 +398,13 @@ test bashdiff BASHP=/opt/zerobrew/bin/bash`.
 
 ## Finishing a change
 
-Before finishing a plan, update this AGENTS.md, the README, docs/shit.1, and
-completions/shit.bash so the docs, the manual, and the completions stay in sync.
-A new flag, a new mood, a new builtin, or a renamed option touches all four. The
-flag, mood, and UX documentation lives in the man page docs/shit.1, so that file
-is the primary write for such a change and this AGENTS.md only routes to it. A
-flag also updates completions/shit.bash so the completion offers it.
+README.md is never modified. Before finishing a plan, update this AGENTS.md,
+docs/shit.1, and completions/shit.bash so the project notes, the manual, and the
+completions stay in sync. A new flag, a new mood, a new builtin, or a renamed
+option touches all three. The flag, mood, and UX documentation lives in the man
+page docs/shit.1, so that file is the primary write for such a change and this
+AGENTS.md only routes to it. A flag also updates completions/shit.bash so the
+completion offers it.
 
 ## Logging and debugging
 
