@@ -23,6 +23,7 @@ TARGET ?= $(shell uname -s)
 endif
 
 ifeq ($(TARGET), Windows_NT)
+.NOTPARALLEL:
 export TEST_PATH_SEPARATOR := ;
 export TEST_NULL_DEVICE := NUL
 else

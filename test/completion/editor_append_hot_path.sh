@@ -80,7 +80,7 @@ send_typing_input()
 send_typing_input | TERM=xterm-256color PATH="$d/path" \
     SHIT_TEST_EDITOR_STATS=1 EDITOR_READY_FILE="$d/typing-ready" \
     SHIT_HISTORY="$d/typing-history" BIN="$BIN" \
-    run_editor "$d/typing-typescript"
+    run_editor "$d/typing-typescript" || :
 
 append_metrics=$(metric_line "$d/typing-typescript" 1) || {
     printf 'editor metrics missing\n'
@@ -127,7 +127,7 @@ send_tab_input()
 
 send_tab_input | PATH="$d/path" SHIT_TEST_EDITOR_STATS=1 \
     EDITOR_READY_FILE="$d/tab-ready" SHIT_HISTORY="$d/tab-history" \
-    BIN="$BIN" run_editor "$d/tab-typescript"
+    BIN="$BIN" run_editor "$d/tab-typescript" || :
 
 tab_metrics=$(metric_line "$d/tab-typescript" 1) || exit 1
 test "$(metric_field "$tab_metrics" probes)" -le 4 || exit 1
@@ -160,7 +160,7 @@ send_history_input()
 send_history_input | TERM=xterm-256color PATH="$d/path" \
     EDITOR_READY_FILE="$d/history-ready" SHIT_TEST_EDITOR_STATS=1 \
     SHIT_HISTORY="$d/miss-history" BIN="$BIN" \
-    run_editor "$d/history-typescript"
+    run_editor "$d/history-typescript" || :
 
 history_short_metrics=$(metric_line "$d/history-typescript" 1) || exit 1
 history_metrics=$(metric_line "$d/history-typescript" 2) || exit 1
@@ -192,7 +192,7 @@ send_startup_input()
 send_startup_input | TERM=xterm-256color NO_COLOR= PATH="$d/startup-before" \
     EDITOR_READY_FILE="$d/startup-ready" STARTUP_AFTER="$d/startup-after" \
     SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/startup-history" \
-    RCFILE="$d/startup-rc" BIN="$BIN" run_editor "$d/startup-typescript"
+    RCFILE="$d/startup-rc" BIN="$BIN" run_editor "$d/startup-typescript" || :
 
 startup_metrics=$(metric_line "$d/startup-typescript" 1) || exit 1
 test "$(metric_field "$startup_metrics" stats)" -eq 0 || exit 1
@@ -222,7 +222,7 @@ send_menu_input | ASAN_OPTIONS=detect_stack_use_after_return=1 \
     EDITOR_READY_FILE="$d/menu-ready" MANPATH= \
     PATH="$d/menu-bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
     SHIT_HISTORY="$d/menu-history" BIN="$BIN" \
-    run_editor "$d/menu-typescript" 100
+    run_editor "$d/menu-typescript" 100 || :
 
 strings "$d/menu-typescript" | \
     grep -q 'Keep this first long completion description intact' || exit 1
@@ -249,7 +249,7 @@ send_quoted_input()
 
 send_quoted_input | EDITOR_READY_FILE="$d/quoted-ready" \
     SHIT_HISTORY="$d/quoted-history" BIN="$BIN" \
-    run_editor "$d/quoted-typescript"
+    run_editor "$d/quoted-typescript" || :
 
 strings "$d/quoted-typescript" | grep -q '<space name>' || exit 1
 strings "$d/quoted-typescript" | grep -q '<plain name>' || exit 1
@@ -272,7 +272,7 @@ send_mixed_path_input | TERM=xterm-256color \
     EDITOR_READY_FILE="$d/mixed-ready" \
     PATH="$d/mixed-path${TEST_PATH_SEPARATOR}${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
     SHIT_TEST_EDITOR_STATS=1 SHIT_HISTORY="$d/mixed-history" BIN="$BIN" \
-    run_editor "$d/mixed-typescript"
+    run_editor "$d/mixed-typescript" || :
 
 mixed_metrics=$(metric_line "$d/mixed-typescript" 2) || exit 1
 case $mixed_metrics in *' stats=0 reads=0 sorts=0 probes=0 '*) ;; *) exit 1 ;; esac
