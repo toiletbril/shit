@@ -1,7 +1,9 @@
 ifeq ($(OS), Windows_NT)
 SHELL := sh
+TEST_ABSOLUTE_DIRECTORY_COMMAND := pwd -W
 else
 SHELL := /bin/bash
+TEST_ABSOLUTE_DIRECTORY_COMMAND := pwd
 endif
 
 TEST_HOST_MAKE ?= $(shell command -v "$(MAKE)")
@@ -45,13 +47,13 @@ endif
 # PATH lookup, so the target binary is found no matter where make was launched.
 override BIN := $(shell \
 	if [ -x "$(BIN)" ]; then \
-		echo "$$(cd "$$(dirname "$(BIN)")" && pwd)/$$(basename "$(BIN)")"; \
+		echo "$$(cd "$$(dirname "$(BIN)")" && $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/$$(basename "$(BIN)")"; \
 	elif [ -x "$(CURDIR)/../$(BIN)" ]; then \
 		candidate="$(CURDIR)/../$(BIN)"; \
-		echo "$$(cd "$$(dirname "$$candidate")" && pwd)/$$(basename "$$candidate")"; \
+		echo "$$(cd "$$(dirname "$$candidate")" && $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/$$(basename "$$candidate")"; \
 	elif command -v "$(BIN)" >/dev/null 2>&1; then \
 		found=$$(command -v "$(BIN)"); \
-		echo "$$(cd "$$(dirname "$$found")" && pwd)/$$(basename "$$found")"; \
+		echo "$$(cd "$$(dirname "$$found")" && $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/$$(basename "$$found")"; \
 	else echo "$(BIN)"; fi)
 export BIN
 
