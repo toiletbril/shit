@@ -21,7 +21,7 @@ run_editor()
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
             "$transcript" >/dev/null 2>"$script_error" || :
     else
-        "$script_command" -q -t 0 "$transcript" /bin/sh -c \
+        "$script_command" -q -F "$transcript" /bin/sh -c \
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
             >/dev/null 2>"$script_error" || :
     fi
@@ -42,7 +42,11 @@ wait_for_editor()
 
 metric_line()
 {
-    strings "$1" | grep 'editor-refresh append=' | sed -n "${2}p"
+    local metric_line_value
+    metric_line_value=$(strings "$1" | grep 'editor-refresh append=' |
+        sed -n "${2}p")
+    [ -n "$metric_line_value" ] || return 1
+    printf '%s\n' "$metric_line_value"
 }
 
 metric_field()

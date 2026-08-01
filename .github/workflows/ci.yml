@@ -288,4 +288,4 @@ jobs:
 
       - name: Run debug tests
         shell: pwsh
-        run: make.exe TEST_HOST_MAKE=make.exe SHELL=C:/msys64/usr/bin/sh.exe MODE=dbg test
+        run: make.exe -j1 TEST_HOST_MAKE=make.exe SHELL=C:/msys64/usr/bin/sh.exe MODE=dbg test
