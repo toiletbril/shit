@@ -7,7 +7,9 @@ unset SHIT_FLAGS
 d=$(mktemp -d)
 cd "$d" || exit 1
 echo "== rm sees a dangling symlink, so it would remove it, not report it absent:"
-ln -s /no/such/target link
+: > target
+ln -s target link
+mv target target-away
 "$BIN" -c 'shitbox rm --dry-run link' 2>&1
 echo "== --dry-run prints without deleting a file:"
 : > keep.txt

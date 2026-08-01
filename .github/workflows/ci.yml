@@ -262,9 +262,12 @@ jobs:
           $symlinkProbeDirectory = Join-Path ([IO.Path]::GetTempPath()) `
             "shit-symlink-$([guid]::NewGuid())"
           $symlinkProbePath = $symlinkProbeDirectory -replace '\\', '/'
-          sh.exe -c `
-            'mkdir -p "$1/target" && ln -s target "$1/directory-link" && ln -s missing "$1/dangling-link"' `
-            sh $symlinkProbePath
+          $symlinkProbeCommand = `
+            'mkdir -p "$1/target" && ' +
+            'ln -s target "$1/directory-link" && ' +
+            ': > "$1/missing" && ln -s missing "$1/dangling-link" && ' +
+            'mv "$1/missing" "$1/moved"'
+          sh.exe -c $symlinkProbeCommand sh $symlinkProbePath
           if ($LASTEXITCODE -ne 0) {
             throw "MSYS2 could not create native test symlinks"
           }
