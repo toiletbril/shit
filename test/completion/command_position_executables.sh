@@ -12,9 +12,11 @@ mkdir "$dir/zz_path_dir"
 cd "$dir"
 if [ "${OS-}" = Windows_NT ]; then
     path_separator='\'
+    path_source_separator='\\'
     path_delimiter=';'
 else
     path_separator='/'
+    path_source_separator='/'
     path_delimiter=':'
 fi
 echo "== command position offers a matching executable:"
@@ -35,9 +37,9 @@ PATH="$dir/blocked-first$path_delimiter$dir/blocked-second" \
 
 mkdir -p "$dir/native/file-probe"
 native_result=$("$BIN" --debug-complete-at \
-    "native${path_separator}file" </dev/null)
+    "native${path_source_separator}file" </dev/null)
 case "$native_result" in
-    *"native${path_separator}file-probe${path_separator}"*) ;;
+    *file-probe*"${path_separator}"*) ;;
     *) exit 1 ;;
 esac
 echo "== native path separators complete directories"

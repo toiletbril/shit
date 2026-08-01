@@ -27,9 +27,10 @@ probe_directory_lock()
     if [ "${OS-}" = Windows_NT ]; then
         lock_file=$directory/.shit-flock.lock
         [ -e "$lock_file" ] || return 2
-        powershell.exe -NoProfile -NonInteractive -Command '
+        powershell.exe -NoProfile -NonInteractive -Command '& {
+            param($lock_path)
             try {
-                $stream = [IO.File]::Open($args[0], "OpenOrCreate", "ReadWrite", "None")
+                $stream = [IO.File]::Open($lock_path, "OpenOrCreate", "ReadWrite", "None")
                 $stream.Dispose()
                 exit 0
             } catch [IO.IOException] {
@@ -37,7 +38,7 @@ probe_directory_lock()
             } catch {
                 exit 2
             }
-        ' "$lock_file" >/dev/null 2>&1
+        }' "$lock_file" >/dev/null 2>&1
         return $?
     fi
 
