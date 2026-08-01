@@ -90,6 +90,7 @@ test: $(BIN)
 	+@"$(TEST_HOST_MAKE)" clean
 	+@"$(TEST_HOST_MAKE)" $(TEST_SUITES)
 	+@for serial_test_name in $(SERIAL_TEST_NAMES); do \
+		printf "	%-64s running\n" "$$serial_test_name"; \
 		"$(TEST_HOST_MAKE)" --no-print-directory "$$serial_test_name" || exit 1; \
 	done
 	@touch $(FAILED_LIST)
@@ -258,7 +259,7 @@ refill:
 		[ -f cli/$$f.sh ] || continue; \
 		printf "	%-64s cli/$$f.out\n" cli/$$f.sh; \
 		case $$f in \
-		command_substitution_interrupt|fg_terminal_handoff|shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job) \
+		command_substitution_interrupt|fg_terminal_handoff|read_timeout|shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job) \
 			golden_timeout_seconds=60; \
 			[ "$$f" != shitbox_timeout ] || golden_timeout_seconds=120; \
 			output=$$(mktemp "expected/cli/.$$f.out.XXXXXX") || exit; \

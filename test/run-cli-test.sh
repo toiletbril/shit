@@ -11,8 +11,8 @@ for f in "$@"; do
     name=$(basename "$f" .sh)
     out=$(mktemp)
     case $name in
-    command_substitution_interrupt|fg_terminal_handoff|shitbox_timeout|\
-        transaction_lock_lifetime|wait_on_stopped_job)
+    command_substitution_interrupt|fg_terminal_handoff|read_timeout|\
+        shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job)
         golden_timeout_seconds=60
         if [ "$name" = shitbox_timeout ]; then
             golden_timeout_seconds=120
