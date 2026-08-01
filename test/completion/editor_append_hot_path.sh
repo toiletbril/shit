@@ -19,12 +19,14 @@ run_editor()
     if [ "$script_style" = gnu ]; then
         "$script_command" -q -c \
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
-            "$transcript" >/dev/null 2>"$script_error"
+            "$transcript" >/dev/null 2>"$script_error" || :
     else
         "$script_command" -q -t 0 "$transcript" /bin/sh -c \
             "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
-            >/dev/null 2>"$script_error"
+            >/dev/null 2>"$script_error" || :
     fi
+
+    return 0
 }
 
 wait_for_editor()

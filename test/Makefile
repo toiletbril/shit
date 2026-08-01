@@ -168,6 +168,7 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_diagnostic_levels \
 	cli_disown_running_only \
 	cli_exec_exit_codes \
+	cli_exec_failed_interactive_state \
 	cli_fg_terminal_handoff \
 	cli_job_state_running_then_stopped \
 	cli_mkdir_mode_umask \

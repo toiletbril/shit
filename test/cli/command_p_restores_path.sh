@@ -11,6 +11,11 @@ export COMMAND_P_OUTPUT=$dir/command-p-output
 PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
     "$BIN" -c 'command -p nonexistent_xyz; probecmd' \
     2>"$COMMAND_P_OUTPUT"
-PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-    "$BIN" -c 'command -p ls > "$COMMAND_P_OUTPUT"; probecmd'
+if [ "${OS-}" = Windows_NT ]; then
+    PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+        "$BIN" -c 'command -p "$BIN" -c true > "$COMMAND_P_OUTPUT"; probecmd'
+else
+    PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+        "$BIN" -c 'command -p ls > "$COMMAND_P_OUTPUT"; probecmd'
+fi
 echo "rc=$?"
