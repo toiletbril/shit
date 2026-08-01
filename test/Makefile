@@ -131,7 +131,7 @@ completion_%: expected/completion/%.out
 		if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
 			printf "	%-64s ok\033[K\r" completion/$*.sh; \
 		else \
-			diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
+			diff $(DIFF_FLAGS) $< $$out | tee -a $(FAILED_LIST); \
 			printf "	%-64s FAILED :c\n" completion/$*.sh; \
 		fi; \
 		rm -f $$out; \

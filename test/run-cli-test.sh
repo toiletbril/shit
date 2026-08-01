@@ -1,8 +1,8 @@
 #!/bin/bash
 # Run each named cli test through its own shell driver and diff the output
-# against the golden. A mismatch appends a unified diff to the failed list. The
-# Makefile passes BIN, DIFF_FLAGS, FAILED_LIST and the cli test files as
-# arguments.
+# against the golden. A mismatch prints and stores a unified diff in the failed
+# list. The Makefile passes BIN, DIFF_FLAGS, FAILED_LIST and the cli test files
+# as arguments.
 
 test_shell=$1
 shift
@@ -40,7 +40,7 @@ for f in "$@"; do
     if diff $DIFF_FLAGS "expected/cli/$name.out" "$out" >/dev/null 2>&1; then
         printf "\t%-64s ok\033[K\r" "cli/$name.sh"
     else
-        diff $DIFF_FLAGS "expected/cli/$name.out" "$out" >> "$FAILED_LIST"
+        diff $DIFF_FLAGS "expected/cli/$name.out" "$out" | tee -a "$FAILED_LIST"
         printf "\t%-64s FAILED :c\n" "cli/$name.sh"
     fi
     rm -f "$out"
