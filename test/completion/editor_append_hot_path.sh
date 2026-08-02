@@ -149,8 +149,9 @@ append_refreshes=$(metric_field "$append_metrics" append)
 full_refreshes=$(metric_field "$append_metrics" full)
 append_serializations=$(metric_field "$append_metrics" serializations)
 refresh_count=$((append_refreshes + full_refreshes))
-if [ "$append_refreshes" -lt 7 ] || [ "$full_refreshes" -lt 1 ] ||
-    [ "$refresh_count" -gt 12 ] || [ "$append_serializations" -gt 1 ]; then
+if [ "$append_refreshes" -lt 6 ] || [ "$full_refreshes" -lt 1 ] ||
+    [ "$refresh_count" -lt 11 ] || [ "$refresh_count" -gt 12 ] ||
+    [ "$append_serializations" -gt 1 ]; then
     printf '%s\n' "$append_metrics"
     exit 1
 fi

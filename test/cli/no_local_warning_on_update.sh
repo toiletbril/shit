@@ -8,5 +8,5 @@ echo "== fresh name warns:"
 echo "== top-level name is quiet:"
 "$BIN" -W -c 'seeded=0; fn(){ seeded=1; }; fn' 2>&1 | grep -c 'has no local'
 echo "== inherited PATH is quiet:"
-"$BIN" -W -c 'fn(){ PATH="${PATH:+$PATH$TEST_NATIVE_PATH_SEPARATOR}/x"; }; fn' 2>&1 | grep -c 'has no local'
+"$BIN" -W -c 'fn(){ PATH="${PATH:+$PATH$TEST_PATH_SEPARATOR}/x"; }; fn' 2>&1 | grep -c 'has no local'
 echo "rc=$?"

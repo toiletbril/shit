@@ -99,7 +99,7 @@
 ]
 [Word
   Unquoted "CDPATH="
-  Variable "TEST_NATIVE_PATH_SEPARATOR"
+  Variable "TEST_PATH_SEPARATOR"
 ]
 [Word
   Unquoted "cd"
