@@ -30,10 +30,12 @@ echo "=== --enable-shitbox turns bare names on ==="
 "$BIN" --enable-shitbox -c 'PATH=; seq 3'
 
 echo "=== --enable-shitbox prefers a PATH binary ==="
-PATH="$dir" "$BIN" --enable-shitbox -c 'seq 3'
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" --enable-shitbox -c 'seq 3'
 
 echo "=== set -o shitbox prefers a PATH binary ==="
-PATH="$dir" "$BIN" -c 'set -o shitbox; seq 3'
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" -c 'set -o shitbox; seq 3'
 
 echo "=== --enable-shitbox works in the sh mood ==="
 "$BIN" --mood sh --enable-shitbox -c 'PATH=; seq 3'

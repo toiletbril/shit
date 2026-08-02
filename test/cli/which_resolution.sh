@@ -10,7 +10,9 @@ echo "== an absent name exits 1 with no output:"
 d=$(mktemp -d); printf '#!/bin/sh\n' > "$d/mytool"; chmod +x "$d/mytool"
 normalized_d=$(printf '%s\n' "$d" | tr '\\' '/')
 echo "== a program resolved in a temp PATH:"
-PATH="$d" "$BIN" -c 'shitbox which mytool' | tr '\\' '/' | sed "s#$normalized_d#TMPDIR#"
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$d" \
+    "$BIN" -c 'shitbox which mytool' | tr '\\' '/' | sed "s#$normalized_d#TMPDIR#"
 echo "== -a lists every match in the temp PATH:"
-PATH="$d" "$BIN" -c 'shitbox which -a mytool' | tr '\\' '/' | sed "s#$normalized_d#TMPDIR#"
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$d" \
+    "$BIN" -c 'shitbox which -a mytool' | tr '\\' '/' | sed "s#$normalized_d#TMPDIR#"
 rm -rf "$d"

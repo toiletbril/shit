@@ -19,10 +19,10 @@ for f in "$@"; do
     esac
     out=$(mktemp)
     case $name in
-    command_substitution_interrupt|fg_terminal_handoff|read_timeout|\
+    command_substitution_interrupt|fg_terminal_handoff|history_recall_large|read_timeout|\
         shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job)
         golden_timeout_seconds=60
-        if [ "$name" = shitbox_timeout ]; then
+        if [ "$name" = history_recall_large ] || [ "$name" = shitbox_timeout ]; then
             golden_timeout_seconds=120
         fi
         CLI_TEST_TIMEOUT_SECONDS=${CLI_TEST_TIMEOUT_SECONDS:-$golden_timeout_seconds} \

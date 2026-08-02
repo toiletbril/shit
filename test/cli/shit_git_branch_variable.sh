@@ -12,7 +12,9 @@ printf 'ref: refs/heads/probe-branch\n' > "$root/repo/.git/HEAD"
 printf '0123456789abcdef\n' > "$root/repo/.git/HEAD"
 "$BIN" -c "cd '$root/repo'; echo \"detached=\$SHIT_GIT_BRANCH\""
 mkdir -p "$root/real/gitdir" "$root/tree"
-real_gitdir=$(cd "$root/real/gitdir" && pwd -P)
+if ! real_gitdir=$(cd "$root/real/gitdir" && pwd -W 2>/dev/null); then
+    real_gitdir=$(cd "$root/real/gitdir" && pwd -P)
+fi
 printf 'gitdir: %s\n' "$real_gitdir" > "$root/tree/.git"
 printf 'ref: refs/heads/linked-tree\n' > "$root/real/gitdir/HEAD"
 "$BIN" -c "cd '$root/tree'; echo \"worktree=\$SHIT_GIT_BRANCH\""

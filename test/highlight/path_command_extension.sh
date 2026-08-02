@@ -21,21 +21,26 @@ printf '#!/bin/sh\n' > "$dir/foobar"
 chmod +x "$dir/foobar"
 
 tab=$(printf '\t')
-PATH="$dir" "$BIN" --debug-highlight-at \
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" --debug-highlight-at \
     'EXPLICIT-PROBE.EXE; collision.exe; directory.exe' |
     grep -E "${tab}(resolved-command|partial-command|unknown-command)$"
-PATH="$dir" "$BIN" --debug-highlight-at 'EXPLICIT-P' |
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" --debug-highlight-at 'EXPLICIT-P' |
     grep -E "${tab}partial-command$"
-PATH="$dir" "$BIN" --debug-highlight-at 'explicit-p' |
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" --debug-highlight-at 'explicit-p' |
     grep -E "${tab}partial-command$"
-PATH="$dir" "$BIN" --debug-highlight-at 'foo' |
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" --debug-highlight-at 'foo' |
     grep -E "${tab}partial-command$"
 
 mkdir "$dir/blocker-first" "$dir/blocker-second"
 mkdir "$dir/blocker-first/blocked.exe"
 printf '#!/bin/sh\n' > "$dir/blocker-second/blocked.exe"
 chmod +x "$dir/blocker-second/blocked.exe"
-PATH="$dir/blocker-first${TEST_PATH_SEPARATOR}$dir/blocker-second" \
+env -u PATH \
+    "$TEST_PATH_ENVIRONMENT_NAME=$dir/blocker-first${TEST_PATH_SEPARATOR}$dir/blocker-second" \
     "$BIN" --debug-highlight-at 'blocked.exe' |
     grep -E "${tab}resolved-command$"
 

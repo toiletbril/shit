@@ -23,11 +23,14 @@ mkdir "$type_path/blocked/calc"
 printf '#!/bin/sh\n' > "$type_path/runnable/calc"
 chmod +x "$type_path/runnable/calc"
 normalized_type_path=$(printf '%s\n' "$type_path" | tr '\\' '/')
-resolved_default=$(PATH="$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
+resolved_default=$(env -u PATH \
+    "$TEST_PATH_ENVIRONMENT_NAME=$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
     "$BIN" -c 'type calc' | tr '\\' '/')
-resolved_path=$(PATH="$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
+resolved_path=$(env -u PATH \
+    "$TEST_PATH_ENVIRONMENT_NAME=$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
     "$BIN" -c 'type -p calc' | tr '\\' '/')
-resolved_forced_path=$(PATH="$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
+resolved_forced_path=$(env -u PATH \
+    "$TEST_PATH_ENVIRONMENT_NAME=$type_path/blocked${TEST_PATH_SEPARATOR}$type_path/runnable" \
     "$BIN" -c 'type -P calc' | tr '\\' '/')
 echo "== type skips a blocked candidate before a runnable candidate:"
 if test "$resolved_default" = "calc is $normalized_type_path/runnable/calc" &&

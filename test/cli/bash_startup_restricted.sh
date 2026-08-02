@@ -391,11 +391,13 @@ printf 'z=%s\n' "$output"
 printf '#!/bin/bash\ncd ..\nprintf "script-cd=%%s" "$?"\n' \
   > "$directory/restricted-script"
 chmod +x "$directory/restricted-script"
-output=$(PATH="$directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+output=$(env -u PATH \
+  "$TEST_PATH_ENVIRONMENT_NAME=$directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
   "$BIN" --mood bash --restricted -I -c \
   'restricted-script')
 printf 'executed=%s\n' "$output"
-output=$(PATH="$directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+output=$(env -u PATH \
+  "$TEST_PATH_ENVIRONMENT_NAME=$directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
   "$BIN" --mood bash --restricted -c \
   '. restricted-script' 2>/dev/null)
 printf 'sourced=%s\n' "$output"

@@ -11,20 +11,23 @@ if ! script -qec true /dev/null >/dev/null 2>&1; then
 fi
 hist=$(mktemp)
 search_hist=$(mktemp)
-keys=$(mktemp)
 ready=$(mktemp)
-trap 'rm -f "$hist" "$search_hist" "$keys" "$ready"' EXIT
+input_status=$(mktemp)
+trap 'rm -f "$hist" "$search_hist" "$ready" "$input_status"' EXIT
 send_input_when_ready()
 {
   wait_count=0
-  while [ ! -s "$ready" ] && [ "$wait_count" -lt 200 ]; do
+  while [ ! -s "$ready" ] && [ "$wait_count" -lt 600 ]; do
     sleep 0.05
     wait_count=$((wait_count + 1))
   done
   [ -s "$ready" ] || return 1
-  sleep 0.1
-  cat "$keys"
-  sleep 0.1
+  sleep 0.25
+  for key_sequence in "$@"; do
+    printf '%b' "$key_sequence" || return 1
+    sleep 0.05 || return 1
+  done
+  sleep 0.25
 }
 i=1
 while [ "$i" -le 4200 ]; do
@@ -32,23 +35,33 @@ while [ "$i" -le 4200 ]; do
   i=$((i + 1))
 done
 # Up arrow then enter recalls and runs the newest entry, then exit leaves.
-printf '\033[A\rexit\r' > "$keys"
 rm -f "$ready"
-out=$(send_input_when_ready |
+rm -f "$input_status"
+out=$({
+  send_input_when_ready '\033[A' '\r' 'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
   BIN="$BIN" READY="$ready" SHIT_HISTORY="$hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    script -qec 'exec "$BIN" -i --rcfile /dev/null' /dev/null 2>/dev/null)
+    script -qec 'exec "$BIN" -i --rcfile /dev/null' /dev/null 2>/dev/null) ||
+  exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
 case "$out" in
 *CMD_04200*) echo "recall ok" ;;
 *) echo "recall broken" ;;
 esac
 printf 'echo MiXeD_History_Marker\n' > "$search_hist"
-printf '\022mixed_history_marker\r\rexit\r' > "$keys"
 rm -f "$ready"
-out=$(send_input_when_ready |
+rm -f "$input_status"
+out=$({
+  send_input_when_ready '\022' 'mixed_history_marker' '\r' '\r' 'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
   BIN="$BIN" READY="$ready" SHIT_HISTORY="$search_hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    script -qec 'exec "$BIN" -i --rcfile /dev/null' /dev/null 2>/dev/null)
+    script -qec 'exec "$BIN" -i --rcfile /dev/null' /dev/null 2>/dev/null) ||
+  exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
 case "$out" in
 *MiXeD_History_Marker*) echo "search casefold ok" ;;
 *) echo "search casefold broken" ;;

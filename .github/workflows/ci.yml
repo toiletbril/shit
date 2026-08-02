@@ -112,10 +112,7 @@ jobs:
 
       - name: Run tests under release coverage binary
         if: '!cancelled()'
-        run: |
-          mkdir -p coverage/profraw
-          LLVM_PROFILE_FILE="$PWD/coverage/profraw/shit-%p.profraw" \
-            make MODE=cov test
+        run: make MODE=cov test
 
       - name: Record release binary coverage
         if: always()
@@ -260,7 +257,7 @@ jobs:
             throw "Unexpected shell platform: $shellPlatform"
           }
           sh.exe -c `
-            'for tool in diff git mkfifo mktemp perl rm script sed strings stty tee; do command -v "$tool" || exit 1; done; test -x /bin/stty'
+            'for tool in diff env git mkfifo mktemp perl rm script sed strings stty tee; do command -v "$tool" || exit 1; done; test -x /bin/stty'
           if ($LASTEXITCODE -ne 0) {
             throw "The MSYS2 golden test toolchain is incomplete"
           }

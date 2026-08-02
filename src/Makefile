@@ -311,12 +311,13 @@ CXXFLAGS += \
 LINK_LIBS += -lsupc++
 endif
 else ifeq ($(MODE), cov)
+COVERAGE_PROFILE_DIRECTORY := $(abspath ../coverage/profraw)
 CXXFLAGS += \
 	-g3 \
 	-DNDEBUG \
 	-fno-omit-frame-pointer \
 	-O0 \
-	-fprofile-instr-generate \
+	"-fprofile-instr-generate=$(COVERAGE_PROFILE_DIRECTORY)/shit-%p.profraw" \
 	-fcoverage-mapping
 ifeq ($(TARGET), Linux)
 CXXFLAGS += \
@@ -374,6 +375,9 @@ $(LINKED_OUT): $(OBJECTS)
 dirs: $(DIRS)
 	mkdir -p $(OBJ_DIR)/
 	for source_dir in $(DIRS); do mkdir -p $(OBJ_DIR)/$$source_dir; done
+ifeq ($(MODE), cov)
+	mkdir -p "$(COVERAGE_PROFILE_DIRECTORY)"
+endif
 
 shit: dirs
 	$(MAKE) $(LINKED_OUT)

@@ -9,5 +9,10 @@
 #
 # Usage: ... | normalize-trace.sh "$BIN"
 BIN=$1
-sed "s|$BIN|SHIT|; s/\(shit: [0-9]*\):[0-9]*: trace:/\1:0: trace:/" \
+BIN_FORWARD=$(printf '%s\n' "$BIN" | tr '\\' '/')
+BIN_BACKWARD=$(printf '%s\n' "$BIN_FORWARD" | tr '/' '\\')
+BIN_PATTERN=$(printf '%s\n' "$BIN" | sed 's/[][\\.^$*]/\\&/g; s/#/\\#/g')
+BIN_FORWARD_PATTERN=$(printf '%s\n' "$BIN_FORWARD" | sed 's/[][\\.^$*]/\\&/g; s/#/\\#/g')
+BIN_BACKWARD_PATTERN=$(printf '%s\n' "$BIN_BACKWARD" | sed 's/[][\\.^$*]/\\&/g; s/#/\\#/g')
+sed "s#$BIN_PATTERN#SHIT#g; s#$BIN_FORWARD_PATTERN#SHIT#g; s#$BIN_BACKWARD_PATTERN#SHIT#g; s/\(shit: [0-9]*\):[0-9]*: trace:/\1:0: trace:/" \
   | awk '/SHIT -/{print; skip=1; next} skip{skip=0; next} {print}'

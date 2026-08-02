@@ -26,9 +26,13 @@ ifeq ($(TARGET), Windows_NT)
 TEST_HOST_MAKE_FLAGS := -j1
 export TEST_PATH_SEPARATOR := ;
 export TEST_NULL_DEVICE := NUL
+export TEST_PATH_ENVIRONMENT_NAME := Path
+export MSYS2_ENV_CONV_EXCL := Path
+export HOME := $(USERPROFILE)
 else
 export TEST_PATH_SEPARATOR := :
 export TEST_NULL_DEVICE := /dev/null
+export TEST_PATH_ENVIRONMENT_NAME := PATH
 endif
 export TEST_HOST_PATH_SEPARATOR := :
 export TEST_TEMP_DIRECTORY := .test-work
@@ -281,9 +285,11 @@ refill:
 		[ -f cli/$$f.sh ] || continue; \
 		printf "	%-64s cli/$$f.out\n" cli/$$f.sh; \
 		case $$f in \
-		command_substitution_interrupt|fg_terminal_handoff|read_timeout|shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job) \
+		command_substitution_interrupt|fg_terminal_handoff|history_recall_large|read_timeout|shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job) \
 			golden_timeout_seconds=60; \
-			[ "$$f" != shitbox_timeout ] || golden_timeout_seconds=120; \
+			if [ "$$f" = history_recall_large ] || [ "$$f" = shitbox_timeout ]; then \
+				golden_timeout_seconds=120; \
+			fi; \
 			output=$$(mktemp "expected/cli/.$$f.out.XXXXXX") || exit; \
 			CLI_TEST_TIMEOUT_SECONDS=$${CLI_TEST_TIMEOUT_SECONDS:-$$golden_timeout_seconds} \
 				BIN='$(BIN)' '$(SHELL)' \

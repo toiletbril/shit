@@ -1,6 +1,7 @@
 if [ "${OS-}" = Windows_NT ]; then
     path_value='C:\clear\e[2J\tail'
-    output=$(PATH="$path_value" "$BIN" -c 'echo "$PATH"; echo survived')
+    output=$(env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$path_value" \
+        "$BIN" -c 'echo "$PATH"; echo survived')
     expected=$(printf '%s\n%s' "$path_value" survived)
     [ "$output" = "$expected" ] || exit 1
 

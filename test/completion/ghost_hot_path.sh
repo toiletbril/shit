@@ -30,14 +30,16 @@ while [ "$unrelated_index" -lt 32 ]; do
     unrelated_index=$((unrelated_index + 1))
 done
 
-command_result=$(PATH="$d/commands" "$BIN" --debug-ghost-at 'probe')
+command_result=$(env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$d/commands" \
+    "$BIN" --debug-ghost-at 'probe')
 assert_field "$command_result" count 2
 assert_field "$command_result" prefix probe-
 assert_field "$command_result" materialized 0
 test "$(result_field "$command_result" source-scans)" -le 128
 echo 'command ghost skips unrelated PATH names'
 
-missing_result=$(PATH="$d/commands" "$BIN" --debug-ghost-at 'zzzz-missing')
+missing_result=$(env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$d/commands" \
+    "$BIN" --debug-ghost-at 'zzzz-missing')
 assert_field "$missing_result" count 0
 test "$(result_field "$missing_result" source-scans)" -le 128
 echo 'command ghost misses stay bounded'
@@ -45,7 +47,8 @@ echo 'command ghost misses stay bounded'
 mkdir "$d/duplicate"
 printf '#!/bin/sh\n' > "$d/duplicate/echo"
 chmod +x "$d/duplicate/echo"
-duplicate_result=$(PATH="$d/duplicate" "$BIN" --debug-ghost-at 'ec')
+duplicate_result=$(env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$d/duplicate" \
+    "$BIN" --debug-ghost-at 'ec')
 assert_field "$duplicate_result" count 1
 assert_field "$duplicate_result" prefix echo
 assert_field "$duplicate_result" materialized 0

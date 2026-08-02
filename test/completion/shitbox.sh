@@ -24,4 +24,5 @@ echo "== shitbox own flags:"
 echo "== bare utility flags under set -o shitbox:"
 "$BIN" -c 'PATH=; set -o shitbox' --debug-complete-at 'ls -' </dev/null
 echo "== a PATH program keeps its own flags:"
-PATH="$dir" "$BIN" -c 'set -o shitbox' --debug-complete-at 'ls -A' </dev/null
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" -c 'set -o shitbox' --debug-complete-at 'ls -A' </dev/null

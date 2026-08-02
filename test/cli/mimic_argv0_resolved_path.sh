@@ -9,7 +9,10 @@ echo "zero=$0"
 test "$0" = "$BASH_SOURCE" && echo match
 EOF
 chmod +x "$bin/argv0probe"
-PATH="$bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-    "$BIN" -I -c 'argv0probe' | sed 's|\\|/|g' | sed "s|$bin|BINDIR|"
+output=$(env -u PATH \
+    "$TEST_PATH_ENVIRONMENT_NAME=$bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+    "$BIN" -I -c 'argv0probe')
+status=$?
+printf '%s\n' "$output" | sed 's|\\|/|g' | sed "s|$bin|BINDIR|"
 rm -rf "$bin"
-echo "rc=$?"
+echo "rc=$status"

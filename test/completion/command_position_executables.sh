@@ -26,13 +26,15 @@ echo "== command position offers a matching directory:"
 echo "== argument position offers a matching data file:"
 "$BIN" --debug-complete-at 'cat ./d' </dev/null
 echo "== PATH command completion offers a matching executable:"
-PATH="$dir" "$BIN" --debug-complete-at 'zz_path_e' </dev/null
+env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" --debug-complete-at 'zz_path_e' </dev/null
 echo "== a blocked first PATH entry does not hide a later executable"
 mkdir "$dir/blocked-first" "$dir/blocked-second"
 : > "$dir/blocked-first/zz_path_blocked"
 printf '#!/bin/sh\n' > "$dir/blocked-second/zz_path_blocked"
 chmod +x "$dir/blocked-second/zz_path_blocked"
-PATH="$dir/blocked-first$path_delimiter$dir/blocked-second" \
+env -u PATH \
+    "$TEST_PATH_ENVIRONMENT_NAME=$dir/blocked-first$path_delimiter$dir/blocked-second" \
     "$BIN" --debug-complete-at 'zz_path_b' </dev/null
 
 mkdir -p "$dir/native/file-probe"
@@ -52,12 +54,14 @@ else
     chmod +x "$dir/MIXEDPROBE"
     mixed_expected=MIXEDPROBE
 fi
-mixed_result=$(PATH="$dir" "$BIN" --debug-complete-at 'MIXEDP' </dev/null)
+mixed_result=$(env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" --debug-complete-at 'MIXEDP' </dev/null)
 case "$mixed_result" in
     *"$mixed_expected"*) ;;
     *) exit 1 ;;
 esac
-mixed_lower_result=$(PATH="$dir" "$BIN" --debug-complete-at 'mixedp' </dev/null)
+mixed_lower_result=$(env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
+    "$BIN" --debug-complete-at 'mixedp' </dev/null)
 case "$mixed_lower_result" in
     *"$mixed_expected"*) ;;
     *) exit 1 ;;

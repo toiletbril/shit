@@ -19,7 +19,8 @@ echo "== command name before a closed substitution delimiter:"
 printf '#!/bin/sh\n' > "$dir/innerprobe-command"
 chmod +x "$dir/innerprobe-command"
 line='echo $(innerprobe-c)'
-PATH="$dir" SHIT_TEST_COMPLETE_CURSOR=$((${#line} - 1)) \
+SHIT_TEST_COMPLETE_CURSOR=$((${#line} - 1)) \
+    env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
     "$BIN" --debug-complete-at "$line" </dev/null
 
 echo "== quoted close and outer suffix stay outside the active body:"

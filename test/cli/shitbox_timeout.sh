@@ -408,7 +408,8 @@ echo "rc=$?"
 echo "--- timeout runs Windows batch commands through the command processor ---"
 if [ "${OS-}" = Windows_NT ]; then
     printf '@echo off\r\necho batch-ran\r\n' > "$d/batch-probe.bat"
-    PATH="$d${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+    env -u PATH \
+        "$TEST_PATH_ENVIRONMENT_NAME=$d${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
         "$BIN" -c 'shitbox timeout 1 batch-probe'
 else
     echo batch-ran
