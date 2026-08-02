@@ -72,7 +72,7 @@ export TEST_SYSTEM_PATH := $(shell \
 export TEST_UNAME_DIRECTORY := $(shell \
 	uname_path=$$(command -v uname); printf '%s' "$${uname_path%/*}")
 endif
-export PATH := $(CURDIR)/bin$(TEST_NATIVE_PATH_SEPARATOR)$(PATH)
+export PATH := $(CURDIR)/bin$(TEST_PATH_SEPARATOR)$(PATH)
 
 FAILED_LIST := failed.diff
 INPUT_FILES := $(wildcard shit/*.shit)

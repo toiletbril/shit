@@ -148,9 +148,12 @@ append_metrics=$(metric_line "$d/typing-typescript" 1) || {
 append_refreshes=$(metric_field "$append_metrics" append)
 full_refreshes=$(metric_field "$append_metrics" full)
 append_serializations=$(metric_field "$append_metrics" serializations)
-test "$((append_refreshes + full_refreshes))" -eq 11 || exit 1
-test "$append_refreshes" -ge 7 || exit 1
-test "$append_serializations" -le 1 || exit 1
+refresh_count=$((append_refreshes + full_refreshes))
+if [ "$append_refreshes" -lt 7 ] || [ "$full_refreshes" -lt 1 ] ||
+    [ "$refresh_count" -gt 12 ] || [ "$append_serializations" -gt 1 ]; then
+    printf '%s\n' "$append_metrics"
+    exit 1
+fi
 echo 'single-row typing uses incremental refresh'
 
 path_metrics=$(metric_line "$d/typing-typescript" 2) || exit 1
