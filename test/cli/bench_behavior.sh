@@ -89,14 +89,24 @@ SH
 vanishing_command="$d/vanishing-command.exe"
 ln -s "$BIN" "$vanishing_command"
 has_typescript=0
+has_progress_terminal=0
 if script -qec true /dev/null >/dev/null 2>&1; then
     has_typescript=1
+    if BIN="$BIN" script -qec \
+        'exec "$BIN" -c "test -t 2"' /dev/null >/dev/null 2>&1; then
+        has_progress_terminal=1
+    fi
     NO_COLOR= TERM=xterm BIN=$BIN BASH_ENV="$d/vanishing-environment" \
         BENCH_VANISHING_COMMAND="$vanishing_command" script -qec \
         "$BIN -c 'bench --runs 3 --no-shell \"$vanishing_command --mood bash -c true\"'" \
         "$d/typescript" >/dev/null 2>&1
 elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
     has_typescript=1
+    native_terminal_output=$(BIN="$BIN" script -q /dev/null "$BIN" -c \
+        'test -t 2 && echo native-stderr-terminal' 2>/dev/null)
+    case $native_terminal_output in
+        *native-stderr-terminal*) has_progress_terminal=1 ;;
+    esac
     NO_COLOR= TERM=xterm BIN=$BIN BASH_ENV="$d/vanishing-environment" \
         BENCH_VANISHING_COMMAND="$vanishing_command" \
         script -q "$d/typescript" "$BIN" -c \
@@ -109,26 +119,36 @@ terminal_hex=$(od -An -tx1 "$d/typescript" | tr -d ' \n')
 if [ "$has_typescript" -eq 1 ]; then
     [ -n "$terminal_hex" ] || exit 1
     [ ! -e "$vanishing_command" ] && [ ! -L "$vanishing_command" ] || exit 1
-    tr -d '\r' < "$d/typescript" |
-        grep -Fq "Unable to run '$vanishing_command --mood bash -c true'"
+    if [ "${OS-}" = Windows_NT ]; then
+        tr -d '\r' < "$d/typescript" |
+            grep -Fq "Unable to run '$vanishing_command --mood bash -c true'" ||
+            exit 1
+    else
+        tr -d '\r' < "$d/typescript" |
+            grep -F "$vanishing_command --mood bash -c true" |
+            grep -Fq 'exited with status 127.' ||
+            exit 1
+    fi
+fi
+if [ "$has_progress_terminal" -eq 1 ]; then
     case $terminal_hex in
         *0d1b5b324b736869743a*) ;;
         *) echo "progress clobbered error"; exit 1 ;;
     esac
 fi
-cat > "$d/progress-driver" <<'SH'
+if [ "$has_progress_terminal" -eq 1 ]; then
+    cat > "$d/progress-driver" <<'SH'
 #!/bin/sh
 exec "$BIN" -c 'bench --runs 2 "sleep 0.12 # deliberately long benchmark label" "sleep 0.12"'
 SH
-chmod +x "$d/progress-driver"
-if script -qec true /dev/null >/dev/null 2>&1; then
-    NO_COLOR= TERM=xterm BIN=$BIN script -qec "$d/progress-driver" \
-        "$d/progress-typescript" >/dev/null 2>&1
-elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
-    NO_COLOR= TERM=xterm BIN=$BIN script -q "$d/progress-typescript" \
-        "$d/progress-driver" >/dev/null 2>&1
-fi
-if [ -e "$d/progress-typescript" ]; then
+    chmod +x "$d/progress-driver"
+    if script -qec true /dev/null >/dev/null 2>&1; then
+        NO_COLOR= TERM=xterm BIN=$BIN script -qec "$d/progress-driver" \
+            "$d/progress-typescript" >/dev/null 2>&1
+    elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
+        NO_COLOR= TERM=xterm BIN=$BIN script -q "$d/progress-typescript" \
+            "$d/progress-driver" >/dev/null 2>&1
+    fi
     progress_hex=$(od -An -tx1 "$d/progress-typescript" | tr -d ' \n')
     clear_count=$(printf '%s\n' "$progress_hex" | grep -o '0d1b5b324b' | \
         wc -l | tr -d ' ')

@@ -22,6 +22,7 @@ perf*
 
 garbage/
 src/o
+/coverage
 zig-out/
 .zig-cache/
 test/failed.diff

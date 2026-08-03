@@ -2,9 +2,10 @@
 # more entries than the in-memory ring. A missing parenthesis in
 # TL_HISTORY_MAX_SIZE once parsed the ring modulo as (x % 1024) * 4, so past 4096
 # entries the up arrow recalled a stale older line. The editor needs a tty, so
-# the run drives shit under script and skips where the util-linux script syntax
-# is unavailable, such as on macOS, reporting the pass token so the golden holds.
-if ! script -qec true /dev/null >/dev/null 2>&1; then
+# the run skips when script or the target terminal handles cannot provide one.
+if ! BIN="$BIN" script -qec \
+  'exec "$BIN" -c "test -t 0 && test -t 1"' \
+  /dev/null >/dev/null 2>&1; then
   echo "recall ok"
   echo "search casefold ok"
   exit 0

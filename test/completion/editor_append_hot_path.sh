@@ -93,6 +93,19 @@ wait_for_editor()
     done
 }
 
+wait_for_prompt_count()
+{
+    ready_file=$1
+    expected_prompt_count=$2
+    attempt_count=0
+    while [ "$(grep '^ready$' "$ready_file" 2>/dev/null | wc -l | tr -d ' ')" \
+        -lt "$expected_prompt_count" ]; do
+        [ "$attempt_count" -lt 3000 ] || return 1
+        sleep 0.01
+        attempt_count=$((attempt_count + 1))
+    done
+}
+
 metric_line()
 {
     local metric_line_value
@@ -177,18 +190,22 @@ done
 
 send_tab_input()
 {
-    wait_for_editor "$d/tab-ready" || exit 1
+    wait_for_prompt_count "$d/tab-ready" 1 || exit 1
     printf 'probe\talpha\n'
-    sleep 0.5
+    wait_for_prompt_count "$d/tab-ready" 2 || exit 1
     printf 'compgen -c >/dev/null 2>&1; cd /\n'
-    sleep 0.5
-    printf 'probe\t\t\nexit 0\n'
-    sleep 0.5
+    wait_for_prompt_count "$d/tab-ready" 3 || exit 1
+    printf 'probe\t\t\n'
+    wait_for_prompt_count "$d/tab-ready" 4 || exit 1
+    printf 'exit 0\n'
 }
 
+printf '%s\n' \
+    "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
+    > "$d/tab-rc"
 send_tab_input | PATH="$d/path" SHIT_TEST_EDITOR_STATS=1 \
     EDITOR_READY_FILE="$d/tab-ready" SHIT_HISTORY="$d/tab-history" \
-    BIN="$BIN" run_editor "$d/tab-typescript" || exit 1
+    RCFILE="$d/tab-rc" BIN="$BIN" run_editor "$d/tab-typescript" || exit 1
 
 tab_metrics=$(metric_line "$d/tab-typescript" 1) || exit 1
 test "$(metric_field "$tab_metrics" probes)" -le 4 || exit 1
