@@ -3,6 +3,7 @@ import fcntl
 import os
 import pty
 import select
+import signal
 import struct
 import sys
 import tempfile
@@ -16,6 +17,9 @@ with tempfile.NamedTemporaryFile(delete=False) as source:
         b'RESOLVED_VARIABLE=$PATH\r\n'
         b'for LOOP_VARIABLE in one; do echo "$LOOP_VARIABLE"; done\r\n'
         b'echo "$PATH" ${PATH} $((PATH + 1))\r\n'
+        b'echo "$CAT_UNSET_VARIABLE" ${CAT_BRACED_UNSET} '
+        b'$((CAT_ARITHMETIC_UNSET + 1))\r\n'
+        b'if true && false || true; then : >out; fi\r\n'
         b'echo "styled"\r\n'
         b'finish() { :; }\r\n'
         b'finish\r\n'
@@ -28,6 +32,9 @@ if pid == 0:
     fcntl.ioctl(1, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
     os.environ["TERM"] = "xterm-256color"
     os.environ.pop("NO_COLOR", None)
+    os.environ.pop("CAT_UNSET_VARIABLE", None)
+    os.environ.pop("CAT_BRACED_UNSET", None)
+    os.environ.pop("CAT_ARITHMETIC_UNSET", None)
     command = "shitbox cat --syntax-highlighting '%s'" % source_path
     os.execv(binary, [binary, "-c", command])
 
@@ -46,26 +53,48 @@ while time.monotonic() < deadline:
     output += chunk
 
 os.close(master)
-_, status = os.waitpid(pid, 0)
+child_exited_cleanly = False
+reap_deadline = time.monotonic() + 2
+while time.monotonic() < reap_deadline:
+    waited, status = os.waitpid(pid, os.WNOHANG)
+    if waited == pid:
+        child_exited_cleanly = os.waitstatus_to_exitcode(status) == 0
+        break
+    time.sleep(0.02)
+else:
+    os.kill(pid, signal.SIGKILL)
+    os.waitpid(pid, 0)
 os.unlink(source_path)
 function_is_resolved = b"\x1b[34mfinish\x1b[0m" in output
 variable_forms_are_resolved = {
-    "assignment": b"\x1b[34mRESOLVED_VARIABLE" in output,
-    "loop": b"\x1b[34mLOOP_VARIABLE" in output,
-    "dollar": b"\x1b[34m$PATH" in output,
-    "braced": b"\x1b[34m${PATH}" in output,
-    "arithmetic": b"\x1b[34mPATH" in output,
+    "assignment": b"\x1b[96mRESOLVED_VARIABLE\x1b[0m" in output,
+    "loop": b"\x1b[96mLOOP_VARIABLE\x1b[0m" in output,
+    "dollar": b"\x1b[96m$PATH\x1b[0m" in output,
+    "braced": b"\x1b[96m${PATH}\x1b[0m" in output,
+    "arithmetic": b"\x1b[96mPATH\x1b[0m" in output,
+    "unset-dollar": b"\x1b[96m$CAT_UNSET_VARIABLE\x1b[0m" in output,
+    "unset-braced": b"\x1b[96m${CAT_BRACED_UNSET}\x1b[0m" in output,
+    "unset-arithmetic": b"\x1b[96mCAT_ARITHMETIC_UNSET\x1b[0m" in output,
+}
+syntax_forms_use_requested_palette = {
+    "keyword": b"\x1b[1;35mif\x1b[0m" in output,
+    "and": b"\x1b[1;35m&&\x1b[0m" in output,
+    "or": b"\x1b[1;35m||\x1b[0m" in output,
+    "redirection": b"\x1b[1;35m>\x1b[0m" in output,
 }
 has_no_underline = b"4:3" not in output
 passed = (
-    os.waitstatus_to_exitcode(status) == 0
+    child_exited_cleanly
     and b"\x1b[" in output
     and function_is_resolved
     and all(variable_forms_are_resolved.values())
+    and all(syntax_forms_use_requested_palette.values())
     and has_no_underline
 )
+print("CHILD_EXITED_CLEANLY:", child_exited_cleanly)
 print("FUNCTION_RESOLVED:", function_is_resolved)
 print("VARIABLE_FORMS_RESOLVED:", variable_forms_are_resolved)
+print("SYNTAX_FORMS_USE_REQUESTED_PALETTE:", syntax_forms_use_requested_palette)
 print("NO_UNDERLINE:", has_no_underline)
 print("TERMINAL_HIGHLIGHTING:", passed)
 sys.exit(0 if passed else 1)

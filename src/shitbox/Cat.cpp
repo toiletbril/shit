@@ -65,7 +65,7 @@ static fn append_cat_source(String &output, StringView source,
           highlight_cache.spans_for(source, line_start, line_end, context);
       completion::append_highlighted_range(
           output, line, *spans, 0, line.length,
-          colors::NONINTERACTIVE_HIGHLIGHT_THEME);
+          colors::PRINTED_SOURCE_HIGHLIGHT_THEME);
     } else {
       output += line;
     }

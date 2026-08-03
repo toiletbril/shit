@@ -261,9 +261,10 @@ siblings. The highlighter and history validation classify a warm command name
 without filesystem access. Explicit PATH validation ends with the TAB callback
 or compgen invocation that began it. The highlighter looks up only variable
 names that occur on the line, and it colors nested command and arithmetic
-substitutions in one pass. Strings and heredocs are bright green, keywords are
-bold, resolved commands and variables are blue, and unfinished command prefixes
-are bright blue. Flags other than a lone dash are italic. A word beginning with
+substitutions in one pass. Strings and heredocs are bright green. Keywords and
+operators are bold magenta. Resolved commands are blue. Resolved variables and
+assignment names are bright cyan, and unfinished command prefixes are bright
+blue. Flags other than a lone dash are italic. A word beginning with
 two dashes stays a flag when it contains an equals sign. Unknown commands and
 invalid paths are bright red. Invalid syntax is bold bright red, and unset
 variables are non-bold bright red. A bright green curly underline is added to
@@ -287,9 +288,10 @@ reassigned. A directory change preserves the command cache when every PATH
 component is absolute, while a relative or empty component still invalidates
 it.
 
-The shitbox cat `--syntax-highlighting` flag uses the shell theme when standard
-output is a terminal. Shell extensions and known shell shebangs select the
-input. Syntax highlighting is suppressed for files with null bytes and
+The shitbox cat `--syntax-highlighting` flag uses the printed source theme when
+standard output is a terminal. This theme colors every variable reference as
+resolved. Shell extensions and known shell shebangs select the input. Syntax
+highlighting is suppressed for files with null bytes and
 redirected output. Line numbering remains continuous across file and standard
 input boundaries. Noninteractive highlighting omits underline attributes.
 

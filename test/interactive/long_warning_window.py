@@ -4,6 +4,7 @@ import os
 import pty
 import re
 import select
+import signal
 import struct
 import sys
 import tempfile
@@ -20,7 +21,7 @@ source_line = 'test "%s" = $UNSET %s' % (
 )
 warning_lines = [
     source_line,
-    "test x = $SECOND_UNSET",
+    "if test x = $SECOND_UNSET && true; then : >diagnostic-output; fi",
     "test y = $THIRD_UNSET",
 ]
 source = "\n" * 20000 + "\n".join(warning_lines) + "\n"
@@ -61,7 +62,17 @@ while time.monotonic() < deadline:
     output += chunk
 
 os.close(master)
-os.waitpid(pid, 0)
+child_exited_cleanly = False
+reap_deadline = time.monotonic() + 2
+while time.monotonic() < reap_deadline:
+    waited, status = os.waitpid(pid, os.WNOHANG)
+    if waited == pid:
+        child_exited_cleanly = os.waitstatus_to_exitcode(status) == 0
+        break
+    time.sleep(0.02)
+else:
+    os.kill(pid, signal.SIGKILL)
+    os.waitpid(pid, 0)
 with open(log_path, "r", encoding="utf-8") as log:
     log_text = log.read()
 os.unlink(log_path)
@@ -89,19 +100,32 @@ caret_aligned = (
     + content[: content.index("$")].count(wide_character)
     == caret.index("^")
 )
+printed_palette_is_applied = all(
+    token in output
+    for token in (
+        b"\x1b[1;35mif\x1b[0m",
+        b"\x1b[1;35m&&\x1b[0m",
+        b"\x1b[1;35m>\x1b[0m",
+        b"\x1b[96m$SECOND_UNSET\x1b[0m",
+    )
+)
 highlight_scan_is_bounded = 0 < highlight_bytes <= len(source_line.encode()) * 2 + 16
 lexical_scan_is_bounded = 0 < lexical_bytes <= len(source.encode()) + 16
 passed = (
-    within_width
+    child_exited_cleanly
+    and within_width
     and has_both_ellipses
     and caret_aligned
+    and printed_palette_is_applied
     and highlight_scan_is_bounded
     and lexical_scan_is_bounded
 )
 
+print("CHILD_EXITED_CLEANLY:", child_exited_cleanly)
 print("WITHIN_WIDTH:", within_width)
 print("BOTH_ELLIPSES:", has_both_ellipses)
 print("CARET_ALIGNED:", caret_aligned)
+print("PRINTED_PALETTE_IS_APPLIED:", printed_palette_is_applied)
 print("HIGHLIGHT_SCAN_BOUNDED:", highlight_scan_is_bounded)
 print("LEXICAL_SCAN_BOUNDED:", lexical_scan_is_bounded)
 print("RESULT:", "PASS" if passed else "FAIL")

@@ -12,15 +12,15 @@ static fn make_shell_highlight_theme() wontthrow -> highlight_theme
   let theme = highlight_theme{};
   theme.reset = ansi::RESET;
   theme.set_style(highlight_role::comment, ansi::DIM);
-  theme.set_style(highlight_role::operator_, ansi::BOLD);
+  theme.set_style(highlight_role::operator_, ansi::BOLD_MAGENTA);
   theme.set_style(highlight_role::string, ansi::BRIGHT_GREEN);
   theme.set_style(highlight_role::heredoc, ansi::BRIGHT_GREEN);
-  theme.set_style(highlight_role::variable, ansi::BLUE);
-  theme.set_style(highlight_role::assignment_name, ansi::BLUE);
+  theme.set_style(highlight_role::variable, ansi::BRIGHT_CYAN);
+  theme.set_style(highlight_role::assignment_name, ansi::BRIGHT_CYAN);
   theme.set_style(highlight_role::unset_variable,
                   ansi::RED_CURLY_GREEN_UNDERLINE);
   theme.set_style(highlight_role::flag, ansi::ITALIC);
-  theme.set_style(highlight_role::keyword, ansi::BOLD);
+  theme.set_style(highlight_role::keyword, ansi::BOLD_MAGENTA);
   theme.set_style(highlight_role::invalid_syntax,
                   ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
   theme.set_style(highlight_role::function_name, ansi::BRIGHT_BLUE);
@@ -47,9 +47,17 @@ static fn make_noninteractive_highlight_theme() wontthrow -> highlight_theme
   return theme;
 }
 
-static fn make_diagnostic_highlight_theme() wontthrow -> highlight_theme
+static fn make_printed_source_highlight_theme() wontthrow -> highlight_theme
 {
   let theme = make_noninteractive_highlight_theme();
+  theme.set_style(highlight_role::unset_variable,
+                  theme.style_for(highlight_role::variable));
+  return theme;
+}
+
+static fn make_diagnostic_highlight_theme() wontthrow -> highlight_theme
+{
+  let theme = make_printed_source_highlight_theme();
   theme.set_style(highlight_role::partial_command, ansi::BRIGHT_RED);
   theme.set_style(highlight_role::partial_path, ansi::BRIGHT_RED);
   return theme;
@@ -58,6 +66,8 @@ static fn make_diagnostic_highlight_theme() wontthrow -> highlight_theme
 const highlight_theme SHELL_HIGHLIGHT_THEME = make_shell_highlight_theme();
 const highlight_theme NONINTERACTIVE_HIGHLIGHT_THEME =
     make_noninteractive_highlight_theme();
+const highlight_theme PRINTED_SOURCE_HIGHLIGHT_THEME =
+    make_printed_source_highlight_theme();
 const highlight_theme DIAGNOSTIC_HIGHLIGHT_THEME =
     make_diagnostic_highlight_theme();
 

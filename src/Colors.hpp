@@ -48,6 +48,7 @@ fn terminal_supports_styled_underlines() throws -> bool;
 
 extern const highlight_theme SHELL_HIGHLIGHT_THEME;
 extern const highlight_theme NONINTERACTIVE_HIGHLIGHT_THEME;
+extern const highlight_theme PRINTED_SOURCE_HIGHLIGHT_THEME;
 extern const highlight_theme DIAGNOSTIC_HIGHLIGHT_THEME;
 
 } /* namespace colors */
