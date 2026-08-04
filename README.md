@@ -2,7 +2,9 @@
 
 [![Shit is at least 5 times faster than Bash](https://github.com/toiletbril/shit/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/shit/actions/workflows/ci.yml)
 
-**See the [Release 1.0 Blog Post](https://fennec.support/scribbles/shell-release)**
+Shit has been released! See the [Release 1.0 Blog Post](https://fennec.support/scribbles/shell-release)
+
+---
 
 Man, my shell is **shit**. The name is experimental.
 
