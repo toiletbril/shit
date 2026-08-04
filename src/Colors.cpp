@@ -110,6 +110,9 @@ fn terminal_wants_color(bool output_is_terminal) throws -> bool
 
 fn terminal_supports_styled_underlines() throws -> bool
 {
+  static constexpr bool IS_STYLED_UNDERLINE_SUPPORT_ENABLED = false;
+  if (!IS_STYLED_UNDERLINE_SUPPORT_ENABLED) return false;
+
   let const term = os::get_environment_variable("TERM");
   if (!term.has_value() || term->is_empty()) return false;
 

@@ -33,10 +33,7 @@ def read_until_idle(master, timeout, required_output=None):
 
 
 def render_highlighted_line(term):
-    if term == "xterm-kitty":
-        styled_final_token = b"\x1b[1;91;4:3;58:5:3mthen\x1b[0m"
-    else:
-        styled_final_token = b"\x1b[1;91mthen\x1b[0m"
+    styled_final_token = b"\x1b[1;91mthen\x1b[0m"
 
     with tempfile.TemporaryDirectory() as directory:
         pid, master = pty.fork()
@@ -79,9 +76,21 @@ generic_output, generic_child_exited_cleanly = render_highlighted_line(
     "xterm-256color"
 )
 kitty_output, kitty_child_exited_cleanly = render_highlighted_line("xterm-kitty")
-generic_has_no_underline = b"4:3" not in generic_output
-kitty_underline_is_yellow = (
-    b"4:3;58:5:3" in kitty_output and b"58:5:10" not in kitty_output
+underline_sgr_fragments = (
+    b"\x1b[4m",
+    b"\x1b[4;",
+    b"\x1b[4:",
+    b";4m",
+    b";4;",
+    b";4:",
+    b"\x1b[58:",
+    b";58:",
+)
+generic_has_no_underline = all(
+    fragment not in generic_output for fragment in underline_sgr_fragments
+)
+kitty_has_no_underline = all(
+    fragment not in kitty_output for fragment in underline_sgr_fragments
 )
 shared_palette_tokens = (
     b"\x1b[1;35mif\x1b[0m",
@@ -94,54 +103,52 @@ shared_palette_is_applied = all(
     for output in (generic_output, kitty_output)
 )
 generic_unset_is_red = b"\x1b[91m$PALETTE_UNSET\x1b[0m" in generic_output
-kitty_unset_is_underlined = (
-    b"\x1b[91;4:3;58:5:3m$PALETTE_UNSET\x1b[0m" in kitty_output
-)
+kitty_unset_is_red = b"\x1b[91m$PALETTE_UNSET\x1b[0m" in kitty_output
 generic_invalid_path_is_red = (
     b"\x1b[91munderline_missing_path\x1b[0m" in generic_output
 )
-kitty_invalid_path_is_underlined = (
-    b"\x1b[91;4:3;58:5:3munderline_missing_path\x1b[0m" in kitty_output
+kitty_invalid_path_is_red = (
+    b"\x1b[91munderline_missing_path\x1b[0m" in kitty_output
 )
 generic_unknown_is_red = (
     b"\x1b[91munderline_missing_command\x1b[0m" in generic_output
 )
-kitty_unknown_is_underlined = (
-    b"\x1b[91;4:3;58:5:3munderline_missing_command\x1b[0m" in kitty_output
+kitty_unknown_is_red = (
+    b"\x1b[91munderline_missing_command\x1b[0m" in kitty_output
 )
 generic_invalid_syntax_is_bold_red = (
     b"\x1b[1;91mthen\x1b[0m" in generic_output
 )
-kitty_invalid_syntax_is_underlined = (
-    b"\x1b[1;91;4:3;58:5:3mthen\x1b[0m" in kitty_output
+kitty_invalid_syntax_is_bold_red = (
+    b"\x1b[1;91mthen\x1b[0m" in kitty_output
 )
 passed = (
     generic_child_exited_cleanly
     and kitty_child_exited_cleanly
     and generic_has_no_underline
-    and kitty_underline_is_yellow
+    and kitty_has_no_underline
     and shared_palette_is_applied
     and generic_unset_is_red
-    and kitty_unset_is_underlined
+    and kitty_unset_is_red
     and generic_invalid_path_is_red
-    and kitty_invalid_path_is_underlined
+    and kitty_invalid_path_is_red
     and generic_unknown_is_red
-    and kitty_unknown_is_underlined
+    and kitty_unknown_is_red
     and generic_invalid_syntax_is_bold_red
-    and kitty_invalid_syntax_is_underlined
+    and kitty_invalid_syntax_is_bold_red
 )
 print("GENERIC_CHILD_EXITED_CLEANLY:", generic_child_exited_cleanly)
 print("KITTY_CHILD_EXITED_CLEANLY:", kitty_child_exited_cleanly)
 print("GENERIC_NO_UNDERLINE:", generic_has_no_underline)
-print("KITTY_UNDERLINE_IS_YELLOW:", kitty_underline_is_yellow)
+print("KITTY_NO_UNDERLINE:", kitty_has_no_underline)
 print("SHARED_PALETTE_IS_APPLIED:", shared_palette_is_applied)
 print("GENERIC_UNSET_IS_RED:", generic_unset_is_red)
-print("KITTY_UNSET_IS_UNDERLINED:", kitty_unset_is_underlined)
+print("KITTY_UNSET_IS_RED:", kitty_unset_is_red)
 print("GENERIC_INVALID_PATH_IS_RED:", generic_invalid_path_is_red)
-print("KITTY_INVALID_PATH_IS_UNDERLINED:", kitty_invalid_path_is_underlined)
+print("KITTY_INVALID_PATH_IS_RED:", kitty_invalid_path_is_red)
 print("GENERIC_UNKNOWN_IS_RED:", generic_unknown_is_red)
-print("KITTY_UNKNOWN_IS_UNDERLINED:", kitty_unknown_is_underlined)
+print("KITTY_UNKNOWN_IS_RED:", kitty_unknown_is_red)
 print("GENERIC_INVALID_SYNTAX_IS_BOLD_RED:", generic_invalid_syntax_is_bold_red)
-print("KITTY_INVALID_SYNTAX_IS_UNDERLINED:", kitty_invalid_syntax_is_underlined)
+print("KITTY_INVALID_SYNTAX_IS_BOLD_RED:", kitty_invalid_syntax_is_bold_red)
 print("TERM_UNDERLINE_POLICY:", passed)
 sys.exit(0 if passed else 1)

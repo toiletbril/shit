@@ -267,9 +267,9 @@ assignment names are bright cyan, and unfinished command prefixes are bright
 blue. Flags other than a lone dash are italic. A word beginning with
 two dashes stays a flag when it contains an equals sign. Live unknown commands
 and invalid paths are bright red. Invalid syntax is bold bright red, and unset
-variables are non-bold bright red. A yellow curly underline is added to
-these roles when TERM names a terminal type with known support. Live globs are
-yellow. Existing paths are bright cyan, and a completable path tail is cyan.
+variables are non-bold bright red. Styled underline infrastructure is retained
+but disabled at the capability gate. Live globs are yellow. Existing paths are
+bright cyan, and a completable path tail is cyan.
 src/Toiletline.cpp bridges the editor to the
 evaluator, and src/toiletline/toiletline.h is the editor. The
 `--debug-highlight-at` flag, a
@@ -294,7 +294,7 @@ command word as resolved. Shell extensions and known shell shebangs select the
 input. Syntax
 highlighting is suppressed for files with null bytes and
 redirected output. Line numbering remains continuous across file and standard
-input boundaries. Noninteractive highlighting omits underline attributes.
+input boundaries. Syntax highlighting emits no underline attributes.
 
 src/Errors.cpp renders the located caret and the trailing note, capitalized on
 its own line, with the shellcheck-style messages in src/Diagnostics.hpp. Only a
