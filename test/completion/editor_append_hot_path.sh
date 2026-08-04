@@ -368,6 +368,48 @@ do
 done
 echo 'quoted replacement and smart-case TAB preserve the completed token'
 
+send_navigation_input()
+{
+    wait_for_prompt_count "$d/navigation-ready" 1 || exit 1
+    printf 'echo alt-left-XXX\033[1;3Dfixed-\n'
+    wait_for_prompt_count "$d/navigation-ready" 2 || exit 1
+    printf 'echo ctrl-left-XXX\033[1;5Dfixed-\n'
+    wait_for_prompt_count "$d/navigation-ready" 3 || exit 1
+    printf 'echo XXX tail\001\033[C\033[C\033[C\033[C\033[C\033[1;3C-fixed\n'
+    wait_for_prompt_count "$d/navigation-ready" 4 || exit 1
+    printf 'echo XXX tail\001\033[C\033[C\033[C\033[C\033[C\033[1;5C-fixed\n'
+    wait_for_prompt_count "$d/navigation-ready" 5 || exit 1
+    printf 'cho command-home\033[He\n'
+    wait_for_prompt_count "$d/navigation-ready" 6 || exit 1
+    printf 'echo command-end\033[H\033[F-ok\n'
+    wait_for_prompt_count "$d/navigation-ready" 7 || exit 1
+    printf 'echo option-del remove\033\177kept\n'
+    wait_for_prompt_count "$d/navigation-ready" 8 || exit 1
+    printf 'echo option-bs remove\033\010kept\n'
+    wait_for_prompt_count "$d/navigation-ready" 9 || exit 1
+    printf 'echo ctrl-w remove\027kept\n'
+    wait_for_prompt_count "$d/navigation-ready" 10 || exit 1
+    printf 'exit 0\n'
+}
+
+printf '%s\n' \
+    "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
+    > "$d/navigation-rc"
+send_navigation_input | TERM=xterm-256color \
+    EDITOR_READY_FILE="$d/navigation-ready" \
+    SHIT_HISTORY="$d/navigation-history" RCFILE="$d/navigation-rc" BIN="$BIN" \
+    run_editor "$d/navigation-typescript" || exit 1
+
+for navigation_expected_output in \
+    'alt-left-fixed-XXX' 'ctrl-left-fixed-XXX' \
+    'XXX-fixed tail' 'command-home' 'command-end-ok' \
+    'option-del kept' 'option-bs kept' 'ctrl-w kept'
+do
+    strings "$d/navigation-typescript" | \
+        grep -q "$navigation_expected_output" || exit 1
+done
+echo 'Alt and Ctrl keys preserve word and line editing'
+
 mkdir "$d/mixed-path" "$d/next-directory"
 printf '#!/bin/sh\n' > "$d/mixed-path/after-cd-probe"
 chmod +x "$d/mixed-path/after-cd-probe"

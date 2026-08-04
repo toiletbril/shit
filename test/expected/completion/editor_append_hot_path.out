@@ -6,5 +6,6 @@ rejected history prefixes scan once without walking PATH
 prompt PATH changes defer work while startup commands highlight
 completion menu keeps callback-owned strings alive
 quoted replacement and smart-case TAB preserve the completed token
+Alt and Ctrl keys preserve word and line editing
 mixed PATH keeps stale absolute commands highlighted after cd
 clobbered PWD completion uses the actual directory
