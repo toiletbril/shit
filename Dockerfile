@@ -31,7 +31,7 @@ RUN git clone --depth=1 'https://github.com/tpoechtrager/osxcross' '/opt/osxcros
     cd '/opt/osxcross' && \
     wget -nc "$MAC_SDK_URL" && \
     mv *.xz 'tarballs/' && \
-    UNATTENDED=yes OSX_VERSION_MIN=11.0 ENABLE_ARCHS=arm64 ./build.sh
+    UNATTENDED=1 OSX_VERSION_MIN=11.0 ENABLE_ARCHS=arm64 ./build.sh
 
 ENV PATH="/opt/osxcross/target/bin:$PATH"
 
