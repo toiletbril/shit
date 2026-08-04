@@ -372,7 +372,7 @@ fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return isatty(fd); }
 
 fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *
 {
-  return std::aligned_alloc(alignment, length);
+  return ::aligned_alloc(alignment, length);
 }
 
 fn free_aligned(opaque *pointer) wontthrow -> void { std::free(pointer); }

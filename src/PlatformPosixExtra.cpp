@@ -19,8 +19,6 @@ fn open_current_directory_reference() wontthrow -> descriptor
 {
 #if defined __linux__
   return ::open(".", O_PATH | O_DIRECTORY | O_CLOEXEC);
-#elif defined __APPLE__
-  return ::open(".", O_SEARCH | O_DIRECTORY | O_CLOEXEC);
 #else
   return ::open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
 #endif
