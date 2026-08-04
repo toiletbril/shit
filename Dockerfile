@@ -1,10 +1,3 @@
-# Image to cross-compile the three static shit release binaries, an x86_64 Linux
-# musl build, an x86_64 Windows build through mingw, and an aarch64 macOS build
-# through osxcross. The Linux target builds natively on this Alpine image, the
-# Windows target builds with mingw, and the macOS target builds with the
-# osxcross clang toolchain. The release workflow caches this image and runs the
-# build inside it, so the slow osxcross build is reused across runs.
-
 FROM alpine:latest
 
 SHELL ["sh", "-xeu", "-c"]
@@ -42,7 +35,6 @@ RUN git clone --depth=1 'https://github.com/tpoechtrager/osxcross' '/opt/osxcros
 
 ENV PATH="/opt/osxcross/target/bin:$PATH"
 
-# The two targets the image cross-compiles for, read by the build invocation.
 ENV SHIT_TARGETS="x86_64-linux-musl aarch64-apple-darwin"
 
 RUN git config --global --add safe.directory '*'

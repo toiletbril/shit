@@ -2,8 +2,9 @@
 
 [![Shit is at least 5 times faster than Bash](https://github.com/toiletbril/shit/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/shit/actions/workflows/ci.yml)
 
-Man, my shell is **shit** (built on top of
-[toiletline](https://github.com/toiletbril/toiletline))
+**See the [Release 1.0 Blog Post](https://fennec.support/scribbles/shell-release)**
+
+Man, my shell is **shit**. The name is experimental.
 
 Have you ever seen warnings from software that uses Bison as its parsing
 engine? Did you encounter any of the coreutils' error messages? Have you spent a
@@ -11,32 +12,37 @@ day debugging a Bash script? Aren't you tired?
 
 I invite you to notice the interactive prompt, the speed, and the diagnostics:
 
-| shit analyzing 20K-line shell script in ~0.1s and getting a lot of cool diagnostics |
+| shit analyzing 20K-line shell script in ~0.05s |
 | :-: | 
 | ![](assets/demo.gif) |
 
 ## What
 
-**Shit** is a cross-platform shell fully compatible with Bash 5.3 and Dash. It
-usually runs at least 5 times faster than Bash. The UX, the errors, and the
-interactive experience are opinionated.
+**Shit** is a cross-platform shell, with tier 1 support for Windows, Linux and
+macOS, fully compatible with Bash 5.3 and Dash. It usually runs at least 5
+times faster than Bash and is built to have the best UX possible.
 
-**Shit** is designed to work without absolutely no config whatsoever. **shit**'s
-Linux binary is static. **shit** also works without coreutils, using it's own
-shitbox utilities instead. All so you can copy shit to any machine and enjoy the
-shell.
+**Shit** is designed to work without absolutely no config whatsoever.
+**shit**'s Linux binary is static and it does not use C++'s STL. **shit** also
+can work without coreutils, using it's own utilities. You can copy **shit** to
+any arch-compatible machine and enjoy the shell.
 
 **The project is in early stage**. There's no gurantee that it will not blow
 you computer up upon the first start. Bug reports are greatly appreciated.
 
 ## Three shells in a trenchcoat
 
-[See the manual page](docs/shit.1) for a fuller explanation.
+[See the manual page](docs/shit.1) for a fuller explanation:
+```bash
+$ man docs/shit.1
+```
 
-**shit** runs in four modes, called moods, across three shell identities. The
-default `shit` mood is a strict superset of Bash with analysis and optimization
-enabled. The other moods are `bash`, `bash-posix`, and `sh`. The `bash-posix`
-mood provides Bash behavior with its POSIX mode enabled.
+**shit** runs in four modes, called moods, across three shell identities. ZSH
+has similar idea behind it's `emulate` builtin.
+
+The default `shit` mood is a strict superset of Bash with analysis and
+optimization enabled. The other moods are `bash`, `bash-posix`, and `sh`. The
+`bash-posix` mood provides Bash behavior with its POSIX mode enabled.
 
 Before it runs a command, **shit** analyzes and optimizes the complete script.
 The default mood reports diagnostics for nondeterministic globs, substitutions,
@@ -59,18 +65,17 @@ The `SHIT_FLAGS` environment variable specifies default flags. A flag on the
 command line still wins.
 
 When `SHIT_FLAGS` or the command line contains an invalid flag or argument, a
-login shell skips its startup files and opens a rescue session. You can fix the
-configuration from that session.
+login shell skips its startup files and opens a rescue session.
 
 ## Additional bull**shit**
 
 The interactive mode is inspired by
-[fish](https://github.com/fish-shell/fish-shell). It provides syntax
+[fish](https://github.com/fish-shell/fish-shell). Shell provides syntax
 highlighting, word movement, editing controls, UTF-8 support, display-width
 handling for wide characters, multiline editing, history search, and persistent
-history.
+history. Shell does not depend on readline.
 
-**shit** has more than 50 builtins, and each builtin supports `--help`. These
+**Shit** has more than 50 builtins, and each builtin supports `--help`. These
 include Bash and POSIX builtins. The additional builtins include the following
 commands.
 

@@ -390,11 +390,13 @@ PREFIX ?= /usr/local
 DESTDIR ?=
 bindir ?= $(PREFIX)/bin
 mandir ?= $(PREFIX)/share/man/man1
+man5dir ?= $(PREFIX)/share/man/man5
 bashcompdir ?= $(PREFIX)/share/bash-completion/completions
 INSTALL_MOOD_SYMLINKS ?=
 
 REL_BINARY := ../shit
 MANPAGE := ../docs/shit.1
+MANPAGE5 := ../docs/shit.5
 BASH_COMPLETION := ../completions/shit.bash
 
 install:
@@ -403,24 +405,27 @@ ifeq ($(TARGET), Windows_NT)
 			Please put '$(realpath ..)' in your PATH manually)
 else
 	$(MAKE) MODE=rel shit
-	mkdir -p "$(DESTDIR)$(bindir)" "$(DESTDIR)$(mandir)" "$(DESTDIR)$(bashcompdir)"
+	mkdir -p "$(DESTDIR)$(bindir)" "$(DESTDIR)$(mandir)" \
+		"$(DESTDIR)$(man5dir)" "$(DESTDIR)$(bashcompdir)"
 	install -m 755 $(REL_BINARY) "$(DESTDIR)$(bindir)/shit"
 	install -m 644 $(MANPAGE) "$(DESTDIR)$(mandir)/shit.1"
+	install -m 644 $(MANPAGE5) "$(DESTDIR)$(man5dir)/shit.5"
 	install -m 644 $(BASH_COMPLETION) "$(DESTDIR)$(bashcompdir)/shit"
 	for mood in $(INSTALL_MOOD_SYMLINKS); do \
 		ln -sf shit "$(DESTDIR)$(bindir)/$$mood"; \
 	done
-	echo "Installed shit, its man page, and its bash completion under '$(DESTDIR)$(PREFIX)'."
+	echo "Installed shit, its manual pages, and its bash completion under '$(DESTDIR)$(PREFIX)'."
 endif
 
 uninstall:
 	rm -f "$(DESTDIR)$(bindir)/shit"
 	rm -f "$(DESTDIR)$(mandir)/shit.1"
+	rm -f "$(DESTDIR)$(man5dir)/shit.5"
 	rm -f "$(DESTDIR)$(bashcompdir)/shit"
 	for mood in $(INSTALL_MOOD_SYMLINKS); do \
 		rm -f "$(DESTDIR)$(bindir)/$$mood"; \
 	done
-	echo "Removed shit, its man page, and its bash completion from '$(DESTDIR)$(PREFIX)'."
+	echo "Removed shit, its manual pages, and its bash completion from '$(DESTDIR)$(PREFIX)'."
 
 CLANG_TIDY ?= clang-tidy
 

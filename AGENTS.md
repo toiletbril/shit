@@ -1,420 +1,379 @@
 # shit project notes
 
-This file records the conventions and the architecture of the shell so a
-session does not relearn them from scratch. shit is a C++ and C shell where
-speed is the defining goal. The interactive editor is a vendored C submodule
-under src/toiletline.
+## Documentation ownership
 
-## Build
+Never modify README.md without explicit approval.
 
-The top-level Makefile delegates to src/Makefile and supplies the configured
-logical CPU count when the caller did not select a parallel job count. `make
-MODE=rel` writes the optimized binary to ./shit, `make MODE=dbg` writes
-./shit-dbg with AddressSanitizer and the UndefinedBehaviorSanitizer, and `make
-MODE=cov` writes ./shit-cov. The default mode is dbg. A bare `make` builds the
-shell into its object tree from a clean checkout, since the object directories
-are created as an order-only prerequisite and the default goal is the shit
-target. The completion suite needs the debug binary, since
-`--debug-complete-at` is gated behind NDEBUG. Prefer a make target over a raw
-compiler call, and clean a stale artifact with `make clean`, never a bare `rm`
-of ./shit. The full MODE catalog, the cross-compilation targets, and the install
-with its PREFIX are documented in the README. The clean target removes the main
-binaries, object trees, and every Cosmopolitan .dbg and architecture ELF
-sidecar.
+The runtime manual is docs/shit.1. It owns invocation, options, moods, shell
+syntax, runtime behavior, builtins, interactive behavior, diagnostics,
+environment variables, startup processing, and runtime files.
 
-## Moods
+The configuration manual is docs/shit.5. It owns startup file identity and
+file-format behavior. Startup files contain ordinary shell commands. Shell
+language and runtime loading rules remain in docs/shit.1.
 
-The flags, the moods, and the UX behavior are documented in the man page
-docs/shit.1, read with `mandoc docs/shit.1`. The man page is the source of truth,
-and a flag, a mood, or a UX change updates it. The architecture notes below cover
-what the man page does not.
+A new flag, mood, builtin, or renamed option updates AGENTS.md, docs/shit.1,
+and completions/shit.bash. A configuration file change also updates docs/shit.5.
+An architecture or contributor workflow change updates AGENTS.md.
 
-The mood drives the nounset, pipefail, and failglob strictness through
-`apply_strictness_for_mood`. An explicit `set -u`, `set -o pipefail`, or `set -o
-failglob` survives a later mood switch through the per-toggle explicit marks.
-`set -o posix` mirrors `--posix`, which selects the `bash-posix` mood, a bash
-mood that seeds `BASH_VERSION` and sources the bash rc so a terminal that
-re-execs with `--posix` finds the bash integration, and `set +o posix` steps
-down to bash only when already in `bash-posix` or the `sh` mood, since the
-prior mood is not a stack. A glob in command position is fatal in the default
-mood and a warning in a compatibility mood, checked in
-SimpleCommand::evaluate_impl through command_word_is_glob. The mood, the
-diagnostics toggles, the explicit strictness marks, and the stored shell option
-bits live in one RuntimeState. Capture and restore copy it whole. The set
-builtin uses one descriptor table for mutation, queries, help, completion,
-SHELLOPTS, and `$-`. `force-warnings` selects level one, `force-diagnostics`
-selects level two and matches `-WW`, and `no-diagnostics` suppresses the stage.
-Its compile-time name map retains binary search. Main.cpp
-enters rescue rather than exiting when a flag fails to parse in a login shell,
-the lockout-risk case marked by a dash-prefixed argv[0], while any other
-invocation keeps the usage exit.
+The project is a C++ and C command shell. Speed is the defining goal. The
+interactive editor is the vendored C submodule under src/toiletline.
 
-The bash startup flags share one selected rc path. `--init-file` and `--rcfile`
-are aliases whose last occurrence wins, while `--norc` suppresses either and
-the normal interactive bash rc. A noninteractive bash mood expands and sources
-BASH_ENV once. Bash-posix does not source it.
-The privileged shell option suppresses BASH_ENV and ENV. An unequal-id shell
-skips startup files and drops its elevated ids unless privileged mode was
-requested.
+## Build and install
 
-On Windows the default mood leaves `echo` backslashes literal. Native paths
-cannot emit terminal controls. An explicit `echo -e` and the sh mood retain
-escape decoding.
+The top-level Makefile delegates to src/Makefile. It supplies the configured
+logical processor count when the caller does not select a parallel job count.
 
-`--restricted`, `-r`, and an rbash basename request restricted mode. The context
-exposes that identity while startup files run and activates its guards when
-startup finishes. Variable changes, directory changes, slash-bearing command
-and source operands, output redirections, exec, command -p, enable loading,
-history paths, and hash -p use shared restriction state. Numeric descriptor
-duplication remains available. An executed shell script clears restriction for
-its run, while a sourced script retains it.
+`make MODE=rel` writes the optimized binary to ./shit. `make MODE=dbg` writes
+./shit-dbg with AddressSanitizer and UndefinedBehaviorSanitizer. `make MODE=cov`
+writes ./shit-cov. The default mode is dbg.
 
-Eval snapshots also carry shopt state, the directory stack, the working
-directory reference, and the file creation mask. An in-process subshell
-restores all of them.
+A bare `make` builds the `shit` target from a clean checkout. The `shit` target
+is the default goal. Object directories are order-only prerequisites. Prefer a
+make target to a raw compiler invocation.
+Use `make clean` to remove stale artifacts. Never remove ./shit directly. The
+clean target removes the main binaries, object trees, and every Cosmopolitan
+.dbg and architecture ELF sidecar.
 
-The name-to-mood mapping is shared from `MimicMood.hpp` as the single
-`parse_mood_name` and `mood_name` pair, so the flag parser, `set --mood`, and
-`set --init-moods` read one table.
+The completion suite requires the debug binary because
+`--debug-complete-at` is unavailable under NDEBUG. The README documents the
+complete mode catalog, cross-compilation targets, and PREFIX installation.
 
-All errors are located in all moods.
+## Test and golden workflow
+
+Run `make -C test test` for the main and completion suites. Run
+`make -C test bench` for the benchmark. Wrap an interactive launch in a timeout.
+
+The `refill` target regenerates goldens. The REFILL variable limits regeneration
+to named tests. Read every regenerated golden before accepting it. Refill
+records the binary output without judging it.
+
+The shit_tests, cli_tests, dashdiff, bashdiff, mimicrydiff, and bench recipes
+live in scripts under test. POSIX hosts launch them with /bin/bash. Windows
+launches them with sh. The shit_tests and cli_tests scripts accept test names.
+A bare NAME target or cli_NAME target runs one test through the same script.
+The dashdiff, bashdiff, and mimicrydiff scripts compare through process
+substitution. The harness carries alternate goldens for documented macOS
+differences.
+
+The benchmark uses `+analysis` for analysis-enabled runs. Compatibility rows
+retain their mood and enable analysis with `-W`.
+
+Every rm test invokes the shitbox rm with `--dry-run`. This rule applies to
+rm_behavior, rm_refuses_dot, rm_refuses_root, and every new rm test. Temporary
+directory cleanup uses the system rm behind a `[ -n "$d" ]` guard. The shitbox
+rm under test never performs cleanup.
+
+The bashdiff and mimicrydiff comparisons require Bash 5.3 or newer. Both scripts
+report a skipped comparison when BASHP names an older Bash. The macOS system
+/bin/bash is Bash 3.2. Pass a modern Bash through BASHP on macOS.
 
 ## Code conventions
 
-Locals use `let` and `let const`, the macros for `auto` and `const auto`, so a
-deducible type is never spelled out. A literal counter such as `usize i = 0`
-keeps its type, because `let i = 0` would deduce int rather than the unsigned
-type. Functions use the `fn name(...) throws -> ret` macro form. A null pointer
-check reads `!= nullptr` or `== nullptr`, never a bare truthiness test.
+### Declarations and names
 
-Names are verbose and semantic, never terse. A boolean reads `is_`, `should_`,
-`was_`, `did_`, or `has_`. A number carries a `_count` suffix or a measure suffix
-such as `_length`, `_depth`, or `_position`, and never a bare `n_` prefix. A
-variable-bound lambda is named `do_`. An accessor reads `get_` or `set_`. A clear
-name replaces a comment that would explain an unclear one. A comment states why
-the code is the way it is, not what it does. C and C++ comments always use
-`/* ... */`, never `//`.
+Use `let` and `let const`, the macros for `auto` and `const auto`, for deduced
+locals. A literal counter such as `usize i = 0` keeps its explicit type because
+`let i = 0` would deduce int. Functions use `fn name(...) throws -> ret`.
 
-An if whose condition has `&&` or `||` is braced, while a trivial
-single-condition if stays unbraced. Logical blocks are separated by a blank line,
-before and after a loop, before a return, and after a group of declarations.
+A null pointer comparison uses `== nullptr` or `!= nullptr`. Never use pointer
+truthiness.
 
-A chain of three or more name comparisons becomes a static table rather than an
-if ladder. A hot dispatch on a leading byte becomes a switch. A static dispatch
-table is a `consteval StaticStringMap` whose keys are written through the `SSK`
-macro.
+Names are verbose and semantic. A boolean begins with `is_`, `should_`, `was_`,
+`did_`, or `has_`. A count ends in `_count`. A measured number ends in a suffix
+such as `_length`, `_depth`, or `_position`. Never use a bare `n_` prefix. A
+variable-bound lambda begins with `do_`. An accessor begins with `get_` or
+`set_`.
 
-Stray enums and structs are lower_snake_case. Only a class, a class nested enum,
-and a nested type are CamelCase. File operations take a Path, not a String or a
-StringView.
+Stray enums and structs use lower_snake_case. Classes, nested enums, and nested
+types use CamelCase. File operations accept Path, never String or StringView.
 
-State threads through EvalContext and through constructors. The codebase holds no
-mutable global for per-executor state. New abstractions, file splits or merges,
-and dependency upgrades wait for approval. Before implementing anything new,
-search for an existing function, parser, or helper and reuse it rather than
-writing a second copy.
+### Comments and control flow
+
+A clear name replaces a comment that explains an unclear name. A comment states
+why the code has its current shape. C and C++ comments use `/* ... */`. Never
+use `//`.
+
+An if condition containing `&&` or `||` uses braces. A trivial single-condition
+if omits braces. Blank lines separate logical blocks. Place a blank line before
+and after a loop, before a return, and after a declaration group.
+
+Three or more name comparisons use a static table. A hot leading-byte dispatch
+uses a switch. A static dispatch table uses `consteval StaticStringMap` and SSK
+keys.
+
+### State and reuse
+
+Per-executor state passes through EvalContext and constructors. The codebase has
+no mutable global for per-executor state.
+
+Search for an existing function, parser, or helper before implementing new
+logic. Reuse the existing mechanism. New abstractions, file splits, file merges,
+and dependency upgrades require approval.
 
 ## Architecture
 
-src/Main.cpp is the entry point, reading the flags, running the rc chain, and
-driving the interactive loop or the script. src/Lexer.cpp turns source into
-tokens, src/Parser.cpp builds the syntax tree, and src/Optimizer.cpp folds
-constants and prunes dead branches in the analysis prepass. A C-style for whose
-condition folds to zero drops the whole loop only when its init clause is blank,
-since a non-blank init runs once before the condition the way C semantics
-require.
+### Front end and evaluation
+
+src/Main.cpp parses flags, runs the startup chain, and drives scripts or the
+interactive loop. src/Lexer.cpp creates tokens. src/Parser.cpp creates the
+syntax tree. src/Optimizer.cpp folds constants and removes dead branches during
+analysis.
+
+A C-style for loop whose condition folds to zero is removed only when its init
+clause is empty. A nonempty init clause runs once before the condition.
 
 Owned shell source normalizes CRLF pairs before lexing, analysis, evaluation,
-and diagnostics. Named files, stdin, command strings, sourced text, and
-executable fallback all use the same normalized bytes. Lone carriage returns
-remain data.
+and diagnostics. Named files, standard input, command strings, sourced text,
+and executable fallback use the same normalization. A lone carriage return
+remains data.
 
-Evaluation spreads across src/Eval.cpp and the Eval prefixed files, which split
-substitution, word expansion, parameter expansion, globbing, arithmetic, arrays,
-source, jobs, and functions into their own units. src/Expressions.cpp holds the
-command node base and the analysis hooks, with the simple command in
-src/ExpressionsSimpleCommand.cpp, the lists, pipeline, loops, case, and compound
-commands in src/ExpressionsCompound.cpp, and the arithmetic and logical nodes in
-src/ExpressionsArith.cpp. Shared free helpers declare in
-src/ExpressionsInternal.hpp. The builtins live under src/builtins, and the
-busybox-style coreutils live under src/shitbox. The `enable` builtin is a
-no-op since every builtin is always enabled in shit, and accepts the bash
-flags `-n`, `-a`, `-d`, `-f`, and `-s` so a bash script that toggles builtins
-keeps sourcing.
+Evaluation is divided among src/Eval.cpp and the Eval-prefixed files. These
+files own substitution, word expansion, parameter expansion, globbing,
+arithmetic, arrays, source, jobs, and functions. src/Expressions.cpp owns the
+command node base and analysis hooks. src/ExpressionsSimpleCommand.cpp owns
+simple commands. src/ExpressionsCompound.cpp owns lists, pipelines, loops,
+case, and compound commands. src/ExpressionsArith.cpp owns arithmetic and
+logical nodes. Shared free helpers are declared in
+src/ExpressionsInternal.hpp.
+
+The builtins live under src/builtins. The bundled utilities live under
+src/shitbox. Every builtin remains enabled. The enable `-d`, `-n`, `-f`, and
+`-s` flags are accepted without effect. The `-a` flag lists every builtin.
+
+### Runtime state
+
+MimicMood.hpp owns `parse_mood_name` and `mood_name`. The flag parser,
+`set --mood`, and `set --init-moods` use that table.
+
+RuntimeState owns the mood, diagnostic controls, explicit strictness marks, and
+shell option bits. Capture and restore copy the complete state. The set builtin
+uses one descriptor table for mutation, queries, help, completion, SHELLOPTS,
+and `$-`. Its compile-time name map retains binary search.
+
+`apply_strictness_for_mood` owns mood strictness. An explicit nounset, pipefail,
+or failglob setting survives a mood change. `command_word_is_glob` owns the
+command-position glob check. The runtime diagnostic levels distinguish
+`force-warnings`, `force-diagnostics`, and `no-diagnostics`.
+
+Restricted behavior uses one shared context state. Variable changes, directory
+changes, slash-bearing command and source operands, output redirections, exec,
+command `-p`, enable loading, history paths, and hash `-p` read that state.
+
+Eval snapshots also retain shopt state, the directory stack, the working
+directory reference, and the file creation mask. An in-process subshell restores
+the complete snapshot.
+
+Sparse indexed array names are tracked separately. Resetting a dense array does
+not scan unrelated sparse entries. A one-element PIPESTATUS update reuses its
+dense slot.
+
+### Jobs and process execution
 
 An asynchronous pipeline job owns every stage process. POSIX stages share one
 process group. The final stage remains primary for `$!`, status, and job output.
 Polling, waiting, foregrounding, backgrounding, signaling, and disowning retain
-or reap the earlier stages. A stopped event from any retained stage remains
-recorded. The wait builtin returns the first stopped status without waiting for
-that process again, while fg and bg resume every retained stage. Forked
-evaluators report their current process through BASHPID, while `$$` retains the
-original shell process.
+or reap earlier stages. A stopped event from any retained stage remains stored.
+The wait builtin returns the first stored stopped status without waiting for
+that process again. The fg and bg builtins resume every retained stage.
 
-The `assimilate TARGET` builtin copies the running binary through scp and uses
-an SSH transaction to install it as `shit` in the first usable remote PATH
-directory. Directories containing sbin are skipped. /usr/local/bin and
-$HOME/.local/bin are preferred when they occur in PATH. Requested bash, dash,
-sh, and shit links are placed beside the binary without clobbering an existing
-path. Custom SSH and SCP command strings are split at literal spaces. A hidden
-candidate is validated before the target is replaced. A
-handled failure restores the prior file or symlink and removes transaction
-files. The candidate SHA-256 identity must match the local executable.
-Concurrent transactions use a keeper process that holds the lock until the
-transaction child exits, including after its launcher exits. A later
-transaction recovers published and orphaned journals. The local shell supports
-every platform. The remote transaction requires a POSIX-compatible SSH login
-shell that can launch the transferred executable. The transferred shell
-performs the transaction with explicit shitbox utilities. A pre-bootstrap
-failure cannot alter the installed target, but an unusable partial upload can
-remain.
-`scripts/shit-scp` is a compatibility wrapper for this builtin.
-
-SHIT_IDENTITY is a read-only exported dynamic variable. Its lowercase SHA-256
-value is computed once on the first read or before a child program starts. An
-inherited value is removed before the evaluator starts.
-
-src/Platform.cpp routes the operating system implementation. POSIX targets use
-PlatformPosix.cpp as the base and PlatformPosixExtra.cpp for the Linux and
-Darwin overlays. Windows loads only PlatformWin32.cpp. Platform.hpp owns every
-platform header. Every platform call and type lives behind an os:: wrapper, so a
-non-platform source names no syscall, no platform header, and no platform macro.
-A closed pipe is reported as EOF by read_fd on every platform. A process-group
-reference used by timeout remains valid after polling closes the leader process,
-and close_process_group releases any retained platform handle. The shared
-get_processor_counts wrapper provides the affinity-limited and configured
-logical CPU counts used by shitbox nproc.
+A process-group reference retained for timeout remains valid after polling
+closes the leader. `close_process_group` releases the retained platform handle.
 An interactive timeout child waits behind a start pipe until its process group
 owns the controlling terminal.
+
+Forked evaluators report the current process through BASHPID. `$$` retains the
+original shell process.
+
+Executable-format fallback uses an explicit invalid-process result. A fresh
+evaluator receives the command environment and argument zero. Caller variables,
+functions, and traps are excluded. Each complete top-level command runs before
+the next command is parsed. Terminal execution begins only after the lexer
+reaches the literal end of source.
+
+The main shell ignores SIGPIPE. A forked child restores the default action.
+
+### Platform boundary
+
+src/Platform.cpp routes the operating system implementation. POSIX targets use
+PlatformPosix.cpp as the base and PlatformPosixExtra.cpp for Linux and Darwin
+overlays. Windows uses PlatformWin32.cpp. Cosmopolitan flags are registered by
+the POSIX implementation.
+
+Platform.hpp owns platform headers. Every platform call and platform type is
+hidden behind an os wrapper. A non-platform source contains no syscall, platform
+header, or platform macro.
+
+`read_fd` reports a closed pipe as EOF on every implementation. The shared
+`get_processor_counts` wrapper supplies the affinity-limited and configured
+logical processor counts used by shitbox nproc.
+
+Fork-backed evaluator launches pass through os wrappers. POSIX evaluates the
+inherited syntax tree in the child. Windows selects an in-process fallback or
+starts a fresh shell from recorded source. When Windows cannot fork a piped
+evaluator, a context-independent builtin or valid shitbox utility starts as a
+fresh shell stage. Platform flags and runtime initialization also pass through
+os wrappers.
+
 On Windows, a background process receives a fresh console process group without
-a Job Object.
-Fork-backed evaluator launches are routed through os wrappers. The POSIX
-implementation evaluates the inherited AST in the child. The Windows
-implementation selects an in-process fallback or starts a fresh shell from the
-recorded source. When Windows cannot fork a piped evaluator,
-context-independent builtins and valid shitbox utilities start as fresh shell
-stages. Platform-specific flags and runtime initialization are also registered
-through os wrappers.
+a Job Object. Successful virtual-terminal initialization enables editor
+decorations without requiring TERM.
 
-src/Completion.cpp drives zero config completion. Completion first slices the
-buffer to the command segment holding the cursor, and the slice is quote aware,
-so a `;`, `|`, `&`, or newline inside quotes does not start a new segment.
-Completion also slices to the innermost command substitution containing the
-cursor, stops before its real closer, and skips heredoc bodies while finding
-that range. The cascade tries the process arguments of kill and its kin, the
-builtin flags, the registered specs, the build tool targets, the man subcommands,
-the manpage
-options, the help subcommands, the help options, and finally the filesystem. A
-candidate is matched by smart case and then by subsequence, so an all lowercase
-token matches either case and `fbb` matches `foo_bar_baz`, while an exact prefix
-always ranks first. Ghost completion stops after the prefix range, while an
-explicit TAB also considers subsequence matches. An explicit TAB at an empty
-command position includes programs from PATH while empty ghost completion
-avoids that scan. A command-position path offers only runnable files and the
-directories, and a known utility floats the files
-whose extension it operates on ahead of the rest. A leading `~` or a `$NAME/`
-prefix on a path token is
-expanded only to list the real directory, while the offered candidate keeps the
-literal prefix so it still expands at run time, and only a glob pattern is
-expanded into its matches. Quoted and escaped directory spelling is preserved
-across a later unquoted slash. Quote reconstruction preserves the raw bytes
-before the quote and appends the candidate suffix inside the same quote. A
-balanced quote at the end of a token is extended inside that quote. Completion
-matches the token prefix through the cursor and replaces a stale suffix. An
-active tilde stays outside quotes. A path suffix after an active variable prefix
-uses backslash escapes, while ordinary path text that needs shell protection
-uses quotes.
-A command forks its `--help` at most once per cache key, behind an allowlist and
-a trusted directory gate, and the subcommand walk stops
-at a dash-led word, an unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four. The
-cascade splits across src/Completion.cpp, src/CompletionManpage.cpp,
-src/CompletionScan.cpp, and the per-keystroke highlighter in
-src/CompletionHighlight.cpp, with shared helpers in src/CompletionInternal.hpp.
-Completion, diagnostic, and shitbox cat highlighting share semantic roles and
-the tolerant lexical state scanner. The shell and diagnostic themes map those
-roles to terminal styles in Colors.cpp. Diagnostic highlighting stores lexical
-checkpoints at line boundaries near 4096-byte intervals. Sequential lines build
-the same checkpoints without copying their lexical containers. The checkpoints
-retain function definitions, so later calls resolve across physical lines. A
-random lookup resumes from the nearest checkpoint and highlights only the
-reported physical line. A source identity change invalidates the checkpoints
-and cached spans.
-The per-program policy tables, the --help allowlist,
-the extension hints, the custom-completer routing, and the transparent prefixes,
-live in src/CompletionPolicy.hpp, so a program absent from every table falls
-through to the manpage and the filesystem. The highlighter, ghost completion,
-TAB completion, and the PATH command index share one directory-listing cache
-keyed by path. The first use of a directory in a completion validation epoch
-checks its cached metadata. Later completion and highlighting calls in that
-epoch reuse the entry without another stat. Each interactive input begins an
-epoch. A stale command index is rebuilt after PROMPT_COMMAND and before the
-editor accepts a key. TAB, `compgen -c`, and `compgen -A command` begin nested
-explicit validation epochs. The sorted runnable-name index and the existing
-regular-file index are derived from directory listings and never populate the
-execution hash. Only actual execution and the hash builtin remember a resolved
-program path. A membership change in a PATH directory invalidates both derived
-indexes and the execution hash. Each directory listing is sorted once by folded
-name, so filesystem completion and partial-path highlighting binary-search the
-active prefix. Symlink target kinds are resolved when each listing is used. The
-highlighter probes a complete bare path directly and does not enumerate its
-siblings. The highlighter and history validation classify a warm command name
-without filesystem access. Explicit PATH validation ends with the TAB callback
-or compgen invocation that began it. The highlighter looks up only variable
-names that occur on the line, and it colors nested command and arithmetic
-substitutions in one pass. Strings and heredocs are bright green. Keywords and
-operators are bold magenta. Resolved commands are blue. Resolved variables and
-assignment names are bright cyan, and unfinished command prefixes are bright
-blue. Flags other than a lone dash are italic. A word beginning with
-two dashes stays a flag when it contains an equals sign. Live unknown commands
-and invalid paths are bright red. Invalid syntax is bold bright red, and unset
-variables are non-bold bright red. Styled underline infrastructure is retained
-but disabled at the capability gate. Live globs are yellow. Existing paths are
-bright cyan, and a completable path tail is cyan.
-src/Toiletline.cpp bridges the editor to the
-evaluator, and src/toiletline/toiletline.h is the editor. The
-`--debug-highlight-at` flag, a
-debug-only test driver gated behind NDEBUG like `--debug-complete-at`, prints the
-highlight spans for a line so the highlighter is testable without the editor.
-Plain editor appends update the stored byte length and serialized line directly.
-Ghost completion and history cache prefixes that produce no valid suggestion.
-Matching history entries are decoded as bytes, and display width is tracked
-separately from byte length.
-On Windows, successful virtual-terminal console initialization enables editor
-decorations without requiring the normally absent TERM environment variable.
-The completion bridge keeps its last result alive until the editor consumes the
-returned pointers. The physical working directory is captured once per input
-and remains the implicit filesystem completion base when the PWD variable is
-reassigned. A directory change preserves the command cache when every PATH
-component is absolute, while a relative or empty component still invalidates
-it.
+### Completion and editor
 
-The shitbox cat `--syntax-highlighting` flag uses the printed source theme when
-standard output is a terminal. This theme colors every variable reference and
-command word as resolved. Shell extensions and known shell shebangs select the
-input. Syntax
-highlighting is suppressed for files with null bytes and
-redirected output. Line numbering remains continuous across file and standard
-input boundaries. Syntax highlighting emits no underline attributes.
+src/Completion.cpp drives completion. src/CompletionManpage.cpp and
+src/CompletionScan.cpp own their scans. src/CompletionHighlight.cpp owns the
+per-keystroke highlighter. src/CompletionInternal.hpp declares shared helpers.
+src/CompletionPolicy.hpp owns program policies, help allowlists, extension
+hints, custom completer routing, and transparent prefixes.
 
-src/Errors.cpp renders the located caret and the trailing note, capitalized on
-its own line, with the shellcheck-style messages in src/Diagnostics.hpp. Only a
-type whose name contains WithLocation owns or inherits a source location. Only
-a type whose name contains WithDetails owns a trailing note. The semantic
-classes remain distinct for catch routing. ErrorWithLocationAndDetails can also
-store a second source location. The relocate_error bridge rewraps an unlocated
-error onto a span and preserves its details. A source backtrace is omitted when
-only one synthetic command-line root exists. Multiple `-c` roots trace the
-source that produced each message. Eval, command substitution, function
-substitution, and process substitution add their call sites to the trace. A
-trace frame is printed once while its source frame remains live. The
-`--no-traces` flag suppresses every
-source backtrace, including in a fresh executable-fallback evaluator. A printed
-frame begins with `trace:`. Error and warning labels, locations, and messages
-are bold. Warning labels are yellow, while warning locations and messages use
-the default foreground. Note and trace labels and messages are plain cyan.
-Error carets and their trailing text are bold bright red. Warning, note, and
-trace carets and their trailing text are regular yellow. A
-located diagnostic syntax-highlights the complete source line on a terminal
-before clipping it. Display width and clipping consume borrowed source views.
-Cached highlight spans use heap storage and survive highlighter arena resets.
-Word segment locations remain attached through parameter modifiers, array
-subscripts, arithmetic expressions, and nested substitutions. A contiguous
-heredoc retains its body location. A tab-stripped heredoc has no source mapping
-because its collected bytes are not contiguous. Diagnostics and LINENO share
-one cached source line index.
-Executable-format fallback uses an explicit
-invalid-process result. A fresh evaluator runs the fallback script with the
-command environment and argv zero, so caller variables, functions, and traps do
-not leak into it. The fallback parser evaluates each completed top-level command
-before it parses the next one. Terminal execution is enabled only when the lexer
-has reached the literal end of the source. The
-shell normalizes SIGPIPE, SIG_IGN for the main shell and SIG_DFL in a forked
-child so a producer dies with status 141. The cd builtin resolves a relative
-operand against the logical PWD, the bash -L mode, and cd .. lexically pops the
-last component. A logical PWD is accepted only when it is absolute and names the
-physical current directory. A missing explicit directory receives a close
-sibling suggestion when one exists. The reported path ends with its first
-unavailable component. The caret covers only that component. The pushd,
-popd, and dirs builtins carry a
-directory stack on EvalContext and route every chdir through the cd builtin, so
-the logical PWD and OLDPWD stay in one place. PIPESTATUS is published after
-every foreground command. Sparse indexed array names are tracked separately,
-so a dense array reset does not scan unrelated sparse entries. A one-element
-PIPESTATUS update reuses its dense slot.
-The condition depth is inherited by a function called from a non-final and-or
-operand or from a negation. The `set -e` option stays suppressed throughout that
-guarded body. An if with no matching branch and no else publishes status zero,
-including at the end of a sourced file. A command path ending in a directory
-separator is rejected with status 126 when the typed target is not a directory.
-Its components are resolved in order. The reported path ends with its first
-unavailable component. The caret covers only that component.
+Completion isolates the command segment at the cursor. The scanner is quote
+aware, recognizes the innermost command substitution, stops before its closer,
+and skips here-document bodies. The cascade checks process arguments, builtin
+flags, registered specifications, build targets, manual subcommands and options,
+help subcommands and options, then the filesystem.
 
-## Header factoring and value-type methods
+Smart-case and subsequence matching follow exact-prefix ranking. Ghost
+completion stops after prefix matches. Explicit Tab also considers subsequences.
+Empty ghost completion avoids a PATH scan. Empty explicit completion includes
+PATH programs.
 
-Small types live in their own lightweight headers, the mimic_mood enum in
-src/MimicMood.hpp, the RuntimeState class in src/RuntimeState.hpp, and the
-name-value split in src/NameValueArg.hpp whose NameValueArg::from factory
-performs the split. A factored data structure lives directly in the shit
-namespace, and a factored class method is defined inline in its header. A free
-helper whose receiver is a value type is a method on that type, such as
-StringView::is_all_decimal_digits, String::replace, and Path::read_entire_file.
-ArrayList::find returns Maybe<usize>, and callers test membership with
-find().has_value(). Logic shared by the POSIX and Windows implementations lives
-in Utils.cpp.
+Path completion expands a leading tilde or variable prefix only for directory
+listing. The offered candidate retains the typed prefix. Glob patterns expand
+to their matches. Quote reconstruction preserves raw bytes before a quote and
+appends the suffix inside the same quote. Completion replaces a stale suffix
+after the cursor.
 
-## Memory discipline
+A command runs `--help` at most once per cache key. The program must pass the
+allowlist and trusted-directory gate. The subcommand walk stops at a flag, an
+unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four.
 
-The custom allocator and the containers live in Arena.cpp, String.cpp, and the
-headers. ArrayList does not allocate on default construction and grows
-geometrically, String carries a small inline buffer and grows geometrically, and
-a scratch arena follows a mark and release lifetime per scope.
+Completion, highlighting, and command lookup share the directory-listing cache.
+The first use in an epoch validates metadata. Later uses in that epoch reuse the
+entry. Each interactive input starts an epoch. Tab and compgen start nested
+explicit validation epochs. A stale command index is rebuilt after
+PROMPT_COMMAND and before the editor accepts a key. Explicit PATH validation
+ends with the Tab callback or compgen invocation that started it.
+
+The runnable-name and regular-file indexes derive from directory listings.
+They never populate the execution hash. Only execution and the hash builtin
+populate that hash. A PATH membership change invalidates both indexes and the
+execution hash. Each directory listing is sorted once by folded name.
+Filesystem completion and partial-path highlighting binary-search the active
+prefix. Symlink target kinds are resolved when a listing is used.
+
+The highlighter probes a complete bare path without enumerating siblings. Warm
+command and history classification performs no filesystem access. Variable
+lookup is limited to names present on the line. Nested command and arithmetic
+substitutions are colored in one pass.
+
+Completion, diagnostics, and shitbox cat share semantic highlight roles and the
+tolerant lexical scanner. Colors.cpp maps roles to terminal styles. Styled
+underline support remains behind a disabled capability gate.
+
+Diagnostic highlighting stores lexical checkpoints at line boundaries near
+4096-byte intervals. Sequential lines build the same checkpoints without
+copying their lexical containers. Checkpoints retain function definitions.
+Random lookup resumes at the nearest checkpoint. A source identity change
+invalidates checkpoints and cached spans.
+
+src/Toiletline.cpp connects the editor and evaluator. The vendored editor lives
+in src/toiletline/toiletline.h. The completion bridge retains its result until
+the editor consumes returned pointers. Plain appends update the stored byte
+length and serialized line directly. History entries are decoded as bytes.
+Display width is tracked separately.
+
+Ghost completion and history cache prefixes that produce no suggestion. The
+physical working directory is captured once per input. Reassigning PWD does not
+change the implicit completion base. A directory change preserves the command
+cache when every PATH component is absolute. A relative or empty component
+invalidates it.
+
+### Diagnostics and source locations
+
+src/Errors.cpp renders located carets and trailing notes. Diagnostic identifiers
+live in src/Diagnostics.hpp. A type whose name contains WithLocation owns or
+inherits a source location. A type whose name contains WithDetails owns a
+trailing note. The semantic classes remain separate for catch routing.
+ErrorWithLocationAndDetails may store a second location.
+
+`relocate_error` wraps an unlocated error with a span and retains its details.
+Word segment locations survive parameter modifiers, array subscripts,
+arithmetic expressions, and nested substitutions. A contiguous here-document
+retains its body location. A tab-stripped here-document has no source mapping.
+
+Source traces are attached by eval, command substitution, function
+substitution, and process substitution. A frame is printed once while its source
+frame remains live. Several `-c` roots retain the source that produced each
+message. Diagnostics and LINENO share one cached source line index. Cached
+highlight spans use heap storage and survive highlighter arena resets. Display
+width and clipping consume borrowed source views.
+
+Directory builtins route every directory change through cd. The directory stack
+lives on EvalContext. Logical PWD and OLDPWD are maintained in one place.
+Missing paths retain the first unavailable component for the diagnostic span.
+
+### Builtins and utilities
+
+The assimilate transaction copies the running executable through scp. The
+remote transaction uses explicit shitbox utilities. The remote login shell must
+be POSIX-compatible and able to start the transferred executable.
+
+The candidate SHA-256 identity must match the local executable. A keeper process
+holds the transaction lock until the child exits, including after its launcher
+exits. A later transaction recovers published and orphaned journals. A handled
+failure restores the prior file or symlink and removes transaction files. A
+failure before bootstrap cannot alter the installed target. An unusable partial
+upload may remain.
+
+`scripts/shit-scp` is a compatibility wrapper for assimilate.
+
+SHIT_IDENTITY is a read-only exported dynamic variable. Its lowercase SHA-256
+value is computed once on first read or before a child starts. An inherited
+value is removed before evaluation begins.
+
+The shitbox cat highlighter selects recognized shell extensions and shebangs.
+It is suppressed for null bytes and redirected output. Line numbering remains
+continuous across file and standard input boundaries. Highlighting emits no
+underline attributes.
+
+## Value types and allocation
+
+Small types live in lightweight headers. MimicMood.hpp owns mimic_mood.
+RuntimeState.hpp owns RuntimeState. NameValueArg.hpp owns NameValueArg and its
+`from` factory.
+
+A factored data structure lives directly in the shit namespace. A factored
+class method is defined inline in its header. A free helper whose receiver is a
+value type becomes a method on that type. Existing examples include
+`StringView::is_all_decimal_digits`, `String::replace`, and
+`Path::read_entire_file`.
+
+`ArrayList::find` returns `Maybe<usize>`. Membership checks use
+`find().has_value()`. Logic shared by POSIX and Windows lives in Utils.cpp.
+
+ArrayList allocates nothing during default construction and grows
+geometrically. String has a small inline buffer and grows geometrically. A
+scratch arena uses mark and release lifetime within one scope.
+
 WordSegment overlays its source position with its folded arithmetic result. A
-folded segment clears its source length, and a source-bearing segment clears the
-folded-result tag. Its 64-bit layout is 160 bytes.
+folded segment clears its source length. A source-bearing segment clears the
+folded-result tag. The 64-bit layout is 160 bytes.
 
-## Testing
+## Logging
 
-Run `make -C test test` for the main suite and the completion suite under the
-debug binary, and `make -C test bench` for the benchmark. Wrap an interactive
-launch in a timeout. The `refill` target regenerates goldens, and the `REFILL`
-variable scopes it to named tests. Read each regenerated golden before trusting
-it, since refill blesses whatever the binary prints. The shit_tests, cli_tests,
-dashdiff, bashdiff, mimicrydiff, and bench recipes live in per-target scripts
-under test/, launched with /bin/bash. The shit_tests and cli_tests scripts take
-the names to run as arguments, so a bare NAME or a cli_NAME target runs one test
-through the same script. The dashdiff, bashdiff, and mimicrydiff scripts compare
-through process substitution. macOS diverges on a few tests, and the harness
-carries alternate goldens.
-The benchmark uses `+analysis` for analysis-enabled runs. Its compatibility
-rows retain their mood and enable the analysis stage through `-W`.
+The log macros live in src/Trace.hpp. `LOG(level, fmt, ...)` prints at or below
+the active verbosity. `LOG_VARS` prints named variables. The levels are Nothing,
+Info, Debug, and All. Both macros compile out of a release build.
 
-Every rm test runs the shitbox rm through `--dry-run`, so a test verifies what
-rm would remove without ever deleting a real file. This is the rule for
-rm_behavior, rm_refuses_dot, and rm_refuses_root, and any new rm test follows
-it. A cleanup of a temp directory uses the system rm behind a `[ -n "$d" ]`
-guard, never the shitbox rm under test.
-
-The bashdiff and mimicrydiff bash comparisons require a bash 5.3 or newer
-reference, since the goldens encode bash 5.x behavior, and both scripts skip the
-bash comparison loudly when `$BASHP` is older. The macOS system `/bin/bash` is
-bash 3.2, so a macOS run passes the modern bash through `BASHP`, as in `make -C
-test bashdiff BASHP="$(brew --prefix bash)/bin/bash"`.
+The executable logging and optimizer flags are documented in docs/shit.1.
 
 ## Finishing a change
 
-README.md is never modified. Before finishing a plan, update this AGENTS.md,
-docs/shit.1, and completions/shit.bash so the project notes, the manual, and the
-completions stay in sync. A new flag, a new mood, a new builtin, or a renamed
-option touches all three. The flag, mood, and UX documentation lives in the man
-page docs/shit.1, so that file is the primary write for such a change and this
-AGENTS.md only routes to it. A flag also updates completions/shit.bash so the
-completion offers it.
+Format the changed files with the project tools that own their format. Run the
+focused tests that cover the changed behavior. Read every regenerated golden.
+Run `git diff --check` and inspect the complete diff.
 
-## Logging and debugging
-
-The log macros live in src/Trace.hpp. LOG(level, fmt, ...) prints at or below the
-active verbosity and LOG_VARS dumps named variables, across the levels Nothing,
-Info, Debug, and All. LOG and LOG_VARS compile out of a release build. The
-`-X` flag, long `--debug-logging`, turns logging on at a level, and
-`--debug-logging-file` appends it to a file. The `--show-optimizer-state` flag
-traces the prepass decisions and prints a located line for every eliminated node.
+Confirm that README.md remains untouched unless approval was explicit. Apply the
+documentation ownership rules at the start of this file before the change is
+finished.

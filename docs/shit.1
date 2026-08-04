@@ -1,6 +1,6 @@
-.TH SHIT 1 "2026-07-28" "shit" "User Commands"
+.TH SHIT 1 "2026-08-04" "shit" "User Commands"
 .SH NAME
-shit \- a fast POSIX- and Bash-compatible shell
+shit \- a POSIX- and Bash-compatible command shell
 .SH SYNOPSIS
 .B shit
 .RI [ options ]
@@ -11,743 +11,985 @@ shit \- a fast POSIX- and Bash-compatible shell
 .B \-c
 .I command
 .RI [ argument ...]
+.br
+.B shit
+.B \-s
+.RI [ argument ...]
+.PP
+.B shit
+is very fast and pedantic.
 .SH DESCRIPTION
 .B shit
-is a fast POSIX- and Bash-compatible shell. An interactive prompt is run when
-standard input is a terminal and no script is given. A script file named on the
-command line is run, or a command string is run when it is given with
-.BR \-c .
+is a command shell with POSIX shell syntax and Bash-compatible extensions.
 .PP
-A command path ending in a directory separator fails with status 126 when its
-target is not a directory. An unavailable path is reported through its first
-unavailable component, and the caret covers that component.
+An interactive shell is started when standard input is a terminal and no
+.BR \-s ,
+.BR \-c ,
+or script operand is given. A script operand names a file to run. The
+.B \-c
+option supplies a command string. The
+.B \-s
+option reads commands from standard input.
 .PP
 Shell source accepts LF and CRLF line endings. A CRLF pair is read as one
 newline. A lone carriage return remains part of the source text.
 .PP
-The shell grammar is the same on every operating system. An unquoted backslash
-is an escape on Windows. A native Windows path therefore uses a quoted
-backslash, an escaped backslash, or the portable forward slash. After quote
-removal, Windows path operations accept both slash forms and recognize drive
-and UNC roots. POSIX path operations accept only the forward slash.
+The grammar is the same on every operating system. An unquoted backslash is an
+escape on Windows. A native Windows path therefore uses a quoted backslash, an
+escaped backslash, or a forward slash. After quote removal, Windows path
+operations accept both slash forms and recognize drive and UNC roots. POSIX
+path operations accept only a forward slash.
 .PP
-The shell requires no configuration. The Linux release is static and includes
-the shitbox utilities.
-.SH MOODS
-The shell supports four moods. The default
-.B shit
-mood enables strict checks and analysis by default. The
-.B bash
-mood accepts bash extensions with analysis disabled by default. The
+No configuration file is required. The static Linux release includes the
+shitbox utilities.
+.SH INVOCATION
+The input source is selected in this order. The
+.B \-s
+option selects standard input. One or more
+.B \-c
+options select their command strings in occurrence order. A script operand
+selects that file. The
+.B \-i
+option or a terminal on standard input selects the interactive editor when no
+earlier source applies. Standard input is used otherwise.
+.PP
+When both
+.B \-s
+and
+.B \-i
+are present, a terminal on standard input selects interactive operation. A
+non-terminal selects standard input. The
+.B \-s
+option takes precedence over command strings and file operands. Command strings
+take precedence over
+.BR \-i .
+A script operand takes precedence over
+.BR \-i .
+.PP
+The invocation basename selects an initial mood. The names
 .B sh
-mood follows dash behavior. The
-.B bash-posix
-mood provides bash behavior with the POSIX option enabled and reads the bash
-startup files.
-.PP
-On Windows,
-.B echo
-in the default mood leaves backslash escapes literal. The
-.B \-e
-option enables them. The
+and
+.B dash
+select the
 .B sh
-mood retains dash-style default escape handling.
-.PP
-A binary named or symlinked to
-.BR sh ", " dash ", or " bash
-is matched to the corresponding mood, and diagnostics are turned off. The mood
-is changed at runtime by the
-.B set \-\-mood
-builtin. A mood selected in a startup file remains active for the session. An
-explicit
-.BR "set \-u" ", " "set \-o pipefail" ", or " "set \-o failglob"
-remains enabled after a mood change.
-.BR "set \-o posix"
-selects the
-.B bash-posix
-mood, and
-.B "set +o posix"
-selects the
+mood. The names
 .B bash
-mood when the current mood is
-.B bash-posix
-or
-.BR sh .
-The option has no effect in another mood.
+and
+.B rbash
+select the
+.B bash
+mood. The name
+.B rbash
+also requests restricted mode. A dash at the start of argument zero or the
+.B \-l
+option selects login operation.
+.PP
+The
+.B SHIT_FLAGS
+environment variable supplies options before the command line is parsed. A
+command-line option overrides the corresponding value from
+.BR SHIT_FLAGS .
+The
+.B \-c
+option is discarded from
+.B SHIT_FLAGS
+and cannot inject a command string.
+.PP
+A dash-prefixed invocation name whose options cannot be parsed enters rescue
+mode when standard input is a terminal. Rescue mode clears the options and
+skips startup files. The
+.B \-l
+option alone does not enable this recovery. Another invalid invocation exits
+with status 2.
 .SH OPTIONS
+.SS Input and invocation
+.TP
+.BR \-c " " \fICOMMAND\fR ", " \-\-command =\fICOMMAND\fR
+COMMAND is read and run. The option may be repeated. Command strings run in
+occurrence order.
+.TP
+.BR \-s ", " \-\-stdin
+Commands are read from standard input.
+.TP
+.BR \-i ", " \-\-interactive
+Interactive operation is requested.
+.TP
+.BR \-l ", " \-\-login
+Login operation is requested.
+.TP
+.B \-\-
+Option parsing ends. The next operand is treated as the script name.
 .SS Mood and startup
 .TP
 .BR \-M ", " \-\-mood =\fINAME\fR
-NAME selects the runtime mood and accepts
-.BR shit ", " bash ", " sh ", or " bash-posix .
+NAME selects
+.BR shit ,
+.BR bash ,
+.BR sh ,
+or
+.BR bash-posix .
 .TP
 .BR \-L ", " \-\-init\-moods =\fILIST\fR
-The startup files for each listed mood are sourced in order. The list accepts
-comma-separated names or repeated flags. The
-.B shit
-mood reads /etc/shitrc and ~/.shitrc, the
-.B bash
-and
-.B bash-posix
-moods read the bash rc and its completion, and the
-.B sh
-mood reads the file named by ENV. The list defaults to the value of
-.BR \-\-mood .
+Startup files for each listed mood are sourced in order. LIST accepts
+comma-separated names. The option may be repeated. The selected runtime mood
+is used when the option is omitted.
 .TP
 .BR \-I ", " \-\-mimicry
-A script with a recognized shell shebang runs under the matching mood.
-The current diagnostics setting is preserved.
+A script with a recognized shell shebang runs under the corresponding mood.
+The current diagnostic setting is retained.
 .TP
 .B \-\-dumb
-The flags
-.BR "\-\-mood sh \-T \-\-no\-diagnostics"
-are applied together.
+The options
+.BR "\-\-mood sh" ,
+.BR \-T ,
+and
+.B \-\-no\-diagnostics
+are applied. Color is disabled.
 .TP
 .BR \-p ", " \-\-privileged
-BASH_ENV is not sourced. Interactive rc files and login profiles are still
-sourced when the real and effective ids are equal. Every startup file is
-skipped in the setuid or setgid case. Without this flag, elevated ids are
-dropped before execution. The privileged state is exposed through
+Privileged mode is enabled. BASH_ENV is not sourced. When the real and
+effective ids differ, every startup file is skipped. Elevated ids are retained
+only when this option is present. The state is exposed through
 .BR $\- ,
 .BR SHELLOPTS ,
 and
 .BR "set \-o privileged" .
 .TP
 .B \-\-clean
-A clean shell is started. No startup file is read in any mood, and PATH is set
-to a minimal default.
+No startup file is read. PATH is set to /usr/bin:/bin.
 .TP
 .BR \-\-init\-file " " \fIFILE\fR ", " \-\-rcfile " " \fIFILE\fR
-FILE is sourced as the interactive rc. The two spellings are aliases, and the
-last occurrence selects the file. The shit mood sources it in place of
-/etc/shitrc and ~/.shitrc. A non-login bash mood sources it in place of
-~/.bashrc. A leading tilde is expanded.
+FILE selects the interactive rc file. The last occurrence of either alias wins.
+A leading tilde is expanded. The file replaces /etc/shitrc and ~/.shitrc in the
+.B shit
+mood. The file replaces ~/.bashrc in an interactive non-login Bash mood. The
+system Bash rc is still read first.
 .TP
 .B \-\-norc
-The interactive bash rc and a file named by
-.B \-\-rcfile
-or
-.B \-\-init\-file
-are skipped. Login profiles and noninteractive BASH_ENV startup are unchanged.
+The interactive non-login Bash rc and a custom rc file are skipped. Login
+profiles and noninteractive BASH_ENV processing are unchanged. The stock Bash
+completion script is not loaded.
 .TP
 .BR \-r ", " \-\-restricted
-Restricted mode is requested. Startup files run before its restrictions become
-active. A basename of
-.B rbash
-requests the same mode and selects the bash mood.
+Restricted mode is requested. Startup files run before the restrictions become
+active.
 .TP
 .B \-\-posix
-The bash-posix mood is selected, as with
-.BR "\-\-mood bash-posix" .
-.SS Restricted shell
-A restricted shell rejects directory changes and changes to SHELL, PATH,
-HISTFILE, ENV, and BASH_ENV. A command name may not contain a directory
-separator. A source path, a history path, and a hash \-p path may not contain a
-directory separator.
-.PP
-The output redirections >, >|, <>, >>, &>, &>>, and output redirection through
->& are rejected. Numeric descriptor duplication remains available. The exec
-builtin, command \-p, and enable \-f or \-d are rejected. Restricted mode
-cannot be disabled with set +r. Changes to the restricted_shell shopt value
-are accepted without effect.
-.PP
-The restrictions become active after startup files finish. A sourced script
-keeps them. A shell script found through PATH and executed as a command runs
-without them, matching bash.
-.SS Diagnostics
-.TP
-.B \-W[W...]
-The analysis stage runs. A single
-.B \-W
-demotes a lenient analysis error to a warning, and the run proceeds. An
-unresolved command and a variable read before it is assigned are the lenient
-errors. A strict analysis error, such as a malformed glob pattern, stays fatal
-under a single
-.BR \-W .
-A repeated
-.BR \-W ,
-written
-.BR \-WW ,
-demotes every analysis error, including strict errors, to a warning. The run
-proceeds in every case. Runtime warnings are reported in the strict default mood
-under
-.B \-W
-and in every mood under
-.BR \-WW .
-The set builtin names level one
-.B force-warnings
-and level two
-.BR force-diagnostics .
-Without the flag the strict default mood reports an analysis error as fatal and
-stops the run before any command executes.
-.TP
-.B \-\-no\-diagnostics
-The analysis stage is skipped. No warning or pre-run diagnostic is reported.
-.TP
-.B \-\-no\-init\-diagnostics
-Diagnostics and warnings are suppressed while startup files are sourced. They
-are restored before the prompt is displayed.
-.TP
-.B \-\-no\-traces
-Source backtraces are suppressed for errors, warnings, and diagnostics. The
-primary message, source caret, note, and detail location remain visible.
-.TP
-.B \-\-list\-diagnostics
-The ShellCheck-style checks reported by the analysis stage are listed, then the
-shell exits.
-.SS Interactive
-.TP
-.BR \-T ", " \-\-no\-completion
-Interactive tab completion and ghost-text are disabled.
-.TP
-.B \-\-no\-syntax\-highlighting
-The syntax coloring and the ghost suggestion are disabled, and tab completion
-still works.
-.SS Shitbox
-.TP
-.B \-\-enable\-shitbox
-The bundled shitbox utility names such as
-.BR ls ", " mkdir ", and " cp
-resolve directly as commands, the same as
-.BR "set \-o shitbox" .
-.SS POSIX
-.TP
-.BR \-c " \fICOMMAND\fR"
-Commands are read from the string COMMAND.
-.TP
-.BR \-i ", " \-\-interactive
-Interactive mode is forced.
-.TP
-.BR \-s ", " \-\-stdin
-Commands are read from standard input.
+The
+.B bash-posix
+mood is selected.
+.SS Shell operation
 .TP
 .BR \-e ", " \-\-error\-exit
-The shell exits on the first failing command.
-The exemption for a non-final operand of
+The shell exits after an unguarded failing command. A function called from a
+non-final operand of
 .B &&
 or
 .BR || ,
-and for a command negated by
-.BR ! ,
-is inherited by a called function body. An otherwise unguarded function call
-and an otherwise unguarded final operand keep error exit enabled.
+or from a negation, inherits the guarded condition for its complete body.
 .TP
 .BR \-f ", " \-\-no\-glob
 Pathname expansion is disabled.
 .TP
 .BR \-u ", " \-\-no\-unset
-An unset variable is treated as an error.
+An unset variable read is an error.
 .TP
 .BR \-C ", " \-\-no\-clobber
-An existing file is not overwritten through a plain redirection.
+An existing file is not overwritten by a plain output redirection.
 .TP
 .BR \-n ", " \-\-no\-exec
-The script is parsed without being run.
+Commands are parsed without being run. A runtime
+.B set \-n
+also suppresses later commands in the current command list.
 .TP
 .BR \-t ", " \-\-one\-command
-A single command is read and run, then the shell exits.
+One command is read and run. The shell then exits.
 .TP
 .BR \-x ", " \-\-xtrace
 Each command is printed after expansion.
 .TP
 .BR \-v ", " \-\-verbose
-Each line is printed as it is read.
+Each input line is printed as it is read.
 .TP
 .BR \-a ", " \-\-export\-all
-Every later assignment is marked for the environment.
+Each later assignment is marked for export.
 .TP
-.BR \-l ", " \-\-login
-The shell runs as a login shell.
+.B \-h
+The option is accepted without effect for compatibility.
+.TP
+.B \-m
+The option is accepted without effect for compatibility.
+.SS Diagnostics
+.TP
+.B \-W[W...]
+The analysis stage runs. One
+.B \-W
+demotes a lenient analysis error to a warning. An unresolved command and a
+variable read before assignment are lenient errors. A strict analysis error
+remains fatal. The form
+.B \-WW
+demotes every analysis error to a warning. Runtime warnings are reported in the
+default mood under
+.B \-W
+and in every mood under
+.BR \-WW .
+.TP
+.B \-\-no\-diagnostics
+The analysis stage is skipped. No warning or pre-run diagnostic is reported.
+.TP
+.B \-\-no\-init\-diagnostics
+Diagnostics and warnings are suppressed while startup files are sourced. The
+previous settings are restored before interactive input begins.
+.TP
+.B \-\-no\-traces
+Source backtraces are suppressed. The primary message, source caret, note, and
+detail location remain visible when available.
+.TP
+.B \-\-list\-diagnostics
+The checks reported by the analysis stage are listed. The shell then exits.
+.SS Interactive operation
+.TP
+.BR \-T ", " \-\-no\-completion
+Tab completion and ghost text are disabled.
+.TP
+.B \-\-no\-syntax\-highlighting
+Syntax coloring and ghost text are disabled. Tab completion remains enabled.
+.SS Shitbox
+.TP
+.B \-\-enable\-shitbox
+Bundled utility names resolve directly as commands. The option is equivalent to
+.BR "set \-o shitbox" .
 .SS Information
 .TP
 .B \-\-help
-The help message is displayed, then the shell exits.
+Help is displayed. The shell then exits.
 .TP
 .B \-\-version
-The version and notices are displayed, then the shell exits.
+The version and notices are displayed. The shell then exits.
 .TP
 .BR \-V ", " \-\-short\-version
-The short version is displayed, then the shell exits.
-.SS Output
+The short version is displayed. The shell then exits.
+.SS Debugging
+.TP
+.BR \-A ", " \-\-show\-ast
+The syntax tree is printed before each command runs.
+.TP
+.B \-\-show\-optimizer\-state
+The analysis prepass decisions are traced. A located line is printed for every
+eliminated node.
 .TP
 .BR \-E ", " \-\-show\-exit\-code
-The exit code is printed after each command.
-.SH BASH SYNTAX
-The bash language beyond POSIX sh is accepted in every mood except sh. The forms
-below describe the supported bash extensions and their edge cases.
-.SS Arrays
+The exit status is printed after each command.
 .TP
-.B Indexed
-An array is built with a=(x y z), an element is set with a[2]=z, and more are
-appended with a+=(w). ${a[i]} reads an element through an arithmetic subscript,
-${a[@]} and ${a[*]} list the elements, ${#a[@]} counts them, and ${!a[@]} lists
-the indices. A negative index counts from the end. A gap left by a[5]=q makes a
-sparse array whose ${!a[@]} skips the holes.
+.BR \-R ", " \-\-show\-lexed\-words
+The escape bitmap is printed after each parsed command.
 .TP
-.B Associative
-An associative array is declared with declare \-A m, then set with m[key]=v and
-read with ${m[key]}. ${!m[@]} lists the keys, and unset 'm[key]' removes one
-entry.
+.B \-\-show\-stats
+Command, expansion, node, and arena statistics are printed after each command.
 .TP
-.B "Array quoting"
-"${a[@]}" keeps each element a separate field, while "${a[*]}" joins them on the
-first byte of IFS. An inner ${a[*]} inside ${x[@]+"${a[*]}"} still joins on IFS.
-A read of ${a[@]} under set \-u raises an error when a is unset.
-.SS Conditionals and arithmetic
+.B \-\-show\-memory
+Arena and heap usage is printed at exit.
 .TP
-.B "[[ ... ]]"
-The test command takes ==, !=, the numeric \-eq family, the file tests including
-\-nt and \-ot, && and ||, and =~ for a POSIX regex that fills BASH_REMATCH. The
-right side of == is a glob when it is bare and a literal when it is quoted, and
-=~ splits the same way. && and || short\-circuit. A malformed regex in an
-unselected branch does not report an error.
+.BR \-X ", " \-\-debug\-logging =\fILEVEL\fR
+Internal logging is enabled at
+.BR info ,
+.BR debug ,
+or
+.BR all .
+An unknown level is a usage error. This option is available only in a debug
+build.
 .TP
-.B "(( ... )) and $(( ... ))"
-Arithmetic takes the C operators, ++ and \-\-, **, the ternary, the comma, and
-the assignment operators. It accepts hexadecimal literals prefixed by 0x,
-octal literals prefixed by 0, binary literals prefixed by 0b, and based literals
-such as 16#ff. The 0b binary prefix is an extension over bash. Bash writes the
-same value as 2#. A name is re\-evaluated as an expression, and a[b[c]] resolves
-c, then b, then a. An empty (( )) exits 1, and an empty $(( )) expands to zero.
+.B \-\-debug\-logging\-file=FILE
+Debug logging is appended to FILE. A missing file is created. Standard error is
+used when the option is omitted or the file cannot be opened. This option is
+available only in a debug build.
+.TP
+.B \-\-debug\-complete\-at=LINE
+Completion candidates for LINE are printed. The shell then exits. This option
+is available only in a debug build.
+.TP
+.B \-\-debug\-highlight\-at=LINE
+Highlight spans for LINE are printed. The shell then exits. This option is
+available only in a debug build.
+.TP
+.B \-\-debug\-ghost\-at=LINE
+The ghost completion result and operation counts for LINE are printed. The
+shell then exits. This option is available only in a debug build.
+.TP
+.BR \-\-ftrace ", " \-\-strace
+Function or system-call tracing is enabled in a Cosmopolitan build. These
+options are unavailable in other builds.
+.SH OPERANDS
+.TP
+.I script
+When neither
+.B \-s
+nor
+.B \-c
+selects another source, the first operand names the script file. A lone
+.B \-
+operand selects standard input. A directory operand fails with status 126. A
+file that cannot be opened fails with status 127.
+.TP
+.I argument
+For a script invocation, the script pathname becomes $0. Arguments after the
+script become positional parameters. For a
+.B \-c
+invocation, the first operand after COMMAND becomes $0. Later operands become
+positional parameters. For
+.B \-s
+and interactive operation, $0 remains the invocation name and every operand
+becomes a positional parameter.
+.SH MOODS
+The
+.B shit
+mood enables strict checks, pipefail, failglob, nounset, and analysis by
+default. The
+.B bash
+mood accepts Bash extensions with analysis disabled by default. The
+.B sh
+mood follows the supported dash behavior. The
+.B bash-posix
+mood uses Bash syntax with the POSIX option enabled and reads the Bash startup
+files.
+.PP
+An explicit
+.BR "set \-u" ,
+.BR "set \-o pipefail" ,
+or
+.B set \-o failglob
+survives a later mood change. The command
+.B set \-o posix
+selects
+.BR bash-posix .
+The command
+.B set +o posix
+selects
+.B bash
+only from the
+.B bash-posix
+or
+.B sh
+mood.
+.PP
+On Windows, the default mood leaves backslashes literal in
+.BR echo .
+The
+.B \-e
+option enables escape decoding. The
+.B sh
+mood retains dash-style default escape handling.
+.SH STARTUP FILES
+Each startup file is parsed with the grammar of the mood whose files are being
+sourced. A mood already being initialized is skipped if a startup file invokes
+.BR "set \-\-init\-moods" .
+.PP
+A login
+.B shit
+or
+.B sh
+mood sources /etc/profile and ~/.profile in that order. An interactive
+.B shit
+mood then sources /etc/shitrc and ~/.shitrc. A custom rc file replaces that
+pair.
+.PP
+An interactive
+.B sh
+mood sources the file named by ENV when privileged mode is disabled. The ENV
+value is used as a pathname without PATH lookup.
+.PP
+A login
+.B bash
+or
+.B bash-posix
+mood sources /etc/profile. It then sources the first readable file among
+~/.bash_profile, ~/.bash_login, and ~/.profile.
+.PP
+An interactive non-login
+.B bash
+or
+.B bash-posix
+mood sources the first readable file among /etc/bash/bashrc and
+/etc/bash.bashrc. It then sources the custom rc file or ~/.bashrc. Unless a
+default completion specification or BASH_COMPLETION_VERSINFO already exists,
+/usr/share/bash-completion/bash_completion is sourced after the rc file.
+.PP
+A noninteractive
+.B bash
+mood sources BASH_ENV once. Parameter expansion, command substitution,
+arithmetic expansion, and leading-tilde expansion are applied to the value.
+PATH is not searched. The
+.B bash-posix
+mood does not source BASH_ENV.
+.PP
+Clean, rescue, and unequal-id shells skip every startup file. The privileged
+option suppresses ENV and BASH_ENV processing. Restricted mode is visible while
+startup files run, but its restrictions become active only after startup
+finishes.
+.PP
+Mood-derived pipefail and failglob settings remain disabled while startup files
+run. An explicit command-line nounset setting remains active. The selected mood
+strictness is applied after startup finishes.
+.PP
+Missing optional files, custom rc files, and BASH_ENV files are skipped. An
+existing custom rc or BASH_ENV file that cannot be read produces a diagnostic
+and is skipped. An unreadable ENV file is skipped without that diagnostic. See
+.BR shit (5)
+for the startup file format.
+.SH RESTRICTED SHELL
+A restricted shell rejects directory changes and changes to SHELL, PATH,
+HISTFILE, ENV, and BASH_ENV. A command name may not contain a directory
+separator. A source operand, history path, and
+.B hash \-p
+path may not contain a directory separator.
+.PP
+The output redirections >, >|, <>, >>, &>, &>>, and output redirection through
+>& are rejected. Numeric descriptor duplication remains available. The
+.B exec
+builtin,
+.BR "command \-p" ,
+and
+.B enable \-f
+or
+.B enable \-d
+are rejected. Restricted mode cannot be disabled with
+.BR "set +r" .
+Changes to the restricted_shell shopt value are accepted without effect.
+.PP
+The restrictions become active after startup files finish. A sourced script
+retains them. A shell script found through PATH and executed as a command runs
+without them.
+.SH SHELL GRAMMAR
+The shell accepts the POSIX Shell Command Language and the Bash extensions
+described below. The
+.B sh
+mood rejects Bash-only syntax. Compatibility differences are listed under
+.BR COMPATIBILITY .
+.PP
+The analysis prepass may fold constants and remove an unreachable command. A
+C-style for loop whose condition folds to zero is removed only when its init
+clause is empty. A nonempty init clause still runs once.
+.PP
+An if command with no selected branch and no else command returns status zero.
+This rule also applies at the end of a sourced file.
+.SH QUOTING
+Single quotes preserve every enclosed byte. Double quotes retain parameter,
+command, and arithmetic expansion. A backslash quotes the next byte where the
+grammar permits it.
+.PP
+The form $'...' reads C escapes including \en, \et, \exHH, and \eOOO. The form
+$"..." marks a string for translation. It behaves as an ordinary double-quoted
+string when no catalog is present.
+.SH PARAMETERS
+.SS Positional parameters
+An unquoted $@ or $* is subject to field splitting. The form "$@" preserves one
+field per positional parameter. The form "$*" joins the parameters with the
+first byte of IFS.
+.SS Indexed arrays
+An indexed array is assigned with a=(x y z). An element is assigned with
+a[2]=z. The form a+=(w) appends elements. ${a[i]} reads an arithmetic subscript.
+${a[@]} and ${a[*]} list elements. ${#a[@]} counts elements. ${!a[@]} lists
+indices. A negative index counts from the end. Sparse indices remain absent
+from ${!a[@]}.
+.PP
+Inside double quotes, "${a[@]}" preserves one field per element.
+"${a[*]}" joins elements with the first byte of IFS. An unset array read through
+${a[@]} is an error under
+.BR "set \-u" .
+.SS Associative arrays
+The command
+.B declare \-A m
+declares an associative array. The form m[key]=v assigns an element. The form
+${m[key]} reads it. The form ${!m[@]} lists keys. The command
+.B unset 'm[key]'
+removes one element.
+.SH EXPANSIONS
 .SS Parameter expansion
+The form ${v:offset:length} selects a substring. A negative offset requires a
+leading space, as in ${v: \-3}. Without the space, ${v:\-3} is the default-value
+form. A negative length excludes that many characters from the end.
+.PP
+The form ${v/pat/rep} replaces the first match. The form ${v//pat/rep} replaces
+every match. The anchors /# and /% select the start and end. An ampersand in the
+replacement denotes the matched text. The form \e& denotes a literal ampersand.
+.PP
+The forms ${v^^}, ${v,,}, ${v^}, and ${v,} change case with an optional pattern.
+The transforms ${v@Q}, ${v@E}, ${v@A}, ${v@P}, and ${v@a} produce a quoted
+value, expanded escapes, an assignment, a prompt expansion, or attributes. The
+forms ${v@U}, ${v@L}, and ${v@u} apply the corresponding case conversion.
+.PP
+The form ${!ref} reads the variable named by ref. The forms ${!pre*} and
+${!pre@} list names beginning with pre.
+.SS Arithmetic expansion
+Arithmetic accepts the C operators, ++, \-\-, **, the conditional operator, the
+comma operator, and assignment operators. Literals may use 0x hexadecimal, 0
+octal, 0b binary, or a base prefix such as 16#ff. A variable value is
+re-evaluated as an arithmetic expression. Nested subscripts such as a[b[c]] are
+resolved from the inner expression outward. An empty (( )) command returns one.
+An empty $(( )) expansion produces zero.
+.SS Command substitution
+The forms $(command) and `command` replace a command with its output. A command
+substitution restores runtime state, shell options, directory stack, working
+directory state, and file creation mask when it finishes.
+.SS Process substitution
+The forms <(command) and >(command) supply a descriptor path. A POSIX process
+evaluates the inherited syntax tree. A Windows process uses the platform
+fallback selected for that command.
+.SS Brace expansion
+The form {a,b,c} produces alternatives. The forms {1..10}, {a..z}, and
+{1..10..2} produce ranges. A numeric range such as {001..10} retains its width.
+Braces nest. A lone {a} remains literal.
+.SS Field splitting
+IFS controls field splitting. A run of an IFS whitespace byte collapses. A run
+of a non-whitespace IFS byte produces an empty field where applicable.
+.SS Pathname expansion
+The
+.B extglob
+option enables ?(), *(), +(), @(), and !(). The
+.B globstar
+option enables **. The
+.BR dotglob ,
+.BR nullglob ,
+and
+.B failglob
+options control leading dots, nonmatches, and failed matches. In the default
+mood, a nonmatching glob is fatal. In a compatibility mood with failglob
+disabled, the nonmatching pattern remains literal. The warning policy may
+report that literal fallback. A glob in command position is fatal in the
+default mood and reports a warning in a compatibility mood unless diagnostics
+are disabled.
+.SH REDIRECTIONS
+The operators &> and &>> redirect standard output and standard error to one
+file. The operator |& pipes both streams. The operator <<< supplies a
+here-string followed by one newline.
+.PP
+A redirection of the form {var}> or {var}< allocates a descriptor numbered ten
+or greater and assigns its number to var. The form {var}>&\- closes the
+descriptor named by var.
+.PP
+A contiguous here-document retains its source location. A tab-stripped
+here-document has no source mapping because its collected bytes are not
+contiguous.
+.SH COMMAND EXECUTION
+Command lookup checks functions, builtins, remembered command paths, PATH, and
+enabled shitbox fallback according to the active mood and options. Completion
+indexes do not populate the execution hash. Actual execution and the
+.B hash
+builtin remember a resolved program path. A PATH directory membership change
+invalidates the derived indexes and execution hash.
+.PP
+A command path ending in a directory separator fails with status 126 when the
+typed target is not a directory. Components are resolved in order. An
+unavailable path is reported through its first unavailable component. The caret
+covers that component.
+.PP
+Executable-format fallback starts a fresh evaluator with the command
+environment and command argument zero. Caller variables, functions, and traps
+do not leak into it. Each complete top-level command runs before the next one is
+parsed.
+.PP
+PIPESTATUS is updated after every foreground command. It contains the status of
+each pipeline stage. When
+.B pipefail
+is enabled, a pipeline returns the status of its rightmost failing stage.
+.SH FUNCTIONS
+A function has its own positional parameters and local variables. Call stack
+state is exposed through FUNCNAME, BASH_SOURCE, BASH_LINENO, and BASH_COMMAND.
+.PP
+A function called from a guarded and-or operand or a negation inherits that
+condition. The
+.B errexit
+option remains suppressed throughout the guarded function body.
+.SH BUILTINS
+The shell provides the POSIX and Bash builtins listed below. The standard forms
+follow the active compatibility mood unless a difference is stated here.
+.PP
+.BR : ,
+.BR . ,
+.BR [ ,
+.BR alias ,
+.BR bg ,
+.BR break ,
+.BR builtin ,
+.BR cd ,
+.BR command ,
+.BR complete ,
+.BR compgen ,
+.BR compopt ,
+.BR continue ,
+.BR declare ,
+.BR dirs ,
+.BR disown ,
+.BR echo ,
+.BR eval ,
+.BR exec ,
+.BR exit ,
+.BR export ,
+.BR false ,
+.BR fg ,
+.BR getopts ,
+.BR history ,
+.BR jobs ,
+.BR kill ,
+.BR let ,
+.BR local ,
+.BR mapfile ,
+.BR newgrp ,
+.BR popd ,
+.BR printf ,
+.BR pushd ,
+.BR pwd ,
+.BR read ,
+.BR readarray ,
+.BR readonly ,
+.BR return ,
+.BR set ,
+.BR shift ,
+.BR shopt ,
+.BR source ,
+.BR test ,
+.BR time ,
+.BR times ,
+.BR trap ,
+.BR true ,
+.BR type ,
+.BR typeset ,
+.BR ulimit ,
+.BR umask ,
+.BR unalias ,
+.BR unset ,
+and
+.BR wait .
+.SS Shell-specific builtins
 .TP
-.B Substring
-${v:offset:length} cuts a substring. A negative offset is written with a leading
-space, ${v: \-3}. Without the space ${v:\-3} is the default\-value form. A
-negative length stops that many characters from the end.
+.BI "assimilate " TARGET
+The running executable is copied through scp to TARGET and installed as
+.B shit
+in the first usable remote PATH directory. A path containing sbin is skipped.
+/usr/local/bin and $HOME/.local/bin are preferred when they occur in PATH. The
+.BI \-\-link\-mood= MOOD
+option requests a relative bash, dash, sh, or shit link. It may be repeated and
+accepts comma-separated values. A candidate directory is skipped when a
+requested link path already exists.
+.PP
+The
+.BR \-x " or " \-\-trace
+option prints remote progress. The
+.BI \-\-ssh\-command= COMMAND
+and
+.BI \-\-scp\-command= COMMAND
+options replace ssh and scp. COMMAND is split at literal spaces.
+.PP
+The candidate identity is validated before the target is replaced. A handled
+failure restores the prior file or symlink and removes transaction files.
+Concurrent transactions are serialized. A later transaction recovers a
+published or orphaned journal. A failure before the remote transaction starts
+cannot alter the installed target. An unusable partial upload may remain.
 .TP
-.B Replacement
-${v/pat/rep} replaces the first match and ${v//pat/rep} every match, anchored by
-/# at the front and /% at the end. An & in the replacement stands for the
-matched text, and \\& is a literal &.
+.B bench
+Commands are sampled through
+.BR "shit \-c" .
+The wall time, peak resident set, and available performance counters are
+reported as a mean, standard deviation, and range. Later commands are compared
+with the first. Sampling stops after a nonzero status unless
+.B \-\-ignore\-exit\-code
+is present. The
+.BR \-\-show\-output ,
+.BR \-\-no\-shell ,
+.BR \-\-runs ,
+and
+.B \-\-duration
+options control output, direct execution, sample count, and the millisecond
+budget.
 .TP
-.B "Case and transform"
-${v^^} and ${v,,} change the case of every character, and ${v^} and ${v,} change
-the first, each with an optional pattern. ${v@Q} quotes the value, ${v@E}
-expands backslash escapes, ${v@A} prints an assignment, ${v@P} expands a prompt
-template, and ${v@a} reports attributes. The ${v@U}, ${v@L}, and ${v@u}
-transforms apply the corresponding case changes.
+.B z
+The current directory is changed to a directory selected from the frecency
+store. Operands form one case-insensitive substring query. Visit count and
+recency determine the ranking.
+.SS Compatibility forms
 .TP
-.B Indirection
-${!ref} reads the variable that ref names. ${!pre*} and ${!pre@} list the names
-that start with pre.
-.SS Word generation
+.B set
+A minus enables an option. A plus disables it. The forms
+.BR "set \-o NAME" " and " "set +o NAME"
+select the option by long name. With no NAME,
+.B set \-o
+prints current states and
+.B set +o
+prints reusable commands. The
+.B set \-\-options
+form prints every option with its state and description. The
+.BR \-E ,
+.BR \-P ,
+.BR \-T ,
+and
+.B \-B
+forms control errtrace, physical directory resolution, functrace, and brace
+expansion. The custom forms
+.BR "set \-\-mood" " and " "set \-\-init\-moods"
+use the same mood table as the command-line options. The options
+.BR force-warnings ,
+.BR force-diagnostics ,
+.BR no-diagnostics ,
+and
+.B shitbox
+control diagnostics and bundled command lookup. Runtime snapshots restore set
+state after an in-process substitution.
 .TP
-.B "Brace expansion"
-{a,b,c} lists words, {1..10} and {a..z} count a range, {1..10..2} adds a step,
-and {001..10} pads the width. Braces nest and multiply. A lone {a} stays
-literal.
+.B enable
+Every builtin remains enabled. The
+.BR \-d ,
+.BR \-n ,
+.BR \-f ,
+and
+.B \-s
+compatibility flags are accepted without effect. The
+.B \-a
+option lists every builtin.
 .TP
-.B Quoting
-$'...' reads the C escapes \\n, \\t, \\xHH, and \\OOO. $"..." marks a string
-for translation. It behaves like an ordinary double-quoted string when no
-catalog is present.
+.B hash
+Resolved command locations are remembered or listed. The
+.B \-r
+option clears the cache. The
+.BI "\-p " path
+option records path as the location of each name.
 .TP
-.B "Redirection and substitution"
-&> and &>> send both output streams to a file, and |& pipes both. <(cmd) and
->(cmd) are process substitutions on a /dev/fd path, and <<< is a here\-string
-that appends one newline. A {var}> or {var}< redirection allocates a free
-descriptor numbered ten or above, performs the redirection on it, and binds the
-number to the variable. The {var}>&\- form closes the descriptor named by the
-variable.
+.B history
+The
+.B \-r
+option reads the history file. The
+.B \-w
+option writes it. The
+.B \-c
+option clears the stored history.
 .TP
-.B Globbing
-shopt \-s extglob turns on ?(), *(), +(), @(), and !(), and shopt \-s globstar
-turns on **. dotglob, nullglob, and failglob change how a leading dot, a
-non\-match, and a failed match are treated. In the default mood a non\-matching
-glob and a glob in command position are fatal, and a compatibility mood warns.
-.SS Builtins
+.B bind
+Flags and operands are accepted without changing key bindings. The builtin
+returns zero.
 .TP
-.B Attributes
-declare, local, typeset, and readonly take \-a, \-A, \-i, \-r, and \-x. printf
-takes \-v to assign its result, and mapfile and readarray with \-t read the
-lines of the input into an array.
+.B caller
+Without an operand, the builtin returns one and prints nothing at top level. It
+returns zero inside a function or sourced file. A numeric operand selects a
+call frame and prints its line number and source file. A nonnumeric operand is
+an error.
 .TP
-.B "Pipeline status"
-Under set \-o pipefail the pipeline reports the rightmost failing stage, and the
-default mood turns pipefail on. PIPESTATUS holds every stage's status in either
-case.
+.B help
+Without a pattern, builtin names are printed one per line. A builtin name
+renders the same help as its
+.B \-\-help
+flag. An unknown name is an error. The
+.B \-d
+and
+.B \-m
+flags are accepted without effect.
 .TP
-.B "Word splitting"
-An unquoted $@ or $* splits on IFS. "$@" keeps the parameters apart, and "$*"
-joins them on the first byte of IFS. A run of a non\-whitespace IFS character
-makes an empty field, and a run of whitespace collapses.
+.B logout
+A login shell runs the EXIT trap and exits. An optional operand supplies the
+status. A non-login shell reports an error and returns one.
+.TP
+.B suspend
+The shell stops on SIGSTOP and resumes on SIGCONT. A login shell rejects the
+operation unless
+.B \-f
+is present.
+.TP
+.BR "declare, local, typeset, readonly"
+These builtins accept
+.BR \-a ,
+.BR \-A ,
+.BR \-i ,
+.BR \-r ,
+and
+.BR \-x .
+.TP
+.BR "mapfile, readarray"
+The
+.B \-t
+option reads input lines into an array without their delimiters.
+.TP
+.B printf
+The
+.B \-v
+option assigns the formatted result to a variable.
 .TP
 .B read
-read \-r keeps a backslash literal. A plain read treats a trailing backslash as
-a line continuation.
-.SH LINE EDITING
-The interactive line editor starts in emacs mode. A vi-style modal editor is
-selected by
-.B set \-o vi
-and the emacs default is restored by
-.BR "set \-o emacs" .
-Ghost text uses prefix matches from completion and history. Tab also offers
-smart-case and subsequence matches.
-An empty command position includes builtins, functions, aliases, shitbox
-utilities, and programs from PATH.
-Quoted, escaped, variable, and tilde directory prefixes remain in their typed
-form when a later unquoted slash or basename is completed.
-.PP
-Syntax highlighting distinguishes shell syntax, commands, flags, variables,
-paths, and globs. Invalid input is marked in the source line.
-.PP
-In vi mode each line begins in insert mode. Escape enters command mode. Command
-mode provides the motions, the operators with counts, the named registers, the
-change repeat, and a visual selection. The visual selection is charwise from
-.B v
-and whole lines from
-.BR V .
-The last edit is undone by
-.B u
-in command mode and by
-.B Ctrl\-_
-in either mode. The undone edit is redone by
-.BR Ctrl\-^ ,
-or by
-.B Ctrl\-R
-in command mode. The incremental history search is opened by
-.B Ctrl\-R
-in insert mode and by the
-.B /
-key in command mode. Enter accepts the highlighted match into the line and
-leaves the search without running it. Ctrl\-G cancels the search, and the line
-is restored to its state from before the search began. The colon key opens an
-ex command. The commands
-.BR q ", " q! ", " wq ", " wq! ", " x ", and " quit
-exit the shell. The cursor shape tracks the submode, a bar in insert, a block in
-command, and an underline in visual or while an operator waits for its motion.
-In command mode the arrow keys step between the buffer rows and do not recall
-history. The insert-mode arrows still recall it. With an operator pending, Up or
-Down acts on the current line together with the line above or below. The dk and
-dj commands perform the corresponding linewise operations.
-.PP
-A block selection is entered with
-.B Ctrl\-V
-in command mode. It creates a rectangular selection across several lines. The
-keys
-.BR d " and " x
-delete the rectangle, and
-.BR I ", " c ", or " C
-insert the typed text at the left column of every selected line. Several lines
-are indented at once. The arrows and
-.B h j k l
-move within the rectangle.
-.PP
 The
-.B Ctrl\-V
-key enters multi-cursor mode in emacs mode without selecting text. A cursor sits
-at the same column on every spanned line, and
-.BR Up " or " Down
-grows the span by one line. A typed character is inserted at every cursor at
-once, and Backspace erases at every cursor. The edit is left with
-.BR Ctrl\-G .
-.SH RESCUE
-A login shell enters rescue mode when SHIT_FLAGS or a command-line flag is
-invalid and standard input is a terminal.
-.SH ENVIRONMENT
-.TP
-.B SHIT_FLAGS
-The default flags are applied before the command line. A flag on the command
-line still wins.
-.TP
-.B SHIT_HISTORY
-The command history is stored in the named file, ~/.shit_history by default.
-The history builtin reads, writes, and clears it through the \fB\-r\fP,
-\fB\-w\fP, and \fB\-c\fP flags.
-.TP
-.B SHIT_DIRECTORY_HISTORY
-The z builtin reads its frecency store from the named file,
-~/.shit_directory_history by default.
-.TP
-.B SHIT_CALC_HISTORY
-Interactive calc history is stored in the named file, ~/.shit_calc_history by
-default.
-.TP
-.B ENV
-The sh mood sources the file named by ENV.
-.TP
-.B BASH_ENV
-A noninteractive bash mood sources this file before its command, standard input,
-or script runs. Parameter expansion, command substitution, arithmetic
-expansion, and a leading tilde are applied to its value. PATH is not searched.
-Interactive, bash-posix, clean, privileged, and rescue sessions do not source
-it.
-.TP
-.B PATH
-Commands are searched through the colon\-separated directories in PATH. The
-\-\-clean flag resets it to a minimal default.
-.TP
-.B HOME
-Tilde expansion and the default startup and history paths use HOME as the home
-directory.
-.TP
-.B PWD
-The cd and z builtins maintain the current working directory in PWD.
-.TP
-.B OLDPWD
-The cd and z builtins store the previous working directory in OLDPWD. The
-command cd \- returns to it.
-.TP
-.B SHELL
-The environment supplies the shell path through SHELL. The running binary path
-is used when the variable was initially unset.
-.TP
-.B SHLVL
-The shell nesting depth is inherited through SHLVL and incremented by a child
-shell.
-.TP
-.B CDPATH
-The cd builtin searches the colon\-separated directories in CDPATH for a
-relative operand. When an explicit directory is missing, cd reports its first
-unavailable component. A close sibling directory is suggested when one exists.
-.TP
-.B IFS
-Word splitting and the join of $* use the separators in IFS. The default value
-contains a space, a tab, and a newline.
-.TP
-.B "COLUMNS, LINES"
-An interactive shell stores the terminal width and height in COLUMNS and LINES.
-.TP
-.B PROMPT_COMMAND
-The command in PROMPT_COMMAND runs before each interactive prompt is drawn.
-.TP
-.B TERM
-Color and interactive decorations on POSIX systems use the terminal type named
-by TERM.
-.TP
-.B MANPATH
-Completion searches the manual paths in MANPATH for subcommands and options.
-.TP
-.B PIPESTATUS
-The exit status of each stage of the last pipeline is stored in PIPESTATUS.
-.TP
-.B REPLY
-The read builtin stores a line in REPLY when no name is given. The select loop
-also stores its input there.
-.TP
-.B "OPTIND, OPTARG"
-The getopts builtin maintains its option index and argument in OPTIND and
-OPTARG.
-.TP
-.B TIMEFORMAT
-The time builtin formats its report with TIMEFORMAT.
-.TP
-.B PS1
-The primary prompt is rendered from PS1. A default template is supplied when it
-is unset.
-.TP
-.B PS0
-The prompt in PS0 is printed after a command line is read and before it runs.
-Its default value is empty.
-.TP
-.B PS2
-The continuation prompt is read from PS2 and defaults to "> ".
-.TP
-.B PS3
-The select loop reads its prompt from PS3, which defaults to "#? ".
-.TP
-.B PS4
-The set \-x trace uses PS4 as its prefix. The value defaults to "+ ", and its
-first character is repeated once per enclosing subshell.
-.TP
-.B BASH_XTRACEFD
-The set \-x trace is written to the descriptor in BASH_XTRACEFD. Standard error
-is used when the variable is unset or invalid.
-.TP
-.B SHIT
-The path used to invoke the shell is available as SHIT in every mood.
-.TP
-.B SHIT_VERSION
-The shell version is available in SHIT_VERSION in a form such as 0.0.8\-beta.
-.TP
-.B SHIT_COMMIT
-The commit used to build the binary is available in SHIT_COMMIT. Its value is
-<no git> when no commit was recorded.
-.TP
-.B SHIT_BUILD_MODE
-The binary build mode is available in SHIT_BUILD_MODE, such as dbg, rel, or cov.
-.TP
-.B SHIT_OS
-The distribution and kernel identification of the build host are available in
-SHIT_OS.
-.TP
-.B SHIT_GIT_BRANCH
-The repository containing the working directory supplies SHIT_GIT_BRANCH. A
-detached head supplies a short commit hash, and a directory outside a repository
-supplies an empty value. An assignment overrides the detected value.
-.TP
-.B SHIT_IDENTITY
-The lowercase SHA-256 identity of the running executable is exported through
-SHIT_IDENTITY. The value is read-only, and an inherited value is discarded.
-.TP
-.B NO_COLOR
-Color is turned off in the prompt, the diagnostics, and shitbox cat syntax
-highlighting when the variable is set to a nonempty value.
-.TP
-.B SHIT_ANSI_*
-A color escape is provided under each of these names. The recognized colors are
-BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, and WHITE. Each color also has a
-BRIGHT_ prefixed high\-intensity form. BOLD, DIM, and RESET are also provided.
-The names resolve in every mood. A recognized name reads back empty when color
-is off. A nonempty NO_COLOR value and a redirected prompt turn the escapes off,
-and the prompt stays plain. A stored assignment to one of the names wins over
-the provided escape.
-.TP
-.B "RANDOM, SRANDOM, SECONDS, LINENO, EPOCHSECONDS, EPOCHREALTIME"
-These dynamic values resolve on each read. RANDOM and SRANDOM give a fresh
-random value,
-SECONDS counts the seconds since the shell started, LINENO gives the line of the
-current command, and EPOCHSECONDS and EPOCHREALTIME give the wall clock time in
-seconds. They resolve in every mood but sh.
-.TP
-.B "BASHPID, PPID, UID, EUID, GROUPS, HOSTNAME, HOSTTYPE, MACHTYPE, OSTYPE"
-These process and host values resolve on each read. BASHPID is the process id,
-PPID is the parent, UID and EUID are the real and the effective user, GROUPS is
-the real group, and HOSTNAME, HOSTTYPE, MACHTYPE, and OSTYPE name the host and
-the platform. They resolve in every mood but sh.
-.TP
-.B "SHELLOPTS, BASH_SUBSHELL, BASH_ARGV0, BASH_EXECUTION_STRING, BASH_MONOSECONDS"
-These shell state values resolve on each read. SHELLOPTS is a colon-separated
-list of the enabled set \-o options and reflects later set changes.
-BASH_SUBSHELL counts the subshell depth, BASH_ARGV0 is the shell name,
-BASH_EXECUTION_STRING is the argument of \-c, and BASH_MONOSECONDS is a
-monotonic millisecond counter. They resolve in every mood but sh.
-.TP
-.B "FUNCNAME, BASH_SOURCE, BASH_LINENO, BASH_COMMAND"
-These call stack values describe the running command. FUNCNAME names the
-function in progress, BASH_SOURCE is the file it was read from, BASH_LINENO is
-the line of the call, and BASH_COMMAND is the command being executed. The array
-forms give the whole call stack. They resolve in every mood but sh.
-.TP
-.B BASH_REMATCH
-BASH_REMATCH contains the groups captured by the last [[ ... =~ ... ]] match.
-.TP
-.B "BASH, BASH_VERSION, BASH_VERSINFO"
-A bash identity is advertised under these names so a bash rc detects it. They
-are seeded only in the bash mood. BASH is the path to the shell, BASH_VERSION is
-the version string, and BASH_VERSINFO is its indexed components.
-.TP
-.B "COMP_WORDS, COMP_CWORD, COMP_LINE, COMP_POINT, COMP_WORDBREAKS, COMPREPLY"
-A programmable completion function reads these and writes COMPREPLY. COMP_WORDS
-holds the words on the line, COMP_CWORD is the index of the word under the
-cursor, COMP_LINE is the whole line, COMP_POINT is the cursor offset, and
-COMP_WORDBREAKS is the characters that split a word.
-.SH FILES
-.TP
-.I /etc/shitrc
-/etc/shitrc is the system startup file for the shit mood.
-.TP
-.I ~/.shitrc
-~/.shitrc is the user startup file for the shit mood.
-.TP
-.I ~/.shit_history
-~/.shit_history is the default command history file.
-.TP
-.I ~/.shit_directory_history
-~/.shit_directory_history is the default frecency store for the z builtin.
-.TP
-.I ~/.shit_calc_history
-~/.shit_calc_history is the default history file for interactive calc.
-.SH SHITBOX
+.B \-r
+option retains backslashes. A plain read treats a trailing backslash as a line
+continuation.
+.SH SHITBOX UTILITIES
 The
 .B shitbox
-builtin provides a set of small bundled core utilities.
-.B "shitbox ls"
-runs the bundled ls. An unknown utility name reports an error. With the
-.B \-\-enable\-shitbox
-flag or
-.B "set \-o shitbox"
-the utility names resolve directly as commands without the prefix. A utility
-is used when PATH holds no program of that name. A binary whose name matches a
-utility acts as that utility. Every utility supports \-\-help. A utility invoked
-through a matching binary name supports \-\-version.
+builtin runs a bundled utility. An unknown utility is an error. Every utility
+supports
+.BR \-\-help .
+A utility invoked through a matching executable name also supports
+.BR \-\-version .
 .PP
+The command
 .BI "shitbox \-\-assimilate " DIR
-installs one such symlink per utility into DIR. In the default shit mood a bare
-utility name also falls back to the bundled utility when PATH holds no binary of
-that name. A PATH binary takes precedence in every mood.
+installs one symlink per utility into DIR. When direct shitbox lookup is
+enabled, a PATH program takes precedence over a bundled utility.
 .TP
 .B basename
-The final path component is printed, with support for an optional suffix
-operand.
+The final path component is printed. An optional suffix operand is removed.
 .TP
 .B calc
-Arithmetic arguments are evaluated, or expressions are read with \-i or \-p.
+Arithmetic operands are evaluated. The
+.B \-i
+and
+.B \-p
+options read expressions interactively or from a pipe.
 .TP
 .B cat
-Files or standard input are concatenated, and \-n enables line numbering.
-The
+Files or standard input are concatenated. The
+.B \-n
+option numbers lines. The
 .B \-\-syntax\-highlighting
-flag colors shell source when standard output is a terminal. A shell extension
-or a known shell shebang selects the source. A file that contains a null byte
-is written without highlighting.
+option colors recognized shell source when standard output is a terminal. A
+file containing a null byte is written without highlighting. Line numbering
+continues across file and standard input boundaries.
 .TP
 .B cp
-Files or directory trees are copied with support for \-r, \-R, and \-v.
+Files and directory trees are copied with
+.BR \-r ,
+.BR \-R ,
+and
+.BR \-v .
 .TP
 .B dirname
 The directory portion of one path is printed.
 .TP
 .B du
-Path sizes are totaled without following symlinks. The \-s and \-h flags are
-supported.
+Path sizes are totaled without following symbolic links. The
+.B \-s
+and
+.B \-h
+options are supported.
 .TP
 .B env
-Temporary assignments can be applied before a command, or the environment can
-be printed.
+Temporary assignments are applied before a command, or the environment is
+printed.
 .TP
 .B find
-Sorted trees are walked with support for \-name, \-type, \-maxdepth,
-\-mindepth, and \-print.
+Sorted trees are walked with
+.BR \-name ,
+.BR \-type ,
+.BR \-maxdepth ,
+.BR \-mindepth ,
+and
+.BR \-print .
 .TP
 .B flock
-A command is run while a directory lock is held.
+A command runs while a directory lock is held.
 .TP
 .B grep
-Regular-expression matches are printed with support for \-i and \-v.
+Regular-expression matches are printed. The
+.B \-i
+and
+.B \-v
+options are supported.
 .TP
 .B head
-The first ten lines are printed by default. The \-n and \-c flags select a
-count.
+The first ten lines are printed by default. The
+.B \-n
+and
+.B \-c
+options select a count.
+.TP
+.B tail
+The last ten lines are printed by default. The
+.B \-n
+and
+.B \-c
+options select a count.
 .TP
 .B killall
-Processes are signaled by exact name. Signal selection and listing use \-s,
-\-\-signal, \-l, and \-\-list.
-.TP
-.B ln
-Symbolic links are created with support for \-s and \-f.
-.TP
-.B ls
-Sorted entries are listed with support for \-a, \-A, \-1, \-l, and \-h.
-.TP
-.B make
-Compact make rules are run with support for \-f, \-\-file, \-C, and
-\-\-directory. The unused \-B and \-k flags are accepted, and \-j is ignored.
-.TP
-.B mkdir
-Directories are created with support for \-p and an octal \-m mode.
-.TP
-.B mv
-Sources are renamed with support for \-f and \-v.
-.TP
-.B nproc
-The available logical processor count is printed. The \-\-all and
-\-\-ignore=COUNT options are supported.
+Processes are signaled by exact name. Signal selection and listing use
+.BR \-s ,
+.BR \-\-signal ,
+.BR \-l ,
+and
+.BR \-\-list .
 .TP
 .B pkill
-Processes whose names match a pattern are signaled. Signal selection and listing
-use \-s, \-\-signal, \-l, and \-\-list.
+Processes whose names match a pattern are signaled. Signal selection and
+listing use
+.BR \-s ,
+.BR \-\-signal ,
+.BR \-l ,
+and
+.BR \-\-list .
+.TP
+.B ln
+Symbolic links are created with
+.B \-s
+and
+.BR \-f .
+.TP
+.B ls
+Sorted entries are listed with
+.BR \-a ,
+.BR \-A ,
+.BR \-1 ,
+.BR \-l ,
+and
+.BR \-h .
+.TP
+.B make
+Compact make rules are run. The
+.BR \-f ,
+.BR \-\-file ,
+.BR \-C ,
+and
+.B \-\-directory
+options are supported. The unused
+.B \-B
+and
+.B \-k
+options are accepted. The
+.B \-j
+option is ignored.
+.TP
+.B mkdir
+Directories are created with
+.B \-p
+and an octal
+.B \-m
+mode.
+.TP
+.B mv
+Sources are renamed with
+.B \-f
+and
+.BR \-v .
+.TP
+.B nproc
+The available logical processor count is printed. The
+.B \-\-all
+and
+.B \-\-ignore=COUNT
+options are supported.
 .TP
 .B ps
-Processes are listed with support for \-a, \-u, \-x, and the accepted \-w flag.
+Processes are listed with
+.BR \-a ,
+.BR \-u ,
+.BR \-x ,
+and the accepted
+.B \-w
+option.
 .TP
 .B realpath
 The canonical absolute form of each path is printed.
 .TP
 .B rm
-Paths are removed with support for \-r, \-R, \-f, and \-\-dry\-run. Root, dot,
-and dot-dot are refused.
+Paths are removed with
+.BR \-r ,
+.BR \-R ,
+.BR \-f ,
+and
+.BR \-\-dry\-run .
+Root, dot, and dot-dot are refused.
 .TP
 .B rmdir
 Empty directories are removed.
@@ -759,167 +1001,328 @@ Signed integer sequences are printed with a nonzero step.
 Execution pauses for summed durations with optional s, m, h, or d suffixes.
 .TP
 .B sort
-Input lines are sorted in byte order, and \-r reverses the result.
-.TP
-.B tail
-The last ten lines are printed by default. The \-n and \-c flags select a
-count.
+Input lines are sorted in byte order. The
+.B \-r
+option reverses the result.
 .TP
 .B tee
-Standard input is copied to output files, and \-a enables append mode.
+Standard input is copied to output files. The
+.B \-a
+option appends.
 .TP
 .B timeout
-A command is supervised for a suffixed duration. Signal, kill delay, and status
-behavior use \-s, \-\-signal, \-k, \-\-kill\-after, \-p, and
-\-\-preserve\-status.
+A command is supervised for a suffixed duration. The
+.BR \-s ,
+.BR \-\-signal ,
+.BR \-k ,
+.BR \-\-kill\-after ,
+.BR \-p ,
+and
+.B \-\-preserve\-status
+options control signals and status handling.
 .TP
 .B touch
-File times are updated, and \-c avoids creating missing files.
+File times are updated. The
+.B \-c
+option avoids creating a missing file.
 .TP
 .B tr
-Input bytes are translated with ranges and character classes, and \-d enables
-deletion.
+Input bytes are translated with ranges and character classes. The
+.B \-d
+option deletes bytes.
 .TP
 .B uniq
-Adjacent equal lines are collapsed, and \-c prints run counts.
+Adjacent equal lines are collapsed. The
+.B \-c
+option prints run counts.
 .TP
 .B unlink
 One non-directory path is removed.
 .TP
 .B wc
-Lines, words, and bytes are counted with support for \-l, \-w, and \-c.
+Lines, words, and bytes are counted with
+.BR \-l ,
+.BR \-w ,
+and
+.BR \-c .
 .TP
 .B which
-Builtins, PATH programs, and shitbox utilities are resolved. The \-a, \-\-all,
-\-q, and \-\-quiet options are supported.
+Builtins, PATH programs, and shitbox utilities are resolved. The
+.BR \-a ,
+.BR \-\-all ,
+.BR \-q ,
+and
+.B \-\-quiet
+options are supported.
 .TP
 .B whoami
 The current user name is printed.
 .TP
 .B yes
-The joined operands, or y, are repeated until output closes.
-.SH SHIT BUILTINS
-These builtins are specific to shit.
-.TP
-.BI "assimilate " TARGET
-The running shell is copied through scp to an SSH target and installed as
-.B shit
-in one writable and searchable directory in the remote PATH. A directory whose
-path contains sbin is skipped. /usr/local/bin and $HOME/.local/bin are preferred
-when they occur in PATH. Every requested link and the binary are installed in
-one directory, and a directory is skipped when an existing path would be
-clobbered. The
-.BI \-\-link\-mood= MOOD
-option requests a relative link named bash, dash, sh, or shit. The option can be
-repeated, and each value can contain comma-separated moods. The
-.BR \-x " or " \-\-trace
-option prints remote installation progress. The
-.BI \-\-ssh\-command= COMMAND
-and
-.BI \-\-scp\-command= COMMAND
-options replace ssh and scp. COMMAND is split into arguments at literal spaces.
-The remote host needs a POSIX-compatible SSH login shell that can launch the
-transferred executable. The installed executable is validated before
-replacement. A validation or installation error restores the prior target, and
-concurrent installations are serialized. An interrupted installation can leave
-temporary files.
-.TP
-.B bench
-bench runs each command repeatedly and prints the wall time, peak resident set,
-and available performance counters as a mean, standard deviation, and range.
-With more than one command, each later command is compared with the first. Each
-sample runs the command through
-.BR "shit \-c" .
-Sampling stops when a sample returns a nonzero exit code unless
-.B \-\-ignore\-exit\-code
-is passed. The command output is suppressed unless
-.B \-\-show\-output
-is passed.
+The joined operands, or y when none are given, are repeated until output
+closes.
+.SH LINE EDITING
+The interactive editor starts in emacs mode. The command
+.B set \-o vi
+selects vi mode. The command
+.B set \-o emacs
+restores emacs mode.
+.PP
+Ghost text uses prefix matches from completion and history. Tab also offers
+smart-case and subsequence matches. An empty command position includes
+builtins, functions, aliases, shitbox utilities, and programs from PATH. An
+exact prefix ranks before a subsequence match. Empty ghost completion does not
+scan PATH.
+.PP
+Completion handles quoted separators, command substitutions, and here-document
+bodies when it selects the command segment at the cursor. Quoted, escaped,
+variable, and tilde directory prefixes retain their typed form. An explicit Tab
+at command position offers executable files and directories. Syntax
+highlighting distinguishes syntax, commands, flags, variables, paths, globs,
+and invalid input.
+.PP
+Each vi line begins in insert mode. Escape enters command mode. Command mode
+supports motions, counted operators, named registers, change repeat, and visual
+selection. The
+.B v
+key selects characters. The
+.B V
+key selects whole lines.
+.PP
 The
-.B \-\-no\-shell
-option runs the command directly. The
-.B \-\-runs
-option sets the exact sample count, and the
-.B \-\-duration
-option sets the sampling budget in milliseconds.
+.B u
+key undoes the last edit in command mode. Ctrl-_ undoes it in either mode.
+Ctrl-^ redoes the edit in either mode. Ctrl-R redoes it in command mode.
+Ctrl-R opens incremental history search in insert mode. The slash key opens the
+same search in command mode. Enter accepts the highlighted match without
+running it. Ctrl-G cancels the search and restores the preceding line state.
+.PP
+The colon key opens an ex command. The commands q, q!, wq, wq!, x, and quit
+exit the shell. The cursor is a bar in insert mode, a block in command mode,
+and an underline in visual mode or while an operator awaits a motion.
+.PP
+In command mode, arrow keys move between buffer rows without recalling history.
+Insert-mode arrow keys recall history. With an operator pending, Up or Down
+operates on the current line and the adjacent line. The dk and dj commands
+perform the corresponding linewise operations.
+.PP
+Ctrl-V enters rectangular selection in vi command mode. The d and x keys delete
+the rectangle. The I, c, and C keys insert text at the left column of every
+selected line.
+.PP
+Ctrl-V enters multi-cursor mode in emacs mode. Up and Down extend the span. A
+typed byte is inserted at every cursor. Backspace erases at every cursor.
+Ctrl-G leaves the mode.
+.SH JOB CONTROL
+An asynchronous pipeline job owns every stage. POSIX stages share one process
+group. The final stage supplies $!, the ordinary pipeline status, and the
+primary job identity. Pipefail may replace that status with the rightmost
+failing stage. Polling, waiting, foregrounding, backgrounding, signaling, and
+disowning retain or reap earlier stages.
+.PP
+A stopped event from any retained stage remains recorded. The
+.B wait
+builtin returns the first stored stopped status without waiting for that
+process again. The
+.B fg
+and
+.B bg
+builtins resume every retained stage.
+.SH SIGNALS
+The main shell ignores SIGPIPE. A forked child restores the default SIGPIPE
+action. A producer terminated by SIGPIPE therefore returns status 141.
+.PP
+An interactive timeout child waits until its process group owns the controlling
+terminal. On Windows, a background process receives a new console process group
+without a Job Object.
+.SH DIAGNOSTICS
+Errors, warnings, and analysis diagnostics include source locations when a
+mapping exists. A diagnostic may include a source line, caret, detail location,
+and trailing note. The complete source line is highlighted before terminal
+clipping.
+.PP
+Eval, command substitution, function substitution, and process substitution add
+their call sites to a source backtrace. A frame is printed once while its source
+remains live. A backtrace is omitted when only one synthetic command-line root
+exists. A printed frame begins with
+.BR trace: .
+.PP
+Error and warning labels, locations, and messages are bold. Warning labels are
+yellow. Note and trace text is cyan. Error carets are bold bright red. Warning,
+note, and trace carets are yellow. NO_COLOR disables color.
+.SH ENVIRONMENT
 .TP
-.B z
-The shell changes to a frequently visited directory ranked by a frecency store
-at ~/.shit_directory_history. The store weights each directory by its visit
-count and how recently it was seen. The operands join into one query, and a
-directory is matched by a case-insensitive substring.
-.SH BASH BUILTIN EXTENSIONS
-These builtins follow bash semantics.
+.B SHIT_FLAGS
+The value supplies default command-line options.
 .TP
-.B set
-.RI [ option ]
-.RI [ argument ...]
-A minus enables a shell option and a plus disables it. set \-o NAME and set +o
-NAME select the same state by long name. With no name, set \-o prints the
-current states, and set +o prints reusable commands. set \-\-options prints
-every option with its state and description. set \-E controls errtrace, set \-P
-makes cd resolve symbolic links, set \-T controls functrace, and set \-B
-controls brace expansion. Runtime set \-n stops later commands in the current
-command list. Runtime set \-r enables restricted mode and cannot disable it
-again with set +r.
-Changes made in a command substitution are restored when the substitution ends.
-SHELLOPTS, $\-, [[ \-o NAME ]], and completion report the shared state.
+.B SHIT_HISTORY
+The value names the command history file. The default is ~/.shit_history.
 .TP
-.B enable
-.RB [ \-a ]
-.RB [ \-d ]
-.RB [ \-n ]
-.RB [ \-f
-.IR file ]
-.RB [ \-s ]
-.RI [ name ...]
-Every builtin remains enabled. The \-d, \-n, \-f, and \-s compatibility flags
-are accepted without effect, and \-a lists every builtin.
+.B SHIT_DIRECTORY_HISTORY
+The value names the z frecency store. The default is
+~/.shit_directory_history.
 .TP
-.B hash
-.RB [ \-r ]
-.RB [ \-p
-.IR path ]
-.RI [ name ...]
-Resolved command locations are remembered or listed. The \-r flag clears the
-cache. The \-p flag records PATH as the location of each NAME.
+.B SHIT_CALC_HISTORY
+The value names interactive calc history. The default is ~/.shit_calc_history.
 .TP
-.B bind
-bind accepts its flags and operands without changing key bindings and returns
-zero.
+.BR ENV ", " BASH_ENV
+These variables select startup files under the conditions in
+.BR "STARTUP FILES" .
 .TP
-.B caller
-Without an operand the builtin prints nothing and returns one at the top level
-and zero inside a function or a sourced file. With an operand the operand is a
-frame index, and the builtin prints the line number and the source file of that
-frame. A non-numeric operand reports an error.
+.B PATH
+The value is a colon-separated command search path. The
+.B \-\-clean
+option resets it to /usr/bin:/bin.
 .TP
-.B help
-Without a pattern every builtin name is printed one per line. With a pattern the
-pattern is a builtin name, and the builtin help is rendered the same way the
-target's
-.B \-\-help
-flag renders it. A name that is not a builtin reports an error. The
-.B \-d
-short description flag and the
-.B \-m
-manpage flag are accepted without effect.
+.BR HOME ", " PWD ", " OLDPWD ", " CDPATH
+HOME supplies home paths. PWD and OLDPWD record the logical current and prior
+directories. CDPATH supplies search directories for a relative
+.B cd
+operand. A relative directory is resolved against logical PWD. The form
+.B cd ..
+removes the last logical component. A logical PWD is accepted only when it is
+absolute and identifies the physical current directory.
 .TP
-.B logout
-logout exits a login shell after the EXIT trap runs. Its optional operand is the
-exit status. In a non-login shell it reports an error and returns one. The
-.B exit
-builtin exits a non-login shell.
+.BR SHELL ", " SHLVL
+SHELL names the executable. The invocation path is used when SHELL was unset.
+SHLVL is inherited and incremented by a child shell.
 .TP
-.B suspend
-The shell is stopped with SIGSTOP and resumes on SIGCONT. A login shell is
-refused unless
-.B \-f
-is passed to force the suspension.
+.B IFS
+The value controls field splitting and the join performed by "$*". The default
+contains space, tab, and newline.
+.TP
+.BR COLUMNS ", " LINES
+An interactive shell stores the initial terminal width and height in these
+variables.
+.TP
+.B PROMPT_COMMAND
+The command runs before each interactive prompt. Its status does not replace the
+previous command status.
+.TP
+.BR PS0 ", " PS1 ", " PS2 ", " PS3 ", " PS4
+These variables provide the pre-execution, primary, continuation, select, and
+xtrace prompts. PS0 defaults to empty. PS2 defaults to "> ". PS3 defaults to
+"#? ". PS4 defaults to "+ ". The first byte of PS4 is repeated once per
+enclosing subshell.
+.TP
+.B BASH_XTRACEFD
+The value selects the xtrace descriptor. Standard error is used when it is unset
+or invalid.
+.TP
+.BR TERM ", " NO_COLOR
+TERM selects terminal capabilities on POSIX systems. A nonempty NO_COLOR
+disables prompt, diagnostic, and shitbox cat color.
+.TP
+.B MANPATH
+Completion searches these manual paths for subcommands and options.
+.TP
+.BR PIPESTATUS ", " REPLY ", " OPTIND ", " OPTARG ", " TIMEFORMAT
+These variables hold pipeline statuses, default read and select input, getopts
+state, and time formatting.
+.TP
+.BR SHIT ", " SHIT_VERSION ", " SHIT_COMMIT ", " SHIT_BUILD_MODE ", " SHIT_OS
+These values identify the invocation path, version, build commit, build mode,
+and build host distribution and kernel.
+.TP
+.B SHIT_GIT_BRANCH
+The repository containing the working directory supplies the branch name. A
+detached head supplies a short commit hash. A directory outside a repository
+supplies an empty value. An assignment overrides detection.
+.TP
+.B SHIT_IDENTITY
+The read-only exported value is the lowercase SHA-256 identity of the running
+executable. It is computed on first read or before a child starts. An inherited
+value is discarded.
+.TP
+.B SHIT_ANSI_*
+The names BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE, their BRIGHT_
+forms, BOLD, DIM, and RESET supply terminal escapes. A recognized name is empty
+when color is disabled. An explicit assignment takes precedence.
+.TP
+.BR RANDOM ", " SRANDOM ", " SECONDS ", " LINENO ", " EPOCHSECONDS ", " EPOCHREALTIME
+These dynamic values supply random numbers, elapsed time, source line, and wall
+clock time. They are unavailable in the
+.B sh
+mood.
+.TP
+.BR BASHPID ", " PPID ", " UID ", " EUID ", " GROUPS ", " HOSTNAME ", " HOSTTYPE ", " MACHTYPE ", " OSTYPE
+These dynamic values identify the current evaluator process, parent, ids,
+groups, host, and platform. The value of $$ remains the original shell process
+id. These names are unavailable in the
+.B sh
+mood.
+.TP
+.BR SHELLOPTS ", " BASH_SUBSHELL ", " BASH_ARGV0 ", " BASH_EXECUTION_STRING ", " BASH_MONOSECONDS
+These values expose shell options, subshell depth, argument zero, the current
+command string, and a monotonic millisecond count. They are unavailable in the
+.B sh
+mood.
+.TP
+.BR FUNCNAME ", " BASH_SOURCE ", " BASH_LINENO ", " BASH_COMMAND
+These values describe the active call stack and command. Their array forms
+contain the complete stack. They are unavailable in the
+.B sh
+mood.
+.TP
+.B BASH_REMATCH
+The array contains groups from the last [[ ... =~ ... ]] match.
+.TP
+.BR BASH ", " BASH_VERSION ", " BASH_VERSINFO
+These values advertise a Bash identity. They are seeded when the runtime mood
+or an initialized mood is
+.B bash
+or
+.BR bash-posix .
+.TP
+.BR COMP_WORDS ", " COMP_CWORD ", " COMP_LINE ", " COMP_POINT ", " COMP_WORDBREAKS ", " COMPREPLY
+A programmable completion function reads these values and writes COMPREPLY.
+COMP_WORDS contains the words on the line. COMP_CWORD is the index of the word
+under the cursor. COMP_LINE contains the complete line. COMP_POINT is the
+cursor byte offset. COMP_WORDBREAKS contains the bytes that split a word.
 .SH EXIT STATUS
-The shell exits with the status of the last command it ran. A usage error such
-as an unknown flag in a non-interactive run exits with status 2.
+The shell exits with the status of the last command it ran. A command path that
+names a directory, or has a trailing separator whose target is not a directory,
+returns 126. A script file that cannot be opened returns 127. A usage error in a
+non-rescue invocation returns 2. A child terminated by SIGPIPE returns 141.
+.SH ERRORS
+An unavailable command or pathname is reported through its first unavailable
+component when that component can be identified. A missing explicit directory
+may include one close sibling suggestion. A source caret covers the relevant
+component or argument when source mapping is available.
+.SH FILES
+.TP
+.I ~/.shit_history
+This is the default command history file.
+.TP
+.I ~/.shit_directory_history
+This is the default z frecency store.
+.TP
+.I ~/.shit_calc_history
+This is the default interactive calc history file.
+.PP
+Startup configuration files are listed in
+.BR shit (5).
+.SH COMPATIBILITY
+The
+.B shit
+and
+.B bash
+moods accept Bash syntax in addition to POSIX syntax. The
+.B bash-posix
+mood selects Bash syntax with POSIX option identity. The
+.B sh
+mood selects the supported dash-compatible behavior.
+.PP
+The 0b arithmetic prefix is an implementation extension. Bash writes the same
+value with a 2# prefix. The
+.BR enable ,
+.BR bind ,
+and selected
+.B help
+flags are accepted compatibility forms with the effects described under
+.BR BUILTINS .
 .SH SEE ALSO
+.BR shit (5),
 .BR bash (1),
 .BR dash (1),
 .BR sh (1),
