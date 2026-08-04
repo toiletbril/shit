@@ -14,5 +14,5 @@
 ]
 shit: 2:1: error: Command 'zzqqxxnonexist_command_4242' was not found.
      2 |  zzqqxxnonexist_command_4242
-       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 [Code 1]

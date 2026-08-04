@@ -124,7 +124,7 @@ warning_header_is_bold = bool(
     )
 )
 caret_annotation_is_yellow = bool(
-    re.search(rb"\x1b\[33m\^~* here\.\x1b\[0m", output)
+    re.search(rb"\x1b\[33m\^~*\x1b\[0m", output)
 )
 highlight_scan_is_bounded = 0 < highlight_bytes <= len(source_line.encode()) * 2 + 16
 lexical_scan_is_bounded = 0 < lexical_bytes <= len(source.encode()) + 16

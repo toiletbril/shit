@@ -65,7 +65,7 @@
 ]
 shit: 3:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
      3 |  case a in a) ;; esac
-       |       ^ here.
+       |       ^
 d
 done
 [Code 0]

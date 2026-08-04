@@ -11,4 +11,4 @@
 ]
 shit: 2:1: error: A pipeline stage expanded to no command to run.
      2 |  x=1 | cat
-       |  ^~~ here.
+       |  ^~~

@@ -18,7 +18,7 @@ shopt -s nullglob
 == an unknown name is an error:
 shit: 1:7: error: Builtin `shopt`: 'bogusopt' is not a valid shell option name.
      1 |  shopt bogusopt
-       |        ^~~~~~~~ here.
+       |        ^~~~~~~~
 rc=1
 == an unknown name under -q is silent:
 rc=1

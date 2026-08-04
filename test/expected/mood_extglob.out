@@ -164,10 +164,10 @@
 ]
 shit: 8:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
      8 |  case foo in
-       |       ^~~ here.
+       |       ^~~
 shit: 11:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
     11 |  case readme in
-       |       ^~~~~~ here.
+       |       ^~~~~~
 plus
 star
 alt

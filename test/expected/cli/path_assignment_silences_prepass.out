@@ -3,5 +3,5 @@ ran
 ran
 error: Command 'definitely_absent_cmd' was not found.
      1 |  FOO=1; definitely_absent_cmd
-       |         ^~~~~~~~~~~~~~~~~~~~~ here.
+       |         ^~~~~~~~~~~~~~~~~~~~~
 rc=0

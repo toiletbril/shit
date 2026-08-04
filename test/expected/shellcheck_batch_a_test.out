@@ -116,21 +116,21 @@
 ]
 shit: 3:8: warning: The operand is a literal, so this -z test is constant.
      3 |    [ -z lit ] && echo a
-       |         ^~~ here.
+       |         ^~~
 note: Test a variable or drop the check.
 shit: 4:5: warning: The numeric comparison -eq reads 'count', which is not a number, so the test errors at run time.
      4 |    [ count -eq notanumber ] && echo b
-       |      ^~~~~ here.
+       |      ^~~~~
 shit: 4:15: warning: The numeric comparison -eq reads 'notanumber', which is not a number, so the test errors at run time.
      4 |    [ count -eq notanumber ] && echo b
-       |                ^~~~~~~~~~ here.
+       |                ^~~~~~~~~~
 shit: 5:12: warning: [ and test compare strings byte for byte and never glob-match.
      5 |    [ "$x" = "glob*" ] && echo c
-       |             ^~~~~~~ here.
+       |             ^~~~~~~
 note: Use a case or the [[ ]] form for the pattern.
 shit: 6:8: warning: The test buffers the whole grep output only to check it is nonempty.
      6 |    [ -n "$(ls | grep x)" ] && echo d
-       |         ^~~~~~~~~~~~~~~~ here.
+       |         ^~~~~~~~~~~~~~~~
 note: Run grep -q directly and test its exit status.
 done
 [Code 0]

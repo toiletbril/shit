@@ -99,11 +99,11 @@
 ]
 shit: 5:1: warning: A read without -r mangles a backslash in the input.
      5 |  read x < "$file"
-       |  ^~~~~~ here.
+       |  ^~~~~~
 note: Add -r to read the line literally.
 shit: 8:1: warning: A read without -r mangles a backslash in the input.
      8 |  read y < "$file"
-       |  ^~~~~~ here.
+       |  ^~~~~~
 note: Add -r to read the line literally.
 no_newline=[abc] 1
 with_newline=[def] 0

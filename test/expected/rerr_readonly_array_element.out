@@ -19,4 +19,4 @@
 ]
 shit: 4:1: error: Unable to assign 'arr' because it is read only.
      4 |  arr[1]=2
-       |  ^~~~~~~~ here.
+       |  ^~~~~~~~

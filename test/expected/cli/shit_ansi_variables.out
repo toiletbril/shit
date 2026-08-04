@@ -22,6 +22,6 @@ stored=[stored]
 sh_green=[]
 shit: 1:15: error: Unable to expand 'SHIT_ANSI_NOPE' because the parameter is not set.
      1 |  set -u; echo "${SHIT_ANSI_NOPE}"
-       |                ^~~~~~~~~~~~~~~~~ here.
+       |                ^~~~~~~~~~~~~~~~~
 note: Replace it with ${SHIT_ANSI_NOPE-} if empty expansion is desired.
 rc=1

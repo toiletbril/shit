@@ -9,5 +9,5 @@
 ]
 shit: 2:6: error: Malformed glob pattern, unterminated '['.
      2 |  echo [abc
-       |       ^~~~ here.
+       |       ^~~~
 [Code 1]

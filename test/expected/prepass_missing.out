@@ -14,5 +14,5 @@
 ]
 shit: 2:1: error: Command 'nosuchcmd_xyz' was not found.
      2 |  nosuchcmd_xyz
-       |  ^~~~~~~~~~~~~ here.
+       |  ^~~~~~~~~~~~~
 [Code 1]

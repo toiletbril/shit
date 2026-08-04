@@ -89,15 +89,15 @@
 ]
 shit: 2:1: warning: The assignment of 'total' wraps an arithmetic expansion.
      2 |  total=$((6 * 7))
-       |  ^~~~~~~~~~~~~~~~ here.
+       |  ^~~~~~~~~~~~~~~~
 note: Use `let total='6 * 7'`.
 shit: 4:1: warning: The typeset builtin is the ksh spelling of declare.
      4 |  typeset name=value
-       |  ^~~~~~~ here.
+       |  ^~~~~~~
 note: Write declare for the clearer bash name.
 shit: 6:1: warning: The assignment of 'A' uses array syntax instead of arithmetic.
      6 |  A=((2 + 2))
-       |  ^~~~~~~~~~~ here.
+       |  ^~~~~~~~~~~
 note: Use `let 'A=2 + 2'` to evaluate and assign it.
 42
 value

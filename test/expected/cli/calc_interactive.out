@@ -1,7 +1,7 @@
 == a located error carets the bad token:
 shit: 1:15: error: Unexpected '.0' after the expression.
      1 |  2312312 / 1323.0
-       |                ^~ here.
+       |                ^~
 note: An operator is missing between two values.
 == a valid expression prints the value:
 14
@@ -11,5 +11,5 @@ note: An operator is missing between two values.
 2
 shit: 1:1: error: The variable 'bad' is not set.
      1 |  bad +
-       |  ^~~ here.
+       |  ^~~
 100

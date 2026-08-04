@@ -26,6 +26,6 @@
 ]
 shit: 3:7: error: Builtin `unset`: 'x' is read-only.
      3 |  unset x
-       |        ^ here.
+       |        ^
 x=1
 [Code 0]

@@ -26,5 +26,5 @@
 before
 shit: 3:7: error: Unable to expand '1' because the parameter is not set.
      3 |  echo "$1"
-       |        ^~ here.
+       |        ^~
 note: Replace it with ${1-} if empty expansion is desired.

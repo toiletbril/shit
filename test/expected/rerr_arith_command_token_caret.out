@@ -12,5 +12,5 @@
 ]
 shit: 2:6: error: Unexpected '@ 2 ' after the expression.
      2 |  (( 1 @ 2 ))
-       |       ^ here.
+       |       ^
 note: An operator is missing between two values.

@@ -9,5 +9,5 @@
 ]
 shit: 2:6: error: The glob pattern 'data/*/doesnotexist' matched no file, it expands to its literal text, which is rarely intended.
      2 |  echo data/*/doesnotexist
-       |       ^~~~~~~~~~~~~~~~~~~ here.
+       |       ^~~~~~~~~~~~~~~~~~~
 note: Probe for matches with compgen -G 'data/*/doesnotexist' or relax with set +o failglob.

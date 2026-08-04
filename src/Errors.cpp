@@ -409,9 +409,8 @@ cold fn ErrorWithLocation::to_string(StringView source,
   }
   result += '\n';
 
-  result +=
-      get_context_pointing_to(source, byte_position, byte_count, line_position,
-                              StringView{"here"}, color, context);
+  result += get_context_pointing_to(source, byte_position, byte_count,
+                                    line_position, None, color, context);
   result += trailing_details_to_string();
   return result;
 }

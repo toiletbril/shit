@@ -1,6 +1,6 @@
 shit: 2:1: error: Unterminated string literal.
      2 |  "quote?
-       |  ^~~~~~~ here.
+       |  ^~~~~~~
 shit: 2:8: note:
      2 |  "quote?
        |         ^ Expected " here.

@@ -1,6 +1,6 @@
 shit: TMPDIR/unterminated:1:1: error: Unterminated brace group.
      1 |  {
-       |  ^ here.
+       |  ^
 shit: TMPDIR/unterminated:2:10: note:
      2 |    echo hi
        |           ^ Expected '}'.
@@ -11,7 +11,7 @@ complete first
 complete second
 shit: TMPDIR/error-state:3:1: error: Unterminated subshell.
      3 |  (
-       |  ^ here.
+       |  ^
 shit: TMPDIR/error-state:3:2: note:
      3 |  (
        |   ^ Expected ')'.
@@ -19,10 +19,10 @@ trap-status=1
 error-state rc=1
 shit: 1:1: error: Cannot execute `TMPDIR/binary` as a shell script.
      1 |  ./binary
-       |  ^~~~~~~~ here.
+       |  ^~~~~~~~
 note: The file is binary and the system has refused execution. Use `file ./binary` to check the file type.
 binary rc=126
 shit: TMPDIR/recurse:2:1: error: Unable to mimic 'TMPDIR/recurse' because the script nesting is too deep.
      2 |  "$0"
-       |  ^~~~ here.
+       |  ^~~~
 recursive rc=1

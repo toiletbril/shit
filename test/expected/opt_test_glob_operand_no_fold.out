@@ -85,11 +85,11 @@
 ]
 shit: 3:13: warning: [ and test compare strings byte for byte and never glob-match.
      3 |  if [ "a*" = "a*" ]; then echo quoted_glob_folds; fi
-       |              ^~~~ here.
+       |              ^~~~
 note: Use a case or the [[ ]] form for the pattern.
 shit: 4:11: warning: [ and test compare strings byte for byte and never glob-match.
      4 |  if [ a* = a* ]; then echo unquoted_glob_no_fold; fi
-       |            ^~ here.
+       |            ^~
 note: Use a case or the [[ ]] form for the pattern.
 quoted_glob_folds
 unquoted_glob_no_fold

@@ -22,5 +22,5 @@
 ]
 shit: 2:6: error: The variable 'count' is read before it is assigned.
      2 |  echo "$count"
-       |       ^~~~~~~~ here.
+       |       ^~~~~~~~
 [Code 1]

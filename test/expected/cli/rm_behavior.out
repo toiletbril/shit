@@ -11,7 +11,7 @@ tree still present
 == rm refuses '.' and the root directory, before any removal:
 shit: 1:1: error: rm: refusing to remove '.' or '..' directory: skipping '.'.
      1 |  shitbox rm --dry-run .
-       |  ^~~~~~~~~~~~~~~~~~~~~~ here.
+       |  ^~~~~~~~~~~~~~~~~~~~~~
 shit: 1:1: error: rm: refusing to remove the root directory: skipping '/'.
      1 |  shitbox rm --dry-run /
-       |  ^~~~~~~~~~~~~~~~~~~~~~ here.
+       |  ^~~~~~~~~~~~~~~~~~~~~~

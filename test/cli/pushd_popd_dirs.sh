@@ -10,8 +10,8 @@ real_dir=$(cd "$dir" && pwd -P)
 
 scrub() {
     sed 's|\\|/|g' | sed "s|$real_dir|D|g; s|$dir|D|g" | awk '
-    /\^~~~ here\./ {
-        print "       |                            ^~~~ here."
+    /\^~~~$/ {
+        print "       |                            ^~~~"
         next
     }
     { print }

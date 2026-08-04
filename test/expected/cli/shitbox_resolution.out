@@ -10,7 +10,7 @@ rc=0
 === sh mood, empty PATH, not found ===
 shit: 1:8: error: Command 'seq' was not found.
      1 |  PATH=; seq 3
-       |         ^~~ here.
+       |         ^~~
 note: Did you mean `set`?
 rc=127
 === set -o shitbox turns bare names on ===
@@ -37,15 +37,15 @@ seq
 === a builtin name is not a shitbox utility ===
 shit: 1:9: error: shitbox has no utility named 'echo'.
      1 |  shitbox echo routed via shitbox
-       |          ^~~~ here.
+       |          ^~~~
 rc=1
 === the shitbox name does not recurse ===
 shit: 1:9: error: shitbox has no utility named 'shitbox'.
      1 |  shitbox shitbox
-       |          ^~~~~~~ here.
+       |          ^~~~~~~
 rc=1
 === unknown utility errors ===
 shit: 1:9: error: shitbox has no utility named 'nope'.
      1 |  shitbox nope
-       |          ^~~~ here.
+       |          ^~~~
 rc=1

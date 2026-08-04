@@ -153,4 +153,4 @@ one three count=3
 bundled=0
 shit: 6:5: error: Builtin `set`: Unknown option '-Z'.
      6 |  set -Z 2>&1; echo "bad=$?"
-       |      ^~ here.
+       |      ^~

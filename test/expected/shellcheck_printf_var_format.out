@@ -42,11 +42,11 @@
 ]
 shit: 3:8: warning: The printf format comes from a variable, the data can inject format directives.
      3 |  printf "$1"
-       |         ^~~~ here.
+       |         ^~~~
 note: Use printf '%s' to print it.
 shit: 5:11: warning: The printf format comes from a variable, the data can inject format directives.
      5 |  printf -- "$1"
-       |            ^~~~ here.
+       |            ^~~~
 note: Use printf '%s' to print it.
 fmt
 okfmt

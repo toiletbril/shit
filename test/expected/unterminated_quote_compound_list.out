@@ -1,6 +1,6 @@
 shit: 2:11: error: Unterminated string literal.
      2 |  echo;hello"helloworld
-       |            ^~~~~~~~~~~ here.
+       |            ^~~~~~~~~~~
 shit: 2:22: note:
      2 |  echo;hello"helloworld
        |                       ^ Expected " here.

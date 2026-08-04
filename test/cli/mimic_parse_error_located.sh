@@ -41,5 +41,5 @@ out=$(SHIT_FLAGS= "$BIN" --mood bash -I "$dir/recurse" 2>&1)
 recursive_status=$?
 printf '%s\n' "$out" |
     sed -e "s#$canonical_dir#TMPDIR#g" -e "s#$dir#TMPDIR#g" \
-        -e '/trace:/,/here\.$/d'
+        -e '/trace:/,/\^~*$/d'
 echo "recursive rc=$recursive_status"

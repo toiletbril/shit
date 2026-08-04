@@ -1,13 +1,13 @@
 shit: INNER:2:9: warning: The variable 'UNSET_CHAIN' is not set, it expands to empty.
      2 |  [[ x = "$UNSET_CHAIN" ]]
-       |          ^~~~~~~~~~~~ here.
+       |          ^~~~~~~~~~~~
 note: Replace it with ${UNSET_CHAIN-} if empty expansion is desired.
 shit: OUTER:2:3: trace:
      2 |  . INNER
-       |    ^~~~~~~~~~~~~~~~~~~ here.
+       |    ^~~~~~~~~~~~~~~~~~~
 shit: 1:0: trace:
      1 |  . OUTER
-       |    ^~~~~~~~~~~~~~~~~~~ here.
+       |    ^~~~~~~~~~~~~~~~~~~
 shit: 1:0: trace:
      1 |  SHIT -W -c '. OUTER'
 0

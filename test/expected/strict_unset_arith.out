@@ -26,5 +26,5 @@
 before
 shit: 3:9: error: Unable to expand 'nope' because the parameter is not set.
      3 |  echo $((nope + 1))
-       |          ^~~~ here.
+       |          ^~~~
 note: Replace it with ${nope-} if empty expansion is desired.

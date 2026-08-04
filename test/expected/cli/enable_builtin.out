@@ -15,7 +15,7 @@ rc=0
 == enable nosuchbuiltin reports and exits 1:
 shit: 1:8: error: Builtin `enable`: 'nosuchbuiltin' is not a shell builtin.
      1 |  enable nosuchbuiltin
-       |         ^~~~~~~~~~~~~ here.
+       |         ^~~~~~~~~~~~~
 rc=1
 == builtin enable compgen unset forwards through enable:
 ok

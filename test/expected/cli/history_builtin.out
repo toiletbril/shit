@@ -9,7 +9,7 @@
 == a non-numeric count is rejected without printing the list ==
 shit: 1:9: error: Builtin `history`: 'foo' is not a valid count.
      1 |  history foo; echo "rc=$?"
-       |          ^~~ here.
+       |          ^~~
 rc=2
 == a count past the list size still prints every entry, no overflow ==
     1  echo one

@@ -82,7 +82,7 @@
 ]
 shit: 4:6: warning: A test reads an unquoted variable.
      4 |  if [ $x = 5 ]; then echo unquoted_no_fold; fi
-       |       ^~ here.
+       |       ^~
 note: Quote it to avoid an empty or split argument.
 quoted_folds
 unquoted_no_fold

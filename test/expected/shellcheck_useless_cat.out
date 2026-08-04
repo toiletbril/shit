@@ -14,6 +14,6 @@
 ]
 shit: 2:1: warning: A useless cat.
      2 |  cat data/hello-d | cat
-       |  ^~~ here.
+       |  ^~~
 note: Give the file to the next command directly instead of piping cat.
 [Code 0]

@@ -31,5 +31,5 @@
 before
 shit: 4:12: error: Unable to expand 'nope' because the parameter is not set.
      4 |  echo "${x:+$nope}"
-       |             ^~~~~ here.
+       |             ^~~~~
 note: Replace it with ${nope-} if empty expansion is desired.

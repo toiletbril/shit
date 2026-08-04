@@ -83,14 +83,14 @@
 ]
 shit: 2:7: error: custom message.
      2 |  (echo "${nope:?custom message}")
-       |        ^~~~~~~~~~~~~~~~~~~~~~~~~ here.
+       |        ^~~~~~~~~~~~~~~~~~~~~~~~~
 default=2
 shit: 5:7: error: bash message.
      5 |  (echo "${nope:?bash message}")
-       |        ^~~~~~~~~~~~~~~~~~~~~~~ here.
+       |        ^~~~~~~~~~~~~~~~~~~~~~~
 bash=1
 shit: 8:7: error: posix message.
      8 |  (echo "${nope?posix message}")
-       |        ^~~~~~~~~~~~~~~~~~~~~~~ here.
+       |        ^~~~~~~~~~~~~~~~~~~~~~~
 posix=2
 [Code 0]
