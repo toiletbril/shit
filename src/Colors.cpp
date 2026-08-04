@@ -18,20 +18,20 @@ static fn make_shell_highlight_theme() wontthrow -> highlight_theme
   theme.set_style(highlight_role::variable, ansi::BRIGHT_CYAN);
   theme.set_style(highlight_role::assignment_name, ansi::BRIGHT_CYAN);
   theme.set_style(highlight_role::unset_variable,
-                  ansi::RED_CURLY_GREEN_UNDERLINE);
+                  ansi::RED_CURLY_YELLOW_UNDERLINE);
   theme.set_style(highlight_role::flag, ansi::ITALIC);
   theme.set_style(highlight_role::keyword, ansi::BOLD_MAGENTA);
   theme.set_style(highlight_role::invalid_syntax,
-                  ansi::BOLD_RED_CURLY_GREEN_UNDERLINE);
+                  ansi::BOLD_RED_CURLY_YELLOW_UNDERLINE);
   theme.set_style(highlight_role::function_name, ansi::BRIGHT_BLUE);
   theme.set_style(highlight_role::resolved_command, ansi::BLUE);
   theme.set_style(highlight_role::partial_command, ansi::BRIGHT_BLUE);
   theme.set_style(highlight_role::unknown_command,
-                  ansi::RED_CURLY_GREEN_UNDERLINE);
+                  ansi::RED_CURLY_YELLOW_UNDERLINE);
   theme.set_style(highlight_role::existing_path, ansi::BRIGHT_CYAN);
   theme.set_style(highlight_role::partial_path, ansi::CYAN);
   theme.set_style(highlight_role::invalid_path,
-                  ansi::RED_CURLY_GREEN_UNDERLINE);
+                  ansi::RED_CURLY_YELLOW_UNDERLINE);
   theme.set_style(highlight_role::url, ansi::BOLD_WHITE);
   theme.set_style(highlight_role::glob, ansi::YELLOW);
   return theme;
@@ -52,13 +52,16 @@ static fn make_printed_source_highlight_theme() wontthrow -> highlight_theme
   let theme = make_noninteractive_highlight_theme();
   theme.set_style(highlight_role::unset_variable,
                   theme.style_for(highlight_role::variable));
+  theme.set_style(highlight_role::unknown_command,
+                  theme.style_for(highlight_role::resolved_command));
+  theme.set_style(highlight_role::partial_command,
+                  theme.style_for(highlight_role::resolved_command));
   return theme;
 }
 
 static fn make_diagnostic_highlight_theme() wontthrow -> highlight_theme
 {
   let theme = make_printed_source_highlight_theme();
-  theme.set_style(highlight_role::partial_command, ansi::BRIGHT_RED);
   theme.set_style(highlight_role::partial_path, ansi::BRIGHT_RED);
   return theme;
 }

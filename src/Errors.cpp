@@ -30,21 +30,19 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
 
   if (severity_word == StringView{"error"}) {
     return diagnostic_color{colors::ansi::BOLD_BRIGHT_RED, colors::ansi::BOLD,
-                            colors::ansi::BOLD, colors::ansi::BRIGHT_GREEN,
+                            colors::ansi::BOLD, colors::ansi::BOLD_BRIGHT_RED,
                             colors::ansi::RESET};
   }
   if (severity_word == StringView{"warning"}) {
-    return diagnostic_color{colors::ansi::BRIGHT_MAGENTA,
-                            {},
-                            {},
-                            colors::ansi::BRIGHT_GREEN,
+    return diagnostic_color{colors::ansi::BOLD_YELLOW, colors::ansi::BOLD,
+                            colors::ansi::BOLD, colors::ansi::YELLOW,
                             colors::ansi::RESET};
   }
 
   return diagnostic_color{colors::ansi::CYAN,
                           {},
                           colors::ansi::CYAN,
-                          colors::ansi::BRIGHT_GREEN,
+                          colors::ansi::YELLOW,
                           colors::ansi::RESET};
 }
 

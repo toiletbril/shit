@@ -32,10 +32,9 @@ inline const StringView CYAN = "\x1b[36m";
 inline const StringView BOLD_MAGENTA = "\x1b[1;35m";
 inline const StringView BOLD_CYAN = "\x1b[1;36m";
 inline const StringView BOLD_WHITE = "\x1b[1;37m";
-inline const StringView CURLY_GREEN_UNDERLINE = "\x1b[4:3;58:5:10m";
-inline const StringView RED_CURLY_GREEN_UNDERLINE = "\x1b[91;4:3;58:5:10m";
-inline const StringView BOLD_RED_CURLY_GREEN_UNDERLINE =
-    "\x1b[1;91;4:3;58:5:10m";
+inline const StringView RED_CURLY_YELLOW_UNDERLINE = "\x1b[91;4:3;58:5:3m";
+inline const StringView BOLD_RED_CURLY_YELLOW_UNDERLINE =
+    "\x1b[1;91;4:3;58:5:3m";
 } /* namespace ansi */
 
 /* Whether color may be written to a stream, decided fresh so a redirected

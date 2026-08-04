@@ -23,8 +23,10 @@ warning_lines = [
     source_line,
     "if test x = $SECOND_UNSET && true; then : >diagnostic-output; fi",
     "test y = $THIRD_UNSET",
+    "diagnostic_missing_command argument",
+    "ech",
 ]
-source = "\n" * 20000 + "\n".join(warning_lines) + "\n"
+source = "\n" * 20000 + "\n".join(warning_lines)
 with tempfile.NamedTemporaryFile(delete=False) as log:
     log_path = log.name
 
@@ -41,6 +43,9 @@ if pid == 0:
             "all",
             "--debug-logging-file",
             log_path,
+            "-M",
+            "bash",
+            "-W",
             "-n",
             "-c",
             source,
@@ -107,7 +112,19 @@ printed_palette_is_applied = all(
         b"\x1b[1;35m&&\x1b[0m",
         b"\x1b[1;35m>\x1b[0m",
         b"\x1b[96m$SECOND_UNSET\x1b[0m",
+        b"\x1b[34mdiagnostic_missing_command\x1b[0m",
+        b"\x1b[34mech\x1b[0m",
     )
+)
+warning_header_is_bold = bool(
+    re.search(
+        rb"\x1b\[1m\d+:\d+:\x1b\[0m \x1b\[1;33mwarning\x1b\[0m: "
+        rb"\x1b\[1mA test reads an unquoted variable\.\x1b\[0m",
+        output,
+    )
+)
+caret_annotation_is_yellow = bool(
+    re.search(rb"\x1b\[33m\^~* here\.\x1b\[0m", output)
 )
 highlight_scan_is_bounded = 0 < highlight_bytes <= len(source_line.encode()) * 2 + 16
 lexical_scan_is_bounded = 0 < lexical_bytes <= len(source.encode()) + 16
@@ -117,6 +134,8 @@ passed = (
     and has_both_ellipses
     and caret_aligned
     and printed_palette_is_applied
+    and warning_header_is_bold
+    and caret_annotation_is_yellow
     and highlight_scan_is_bounded
     and lexical_scan_is_bounded
 )
@@ -126,6 +145,8 @@ print("WITHIN_WIDTH:", within_width)
 print("BOTH_ELLIPSES:", has_both_ellipses)
 print("CARET_ALIGNED:", caret_aligned)
 print("PRINTED_PALETTE_IS_APPLIED:", printed_palette_is_applied)
+print("WARNING_HEADER_IS_BOLD:", warning_header_is_bold)
+print("CARET_ANNOTATION_IS_YELLOW:", caret_annotation_is_yellow)
 print("HIGHLIGHT_SCAN_BOUNDED:", highlight_scan_is_bounded)
 print("LEXICAL_SCAN_BOUNDED:", lexical_scan_is_bounded)
 print("RESULT:", "PASS" if passed else "FAIL")

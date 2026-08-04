@@ -24,6 +24,7 @@ with tempfile.NamedTemporaryFile(delete=False) as source:
         b'finish() { :; }\r\n'
         b'finish\r\n'
         b'missing_command\r\n'
+        b'ech'
     )
     source_path = source.name
 
@@ -65,7 +66,11 @@ else:
     os.kill(pid, signal.SIGKILL)
     os.waitpid(pid, 0)
 os.unlink(source_path)
-function_is_resolved = b"\x1b[34mfinish\x1b[0m" in output
+command_forms_are_resolved = {
+    "function": b"\x1b[34mfinish\x1b[0m" in output,
+    "unknown": b"\x1b[34mmissing_command\x1b[0m" in output,
+    "partial": b"\x1b[34mech\x1b[0m" in output,
+}
 variable_forms_are_resolved = {
     "assignment": b"\x1b[96mRESOLVED_VARIABLE\x1b[0m" in output,
     "loop": b"\x1b[96mLOOP_VARIABLE\x1b[0m" in output,
@@ -86,13 +91,13 @@ has_no_underline = b"4:3" not in output
 passed = (
     child_exited_cleanly
     and b"\x1b[" in output
-    and function_is_resolved
+    and all(command_forms_are_resolved.values())
     and all(variable_forms_are_resolved.values())
     and all(syntax_forms_use_requested_palette.values())
     and has_no_underline
 )
 print("CHILD_EXITED_CLEANLY:", child_exited_cleanly)
-print("FUNCTION_RESOLVED:", function_is_resolved)
+print("COMMAND_FORMS_RESOLVED:", command_forms_are_resolved)
 print("VARIABLE_FORMS_RESOLVED:", variable_forms_are_resolved)
 print("SYNTAX_FORMS_USE_REQUESTED_PALETTE:", syntax_forms_use_requested_palette)
 print("NO_UNDERLINE:", has_no_underline)

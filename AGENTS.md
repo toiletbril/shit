@@ -265,9 +265,9 @@ substitutions in one pass. Strings and heredocs are bright green. Keywords and
 operators are bold magenta. Resolved commands are blue. Resolved variables and
 assignment names are bright cyan, and unfinished command prefixes are bright
 blue. Flags other than a lone dash are italic. A word beginning with
-two dashes stays a flag when it contains an equals sign. Unknown commands and
-invalid paths are bright red. Invalid syntax is bold bright red, and unset
-variables are non-bold bright red. A bright green curly underline is added to
+two dashes stays a flag when it contains an equals sign. Live unknown commands
+and invalid paths are bright red. Invalid syntax is bold bright red, and unset
+variables are non-bold bright red. A yellow curly underline is added to
 these roles when TERM names a terminal type with known support. Live globs are
 yellow. Existing paths are bright cyan, and a completable path tail is cyan.
 src/Toiletline.cpp bridges the editor to the
@@ -289,8 +289,9 @@ component is absolute, while a relative or empty component still invalidates
 it.
 
 The shitbox cat `--syntax-highlighting` flag uses the printed source theme when
-standard output is a terminal. This theme colors every variable reference as
-resolved. Shell extensions and known shell shebangs select the input. Syntax
+standard output is a terminal. This theme colors every variable reference and
+command word as resolved. Shell extensions and known shell shebangs select the
+input. Syntax
 highlighting is suppressed for files with null bytes and
 redirected output. Line numbering remains continuous across file and standard
 input boundaries. Noninteractive highlighting omits underline attributes.
@@ -308,10 +309,11 @@ substitution, and process substitution add their call sites to the trace. A
 trace frame is printed once while its source frame remains live. The
 `--no-traces` flag suppresses every
 source backtrace, including in a fresh executable-fallback evaluator. A printed
-frame begins with `trace:`. Only error
-labels, locations, and messages are bold. Warning labels are plain bright
-magenta, while warning messages use the default color. Note and trace labels and
-messages are plain cyan. The caret and its trailing text are bright green. A
+frame begins with `trace:`. Error and warning labels, locations, and messages
+are bold. Warning labels are yellow, while warning locations and messages use
+the default foreground. Note and trace labels and messages are plain cyan.
+Error carets and their trailing text are bold bright red. Warning, note, and
+trace carets and their trailing text are regular yellow. A
 located diagnostic syntax-highlights the complete source line on a terminal
 before clipping it. Display width and clipping consume borrowed source views.
 Cached highlight spans use heap storage and survive highlighter arena resets.
