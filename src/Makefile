@@ -240,7 +240,11 @@ CXXFLAGS += \
 	-U_FORTIFY_SOURCE \
 	-D_FORTIFY_SOURCE=2
 ifneq ($(TARGET), Windows_NT)
+ifneq ($(TARGET), Darwin)
 CXXFLAGS += -flto
+else ifeq ($(HOST_OS), Darwin)
+CXXFLAGS += -flto
+endif
 endif
 ifeq ($(TARGET), Linux)
 ifeq ($(LINUX_CROSS_COMPILATION), 1)
