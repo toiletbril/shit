@@ -1,6 +1,6 @@
 .TH SHIT 1 "2026-08-04" "shit" "User Commands"
 .SH NAME
-shit \- a POSIX- and Bash-compatible command shell
+shit \- a very fast and debuggable POSIX- and Bash-compatible command shell
 .SH SYNOPSIS
 .B shit
 .RI [ options ]
@@ -16,11 +16,17 @@ shit \- a POSIX- and Bash-compatible command shell
 .B \-s
 .RI [ argument ...]
 .PP
-.B shit
-is very fast and pedantic.
 .SH DESCRIPTION
 .B shit
-is a command shell with POSIX shell syntax and Bash-compatible extensions.
+is an interpreter, interactive shell and a diagnostic tool with full Bash and
+POSIX shell syntax and Bash-compatible extensions.
+.PP
+It aims to be a complete, faster and portable Bash-compatible shell replacement
+for systems, runners or development machines that can benefit from it's speed
+and pedantic diagnostics.
+.PP
+The shell gurantees first tier support for Linux, macOS and Windows,
+preserving equivalent behavior on either of these systems.
 .PP
 An interactive shell is started when standard input is a terminal and no
 .BR \-s ,
@@ -32,16 +38,13 @@ option supplies a command string. The
 option reads commands from standard input.
 .PP
 Shell source accepts LF and CRLF line endings. A CRLF pair is read as one
-newline. A lone carriage return remains part of the source text.
+newline. A single carriage return remains part of the source text.
 .PP
 The grammar is the same on every operating system. An unquoted backslash is an
 escape on Windows. A native Windows path therefore uses a quoted backslash, an
 escaped backslash, or a forward slash. After quote removal, Windows path
 operations accept both slash forms and recognize drive and UNC roots. POSIX
 path operations accept only a forward slash.
-.PP
-No configuration file is required. The static Linux release includes the
-shitbox utilities.
 .SH INVOCATION
 The input source is selected in this order. The
 .B \-s

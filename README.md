@@ -2,7 +2,7 @@
 
 [![Shit is at least 5 times faster than Bash](https://github.com/toiletbril/shit/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/shit/actions/workflows/ci.yml)
 
-Shit has been released! See the [Release 1.0 Blog Post](https://fennec.support/scribbles/shell-release)
+0.1.0 has been released! See the [Release Blog Post](https://fennec.support/scribbles/shell-release).
 
 ---
 
@@ -20,17 +20,24 @@ I invite you to notice the interactive prompt, the speed, and the diagnostics:
 
 ## What
 
-**Shit** is a cross-platform shell, with tier 1 support for Windows, Linux and
-macOS, fully compatible with Bash 5.3 and Dash. It usually runs at least 5
-times faster than Bash and is built to have the best UX possible.
+**Shit** is is an interpreter, interactive shell and diagnostic tool, with
+first tier support for Windows, Linux and macOS, fully compatible with Bash 5.3
+and Dash. It usually runs at least 5 times faster than Bash and is built to
+have the best UX possible.
+
+It aims to be a complete, faster and portable Bash-compatible shell replacement
+for systems, runners or development machines that can benefit from it's speed
+and pedantic diagnostics.
+
+The shell gurantees first tier support for Linux, macOS and Windows,
+preserving equivalent behavior on either of these systems.
 
 **Shit** is designed to work without absolutely no config whatsoever.
 **shit**'s Linux binary is static and it does not use C++'s STL. **shit** also
-can work without coreutils, using it's own utilities. You can copy **shit** to
-any arch-compatible machine and enjoy the shell.
+can work without coreutils, using it's own utilities.
 
 **The project is in early stage**. There's no gurantee that it will not blow
-you computer up upon the first start. Bug reports are greatly appreciated.
+you computer up. Bug reports are greatly appreciated.
 
 ## Three shells in a trenchcoat
 
