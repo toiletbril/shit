@@ -20,7 +20,7 @@ I invite you to notice the interactive prompt, the speed, and the diagnostics:
 
 ## What
 
-**Shit** is is an interpreter, interactive shell and diagnostic tool, with
+**Shit** is an interpreter, interactive shell and diagnostic tool, with
 first tier support for Windows, Linux and macOS, fully compatible with Bash 5.3
 and Dash. It usually runs at least 5 times faster than Bash and is built to
 have the best UX possible.
@@ -29,15 +29,15 @@ It aims to be a complete, faster and portable Bash-compatible shell replacement
 for systems, runners or development machines that can benefit from it's speed
 and pedantic diagnostics.
 
-The shell gurantees first tier support for Linux, macOS and Windows,
+The shell guarantees first tier support for Linux, macOS and Windows,
 preserving equivalent behavior on either of these systems.
 
 **Shit** is designed to work without absolutely no config whatsoever.
 **shit**'s Linux binary is static and it does not use C++'s STL. **shit** also
 can work without coreutils, using it's own utilities.
 
-**The project is in early stage**. There's no gurantee that it will not blow
-you computer up. Bug reports are greatly appreciated.
+**The project is in early stage**. There's no guarantee that it will not blow
+your computer up. Bug reports are greatly appreciated.
 
 ## Three shells in a trenchcoat
 
