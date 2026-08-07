@@ -39,7 +39,7 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
                             colors::ansi::RESET};
   }
   if (severity_word == StringView{"trace"}) {
-    return diagnostic_color{colors::ansi::BOLD_CYAN,
+    return diagnostic_color{colors::ansi::CYAN,
                             {},
                             colors::ansi::CYAN,
                             colors::ansi::CYAN,

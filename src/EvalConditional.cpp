@@ -335,6 +335,25 @@ struct conditional_evaluator
           }
           pos += 3;
           if (is_skipping) return false;
+
+          /* An unset variable in an integer or file comparison is the question
+             the test asks, so the unset-variable diagnostic stays quiet for
+             those operands. A string comparison (= == != =~) still warns. */
+          let const is_test_operand_op =
+              op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
+              op == "-gt" || op == "-ge" || op == "-ef" || op == "-nt" ||
+              op == "-ot";
+          let const saved_suppress_test_operand =
+              cxt.is_warning_suppressed(suppressible_warning::UnsetTestOperand);
+          if (is_test_operand_op)
+            cxt.set_warning_suppressed(suppressible_warning::UnsetTestOperand,
+                                       true);
+          defer
+          {
+            cxt.set_warning_suppressed(suppressible_warning::UnsetTestOperand,
+                                       saved_suppress_test_operand);
+          };
+
           const String left = operand_value(elements[pos - 3]);
           if (op == "==" || op == "=" || op == "!=") {
             let active = Bitset{cxt.scratch_allocator()};
@@ -481,19 +500,6 @@ fn EvalContext::evaluate_conditional(
     fail_conditional("The conditional expression is empty");
   LOG(Debug, "evaluating a [[ ]] conditional of %zu elements",
       elements.count());
-
-  /* bash does not nounset on any [[ ]] operand, so the unset-variable
-     diagnostic stays silent while the whole conditional expands. The -v test
-     sets the stronger UnsetReference suppression inside eval_primary; the
-     defer restores the prior value so a throw cannot strand it. */
-  let const saved_suppress_test_operand =
-      is_warning_suppressed(suppressible_warning::UnsetTestOperand);
-  set_warning_suppressed(suppressible_warning::UnsetTestOperand, true);
-  defer
-  {
-    set_warning_suppressed(suppressible_warning::UnsetTestOperand,
-                           saved_suppress_test_operand);
-  };
 
   let evaluator = conditional_evaluator{*this, elements};
   const bool is_conditional_true = evaluator.eval_or();
