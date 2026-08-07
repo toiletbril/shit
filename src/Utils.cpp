@@ -487,7 +487,14 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
     -> String
 {
   let result = String{heap_allocator()};
-  result.reserve(64);
+  usize total_length = 0;
+  for (usize i = 0; i < tokens.count(); i++) {
+    let const token = tokens[i];
+    ASSERT(token != nullptr);
+    total_length += token->raw_string().count();
+    if (i + 1 < tokens.count()) total_length++;
+  }
+  result.reserve(total_length);
   for (usize i = 0; i < tokens.count(); i++) {
     let const token = tokens[i];
     ASSERT(token != nullptr);
