@@ -3719,7 +3719,37 @@ fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void
   let const upstream_sha = read_git_ref_sha(git_dir, upstream.view());
   if (upstream_sha.is_empty()) return;
 
-  if (local_sha == upstream_sha) return;
+  /* The prompt reads SHIT_GIT_AHEAD and SHIT_GIT_BEHIND back to back, so the
+     pair is cached keyed on the git state to avoid the filesystem walk and
+     the subprocess pair running twice per prompt cycle. */
+  struct ahead_behind_cache
+  {
+    String branch{heap_allocator()};
+    String local_sha{heap_allocator()};
+    String upstream_sha{heap_allocator()};
+    i32 ahead_count{0};
+    i32 behind_count{0};
+  };
+  static ahead_behind_cache cached;
+  if (cached.branch == branch && cached.local_sha == local_sha &&
+      cached.upstream_sha == upstream_sha)
+  {
+    ahead_count = cached.ahead_count;
+    behind_count = cached.behind_count;
+    return;
+  }
+
+  ahead_count = 0;
+  behind_count = 0;
+
+  if (local_sha == upstream_sha) {
+    cached.branch = String{branch.view()};
+    cached.local_sha = String{local_sha.view()};
+    cached.upstream_sha = String{upstream_sha.view()};
+    cached.ahead_count = 0;
+    cached.behind_count = 0;
+    return;
+  }
 
   /* posix_spawn needs a full path, so resolve git via PATH. */
   let const path_env = os::get_environment_variable("PATH");
@@ -3768,10 +3798,11 @@ fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void
   if (behind_output.has_value())
     behind_count = parse_count(behind_output->view());
 
-  if (ahead_count == 0 && behind_count == 0) {
-    ahead_count = 0;
-    behind_count = 0;
-  }
+  cached.branch = String{branch.view()};
+  cached.local_sha = String{local_sha.view()};
+  cached.upstream_sha = String{upstream_sha.view()};
+  cached.ahead_count = ahead_count;
+  cached.behind_count = behind_count;
 }
 
 } /* namespace utils */
