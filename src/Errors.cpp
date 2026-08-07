@@ -149,7 +149,8 @@ cold static fn get_context_pointing_to(
 
   let generated_highlights = ArrayList<highlight_span>{heap_allocator()};
   const ArrayList<highlight_span> *source_highlights = &generated_highlights;
-  if (eval_context != nullptr && !color.reset.is_empty()) {
+  if (eval_context != nullptr && !color.reset.is_empty() &&
+      eval_context->shell_is_interactive()) {
     let *cache = eval_context->get_or_create_diagnostic_highlight_cache();
     source_highlights = cache->spans_for(source, line_position.line_start,
                                          line_position.line_end, *eval_context);
