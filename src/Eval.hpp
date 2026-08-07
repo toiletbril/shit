@@ -683,6 +683,16 @@ public:
     return m_shell_variables.find(name);
   }
 
+  hot fn arith_value_cache_find(StringView name) const wontthrow -> const i64 *
+  {
+    return m_arith_value_cache.find(name);
+  }
+
+  hot fn arith_value_cache_set(StringView name, i64 value) throws -> void
+  {
+    m_arith_value_cache.set(name, value);
+  }
+
   hot pure fn has_variable_name(StringView name) const wontthrow -> bool
   {
     return m_shell_variables.find(name) != nullptr ||
@@ -1693,6 +1703,11 @@ protected:
 
   mutable BumpArena m_scratch_arena{};
   StringMap<String> m_shell_variables{heap_allocator()};
+  /* The last-known integer value of a shell variable, so a tight arithmetic
+     loop that reads and writes the same counter skips the hash lookup and
+     string-to-int re-parse on every iteration. Invalidated by assign_variable
+     when the variable is written. */
+  StringMap<i64> m_arith_value_cache{heap_allocator()};
   StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   StringMap<completion_spec> m_completion_specs{heap_allocator()};
   Maybe<completion_spec> m_default_completion_spec{};

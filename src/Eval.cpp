@@ -106,6 +106,7 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
       static_cast<int>(name.length), name.data, value.length);
   if (name == "IFS") set_field_separators(value);
   if (name == "PATH") m_program_resolver.assign_path(String{value});
+  m_arith_value_cache.erase(name);
   m_shell_variables.set(name, value);
   if (m_exported_names.contains(name)) {
     if (m_subshell_depth > 0)
