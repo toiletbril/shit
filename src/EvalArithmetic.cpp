@@ -93,7 +93,7 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
   return static_cast<i64>(is_negative ? -magnitude : magnitude);
 }
 
-pure fn try_parse_single_integer_literal(StringView text) wontthrow
+pure alwaysinline fn try_parse_single_integer_literal(StringView text) wontthrow
     -> Maybe<i64>
 {
   usize i = 0;
