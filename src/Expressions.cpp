@@ -869,21 +869,19 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      guarded and its not-found diagnostic stays quiet. */
   if (name.has_value()) {
     let const is_command_test = name->view() == "command";
-    let const is_type_or_hash = name->view() == "type" || name->view() == "hash";
+    let const is_type_or_hash =
+        name->view() == "type" || name->view() == "hash";
     if (is_command_test || is_type_or_hash) {
       bool has_presence_flag = is_type_or_hash;
       for (usize i = 1; i < m_args.count(); i++) {
         let const arg = static_command_name(m_args[i]);
         if (!arg.has_value()) break;
-        if (is_command_test &&
-            (arg->view() == "-v" || arg->view() == "-V"))
-        {
+        if (is_command_test && (arg->view() == "-v" || arg->view() == "-V")) {
           has_presence_flag = true;
           continue;
         }
         if (arg->view().starts_with("-")) continue;
-        if (has_presence_flag)
-          actx.tested_command_names.add(arg->view());
+        if (has_presence_flag) actx.tested_command_names.add(arg->view());
       }
     }
   }

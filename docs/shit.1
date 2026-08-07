@@ -1206,7 +1206,13 @@ previous command status.
 These variables provide the pre-execution, primary, continuation, select, and
 xtrace prompts. PS0 defaults to empty. PS2 defaults to "> ". PS3 defaults to
 "#? ". PS4 defaults to "+ ". The first byte of PS4 is repeated once per
-enclosing subshell.
+enclosing subshell. The default PS1 shows the git branch, ahead and behind
+counts, user, host, and working directory, ending with a status-colored
+bullet that turns bold red on a non-zero exit. The backslash escapes \\u,
+\\h, \\H, \\w, \\W, \\P, \\g, \\$, \\?, \\j, \\D, \\., \\t, \\T, \\@, \\A,
+\\d, \\s, \\v, \\V, \\!, \\#, \\n, \\r, \\e, \\a, \\[, and \\] are expanded.
+The \\. escape emits a bullet, plain when the last exit status is zero and
+bold red when it is not.
 .TP
 .B BASH_XTRACEFD
 The value selects the xtrace descriptor. Standard error is used when it is unset
@@ -1231,6 +1237,14 @@ and build host distribution and kernel.
 The repository containing the working directory supplies the branch name. A
 detached head supplies a short commit hash. A directory outside a repository
 supplies an empty value. An assignment overrides detection.
+.TP
+.BR SHIT_GIT_AHEAD ", " SHIT_GIT_BEHIND
+The repository supplies the unpushed and unpulled commit counts for the current
+branch against its upstream. Both are empty outside a repository, with no
+upstream configured, or when the count is zero. The common up-to-date case is
+resolved from the filesystem without forking. A divergent branch forks
+.B git rev-list --count
+to count each direction.
 .TP
 .B SHIT_IDENTITY
 The read-only exported value is the lowercase CRC-32 identity of the running

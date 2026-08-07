@@ -1453,8 +1453,8 @@ fn main(int argc, char **argv) -> int
              span length must be the quoted token length, not the raw argument
              length, or it stops short of the closing quote. */
           const shit::SourceLocation operand_location{
-              operand_offset,
-              shit::shell_quoted_arg_length(file_name.view()), shit::None};
+              operand_offset, shit::shell_quoted_arg_length(file_name.view()),
+              shit::None};
           const shit::Path script_path{file_name.view()};
 
           if (script_path.is_directory()) {
@@ -1479,15 +1479,14 @@ fn main(int argc, char **argv) -> int
             let const message = "Could not open '" + file_name.view() +
                                 "': " + shit::os::last_system_error_message();
             if (hint.is_empty()) {
-              shit::show_message(shit::ErrorWithLocation{
-                  operand_location, message}
-                                     .to_string(context.cli_invocation().view(),
-                                                &context));
+              shit::show_message(
+                  shit::ErrorWithLocation{operand_location, message}.to_string(
+                      context.cli_invocation().view(), &context));
             } else {
-              shit::show_message(shit::ErrorWithLocationAndDetails{
-                  operand_location, message, hint.view()}
-                                     .to_string(context.cli_invocation().view(),
-                                                &context));
+              shit::show_message(
+                  shit::ErrorWithLocationAndDetails{operand_location, message,
+                                                    hint.view()}
+                      .to_string(context.cli_invocation().view(), &context));
             }
             shit::utils::quit(127, shit::utils::farewell_policy::Goodbye);
           }

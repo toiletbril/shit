@@ -332,6 +332,14 @@ SHIT_IDENTITY is a read-only exported dynamic variable. Its lowercase CRC-32
 value is computed once on first read or before a child starts. An inherited
 value is removed before evaluation begins.
 
+SHIT_GIT_BRANCH, SHIT_GIT_AHEAD, and SHIT_GIT_BEHIND are always-dynamic
+variables. SHIT_GIT_BRANCH reads the branch name from .git/HEAD. SHIT_GIT_AHEAD
+and SHIT_GIT_BEHIND read the local and upstream SHAs from the filesystem and
+fork git rev-list --count only when the SHAs diverge. Both are empty outside a
+repository, with no upstream, or when the count is zero. The ahead/behind pair
+is cached keyed on branch and both SHAs so a single prompt cycle computes it
+once.
+
 The shitbox cat highlighter selects recognized shell extensions and shebangs.
 It is suppressed for null bytes and redirected output. Line numbering remains
 continuous across file and standard input boundaries. Highlighting emits no

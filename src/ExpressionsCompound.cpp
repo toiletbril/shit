@@ -787,7 +787,7 @@ cold fn IfClause::analyze(AnalysisContext &actx,
      bodies are conditional. */
   let is_first_branch = true;
   for (usize i = 0; i < m_branches.count(); i++) {
-    let const &[condition, body] = m_branches[i];
+    let const & [ condition, body ] = m_branches[i];
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
 
