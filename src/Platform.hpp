@@ -432,6 +432,10 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>;
 
 fn current_executable_path() wontthrow -> Maybe<String>;
 
+/* Continues the running CRC-32C value over the bytes. The caller seeds the
+   initial crc with 0xFFFFFFFF and applies a final bitwise not. */
+fn crc32c_update(u32 crc, const void *data, usize length) wontthrow -> u32;
+
 /* The mode carries the type and permission bits in the POSIX st_mode layout. */
 struct file_status
 {

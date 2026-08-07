@@ -466,6 +466,10 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   }
   if (!can_evaluate_in_process) {
     LOG(Debug, "running the captured substitution in a child process");
+    /* Materialize the identity in this parent before forking, so the child
+       inherits the already-published SHIT_IDENTITY and the cached global
+       instead of re-hashing the executable on every substitution. */
+    unused(materialize_shit_identity());
     let const pipe = os::make_pipe();
     if (!pipe)
       throw ErrorWithLocation{previous_location,

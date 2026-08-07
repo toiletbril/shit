@@ -1722,8 +1722,6 @@ protected:
 
   String m_shell_name{heap_allocator()};
   String m_shell_executable_path{heap_allocator()};
-  mutable Maybe<String> m_shit_identity{};
-  mutable bool m_shit_identity_was_attempted{false};
   String m_last_argument{heap_allocator()};
   String m_execution_string{heap_allocator()};
   bool m_has_execution_string{false};

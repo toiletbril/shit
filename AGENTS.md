@@ -328,7 +328,7 @@ upload may remain.
 
 `scripts/shit-scp` is a compatibility wrapper for assimilate.
 
-SHIT_IDENTITY is a read-only exported dynamic variable. Its lowercase SHA-256
+SHIT_IDENTITY is a read-only exported dynamic variable. Its lowercase CRC-32
 value is computed once on first read or before a child starts. An inherited
 value is removed before evaluation begins.
 

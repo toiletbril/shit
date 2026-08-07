@@ -16,138 +16,6 @@ namespace shit {
 
 namespace utils {
 
-namespace {
-
-struct sha256_state
-{
-  u32 words[8]{0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-               0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-  u64 byte_count{0};
-  u8 block[64]{};
-  usize block_length{0};
-};
-
-constexpr u32 SHA256_CONSTANTS[64] = {
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
-    0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
-    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
-    0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
-    0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
-    0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
-    0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
-
-pure alwaysinline fn rotate_right(u32 value, u32 count) wontthrow -> u32
-{
-  return (value >> count) | (value << (32 - count));
-}
-
-fn transform_sha256(sha256_state &state) wontthrow -> void
-{
-  u32 schedule[64];
-  for (usize position = 0; position < 16; position++) {
-    let const offset = position * 4;
-    schedule[position] = static_cast<u32>(state.block[offset]) << 24 |
-                         static_cast<u32>(state.block[offset + 1]) << 16 |
-                         static_cast<u32>(state.block[offset + 2]) << 8 |
-                         static_cast<u32>(state.block[offset + 3]);
-  }
-  for (usize position = 16; position < 64; position++) {
-    let const previous = schedule[position - 15];
-    let const before_previous = schedule[position - 2];
-    let const first = rotate_right(previous, 7) ^ rotate_right(previous, 18) ^
-                      (previous >> 3);
-    let const second = rotate_right(before_previous, 17) ^
-                       rotate_right(before_previous, 19) ^
-                       (before_previous >> 10);
-    schedule[position] =
-        schedule[position - 16] + first + schedule[position - 7] + second;
-  }
-
-  u32 first = state.words[0];
-  u32 second = state.words[1];
-  u32 third = state.words[2];
-  u32 fourth = state.words[3];
-  u32 fifth = state.words[4];
-  u32 sixth = state.words[5];
-  u32 seventh = state.words[6];
-  u32 eighth = state.words[7];
-  for (usize position = 0; position < 64; position++) {
-    let const fifth_mix = rotate_right(fifth, 6) ^ rotate_right(fifth, 11) ^
-                          rotate_right(fifth, 25);
-    let const choice = (fifth & sixth) ^ (~fifth & seventh);
-    let const temporary_first = eighth + fifth_mix + choice +
-                                SHA256_CONSTANTS[position] + schedule[position];
-    let const first_mix = rotate_right(first, 2) ^ rotate_right(first, 13) ^
-                          rotate_right(first, 22);
-    let const majority = (first & second) ^ (first & third) ^ (second & third);
-    let const temporary_second = first_mix + majority;
-    eighth = seventh;
-    seventh = sixth;
-    sixth = fifth;
-    fifth = fourth + temporary_first;
-    fourth = third;
-    third = second;
-    second = first;
-    first = temporary_first + temporary_second;
-  }
-
-  state.words[0] += first;
-  state.words[1] += second;
-  state.words[2] += third;
-  state.words[3] += fourth;
-  state.words[4] += fifth;
-  state.words[5] += sixth;
-  state.words[6] += seventh;
-  state.words[7] += eighth;
-}
-
-fn update_sha256(sha256_state &state, const u8 *data, usize length) wontthrow
-    -> void
-{
-  state.byte_count += length;
-  for (usize position = 0; position < length; position++) {
-    state.block[state.block_length++] = data[position];
-    if (state.block_length == sizeof(state.block)) {
-      transform_sha256(state);
-      state.block_length = 0;
-    }
-  }
-}
-
-fn finish_sha256(sha256_state &state, Allocator allocator) throws -> String
-{
-  let const bit_count = state.byte_count * 8;
-  state.block[state.block_length++] = 0x80;
-  if (state.block_length > 56) {
-    while (state.block_length < sizeof(state.block))
-      state.block[state.block_length++] = 0;
-    transform_sha256(state);
-    state.block_length = 0;
-  }
-  while (state.block_length < 56)
-    state.block[state.block_length++] = 0;
-  for (usize position = 0; position < 8; position++)
-    state.block[63 - position] = static_cast<u8>(bit_count >> (position * 8));
-  transform_sha256(state);
-
-  constexpr char HEX_DIGITS[] = "0123456789abcdef";
-  let digest = String{allocator};
-  digest.reserve(64);
-  for (u32 word : state.words) {
-    for (usize position = 0; position < 8; position++) {
-      let const shift = static_cast<u32>((7 - position) * 4);
-      digest.push(HEX_DIGITS[(word >> shift) & 0xf]);
-    }
-  }
-  return digest;
-}
-
-} // namespace
-
 static fn shell_word_expansion_end(StringView word,
                                    usize expansion_start) wontthrow -> usize
 {
@@ -560,17 +428,59 @@ fn file_content_identity(const Path &path, Allocator allocator) throws
   if (!file.has_value()) return None;
   defer { os::close_fd(*file); };
 
-  sha256_state digest;
+  u32 crc = 0xFFFFFFFF;
   char buffer[65536];
   loop
   {
     let const read_count = os::read_fd(*file, buffer, sizeof(buffer));
     if (!read_count.has_value()) return None;
     if (*read_count == 0) break;
-    update_sha256(digest, reinterpret_cast<const u8 *>(buffer), *read_count);
+    crc = os::crc32c_update(crc, buffer, *read_count);
   }
 
-  return finish_sha256(digest, allocator);
+  crc = ~crc;
+  constexpr char HEX_DIGITS[] = "0123456789abcdef";
+  let digest = String{allocator};
+  digest.reserve(8);
+  for (usize position = 0; position < 8; position++) {
+    let const shift = static_cast<u32>((7 - position) * 4);
+    digest.push(HEX_DIGITS[(crc >> shift) & 0xf]);
+  }
+  return digest;
+}
+
+namespace {
+
+fn compute_shit_identity(StringView fallback_path) throws -> Maybe<String>
+{
+  if (let const executable = os::current_executable_path();
+      executable.has_value())
+  {
+    let const identity =
+        file_content_identity(Path{executable->view()}, heap_allocator());
+    if (identity.has_value()) {
+      os::set_environment_variable("SHIT_IDENTITY", identity->view());
+      return identity;
+    }
+  }
+  let const identity =
+      file_content_identity(Path{fallback_path}, heap_allocator());
+  if (identity.has_value())
+    os::set_environment_variable("SHIT_IDENTITY", identity->view());
+  return identity;
+}
+
+} /* namespace */
+
+fn shit_identity(StringView fallback_path) throws -> Maybe<StringView>
+{
+  /* The identity is a process constant, so a magic static computes it exactly
+     once and publishes it into the environment. A forked substitution child
+     inherits both the initialized static and the exported variable, so it never
+     re-hashes the executable. */
+  static const Maybe<String> cached = compute_shit_identity(fallback_path);
+  if (cached.has_value()) return cached->view();
+  return None;
 }
 
 fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws

@@ -233,6 +233,8 @@ pure fn debug_program_path_candidate_count() wontthrow -> usize;
 fn file_content_identity(const Path &path, Allocator allocator) throws
     -> Maybe<String>;
 
+fn shit_identity(StringView fallback_path) throws -> Maybe<StringView>;
+
 /* glob_active reads which bytes act as metacharacters. With extglob set the
    bash extended-glob groups ?(..), *(..), +(..), @(..), and !(..) are
    recognized, otherwise they are plain bytes. */

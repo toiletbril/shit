@@ -22,7 +22,7 @@ validate_identity()
         cd "$IDENTITY_TEST_DIRECTORY" || exit 1
         case $SHIT_IDENTITY in
             *[!0-9a-f]*|"") exit 1 ;;
-            *) [ "${#SHIT_IDENTITY}" -eq 64 ] ;;
+            *) [ "${#SHIT_IDENTITY}" -eq 8 ] ;;
         esac
     '
 }
@@ -38,7 +38,7 @@ SHIT_IDENTITY=forged "$BIN" -c '
     identity=$SHIT_IDENTITY
     case $identity in
         *[!0-9a-f]*|"") valid=0 ;;
-        *) [ "${#identity}" -eq 64 ] && valid=1 || valid=0 ;;
+        *) [ "${#identity}" -eq 8 ] && valid=1 || valid=0 ;;
     esac
     shitbox env > "$IDENTITY_TEST_DIRECTORY/environment-output"
     exported_line=$(shitbox grep "SHIT_IDENTITY=$identity" \

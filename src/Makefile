@@ -448,6 +448,7 @@ clean:
 	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
 	rm -rf ../shit.com ../shit-cosmo.com ../shit.com.dbg ../shit-cosmo.com.dbg ../shit.aarch64.elf ../shit-cosmo.aarch64.elf # Cosmopolitan
 	rm -rf ../perf*
+	rm -rf ../zig-out
 	rm -rf ../*.profraw ../*.profdata ../coverage # Coverage
 
 .PHONY: dirs shit install uninstall tidy fmt clean
