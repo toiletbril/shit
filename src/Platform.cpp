@@ -43,8 +43,9 @@ namespace os {
 namespace {
 
 #if defined __x86_64__ && !defined __COSMOPOLITAN__
-[[gnu::target("sse4.2")]] pure fn
-crc32c_update_sse42(u32 crc, const u8 *data, usize length) wontthrow -> u32
+[[gnu::target("sse4.2")]] pure fn crc32c_update_sse42(u32 crc, const u8 *data,
+                                                      usize length) wontthrow
+    -> u32
 {
   while (length >= 8) {
     u64 word;
@@ -60,8 +61,9 @@ crc32c_update_sse42(u32 crc, const u8 *data, usize length) wontthrow -> u32
 #endif
 
 #if defined __aarch64__ || defined __arm64__
-[[gnu::target("+crc")]] pure fn
-crc32c_update_acle(u32 crc, const u8 *data, usize length) wontthrow -> u32
+[[gnu::target("+crc")]] pure fn crc32c_update_acle(u32 crc, const u8 *data,
+                                                   usize length) wontthrow
+    -> u32
 {
   while (length >= 8) {
     u64 word;

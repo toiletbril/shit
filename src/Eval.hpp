@@ -1703,10 +1703,6 @@ protected:
 
   mutable BumpArena m_scratch_arena{};
   StringMap<String> m_shell_variables{heap_allocator()};
-  /* The last-known integer value of a shell variable, so a tight arithmetic
-     loop that reads and writes the same counter skips the hash lookup and
-     string-to-int re-parse on every iteration. Invalidated by assign_variable
-     when the variable is written. */
   StringMap<i64> m_arith_value_cache{heap_allocator()};
   StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   StringMap<completion_spec> m_completion_specs{heap_allocator()};

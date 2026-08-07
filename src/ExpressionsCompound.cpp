@@ -792,8 +792,6 @@ cold fn IfClause::analyze(AnalysisContext &actx,
     ASSERT(body != nullptr);
 
     condition->analyze(actx, is_unconditional && is_first_branch);
-    /* A folded branch that is not the taken one is dead code, so the
-       unresolved-command diagnostic stays quiet inside it. */
     let const is_dead_branch =
         has_folded_branch() && folded_branch_index() != i;
     let const was_silenced = actx.should_silence_unresolved_commands;
@@ -972,8 +970,6 @@ cold fn WhileLoop::analyze(AnalysisContext &actx,
 
   m_condition->analyze(actx, is_unconditional);
 
-  /* A loop folded to skip runs its body zero times, so the unresolved-command
-     diagnostic stays quiet inside it. */
   let const was_silenced = actx.should_silence_unresolved_commands;
   if (is_folded_to_skip()) actx.should_silence_unresolved_commands = true;
   m_body->analyze(actx, false);

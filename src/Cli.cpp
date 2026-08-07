@@ -636,7 +636,7 @@ cold fn short_version_string(Allocator allocator) throws -> String
   append_version_triple(s, allocator);
   s += '-';
   s += SHIT_BUILD_MODE;
-  s += '-';
+  s += '+';
   s += StringView{SHIT_COMMIT_HASH}.substring_of_length(0, 7);
 
   return s;

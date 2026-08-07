@@ -336,9 +336,6 @@ struct conditional_evaluator
           pos += 3;
           if (is_skipping) return false;
 
-          /* An unset variable in an integer or file comparison is the question
-             the test asks, so the unset-variable diagnostic stays quiet for
-             those operands. A string comparison (= == != =~) still warns. */
           let const is_test_operand_op =
               op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
               op == "-gt" || op == "-ge" || op == "-ef" || op == "-nt" ||

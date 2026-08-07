@@ -474,10 +474,6 @@ fn compute_shit_identity(StringView fallback_path) throws -> Maybe<String>
 
 fn shit_identity(StringView fallback_path) throws -> Maybe<StringView>
 {
-  /* The identity is a process constant, so a magic static computes it exactly
-     once and publishes it into the environment. A forked substitution child
-     inherits both the initialized static and the exported variable, so it never
-     re-hashes the executable. */
   static const Maybe<String> cached = compute_shit_identity(fallback_path);
   if (cached.has_value()) return cached->view();
   return None;
@@ -1298,7 +1294,6 @@ public:
     m_source_length = source.count();
     m_newline_offsets.clear();
 
-    /* Use find_character (memchr/SIMD) instead of a byte-by-byte scan. */
     usize scan_position = 0;
     while (scan_position < source.count()) {
       let const remaining = source.substring(scan_position);
@@ -3738,9 +3733,6 @@ fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void
   let const upstream_sha = read_git_ref_sha(git_dir, upstream.view());
   if (upstream_sha.is_empty()) return;
 
-  /* The prompt reads SHIT_GIT_AHEAD and SHIT_GIT_BEHIND back to back, so the
-     pair is cached keyed on the git state to avoid the filesystem walk and
-     the subprocess pair running twice per prompt cycle. */
   struct ahead_behind_cache
   {
     String branch{heap_allocator()};
@@ -3770,7 +3762,6 @@ fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void
     return;
   }
 
-  /* posix_spawn needs a full path, so resolve git via PATH. */
   let const path_env = os::get_environment_variable("PATH");
   if (!path_env.has_value()) return;
   let path_resolver = ProgramResolver{*path_env};

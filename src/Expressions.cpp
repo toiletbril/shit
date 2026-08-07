@@ -864,9 +864,6 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   ASSERT(m_args[0] != nullptr);
   let const name = static_command_name(m_args[0]);
 
-  /* A command -v, type, or hash call tests whether a name resolves. The tested
-     names are recorded so a later call to the same name is recognized as
-     guarded and its not-found diagnostic stays quiet. */
   if (name.has_value()) {
     let const is_command_test = name->view() == "command";
     let const is_type_or_hash =

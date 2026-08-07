@@ -65,9 +65,6 @@ public:
      double the report. A script run keeps the check. */
   bool should_silence_unresolved_commands{false};
 
-  /* Names tested by command -v, type, or hash during the preorder analyze
-     walk. A later call to the same name is guarded by that test, so the
-     not-found diagnostic stays quiet for it. */
   HashSet tested_command_names{heap_allocator()};
 
   bool should_trace_optimizer{false};

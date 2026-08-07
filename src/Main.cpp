@@ -1449,9 +1449,6 @@ fn main(int argc, char **argv) -> int
           const shit::String &file_name = file_names[0];
           const usize operand_offset = shit::quoted_argv_offset_until(
               parse_argc, parse_argv, file_name.view());
-          /* The caret renders against the shell-quoted cli_invocation, so the
-             span length must be the quoted token length, not the raw argument
-             length, or it stops short of the closing quote. */
           const shit::SourceLocation operand_location{
               operand_offset, shit::shell_quoted_arg_length(file_name.view()),
               shit::None};
@@ -1469,8 +1466,6 @@ fn main(int argc, char **argv) -> int
           LOG(Info, "reading the script file '%s'", file_name.c_str());
           shit::Maybe<shit::String> contents = script_path.read_entire_file();
           if (!contents) {
-            /* An operand with no slash that does not exist as a file is most
-               likely a command string the user forgot to pass -c. */
             let const looks_like_command =
                 !file_name.view().find_character('/').has_value();
             let hint = shit::String{shit::heap_allocator()};
