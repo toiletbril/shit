@@ -1,0 +1,318 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== command -v guard:"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "command" "-v" "nonexistent-tool-xyz"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "tool is required"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== command -v if/then/else:"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "command" "-v" "nonexistent-tool-xyz"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "nonexistent-tool-xyz" "run"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "tool not installed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== type guard:"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "type" "nonexistent-tool-abc"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "need abc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== hash guard:"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "hash" "nonexistent-tool-def"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "need def"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== dead branch if false:"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "start"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "totally-nonexistent-command"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "end"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== unguarded still errors:"]
+  [CompoundListCondition, None]
+    [SimpleCommand "totally-nonexistent-command"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== command -v guard:"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "nonexistent-tool-xyz"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tool is required"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== command -v if/then/else:"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "nonexistent-tool-xyz"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "nonexistent-tool-xyz"
+]
+[Word
+  Unquoted "run"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tool not installed"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== type guard:"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "nonexistent-tool-abc"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "need abc"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== hash guard:"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "hash"
+]
+[Word
+  Unquoted "nonexistent-tool-def"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "need def"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== dead branch if false:"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "start"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "totally-nonexistent-command"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "end"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== unguarded still errors:"
+]
+[Word
+  Unquoted "totally-nonexistent-command"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+shit: 19:1: error: Command 'totally-nonexistent-command' was not found.
+    19 |  totally-nonexistent-command
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Code 1]

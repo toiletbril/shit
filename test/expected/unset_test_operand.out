@@ -1,0 +1,235 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== [ -z unset ]:"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-z" "$UNSET_VAR" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "exit=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== [ -n unset ]:"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-n" "$UNSET_VAR" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "exit=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== [[ -z unset ]]:"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "exit=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== [[ unset -ne 0 ]]:"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "exit=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== [ unset -ne 0 ] (builtin, integer expected):"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$UNSET_VAR" "-ne" "0" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "exit=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== set -u aborts a bare reference:"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "set" "-u"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$UNSET_VAR"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== [ -z unset ]:"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  Variable "UNSET_VAR"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "exit="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== [ -n unset ]:"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "UNSET_VAR"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "exit="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== [[ -z unset ]]:"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  Variable "UNSET_VAR"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "exit="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== [[ unset -ne 0 ]]:"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "UNSET_VAR"
+]
+[Word
+  Unquoted "-ne"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "exit="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== [ unset -ne 0 ] (builtin, integer expected):"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "UNSET_VAR"
+]
+[Word
+  Unquoted "-ne"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "exit="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== set -u aborts a bare reference:"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "UNSET_VAR"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+== [ -z unset ]:
+exit=0
+== [ -n unset ]:
+exit=1
+== [[ -z unset ]]:
+exit=0
+== [[ unset -ne 0 ]]:
+exit=1
+== [ unset -ne 0 ] (builtin, integer expected):
+shit: 11:5: error: Builtin `[`: Cannot compare with '-ne', '' is not an integer.
+    11 |  ( [ "$UNSET_VAR" -ne 0 ] ) 2>&1; echo "exit=$?"
+       |      ^~~~~~~~~~~~
+exit=1
+== set -u aborts a bare reference:
+shit: 13:17: error: Unable to expand 'UNSET_VAR' because the parameter is not set.
+    13 |  ( set -u; echo "$UNSET_VAR" ) 2>&1
+       |                  ^~~~~~~~~~
+note: Replace it with ${UNSET_VAR-} if empty expansion is desired.
+rc=2
+[Code 0]
