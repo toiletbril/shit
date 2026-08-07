@@ -44,7 +44,7 @@
 
 #define SHIT_VER_MAJOR 0
 #define SHIT_VER_MINOR 1
-#define SHIT_VER_PATCH 0
+#define SHIT_VER_PATCH 1
 #define SHIT_VER_EXTRA "prod"
 
 #define SHIT_STRINGIFY_INNER(x) #x
