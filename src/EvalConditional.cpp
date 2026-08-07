@@ -481,6 +481,20 @@ fn EvalContext::evaluate_conditional(
     fail_conditional("The conditional expression is empty");
   LOG(Debug, "evaluating a [[ ]] conditional of %zu elements",
       elements.count());
+
+  /* bash does not nounset on any [[ ]] operand, so the unset-variable
+     diagnostic stays silent while the whole conditional expands. The -v test
+     sets the stronger UnsetReference suppression inside eval_primary; the
+     defer restores the prior value so a throw cannot strand it. */
+  let const saved_suppress_test_operand =
+      is_warning_suppressed(suppressible_warning::UnsetTestOperand);
+  set_warning_suppressed(suppressible_warning::UnsetTestOperand, true);
+  defer
+  {
+    set_warning_suppressed(suppressible_warning::UnsetTestOperand,
+                           saved_suppress_test_operand);
+  };
+
   let evaluator = conditional_evaluator{*this, elements};
   const bool is_conditional_true = evaluator.eval_or();
   if (!evaluator.at_end()) {

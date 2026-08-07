@@ -485,7 +485,12 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   let const empty_expansion_note =
       "Replace it with ${" + String{name} + "-} if empty expansion is desired";
 
-  if (error_unset() && (m_runtime.error_unset_explicit || !warnings_enabled()))
+  /* An unset variable in a test operand is the question the command asks, so
+     the fatal stays quiet for it. An explicit set -u still aborts because
+     error_unset_explicit overrides the suppression. */
+  if (error_unset() &&
+      (m_runtime.error_unset_explicit || !warnings_enabled()) &&
+      !is_warning_suppressed(suppressible_warning::UnsetTestOperand))
   {
     let const message = "Unable to expand '" + String{name} +
                         "' because the parameter is not set";
