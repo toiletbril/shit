@@ -183,6 +183,25 @@ fn suggest_directory_entry(const Path &directory, StringView name) throws
    repository. A detached HEAD reads as the short commit hash. */
 fn current_git_branch() throws -> String;
 
+/* Resolves the .git directory by walking up from the working directory. Empty
+   path outside a repository. */
+fn resolve_git_directory() throws -> Path;
+
+/* Reads the SHA a ref points at from the loose ref file or packed-refs. Empty
+   if the ref is absent. */
+fn read_git_ref_sha(const Path &git_dir, StringView ref_name) throws -> String;
+
+/* Parses .git/config for the upstream tracking ref of a branch. Empty if no
+   upstream is configured. */
+fn git_upstream_ref(const Path &git_dir, StringView branch_name) throws
+    -> String;
+
+/* The unpushed and unpulled commit counts for the current branch. Both are
+   empty outside a repository, when the branch has no upstream, or when the
+   counts are zero. A nonzero count forks git rev-list only when the local and
+   upstream SHAs actually diverge. */
+fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void;
+
 fn read_entire_standard_input() throws -> String;
 
 /* Returns None at end of input with no bytes read. The delimiter defaults to a

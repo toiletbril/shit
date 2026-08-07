@@ -3522,16 +3522,13 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
   return line;
 }
 
-fn current_git_branch() throws -> String
+fn resolve_git_directory() throws -> Path
 {
   let dir = Path::current_directory();
   loop
   {
     let head = dir.clone();
     head.push_component(".git");
-    /* A linked worktree or a submodule stores .git as a file holding a
-       'gitdir: <path>' pointer rather than a directory, so the real git dir is
-       followed before reading HEAD. */
     let git_dir = head.clone();
     if (let const dot_git = head.read_entire_file()) {
       let const pointer = dot_git->view();
@@ -3544,8 +3541,6 @@ fn current_git_branch() throws -> String
           line = line.substring_of_length(0, line.length - 1);
         }
         let resolved_gitdir = Path{line};
-        /* A relative gitdir pointer is relative to the directory holding the
-           .git file, not the current directory. */
         if (!resolved_gitdir.is_absolute()) {
           resolved_gitdir = dir;
           resolved_gitdir.push_component(line);
@@ -3553,28 +3548,230 @@ fn current_git_branch() throws -> String
         git_dir = steal(resolved_gitdir);
       }
     }
-    let git_head = git_dir.clone();
-    git_head.push_component("HEAD");
-    if (let const content = git_head.read_entire_file()) {
-      let text = content->view();
-      while (!text.is_empty() &&
-             (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))
-      {
-        text = text.substring_of_length(0, text.length - 1);
-      }
-      let const ref_prefix = StringView{"ref: refs/heads/"};
-      if (text.starts_with(ref_prefix))
-        return String{text.substring(ref_prefix.length)};
-      return String{
-          text.substring_of_length(0, text.length < 7 ? text.length : 7)};
-    }
+    if (git_dir.is_directory()) return git_dir;
+
     let parent = dir.clone();
     parent.push_component("..");
     let normalized = parent.to_absolute().normalized();
     if (normalized.text() == dir.text()) break;
     dir = steal(normalized);
   }
+  return Path{StringView{}};
+}
+
+fn current_git_branch() throws -> String
+{
+  let const git_dir = resolve_git_directory();
+  if (git_dir.text().is_empty()) return String{heap_allocator()};
+
+  let git_head = git_dir.clone();
+  git_head.push_component("HEAD");
+  if (let const content = git_head.read_entire_file()) {
+    let text = content->view();
+    while (!text.is_empty() &&
+           (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))
+    {
+      text = text.substring_of_length(0, text.length - 1);
+    }
+    let const ref_prefix = StringView{"ref: refs/heads/"};
+    if (text.starts_with(ref_prefix))
+      return String{text.substring(ref_prefix.length)};
+    return String{
+        text.substring_of_length(0, text.length < 7 ? text.length : 7)};
+  }
   return String{heap_allocator()};
+}
+
+fn read_git_ref_sha(const Path &git_dir, StringView ref_name) throws -> String
+{
+  let ref_path = git_dir.clone();
+  ref_path.push_component(ref_name);
+  if (let const content = ref_path.read_entire_file()) {
+    let text = content->view();
+    while (!text.is_empty() &&
+           (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))
+    {
+      text = text.substring_of_length(0, text.length - 1);
+    }
+    if (!text.is_empty()) return String{text};
+  }
+
+  let packed_path = git_dir.clone();
+  packed_path.push_component("packed-refs");
+  if (let const packed = packed_path.read_entire_file()) {
+    let search_prefix = String{heap_allocator()};
+    search_prefix += ref_name;
+    search_prefix += ' ';
+    let remainder = packed->view();
+    while (!remainder.is_empty()) {
+      let const newline_pos = remainder.find_character('\n');
+      let const line = newline_pos.has_value()
+                           ? remainder.substring_of_length(0, *newline_pos)
+                           : remainder;
+      if (line.starts_with(search_prefix.view())) {
+        let sha = line.substring(search_prefix.count());
+        return String{sha};
+      }
+      if (!newline_pos.has_value()) break;
+      remainder = remainder.substring(*newline_pos + 1);
+    }
+  }
+  return String{heap_allocator()};
+}
+
+fn git_upstream_ref(const Path &git_dir, StringView branch_name) throws
+    -> String
+{
+  let config_path = git_dir.clone();
+  config_path.push_component("config");
+  if (!config_path.exists()) return String{heap_allocator()};
+
+  let const content = config_path.read_entire_file();
+  if (!content.has_value()) return String{heap_allocator()};
+
+  let const section_header =
+      StringView{"[branch \""} + branch_name + StringView{"\"]"};
+  let remote_name = String{heap_allocator()};
+  let merge_ref = String{heap_allocator()};
+  let in_section = false;
+
+  let remainder = content->view();
+  while (!remainder.is_empty()) {
+    let const newline_pos = remainder.find_character('\n');
+    let line = newline_pos.has_value()
+                   ? remainder.substring_of_length(0, *newline_pos)
+                   : remainder;
+
+    while (!line.is_empty() && (line[0] == ' ' || line[0] == '\t'))
+      line = line.substring(1);
+    while (!line.is_empty() &&
+           (line[line.length - 1] == ' ' || line[line.length - 1] == '\r'))
+    {
+      line = line.substring_of_length(0, line.length - 1);
+    }
+
+    if (line.starts_with("[")) {
+      in_section = line == section_header;
+    } else if (in_section) {
+      let const eq_pos = line.find_character('=');
+      if (!eq_pos.has_value()) {
+        if (!newline_pos.has_value()) break;
+        remainder = remainder.substring(*newline_pos + 1);
+        continue;
+      }
+      let key = line.substring_of_length(0, *eq_pos);
+      while (!key.is_empty() && key[key.length - 1] == ' ')
+        key = key.substring_of_length(0, key.length - 1);
+      let value = line.substring(*eq_pos + 1);
+      while (!value.is_empty() && (value[0] == ' ' || value[0] == '\t'))
+        value = value.substring(1);
+
+      if (key == "remote") remote_name = String{value};
+      if (key == "merge") merge_ref = String{value};
+    }
+
+    if (!newline_pos.has_value()) break;
+    remainder = remainder.substring(*newline_pos + 1);
+  }
+
+  if (remote_name.is_empty() || merge_ref.is_empty())
+    return String{heap_allocator()};
+
+  let const refs_prefix = StringView{"refs/"};
+  let const remotes_prefix = StringView{"refs/remotes/"};
+  if (merge_ref.starts_with(refs_prefix)) {
+    let short_ref = merge_ref.view().substring(refs_prefix.length);
+    if (short_ref.starts_with("heads/")) short_ref = short_ref.substring(6);
+    let result = String{heap_allocator()};
+    result += "refs/remotes/";
+    result += remote_name.view();
+    result += "/";
+    result += short_ref;
+    return result;
+  }
+
+  let result = String{heap_allocator()};
+  result += "refs/remotes/";
+  result += remote_name.view();
+  result += "/";
+  result += merge_ref.view();
+  return result;
+}
+
+fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void
+{
+  ahead_count = 0;
+  behind_count = 0;
+
+  let const git_dir = resolve_git_directory();
+  if (git_dir.text().is_empty()) return;
+
+  let const branch = current_git_branch();
+  if (branch.is_empty()) return;
+
+  let const local_ref = StringView{"refs/heads/"} + branch.view();
+  let const local_sha = read_git_ref_sha(git_dir, local_ref.view());
+  if (local_sha.is_empty()) return;
+
+  let const upstream = git_upstream_ref(git_dir, branch.view());
+  if (upstream.is_empty()) return;
+
+  let const upstream_sha = read_git_ref_sha(git_dir, upstream.view());
+  if (upstream_sha.is_empty()) return;
+
+  if (local_sha == upstream_sha) return;
+
+  /* posix_spawn needs a full path, so resolve git via PATH. */
+  let const path_env = os::get_environment_variable("PATH");
+  if (!path_env.has_value()) return;
+  let path_resolver = ProgramResolver{*path_env};
+  let const git_results =
+      path_resolver.search("git", ProgramResolver::SearchMode::First,
+                           ProgramResolver::Requirement::Regular,
+                           ProgramResolver::CachePolicy::Bypass);
+  if (git_results.is_empty()) return;
+  let const git_path = String{heap_allocator(), git_results[0].text().view()};
+
+  let ahead_argv = ArrayList<String>{heap_allocator()};
+  ahead_argv.push(String{heap_allocator(), git_path.view()});
+  ahead_argv.push(String{heap_allocator(), "rev-list"});
+  ahead_argv.push(String{heap_allocator(), "--count"});
+  ahead_argv.push(StringView{upstream_sha.view()} + ".." + local_sha.view());
+
+  let behind_argv = ArrayList<String>{heap_allocator()};
+  behind_argv.push(String{heap_allocator(), git_path.view()});
+  behind_argv.push(String{heap_allocator(), "rev-list"});
+  behind_argv.push(String{heap_allocator(), "--count"});
+  behind_argv.push(StringView{local_sha.view()} + ".." + upstream_sha.view());
+
+  let const ahead_output =
+      os::capture_program_output(ahead_argv, 5'000'000'000);
+  let const behind_output =
+      os::capture_program_output(behind_argv, 5'000'000'000);
+
+  let const parse_count = [](StringView s) -> i32 {
+    while (!s.is_empty() &&
+           (s[0] == ' ' || s[0] == '\t' || s[0] == '\n' || s[0] == '\r'))
+    {
+      s = s.substring(1);
+    }
+    if (s.is_empty()) return 0;
+    i32 value = 0;
+    for (usize i = 0; i < s.length; i++) {
+      if (s[i] < '0' || s[i] > '9') break;
+      value = value * 10 + (s[i] - '0');
+    }
+    return value;
+  };
+
+  if (ahead_output.has_value()) ahead_count = parse_count(ahead_output->view());
+  if (behind_output.has_value())
+    behind_count = parse_count(behind_output->view());
+
+  if (ahead_count == 0 && behind_count == 0) {
+    ahead_count = 0;
+    behind_count = 0;
+  }
 }
 
 } /* namespace utils */

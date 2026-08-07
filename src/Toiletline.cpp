@@ -918,8 +918,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case '.': {
       const i32 status = context.last_exit_status();
       const bool should_use_color = colors::stdout_wants_color();
-      if (should_use_color && status != 0)
-        out += colors::ansi::BOLD_BRIGHT_RED;
+      if (should_use_color && status != 0) out += colors::ansi::BOLD_BRIGHT_RED;
       out += "•";
       if (should_use_color && status != 0) out += colors::ansi::RESET;
     } break;
@@ -1027,12 +1026,23 @@ fn default_prompt_template() -> String
     template_string += colors::ansi::CYAN;
     template_string += R"($SHIT_GIT_BRANCH)";
     template_string += colors::ansi::RESET;
+    template_string += R"(${SHIT_GIT_AHEAD:+ )";
+    template_string += colors::ansi::BOLD_YELLOW;
+    template_string += R"(\342\206\221$SHIT_GIT_AHEAD)";
+    template_string += colors::ansi::RESET;
+    template_string += R"(}${SHIT_GIT_BEHIND:+ )";
+    template_string += colors::ansi::BOLD_YELLOW;
+    template_string += R"(\342\206\223$SHIT_GIT_BEHIND)";
+    template_string += colors::ansi::RESET;
     template_string += R"( at }\u@\h )";
     template_string += colors::ansi::GREEN;
     template_string += R"(\P)";
     template_string += colors::ansi::RESET;
   } else {
-    template_string += R"([${SHIT_GIT_BRANCH:+$SHIT_GIT_BRANCH at }\u@\h \P)";
+    template_string += R"([${SHIT_GIT_BRANCH:+$SHIT_GIT_BRANCH)";
+    template_string += R"(${SHIT_GIT_AHEAD:+ \342\206\221$SHIT_GIT_AHEAD})";
+    template_string += R"(${SHIT_GIT_BEHIND:+ \342\206\223$SHIT_GIT_BEHIND})";
+    template_string += R"( at }\u@\h \P)";
   }
   template_string += R"( \. )";
   return template_string;

@@ -641,6 +641,8 @@ enum class dynamic_var : u8
   IFS,
   LINENO,
   SHIT_GIT_BRANCH,
+  SHIT_GIT_AHEAD,
+  SHIT_GIT_BEHIND,
   SHIT_IDENTITY,
 
   RANDOM,
@@ -672,6 +674,8 @@ constexpr static_string_entry<dynamic_var> ALWAYS_DYNAMIC_ENTRIES[] = {
     {SSK("IFS"),             dynamic_var::IFS            },
     {SSK("LINENO"),          dynamic_var::LINENO         },
     {SSK("SHIT_GIT_BRANCH"), dynamic_var::SHIT_GIT_BRANCH},
+    {SSK("SHIT_GIT_AHEAD"),  dynamic_var::SHIT_GIT_AHEAD },
+    {SSK("SHIT_GIT_BEHIND"), dynamic_var::SHIT_GIT_BEHIND},
     {SSK("SHIT_IDENTITY"),   dynamic_var::SHIT_IDENTITY  },
 };
 constexpr StaticStringMap ALWAYS_DYNAMIC{ALWAYS_DYNAMIC_ENTRIES};
@@ -825,6 +829,18 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         return String::from(line_number_at_location(m_current_location),
                             heap_allocator());
       case dynamic_var::SHIT_GIT_BRANCH: return utils::current_git_branch();
+      case dynamic_var::SHIT_GIT_AHEAD: {
+        i32 ahead_count = 0, behind_count = 0;
+        utils::git_ahead_behind_counts(ahead_count, behind_count);
+        return ahead_count > 0 ? String::from(ahead_count, heap_allocator())
+                               : String{heap_allocator()};
+      }
+      case dynamic_var::SHIT_GIT_BEHIND: {
+        i32 ahead_count = 0, behind_count = 0;
+        utils::git_ahead_behind_counts(ahead_count, behind_count);
+        return behind_count > 0 ? String::from(behind_count, heap_allocator())
+                                : String{heap_allocator()};
+      }
       case dynamic_var::SHIT_IDENTITY: return materialize_shit_identity();
       default: break;
       }
