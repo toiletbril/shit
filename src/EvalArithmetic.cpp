@@ -181,15 +181,16 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize;
 
 static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64;
 
-static fn arith_skip_spaces(StringView source, usize &pos) wontthrow -> void
+static alwaysinline fn arith_skip_spaces(StringView source,
+                                          usize &pos) wontthrow -> void
 {
   while (pos < source.length && (source[pos] == ' ' || source[pos] == '\t' ||
                                  source[pos] == '\n' || source[pos] == '\r'))
     pos++;
 }
 
-static fn arith_starts_with(StringView source, usize &pos,
-                            StringView op) wontthrow -> bool
+static alwaysinline fn arith_starts_with(StringView source, usize &pos,
+                                          StringView op) wontthrow -> bool
 {
   arith_skip_spaces(source, pos);
   if (pos + op.length > source.length) return false;
