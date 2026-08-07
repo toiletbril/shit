@@ -1298,8 +1298,15 @@ public:
     m_source_length = source.count();
     m_newline_offsets.clear();
 
-    for (usize i = 0; i < source.count(); i++)
-      if (source[i] == '\n') m_newline_offsets.push(i);
+    /* Use find_character (memchr/SIMD) instead of a byte-by-byte scan. */
+    usize scan_position = 0;
+    while (scan_position < source.count()) {
+      let const remaining = source.substring(scan_position);
+      let const newline = remaining.find_character('\n');
+      if (!newline.has_value()) break;
+      m_newline_offsets.push(scan_position + *newline);
+      scan_position += *newline + 1;
+    }
   }
 
   fn invalidate() wontthrow -> void
