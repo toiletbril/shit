@@ -1015,7 +1015,7 @@ fn default_prompt_template() -> String
   const bool should_use_color = colors::stdout_wants_color();
 
   if (should_use_color) {
-    template_string += R"([${SHIT_GIT_BRANCH:+)";
+    template_string += R"(${SHIT_GIT_BRANCH:+)";
     template_string += colors::ansi::CYAN;
     template_string += R"($SHIT_GIT_BRANCH)";
     template_string += colors::ansi::RESET;
@@ -1026,7 +1026,7 @@ fn default_prompt_template() -> String
   } else {
     template_string += R"([${SHIT_GIT_BRANCH:+$SHIT_GIT_BRANCH at }\u@\h \P)";
   }
-  template_string += R"(] )";
+  template_string += R"( • )";
   return template_string;
 }
 

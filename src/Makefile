@@ -295,7 +295,6 @@ endif
 else ifeq ($(MODE), prof)
 CXXFLAGS += \
 	-g3 \
-	-finstrument-functions \
 	-DNDEBUG \
 	-fno-omit-frame-pointer \
 	-flto
@@ -311,7 +310,8 @@ CXXFLAGS += \
 endif
 ifeq ($(TARGET), Linux)
 CXXFLAGS += \
-	-nostdlib++
+	-nostdlib++ \
+	-finstrument-functions
 LINK_LIBS += -lsupc++
 endif
 else ifeq ($(MODE), cov)
