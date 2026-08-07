@@ -1253,10 +1253,11 @@ value is discarded.
 .TP
 .BR SHIT_WELCOME ", " SHIT_FAREWELL
 When set and non-empty, the value is printed once at interactive startup
-(SHIT_WELCOME) or exit (SHIT_FAREWELL), prefixed with the shell name. An unset
-or empty value prints nothing. A non-zero exit code is appended in parentheses
-to the farewell. A startup file can assign these to customize the session
-greeting.
+(SHIT_WELCOME) or exit (SHIT_FAREWELL), prefixed with the shell name. An empty
+value prints nothing. When unset, the shell prints the built-in greeting for
+the active mood on startup and a fixed farewell on exit. A non-zero exit code
+is appended in parentheses to the farewell. A startup file can assign these
+to customize the session greeting.
 .TP
 .B SHIT_ANSI_*
 The names BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE, their BRIGHT_

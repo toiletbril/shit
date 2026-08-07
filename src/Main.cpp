@@ -1544,8 +1544,17 @@ fn main(int argc, char **argv) -> int
           toiletline::set_highlight_enabled(should_highlight);
           toiletline::set_ghost_enabled(should_highlight);
           if (let const welcome = context.get_variable_value("SHIT_WELCOME");
-              welcome.has_value() && !welcome->is_empty())
-            shit::show_message(welcome->view());
+              welcome.has_value())
+          {
+            if (!welcome->is_empty()) shit::show_message(welcome->view());
+          } else {
+            shit::show_message(session_mood == shit::mimic_mood::Posix
+                                   ? "POSIX me harder!"
+                               : (session_mood == shit::mimic_mood::Bash ||
+                                  session_mood == shit::mimic_mood::BashPosix)
+                                   ? "Bash me harder!"
+                                   : "Welcome :3");
+          }
         } else {
           toiletline::enter_raw_mode();
         }

@@ -2362,9 +2362,19 @@ cold fn print_memory_report() wontthrow -> void
     {
       if (let const farewell =
               QUIT_CONTEXT->get_variable_value("SHIT_FAREWELL");
-          farewell.has_value() && !farewell->is_empty())
+          farewell.has_value())
       {
-        let message = String{heap_allocator(), farewell->view()};
+        if (!farewell->is_empty()) {
+          let message = String{heap_allocator(), farewell->view()};
+          if (code != 0) {
+            message += " (Code ";
+            message += String::from(actual_code, heap_allocator());
+            message += ')';
+          }
+          show_message(message);
+        }
+      } else {
+        let message = String{heap_allocator(), "Goodbye :c"};
         if (code != 0) {
           message += " (Code ";
           message += String::from(actual_code, heap_allocator());
