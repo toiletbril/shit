@@ -1449,8 +1449,12 @@ fn main(int argc, char **argv) -> int
           const shit::String &file_name = file_names[0];
           const usize operand_offset = shit::quoted_argv_offset_until(
               parse_argc, parse_argv, file_name.view());
+          /* The caret renders against the shell-quoted cli_invocation, so the
+             span length must be the quoted token length, not the raw argument
+             length, or it stops short of the closing quote. */
           const shit::SourceLocation operand_location{
-              operand_offset, file_name.count(), shit::None};
+              operand_offset,
+              shit::shell_quoted_arg_length(file_name.view()), shit::None};
           const shit::Path script_path{file_name.view()};
 
           if (script_path.is_directory()) {
@@ -1465,12 +1469,26 @@ fn main(int argc, char **argv) -> int
           LOG(Info, "reading the script file '%s'", file_name.c_str());
           shit::Maybe<shit::String> contents = script_path.read_entire_file();
           if (!contents) {
-            shit::show_message(
-                shit::ErrorWithLocation{
-                    operand_location,
-                    "Could not open '" + file_name.view() +
-                        "': " + shit::os::last_system_error_message()}
-                    .to_string(context.cli_invocation().view(), &context));
+            /* An operand with no slash that does not exist as a file is most
+               likely a command string the user forgot to pass -c. */
+            let const looks_like_command =
+                !file_name.view().find_character('/').has_value();
+            let hint = shit::String{shit::heap_allocator()};
+            if (looks_like_command)
+              hint = "Pass -c to run this as a command string";
+            let const message = "Could not open '" + file_name.view() +
+                                "': " + shit::os::last_system_error_message();
+            if (hint.is_empty()) {
+              shit::show_message(shit::ErrorWithLocation{
+                  operand_location, message}
+                                     .to_string(context.cli_invocation().view(),
+                                                &context));
+            } else {
+              shit::show_message(shit::ErrorWithLocationAndDetails{
+                  operand_location, message, hint.view()}
+                                     .to_string(context.cli_invocation().view(),
+                                                &context));
+            }
             shit::utils::quit(127, shit::utils::farewell_policy::Goodbye);
           }
           script_contents = steal(*contents);
