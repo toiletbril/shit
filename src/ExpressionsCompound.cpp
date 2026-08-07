@@ -786,16 +786,29 @@ cold fn IfClause::analyze(AnalysisContext &actx,
   /* The first condition runs whenever the if runs. The elif conditions and all
      bodies are conditional. */
   let is_first_branch = true;
-  for (let const &[ condition, body ] : m_branches) {
+  for (usize i = 0; i < m_branches.count(); i++) {
+    let const &[condition, body] = m_branches[i];
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
 
     condition->analyze(actx, is_unconditional && is_first_branch);
+    /* A folded branch that is not the taken one is dead code, so the
+       unresolved-command diagnostic stays quiet inside it. */
+    let const is_dead_branch =
+        has_folded_branch() && folded_branch_index() != i;
+    let const was_silenced = actx.should_silence_unresolved_commands;
+    if (is_dead_branch) actx.should_silence_unresolved_commands = true;
     body->analyze(actx, false);
+    actx.should_silence_unresolved_commands = was_silenced;
     is_first_branch = false;
   }
 
+  let const else_is_dead =
+      has_folded_branch() && folded_branch_index() != m_branches.count();
+  let const was_else_silenced = actx.should_silence_unresolved_commands;
+  if (else_is_dead) actx.should_silence_unresolved_commands = true;
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
+  actx.should_silence_unresolved_commands = was_else_silenced;
 
   /* A branch ran conditionally and may have reassigned a name, so a value
      recorded before this if is no longer proven after it. */
@@ -958,7 +971,13 @@ cold fn WhileLoop::analyze(AnalysisContext &actx,
   optimizer::optimize_node(this, actx);
 
   m_condition->analyze(actx, is_unconditional);
+
+  /* A loop folded to skip runs its body zero times, so the unresolved-command
+     diagnostic stays quiet inside it. */
+  let const was_silenced = actx.should_silence_unresolved_commands;
+  if (is_folded_to_skip()) actx.should_silence_unresolved_commands = true;
   m_body->analyze(actx, false);
+  actx.should_silence_unresolved_commands = was_silenced;
 }
 
 cold fn WhileLoop::register_defined_functions(

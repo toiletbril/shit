@@ -864,6 +864,30 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   ASSERT(m_args[0] != nullptr);
   let const name = static_command_name(m_args[0]);
 
+  /* A command -v, type, or hash call tests whether a name resolves. The tested
+     names are recorded so a later call to the same name is recognized as
+     guarded and its not-found diagnostic stays quiet. */
+  if (name.has_value()) {
+    let const is_command_test = name->view() == "command";
+    let const is_type_or_hash = name->view() == "type" || name->view() == "hash";
+    if (is_command_test || is_type_or_hash) {
+      bool has_presence_flag = is_type_or_hash;
+      for (usize i = 1; i < m_args.count(); i++) {
+        let const arg = static_command_name(m_args[i]);
+        if (!arg.has_value()) break;
+        if (is_command_test &&
+            (arg->view() == "-v" || arg->view() == "-V"))
+        {
+          has_presence_flag = true;
+          continue;
+        }
+        if (arg->view().starts_with("-")) continue;
+        if (has_presence_flag)
+          actx.tested_command_names.add(arg->view());
+      }
+    }
+  }
+
   /* local, declare, and typeset name variables that stay inside the function,
      so their names are recorded and the leak warning stays quiet for a later
      assignment. */
@@ -1638,7 +1662,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                                             actx, unavailable);
   }
   if (name.has_value() && !actx.should_silence_unresolved_commands &&
-      !command_is_shadowed && !command_was_resolved)
+      !command_is_shadowed && !command_was_resolved &&
+      !actx.tested_command_names.contains(*name))
   {
     let diagnostic_location = m_args[0]->source_location();
     let reported_name = name->view();
