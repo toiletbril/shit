@@ -915,6 +915,14 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       out += String::from(status, shit::heap_allocator());
       if (should_use_color) out += colors::ansi::RESET;
     } break;
+    case '.': {
+      const i32 status = context.last_exit_status();
+      const bool should_use_color = colors::stdout_wants_color();
+      if (should_use_color && status != 0)
+        out += colors::ansi::BOLD_BRIGHT_RED;
+      out += "•";
+      if (should_use_color && status != 0) out += colors::ansi::RESET;
+    } break;
     case 'j':
       out += String::from(static_cast<i64>(context.jobs().count()),
                           shit::heap_allocator());
@@ -1026,7 +1034,7 @@ fn default_prompt_template() -> String
   } else {
     template_string += R"([${SHIT_GIT_BRANCH:+$SHIT_GIT_BRANCH at }\u@\h \P)";
   }
-  template_string += R"( • )";
+  template_string += R"( \. )";
   return template_string;
 }
 
