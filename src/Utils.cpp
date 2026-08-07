@@ -2351,13 +2351,18 @@ cold fn print_memory_report() wontthrow -> void
     if (should_goodbye && QUIT_CONTEXT != nullptr &&
         QUIT_CONTEXT->shell_is_interactive())
     {
-      let code_str = String{heap_allocator()};
-      if (code != 0) {
-        code_str += " (Code ";
-        code_str += String::from(actual_code, heap_allocator());
-        code_str += ')';
+      if (let const farewell =
+              QUIT_CONTEXT->get_variable_value("SHIT_FAREWELL");
+          farewell.has_value() && !farewell->is_empty())
+      {
+        let message = String{heap_allocator(), farewell->view()};
+        if (code != 0) {
+          message += " (Code ";
+          message += String::from(actual_code, heap_allocator());
+          message += ')';
+        }
+        show_message(message);
       }
-      show_message("Goodbye :c" + code_str);
     }
   }
 

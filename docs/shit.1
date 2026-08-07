@@ -1251,6 +1251,13 @@ The read-only exported value is the lowercase CRC-32 identity of the running
 executable. It is computed on first read or before a child starts. An inherited
 value is discarded.
 .TP
+.BR SHIT_WELCOME ", " SHIT_FAREWELL
+When set and non-empty, the value is printed once at interactive startup
+(SHIT_WELCOME) or exit (SHIT_FAREWELL), prefixed with the shell name. An unset
+or empty value prints nothing. A non-zero exit code is appended in parentheses
+to the farewell. A startup file can assign these to customize the session
+greeting.
+.TP
 .B SHIT_ANSI_*
 The names BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE, their BRIGHT_
 forms, BOLD, DIM, and RESET supply terminal escapes. A recognized name is empty

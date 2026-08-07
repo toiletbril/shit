@@ -1548,12 +1548,9 @@ fn main(int argc, char **argv) -> int
               !FLAG_NO_SYNTAX_HIGHLIGHTING.is_enabled();
           toiletline::set_highlight_enabled(should_highlight);
           toiletline::set_ghost_enabled(should_highlight);
-          shit::show_message(session_mood == shit::mimic_mood::Posix
-                                 ? "POSIX me harder!"
-                             : (session_mood == shit::mimic_mood::Bash ||
-                                session_mood == shit::mimic_mood::BashPosix)
-                                 ? "Bash me harder!"
-                                 : "Welcome :3");
+          if (let const welcome = context.get_variable_value("SHIT_WELCOME");
+              welcome.has_value() && !welcome->is_empty())
+            shit::show_message(welcome->view());
         } else {
           toiletline::enter_raw_mode();
         }

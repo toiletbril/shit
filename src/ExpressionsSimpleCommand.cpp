@@ -1149,8 +1149,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         name == "IFS" && command_word_function == nullptr &&
         !program_args.is_empty() && program_args[0] == "read";
     Maybe<String> previous;
-    if (!is_read_field_separator)
-      previous = os::get_environment_variable(name);
+    if (!is_read_field_separator) previous = os::get_environment_variable(name);
     let expanded_value = String{cxt.scratch_allocator()};
     try {
       expanded_value = cxt.expand_word_for_assignment(var.value);
