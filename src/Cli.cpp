@@ -612,6 +612,11 @@ cold fn show_version() throws -> void
   s += "OS=";
   s += SHIT_OS_INFO;
   s += '\n';
+  s += "RUNTIME=";
+  s += os::executable_system_name();
+  s += ' ';
+  s += os::executable_machine_name();
+  s += '\n';
   s += '\n';
   s += SHIT_SHORT_LICENSE;
   s += '\n';
