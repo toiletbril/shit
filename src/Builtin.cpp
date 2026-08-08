@@ -165,6 +165,8 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
     }
   } catch (const BrokenPipeExit &) {
     return SHIT_BROKEN_PIPE_EXIT_STATUS;
+  } catch (const ErrorWithLocation &) {
+    throw;
   } catch (const Error &e) {
     if (cxt.is_bash_compatible()) {
       if (!e.detail_message().is_empty())

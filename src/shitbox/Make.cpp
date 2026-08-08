@@ -1051,6 +1051,8 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
       build_target(ec, cxt, mk, goal.view(), visiting, built);
   } catch (const InterruptErrorWithLocation &) {
     throw;
+  } catch (const ErrorWithLocation &) {
+    throw;
   } catch (Error &error) {
     error.set_command_status(2);
     throw;

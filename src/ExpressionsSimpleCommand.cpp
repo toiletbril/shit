@@ -257,6 +257,8 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     if (!value_ran_substitution) cxt.set_last_exit_status(0);
     return cxt.last_exit_status();
+  } catch (const ErrorWithLocation &) {
+    throw;
   } catch (const Error &e) {
     relocate_error(e, source_location());
   }
@@ -1153,6 +1155,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     let expanded_value = String{cxt.scratch_allocator()};
     try {
       expanded_value = cxt.expand_word_for_assignment(var.value);
+    } catch (const ErrorWithLocation &) {
+      throw;
     } catch (const Error &e) {
       relocate_error(e, source_location());
     }

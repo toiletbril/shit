@@ -1291,6 +1291,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       try {
         return cxt.expand_word_for_assignment(
             static_cast<const tokens::WordToken *>(t)->word());
+      } catch (const ErrorWithLocation &) {
+        throw;
       } catch (const Error &e) {
         relocate_error(e, t->source_location());
       }
@@ -1323,6 +1325,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
           pattern = cxt.expand_case_pattern_masked(
               static_cast<const tokens::WordToken *>(pattern_token)->word(),
               pattern_active);
+        } catch (const ErrorWithLocation &) {
+          throw;
         } catch (const Error &e) {
           relocate_error(e, pattern_token->source_location());
         }

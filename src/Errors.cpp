@@ -269,12 +269,6 @@ cold static fn get_context_pointing_to(
   return msg;
 }
 
-ErrorBase::ErrorBase(StringView message) : m_message(heap_allocator(), message)
-{
-  LOG(Debug, "constructing an error with message '%.*s'",
-      static_cast<int>(message.length), message.data);
-}
-
 ErrorBase::~ErrorBase() = default;
 
 cold fn ErrorBase::trailing_details_to_string() const throws -> String
@@ -297,7 +291,11 @@ cold fn ErrorBase::severity_word() const wontthrow -> StringView
   return "error";
 }
 
-Error::Error(StringView message) : ErrorBase(message) {}
+Error::Error(StringView message) : m_message(heap_allocator(), message)
+{
+  LOG(Debug, "constructing an error with message '%.*s'",
+      static_cast<int>(message.length), message.data);
+}
 
 ErrorWithDetails::ErrorWithDetails(StringView message, StringView note)
     : Error(message), m_note(note)
@@ -342,7 +340,7 @@ BrokenPipeExit::BrokenPipeExit() : Error("broken pipe") {}
 
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
-    : ErrorBase(message), m_location(steal(location))
+    : Error(message), m_location(steal(location))
 {
   LOG(Debug, "locating the error at byte %zu spanning %zu bytes",
       m_location.position, m_location.length);

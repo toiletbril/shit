@@ -74,6 +74,8 @@ struct conditional_evaluator
       try {
         return cxt.expand_word_for_assignment(
             static_cast<const tokens::WordToken *>(e.word)->word());
+      } catch (const ErrorWithLocation &) {
+        throw;
       } catch (const Error &err) {
         relocate_error(err, e.word->source_location());
       }
@@ -91,6 +93,8 @@ struct conditional_evaluator
       try {
         return cxt.expand_case_pattern_masked(
             static_cast<const tokens::WordToken *>(e.word)->word(), active);
+      } catch (const ErrorWithLocation &) {
+        throw;
       } catch (const Error &err) {
         relocate_error(err, e.word->source_location());
       }
@@ -378,6 +382,8 @@ struct conditional_evaluator
                pointed at the regex operand. */
             try {
               return regex_match(left.view(), pattern.view(), active);
+            } catch (const ErrorWithLocation &) {
+              throw;
             } catch (const Error &err) {
               const conditional_element &operand = elements[pos - 1];
               if (operand.word != nullptr)

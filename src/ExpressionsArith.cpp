@@ -43,6 +43,8 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   i64 status;
   try {
     status = cxt.evaluate_conditional(m_elements) ? 0 : 1;
+  } catch (const ErrorWithLocation &) {
+    throw;
   } catch (const Error &e) {
     SourceLocation span = source_location();
     if (source_end_position() > span.position)

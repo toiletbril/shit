@@ -52,10 +52,9 @@ struct SourceLocation
 class ErrorBase
 {
 public:
-  ErrorBase(StringView message);
   virtual ~ErrorBase();
 
-  pure fn message() const wontthrow -> const String & { return m_message; }
+  virtual pure fn message() const wontthrow -> const String & = 0;
   virtual pure fn detail_message() const wontthrow -> StringView { return {}; }
 
   virtual fn severity_word() const wontthrow -> StringView;
@@ -82,7 +81,6 @@ protected:
 
   bool m_is_script_fatal{false};
   i64 m_command_status{1};
-  String m_message{heap_allocator()};
 };
 
 class Error : public ErrorBase
@@ -90,8 +88,16 @@ class Error : public ErrorBase
 public:
   Error(StringView message);
 
+  pure fn message() const wontthrow -> const String & override
+  {
+    return m_message;
+  }
+
   fn to_string() const throws -> String;
   using ErrorBase::to_string;
+
+protected:
+  String m_message{heap_allocator()};
 };
 
 class ErrorWithDetails : public Error
@@ -148,13 +154,13 @@ public:
   BrokenPipeExit();
 };
 
-class ErrorWithLocation : public ErrorBase
+class ErrorWithLocation : public Error
 {
 public:
   ErrorWithLocation(SourceLocation location, StringView message);
 
-  virtual fn to_string(StringView source,
-                       EvalContext *context = nullptr) const throws -> String;
+  fn to_string(StringView source, EvalContext *context = nullptr) const throws
+      -> String override;
 
   /* The line numbering starts this many lines past one, for a source that is a
      window into a larger file. */
@@ -263,6 +269,8 @@ protected:
   String m_note{heap_allocator()};
 };
 
+static_assert(std::is_abstract_v<ErrorBase>);
+static_assert(std::is_base_of_v<Error, ErrorWithLocation>);
 static_assert(!std::is_same_v<ErrorWithDetails, Error>);
 static_assert(!std::is_same_v<WarningWithDetails, Warning>);
 static_assert(

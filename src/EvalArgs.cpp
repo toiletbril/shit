@@ -751,6 +751,8 @@ hot flatten fn EvalContext::process_args(
       } else {
         do_expand_one_word(*word);
       }
+    } catch (const ErrorWithLocation &) {
+      throw;
     } catch (const Error &e) {
       relocate_error(e, location);
     }
