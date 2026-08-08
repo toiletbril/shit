@@ -396,8 +396,17 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   shit::flush();
   let const forked_child = os::try_fork_compound_stage(None, None, None);
-  if (!forked_child.has_value())
-    return evaluate_subshell_in_process(m_body, cxt);
+  if (!forked_child.has_value()) {
+    i32 status = 1;
+    try {
+      status = static_cast<i32>(evaluate_subshell_in_process(m_body, cxt));
+    } catch (const ErrorBase &error) {
+      let const source = cxt.current_source();
+      show_message(error.to_string(
+          source != nullptr ? source->view() : StringView{}, &cxt));
+    }
+    SET_AND_RETURN_EXIT_STATUS(cxt, status);
+  }
 
   const os::process child = *forked_child;
   if (os::process_id_of(child) == 0) {
