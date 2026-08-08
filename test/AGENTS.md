@@ -88,6 +88,7 @@ focused assertion is sufficient.
 Use paths below `$TEST_TEMP_DIRECTORY`. Prefer one fixed directory for the
 test. The `bin/mktemp` shim is available when uniqueness is part of the test.
 It uses host filesystem operations and does not launch the tested shell.
+`TEST_MKTEMP_DIRECTORY` gives the shim an absolute native allocation root.
 
 Do not add fixed sleeps for synchronization. Use a ready marker, pipe,
 process-state check, or bounded polling loop. Retain a bounded timeout for a

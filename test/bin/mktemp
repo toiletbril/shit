@@ -26,7 +26,7 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 
-workspace=${TEST_TEMP_DIRECTORY:-.test-work}
+workspace=${TEST_MKTEMP_DIRECTORY:-${TEST_TEMP_DIRECTORY:-.test-work}}
 candidate_directory=$workspace
 candidate_prefix=temp-
 case $template in
@@ -48,15 +48,11 @@ while [ "$attempt_count" -lt 100 ]; do
     candidate="$candidate_directory/$candidate_prefix${PPID-0}-$$-$attempt_count"
     if [ "$is_directory" -eq 1 ]; then
         if mkdir "$candidate" 2>/dev/null; then
-            candidate_name=${candidate##*/}
-            candidate_directory=${candidate%/*}
-            printf '%s/%s\n' "$(cd "$candidate_directory" && pwd)" "$candidate_name"
+            printf '%s\n' "$candidate"
             exit 0
         fi
     elif ( set -C; : > "$candidate" ) 2>/dev/null; then
-        candidate_name=${candidate##*/}
-        candidate_directory=${candidate%/*}
-        printf '%s/%s\n' "$(cd "$candidate_directory" && pwd)" "$candidate_name"
+        printf '%s\n' "$candidate"
         exit 0
     fi
     attempt_count=$((attempt_count + 1))

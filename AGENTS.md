@@ -62,7 +62,8 @@ reference result. The dashdiff, bashdiff, and mimicrydiff targets select that
 runner. The harness carries alternate goldens for documented macOS differences.
 
 Runner output files live below `.test-work/results`. The portable mktemp shim
-uses host filesystem operations and never starts the tested shell.
+uses host filesystem operations and never starts the tested shell. Its exported
+allocation root is absolute and uses native path syntax on every host.
 
 The benchmark uses `+analysis` for analysis-enabled runs. Compatibility rows
 retain their mood and enable analysis with `-W`.
