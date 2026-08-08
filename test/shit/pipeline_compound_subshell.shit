@@ -1,3 +1,0 @@
-#!/bin/env shit
-(echo hi) | cat
-(echo a; echo b) | wc -l | tr -d ' '

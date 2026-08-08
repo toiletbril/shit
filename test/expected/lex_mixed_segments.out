@@ -3,6 +3,48 @@
     [SimpleCommand ":" "predqsq$x$ypost"]
   [CompoundListCondition, None]
     [SimpleCommand ":" "a$bc$(:)d$(( 1 + 1 ))e"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$(( 1 + 2 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "pre$(( 3 * 4 ))post"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "val=$(( 5 - 1 ))end"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$(( 6 ))$(( 7 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$(:)"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "pre$(:)post"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "head$(:)tail"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$(:)$(:)"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "a*b" "c?d"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$foo" "~home"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" """ "\" "`"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "pre space"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-f"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "a*b" "c?d" "[a-z]"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "lit*" "lit?" "[abc]"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "bare" "single" "double"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "premidpost"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "outinout"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "onetwothree"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "~" "~user" "~/path"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "pre~mid" "~quoted" "~raw"]
 [Word
   Unquoted ":"
 ]
@@ -26,9 +68,208 @@
   ArithmeticExpansion " 1 + 1 "
   DoubleQuoted "e"
 ]
+[Word
+  Unquoted ":"
+]
+[Word
+  ArithmeticExpansion " 1 + 2 "
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre"
+  ArithmeticExpansion " 3 * 4 "
+  Unquoted "post"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  DoubleQuoted "val="
+  ArithmeticExpansion " 5 - 1 "
+  DoubleQuoted "end"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  ArithmeticExpansion " 6 "
+  ArithmeticExpansion " 7 "
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  CommandSubstitution ":"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre"
+  CommandSubstitution ":"
+  Unquoted "post"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  DoubleQuoted "head"
+  CommandSubstitution ":"
+  DoubleQuoted "tail"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  CommandSubstitution ":"
+  CommandSubstitution ":"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "a"
+  Literal "*"
+  Unquoted "b"
+]
+[Word
+  Unquoted "c"
+  Literal "?"
+  Unquoted "d"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal "$"
+  Unquoted "foo"
+]
+[Word
+  Literal "~"
+  Unquoted "home"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal """
+]
+[Word
+  Literal "\"
+]
+[Word
+  Literal "`"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre"
+  Literal " "
+  Unquoted "space"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "a*b"
+]
+[Word
+  Unquoted "c?d"
+]
+[Word
+  Unquoted "[a-z]"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  DoubleQuoted "lit*"
+]
+[Word
+  Literal "lit?"
+]
+[Word
+  DoubleQuoted "[abc]"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "bare"
+]
+[Word
+  Literal "single"
+]
+[Word
+  DoubleQuoted "double"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre"
+  Literal "mid"
+  Unquoted "post"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "out"
+  DoubleQuoted "in"
+  Unquoted "out"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal "onetwo"
+  DoubleQuoted "three"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "~"
+]
+[Word
+  Unquoted "~user"
+]
+[Word
+  Unquoted "~/path"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre~mid"
+]
+[Word
+  DoubleQuoted "~quoted"
+]
+[Word
+  Literal "~raw"
+]
 shit: 3:3: warning: An unquoted command substitution splits its output.
      3 |  : "a$b"'c'$(:)"d$(( 1 + 1 ))e"
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+note: Quote it to keep one argument.
+shit: 12:3: warning: An unquoted command substitution splits its output.
+    12 |  : pre$(:)post
+       |    ^~~~~~~~~~~
+note: Quote it to keep one argument.
+shit: 14:3: warning: An unquoted command substitution splits its output.
+    14 |  : $(:)$(:)
+       |    ^~~~~~~~
 note: Quote it to keep one argument.
 shit: 2:14: error: Unable to expand 'x' because the parameter is not set.
      2 |  : pre"dq"'sq'$x${y}post

@@ -221,3 +221,28 @@ out=$("$BIN" --no-traces -c '"$1"' trace-driver "$d/fallback" 2>&1)
 printf 'disabled-fallback traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
+
+unset SHIT_FLAGS
+out=$("$BIN" -c 'echo hi' -c no_such_command_xyz 2>&1)
+rc=$?
+trace_line=$(printf '%s\n' "$out" | grep 'trace:' -A1 | tail -1)
+trace_line="     1 |  SHIT -c ${trace_line#* -c }"
+printf '%s\n' "$trace_line"
+printf '%s\n' "$out" | grep -q -- "-c 'echo hi' -c no_such_command_xyz" && echo "quoted_and_second_c=ok"
+echo "rc=$rc"
+
+unset SHIT_FLAGS
+out=$("$BIN" -c no_such_command_xyz 2>&1)
+rc=$?
+printf 'traces=%s\n' "$(printf '%s\n' "$out" | grep -Ec 'trace:')"
+printf '%s\n' "$out" | grep -q 'no_such_command_xyz' && echo "error=ok"
+echo "rc=$rc"
+
+unset SHIT_FLAGS
+# A missing script file operand with spaces in its name is wrapped in single
+# quotes in the trace line, and the caret lands on the quoted operand.
+out=$("$BIN" "no such script file" 2>&1)
+rc=$?
+printf '%s\n' "$out" | grep -o "Could not open 'no such script file'"
+printf '%s\n' "$out" | grep -o "'no such script file'"
+echo "rc=$rc"

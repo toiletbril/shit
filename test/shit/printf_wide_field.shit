@@ -1,2 +1,0 @@
-printf '%300d\n' 5
-printf '%.290f\n' 1

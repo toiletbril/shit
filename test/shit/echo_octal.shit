@@ -1,6 +1,0 @@
-#!/bin/env shit
-echo -e "\101"
-echo -e "\0101"
-echo -e "\1011"
-echo -e "\77"
-echo -e "\8"

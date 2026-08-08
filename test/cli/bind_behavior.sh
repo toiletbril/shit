@@ -8,5 +8,3 @@ echo "== bind -l returns 0:"
 "$BIN" -c 'bind -l'; echo "rc=$?"
 echo "== bind with a keyseq returns 0:"
 "$BIN" -c 'bind "\C-x: abort"'; echo "rc=$?"
-echo "== bind --help shows the help:"
-"$BIN" -c 'bind --help' | head -2

@@ -56,7 +56,11 @@ filesystem_result=$("$BIN" \
 test "$filesystem_result" = "$dir/onlyfile"
 echo onlyfile
 echo "== arithmetic is not a command body:"
-"$BIN" -c 'complete -W "alpha beta gamma" probecmd' --debug-complete-at 'echo $((probecmd a' </dev/null
+(
+    cd "$dir" &&
+        "$BIN" -c 'complete -W "alpha beta gamma" probecmd' \
+            --debug-complete-at 'echo $((probecmd a' </dev/null
+)
 
 echo "== a case pattern does not close the substitution:"
 prefix='echo $(case x in x) probecmd a'

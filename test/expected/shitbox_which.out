@@ -1,0 +1,14 @@
+== a builtin name:
+echo
+== an absent name exits 1 with no output:
+rc=1
+== a program resolved in a temp PATH:
+TMPDIR/mytool
+== -a lists every match in the temp PATH:
+TMPDIR/mytool
+== -q on a resolving name is silent, status 0:
+status=0
+== -q on a missing name is silent, status 1:
+status=1
+== without -q the location still prints:
+1

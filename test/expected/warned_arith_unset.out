@@ -5,6 +5,20 @@
     [SimpleCommand "echo" "$((never_counted + 1))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "continued"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-W"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "*.zzz_nomatch_downgrade"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "continued"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-W"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "echo" "value=$never_piped"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "continued"]
 [Word
   Unquoted "set"
 ]
@@ -23,10 +37,62 @@
 [Word
   Unquoted "continued"
 ]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-W"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "*.zzz_nomatch_downgrade"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "continued"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-W"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "value="
+  Variable "never_piped"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "continued"
+]
 shit: 3:9: warning: The variable 'never_counted' is not set, it expands to empty.
      3 |  echo $((never_counted + 1))
        |          ^~~~~~~~~~~~~
 note: Replace it with ${never_counted-} if empty expansion is desired.
 1
+continued
+shit: 8:6: warning: The glob pattern '*.zzz_nomatch_downgrade' matched no file, it expands to its literal text, which is rarely intended.
+     8 |  echo *.zzz_nomatch_downgrade
+       |       ^~~~~~~~~~~~~~~~~~~~~~~
+note: Probe for matches with compgen -G '*.zzz_nomatch_downgrade' or relax with set +o failglob.
+*.zzz_nomatch_downgrade
+continued
+shit: 12:13: warning: The variable 'never_piped' is not set, it expands to empty.
+    12 |  echo "value=$never_piped" | cat
+       |              ^~~~~~~~~~~~
+note: Replace it with ${never_piped-} if empty expansion is desired.
+value=
 continued
 [Code 0]

@@ -1,0 +1,107 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "readonly" "x=1"]
+  [CompoundListCondition, None]
+    [Assign x=2]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "assign=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "y=1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "readonly" "y"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "y=2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "export=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "unset=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "readonly" "R=5"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "R=$R"]
+  [CompoundListCondition, None]
+    [Assign R=9]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after=$R"]
+[Word
+  Unquoted "readonly"
+]
+[Word
+  Unquoted "x=1"
+]
+[Word
+  Unquoted "x=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "assign="
+  Variable "?"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "y=1"
+]
+[Word
+  Unquoted "readonly"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "y=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "export="
+  Variable "?"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "unset="
+  Variable "?"
+]
+[Word
+  Unquoted "readonly"
+]
+[Word
+  Unquoted "R=5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "R="
+  Variable "R"
+]
+[Word
+  Unquoted "R=9"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after="
+  Variable "R"
+]
+shit: 3:1: error: Unable to assign 'x' because it is read only.
+     3 |  x=2; echo "assign=$?"
+       |  ^~~

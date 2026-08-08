@@ -1,0 +1,127 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-n" "no-newline"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-e" "tab\tnl\nff\f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-e" "stop\cafter"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-E" "raw\tkept"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-e" "esc\eX"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-e" "\101"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-e" "\0101"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-e" "\1011"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-e" "\77"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-e" "\8"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "no-newline"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  DoubleQuoted "tab\tnl\nff\f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  DoubleQuoted "stop\cafter"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-E"
+]
+[Word
+  DoubleQuoted "raw\tkept"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  DoubleQuoted "esc\eX"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  DoubleQuoted "\101"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  DoubleQuoted "\0101"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  DoubleQuoted "\1011"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  DoubleQuoted "\77"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  DoubleQuoted "\8"
+]
+no-newline
+tab	nl
+ff
+stopraw\tkept
+escX
+A
+A
+A1
+?
+\8
+[Code 0]

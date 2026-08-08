@@ -1,0 +1,6 @@
+== bind -m returns 0:
+rc=0
+== bind -l returns 0:
+rc=0
+== bind with a keyseq returns 0:
+rc=0

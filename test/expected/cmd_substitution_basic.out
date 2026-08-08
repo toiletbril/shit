@@ -1,6 +1,109 @@
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "a" "$(echo b)" "c"]
+  [CompoundListCondition, None]
+    [Assign v=$(echo hello)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "got=$v"]
+  [CompoundListCondition, None]
+    [Assign result=$(echo hello  # a ) comment
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$result"]
+  [CompoundListCondition, None]
+    [Assign mid=$(echo foo#bar)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$mid"]
+  [CompoundListCondition, None]
+    [Assign quoted=$(echo "a # ) b")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$quoted"]
+  [CompoundListCondition, None]
+    [Assign nested=$(echo $(echo inner # ) cmt
+))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$nested"]
+  [CompoundListCondition, None]
+    [Assign x=$( cat <<< "payload" )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "x=$x"]
+  [CompoundListCondition, None]
+    [Assign empty=]
+  [CompoundListCondition, None]
+    [Assign y=$( cat <<<"$empty" )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "y=$y"]
+  [CompoundListCondition, None]
+    [Assign z=$( echo "$( echo nested )" -- "$x" )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "z=$z"]
+  [CompoundListCondition, None]
+    [Assign w=$( echo "$( printf '%s\n' "'")")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "w=$w"]
+  [CompoundListCondition, None]
+    [Assign line=part value tail]
+  [CompoundListCondition, None]
+    [Assign tar=$( printf '%s\n' "$line" | sed -e 's/^.* \([^ ]*x\) .*$/\1/' <<<"$line" )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tar=$tar"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$(echo hi)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo $(echo deep))"]
+  [CompoundListCondition, None]
+    [ForLoop "w"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "i=$w"]
+  [CompoundListCondition, None]
+    [Assign x=$(false)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_false=$?"]
+  [CompoundListCondition, None]
+    [Assign y=$(true)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_true=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "$(false)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bare_csub=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "${ false;  }"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bare_funsub=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "$(false)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "vanished_word=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "last_assign=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "last_assign2=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "plain_assign=$?"]
 [Word
   Unquoted "echo"
 ]
@@ -13,6 +116,281 @@
 [Word
   Unquoted "c"
 ]
+[Word
+  Unquoted "v="
+  CommandSubstitution "echo hello"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "got="
+  Variable "v"
+]
+[Word
+  Unquoted "result="
+  CommandSubstitution "echo hello  # a ) comment
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "result"
+]
+[Word
+  Unquoted "mid="
+  CommandSubstitution "echo foo#bar"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "mid"
+]
+[Word
+  Unquoted "quoted="
+  CommandSubstitution "echo "a # ) b""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "quoted"
+]
+[Word
+  Unquoted "nested="
+  CommandSubstitution "echo $(echo inner # ) cmt
+)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "nested"
+]
+[Word
+  Unquoted "x="
+  CommandSubstitution " cat <<< "payload" "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "x="
+  Variable "x"
+]
+[Word
+  Unquoted "empty="
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "y="
+  CommandSubstitution " cat <<<"$empty" "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "y="
+  Variable "y"
+]
+[Word
+  Unquoted "z="
+  CommandSubstitution " echo "$( echo nested )" -- "$x" "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "z="
+  Variable "z"
+]
+[Word
+  Unquoted "w="
+  CommandSubstitution " echo "$( printf '%s\n' "'")""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "w="
+  Variable "w"
+]
+[Word
+  Unquoted "line="
+  DoubleQuoted "part value tail"
+]
+[Word
+  Unquoted "tar="
+  CommandSubstitution " printf '%s\n' "$line" | sed -e 's/^.* \([^ ]*x\) .*$/\1/' <<<"$line" "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tar="
+  Variable "tar"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo hi"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo $(echo deep)"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "w"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  CommandSubstitution "echo x y z"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "i="
+  Variable "w"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "x="
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after_false="
+  Variable "?"
+]
+[Word
+  Unquoted "y="
+  CommandSubstitution "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after_true="
+  Variable "?"
+]
+[Word
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "bare_csub="
+  Variable "?"
+]
+[Word
+  FunctionSubstitution "false; "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "bare_funsub="
+  Variable "?"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "vanished_word="
+  Variable "?"
+]
+[Word
+  Unquoted "a="
+  CommandSubstitution "true"
+]
+[Word
+  Unquoted "b="
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "last_assign="
+  Variable "?"
+]
+[Word
+  Unquoted "a="
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "b="
+  CommandSubstitution "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "last_assign2="
+  Variable "?"
+]
+[Word
+  Unquoted "a=1"
+]
+[Word
+  Unquoted "b=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "plain_assign="
+  Variable "?"
+]
 shit: 2:8: warning: An unquoted command substitution splits its output.
      2 |  echo a $(echo b) c
        |         ^~~~~~~~~
@@ -21,5 +399,50 @@ shit: 2:8: warning: A command substitution wraps a useless echo.
      2 |  echo a $(echo b) c
        |         ^~~~~~~~~
 note: The text can be used directly without the subshell.
+shit: 31:6: warning: An echo of a command substitution prints what the command already prints.
+    31 |  f(){ echo "$(echo hi)"; }
+       |       ^~~~
+note: Run the command on its own instead.
+shit: 31:11: warning: A command substitution wraps a useless echo.
+    31 |  f(){ echo "$(echo hi)"; }
+       |            ^~~~~~~~~~~~
+note: The text can be used directly without the subshell.
+shit: 38:1: warning: An echo of a command substitution prints what the command already prints.
+    38 |  echo $(echo $(echo deep))
+       |  ^~~~
+note: Run the command on its own instead.
+shit: 38:6: warning: An unquoted command substitution splits its output.
+    38 |  echo $(echo $(echo deep))
+       |       ^~~~~~~~~~~~~~~~~~~~
+note: Quote it to keep one argument.
+shit: 38:6: warning: A command substitution wraps a useless echo.
+    38 |  echo $(echo $(echo deep))
+       |       ^~~~~~~~~~~~~~~~~~~~
+note: The text can be used directly without the subshell.
 a b c
+got=hello
+hello
+foo#bar
+a # ) b
+inner
+x=payload
+y=
+z=nested -- payload
+w='
+tar=part value tail
+hi
+hi
+hi
+deep
+i=x
+i=y
+i=z
+after_false=1
+after_true=0
+bare_csub=1
+bare_funsub=1
+vanished_word=1
+last_assign=1
+last_assign2=0
+plain_assign=0
 [Code 0]

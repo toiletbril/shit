@@ -1,7 +1,0 @@
-== rm -rf / is refused (count of the refusal):
-1
-== rm -rf // is refused (count):
-1
-== a normal file is reported for removal under --dry-run, and survives:
-rm: would remove 'keep'
-keep-survives

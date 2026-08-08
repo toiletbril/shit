@@ -1,0 +1,67 @@
+=== constant arithmetic fold ===
+[optimizer] folded constant arithmetic: 1 + 2 * 3 = 7
+[optimizer] summary: 1 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 0 compounds eliminated
+7
+=== constant propagation into arithmetic ===
+[optimizer] recorded constant: x = 2
+[optimizer] recorded constant: y = 3
+[optimizer] folded constant arithmetic: x + y = 5
+[optimizer] summary: 1 arithmetic folded, 2 constants recorded, 0 branches folded, 0 loops folded, 0 compounds eliminated
+5
+=== dead branch, condition is true ===
+[optimizer] folded if to branch 0
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 1 branches folded, 0 loops folded, 0 compounds eliminated
+a
+=== dead branch, all false folds to else ===
+[optimizer] folded if to the else body
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 1 branches folded, 0 loops folded, 0 compounds eliminated
+b
+=== while false is eliminated ===
+[optimizer] folded while loop to a skip
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 1 loops folded, 0 compounds eliminated
+after
+=== until true is eliminated ===
+[optimizer] folded until loop to a skip
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 1 loops folded, 0 compounds eliminated
+after
+=== runtime variable does not fold ===
+shit: 1:1: warning: A read without -r mangles a backslash in the input.
+     1 |  read n; echo $((n + 1))
+       |  ^~~~~~
+note: Add -r to read the line literally.
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 0 compounds eliminated
+1
+=== undecidable condition does not fold ===
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 0 compounds eliminated
+done
+=== if with no reachable body is eliminated ===
+[optimizer] folded if to the else body
+[optimizer] eliminated if to a no-op
+[optimizer-state] 1:1: warning: Eliminated if with no reachable body.
+     1 |  if false; then echo a; fi; echo done
+       |  ^~
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 1 branches folded, 0 loops folded, 1 compounds eliminated
+done
+=== for over an empty list is eliminated ===
+[optimizer] eliminated empty for loop
+[optimizer-state] 1:1: warning: Eliminated for over an empty list.
+     1 |  for x in; do echo a; done; echo done
+       |  ^~~
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 1 compounds eliminated
+done
+=== c-style for with a blank init and a zero condition is eliminated ===
+[optimizer] folded c-style for condition: 0 = 0
+[optimizer] eliminated c-style for loop
+[optimizer-state] 1:1: warning: Eliminated c-style for whose condition is zero.
+     1 |  for ((; 0; i++)); do echo a; done; echo done
+       |  ^~~
+[optimizer] summary: 1 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 1 compounds eliminated
+done
+=== c-style for with a non-blank init folds but keeps the init ===
+[optimizer] folded c-style for condition: 0 = 0
+[optimizer] summary: 1 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 0 compounds eliminated
+done
+=== while false is eliminated ===
+[optimizer] folded while loop to a skip
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 1 loops folded, 0 compounds eliminated
+done

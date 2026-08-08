@@ -34,6 +34,67 @@
       [CompoundList]
         [CompoundListCondition, None]
           [SimpleCommand "echo" "elem $x"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "n=$#e[@] all=$e[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "appended=$e[2]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "empty_n=$#g[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "seq=$pvars $specs[1]"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "local_arr=$a[1]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "empty default, set: [$a[@]:-]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "default, set: [$a[@]:-fallback]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "default, unset: [$b[@]:-fallback]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "alternate, set: [$a[@]:+present]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "star empty default: [$a[*]:-z]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "slice still works: [$a[@]:1:1]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "no-colon dash, set: [$a[@]-nc]"]
+  [CompoundListCondition, None]
+    [ForLoop "c"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "loop c=$c"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-p" "a"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-p" "b"]
 [Word
   Unquoted "a="
 ]
@@ -158,6 +219,258 @@
 [Word
   Unquoted "done"
 ]
+[Word
+  Unquoted "e="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "n="
+  Variable "#e[@]"
+  DoubleQuoted " all="
+  Variable "e[@]"
+]
+[Word
+  Unquoted "e+="
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "appended="
+  Variable "e[2]"
+]
+[Word
+  Unquoted "g="
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "empty_n="
+  Variable "#g[@]"
+]
+[Word
+  Unquoted "flags="
+]
+[Word
+  Unquoted "pvars="
+]
+[Word
+  Unquoted "p"
+]
+[Word
+  Unquoted "specs="
+]
+[Word
+  Unquoted "s1"
+]
+[Word
+  Unquoted "s2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "seq="
+  Variable "pvars"
+  DoubleQuoted " "
+  Variable "specs[1]"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "a="
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "local_arr="
+  Variable "a[1]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "a="
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "empty default, set: ["
+  Variable "a[@]:-"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "default, set: ["
+  Variable "a[@]:-fallback"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "default, unset: ["
+  Variable "b[@]:-fallback"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "alternate, set: ["
+  Variable "a[@]:+present"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "star empty default: ["
+  Variable "a[*]:-z"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "slice still works: ["
+  Variable "a[@]:1:1"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "no-colon dash, set: ["
+  Variable "a[@]-nc"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "a[@]:-"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "loop c="
+  Variable "c"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "a="
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "a+="
+]
+[Word
+  Unquoted "[-1]=9"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b="
+]
+[Word
+  Unquoted "10"
+]
+[Word
+  Unquoted "20"
+]
+[Word
+  Unquoted "30"
+]
+[Word
+  Unquoted "40"
+]
+[Word
+  Unquoted "b+="
+]
+[Word
+  Unquoted "[-2]=99"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "b"
+]
 one two three four five
 one two three four five
 5
@@ -172,4 +485,20 @@ empty 0
 elem one
 elem two
 elem three
+n=2 all=a b
+appended=c
+empty_n=0
+seq=p s2
+local_arr=2
+empty default, set: [x y]
+default, set: [x y]
+default, unset: [fallback]
+alternate, set: [present]
+star empty default: [x y]
+slice still works: [y]
+no-colon dash, set: [x y]
+loop c=x
+loop c=y
+declare -a a=([0]="1" [1]="2" [2]="9")
+declare -a b=([0]="10" [1]="20" [2]="99" [3]="40")
 [Code 0]

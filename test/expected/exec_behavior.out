@@ -1,0 +1,25 @@
+== a missing command with a slash exits 127:
+shit: 1:7: error: Command '/nonexistent' was not found.
+     1 |  exec /nonexistent/cmd
+       |        ^~~~~~~~~~~
+rc=127
+== a missing command on the PATH exits 127:
+shit: 1:6: error: Command 'nonexistent_cmd_xyz' was not found.
+     1 |  exec nonexistent_cmd_xyz
+       |       ^~~~~~~~~~~~~~~~~~~
+rc=127
+== a non-executable file exits 126:
+shit: 1:6: error: Unable to execute `./notexec`: Permission denied.
+     1 |  exec ./notexec
+       |       ^~~~~~~~~
+rc=126
+== exec replaces the shell and runs the command:
+replaced
+== exec in a command substitution runs as a child:
+[sub]
+== direct no-shebang exec starts a replacement shell:
+hidden=unset shown=exported function=unset zero=custom arg=value
+== direct no-shebang exec honors an empty environment:
+hidden=unset shown=unset function=unset zero=empty arg=value
+input survived
+signal survived

@@ -27,6 +27,100 @@
     [SimpleCommand "test" "/dev/null" "-nt" "/dev/null"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "1" "-eq" "1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "eq=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "1" "-ne" "2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ne=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "abc" "=" "abc" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "streq=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-z" "" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "empty=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-n" "x" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "nonempty=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "5" "-gt" "3" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "gt=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "$TEST_TEMP_DIRECTORY/same-file" "-ef" "$TEST_TEMP_DIRECTORY/same-file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ef_same:$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "$TEST_TEMP_DIRECTORY/same-file" "-ef" "$TEST_TEMP_DIRECTORY/different-file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ef_diff:$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "unlink" "$TEST_TEMP_DIRECTORY/same-file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "unlink" "$TEST_TEMP_DIRECTORY/different-file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "=" "(" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "paren_eq=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "paren_single=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" ")" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rparen_single=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "=" ")" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "paren_ne=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "a" "<" "b" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "lt_true=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "b" "<" "a" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "lt_false=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "a" ">" "b" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "gt_false=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "b" ">" "a" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "gt_true=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "10" "<" "9" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "byte_lt=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "abc" "<" "abd" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "abc_lt_abd=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "a" "=" "a" ")" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "group_eq=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "a" "=" "a" ")" "-a" "-n" "x" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "group_and=$?"]
 [Word
   Unquoted "test"
 ]
@@ -144,6 +238,502 @@
 [Word
   Variable "?"
 ]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "eq="
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "-ne"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ne="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "streq="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "empty="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  DoubleQuoted "x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "nonempty="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "gt="
+  Variable "?"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/same-file"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/different-file"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/same-file"
+]
+[Word
+  Unquoted "-ef"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/same-file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ef_same:"
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/same-file"
+]
+[Word
+  Unquoted "-ef"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/different-file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ef_diff:"
+  Variable "?"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "unlink"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/same-file"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "unlink"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/different-file"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  DoubleQuoted "("
+]
+[Word
+  Unquoted "="
+]
+[Word
+  DoubleQuoted "("
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "paren_eq="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  DoubleQuoted "("
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "paren_single="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  DoubleQuoted ")"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rparen_single="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  DoubleQuoted "("
+]
+[Word
+  Unquoted "="
+]
+[Word
+  DoubleQuoted ")"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "paren_ne="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal "<"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "lt_true="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Literal "<"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "lt_false="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal ">"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "gt_false="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Literal ">"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "gt_true="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "10"
+]
+[Word
+  Literal "<"
+]
+[Word
+  Unquoted "9"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "byte_lt="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Literal "<"
+]
+[Word
+  Unquoted "abd"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "abc_lt_abd="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Literal "("
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal ")"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "group_eq="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Literal "("
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal ")"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "group_and="
+  Variable "?"
+]
 shit: 4:6: warning: The numeric comparison -eq reads 'abc', which is not a number, so the test errors at run time.
      4 |  test abc -eq 5; echo $?
        |       ^~~
@@ -151,6 +741,34 @@ shit: 7:8: warning: A test with -a or -o is obsolescent.
      7 |  test a -a b c; echo $?
        |         ^~
 note: Join two tests with && or || instead.
+shit: 11:3: warning: A one-operand test is the nonempty-string test.
+    11 |  [ ! ]
+       |    ^
+note: Write it with -n to read clearer.
+shit: 17:6: warning: The operand is a literal, so this -z test is constant.
+    17 |  [ -z "" ]; echo "empty=$?"
+       |       ^~
+note: Test a variable or drop the check.
+shit: 18:6: warning: The operand is a literal, so this -n test is constant.
+    18 |  [ -n "x" ]; echo "nonempty=$?"
+       |       ^~~
+note: Test a variable or drop the check.
+shit: 30:3: warning: A one-operand test is the nonempty-string test.
+    30 |  [ "(" ]; echo "paren_single=$?"
+       |    ^~~
+note: Write it with -n to read clearer.
+shit: 31:3: warning: A one-operand test is the nonempty-string test.
+    31 |  [ ")" ]; echo "rparen_single=$?"
+       |    ^~~
+note: Write it with -n to read clearer.
+shit: 40:15: warning: A test with -a or -o is obsolescent.
+    40 |  [ \( a = a \) -a -n x ]; echo "group_and=$?"
+       |                ^~
+note: Join two tests with && or || instead.
+shit: 40:21: warning: The operand is a literal, so this -n test is constant.
+    40 |  [ \( a = a \) -a -n x ]; echo "group_and=$?"
+       |                      ^
+note: Test a variable or drop the check.
 1
 0
 shit: 4:6: error: Builtin `test`: Cannot compare with '-eq', 'abc' is not an integer.

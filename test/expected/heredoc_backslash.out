@@ -3,6 +3,14 @@
     [Assign x=VAL]
   [CompoundListCondition, None]
     [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "-n"]
 [Word
   Unquoted "x=VAL"
 ]
@@ -12,5 +20,47 @@
 [Word
   Unquoted "EOF"
 ]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "B"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Literal "-EOF"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "-"
+  Literal "-EOF"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "EOF"
+]
+[Word
+  Unquoted "EOF2"
+]
+[Word
+  Unquoted "2"
+]
 $x stays, \ is one, $ok stays, VAL expands
+hi
+body
+indented
+     1	second-a
+     2	second-b
 [Code 0]

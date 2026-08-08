@@ -34,6 +34,69 @@ EOF
 )]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$v"]
+  [CompoundListCondition, None]
+    [Assign x=$(cat <<EOF
+body
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign y=$(cat <<EOF
+first line
+second line
+third line
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$y"]
+  [CompoundListCondition, None]
+    [ForLoop "i"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign z=$(cat <<EOF
+iteration $i
+EOF
+)]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$z"]
+  [CompoundListCondition, None]
+    [Assign HOME=/testhome]
+  [CompoundListCondition, None]
+    [Assign x=$(cat <<EOF
+body
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign y=$(cat <<'EOF'
+a " b
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$y"]
+  [CompoundListCondition, None]
+    [Assign z=$(cat <<EOF
+$HOME
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$z"]
+  [CompoundListCondition, None]
+    [Assign w=$(echo pre; cat <<EOF
+mid
+EOF
+echo post)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$w"]
+  [CompoundListCondition, None]
+    [Assign t=$(cat <<'EOF'
+has `backticks` and $vars
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$t"]
 [Word
   Unquoted "x="
   CommandSubstitution "cat <<\EOF
@@ -99,10 +162,157 @@ EOF
 [Word
   Variable "v"
 ]
+[Word
+  Unquoted "x="
+  CommandSubstitution "cat <<EOF
+body
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "y="
+  CommandSubstitution "cat <<EOF
+first line
+second line
+third line
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "y"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "z="
+  CommandSubstitution "cat <<EOF
+iteration $i
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "z"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "HOME=/testhome"
+]
+[Word
+  Unquoted "x="
+  CommandSubstitution "cat <<EOF
+body
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "y="
+  CommandSubstitution "cat <<'EOF'
+a " b
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "y"
+]
+[Word
+  Unquoted "z="
+  CommandSubstitution "cat <<EOF
+$HOME
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "z"
+]
+[Word
+  Unquoted "w="
+  CommandSubstitution "echo pre; cat <<EOF
+mid
+EOF
+echo post"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "w"
+]
+[Word
+  Unquoted "t="
+  CommandSubstitution "cat <<'EOF'
+has `backticks` and $vars
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "t"
+]
 backslash escaped delimiter
 bareword with dash
 leading whitespace before delimiter
 pre
 semicolon sentinel
 tab stripped in substitution
+body
+first line
+second line
+third line
+iteration 1
+iteration 2
+iteration 3
+body
+a " b
+/testhome
+pre
+mid
+post
+has `backticks` and $vars
 [Code 0]

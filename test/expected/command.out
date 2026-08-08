@@ -1,0 +1,491 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "command" "-v" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "command" "-v" "set"]
+  [CompoundListCondition, None]
+    [Assign d=$TEST_TEMP_DIRECTORY/command-v-golden]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$d"]
+  [CompoundListCondition, None]
+    [Assign probe_file=$d/probe]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$OS-" "=" "Windows_NT" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign probe_file=$probe_file.exe]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "cp" "$BIN" "$probe_file"]
+  [CompoundListCondition, None]
+    [Assign PATH=$d]
+  [CompoundListCondition, None]
+    [FunctionDefinition "probe"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "function_probe"]
+  [CompoundListCondition, None]
+    [SimpleCommand "command" "-v" "probe"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "rm" "-rf" "$d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== command -v guard:"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "command" "-v" "nonexistent-tool-xyz"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "tool is required"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== command -v if/then/else:"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "command" "-v" "nonexistent-tool-xyz"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "nonexistent-tool-xyz" "run"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "tool not installed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== type guard:"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "type" "nonexistent-tool-abc"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "need abc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== hash guard:"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "hash" "nonexistent-tool-def"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "need def"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== dead branch if false:"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "start"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "totally-nonexistent-command"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "end"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== unguarded still errors:"]
+  [CompoundListCondition, None]
+    [SimpleCommand "totally-nonexistent-command"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "d="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/command-v-golden"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "d"
+]
+[Word
+  Unquoted "probe_file="
+  Variable "d"
+  Unquoted "/probe"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "OS-"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "Windows_NT"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "probe_file="
+  Variable "probe_file"
+  Unquoted ".exe"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "cp"
+]
+[Word
+  Variable "BIN"
+]
+[Word
+  Variable "probe_file"
+]
+[Word
+  Unquoted "PATH="
+  Variable "d"
+]
+[Word
+  Unquoted "probe"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "function_probe"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "probe"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-rf"
+]
+[Word
+  Variable "d"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== command -v guard:"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "nonexistent-tool-xyz"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tool is required"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== command -v if/then/else:"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "nonexistent-tool-xyz"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "nonexistent-tool-xyz"
+]
+[Word
+  Unquoted "run"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tool not installed"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== type guard:"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "nonexistent-tool-abc"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "need abc"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== hash guard:"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "hash"
+]
+[Word
+  Unquoted "nonexistent-tool-def"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "need def"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== dead branch if false:"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "start"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "totally-nonexistent-command"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "end"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== unguarded still errors:"
+]
+[Word
+  Unquoted "totally-nonexistent-command"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+echo
+set
+probe
+== command -v guard:
+tool is required
+rc=0
+== command -v if/then/else:
+tool not installed
+rc=0
+== type guard:
+need abc
+rc=0
+== hash guard:
+need def
+rc=0
+== dead branch if false:
+start
+end
+== unguarded still errors:
+shit: 31:1: error: Command 'totally-nonexistent-command' was not found.
+    31 |  totally-nonexistent-command
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+rc=127
+[Code 0]

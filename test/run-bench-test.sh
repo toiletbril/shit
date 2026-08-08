@@ -8,7 +8,9 @@
 
 export TIMEFORMAT="  %R"
 
-WORK=$(mktemp -d -t shit_bench_XXX)
+WORK=$TEST_TEMP_DIRECTORY/bench
+rm -rf "$WORK"
+mkdir -p "$WORK"
 trap 'rm -rf "$WORK"' EXIT
 D=$WORK/d
 B=$WORK/b

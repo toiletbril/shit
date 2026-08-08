@@ -1,2 +1,0 @@
-#!/bin/env shit
-true && echo a || echo b && false || true

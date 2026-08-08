@@ -17,12 +17,14 @@ for f in "$@"; do
         fi
         ;;
     esac
-    out=$(mktemp)
+    output_directory="$TEST_TEMP_DIRECTORY/results/cli"
+    mkdir -p "$output_directory"
+    out="$output_directory/$name.out"
     case $name in
-    command_substitution_interrupt|fg_terminal_handoff|history_recall_large|read_timeout|\
+    command_substitution_interrupt|fg_terminal_handoff|history_behavior|read_behavior|\
         shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job)
         golden_timeout_seconds=60
-        if [ "$name" = history_recall_large ] || [ "$name" = shitbox_timeout ]; then
+        if [ "$name" = history_behavior ] || [ "$name" = shitbox_timeout ]; then
             golden_timeout_seconds=120
         fi
         CLI_TEST_TIMEOUT_SECONDS=${CLI_TEST_TIMEOUT_SECONDS:-$golden_timeout_seconds} \
@@ -37,10 +39,10 @@ for f in "$@"; do
         BIN="$BIN" "$test_shell" "$f" > "$out" 2>&1
         ;;
     esac
-    if diff $DIFF_FLAGS "expected/cli/$name.out" "$out" >/dev/null 2>&1; then
+    if diff $DIFF_FLAGS "expected/$name.out" "$out" >/dev/null 2>&1; then
         printf "\t%-64s ok\033[K\r" "cli/$name.sh"
     else
-        diff $DIFF_FLAGS "expected/cli/$name.out" "$out" | tee -a "$FAILED_LIST"
+        diff $DIFF_FLAGS "expected/$name.out" "$out" | tee -a "$FAILED_LIST"
         printf "\t%-64s FAILED :c\n" "cli/$name.sh"
     fi
     rm -f "$out"

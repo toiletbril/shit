@@ -7,7 +7,9 @@
 
 for name in "$@"; do
     [ -f "shit/$name.shit" ] || continue
-    out=$(mktemp)
+    output_directory="$TEST_TEMP_DIRECTORY/results/shit"
+    mkdir -p "$output_directory"
+    out="$output_directory/$name.out"
     "$BIN" $BIN_FLAGS - < "shit/$name.shit" > "$out" 2>&1
     if diff $DIFF_FLAGS "expected/$name.out" "$out" >/dev/null 2>&1 || \
        { [ -f "expected/${name}_1.out" ] && \

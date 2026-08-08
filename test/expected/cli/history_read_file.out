@@ -1,7 +1,0 @@
-== history -r <file> merges the named file into the list:
-    1  existing one
-    2  existing two
-    3  merged alpha
-    4  merged beta
-== history -r on a missing file errors:
-rc=1

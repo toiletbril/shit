@@ -1,6 +1,0 @@
-#!/bin/env shit
-g() { :; }
-type echo
-type g
-type true
-type nonexistent_xyz

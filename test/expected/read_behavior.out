@@ -1,0 +1,24 @@
+rc=0 x=[hi]
+rc=1 x=[h]
+rc=1 x=[]
+== a prefix IFS splits read after the global IFS was changed:
+count=4 first=a last=d
+== a prefix IFS splits read with the default global IFS:
+x|y|z
+== read without a prefix follows the changed global IFS:
+count=3
+== read -q returns zero for y:
+rc=0
+== read -q returns zero for Y:
+rc=0
+== read -q returns one for n:
+rc=1
+== read -q returns one for a non-y byte:
+rc=1
+== read -q at EOF returns one:
+rc=1
+query=142
+count=142 value=[a]
+continued=142 value=[a]
+invalid=1
+eof=1 value=[]

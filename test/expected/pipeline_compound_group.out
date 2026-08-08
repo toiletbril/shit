@@ -17,6 +17,96 @@
             [SimpleCommand "read" "b"]
           [CompoundListCondition, None]
             [SimpleCommand "echo" "$a-$b"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "echo" "1"]
+      [SimpleCommand "cat"]
+      [SimpleCommand "cat"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "echo" "2"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, &&]
+    [Pipeline]
+      [SimpleCommand "echo" "3"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "echo" "4"]
+      [SimpleCommand "false"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "4"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "a"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "hi"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "a"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "b"]
+      [SimpleCommand "wc" "-l"]
+      [SimpleCommand "tr" "-d" " "]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a\nb\nc\n"]
+      [WhileLoop]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "l"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "got $l"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "true"]
+      [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tf=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "false"]
+      [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ft=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "false"]
+      [SimpleCommand "read" "-r" "x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "fr=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "echo" "hi"]
+      [SimpleCommand "read" "-r" "y"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "er=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "true"]
+      [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tt=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "true"]
+      [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "neg=$?"]
 [Word
   Unquoted "echo"
 ]
@@ -67,6 +157,229 @@
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal " "
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\nb\nc\n"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "l"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "got "
+  Variable "l"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tf="
+  Variable "?"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ft="
+  Variable "?"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "fr="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "er="
+  Variable "?"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tt="
+  Variable "?"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "neg="
+  Variable "?"
+]
 shit: 3:13: warning: A read without -r mangles a backslash in the input.
      3 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
        |              ^~~~~~
@@ -75,6 +388,41 @@ shit: 3:21: warning: A read without -r mangles a backslash in the input.
      3 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
        |                      ^~~~~~
 note: Add -r to read the line literally.
+shit: 8:10: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
+     8 |  echo 4 | false || echo 4;
+       |           ^~~~~
+shit: 14:28: warning: A read without -r mangles a backslash in the input.
+    14 |  printf 'a\nb\nc\n' | while read l; do echo "got $l"; done
+       |                             ^~~~~~
+note: Add -r to read the line literally.
+shit: 16:8: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
+    16 |  true | false
+       |         ^~~~~
+shit: 18:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+    18 |  false | true
+       |          ^~~~
+shit: 24:8: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+    24 |  true | true
+       |         ^~~~
+shit: 26:10: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
+    26 |  ! true | false
+       |           ^~~~~
 x
 1-2
+1
+2
+3
+4
+a
+hi
+2
+got a
+got b
+got c
+tf=1
+ft=1
+fr=1
+er=0
+tt=0
+neg=0
 [Code 0]

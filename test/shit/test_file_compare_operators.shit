@@ -1,8 +1,0 @@
-#!/bin/env shit
-shitbox mkdir -p "$TEST_TEMP_DIRECTORY"
-: > "$TEST_TEMP_DIRECTORY/same-file"
-: > "$TEST_TEMP_DIRECTORY/different-file"
-test "$TEST_TEMP_DIRECTORY/same-file" -ef "$TEST_TEMP_DIRECTORY/same-file"; echo "ef_same:$?"
-test "$TEST_TEMP_DIRECTORY/same-file" -ef "$TEST_TEMP_DIRECTORY/different-file"; echo "ef_diff:$?"
-shitbox unlink "$TEST_TEMP_DIRECTORY/same-file"
-shitbox unlink "$TEST_TEMP_DIRECTORY/different-file"

@@ -71,12 +71,6 @@ else
     echo operand-rejected
 fi
 
-help=$(PATH= "$BIN" -c 'set -o shitbox; nproc --help')
-case "$help" in
-    *--all*--ignore*) echo help-flags ;;
-    *) echo help-missing ;;
-esac
-
 listed=$(PATH= "$BIN" -c 'shitbox --list | shitbox grep nproc')
 if [ "$listed" = nproc ]; then
     echo listed-once

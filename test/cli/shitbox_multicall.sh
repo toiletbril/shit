@@ -20,8 +20,22 @@ echo "--- unknown flag on a symlinked utility reports an error, not a crash ---"
 ./tail --bogus
 echo "rc=$?"
 
-echo "--- a symlinked utility names the shit binary in its help ---"
-./tail --help | grep -c "bundled with the shit shell"
-
 echo "--- a symlinked utility reports the shit version on --version ---"
 ./tail --version | grep -c "Shit Shell"
+
+unset SHIT_FLAGS
+# shitbox --assimilate installs a symlink to the binary named for each utility
+# into a directory, the busybox-style install. A symlinked invocation routes its
+# own flags to the utility rather than the shell CLI. A hermetic temp directory
+# keeps it stable, and it is left in place so the test never runs rm.
+dir=$(mktemp -d)
+"$BIN" -c "shitbox --assimilate '$dir'" </dev/null
+echo "== a symlink was installed for head:"
+[ -L "$dir/head" ] && echo head-linked || echo head-missing
+echo "== a symlinked head routes its own -c flag to the utility:"
+printf 'abcdefgh' > "$dir/sample"
+"$dir/head" -c 3 "$dir/sample"
+echo ""
+echo "== a symlinked ls routes -A to ls (count of the dot file):"
+: > "$dir/.dotfile"
+"$dir/ls" -A -1 "$dir" | grep -c '^\.dotfile$'

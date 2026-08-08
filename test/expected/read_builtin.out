@@ -26,6 +26,48 @@
             [SimpleCommand "read" "v"]
           [CompoundListCondition, None]
             [SimpleCommand "echo" "rc=$? v=$v"]
+  [CompoundListCondition, None]
+    [Assign file=$TEST_TEMP_DIRECTORY/read-eof]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "abc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "read" "x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "no_newline=[$x] $?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "def\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "read" "y"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "with_newline=[$y] $?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "unlink" "$file"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "x::y\n"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign IFS=:]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "a" "b" "c"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "[$a][$b][$c]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "read" "a" "b" "c" "d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[$a][$b][$c][$d]"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "p q r\n"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "m" "n" "o"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "[$m][$n][$o]"]
 [Word
   Unquoted "printf"
 ]
@@ -115,6 +157,196 @@
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "file="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/read-eof"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Variable "file"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Variable "file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "no_newline=["
+  Variable "x"
+  DoubleQuoted "] "
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "def\n"
+]
+[Word
+  Variable "file"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Variable "file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "with_newline=["
+  Variable "y"
+  DoubleQuoted "] "
+  Variable "?"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "unlink"
+]
+[Word
+  Variable "file"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "x::y\n"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "IFS=:"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "a"
+  DoubleQuoted "]["
+  Variable "b"
+  DoubleQuoted "]["
+  Variable "c"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "IFS=-"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "IN"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "a"
+  DoubleQuoted "]["
+  Variable "b"
+  DoubleQuoted "]["
+  Variable "c"
+  DoubleQuoted "]["
+  Variable "d"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "p q r\n"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "m"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "o"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "m"
+  DoubleQuoted "]["
+  Variable "n"
+  DoubleQuoted "]["
+  Variable "o"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "}"
+]
 shit: 2:22: warning: A read without -r mangles a backslash in the input.
      2 |  printf 'a b c\n' | { read first rest; echo "first=$first rest=$rest"; }
        |                       ^~~~~~~~~~~~~~~
@@ -127,7 +359,32 @@ shit: 4:20: warning: A read without -r mangles a backslash in the input.
      4 |  printf 'noeol' | { read v; echo "rc=$? v=$v"; }
        |                     ^~~~~~
 note: Add -r to read the line literally.
+shit: 10:1: warning: A read without -r mangles a backslash in the input.
+    10 |  read x < "$file"
+       |  ^~~~~~
+note: Add -r to read the line literally.
+shit: 13:1: warning: A read without -r mangles a backslash in the input.
+    13 |  read y < "$file"
+       |  ^~~~~~
+note: Add -r to read the line literally.
+shit: 17:28: warning: A read without -r mangles a backslash in the input.
+    17 |  printf 'x::y\n' | { IFS=:; read a b c; echo "[$a][$b][$c]"; }
+       |                             ^~~~~~~~~~
+note: Add -r to read the line literally.
+shit: 19:7: warning: A read without -r mangles a backslash in the input.
+    19 |  IFS=- read a b c d <<IN
+       |        ^~~~~~~~~~~~
+note: Add -r to read the line literally.
+shit: 22:47: warning: A read without -r mangles a backslash in the input.
+    22 |  echo "[$a][$b][$c][$d]"; printf 'p q r\n' | { read m n o; echo "[$m][$n][$o]"; }
+       |                                                ^~~~~~~~~~
+note: Add -r to read the line literally.
 first=a rest=b c
 n=3 a0=1 a2=3
 rc=1 v=noeol
+no_newline=[abc] 1
+with_newline=[def] 0
+[x][][y]
+[w][x][y][z]
+[p][q][r]
 [Code 0]

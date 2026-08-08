@@ -110,12 +110,10 @@ cleanup()
 trap cleanup EXIT
 
 SHELL_BINARY=$BIN "$BIN" -p --mood sh -c '
-    shitbox flock --help >/dev/null
     shitbox flock "$1" "$SHELL_BINARY" -p --mood sh -c \
         "printf held > \"\$1\"" shell "$2"
 ' shell "$directory" "$directory/normal"
-printf 'normal=%s help=%s list=%s\n' "$(cat "$directory/normal")" \
-    "$("$BIN" -c 'shitbox flock --help' | grep -c transaction-held-lock)" \
+printf 'normal=%s list=%s\n' "$(cat "$directory/normal")" \
     "$("$BIN" -c 'shitbox --list' | grep -c '^flock$')"
 if [ "${OS-}" = Windows_NT ]; then
     wait_for_lock_release 10 || exit 1

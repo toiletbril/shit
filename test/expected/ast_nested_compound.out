@@ -22,6 +22,71 @@
                     [CompoundList]
                       [CompoundListCondition, None]
                         [SimpleCommand "echo" "y"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "a"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "b"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "false"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [BraceGroup]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "a"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "b"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "m"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "d"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "yes"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "f"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "g"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "g"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "g"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "echo" "hi"]
+      [SimpleCommand "cat"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "a"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "a"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "b"]
 [Word
   Unquoted "if"
 ]
@@ -67,4 +132,205 @@
 [Word
   Unquoted "/dev/null"
 ]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "word"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "word"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "m"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "a*"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "function"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "g"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "g"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "g"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "EOF"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+a
+a
+b
+m
+yes
+f
+g
+a
+b
 [Code 0]

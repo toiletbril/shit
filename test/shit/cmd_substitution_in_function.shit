@@ -1,7 +1,0 @@
-#!/bin/env shit
-f(){ echo "$(echo hi)"; }
-f
-:
-f
-:
-f

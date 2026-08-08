@@ -10,6 +10,158 @@
           [SimpleCommand "cd" "$TEST_TEMP_DIRECTORY/subshell-state"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "outside"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "alias" "sub_only=echo hi"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Pipeline]
+            [SimpleCommand "alias"]
+            [SimpleCommand "shitbox" "grep" "^alias sub_only="]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "leaked from subshell"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "isolated from subshell"]
+  [CompoundListCondition, None]
+    [Assign cs=$( alias cs_only='echo hi'; echo defined-inside )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cmdsub reported: $cs"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Pipeline]
+            [SimpleCommand "alias"]
+            [SimpleCommand "shitbox" "grep" "^alias cs_only="]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "leaked from cmdsub"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "isolated from cmdsub"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "V=parent"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign V=child]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "1:$V"]
+  [CompoundListCondition, None]
+    [Assign r=$(V=sub; echo x)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "2:$V $r"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "W=keep"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "unset" "W"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "3:[$W]"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "parent"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [FunctionDefinition "f"]
+            [BraceGroup]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "child"]
+        [CompoundListCondition, None]
+          [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+e"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "set" "-e"]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never-printed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "e-isolated-parent-survives"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+f"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "set" "-f"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "f-LEAKED"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "f-isolated"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-f"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "set" "+f"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "f-still-set"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "f-UNSET-LEAK"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo PARENT" "EXIT"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "trap" "echo SUB" "EXIT"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "in-sub"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-sub"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "plain-sub"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-plain"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "exit" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "exit-rc=$?"]
+  [CompoundListCondition, None]
+    [Assign v=$( trap "echo CSUB" EXIT; echo captured )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "got=$v"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
 [Word
   Unquoted "shitbox"
 ]
@@ -42,6 +194,396 @@
 [Word
   Unquoted "outside"
 ]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "sub_only="
+  Literal "echo hi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "^alias sub_only="
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "leaked from subshell"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "isolated from subshell"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "cs="
+  CommandSubstitution " alias cs_only='echo hi'; echo defined-inside "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cmdsub reported: "
+  Variable "cs"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "^alias cs_only="
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "leaked from cmdsub"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "isolated from cmdsub"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "V=parent"
+]
+[Word
+  Unquoted "V=child"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "1:"
+  Variable "V"
+]
+[Word
+  Unquoted "r="
+  CommandSubstitution "V=sub; echo x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "2:"
+  Variable "V"
+  DoubleQuoted " "
+  Variable "r"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "W=keep"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "W"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "3:["
+  Variable "W"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "parent"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "child"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+e"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never-printed"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "e-isolated-parent-survives"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+f"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "-"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "*f*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "f-LEAKED"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "f-isolated"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+f"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "-"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "*f*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "f-still-set"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "f-UNSET-LEAK"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+f"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  DoubleQuoted "echo PARENT"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  DoubleQuoted "echo SUB"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "in-sub"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-sub"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "plain-sub"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-plain"
+]
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "exit-rc="
+  Variable "?"
+]
+[Word
+  Unquoted "v="
+  CommandSubstitution " trap "echo CSUB" EXIT; echo captured "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "got="
+  Variable "v"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
 inside
 outside
+isolated from subshell
+cmdsub reported: defined-inside
+isolated from cmdsub
+1:parent
+2:parent x
+3:[keep]
+child
+parent
+e-isolated-parent-survives
+f-isolated
+f-still-set
+in-sub
+SUB
+after-sub
+plain-sub
+after-plain
+exit-rc=3
+got=captured CSUB
+done
 [Code 0]
+PARENT

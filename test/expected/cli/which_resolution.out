@@ -1,8 +1,0 @@
-== a builtin name:
-echo
-== an absent name exits 1 with no output:
-rc=1
-== a program resolved in a temp PATH:
-TMPDIR/mytool
-== -a lists every match in the temp PATH:
-TMPDIR/mytool

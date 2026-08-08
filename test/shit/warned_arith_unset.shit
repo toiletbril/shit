@@ -2,3 +2,12 @@
 set -W
 echo $((never_counted + 1))
 echo continued
+
+
+set -W
+echo *.zzz_nomatch_downgrade
+echo continued
+
+set -W
+echo "value=$never_piped" | cat
+echo continued

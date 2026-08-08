@@ -41,28 +41,35 @@ complete mode catalog, cross-compilation targets, and PREFIX installation.
 
 ## Test and golden workflow
 
-Run `make -C test test` for the main and completion suites. Run
+Run `make test` for the main and completion suites. Run
 `make -C test bench` for the benchmark. Wrap an interactive launch in a timeout.
+The debug test step reports its elapsed time. It warns after 180 seconds and
+fails after 300 seconds.
 
 The `refill` target regenerates goldens. The REFILL variable limits regeneration
 to named tests. Read every regenerated golden before accepting it. Refill
 records the binary output without judging it.
 
-The shit_tests, cli_tests, dashdiff, bashdiff, mimicrydiff, and bench recipes
-live in scripts under test. POSIX hosts launch them with /bin/bash. Windows
-launches them with sh. The shit_tests and cli_tests scripts accept test names.
-A bare NAME target or cli_NAME target runs one test through the same script.
-The dashdiff, bashdiff, and mimicrydiff scripts compare through process
-substitution. The harness carries alternate goldens for documented macOS
-differences.
+Every golden lives directly below `test/expected`. The directory has no
+subdirectories. Golden-backed test names remain unique across every harness.
+
+The shit_tests, cli_tests, build_tests, compatdiff, and bench recipes live in
+scripts under test. POSIX hosts launch them with /bin/bash. Windows launches
+them with sh. The shit_tests and cli_tests scripts accept test names. A bare
+NAME target or cli_NAME target runs one test through the same script. The
+compatdiff runner compares explicit moods and mimicry against one shared
+reference result. The dashdiff, bashdiff, and mimicrydiff targets select that
+runner. The harness carries alternate goldens for documented macOS differences.
+
+Runner output files live below `.test-work/results`. The portable mktemp shim
+uses host filesystem operations and never starts the tested shell.
 
 The benchmark uses `+analysis` for analysis-enabled runs. Compatibility rows
 retain their mood and enable analysis with `-W`.
 
 Every rm test invokes the shitbox rm with `--dry-run`. This rule applies to
-rm_behavior, rm_refuses_dot, rm_refuses_root, and every new rm test. Temporary
-directory cleanup uses the system rm behind a `[ -n "$d" ]` guard. The shitbox
-rm under test never performs cleanup.
+shitbox_rm and every new rm test. Temporary directory cleanup uses the system rm
+behind a `[ -n "$d" ]` guard. The shitbox rm under test never performs cleanup.
 
 The bashdiff and mimicrydiff comparisons require Bash 5.3 or newer. Both scripts
 report a skipped comparison when BASHP names an older Bash. The macOS system

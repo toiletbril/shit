@@ -8,3 +8,14 @@ echo done
 echo "neg-true=$?"
 ! false
 echo "neg-false=$?"
+
+
+flag_string=$-
+echo "${flag_string//[cI]/}"
+set -f
+flag_string=$-
+echo "${flag_string//[cI]/}"
+set +f
+set -u
+flag_string=$-
+echo "${flag_string//[cI]/}"

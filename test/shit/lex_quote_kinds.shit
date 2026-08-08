@@ -1,5 +1,0 @@
-#!/bin/env shit
-: bare 'single' "double"
-: pre'mid'post
-: out"in"out
-: 'one''two'"three"

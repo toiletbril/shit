@@ -14,12 +14,14 @@ fi
 
 for f in "$@"; do
     name=$(basename "$f" .sh)
-    out=$(mktemp)
+    output_directory="$TEST_TEMP_DIRECTORY/results/highlight"
+    mkdir -p "$output_directory"
+    out="$output_directory/$name.out"
     BIN="$BIN" "$test_shell" "$f" > "$out" 2>/dev/null
-    if diff $DIFF_FLAGS "expected/highlight/$name.out" "$out" >/dev/null 2>&1; then
+    if diff $DIFF_FLAGS "expected/$name.out" "$out" >/dev/null 2>&1; then
         printf "\t%-64s ok\033[K\r" "highlight/$name.sh"
     else
-        diff $DIFF_FLAGS "expected/highlight/$name.out" "$out" | \
+        diff $DIFF_FLAGS "expected/$name.out" "$out" | \
             tee -a "$FAILED_LIST"
         printf "\t%-64s FAILED :c\n" "highlight/$name.sh"
     fi
