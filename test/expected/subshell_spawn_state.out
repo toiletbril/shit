@@ -27,4 +27,7 @@ external-state=pid:status:depth
 pipeline-state=before
 pipeline-output=1
 pipeline-status=0
+execution-string-process=preserved
+execution-string-compound=preserved
+execution-string-substitution=preserved
 internal-startup=skipped

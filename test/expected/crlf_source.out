@@ -9,4 +9,5 @@ eval-two
 fallback
 lone=3
 execution-string=exact
+empty-execution-string=set:0
 diagnostic=clean

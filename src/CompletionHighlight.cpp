@@ -945,6 +945,82 @@ static pure fn command_name_operand_of(StringView word) wontthrow -> StringView
   return word_is_function_name(name) ? name : StringView{};
 }
 
+static fn static_koshkit_operand(StringView word,
+                                  bool &is_valid) throws
+    -> Maybe<koshkit::Utility::Kind>
+{
+  constexpr usize CAPACITY = koshkit::KOSHKIT_UTILS.prefilter.longest_key_length;
+  static_assert(CAPACITY > 0);
+
+  is_valid = false;
+  char decoded[CAPACITY];
+  usize decoded_length = 0;
+  char quote_character = 0;
+  bool is_decoded_too_long = false;
+
+  for (usize position = 0; position < word.length; position++) {
+    let byte = word[position];
+    if (quote_character == 0 && byte == '$' && position + 1 < word.length &&
+        (word[position + 1] == '\'' || word[position + 1] == '"'))
+    {
+      let const quote = word[++position];
+      let const body_start = position + 1;
+      while (++position < word.length && word[position] != quote) {
+        if (word[position] == '\\' && position + 1 < word.length) position++;
+      }
+      if (position == word.length) return None;
+
+      let special_decoded = String{bump_allocator(HIGHLIGHT_ARENA)};
+      let const body = word.substring_of_length(body_start, position - body_start);
+      if (quote == '\'')
+        utils::decode_ansi_c_escapes(special_decoded, body);
+      else {
+        let const locale_decoded = utils::decode_shell_word(
+            word.substring_of_length(body_start - 1, position - body_start + 2),
+            bump_allocator(HIGHLIGHT_ARENA));
+        special_decoded.append(locale_decoded.text.view());
+      }
+      if (special_decoded.length() > CAPACITY - decoded_length) {
+        is_decoded_too_long = true;
+        continue;
+      }
+      __builtin_memcpy(decoded + decoded_length, special_decoded.c_str(),
+                       special_decoded.length());
+      decoded_length += special_decoded.length();
+      continue;
+    }
+    if (quote_character == 0 && (byte == '\'' || byte == '"')) {
+      quote_character = byte;
+      continue;
+    }
+    if (byte == quote_character) {
+      quote_character = 0;
+      continue;
+    }
+    if (byte == '\\' && quote_character != '\'' && position + 1 < word.length) {
+      let const escaped_byte = word[position + 1];
+      if (quote_character != '"' || escaped_byte == '$' ||
+          escaped_byte == '`' || escaped_byte == '"' || escaped_byte == '\\' ||
+          escaped_byte == '\n')
+      {
+        position++;
+        if (escaped_byte == '\n') continue;
+        byte = escaped_byte;
+      }
+    }
+    if (decoded_length == CAPACITY) {
+      is_decoded_too_long = true;
+      continue;
+    }
+    decoded[decoded_length++] = byte;
+  }
+
+  if (quote_character != 0) return None;
+  is_valid = true;
+  if (is_decoded_too_long) return None;
+  return koshkit::find_util(StringView{decoded, decoded_length});
+}
+
 static pure fn variable_name_operand_of(StringView word) wontthrow -> StringView
 {
   let name = word;
@@ -1226,10 +1302,13 @@ fn internal::scan_highlight_range(
               highlight_span{literal_start, i, highlight_role::string});
       } else if (d == '`') {
         i = do_color_backtick(i, word_spans);
-      } else if (d == '$' && i + 1 < end && line[i + 1] == '\'') {
+      } else if (d == '$' && i + 1 < end &&
+                 (line[i + 1] == '\'' || line[i + 1] == '"'))
+      {
         let const string_start = i;
+        let const quote_character = line[i + 1];
         i += 2;
-        while (i < end && line[i] != '\'') {
+        while (i < end && line[i] != quote_character) {
           if (line[i] == '\\' && i + 1 < end) {
             i += 2;
             continue;
@@ -1406,14 +1485,16 @@ fn internal::scan_highlight_range(
           }
         }
         if (!has_opaque_expansion) {
-          let const decoded =
-              utils::decode_shell_word(word, bump_allocator(HIGHLIGHT_ARENA));
-          word_spans.clear();
-          do_push(word_start, word_end,
-                  koshkit::find_util(decoded.text.view()).has_value()
-                      ? highlight_role::resolved_command
-                      : highlight_role::unknown_command);
-          continue;
+          bool is_static_operand_valid = false;
+          let const utility =
+              static_koshkit_operand(word, is_static_operand_valid);
+          if (is_static_operand_valid) {
+            word_spans.clear();
+            do_push(word_start, word_end,
+                    utility.has_value() ? highlight_role::resolved_command
+                                        : highlight_role::unknown_command);
+            continue;
+          }
         }
       }
     }

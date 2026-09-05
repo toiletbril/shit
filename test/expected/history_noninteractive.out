@@ -50,6 +50,17 @@ rc=0
 0
 == concurrent history stores preserve both records ==
 2
+== consecutive duplicate stores succeed and retain one record ==
+rc=0,0
+    1  repeated
+== an equal size replacement refreshes append state ==
+    1  second
+    2  third
+== history deletion rewrites the no editor store ==
+    1  second
+== invalid stored bytes leave existing history intact ==
+rc=1
+    1  valid
 == running shells reload history written by another instance ==
     1  shared-event
 == KOSH_HISTORY_SIZE controls the visible retained window ==

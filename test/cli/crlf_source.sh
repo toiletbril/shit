@@ -41,6 +41,10 @@ execution_string=$(printf '[ "$BASH_EXECUTION_STRING" = "$1" ] || exit 1\r\necho
 execution_string=${execution_string%_}
 "$BIN" --mood bash -c "$execution_string" crlf-driver "$execution_string"
 
+startup_script="$dir/startup.kosh"
+printf 'printf "empty-execution-string=%%s:%%s\\n" "${BASH_EXECUTION_STRING+set}" "${#BASH_EXECUTION_STRING}"\n' > "$startup_script"
+BASH_ENV=$startup_script "$BIN" --mood bash -c ''
+
 invalid_script="$dir/invalid.kosh"
 printf 'echo first\r\nmissing_crlf_probe\r\n' > "$invalid_script"
 diagnostic=$("$BIN" "$invalid_script" 2>&1) && exit 1

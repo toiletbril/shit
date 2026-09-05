@@ -167,11 +167,18 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   LOG(All, "assigning variable '%.*s' to a value of %zu bytes",
       static_cast<int>(name.length), name.data, value.length);
   if (name == "IFS") set_field_separators(value);
-  if (name == "PATH") m_program_resolver.assign_path(String{value});
+  let const is_path =
+      name == "PATH" ||
+      (!os::ENVIRONMENT_IS_CASE_SENSITIVE && name.length == 4 &&
+       utils::ascii_to_lower(name[0]) == 'p' &&
+       utils::ascii_to_lower(name[1]) == 'a' &&
+       utils::ascii_to_lower(name[2]) == 't' &&
+       utils::ascii_to_lower(name[3]) == 'h');
+  if (is_path) m_program_resolver.assign_path(String{value});
   if (name == "IGNOREEOF")
     m_runtime.set_option(shell_option_id::Ignoreeof, true);
   m_shell_variables.set(name, value);
-  if (m_exported_names.contains(name)) {
+  if (is_exported(name)) {
     if (m_subshell_depth > 0)
       m_environment_undo_log.push(environment_undo_entry{
           String{name}, os::get_environment_variable(name)});
@@ -409,11 +416,11 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
                               binding.previous_associative_keys[k].view(),
                               binding.previous_associative_values[k].view());
   if (binding.previous_was_exported) {
-    m_exported_names.add(binding.name.view());
+    mark_exported(binding.name.view());
     if (binding.previous_value.has_value())
       os::set_environment_variable(binding.name, *binding.previous_value);
-  } else if (is_exported(binding.name)) {
-    m_exported_names.remove(binding.name.view());
+  } else if (is_exported(binding.name.view())) {
+    unmark_exported(binding.name.view());
     os::unset_environment_variable(binding.name);
   }
 }
@@ -721,7 +728,14 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
   os::unset_environment_variable(name);
   unmark_exported(name);
   if (name == "IFS") set_field_separators(" \t\n");
-  if (name == "PATH")
+  let const is_path =
+      name == "PATH" ||
+      (!os::ENVIRONMENT_IS_CASE_SENSITIVE && name.length == 4 &&
+       utils::ascii_to_lower(name[0]) == 'p' &&
+       utils::ascii_to_lower(name[1]) == 'a' &&
+       utils::ascii_to_lower(name[2]) == 't' &&
+       utils::ascii_to_lower(name[3]) == 'h');
+  if (is_path)
     m_program_resolver.assign_path(os::get_environment_variable("PATH"));
   if (name == "IGNOREEOF")
     m_runtime.set_option(shell_option_id::Ignoreeof, false);
@@ -738,12 +752,31 @@ fn EvalContext::mark_exported(StringView name) throws -> void
 {
   LOG(All, "marking '%.*s' as exported", static_cast<int>(name.length),
       name.data);
-  m_exported_names.add(name);
+  if (!is_exported(name)) m_exported_names.add(name);
 }
 
 fn EvalContext::unmark_exported(StringView name) throws -> void
 {
-  m_exported_names.remove(name);
+  if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) {
+    m_exported_names.remove(name);
+    return;
+  }
+
+  Maybe<StringView> exported_name;
+  m_exported_names.for_each([&](StringView candidate) {
+    if (candidate.length != name.length) return;
+
+    for (usize position = 0; position < name.length; position++) {
+      if (utils::ascii_to_lower(candidate[position]) !=
+          utils::ascii_to_lower(name[position]))
+      {
+        return;
+      }
+    }
+
+    exported_name = candidate;
+  });
+  if (exported_name.has_value()) m_exported_names.remove(*exported_name);
 }
 
 fn EvalContext::unexport_shell_variable(StringView name) throws -> void
@@ -762,18 +795,36 @@ fn EvalContext::unexport_shell_variable(StringView name) throws -> void
     assign_variable(name, environment_value->view());
 }
 
-pure fn EvalContext::is_exported(StringView name) const wontthrow -> bool
+fn EvalContext::is_exported(StringView name) const throws -> bool
 {
-  return m_exported_names.contains(name);
+  if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE)
+    return m_exported_names.contains(name);
+
+  bool is_exported_name = false;
+  m_exported_names.for_each([&](StringView candidate) {
+    if (is_exported_name || candidate.length != name.length) return;
+
+    for (usize position = 0; position < name.length; position++) {
+      if (utils::ascii_to_lower(candidate[position]) !=
+          utils::ascii_to_lower(name[position]))
+      {
+        return;
+      }
+    }
+
+    is_exported_name = true;
+  });
+
+  return is_exported_name;
 }
 
 fn EvalContext::sync_exported_after_restore(StringView name,
                                             bool has_value) throws -> void
 {
   if (has_value)
-    m_exported_names.add(name);
+    mark_exported(name);
   else
-    m_exported_names.remove(name);
+    unmark_exported(name);
 }
 
 pure fn EvalContext::positional_params() const wontthrow

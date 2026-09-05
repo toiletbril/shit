@@ -5,6 +5,16 @@ if [ "${OS-}" = Windows_NT ]; then
     expected=$(printf '%s\n%s' "$path_value" survived)
     [ "$output" = "$expected" ] || exit 1
 
+    output=$(env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$path_value" \
+        "$BIN" -c '# shellcheck disable=SC2123
+PATH="C:\updated"; koshkit env | koshkit grep "^Path="')
+    [ "$output" = 'Path=C:\updated' ] || exit 1
+
+    printf '@echo off\r\necho path-refresh-ran\r\n' > "$TEST_SYSTEM_PATH/path-refresh.bat"
+    output=$(env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$path_value" \
+        "$BIN" -c 'Path="$TEST_SYSTEM_PATH"; path-refresh')
+    [ "$output" = path-refresh-ran ] || exit 1
+
     [ "$("$BIN" --no-annoying-diagnostics -c 'printf "%s" C:\new')" = 'C:new' ] || exit 1
     [ "$("$BIN" -c "printf '%s' 'C:\new'")" = 'C:\new' ] || exit 1
     [ "$("$BIN" -c 'printf "%s" C:\\new')" = 'C:\new' ] || exit 1

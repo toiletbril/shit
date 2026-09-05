@@ -741,6 +741,8 @@ fn kosh_main(int argc, char **argv) -> int
                                  FLAG_PRIVILEGED.is_enabled());
   context.set_shell_option_state(koshka::shell_option_id::Onecmd,
                                  FLAG_ONE_COMMAND.is_enabled());
+  if (should_execute_commands)
+    context.set_execution_string(FLAG_COMMAND.get(0));
   context.set_login_shell(is_login_shell);
   context.set_custom_rcfile(koshka::selected_rcfile().has_value());
   if (is_restricted_shell) context.request_restricted_shell();

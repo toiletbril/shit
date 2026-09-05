@@ -255,7 +255,7 @@ case "$out" in
     if [ -e "$modifier_print_path" ]; then
       echo "history print modifier broken"
     elif [ "$(grep -c '^false # DUPLICATE_HISTORY_MARKER$' \
-      "$modifier_history_path")" -ne 2 ]; then
+      "$modifier_history_path")" -ne 1 ]; then
       echo "history duplicate recording broken"
     elif grep -q -e ':z' -e MISSING "$modifier_history_path"; then
       echo "history modifier error recording broken"
@@ -293,7 +293,7 @@ out=$({
     run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
 if [ "$(grep -c '^ echo SPACE_STORAGE_MARKER$' "$storage_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^echo DUP_STORAGE_MARKER$' "$storage_history_path")" -eq 2 ]; then
+  [ "$(grep -c '^echo DUP_STORAGE_MARKER$' "$storage_history_path")" -eq 1 ]; then
   echo "history storage ok"
 else
   printf 'history storage file:\n%.4096s\n' \

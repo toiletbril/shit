@@ -42,12 +42,21 @@ _ACEOF
 echo tail' | grep -E "${tab}(heredoc|heredoc-delimiter|resolved-command)$"
 
 koshkit_result=$("$BIN" --debug-highlight-at \
-    'koshkit ls -l; koshkit koshkit-missing-utility value; koshkit --help; koshkit "cat"; koshkit koshkit\-missing-escaped')
+    'koshkit ls -l; koshkit koshkit-missing-utility value; koshkit --help; koshkit "cat"; koshkit '\''expr'\''; koshkit koshkit\-missing-escaped; koshkit c\at; koshkit basename; koshkit $'\''c\x61t'\''; koshkit $"cat"; koshkit "overlong-utility"; koshkit "cat')
 printf '%s\n' "$koshkit_result" | grep -Fx "ls${tab}resolved-command"
 printf '%s\n' "$koshkit_result" |
     grep -Fx "koshkit-missing-utility${tab}unknown-command"
 printf '%s\n' "$koshkit_result" | grep -Fx -- "--help${tab}flag"
 printf '%s\n' "$koshkit_result" | grep -Fx '"cat"'"${tab}resolved-command"
+printf '%s\n' "$koshkit_result" | grep -Fx "'expr'${tab}resolved-command"
 printf '%s\n' "$koshkit_result" |
     grep -Fx "koshkit\\-missing-escaped${tab}unknown-command"
+printf '%s\n' "$koshkit_result" | grep -Fx "c\\at${tab}resolved-command"
+printf '%s\n' "$koshkit_result" | grep -Fx "basename${tab}resolved-command"
+printf '%s\n' "$koshkit_result" |
+    grep -Fx '$'"'"'c\x61t'"'"''"${tab}resolved-command"
+printf '%s\n' "$koshkit_result" | grep -Fx '$"cat"'"${tab}resolved-command"
+printf '%s\n' "$koshkit_result" |
+    grep -Fx '"overlong-utility"'"${tab}unknown-command"
+printf '%s\n' "$koshkit_result" | grep -Fx '"cat'"${tab}string"
 echo "koshkit static operands are classified"

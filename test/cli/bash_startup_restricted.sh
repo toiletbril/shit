@@ -430,7 +430,7 @@ chmod +x "$directory/restricted-script"
 output=$(env -u PATH \
   "$TEST_PATH_ENVIRONMENT_NAME=$directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
   "$BIN" --mood bash --restricted -I -c \
-  'restricted-script')
+  'restricted-script' 2>/dev/null)
 printf 'executed=%s\n' "$output"
 output=$(env -u PATH \
   "$TEST_PATH_ENVIRONMENT_NAME=$directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \

@@ -225,6 +225,7 @@ changes update this file.
   Use an explicit continuation before any physical line break.
 - Resolve every guessed or optional peer path with `fd` before passing it to
   `rg`. Do not type a path merely because a nearby file suggests its name.
+- Select `fd` glob mode before passing a wildcard pattern.
 - Do not use Python, here-documents, sed in-place rewrites, or awk rewrites.
   Shell text tools remain read-only probes.
 - Inspect the complete command string, including nested quoted source, for

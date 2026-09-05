@@ -692,7 +692,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         }
         /* The resolver reads its own MAYBE_PATH, so a prefix PATH=... must
            update it for the environment write to change the search order. */
-        if (name == "PATH") {
+        let const is_path =
+            name == "PATH" ||
+            (!os::ENVIRONMENT_IS_CASE_SENSITIVE && name.length == 4 &&
+             utils::ascii_to_lower(name[0]) == 'p' &&
+             utils::ascii_to_lower(name[1]) == 'a' &&
+             utils::ascii_to_lower(name[2]) == 't' &&
+             utils::ascii_to_lower(name[3]) == 'h');
+        if (is_path) {
           if (!saved_program_resolver.has_value())
             saved_program_resolver =
                 Maybe<ProgramResolver>{cxt.get_program_resolver()};

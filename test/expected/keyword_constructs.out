@@ -64,5 +64,12 @@ ls	resolved-command
 koshkit-missing-utility	unknown-command
 --help	flag
 "cat"	resolved-command
+'expr'	resolved-command
 koshkit\-missing-escaped	unknown-command
+c\at	resolved-command
+basename	resolved-command
+$'c\x61t'	resolved-command
+$"cat"	resolved-command
+"overlong-utility"	unknown-command
+"cat	string
 koshkit static operands are classified

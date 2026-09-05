@@ -318,6 +318,8 @@ fn kosh_ghost_validate_callback(const char *entry) -> int
 
 namespace toiletline {
 
+fn is_history_contents_valid(koshka::StringView contents) -> bool;
+
 using koshka::EvalContext;
 using koshka::Maybe;
 using koshka::Path;
@@ -354,6 +356,9 @@ static fn resolve_history_path(StringView env_name, StringView default_file)
 }
 
 static constexpr char KOSH_CALC_HISTORY_FILE[] = ".kosh_calc_history";
+
+static os::file_status HISTORY_FILE_STATUS{};
+static bool HAS_HISTORY_FILE_STATUS = false;
 
 static fn history_file_path() -> koshka::Maybe<koshka::Path>
 {
@@ -401,11 +406,53 @@ fn history_write() -> bool
   return status == TL_SUCCESS || status == -EINVAL;
 }
 
+static fn file_status_matches(const os::file_status &expected,
+                              const os::file_status &actual) -> bool
+{
+  if (expected.has_file_identity && actual.has_file_identity &&
+      (expected.device_id != actual.device_id ||
+       expected.file_id != actual.file_id))
+  {
+    return false;
+  }
+
+  return expected.size == actual.size &&
+         expected.modification_time == actual.modification_time &&
+         expected.modification_nanoseconds == actual.modification_nanoseconds &&
+         expected.change_time == actual.change_time &&
+         expected.change_nanoseconds == actual.change_nanoseconds;
+}
+
+static fn load_history(const Path &path) -> bool
+{
+  HAS_HISTORY_FILE_STATUS = false;
+  if (::tl_history_load(path.c_str()) != TL_SUCCESS) return false;
+
+  HAS_HISTORY_FILE_STATUS =
+      os::stat_path_following(path.text().view(), HISTORY_FILE_STATUS);
+  return true;
+}
+
 fn history_read() -> bool
 {
   let const path = history_file_path();
   if (!path.has_value()) return false;
-  return ::tl_history_load(path->c_str()) == TL_SUCCESS;
+  return load_history(*path);
+}
+
+static fn sync_history(const Path &path) -> bool
+{
+  let status = os::file_status{};
+  if (::itl_g_history_path != nullptr &&
+      StringView{::itl_g_history_path} == path.text().view() &&
+      !::itl_g_history_file_is_bad && HAS_HISTORY_FILE_STATUS &&
+      os::stat_path_following(path.text().view(), status) &&
+      file_status_matches(HISTORY_FILE_STATUS, status))
+  {
+    return true;
+  }
+
+  return load_history(path);
 }
 
 fn history_clear() -> bool
@@ -420,9 +467,8 @@ fn history_clear() -> bool
   let opened = koshka::os::open_file_descriptor(
       path->text().view(), koshka::os::file_open_mode::Truncate);
   if (!opened.has_value()) return false;
-  koshka::os::close_fd(opened.take());
-  ::tl_history_load(path->c_str());
-  return true;
+  if (!koshka::os::close_fd(opened.take())) return false;
+  return load_history(*path);
 }
 
 fn set_history_enabled(bool is_enabled) -> void
@@ -547,7 +593,9 @@ fn containing_history_event(koshka::Allocator allocator, StringView text,
 
 fn history_append_event(StringView command) -> koshka::Maybe<usize>
 {
-  if (command.is_empty() || command.length > ITL_HISTORY_ENTRY_MAX_BYTES) {
+  if (command.is_empty() || command.length > ITL_HISTORY_ENTRY_MAX_BYTES ||
+      !is_history_contents_valid(command))
+  {
     return koshka::None;
   }
 
@@ -558,13 +606,27 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return koshka::None;
   defer { os::release_process_lock(lock.take()); };
-  unused(::tl_history_load(path->c_str()));
+  if (!sync_history(*path)) return koshka::None;
 
   itl_string_t *entry = ::itl_string_alloc();
   defer { ITL_STRING_FREE(entry); };
   if (!::itl_string_from_bytes(entry, command.data, command.length))
     return koshka::None;
+
+  if (::itl_g_history_count > 0) {
+    itl_string_t *newest = ::itl_string_alloc();
+    defer { ITL_STRING_FREE(newest); };
+    if (!::itl_history_read_entry(
+            ::itl_history_index_to_offset(::itl_g_history_count - 1), newest))
+    {
+      return koshka::None;
+    }
+    if (::itl_string_equal(newest, entry)) return ::itl_g_history_total_count;
+  }
+
   if (!::itl_history_append_to_file(entry, false, true)) return koshka::None;
+  HAS_HISTORY_FILE_STATUS =
+      os::stat_path_following(path->text().view(), HISTORY_FILE_STATUS);
 
   return ::itl_g_last_history_event_number;
 }
@@ -970,7 +1032,8 @@ fn get_input(const String &prompt) -> input_result
   let const program_path_candidate_count_before =
       utils::debug_program_path_candidate_count();
 #endif
-  unused(history_read());
+  let const history_path = history_file_path();
+  if (history_path.has_value()) unused(sync_history(*history_path));
   ::itl_g_last_history_event_number = 0;
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   COMPLETION_BASE_DIRECTORY = nullptr;

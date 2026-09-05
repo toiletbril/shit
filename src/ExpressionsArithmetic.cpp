@@ -702,8 +702,10 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
 
-  let const condition_is_blank = is_blank_clause(m_condition);
-  let const step_is_blank = is_blank_clause(m_step);
+  let const is_condition_blank = is_blank_clause(m_condition);
+  let const is_condition_folded =
+      m_folded_condition.has_value() && can_skip_condition_commands;
+  let const is_step_blank = is_blank_clause(m_step);
 
   let const do_evaluate_condition = [&]() throws -> bool {
     let &cache = get_clause_cache(m_condition_cache);
@@ -714,8 +716,8 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   status_result result{};
   /* An empty condition is always true, the way for ((;;)) loops forever. */
-  while (condition_is_blank ||
-         (m_folded_condition.has_value() && can_skip_condition_commands
+  while (is_condition_blank ||
+         (is_condition_folded
               ? (cxt.is_extended_arithmetic_enabled()
                      ? m_is_exact_folded_condition_nonzero
                      : *m_folded_condition != 0)
@@ -726,7 +728,7 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
     /* The step runs after the body on every iteration, including one ended by a
        continue. */
-    if (!step_is_blank) {
+    if (!is_step_blank) {
       let &cache = get_clause_cache(m_step_cache);
       cxt.evaluate_arithmetic_cached_clause_nonzero(
           m_step, cache.tokens, cache.is_tokenized, cache.is_simple);

@@ -848,7 +848,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 }
 
 static constexpr u32 SUBSHELL_BOOTSTRAP_MAGIC = 0x4b534842U;
-static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 7U;
+static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 8U;
 static constexpr u32 NO_BOOTSTRAP_PROCESS = UINT32_MAX;
 static constexpr u8 SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS = 0x3fU;
 
@@ -1170,6 +1170,9 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   bootstrap.source_length = static_cast<u32>(source.count());
 
   let body = String{heap_allocator()};
+  body.push(static_cast<char>(m_has_execution_string));
+  if (m_has_execution_string)
+    append_subshell_bootstrap_text(body, m_execution_string.view());
   append_subshell_bootstrap_text(body, m_last_argument.view());
   body.push(static_cast<char>(m_last_background_pid.has_value()));
   if (m_last_background_pid.has_value())
@@ -1288,6 +1291,12 @@ fn EvalContext::apply_subshell_bootstrap(
   if (!reader.is_valid || body_length != reader.get_remaining_length())
     invalid_subshell_bootstrap();
 
+  bool has_execution_string = false;
+  if (!read_subshell_bootstrap_bool(reader, has_execution_string))
+    invalid_subshell_bootstrap();
+  let execution_string = String{heap_allocator()};
+  if (has_execution_string)
+    execution_string = String{heap_allocator(), reader.read_text()};
   let last_argument = String{heap_allocator(), reader.read_text()};
   bool has_last_background_pid = false;
   if (!read_subshell_bootstrap_bool(reader, has_last_background_pid))
@@ -1551,6 +1560,8 @@ fn EvalContext::apply_subshell_bootstrap(
   if (is_restricted) request_restricted_shell();
   runtime.restore(*this);
 
+  m_has_execution_string = has_execution_string;
+  m_execution_string = steal(execution_string);
   m_last_argument = steal(last_argument);
   m_last_background_pid = last_background_pid;
   m_random_state = random_state;

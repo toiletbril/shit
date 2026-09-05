@@ -253,6 +253,21 @@ pipeline_output=$("$BIN" --no-init-files --no-diagnostics -c \
 pipeline_status=$?
 printf "pipeline-output=%s\n" "$pipeline_output"
 printf "pipeline-status=%s\n" "$pipeline_status"
+
+"$BIN" --mood bash --no-init-files --no-diagnostics -c '
+execution_string=$BASH_EXECUTION_STRING
+printf "execution-string-process="
+koshkit cat < <(
+  if [ "$BASH_EXECUTION_STRING" = "$execution_string" ]; then printf preserved; fi
+)
+printf "\nexecution-string-compound="
+printf "" | {
+  if [ "$BASH_EXECUTION_STRING" = "$execution_string" ]; then printf preserved; fi
+}
+printf "\nexecution-string-substitution=%s\n" "$(
+  if [ "$BASH_EXECUTION_STRING" = "$execution_string" ]; then printf preserved; fi
+)"
+'
 printf 'printf sourced >> "$KOSH_STARTUP_MARKER"\n' > "$startup_file"
 KOSH_STARTUP_MARKER=$startup_marker BASH_ENV=$startup_file \
   "$BIN" --mood bash --no-init-files -c '

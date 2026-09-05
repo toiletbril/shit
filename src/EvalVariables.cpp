@@ -428,7 +428,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         case dynamic_var::BASH_ARGV0:
           return String{heap_allocator(), m_shell_name.view()};
         case dynamic_var::BASH_EXECUTION_STRING:
-          if (!m_execution_string.is_empty())
+          if (m_has_execution_string)
             return String{heap_allocator(), m_execution_string.view()};
           break;
         case dynamic_var::BASH_SUBSHELL:

@@ -522,7 +522,7 @@ public:
   fn mark_exported(StringView name) throws -> void;
   fn unmark_exported(StringView name) throws -> void;
   fn unexport_shell_variable(StringView name) throws -> void;
-  pure fn is_exported(StringView name) const wontthrow -> bool;
+  fn is_exported(StringView name) const throws -> bool;
 
   fn sync_exported_after_restore(StringView name, bool has_value) throws
       -> void;
@@ -563,12 +563,11 @@ public:
     return static_cast<usize>(parsed.value());
   }
 
-  hot pure fn has_variable_name(StringView name) const wontthrow -> bool
+  hot fn has_variable_name(StringView name) const throws -> bool
   {
     return m_shell_variables.find(name) != nullptr ||
            m_indexed_arrays.find(name) != nullptr ||
-           m_associative_names.contains(name) ||
-           m_exported_names.contains(name) ||
+           m_associative_names.contains(name) || is_exported(name) ||
            variable_requires_dynamic_lookup(name);
   }
 

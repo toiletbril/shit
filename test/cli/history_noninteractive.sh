@@ -89,6 +89,30 @@ wait "$second_pid"
 KOSH_HISTORY_FILE="$dir/concurrent" "$BIN" --no-init-files -c \
   'history | koshkit wc -l'
 
+: > "$dir/duplicate"
+echo "== consecutive duplicate stores succeed and retain one record =="
+KOSH_HISTORY_FILE="$dir/duplicate" "$BIN" --no-init-files -c \
+  'history -s repeated; first_status=$?; history -s repeated; \
+second_status=$?; printf "rc=%s,%s\n" "$first_status" "$second_status"; history'
+
+printf 'first\n' > "$dir/equal-size"
+printf second > "$dir/equal-size-replacement"
+echo "== an equal size replacement refreshes append state =="
+KOSH_HISTORY_FILE="$dir/equal-size" "$BIN" --no-init-files -c \
+  'history >/dev/null; koshkit mv "$1" "$KOSH_HISTORY_FILE"; \
+history -s third; history' history-test "$dir/equal-size-replacement"
+
+: > "$dir/rewrite"
+echo "== history deletion rewrites the no editor store =="
+KOSH_HISTORY_FILE="$dir/rewrite" "$BIN" --no-init-files -c \
+  'history -s first; history -s second; history -d 1; history'
+
+printf 'valid\n' > "$dir/invalid-store"
+echo "== invalid stored bytes leave existing history intact =="
+KOSH_HISTORY_FILE="$dir/invalid-store" "$BIN" --no-init-files -c \
+  "history -s \$'bad\\evalue'; printf 'rc=%s\\n' \"\$?\"; history" \
+  2>/dev/null
+
 : > "$dir/synchronized"
 echo "== running shells reload history written by another instance =="
 KOSH_HISTORY_FILE="$dir/synchronized" "$BIN" --no-init-files -c \

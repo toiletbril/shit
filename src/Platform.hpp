@@ -215,6 +215,7 @@ enum class terminal_handoff : u8
 #if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
 constexpr char PATH_DELIMITER = ';';
 constexpr char DIRECTORY_SEPARATOR = '\\';
+constexpr bool ENVIRONMENT_IS_CASE_SENSITIVE = false;
 constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = false;
 constexpr bool HAS_CHILD_STATE_CHANGE_WAIT = false;
 
@@ -232,6 +233,7 @@ using os_args = String;
 #elif KOSH_PLATFORM_IS KOSH_PLATFORM_POSIX
 constexpr char PATH_DELIMITER = ':';
 constexpr char DIRECTORY_SEPARATOR = '/';
+constexpr bool ENVIRONMENT_IS_CASE_SENSITIVE = true;
 constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = true;
 constexpr bool HAS_CHILD_STATE_CHANGE_WAIT = true;
 
