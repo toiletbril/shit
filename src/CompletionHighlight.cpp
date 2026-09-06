@@ -945,11 +945,11 @@ static pure fn command_name_operand_of(StringView word) wontthrow -> StringView
   return word_is_function_name(name) ? name : StringView{};
 }
 
-static fn static_koshkit_operand(StringView word,
-                                  bool &is_valid) throws
+static fn static_koshkit_operand(StringView word, bool &is_valid) throws
     -> Maybe<koshkit::Utility::Kind>
 {
-  constexpr usize CAPACITY = koshkit::KOSHKIT_UTILS.prefilter.longest_key_length;
+  constexpr usize CAPACITY =
+      koshkit::KOSHKIT_UTILS.prefilter.longest_key_length;
   static_assert(CAPACITY > 0);
 
   is_valid = false;
@@ -971,7 +971,8 @@ static fn static_koshkit_operand(StringView word,
       if (position == word.length) return None;
 
       let special_decoded = String{bump_allocator(HIGHLIGHT_ARENA)};
-      let const body = word.substring_of_length(body_start, position - body_start);
+      let const body =
+          word.substring_of_length(body_start, position - body_start);
       if (quote == '\'')
         utils::decode_ansi_c_escapes(special_decoded, body);
       else {
@@ -1267,11 +1268,12 @@ fn internal::scan_highlight_range(
         if (i < end) i++;
         word_spans.push(
             highlight_span{string_start, i, highlight_role::string});
-      } else if (d == '"') {
+      } else if (d == '"' || (d == '$' && i + 1 < end && line[i + 1] == '"')) {
         /* literal_start tracks the current yellow run, which resumes after
            every expansion. */
+        let literal_start = i;
+        if (d == '$') i++;
         i++;
-        let literal_start = i - 1;
         while (i < end && line[i] != '"') {
           if (line[i] == '\\' && i + 1 < end) {
             i += 2;
@@ -1302,13 +1304,10 @@ fn internal::scan_highlight_range(
               highlight_span{literal_start, i, highlight_role::string});
       } else if (d == '`') {
         i = do_color_backtick(i, word_spans);
-      } else if (d == '$' && i + 1 < end &&
-                 (line[i + 1] == '\'' || line[i + 1] == '"'))
-      {
+      } else if (d == '$' && i + 1 < end && line[i + 1] == '\'') {
         let const string_start = i;
-        let const quote_character = line[i + 1];
         i += 2;
-        while (i < end && line[i] != quote_character) {
+        while (i < end && line[i] != '\'') {
           if (line[i] == '\\' && i + 1 < end) {
             i += 2;
             continue;

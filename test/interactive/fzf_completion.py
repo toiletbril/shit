@@ -76,9 +76,11 @@ def run_interrupt_scenario(directory):
         os.environ["TERM"] = "xterm-256color"
         os.environ["HOME"] = directory
         os.environ["KOSH_HISTORY"] = os.path.join(directory, "history")
-        os.environ.pop("KOSH_FZF_COMPLETION", None)
         os.chdir(os.path.join(directory, "tree"))
-        os.execv(binary, [binary, "--norc", "--no-diagnostics"])
+        os.execv(
+            binary,
+            [binary, "--norc", "--no-diagnostics", "--tab-selector", "plain"],
+        )
 
     read_until_idle(master, 3)
     os.write(master, b"_stall() { sleep 60; COMPREPLY=(late); }\n")
@@ -112,7 +114,7 @@ def run_interrupt_scenario(directory):
     return output, elapsed
 
 
-def run_scenario(directory, selector, environment, typed):
+def run_scenario(directory, selector, environment, typed, mode="external"):
     """Type the words, press tab, submit, and return the transcript and log."""
     log_path = os.path.join(directory, "selector-log")
     if os.path.exists(log_path):
@@ -126,12 +128,14 @@ def run_scenario(directory, selector, environment, typed):
         os.environ["KOSH_HISTORY"] = os.path.join(directory, "history")
         os.environ["STUB_LOG"] = log_path
         os.environ["KOSH_FZF_COMPLETION_COMMAND"] = selector
-        os.environ.pop("KOSH_FZF_COMPLETION", None)
         os.environ.pop("STUB_CANCEL", None)
         os.environ.pop("STUB_PICK", None)
         os.environ.update(environment)
         os.chdir(os.path.join(directory, "tree"))
-        os.execv(binary, [binary, "--norc", "--no-diagnostics"])
+        os.execv(
+            binary,
+            [binary, "--norc", "--no-diagnostics", "--tab-selector", mode],
+        )
 
     read_until_idle(master, 3)
     os.write(master, typed.encode())
@@ -175,11 +179,10 @@ def main():
             handle.write(SELECTOR_SOURCE)
         os.chmod(selector, 0o755)
 
-        enabled = {"KOSH_FZF_COMPLETION": "1"}
         typed = "printf '<%s>\\n' alpha"
 
         picked, picked_log = run_scenario(
-            directory, selector, {**enabled, "STUB_PICK": "3"}, typed
+            directory, selector, {"STUB_PICK": "3"}, typed
         )
         selector_saw_every_candidate = (
             b"record alpha-one" in picked_log
@@ -189,14 +192,14 @@ def main():
         pick_replaced_the_token = b"<alpha-two>" in picked
 
         multi, _ = run_scenario(
-            directory, selector, {**enabled, "STUB_PICK": "1 2"}, typed
+            directory, selector, {"STUB_PICK": "1 2"}, typed
         )
         several_picks_are_joined = (
             b"<alpha-one>" in multi and b"<alpha-three>" in multi
         )
 
         cancelled, cancelled_log = run_scenario(
-            directory, selector, {**enabled, "STUB_CANCEL": "1"}, typed
+            directory, selector, {"STUB_CANCEL": "1"}, typed
         )
         cancel_ran_the_selector = b"ran\n" in cancelled_log
         cancel_leaves_the_line_alone = b"<alpha>" in cancelled
@@ -206,14 +209,16 @@ def main():
             b"alpha-one" not in cancelled and b"alpha-three" not in cancelled
         )
 
-        disabled, disabled_log = run_scenario(directory, selector, {}, typed)
-        disabled_skips_the_selector = disabled_log == b""
-        disabled_keeps_the_static_completion = b"<alpha->" in disabled
+        plain, plain_log = run_scenario(
+            directory, selector, {}, typed, mode="plain"
+        )
+        plain_skips_the_selector = plain_log == b""
+        plain_keeps_the_static_completion = b"<alpha->" in plain
 
         lone, lone_log = run_scenario(
             directory,
             selector,
-            {**enabled, "STUB_PICK": "1"},
+            {"STUB_PICK": "1"},
             "printf '<%s>\\n' gamma",
         )
         one_candidate_skips_the_selector = lone_log == b""
@@ -222,7 +227,7 @@ def main():
         quoted, quoted_log = run_scenario(
             directory,
             selector,
-            {**enabled, "STUB_PICK": "1"},
+            {"STUB_PICK": "1"},
             "printf '<%s>\\n' beta",
         )
         quoting_survives_the_selector = (
@@ -243,9 +248,9 @@ def main():
             "CANCEL_RAN_THE_SELECTOR": cancel_ran_the_selector,
             "CANCEL_LEAVES_THE_LINE_ALONE": cancel_leaves_the_line_alone,
             "CANCEL_PRINTS_NO_LIST": cancel_prints_no_list,
-            "DISABLED_SKIPS_THE_SELECTOR": disabled_skips_the_selector,
-            "DISABLED_KEEPS_THE_STATIC_COMPLETION": (
-                disabled_keeps_the_static_completion
+            "PLAIN_SKIPS_THE_SELECTOR": plain_skips_the_selector,
+            "PLAIN_KEEPS_THE_STATIC_COMPLETION": (
+                plain_keeps_the_static_completion
             ),
             "ONE_CANDIDATE_SKIPS_THE_SELECTOR": one_candidate_skips_the_selector,
             "ONE_CANDIDATE_IS_INSERTED": one_candidate_is_inserted,

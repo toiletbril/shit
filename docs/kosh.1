@@ -269,15 +269,34 @@ is used when the option is omitted.
 .TP
 .BR \-I ", " \-\-enable\-mimicry
 A script with a recognized shell shebang runs under the corresponding mood.
-The current diagnostic setting is retained.
+A script operand and a script run as a command are both covered. An explicit
+.BR \-\-mood ,
+.BR \-\-dumb ,
+or
+.B \-\-posix
+wins. The current diagnostic setting is retained.
 .TP
 .B \-\-dumb
 The options
 .BR "\-\-mood sh" ,
 .BR \-\-no\-completion ,
+.BR "\-\-tab\-selector plain" ,
 and
 .B \-\-no\-diagnostics
-are applied. Color is disabled.
+are applied. Color is disabled. An explicit
+.B \-\-tab\-selector
+wins wherever it appears.
+.TP
+.BR \-\-tab\-selector " " \fIMODE\fR
+MODE selects how an explicit Tab presents several candidates. The names are
+.BR interactive ,
+.BR external ,
+and
+.BR plain .
+The default is
+.BR interactive .
+The behavior of each mode is described under
+.BR "LINE EDITING" .
 .TP
 .BR \-p ", " \-\-privileged
 Privileged mode is enabled. BASH_ENV is not sourced. When the real and
@@ -693,7 +712,8 @@ without them.
 The shell accepts the POSIX Shell Command Language and the Bash extensions
 described below. The
 .B sh
-mood rejects Bash-only syntax. Compatibility differences are listed under
+mood disables Bash-only syntax except for documented compatibility forms.
+Compatibility differences are listed under
 .BR COMPATIBILITY .
 .PP
 The analysis prepass may fold constants and remove an unreachable command. The
@@ -708,8 +728,11 @@ command, and arithmetic expansion. A backslash quotes the next byte where the
 grammar permits it.
 .PP
 The form $'...' reads C escapes including \en, \et, \exHH, and \eOOO. The form
-$"..." marks a string for translation. It behaves as an ordinary double-quoted
-string when no catalog is present.
+$"..." marks a string for translation. Every mood accepts it, and it behaves as
+an ordinary double-quoted string when no catalog is present. It is recognized
+only outside double quotes. Within a double-quoted string, $" is a literal
+dollar followed by the closing quote. Under an sh or dash shebang, analysis
+reports it as a bash extension absent from POSIX sh.
 .SH PARAMETERS
 .SS Positional parameters
 An unquoted $@ or $* is subject to field splitting. The form "$@" preserves one
@@ -993,7 +1016,10 @@ and
 .B \-L
 are their short names. Without a value,
 .B set \-\-mood
-prints the active mood name. The
+prints the active mood name. The custom form
+.B set \-\-tab\-selector
+changes the tab selector for the session, and without a value it prints the
+active name. A mood change leaves the selector alone. The
 .BR \-b ,
 .BR \-h ,
 and
@@ -1103,10 +1129,13 @@ recording and preserves the previous exit status. Both history options are
 enabled by default in an interactive shell and disabled in a noninteractive
 shell.
 .PP
-Each submitted command is appended to the shared history immediately. Running
-shell instances reload the file before recall, search, and listing. A multiline
-command is stored as one event, and its embedded newlines are preserved.
-KOSH_HISTORY_SIZE bounds the retained history and defaults to 4096.
+Each submitted command is appended to the shared history immediately. A command
+that duplicates the preceding event is skipped. Running shell instances reload
+the file before recall, search, and listing. A multiline command is stored as
+one event, and its embedded newlines are preserved. KOSH_HISTORY_SIZE bounds the
+retained and stored history and defaults to 4096. A value of zero disables
+history retention and storage. A history file that exists and cannot be read is
+reported once at startup, and the session begins with an empty history.
 .PP
 The
 .B ignoreeof
@@ -1147,16 +1176,24 @@ option clears the cache. The
 .BI "\-p " path
 option records path as the location of each name.
 .TP
-.B history
-The
+.B "history [\-cnrwaps] [\-d selector] [operand]"
+Without a maintenance option the stored events are listed, and a numeric
+operand limits the listing to that many newest events. The
 .B \-r
-and
+option reads the history file into the list, and an operand names the file that
+is read. The
 .B \-n
-options read the history file into the list. The
+option reads the same way, and an operand names a file whose already read bytes
+are skipped. The
 .B \-w
-and
+option writes the list to the history file, and an operand names a file that is
+replaced. The
 .B \-a
-options write the list to the file. The
+option writes the list to the history file, and an operand names a file that
+receives the events this shell has not written to a named file yet. The written
+events are bounded by
+.BR KOSH_HISTORY_SIZE .
+The
 .B \-c
 option clears the stored history, and
 .B \-p
@@ -1712,15 +1749,27 @@ smart-case and subsequence matches. An empty command position includes
 keywords, builtins, functions, aliases, koshkit utilities, and programs from
 PATH. An exact prefix ranks before a subsequence match.
 .PP
-An explicit Tab prints the candidates below the prompt. When
-.B KOSH_FZF_COMPLETION
-is enabled and more than one candidate remains, the candidates are handed to
-the selector named by
+An explicit Tab first replaces the token with the longest common prefix. When
+that prefix does not extend the token and more than one candidate remains, the
+candidates are presented the way
+.B \-\-tab\-selector
+selects.
+.PP
+The interactive selector draws a menu of the candidates below the prompt. Tab
+and the down arrow move to the next row, the up arrow moves back, Enter accepts
+the highlighted row, and Escape closes the menu and leaves the line alone. Any
+other key closes the menu and then does its own work on the line. The rows are
+bounded by the terminal height, and a count row names the part that is drawn.
+.PP
+The external selector hands the candidates to the program named by
 .B KOSH_FZF_COMPLETION_COMMAND
 and what it prints replaces the token. The editor leaves raw mode while the
-selector owns the terminal, then repaints the prompt. The printed list is kept
+selector owns the terminal, then repaints the prompt. The plain listing is kept
 when the selector is cancelled or missing, when one candidate remains, and when
 the session has no controlling terminal.
+.PP
+The plain selector prints the candidates below the prompt as a static column
+list. A terminal that supports no decorations always gets the plain listing.
 .PP
 Completion identifies the command segment at the cursor across quoted
 separators, command substitutions, and here-document bodies. Directory prefixes
@@ -1834,7 +1883,8 @@ The value names the command history file. The default is ~/.kosh_history.
 .TP
 .B KOSH_HISTORY_SIZE
 The value bounds the number of history events retained for recall, listing, and
-storage. The default is 4096.
+storage. The default is 4096. A value of zero disables history retention and
+storage.
 .TP
 .BR FCEDIT ", " EDITOR
 These variables select the editor used by
@@ -1848,10 +1898,9 @@ The value names the z frecency store. The default is
 .B KOSH_CALC_HISTORY
 The value names interactive calc history. The default is ~/.kosh_calc_history.
 .TP
-.BR KOSH_FZF_COMPLETION ", " KOSH_FZF_COMPLETION_COMMAND ", " KOSH_FZF_COMPLETION_OPTS
-A value other than empty or 0 in KOSH_FZF_COMPLETION routes the candidates of an
-explicit Tab through an interactive selector. KOSH_FZF_COMPLETION_COMMAND names
-that program and defaults to
+.BR KOSH_FZF_COMPLETION_COMMAND ", " KOSH_FZF_COMPLETION_OPTS
+These variables configure the external tab selector. KOSH_FZF_COMPLETION_COMMAND
+names the program the candidates are handed to and defaults to
 .BR fzf .
 KOSH_FZF_COMPLETION_OPTS supplies further options, split on blanks with no
 expansion, and they follow the built-in ones so they win.

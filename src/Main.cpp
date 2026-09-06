@@ -98,7 +98,7 @@ FLAG(MIMICRY, Bool, 'I', "enable-mimicry", Compat,
      "in-process in the matching mode.");
 FLAG(DUMB, Bool, '\0', "dumb", Compat,
      "Make the shell extremely dumb. Equivalent to --mood sh --no-completion "
-     "--no-diagnostics.");
+     "--no-diagnostics --tab-selector plain.");
 
 FLAG(LINT, Bool, '\0', "lint", Auxiliary,
      "Analyze shell inputs without running them and enable every diagnostic "
@@ -130,6 +130,10 @@ FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Kosh,
 FLAG(NO_SYNTAX_HIGHLIGHTING, Bool, '\0', "no-syntax-highlighting", Kosh,
      "Disable the syntax coloring and the ghost suggestion, leaving tab "
      "completion working.");
+FLAG(TAB_SELECTOR, String, '\0', "tab-selector", Kosh,
+     "Select how several completion candidates are presented, 'interactive' "
+     "draws the shell's own menu, 'external' launches the configured selector "
+     "program, and 'plain' lists the candidates. --dumb selects 'plain'.");
 FLAG(ENABLE_KOSHKIT, Bool, '\0', "enable-koshkit", Kosh,
      "Resolve the bundled koshkit utility names such as ls and mkdir directly "
      "as commands, the same as set -o koshkit.");
@@ -470,6 +474,22 @@ fn kosh_main(int argc, char **argv) -> int
     return 2;
   }
 
+  if (FLAG_TAB_SELECTOR.is_set() &&
+      !koshka::parse_tab_selector_name(FLAG_TAB_SELECTOR.value()))
+  {
+    koshka::String source = "--tab-selector ";
+    let const value_position = source.count();
+    source += FLAG_TAB_SELECTOR.value();
+    koshka::show_message(koshka::ErrorWithLocation{
+        koshka::SourceLocation{value_position,
+                               FLAG_TAB_SELECTOR.value().length},
+        "Unknown --tab-selector value, expected one of 'interactive', "
+        "'external', or 'plain'"
+    }
+                             .to_string(source.view()));
+    return 2;
+  }
+
   let const is_language_server = FLAG_LANGUAGE_SERVER.is_enabled();
   if (is_language_server &&
       (FLAG_STDIN.is_enabled() || FLAG_INTERACTIVE.is_enabled() ||
@@ -750,6 +770,7 @@ fn kosh_main(int argc, char **argv) -> int
      variables such as $BASH_VERSION on the /etc/profile path. The session
      strictness is applied at the seam below once the config has loaded. */
   context.set_mood(session_mood);
+  context.set_tab_selector(koshka::resolve_session_tab_selector());
   context.set_extended_arithmetic(session_mood == koshka::mimic_mood::Default ||
                                   FLAG_EXTENDED_ARITHMETIC.is_enabled());
   if (FLAG_EXTENDED_ARITHMETIC.is_enabled())
@@ -912,15 +933,14 @@ fn kosh_main(int argc, char **argv) -> int
         : FLAG_LINT.is_enabled()  ? "lint"
                                   : "privileged");
   } else {
-    /* --no-init-diagnostics turns diagnostics and warnings off while the init
-       files source, so a -W shell loads a lax bash config quietly, then
-       restores them for the session. */
+    /* --no-init-diagnostics disables analysis while startup files source. */
     let const saved_diagnostics_disabled = context.diagnostics_disabled();
-    let const saved_warning_level = context.warning_level();
-    if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled()) {
+    if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled())
       context.set_diagnostics_disabled(true);
-      context.set_warning_level(0);
-    }
+
+    let const saved_diagnostics_mutation_revision =
+        context.diagnostics_mutation_revision();
+
     if (!init_moods.is_empty() || is_login_shell || should_be_interactive ||
         session_mood == koshka::mimic_mood::Bash)
     {
@@ -929,8 +949,11 @@ fn kosh_main(int argc, char **argv) -> int
                                 should_be_interactive);
     }
     if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled()) {
-      context.set_diagnostics_disabled(saved_diagnostics_disabled);
-      context.set_warning_level(saved_warning_level);
+      if (context.diagnostics_mutation_revision() ==
+          saved_diagnostics_mutation_revision)
+      {
+        context.set_diagnostics_disabled(saved_diagnostics_disabled);
+      }
     }
   }
 
@@ -977,6 +1000,12 @@ fn kosh_main(int argc, char **argv) -> int
   usize next_file_index = 0;
   usize ignored_eof_count = 0;
   koshka::analysis_diagnostic_totals lint_diagnostic_totals{};
+
+  /* --mood, --dumb, and --posix each name the mood outright, so a script
+     operand under mimicry keeps that choice and leaves its shebang unread. */
+  let const was_mood_named_on_command_line = FLAG_MOOD.is_set() ||
+                                             FLAG_DUMB.is_enabled() ||
+                                             FLAG_POSIX_COMPAT.is_enabled();
 
   loop
   {
@@ -1122,6 +1151,28 @@ fn kosh_main(int argc, char **argv) -> int
                  stdin runs leave it off. */
               context.set_script_run(true);
               root_frame_call_site = operand_location;
+
+              /* Mimicry reads the shebang of a script operand, so `kosh -I
+                 script.sh` picks the same mood the dispatch path picks for
+                 `./script.sh`. A script with no shebang keeps the session
+                 mood, and a mood a startup file chose explicitly wins. */
+              if (context.mimicry() && !was_mood_named_on_command_line &&
+                  !context.was_mood_set_explicitly())
+              {
+                let const detected_mood =
+                    koshka::detect_mimic_shell_from_source(
+                        script_contents.view());
+                LOG(Info, "the script operand '%s' %s a shell to mimic",
+                    file_name.c_str(),
+                    detected_mood.has_value() ? "names" : "does not name");
+                context.set_mood(detected_mood.value_or(session_mood));
+                context.apply_strictness_for_mood();
+
+                if (FLAG_LINT.is_enabled()) {
+                  context.set_warning_level(
+                      context.mood() == koshka::mimic_mood::Default ? 0 : 3);
+                }
+              }
             }
           }
         }
@@ -1176,6 +1227,18 @@ fn kosh_main(int argc, char **argv) -> int
           did_seed_interactive_path_map = true;
         }
 
+        /* The working directory is indexed before the first keystroke so a
+           ghost path suggestion is ready without a tab. A directory that cannot
+           be read leaves the index empty. */
+        if (should_be_interactive && !is_rescue_mode &&
+            !FLAG_NO_COMPLETION.is_enabled())
+        {
+          try {
+            koshka::utils::warm_directory_index(
+                koshka::Path::current_directory());
+          } catch (const koshka::Error &) {}
+        }
+
         /* A command whose output did not end in a newline leaves the cursor off
            the first column. A marker, spaces to the line width, and a carriage
            return push the prompt to a fresh line, and on a clean line the
@@ -1211,6 +1274,7 @@ fn kosh_main(int argc, char **argv) -> int
         toiletline::set_edit_mode(context.vi_mode()
                                       ? toiletline::edit_mode::Vi
                                       : toiletline::edit_mode::Emacs);
+        toiletline::set_tab_selector(context.tab_selector());
         toiletline::set_history_limit(
             context.get_history_limit("KOSH_HISTORY_SIZE", 4096));
 

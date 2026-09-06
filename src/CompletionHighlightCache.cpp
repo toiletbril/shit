@@ -222,10 +222,11 @@ fn append_highlighted_range(String &output, StringView text,
 
   let rendered_position = range_start;
   for (let const &span : spans) {
-    if (span.end <= range_start) continue;
+    if (span.end <= rendered_position) continue;
     if (span.start >= range_end) break;
 
-    let const span_start = span.start < range_start ? range_start : span.start;
+    let const span_start =
+        span.start < rendered_position ? rendered_position : span.start;
     let const span_end = span.end > range_end ? range_end : span.end;
     if (rendered_position < span_start)
       output += text.substring_of_length(rendered_position,

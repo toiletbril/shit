@@ -20,7 +20,12 @@ _kosh_complete()
   previous_word=${COMP_WORDS[COMP_CWORD-1]}
 
   local mood_values="kosh bash sh bash-posix"
+  local tab_selector_values="interactive external plain"
   case $previous_word in
+    --tab-selector)
+      _kosh_compgen -W "$tab_selector_values" -- "$current_word"
+      return
+      ;;
     -M|--mood)
       _kosh_compgen -W "$mood_values" -- "$current_word"
       return
@@ -43,7 +48,7 @@ _kosh_complete()
 --command --error-exit --no-glob --one-command --verbose --xtrace --export-all \
 --no-clobber --no-exec --no-unset --login --rcfile --init-file --norc \
 --restricted --privileged --no-init-files --posix --mood \
---init-moods --enable-mimicry --dumb --lint --format --apply --as-language-server --list-diagnostics \
+--init-moods --enable-mimicry --dumb --tab-selector --lint --format --apply --as-language-server --list-diagnostics \
 --no-diagnostics --no-annoying-diagnostics --no-init-diagnostics --no-traces --no-completion --no-syntax-highlighting \
 --enable-koshkit --enable-extended-arithmetic \
 --show-ast \
@@ -96,7 +101,8 @@ histexpand history ignoreeof nolog \
 noclobber no-clobber errtrace physical functrace onecmd pipefail failglob koshkit vi emacs \
 posix show-ast show-lexed-words show-exit-code mimicry extended-arithmetic annoying-diagnostics \
 show-stats no-diagnostics show-memory login rcfile"
-  local switches="--help --options --mood --init-moods -o +o -M -L \
+  local tab_selectors="interactive external plain"
+  local switches="--help --options --mood --init-moods --tab-selector -o +o -M -L \
 -a -b -e -f -h -k -m -n -t -u -v -x -B -C -E -H -P -T -A -R -W -WW -WWW -I -S -G \
 +a +b +e +f +h +k +m +n +t +u +v +x +B +C +E +H +P +T +A +R +W +WW +WWW +I +S +G"
 
@@ -111,6 +117,10 @@ show-stats no-diagnostics show-memory login rcfile"
       ;;
     -L|--init-moods)
       _kosh_compgen -W "$moods" -- "$current_word"
+      return
+      ;;
+    --tab-selector)
+      _kosh_compgen -W "$tab_selectors" -- "$current_word"
       return
       ;;
   esac

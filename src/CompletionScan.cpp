@@ -756,6 +756,15 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
       return None;
     }
 
+    if (previous_word == "--tab-selector") {
+      for (tab_selector_mode selector :
+           {tab_selector_mode::Interactive, tab_selector_mode::External,
+            tab_selector_mode::Plain})
+        do_push_matching(tab_selector_name(selector));
+      if (!candidates.is_empty()) return candidates;
+      return None;
+    }
+
 #if !defined NDEBUG
     if (completes_shell_binary &&
         (previous_word == "--debug-logging" || previous_word == "-X"))

@@ -1,0 +1,22 @@
+== set --tab-selector value:
+external
+interactive
+plain
+== set --tab-selector= value:
+external
+interactive
+plain
+== set --tab-selector= prefix:
+external
+== kosh --tab-selector value:
+external
+interactive
+plain
+== kosh --tab-selector= prefix:
+plain
+== the flag name itself:
+--tab-selector
+== set flag name:
+--tab-selector
+== an unrelated command keeps its own candidates:
+0

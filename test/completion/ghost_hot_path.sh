@@ -69,6 +69,19 @@ assert_field "$filesystem_result" source-scans 2
 assert_field "$filesystem_result" materialized 0
 echo 'filesystem ghost skips unrelated directory entries'
 
+mkdir "$d/slash"
+: > "$d/slash/aaa_first"
+: > "$d/slash/zzz_last"
+slash_result=$(PATH=/bin "$BIN" --debug-ghost-at "echo $d/slash/")
+assert_field "$slash_result" count 2
+assert_field "$slash_result" prefix "$d/slash/aaa_first"
+echo 'filesystem ghost reads a directory as soon as the slash is typed'
+
+empty_result=$(PATH=/bin "$BIN" --debug-ghost-at 'echo ')
+assert_field "$empty_result" count 0
+assert_field "$empty_result" prefix ''
+echo 'an empty argument gets no filesystem ghost'
+
 : > "$d/filesystem/foo_bar_baz"
 fuzzy_result=$(PATH=/bin "$BIN" \
     --debug-ghost-at "echo $d/filesystem/fbb")

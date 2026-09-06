@@ -1133,29 +1133,26 @@ fn complete(StringView line, usize cursor, EvalContext &context,
     if (from_stage.has_value()) {
       candidates = steal(*from_stage);
       should_rebuild_shell_syntax_candidates = decoded_token.has_shell_syntax;
-    } else if (for_listing || !split_path_token(decoded_token.text.view())
-                                   .basename_part.is_empty())
-    {
-      /* A token ending in a slash has an empty basename, so the ghost listing
-         runs only once a basename is typed. An explicit tab still lists. */
-      if (for_listing) {
-        let const basename =
-            split_path_token(decoded_token.text.view()).basename_part;
-        should_ignore_common_prefix_case =
-            !basename.is_empty() && (!os::FILESYSTEM_IS_CASE_SENSITIVE ||
-                                     !utils::token_has_uppercase(basename));
-        candidates = complete_filesystem(
-            token, base_directory, path_text_mode::ShellSyntax,
-            filesystem_filter, context, &decoded_token);
-      } else {
-        let collector = complete_filesystem_prefix(
-            token, base_directory, path_text_mode::ShellSyntax,
-            filesystem_filter, context, &decoded_token);
-        ghost_candidate_count = collector.count();
-        source_candidate_scan_count = collector.source_scans();
-        materialized_candidate_count = collector.materialized();
-        ghost_prefix = collector.take_prefix();
-      }
+    } else if (for_listing) {
+      let const basename =
+          split_path_token(decoded_token.text.view()).basename_part;
+      should_ignore_common_prefix_case =
+          !basename.is_empty() && (!os::FILESYSTEM_IS_CASE_SENSITIVE ||
+                                   !utils::token_has_uppercase(basename));
+      candidates = complete_filesystem(
+          token, base_directory, path_text_mode::ShellSyntax, filesystem_filter,
+          context, &decoded_token);
+    } else if (!decoded_token.text.is_empty()) {
+      /* A token ending in a slash names a directory the ghost has not read yet,
+         and the collector indexes it and suggests its first entry. An empty
+         token names nothing and gets no suggestion. */
+      let collector = complete_filesystem_prefix(
+          token, base_directory, path_text_mode::ShellSyntax, filesystem_filter,
+          context, &decoded_token);
+      ghost_candidate_count = collector.count();
+      source_candidate_scan_count = collector.source_scans();
+      materialized_candidate_count = collector.materialized();
+      ghost_prefix = collector.take_prefix();
     }
   }
 

@@ -1,0 +1,26 @@
+== the default session selector:
+interactive
+== --tab-selector plain:
+plain
+== --tab-selector external:
+external
+== --dumb selects plain:
+plain
+== an explicit value wins over --dumb:
+interactive
+== an unknown command line value is rejected:
+1:16: error: Unknown --tab-selector value, expected one of 'interactive', 'external', or 'plain'.
+     1 |  --tab-selector bogus
+       |                 ^~~~~
+status=2
+== the set builtin changes it at runtime:
+external
+== a mood change keeps the selector:
+plain
+== an unknown set value is rejected:
+1:20: error: Builtin `set`: Unknown --tab-selector value 'bogus', expected 'interactive', 'external', or 'plain'.
+     1 |  set --tab-selector bogus
+       |                     ^~~~~
+status=1
+== the selector survives a subshell:
+external

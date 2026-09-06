@@ -33,6 +33,9 @@ FLAG(MOOD, String, 'M', "mood",
 FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods",
      "Source the startup files for the listed moods, or print the loaded ones "
      "with no value.");
+FLAG(TAB_SELECTOR, String, '\0', "tab-selector",
+     "Present several completion candidates as interactive, external, or "
+     "plain, or print the active one with no value.");
 
 REGISTER_BUILTIN_FLAGS(Set);
 
@@ -840,6 +843,27 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_warning_level(0);
       cxt.apply_strictness_for_mood();
       cxt.note_explicit_mood();
+      continue;
+    }
+
+    if (arg == "--tab-selector" ||
+        arg.view().starts_with(StringView{"--tab-selector="}))
+    {
+      let const value = do_read_option_value(arg);
+      if (!value.has_value()) {
+        ec.print_to_stdout(String{cxt.scratch_allocator(),
+                                  tab_selector_name(cxt.tab_selector())} +
+                           "\n");
+        continue;
+      }
+      let const parsed = parse_tab_selector_name(*value);
+      if (!parsed.has_value()) {
+        throw make_error_for_arg(
+            ec, i,
+            String{cxt.scratch_allocator(), "Unknown --tab-selector value '"} +
+                *value + "', expected 'interactive', 'external', or 'plain'");
+      }
+      cxt.set_tab_selector(*parsed);
       continue;
     }
 
