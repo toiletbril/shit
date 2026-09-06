@@ -44,7 +44,7 @@ TEST_TEMP_DIRECTORY=$d \
 TEST_SYSTEM_RM=$TEST_SYSTEM_RM \
   "$TEST_SHELL" run-compat-diff-test.sh >/dev/null
 
-failure=$(< "$failed_list")
+failure=$(command cat "$failed_list".d/*.diff)
 case $failure in
   *'+reference stderr'*)
     echo compatibility-runner-captures-stderr

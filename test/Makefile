@@ -56,7 +56,7 @@ endif
 # relative to the repo root or as a bare name is resolved to an absolute path
 # here. A path that exists as given wins, then the repo-root sibling, then a
 # PATH lookup, so the target binary is found no matter where make was launched.
-override BIN := $(shell \
+RESOLVED_BIN := $(strip $(shell \
 	if [ -x "$(BIN)" ]; then \
 		echo "$$(cd "$$(dirname "$(BIN)")" && $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/$$(basename "$(BIN)")"; \
 	elif [ -x "$(CURDIR)/../$(BIN)" ]; then \
@@ -65,7 +65,11 @@ override BIN := $(shell \
 	elif command -v "$(BIN)" >/dev/null 2>&1; then \
 		found=$$(command -v "$(BIN)"); \
 		echo "$$(cd "$$(dirname "$$found")" && $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/$$(basename "$$found")"; \
-	else echo "$(BIN)"; fi)
+	else echo "$(BIN)"; fi))
+# A directory probe that produces nothing leaves the original path in place.
+# Windows also takes SHELL from this variable, where an empty value makes every
+# recipe fail with a bare status of 127.
+override BIN := $(if $(RESOLVED_BIN),$(RESOLVED_BIN),$(BIN))
 export BIN
 ifeq ($(OS), Windows_NT)
 SHELL := $(BIN)
@@ -89,37 +93,42 @@ export TEST_UNAME_DIRECTORY := $(shell \
 endif
 export PATH := $(CURDIR)/bin$(TEST_HOST_PATH_SEPARATOR)$(PATH)
 
-%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
+%: kosh/%.kosh expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@BIN='$(BIN)' BIN_FLAGS='$(BIN_FLAGS)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 		FAILED_LIST='$(FAILED_LIST)' $(SHELL) run-kosh-test.sh $*
 
 clean:
 	@rm -f $(FAILED_LIST) $(KOSH_HISTORY_FILE) $(KOSH_DIRECTORY_HISTORY)
+	@rm -rf $(FAILED_LIST).d
 	@test -n "$(CURDIR)/.test-work" && rm -rf "$(CURDIR)/.test-work"
 
 test: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh all
 
 verify_koshkit_diff: $(BIN)
+	@if test ! -x '$(BIN)'; then \
+		echo "The shell '$(BIN)' is missing or is not executable." >&2; \
+		exit 1; \
+	fi
 	@'$(BIN)' verify-koshkit-diff.sh
 
 kosh_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh kosh
 
-cli_%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
+cli_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-cli-test.sh '$(SHELL)' cli/$*.sh
 
 cli_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh cli
 
-build_%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
+build_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-build-test.sh '$(SHELL)' build/$*.sh
 
 build_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh build
 
-completion_%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
+completion_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-completion-test.sh '$(SHELL)' completion/$*.sh
 
 ifeq ($(TARGET), Windows_NT)
@@ -157,7 +166,15 @@ $(WINDOWS_SKIPPED_CLI_NAMES):
 	@printf "	%-64s skipped, unsupported Windows backend feature\n" \
 		"cli/$(patsubst cli_%,%,$@).sh"
 
+WINDOWS_SKIPPED_BUILD_NAMES := \
+	build_golden_runner_status
+
+$(WINDOWS_SKIPPED_BUILD_NAMES):
+	@printf "	%-64s skipped, needs POSIX process fixtures\n" \
+		"build/$(patsubst build_%,%,$@).sh"
+
 WINDOWS_SKIPPED_COMPLETION_NAMES := \
+	completion_ansi_c_quoted_word \
 	completion_complete_git_grouped_subcommands \
 	completion_complete_go_subcommands \
 	completion_complete_help_subcommands \
@@ -183,7 +200,7 @@ completion_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh completion
 
 
-highlight_%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
+highlight_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-highlight-test.sh '$(SHELL)' highlight/$*.sh
 
@@ -192,7 +209,8 @@ highlight_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 
 SKIPPED_TEST_NAMES := $(WINDOWS_SKIPPED_TEST_NAMES)
 SKIPPED_CLI_INPUT := $(patsubst cli_%,cli/%.sh,$(WINDOWS_SKIPPED_CLI_NAMES))
-SKIPPED_BUILD_INPUT :=
+SKIPPED_BUILD_INPUT := \
+	$(patsubst build_%,build/%.sh,$(WINDOWS_SKIPPED_BUILD_NAMES))
 SKIPPED_COMPLETION_INPUT := \
 	$(patsubst completion_%,completion/%.sh,$(WINDOWS_SKIPPED_COMPLETION_NAMES))
 UNREPRESENTABLE_COMPLETION_INPUT := \
@@ -211,7 +229,7 @@ diagnostic_tty_test: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 
 REFILL ?=
 
-refill:
+refill: $(BIN)
 	@REFILL='$(REFILL)' $(SHELL) run-refill.sh '$(SHELL)'
 
 
@@ -254,5 +272,5 @@ bench: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 		$(SHELL) run-bench-test.sh
 
 .PHONY: test clean verify_koshkit_diff kosh_tests refill compatdiff dashdiff \
-		bashdiff mimicrydiff bench build_tests completion_tests completion_refill \
+		bashdiff mimicrydiff bench build_tests completion_tests diagnostic_tty_test \
 		cli_tests highlight_tests

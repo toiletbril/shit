@@ -1,8 +1,17 @@
 #!/bin/bash
 
+# Every fixture drives the editor through a pseudo terminal. The native Windows
+# build of Python does not provide one.
+SKIP_REASON=
 if ! command -v python3 >/dev/null 2>&1; then
+  SKIP_REASON="python3 unavailable"
+elif ! python3 -c 'import pty' >/dev/null 2>&1; then
+  SKIP_REASON="python3 has no pty module"
+fi
+
+if [ -n "$SKIP_REASON" ]; then
   for TEST_FILE in "$@"; do
-    printf "\t%-64s skipped, python3 unavailable\n" "$TEST_FILE"
+    printf "\t%-64s skipped, %s\n" "$TEST_FILE" "$SKIP_REASON"
   done
   exit 0
 fi

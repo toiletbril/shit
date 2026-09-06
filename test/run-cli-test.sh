@@ -1,4 +1,6 @@
 #!/bin/bash
+. ./runner-status.sh
+
 REFILL_MODE=no
 TEST_STATUS=0
 if [ "${1-}" = --refill ]; then
@@ -28,11 +30,20 @@ for TEST_FILE in "$@"; do
     OUTPUT="$OUTPUT_DIRECTORY/$TEST_NAME.out"
   fi
 
+  SHOULD_BOUND_CLI_TEST=no
   case $TEST_NAME in
   command_substitution_interrupt|fg_terminal_handoff|history_behavior|\
     history_noninteractive|read_behavior|language_server|koshkit_fuser|\
     koshkit_timeout|transaction_lock_lifetime|\
     subshell_spawn_state|wait_on_stopped_job)
+    SHOULD_BOUND_CLI_TEST=yes
+    ;;
+  esac
+  if [ -n "${CLI_TEST_TIMEOUT_SECONDS-}" ]; then
+    SHOULD_BOUND_CLI_TEST=yes
+  fi
+
+  if [ "$SHOULD_BOUND_CLI_TEST" = yes ]; then
     GOLDEN_TIMEOUT_SECONDS=60
     if [ "$TEST_NAME" = history_behavior ] || [ "$TEST_NAME" = koshkit_timeout ]; then
       GOLDEN_TIMEOUT_SECONDS=120
@@ -41,18 +52,22 @@ for TEST_FILE in "$@"; do
       BIN="$BIN" "$TEST_SHELL_COMMAND" ./run-bounded-cli-golden.sh \
       "$TEST_FILE" > "$OUTPUT" 2>&1
     DRIVER_STATUS=$?
-    if [ "$REFILL_MODE" = yes ] && [ "$DRIVER_STATUS" -ne 0 ]; then
-      rm -f "$OUTPUT"
-      exit "$DRIVER_STATUS"
-    fi
-    if [ "$REFILL_MODE" = no ] && [ "$DRIVER_STATUS" -ne 0 ]; then
-      printf 'golden exited with status %s\n' "$DRIVER_STATUS" >> "$OUTPUT"
-    fi
-    ;;
-  *)
+  else
     BIN="$BIN" "$TEST_SHELL_COMMAND" "$TEST_FILE" > "$OUTPUT" 2>&1
-    ;;
-  esac
+    DRIVER_STATUS=$?
+  fi
+
+  if is_driver_status_harness_failure "$DRIVER_STATUS" "$REFILL_MODE"; then
+    command cat "$OUTPUT"
+    printf "\t%-64s harness failure, status %s\n" \
+      "cli/$TEST_NAME.sh" "$DRIVER_STATUS"
+    rm -f "$OUTPUT"
+    if [ "$TEST_STATUS" -eq 0 ]; then
+      TEST_STATUS=$DRIVER_STATUS
+    fi
+    continue
+  fi
+
   if [ "$REFILL_MODE" = yes ]; then
     mv "$OUTPUT" "expected/$TEST_NAME.out"
     printf "\t%-64s cli/%s.out\n" "cli/$TEST_NAME.sh" "$TEST_NAME"
@@ -62,9 +77,13 @@ for TEST_FILE in "$@"; do
   if diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" >/dev/null 2>&1; then
     printf "\t%-64s ok\033[K\r" "cli/$TEST_NAME.sh"
   else
-    diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" | tee -a "$FAILED_LIST"
+    set_golden_failure_file "cli-$TEST_NAME"
+    diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" | \
+      tee -a "$GOLDEN_FAILURE_FILE"
     printf "\t%-64s FAILED :c\n" "cli/$TEST_NAME.sh"
-    TEST_STATUS=1
+    if [ "$TEST_STATUS" -eq 0 ]; then
+      TEST_STATUS=1
+    fi
   fi
   rm -f "$OUTPUT"
 done

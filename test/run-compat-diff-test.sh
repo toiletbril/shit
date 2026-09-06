@@ -1,4 +1,5 @@
 #!/bin/bash
+. ./runner-status.sh
 
 CAPTURE_DIRECTORY="$TEST_TEMP_DIRECTORY/compat-diff-capture.$$"
 mkdir -p "$CAPTURE_DIRECTORY"
@@ -42,7 +43,7 @@ append_result_diff() {
       "$ACTUAL_STDOUT" "$ACTUAL_STDERR" "$ACTUAL_STATUS") \
     <(printf 'stdout\n%s\nstderr\n%s\nstatus\n%s\n' \
       "$REFERENCE_STDOUT" "$REFERENCE_STDERR" "$REFERENCE_STATUS") \
-    >> "$FAILED_LIST"
+    >> "$GOLDEN_FAILURE_FILE"
 }
 
 compare_one() {
@@ -57,6 +58,7 @@ compare_one() {
   local ALTERNATIVE_FILE ALTERNATIVE_STDOUT ALTERNATIVE_STDERR
   local ALTERNATIVE_STATUS
   local EXPLICIT_MATCHES=0 MIMIC_MATCHES=0
+  local FAILURE_LABEL
 
   capture_command "$BIN" --no-traces --mood "$MOOD" "$TEST_FILE"
   EXPLICIT_STDOUT=$CAPTURED_STDOUT
@@ -106,6 +108,9 @@ compare_one() {
     printf "\t%-64s ok\033[K\r" "$TEST_FILE"
     return
   fi
+
+  FAILURE_LABEL=${TEST_FILE##*/}
+  set_golden_failure_file "compat-$MOOD-${FAILURE_LABEL%$SUFFIX}"
 
   if [ "$EXPLICIT_MATCHES" -eq 0 ]; then
     append_result_diff "$TEST_FILE (kosh --mood $MOOD)" \

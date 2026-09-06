@@ -35,6 +35,7 @@ export NO_TOILETLINE
 export TARGET
 
 TEST_TARGET := $(if $(filter 1,$(NO_TOILETLINE)),cli_history_noninteractive,test)
+EDITOR_TEST_TARGET := $(if $(filter 1,$(NO_TOILETLINE)),,toiletline_test)
 
 all: kosh test
 
@@ -58,7 +59,11 @@ fmt:
 	echo Launching '$$'CLANG_FMT...
 	$(MAKE) $(AUTO_JOBS) -C src fmt
 
-test: kosh
+toiletline_test: kosh
+	echo Launching editor tests...
+	$(MAKE) -C src/toiletline test
+
+test: kosh $(EDITOR_TEST_TARGET)
 	echo Launching tests...
 	$(MAKE) $(AUTO_JOBS) -C test $(TEST_TARGET)
 
@@ -74,5 +79,7 @@ clean:
 	echo Cleaning up...
 	$(MAKE) $(AUTO_JOBS) -C src clean
 	$(MAKE) $(AUTO_JOBS) -C test clean
+	$(MAKE) -C src/toiletline clean
 
-.PHONY: all kosh install uninstall tidy fmt test bench refill_tests clean
+.PHONY: all kosh install uninstall tidy fmt toiletline_test test bench \
+	refill_tests clean

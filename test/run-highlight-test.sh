@@ -1,4 +1,6 @@
 #!/bin/bash
+. ./runner-status.sh
+
 REFILL_MODE=no
 TEST_STATUS=0
 if [ "${1-}" = --refill ]; then
@@ -25,6 +27,17 @@ for TEST_FILE in "$@"; do
   fi
 
   BIN="$BIN" "$TEST_SHELL_COMMAND" "$TEST_FILE" > "$OUTPUT" 2>/dev/null
+  DRIVER_STATUS=$?
+  if is_driver_status_harness_failure "$DRIVER_STATUS" "$REFILL_MODE"; then
+    printf "\t%-64s harness failure, status %s\n" \
+      "highlight/$TEST_NAME.sh" "$DRIVER_STATUS"
+    rm -f "$OUTPUT"
+    if [ "$TEST_STATUS" -eq 0 ]; then
+      TEST_STATUS=$DRIVER_STATUS
+    fi
+    continue
+  fi
+
   if [ "$REFILL_MODE" = yes ]; then
     mv "$OUTPUT" "expected/$TEST_NAME.out"
     printf "\t%-64s %s.out\n" "highlight/$TEST_NAME.sh" "$TEST_NAME"
@@ -34,10 +47,13 @@ for TEST_FILE in "$@"; do
   if diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" >/dev/null 2>&1; then
     printf "\t%-64s ok\033[K\r" "highlight/$TEST_NAME.sh"
   else
+    set_golden_failure_file "highlight-$TEST_NAME"
     diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" | \
-      tee -a "$FAILED_LIST"
+      tee -a "$GOLDEN_FAILURE_FILE"
     printf "\t%-64s FAILED :c\n" "highlight/$TEST_NAME.sh"
-    TEST_STATUS=1
+    if [ "$TEST_STATUS" -eq 0 ]; then
+      TEST_STATUS=1
+    fi
   fi
   rm -f "$OUTPUT"
 done

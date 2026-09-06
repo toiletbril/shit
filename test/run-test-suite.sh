@@ -92,7 +92,9 @@ done
 wait_for_workers()
 {
   for WORKER_PID in $WORKER_PIDS; do
-    wait "$WORKER_PID" || WORKER_STATUS=$?
+    WAIT_STATUS=0
+    wait "$WORKER_PID" || WAIT_STATUS=$?
+    [ "$WORKER_STATUS" -ne 0 ] || WORKER_STATUS=$WAIT_STATUS
   done
   WORKER_PIDS=
   WORKER_COUNT=0
@@ -108,7 +110,9 @@ wait_for_worker_slot()
         REMAINING_WORKER_PIDS="$REMAINING_WORKER_PIDS $WORKER_PID"
         continue
       fi
-      wait "$WORKER_PID" || WORKER_STATUS=$?
+      WAIT_STATUS=0
+      wait "$WORKER_PID" || WAIT_STATUS=$?
+      [ "$WORKER_STATUS" -ne 0 ] || WORKER_STATUS=$WAIT_STATUS
       WORKER_COUNT=$((WORKER_COUNT - 1))
       DID_REAP_WORKER=yes
     done
@@ -202,19 +206,29 @@ print_platform_skips()
 
 run_serial_cli_tests()
 {
+  SERIAL_STATUS=0
   for TEST_FILE in $SERIAL_CLI_INPUT; do
     printf "\t%-64s running\n" "cli_$(basename "$TEST_FILE" .sh)"
-    run_harness_item cli "$TEST_FILE" || return $?
+    RUNNER_STATUS=0
+    run_harness_item cli "$TEST_FILE" || RUNNER_STATUS=$?
+    [ "$SERIAL_STATUS" -ne 0 ] || SERIAL_STATUS=$RUNNER_STATUS
   done
+
+  return "$SERIAL_STATUS"
 }
 
 run_serial_completion_tests()
 {
+  SERIAL_STATUS=0
   for TEST_FILE in $SERIAL_COMPLETION_INPUT; do
     printf "\t%-64s running\n" \
       "completion_$(basename "$TEST_FILE" .sh)"
-    run_harness_item completion "$TEST_FILE" || return $?
+    RUNNER_STATUS=0
+    run_harness_item completion "$TEST_FILE" || RUNNER_STATUS=$?
+    [ "$SERIAL_STATUS" -ne 0 ] || SERIAL_STATUS=$RUNNER_STATUS
   done
+
+  return "$SERIAL_STATUS"
 }
 
 run_named_suite()
@@ -227,14 +241,26 @@ run_named_suite()
     run_parallel_harness kosh "$ACTIVE_TEST_NAMES"
     ;;
   cli)
-    run_parallel_harness cli "$PARALLEL_CLI_INPUT" && run_serial_cli_tests
+    HARNESS_STATUS=0
+    run_parallel_harness cli "$PARALLEL_CLI_INPUT" || HARNESS_STATUS=$?
+    SERIAL_STATUS=0
+    run_serial_cli_tests || SERIAL_STATUS=$?
+    [ "$HARNESS_STATUS" -ne 0 ] || HARNESS_STATUS=$SERIAL_STATUS
+
+    return "$HARNESS_STATUS"
     ;;
   build)
     run_parallel_harness build "$ACTIVE_BUILD_INPUT"
     ;;
   completion)
-    run_parallel_harness completion "$PARALLEL_COMPLETION_INPUT" && \
-      run_serial_completion_tests
+    HARNESS_STATUS=0
+    run_parallel_harness completion "$PARALLEL_COMPLETION_INPUT" || \
+      HARNESS_STATUS=$?
+    SERIAL_STATUS=0
+    run_serial_completion_tests || SERIAL_STATUS=$?
+    [ "$HARNESS_STATUS" -ne 0 ] || HARNESS_STATUS=$SERIAL_STATUS
+
+    return "$HARNESS_STATUS"
     ;;
   highlight)
     run_parallel_harness highlight "$HIGHLIGHT_INPUT"
@@ -252,9 +278,20 @@ run_named_suite()
   esac
 }
 
+# Appends every recorded fixture diff to the shared failure list and prints the
+# result. A golden runner writes one file per failing fixture, so a concurrent
+# worker cannot interleave its diff with another one. The glob orders the
+# fixtures by name.
 finish_results()
 {
   touch "$FAILED_LIST"
+  for RECORDED_DIFF in "$FAILED_LIST.d"/*.diff; do
+    if [ -s "$RECORDED_DIFF" ]; then
+      cat "$RECORDED_DIFF" >> "$FAILED_LIST"
+    fi
+  done
+  rm -rf "$FAILED_LIST.d"
+
   cat "$FAILED_LIST"
   if [ -s "$FAILED_LIST" ]; then
     return 1
@@ -265,60 +302,52 @@ finish_results()
 
 if [ "$SUITE_NAME" != all ]; then
   rm -f "$FAILED_LIST"
+  rm -rf "$FAILED_LIST.d"
   run_named_suite "$SUITE_NAME"
   SUITE_STATUS=$?
-  finish_results || SUITE_STATUS=$?
+  RESULT_STATUS=0
+  finish_results || RESULT_STATUS=$?
+  [ "$SUITE_STATUS" -ne 0 ] || SUITE_STATUS=$RESULT_STATUS
+
   exit "$SUITE_STATUS"
 fi
 
 START_TIME=$(date +%s)
 SUITE_STATUS=0
 rm -f "$FAILED_LIST" "$KOSH_HISTORY_FILE" "$KOSH_DIRECTORY_HISTORY"
+rm -rf "$FAILED_LIST.d"
 test -n "$PWD/.test-work" && rm -rf "$PWD/.test-work"
 
-if [ "$SUITE_STATUS" -eq 0 ]; then
-  run_named_suite cli || SUITE_STATUS=$?
-fi
+RUNNER_STATUS=0
+run_named_suite cli || RUNNER_STATUS=$?
+[ "$SUITE_STATUS" -ne 0 ] || SUITE_STATUS=$RUNNER_STATUS
 
-COMPAT_FAILED_LIST="$FAILED_LIST.compat"
-PARALLEL_FAILED_LIST="$FAILED_LIST.parallel"
-if [ "$SUITE_STATUS" -eq 0 ] && [ "${TARGET-}" != Windows_NT ]; then
-  rm -f "$COMPAT_FAILED_LIST" "$PARALLEL_FAILED_LIST"
-  (
-    FAILED_LIST=$PARALLEL_FAILED_LIST
-    PARALLEL_STATUS=0
-    for HARNESS_NAME in kosh build highlight; do
-      if [ "$PARALLEL_STATUS" -eq 0 ]; then
-        run_named_suite "$HARNESS_NAME" || PARALLEL_STATUS=$?
-      fi
-    done
-    if [ "$PARALLEL_STATUS" -eq 0 ]; then
-      run_named_suite completion || PARALLEL_STATUS=$?
-    fi
-    exit "$PARALLEL_STATUS"
-  ) &
-  PARALLEL_PROCESS=$!
-
-  FAILED_LIST="$COMPAT_FAILED_LIST" run_named_suite compat || SUITE_STATUS=$?
-  wait "$PARALLEL_PROCESS" || SUITE_STATUS=$?
-  for PARTIAL_FAILED_LIST in "$COMPAT_FAILED_LIST" "$PARALLEL_FAILED_LIST"; do
-    if [ -f "$PARTIAL_FAILED_LIST" ]; then
-      cat "$PARTIAL_FAILED_LIST" >> "$FAILED_LIST"
-      rm -f "$PARTIAL_FAILED_LIST"
-    fi
-  done
-
-  if [ "$SUITE_STATUS" -eq 0 ]; then
-    run_named_suite interactive || SUITE_STATUS=$?
-  fi
-else
+(
+  PARALLEL_STATUS=0
   for HARNESS_NAME in kosh build highlight completion; do
-    if [ "$SUITE_STATUS" -eq 0 ]; then
-      run_named_suite "$HARNESS_NAME" || SUITE_STATUS=$?
-    fi
+    RUNNER_STATUS=0
+    run_named_suite "$HARNESS_NAME" || RUNNER_STATUS=$?
+    [ "$PARALLEL_STATUS" -ne 0 ] || PARALLEL_STATUS=$RUNNER_STATUS
   done
-fi
-finish_results || SUITE_STATUS=$?
+  exit "$PARALLEL_STATUS"
+) &
+PARALLEL_PROCESS=$!
+
+RUNNER_STATUS=0
+run_named_suite compat || RUNNER_STATUS=$?
+[ "$SUITE_STATUS" -ne 0 ] || SUITE_STATUS=$RUNNER_STATUS
+
+RUNNER_STATUS=0
+wait "$PARALLEL_PROCESS" || RUNNER_STATUS=$?
+[ "$SUITE_STATUS" -ne 0 ] || SUITE_STATUS=$RUNNER_STATUS
+
+RUNNER_STATUS=0
+run_named_suite interactive || RUNNER_STATUS=$?
+[ "$SUITE_STATUS" -ne 0 ] || SUITE_STATUS=$RUNNER_STATUS
+
+RESULT_STATUS=0
+finish_results || RESULT_STATUS=$?
+[ "$SUITE_STATUS" -ne 0 ] || SUITE_STATUS=$RESULT_STATUS
 
 ELAPSED_SECONDS=$(($(date +%s) - START_TIME))
 printf "\nDebug test step completed in %s seconds\n" "$ELAPSED_SECONDS"
