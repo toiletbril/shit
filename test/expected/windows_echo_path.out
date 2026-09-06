@@ -1,2 +1,3 @@
+Exported name folding follows the platform
 Windows PATH echo stays literal
 Windows paths retain the portable shell escape grammar

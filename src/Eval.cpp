@@ -50,10 +50,9 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
 
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
 
-  os::for_each_environment_name(&m_exported_names,
-                                [](opaque *context, StringView name) {
-                                  static_cast<HashSet *>(context)->add(name);
-                                });
+  os::for_each_environment_name(this, [](opaque *context, StringView name) {
+    static_cast<EvalContext *>(context)->mark_exported(name);
+  });
 }
 
 EvalContext::~EvalContext()
@@ -135,6 +134,7 @@ fn EvalContext::record_history_event(StringView command) throws -> bool
     return true;
   }
 
+  toiletline::set_history_limit(get_history_limit("KOSH_HISTORY_SIZE", 4096));
   unused(toiletline::history_append_event(command));
   return true;
 }
@@ -167,14 +167,8 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   LOG(All, "assigning variable '%.*s' to a value of %zu bytes",
       static_cast<int>(name.length), name.data, value.length);
   if (name == "IFS") set_field_separators(value);
-  let const is_path =
-      name == "PATH" ||
-      (!os::ENVIRONMENT_IS_CASE_SENSITIVE && name.length == 4 &&
-       utils::ascii_to_lower(name[0]) == 'p' &&
-       utils::ascii_to_lower(name[1]) == 'a' &&
-       utils::ascii_to_lower(name[2]) == 't' &&
-       utils::ascii_to_lower(name[3]) == 'h');
-  if (is_path) m_program_resolver.assign_path(String{value});
+  if (utils::environment_name_is_path(name))
+    m_program_resolver.assign_path(String{value});
   if (name == "IGNOREEOF")
     m_runtime.set_option(shell_option_id::Ignoreeof, true);
   m_shell_variables.set(name, value);
@@ -525,7 +519,7 @@ cold fn EvalContext::show_runtime_warning_at(
      filename. */
   try {
     let const resolved_source = resolve_render_source(location);
-    usize line_offset = 0;
+    isize line_offset = 0;
     if (resolved_source.is_windowed) {
       location.position = static_cast<u32>(
           resolved_source.to_render_position(location.position));
@@ -553,7 +547,7 @@ cold fn EvalContext::show_runtime_error_at(SourceLocation location,
   let const trace_location = location;
   try {
     let const resolved_source = resolve_render_source(location);
-    usize line_offset = 0;
+    isize line_offset = 0;
     if (resolved_source.is_windowed) {
       location.position = static_cast<u32>(
           resolved_source.to_render_position(location.position));
@@ -728,14 +722,7 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
   os::unset_environment_variable(name);
   unmark_exported(name);
   if (name == "IFS") set_field_separators(" \t\n");
-  let const is_path =
-      name == "PATH" ||
-      (!os::ENVIRONMENT_IS_CASE_SENSITIVE && name.length == 4 &&
-       utils::ascii_to_lower(name[0]) == 'p' &&
-       utils::ascii_to_lower(name[1]) == 'a' &&
-       utils::ascii_to_lower(name[2]) == 't' &&
-       utils::ascii_to_lower(name[3]) == 'h');
-  if (is_path)
+  if (utils::environment_name_is_path(name))
     m_program_resolver.assign_path(os::get_environment_variable("PATH"));
   if (name == "IGNOREEOF")
     m_runtime.set_option(shell_option_id::Ignoreeof, false);
@@ -748,35 +735,72 @@ fn EvalContext::record_environment_change(StringView name) throws -> void
       environment_undo_entry{String{name}, os::get_environment_variable(name)});
 }
 
+static constexpr usize EXPORTED_NAME_FOLD_BYTES = 64;
+
+/* A name that fits the buffer folds without touching an allocator, and a longer
+   name folds into the caller's string. The result borrows from whichever of the
+   two holds it, so both outlive the lookup. */
+static fn fold_exported_name(StringView name,
+                             char (&buffer)[EXPORTED_NAME_FOLD_BYTES],
+                             String &spill) throws -> StringView
+{
+  if (name.length > EXPORTED_NAME_FOLD_BYTES) {
+    spill.append(name);
+    spill.lowercase_ascii();
+
+    return spill.view();
+  }
+
+  for (usize position = 0; position < name.length; position++)
+    buffer[position] = utils::ascii_to_lower(name[position]);
+
+  return StringView{buffer, name.length};
+}
+
+/* The stored value keeps the original spelling only where the environment
+   ignores case and folding changed the name. */
+template <typename Value>
+static fn store_exported_name(StringMap<Value> &names, StringView key,
+                              StringView spelling) throws -> void
+{
+  if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) {
+    unused(spelling);
+    names.set(key, Nothing{});
+  } else {
+    /* The empty default costs no allocation, so one probe both finds an
+       existing name and places a new one. */
+    let const previous_count = names.count();
+    let &display_name = names.get_or_create(key, String{heap_allocator()});
+    if (names.count() != previous_count && key != spelling)
+      display_name.append(spelling);
+  }
+}
+
 fn EvalContext::mark_exported(StringView name) throws -> void
 {
   LOG(All, "marking '%.*s' as exported", static_cast<int>(name.length),
       name.data);
-  if (!is_exported(name)) m_exported_names.add(name);
+  if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) {
+    store_exported_name(m_exported_names, name, name);
+    return;
+  }
+
+  char folded[EXPORTED_NAME_FOLD_BYTES];
+  let spill = String{heap_allocator()};
+  store_exported_name(m_exported_names, fold_exported_name(name, folded, spill),
+                      name);
 }
 
 fn EvalContext::unmark_exported(StringView name) throws -> void
 {
   if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) {
-    m_exported_names.remove(name);
+    m_exported_names.erase(name);
     return;
   }
 
-  Maybe<StringView> exported_name;
-  m_exported_names.for_each([&](StringView candidate) {
-    if (candidate.length != name.length) return;
-
-    for (usize position = 0; position < name.length; position++) {
-      if (utils::ascii_to_lower(candidate[position]) !=
-          utils::ascii_to_lower(name[position]))
-      {
-        return;
-      }
-    }
-
-    exported_name = candidate;
-  });
-  if (exported_name.has_value()) m_exported_names.remove(*exported_name);
+  char folded[EXPORTED_NAME_FOLD_BYTES];
+  let spill = String{heap_allocator()};
+  m_exported_names.erase(fold_exported_name(name, folded, spill));
 }
 
 fn EvalContext::unexport_shell_variable(StringView name) throws -> void
@@ -798,24 +822,12 @@ fn EvalContext::unexport_shell_variable(StringView name) throws -> void
 fn EvalContext::is_exported(StringView name) const throws -> bool
 {
   if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE)
-    return m_exported_names.contains(name);
+    return m_exported_names.find(name) != nullptr;
 
-  bool is_exported_name = false;
-  m_exported_names.for_each([&](StringView candidate) {
-    if (is_exported_name || candidate.length != name.length) return;
-
-    for (usize position = 0; position < name.length; position++) {
-      if (utils::ascii_to_lower(candidate[position]) !=
-          utils::ascii_to_lower(name[position]))
-      {
-        return;
-      }
-    }
-
-    is_exported_name = true;
-  });
-
-  return is_exported_name;
+  char folded[EXPORTED_NAME_FOLD_BYTES];
+  let spill = String{heap_allocator()};
+  return m_exported_names.find(fold_exported_name(name, folded, spill)) !=
+         nullptr;
 }
 
 fn EvalContext::sync_exported_after_restore(StringView name,
@@ -1105,9 +1117,11 @@ fn EvalContext::line_number_at_location(
   if (resolved_source.text != nullptr) {
     const usize render_position =
         resolved_source.to_render_position(location.position);
-    line =
-        utils::line_number_at(resolved_source.text->view(), render_position) +
-        (resolved_source.is_windowed ? resolved_source.line_offset : 0);
+    let const render_line = static_cast<isize>(
+        utils::line_number_at(resolved_source.text->view(), render_position));
+    line = static_cast<usize>(render_line + (resolved_source.is_windowed
+                                                 ? resolved_source.line_offset
+                                                 : 0));
   }
   return line;
 }

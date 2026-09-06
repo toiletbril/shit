@@ -190,14 +190,7 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.record_environment_change(name);
       os::set_environment_variable(name, value);
       cxt.mark_exported(name);
-      let const is_path =
-          name == "PATH" ||
-          (!os::ENVIRONMENT_IS_CASE_SENSITIVE && name.length() == 4 &&
-           utils::ascii_to_lower(name[0]) == 'p' &&
-           utils::ascii_to_lower(name[1]) == 'a' &&
-           utils::ascii_to_lower(name[2]) == 't' &&
-           utils::ascii_to_lower(name[3]) == 'h');
-      if (is_path)
+      if (utils::environment_name_is_path(name.view()))
         cxt.get_program_resolver().assign_path(String{value.view()});
       continue;
     }
@@ -221,14 +214,7 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     /* The unset above pointed the resolver at the now-removed environment PATH,
        so an export PATH=... refreshes it to the value just placed in the
        environment. */
-    let const is_path =
-        name == "PATH" ||
-        (!os::ENVIRONMENT_IS_CASE_SENSITIVE && name.length() == 4 &&
-         utils::ascii_to_lower(name[0]) == 'p' &&
-         utils::ascii_to_lower(name[1]) == 'a' &&
-         utils::ascii_to_lower(name[2]) == 't' &&
-         utils::ascii_to_lower(name[3]) == 'h');
-    if (is_path)
+    if (utils::environment_name_is_path(name.view()))
       cxt.get_program_resolver().assign_path(String{value.view()});
   }
 

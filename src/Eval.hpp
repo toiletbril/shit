@@ -22,6 +22,7 @@
 #include "MimicMood.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+#include "TabSelector.hpp"
 
 namespace koshka {
 
@@ -133,6 +134,7 @@ class RuntimeState
 public:
   mimic_mood mood{mimic_mood::Default};
   u8 warning_level{0};
+  tab_selector_mode tab_selector{tab_selector_mode::Interactive};
 
 private:
   enum class Flag : u8
@@ -392,7 +394,7 @@ public:
   {
     return m_scratch_arena.mark();
   }
-  fn scratch_release(BumpArena::Mark saved) wontthrow -> void
+  fn scratch_release(BumpArena::Mark saved) const wontthrow -> void
   {
     m_scratch_arena.release(saved);
   }
@@ -553,7 +555,7 @@ public:
   {
     return m_shell_variables.find(name);
   }
-  pure fn get_history_limit(StringView name, usize fallback) const wontthrow
+  fn get_history_limit(StringView name, usize fallback) const wontthrow
       -> usize
   {
     let const *value = lookup_shell_variable(name);
@@ -667,7 +669,7 @@ public:
     bool is_windowed{false};
     usize body_start_position{0};
     usize header_length{0};
-    usize line_offset{0};
+    isize line_offset{0};
     u32 source_name_index{0};
 
     pure fn to_render_position(usize absolute_position) const wontthrow -> usize
@@ -679,6 +681,8 @@ public:
   };
   pure fn resolve_render_source(const SourceLocation &location) const wontthrow
       -> resolved_render_source;
+  pure fn source_text_in_span(const SourceLocation &location,
+                              usize end_position) const wontthrow -> StringView;
   mustuse fn sorted_function_names() const throws -> ArrayList<String>;
   fn find_function(StringView name) const wontthrow -> const Expression *;
   pure fn find_function_storage(StringView name) const wontthrow
@@ -738,7 +742,12 @@ public:
   pure fn traps() const wontthrow -> const StringMap<String> &;
   fn run_exit_trap() throws -> void;
 
-  fn run_named_trap(StringView condition) throws -> void;
+  /* The trigger location is the command that fired the trap, which $LINENO
+     reports inside the action. An absent location falls back to the current
+     one, which suits a trap that fires as a command runs. */
+  fn run_named_trap(StringView condition,
+                    const SourceLocation *trigger_location = nullptr) throws
+      -> void;
   pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
   pure fn should_run_err_trap() const wontthrow -> bool
   {
@@ -746,11 +755,33 @@ public:
            (m_function_call_depth == 0 && m_subshell_depth == 0 &&
             m_substitution_depth == 0);
   }
+  pure fn should_run_debug_trap() const wontthrow -> bool
+  {
+    return m_has_debug_trap && !is_posix_mode() &&
+           (m_runtime.option_is_enabled(shell_option_id::Functrace) ||
+            (m_function_call_depth == 0 && m_subshell_depth == 0 &&
+             m_substitution_depth == 0));
+  }
   pure fn should_run_return_trap() const wontthrow -> bool
   {
     return !is_posix_mode() &&
            (!is_bash_compatible() ||
             m_runtime.option_is_enabled(shell_option_id::Functrace));
+  }
+  pure fn is_running_trap_action() const wontthrow -> bool
+  {
+    return m_trap_action_depth > 0;
+  }
+  /* The line $LINENO reports inside a trap action, which is the line of the
+     command that fired the trap. A function or a sourced file the action enters
+     carries its own lines, so the answer is empty there. */
+  pure fn trap_trigger_line_number() const wontthrow -> Maybe<usize>
+  {
+    if (m_trap_action_depth == 0) return None;
+    if (m_source_frames.count() != m_trap_action_source_depth) return None;
+    if (m_function_call_depth != m_trap_action_function_depth) return None;
+
+    return m_trap_trigger_line_number;
   }
 
   /* Run the action of every signal whose flag the handler set, at the command
@@ -1126,6 +1157,17 @@ public:
   fn set_mood(mimic_mood mood) wontthrow -> void { m_runtime.mood = mood; }
   pure fn mood() const wontthrow -> mimic_mood { return m_runtime.mood; }
 
+  /* The presentation the editor uses for a completion with several candidates.
+     The mood does not carry it, so a mood change leaves it alone. */
+  fn set_tab_selector(tab_selector_mode selector) wontthrow -> void
+  {
+    m_runtime.tab_selector = selector;
+  }
+  pure fn tab_selector() const wontthrow -> tab_selector_mode
+  {
+    return m_runtime.tab_selector;
+  }
+
   /* The set -o posix form enters the BashPosix mood, and set +o posix steps
      down to bash when already in BashPosix or the dash-like Posix mood. A
      non-posix mood is left alone, since the mood is not a stack and the prior
@@ -1322,6 +1364,10 @@ public:
   fn note_diagnostics_option_mutation() wontthrow -> void
   {
     m_diagnostics_mutation_revision++;
+  }
+  pure fn diagnostics_mutation_revision() const wontthrow -> u64
+  {
+    return m_diagnostics_mutation_revision;
   }
   fn note_annoying_diagnostics_option_mutation() wontthrow -> void
   {
@@ -1778,8 +1824,9 @@ protected:
      nothing. */
   ArrayList<environment_undo_entry> m_environment_undo_log{heap_allocator()};
   /* The names currently in the process environment, kept in step with every
-     environment write so an assignment tests membership in O(1). */
-  HashSet m_exported_names{heap_allocator()};
+     environment write so an assignment tests membership in O(1). A key is the
+     ASCII lowercase form of the name where the environment ignores case. */
+  StringMap<exported_name_value> m_exported_names{heap_allocator()};
 #if !defined NDEBUG
   mutable usize m_debug_variable_name_enumeration_count{0};
 #endif
@@ -1864,6 +1911,16 @@ protected:
   /* True while run_pending_traps is draining, so a signal delivered during a
      trap action does not nest a second drain. */
   bool m_running_traps{false};
+  /* Nonzero while a trap action evaluates, so BASH_COMMAND keeps the command
+     that triggered the trap instead of the action's own commands. */
+  u32 m_trap_action_depth{0};
+  /* The line of the command that fired the running trap, together with the
+     source and function nesting the action itself runs at. The action is parsed
+     as its own source, whose first line would otherwise be the only line
+     $LINENO can report. */
+  usize m_trap_trigger_line_number{0};
+  usize m_trap_action_source_depth{0};
+  usize m_trap_action_function_depth{0};
   bool m_terminal_exec_allowed{false};
   bool m_is_completion_function_running{false};
   bool m_is_prompt_command_running{false};

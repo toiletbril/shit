@@ -71,7 +71,7 @@ struct eval_state_snapshot
   /* Variable attributes ride the snapshot, so a declaration inside a
      subshell does not leak its marks to the parent. */
   StringMap<u8> variable_attributes;
-  HashSet exported_names;
+  StringMap<exported_name_value> exported_names;
   /* The length of the environment undo log when the snapshot was taken, the
      point restore_state rewinds the process environment back to. */
   usize environment_undo_mark;

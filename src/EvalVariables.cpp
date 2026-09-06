@@ -331,9 +331,16 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       switch (info->kind) {
       case dynamic_var::IFS:
         return String{heap_allocator(), m_field_separators.view()};
-      case dynamic_var::LINENO:
+      case dynamic_var::LINENO: {
+        if (let const trigger_line = trap_trigger_line_number();
+            trigger_line.has_value())
+        {
+          return String::from(*trigger_line, heap_allocator());
+        }
+
         return String::from(line_number_at_location(m_current_location),
                             heap_allocator());
+      }
       case dynamic_var::KOSH_GIT_BRANCH: {
         if (m_git_branch_command_index != m_command_evaluation_index) {
           m_git_branch = utils::current_git_branch();

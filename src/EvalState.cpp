@@ -636,9 +636,18 @@ fn EvalContext::suggest_similar_variable_name(StringView name) const throws
   m_associative_names.for_each(
       [&suggestion](StringView candidate)
           throws -> void { suggestion.consider(candidate); });
-  m_exported_names.for_each([&suggestion](StringView candidate) throws -> void {
-    suggestion.consider(candidate);
-  });
+  /* A case-sensitive environment types the value as Nothing. The generic
+     parameter keeps the folded branch uninstantiated there. */
+  m_exported_names.for_each(
+      [&suggestion](StringView key, const auto &display_name) throws -> void {
+        if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) {
+          unused(display_name);
+          suggestion.consider(key);
+        } else {
+          suggestion.consider(display_name.is_empty() ? key
+                                                      : display_name.view());
+        }
+      });
 
   let dynamic_names = ArrayList<StringView>{heap_allocator()};
   append_dynamic_variable_names(dynamic_names);
@@ -848,7 +857,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 }
 
 static constexpr u32 SUBSHELL_BOOTSTRAP_MAGIC = 0x4b534842U;
-static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 8U;
+static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 9U;
 static constexpr u32 NO_BOOTSTRAP_PROCESS = UINT32_MAX;
 static constexpr u8 SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS = 0x3fU;
 
@@ -896,6 +905,7 @@ static fn append_subshell_bootstrap_runtime(String &output,
 {
   output.push(static_cast<char>(runtime.mood));
   output.push(static_cast<char>(runtime.warning_level));
+  output.push(static_cast<char>(runtime.tab_selector));
   u8 flags = 0;
   if (runtime.is_diagnostics_disabled()) flags |= 1U << 0;
   if (runtime.is_annoying_diagnostics_enabled()) flags |= 1U << 1;
@@ -1005,13 +1015,16 @@ static fn read_subshell_bootstrap_runtime(subshell_bootstrap_reader &reader,
 {
   let const mood = reader.read_u8();
   let const warning_level = reader.read_u8();
+  let const tab_selector = reader.read_u8();
   let const flags = reader.read_u8();
   let const shell_options = reader.read_u64();
   static_assert(static_cast<u8>(shell_option_id::Count) < 64);
   let const valid_shell_options =
       (u64{1} << static_cast<u8>(shell_option_id::Count)) - 1U;
   if (!reader.is_valid || mood > static_cast<u8>(mimic_mood::BashPosix) ||
-      warning_level > 3 || (flags & ~SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS) != 0 ||
+      warning_level > 3 ||
+      tab_selector > static_cast<u8>(tab_selector_mode::Plain) ||
+      (flags & ~SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS) != 0 ||
       (shell_options & ~valid_shell_options) != 0)
   {
     return false;
@@ -1019,6 +1032,7 @@ static fn read_subshell_bootstrap_runtime(subshell_bootstrap_reader &reader,
 
   runtime.mood = static_cast<mimic_mood>(mood);
   runtime.warning_level = warning_level;
+  runtime.tab_selector = static_cast<tab_selector_mode>(tab_selector);
   runtime.shell_options = shell_options;
   runtime.set_diagnostics_disabled((flags & (1U << 0)) != 0);
   runtime.set_annoying_diagnostics_enabled((flags & (1U << 1)) != 0);
@@ -1164,8 +1178,6 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
     source.append(stored_name.view());
     source.push('\n');
   }
-  if (is_restricted_shell()) source += "set -r\n";
-
   if (source.count() > UINT32_MAX) throw std::bad_alloc{};
   bootstrap.source_length = static_cast<u32>(source.count());
 
@@ -1185,6 +1197,7 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   append_subshell_bootstrap_u64(body, m_shopt_option_overrides);
   append_subshell_bootstrap_u64(body, m_shopt_option_values);
   body.push(static_cast<char>(m_disabled_bash_special_arrays));
+  body.push(static_cast<char>(m_is_restricted_shell));
   body.push(static_cast<char>(m_bash_argument_arrays != nullptr));
   if (m_bash_argument_arrays != nullptr) {
     append_subshell_bootstrap_u32(
@@ -1313,6 +1326,7 @@ fn EvalContext::apply_subshell_bootstrap(
   let const shopt_option_overrides = reader.read_u64();
   let const shopt_option_values = reader.read_u64();
   let const disabled_bash_special_arrays = reader.read_u8();
+  let const is_restricted_shell_identity = reader.read_u8() != 0;
   bool has_bash_argument_arrays = false;
   if (!read_subshell_bootstrap_bool(reader, has_bash_argument_arrays))
     invalid_subshell_bootstrap();
@@ -1551,13 +1565,11 @@ fn EvalContext::apply_subshell_bootstrap(
   replay_runtime.set_option(shell_option_id::Verbose, false);
   replay_runtime.set_option(shell_option_id::Xtrace, false);
   replay_runtime.restore(*this);
-  let const is_restricted =
-      runtime.option_is_enabled(shell_option_id::Restricted);
   m_disabled_bash_special_arrays = disabled_bash_special_arrays;
   run_source(bootstrap.payload.view().substring_of_length(
                  0, static_cast<usize>(bootstrap.source_length)),
              "inherited shell state");
-  if (is_restricted) request_restricted_shell();
+  if (is_restricted_shell_identity) request_restricted_shell();
   runtime.restore(*this);
 
   m_has_execution_string = has_execution_string;
