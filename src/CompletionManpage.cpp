@@ -53,8 +53,11 @@ static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
   return matches;
 }
 
-/* An empty list is cached too, so a command with no manpage is not retried. */
+/* An empty list is cached too, so a command with no manpage is not retried. A
+   fork that was killed borrows EMPTY_HELP_ENTRIES for the reference it owes its
+   caller until its attempts run out. */
 static StringMap<ArrayList<help_entry>> MANPAGE_OPTION_CACHE{heap_allocator()};
+static const ArrayList<help_entry> EMPTY_HELP_ENTRIES{heap_allocator()};
 
 static fn manpage_name_for(StringView command) throws -> String
 {
@@ -72,9 +75,32 @@ static StringMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
 static StringMap<bool> MAN_SUBCOMMAND_PAGE_VALID{heap_allocator()};
 static bool is_man_subcommand_index_built = false;
 
-/* A fork that runs past this budget is killed and caches the empty string, so
-   the prompt never freezes and the command is not forked again this session. */
+/* A fork that runs past this budget is killed so the prompt never freezes. */
 static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
+
+/* A killed fork is retried until this many attempts have been spent on one key,
+   and the empty answer is then cached for the session. A first execution that
+   the platform serializes recovers on the retry, while a command that always
+   runs past the budget stops forking. */
+static constexpr u32 KILLED_FORK_ATTEMPT_LIMIT = 2;
+
+static StringMap<u32> KILLED_FORK_ATTEMPTS{heap_allocator()};
+
+/* The kind separates a help key from a page name so two caches never share one
+   attempt count. */
+static fn should_retry_killed_fork(StringView kind, StringView name) throws
+    -> bool
+{
+  let key = String{kind};
+  key += " ";
+  key += name;
+
+  let &attempt_count = KILLED_FORK_ATTEMPTS.get_or_create(key.view(), 0u);
+  attempt_count++;
+  return attempt_count < KILLED_FORK_ATTEMPT_LIMIT;
+}
+
+static bool was_manpath_settled = false;
 
 static fn
 capture_completion_program_output(const ArrayList<String> &arguments) wontthrow
@@ -94,10 +120,8 @@ static fn manpage_section1_directories(ProgramResolver &resolver) throws
    is cached for the session. */
 static fn manpath_command_output(ProgramResolver &resolver) throws -> StringView
 {
-  static bool was_tried = false;
   static String cached{heap_allocator()};
-  if (was_tried) return cached.view();
-  was_tried = true;
+  if (was_manpath_settled) return cached.view();
 
   let const man_paths =
       resolver.search("manpath", ProgramResolver::SearchMode::First,
@@ -113,20 +137,32 @@ static fn manpath_command_output(ProgramResolver &resolver) throws -> StringView
   let const man_present =
       !manbin_paths.is_empty() &&
       os::directory_is_trusted_for_exec(manbin_paths[0].parent());
-  if (manpath_present) {
+  if (manpath_present || man_present) {
     let argv = ArrayList<String>{heap_allocator()};
-    argv.push(String{man_paths[0].text().view()});
-    if (Maybe<String> output = capture_completion_program_output(argv);
-        output.has_value())
-      cached = steal(*output);
-  } else if (man_present) {
-    let argv = ArrayList<String>{heap_allocator()};
-    argv.push(String{manbin_paths[0].text().view()});
-    argv.push(String{"--path"});
-    if (Maybe<String> output = capture_completion_program_output(argv);
-        output.has_value())
-      cached = steal(*output);
+    if (manpath_present) {
+      argv.push(String{man_paths[0].text().view()});
+    } else {
+      argv.push(String{manbin_paths[0].text().view()});
+      argv.push(String{"--path"});
+    }
+
+    Maybe<String> output = capture_completion_program_output(argv);
+    if (!output.has_value()) {
+      if (should_retry_killed_fork("manpath", "")) {
+        LOG(Debug, "the manpath fork was killed, retrying on the next request");
+        return cached.view();
+      }
+
+      LOG(Debug, "the manpath fork was killed again, settling on the roots "
+                 "resolved without it");
+      was_manpath_settled = true;
+      return cached.view();
+    }
+
+    cached = steal(*output);
   }
+
+  was_manpath_settled = true;
   return cached.view();
 }
 
@@ -232,7 +268,7 @@ static pure fn strip_man1_suffix(StringView entry) wontthrow
    invents no xdg, and a digit-leading version tail is none. */
 static fn build_man_subcommand_index(ProgramResolver &resolver) throws -> void
 {
-  is_man_subcommand_index_built = true;
+  MAN_SUBCOMMAND_INDEX.clear();
   for (let const &directory : manpage_section1_directories(resolver)) {
     LOG(Info, "scanning man1 directory '%s'", directory.text().c_str());
     let entries = Path::read_directory(directory);
@@ -262,6 +298,10 @@ static fn build_man_subcommand_index(ProgramResolver &resolver) throws -> void
         .get_or_create(head, ArrayList<String>{heap_allocator()})
         .push(String{tail});
   });
+
+  /* A killed manpath fork hides every root the environment leaves out, so the
+     index is incomplete until that fork settles and is built again. */
+  is_man_subcommand_index_built = was_manpath_settled;
   LOG(Info, "indexed %zu section-1 pages", MAN_PAGE_FILE_PATHS.count());
 }
 
@@ -606,9 +646,20 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   let argv = ArrayList<String>{heap_allocator()};
   argv.push(String{man_paths[0].text().view()});
   argv.push(String{page_name});
-  if (Maybe<String> page = capture_completion_program_output(argv);
-      page.has_value())
-    parsed_options = parse_manpage_option_entries(page->view());
+  Maybe<String> page = capture_completion_program_output(argv);
+  if (!page.has_value()) {
+    LOG(Debug,
+        "the man fork for '%.*s' was killed or failed to start, leaving the "
+        "option cache unset",
+        static_cast<int>(page_name.length), page_name.data);
+
+    if (should_retry_killed_fork("man-options", page_name))
+      return EMPTY_HELP_ENTRIES;
+
+    return *MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
+  }
+
+  parsed_options = parse_manpage_option_entries(page->view());
   return *MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
 }
 
@@ -642,18 +693,36 @@ fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
   locate_argv.push(String{"-w"});
   locate_argv.push(String{page_name});
   let const location = capture_completion_program_output(locate_argv);
-  if (!location.has_value() ||
-      !location->view().find_character('/').has_value())
-  {
+  if (!location.has_value()) {
+    LOG(Debug,
+        "the man location fork for '%.*s' was killed or failed to start, "
+        "leaving the text cache unset",
+        static_cast<int>(page_name.length), page_name.data);
+
+    if (should_retry_killed_fork("man-text", page_name)) return StringView{};
+
     return MANPAGE_TEXT_CACHE.set(page_name, steal(text))->view();
   }
+
+  if (!location->view().find_character('/').has_value())
+    return MANPAGE_TEXT_CACHE.set(page_name, steal(text))->view();
 
   let argv = ArrayList<String>{heap_allocator()};
   argv.push(String{man_paths[0].text().view()});
   argv.push(String{page_name});
-  if (Maybe<String> page = capture_completion_program_output(argv);
-      page.has_value() && !page->is_empty())
-  {
+  Maybe<String> page = capture_completion_program_output(argv);
+  if (!page.has_value()) {
+    LOG(Debug,
+        "the man fork for '%.*s' was killed or failed to start, leaving the "
+        "text cache unset",
+        static_cast<int>(page_name.length), page_name.data);
+
+    if (should_retry_killed_fork("man-text", page_name)) return StringView{};
+
+    return MANPAGE_TEXT_CACHE.set(page_name, steal(text))->view();
+  }
+
+  if (!page->is_empty()) {
     let const page_view = page->view();
     for (usize position = 0; position < page_view.length; position++) {
       let const byte = page_view[position];
@@ -730,9 +799,8 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
    a trusted directory. The resolved absolute path runs as the only argv entry,
    not through a shell, so no alias shadows it. */
 static fn help_text_for(ProgramResolver &resolver, StringView command,
-                        StringView subcommand = {}) throws -> String
+                        StringView subcommand = {}) throws -> Maybe<String>
 {
-  let text = String{heap_allocator()};
   let help_argument = HELP_ALLOWLIST.find(command);
   let const paths = resolver.search(command, ProgramResolver::SearchMode::First,
                                     ProgramResolver::Requirement::Runnable,
@@ -755,17 +823,23 @@ static fn help_text_for(ProgramResolver &resolver, StringView command,
         [&](StringView word) throws { argv.push(String{word}); });
     LOG(Debug, "forking '%.*s' for its --help text",
         static_cast<int>(command.length), command.data);
-    if (Maybe<String> output = capture_completion_program_output(argv);
-        output.has_value())
-    {
-      LOG(Debug, "the --help fork for '%.*s' produced %zu bytes",
-          static_cast<int>(command.length), command.data, output->length());
-      text = steal(*output);
-    } else {
-      LOG(Debug, "the --help fork for '%.*s' produced no output",
+    Maybe<String> output = capture_completion_program_output(argv);
+    if (!output.has_value()) {
+      LOG(Debug,
+          "the --help fork for '%.*s' was killed or failed to start, leaving "
+          "the cache unset",
           static_cast<int>(command.length), command.data);
+
+      return None;
     }
-  } else if (help_argument.has_value() && paths.is_empty()) {
+
+    LOG(Debug, "the --help fork for '%.*s' produced %zu bytes",
+        static_cast<int>(command.length), command.data, output->length());
+
+    return steal(*output);
+  }
+
+  if (help_argument.has_value() && paths.is_empty()) {
     LOG(Debug,
         "the help allowlist lists '%.*s' but the program is not on the "
         "path, skipping the --help fork",
@@ -778,7 +852,8 @@ static fn help_text_for(ProgramResolver &resolver, StringView command,
         static_cast<int>(paths[0].text().view().length),
         paths[0].text().view().data);
   }
-  return text;
+
+  return String{heap_allocator()};
 }
 
 /* The parsed caches keep entries and free the raw text, so a reader that wants
@@ -792,8 +867,9 @@ fn internal::help_text_of(StringView command, EvalContext &context) throws
     return cached->view();
 
   let text = help_text_for(context.get_program_resolver(), command);
+  if (!text.has_value()) return StringView{};
 
-  return HELP_TEXT_CACHE.set(command, steal(text))->view();
+  return HELP_TEXT_CACHE.set(command, steal(*text))->view();
 }
 
 static fn parse_help_option_entries(StringView text) throws
@@ -837,17 +913,22 @@ static fn help_cache_key(StringView command, StringView subcommand) throws
   return key;
 }
 
-/* HELP_PARSED gates the fork so a second tab reads the parsed caches. */
+/* HELP_PARSED gates the fork so a second tab reads the parsed caches. A key is
+   recorded only after the fork settles. */
 static fn ensure_help_parsed(ProgramResolver &resolver, StringView command,
                              StringView subcommand = {}) throws -> void
 {
   let const key = help_cache_key(command, subcommand);
   if (HELP_PARSED.contains(key.view())) return;
+  /* A killed fork still fills both caches so the caller has a reference to
+     return, and the key stays unparsed while attempts remain. */
   let const text = help_text_for(resolver, command, subcommand);
-  HELP_OPTION_CACHE.set(key.view(), parse_help_option_entries(text.view()));
+  let const parsed = text.has_value() ? text->view() : StringView{};
+  HELP_OPTION_CACHE.set(key.view(), parse_help_option_entries(parsed));
   HELP_SUBCOMMAND_CACHE.set(key.view(),
-                            parse_help_subcommands(text.view(), command));
-  HELP_PARSED.add(key.view());
+                            parse_help_subcommands(parsed, command));
+  if (text.has_value() || !should_retry_killed_fork("help", key.view()))
+    HELP_PARSED.add(key.view());
 }
 
 static fn help_entries_for(StringMap<ArrayList<help_entry>> &cache,

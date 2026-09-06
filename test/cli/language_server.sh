@@ -116,6 +116,9 @@ chmod +x "$act_program" "$man_program" \
   "$directory/bin/manprobe$program_suffix" \
   "$directory/bin/man$program_suffix"
 
+"$act_program" --help > /dev/null 2>&1
+"$man_program" -w act > /dev/null 2>&1
+
 {
   frame '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{"general":{"positionEncodings":["utf-8"]},"textDocument":{"publishDiagnostics":{"dataSupport":true},"codeAction":{"isPreferredSupport":true,"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["quickfix","source.fixAll.kosh"]}}}}}}}'
   frame '{"jsonrpc":"2.0","method":"initialized","params":{}}'

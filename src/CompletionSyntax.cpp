@@ -55,6 +55,25 @@ static pure fn is_unmatched_closing_paren(StringView line,
   return depth == 0;
 }
 
+/* A single quote that a dollar opens holds backslash escapes, so its run ends
+   past an escaped quote. An even run of backslashes leaves the dollar itself
+   unescaped. */
+static pure fn opens_dollar_quote(StringView line, usize position) wontthrow
+    -> bool
+{
+  if (position == 0 || line[position] != '\'') return false;
+  if (line[position - 1] != '$') return false;
+
+  usize backslash_count = 0;
+  usize k = position - 1;
+  while (k > 0 && line[k - 1] == '\\') {
+    backslash_count++;
+    k--;
+  }
+
+  return backslash_count % 2 == 0;
+}
+
 pure fn internal::quoted_run_end(StringView line, usize position) wontthrow
     -> usize
 {
@@ -63,9 +82,12 @@ pure fn internal::quoted_run_end(StringView line, usize position) wontthrow
     return position + 1 < line.length ? position + 1 : position;
   if (opener != '\'' && opener != '"') return position;
 
+  let const is_escaped_body =
+      opener == '"' || opens_dollar_quote(line, position);
+
   usize k = position + 1;
   while (k < line.length && line[k] != opener) {
-    if (opener == '"' && line[k] == '\\' && k + 1 < line.length) k++;
+    if (is_escaped_body && line[k] == '\\' && k + 1 < line.length) k++;
     k++;
   }
   return k < line.length ? k : line.length - 1;
@@ -148,8 +170,8 @@ static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
   return TRANSPARENT_PREFIXES.contains(word);
 }
 
-static pure fn next_completion_prefix_word(StringView line,
-                                           usize &position) wontthrow
+static fn next_completion_prefix_word(StringView line,
+                                      usize &position) wontthrow
     -> Maybe<StringView>
 {
   position = skip_blanks(line, position);
@@ -206,8 +228,8 @@ static fn timeout_option_takes_next_word(StringView word) wontthrow -> bool
   return false;
 }
 
-static pure fn timeout_managed_command_start(StringView line,
-                                             usize position) wontthrow
+static fn timeout_managed_command_start(StringView line,
+                                        usize position) wontthrow
     -> Maybe<usize>
 {
   let should_skip_value = false;
@@ -241,7 +263,7 @@ static pure fn timeout_managed_command_start(StringView line,
   }
 }
 
-static pure fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
+static fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
 {
   usize position = 0;
   loop
@@ -268,8 +290,8 @@ static pure fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
   }
 }
 
-pure fn internal::is_in_command_position(StringView line,
-                                         usize token_start) wontthrow -> bool
+fn internal::is_in_command_position(StringView line,
+                                    usize token_start) wontthrow -> bool
 {
   if (let const managed_start = timeout_command_start(line);
       managed_start.has_value())

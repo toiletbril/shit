@@ -1,0 +1,25 @@
+== a plain single quote lists the markers:
+'ZQcommand_marker
+'ZQdir_marker/
+'ZQmarker_file
+== an ANSI C quote lists the same markers:
+$'ZQcommand_marker
+$'ZQdir_marker/
+$'ZQmarker_file
+== an ANSI C escape resolves to the decoded name:
+$'ZQdir_marker/\x5aQinner
+== an ANSI C quote completes a command name:
+$'ZQcommand_marker
+== an ANSI C quote after a directory keeps the prefix:
+ZQdir_marker/$'ZQinner
+== a doubled dollar sign keeps the process id in the prefix:
+== a tripled dollar sign keeps the process id before the quote body:
+== a locale quote lists the same markers:
+$"ZQcommand_marker
+$"ZQdir_marker/
+$"ZQmarker_file
+== a locale quote completes a command name:
+$"ZQcommand_marker
+== a locale quote after a directory keeps the prefix:
+ZQdir_marker/$"ZQinner
+== a doubled dollar sign keeps the process id before a locale quote:
