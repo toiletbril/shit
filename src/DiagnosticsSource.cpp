@@ -27,15 +27,18 @@ enum class source_scan_state : u8
 {
   Normal,
   SingleQuoted,
+  AnsiCQuoted,
   DoubleQuoted,
   Comment,
 };
 
 constexpr u8 SCAN_ACTS_NORMAL = 1U << 0U;
 constexpr u8 SCAN_ACTS_SINGLE_QUOTED = 1U << 1U;
-constexpr u8 SCAN_ACTS_DOUBLE_QUOTED = 1U << 2U;
-constexpr u8 SCAN_ACTS_COMMENT = 1U << 3U;
+constexpr u8 SCAN_ACTS_ANSI_C_QUOTED = 1U << 2U;
+constexpr u8 SCAN_ACTS_DOUBLE_QUOTED = 1U << 3U;
+constexpr u8 SCAN_ACTS_COMMENT = 1U << 4U;
 constexpr u8 SCAN_ACTS_EVERYWHERE = SCAN_ACTS_NORMAL | SCAN_ACTS_SINGLE_QUOTED |
+                                    SCAN_ACTS_ANSI_C_QUOTED |
                                     SCAN_ACTS_DOUBLE_QUOTED | SCAN_ACTS_COMMENT;
 
 struct source_scan_table
@@ -56,9 +59,11 @@ consteval fn build_source_scan_table() -> source_scan_table
   table.acting_states[static_cast<u8>('\r')] = SCAN_ACTS_EVERYWHERE;
   table.acting_states[static_cast<u8>('\n')] = SCAN_ACTS_EVERYWHERE;
   table.acting_states[static_cast<u8>('\\')] =
-      SCAN_ACTS_NORMAL | SCAN_ACTS_SINGLE_QUOTED | SCAN_ACTS_DOUBLE_QUOTED;
+      SCAN_ACTS_NORMAL | SCAN_ACTS_SINGLE_QUOTED | SCAN_ACTS_ANSI_C_QUOTED |
+      SCAN_ACTS_DOUBLE_QUOTED;
   table.acting_states[static_cast<u8>('\'')] =
-      SCAN_ACTS_NORMAL | SCAN_ACTS_SINGLE_QUOTED;
+      SCAN_ACTS_NORMAL | SCAN_ACTS_SINGLE_QUOTED | SCAN_ACTS_ANSI_C_QUOTED;
+  table.acting_states[static_cast<u8>('$')] |= SCAN_ACTS_NORMAL;
   table.acting_states[static_cast<u8>('"')] =
       SCAN_ACTS_NORMAL | SCAN_ACTS_DOUBLE_QUOTED;
 
@@ -195,7 +200,11 @@ pure fn homoglyph_diagnostic(homoglyph_kind kind,
   switch (kind) {
   case homoglyph_kind::SingleQuote:
     if (state == source_scan_state::Normal) return diagnostic_id::sc1110;
-    if (state == source_scan_state::SingleQuoted) return diagnostic_id::sc1112;
+    if (state == source_scan_state::SingleQuoted ||
+        state == source_scan_state::AnsiCQuoted)
+    {
+      return diagnostic_id::sc1112;
+    }
     return None;
 
   case homoglyph_kind::DoubleQuote:
@@ -375,6 +384,7 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
   let is_command_position = true;
   usize comment_line_start = 0;
   usize line_start = 0;
+  usize arithmetic_paren_depth = 0;
   usize at = 0;
 
   while (at < source.length) {
@@ -407,6 +417,23 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
       case '\'':
         state = source_scan_state::SingleQuoted;
         is_command_position = false;
+        break;
+
+      case '$':
+        is_command_position = false;
+        if (at + 1 < source.length && source[at + 1] == '\'') {
+          state = source_scan_state::AnsiCQuoted;
+          at++;
+        } else if (at + 2 < source.length && source[at + 1] == '(' &&
+                   source[at + 2] == '(')
+        {
+          /* A redirection cannot open inside an arithmetic expansion, so the
+             shift operator is not read as a here-document there. */
+          arithmetic_paren_depth += 2;
+          at += 2;
+        } else {
+          at = skip_plain_bytes(source, at, SCAN_ACTS_NORMAL);
+        }
         break;
 
       case '"':
@@ -452,8 +479,8 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
 
       case '<':
         is_command_position = false;
-        if (at + 2 < source.length && source[at + 1] == '<' &&
-            source[at + 2] != '<')
+        if (arithmetic_paren_depth == 0 && at + 2 < source.length &&
+            source[at + 1] == '<' && source[at + 2] != '<')
         {
           at = skip_here_document(source, at);
           line_start = at;
@@ -470,9 +497,17 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
       case '\n':
       case ';':
       case '&':
-      case '|':
+      case '|': is_command_position = true; break;
+
       case '(':
-      case ')': is_command_position = true; break;
+        if (arithmetic_paren_depth > 0) arithmetic_paren_depth++;
+        is_command_position = true;
+        break;
+
+      case ')':
+        if (arithmetic_paren_depth > 0) arithmetic_paren_depth--;
+        is_command_position = true;
+        break;
 
       default:
         is_command_position = false;
@@ -507,6 +542,17 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
       }
       break;
 
+    case source_scan_state::AnsiCQuoted:
+      switch (byte) {
+      case '\'': state = source_scan_state::Normal; break;
+      case '\\': at++; break;
+
+      default:
+        at = skip_plain_bytes(source, at, SCAN_ACTS_ANSI_C_QUOTED);
+        break;
+      }
+      break;
+
     case source_scan_state::DoubleQuoted:
       switch (byte) {
       case '"': state = source_scan_state::Normal; break;
@@ -537,9 +583,10 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
     }
 
     /* An escape case consumes its escaped byte, so the last consumed byte is
-       read rather than the byte the state switch dispatched on. */
+       read here and not the byte the state switch dispatched on. An escape that
+       ends the source leaves nothing behind it to read. */
     at++;
-    if (source[at - 1] == '\n') line_start = at;
+    if (at <= source.length && source[at - 1] == '\n') line_start = at;
   }
 }
 
