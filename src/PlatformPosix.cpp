@@ -146,6 +146,13 @@ fn rewind_descriptor(os::descriptor fd, usize byte_count) wontthrow -> bool
          static_cast<off_t>(-1);
 }
 
+fn seek_descriptor_from_start(os::descriptor fd, u64 byte_offset) wontthrow
+    -> bool
+{
+  return lseek(fd, static_cast<off_t>(byte_offset), SEEK_SET) !=
+         static_cast<off_t>(-1);
+}
+
 hot fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow
     -> i32
 {
@@ -895,7 +902,7 @@ static fn restore_encoded_terminal_settings(termios &state,
   return position == encoded.length + 1;
 }
 
-static pure fn parse_terminal_character(StringView text, cc_t &value) wontthrow
+static fn parse_terminal_character(StringView text, cc_t &value) wontthrow
     -> bool
 {
   if (text == "undef" || text == "^-") {

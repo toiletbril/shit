@@ -54,6 +54,7 @@ public:
   hot mustuse pure fn has_trailing_separator() const wontthrow -> bool;
 
   mustuse fn parent() const throws -> Path;
+  mustuse fn parent_or_current() const throws -> Path;
   mustuse pure fn filename() const wontthrow -> StringView;
   mustuse pure fn extension() const wontthrow -> StringView;
   mustuse fn next_component(usize &position) const wontthrow -> component;
@@ -72,7 +73,7 @@ public:
 
   fn push_component(StringView component) throws -> Path &;
 
-  mustuse pure fn with_extension(StringView new_extension) const throws -> Path;
+  mustuse fn with_extension(StringView new_extension) const throws -> Path;
 
   cold mustuse fn exists() const wontthrow -> bool;
   cold mustuse fn is_directory() const wontthrow -> bool;

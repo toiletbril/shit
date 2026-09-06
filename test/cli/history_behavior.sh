@@ -8,7 +8,13 @@
 
 unset KOSH_FLAGS
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+cleanup()
+{
+  if [ -n "$dir" ]; then
+    "$TEST_SYSTEM_RM" -rf -- "$dir"
+  fi
+}
+trap cleanup EXIT
 
 # History recall brings back the newest command even when the history file holds
 # more entries than the in-memory ring. A missing parenthesis in
@@ -44,6 +50,8 @@ modifier_stderr_log=$dir/modifier-stderr
 storage_history_path=$dir/storage-history
 multiline_history_path=$dir/multiline-history
 history_size_path=$dir/history-size
+zero_history_size_path=$dir/zero-history-size
+zero_history_size_rc=$dir/zero-history-size-rc
 disabled_hist=$dir/disabled
 ignoreeof_hist=$dir/ignoreeof
 ignoreeof_rc=$dir/ignoreeof-rc
@@ -360,6 +368,28 @@ else
   printf 'history size file:\n%.2048s\n' \
     "$(cat "$history_size_path")" >&2
   echo "history size broken"
+fi
+
+printf 'ZERO_HISTORY_SIZE_BASE\n' > "$zero_history_size_path"
+printf 'KOSH_HISTORY_SIZE=0\n' > "$zero_history_size_rc"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready 'echo ZERO_HISTORY_SIZE_OMITTED\r' 'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$zero_history_size_path" \
+    ZERO_HISTORY_SIZE_RC="$zero_history_size_rc" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    run_interactive \
+      'exec "$BIN" -i -M bash --rcfile "$ZERO_HISTORY_SIZE_RC"') || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+if [ "$(cat "$zero_history_size_path")" = ZERO_HISTORY_SIZE_BASE ]; then
+  echo "zero history size storage ok"
+else
+  printf 'zero history size file:\n%.2048s\n' \
+    "$(cat "$zero_history_size_path")" >&2
+  echo "zero history size storage broken"
 fi
 
 printf 'echo STDERR_HISTORY_MARKER\n' > "$stderr_hist"

@@ -291,6 +291,14 @@ fn rewind_descriptor(os::descriptor fd, usize byte_count) wontthrow -> bool
   return SetFilePointerEx(fd, distance, nullptr, FILE_CURRENT) != FALSE;
 }
 
+fn seek_descriptor_from_start(os::descriptor fd, u64 byte_offset) wontthrow
+    -> bool
+{
+  LARGE_INTEGER distance{};
+  distance.QuadPart = static_cast<LONGLONG>(byte_offset);
+  return SetFilePointerEx(fd, distance, nullptr, FILE_BEGIN) != FALSE;
+}
+
 fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32
 {
   let const file_type = GetFileType(fd);

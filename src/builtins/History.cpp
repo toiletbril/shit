@@ -43,10 +43,101 @@ pure fn History::kind() const wontthrow -> Builtin::Kind
   return Kind::History;
 }
 
-static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
-                             usize wanted_count) throws -> void
+/* A failed history operation names the resolved file. A file whose bytes the
+   history format rejects is reported apart from a system failure. The system
+   message is taken before the file is read again. */
+static fn report_history_file_failure(const ExecContext &ec, EvalContext &cxt,
+                                      StringView action) throws -> void
 {
-  let events = toiletline::history_events(cxt.scratch_allocator());
+  let const system_message = os::last_system_error_message();
+  let const path = toiletline::history_path();
+  if (!path.has_value()) {
+    report_soft_builtin_error(ec, cxt, ec.source_location(),
+                              StringView{"Unable to "} + action +
+                                  " the history file");
+    return;
+  }
+
+  let const contents = path->read_entire_file();
+  let const is_data_invalid =
+      contents.has_value() &&
+      !toiletline::is_history_contents_valid(contents->view());
+  report_soft_builtin_error(
+      ec, cxt, ec.source_location(),
+      StringView{"cannot "} + action + " history at '" + path->text().view() +
+          "': " +
+          (is_data_invalid ? StringView{"the file contains invalid data"}
+                           : system_message.view()));
+}
+
+/* A file that cannot be examined is kept apart from a file that is empty, so an
+   unreadable history is reported instead of printed as an empty list. A path
+   that does not resolve or does not exist has nothing to read and is valid. */
+enum class history_file_condition : u8
+{
+  Valid,
+  Invalid,
+  Unreadable,
+};
+
+static fn get_history_file_condition() throws -> history_file_condition
+{
+  let const path = toiletline::history_path();
+  if (!path.has_value()) return history_file_condition::Valid;
+  if (!path->exists()) return history_file_condition::Valid;
+
+  let const contents = path->read_entire_file();
+  if (!contents.has_value()) return history_file_condition::Unreadable;
+
+  return toiletline::is_history_contents_valid(contents->view())
+             ? history_file_condition::Valid
+             : history_file_condition::Invalid;
+}
+
+/* An appended record needs a leading newline when the target does not end with
+   one. Only the last byte is read, because the target holds every event this
+   shell has already stored. None reports a file that could not be examined. */
+static fn history_target_needs_separator(const Path &target) throws
+    -> Maybe<bool>
+{
+  os::file_status status{};
+  if (!os::stat_path_following(target.text().view(), status)) return false;
+  if (status.size == 0) return false;
+
+  let const opened =
+      os::open_file_descriptor(target.text().view(), os::file_open_mode::Read);
+  if (!opened.has_value()) return None;
+
+  let const fd = opened.value();
+  char last_byte = '\0';
+  let const did_seek = os::seek_descriptor_from_start(fd, status.size - 1);
+  let const read_count =
+      did_seek ? os::read_fd(fd, &last_byte, 1) : Maybe<usize>{None};
+  let const was_closed = os::close_fd(fd);
+  if (!read_count.has_value() || *read_count != 1 || !was_closed) return None;
+
+  return last_byte != '\n';
+}
+
+static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
+                             usize wanted_count) throws -> bool
+{
+  let const read_events = toiletline::history_events(cxt.scratch_allocator());
+  if (!read_events.has_value()) {
+    report_history_file_failure(ec, cxt, "read");
+    return false;
+  }
+
+  let const &events = *read_events;
+
+  /* An empty list still reaches a file the reader accepted, so the file itself
+     answers whether the history is empty or damaged. */
+  if (events.is_empty() &&
+      get_history_file_condition() != history_file_condition::Valid)
+  {
+    report_history_file_failure(ec, cxt, "read");
+    return false;
+  }
 
   usize first_index = 0;
   if (wanted_count != 0 && wanted_count < events.count()) {
@@ -66,6 +157,23 @@ static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
     out += '\n';
   }
   ec.print_to_stdout(out);
+
+  return true;
+}
+
+/* The named file this shell has already imported and how many of its bytes were
+   taken. A -n import resumes at that offset, so the same events are not stored
+   again. */
+struct history_import_state
+{
+  String path{heap_allocator()};
+  usize byte_count{0};
+};
+
+static fn get_history_import_state() -> history_import_state &
+{
+  static history_import_state state;
+  return state;
 }
 
 static fn append_contents_into_history(EvalContext &cxt,
@@ -73,34 +181,15 @@ static fn append_contents_into_history(EvalContext &cxt,
 {
   let const backing = toiletline::history_path();
   if (!backing.has_value()) return false;
-  let parent = backing->parent();
-  if (parent.text().is_empty()) parent = Path{"."};
+  let const parent = backing->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return false;
   defer { os::release_process_lock(lock.take()); };
 
-  bool needs_separator = false;
-  if (backing->exists()) {
-    let opened = os::open_file_descriptor(backing->text().view(),
-                                          os::file_open_mode::Read);
-    if (!opened.has_value()) return false;
-    let const fd = opened.value();
-    char buffer[2048];
-    bool has_bytes = false;
-    char last_byte = '\0';
-    for (;;) {
-      let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
-      if (!read_count.has_value()) {
-        os::close_fd(fd);
-        return false;
-      }
-      if (*read_count == 0) break;
-      has_bytes = true;
-      last_byte = buffer[*read_count - 1];
-    }
-    os::close_fd(fd);
-    needs_separator = has_bytes && last_byte != '\n';
-  }
+  let const probed_separator = history_target_needs_separator(*backing);
+  if (!probed_separator.has_value()) return false;
+
+  let const needs_separator = *probed_separator;
 
   let payload = String{cxt.scratch_allocator()};
   let contents = source_text;
@@ -111,7 +200,9 @@ static fn append_contents_into_history(EvalContext &cxt,
     if (needs_separator) payload.push('\n');
     payload.append(source_text);
     if (!source_text.is_empty() && source_text[source_text.length - 1] != '\n')
+    {
       payload.push('\n');
+    }
     contents = payload.view();
   }
 
@@ -122,32 +213,115 @@ static fn append_contents_into_history(EvalContext &cxt,
   let const fd = opened.value();
   let const was_written =
       contents.is_empty() || os::write_all(fd, contents.data, contents.length);
-  os::close_fd(fd);
-  return was_written;
+  let const was_closed = os::close_fd(fd);
+  return was_written && was_closed;
 }
 
-static fn write_history_to_file(const Path &target) throws -> bool
+/* The named file this shell last wrote and the newest event it stored there. A
+   repeated append resumes above that event so the same events are not stored
+   twice, while a different file starts from the whole retained list. */
+struct history_append_state
 {
-  let contents = Maybe<String>{None};
-  if (let const source_path = toiletline::history_path();
-      source_path.has_value() && source_path->exists())
+  String path{heap_allocator()};
+  usize event_number{0};
+};
+
+static fn get_history_append_state() -> history_append_state &
+{
+  static history_append_state state;
+  return state;
+}
+
+/* A write starts from the retained event list, so KOSH_HISTORY_SIZE bounds what
+   reaches the target. A byte copy of the backing file would also carry the
+   events the list has already dropped. */
+static fn write_history_to_file(EvalContext &cxt, const Path &target,
+                                bool should_append) throws -> bool
+{
+  let &append_state = get_history_append_state();
+  if (append_state.path.view() != target.text().view()) {
+    append_state.path.clear();
+    append_state.path.append(target.text().view());
+    append_state.event_number = 0;
+  }
+
+  usize newest_number = 0;
+  if (let const current_number = toiletline::newest_history_event_number();
+      current_number.has_value())
   {
-    contents = source_path->read_entire_file();
-    if (!contents.has_value()) return false;
+    newest_number = *current_number;
+  }
+
+  if (append_state.event_number > newest_number)
+    append_state.event_number = 0;
+
+  let const watermark = should_append ? append_state.event_number : 0;
+
+  let const source_path = toiletline::history_path();
+  if (source_path.has_value() && source_path->exists() && target.exists() &&
+      source_path->is_same_file_as(target))
+  {
+    append_state.event_number = newest_number;
+    return true;
+  }
+
+  Maybe<usize> written_above{None};
+  if (should_append) written_above = watermark;
+
+  /* A failed read would write an empty payload over the target, so the write
+     stops before it destroys the saved history. */
+  let const read_events =
+      toiletline::history_events(cxt.scratch_allocator(), written_above);
+  if (!read_events.has_value()) return false;
+
+  let const &events = *read_events;
+
+  let payload = String{cxt.scratch_allocator()};
+  for (usize index = 0; index < events.count(); index++)
+    toiletline::encode_history_record(payload, events[index].command.view());
+
+  /* A truncating write is staged beside the target and renamed over it, so a
+     failure leaves the saved history in place. */
+  if (!should_append) {
+    let const parent = target.parent_or_current();
+    let const replacement = os::write_to_named_temp_file(
+        parent, ".kosh_history_write", payload.view());
+    if (!replacement.has_value()) return false;
+    defer { unused(os::remove_file(replacement->text().view())); };
+
+    if (!os::rename_path(replacement->text().view(), target.text().view()))
+      return false;
+
+    append_state.event_number = newest_number;
+    return true;
+  }
+
+  bool needs_separator = false;
+  if (!payload.is_empty()) {
+    let const probed_separator = history_target_needs_separator(target);
+    if (!probed_separator.has_value()) return false;
+
+    needs_separator = *probed_separator;
   }
 
   let const opened = os::open_file_descriptor(target.text().view(),
-                                              os::file_open_mode::Truncate);
+                                              os::file_open_mode::Append);
   if (!opened.has_value()) return false;
 
   let const fd = opened.value();
 
   bool was_written = true;
-  if (contents.has_value() && !contents->is_empty())
-    was_written = os::write_all(fd, contents->data(), contents->count());
+  if (needs_separator) was_written = os::write_all(fd, "\n", 1);
 
-  os::close_fd(fd);
-  return was_written;
+  if (was_written && !payload.is_empty()) {
+    was_written = os::write_all(fd, payload.data(), payload.count());
+  }
+
+  let const was_closed = os::close_fd(fd);
+  if (!was_written || !was_closed) return false;
+
+  append_state.event_number = newest_number;
+  return true;
 }
 
 struct history_selection
@@ -253,16 +427,30 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                   "Pass a text history file");
         return 1;
       }
-      if (!append_contents_into_history(cxt, source_text->view())) {
+      let &import_state = get_history_import_state();
+      let imported = source_text->view();
+      if (FLAG_HISTORY_READ_NEW.is_enabled() &&
+          import_state.path.view() == args[1].view() &&
+          import_state.byte_count <= imported.length)
+      {
+        imported = imported.substring(import_state.byte_count);
+      }
+
+      /* An empty import still runs, because reading a file establishes a
+         missing backing store. */
+      if (!append_contents_into_history(cxt, imported)) {
         report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
                                   "Unable to append the history file");
         return 1;
       }
+
+      import_state.path.clear();
+      import_state.path.append(args[1].view());
+      import_state.byte_count = source_text->count();
     }
 
     if (!toiletline::history_read()) {
-      report_soft_builtin_error(ec, cxt, ec.source_location(),
-                                "Unable to read the history file");
+      report_history_file_failure(ec, cxt, "read");
       return 1;
     }
 
@@ -276,7 +464,8 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.guard_restricted_path(args[1].view(), ec.arg_location_at(1),
                                 restricted_path_use::History);
       let const target = Path{args[1].view()};
-      if (!write_history_to_file(target)) {
+      if (!write_history_to_file(cxt, target, FLAG_HISTORY_APPEND.is_enabled()))
+      {
         report_soft_builtin_error(
             ec, cxt, ec.arg_location_at(1),
             StringView{"cannot write history to '"} + args[1].view() +
@@ -286,8 +475,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
     } else {
       if (!toiletline::history_write()) {
-        report_soft_builtin_error(ec, cxt, ec.source_location(),
-                                  "Unable to write the history file");
+        report_history_file_failure(ec, cxt, "write");
         return 1;
       }
     }
@@ -306,7 +494,13 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (FLAG_HISTORY_DELETE.is_set()) {
-    let events = toiletline::history_events(cxt.scratch_allocator());
+    let const read_events = toiletline::history_events(cxt.scratch_allocator());
+    if (!read_events.has_value()) {
+      report_history_file_failure(ec, cxt, "read");
+      return 1;
+    }
+
+    let const &events = *read_events;
     let const selection =
         parse_history_selection(FLAG_HISTORY_DELETE.value(), events);
     if (!selection.has_value()) {
@@ -365,7 +559,8 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (parsed.value() > 0) wanted_count = static_cast<usize>(parsed.value());
   }
 
-  print_history_list(ec, cxt, wanted_count);
+  if (!print_history_list(ec, cxt, wanted_count)) return 1;
+
   return 0;
 }
 

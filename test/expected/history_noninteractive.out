@@ -30,6 +30,33 @@ cleared
     2  existing two
     3  merged alpha
     4  merged beta
+== history -a separates and appends the list to a named file ==
+rc=0
+named base
+existing one
+existing two
+merged alpha
+merged beta
+== history -a leaves its backing file unchanged ==
+rc=0
+    1  existing one
+    2  existing two
+    3  merged alpha
+    4  merged beta
+== a hard link aliases the backing file ==
+rc=0
+== history -a leaves an aliased backing file unchanged ==
+rc=0
+    1  existing one
+    2  existing two
+    3  merged alpha
+    4  merged beta
+== history -w replaces a named file with the list ==
+rc=0
+existing one
+existing two
+merged alpha
+merged beta
 == history -r on a missing file errors ==
 rc=1
 == history -r rejects invalid data without changing the list ==
@@ -38,27 +65,94 @@ rc=1
     2  existing two
     3  merged alpha
     4  merged beta
+== history -r rejects malformed UTF-8 without changing the list ==
+rc=1
+    1  existing one
+    2  existing two
+    3  merged alpha
+    4  merged beta
 == history -r separates an unterminated backing record ==
     1  tail
     2  next
+== history -r terminates an unterminated imported record ==
+    1  next
 == an empty import creates a missing backing file ==
 rc=0
-== history accepts high bytes as file data ==
+== history stores into a missing backing file ==
 rc=0
+    1  created
+    1  created
+== history accepts high bytes as file data ==
 1
-== an oversized decoded record is omitted ==
-0
+== history accepts valid UTF-8 as imported file data ==
+rc=0
+3
+== history rejects malformed UTF-8 imported bytes \200 ==
+rc=1
+== history rejects malformed UTF-8 imported bytes \300\200 ==
+rc=1
+== history rejects malformed UTF-8 imported bytes \340\200\200 ==
+rc=1
+== history rejects malformed UTF-8 imported bytes \355\240\200 ==
+rc=1
+== history rejects malformed UTF-8 imported bytes \364\220\200\200 ==
+rc=1
+== history rejects a truncated UTF-8 imported sequence ==
+rc=1
+== an oversized decoded record is reported ==
+1
+rc=1
 == concurrent history stores preserve both records ==
+rc=0,0
 2
 == consecutive duplicate stores succeed and retain one record ==
 rc=0,0
     1  repeated
+== a zero KOSH_HISTORY_SIZE retains and stores nothing ==
+rc=0,0,0
+0
+== nonconsecutive duplicate stores remain separate records ==
+    1  alpha
+    2  beta
+    3  alpha
 == an equal size replacement refreshes append state ==
     1  second
     2  third
+== a mode change on the backing file keeps the store readable ==
+rc=0
+    1  mode one
+    2  modetwo
 == history deletion rewrites the no editor store ==
     1  second
+== history deletion preserves legacy high-byte records ==
+rc=0
+1
+== a range deletion renumbers before the next store ==
+rc=0,0
+    1  third
+    2  fourth
 == invalid stored bytes leave existing history intact ==
+rc=1
+    1  valid
+== malformed UTF-8 stored bytes \377 leave existing history intact ==
+rc=1
+    1  valid
+== malformed UTF-8 stored bytes \200 leave existing history intact ==
+rc=1
+    1  valid
+== malformed UTF-8 stored bytes \303 leave existing history intact ==
+rc=1
+    1  valid
+== malformed UTF-8 stored bytes \300\200 leave existing history intact ==
+rc=1
+    1  valid
+== malformed UTF-8 stored bytes \340\200\200 leave existing history intact ==
+rc=1
+    1  valid
+== malformed UTF-8 stored bytes \355\240\200 leave existing history intact ==
+rc=1
+    1  valid
+== malformed UTF-8 stored bytes \364\220\200\200 leave existing history intact ==
 rc=1
     1  valid
 == running shells reload history written by another instance ==
@@ -71,6 +165,71 @@ rc=1
     3  three
     4  four
     5  five
+    2  two
+    3  three
+    4  four
+    5  five
+    6  six
+== a bare listing reports a damaged backing file ==
+1
+rc=1
+== an operandless read names the resolved backing file ==
+1
+1
 == a stored multiline event keeps its submitted shape ==
     1  line one
 line two
+== a repeated named append stores only the events not written yet ==
+rc=0
+named base
+one
+two
+== appends to different files each receive the retained list ==
+rc=0
+first target
+alpha
+second target
+alpha
+== a named write to a directory fails and leaves the directory in place ==
+rc=1
+directory intact
+    1  kept
+1
+== a named append to a directory fails ==
+rc=1
+== an operandless write names the resolved backing file ==
+1
+== a named append is bounded by KOSH_HISTORY_SIZE ==
+rc=0
+append base
+two
+three
+== a repeated new read skips the bytes it already took ==
+    1  import one
+    2  import two
+== a repeated read takes the whole file again ==
+    1  import one
+    2  import two
+    3  import one
+    4  import two
+== an operandless write trims the backing file to the retained window ==
+rc=0
+four
+five
+== a named write is bounded by KOSH_HISTORY_SIZE ==
+rc=0
+four
+five
+== a stored carriage return stays inside the event ==
+rc=0
+    1  aRb
+== a CRLF backing file drops only the record terminator ==
+    1  crlf one
+    2  crlf two
+== a concurrent deletion and store leave a readable store ==
+rc=0,0
+rc=0
+== a store after an external append keeps both records ==
+    1  grow one
+    2  grow two
+    3  growthree

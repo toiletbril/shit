@@ -584,6 +584,27 @@ struct file_status
 
 static_assert(sizeof(usize) != 8 || sizeof(file_status) == 104);
 
+/* Two observations describe the same untouched file. The device and file
+   identity is compared only when both observations carry it, because a
+   filesystem that reports no identity would otherwise never match. */
+pure constexpr fn file_status_matches(const file_status &expected,
+                                      const file_status &actual) wontthrow
+    -> bool
+{
+  if (expected.has_file_identity && actual.has_file_identity &&
+      (expected.device_id != actual.device_id ||
+       expected.file_id != actual.file_id))
+  {
+    return false;
+  }
+
+  return expected.mode == actual.mode && expected.size == actual.size &&
+         expected.modification_time == actual.modification_time &&
+         expected.modification_nanoseconds == actual.modification_nanoseconds &&
+         expected.change_time == actual.change_time &&
+         expected.change_nanoseconds == actual.change_nanoseconds;
+}
+
 fn stat_path(StringView path, file_status &status) wontthrow -> bool;
 fn stat_path_following(StringView path, file_status &status) wontthrow -> bool;
 fn process_file_query_is_supported(const file_status &status,
@@ -658,6 +679,8 @@ fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
 fn descriptor_is_seekable(os::descriptor fd) wontthrow -> bool;
 fn rewind_descriptor(os::descriptor fd, usize byte_count) wontthrow -> bool;
+fn seek_descriptor_from_start(os::descriptor fd, u64 byte_offset) wontthrow
+    -> bool;
 fn read_fd_to_string(os::descriptor fd, Allocator allocator) throws
     -> Maybe<String>;
 

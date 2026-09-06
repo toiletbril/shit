@@ -13,6 +13,8 @@
 #include "Path.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
+#include "TabSelector.hpp"
+#include "ToiletlineHistory.hpp"
 
 #define TL_HISTORY_MAX_SIZE (1024 * 4)
 #include "toiletline/toiletline.h"
@@ -46,6 +48,7 @@ void leave_calc_history();
 
 koshka::Maybe<koshka::Path> history_path();
 bool is_history_contents_valid(StringView contents);
+void encode_history_record(String &output, StringView command);
 bool history_write();
 bool history_read();
 bool history_clear();
@@ -58,7 +61,14 @@ struct history_event
   String command;
 };
 
-koshka::ArrayList<history_event> history_events(koshka::Allocator allocator);
+/* Only the events above after_event_number are decoded, so a caller that writes
+   an increment pays for the increment alone. The result is None when the file
+   cannot be read or an event cannot be decoded. A missing file is an empty
+   list. */
+koshka::Maybe<koshka::ArrayList<history_event>>
+history_events(koshka::Allocator allocator,
+               koshka::Maybe<usize> after_event_number = koshka::None);
+koshka::Maybe<usize> newest_history_event_number();
 koshka::Maybe<history_event>
 relative_history_event(koshka::Allocator allocator, usize distance,
                        koshka::Maybe<usize> before_event_number = koshka::None);
@@ -90,6 +100,8 @@ enum class edit_mode : u8
 };
 
 void set_edit_mode(edit_mode mode);
+
+void set_tab_selector(koshka::tab_selector_mode selector);
 
 usize utf8_strlen(const String &s, usize byte_count = static_cast<usize>(-1));
 

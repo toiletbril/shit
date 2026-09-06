@@ -288,6 +288,40 @@ test "$history_scan_count" -le "$history_short_scan_count" || exit 1
 test "$(metric_field "$history_metrics" resolutions)" -eq 0 || exit 1
 echo 'rejected history prefixes scan once without walking PATH'
 
+if strings "$d/history-typescript" | grep -q zzzz-invalid-history-command; then
+    printf 'a history entry with an unresolvable command was suggested\n'
+    strings "$d/history-typescript" || true
+    exit 1
+fi
+echo 'history ghost hides entries whose command no longer resolves'
+
+printf 'probe-alpha --ghost-accepted\n' > "$d/accept-history"
+
+send_accepted_history_input()
+{
+    wait_for_editor "$d/accept-ready" || exit 1
+    printf 'probe-alpha -'
+    sleep 0.3
+    printf '\003'
+    sleep 0.2
+    printf 'exit 0\n'
+    sleep 0.5
+}
+
+send_accepted_history_input | TERM=xterm-256color PATH="$d/path" \
+    EDITOR_READY_FILE="$d/accept-ready" \
+    KOSH_HISTORY_FILE="$d/accept-history" BIN="$BIN" \
+    run_editor "$d/accept-typescript" || exit 1
+
+strings "$d/accept-typescript" | grep -q ghost-accepted || {
+    printf 'a history entry with a resolvable command was not suggested\n'
+    strings "$d/accept-typescript" || true
+    [ ! -s "$d/accept-typescript.script-error" ] ||
+        /bin/cat "$d/accept-typescript.script-error"
+    exit 1
+}
+echo 'history ghost suggests entries whose command resolves'
+
 mkdir "$d/startup-before" "$d/startup-after"
 printf '#!/bin/sh\n' > "$d/startup-after/git"
 chmod +x "$d/startup-after/git"

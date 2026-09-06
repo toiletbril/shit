@@ -22,6 +22,7 @@
 #include "ExecContext.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+#include "ToiletlineHistory.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -115,6 +116,11 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 #pragma GCC diagnostic pop
 #endif
 
+/* The shell-facing limit is declared where the implementation macro is not
+   visible, so the two values are compared here. */
+static_assert(toiletline::HISTORY_RECORD_MAX_DECODED_BYTE_COUNT ==
+              ITL_STRING_MAX_LEN);
+
 namespace {
 
 koshka::EvalContext *COMPLETION_CONTEXT = nullptr;
@@ -133,28 +139,20 @@ koshka::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
     koshka::heap_allocator()};
 koshka::completion::completion_result *COMPLETION_RESULT = nullptr;
 
-/* An explicit tab normally prints the candidates as a static list. When
-   KOSH_FZF_COMPLETION holds anything other than an empty value or 0, the same
-   candidates are handed to a filtering program instead, and what it prints
-   replaces them. The engine, the replaced token span, and the quoting are
-   untouched, so only the presentation moves. Every failure below leaves the
-   result alone, so the static list still appears. */
-constexpr koshka::StringView SELECTOR_ENABLE_VARIABLE{"KOSH_FZF_COMPLETION"};
+/* The presentation the shell pushes before each prompt. */
+koshka::tab_selector_mode TAB_SELECTOR{koshka::tab_selector_mode::Interactive};
+
+/* The external selector hands the candidates to a filtering program, and what
+   it prints replaces them. The engine, the replaced token span, and the quoting
+   are untouched, so only the presentation moves. Every failure below leaves the
+   result alone, so the printed list still appears. */
 constexpr koshka::StringView SELECTOR_COMMAND_VARIABLE{
     "KOSH_FZF_COMPLETION_COMMAND"};
 constexpr koshka::StringView SELECTOR_OPTIONS_VARIABLE{
     "KOSH_FZF_COMPLETION_OPTS"};
 
-fn selector_command_name(koshka::EvalContext &context) throws
-    -> koshka::Maybe<koshka::String>
+fn selector_command_name(koshka::EvalContext &context) throws -> koshka::String
 {
-  let const enabled = context.get_variable_value(SELECTOR_ENABLE_VARIABLE);
-  if (!enabled.has_value() || enabled->is_empty() ||
-      enabled->view() == koshka::StringView{"0"})
-  {
-    return koshka::None;
-  }
-
   if (let const configured =
           context.get_variable_value(SELECTOR_COMMAND_VARIABLE);
       configured.has_value() && !configured->is_empty())
@@ -252,16 +250,18 @@ fn run_completion_selector(koshka::EvalContext &context,
                            koshka::completion::completion_result &result) throws
     -> selector_outcome
 {
+  if (TAB_SELECTOR != koshka::tab_selector_mode::External)
+    return selector_outcome::NotRun;
+
   if (result.candidates.count() < 2) return selector_outcome::NotRun;
   if (!::itl_g_is_active) return selector_outcome::NotRun;
   if (!koshka::os::shell_has_controlling_terminal())
     return selector_outcome::NotRun;
 
   let const command_name = selector_command_name(context);
-  if (!command_name.has_value()) return selector_outcome::NotRun;
 
   let const resolved = context.get_program_resolver().search(
-      command_name->view(), koshka::ProgramResolver::SearchMode::First,
+      command_name.view(), koshka::ProgramResolver::SearchMode::First,
       koshka::ProgramResolver::Requirement::Execution,
       koshka::ProgramResolver::CachePolicy::ReadOnly);
   if (resolved.is_empty()) return selector_outcome::NotRun;
@@ -570,6 +570,8 @@ fn kosh_ghost_validate_callback(const char *entry) -> int
 namespace toiletline {
 
 fn is_history_contents_valid(koshka::StringView contents) -> bool;
+fn encode_history_record(koshka::String &output, koshka::StringView command)
+    -> void;
 
 using koshka::EvalContext;
 using koshka::Maybe;
@@ -611,6 +613,26 @@ static constexpr char KOSH_CALC_HISTORY_FILE[] = ".kosh_calc_history";
 static os::file_status HISTORY_FILE_STATUS{};
 static bool HAS_HISTORY_FILE_STATUS = false;
 
+/* A rename that commits leaves the file correct even when the reload that
+   follows it fails. A caller that only wrote bytes accepts the second outcome,
+   while a caller that rewrote entries in place cannot. */
+enum class history_replacement : u8
+{
+  Replaced,
+  NotReloaded,
+  Failed,
+};
+
+static fn load_history(const Path &path, bool should_allow_missing) -> bool;
+static fn sync_history(const Path &path, bool should_allow_missing) -> bool;
+static fn commit_history_replacement(const Path &path, const Path &parent,
+                                     StringView name_prefix,
+                                     StringView contents) -> bool;
+static fn replace_history_file(const Path &path, const Path &parent,
+                               StringView name_prefix, StringView contents)
+    -> history_replacement;
+static fn record_history_file_status(const Path &path) -> void;
+
 static fn history_file_path() -> koshka::Maybe<koshka::Path>
 {
   return resolve_history_path("KOSH_HISTORY_FILE", DEFAULT_HISTORY_FILE);
@@ -632,7 +654,7 @@ fn enter_calc_history() -> void
 
   if (koshka::Maybe<koshka::Path> calc = calc_history_file_path();
       calc.has_value())
-    ::tl_history_load(calc->c_str());
+    unused(load_history(*calc, true));
 }
 
 fn leave_calc_history() -> void
@@ -643,75 +665,152 @@ fn leave_calc_history() -> void
 
   if (koshka::Maybe<koshka::Path> shell = history_file_path();
       shell.has_value())
-    ::tl_history_load(shell->c_str());
+    unused(load_history(*shell, true));
 }
 
 fn history_path() -> koshka::Maybe<koshka::Path> { return history_file_path(); }
 
+/* Every entry is appended to the file as it is stored, so a write only has to
+   drop the leading records the bounded list no longer reaches. */
 fn history_write() -> bool
 {
-  if (!::itl_g_is_active) return true;
   let const path = history_file_path();
   if (!path.has_value()) return false;
-  int status = ::tl_history_dump(path->c_str());
-  return status == TL_SUCCESS || status == -EINVAL;
-}
 
-static fn file_status_matches(const os::file_status &expected,
-                              const os::file_status &actual) -> bool
-{
-  if (expected.has_file_identity && actual.has_file_identity &&
-      (expected.device_id != actual.device_id ||
-       expected.file_id != actual.file_id))
+  let const parent = path->parent_or_current();
+  let lock = os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return false;
+  defer { os::release_process_lock(lock.take()); };
+  if (!sync_history(*path, true)) return false;
+  if (::itl_g_history_count == 0) return true;
+
+  let const first_offset = ::itl_history_index_to_offset(0);
+  if (first_offset == 0) return true;
+
+  let const contents = path->read_entire_file();
+  if (!contents.has_value() || first_offset > contents->count()) return false;
+
+  let const retained = contents->view().substring(first_offset);
+  if (!commit_history_replacement(*path, parent, ".kosh_history_write",
+                                  retained))
   {
     return false;
   }
 
-  return expected.size == actual.size &&
-         expected.modification_time == actual.modification_time &&
-         expected.modification_nanoseconds == actual.modification_nanoseconds &&
-         expected.change_time == actual.change_time &&
-         expected.change_nanoseconds == actual.change_nanoseconds;
-}
-
-static fn load_history(const Path &path) -> bool
-{
-  HAS_HISTORY_FILE_STATUS = false;
-  if (::tl_history_load(path.c_str()) != TL_SUCCESS) return false;
-
-  HAS_HISTORY_FILE_STATUS =
-      os::stat_path_following(path.text().view(), HISTORY_FILE_STATUS);
+  /* The rename dropped a leading span and left the retained bytes untouched, so
+     the shift describes the new file exactly and a rescan would only read it
+     back. */
+  ::itl_history_offsets_shift(first_offset);
+  record_history_file_status(*path);
   return true;
 }
 
-fn history_read() -> bool
+static fn load_history(const Path &path, bool should_allow_missing) -> bool
 {
-  let const path = history_file_path();
-  if (!path.has_value()) return false;
-  return load_history(*path);
+  HAS_HISTORY_FILE_STATUS = false;
+  for (int attempt_index = 0; attempt_index < HISTORY_RACE_ATTEMPT_COUNT;
+       attempt_index++)
+  {
+    let status_before = os::file_status{};
+    let const had_status_before =
+        os::stat_path_following(path.text().view(), status_before);
+
+    if (::tl_history_load(path.c_str()) != TL_SUCCESS) {
+      let const was_missing = !::itl_g_history_file_is_bad;
+      if (!should_allow_missing || !was_missing) {
+        return false;
+      }
+
+      let status_after = os::file_status{};
+      if (!os::stat_path_following(path.text().view(), status_after))
+        return os::last_system_error_is_missing_file();
+      continue;
+    }
+
+    let status_after = os::file_status{};
+    if (!os::stat_path_following(path.text().view(), status_after)) continue;
+    if (!had_status_before ||
+        !os::file_status_matches(status_before, status_after))
+    {
+      continue;
+    }
+
+    HISTORY_FILE_STATUS = status_after;
+    HAS_HISTORY_FILE_STATUS = true;
+    return true;
+  }
+
+  return false;
 }
 
-static fn sync_history(const Path &path) -> bool
+static fn sync_history(const Path &path, bool should_allow_missing) -> bool
 {
   let status = os::file_status{};
   if (::itl_g_history_path != nullptr &&
       StringView{::itl_g_history_path} == path.text().view() &&
       !::itl_g_history_file_is_bad && HAS_HISTORY_FILE_STATUS &&
       os::stat_path_following(path.text().view(), status) &&
-      file_status_matches(HISTORY_FILE_STATUS, status))
+      os::file_status_matches(HISTORY_FILE_STATUS, status))
   {
     return true;
   }
 
-  return load_history(path);
+  return load_history(path, should_allow_missing);
+}
+
+/* The replacement is written beside the history file and renamed over it, so no
+   reader observes a partial file. The caller holds the process lock. */
+static fn commit_history_replacement(const Path &path, const Path &parent,
+                                     StringView name_prefix,
+                                     StringView contents) -> bool
+{
+  let const replacement_path =
+      os::write_to_named_temp_file(parent, name_prefix, contents);
+  if (!replacement_path.has_value()) return false;
+  defer { unused(os::remove_file(replacement_path->text().view())); };
+
+  return os::rename_path(replacement_path->text().view(), path.text().view());
+}
+
+/* A caller that cannot describe the new file itself reloads it here. */
+static fn replace_history_file(const Path &path, const Path &parent,
+                               StringView name_prefix, StringView contents)
+    -> history_replacement
+{
+  if (!commit_history_replacement(path, parent, name_prefix, contents))
+    return history_replacement::Failed;
+
+  if (!load_history(path, false)) return history_replacement::NotReloaded;
+
+  return history_replacement::Replaced;
+}
+
+/* A session that does not hold the process lock can append between the write
+   and the stat, so a size the vendored state does not track leaves the status
+   unrecorded and the next sync loads the file. */
+static fn record_history_file_status(const Path &path) -> void
+{
+  HAS_HISTORY_FILE_STATUS =
+      os::stat_path_following(path.text().view(), HISTORY_FILE_STATUS);
+  if (HAS_HISTORY_FILE_STATUS &&
+      HISTORY_FILE_STATUS.size != ::itl_g_history_file_size)
+  {
+    HAS_HISTORY_FILE_STATUS = false;
+  }
+}
+
+fn history_read() -> bool
+{
+  let const path = history_file_path();
+  if (!path.has_value()) return false;
+  return sync_history(*path, false);
 }
 
 fn history_clear() -> bool
 {
   let const path = history_file_path();
   if (!path.has_value()) return false;
-  let parent = path->parent();
-  if (parent.text().is_empty()) parent = Path{"."};
+  let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return false;
   defer { os::release_process_lock(lock.take()); };
@@ -719,7 +818,7 @@ fn history_clear() -> bool
       path->text().view(), koshka::os::file_open_mode::Truncate);
   if (!opened.has_value()) return false;
   if (!koshka::os::close_fd(opened.take())) return false;
-  return load_history(*path);
+  return load_history(*path, false);
 }
 
 fn set_history_enabled(bool is_enabled) -> void
@@ -729,7 +828,9 @@ fn set_history_enabled(bool is_enabled) -> void
 
 fn set_history_limit(usize entry_count) -> void
 {
+  let const previous_limit = ::itl_g_history_limit;
   ::tl_set_history_limit(entry_count);
+  if (::itl_g_history_limit > previous_limit) HAS_HISTORY_FILE_STATUS = false;
 }
 
 struct history_event
@@ -738,26 +839,44 @@ struct history_event
   String command;
 };
 
-fn history_events(koshka::Allocator allocator)
-    -> koshka::ArrayList<history_event>
+fn newest_history_event_number() -> koshka::Maybe<usize>
+{
+  if (!history_read()) return koshka::None;
+  if (::itl_g_history_count == 0) return koshka::None;
+
+  return ::itl_g_history_total_count;
+}
+
+fn history_events(koshka::Allocator allocator,
+                  koshka::Maybe<usize> after_event_number)
+    -> koshka::Maybe<koshka::ArrayList<history_event>>
 {
   let events = koshka::ArrayList<history_event>{allocator};
-  if (!history_read()) return events;
+  let const path = history_file_path();
+  if (!path.has_value()) return events;
+
+  /* The load is allowed to miss the file, so an absent history reads as an
+     empty list and a damaged or unreadable file reads as a failure. */
+  if (!sync_history(*path, true)) return koshka::None;
   if (::itl_g_history_count == 0) return events;
-  if (!::itl_history_ensure_read_buffer()) return events;
+  if (!::itl_history_ensure_read_buffer()) return koshka::None;
 
   let const first_number =
       ::itl_g_history_total_count - ::itl_g_history_count + 1;
+  usize first_index = 0;
+  if (after_event_number.has_value() && *after_event_number >= first_number) {
+    first_index = *after_event_number - first_number + 1;
+  }
+
   char decoded[ITL_STRING_MAX_LEN + 1];
 
-  for (usize index = 0; index < ::itl_g_history_count; index++) {
+  for (usize index = first_index; index < ::itl_g_history_count; index++) {
     usize decoded_size = 0;
     if (!::itl_history_decode_entry_buffered(
             ::itl_history_index_to_offset(index), decoded, sizeof(decoded),
             &decoded_size))
     {
-      events.clear();
-      return events;
+      return koshka::None;
     }
 
     events.push(history_event{
@@ -852,32 +971,20 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
 
   let const path = history_file_path();
   if (!path.has_value()) return koshka::None;
-  let parent = path->parent();
-  if (parent.text().is_empty()) parent = Path{"."};
+  let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return koshka::None;
   defer { os::release_process_lock(lock.take()); };
-  if (!sync_history(*path)) return koshka::None;
+  if (!sync_history(*path, true)) return koshka::None;
+  if (::itl_g_history_limit == 0) return ::itl_g_history_total_count;
 
   itl_string_t *entry = ::itl_string_alloc();
   defer { ITL_STRING_FREE(entry); };
   if (!::itl_string_from_bytes(entry, command.data, command.length))
     return koshka::None;
 
-  if (::itl_g_history_count > 0) {
-    itl_string_t *newest = ::itl_string_alloc();
-    defer { ITL_STRING_FREE(newest); };
-    if (!::itl_history_read_entry(
-            ::itl_history_index_to_offset(::itl_g_history_count - 1), newest))
-    {
-      return koshka::None;
-    }
-    if (::itl_string_equal(newest, entry)) return ::itl_g_history_total_count;
-  }
-
-  if (!::itl_history_append_to_file(entry, false, true)) return koshka::None;
-  HAS_HISTORY_FILE_STATUS =
-      os::stat_path_following(path->text().view(), HISTORY_FILE_STATUS);
+  if (!::itl_history_append_to_file(entry, false, false)) return koshka::None;
+  record_history_file_status(*path);
 
   return ::itl_g_last_history_event_number;
 }
@@ -903,8 +1010,7 @@ fn history_rewrite_event(usize number, StringView expected,
 {
   let const path = history_file_path();
   if (!path.has_value()) return false;
-  let parent = path->parent();
-  if (parent.text().is_empty()) parent = Path{"."};
+  let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return false;
   defer { os::release_process_lock(lock.take()); };
@@ -985,7 +1091,7 @@ fn history_rewrite_event(usize number, StringView expected,
   {
     return false;
   }
-  return ::tl_history_load(path->c_str()) == TL_SUCCESS;
+  return load_history(*path, false);
 }
 
 static fn strip_ansi_color(StringView text) throws -> String;
@@ -1155,14 +1261,38 @@ fn set_edit_mode(edit_mode mode) -> void
                                            : TL_EDIT_MODE_EMACS);
 }
 
+fn set_tab_selector(koshka::tab_selector_mode selector) -> void
+{
+  TAB_SELECTOR = selector;
+  ::tl_set_completion_menu_enabled(selector ==
+                                   koshka::tab_selector_mode::Interactive);
+}
+
 fn is_active() -> bool { return ::itl_g_is_active; }
+
+/* A session that starts without its saved history names the reason once. The
+   system message is taken before the file is read again. */
+static fn report_history_load_failure(const Path &path) throws -> void
+{
+  let const system_message = os::last_system_error_message();
+  let const contents = path.read_entire_file();
+  let const is_data_invalid =
+      contents.has_value() && !is_history_contents_valid(contents->view());
+
+  koshka::show_message(
+      koshka::StringView{"Unable to read the history at '"} +
+      path.text().view() + "': " +
+      (is_data_invalid ? koshka::StringView{"the file contains invalid data"}
+                       : system_message.view()));
+}
 
 fn initialize() -> void
 {
   if (koshka::Maybe<koshka::Path> kosh_history = history_file_path();
       kosh_history.has_value())
   {
-    ::tl_history_load(kosh_history->c_str());
+    if (!load_history(*kosh_history, true))
+      report_history_load_failure(*kosh_history);
   }
 
   if (::tl_init() != TL_SUCCESS) {
@@ -1177,15 +1307,18 @@ static fn compact_history_file(usize entry_limit) -> bool
 {
   let const path = history_file_path();
   if (!path.has_value()) return true;
-  let parent = path->parent();
-  if (parent.text().is_empty()) parent = Path{"."};
+  let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return false;
   defer { os::release_process_lock(lock.take()); };
 
-  ::tl_set_history_limit(entry_limit);
-  if (!history_read()) return false;
-  if (::itl_g_history_total_count <= entry_limit) return true;
+  set_history_limit(entry_limit);
+  if (!sync_history(*path, true)) return false;
+  let const retained_entry_limit = ::itl_g_history_limit;
+  if (entry_limit == 0 || ::itl_g_history_total_count <= entry_limit) {
+    return true;
+  }
+  if (entry_limit > retained_entry_limit) return true;
 
   let contents = String{koshka::heap_allocator()};
   if (!::itl_history_ensure_read_buffer() && ::itl_g_history_count != 0)
@@ -1199,24 +1332,11 @@ static fn compact_history_file(usize entry_limit) -> bool
     {
       return false;
     }
-    for (usize position = 0; position < decoded_size; position++) {
-      if (decoded[position] == '\\')
-        contents += "\\\\";
-      else if (decoded[position] == '\n')
-        contents += "\\n";
-      else
-        contents.push(decoded[position]);
-    }
-    contents.push('\n');
+    encode_history_record(contents, StringView{decoded, decoded_size});
   }
 
-  let replacement = os::write_to_named_temp_file(
-      parent, ".kosh_history_compact", contents.view());
-  if (!replacement.has_value()) return false;
-  defer { unused(os::remove_file(replacement->text().view())); };
-  if (!os::rename_path(replacement->text().view(), path->text().view()))
-    return false;
-  return ::tl_history_load(path->c_str()) == TL_SUCCESS;
+  return replace_history_file(*path, parent, ".kosh_history_compact",
+                              contents.view()) == history_replacement::Replaced;
 }
 
 fn exit(usize history_size_limit) -> void
@@ -1284,7 +1404,7 @@ fn get_input(const String &prompt) -> input_result
       utils::debug_program_path_candidate_count();
 #endif
   let const history_path = history_file_path();
-  if (history_path.has_value()) unused(sync_history(*history_path));
+  if (history_path.has_value()) unused(sync_history(*history_path, true));
   ::itl_g_last_history_event_number = 0;
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   COMPLETION_BASE_DIRECTORY = nullptr;

@@ -11,13 +11,15 @@
 #include "Eval.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
+#include "Utils.hpp"
 
 #if defined KOSH_NO_TOILETLINE
 
 namespace koshka::internal {
 
 static constexpr usize NO_EDITOR_HISTORY_ENTRY_MAX_BYTE_COUNT = 2048;
-static constexpr usize NO_EDITOR_HISTORY_DECODED_MAX_BYTE_COUNT = 4095;
+static constexpr usize NO_EDITOR_HISTORY_DECODED_MAX_BYTE_COUNT =
+    toiletline::HISTORY_RECORD_MAX_DECODED_BYTE_COUNT;
 static constexpr u64 HISTORY_HASH_OFFSET_BASIS = 14695981039346656037ull;
 static constexpr u64 HISTORY_HASH_PRIME = 1099511628211ull;
 static constexpr char NO_EDITOR_HISTORY_FILE[] = ".kosh_history";
@@ -43,6 +45,26 @@ struct history_record_span
   usize end_byte_offset;
 };
 
+/* Rereading the same bytes cannot repair a malformed record, and it can repair
+   a file that grew between the read and the stat. The outcomes are kept apart
+   so a retry is spent only on the second case. */
+enum class history_scan_outcome : u8
+{
+  Loaded,
+  Invalid,
+  Stale,
+};
+
+/* A replacement is computed from one exact snapshot of the file. When the file
+   no longer holds that snapshot the caller has to start over from fresh bytes,
+   which a plain failure would not tell it. */
+enum class history_replace_outcome : u8
+{
+  Replaced,
+  Changed,
+  Failed,
+};
+
 static fn get_no_editor_history_state() -> no_editor_history_state &
 {
   static no_editor_history_state state;
@@ -57,23 +79,6 @@ static fn extend_history_contents_hash(u64 hash, StringView contents) -> u64
   }
 
   return hash;
-}
-
-static fn file_status_matches(const os::file_status &expected,
-                              const os::file_status &actual) -> bool
-{
-  if (expected.has_file_identity && actual.has_file_identity &&
-      (expected.device_id != actual.device_id ||
-       expected.file_id != actual.file_id))
-  {
-    return false;
-  }
-
-  return expected.size == actual.size &&
-         expected.modification_time == actual.modification_time &&
-         expected.modification_nanoseconds == actual.modification_nanoseconds &&
-         expected.change_time == actual.change_time &&
-         expected.change_nanoseconds == actual.change_nanoseconds;
 }
 
 static fn update_history_file_status(no_editor_history_state &state,
@@ -168,9 +173,6 @@ static fn next_history_record(StringView contents, usize &byte_offset,
   return false;
 }
 
-static fn measure_history_text(StringView text, usize &accepted_byte_count,
-                               usize *codepoint_count) -> bool;
-
 static fn decode_history_record(String &decoded, StringView contents,
                                 history_record_span span) -> bool
 {
@@ -196,7 +198,9 @@ static fn decode_history_record(String &decoded, StringView contents,
     } else if (byte == '\\') {
       is_escape_pending = true;
       continue;
-    } else if (byte == '\r') {
+    } else if (byte == '\r' && byte_offset + 2 == span.end_byte_offset) {
+      /* The record was written with CRLF endings. A carriage return anywhere
+         else is entry data. */
       continue;
     }
 
@@ -208,65 +212,48 @@ static fn decode_history_record(String &decoded, StringView contents,
   return true;
 }
 
-static fn encode_history_record(String &output, StringView command) -> void
+static constexpr usize HISTORY_SPAN_READ_CHUNK_BYTE_COUNT = 512;
+
+/* Reads the encoded bytes of one record. A caller that needs a single record
+   leaves the rest of the file unread. The returned text begins at the start of
+   the span, so its own span is zero based. */
+static fn read_no_editor_history_span(const Path &path,
+                                      history_record_span span) throws
+    -> Maybe<String>
 {
-  output.reserve(output.count() + command.length * 2 + 1);
-  for (usize byte_offset = 0; byte_offset < command.length; byte_offset++) {
-    let const byte = command[byte_offset];
-    if (byte == '\\')
-      output += "\\\\";
-    else if (byte == '\n')
-      output += "\\n";
-    else
-      output.push(byte);
-  }
-  output.push('\n');
-}
+  let const byte_count = span.end_byte_offset - span.start_byte_offset;
+  let opened =
+      os::open_file_descriptor(path.text().view(), os::file_open_mode::Read);
+  if (!opened.has_value()) return None;
 
-static fn measure_history_text(StringView text, usize &accepted_byte_count,
-                               usize *codepoint_count) -> bool
-{
-  accepted_byte_count = 0;
-  if (codepoint_count != nullptr) *codepoint_count = 0;
-  while (accepted_byte_count < text.length) {
-    let const first_byte = static_cast<u8>(text[accepted_byte_count]);
-    if ((first_byte < 0x20 && first_byte != '\n' && first_byte != '\r' &&
-         first_byte != '\t' && first_byte != '\v' && first_byte != '\f') ||
-        first_byte == 0x7f)
-    {
-      return false;
-    }
+  let const fd = opened.value();
+  defer { unused(os::close_fd(fd)); };
 
-    usize codepoint_byte_count = 0;
-    if ((first_byte & 0x80) == 0)
-      codepoint_byte_count = 1;
-    else if ((first_byte & 0xe0) == 0xc0)
-      codepoint_byte_count = 2;
-    else if ((first_byte & 0xf0) == 0xe0)
-      codepoint_byte_count = 3;
-    else if ((first_byte & 0xf8) == 0xf0)
-      codepoint_byte_count = 4;
-    else
-      return false;
+  if (!os::seek_descriptor_from_start(fd, span.start_byte_offset)) return None;
 
-    if (accepted_byte_count + codepoint_byte_count > text.length) break;
-    for (usize continuation_index = 1;
-         continuation_index < codepoint_byte_count; continuation_index++)
-    {
-      let const continuation_byte =
-          static_cast<u8>(text[accepted_byte_count + continuation_index]);
-      if ((continuation_byte & 0xc0) != 0x80) return false;
-    }
-    accepted_byte_count += codepoint_byte_count;
-    if (codepoint_count != nullptr) (*codepoint_count)++;
+  let record = String{heap_allocator()};
+  record.reserve(byte_count);
+
+  char chunk[HISTORY_SPAN_READ_CHUNK_BYTE_COUNT];
+  usize read_byte_count = 0;
+  while (read_byte_count < byte_count) {
+    let const wanted_byte_count = byte_count - read_byte_count;
+    let const result = os::read_fd(
+        fd, chunk,
+        wanted_byte_count < sizeof chunk ? wanted_byte_count : sizeof chunk);
+    if (!result.has_value() || *result == 0) return None;
+
+    record.append(StringView{chunk, *result});
+    read_byte_count += *result;
   }
 
-  return true;
+  return record;
 }
 
 static fn scan_no_editor_history(const Path &path, StringView contents,
                                  Maybe<u64> contents_hash = None,
-                                 bool should_allow_missing = false) -> bool
+                                 bool should_allow_missing = false)
+    -> history_scan_outcome
 {
   let &state = get_no_editor_history_state();
   if (state.loaded_path.view() != path.text().view())
@@ -290,14 +277,17 @@ static fn scan_no_editor_history(const Path &path, StringView contents,
     push_history_record_byte_offset(state, span.start_byte_offset);
     state.total_count++;
   }
-  if (!is_valid) return false;
+  if (!is_valid) return history_scan_outcome::Invalid;
 
   state.trailing_record_start_byte_offset = span.start_byte_offset;
   if (!update_history_file_status(state, path)) {
-    if (!should_allow_missing || path.exists()) return false;
+    if (!should_allow_missing || path.exists())
+      return history_scan_outcome::Stale;
+  } else if (state.file_status.size != contents.length) {
+    return history_scan_outcome::Stale;
   }
   state.is_loaded = true;
-  return true;
+  return history_scan_outcome::Loaded;
 }
 
 static fn load_no_editor_history(const Path &path, bool should_allow_missing)
@@ -306,14 +296,33 @@ static fn load_no_editor_history(const Path &path, bool should_allow_missing)
   let &state = get_no_editor_history_state();
   state.is_loaded = false;
 
-  if (!path.exists()) {
-    if (!should_allow_missing) return false;
-    return scan_no_editor_history(path, {}, None, true);
+  for (int attempt_index = 0;
+       attempt_index < toiletline::HISTORY_RACE_ATTEMPT_COUNT; attempt_index++)
+  {
+    if (!path.exists()) {
+      if (!should_allow_missing) return false;
+      if (scan_no_editor_history(path, {}, None, true) ==
+          history_scan_outcome::Loaded)
+      {
+        return true;
+      }
+
+      continue;
+    }
+
+    let const contents = path.read_entire_file();
+    if (!contents.has_value()) {
+      if (!should_allow_missing || path.exists()) return false;
+
+      continue;
+    }
+
+    let const outcome = scan_no_editor_history(path, contents->view());
+    if (outcome == history_scan_outcome::Loaded) return true;
+    if (outcome == history_scan_outcome::Invalid) return false;
   }
 
-  let const contents = path.read_entire_file();
-  if (!contents.has_value()) return false;
-  return scan_no_editor_history(path, contents->view());
+  return false;
 }
 
 static fn ensure_no_editor_history_loaded(const Path &path,
@@ -328,7 +337,8 @@ static fn ensure_no_editor_history_loaded(const Path &path,
     if (!should_allow_missing || path.exists()) return false;
     return load_no_editor_history(path, true);
   }
-  if (state.has_file_status && file_status_matches(state.file_status, status))
+  if (state.has_file_status &&
+      os::file_status_matches(state.file_status, status))
     return true;
   return load_no_editor_history(path, should_allow_missing);
 }
@@ -337,52 +347,67 @@ static fn read_no_editor_history_contents(const Path &path,
                                           bool should_allow_missing)
     -> Maybe<String>
 {
-  let contents = path.read_entire_file();
-  if (!contents.has_value()) {
-    if (should_allow_missing && !path.exists() &&
-        scan_no_editor_history(path, {}, None, true))
-    {
-      return String{heap_allocator()};
+  let &state = get_no_editor_history_state();
+  for (int attempt_index = 0;
+       attempt_index < toiletline::HISTORY_RACE_ATTEMPT_COUNT; attempt_index++)
+  {
+    let contents = path.read_entire_file();
+    if (!contents.has_value()) {
+      if (should_allow_missing && !path.exists() &&
+          scan_no_editor_history(path, {}, None, true) ==
+              history_scan_outcome::Loaded)
+      {
+        return String{heap_allocator()};
+      }
+
+      break;
     }
 
-    let &state = get_no_editor_history_state();
-    state.record_byte_offsets.clear();
-    state.total_count = 0;
-    state.is_loaded = false;
-    return None;
-  }
-  let &state = get_no_editor_history_state();
-  let const contents_hash =
-      extend_history_contents_hash(HISTORY_HASH_OFFSET_BASIS, contents->view());
-  if (!state.is_loaded || state.loaded_path.view() != path.text().view() ||
-      state.file_byte_count != contents->count() ||
-      state.file_contents_hash != contents_hash)
-  {
-    if (!scan_no_editor_history(path, contents->view(), contents_hash))
-      return None;
+    let const contents_hash = extend_history_contents_hash(
+        HISTORY_HASH_OFFSET_BASIS, contents->view());
+    if (state.is_loaded && state.loaded_path.view() == path.text().view() &&
+        state.file_byte_count == contents->count() &&
+        state.file_contents_hash == contents_hash)
+    {
+      return contents.take();
+    }
+
+    let const outcome =
+        scan_no_editor_history(path, contents->view(), contents_hash);
+    if (outcome == history_scan_outcome::Loaded) return contents.take();
+    if (outcome == history_scan_outcome::Invalid) break;
   }
 
-  return contents.take();
+  state.record_byte_offsets.clear();
+  state.total_count = 0;
+  state.is_loaded = false;
+  return None;
 }
 
 static fn replace_history_file(const Path &path, StringView original,
-                               StringView replacement, StringView prefix) -> bool
+                               StringView replacement, StringView prefix)
+    -> history_replace_outcome
 {
-  let parent = path.parent();
-  if (parent.text().is_empty()) parent = Path{"."};
-  if (!toiletline::is_history_contents_valid(replacement)) return false;
+  let const parent = path.parent_or_current();
   let replacement_path =
       os::write_to_named_temp_file(parent, prefix, replacement);
-  if (!replacement_path.has_value()) return false;
+  if (!replacement_path.has_value()) return history_replace_outcome::Failed;
   defer { unused(os::remove_file(replacement_path->text().view())); };
 
   let const current_contents = path.read_entire_file();
   if (!current_contents.has_value() || current_contents->view() != original)
-    return false;
+    return history_replace_outcome::Changed;
   if (!os::rename_path(replacement_path->text().view(), path.text().view()))
-    return false;
+    return history_replace_outcome::Failed;
 
-  return scan_no_editor_history(path, replacement);
+  let &state = get_no_editor_history_state();
+  if (scan_no_editor_history(path, replacement) != history_scan_outcome::Loaded)
+  {
+    state.is_loaded = false;
+    state.has_file_status = false;
+  }
+
+  return history_replace_outcome::Replaced;
 }
 
 template <class Match>
@@ -422,45 +447,56 @@ static fn rewrite_no_editor_history_event(usize wanted_number,
 {
   let const path = resolve_no_editor_history_path();
   if (!path.has_value()) return false;
-  let parent = path->parent();
-  if (parent.text().is_empty()) parent = Path{"."};
+  let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return false;
   defer { os::release_process_lock(lock.take()); };
-  let contents = read_no_editor_history_contents(*path, false);
-  if (!contents.has_value()) return false;
   let &state = get_no_editor_history_state();
-  let const retained_record_count = state.record_byte_offsets.count();
-  if (retained_record_count == 0) return false;
-  let const first_number = state.total_count - retained_record_count + 1;
-  if (wanted_number < first_number ||
-      wanted_number >= first_number + retained_record_count)
+
+  for (int attempt_index = 0;
+       attempt_index < toiletline::HISTORY_RACE_ATTEMPT_COUNT; attempt_index++)
   {
-    return false;
-  }
-
-  let const retained_index = wanted_number - first_number;
-  let const span = get_history_record_span(state, retained_index);
-  let decoded = String{heap_allocator()};
-  if (!decode_history_record(decoded, contents->view(), span)) return false;
-  if (decoded.view() != expected) return false;
-
-  let rewritten = String{heap_allocator()};
-  rewritten.reserve(contents->count());
-  rewritten.append(contents->substring_of_length(0, span.start_byte_offset));
-  for (let const &replacement : replacements) {
-    usize accepted_byte_count = 0;
-    if (replacement.count() > NO_EDITOR_HISTORY_ENTRY_MAX_BYTE_COUNT ||
-        !measure_history_text(replacement.view(), accepted_byte_count, nullptr))
+    let contents = read_no_editor_history_contents(*path, false);
+    if (!contents.has_value()) return false;
+    let const retained_record_count = state.record_byte_offsets.count();
+    if (retained_record_count == 0) return false;
+    let const first_number = state.total_count - retained_record_count + 1;
+    if (wanted_number < first_number ||
+        wanted_number >= first_number + retained_record_count)
     {
       return false;
     }
-    encode_history_record(rewritten, replacement.view().substring_of_length(
-                                         0, accepted_byte_count));
+
+    let const retained_index = wanted_number - first_number;
+    let const span = get_history_record_span(state, retained_index);
+    let decoded = String{heap_allocator()};
+    if (!decode_history_record(decoded, contents->view(), span)) return false;
+    if (decoded.view() != expected) return false;
+
+    let rewritten = String{heap_allocator()};
+    rewritten.reserve(contents->count());
+    rewritten.append(contents->substring_of_length(0, span.start_byte_offset));
+    for (let const &replacement : replacements) {
+      if (replacement.count() > NO_EDITOR_HISTORY_ENTRY_MAX_BYTE_COUNT ||
+          !toiletline::is_history_contents_valid(replacement.view()))
+      {
+        return false;
+      }
+      toiletline::encode_history_record(rewritten, replacement.view());
+    }
+    rewritten.append(contents->substring(span.end_byte_offset));
+
+    let const outcome = replace_history_file(
+        *path, contents->view(), rewritten.view(), ".kosh_history_fc");
+    if (outcome == history_replace_outcome::Replaced) return true;
+    if (outcome == history_replace_outcome::Failed) return false;
+
+    /* A writer outside the lock moved the file, so the snapshot the rewrite
+       was built from is gone and the next attempt starts from fresh bytes. */
+    state.is_loaded = false;
   }
-  rewritten.append(contents->substring(span.end_byte_offset));
-  return replace_history_file(*path, contents->view(), rewritten.view(),
-                              ".kosh_history_fc");
+
+  return false;
 }
 
 } /* namespace koshka::internal */
@@ -485,7 +521,49 @@ fn history_path() -> koshka::Maybe<koshka::Path>
   return koshka::internal::resolve_no_editor_history_path();
 }
 
-fn history_write() -> bool { return true; }
+/* Every event is appended to the file as it is stored, so a write only has to
+   drop the leading records the bounded list no longer reaches. */
+fn history_write() -> bool
+{
+  let const path = history_path();
+  if (!path.has_value()) return false;
+
+  let const parent = path->parent_or_current();
+  let lock = koshka::os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return false;
+  defer { koshka::os::release_process_lock(lock.take()); };
+
+  let &state = koshka::internal::get_no_editor_history_state();
+  for (int attempt_index = 0;
+       attempt_index < toiletline::HISTORY_RACE_ATTEMPT_COUNT; attempt_index++)
+  {
+    let const contents =
+        koshka::internal::read_no_editor_history_contents(*path, true);
+    if (!contents.has_value()) return false;
+    if (state.record_byte_offsets.is_empty()) return true;
+
+    let const first_byte_offset =
+        koshka::internal::get_history_record_byte_offset(state, 0);
+    if (first_byte_offset == 0) return true;
+
+    let const total_count = state.total_count;
+    let const outcome = koshka::internal::replace_history_file(
+        *path, contents->view(), contents->view().substring(first_byte_offset),
+        ".kosh_history_write");
+    if (outcome == koshka::internal::history_replace_outcome::Replaced) {
+      state.total_count = total_count;
+      return true;
+    }
+    if (outcome == koshka::internal::history_replace_outcome::Failed)
+      return false;
+
+    /* A writer outside the lock moved the file, so the offsets no longer
+       describe it and the next attempt starts from fresh bytes. */
+    state.is_loaded = false;
+  }
+
+  return false;
+}
 
 fn history_read() -> bool
 {
@@ -498,8 +576,7 @@ fn history_clear() -> bool
 {
   let const path = history_path();
   if (!path.has_value()) return false;
-  let parent = path->parent();
-  if (parent.text().is_empty()) parent = koshka::Path{"."};
+  let const parent = path->parent_or_current();
   let lock = koshka::os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return false;
   defer { koshka::os::release_process_lock(lock.take()); };
@@ -518,18 +595,26 @@ fn set_history_limit(usize entry_count) -> void
   let const retained_limit =
       entry_count < TL_HISTORY_MAX_SIZE ? entry_count : TL_HISTORY_MAX_SIZE;
   if (retained_limit == state.entry_limit) return;
+  let const previous_limit = state.entry_limit;
   state.entry_limit = static_cast<u16>(retained_limit);
-  if (state.record_byte_offsets.count() <= retained_limit) {
+  if (retained_limit > previous_limit) {
     state.is_loaded = false;
+    return;
+  }
+  let const retained_record_count = state.record_byte_offsets.count();
+  if (retained_record_count <= retained_limit && state.first_record_index == 0)
+  {
     return;
   }
 
   let retained_offsets = koshka::ArrayList<usize>{koshka::heap_allocator()};
-  retained_offsets.reserve(retained_limit);
-  let const first_retained_index =
-      state.record_byte_offsets.count() - retained_limit;
-  for (usize index = first_retained_index;
-       index < state.record_byte_offsets.count(); index++)
+  let const new_record_count = retained_record_count < retained_limit
+                                   ? retained_record_count
+                                   : retained_limit;
+  retained_offsets.reserve(new_record_count);
+  let const first_retained_index = retained_record_count - new_record_count;
+  for (usize index = first_retained_index; index < retained_record_count;
+       index++)
   {
     retained_offsets.push(
         koshka::internal::get_history_record_byte_offset(state, index));
@@ -539,28 +624,51 @@ fn set_history_limit(usize entry_count) -> void
   state.first_record_index = 0;
 }
 
-fn history_events(koshka::Allocator allocator)
-    -> koshka::ArrayList<history_event>
+fn newest_history_event_number() -> koshka::Maybe<usize>
+{
+  let const path = history_path();
+  if (!path.has_value()) return koshka::None;
+
+  let const contents =
+      koshka::internal::read_no_editor_history_contents(*path, false);
+  if (!contents.has_value()) return koshka::None;
+
+  let const &state = koshka::internal::get_no_editor_history_state();
+  if (state.record_byte_offsets.is_empty()) return koshka::None;
+
+  return state.total_count;
+}
+
+fn history_events(koshka::Allocator allocator,
+                  koshka::Maybe<usize> after_event_number)
+    -> koshka::Maybe<koshka::ArrayList<history_event>>
 {
   let events = koshka::ArrayList<history_event>{allocator};
   let const path = history_path();
   if (!path.has_value()) return events;
-  let contents =
-      koshka::internal::read_no_editor_history_contents(*path, false);
-  if (!contents.has_value()) return events;
+
+  /* The read is allowed to miss the file, so an absent history reads as an
+     empty list and a damaged or unreadable file reads as a failure. */
+  let contents = koshka::internal::read_no_editor_history_contents(*path, true);
+  if (!contents.has_value()) return koshka::None;
   let &state = koshka::internal::get_no_editor_history_state();
   let const retained_record_count = state.record_byte_offsets.count();
   let const first_number = state.total_count - retained_record_count + 1;
-  events.reserve(retained_record_count);
-  for (usize index = 0; index < retained_record_count; index++) {
-    let const span =
-        koshka::internal::get_history_record_span(state, index);
+  usize first_index = 0;
+  if (after_event_number.has_value() && *after_event_number >= first_number) {
+    first_index = *after_event_number - first_number + 1;
+  }
+
+  events.reserve(retained_record_count - (first_index < retained_record_count
+                                              ? first_index
+                                              : retained_record_count));
+  for (usize index = first_index; index < retained_record_count; index++) {
+    let const span = koshka::internal::get_history_record_span(state, index);
     let command = String{allocator};
     if (!koshka::internal::decode_history_record(command, contents->view(),
                                                  span))
     {
-      events.clear();
-      return events;
+      return koshka::None;
     }
     events.push(history_event{first_number + index, steal(command)});
   }
@@ -614,20 +722,9 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   {
     return koshka::None;
   }
-  usize accepted_byte_count = 0;
-  usize codepoint_count = 0;
-  if (!koshka::internal::measure_history_text(command, accepted_byte_count,
-                                              &codepoint_count) ||
-      codepoint_count <= 1)
-  {
-    return koshka::None;
-  }
-  command = command.substring_of_length(0, accepted_byte_count);
-
   let const path = history_path();
   if (!path.has_value()) return koshka::None;
-  let parent = path->parent();
-  if (parent.text().is_empty()) parent = koshka::Path{"."};
+  let const parent = path->parent_or_current();
   let lock = koshka::os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return koshka::None;
   defer { koshka::os::release_process_lock(lock.take()); };
@@ -635,29 +732,42 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
     return koshka::None;
 
   let &state = koshka::internal::get_no_editor_history_state();
+  if (state.entry_limit == 0) return state.total_count;
+  let const first_rune = koshka::utils::decode_utf8(command, 0, 0xfffd);
+  if (first_rune.length >= command.length ||
+      !toiletline::is_history_contents_valid(command))
+  {
+    return koshka::None;
+  }
   if (!state.record_byte_offsets.is_empty()) {
-    let contents = path->read_entire_file();
-    if (!contents.has_value()) {
+    /* The load above proved the offsets describe the file, so the duplicate
+       check reads the newest record alone. */
+    let const newest_span = koshka::internal::get_history_record_span(
+        state, state.record_byte_offsets.count() - 1);
+    let const encoded =
+        koshka::internal::read_no_editor_history_span(*path, newest_span);
+    if (!encoded.has_value()) {
       state.is_loaded = false;
       return koshka::None;
     }
+
     let newest = String{koshka::heap_allocator()};
-    let const newest_span = koshka::internal::get_history_record_span(
-        state, state.record_byte_offsets.count() - 1);
-    if (!koshka::internal::decode_history_record(newest, contents->view(),
-                                                newest_span))
+    if (!koshka::internal::decode_history_record(newest, encoded->view(),
+                                                 {0, encoded->count()}))
     {
       state.is_loaded = false;
       return koshka::None;
     }
+
     if (newest.view() == command) return state.total_count;
   }
 
+  let const previous_file_byte_count = state.file_byte_count;
   let const had_unterminated_record =
-      state.trailing_record_start_byte_offset != state.file_byte_count;
+      state.trailing_record_start_byte_offset != previous_file_byte_count;
   let payload = String{koshka::heap_allocator()};
   if (had_unterminated_record) payload.push('\n');
-  koshka::internal::encode_history_record(payload, command);
+  encode_history_record(payload, command);
   let opened = koshka::os::open_file_descriptor(
       path->text().view(), koshka::os::file_open_mode::Append);
   if (!opened.has_value()) return koshka::None;
@@ -677,20 +787,23 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   }
 
   let const record_start_byte_offset =
-      state.file_byte_count + (had_unterminated_record ? 1 : 0);
+      previous_file_byte_count + (had_unterminated_record ? 1 : 0);
   koshka::internal::push_history_record_byte_offset(state,
                                                     record_start_byte_offset);
   state.total_count++;
+  let const event_number = state.total_count;
   state.file_contents_hash = koshka::internal::extend_history_contents_hash(
       state.file_contents_hash, payload.view());
-  state.file_byte_count += payload.count();
+  state.file_byte_count = previous_file_byte_count + payload.count();
   state.trailing_record_start_byte_offset = state.file_byte_count;
-  if (!koshka::internal::update_history_file_status(state, *path)) {
+  if (!koshka::internal::update_history_file_status(state, *path) ||
+      state.file_status.size != state.file_byte_count)
+  {
     state.is_loaded = false;
-    return koshka::None;
+    state.has_file_status = false;
   }
 
-  return state.total_count;
+  return event_number;
 }
 
 fn history_rewrite_event(usize number, StringView expected,
@@ -720,6 +833,11 @@ fn set_ghost_enabled(bool enabled) -> void { unused(enabled); }
 fn set_highlight_enabled(bool enabled) -> void { unused(enabled); }
 
 fn set_edit_mode(edit_mode mode) -> void { unused(mode); }
+
+fn set_tab_selector(koshka::tab_selector_mode selector) -> void
+{
+  unused(selector);
+}
 
 fn is_active() -> bool { return false; }
 

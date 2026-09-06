@@ -2,10 +2,15 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements UTF-8 length, position, and terminal display-width
- * conversion shared by the interactive editor and noninteractive stubs. It
- * remains outside either implementation so both build configurations use the
- * same text measurement behavior without initializing terminal state.
+ * This file implements UTF-8 validation, length, position, terminal
+ * display-width conversion, and history record encoding shared by the
+ * interactive editor and noninteractive stubs. It remains outside either
+ * implementation so both build configurations use the same text measurement and
+ * history format behavior without initializing terminal state.
+ *
+ * is_history_contents_valid applies the same rejection rules as the vendored
+ * itl_string_from_bytes in src/toiletline/toiletline.h. Both sides of the
+ * vendor boundary must stay in agreement.
  */
 
 #include "Toiletline.hpp"
@@ -18,6 +23,8 @@ struct codepoint_interval
   u32 first;
   u32 last;
 };
+
+static constexpr u32 NARROW_CODEPOINT_LIMIT = 0x0300;
 
 static constexpr codepoint_interval ZERO_WIDTH_INTERVALS[] = {
     {0x0300, 0x036f},
@@ -52,6 +59,9 @@ static constexpr codepoint_interval WIDE_INTERVALS[] = {
     {0x20000, 0x3fffd},
 };
 
+static_assert(ZERO_WIDTH_INTERVALS[0].first >= NARROW_CODEPOINT_LIMIT);
+static_assert(WIDE_INTERVALS[0].first >= NARROW_CODEPOINT_LIMIT);
+
 static fn codepoint_is_in(u32 codepoint, const codepoint_interval *intervals,
                           usize interval_count) -> bool
 {
@@ -74,6 +84,11 @@ static fn codepoint_display_width(u32 codepoint) -> usize
 {
   if (codepoint == '\t') return 1;
   if (codepoint < 0x20 || (codepoint >= 0x7f && codepoint < 0xa0)) return 0;
+
+  /* The first interval of either table begins at NARROW_CODEPOINT_LIMIT, so
+     everything below it is one column and skips both searches. */
+  if (codepoint < NARROW_CODEPOINT_LIMIT) return 1;
+
   if (codepoint_is_in(codepoint, ZERO_WIDTH_INTERVALS,
                       countof(ZERO_WIDTH_INTERVALS)))
   {
@@ -85,8 +100,8 @@ static fn codepoint_display_width(u32 codepoint) -> usize
   return 1;
 }
 
-static fn display_width_walk(StringView text, usize stop_after,
-                             usize *out_byte_offset) -> usize
+flatten static fn display_width_walk(StringView text, usize stop_after,
+                                     usize *out_byte_offset) -> usize
 {
   usize width = 0;
   usize byte_offset = 0;
@@ -144,20 +159,115 @@ namespace toiletline {
 
 fn is_history_contents_valid(StringView contents) -> bool
 {
-  for (usize byte_offset = 0; byte_offset < contents.length; byte_offset++) {
+  usize decoded_byte_count = 0;
+  bool is_escape_pending = false;
+
+  for (usize byte_offset = 0; byte_offset < contents.length;) {
     let const byte = static_cast<u8>(contents[byte_offset]);
     switch (byte) {
     case '\n':
+      decoded_byte_count = 0;
+      is_escape_pending = false;
+      byte_offset++;
+      continue;
     case '\r':
     case '\t':
     case '\v':
-    case '\f': continue;
+    case '\f': break;
     default:
       if (byte < 0x20 || byte == 0x7f) return false;
     }
+
+    /* A backslash escape decodes to one byte for a newline or a backslash and
+       to two bytes for anything else, and a carriage return before a newline
+       decodes to nothing. */
+    usize escaped_byte_count = 0;
+    if (is_escape_pending) {
+      is_escape_pending = false;
+      if (byte != 'n' && byte != '\\') escaped_byte_count = 1;
+    } else if (byte == '\\') {
+      is_escape_pending = true;
+      byte_offset++;
+      continue;
+    } else if (byte == '\r' && byte_offset + 1 < contents.length &&
+               contents[byte_offset + 1] == '\n')
+    {
+      byte_offset++;
+      continue;
+    }
+
+    if (byte < 0x80) {
+      decoded_byte_count += escaped_byte_count + 1;
+      if (decoded_byte_count > HISTORY_RECORD_MAX_DECODED_BYTE_COUNT)
+        return false;
+
+      byte_offset++;
+      continue;
+    }
+
+    usize codepoint_byte_count = 0;
+    u32 codepoint = 0;
+    if (byte >= 0xc2 && byte <= 0xdf) {
+      codepoint_byte_count = 2;
+      codepoint = byte & 0x1f;
+    } else if (byte >= 0xe0 && byte <= 0xef) {
+      codepoint_byte_count = 3;
+      codepoint = byte & 0x0f;
+    } else if (byte >= 0xf0 && byte <= 0xf4) {
+      codepoint_byte_count = 4;
+      codepoint = byte & 0x07;
+    } else {
+      return false;
+    }
+    if (byte_offset + codepoint_byte_count > contents.length) return false;
+
+    for (usize continuation_index = 1;
+         continuation_index < codepoint_byte_count; continuation_index++)
+    {
+      let const continuation_byte =
+          static_cast<u8>(contents[byte_offset + continuation_index]);
+      if ((continuation_byte & 0xc0) != 0x80) return false;
+      codepoint = (codepoint << 6) | (continuation_byte & 0x3f);
+    }
+
+    u32 minimum_codepoint = 0;
+    switch (codepoint_byte_count) {
+    case 2: minimum_codepoint = 0x80u; break;
+    case 3: minimum_codepoint = 0x800u; break;
+    case 4: minimum_codepoint = 0x10000u; break;
+    default: return false;
+    }
+    if (codepoint < minimum_codepoint || codepoint > 0x10ffffu ||
+        (codepoint >= 0xd800u && codepoint <= 0xdfffu))
+    {
+      return false;
+    }
+    decoded_byte_count += escaped_byte_count + codepoint_byte_count;
+    if (decoded_byte_count > HISTORY_RECORD_MAX_DECODED_BYTE_COUNT) return false;
+
+    byte_offset += codepoint_byte_count;
   }
 
   return true;
+}
+
+/* One record occupies one line, so a newline inside the command is written as
+   backslash n and every backslash is doubled. The editor and the noninteractive
+   store both read this form. */
+fn encode_history_record(String &output, StringView command) -> void
+{
+  output.reserve(output.count() + command.length * 2 + 1);
+  for (usize byte_offset = 0; byte_offset < command.length; byte_offset++) {
+    let const byte = command[byte_offset];
+    if (byte == '\\')
+      output += "\\\\";
+    else if (byte == '\n')
+      output += "\\n";
+    else
+      output.push(byte);
+  }
+
+  output.push('\n');
 }
 
 fn utf8_strlen(const koshka::String &string, usize byte_count) -> usize

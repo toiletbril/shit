@@ -74,6 +74,16 @@ fn Path::parent() const throws -> Path
   return Path{m_text.substring_of_length(0, end - 1)};
 }
 
+/* A bare filename has no parent text, and every caller that locks or writes
+   beside the file needs a directory it can name. */
+fn Path::parent_or_current() const throws -> Path
+{
+  let directory = parent();
+  if (directory.text().is_empty()) return Path{"."};
+
+  return directory;
+}
+
 static fn append_path_component(String &text, StringView component) throws
     -> void
 {

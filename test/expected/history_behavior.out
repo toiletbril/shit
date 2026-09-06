@@ -7,5 +7,6 @@ history modifiers ok
 history storage ok
 multiline history ok
 history size ok
+zero history size storage ok
 history option ok
 ignoreeof ok
