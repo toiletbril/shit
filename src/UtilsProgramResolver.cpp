@@ -341,6 +341,12 @@ fn directory_entry_kind(const Path &directory,
   return Path::entry_kind::Other;
 }
 
+fn warm_directory_index(const Path &directory) throws -> void
+{
+  unused(read_directory_cached(directory, directory_validation::Validate,
+                               directory_listing_order::FoldedName));
+}
+
 pure fn directory_listing_generation(const Path &directory) wontthrow -> u64
 {
   let const *alias = DIR_LISTING_ALIASES.find(directory.text().view());

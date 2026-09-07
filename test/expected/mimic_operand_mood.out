@@ -1,0 +1,29 @@
+== a bash shebang selects the bash mood:
+bash
+== an sh shebang selects the posix mood:
+sh
+== an env shebang selects the named shell:
+sh
+== a script with no shebang keeps the session mood:
+kosh
+== the shebang is unread without -I:
+kosh
+== an explicit --mood wins:
+kosh
+== --dumb wins:
+sh
+== the mimicked mood relaxes the strict options:
+[]
+rc=0
+== an explicit -u stays fatal:
+TMPDIR/unset-script:2:8: error: Unable to expand 'undefined_name' because the parameter is not set.
+     2 |  echo "[${undefined_name}]"
+       |         ^~~~~~~~~~~~~~~~~
+note: Replace it with ${undefined_name-} if empty expansion is desired.
+rc=1
+== the strict default still reports the unset read:
+TMPDIR/unset-script:2:8: error: The variable 'undefined_name' is read before any assignment gives it a value. (SC2154)
+     2 |  echo "[${undefined_name}]"
+       |         ^~~~~~~~~~~~~~~~~
+note: Assign 'undefined_name' before it is read, or set it in the environment.
+rc=1

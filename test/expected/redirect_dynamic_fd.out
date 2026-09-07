@@ -1,5 +1,11 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+  [CompoundListCondition, None]
+    [Assign dyn_file=$TEST_TEMP_DIRECTORY/redirect-dynamic-fd]
+  [CompoundListCondition, None]
+    [Assign err_file=$TEST_TEMP_DIRECTORY/redirect-dynamic-fd-error]
+  [CompoundListCondition, None]
     [Assign fd=5]
   [CompoundListCondition, None]
     [RedirectedCommand]
@@ -12,7 +18,7 @@
           [CompoundListCondition, None]
             [SimpleCommand "/bin/echo" "dyn-extern"]
   [CompoundListCondition, None]
-    [SimpleCommand "cat" "/tmp/kosh_dyn_fd.txt"]
+    [SimpleCommand "cat" "$dyn_file"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "separator"]
   [CompoundListCondition, None]
@@ -20,9 +26,33 @@
   [CompoundListCondition, None]
     [SimpleCommand "/bin/echo" "to-stderr"]
   [CompoundListCondition, None]
-    [SimpleCommand "cat" "/tmp/kosh_dyn_fd2.txt"]
+    [SimpleCommand "cat" "$err_file"]
   [CompoundListCondition, None]
-    [SimpleCommand "rm" "-f" "/tmp/kosh_dyn_fd.txt" "/tmp/kosh_dyn_fd2.txt"]
+    [SimpleCommand "koshkit" "unlink" "$dyn_file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "unlink" "$err_file"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+]
+[Word
+  Unquoted "dyn_file="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/redirect-dynamic-fd"
+]
+[Word
+  Unquoted "err_file="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/redirect-dynamic-fd-error"
+]
 [Word
   Unquoted "fd=5"
 ]
@@ -63,13 +93,13 @@
   Unquoted "5"
 ]
 [Word
-  Unquoted "/tmp/kosh_dyn_fd.txt"
+  Variable "dyn_file"
 ]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Unquoted "/tmp/kosh_dyn_fd.txt"
+  Variable "dyn_file"
 ]
 [Word
   Unquoted "echo"
@@ -93,25 +123,31 @@
   Unquoted "2"
 ]
 [Word
-  Unquoted "/tmp/kosh_dyn_fd2.txt"
+  Variable "err_file"
 ]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Unquoted "/tmp/kosh_dyn_fd2.txt"
+  Variable "err_file"
 ]
 [Word
-  Unquoted "rm"
+  Unquoted "koshkit"
 ]
 [Word
-  Unquoted "-f"
+  Unquoted "unlink"
 ]
 [Word
-  Unquoted "/tmp/kosh_dyn_fd.txt"
+  Variable "dyn_file"
 ]
 [Word
-  Unquoted "/tmp/kosh_dyn_fd2.txt"
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "unlink"
+]
+[Word
+  Variable "err_file"
 ]
 dyn-builtin
 lit-builtin

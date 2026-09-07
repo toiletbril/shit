@@ -17,7 +17,7 @@ bash-env-permission=ok
 privileged-identity=flagoptionshellopts
 runtime-privileged=onoff
 restricted-startup=startup=0:body
-restricted-startup-state=no-r:0:0
+restricted-startup-state=no-r:0:0 r:0:1
 startup-set-r=blocked
 restricted-identity=flagsshopt
 runtime-restricted=flagsno-shopt
@@ -26,6 +26,8 @@ restricted-shopt-fixed=0:0
 rbash-identity=flagsshopt
 SHELL=1 PATH=1 ENV=1 BASH_ENV=1 KOSH_HISTORY_FILE=1 KOSH_HISTORY_SIZE=1 KOSH_CALC_HISTORY=1 KOSH_DIRECTORY_HISTORY=1
 1 1 1 1 1 1 1 1 1 1 1 1 0
+restricted-path-casefold=path=ok Path=ok pATH=ok
+restricted-export-path-casefold=path=ok Path=ok pATH=ok
 unexport=0:0 unexport-value=1
 unexport-dynamic=dynamic unexport-function=1:0 unexport-invalid=1
 restricted-declare=ok
@@ -34,6 +36,8 @@ slash=1 expanded-slash=1 cd=1 source=1 command-p=1 command-v=0 command-V=0 exec=
 truncate=1 append=1 readwrite=1 both=1 override=1 ampersand=1 ampersand-append=1 fd-dup=0
 enable=1 enable-d=1 hash=1 history=1 history-write=1 unset=1
 subshell-restore=cd=0
+runtime-restricted-subshell=flags
+restricted-identity-subshell=flagsshopt
 associative-local-restore=old
 sparse-local-restore=old
 z=status=1 cwd=0

@@ -117,6 +117,7 @@ using uchar = u8;
 using ichar = i8;
 
 using usize = size_t;
+using isize = ptrdiff_t;
 using uintptr = uintptr_t;
 
 /* void is ambiguous, this is an alias for clarity. */

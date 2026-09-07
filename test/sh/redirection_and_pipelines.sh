@@ -50,6 +50,13 @@ exec 3>&-
 cat "$f"
 echo
 
+# Closing a descriptor that was never open is the state the close asks for, so
+# the command runs and succeeds.
+echo unopened_close 3>&-
+echo "close_status=$?"
+exec 4>&-
+echo "exec_close_status=$?"
+
 # A bar that does not touch the greater is still a pipe stage.
 echo piped > "$f" | cat
 cat "$f"

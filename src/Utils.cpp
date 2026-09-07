@@ -129,8 +129,86 @@ hot fn decode_shell_word(StringView word, Allocator allocator,
   let is_scanning_tilde_prefix = false;
   let is_scanning_leading_variable = false;
   let leading_variable_is_braced = false;
+  let is_after_unconsumed_dollar = false;
   for (usize position = 0; position < word.length; position++) {
     let const byte = word[position];
+
+    /* A doubled dollar sign is the process id expansion. Its second byte is
+       already consumed, so it cannot open a locale quote. */
+    let const was_after_unconsumed_dollar = is_after_unconsumed_dollar;
+    is_after_unconsumed_dollar = false;
+
+    if (quote_character == 0 && !was_after_unconsumed_dollar && byte == '$' &&
+        position + 1 < word.length && word[position + 1] == '"')
+    {
+      decoded.has_shell_syntax = true;
+      continue;
+    }
+    if (quote_character == 0 && !was_after_unconsumed_dollar && byte == '$' &&
+        position + 1 < word.length && word[position + 1] == '\'')
+    {
+      decoded.has_shell_syntax = true;
+
+      let const body_start = position + 2;
+      usize body_end = body_start;
+      let is_terminated = false;
+
+      /* An escape makes the decoded length differ from the source length, so
+         the whole construct becomes the source of every byte it produced. */
+      let has_escape = false;
+      while (body_end < word.length) {
+        if (word[body_end] == '\\') {
+          has_escape = true;
+          if (body_end + 1 < word.length) {
+            body_end += 2;
+            continue;
+          }
+        }
+        if (word[body_end] == '\'') {
+          is_terminated = true;
+          break;
+        }
+        body_end++;
+      }
+      if (body_end > word.length) body_end = word.length;
+
+      if (is_scanning_tilde_prefix) {
+        decoded.is_leading_tilde_active = false;
+        is_scanning_tilde_prefix = false;
+      }
+      is_scanning_leading_variable = false;
+      decoded.last_quote_character = '\'';
+      decoded.last_quote_content_start = body_start;
+      decoded.last_quote_decoded_start = decoded.text.length();
+      if (!is_terminated) {
+        decoded.open_quote_content_start = body_start;
+        decoded.open_quote_decoded_start = decoded.text.length();
+      }
+
+      let const body =
+          word.substring_of_length(body_start, body_end - body_start);
+      let ansi_text = String{allocator};
+      decode_ansi_c_escapes(ansi_text, body);
+
+      let const construct_end = is_terminated ? body_end + 1 : body_end;
+      if (should_map_source && !has_escape)
+        decoded.raw_positions.back() = body_start;
+
+      for (usize index = 0; index < ansi_text.length(); index++) {
+        let const decoded_byte = ansi_text[index];
+        let const raw_after =
+            has_escape ? construct_end : body_start + index + 1;
+        decoded.text.push(decoded_byte);
+        decoded.glob_active.push(false);
+        if (should_map_source) decoded.raw_positions.push(raw_after);
+        if (os::is_directory_separator(decoded_byte))
+          decoded.raw_directory_end = raw_after;
+      }
+
+      if (!is_terminated) quote_character = '\'';
+      position = is_terminated ? body_end : word.length - 1;
+      continue;
+    }
     if (quote_character == 0 && (byte == '\'' || byte == '"')) {
       decoded.has_shell_syntax = true;
       if (is_scanning_tilde_prefix) {
@@ -221,6 +299,9 @@ hot fn decode_shell_word(StringView word, Allocator allocator,
       decoded.raw_directory_end = position + 1;
       is_scanning_tilde_prefix = false;
     }
+
+    is_after_unconsumed_dollar =
+        byte == '$' && !was_after_unconsumed_dollar && quote_character != '\'';
   }
   decoded.quote_character = quote_character;
 

@@ -1,0 +1,10 @@
+2:5: error: Bad for loop variable, 'item' is not a plain name.
+     2 |  for "item" in a b c; do break; done
+       |      ^~~~~~
+note: Drop the '$' and any quotes.
+2:22: error: 'do' has no matching 'while', 'until', or 'for'.
+     2 |  for "item" in a b c; do break; done
+       |                       ^~
+2:32: error: 'done' has no matching 'while', 'until', or 'for'.
+     2 |  for "item" in a b c; do break; done
+       |                                 ^~~~

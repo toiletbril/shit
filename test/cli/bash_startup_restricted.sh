@@ -1,8 +1,8 @@
-directory=$(mktemp -d)
+directory=$(mktemp -d) || exit 1
 cleanup()
 {
   if [ -n "$directory" ]; then
-    /bin/rm -rf "$directory"
+    "$TEST_SYSTEM_RM" -rf -- "$directory"
   fi
 }
 trap cleanup EXIT
@@ -234,17 +234,24 @@ printf '%s\n' \
   'shopt -q restricted_shell; printf ":%s:" "$?"' \
   'cd ..; printf "%s" "$?"' > "$directory/restricted-state-env"
 output=$(BASH_ENV="$directory/restricted-state-env" \
-  "$BIN" --mood bash --restricted -c ':' 2>/dev/null)
+  "$BIN" --mood bash --restricted -c \
+  'case "$-" in *r*) printf " r" ;; *) printf " no-r" ;; esac; shopt -q restricted_shell; printf ":%s:" "$?"; cd ..; printf "%s" "$?"' \
+  2>/dev/null)
 printf 'restricted-startup-state=%s\n' "$output"
 
 printf 'set -r\ncd ..\n' > "$directory/set-r-env"
+physical_directory=$(cd "$directory" && pwd -P)
 output=$(cd "$directory" &&
   BASH_ENV="$directory/set-r-env" \
-    "$BIN" --mood bash -c 'printf "%s" "$PWD"' 2>/dev/null)
-if [ "$output" = / ]; then
-  printf 'startup-set-r=changed\n'
-else
+    "$BIN" --mood bash -c 'printf "%s" "$PWD"' \
+    2> "$directory/set-r-error")
+if [ "$output" = "$physical_directory" ] &&
+   grep -F 'cd is forbidden in a restricted shell' \
+     "$directory/set-r-error" >/dev/null 2>&1
+then
   printf 'startup-set-r=blocked\n'
+else
+  printf 'startup-set-r=broken\n'
 fi
 
 output=$("$BIN" --mood bash --restricted -c \
@@ -308,6 +315,32 @@ done
 "$BIN" --mood bash --restricted -c \
   'export PATH; readonly -p | grep -q "declare -r PATH="' >/dev/null 2>&1
 printf '%s\n' "$?"
+
+# A case-insensitive environment makes every spelling of PATH the same entry, so
+# the restricted guard must refuse them all there and only there.
+expected_casefold=0
+if [ "${OS-}" = Windows_NT ]; then
+  expected_casefold=1
+fi
+for prefix in '' 'export '; do
+  if [ -z "$prefix" ]; then
+    printf 'restricted-path-casefold='
+  else
+    printf 'restricted-export-path-casefold='
+  fi
+  separator=
+  for name in path Path pATH; do
+    "$BIN" --mood bash --restricted -c "$prefix$name=blocked" >/dev/null 2>&1
+    casefold_status=$?
+    if [ "$casefold_status" -eq "$expected_casefold" ]; then
+      printf '%s%s=ok' "$separator" "$name"
+    else
+      printf '%s%s=%s' "$separator" "$name" "$casefold_status"
+    fi
+    separator=' '
+  done
+  printf '\n'
+done
 
 output=$("$BIN" --mood bash --restricted -c \
   'old=$PATH; export -n PATH; status=$?; test "$PATH" = "$old"; printf "%s:%s" "$status" "$?"')
@@ -407,6 +440,14 @@ if [ "${OS-}" = Windows_NT ]; then
     '(set -r); cd .; printf "cd=%s" "$?"' 2>/dev/null)
 fi
 printf 'subshell-restore=%s\n' "$output"
+output=$("$BIN" --mood bash -c \
+  'set -r; (case "$-" in *r*) printf flags ;; esac; shopt -q restricted_shell && printf shopt)' \
+  2>/dev/null)
+printf 'runtime-restricted-subshell=%s\n' "$output"
+output=$("$BIN" --mood bash --restricted -c \
+  '(case "$-" in *r*) printf flags ;; esac; shopt -q restricted_shell && printf shopt)' \
+  2>/dev/null)
+printf 'restricted-identity-subshell=%s\n' "$output"
 output=$("$BIN" --mood bash -c \
   'declare -A PATH=([x]=old); f() { local PATH=scalar; set -r; }; f; printf "%s" "${PATH[x]}"' \
   2>/dev/null)

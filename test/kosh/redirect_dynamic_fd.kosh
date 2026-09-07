@@ -1,9 +1,13 @@
 #!/bin/env kosh
+koshkit mkdir -p "$TEST_TEMP_DIRECTORY"
+dyn_file=$TEST_TEMP_DIRECTORY/redirect-dynamic-fd
+err_file=$TEST_TEMP_DIRECTORY/redirect-dynamic-fd-error
 fd=5
-{ echo dyn-builtin >&$fd; echo lit-builtin >&5; /bin/echo dyn-extern >&$fd; } 5>/tmp/kosh_dyn_fd.txt
-cat /tmp/kosh_dyn_fd.txt
+{ echo dyn-builtin >&$fd; echo lit-builtin >&5; /bin/echo dyn-extern >&$fd; } 5>"$dyn_file"
+cat "$dyn_file"
 echo separator
 errfd=2
-/bin/echo to-stderr >&$errfd 2>/tmp/kosh_dyn_fd2.txt
-cat /tmp/kosh_dyn_fd2.txt
-rm -f /tmp/kosh_dyn_fd.txt /tmp/kosh_dyn_fd2.txt
+/bin/echo to-stderr >&$errfd 2>"$err_file"
+cat "$err_file"
+koshkit unlink "$dyn_file"
+koshkit unlink "$err_file"

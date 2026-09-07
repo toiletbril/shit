@@ -1,0 +1,55 @@
+== a select menu variable must be a plain name ==
+1:8: error: Bad select loop variable, '$menu' is not a plain name.
+     1 |  select $menu in a b c; do break; done
+       |         ^~~~~
+note: Drop the '$' and any quotes.
+1:24: error: 'do' has no matching 'while', 'until', or 'for'.
+     1 |  select $menu in a b c; do break; done
+       |                         ^~
+1:34: error: 'done' has no matching 'while', 'until', or 'for'.
+     1 |  select $menu in a b c; do break; done
+       |                                   ^~~~
+rc=1
+== a quoted select menu variable is rejected the same way ==
+1:8: error: Bad select loop variable, 'menu' is not a plain name.
+     1 |  select "menu" in a b c; do break; done
+       |         ^~~~~~
+note: Drop the '$' and any quotes.
+1:25: error: 'do' has no matching 'while', 'until', or 'for'.
+     1 |  select "menu" in a b c; do break; done
+       |                          ^~
+1:35: error: 'done' has no matching 'while', 'until', or 'for'.
+     1 |  select "menu" in a b c; do break; done
+       |                                    ^~~~
+rc=1
+== a select menu variable that is not an identifier is rejected ==
+1:8: error: Bad select loop variable, '9bad' is not a plain name.
+     1 |  select 9bad in a b c; do break; done
+       |         ^~~~
+note: Drop the '$' and any quotes.
+1:23: error: 'do' has no matching 'while', 'until', or 'for'.
+     1 |  select 9bad in a b c; do break; done
+       |                        ^~
+1:33: error: 'done' has no matching 'while', 'until', or 'for'.
+     1 |  select 9bad in a b c; do break; done
+       |                                  ^~~~
+rc=1
+== a plain select menu variable is accepted ==
+1) a
+2) b
+#? picked a
+rc=0
+== select is not a keyword outside bash mood ==
+1:24: error: 'do' has no matching 'while', 'until', or 'for'.
+     1 |  select $menu in a b c; do break; done
+       |                         ^~
+1:34: error: 'done' has no matching 'while', 'until', or 'for'.
+     1 |  select $menu in a b c; do break; done
+       |                                   ^~~~
+rc=1
+== a select menu word is checked against the sh shebang ==
+2:16: warning: The `$"..."` quoting form is a bash extension absent from POSIX sh. (SC3004)
+     2 |  select menu in item=$"select locale"; do break; done
+       |                 ^~~~~~~~~~~~~~~~~~~~~
+note: Use ordinary double quotes under a `sh` shebang.
+rc=0

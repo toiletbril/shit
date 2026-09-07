@@ -263,6 +263,24 @@ pure static fn resolve_session_mood(mimic_mood invocation_mood) wontthrow
   return invocation_mood;
 }
 
+/* The session tab selector, from --tab-selector when given, then the plain
+   listing --dumb asks for, then the interactive menu. An unknown spelling is
+   rejected before this runs. */
+pure static fn resolve_session_tab_selector() wontthrow -> tab_selector_mode
+{
+  if (FLAG_TAB_SELECTOR.is_set()) {
+    if (Maybe<tab_selector_mode> parsed_selector =
+            parse_tab_selector_name(FLAG_TAB_SELECTOR.value());
+        parsed_selector.has_value())
+    {
+      return *parsed_selector;
+    }
+    return tab_selector_mode::Interactive;
+  }
+  if (FLAG_DUMB.is_enabled()) return tab_selector_mode::Plain;
+  return tab_selector_mode::Interactive;
+}
+
 static fn
 append_listed_diagnostic(String &listing,
                          const diagnostic_definition &definition) throws -> void
@@ -1929,21 +1947,6 @@ struct apply_file_snapshot
   String contents;
 };
 
-pure fn file_status_matches(const os::file_status &expected,
-                            const os::file_status &actual) wontthrow -> bool
-{
-  if (expected.has_file_identity && actual.has_file_identity &&
-      (expected.device_id != actual.device_id ||
-       expected.file_id != actual.file_id))
-    return false;
-
-  return expected.mode == actual.mode && expected.size == actual.size &&
-         expected.modification_time == actual.modification_time &&
-         expected.modification_nanoseconds == actual.modification_nanoseconds &&
-         expected.change_time == actual.change_time &&
-         expected.change_nanoseconds == actual.change_nanoseconds;
-}
-
 static fn read_apply_file(const Path &operand_path) throws
     -> Maybe<apply_file_snapshot>
 {
@@ -1968,7 +1971,7 @@ static fn read_apply_file(const Path &operand_path) throws
   let verified_status = os::file_status{};
   if (!contents.has_value() ||
       !os::stat_path_following(target_path->text().view(), verified_status) ||
-      !file_status_matches(status, verified_status))
+      !os::file_status_matches(status, verified_status))
   {
     show_message("Refusing to read '" + operand_path.text() +
                  "' because it changed while being processed.");
@@ -2008,7 +2011,7 @@ static fn replace_file_contents(const apply_file_snapshot &snapshot,
       current_contents->view() != snapshot.contents.view() ||
       !os::stat_path_following(snapshot.target_path.text().view(),
                                current_status) ||
-      !file_status_matches(snapshot.status, current_status))
+      !os::file_status_matches(snapshot.status, current_status))
   {
     show_message("Refusing to replace '" + snapshot.operand_path.text() +
                  "' because it changed while being processed.");

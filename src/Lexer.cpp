@@ -866,10 +866,11 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
       }
 
       /* $"..." is bash locale translation. With no catalog it is the plain
-         double-quoted string, so the dollar is dropped. It rides every mood but
-         POSIX and only at the top level, since inside a double quote $" is a
-         dollar then the close quote. */
-      if (next == '"' && bash_additions_enabled() && !is_in_double_quotes) {
+         double-quoted string, so the dollar is dropped. It applies only at the
+         top level, since inside a double quote $" is a dollar then the close
+         quote. */
+      if (next == '"' && !is_in_double_quotes) {
+        word.has_locale_translation_quote = true;
         continue;
       }
 

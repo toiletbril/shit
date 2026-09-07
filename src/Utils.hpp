@@ -164,6 +164,15 @@ pure alwaysinline fn ascii_to_lower(char ch) wontthrow -> char
   return ch;
 }
 
+pure alwaysinline fn environment_name_is_path(StringView name) wontthrow -> bool
+{
+  if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) return name == "PATH";
+
+  return name.length == 4 && ascii_to_lower(name[0]) == 'p' &&
+         ascii_to_lower(name[1]) == 'a' && ascii_to_lower(name[2]) == 't' &&
+         ascii_to_lower(name[3]) == 'h';
+}
+
 pure alwaysinline fn hex_digit_value(char byte) wontthrow -> Maybe<u8>
 {
   if (byte >= '0' && byte <= '9') return static_cast<u8>(byte - '0');
@@ -402,6 +411,10 @@ fn read_directory_cached(
     directory_validation validation = directory_validation::Validate,
     directory_listing_order order = directory_listing_order::Unsorted) throws
     -> const ArrayList<Path::directory_child> *;
+/* Indexes the directory in the order the ghost completion asks for, so the
+   suggestion after the next keystroke costs no read. A directory that cannot be
+   read is left out of the index. */
+fn warm_directory_index(const Path &directory) throws -> void;
 pure fn directory_listing_generation(const Path &directory) wontthrow -> u64;
 pure fn directory_entry_name_lower_bound(
     const ArrayList<Path::directory_child> &entries, StringView name) wontthrow
