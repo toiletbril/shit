@@ -1058,6 +1058,9 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
   fn evaluate_root_impl(EvalContext &cxt,
                         root_evaluation_mode mode) const throws -> i64 override;
+  fn evaluate_root_status_impl(EvalContext &cxt,
+                               root_evaluation_mode mode) const throws
+      -> status_result override;
 
   ArrayList<const Token *> m_args{heap_allocator()};
 

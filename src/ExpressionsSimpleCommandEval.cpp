@@ -126,6 +126,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   return evaluate_root_impl(cxt, root_evaluation_mode::Normal);
 }
 
+hot fn SimpleCommand::evaluate_root_status_impl(
+    EvalContext &cxt, root_evaluation_mode mode) const throws -> status_result
+{
+  return {static_cast<i32>(evaluate_root_impl(cxt, mode)), 0};
+}
+
 hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
                                          root_evaluation_mode mode) const throws
     -> i64

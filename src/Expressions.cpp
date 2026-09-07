@@ -572,9 +572,8 @@ fn Expression::evaluate_root_status_impl(EvalContext &cxt,
                                          root_evaluation_mode mode) const throws
     -> status_result
 {
-  if (mode == root_evaluation_mode::Normal) return evaluate_status_impl(cxt);
-
-  return {static_cast<i32>(evaluate_root_impl(cxt, mode)), 0};
+  unused(mode);
+  return evaluate_status_impl(cxt);
 }
 
 fn Expression::operator delete(opaque *pointer) wontthrow -> void
