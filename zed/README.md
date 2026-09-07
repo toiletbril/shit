@@ -1,8 +1,8 @@
 # Koshka for Zed
 
 This extension runs the Koshka language server. The same server formats the
-document. The server is part of the shell binary, and a `kosh` on your PATH is
-the only requirement.
+document. The server is part of the shell binary. A `kosh` on your PATH is used
+when one is there, and the latest release is downloaded when it is not.
 
 No tree-sitter grammar is bundled. The server is attached to languages Zed
 already provides.
@@ -58,6 +58,19 @@ reports nothing.
 
 The bare `"language_server"` value picks the first attached server that can
 format. The named form selects `kosh` once a second server is attached.
+
+## Finding the shell
+
+The binary named under `lsp.kosh.binary.path` is used as it is written.
+Otherwise `kosh` is looked up on the PATH of the worktree.
+
+When there is neither, the newest release is downloaded. The asset for your
+platform is saved to a directory named after the release, made executable, and
+used to start the server. Zed shows the progress in its language server status,
+and earlier downloads are removed.
+
+There is no release asset for an Intel Mac. That machine builds the shell from
+source.
 
 ## Naming the binary
 

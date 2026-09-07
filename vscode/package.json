@@ -182,6 +182,11 @@
         "command": "kosh.restartServer",
         "title": "Restart the Koshka language server",
         "category": "Koshka"
+      },
+      {
+        "command": "kosh.downloadServer",
+        "title": "Download the shell from the latest release",
+        "category": "Koshka"
       }
     ],
     "configurationDefaults": {

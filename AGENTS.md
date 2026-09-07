@@ -137,6 +137,12 @@ changes update this file.
 - The client log of a real editor session confirms an integration change. The
   VS Code family writes one file for each extension output channel under its
   own log directory.
+- A client resolves the shell from its configured path, then PATH, then its own
+  storage. A missing shell is downloaded from the newest release of
+  `toiletbril/kosh`. Drafts and prereleases are skipped. An asset is named
+  `kosh-<platform>-<processor>-<tag>`. The platform is `darwin`, `linux`, or
+  `win32`. The Darwin processor is `aarch64`, and the Linux and Windows
+  processor is `amd64`. A Windows asset ends in `.exe`.
 
 ## Diagnostics and storage
 
