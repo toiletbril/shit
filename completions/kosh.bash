@@ -97,7 +97,7 @@ _kosh_set_complete()
   local moods="kosh bash sh bash-posix"
   local option_names="allexport export-all notify errexit error-exit noglob no-glob \
 hashall keyword monitor noexec no-exec nounset no-unset verbose xtrace braceexpand \
-histexpand history ignoreeof nolog \
+histexpand history ignoreeof interactive-comments nolog \
 noclobber no-clobber errtrace physical functrace onecmd pipefail failglob koshkit vi emacs \
 posix show-ast show-lexed-words show-exit-code mimicry extended-arithmetic annoying-diagnostics \
 show-stats no-diagnostics show-memory login rcfile"

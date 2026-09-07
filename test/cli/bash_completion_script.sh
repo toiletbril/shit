@@ -25,6 +25,11 @@ COMP_CWORD=1
 _kosh_complete
 printf 'extended-arithmetic=<%s>\n' "${COMPREPLY[0]}"
 
+COMP_WORDS=(set -o interactive-c)
+COMP_CWORD=2
+_kosh_set_complete
+printf 'interactive-comments=<%s>\n' "${COMPREPLY[0]}"
+
 printf 'calc-flags=<%s>\n' "$(_koshkit_util_flags calc)"
 printf 'head-flags=<%s>\n' "$(_koshkit_util_flags head)"
 printf 'killall-flags=<%s>\n' "$(_koshkit_util_flags killall)"

@@ -2,6 +2,9 @@
 set -o pipefail; echo "on=$?"
 set +o pipefail; echo "off=$?"
 set -- one two three; echo "$1 $3 count=$#"
+set --mood -- mood-marker; echo "mood=$(set --mood) args=$*"
+set --init-moods -- init-marker; echo "init=$*"
+set --tab-selector -- selector-marker; echo "selector=$(set --tab-selector) args=$*"
 ( set -euo pipefail; echo "bundled=$?" )
 set -Z 2>&1; echo "bad=$?"
 ( set -e; false; echo notreached ); echo "after=$?"

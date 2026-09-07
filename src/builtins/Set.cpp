@@ -18,7 +18,8 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-abefhkmnruvxBCEPTARWISG] [+abefhkmnuvxBCEPTARWISG] "
-                   "[-o name] [+o name] [--options] [--] [arg ...]");
+                   "[-o name] [+o name] [--options] [-M mood] "
+                   "[-L mood,...] [--tab-selector mode] [--] [arg ...]");
 
 HELP_DESCRIPTION_DECL(
     "The set builtin sets the shell options and the positional parameters.");
@@ -804,7 +805,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       [&](const String &option_arg) -> Maybe<StringView> {
     if (let const eq = option_arg.view().find_character('='); eq.has_value())
       return option_arg.view().substring(*eq + 1);
-    if (i + 1 < args.count()) return args[++i].view();
+    if (i + 1 < args.count() && args[i + 1] != "--") return args[++i].view();
     return None;
   };
 

@@ -12,6 +12,18 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$1 $3 count=$#"]
   [CompoundListCondition, None]
+    [SimpleCommand "set" "--mood" "--" "mood-marker"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "mood=$(set --mood) args=$*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--init-moods" "--" "init-marker"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "init=$*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--tab-selector" "--" "selector-marker"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "selector=$(set --tab-selector) args=$*"]
+  [CompoundListCondition, None]
     [Subshell]
       [CompoundList]
         [CompoundListCondition, None]
@@ -94,6 +106,67 @@
   Unquoted "set"
 ]
 [Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "mood-marker"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "mood="
+  CommandSubstitution "set --mood"
+  DoubleQuoted " args="
+  Variable "*"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--init-moods"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "init-marker"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "init="
+  Variable "*"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--tab-selector"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "selector-marker"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "selector="
+  CommandSubstitution "set --tab-selector"
+  DoubleQuoted " args="
+  Variable "*"
+]
+[Word
+  Unquoted "set"
+]
+[Word
   Unquoted "-euo"
 ]
 [Word
@@ -150,7 +223,13 @@
 on=0
 off=0
 one three count=3
+kosh
+mood=kosh args=mood-marker
+
+init=init-marker
+interactive
+selector=interactive args=selector-marker
 bundled=0
-6:5: error: Builtin `set`: Unknown option '-Z'.
-     6 |  set -Z 2>&1; echo "bad=$?"
+9:5: error: Builtin `set`: Unknown option '-Z'.
+     9 |  set -Z 2>&1; echo "bad=$?"
        |      ^~

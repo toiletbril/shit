@@ -3,6 +3,7 @@
 release-debug-flags=0
 as-language-server=<--as-language-server>
 extended-arithmetic=<--enable-extended-arithmetic>
+interactive-comments=<interactive-comments>
 calc-flags=<-i --interactive -p --pipe>
 head-flags=<-n -c>
 killall-flags=<-s --signal -l --list>
