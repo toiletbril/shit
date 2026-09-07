@@ -4,7 +4,6 @@ import {
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
-  TransportKind,
 } from "vscode-languageclient/node";
 
 const SERVER_ARGUMENT = "--as-language-server";
@@ -50,10 +49,14 @@ function build_server_options(): ServerOptions {
   const binary_path = configuration.get<string>("path", "kosh");
   const extra_arguments = configuration.get<string[]>("arguments", []);
 
+  /*
+   * An executable with no transport talks over the standard streams of the
+   * child. The explicit stdio transport appends a `--stdio` flag, and the
+   * shell rejects it.
+   */
   const executable: Executable = {
     command: binary_path,
     args: [...extra_arguments, SERVER_ARGUMENT],
-    transport: TransportKind.stdio,
     options: { env: { ...process.env, NO_COLOR: "1" } },
   };
 

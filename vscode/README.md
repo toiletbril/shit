@@ -13,6 +13,19 @@ npm run package
 code --install-extension kosh.vsix
 ```
 
+VSCodium names the same command `codium`.
+
+## What is analyzed
+
+Every host format the shell recognizes is analyzed without any setting. The
+list holds shell scripts, YAML, Docker Compose, Dockerfiles, Markdown,
+makefiles, JSON, and JSONC. A justfile and an RPM spec file are matched by
+name. Semantic highlighting is enabled for each of them.
+
+Formatting is offered for the same set. Koshka is the default formatter for
+shell documents alone. A YAML or Markdown document keeps the formatter it
+already has, and `Format Document With...` picks Koshka for a single run.
+
 ## Formatting on save
 
 Formatting on save is a user setting. The extension does not enable it.
@@ -20,7 +33,6 @@ Formatting on save is a user setting. The extension does not enable it.
 ```jsonc
 {
   "[shellscript]": {
-    "editor.defaultFormatter": "toiletbril.kosh",
     "editor.formatOnSave": true
   }
 }

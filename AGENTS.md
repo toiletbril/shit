@@ -131,6 +131,12 @@ changes update this file.
   the detector finds by name is matched by file name in the client.
 - Zed receives no identifier for Shell Script. The extension of the file
   selects the mood.
+- A client names no transport kind. The stdio kind appends a `--stdio` flag
+  that the shell rejects. An executable server with no transport already talks
+  over the standard streams of its child.
+- The client log of a real editor session confirms an integration change. The
+  VS Code family writes one file for each extension output channel under its
+  own log directory.
 
 ## Diagnostics and storage
 
@@ -409,3 +415,6 @@ changes update this file.
 - Verify git identity. Keep commit subjects within the limit and bodies within
   72 columns. Commit locally. Never push or create external artifacts without
   an explicit request.
+- Pass an explicit pathspec to every commit, because the index can hold a path
+  that another worker staged in the same working copy. A status reading goes
+  stale as soon as another command runs.

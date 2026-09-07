@@ -19,6 +19,9 @@
   ],
   "main": "./out/extension.js",
   "activationEvents": [
+    "onStartupFinished",
+    "onLanguage:kosh",
+    "onLanguage:shit",
     "onLanguage:shellscript",
     "onLanguage:yaml",
     "onLanguage:dockercompose",
@@ -191,6 +194,28 @@
         "editor.defaultFormatter": "toiletbril.kosh"
       },
       "[shellscript]": {
+        "editor.semanticHighlighting.enabled": true,
+        "editor.defaultFormatter": "toiletbril.kosh"
+      },
+      "[yaml]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[dockercompose]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[dockerfile]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[markdown]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[makefile]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[json]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[jsonc]": {
         "editor.semanticHighlighting.enabled": true
       }
     }
