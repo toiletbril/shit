@@ -247,9 +247,17 @@ fn EvalContext::run_named_trap(StringView condition,
   };
 
   let const saved_exit_status = m_last_exit_status;
+  let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
+  let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
+  ArrayList<String> saved_pipe_statuses{heap_allocator()};
+  if (has_saved_pipe_statuses)
+    saved_pipe_statuses = current_pipe_statuses->clone();
+
   run_source(action->view(),
              "the " + String{heap_allocator(), condition} + " trap");
   m_last_exit_status = saved_exit_status;
+  if (has_saved_pipe_statuses)
+    set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
 }
 
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
@@ -309,6 +317,11 @@ fn EvalContext::run_pending_traps() throws -> void
   os::SIGNAL_PENDING = 0;
 
   let const saved_exit_status = m_last_exit_status;
+  let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
+  let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
+  ArrayList<String> saved_pipe_statuses{heap_allocator()};
+  if (has_saved_pipe_statuses)
+    saved_pipe_statuses = current_pipe_statuses->clone();
 
   for (i32 number = os::take_pending_signal(); number != 0;
        number = os::take_pending_signal())
@@ -323,6 +336,8 @@ fn EvalContext::run_pending_traps() throws -> void
   }
 
   m_last_exit_status = saved_exit_status;
+  if (has_saved_pipe_statuses)
+    set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
 }
 
 pure fn EvalContext::traps() const wontthrow -> const StringMap<String> &

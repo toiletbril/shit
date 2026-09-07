@@ -76,6 +76,80 @@ trap 'echo D-$BASH_COMMAND' DEBUG
 printf 'payload\n' | grep -c '^payload$'
 trap - DEBUG
 
+echo pipeline-compound-stages
+trap 'echo D-$BASH_COMMAND' DEBUG
+{ echo group-a; echo group-b; } | wc -l | tr -d ' '
+( echo subshell-stage ) | cat
+if true; then echo if-stage; fi | wc -l | tr -d ' '
+while false; do :; done | cat
+for word in a b; do echo for-$word; done | wc -l | tr -d ' '
+echo nested | cat | { cat; } | wc -l | tr -d ' '
+trap - DEBUG
+
+echo pipeline-prefix-assignment
+trap 'echo D-$BASH_COMMAND' DEBUG
+prefix_stage=one printf '%s\n' prefixed | cat
+prefix_stage=two printf '%s\n' second | prefix_stage=three cat
+trap - DEBUG
+printf 'prefix-leak=%s\n' "${prefix_stage-unset}"
+
+echo pipeline-indirect-word
+indirect_command=printf
+trap 'echo D-$BASH_COMMAND' DEBUG
+$indirect_command '%s\n' indirect | cat
+"$indirect_command" '%s\n' quoted | cat
+trap - DEBUG
+
+echo pipeline-unresolved
+trap 'echo D-$BASH_COMMAND' DEBUG
+kosh_absent_stage_command | cat
+echo unresolved-first=$?
+printf 'a\n' | kosh_absent_stage_command
+echo unresolved-last=$?
+trap - DEBUG
+
+echo pipeline-negated
+trap 'echo D-$BASH_COMMAND' DEBUG
+! printf '%s\n' negated | grep -q missing
+echo negated-status=$?
+trap - DEBUG
+
+echo pipeline-async
+trap 'echo D-$BASH_COMMAND' DEBUG
+pipeline_function | wc -l > /dev/null &
+wait
+echo async-status=$?
+trap - DEBUG
+
+echo pipeline-errexit
+trap 'echo D-$BASH_COMMAND' DEBUG
+set -e
+printf 'a\n' | grep -q nomatch || echo errexit-guarded
+printf 'a\n' | grep -q a
+echo errexit-survived
+set +e
+trap - DEBUG
+
+echo pipeline-pipefail
+set -o pipefail
+trap 'echo D-$BASH_COMMAND' DEBUG
+false | true
+echo pipefail-status=$?
+printf 'p\n' | grep -q p
+echo pipefail-ok=$?
+trap - DEBUG
+set +o pipefail
+
+echo pipeline-status-array
+trap 'echo D-$BASH_COMMAND' DEBUG
+false | true
+echo pipestatus-two=${PIPESTATUS[*]}
+printf 'a\n' | grep -q nomatch | cat
+echo pipestatus-three=${PIPESTATUS[*]}
+trap - DEBUG
+false | true
+echo pipestatus-untrapped=${PIPESTATUS[*]}
+
 echo pipeline-mutation
 pipeline_value=before
 pipeline_debug_count=0
@@ -89,8 +163,10 @@ set +m
 shopt -s lastpipe
 trap 'echo D-$BASH_COMMAND' DEBUG
 printf 'lastpipe\n' | read pipeline_value
+printf 'grouped\n' | { read pipeline_group_value; }
+printf 'fnpipe\n' | pipeline_function
 trap - DEBUG
-printf 'value=%s\n' "$pipeline_value"
+printf 'value=%s group=%s\n' "$pipeline_value" "$pipeline_group_value"
 shopt -u lastpipe
 
 echo done
