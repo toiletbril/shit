@@ -38,6 +38,9 @@ if log_path:
 if os.environ.get("STUB_CANCEL"):
     sys.exit(130)
 
+if os.environ.get("STUB_FAIL"):
+    sys.exit(int(os.environ["STUB_FAIL"]))
+
 picks = os.environ.get("STUB_PICK", "1").split()
 for pick in picks:
     sys.stdout.buffer.write(records[int(pick) - 1] + b"\\0")
@@ -63,6 +66,44 @@ def read_until_idle(master, timeout, required_output=None):
     return output
 
 
+def reap(pid):
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        waited, _ = os.waitpid(pid, os.WNOHANG)
+        if waited == pid:
+            return
+        time.sleep(0.02)
+    os.kill(pid, signal.SIGKILL)
+    os.waitpid(pid, 0)
+
+
+def run_variable_probe(directory):
+    """Read the selector variables from a session that never set them."""
+    pid, master = pty.fork()
+    if pid == 0:
+        fcntl.ioctl(1, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 120, 0, 0))
+        os.environ["TERM"] = "xterm-256color"
+        os.environ["HOME"] = directory
+        os.environ["KOSH_HISTORY_FILE"] = os.path.join(directory, "history")
+        os.environ.pop("KOSH_FZF_COMPLETION_COMMAND", None)
+        os.environ.pop("KOSH_FZF_COMPLETION_OPTS", None)
+        os.chdir(os.path.join(directory, "tree"))
+        os.execv(binary, [binary, "--norc", "--no-diagnostics"])
+
+    read_until_idle(master, 3)
+    os.write(
+        master,
+        b'printf "seeded (%s) (%s)\\n"'
+        b' "$KOSH_FZF_COMPLETION_COMMAND" "$KOSH_FZF_COMPLETION_OPTS"\n',
+    )
+    output = read_until_idle(master, 3)
+    os.write(master, b"exit\n")
+    output += read_until_idle(master, 2)
+    os.close(master)
+    reap(pid)
+    return output
+
+
 def run_interrupt_scenario(directory):
     """Tab into a spec that never finishes, then interrupt it.
 
@@ -75,7 +116,7 @@ def run_interrupt_scenario(directory):
         fcntl.ioctl(1, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 120, 0, 0))
         os.environ["TERM"] = "xterm-256color"
         os.environ["HOME"] = directory
-        os.environ["KOSH_HISTORY"] = os.path.join(directory, "history")
+        os.environ["KOSH_HISTORY_FILE"] = os.path.join(directory, "history")
         os.chdir(os.path.join(directory, "tree"))
         os.execv(
             binary,
@@ -101,15 +142,7 @@ def run_interrupt_scenario(directory):
     elapsed = time.monotonic() - started
     os.close(master)
 
-    deadline = time.monotonic() + 2
-    while time.monotonic() < deadline:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            break
-        time.sleep(0.02)
-    else:
-        os.kill(pid, signal.SIGKILL)
-        os.waitpid(pid, 0)
+    reap(pid)
 
     return output, elapsed
 
@@ -119,19 +152,23 @@ def run_scenario(
 ):
     """Type the words, press tab, submit, and return the transcript and log."""
     log_path = os.path.join(directory, "selector-log")
-    if os.path.exists(log_path):
-        os.remove(log_path)
+    # A command left by an earlier scenario would come back as a ghost and put
+    # its candidate names on this screen.
+    for stale in (log_path, os.path.join(directory, "history")):
+        if os.path.exists(stale):
+            os.remove(stale)
 
     pid, master = pty.fork()
     if pid == 0:
         fcntl.ioctl(1, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 120, 0, 0))
         os.environ["TERM"] = "xterm-256color"
         os.environ["HOME"] = directory
-        os.environ["KOSH_HISTORY"] = os.path.join(directory, "history")
+        os.environ["KOSH_HISTORY_FILE"] = os.path.join(directory, "history")
         os.environ["STUB_LOG"] = log_path
         os.environ["KOSH_FZF_COMPLETION_COMMAND"] = selector
         os.environ.pop("STUB_CANCEL", None)
         os.environ.pop("STUB_PICK", None)
+        os.environ.pop("STUB_FAIL", None)
         os.environ.update(environment)
         os.chdir(os.path.join(directory, "tree"))
         os.execv(
@@ -141,25 +178,18 @@ def run_scenario(
 
     read_until_idle(master, 3)
     os.write(master, typed.encode())
-    read_until_idle(master, 1)
+    # What the tab draws is part of the result, so every read is kept.
+    output = read_until_idle(master, 1)
     for _ in range(tab_count):
         os.write(master, b"\t")
-        read_until_idle(master, 3)
+        output += read_until_idle(master, 3)
     os.write(master, b"\n")
-    output = read_until_idle(master, 2, b"MARKER-END")
+    output += read_until_idle(master, 2, b"MARKER-END")
     os.write(master, b"printf 'MARKER-END\\n'\nexit\n")
     output += read_until_idle(master, 2)
     os.close(master)
 
-    deadline = time.monotonic() + 2
-    while time.monotonic() < deadline:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            break
-        time.sleep(0.02)
-    else:
-        os.kill(pid, signal.SIGKILL)
-        os.waitpid(pid, 0)
+    reap(pid)
 
     log = b""
     if os.path.exists(log_path):
@@ -270,6 +300,39 @@ def main():
             and b"<hash#one>" in metacharacter
         )
 
+        seeded = run_variable_probe(directory)
+        the_command_variable_is_seeded = b"seeded (fzf)" in seeded
+        the_options_variable_is_seeded = b"--layout=reverse" in seeded
+
+        empty, empty_log = run_scenario(
+            directory,
+            selector,
+            {"KOSH_FZF_COMPLETION_COMMAND": ""},
+            typed,
+            tab_count=2,
+        )
+        an_empty_command_is_reported = b"names no tab selector" in empty
+        an_empty_command_skips_the_selector = empty_log == b""
+        an_empty_command_prints_the_list = b"alpha-three" in empty
+
+        missing, missing_log = run_scenario(
+            directory,
+            selector,
+            {"KOSH_FZF_COMPLETION_COMMAND": "kosh_absent_selector_zzqq"},
+            typed,
+            tab_count=2,
+        )
+        a_missing_command_is_reported = b"was not found" in missing
+        a_missing_command_skips_the_selector = missing_log == b""
+        a_missing_command_prints_the_list = b"alpha-three" in missing
+
+        failed, failed_log = run_scenario(
+            directory, selector, {"STUB_FAIL": "3"}, typed, tab_count=2
+        )
+        a_failing_selector_ran = b"ran\n" in failed_log
+        a_failing_selector_is_reported = b"exited with status 3" in failed
+        a_failing_selector_prints_the_list = b"alpha-three" in failed
+
         prompt_stays_usable = b"MARKER-END" in picked
 
         interrupted, interrupt_seconds = run_interrupt_scenario(directory)
@@ -294,6 +357,25 @@ def main():
             "QUOTING_SURVIVES_THE_SELECTOR": quoting_survives_the_selector,
             "SEVERAL_QUOTED_PICKS_ARE_JOINED": several_quoted_picks_are_joined,
             "METACHARACTER_IS_QUOTED": metacharacter_is_quoted,
+            "THE_COMMAND_VARIABLE_IS_SEEDED": the_command_variable_is_seeded,
+            "THE_OPTIONS_VARIABLE_IS_SEEDED": the_options_variable_is_seeded,
+            "AN_EMPTY_COMMAND_IS_REPORTED": an_empty_command_is_reported,
+            "AN_EMPTY_COMMAND_SKIPS_THE_SELECTOR": (
+                an_empty_command_skips_the_selector
+            ),
+            "AN_EMPTY_COMMAND_PRINTS_THE_LIST": an_empty_command_prints_the_list,
+            "A_MISSING_COMMAND_IS_REPORTED": a_missing_command_is_reported,
+            "A_MISSING_COMMAND_SKIPS_THE_SELECTOR": (
+                a_missing_command_skips_the_selector
+            ),
+            "A_MISSING_COMMAND_PRINTS_THE_LIST": (
+                a_missing_command_prints_the_list
+            ),
+            "A_FAILING_SELECTOR_RAN": a_failing_selector_ran,
+            "A_FAILING_SELECTOR_IS_REPORTED": a_failing_selector_is_reported,
+            "A_FAILING_SELECTOR_PRINTS_THE_LIST": (
+                a_failing_selector_prints_the_list
+            ),
             "PROMPT_STAYS_USABLE": prompt_stays_usable,
             "INTERRUPT_FREES_THE_PROMPT": interrupt_frees_the_prompt,
             "INTERRUPT_IS_PROMPT": interrupt_is_prompt,

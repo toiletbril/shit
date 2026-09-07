@@ -1765,9 +1765,16 @@ bounded by the terminal height, and a count row names the part that is drawn.
 The external selector hands the candidates to the program named by
 .B KOSH_FZF_COMPLETION_COMMAND
 and what it prints replaces the token. The editor leaves raw mode while the
-selector owns the terminal, then repaints the prompt. The plain listing is kept
-when the selector is cancelled or missing, when one candidate remains, and when
-the session has no controlling terminal.
+selector owns the terminal, then repaints the prompt. A selector that reports no
+match or is dismissed leaves the line alone and prints nothing. The plain
+listing is kept when one candidate remains and when the session has no
+controlling terminal.
+.PP
+An empty
+.BR KOSH_FZF_COMPLETION_COMMAND ,
+a name that resolves to no program, and a selector that exits with a status
+other than 0, 1, or 130 each report a message above the prompt and keep the
+plain listing.
 .PP
 The plain selector prints the candidates below the prompt as a static column
 list. A terminal that supports no decorations always gets the plain listing.
@@ -1900,11 +1907,15 @@ The value names the z frecency store. The default is
 The value names interactive calc history. The default is ~/.kosh_calc_history.
 .TP
 .BR KOSH_FZF_COMPLETION_COMMAND ", " KOSH_FZF_COMPLETION_OPTS
-These variables configure the external tab selector. KOSH_FZF_COMPLETION_COMMAND
-names the program the candidates are handed to and defaults to
+These variables configure the external tab selector. An interactive session sets
+both before the first prompt when a startup file has not already set them.
+KOSH_FZF_COMPLETION_COMMAND names the program the candidates are handed to and
+defaults to
 .BR fzf .
-KOSH_FZF_COMPLETION_OPTS supplies further options, split on blanks with no
-expansion, and they follow the built-in ones so they win.
+KOSH_FZF_COMPLETION_OPTS holds the presentation options and defaults to
+\-\-multi \-\-layout=reverse \-\-height=~40% \-\-min\-height=3. The value is
+split on blanks with no expansion. The \-\-read0 and \-\-print0 record framing
+is supplied separately and stays out of the value.
 .TP
 .BR ENV ", " BASH_ENV
 These variables select startup files under the conditions in

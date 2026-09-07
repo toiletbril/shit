@@ -152,15 +152,36 @@ constexpr koshka::StringView SELECTOR_COMMAND_VARIABLE{
 constexpr koshka::StringView SELECTOR_OPTIONS_VARIABLE{
     "KOSH_FZF_COMPLETION_OPTS"};
 
-fn selector_command_name(koshka::EvalContext &context) throws -> koshka::String
+/* Seeded into the shell before the first prompt, so the picker and its
+   presentation are visible and editable. The record framing is absent, since
+   --read0 and --print0 are the protocol between the shell and the picker. */
+constexpr koshka::StringView DEFAULT_SELECTOR_COMMAND{"fzf"};
+constexpr koshka::StringView DEFAULT_SELECTOR_OPTIONS{
+    "--multi --layout=reverse --height=~40% --min-height=3"};
+
+/* The picker the variable names, or the reason the selector cannot run. */
+fn resolve_selector_program(koshka::EvalContext &context) throws
+    -> koshka::ErrorOr<koshka::Path>
 {
-  if (let const configured =
-          context.get_variable_value(SELECTOR_COMMAND_VARIABLE);
-      configured.has_value() && !configured->is_empty())
-  {
-    return koshka::String{configured->view()};
+  let const configured = context.get_variable_value(SELECTOR_COMMAND_VARIABLE);
+  if (configured.has_value() && configured->is_empty()) {
+    return koshka::Error{SELECTOR_COMMAND_VARIABLE +
+                         " is empty and names no tab selector"};
   }
-  return koshka::String{"fzf"};
+
+  let const command_name =
+      configured.has_value() ? configured->view() : DEFAULT_SELECTOR_COMMAND;
+
+  let const resolved = context.get_program_resolver().search(
+      command_name, koshka::ProgramResolver::SearchMode::First,
+      koshka::ProgramResolver::Requirement::Execution,
+      koshka::ProgramResolver::CachePolicy::ReadOnly);
+  if (resolved.is_empty()) {
+    return koshka::Error{koshka::StringView{"The tab selector '"} +
+                         command_name + "' was not found"};
+  }
+
+  return koshka::Path{resolved[0].text()};
 }
 
 /* Records are NUL separated in both directions, so a candidate carrying a
@@ -193,23 +214,23 @@ fn build_selector_args(koshka::EvalContext &context,
 {
   let args = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
   args.push(koshka::String{program.text().view()});
+
+  /* The records travel NUL separated in both directions, so the framing belongs
+     to the shell and stays out of the variable. */
   args.push(koshka::String{"--read0"});
   args.push(koshka::String{"--print0"});
-  args.push(koshka::String{"--multi"});
-  args.push(koshka::String{"--layout=reverse"});
-  args.push(koshka::String{"--height=~40%"});
-  args.push(koshka::String{"--min-height=3"});
 
-  /* The user's own options come last so they win over the defaults above. The
-     value is split on blanks with no expansion, since a completion keystroke
-     must never run a substitution. */
-  if (let const options = context.get_variable_value(SELECTOR_OPTIONS_VARIABLE);
-      options.has_value() && !options->is_empty())
-  {
-    for (let const &option :
-         context.expand_wordlist_to_fields(options->view(), false))
-      args.push(koshka::String{option.view()});
-  }
+  /* The value is split on blanks with no expansion, since a completion
+     keystroke must never run a substitution. An unset variable carries the
+     defaults, which is what the seeded value holds. */
+  let const options = context.get_variable_value(SELECTOR_OPTIONS_VARIABLE);
+  let const option_text =
+      options.has_value() ? options->view() : DEFAULT_SELECTOR_OPTIONS;
+
+  for (let const &option :
+       context.expand_wordlist_to_fields(option_text, false))
+    args.push(koshka::String{option.view()});
+
   return args;
 }
 
@@ -247,6 +268,22 @@ enum class selector_outcome : u8
   Dismissed,
 };
 
+/* Handing the editor screen back erases every row below the prompt, so a
+   message survives only after that. A failure that happens before the picker
+   starts cycles the screen itself to reach the same place, which leaves the
+   message above the repainted prompt. */
+fn report_selector_failure(koshka::StringView message,
+                           bool should_hand_back_screen) throws -> void
+{
+  if (should_hand_back_screen) {
+    koshka::flush();
+    if (::tl_begin_external_screen() != TL_SUCCESS) return;
+    if (::tl_end_external_screen() != TL_SUCCESS) return;
+  }
+
+  koshka::show_message(message);
+}
+
 fn run_completion_selector(koshka::EvalContext &context,
                            koshka::completion::completion_result &result,
                            usize token_codepoint_count) throws
@@ -266,13 +303,12 @@ fn run_completion_selector(koshka::EvalContext &context,
   if (!koshka::os::shell_has_controlling_terminal())
     return selector_outcome::NotRun;
 
-  let const command_name = selector_command_name(context);
-
-  let const resolved = context.get_program_resolver().search(
-      command_name.view(), koshka::ProgramResolver::SearchMode::First,
-      koshka::ProgramResolver::Requirement::Execution,
-      koshka::ProgramResolver::CachePolicy::ReadOnly);
-  if (resolved.is_empty()) return selector_outcome::NotRun;
+  let const program = resolve_selector_program(context);
+  if (program.is_error()) {
+    report_selector_failure(program.error().message(), true);
+    return selector_outcome::NotRun;
+  }
+  let const &selector_program = program.value();
 
   let const input = build_selector_input(result);
   let const input_fd = koshka::os::write_to_temp_file(input.view());
@@ -301,8 +337,9 @@ fn run_completion_selector(koshka::EvalContext &context,
       koshka::ArrayList<koshka::SourceLocation>{koshka::heap_allocator()};
   let selector = koshka::ExecContext::from_resolved(
       koshka::SourceLocation{},
-      koshka::ResolvedCommand::from_program(koshka::Path{resolved[0].text()}),
-      build_selector_args(context, resolved[0]), steal(arg_locations));
+      koshka::ResolvedCommand::from_program(
+          koshka::Path{selector_program.text()}),
+      build_selector_args(context, selector_program), steal(arg_locations));
   selector.in_fd = *input_fd;
   selector.out_fd = output_pipe->out;
 
@@ -336,11 +373,20 @@ fn run_completion_selector(koshka::EvalContext &context,
   if (::tl_end_external_screen() != TL_SUCCESS) return selector_outcome::NotRun;
 
   /* A picker reports 0 for a selection, 1 when nothing matched, and 130 when it
-     was dismissed. Only a status it never uses for either, such as a failure to
-     start, falls back to the printed list. */
-  if (status != 0)
-    return status == 1 || status == 130 ? selector_outcome::Dismissed
-                                        : selector_outcome::NotRun;
+     was dismissed. A status it never uses for either says the picker could not
+     do its work, which is reported before the printed list answers the key. */
+  if (status != 0) {
+    if (status == 1 || status == 130) return selector_outcome::Dismissed;
+
+    report_selector_failure(
+        koshka::StringView{"The tab selector '"} +
+            selector_program.text().view() + "' exited with status " +
+            koshka::String::from(status, koshka::heap_allocator()),
+        false);
+
+    return selector_outcome::NotRun;
+  }
+
   if (!captured.has_value()) return selector_outcome::NotRun;
 
   let selected = parse_selector_reply(captured->view());
@@ -1257,6 +1303,16 @@ fn enable_completion(koshka::EvalContext &context) -> void
   ::tl_set_complete_callback(kosh_completion_callback);
   ::tl_set_highlight_callback(kosh_highlight_callback);
   ::tl_set_ghost_validate_callback(kosh_ghost_validate_callback);
+
+  /* The selector configuration is seeded after the startup files have run, so a
+     value they set wins and an unset one becomes visible and editable. */
+  if (!context.get_variable_value(SELECTOR_COMMAND_VARIABLE).has_value())
+    context.set_shell_variable(SELECTOR_COMMAND_VARIABLE,
+                               DEFAULT_SELECTOR_COMMAND);
+
+  if (!context.get_variable_value(SELECTOR_OPTIONS_VARIABLE).has_value())
+    context.set_shell_variable(SELECTOR_OPTIONS_VARIABLE,
+                               DEFAULT_SELECTOR_OPTIONS);
 }
 
 fn disable_completion() -> void
