@@ -888,25 +888,28 @@ fn internal::append_redirections_text(
 }
 
 fn internal::publish_simple_command(EvalContext &cxt,
-                                    const SimpleCommand &command) throws -> void
+                                    const SimpleCommand &command,
+                                    root_evaluation_mode mode) throws -> void
 {
-  publish_command_and_run_debug_trap(cxt, [&] throws {
-    let location = command.source_location();
-    for (let const &var : command.local_vars()) {
-      let const assignment_position = var.get_location().position;
-      if (assignment_position >= location.position) continue;
+  publish_command_and_run_debug_trap(
+      cxt,
+      [&] throws {
+        let location = command.source_location();
+        for (let const &var : command.local_vars()) {
+          let const assignment_position = var.get_location().position;
+          if (assignment_position >= location.position) continue;
 
-      location.length += location.position - assignment_position;
-      location.position = assignment_position;
-    }
+          location.length += location.position - assignment_position;
+          location.position = assignment_position;
+        }
 
-    let text =
-        source_command_text(cxt, location, command.source_end_position(), [&] {
-          return utils::merge_tokens_to_string(command.args());
-        });
-    append_redirections_text(cxt, text, command.redirections());
-    return text;
-  });
+        let text = source_command_text(
+            cxt, location, command.source_end_position(),
+            [&] { return utils::merge_tokens_to_string(command.args()); });
+        append_redirections_text(cxt, text, command.redirections());
+        return text;
+      },
+      mode);
 }
 
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,

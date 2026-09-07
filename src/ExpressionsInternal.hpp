@@ -348,22 +348,28 @@ fn append_redirections_text(EvalContext &cxt, String &out,
                             const SparseList<Redirection> &redirections) throws
     -> void;
 
-fn publish_simple_command(EvalContext &cxt, const SimpleCommand &command) throws
-    -> void;
+fn publish_simple_command(
+    EvalContext &cxt, const SimpleCommand &command,
+    root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> void;
 
 /* The command text a DEBUG trap and BASH_COMMAND observe, published before the
    command runs. The builder runs only when a reader can observe its result,
    because BASH_COMMAND belongs to the bash mood and a trap action keeps the
    command that triggered it. The text is heap owned, since the context holds it
-   past the arena that carries the syntax node. */
+   past the arena that carries the syntax node. A prepared pipeline stage takes
+   the text and leaves the trap to the boundary its pipeline already ran. */
 template <typename CommandTextBuilder>
 fn publish_command_and_run_debug_trap(
-    EvalContext &cxt, CommandTextBuilder do_build_command_text) throws -> void
+    EvalContext &cxt, CommandTextBuilder do_build_command_text,
+    root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> void
 {
-  if (cxt.bash_dynamic_variables_enabled() && !cxt.is_running_trap_action())
+  if (cxt.bash_dynamic_variables_enabled() && !cxt.is_running_trap_action()) {
     cxt.set_current_command(do_build_command_text());
+  }
 
-  if (cxt.should_run_debug_trap()) cxt.run_named_trap(StringView{"DEBUG", 5});
+  if (mode == root_evaluation_mode::Normal && cxt.should_run_debug_trap()) {
+    cxt.run_named_trap(StringView{"DEBUG", 5});
+  }
 }
 
 /* Whether the shell or the environment gives the name a value on its own, so a

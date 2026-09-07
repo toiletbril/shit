@@ -137,7 +137,7 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
 
   cxt.set_current_location(source_location());
 
-  if (mode == root_evaluation_mode::Normal) publish_simple_command(cxt, *this);
+  publish_simple_command(cxt, *this, mode);
 
   /* The check reads the typed command word before its expansion, so a pattern
      that happens to match a single file is still caught. */
