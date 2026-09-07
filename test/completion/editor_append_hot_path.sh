@@ -108,6 +108,23 @@ wait_for_prompt_count()
     done
 }
 
+wait_for_marker_count()
+{
+  marker_file=$1
+  expected_marker_count=$2
+  attempt_count=0
+  while :; do
+    marker_count=0
+    if [ -f "$marker_file" ]; then
+      marker_count=$(wc -l < "$marker_file")
+    fi
+    [ "$marker_count" -lt "$expected_marker_count" ] || return 0
+    [ "$attempt_count" -lt 1000 ] || return 1
+    sleep 0.01
+    attempt_count=$((attempt_count + 1))
+  done
+}
+
 metric_line()
 {
     local metric_line_value
@@ -194,11 +211,15 @@ send_unhighlighted_input()
     sleep 0.5
 }
 
+printf '%s\n' \
+    "set --tab-selector=plain" \
+    "PROMPT_COMMAND='printf ready > \"\$EDITOR_READY_FILE\"; unset PROMPT_COMMAND'" \
+    > "$d/unhighlighted-rc"
 send_unhighlighted_input | TERM=xterm-256color PATH="$d/path" \
     EDITOR_OPTIONS=--no-syntax-highlighting KOSH_TEST_EDITOR_STATS=1 \
     EDITOR_READY_FILE="$d/unhighlighted-ready" \
-    KOSH_HISTORY_FILE="$d/unhighlighted-history" BIN="$BIN" \
-    run_editor "$d/unhighlighted-typescript" || exit 1
+    KOSH_HISTORY_FILE="$d/unhighlighted-history" RCFILE="$d/unhighlighted-rc" \
+    BIN="$BIN" run_editor "$d/unhighlighted-typescript" || exit 1
 
 unhighlighted_metrics=$(metric_line "$d/unhighlighted-typescript" 1) || exit 1
 test "$(metric_field "$unhighlighted_metrics" stats)" -eq 0 || exit 1
@@ -229,6 +250,7 @@ send_tab_input()
 }
 
 printf '%s\n' \
+    "set --tab-selector=plain" \
     "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
     > "$d/tab-rc"
 send_tab_input | PATH="$d/path" KOSH_TEST_EDITOR_STATS=1 \
@@ -384,6 +406,96 @@ strings "$d/menu-typescript" | \
 strings "$d/menu-typescript" | \
     grep -q 'Keep this second long completion description intact' || exit 1
 echo 'completion menu keeps callback-owned strings alive'
+
+mkdir "$d/retry-bin"
+printf '%s\n' \
+  '#!/bin/sh' \
+  'printf "attempted\\n" >> "$KOSH_HELP_MARKER"' \
+  'sleep 2' \
+  > "$d/retry-bin/act"
+chmod +x "$d/retry-bin/act"
+
+send_help_retry_input()
+{
+  wait_for_prompt_count "$d/help-retry-ready" 1 || exit 1
+  printf 'act --mark\t'
+  wait_for_marker_count "$d/help-retry-marker" 1 || exit 1
+  sleep 1.1
+  printf '\t'
+  wait_for_marker_count "$d/help-retry-marker" 2 || exit 1
+  sleep 1.1
+  printf '\t'
+  sleep 0.2
+  printf '\003'
+  sleep 0.2
+  printf 'exit 0\n'
+}
+
+printf '%s\n' \
+  "set --tab-selector=plain" \
+  "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
+  > "$d/help-retry-rc"
+send_help_retry_input | TERM=xterm-256color \
+  PATH="$d/retry-bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+  KOSH_HELP_MARKER="$d/help-retry-marker" \
+  EDITOR_READY_FILE="$d/help-retry-ready" \
+  KOSH_HISTORY_FILE="$d/help-retry-history" RCFILE="$d/help-retry-rc" \
+  EDITOR_OPTIONS=--no-syntax-highlighting BIN="$BIN" \
+  run_editor "$d/help-retry-typescript" || exit 1
+
+test "$(wc -l < "$d/help-retry-marker")" -eq 2 || exit 1
+echo 'timed out help completion stops after two attempts'
+
+mkdir "$d/manpath-bin" "$d/recovered-man"
+mkdir "$d/recovered-man/man1"
+printf '#!/bin/sh\n' > "$d/manpath-bin/git"
+printf '%s\n' \
+  '#!/bin/sh' \
+  'printf "attempted\\n" >> "$KOSH_MANPATH_MARKER"' \
+  'if [ ! -f "$KOSH_MANPATH_ATTEMPTED" ]; then' \
+  '  : > "$KOSH_MANPATH_ATTEMPTED"' \
+  '  sleep 2' \
+  'else' \
+  '  printf "%s\\n" "$KOSH_MANPATH_ROOT"' \
+  'fi' \
+  > "$d/manpath-bin/manpath"
+chmod +x "$d/manpath-bin/git" "$d/manpath-bin/manpath"
+printf '%s\n' '.TH GIT 1' '.SH SYNOPSIS' '\fBgit\fR' \
+  > "$d/recovered-man/man1/git.1"
+printf '%s\n' '.TH GIT-RECOVERED 1' '.SH SYNOPSIS' \
+  '\fBgit\fR \fBrecovered\fR' \
+  > "$d/recovered-man/man1/git-recovered.1"
+
+send_manpath_retry_input()
+{
+  wait_for_prompt_count "$d/manpath-ready" 1 || exit 1
+  printf 'git rec\t'
+  wait_for_marker_count "$d/manpath-marker" 1 || exit 1
+  sleep 1.1
+  printf '\t'
+  wait_for_marker_count "$d/manpath-marker" 2 || exit 1
+  sleep 0.2
+  printf '\n'
+  wait_for_prompt_count "$d/manpath-ready" 2 || exit 1
+  printf 'exit 0\n'
+}
+
+printf '%s\n' \
+  "set --tab-selector=plain" \
+  "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
+  > "$d/manpath-rc"
+send_manpath_retry_input | TERM=xterm-256color MANPATH= \
+  PATH="$d/manpath-bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+  KOSH_MANPATH_MARKER="$d/manpath-marker" \
+  KOSH_MANPATH_ATTEMPTED="$d/manpath-attempted" \
+  KOSH_MANPATH_ROOT="$d/recovered-man" \
+  EDITOR_READY_FILE="$d/manpath-ready" KOSH_HISTORY_FILE="$d/manpath-history" \
+  RCFILE="$d/manpath-rc" BIN="$BIN" \
+  run_editor "$d/manpath-typescript" || exit 1
+
+test "$(wc -l < "$d/manpath-marker")" -eq 2 || exit 1
+strings "$d/manpath-typescript" | grep -q recovered || exit 1
+echo 'man subcommand indexing recovers after a timed out manpath command'
 
 mkdir "$d/quoted-completion"
 touch "$d/quoted-completion/space name" \
