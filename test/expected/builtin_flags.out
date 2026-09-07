@@ -3,6 +3,7 @@
 --init-moods
 --mood
 --options
+--tab-selector
 -A
 -B
 -C

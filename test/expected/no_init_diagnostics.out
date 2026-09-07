@@ -4,3 +4,9 @@
 0
 == -WWW stays active for the session:
 1
+== a startup diagnostics change survives suppression:
+1
+== a startup warning change does not end suppression:
+1
+== a startup warning level reaches the session:
+1
