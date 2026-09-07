@@ -5,7 +5,7 @@ printf '[%s]\n' $"hello $x"
 echo pre$"mid"post
 echo "a $"
 "$BIN" --mood posix --no-annoying-diagnostics -c \
-  'printf "[%s]\n" $"posix locale"'
+  'printf "[%s]\n" $"posix locale"; printf "[%s]\n" pre$"mid"post'
 "$BIN" --mood posix --no-annoying-diagnostics -c \
   'printf "[%s]\n" "${x:-$"posix modifier"}"'
 doubled_locale=$$"tail"
