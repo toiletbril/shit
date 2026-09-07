@@ -1,0 +1,71 @@
+name: Bug report
+description: Report incorrect shell behavior.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every field below is answered against the version you actually ran.
+  - type: textarea
+    id: version
+    attributes:
+      label: Version
+      description: The complete output of `kosh --version`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: >
+        The smallest script or command sequence that shows the problem, with the
+        files and the environment it needs.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: >
+        What the shell was supposed to do. Name the reference shell and its
+        version when the report is about compatibility.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What the shell did instead, including the exit status.
+    validations:
+      required: true
+  - type: textarea
+    id: xtrace
+    attributes:
+      label: Execution trace
+      description: >
+        The output of the reproducer run with `set -x`, or with the `-x` option
+        on the command line.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: debug-log
+    attributes:
+      label: Debug log
+      description: >
+        A debug build writes an internal log. Build it with `make MODE=dbg` and
+        run `./kosh-dbg -X all --debug-logging-file=kosh-debug.log` on the
+        reproducer, then attach the log. Leave this empty when a debug build is
+        not available to you.
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: The operating system, its version, and the processor.
+    validations:
+      required: true

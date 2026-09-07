@@ -93,6 +93,10 @@ changes update this file.
 - Completion, highlighting, diagnostics, and koshkit cat share the tolerant
   scanner and semantic roles. Completion, highlighting, and command lookup
   share directory indexes.
+- The interactive loop indexes the working directory before each prompt through
+  `utils::warm_directory_index`, so the ghost suggestion needs no tab. The ghost
+  runs for any non-empty token, which indexes a directory as soon as its slash
+  is typed.
 - Command completion reads keywords, builtins, bundled utilities, functions,
   aliases, and PATH. `KEYWORD_ENTRIES` is the sole keyword catalog.
 - Static koshkit completion names stay alphabetically sorted.
@@ -184,6 +188,8 @@ changes update this file.
 - Resolve files, tools, services, interpreters, options, streams, test targets,
   cleanup, and expected statuses before use. Recheck CLI options after checkout.
   Run independent probes independently.
+- Before branch integration, verify that durable snapshots exist and that the
+  integration worktree has no overlapping local changes.
 - Resolve an executable in the environment that launches it. Pass its verified
   absolute path when a nested shell can use a different command search path.
 - Inspect the reported source line before diagnosing a shell error.
@@ -199,6 +205,10 @@ changes update this file.
   unfamiliar make target recipe before invoking it.
 - Reduce a bounded platform probe to one verified command. Confirm its mood,
   option defaults, output order, and final status before writing the golden.
+- Run a Bash compatibility probe under `--mood bash`. The default mood follows
+  dash where the two shells disagree.
+- Redirect a build or a suite into a log file and echo its status. A pipe
+  reports the status of the last command in the pipeline.
 - Do not embed direct recursive removal in a probe. Use an accepted cleanup
   owner, or leave a bounded temporary directory for system cleanup.
 - Reduce a high-volume fixture to its failing section before enabling shell
@@ -255,7 +265,8 @@ changes update this file.
 - Print the required before-and-after table immediately after each edit batch.
   Do not combine a formatter or another editing command with the next probe,
   build, or test. Do not run another tool before the table is printed. After a
-  resumed session, print any pending table before the first tool call.
+  resumed session, print any pending table before the first tool call. Reread
+  the matching guidance and the current target before the first resumed edit.
 - Inspect the formatter diff before validation. Restore changes to unrelated
   files that were clean before the formatter ran.
 - Name the active case before each assertion in a compound probe that can stop
@@ -320,8 +331,9 @@ changes update this file.
   mode to every counter or diagnostic hook the fixture requires.
 - Rebuild the required mode. Verify platform, mode, and revision when relevant.
   Compile release after changing assertion-only locals.
-- Run owners sharing result paths sequentially. Use finite workloads,
-  event-based synchronization, bounded polling, and preserved session ids.
+- Run owners sharing result or artifact paths sequentially. Rebuild the required
+  configuration before its tests. Use finite workloads, event-based
+  synchronization, bounded polling, and preserved session ids.
 - Assert exact streams, statuses, punctuation, source, carets, and log arguments.
   Use distinct fixture names. CLI fixtures cover runtime output. Native fixtures
   also emit lexer and syntax tree output.
