@@ -45,7 +45,7 @@ pure inline fn get_error_severity_word(error_severity severity) wontthrow
    never released, because the row count is the number of distinct script paths
    one run touches. Index zero is the source with no name. */
 fn intern_source_name(StringView name) throws -> u32;
-pure fn source_name_at(u32 source_name_index) wontthrow -> Maybe<StringView>;
+fn source_name_at(u32 source_name_index) wontthrow -> Maybe<StringView>;
 
 /* The offsets are 32-bit because one shell source is far below four gigabytes,
    and every token and every syntax node carries one of these. The constructor
@@ -93,9 +93,9 @@ struct SourceLocation
                           source_name_index};
   }
 
-  pure fn subspan_for_view(StringView source, StringView part,
-                           SourceLocation &storage,
-                           usize source_offset = 0) const wontthrow
+  fn subspan_for_view(StringView source, StringView part,
+                      SourceLocation &storage,
+                      usize source_offset = 0) const wontthrow
       -> const SourceLocation *
   {
     ASSERT(part.data >= source.data &&
@@ -223,9 +223,10 @@ public:
   fn to_string(StringView source, EvalContext *context = nullptr) const throws
       -> String override;
 
-  /* The line numbering starts this many lines past one, for a source that is a
-     window into a larger file. */
-  fn set_line_offset(usize offset) wontthrow -> void { m_line_offset = offset; }
+  /* The line numbering shifts by this many lines, for a source that is a window
+     into a larger file. A window that carries a synthesized header ahead of the
+     original text shifts backwards. */
+  fn set_line_offset(isize offset) wontthrow -> void { m_line_offset = offset; }
 
   pure fn location() const wontthrow -> SourceLocation { return m_location; }
   fn set_location(SourceLocation location) wontthrow -> void
@@ -238,7 +239,7 @@ public:
 
 protected:
   SourceLocation m_location;
-  usize m_line_offset{0};
+  isize m_line_offset{0};
   bool m_was_rendered{false};
 };
 

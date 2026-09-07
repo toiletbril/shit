@@ -16,3 +16,16 @@ EOF
 "$BIN" -WWW -c ". $lib; probe_fn" 2>&1 | sed "s|$lib|LIB|" | ./normalize-trace.sh "$BIN"
 "$BIN" -c 'koshkit unlink "$1"' cleanup "$lib"
 echo "rc=$?"
+
+# A body that opens on the defining file's first line sits one line ahead of
+# the header the definition copy carries, so its reported lines shift back.
+first=$TEST_TEMP_DIRECTORY/function-body-warning-first
+cat > "$first" <<'EOF'
+first_fn() {
+  echo "first=${UNSET_FIRST_PROBE}"
+  echo "line=$LINENO"
+}
+EOF
+"$BIN" -WWW -c ". $first; first_fn" 2>&1 | sed "s|$first|FIRST|" | ./normalize-trace.sh "$BIN"
+"$BIN" -c 'koshkit unlink "$1"' cleanup "$first"
+echo "rc=$?"

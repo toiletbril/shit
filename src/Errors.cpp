@@ -73,7 +73,7 @@ cold fn intern_source_name(StringView name) throws -> u32
   return static_cast<u32>(table.count());
 }
 
-pure fn source_name_at(u32 source_name_index) wontthrow -> Maybe<StringView>
+fn source_name_at(u32 source_name_index) wontthrow -> Maybe<StringView>
 {
   if (source_name_index == 0) return None;
 
@@ -179,12 +179,24 @@ cold static fn number_string_length(T value) wontthrow -> usize
   return digit_count;
 }
 
+/* The reported line of a zero-based line inside the rendered source. A window
+   that carries a synthesized header shifts backwards, so the sum is taken
+   signed. */
+cold static fn reported_line_number(usize rendered_line,
+                                    isize line_offset) wontthrow -> usize
+{
+  return static_cast<usize>(static_cast<isize>(rendered_line + 1) +
+                            line_offset);
+}
+
 cold static fn get_context_pointing_to(
     StringView source, usize byte_position, usize byte_count,
-    const utils::source_line_position &line_position, Maybe<StringView> message,
-    const diagnostic_color &color, EvalContext *eval_context) throws -> String
+    const utils::source_line_position &line_position, isize line_offset,
+    Maybe<StringView> message, const diagnostic_color &color,
+    EvalContext *eval_context) throws -> String
 {
-  let const line_number = line_position.line_number;
+  let const line_number =
+      reported_line_number(line_position.line_number, line_offset) - 1;
   LOG(Debug, "assembling the caret context for line %zu", line_number + 1);
 
   static constexpr usize LINE_NUMBER_FIELD_WIDTH = 6;
@@ -508,8 +520,9 @@ fn ErrorWithLocation::to_string(StringView source,
     result += *name;
     result += ':';
   }
-  result += String::from(line_position.line_number + 1 + m_line_offset,
-                         heap_allocator());
+  result += String::from(
+      reported_line_number(line_position.line_number, m_line_offset),
+      heap_allocator());
   result += ':';
   result += String::from(line_byte_position, heap_allocator());
   result += ':';
@@ -530,8 +543,9 @@ fn ErrorWithLocation::to_string(StringView source,
   }
   result += '\n';
 
-  result += get_context_pointing_to(source, byte_position, byte_count,
-                                    line_position, None, color, context);
+  result +=
+      get_context_pointing_to(source, byte_position, byte_count, line_position,
+                              m_line_offset, None, color, context);
   result += trailing_details_to_string();
   return result;
 }
@@ -641,8 +655,9 @@ cold fn DetailsWithLocation::to_string(StringView source,
     result += *name;
     result += ':';
   }
-  result +=
-      String::from(details_line_position.line_number + 1, heap_allocator());
+  result += String::from(
+      reported_line_number(details_line_position.line_number, m_line_offset),
+      heap_allocator());
   result += ':';
   result += String::from(details_line_byte_position, heap_allocator());
   result += ':';
@@ -654,8 +669,8 @@ cold fn DetailsWithLocation::to_string(StringView source,
   result += ":\n";
 
   result += get_context_pointing_to(source, byte_position, byte_count,
-                                    details_line_position, m_message.view(),
-                                    color, context);
+                                    details_line_position, m_line_offset,
+                                    m_message.view(), color, context);
   return result;
 }
 

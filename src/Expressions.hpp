@@ -954,12 +954,18 @@ public:
   const Token *target;
   const heredoc_contents *heredoc;
   const Token *fd_allocation_name_token;
+  /* The delimiter word of a heredoc, kept for analysis. The delimiter is
+     matched literally and never expanded, so it is not a target. */
+  const Token *heredoc_delimiter;
   i32 fd;
   /* The literal descriptor to copy from, or DUP_FD_CLOSE for the close form,
      or -1 when the descriptor is a dynamic word held in target. */
   i32 dup_fd;
   Kind kind;
   bool should_expand_heredoc;
+  /* True for the <<- form, whose dash both strips the leading tabs and stays
+     out of the terminator. */
+  bool should_strip_heredoc_tabs;
   /* True for a bare >&word outside POSIX mode, where a word that expands to
      neither a number nor a dash is the csh both-streams spelling bash reads
      as >word 2>&1, resolved after the expansion the way bash decides it. */

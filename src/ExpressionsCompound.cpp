@@ -256,7 +256,14 @@ hot fn CompoundList::evaluate_status_impl(EvalContext &cxt) const throws
 
     if (was_command_failure_uncaught && !cxt.is_posix_mode()) {
       cxt.set_last_exit_status(ret.status);
-      if (cxt.should_run_err_trap()) cxt.run_named_trap(StringView{"ERR", 3});
+      if (cxt.should_run_err_trap()) {
+        let const failed_location = n->command()->source_location();
+        cxt.run_named_trap(StringView{"ERR", 3}, &failed_location);
+      }
+
+      /* The action can request an exit, a return, or a loop jump of its own,
+         which stops the rest of this list the same way a node would. */
+      if (cxt.has_pending_control_flow()) break;
     }
 
     if (is_fatal_exit) {

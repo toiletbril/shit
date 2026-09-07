@@ -87,8 +87,7 @@ public:
     let const length = suffix.length + 1;
     let const bytes = allocator.alloc_array<char>(length);
     bytes[0] = prefix;
-    if (suffix.length > 0)
-      std::memcpy(bytes + 1, suffix.data, suffix.length);
+    if (suffix.length > 0) std::memcpy(bytes + 1, suffix.data, suffix.length);
     m_data = bytes;
     m_length = static_cast<u32>(length);
     m_capacity = allocator.get_kind() == Allocator::Kind::Heap
@@ -491,9 +490,11 @@ public:
   Word() = default;
   ~Word() { release_constant_value(); }
 
-  /* A copy carries the segments alone. The flattened text is a cache, and it is
-     rebuilt on the copy when something asks for it. */
-  cold Word(const Word &other) throws : segments(heap_allocator())
+  /* A copy carries the segments and syntax markers. The flattened text is a
+     cache, and it is rebuilt on the copy when something asks for it. */
+  cold Word(const Word &other) throws
+      : segments(heap_allocator()),
+        has_locale_translation_quote(other.has_locale_translation_quote)
   {
     segments.reserve(other.segments.count());
     for (let const &segment : other.segments)
@@ -505,7 +506,8 @@ public:
         m_constant_value_data(other.m_constant_value_data),
         m_constant_value_length(other.m_constant_value_length),
         m_cached_plain_kind(other.m_cached_plain_kind),
-        m_has_cached_plain_kind(other.m_has_cached_plain_kind)
+        m_has_cached_plain_kind(other.m_has_cached_plain_kind),
+        has_locale_translation_quote(other.has_locale_translation_quote)
   {
     other.m_constant_value_data = nullptr;
     other.m_constant_value_length = 0;
@@ -519,6 +521,7 @@ public:
     release_constant_value();
     m_cached_plain_kind = PlainLiteral::NotPlain;
     m_has_cached_plain_kind = false;
+    has_locale_translation_quote = other.has_locale_translation_quote;
 
     return *this;
   }
@@ -533,6 +536,7 @@ public:
     m_constant_value_length = other.m_constant_value_length;
     m_cached_plain_kind = other.m_cached_plain_kind;
     m_has_cached_plain_kind = other.m_has_cached_plain_kind;
+    has_locale_translation_quote = other.has_locale_translation_quote;
     other.m_constant_value_data = nullptr;
     other.m_constant_value_length = 0;
 
@@ -588,7 +592,10 @@ private:
   mutable char *m_constant_value_data{nullptr};
   mutable u32 m_constant_value_length{0};
   mutable PlainLiteral m_cached_plain_kind{PlainLiteral::NotPlain};
-  mutable bool m_has_cached_plain_kind{false};
+  mutable bool m_has_cached_plain_kind : 1 {false};
+
+public:
+  bool has_locale_translation_quote : 1 {false};
 };
 
 static_assert(sizeof(usize) != 8 || sizeof(Word) == 40);

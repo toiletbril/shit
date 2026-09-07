@@ -1,0 +1,2 @@
+echo sourced
+false

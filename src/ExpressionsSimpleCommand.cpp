@@ -258,6 +258,13 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_current_location(source_location());
 
+  publish_command_and_run_debug_trap(cxt, [&] {
+    return source_command_text(
+        cxt, source_location(), source_end_position(), [&] {
+          return String{heap_allocator(), m_assignment->raw_string().view()};
+        });
+  });
+
   /* A command substitution in the value leaves the status of the last one, so
      the reset to 0 waits until after the expansion and a $? in the value reads
      the prior command's status. */
@@ -673,6 +680,198 @@ fn internal::allocate_redirection_descriptor(
   cxt.set_shell_variable(*allocation_name,
                          String::from(allocated_fd, heap_allocator()));
   return allocated_fd;
+}
+
+fn internal::append_word_source_text(EvalContext &cxt, String &out,
+                                     const Token &word) throws -> void
+{
+  let const text = cxt.source_text_in_span(word.source_location(), 0);
+  if (text.length != 0) {
+    out.append(text);
+    return;
+  }
+
+  out += word.raw_string();
+}
+
+/* The descriptor the operator carries. A named allocation prints its name in
+   braces, a descriptor equal to the form's own default prints nothing, and
+   every other descriptor prints its number. */
+static fn append_redirection_descriptor(String &out, const Redirection &redir,
+                                        i32 default_fd) throws -> void
+{
+  if (redir.fd_allocation_name_token != nullptr) {
+    let const name =
+        static_cast<const tokens::WordToken *>(redir.fd_allocation_name_token)
+            ->word()
+            .fd_allocation_name();
+    if (name.has_value()) {
+      out.push('{');
+      out.append(*name);
+      out.push('}');
+      return;
+    }
+  }
+
+  if (redir.fd == default_fd) return;
+
+  out += String::from(static_cast<i64>(redir.fd), heap_allocator());
+}
+
+/* The descriptor a duplication carries, which bash prints even when it is the
+   form's own default. */
+static fn append_duplication_descriptor(String &out,
+                                        const Redirection &redir) throws -> void
+{
+  append_redirection_descriptor(out, redir, -1);
+}
+
+/* The heredoc terminator, which is the delimiter word without its quoting and
+   without the dash that requested the tab stripping. */
+static fn heredoc_terminator(const Redirection &redir) throws -> String
+{
+  ASSERT(redir.heredoc_delimiter != nullptr);
+  let terminator =
+      static_cast<const tokens::WordToken *>(redir.heredoc_delimiter)
+          ->word()
+          .to_literal_string();
+  if (redir.should_strip_heredoc_tabs && !terminator.is_empty())
+    return String{heap_allocator(), terminator.view().substring(1)};
+
+  return terminator;
+}
+
+static fn append_one_redirection(EvalContext &cxt, String &out,
+                                 const Redirection &redir) throws -> void
+{
+  let const do_append_target = [&] throws {
+    if (redir.target != nullptr)
+      append_word_source_text(cxt, out, *redir.target);
+  };
+
+  switch (redir.kind) {
+  case Redirection::Kind::TruncateOutput:
+    if (redir.is_both_streams_spelling) {
+      out += "&> ";
+      do_append_target();
+      return;
+    }
+
+    append_redirection_descriptor(out, redir, 1);
+    out += "> ";
+    do_append_target();
+    return;
+
+  case Redirection::Kind::TruncateOutputOverride:
+    append_redirection_descriptor(out, redir, 1);
+    out += ">| ";
+    do_append_target();
+    return;
+
+  case Redirection::Kind::AppendOutput:
+    if (redir.is_both_streams_spelling) {
+      out += "&>> ";
+      do_append_target();
+      return;
+    }
+
+    append_redirection_descriptor(out, redir, 1);
+    out += ">> ";
+    do_append_target();
+    return;
+
+  case Redirection::Kind::ReadInput:
+    append_redirection_descriptor(out, redir, 0);
+    out += "< ";
+    do_append_target();
+    return;
+
+  case Redirection::Kind::ReadWrite:
+    append_redirection_descriptor(out, redir, 0);
+    out += "<> ";
+    do_append_target();
+    return;
+
+  case Redirection::Kind::HereString:
+    append_redirection_descriptor(out, redir, 0);
+    out += "<<< ";
+    do_append_target();
+    return;
+
+  case Redirection::Kind::Heredoc:
+    append_redirection_descriptor(out, redir, 0);
+    out += "<<";
+    if (redir.heredoc_delimiter != nullptr)
+      append_word_source_text(cxt, out, *redir.heredoc_delimiter);
+    return;
+
+  case Redirection::Kind::DuplicateOutput:
+  case Redirection::Kind::DuplicateInput: {
+    /* A close prints as an output duplication in either direction, the way bash
+       spells 0>&- for <&-. */
+    if (redir.dup_fd == Redirection::DUP_FD_CLOSE) {
+      append_duplication_descriptor(out, redir);
+      out += ">&-";
+      return;
+    }
+
+    let const is_output = redir.kind == Redirection::Kind::DuplicateOutput;
+    if (redir.dup_fd >= 0) {
+      append_duplication_descriptor(out, redir);
+      out += is_output ? ">&" : "<&";
+      out += String::from(static_cast<i64>(redir.dup_fd), heap_allocator());
+      return;
+    }
+
+    append_redirection_descriptor(out, redir, is_output ? 1 : 0);
+    out += is_output ? ">&" : "<&";
+    do_append_target();
+    return;
+  }
+  }
+}
+
+/* Whether the duplication is the one the parser adds behind &>file, which bash
+   spells as part of the operator and never prints on its own. */
+static pure fn
+is_synthesized_error_duplication(const Redirection &redir) wontthrow -> bool
+{
+  return redir.kind == Redirection::Kind::DuplicateOutput && redir.fd == 2 &&
+         redir.dup_fd == 1 && redir.target == nullptr &&
+         redir.fd_allocation_name_token == nullptr;
+}
+
+fn internal::append_redirections_text(
+    EvalContext &cxt, String &out,
+    const SparseList<Redirection> &redirections) throws -> void
+{
+  bool should_drop_error_duplication = false;
+  bool has_heredoc = false;
+  for (let const &redir : redirections) {
+    if (should_drop_error_duplication) {
+      should_drop_error_duplication = false;
+      if (is_synthesized_error_duplication(redir)) continue;
+    }
+
+    if (!out.is_empty()) out.push(' ');
+
+    append_one_redirection(cxt, out, redir);
+    should_drop_error_duplication = redir.is_both_streams_spelling;
+    has_heredoc |= redir.kind == Redirection::Kind::Heredoc;
+  }
+
+  if (!has_heredoc) return;
+
+  /* Each here-document follows the whole command, in the order the operators
+     appear. */
+  for (let const &redir : redirections) {
+    if (redir.kind != Redirection::Kind::Heredoc) continue;
+
+    out.push('\n');
+    if (redir.heredoc != nullptr) out.append(redir.heredoc->text.view());
+    out += heredoc_terminator(redir);
+    out.push('\n');
+  }
 }
 
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,

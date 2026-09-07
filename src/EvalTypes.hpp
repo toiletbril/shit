@@ -4,7 +4,8 @@
  *
  * This file defines lightweight evaluator enums and value records for
  * argument lifetimes, execution modes, status propagation, restrictions, and
- * glob fields. It prevents common evaluator types from depending on Eval.hpp.
+ * glob fields. It also names the value the exported set stores beside each
+ * name. It prevents common evaluator types from depending on Eval.hpp.
  */
 
 #pragma once
@@ -21,6 +22,12 @@
 #include "Platform.hpp"
 
 namespace koshka {
+
+/* A case-sensitive environment is keyed by the name itself and needs no value.
+   An environment that ignores case is keyed by the folded name, and the value
+   holds the original spelling when folding changed it. */
+using exported_name_value =
+    std::conditional_t<os::ENVIRONMENT_IS_CASE_SENSITIVE, Nothing, String>;
 
 enum class argument_lifetime : u8
 {
@@ -275,12 +282,15 @@ struct subshell_saved_descriptor
 
 /* How a function body's absolute source positions map onto the stored
    definition copy. The copy holds a "name () " header then the body verbatim,
-   so an absolute position rebases by the body start and header length. */
+   so an absolute position rebases by the body start and header length. The
+   header occupies the copy's first line, and the line offset restores the
+   defining file's numbering. A body that starts on the first line needs a
+   negative offset. */
 struct function_definition_info
 {
   usize body_start_position{0};
   usize header_length{0};
-  usize line_offset{0};
+  isize line_offset{0};
   u32 source_name_index{0};
   RuntimeState defining_runtime;
 };

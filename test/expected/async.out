@@ -2,6 +2,8 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo", Async]
   [CompoundListCondition, None]
+    [SimpleCommand "wait"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "1", Async]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "1"]
@@ -18,6 +20,9 @@
     [SimpleCommand "wait"]
 [Word
   Unquoted "echo"
+]
+[Word
+  Unquoted "wait"
 ]
 [Word
   Unquoted "echo"

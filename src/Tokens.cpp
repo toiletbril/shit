@@ -356,7 +356,8 @@ static fn append_subscript_segment_source(const WordSegment &segment,
    v[$k]=1, splits across segments since the = lands after the ] in a later
    segment. */
 static fn
-array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
+array_element_assignment_split(const ArrayList<WordSegment> &segments,
+                               bool has_locale_translation_quote) throws
     -> Maybe<word_assignment_split>
 {
   const WordSegment &first = segments[0];
@@ -410,6 +411,7 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     LOG(All, "folding the subscript into array element key '%s'", key.c_str());
 
     let value = Word{};
+    value.has_locale_translation_quote = has_locale_translation_quote;
     value.segments.push(WordSegment{
         WordSegment::Kind::UnquotedText,
         SegmentText{heap_allocator(), after.substring(value_start)},
@@ -438,7 +440,8 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   let const equals_position = first.text.find_character('=');
   if (!equals_position.has_value()) {
     if (first.text.find_character('[').has_value())
-      return array_element_assignment_split(segments);
+      return array_element_assignment_split(segments,
+                                            has_locale_translation_quote);
     return koshka::None;
   }
   if (*equals_position == 0) return koshka::None;
@@ -465,6 +468,7 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   let name = String{name_view};
 
   let value = Word{};
+  value.has_locale_translation_quote = has_locale_translation_quote;
   /* The value always begins with an unquoted segment, even when empty, so that
      FOO= produces one empty field rather than no field at all. */
   value.segments.push(WordSegment{
@@ -540,6 +544,7 @@ cold fn Word::get_quoted_assignment_split() const throws
   const WordSegment &carrier = segments[equals_segment];
 
   let value = Word{};
+  value.has_locale_translation_quote = has_locale_translation_quote;
   value.segments.push(WordSegment{
       carrier.kind,
       SegmentText{heap_allocator(),

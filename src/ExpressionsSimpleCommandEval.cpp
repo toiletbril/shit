@@ -119,6 +119,24 @@ static fn command_word_is_glob(const Word &word) wontthrow -> bool
   return false;
 }
 
+/* The span BASH_COMMAND reports for a simple command. The command location
+   starts at the first word, and an assignment that leads the command sits
+   before it while still belonging to the command bash names. */
+static pure fn command_span_with_assignments(
+    SourceLocation location,
+    const SparseList<PrefixAssignment> &local_vars) wontthrow -> SourceLocation
+{
+  for (let const &var : local_vars) {
+    let const assignment_position = var.get_location().position;
+    if (assignment_position >= location.position) continue;
+
+    location.length += location.position - assignment_position;
+    location.position = assignment_position;
+  }
+
+  return location;
+}
+
 } /* namespace */
 
 hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
@@ -130,11 +148,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_current_location(source_location());
 
-  if (cxt.bash_dynamic_variables_enabled())
-    cxt.set_current_command(utils::merge_tokens_to_string(m_args));
-
-  if (cxt.has_debug_trap() && !cxt.is_posix_mode())
-    cxt.run_named_trap(StringView{"DEBUG", 5});
+  publish_command_and_run_debug_trap(cxt, [&] throws {
+    let text = source_command_text(
+        cxt, command_span_with_assignments(source_location(), m_local_vars),
+        source_end_position(),
+        [&] { return utils::merge_tokens_to_string(m_args); });
+    append_redirections_text(cxt, text, m_redirections);
+    return text;
+  });
 
   /* The check reads the typed command word before its expansion, so a pattern
      that happens to match a single file is still caught. */
@@ -394,10 +415,16 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           let const saved = os::save_and_replace_descriptor(
               redir.fd, os::descriptor_for_shell_fd(redir.fd));
           dup_saved_descriptors.push(saved);
+
+          /* A descriptor that was never open is already in the state the close
+             asks for. */
+          if (!saved.was_open) break;
+
           if (!saved.is_dup2_ok) {
             did_redirection_open_fail = true;
             throw ErrorWithLocation{source_location(), "Bad file descriptor"};
           }
+
           os::close_fd(os::descriptor_for_shell_fd(redir.fd));
           break;
         }
@@ -692,14 +719,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         }
         /* The resolver reads its own MAYBE_PATH, so a prefix PATH=... must
            update it for the environment write to change the search order. */
-        let const is_path =
-            name == "PATH" ||
-            (!os::ENVIRONMENT_IS_CASE_SENSITIVE && name.length == 4 &&
-             utils::ascii_to_lower(name[0]) == 'p' &&
-             utils::ascii_to_lower(name[1]) == 'a' &&
-             utils::ascii_to_lower(name[2]) == 't' &&
-             utils::ascii_to_lower(name[3]) == 'h');
-        if (is_path) {
+        if (utils::environment_name_is_path(name)) {
           if (!saved_program_resolver.has_value())
             saved_program_resolver =
                 Maybe<ProgramResolver>{cxt.get_program_resolver()};
@@ -818,6 +838,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (command_function_storage.has_value())
       FUNCTION_ARENA = command_function_storage.get_arena();
     defer { FUNCTION_ARENA = previous_function_arena; };
+
+    /* Bash traces the entry into the frame as a second DEBUG fire, which the
+       depth gate reaches only while functrace is on. */
+    if (cxt.should_run_debug_trap()) cxt.run_named_trap(StringView{"DEBUG", 5});
 
     i64 function_ret = 0;
     try {

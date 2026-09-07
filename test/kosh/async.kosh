@@ -1,5 +1,6 @@
 #!/bin/env kosh
 echo &
+wait
 echo 1 & echo 1
 echo 1 | cat &
 for item in; do echo unreachable; done &

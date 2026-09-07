@@ -2,14 +2,14 @@
 1:32: warning: The command 'f' could not be verified after runtime code.
      1 |  eval "f(){ echo \$((1/0)); }"; f
        |                                 ^
-eval:2:8: error: Division by zero.
-     2 |  { echo $((1/0)); }
+eval:1:8: error: Division by zero.
+     1 |  { echo $((1/0)); }
        |         ^~~~~~~~
 note: The right operand evaluated to 0.
 rc=1
 == bash mood, literal eval argument ==
-eval:2:8: error: Division by zero.
-     2 |  { echo $((1/0)); }
+eval:1:8: error: Division by zero.
+     1 |  { echo $((1/0)); }
        |         ^~~~~~~~
 note: The right operand evaluated to 0.
 rc=1
@@ -17,14 +17,14 @@ rc=1
 1:61: warning: The command 'h' could not be verified after runtime code.
      1 |  code=$(printf "%s" "h(){ echo \$((1/0)); }"); eval "$code"; h
        |                                                              ^
-eval:2:8: error: Division by zero.
-     2 |  { echo $((1/0)); }
+eval:1:8: error: Division by zero.
+     1 |  { echo $((1/0)); }
        |         ^~~~~~~~
 note: The right operand evaluated to 0.
 rc=1
 == bash mood, function keyword form ==
-eval:2:8: error: Division by zero.
-     2 |  { echo $((1/0)); }
+eval:1:8: error: Division by zero.
+     1 |  { echo $((1/0)); }
        |         ^~~~~~~~
 note: The right operand evaluated to 0.
 rc=1

@@ -335,8 +335,26 @@ hot fn Parser::parse_select() throws -> Command *
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'select'"};
   }
-  let const variable_name =
-      name_token->raw_string().view().copy_to(bump_allocator(m_lexer.arena()));
+  /* The menu variable must be a plain name, so a $ expansion such as select $f,
+     a quoted word, or a non-identifier is rejected. */
+  let const &name_word =
+      static_cast<const tokens::WordToken *>(name_token)->word();
+  let is_name_plain =
+      name_word.segments.count() == 1 &&
+      name_word.segments[0].kind == WordSegment::Kind::UnquotedText;
+  if (is_name_plain) {
+    is_name_plain =
+        lexer::word_is_variable_name(name_word.segments[0].text.view());
+  }
+  if (!is_name_plain) {
+    throw ErrorWithLocationAndDetails{
+        name_token->source_location(),
+        StringView{"Bad select loop variable, '"} + name_token->raw_string() +
+            "' is not a plain name",
+        "Drop the '$' and any quotes"};
+  }
+
+  let const variable_name = name_word.segments[0].text.view();
 
   ArrayList<const Token *> words{heap_allocator()};
   let const has_in_clause = parse_optional_in_clause_words(words);
@@ -368,6 +386,8 @@ static fn word_token_from_assignment(BumpArena &arena,
     -> tokens::WordToken *
 {
   let word = Word{};
+  word.has_locale_translation_quote =
+      a->value_word().has_locale_translation_quote;
   let prefix = a->key().clone();
   prefix += a->is_append() ? "+=" : "=";
   word.segments.push(WordSegment{
@@ -824,8 +844,11 @@ hot fn Parser::parse_conditional_command() throws -> Command *
           Word regex_word{};
           let const do_append_segments = [&](Token *tok) throws {
             if (tok->kind() == Token::Kind::Word) {
-              for (let const &segment :
-                   static_cast<const tokens::WordToken *>(tok)->word().segments)
+              let const &word =
+                  static_cast<const tokens::WordToken *>(tok)->word();
+              regex_word.has_locale_translation_quote |=
+                  word.has_locale_translation_quote;
+              for (let const &segment : word.segments)
                 regex_word.segments.push(
                     segment.clone(bump_allocator(m_lexer.arena())));
             } else {

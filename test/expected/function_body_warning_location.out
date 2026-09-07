@@ -10,3 +10,10 @@ note: Replace it with ${UNSET_FN_ARITH-} if empty expansion is desired.
 1
 line=5
 rc=0
+FIRST:2:17: warning: The variable 'UNSET_FIRST_PROBE' is not set, it expands to empty.
+     2 |    echo "first=${UNSET_FIRST_PROBE}"
+       |                  ^~~~~~~~~~~~~~~~~~~
+note: Replace it with ${UNSET_FIRST_PROBE-} if empty expansion is desired.
+first=
+line=3
+rc=0

@@ -47,9 +47,12 @@ fn EvalContext::register_function(StringView name,
   info.body_start_position = body_start_position;
   info.header_length = name.length + StringView{" () \n"}.length;
   if (m_current_source != nullptr && !definition_text.is_empty()) {
-    let const body_line =
-        utils::line_number_at(m_current_source->view(), body_start_position);
-    info.line_offset = body_line > 2 ? body_line - 2 : 0;
+    /* The body opens on the copy's second line, because the synthesized header
+       occupies the first one. A body that opens on the defining file's first
+       line therefore shifts back by one. */
+    let const body_line = static_cast<isize>(
+        utils::line_number_at(m_current_source->view(), body_start_position));
+    info.line_offset = body_line - 2;
   }
   info.source_name_index = definition_location.source_name_index;
   info.defining_runtime = RuntimeState::capture(*this);
@@ -98,6 +101,27 @@ pure fn EvalContext::resolve_render_source(
   resolved_source.line_offset = info->line_offset;
   resolved_source.source_name_index = info->source_name_index;
   return resolved_source;
+}
+
+/* The exact source a span covers, which keeps the quoting the parsed words
+   drop. A body window maps the span onto the stored definition first. The
+   answer is empty when the span reaches past the resolved source, the way a
+   node the optimizer rewrote can. */
+pure fn EvalContext::source_text_in_span(const SourceLocation &location,
+                                         usize end_position) const wontthrow
+    -> StringView
+{
+  let const resolved_source = resolve_render_source(location);
+  if (resolved_source.text == nullptr) return {};
+
+  let const view = resolved_source.text->view();
+  let const location_end = location.position + usize{location.length};
+  let const start = resolved_source.to_render_position(location.position);
+  let const stop = resolved_source.to_render_position(
+      end_position > location_end ? end_position : location_end);
+  if (start >= stop || stop > view.length) return {};
+
+  return view.substring_of_length(start, stop - start);
 }
 
 fn EvalContext::find_function_source(StringView name) const wontthrow
@@ -189,7 +213,9 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
   return names;
 }
 
-fn EvalContext::run_named_trap(StringView condition) throws -> void
+fn EvalContext::run_named_trap(StringView condition,
+                               const SourceLocation *trigger_location) throws
+    -> void
 {
   if (m_running_traps) return;
   const String *action = m_traps.find(condition);
@@ -199,6 +225,26 @@ fn EvalContext::run_named_trap(StringView condition) throws -> void
 
   m_running_traps = true;
   defer { m_running_traps = false; };
+
+  m_trap_action_depth += 1;
+  defer { m_trap_action_depth -= 1; };
+
+  /* The line is resolved here, while the triggering command is still current.
+     The action below replaces the current source, which the location alone
+     cannot be read against afterwards. run_source pushes exactly one frame. */
+  let const saved_trigger_line_number = m_trap_trigger_line_number;
+  let const saved_action_source_depth = m_trap_action_source_depth;
+  let const saved_action_function_depth = m_trap_action_function_depth;
+  m_trap_trigger_line_number = line_number_at_location(
+      trigger_location != nullptr ? *trigger_location : m_current_location);
+  m_trap_action_source_depth = m_source_frames.count() + 1;
+  m_trap_action_function_depth = m_function_call_depth;
+  defer
+  {
+    m_trap_trigger_line_number = saved_trigger_line_number;
+    m_trap_action_source_depth = saved_action_source_depth;
+    m_trap_action_function_depth = saved_action_function_depth;
+  };
 
   let const saved_exit_status = m_last_exit_status;
   run_source(action->view(),
@@ -254,6 +300,9 @@ fn EvalContext::run_pending_traps() throws -> void
   m_running_traps = true;
   defer { m_running_traps = false; };
 
+  m_trap_action_depth += 1;
+  defer { m_trap_action_depth -= 1; };
+
   /* The fast flag is cleared before the per-signal flags are consumed, so a
      signal that arrives during the drain re-sets it and the next boundary
      drains again rather than dropping the arrival. */
@@ -289,6 +338,9 @@ cold fn EvalContext::run_exit_trap() throws -> void
   /* A Ctrl-C that ended the last command leaves the interrupt flag set, so it
      is dropped before the action evaluates. */
   os::INTERRUPT_REQUESTED = 0;
+
+  m_trap_action_depth += 1;
+  defer { m_trap_action_depth -= 1; };
 
   if (let const *action = m_traps.find(StringView{"EXIT", 4});
       action != nullptr)
@@ -339,9 +391,13 @@ fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
   if (bash_dynamic_variables_enabled())
     for (let const readonly_name : BASH_IMPLICIT_READONLY_NAMES)
       if (name == readonly_name) return true;
-  if (restricted_enforcement_active())
+  if (restricted_enforcement_active()) {
+    if (utils::environment_name_is_path(name)) return true;
+
     for (let const restricted_name : RESTRICTED_READONLY_NAMES)
       if (name == restricted_name) return true;
+  }
+
   return (variable_attributes(name) &
           static_cast<u8>(variable_attribute::Readonly)) != 0;
 }

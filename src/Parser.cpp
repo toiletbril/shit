@@ -1046,9 +1046,11 @@ fn Parser::build_heredoc_redirection(
   redir.fd = fd;
   redir.kind = expressions::Redirection::Kind::Heredoc;
   redir.target = nullptr;
+  redir.heredoc_delimiter = delimiter_token;
   redir.dup_fd = -1;
   redir.heredoc = m_lexer.register_heredoc(delimiter, should_strip_tabs);
   redir.should_expand_heredoc = should_expand;
+  redir.should_strip_heredoc_tabs = should_strip_tabs;
   out.push(redir);
 }
 

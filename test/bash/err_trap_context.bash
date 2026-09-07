@@ -57,3 +57,18 @@ set -T
 return_function
 set +T
 trap - RETURN
+
+echo lineno-plain
+trap 'echo "at $LINENO"' ERR
+false
+echo lineno-function
+lineno_function() {
+  false
+}
+lineno_function
+echo lineno-subshell
+(false)
+echo lineno-source
+. bash/goldens/err_trap_lineno_inner.bash
+trap - ERR
+echo lineno-done
