@@ -395,12 +395,30 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       if (!pipe) {
         throw ErrorWithLocation{ec.source_location(), "Could not open a pipe"};
       }
-      /* An explicit > takes the stage's stdout, so the pipe end closes unused.
-       */
-      if (!ec.out_fd)
+      /* The write end is the stage's standard output before the stage applies
+         its own redirections, so a dup written ahead of them reads the pipe.
+         2>&1 >file on a stage is 2>pipe 1>file. */
+      let const has_leading_error_dup = ec.should_duplicate_error_to_output &&
+                                        ec.did_output_file_follow_error_dup;
+      let const has_leading_output_dup = ec.should_duplicate_output_to_error &&
+                                         ec.did_error_file_follow_output_dup;
+
+      bool did_stage_take_pipe = false;
+
+      if (has_leading_error_dup && !ec.err_fd) {
+        ec.err_fd = pipe->out;
+        ec.should_duplicate_error_to_output = false;
+        did_stage_take_pipe = true;
+      }
+
+      /* An explicit > takes the stage's stdout, and a leading 1>&2 replaces it
+         with the inherited standard error, so the pipe end closes unused. */
+      if (!ec.out_fd && !has_leading_output_dup && !did_stage_take_pipe) {
         ec.out_fd = pipe->out;
-      else
-        os::close_fd(pipe->out);
+        did_stage_take_pipe = true;
+      }
+
+      if (!did_stage_take_pipe) os::close_fd(pipe->out);
     }
 
     if (!is_first) {

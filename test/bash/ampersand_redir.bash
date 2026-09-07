@@ -147,5 +147,16 @@ echo "ordered_file=[$(cat "$ordered")] ordered_inherited=[$(cat "$ordered_out")]
 echo "merged_file=[$(sort "$ordered" | tr '\n' ' ')] merged_inherited=[$(cat "$ordered_out")]"
 ( /bin/sh -c 'echo E >&2; echo O' 1>&2 2>"$ordered" ) 2>"$ordered_out"
 echo "swapped_file=[$(cat "$ordered")] swapped_inherited=[$(cat "$ordered_out")]"
-rm -f "$ordered" "$ordered_out"
+
+# The write end of a pipe is the stage's standard output before the stage
+# applies its own redirections. A 2>&1 written ahead of the file on the stage
+# carries the standard error onto the pipe, and a 1>&2 written ahead of the file
+# replaces the stage's standard output with the inherited standard error, which
+# leaves the pipe with nothing to carry.
+ordered_err=/tmp/kosh_bashdiff_ordered_err_$$
+( /bin/sh -c 'echo E >&2; echo O' 2>&1 >"$ordered" | sed 's/^/P:/' ) >"$ordered_out"
+echo "pipe_dup_file=[$(tr '\n' ' ' < "$ordered")] pipe_dup_piped=[$(tr '\n' ' ' < "$ordered_out")]"
+( /bin/sh -c 'echo E >&2; echo O' 1>&2 2>"$ordered" | sed 's/^/P:/' ) >"$ordered_out" 2>"$ordered_err"
+echo "pipe_swap_file=[$(tr '\n' ' ' < "$ordered")] pipe_swap_inherited=[$(tr '\n' ' ' < "$ordered_err")] pipe_swap_piped=[$(tr '\n' ' ' < "$ordered_out")]"
+rm -f "$ordered" "$ordered_out" "$ordered_err"
 echo ordered_done
