@@ -106,11 +106,20 @@ echo still_running
 # lands. The message text differs between the shells, the checks assert the
 # routing and the status.
 report=/tmp/kosh_bashdiff_unresolved_$$
-echo x | nosuchcmd_zzqq 2>/dev/null
-echo "hidden_status=$?"
+: > "$report"
+{ echo x | nosuchcmd_zzqq 2>/dev/null; } 2>"$report"
+echo "hidden_status=$? hidden_leak=$(( $(wc -c < "$report") > 0 ))"
 echo x | nosuchcmd_zzqq 2>"$report"
 echo "captured_status=$? captured=$(( $(wc -c < "$report") > 0 ))"
 echo x | nosuchcmd_zzqq >"$report" 2>&1
 echo "merged_status=$? merged=$(( $(wc -c < "$report") > 0 ))"
+: > "$report"
+echo x | nosuchcmd_zzqq &>"$report"
+echo "both_status=$? both=$(( $(wc -c < "$report") > 0 ))"
+: > "$report"
+{ nosuchcmd_zzqq 2>/dev/null | cat; } 2>"$report"
+echo "first_hidden_status=$? first_hidden_leak=$(( $(wc -c < "$report") > 0 ))"
+nosuchcmd_zzqq 2>"$report" | cat
+echo "first_captured_status=$? first_captured=$(( $(wc -c < "$report") > 0 ))"
 rm -f "$report"
 echo unresolved_done

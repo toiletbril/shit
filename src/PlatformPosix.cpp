@@ -258,7 +258,12 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
 
 fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 {
-  if (!saved.is_dup2_ok) return;
+  /* A failed replacement leaves the shell descriptor untouched, the backup it
+     already took still has to be closed. */
+  if (!saved.is_dup2_ok) {
+    if (saved.was_open) close(saved.saved);
+    return;
+  }
 
   if (saved.was_open) {
     dup2(saved.saved, saved.shell_fd);

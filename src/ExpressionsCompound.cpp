@@ -701,11 +701,18 @@ static fn report_unresolved_stage_error(
   }
 
   koshka::flush();
+
   let const saved = os::save_and_replace_descriptor(2, *target);
   defer { os::restore_descriptor(saved); };
 
-  report_command_resolution_error(cxt, error);
-  koshka::flush();
+  if (!saved.is_dup2_ok) {
+    report_command_resolution_error(cxt, error);
+    return;
+  }
+
+  /* The backtrace belongs to the message, a deferred one would surface after
+     the descriptor is restored and land on the shell's own stream. */
+  report_command_resolution_error(cxt, error, false);
 }
 
 hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
