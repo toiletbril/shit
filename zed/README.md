@@ -16,6 +16,11 @@ rustup target add wasm32-wasip2
 Open the command palette, run `zed: install dev extension`, and select this
 directory. Zed builds the extension and reloads it.
 
+Zed reads its PATH from a login shell. A rustup toolchain under `~/.cargo/bin`
+reaches the build only when a login startup file adds it. Bash reads
+`~/.bash_profile` and falls back to `~/.profile` only when that file is absent.
+Zsh reads `~/.zprofile`. Restart Zed after changing one of them.
+
 ## Settings
 
 ```jsonc
