@@ -121,6 +121,16 @@ echo "both_status=$? both=$(( $(wc -c < "$report") > 0 ))"
 echo "first_hidden_status=$? first_hidden_leak=$(( $(wc -c < "$report") > 0 ))"
 nosuchcmd_zzqq 2>"$report" | cat
 echo "first_captured_status=$? first_captured=$(( $(wc -c < "$report") > 0 ))"
+# A stage that merges its error into its output carries the diagnostic onto the
+# pipe, and the last stage of such a pipeline carries it onto the shell's own
+# standard output. The message text differs between the shells, the checks
+# assert that the bytes arrive at the merged destination.
+piped=$(nosuchcmd_zzqq 2>&1 | wc -c | tr -d ' ')
+echo "piped_merged=$(( piped > 0 ))"
+piped_hidden=$(nosuchcmd_zzqq 2>/dev/null | wc -c | tr -d ' ')
+echo "piped_hidden=$piped_hidden"
+( echo x | nosuchcmd_zzqq 2>&1 ) >"$report" 2>/dev/null
+echo "last_merged=$(( $(wc -c < "$report") > 0 ))"
 rm -f "$report"
 echo unresolved_done
 

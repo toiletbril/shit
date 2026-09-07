@@ -686,40 +686,6 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
-/* The diagnostic for a stage whose command did not resolve goes to the stage's
-   own standard error, so 2>/dev/null on that stage hides it. A stage that sends
-   its error onto a pipe keeps the shell's own stream, because the pipe opens
-   after every stage is built. */
-static fn report_unresolved_stage_error(
-    EvalContext &cxt, const ExecContext &stage,
-    const CommandResolutionErrorWithLocation &error) throws -> void
-{
-  let const does_error_follow_output =
-      stage.should_duplicate_error_to_output &&
-      (!stage.should_duplicate_output_to_error ||
-       stage.was_output_to_error_last);
-  let const target = does_error_follow_output ? stage.out_fd : stage.err_fd;
-
-  if (!target.has_value()) {
-    report_command_resolution_error(cxt, error);
-    return;
-  }
-
-  koshka::flush();
-
-  let const saved = os::save_and_replace_descriptor(2, *target);
-  defer { os::restore_descriptor(saved); };
-
-  if (!saved.is_dup2_ok) {
-    report_command_resolution_error(cxt, error);
-    return;
-  }
-
-  /* The backtrace belongs to the message, a deferred one would surface after
-     the descriptor is restored and land on the shell's own stream. */
-  report_command_resolution_error(cxt, error, false);
-}
-
 hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_commands.count() > 1);
@@ -822,17 +788,21 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
           cxt.get_program_resolver(), steal(stage_arg_locations));
     } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       /* The stage still applies its own redirections. A > onto its stdout takes
-         the slot ahead of the pipe, so the next stage still sees EOF. */
+         the slot ahead of the pipe, so the next stage still sees EOF. The
+         message is rendered here and written once the pipeline has placed every
+         descriptor, so a stage that merges into the pipe carries it there. */
+      let const *error_source = cxt.current_source();
+      let const rendered = resolution_error.to_string(
+          error_source != nullptr ? error_source->view() : StringView{}, &cxt);
       let unresolved = ExecContext::make_unresolved(
           e->source_location(),
-          static_cast<i32>(resolution_error.command_status()));
+          static_cast<i32>(resolution_error.command_status()), rendered.view());
       bool was_unresolved_handed_off = false;
       defer
       {
         if (!was_unresolved_handed_off) unresolved.close_fds();
       };
       e->redirect_exec_context(unresolved, cxt);
-      report_unresolved_stage_error(cxt, unresolved, resolution_error);
       was_unresolved_handed_off = true;
       ecs.push(steal(unresolved));
       continue;

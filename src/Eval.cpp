@@ -1392,6 +1392,12 @@ pure fn ExecContext::get_unresolved_status() const wontthrow -> i32
   return m_kind.unresolved_status;
 }
 
+pure fn ExecContext::get_unresolved_diagnostic() const wontthrow -> StringView
+{
+  ASSERT(is_unresolved());
+  return m_unresolved_diagnostic.view();
+}
+
 pure fn ExecContext::program_path() const wontthrow -> const Path &
 {
   ASSERT(!is_builtin());
@@ -1572,14 +1578,19 @@ fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
 }
 
 fn ExecContext::make_unresolved(const SourceLocation &location,
-                                i32 resolution_status) throws -> ExecContext
+                                i32 resolution_status,
+                                StringView diagnostic) throws -> ExecContext
 {
   let args = ArrayList<String>{heap_allocator()};
   args.push(String{heap_allocator()});
   let arg_locations = ArrayList<SourceLocation>{heap_allocator()};
   arg_locations.push(location);
-  return {location, ResolvedCommand::from_unresolved(resolution_status),
-          steal(args), steal(arg_locations)};
+  let context =
+      ExecContext{location, ResolvedCommand::from_unresolved(resolution_status),
+                  steal(args), steal(arg_locations)};
+  context.m_unresolved_diagnostic = diagnostic;
+
+  return context;
 }
 
 } /* namespace koshka */

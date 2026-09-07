@@ -272,6 +272,42 @@ fn terminate_and_reap_processes(const ArrayList<os::process> &processes,
   }
 }
 
+/* The diagnostic for a stage whose command did not resolve goes to the stage's
+   own standard error, so 2>/dev/null on that stage hides it and 2>&1 carries it
+   onto the pipe. The message is written from here because a stage only owns its
+   pipe end after the loop below places it. */
+static fn report_unresolved_stage(EvalContext &cxt,
+                                  const ExecContext &stage) throws -> void
+{
+  let const does_error_follow_output =
+      stage.should_duplicate_error_to_output &&
+      (!stage.should_duplicate_output_to_error ||
+       stage.was_output_to_error_last);
+  let target = does_error_follow_output ? stage.out_fd : stage.err_fd;
+
+  /* 2>&1 with no file and no pipe on the stage names the shell's own standard
+     output. */
+  if (does_error_follow_output && !target.has_value())
+    target = os::descriptor_for_shell_fd(1);
+
+  if (!target.has_value()) {
+    show_message(stage.get_unresolved_diagnostic());
+    cxt.print_source_backtrace(stage.source_location());
+    return;
+  }
+
+  koshka::flush();
+
+  let const saved = os::save_and_replace_descriptor(2, *target);
+  defer { os::restore_descriptor(saved); };
+
+  show_message(stage.get_unresolved_diagnostic());
+
+  /* The backtrace belongs to the message, a deferred one would surface after
+     the descriptor is restored and land on the shell's own stream. */
+  cxt.print_source_backtrace(stage.source_location(), !saved.is_dup2_ok);
+}
+
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                execution_mode mode) throws -> i32
 {
@@ -379,6 +415,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
     if (ec.is_unresolved()) {
       stage_status[stage_index] = ec.get_unresolved_status();
+      report_unresolved_stage(cxt, ec);
       ec.close_fds();
     } else if (!ec.is_builtin()) {
       let const source = cxt.current_source();

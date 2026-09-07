@@ -43,8 +43,12 @@ public:
                           ArrayList<SourceLocation> &&arg_locations) throws
       -> ExecContext;
 
+  /* The rendered diagnostic rides the context because a pipeline stage only
+     learns its pipe end after every stage is built, and the message has to
+     reach that end. */
   static fn make_unresolved(const SourceLocation &location,
-                            i32 resolution_status) throws -> ExecContext;
+                            i32 resolution_status, StringView diagnostic) throws
+      -> ExecContext;
 
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
@@ -78,6 +82,7 @@ public:
   pure fn is_builtin() const wontthrow -> bool;
   pure fn is_unresolved() const wontthrow -> bool;
   pure fn get_unresolved_status() const wontthrow -> i32;
+  pure fn get_unresolved_diagnostic() const wontthrow -> StringView;
 
   pure fn args() const wontthrow -> const ArrayList<String> &;
   pure fn program() const wontthrow -> const String &;
@@ -147,6 +152,7 @@ private:
 
   ResolvedCommand m_kind;
 
+  String m_unresolved_diagnostic{heap_allocator()};
   SourceLocation m_location;
   ArrayList<String> m_args{heap_allocator()};
   ArrayList<SourceLocation> m_arg_locations{heap_allocator()};
