@@ -218,6 +218,10 @@ namespace koshka {
 constexpr const char *EXPRESSION_AST_INDENT = " ";
 constexpr const char *EXPRESSION_DOUBLE_AST_INDENT = "  ";
 
+/* Normal means the node owns its command boundary and runs the DEBUG trap
+   itself. PreparedPipelineStage means the pipeline already published the
+   boundary and ran the trap, so the stage keeps the command text and leaves
+   the trap alone. */
 enum class root_evaluation_mode : u8
 {
   Normal,

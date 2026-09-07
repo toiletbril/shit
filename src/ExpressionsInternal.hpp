@@ -348,10 +348,6 @@ fn append_redirections_text(EvalContext &cxt, String &out,
                             const SparseList<Redirection> &redirections) throws
     -> void;
 
-fn publish_simple_command(
-    EvalContext &cxt, const SimpleCommand &command,
-    root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> void;
-
 /* The command text a DEBUG trap and BASH_COMMAND observe, published before the
    command runs. The builder runs only when a reader can observe its result,
    because BASH_COMMAND belongs to the bash mood and a trap action keeps the
@@ -371,6 +367,12 @@ fn publish_command_and_run_debug_trap(
     cxt.run_named_trap(StringView{"DEBUG", 5});
   }
 }
+
+/* The same publication for a simple command, whose text is built from its
+   assignments, its words, and its redirections. */
+fn publish_simple_command(
+    EvalContext &cxt, const SimpleCommand &command,
+    root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> void;
 
 /* Whether the shell or the environment gives the name a value on its own, so a
    script that reads it without assigning it is correct. */

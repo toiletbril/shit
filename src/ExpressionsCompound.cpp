@@ -493,6 +493,12 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       let const *simple = stage->as_simple_command();
       if (simple != nullptr) publish_simple_command(cxt, *simple);
 
+      /* The stage boundary was published above for a simple stage, so the
+         stage itself must not publish a second one. */
+      let const stage_mode = simple != nullptr
+                                 ? root_evaluation_mode::PreparedPipelineStage
+                                 : root_evaluation_mode::Normal;
+
       let stage_in = Maybe<os::descriptor>{};
       let stage_out = Maybe<os::descriptor>{};
       let pipe = Maybe<os::Pipe>{};
@@ -525,9 +531,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         };
         cxt.set_in_pipeline_stage(true);
         defer { cxt.set_in_pipeline_stage(false); };
-        parent_stage_status = static_cast<i32>(stage->evaluate_root(
-            cxt, simple != nullptr ? root_evaluation_mode::PreparedPipelineStage
-                                   : root_evaluation_mode::Normal));
+        parent_stage_status =
+            static_cast<i32>(stage->evaluate_root(cxt, stage_mode));
         continue;
       }
 
@@ -547,9 +552,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       let const process_group =
           !is_async() ? os::process_group_mode::Inherit
                       : os::background_process_group_mode(process_group_id);
-      bootstrap.evaluation_mode =
-          simple != nullptr ? root_evaluation_mode::PreparedPipelineStage
-                            : root_evaluation_mode::Normal;
+      bootstrap.evaluation_mode = stage_mode;
       let const launch = os::launch_compound_stage(
           stage_text, stage_in, stage_out, None, cxt.mood(), stage_location,
           stage_source != nullptr ? stage_source->view() : StringView{},
@@ -572,10 +575,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         i32 stage_status = 0;
         try {
           cxt.enter_subshell();
-          stage_status = static_cast<i32>(stage->evaluate_root(
-              cxt, simple != nullptr
-                       ? root_evaluation_mode::PreparedPipelineStage
-                       : root_evaluation_mode::Normal));
+          stage_status =
+              static_cast<i32>(stage->evaluate_root(cxt, stage_mode));
           if (cxt.has_pending_control_flow() &&
               cxt.pending_control_flow().kind == control_flow::Kind::Exit)
           {
