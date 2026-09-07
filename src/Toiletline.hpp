@@ -10,6 +10,7 @@
 
 #include "ArrayList.hpp"
 #include "Common.hpp"
+#include "ErrorOr.hpp"
 #include "Path.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
@@ -49,9 +50,9 @@ void leave_calc_history();
 koshka::Maybe<koshka::Path> history_path();
 bool is_history_contents_valid(StringView contents);
 void encode_history_record(String &output, StringView command);
-bool history_write();
-bool history_read();
-bool history_clear();
+koshka::ErrorOr<koshka::Ok> history_write();
+koshka::ErrorOr<koshka::Ok> history_read();
+koshka::ErrorOr<koshka::Ok> history_clear();
 void set_history_enabled(bool is_enabled);
 void set_history_limit(usize entry_count);
 
@@ -62,10 +63,9 @@ struct history_event
 };
 
 /* Only the events above after_event_number are decoded, so a caller that writes
-   an increment pays for the increment alone. The result is None when the file
-   cannot be read or an event cannot be decoded. A missing file is an empty
-   list. */
-koshka::Maybe<koshka::ArrayList<history_event>>
+   an increment pays for the increment alone. A missing file is an empty list.
+ */
+koshka::ErrorOr<koshka::ArrayList<history_event>>
 history_events(koshka::Allocator allocator,
                koshka::Maybe<usize> after_event_number = koshka::None);
 koshka::Maybe<usize> newest_history_event_number();

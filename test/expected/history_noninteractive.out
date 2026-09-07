@@ -233,3 +233,39 @@ rc=0
     1  grow one
     2  grow two
     3  growthree
+== a named write preserves a symlink target ==
+rc=0 link=0
+symlinked
+== a named write preserves hardlink identity ==
+rc=0 same=0
+hardlinked
+== a named write preserves the target mode ==
+rc=0 mode=0
+modekept
+== new reads share state across equivalent path spellings ==
+    1  new one
+    2  new two
+== a rewritten new-read source restarts from the beginning ==
+    1  old one
+    2  old two
+    3  replacement
+== a replaced new-read source restarts from the beginning ==
+    1  before replacement
+    2  after replacement
+== named appends share state across equivalent path spellings ==
+rc=0
+append base
+aliasone
+aliastwo
+== a named write trims its backing file ==
+rc=0
+two
+three
+== concurrent named appends keep complete records ==
+rc=0,0
+2
+== a concurrent named write and append leave readable history ==
+rc=0,0
+rc=0
+== a history read reports its owned failure cause ==
+1

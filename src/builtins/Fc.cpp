@@ -444,13 +444,14 @@ fn Fc::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let const read_events = toiletline::history_events(cxt.scratch_allocator());
-  if (!read_events.has_value()) {
+  if (read_events.is_error()) {
     report_soft_builtin_error(ec, cxt, ec.source_location(),
-                              "Unable to read the history file");
+                              StringView{"Unable to read the history file: "} +
+                                  read_events.error().message());
     return 1;
   }
 
-  let const &events = *read_events;
+  let const &events = read_events.value();
   let const active_index =
       active_event_index(events, cxt.current_history_event_number());
 

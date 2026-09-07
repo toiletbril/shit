@@ -351,3 +351,112 @@ echo "== a store after an external append keeps both records =="
 KOSH_HISTORY_FILE="$dir/grow" "$BIN" --no-init-files -c \
   'history >/dev/null; printf "grow two\n" >> "$KOSH_HISTORY_FILE"; \
 history -s growthree; history'
+
+printf 'old symlink\n' > "$dir/write-symlink-target"
+"$BIN" --no-init-files -c 'koshkit ln -s "$1" "$2"' history-test \
+  "$dir/write-symlink-target" "$dir/write-symlink"
+echo "== a named write preserves a symlink target =="
+KOSH_HISTORY_FILE="$dir/write-symlink-backing" "$BIN" --no-init-files -c \
+  'history -s symlinked; history -w "$1"; write_status=$?; \
+if [ -L "$1" ]; then link_status=0; else link_status=1; fi; \
+printf "rc=%s link=%s\n" "$write_status" "$link_status"' history-test \
+  "$dir/write-symlink"
+cat "$dir/write-symlink-target"
+
+printf 'old hardlink\n' > "$dir/write-hardlink-target"
+"$BIN" --no-init-files -c 'koshkit ln "$1" "$2"' history-test \
+  "$dir/write-hardlink-target" "$dir/write-hardlink"
+echo "== a named write preserves hardlink identity =="
+KOSH_HISTORY_FILE="$dir/write-hardlink-backing" "$BIN" --no-init-files -c \
+  'history -s hardlinked; history -w "$1"; write_status=$?; \
+if [ "$1" -ef "$2" ]; then same_status=0; else same_status=1; fi; \
+printf "rc=%s same=%s\n" "$write_status" "$same_status"' history-test \
+  "$dir/write-hardlink" "$dir/write-hardlink-target"
+cat "$dir/write-hardlink-target"
+
+printf 'old mode\n' > "$dir/write-mode"
+"$BIN" --no-init-files -c 'koshkit chmod 700 "$1"' history-test \
+  "$dir/write-mode"
+echo "== a named write preserves the target mode =="
+KOSH_HISTORY_FILE="$dir/write-mode-backing" "$BIN" --no-init-files -c \
+  'history -s modekept; history -w "$1"; write_status=$?; \
+if [ -x "$1" ]; then mode_status=0; else mode_status=1; fi; \
+printf "rc=%s mode=%s\n" "$write_status" "$mode_status"' history-test \
+  "$dir/write-mode"
+cat "$dir/write-mode"
+
+printf 'new one\nnew two\n' > "$dir/import-alias-source"
+echo "== new reads share state across equivalent path spellings =="
+KOSH_HISTORY_FILE="$dir/import-alias-backing" "$BIN" --no-init-files -c \
+  'history -n "$1"; history -n "$2"; history' history-test \
+  "$dir/import-alias-source" "$dir/./import-alias-source"
+
+printf 'old one\nold two\n' > "$dir/import-rewrite-source"
+echo "== a rewritten new-read source restarts from the beginning =="
+KOSH_HISTORY_FILE="$dir/import-rewrite-backing" "$BIN" --no-init-files -c \
+  'history -n "$1"; printf "replacement\n" > "$1"; history -n "$1"; history' \
+  history-test "$dir/import-rewrite-source"
+
+printf 'before replacement\n' > "$dir/import-replaced-source"
+printf 'after replacement\n' > "$dir/import-source-replacement"
+echo "== a replaced new-read source restarts from the beginning =="
+KOSH_HISTORY_FILE="$dir/import-replaced-backing" "$BIN" --no-init-files -c \
+  'history -n "$1"; koshkit mv "$2" "$1"; history -n "$1"; history' \
+  history-test "$dir/import-replaced-source" "$dir/import-source-replacement"
+
+printf 'append base\n' > "$dir/append-alias-target"
+echo "== named appends share state across equivalent path spellings =="
+KOSH_HISTORY_FILE="$dir/append-alias-backing" "$BIN" --no-init-files -c \
+  'history -s aliasone; history -a "$1"; history -s aliastwo; \
+history -a "$2"; echo "rc=$?"' history-test "$dir/append-alias-target" \
+  "$dir/./append-alias-target"
+cat "$dir/append-alias-target"
+
+printf 'one\ntwo\nthree\n' > "$dir/backing-write"
+echo "== a named write trims its backing file =="
+KOSH_HISTORY_FILE="$dir/backing-write" "$BIN" --no-init-files -c \
+  'KOSH_HISTORY_SIZE=2; history -w "$KOSH_HISTORY_FILE"; echo "rc=$?"'
+cat "$dir/backing-write"
+
+: > "$dir/concurrent-named-append"
+echo "== concurrent named appends keep complete records =="
+KOSH_HISTORY_FILE="$dir/named-append-one" "$BIN" --no-init-files -c \
+  'history -s appendone; history -a "$1"' history-test \
+  "$dir/concurrent-named-append" &
+first_pid=$!
+KOSH_HISTORY_FILE="$dir/named-append-two" "$BIN" --no-init-files -c \
+  'history -s appendtwo; history -a "$1"' history-test \
+  "$dir/concurrent-named-append" &
+second_pid=$!
+wait "$first_pid"
+first_status=$?
+wait "$second_pid"
+second_status=$?
+printf 'rc=%s,%s\n' "$first_status" "$second_status"
+KOSH_HISTORY_FILE="$dir/concurrent-named-append" "$BIN" --no-init-files -c \
+  'history | koshkit wc -l'
+
+printf 'old\n' > "$dir/concurrent-named-write"
+echo "== a concurrent named write and append leave readable history =="
+KOSH_HISTORY_FILE="$dir/named-write-backing" "$BIN" --no-init-files -c \
+  'history -s written; history -w "$1"' history-test \
+  "$dir/concurrent-named-write" &
+write_pid=$!
+KOSH_HISTORY_FILE="$dir/named-append-backing" "$BIN" --no-init-files -c \
+  'history -s appended; history -a "$1"' history-test \
+  "$dir/concurrent-named-write" &
+append_pid=$!
+wait "$write_pid"
+write_status=$?
+wait "$append_pid"
+append_status=$?
+printf 'rc=%s,%s\n' "$write_status" "$append_status"
+KOSH_HISTORY_FILE="$dir/concurrent-named-write" "$BIN" --no-init-files -c \
+  'history >/dev/null; echo "rc=$?"'
+
+printf '\001bad\n' > "$dir/exact-failure"
+echo "== a history read reports its owned failure cause =="
+KOSH_HISTORY_FILE="$dir/exact-failure" "$BIN" --no-init-files -c \
+  'koshkit cat "$1" >/dev/null 2>&1; history -r' history-test \
+  "$dir/no-such-file" 2>&1 | \
+  grep -c "cannot read history at .*: the file contains invalid data"

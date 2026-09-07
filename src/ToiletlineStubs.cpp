@@ -291,7 +291,7 @@ static fn scan_no_editor_history(const Path &path, StringView contents,
 }
 
 static fn load_no_editor_history(const Path &path, bool should_allow_missing)
-    -> bool
+    -> ErrorOr<Ok>
 {
   let &state = get_no_editor_history_state();
   state.is_loaded = false;
@@ -299,34 +299,33 @@ static fn load_no_editor_history(const Path &path, bool should_allow_missing)
   for (int attempt_index = 0;
        attempt_index < toiletline::HISTORY_RACE_ATTEMPT_COUNT; attempt_index++)
   {
-    if (!path.exists()) {
-      if (!should_allow_missing) return false;
+    let const contents = path.read_entire_file();
+    if (!contents.has_value()) {
+      let const was_missing = os::last_system_error_is_missing_file();
+      if (!should_allow_missing || !was_missing)
+        return Error{os::last_system_error_message()};
+
       if (scan_no_editor_history(path, {}, None, true) ==
           history_scan_outcome::Loaded)
       {
-        return true;
+        return Success;
       }
 
       continue;
     }
 
-    let const contents = path.read_entire_file();
-    if (!contents.has_value()) {
-      if (!should_allow_missing || path.exists()) return false;
-
-      continue;
-    }
-
     let const outcome = scan_no_editor_history(path, contents->view());
-    if (outcome == history_scan_outcome::Loaded) return true;
-    if (outcome == history_scan_outcome::Invalid) return false;
+    if (outcome == history_scan_outcome::Loaded) return Success;
+    if (outcome == history_scan_outcome::Invalid)
+      return Error{"the file contains invalid data"};
   }
 
-  return false;
+  return Error{"the file kept changing"};
 }
 
 static fn ensure_no_editor_history_loaded(const Path &path,
-                                          bool should_allow_missing) -> bool
+                                          bool should_allow_missing)
+    -> ErrorOr<Ok>
 {
   let &state = get_no_editor_history_state();
   if (!state.is_loaded || state.loaded_path.view() != path.text().view())
@@ -334,33 +333,45 @@ static fn ensure_no_editor_history_loaded(const Path &path,
 
   let status = os::file_status{};
   if (!os::stat_path_following(path.text().view(), status)) {
-    if (!should_allow_missing || path.exists()) return false;
+    if (!should_allow_missing || path.exists())
+      return Error{os::last_system_error_message()};
+
     return load_no_editor_history(path, true);
   }
   if (state.has_file_status &&
       os::file_status_matches(state.file_status, status))
-    return true;
+  {
+    return Success;
+  }
+
   return load_no_editor_history(path, should_allow_missing);
 }
 
 static fn read_no_editor_history_contents(const Path &path,
                                           bool should_allow_missing)
-    -> Maybe<String>
+    -> ErrorOr<String>
 {
   let &state = get_no_editor_history_state();
+  let failure_message = String{heap_allocator()};
   for (int attempt_index = 0;
        attempt_index < toiletline::HISTORY_RACE_ATTEMPT_COUNT; attempt_index++)
   {
     let contents = path.read_entire_file();
     if (!contents.has_value()) {
-      if (should_allow_missing && !path.exists() &&
+      let const was_missing = os::last_system_error_is_missing_file();
+      if (should_allow_missing && was_missing &&
           scan_no_editor_history(path, {}, None, true) ==
               history_scan_outcome::Loaded)
       {
         return String{heap_allocator()};
       }
 
-      break;
+      if (!was_missing || !should_allow_missing) {
+        failure_message = os::last_system_error_message();
+        break;
+      }
+
+      continue;
     }
 
     let const contents_hash = extend_history_contents_hash(
@@ -375,13 +386,18 @@ static fn read_no_editor_history_contents(const Path &path,
     let const outcome =
         scan_no_editor_history(path, contents->view(), contents_hash);
     if (outcome == history_scan_outcome::Loaded) return contents.take();
-    if (outcome == history_scan_outcome::Invalid) break;
+    if (outcome == history_scan_outcome::Invalid) {
+      failure_message = "the file contains invalid data";
+      break;
+    }
   }
 
   state.record_byte_offsets.clear();
   state.total_count = 0;
   state.is_loaded = false;
-  return None;
+  if (failure_message.is_empty()) return Error{"the file kept changing"};
+
+  return Error{failure_message.view()};
 }
 
 static fn replace_history_file(const Path &path, StringView original,
@@ -419,7 +435,7 @@ static fn find_no_editor_history_event(Allocator allocator,
   let const path = resolve_no_editor_history_path();
   if (!path.has_value()) return None;
   let contents = read_no_editor_history_contents(*path, false);
-  if (!contents.has_value()) return None;
+  if (contents.is_error()) return None;
   let &state = get_no_editor_history_state();
   let const retained_record_count = state.record_byte_offsets.count();
   let const first_number = state.total_count - retained_record_count + 1;
@@ -429,7 +445,8 @@ static fn find_no_editor_history_event(Allocator allocator,
     if (before_event_number.has_value() && number >= *before_event_number)
       continue;
     let const span = get_history_record_span(state, index - 1);
-    if (!decode_history_record(decoded, contents->view(), span)) return None;
+    if (!decode_history_record(decoded, contents.value().view(), span))
+      return None;
     if (do_match(number, decoded.view())) {
       return toiletline::history_event{
           number, String{allocator, decoded.view()}
@@ -456,8 +473,10 @@ static fn rewrite_no_editor_history_event(usize wanted_number,
   for (int attempt_index = 0;
        attempt_index < toiletline::HISTORY_RACE_ATTEMPT_COUNT; attempt_index++)
   {
-    let contents = read_no_editor_history_contents(*path, false);
-    if (!contents.has_value()) return false;
+    let const result = read_no_editor_history_contents(*path, false);
+    if (result.is_error()) return false;
+
+    let const &contents = result.value();
     let const retained_record_count = state.record_byte_offsets.count();
     if (retained_record_count == 0) return false;
     let const first_number = state.total_count - retained_record_count + 1;
@@ -470,12 +489,12 @@ static fn rewrite_no_editor_history_event(usize wanted_number,
     let const retained_index = wanted_number - first_number;
     let const span = get_history_record_span(state, retained_index);
     let decoded = String{heap_allocator()};
-    if (!decode_history_record(decoded, contents->view(), span)) return false;
+    if (!decode_history_record(decoded, contents.view(), span)) return false;
     if (decoded.view() != expected) return false;
 
     let rewritten = String{heap_allocator()};
-    rewritten.reserve(contents->count());
-    rewritten.append(contents->substring_of_length(0, span.start_byte_offset));
+    rewritten.reserve(contents.count());
+    rewritten.append(contents.substring_of_length(0, span.start_byte_offset));
     for (let const &replacement : replacements) {
       if (replacement.count() > NO_EDITOR_HISTORY_ENTRY_MAX_BYTE_COUNT ||
           !toiletline::is_history_contents_valid(replacement.view()))
@@ -484,10 +503,10 @@ static fn rewrite_no_editor_history_event(usize wanted_number,
       }
       toiletline::encode_history_record(rewritten, replacement.view());
     }
-    rewritten.append(contents->substring(span.end_byte_offset));
+    rewritten.append(contents.substring(span.end_byte_offset));
 
     let const outcome = replace_history_file(
-        *path, contents->view(), rewritten.view(), ".kosh_history_fc");
+        *path, contents.view(), rewritten.view(), ".kosh_history_fc");
     if (outcome == history_replace_outcome::Replaced) return true;
     if (outcome == history_replace_outcome::Failed) return false;
 
@@ -523,67 +542,73 @@ fn history_path() -> koshka::Maybe<koshka::Path>
 
 /* Every event is appended to the file as it is stored, so a write only has to
    drop the leading records the bounded list no longer reaches. */
-fn history_write() -> bool
+fn history_write() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = history_path();
-  if (!path.has_value()) return false;
+  if (!path.has_value()) return koshka::Error{"the path is unavailable"};
 
   let const parent = path->parent_or_current();
   let lock = koshka::os::acquire_process_lock(parent.text().view());
-  if (!lock.has_value()) return false;
+  if (!lock.has_value())
+    return koshka::Error{koshka::os::last_system_error_message()};
   defer { koshka::os::release_process_lock(lock.take()); };
 
   let &state = koshka::internal::get_no_editor_history_state();
   for (int attempt_index = 0;
        attempt_index < toiletline::HISTORY_RACE_ATTEMPT_COUNT; attempt_index++)
   {
-    let const contents =
-        koshka::internal::read_no_editor_history_contents(*path, true);
-    if (!contents.has_value()) return false;
-    if (state.record_byte_offsets.is_empty()) return true;
+    let contents =
+        TRY(koshka::internal::read_no_editor_history_contents(*path, true));
+    if (state.record_byte_offsets.is_empty()) return koshka::Success;
 
     let const first_byte_offset =
         koshka::internal::get_history_record_byte_offset(state, 0);
-    if (first_byte_offset == 0) return true;
+    if (first_byte_offset == 0) return koshka::Success;
 
     let const total_count = state.total_count;
     let const outcome = koshka::internal::replace_history_file(
-        *path, contents->view(), contents->view().substring(first_byte_offset),
+        *path, contents.view(), contents.view().substring(first_byte_offset),
         ".kosh_history_write");
     if (outcome == koshka::internal::history_replace_outcome::Replaced) {
       state.total_count = total_count;
-      return true;
+      return koshka::Success;
     }
     if (outcome == koshka::internal::history_replace_outcome::Failed)
-      return false;
+      return koshka::Error{koshka::os::last_system_error_message()};
 
     /* A writer outside the lock moved the file, so the offsets no longer
        describe it and the next attempt starts from fresh bytes. */
     state.is_loaded = false;
   }
 
-  return false;
+  return koshka::Error{"the file kept changing"};
 }
 
-fn history_read() -> bool
+fn history_read() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = history_path();
-  if (!path.has_value()) return false;
+  if (!path.has_value()) return koshka::Error{"the path is unavailable"};
+
   return koshka::internal::load_no_editor_history(*path, false);
 }
 
-fn history_clear() -> bool
+fn history_clear() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = history_path();
-  if (!path.has_value()) return false;
+  if (!path.has_value()) return koshka::Error{"the path is unavailable"};
+
   let const parent = path->parent_or_current();
   let lock = koshka::os::acquire_process_lock(parent.text().view());
-  if (!lock.has_value()) return false;
+  if (!lock.has_value())
+    return koshka::Error{koshka::os::last_system_error_message()};
   defer { koshka::os::release_process_lock(lock.take()); };
   let opened = koshka::os::open_file_descriptor(
       path->text().view(), koshka::os::file_open_mode::Truncate);
-  if (!opened.has_value()) return false;
-  if (!koshka::os::close_fd(opened.take())) return false;
+  if (!opened.has_value())
+    return koshka::Error{koshka::os::last_system_error_message()};
+  if (!koshka::os::close_fd(opened.take()))
+    return koshka::Error{koshka::os::last_system_error_message()};
+
   return koshka::internal::load_no_editor_history(*path, false);
 }
 
@@ -631,7 +656,7 @@ fn newest_history_event_number() -> koshka::Maybe<usize>
 
   let const contents =
       koshka::internal::read_no_editor_history_contents(*path, false);
-  if (!contents.has_value()) return koshka::None;
+  if (contents.is_error()) return koshka::None;
 
   let const &state = koshka::internal::get_no_editor_history_state();
   if (state.record_byte_offsets.is_empty()) return koshka::None;
@@ -641,16 +666,16 @@ fn newest_history_event_number() -> koshka::Maybe<usize>
 
 fn history_events(koshka::Allocator allocator,
                   koshka::Maybe<usize> after_event_number)
-    -> koshka::Maybe<koshka::ArrayList<history_event>>
+    -> koshka::ErrorOr<koshka::ArrayList<history_event>>
 {
   let events = koshka::ArrayList<history_event>{allocator};
   let const path = history_path();
-  if (!path.has_value()) return events;
+  if (!path.has_value()) return steal(events);
 
   /* The read is allowed to miss the file, so an absent history reads as an
      empty list and a damaged or unreadable file reads as a failure. */
-  let contents = koshka::internal::read_no_editor_history_contents(*path, true);
-  if (!contents.has_value()) return koshka::None;
+  let const contents =
+      TRY(koshka::internal::read_no_editor_history_contents(*path, true));
   let &state = koshka::internal::get_no_editor_history_state();
   let const retained_record_count = state.record_byte_offsets.count();
   let const first_number = state.total_count - retained_record_count + 1;
@@ -665,14 +690,15 @@ fn history_events(koshka::Allocator allocator,
   for (usize index = first_index; index < retained_record_count; index++) {
     let const span = koshka::internal::get_history_record_span(state, index);
     let command = String{allocator};
-    if (!koshka::internal::decode_history_record(command, contents->view(),
+    if (!koshka::internal::decode_history_record(command, contents.view(),
                                                  span))
     {
-      return koshka::None;
+      return koshka::Error{"the file contains invalid data"};
     }
     events.push(history_event{first_number + index, steal(command)});
   }
-  return events;
+
+  return steal(events);
 }
 
 fn relative_history_event(koshka::Allocator allocator, usize distance,
@@ -728,7 +754,7 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   let lock = koshka::os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return koshka::None;
   defer { koshka::os::release_process_lock(lock.take()); };
-  if (!koshka::internal::ensure_no_editor_history_loaded(*path, true))
+  if (koshka::internal::ensure_no_editor_history_loaded(*path, true).is_error())
     return koshka::None;
 
   let &state = koshka::internal::get_no_editor_history_state();

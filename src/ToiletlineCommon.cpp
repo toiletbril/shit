@@ -243,7 +243,8 @@ fn is_history_contents_valid(StringView contents) -> bool
       return false;
     }
     decoded_byte_count += escaped_byte_count + codepoint_byte_count;
-    if (decoded_byte_count > HISTORY_RECORD_MAX_DECODED_BYTE_COUNT) return false;
+    if (decoded_byte_count > HISTORY_RECORD_MAX_DECODED_BYTE_COUNT)
+      return false;
 
     byte_offset += codepoint_byte_count;
   }
