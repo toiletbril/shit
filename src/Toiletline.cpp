@@ -703,6 +703,17 @@ static fn get_calc_history_file_path() -> koshka::Maybe<koshka::Path>
   return resolve_history_path("KOSH_CALC_HISTORY", KOSH_CALC_HISTORY_FILE);
 }
 
+static bool IS_CALC_HISTORY_ACTIVE = false;
+
+/* Every read and append resolves the file the swap currently points at, so a
+   calc prompt never reloads the shell file over the calc entries. */
+static fn get_active_history_file_path() -> koshka::Maybe<koshka::Path>
+{
+  if (IS_CALC_HISTORY_ACTIVE) return get_calc_history_file_path();
+
+  return get_history_file_path();
+}
+
 /* The history is swapped to the calc file on entry and back on leave, so the
    two histories never mix. The shell history is dumped first for a later
    reload. */
@@ -711,6 +722,8 @@ fn enter_calc_history() -> void
   if (koshka::Maybe<koshka::Path> shell = get_history_file_path();
       shell.has_value())
     ::tl_history_dump(shell->c_str());
+
+  IS_CALC_HISTORY_ACTIVE = true;
 
   if (koshka::Maybe<koshka::Path> calc = get_calc_history_file_path();
       calc.has_value())
@@ -722,6 +735,8 @@ fn leave_calc_history() -> void
   if (koshka::Maybe<koshka::Path> calc = get_calc_history_file_path();
       calc.has_value())
     ::tl_history_dump(calc->c_str());
+
+  IS_CALC_HISTORY_ACTIVE = false;
 
   if (koshka::Maybe<koshka::Path> shell = get_history_file_path();
       shell.has_value())
@@ -1049,7 +1064,7 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
     return koshka::None;
   }
 
-  let const path = get_history_file_path();
+  let const path = get_active_history_file_path();
   if (!path.has_value()) return koshka::None;
   let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
@@ -1485,7 +1500,7 @@ fn get_input(const String &prompt) -> input_result
   let const program_path_candidate_count_before =
       utils::debug_program_path_candidate_count();
 #endif
-  let const history_path = get_history_file_path();
+  let const history_path = get_active_history_file_path();
   if (history_path.has_value()) unused(sync_history(*history_path, true));
   ::itl_g_last_history_event_number = 0;
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());

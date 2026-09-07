@@ -242,6 +242,9 @@ fn run_repl(const ExecContext &ec, EvalContext &cxt,
 
     if (line->view().is_empty()) continue;
 
+    if (should_use_editor)
+      unused(toiletline::history_append_event(line->view()));
+
     try {
       if (try_define(cxt, line->view())) continue;
     } catch (const ErrorWithLocation &error) {
