@@ -48,9 +48,12 @@ namespace os {
 
 subshell_bootstrap::subshell_bootstrap(subshell_bootstrap &&other) noexcept
     : payload(steal(other.payload)), processes(steal(other.processes)),
-      source_length(other.source_length), owns_processes(other.owns_processes)
+      source_length(other.source_length),
+      evaluation_mode(other.evaluation_mode),
+      owns_processes(other.owns_processes)
 {
   other.source_length = 0;
+  other.evaluation_mode = root_evaluation_mode::Normal;
   other.owns_processes = false;
 }
 
@@ -65,8 +68,10 @@ fn subshell_bootstrap::operator=(subshell_bootstrap &&other) noexcept
   payload = steal(other.payload);
   processes = steal(other.processes);
   source_length = other.source_length;
+  evaluation_mode = other.evaluation_mode;
   owns_processes = other.owns_processes;
   other.source_length = 0;
+  other.evaluation_mode = root_evaluation_mode::Normal;
   other.owns_processes = false;
   return *this;
 }

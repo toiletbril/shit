@@ -1201,8 +1201,8 @@ fn get_current_process_id() wontthrow -> i64
 fn register_platform_flags(FlagList &flags) throws -> void { unused(flags); }
 
 static constexpr u32 SUBSHELL_TRANSPORT_MAGIC = 0x4b535442U;
-static constexpr u32 SUBSHELL_TRANSPORT_VERSION = 1U;
-static constexpr usize SUBSHELL_TRANSPORT_HEADER_LENGTH = 20;
+static constexpr u32 SUBSHELL_TRANSPORT_VERSION = 2U;
+static constexpr usize SUBSHELL_TRANSPORT_HEADER_LENGTH = 24;
 static constexpr usize MAXIMUM_SUBSHELL_TRANSPORT_LENGTH = 16 * 1024 * 1024;
 static subshell_bootstrap SUBSHELL_BOOTSTRAP{};
 
@@ -1275,9 +1275,12 @@ static fn receive_subshell_bootstrap() wontthrow -> void
   let const source_length = decode_subshell_transport_u32(header + 12);
   let const process_count =
       static_cast<usize>(decode_subshell_transport_u32(header + 16));
+  let const evaluation_mode = decode_subshell_transport_u32(header + 20);
   if (magic != SUBSHELL_TRANSPORT_MAGIC ||
       version != SUBSHELL_TRANSPORT_VERSION || source_length > payload_length ||
       payload_length > MAXIMUM_SUBSHELL_TRANSPORT_LENGTH ||
+      evaluation_mode >
+          static_cast<u32>(root_evaluation_mode::PreparedPipelineStage) ||
       process_count >
           (MAXIMUM_SUBSHELL_TRANSPORT_LENGTH - payload_length) / sizeof(u64))
   {
@@ -1317,6 +1320,8 @@ static fn receive_subshell_bootstrap() wontthrow -> void
           reinterpret_cast<process>(static_cast<uintptr>(process_value)));
     }
     SUBSHELL_BOOTSTRAP.source_length = source_length;
+    SUBSHELL_BOOTSTRAP.evaluation_mode =
+        static_cast<root_evaluation_mode>(evaluation_mode);
     SUBSHELL_BOOTSTRAP.owns_processes = true;
   } catch (...) {
     CloseHandle(pipe);

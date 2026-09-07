@@ -691,7 +691,12 @@ public:
   pure fn source_end_position() const wontthrow -> usize;
   fn set_source_end_position(usize position) wontthrow -> void;
   fn evaluate(EvalContext &cxt) const throws -> i64;
+  fn evaluate_root(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> i64;
   fn evaluate_status(EvalContext &cxt) const throws -> status_result;
+  fn evaluate_root_status(EvalContext &cxt,
+                          root_evaluation_mode mode) const throws
+      -> status_result;
 
   Expression(const Expression &) = delete;
   Expression(Expression &&) noexcept = delete;
@@ -746,7 +751,12 @@ public:
 
 protected:
   virtual fn evaluate_impl(EvalContext &cxt) const throws -> i64 = 0;
+  virtual fn evaluate_root_impl(EvalContext &cxt,
+                                root_evaluation_mode mode) const throws -> i64;
   virtual fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result;
+  virtual fn evaluate_root_status_impl(EvalContext &cxt,
+                                       root_evaluation_mode mode) const throws
       -> status_result;
 
   SourceLocation m_location;
@@ -1043,6 +1053,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_root_impl(EvalContext &cxt,
+                        root_evaluation_mode mode) const throws -> i64 override;
 
   ArrayList<const Token *> m_args{heap_allocator()};
 
@@ -1094,6 +1106,9 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
   fn evaluate_status_impl(EvalContext &cxt) const throws
       -> status_result override;
+  fn evaluate_root_status_impl(EvalContext &cxt,
+                               root_evaluation_mode mode) const throws
+      -> status_result override;
 
   Kind m_kind;
   const Command *m_cmd;
@@ -1129,7 +1144,12 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_root_impl(EvalContext &cxt,
+                        root_evaluation_mode mode) const throws -> i64 override;
   fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
+  fn evaluate_root_status_impl(EvalContext &cxt,
+                               root_evaluation_mode mode) const throws
       -> status_result override;
 
   ArrayList<const CompoundListCondition *> m_nodes{heap_allocator()};

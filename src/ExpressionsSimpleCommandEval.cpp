@@ -119,27 +119,16 @@ static fn command_word_is_glob(const Word &word) wontthrow -> bool
   return false;
 }
 
-/* The span BASH_COMMAND reports for a simple command. The command location
-   starts at the first word, and an assignment that leads the command sits
-   before it while still belonging to the command bash names. */
-static pure fn command_span_with_assignments(
-    SourceLocation location,
-    const SparseList<PrefixAssignment> &local_vars) wontthrow -> SourceLocation
-{
-  for (let const &var : local_vars) {
-    let const assignment_position = var.get_location().position;
-    if (assignment_position >= location.position) continue;
-
-    location.length += location.position - assignment_position;
-    location.position = assignment_position;
-  }
-
-  return location;
-}
-
 } /* namespace */
 
 hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  return evaluate_root_impl(cxt, root_evaluation_mode::Normal);
+}
+
+hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
+                                         root_evaluation_mode mode) const throws
+    -> i64
 {
   /* A command may have no words when it is only a redirection or only
      assignments, so those still run below. */
@@ -148,14 +137,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_current_location(source_location());
 
-  publish_command_and_run_debug_trap(cxt, [&] throws {
-    let text = source_command_text(
-        cxt, command_span_with_assignments(source_location(), m_local_vars),
-        source_end_position(),
-        [&] { return utils::merge_tokens_to_string(m_args); });
-    append_redirections_text(cxt, text, m_redirections);
-    return text;
-  });
+  if (mode == root_evaluation_mode::Normal) publish_simple_command(cxt, *this);
 
   /* The check reads the typed command word before its expansion, so a pattern
      that happens to match a single file is still caught. */

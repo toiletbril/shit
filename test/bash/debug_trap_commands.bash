@@ -51,4 +51,46 @@ trap 'echo D-$BASH_COMMAND' DEBUG
 [[ x = x && -n y ]]
 trap - DEBUG
 
+echo pipeline-commands
+trap 'echo D-$BASH_COMMAND' DEBUG
+printf 'payload\n' | wc -l
+trap - DEBUG
+
+echo pipeline-function
+pipeline_function() {
+  printf 'payload\n'
+}
+trap 'echo D-$BASH_COMMAND' DEBUG
+pipeline_function | wc -l | tr -d ' '
+trap - DEBUG
+
+echo pipeline-function-functrace
+set -T
+trap 'echo D-$BASH_COMMAND' DEBUG
+pipeline_function | wc -l | tr -d ' '
+trap - DEBUG
+set +T
+
+echo pipeline-trap-output
+trap 'echo D-$BASH_COMMAND' DEBUG
+printf 'payload\n' | grep -c '^payload$'
+trap - DEBUG
+
+echo pipeline-mutation
+pipeline_value=before
+pipeline_debug_count=0
+trap 'pipeline_value=after; pipeline_debug_count=$((pipeline_debug_count + 1)); echo D-$BASH_COMMAND' DEBUG
+printf '%s\n' "$pipeline_value" | grep -c '^after$'
+trap - DEBUG
+printf 'value=%s count=%s\n' "$pipeline_value" "$pipeline_debug_count"
+
+echo pipeline-lastpipe
+set +m
+shopt -s lastpipe
+trap 'echo D-$BASH_COMMAND' DEBUG
+printf 'lastpipe\n' | read pipeline_value
+trap - DEBUG
+printf 'value=%s\n' "$pipeline_value"
+shopt -u lastpipe
+
 echo done

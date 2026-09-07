@@ -455,7 +455,8 @@ static fn run_script_contents(
     ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
     bool should_require_shebang = true,
     bool should_silence_unresolved_commands = false,
-    bool should_print_ast = true) -> int
+    bool should_print_ast = true,
+    root_evaluation_mode evaluation_mode = root_evaluation_mode::Normal) -> int
 {
   i32 exit_code = EXIT_SUCCESS;
 
@@ -707,7 +708,9 @@ static fn run_script_contents(
 
           context.set_terminal_exec_allowed(was_terminal_exec_allowed &&
                                             execution_parser.is_at_end());
-          exit_code = static_cast<int>(unit->evaluate(context));
+          exit_code =
+              static_cast<int>(unit->evaluate_root(context, evaluation_mode));
+          evaluation_mode = root_evaluation_mode::Normal;
           if (context.has_pending_control_flow() ||
               (context.shell_option_state(shell_option_id::Onecmd) &&
                !context.has_execution_string()))
@@ -716,7 +719,8 @@ static fn run_script_contents(
           }
         }
       } else {
-        exit_code = static_cast<int>(ast->evaluate(context));
+        exit_code =
+            static_cast<int>(ast->evaluate_root(context, evaluation_mode));
       }
       context.set_last_command_duration_nanos(koshka::os::monotonic_nanos() -
                                               command_start_nanos);

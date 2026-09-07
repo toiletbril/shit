@@ -84,8 +84,21 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
   return evaluate_status_impl(cxt).status;
 }
 
+hot fn CompoundList::evaluate_root_impl(EvalContext &cxt,
+                                        root_evaluation_mode mode) const throws
+    -> i64
+{
+  return evaluate_root_status_impl(cxt, mode).status;
+}
+
 hot fn CompoundList::evaluate_status_impl(EvalContext &cxt) const throws
     -> status_result
+{
+  return evaluate_root_status_impl(cxt, root_evaluation_mode::Normal);
+}
+
+hot fn CompoundList::evaluate_root_status_impl(
+    EvalContext &cxt, root_evaluation_mode mode) const throws -> status_result
 {
   ASSERT(m_nodes.count() > 0);
 
@@ -156,7 +169,8 @@ hot fn CompoundList::evaluate_status_impl(EvalContext &cxt) const throws
         if (should_ignore_errexit) cxt.leave_condition();
       };
       try {
-        return n->evaluate_status(cxt);
+        let const node_mode = index == 0 ? mode : root_evaluation_mode::Normal;
+        return n->evaluate_root_status(cxt, node_mode);
       } catch (const InterruptErrorWithLocation &) {
         throw;
       } catch (ErrorWithLocation &error) {
@@ -344,6 +358,12 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
 hot fn CompoundListCondition::evaluate_status_impl(
     EvalContext &cxt) const throws -> status_result
 {
+  return evaluate_root_status_impl(cxt, root_evaluation_mode::Normal);
+}
+
+hot fn CompoundListCondition::evaluate_root_status_impl(
+    EvalContext &cxt, root_evaluation_mode mode) const throws -> status_result
+{
   ASSERT(m_cmd != nullptr);
   cxt.begin_command_evaluation();
 
@@ -362,7 +382,7 @@ hot fn CompoundListCondition::evaluate_status_impl(
     start_nanos = os::monotonic_nanos();
   }
 
-  let result = m_cmd->evaluate_status(cxt);
+  let result = m_cmd->evaluate_root_status(cxt, mode);
 
   if (m_cmd->is_timed()) {
     let const elapsed_nanos = os::monotonic_nanos() - start_nanos;
@@ -470,6 +490,9 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
           cxt.is_shopt_enabled(shopt_option_id::Lastpipe) &&
           !cxt.shell_option_state(shell_option_id::Monitor);
 
+      let const *simple = stage->as_simple_command();
+      if (simple != nullptr) publish_simple_command(cxt, *simple);
+
       let stage_in = Maybe<os::descriptor>{};
       let stage_out = Maybe<os::descriptor>{};
       let pipe = Maybe<os::Pipe>{};
@@ -502,7 +525,9 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         };
         cxt.set_in_pipeline_stage(true);
         defer { cxt.set_in_pipeline_stage(false); };
-        parent_stage_status = static_cast<i32>(stage->evaluate(cxt));
+        parent_stage_status = static_cast<i32>(stage->evaluate_root(
+            cxt, simple != nullptr ? root_evaluation_mode::PreparedPipelineStage
+                                   : root_evaluation_mode::Normal));
         continue;
       }
 
@@ -522,6 +547,9 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       let const process_group =
           !is_async() ? os::process_group_mode::Inherit
                       : os::background_process_group_mode(process_group_id);
+      bootstrap.evaluation_mode =
+          simple != nullptr ? root_evaluation_mode::PreparedPipelineStage
+                            : root_evaluation_mode::Normal;
       let const launch = os::launch_compound_stage(
           stage_text, stage_in, stage_out, None, cxt.mood(), stage_location,
           stage_source != nullptr ? stage_source->view() : StringView{},
@@ -544,7 +572,10 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         i32 stage_status = 0;
         try {
           cxt.enter_subshell();
-          stage_status = static_cast<i32>(stage->evaluate(cxt));
+          stage_status = static_cast<i32>(stage->evaluate_root(
+              cxt, simple != nullptr
+                       ? root_evaluation_mode::PreparedPipelineStage
+                       : root_evaluation_mode::Normal));
           if (cxt.has_pending_control_flow() &&
               cxt.pending_control_flow().kind == control_flow::Kind::Exit)
           {
@@ -724,6 +755,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* The location moves onto the stage first so a runtime warning from its
        words carets the stage that read the variable. */
     cxt.set_current_location(e->source_location());
+    publish_simple_command(cxt, *e);
 
     let stage_arg_locations =
         ArrayList<SourceLocation>{cxt.scratch_allocator()};

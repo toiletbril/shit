@@ -489,6 +489,13 @@ cold fn Expression::to_ast_string(usize layer) const throws -> String
 
 hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
 {
+  return evaluate_root(cxt, root_evaluation_mode::Normal);
+}
+
+hot flatten fn Expression::evaluate_root(EvalContext &cxt,
+                                         root_evaluation_mode mode) const throws
+    -> i64
+{
   if (os::INTERRUPT_REQUESTED) {
     os::INTERRUPT_REQUESTED = 0;
     throw InterruptErrorWithLocation{source_location()};
@@ -500,7 +507,7 @@ hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
     if (command->is_async()) return command->evaluate_async(cxt);
   }
   try {
-    return evaluate_impl(cxt);
+    return evaluate_root_impl(cxt, mode);
   } catch (InterruptErrorWithLocation &error) {
     let const location = error.location();
     if (location.position == 0 && location.length == 0 &&
@@ -514,6 +521,12 @@ hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
 
 hot flatten fn Expression::evaluate_status(EvalContext &cxt) const throws
     -> status_result
+{
+  return evaluate_root_status(cxt, root_evaluation_mode::Normal);
+}
+
+hot flatten fn Expression::evaluate_root_status(
+    EvalContext &cxt, root_evaluation_mode mode) const throws -> status_result
 {
   /* The check runs before every node, so a running command stops promptly and
      control returns to the prompt. */
@@ -530,7 +543,7 @@ hot flatten fn Expression::evaluate_status(EvalContext &cxt) const throws
       return {static_cast<i32>(command->evaluate_async(cxt)), 0};
   }
   try {
-    return evaluate_status_impl(cxt);
+    return evaluate_root_status_impl(cxt, mode);
   } catch (InterruptErrorWithLocation &error) {
     let const location = error.location();
     if (location.position == 0 && location.length == 0 &&
@@ -542,10 +555,26 @@ hot flatten fn Expression::evaluate_status(EvalContext &cxt) const throws
   }
 }
 
+fn Expression::evaluate_root_impl(EvalContext &cxt,
+                                  root_evaluation_mode mode) const throws -> i64
+{
+  unused(mode);
+  return evaluate_impl(cxt);
+}
+
 fn Expression::evaluate_status_impl(EvalContext &cxt) const throws
     -> status_result
 {
   return {static_cast<i32>(evaluate_impl(cxt)), 0};
+}
+
+fn Expression::evaluate_root_status_impl(EvalContext &cxt,
+                                         root_evaluation_mode mode) const throws
+    -> status_result
+{
+  if (mode == root_evaluation_mode::Normal) return evaluate_status_impl(cxt);
+
+  return {static_cast<i32>(evaluate_root_impl(cxt, mode)), 0};
 }
 
 fn Expression::operator delete(opaque *pointer) wontthrow -> void

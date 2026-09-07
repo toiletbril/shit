@@ -348,6 +348,9 @@ fn append_redirections_text(EvalContext &cxt, String &out,
                             const SparseList<Redirection> &redirections) throws
     -> void;
 
+fn publish_simple_command(EvalContext &cxt, const SimpleCommand &command) throws
+    -> void;
+
 /* The command text a DEBUG trap and BASH_COMMAND observe, published before the
    command runs. The builder runs only when a reader can observe its result,
    because BASH_COMMAND belongs to the bash mood and a trap action keeps the

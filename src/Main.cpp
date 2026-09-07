@@ -687,6 +687,7 @@ fn kosh_main(int argc, char **argv) -> int
 
   koshka::os::unset_environment_variable("KOSH_IDENTITY");
   let inherited_bootstrap = koshka::os::take_subshell_bootstrap();
+  let inherited_evaluation_mode = inherited_bootstrap.evaluation_mode;
   koshka::Maybe<i32> inherited_exit_status = koshka::None;
   koshka::Maybe<usize> inherited_subshell_depth = koshka::None;
   if (!koshka::os::can_fork_evaluator() &&
@@ -1440,14 +1441,17 @@ fn kosh_main(int argc, char **argv) -> int
 
     if (should_analyze_input) {
       script_contents.normalize_crlf_line_endings();
-      if (FLAG_LINT.is_enabled())
+      if (FLAG_LINT.is_enabled()) {
         exit_code = run_lint_document_contents(script_contents, context,
                                                ast_arena, source_filename,
                                                &lint_diagnostic_totals);
-      else
-        exit_code = run_script_contents(script_contents, context, ast_arena,
-                                        source_filename, nullptr, nullptr,
-                                        history_event_number);
+      } else {
+        exit_code = run_script_contents(
+            script_contents, context, ast_arena, source_filename, nullptr,
+            nullptr, history_event_number, nullptr, nullptr, true, false, true,
+            inherited_evaluation_mode);
+        inherited_evaluation_mode = koshka::root_evaluation_mode::Normal;
+      }
     } else {
       exit_code = EXIT_FAILURE;
     }

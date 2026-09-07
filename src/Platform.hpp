@@ -1179,6 +1179,7 @@ struct subshell_bootstrap
   String payload{heap_allocator()};
   ArrayList<process> processes{heap_allocator()};
   u32 source_length{0};
+  root_evaluation_mode evaluation_mode{root_evaluation_mode::Normal};
   bool owns_processes{false};
 
 private:

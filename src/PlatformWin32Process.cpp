@@ -998,6 +998,8 @@ static fn make_subshell_transport(const subshell_bootstrap &bootstrap,
   append_subshell_transport_u32(transport, bootstrap.source_length);
   append_subshell_transport_u32(transport,
                                 static_cast<u32>(bootstrap.processes.count()));
+  append_subshell_transport_u32(transport,
+                                static_cast<u32>(bootstrap.evaluation_mode));
   transport.append(bootstrap.payload.view());
 
   for (let const inherited_process : bootstrap.processes) {
