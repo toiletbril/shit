@@ -400,6 +400,19 @@ fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
   m_redirections.fill(steal(redirections));
 }
 
+fn SimpleCommand::append_redirection(const Redirection &redirection,
+                                     Allocator allocator) throws -> void
+{
+  ArrayList<Redirection> redirections{allocator};
+  redirections.reserve(m_redirections.count() + 1);
+  for (let const &existing : m_redirections) {
+    redirections.push(existing);
+  }
+
+  redirections.push(redirection);
+  m_redirections.fill(steal(redirections));
+}
+
 fn SimpleCommand::set_array_args(
     ArrayList<array_builtin_assignment> &&array_args) throws -> void
 {

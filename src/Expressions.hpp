@@ -1021,6 +1021,9 @@ public:
 
   fn set_redirections(ArrayList<Redirection> &&redirections) throws -> void;
 
+  fn append_redirection(const Redirection &redirection,
+                        Allocator allocator) throws -> void;
+
   fn set_array_args(ArrayList<array_builtin_assignment> &&array_args) throws
       -> void;
 

@@ -86,6 +86,13 @@ for word in a b; do echo for-$word; done | wc -l | tr -d ' '
 echo nested | cat | { cat; } | wc -l | tr -d ' '
 trap - DEBUG
 
+echo pipeline-stderr-merge
+trap 'echo D-$BASH_COMMAND' DEBUG
+printf 'merged\n' |& cat
+printf 'first\n' |& grep -c merged
+{ echo grouped-merge; } |& cat
+trap - DEBUG
+
 echo pipeline-prefix-assignment
 trap 'echo D-$BASH_COMMAND' DEBUG
 prefix_stage=one printf '%s\n' prefixed | cat

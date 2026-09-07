@@ -978,7 +978,15 @@ mustuse fn Parser::wrap_with_stderr_to_stdout(Command *command) throws
     -> Command *
 {
   ASSERT(command != nullptr);
-  let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
+  let const arena_allocator = bump_allocator(m_lexer.arena());
+
+  if (command->is_simple_command()) {
+    static_cast<SimpleCommand *>(command)->append_redirection(
+        stderr_to_stdout_dup(), arena_allocator);
+    return command;
+  }
+
+  let redirections = ArrayList<expressions::Redirection>{arena_allocator};
   redirections.push(stderr_to_stdout_dup());
   let redirected = m_lexer.arena().create<RedirectedCommand>(
       command->source_location(), command, steal(redirections));
