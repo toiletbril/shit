@@ -54,6 +54,8 @@ space\ dir/mixed.txt
 == an active tilde directory expands:
 ~/'space file.txt'
 ~/home.txt
+== tilde user completion ignores malformed passwd records:
+~fixture-valid/
 == an active tilde stays outside a quoted match:
 ~/'space file.txt'
 == an active variable uses escapes for a matched space:

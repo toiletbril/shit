@@ -24,6 +24,8 @@ trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 : > "$dir/\$HOME/literal-variable.txt"
 : > "$dir/~/literal-tilde.txt"
 : > "$dir/PATH/tool"
+printf '%s\n' 'fixture-malformed' \
+    'fixture-valid:x:1000:1000:Valid User:/home/fixture-valid:' > "$dir/passwd"
 chmod +x "$dir/PATH/tool"
 cd "$dir"
 HOME="$dir/home"
@@ -78,6 +80,9 @@ echo "== an open double-quoted variable directory remains active:"
 "$BIN" --debug-complete-at 'cat "$HOME/' </dev/null
 echo "== an active tilde directory expands:"
 "$BIN" --debug-complete-at 'cat ~/' </dev/null
+echo "== tilde user completion ignores malformed passwd records:"
+KOSH_TEST_PASSWD="$dir/passwd" \
+    "$BIN" --debug-complete-at 'cat ~fixture-' </dev/null
 echo "== an active tilde stays outside a quoted match:"
 "$BIN" --debug-complete-at 'cat ~/sp' </dev/null
 echo "== an active variable uses escapes for a matched space:"
