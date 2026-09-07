@@ -202,7 +202,8 @@ changes update this file.
   the shell under test and the reference shell.
 - Put the explicitly verified interpreter and `-c` in the command text for a
   compound host probe. Do not rely on command-runner shell metadata. Inspect an
-  unfamiliar make target recipe before invoking it.
+  unfamiliar make target recipe before invoking it. Inspect local help before
+  using an unfamiliar tool option.
 - Reduce a bounded platform probe to one verified command. Confirm its mood,
   option defaults, output order, and final status before writing the golden.
 - Run a Bash compatibility probe under `--mood bash`. The default mood follows
@@ -218,7 +219,8 @@ changes update this file.
   separator, and paths. Put `--` before dash-leading patterns. Enable PCRE2
   only when required. Resolve wildcard paths before searching, and pass only
   existing matches. Run independent searches independently.
-- Put `--glob` before the pattern and every path.
+- Put `--glob` before the pattern and every path. Keep short options separate
+  when any option accepts a value.
 - A command that runs ripgrep must not contain `&&` or `||`.
 - Run an expected no-match search as its own command, since its status must not
   stop later checks.
