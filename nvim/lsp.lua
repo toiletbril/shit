@@ -1,11 +1,10 @@
 --
--- This snippet allows you to use Koshka's shell language server and its
--- formatter in Neovim 0.11+. Paste the code below into your configuration and
--- you should be good to go.
+-- This snippet runs Koshka's shell language server and its formatter in
+-- Neovim 0.11+. Paste the code below into your configuration.
 --
--- The server formats the document itself, so the formatter needs no separate
--- program. A recipe for the standalone `kosh --format` command is commented
--- out at the bottom.
+-- The same server formats the document, and no separate formatter program is
+-- needed. A recipe for the standalone `kosh --format` command is commented out
+-- at the bottom.
 --
 
 -- start koshka snippet
@@ -28,9 +27,9 @@ vim.treesitter.language.register("bash", {
 -- false to format only on demand with vim.lsp.buf.format().
 local should_format_on_save = true
 
--- Koshka reads embedded shell out of a justfile by its file name. A buffer
--- named foo.just is a justfile to Neovim and an ordinary shell script to the
--- server, so the server is kept away from it.
+-- Koshka finds embedded shell in a justfile by its file name. A buffer named
+-- foo.just is a justfile to Neovim and an ordinary shell script to the server.
+-- The server is kept away from it.
 local function is_analyzable_buffer(bufnr)
   if vim.bo[bufnr].filetype ~= "just" then
     return true
@@ -93,14 +92,12 @@ vim.api.nvim_create_autocmd("LspAttach", {
 -- end koshka snippet
 
 --
--- The recipe below formats through the `kosh --format` command with
--- conform.nvim, for people who do not run the language server. Run one or the
--- other, never both.
+-- The recipe below formats with conform.nvim and the `kosh --format` command,
+-- for a setup without the language server. Run one or the other, never both.
 --
--- Standard input carries no file name, so the command reads every buffer as a
--- shell script. Only shell filetypes are listed here. Sending a yaml,
--- markdown, dockerfile, make, json, just, or spec buffer through it would
--- rewrite the whole file as shell.
+-- Standard input carries no file name. The command reads every buffer as a
+-- shell script. Only shell filetypes are listed here. A yaml, markdown,
+-- dockerfile, make, json, just, or spec buffer would be rewritten as shell.
 --
 -- The mood is left unset. The default mood accepts every construct the other
 -- moods accept, and a recognized shebang still selects the dialect.

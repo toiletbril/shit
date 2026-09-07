@@ -14,7 +14,7 @@ const CONFIGURATION_SECTION = "kosh";
  * Koshka reads a language identifier it does not recognize as a plain shell
  * script and analyzes the whole document that way. Only the identifiers it
  * compares against are listed here. A justfile and an RPM spec file are
- * recognized by their names, so they are matched by pattern.
+ * recognized by their names. Both are matched by pattern.
  */
 const DOCUMENT_SELECTOR = [
   { scheme: "file", language: "shellscript" },

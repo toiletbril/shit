@@ -1,8 +1,8 @@
 # Koshka for Zed
 
-This extension runs the Koshka language server and routes formatting through
-it. The server ships inside the shell binary, so the only requirement is a
-`kosh` on your PATH.
+This extension runs the Koshka language server. The same server formats the
+document. The server is part of the shell binary, and a `kosh` on your PATH is
+the only requirement.
 
 No tree-sitter grammar is bundled. The server is attached to languages Zed
 already provides.
@@ -41,19 +41,18 @@ directory. Zed builds the extension and reloads it.
 ```
 
 The `file_types` block gives `.kosh` and `.shit` files the built-in Shell
-Script language, which is what puts them in front of the server.
+Script language. The server is attached to that language.
 
 The `"..."` entry keeps the other servers registered for the language. A list
 without it replaces the defaults. Write `"!bash-language-server"` to drop a
 server you do not want.
 
 Keep `format_on_save` at `on`. The server formats whole documents and
-advertises no range formatting, so the `modifications` mode would quietly skip
-the file.
+advertises no range formatting. The `modifications` mode skips the file and
+reports nothing.
 
-The named form of the formatter matters once a second server is attached,
-because the bare `"language_server"` value picks the first one that can
-format.
+The bare `"language_server"` value picks the first attached server that can
+format. The named form selects `kosh` once a second server is attached.
 
 ## Naming the binary
 
@@ -69,13 +68,12 @@ format.
 }
 ```
 
-The language server option is appended when it is absent, so a `binary`
-setting that lists other arguments still starts a working server.
+The language server option is appended when it is absent. A `binary` setting
+that lists other arguments still starts the server.
 
 ## The command line formatter
 
-`kosh --format` formats a file without the server, for a setup that runs no
-language server at all.
+`kosh --format` formats a file without the language server.
 
 ```jsonc
 {
@@ -92,6 +90,6 @@ language server at all.
 }
 ```
 
-Zed feeds the buffer through standard input, and a document with no file name
-is read as a plain shell script. Configure this for shell languages only. A
-YAML or Markdown buffer sent through it would be rewritten as shell.
+Zed writes the buffer to standard input, and a document with no file name is
+read as a plain shell script. Configure this for shell languages only. A YAML
+or Markdown buffer would be rewritten as shell.
