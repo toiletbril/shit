@@ -1189,18 +1189,21 @@ static fn make_sigset_impl(int first, ...) wontthrow -> sigset_t
 
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
-static fn sigchild_handler(int n, siginfo_t *siginfo, opaque *ctx) wontthrow
-    -> void
+static fn sigchild_handler(int signal_number, siginfo_t *siginfo,
+                           opaque *context) wontthrow -> void
 {
-  unused(n);
-  unused(ctx);
+  unused(context);
   unused(siginfo);
   CHILD_STATE_CHANGED = 1;
+  if (is_trappable_signal(signal_number))
+    PENDING_SIGNAL_FLAGS[signal_number] = 1;
+  SIGNAL_PENDING = 1;
 }
 
 static fn install_child_state_handler() throws -> void
 {
   struct sigaction action = {};
+  check_syscall(sigemptyset(&action.sa_mask));
   action.sa_flags = SA_SIGINFO;
   action.sa_sigaction = sigchild_handler;
   check_syscall(sigaction(SIGCHLD, &action, nullptr));
@@ -1276,7 +1279,13 @@ fn set_trap_handler(i32 signal_number) throws -> void
   sigaddset(&sm, signal_number);
   check_syscall(sigprocmask(SIG_UNBLOCK, &sm, nullptr));
 
+  if (signal_number == SIGCHLD) {
+    install_child_state_handler();
+    return;
+  }
+
   struct sigaction sa = {};
+  check_syscall(sigemptyset(&sa.sa_mask));
   sa.sa_handler = handle_trapped_signal;
   check_syscall(sigaction(signal_number, &sa, nullptr));
 }
@@ -1285,7 +1294,13 @@ fn set_trap_ignore(i32 signal_number) throws -> void
 {
   if (!is_trappable_signal(signal_number)) return;
   LOG(Info, "ignoring signal %d", signal_number);
+  if (signal_number == SIGCHLD) {
+    install_child_state_handler();
+    return;
+  }
+
   struct sigaction sa = {};
+  check_syscall(sigemptyset(&sa.sa_mask));
   sa.sa_handler = SIG_IGN;
   check_syscall(sigaction(signal_number, &sa, nullptr));
 }
@@ -1294,7 +1309,13 @@ fn clear_trap_handler(i32 signal_number) throws -> void
 {
   if (!is_trappable_signal(signal_number)) return;
   LOG(Info, "clearing the trap for signal %d", signal_number);
+  if (signal_number == SIGCHLD) {
+    install_child_state_handler();
+    return;
+  }
+
   struct sigaction sa = {};
+  check_syscall(sigemptyset(&sa.sa_mask));
   /* SIGINT returns to the shell's handler so a Ctrl-C still aborts a loop. */
   if (signal_number == SIGINT)
     sa.sa_handler = handle_interrupt;
