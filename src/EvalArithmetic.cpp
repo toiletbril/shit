@@ -2124,11 +2124,10 @@ fn EvalContext::evaluate_calculator_arithmetic_text(
 {
   let const scratch = scratch_mark();
   defer { scratch_release(scratch); };
-  let const is_exact = is_extended_arithmetic_enabled();
   const SourceLocation synthetic_base{0, 0};
   let const base =
       expression_base != nullptr ? expression_base : &synthetic_base;
-  let const value = evaluate_arithmetic_value(this, expression, base, is_exact,
+  let const value = evaluate_arithmetic_value(this, expression, base, true,
                                               m_scratch_arena, true);
   return value.to_string(heap_allocator());
 }

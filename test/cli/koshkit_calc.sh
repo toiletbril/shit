@@ -16,6 +16,14 @@ echo "=== 128-bit in the default mood ==="
 echo "=== beyond 128-bit in the default mood ==="
 "$BIN" -c 'koshkit calc "2 ** 256"'
 
+# calc owns its own arithmetic width, so neither the bash mood nor an explicitly
+# disabled extended-arithmetic option narrows a calc result to 64 bits.
+echo "=== arbitrary precision under the bash mood ==="
+"$BIN" --mood bash -c 'koshkit calc "2 ** 100"'
+
+echo "=== arbitrary precision with extended arithmetic off ==="
+"$BIN" -c 'set +o extended-arithmetic; koshkit calc "2 ** 100"'
+
 echo "=== signed 128-bit minimum ==="
 "$BIN" -c 'koshkit calc -- "-170141183460469231731687303715884105728"'
 "$BIN" -c 'koshkit calc "(2 ** 127) / -1"'

@@ -1418,10 +1418,12 @@ Arithmetic operands are evaluated. The
 and
 .BR \-p ", " \-\-pipe
 options read expressions interactively or from a pipe.
-The default mood accepts arbitrary precision integers and finite decimal
-values. Compatibility moods use signed 64-bit arithmetic. The abs, atan, ceil,
-cmp, cos, exp, fact, fib, floor, frac, gcd, int, iseven, isint, isodd, length,
-lcm, ln, max, min, scale, sgn, sin, and sqrt functions are available.
+Arbitrary precision integers and finite decimal values are accepted in every
+mood, and the
+.B extended-arithmetic
+option does not narrow a calc result. The abs, atan, ceil, cmp, cos, exp,
+fact, fib, floor, frac, gcd, int, iseven, isint, isodd, length, lcm, ln, max,
+min, scale, sgn, sin, and sqrt functions are available.
 .TP
 .B bc
 Expressions, assignments, functions, arrays, control flow, input and output
