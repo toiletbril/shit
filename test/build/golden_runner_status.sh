@@ -73,7 +73,7 @@ CLI_TIMEOUT_SECONDS=
 
 mkdir -p "$directory/cli" "$directory/completion" "$directory/expected" \
   "$directory/highlight" "$directory/kosh" "$directory/suite/bash" \
-  "$directory/suite/build" "$directory/suite/cli" \
+  "$directory/suite/bin" "$directory/suite/build" "$directory/suite/cli" \
   "$directory/suite/completion" "$directory/suite/highlight" \
   "$directory/suite/interactive" "$directory/suite/kosh" \
   "$directory/suite/sh"
@@ -109,13 +109,17 @@ printf '%s\n' '#!/bin/sh' \
 printf '%s\n' '#!/bin/sh' \
   'printf "compat\\n" >> "$SUITE_TRACE"' \
   > "$directory/suite/run-compat-diff-test.sh"
+cp run-interactive-test.sh "$directory/suite"
 printf '%s\n' '#!/bin/sh' \
-  'printf "interactive\\n" >> "$SUITE_TRACE"' \
-  > "$directory/suite/run-interactive-test.sh"
+  'printf "interactive:%s\\n" "$1" >> "$SUITE_TRACE"' \
+  'case $1 in interactive/a_failure.py) exit 1 ;; esac' \
+  > "$directory/suite/bin/python3"
+chmod +x "$directory/suite/bin/python3"
 for SUITE_INPUT in cli/a_failure.sh cli/b_after.sh cli/read_behavior.sh \
   completion/a_failure.sh completion/b_after.sh \
   completion/editor_append_hot_path.sh build/after.sh highlight/after.sh \
-  interactive/after.py kosh/after.kosh sh/after.sh bash/after.bash; do
+  interactive/a_failure.py interactive/b_after.py kosh/after.kosh sh/after.sh \
+  bash/after.bash; do
   printf '\n' > "$directory/suite/$SUITE_INPUT"
 done
 
@@ -129,14 +133,17 @@ done
   FAILED_LIST="$directory/suite-failed.diff" \
   KOSH_DIRECTORY_HISTORY="$directory/suite-directory-history" \
   KOSH_HISTORY_FILE="$directory/suite-history" \
+  PATH="$directory/suite/bin:$PATH" \
   SKIPPED_BUILD_INPUT= \
   SKIPPED_CLI_INPUT= \
   SKIPPED_COMPLETION_INPUT= \
   SKIPPED_TEST_NAMES= \
   SUITE_TRACE="$directory/suite-trace.log" \
+  TEST_HOST_PATH_SEPARATOR=: \
   TEST_JOBS=1 \
   TEST_NULL_DEVICE="$TEST_NULL_DEVICE" \
   TEST_SHELL="$TEST_SHELL" \
+  TEST_SYSTEM_PATH="$directory/suite/bin" \
   TEST_SYSTEM_RM="$TEST_SYSTEM_RM" \
   TEST_TEMP_DIRECTORY="$directory/suite-work" \
   UNREPRESENTABLE_COMPLETION_INPUT= \
@@ -165,7 +172,8 @@ if grep -Fqx 'kosh:after' "$directory/suite-trace.log" && \
   grep -Fqx 'completion:completion/a_failure.sh' \
   "$directory/suite-trace.log" && \
   grep -Fqx 'compat' "$directory/suite-trace.log" && \
-  grep -Fqx 'interactive' "$directory/suite-trace.log"; then
+  grep -Fqx 'interactive:interactive/a_failure.py' \
+  "$directory/suite-trace.log"; then
   echo suite-runner-continues-harnesses
 else
   echo suite-runner-stops-harnesses
@@ -174,6 +182,14 @@ if grep -Fqx 'suite-failed-list-marker' "$directory/suite-failed.diff"; then
   echo suite-runner-aggregates-failed-list
 else
   echo suite-runner-loses-failed-list
+fi
+if grep -Fqx 'interactive:interactive/a_failure.py' \
+  "$directory/suite-trace.log" && \
+  grep -Fqx 'interactive:interactive/b_after.py' \
+  "$directory/suite-trace.log"; then
+  echo suite-runner-continues-interactive-batches
+else
+  echo suite-runner-stops-interactive-batches
 fi
 
 run_cli_runner failed.diff "$directory/comparison.log" "$TEST_SHELL" \

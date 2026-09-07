@@ -34,7 +34,7 @@ export TEST_PATH_SEPARATOR := :
 export TEST_NULL_DEVICE := /dev/null
 export TEST_PATH_ENVIRONMENT_NAME := PATH
 endif
-TEST_JOBS ?= $(shell ../scripts/cpu-count.sh)
+TEST_JOBS ?= $(or $(shell ../scripts/cpu-count.sh),1)
 export TEST_HOST_PATH_SEPARATOR := :
 export TEST_TEMP_DIRECTORY := .test-work
 export TEST_MKTEMP_DIRECTORY := $(shell $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/.test-work
@@ -94,13 +94,14 @@ endif
 export PATH := $(CURDIR)/bin$(TEST_HOST_PATH_SEPARATOR)$(PATH)
 
 %: kosh/%.kosh expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
+	@rm -f '$(FAILED_LIST)' && rm -rf '$(FAILED_LIST).d'
 	@BIN='$(BIN)' BIN_FLAGS='$(BIN_FLAGS)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 		FAILED_LIST='$(FAILED_LIST)' $(SHELL) run-kosh-test.sh $*
 
 clean:
 	@rm -f $(FAILED_LIST) $(KOSH_HISTORY_FILE) $(KOSH_DIRECTORY_HISTORY)
 	@rm -rf $(FAILED_LIST).d
-	@test -n "$(CURDIR)/.test-work" && rm -rf "$(CURDIR)/.test-work"
+	@rm -rf "$(CURDIR)/.test-work"
 
 test: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh all
@@ -116,6 +117,7 @@ kosh_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh kosh
 
 cli_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
+	@rm -f '$(FAILED_LIST)' && rm -rf '$(FAILED_LIST).d'
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-cli-test.sh '$(SHELL)' cli/$*.sh
 
@@ -123,12 +125,14 @@ cli_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh cli
 
 build_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
+	@rm -f '$(FAILED_LIST)' && rm -rf '$(FAILED_LIST).d'
 	@$(SHELL) run-build-test.sh '$(SHELL)' build/$*.sh
 
 build_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh build
 
 completion_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
+	@rm -f '$(FAILED_LIST)' && rm -rf '$(FAILED_LIST).d'
 	@$(SHELL) run-completion-test.sh '$(SHELL)' completion/$*.sh
 
 ifeq ($(TARGET), Windows_NT)
@@ -201,6 +205,7 @@ completion_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 
 
 highlight_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
+	@rm -f '$(FAILED_LIST)' && rm -rf '$(FAILED_LIST).d'
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-highlight-test.sh '$(SHELL)' highlight/$*.sh
 

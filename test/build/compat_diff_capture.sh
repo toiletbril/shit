@@ -10,7 +10,7 @@
 # diagnostics.
 #
 
-d=$(mktemp -d)
+d=$(mktemp -d) || exit 1
 trap 'test -n "$d" && "$TEST_SYSTEM_RM" -rf "$d"' EXIT
 
 reference_shell=$d/reference-shell
@@ -43,6 +43,13 @@ BASH_COMPAT_FILES= \
 TEST_TEMP_DIRECTORY=$d \
 TEST_SYSTEM_RM=$TEST_SYSTEM_RM \
   "$TEST_SHELL" run-compat-diff-test.sh >/dev/null
+runner_status=$?
+
+if [ "$runner_status" -ne 0 ]; then
+  echo compatibility-runner-reports-failure
+else
+  echo compatibility-runner-missed-failure-status
+fi
 
 failure=$(command cat "$failed_list".d/*.diff)
 case $failure in

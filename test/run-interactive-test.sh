@@ -18,6 +18,7 @@ fi
 
 OUTPUT_DIRECTORY="$TEST_TEMP_DIRECTORY/results/interactive"
 mkdir -p "$OUTPUT_DIRECTORY"
+TEST_STATUS=0
 
 for TEST_FILE in "$@"; do
   if [ "$TEST_FILE" = interactive/long_warning_window.py ] && \
@@ -32,8 +33,11 @@ for TEST_FILE in "$@"; do
   else
     cat "$OUTPUT"
     printf "\t%-64s FAILED :c\n" "$TEST_FILE"
-    rm -f "$OUTPUT"
-    exit 1
+    if [ "$TEST_STATUS" -eq 0 ]; then
+      TEST_STATUS=1
+    fi
   fi
   rm -f "$OUTPUT"
 done
+
+exit "$TEST_STATUS"

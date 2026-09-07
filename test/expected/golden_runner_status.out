@@ -3,6 +3,7 @@ suite-runner-continues-cli-batches
 suite-runner-continues-completion-batches
 suite-runner-continues-harnesses
 suite-runner-aggregates-failed-list
+suite-runner-continues-interactive-batches
 comparison-runner-accepts-matching-nonzero-fixture
 comparison-runner-rejects-mismatching-nonzero-fixture
 comparison-runner-compares-nonzero-fixture

@@ -102,25 +102,18 @@ wait_for_workers()
 
 wait_for_worker_slot()
 {
-  while [ "$WORKER_COUNT" -ge "$TEST_JOBS" ]; do
-    REMAINING_WORKER_PIDS=
-    DID_REAP_WORKER=no
-    for WORKER_PID in $WORKER_PIDS; do
-      if kill -0 "$WORKER_PID" 2>/dev/null; then
-        REMAINING_WORKER_PIDS="$REMAINING_WORKER_PIDS $WORKER_PID"
-        continue
-      fi
-      WAIT_STATUS=0
-      wait "$WORKER_PID" || WAIT_STATUS=$?
-      [ "$WORKER_STATUS" -ne 0 ] || WORKER_STATUS=$WAIT_STATUS
-      WORKER_COUNT=$((WORKER_COUNT - 1))
-      DID_REAP_WORKER=yes
-    done
-    WORKER_PIDS=$REMAINING_WORKER_PIDS
-    if [ "$DID_REAP_WORKER" = no ]; then
-      sleep 0.01
-    fi
-  done
+  if [ "$WORKER_COUNT" -lt "$TEST_JOBS" ]; then
+    return
+  fi
+
+  set -- $WORKER_PIDS
+  WORKER_PID=$1
+  shift
+  WAIT_STATUS=0
+  wait "$WORKER_PID" || WAIT_STATUS=$?
+  [ "$WORKER_STATUS" -ne 0 ] || WORKER_STATUS=$WAIT_STATUS
+  WORKER_PIDS="$*"
+  WORKER_COUNT=$((WORKER_COUNT - 1))
 }
 
 run_harness_item()
@@ -287,12 +280,12 @@ finish_results()
   touch "$FAILED_LIST"
   for RECORDED_DIFF in "$FAILED_LIST.d"/*.diff; do
     if [ -s "$RECORDED_DIFF" ]; then
-      cat "$RECORDED_DIFF" >> "$FAILED_LIST"
+      command cat "$RECORDED_DIFF" >> "$FAILED_LIST"
     fi
   done
   rm -rf "$FAILED_LIST.d"
 
-  cat "$FAILED_LIST"
+  command cat "$FAILED_LIST"
   if [ -s "$FAILED_LIST" ]; then
     return 1
   fi
@@ -316,7 +309,7 @@ START_TIME=$(date +%s)
 SUITE_STATUS=0
 rm -f "$FAILED_LIST" "$KOSH_HISTORY_FILE" "$KOSH_DIRECTORY_HISTORY"
 rm -rf "$FAILED_LIST.d"
-test -n "$PWD/.test-work" && rm -rf "$PWD/.test-work"
+rm -rf "$PWD/.test-work"
 
 RUNNER_STATUS=0
 run_named_suite cli || RUNNER_STATUS=$?

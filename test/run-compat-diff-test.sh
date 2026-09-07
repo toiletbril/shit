@@ -3,7 +3,8 @@
 
 CAPTURE_DIRECTORY="$TEST_TEMP_DIRECTORY/compat-diff-capture.$$"
 mkdir -p "$CAPTURE_DIRECTORY"
-trap 'test -n "$CAPTURE_DIRECTORY" && "$TEST_SYSTEM_RM" -rf "$CAPTURE_DIRECTORY"' EXIT
+trap '"$TEST_SYSTEM_RM" -rf "$CAPTURE_DIRECTORY"' EXIT
+RUNNER_STATUS=0
 
 capture_command() {
   if "$@" > "$CAPTURE_DIRECTORY/stdout" 2> "$CAPTURE_DIRECTORY/stderr"; then
@@ -125,6 +126,7 @@ compare_one() {
       "$REFERENCE_STDOUT" "$REFERENCE_STDERR" "$REFERENCE_STATUS"
   fi
   printf "\t%-64s FAILED :c\n" "$TEST_FILE"
+  RUNNER_STATUS=1
 }
 
 BASH_SKIP_REASON=
@@ -157,3 +159,5 @@ if command -v "$DASH" >/dev/null 2>&1; then
 else
   printf "\t%-64s skipped, no %s\n" dashdiff "$DASH"
 fi
+
+exit "$RUNNER_STATUS"
