@@ -80,7 +80,7 @@ static pure fn magic_digit(char byte) wontthrow -> u8
   return 0xff;
 }
 
-static pure fn parse_magic_number(StringView text, u64 &value) wontthrow -> bool
+static fn parse_magic_number(StringView text, u64 &value) wontthrow -> bool
 {
   if (text.is_empty()) return false;
   usize position = 0;
@@ -172,7 +172,7 @@ static fn decode_magic_text(StringView encoded, String &decoded) throws -> void
   }
 }
 
-static pure fn next_magic_field(StringView line, usize &position) wontthrow
+static fn next_magic_field(StringView line, usize &position) wontthrow
     -> StringView
 {
   while (position < line.length &&
@@ -325,8 +325,8 @@ static fn append_magic_database(StringView path,
   return true;
 }
 
-static pure fn read_magic_number(const file_magic_rule &rule, StringView bytes,
-                                 u64 &value) wontthrow -> bool
+static fn read_magic_number(const file_magic_rule &rule, StringView bytes,
+                            u64 &value) wontthrow -> bool
 {
   if (rule.byte_count == 0 || rule.byte_count > 8 ||
       rule.offset > bytes.length ||
@@ -361,8 +361,8 @@ static pure fn read_magic_number(const file_magic_rule &rule, StringView bytes,
   }
 }
 
-static pure fn magic_rule_matches(const file_magic_rule &rule, StringView bytes,
-                                  u64 &number) wontthrow -> bool
+static fn magic_rule_matches(const file_magic_rule &rule, StringView bytes,
+                             u64 &number) wontthrow -> bool
 {
   if (rule.kind != file_magic_kind::String)
     return read_magic_number(rule, bytes, number);

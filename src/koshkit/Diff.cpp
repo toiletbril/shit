@@ -75,8 +75,8 @@ static fn split_diff_lines(StringView contents, Allocator allocator) throws
   return {contents, steal(end_positions)};
 }
 
-static pure fn diff_lines_equal(StringView left, StringView right,
-                                bool should_ignore_space) wontthrow -> bool
+static fn diff_lines_equal(StringView left, StringView right,
+                           bool should_ignore_space) wontthrow -> bool
 {
   if (!should_ignore_space) return left == right;
 

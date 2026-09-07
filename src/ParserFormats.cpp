@@ -128,7 +128,7 @@ static pure fn known_host_extension(StringView path) wontthrow -> bool
   return false;
 }
 
-static pure fn detect_format_kind(const parser_format_input &input) throws
+static fn detect_format_kind(const parser_format_input &input) throws
     -> parser_format_kind
 {
   let path = input.path.has_value() ? *input.path : StringView{};
@@ -327,9 +327,9 @@ fn parser_format_add_indented_fragment(parsed_format_document &document,
   fragment.shell_source = steal(deindented);
 }
 
-static pure fn yaml_key_match(StringView line, const StringView *keys,
-                              usize key_count,
-                              usize &content_position) wontthrow -> bool
+static fn yaml_key_match(StringView line, const StringView *keys,
+                         usize key_count, usize &content_position) wontthrow
+    -> bool
 {
   usize position = 0;
   while (position < line.length &&
@@ -410,7 +410,7 @@ static pure fn yaml_line_value(StringView line, StringView key) wontthrow
   return line.substring(position + key.length + 1).trim_blanks();
 }
 
-static pure fn previous_line(StringView source, usize &position) wontthrow
+static fn previous_line(StringView source, usize &position) wontthrow
     -> StringView
 {
   if (position == 0) return StringView{};

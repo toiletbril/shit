@@ -506,7 +506,7 @@ private:
     return static_cast<usize>(-1);
   }
 
-  pure fn parse_content_length(StringView headers) const throws -> Maybe<usize>
+  fn parse_content_length(StringView headers) const throws -> Maybe<usize>
   {
     static const StringView PREFIX{"Content-Length:"};
     usize line_start = 0;
@@ -606,8 +606,7 @@ pure fn string_field(const JsonValue *object, StringView name) wontthrow
   return value->text.view();
 }
 
-pure fn integer_field(const JsonValue *object, StringView name) throws
-    -> Maybe<i64>
+fn integer_field(const JsonValue *object, StringView name) throws -> Maybe<i64>
 {
   if (object == nullptr || object->kind != json_kind::Object) return None;
   let const *value = object->get(name);
@@ -909,7 +908,7 @@ fn append_protocol_range(String &output, const Document &document, usize start,
   output.push('}');
 }
 
-pure fn mood_for(const Document &document) throws -> mimic_mood
+fn mood_for(const Document &document) throws -> mimic_mood
 {
   if (let const detected =
           detect_mimic_shell_from_source(document.normalized_source.view());
@@ -931,7 +930,7 @@ pure fn mood_for(const Document &document) throws -> mimic_mood
   return mimic_mood::Default;
 }
 
-pure fn document_position(const JsonValue *position) throws
+fn document_position(const JsonValue *position) throws
     -> Maybe<protocol_position>
 {
   let const line = integer_field(position, "line");

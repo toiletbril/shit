@@ -52,9 +52,8 @@ static fn parse_nl_unsigned(StringView value, StringView name) throws -> u64
   return parsed.value();
 }
 
-static pure fn nl_style_numbers(StringView style, bool is_empty,
-                                u64 &blank_count, u64 blank_group) wontthrow
-    -> bool
+static fn nl_style_numbers(StringView style, bool is_empty, u64 &blank_count,
+                           u64 blank_group) wontthrow -> bool
 {
   if (style == "n") return false;
   if (style == "a") {

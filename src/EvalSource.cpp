@@ -423,18 +423,12 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
 {
   static constexpr PackedStringKey KEYS[] = {
-      SSK("progcomp"),
-      SSK("promptvars"),
-      SSK("sourcepath"),
-      SSK("extquote"),
-      SSK("complete_fullquote"),
-      SSK("hostcomplete"),
-      SSK("checkwinsize"),
-      SSK("force_fignore"),
-      SSK("globasciiranges"),
-      SSK("globskipdots"),
-      SSK("expand_aliases"),
-      SSK("interactive_comments"),
+      SSK("progcomp"),           SSK("promptvars"),
+      SSK("sourcepath"),         SSK("extquote"),
+      SSK("complete_fullquote"), SSK("hostcomplete"),
+      SSK("checkwinsize"),       SSK("force_fignore"),
+      SSK("globasciiranges"),    SSK("globskipdots"),
+      SSK("expand_aliases"),     SSK("interactive_comments"),
   };
   static constexpr StaticStringSet DEFAULT_ON_SHOPT_NAMES{KEYS};
   return DEFAULT_ON_SHOPT_NAMES.contains(name);

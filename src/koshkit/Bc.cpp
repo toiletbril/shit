@@ -960,8 +960,8 @@ static fn bc_condition_is_true(StringView condition, const ExecContext &ec,
          "0";
 }
 
-static pure fn bc_control_parts(StringView statement, StringView keyword,
-                                StringView &header, StringView &body) wontthrow
+static fn bc_control_parts(StringView statement, StringView keyword,
+                           StringView &header, StringView &body) wontthrow
     -> bool
 {
   if (!statement.starts_with(keyword)) return false;

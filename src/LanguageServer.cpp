@@ -126,7 +126,7 @@ private:
   fn validate_all(Document *changed_document = nullptr) throws -> bool;
   pure fn find_document(StringView uri) wontthrow -> Document *;
   pure fn request_document(const JsonValue *params) wontthrow -> Document *;
-  pure fn request_positioned_document(const JsonValue *params) throws
+  fn request_positioned_document(const JsonValue *params) throws
       -> Maybe<positioned_document>;
   fn request_positioned_symbol(const JsonValue *params) throws
       -> Maybe<positioned_symbol>;
@@ -243,7 +243,7 @@ pure fn Server::request_document(const JsonValue *params) wontthrow
   return uri.has_value() ? find_document(*uri) : nullptr;
 }
 
-pure fn Server::request_positioned_document(const JsonValue *params) throws
+fn Server::request_positioned_document(const JsonValue *params) throws
     -> Maybe<positioned_document>
 {
   let *document = request_document(params);
@@ -1666,8 +1666,8 @@ fn append_hover_block(String &output, StringView text, bool is_markdown,
   do_append_fence();
 }
 
-pure fn clipped_line_span(StringView text, usize line_limit,
-                          usize &dropped_line_count) wontthrow -> StringView
+fn clipped_line_span(StringView text, usize line_limit,
+                     usize &dropped_line_count) wontthrow -> StringView
 {
   dropped_line_count = 0;
 

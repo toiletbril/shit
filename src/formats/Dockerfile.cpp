@@ -22,8 +22,8 @@ enum class docker_instruction_kind : u8
   Healthcheck,
 };
 
-static pure fn docker_instruction(StringView line,
-                                  usize &content_position) wontthrow
+static fn docker_instruction(StringView line,
+                             usize &content_position) wontthrow
     -> docker_instruction_kind
 {
   usize position = 0;
