@@ -33,7 +33,9 @@ source_byte_diagnostics() {
   echo "inside ” quotes"
   echo 'inside ’ quotes'
   echo $'inside ’ ansi c quotes'
+  echo $'escaped \' quote and ” double'
   echo $"inside ” locale quotes"
+  echo $((1 << 2)); echo “after shift”
 }
 source_byte_diagnostics() {
   echo spaced word
