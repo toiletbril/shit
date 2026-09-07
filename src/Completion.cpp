@@ -1030,6 +1030,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
   usize source_candidate_scan_count = 0;
   usize materialized_candidate_count = 0;
   let should_rebuild_shell_syntax_candidates = false;
+  let should_close_generated_prefix_quote = false;
   let should_ignore_common_prefix_case = false;
 
   let const is_posix_completion = context.mood() == mimic_mood::Posix;
@@ -1142,6 +1143,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       candidates = complete_filesystem(
           token, base_directory, path_text_mode::ShellSyntax, filesystem_filter,
           context, &decoded_token);
+      should_close_generated_prefix_quote = decoded_token.quote_character == 0;
     } else if (!decoded_token.text.is_empty()) {
       /* A token ending in a slash names a directory the ghost has not read yet,
          and the collector indexes it and suggests its first entry. An empty
@@ -1156,26 +1158,11 @@ fn complete(StringView line, usize cursor, EvalContext &context,
     }
   }
 
-  if (should_rebuild_shell_syntax_candidates) {
-    let rebuilt_descriptions = StringMap<String>{arena};
-    if (descriptions.count() > 0)
-      rebuilt_descriptions.reserve(descriptions.count());
-    for (let &candidate : candidates) {
-      let const description = descriptions.find(candidate.view());
-      let rebuilt = rebuild_shell_syntax_candidate(token, decoded_token,
-                                                   candidate.view());
-      if (description != nullptr)
-        rebuilt_descriptions.set(rebuilt.view(), description->view());
-      candidate = steal(rebuilt);
-    }
-    descriptions = steal(rebuilt_descriptions);
-    if (ghost_candidate_count > 0)
-      ghost_prefix = rebuild_shell_syntax_candidate(token, decoded_token,
-                                                    ghost_prefix.view());
-  }
-
   let longest_common_prefix = String{arena};
   if (ghost_candidate_count > 0) {
+    if (should_rebuild_shell_syntax_candidates)
+      ghost_prefix = rebuild_shell_syntax_candidate(token, decoded_token,
+                                                    ghost_prefix.view());
     longest_common_prefix = steal(ghost_prefix);
   } else if (!candidates.is_empty()) {
     if (for_listing) {
@@ -1199,6 +1186,29 @@ fn complete(StringView line, usize cursor, EvalContext &context,
 
     longest_common_prefix = compute_longest_common_prefix(
         candidates, should_ignore_common_prefix_case);
+    if (should_close_generated_prefix_quote &&
+        !longest_common_prefix.is_empty() &&
+        (longest_common_prefix[0] == '\'' || longest_common_prefix[0] == '"'))
+    {
+      longest_common_prefix.push(longest_common_prefix[0]);
+    }
+    if (should_rebuild_shell_syntax_candidates) {
+      longest_common_prefix = rebuild_shell_syntax_candidate(
+          token, decoded_token, longest_common_prefix.view());
+
+      let rebuilt_descriptions = StringMap<String>{arena};
+      if (descriptions.count() > 0)
+        rebuilt_descriptions.reserve(descriptions.count());
+      for (let &candidate : candidates) {
+        let const description = descriptions.find(candidate.view());
+        let rebuilt = rebuild_shell_syntax_candidate(token, decoded_token,
+                                                     candidate.view());
+        if (description != nullptr)
+          rebuilt_descriptions.set(rebuilt.view(), description->view());
+        candidate = steal(rebuilt);
+      }
+      descriptions = steal(rebuilt_descriptions);
+    }
 
     if (for_listing && extension_hint != nullptr && !stage_token.is_empty()) {
       candidates =

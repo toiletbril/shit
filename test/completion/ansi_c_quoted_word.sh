@@ -29,6 +29,8 @@ echo "== a tripled dollar sign keeps the process id before the quote body:"
 "$BIN" --debug-complete-at "echo \$\$\$'ZQ" </dev/null
 echo "== a locale quote lists the same markers:"
 "$BIN" --debug-complete-at "echo \$\"ZQ" </dev/null
+echo "== an escaped quote stays inside a locale quoted word:"
+"$BIN" --debug-complete-at "echo \$\"ZQ\\\" marker ZQ" </dev/null
 echo "== a locale quote completes a command name:"
 "$BIN" --debug-complete-at "\$\"ZQcommand" </dev/null
 echo "== a locale quote after a directory keeps the prefix:"

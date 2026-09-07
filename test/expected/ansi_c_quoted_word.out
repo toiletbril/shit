@@ -18,6 +18,7 @@ ZQdir_marker/$'ZQinner
 $"ZQcommand_marker
 $"ZQdir_marker/
 $"ZQmarker_file
+== an escaped quote stays inside a locale quoted word:
 == a locale quote completes a command name:
 $"ZQcommand_marker
 == a locale quote after a directory keeps the prefix:
