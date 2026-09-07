@@ -3,3 +3,7 @@ echo	resolved-command
 echo	resolved-command
 $'plain'	string
 echo	resolved-command
+$"plain 	string
+$HOME	variable
+echo	resolved-command
+"	string

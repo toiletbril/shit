@@ -49,7 +49,41 @@ fn check_posix_redirection_portability(AnalysisContext &actx,
   if (redirection.is_both_streams_spelling)
     actx.report_diagnostic(diagnostic_id::sc3020, do_get_location());
 
+  /* A delimiter is matched literally and is never expanded, so only its
+     quoting form carries a portability difference. POSIX sh reads the dollar
+     sign of a quoting form as part of the delimiter and ends the document on a
+     different line than bash does. */
+  if (redirection.heredoc_delimiter != nullptr) {
+    let const delimiter_location =
+        redirection.heredoc_delimiter->source_location();
+    let const &delimiter_word =
+        static_cast<const tokens::WordToken *>(redirection.heredoc_delimiter)
+            ->word();
+
+    if (delimiter_word.has_locale_translation_quote)
+      actx.report_diagnostic(diagnostic_id::sc3004, delimiter_location);
+
+    for (let const &segment : delimiter_word.segments) {
+      if (segment.kind == WordSegment::Kind::LiteralText &&
+          segment.was_ansi_c_quoted)
+      {
+        actx.report_diagnostic(diagnostic_id::sc3003, delimiter_location);
+        break;
+      }
+    }
+  }
+
   if (redirection.target == nullptr) return;
+
+  /* A target expands like any other word, so the same segment checks the
+     operands use apply here. */
+  if (redirection.target->kind() == Token::Kind::Word) {
+    let const target_location = redirection.target->source_location();
+    let const &target_word =
+        static_cast<const tokens::WordToken *>(redirection.target)->word();
+
+    check_posix_word_portability(actx, target_word, target_location);
+  }
 
   let const target_text = redirection.target->raw_view();
   if (!target_text.has_value()) return;
@@ -815,12 +849,11 @@ fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
   assignment_value_shape shape{};
   let has_reported_array_collapse = false;
 
+  check_posix_word_portability(actx, value_word, location);
+
   for (let const &segment : value_word.segments) {
     if (segment.kind != WordSegment::Kind::UnquotedText)
       shape.has_bare_literal_value = false;
-
-    if (actx.is_posix_sh_shebang)
-      check_posix_word_portability(actx, segment, location);
 
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:

@@ -331,6 +331,9 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
           static_cast<const tokens::WordToken *>(element.word)->word();
       let const shape = classify_test_operand(operand_word);
 
+      check_posix_word_portability(actx, operand_word,
+                                   element.word->source_location());
+
       for (let const &segment : operand_word.segments) {
         if (segment.kind != WordSegment::Kind::VariableReference) continue;
 
@@ -472,9 +475,39 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
   actx.constant_variables.clear();
 }
 
+/* The conditional as BASH_COMMAND names it, rebuilt from the operands and
+   operators the parser kept. */
+static fn
+conditional_command_text(const ArrayList<conditional_element> &elements) throws
+    -> String
+{
+  let command_text = String{heap_allocator(), "[["};
+  for (let const &element : elements) {
+    command_text.push(' ');
+    switch (element.kind) {
+    case conditional_element::Kind::Operand:
+      if (element.word != nullptr) command_text += element.word->raw_string();
+      break;
+    case conditional_element::Kind::And: command_text += "&&"; break;
+    case conditional_element::Kind::Or: command_text += "||"; break;
+    case conditional_element::Kind::Not: command_text += "!"; break;
+    case conditional_element::Kind::OpenParen: command_text += "("; break;
+    case conditional_element::Kind::CloseParen: command_text += ")"; break;
+    case conditional_element::Kind::Less: command_text += "<"; break;
+    case conditional_element::Kind::Greater: command_text += ">"; break;
+    }
+  }
+  command_text += " ]]";
+  return command_text;
+}
+
 fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   cxt.set_current_location(source_location());
+
+  publish_command_and_run_debug_trap(
+      cxt, [&] { return conditional_command_text(m_elements); });
+
   i64 status;
   try {
     status = cxt.evaluate_conditional(m_elements) ? 0 : 1;
@@ -528,12 +561,43 @@ static pure fn is_blank_clause(StringView text) wontthrow -> bool
   return true;
 }
 
+/* The clause without the blanks that follow the opening parenthesis or the
+   separating semicolon. A c-style for reports its clause from that point and
+   keeps whatever trails it. */
+static pure fn clause_without_leading_blanks(StringView clause) wontthrow
+    -> StringView
+{
+  usize start = 0;
+  while (start < clause.length &&
+         (clause[start] == ' ' || clause[start] == '\t'))
+  {
+    start++;
+  }
+
+  return clause.substring_of_length(start, clause.length - start);
+}
+
+/* The clause as BASH_COMMAND names it. A c-style for reports each of its three
+   clauses under the same double parentheses the standalone command wears. */
+static fn arithmetic_clause_command_text(StringView clause) throws -> String
+{
+  let command_text = String{heap_allocator()};
+  command_text.reserve(clause.length + 4);
+  command_text += "((";
+  command_text.append(clause);
+  command_text += "))";
+  return command_text;
+}
+
 fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   LOG(Debug, "evaluating the arithmetic command '%.*s'",
       static_cast<int>(m_expression.length), m_expression.data);
 
   cxt.set_current_location(source_location());
+
+  publish_command_and_run_debug_trap(
+      cxt, [&] { return arithmetic_clause_command_text(m_expression); });
 
   if (is_blank_clause(m_expression)) {
     cxt.publish_single_pipe_status(1);
@@ -592,6 +656,8 @@ fn SelectLoop::analyze(AnalysisContext &actx,
     if (t->kind() != Token::Kind::Word) continue;
 
     let const &word = static_cast<const tokens::WordToken *>(t)->word();
+    check_posix_word_portability(actx, word, t->source_location());
+
     for (let const &segment : word.segments) {
       if (segment.kind != WordSegment::Kind::VariableReference) continue;
 
@@ -697,7 +763,13 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
       static_cast<int>(m_condition.length), m_condition.data,
       static_cast<int>(m_step.length), m_step.data);
 
-  if (!is_blank_clause(m_init)) cxt.evaluate_arithmetic_nonzero(m_init);
+  if (!is_blank_clause(m_init)) {
+    publish_command_and_run_debug_trap(cxt, [&] {
+      return arithmetic_clause_command_text(
+          clause_without_leading_blanks(m_init));
+    });
+    cxt.evaluate_arithmetic_nonzero(m_init);
+  }
 
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
@@ -708,6 +780,11 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
   let const is_step_blank = is_blank_clause(m_step);
 
   let const do_evaluate_condition = [&]() throws -> bool {
+    publish_command_and_run_debug_trap(cxt, [&] {
+      return arithmetic_clause_command_text(
+          clause_without_leading_blanks(m_condition));
+    });
+
     let &cache = get_clause_cache(m_condition_cache);
 
     return cxt.evaluate_arithmetic_cached_clause_nonzero(
@@ -717,11 +794,10 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
   status_result result{};
   /* An empty condition is always true, the way for ((;;)) loops forever. */
   while (is_condition_blank ||
-         (is_condition_folded
-              ? (cxt.is_extended_arithmetic_enabled()
-                     ? m_is_exact_folded_condition_nonzero
-                     : *m_folded_condition != 0)
-              : do_evaluate_condition()))
+         (is_condition_folded ? (cxt.is_extended_arithmetic_enabled()
+                                     ? m_is_exact_folded_condition_nonzero
+                                     : *m_folded_condition != 0)
+                              : do_evaluate_condition()))
   {
     result = m_body->evaluate_status(cxt);
     if (cxt.no_exec()) break;
@@ -729,6 +805,11 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
     /* The step runs after the body on every iteration, including one ended by a
        continue. */
     if (!is_step_blank) {
+      publish_command_and_run_debug_trap(cxt, [&] {
+        return arithmetic_clause_command_text(
+            clause_without_leading_blanks(m_step));
+      });
+
       let &cache = get_clause_cache(m_step_cache);
       cxt.evaluate_arithmetic_cached_clause_nonzero(
           m_step, cache.tokens, cache.is_tokenized, cache.is_simple);

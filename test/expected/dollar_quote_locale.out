@@ -9,6 +9,22 @@
     [SimpleCommand "echo" "premidpost"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "a $"]
+  [CompoundListCondition, None]
+    [SimpleCommand "$BIN" "--mood" "posix" "--no-annoying-diagnostics" "-c" "printf "[%s]\n" $"posix locale""]
+  [CompoundListCondition, None]
+    [SimpleCommand "$BIN" "--mood" "posix" "--no-annoying-diagnostics" "-c" "printf "[%s]\n" "${x:-$"posix modifier"}""]
+  [CompoundListCondition, None]
+    [Assign doubled_locale=$$tail]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$doubled_locale#$$"]
+  [CompoundListCondition, None]
+    [Assign doubled_ansi=$$a\tb]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$doubled_ansi#$$"]
+  [CompoundListCondition, None]
+    [Assign tripled_ansi=$$a	b]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$tripled_ansi#$$"]
 [Word
   Unquoted "x=world"
 ]
@@ -45,7 +61,90 @@
 [Word
   DoubleQuoted "a $"
 ]
+[Word
+  Variable "BIN"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "posix"
+]
+[Word
+  Unquoted "--no-annoying-diagnostics"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Literal "printf "[%s]\n" $"posix locale""
+]
+[Word
+  Variable "BIN"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "posix"
+]
+[Word
+  Unquoted "--no-annoying-diagnostics"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Literal "printf "[%s]\n" "${x:-$"posix modifier"}""
+]
+[Word
+  Unquoted "doubled_locale="
+  Variable "$"
+  DoubleQuoted "tail"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "doubled_locale#$$"
+]
+[Word
+  Unquoted "doubled_ansi="
+  Variable "$"
+  Literal "a\tb"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "doubled_ansi#$$"
+]
+[Word
+  Unquoted "tripled_ansi="
+  Variable "$"
+  Literal "a	b"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "tripled_ansi#$$"
+]
 [plain]
 [hello world]
 premidpost
 a $
+[posix locale]
+[posix modifier]
+[tail]
+[a\tb]
+[a	b]

@@ -11,6 +11,10 @@
     [SimpleCommand "printf" "[%s]\n" "$y/$'\t'/-"]
   [CompoundListCondition, None]
     [SimpleCommand "printf" "[%s]\n" "$x:-$'\x41é'"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$x:-$"a b""]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$x:-pre$"mid"post"]
 [Word
   Unquoted "unset"
 ]
@@ -57,7 +61,27 @@
 [Word
   Variable "x:-$'\x41é'"
 ]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "x:-$"a b""
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "x:-pre$"mid"post"
+]
 [a	b]
 [b]
 [a-b]
 [Aé]
+[a b]
+[premidpost]

@@ -108,6 +108,10 @@ fn check_posix_word_portability(AnalysisContext &actx,
                                 const WordSegment &segment,
                                 SourceLocation fallback_location) throws
     -> void;
+/* The whole-word form reports the locale quoting form and walks every segment.
+   It answers the shebang question once for the word. */
+fn check_posix_word_portability(AnalysisContext &actx, const Word &word,
+                                const SourceLocation &location) throws -> void;
 fn check_posix_arithmetic_operators(AnalysisContext &actx,
                                     StringView expression,
                                     const SourceLocation &location) throws
@@ -316,6 +320,48 @@ enum class loop_disposition : u8
 };
 
 fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition;
+
+/* The command as its source spells it, which keeps the quoting that the parsed
+   words no longer carry. The builder answers for a node whose span is
+   unavailable. */
+template <typename CommandTextBuilder>
+fn source_command_text(EvalContext &cxt, const SourceLocation &location,
+                       usize end_position,
+                       CommandTextBuilder do_build_command_text) throws
+    -> String
+{
+  let const text = cxt.source_text_in_span(location, end_position);
+  if (text.length == 0) return do_build_command_text();
+
+  return String{heap_allocator(), text};
+}
+
+/* The word as its source spells it, which keeps the quoting the parsed word
+   drops. The parsed text answers for a word whose span is unavailable. */
+fn append_word_source_text(EvalContext &cxt, String &out,
+                           const Token &word) throws -> void;
+
+/* The redirection list the way bash spells it, with canonical operators and
+   spacing and with each target kept as its source spells it. A here-document
+   appends its body and its terminator after the whole list. */
+fn append_redirections_text(EvalContext &cxt, String &out,
+                            const SparseList<Redirection> &redirections) throws
+    -> void;
+
+/* The command text a DEBUG trap and BASH_COMMAND observe, published before the
+   command runs. The builder runs only when a reader can observe its result,
+   because BASH_COMMAND belongs to the bash mood and a trap action keeps the
+   command that triggered it. The text is heap owned, since the context holds it
+   past the arena that carries the syntax node. */
+template <typename CommandTextBuilder>
+fn publish_command_and_run_debug_trap(
+    EvalContext &cxt, CommandTextBuilder do_build_command_text) throws -> void
+{
+  if (cxt.bash_dynamic_variables_enabled() && !cxt.is_running_trap_action())
+    cxt.set_current_command(do_build_command_text());
+
+  if (cxt.should_run_debug_trap()) cxt.run_named_trap(StringView{"DEBUG", 5});
+}
 
 /* Whether the shell or the environment gives the name a value on its own, so a
    script that reads it without assigning it is correct. */

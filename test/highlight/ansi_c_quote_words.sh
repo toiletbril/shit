@@ -14,3 +14,9 @@ printf '%s\n' "$result" | grep -Fx "echo${tab}resolved-command"
 result=$("$BIN" --debug-highlight-at "v=\$${quote}plain${quote}; echo tail")
 printf '%s\n' "$result" | grep -Fx "\$${quote}plain${quote}${tab}string"
 printf '%s\n' "$result" | grep -Fx "echo${tab}resolved-command"
+
+result=$("$BIN" --debug-highlight-at 'v=$"plain $HOME $(echo nested)"')
+printf '%s\n' "$result" | grep -Fx "\$\"plain ${tab}string"
+printf '%s\n' "$result" | grep -Fx "\$HOME${tab}variable"
+printf '%s\n' "$result" | grep -Fx "echo${tab}resolved-command"
+printf '%s\n' "$result" | grep -Fx "\"${tab}string"

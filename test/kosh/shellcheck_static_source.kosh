@@ -32,6 +32,8 @@ source_byte_diagnostics() {
   ls –l
   echo "inside ” quotes"
   echo 'inside ’ quotes'
+  echo $'inside ’ ansi c quotes'
+  echo $"inside ” locale quotes"
 }
 source_byte_diagnostics() {
   echo spaced word
@@ -45,6 +47,15 @@ escape_style_diagnostics() {
   quoted='long \
 text'
   echo "The apples are $""1 each"
+  echo "escaped \$" word
+  unset modifier
+  echo "${modifier:-$"nested locale"}"
+  echo "${modifier:-$'ansi } brace'}"
+  echo $'\''$"ansi prefix"
+  echo $'x'"$"
+  echo $'"'$"literal"
+  echo "${modifier-'}'}"
+  echo $"localized $HOME"
   echo "$"
   \ls -l
   sed \
@@ -76,6 +87,12 @@ stdin_and_subscript_diagnostics() {
   read -r chosen
   slots[chosen]=x
   echo value | tally=1
+}
+
+# shellcheck disable=SC2155
+assignment_operand_diagnostics() {
+  export assigned_glob=*.txt
+  export assigned_substitution=$(printf 'a b')
 }
 
 compound_redirection_diagnostics() {

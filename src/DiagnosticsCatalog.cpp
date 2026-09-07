@@ -1153,6 +1153,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The `$'...'` quoting form is a bash extension absent from POSIX sh",
       "Use `printf` to produce the escapes under a `sh` shebang", None, Strict,
       Policy),
+    D(3004, "posix-locale-quoting",
+      "`$\"...\"` quoting is absent from POSIX sh",
+      "The `$\"...\"` quoting form is a bash extension absent from POSIX sh",
+      "Use ordinary double quotes under a `sh` shebang", None, Strict, Policy),
     D(3006, "posix-standalone-arithmetic",
       "a standalone `((...))` is undefined in POSIX sh",
       "The standalone `((...))` command is a bash extension absent from POSIX "

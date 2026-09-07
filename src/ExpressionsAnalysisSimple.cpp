@@ -883,10 +883,14 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     let const arg_location = arg->source_location();
     let const source_text = analysis_source_text(actx, arg_location);
     let const is_operand = i >= 1;
-    const Word *const word =
-        arg->kind() == Token::Kind::Word
-            ? &static_cast<const tokens::WordToken *>(arg)->word()
-            : nullptr;
+    const Word *word = nullptr;
+    const Word *locale_word = nullptr;
+    if (arg->kind() == Token::Kind::Word) {
+      word = &static_cast<const tokens::WordToken *>(arg)->word();
+      locale_word = word;
+    } else if (arg->kind() == Token::Kind::Assignment) {
+      locale_word = &static_cast<const tokens::Assignment *>(arg)->value_word();
+    }
     let is_assignment_builtin_operand = false;
     if (is_operand && command_is_assignment_builtin && word != nullptr) {
       is_assignment_builtin_operand =
@@ -900,9 +904,55 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     bool has_dollar_byte = false;
     bool has_quote_break_for_dollar = false;
     bool has_literal_dollar_in_quotes = false;
+    bool is_in_single_quote = false;
+    bool is_in_ansi_c_quote = false;
+    bool is_in_double_quote = false;
+    bool is_quote_escape_pending = false;
+    usize parameter_expansion_depth = 0;
 
     for (usize position = 0; position < source_text.length; position++) {
       let const byte = source_text[position];
+      let const was_quote_escape_pending = is_quote_escape_pending;
+      let const was_in_parameter_expansion = parameter_expansion_depth > 0;
+
+      if (is_quote_escape_pending) {
+        is_quote_escape_pending = false;
+      } else if (is_in_ansi_c_quote) {
+        if (byte == '\\') {
+          is_quote_escape_pending = true;
+        } else if (byte == '\'') {
+          is_in_ansi_c_quote = false;
+        }
+      } else if (is_in_single_quote) {
+        if (byte == '\'') is_in_single_quote = false;
+      } else if (was_in_parameter_expansion) {
+        if (byte == '\\') {
+          is_quote_escape_pending = true;
+        } else if (byte == '$' && position + 1 < source_text.length &&
+                   source_text[position + 1] == '\'')
+        {
+          is_in_ansi_c_quote = true;
+          is_quote_escape_pending = true;
+        } else if (byte == '\'') {
+          is_in_single_quote = true;
+        } else if (byte == '"') {
+          is_in_double_quote = !is_in_double_quote;
+        } else if (byte == '}' && !is_in_double_quote) {
+          parameter_expansion_depth--;
+        }
+      } else if (byte == '\\') {
+        is_quote_escape_pending = true;
+      } else if (byte == '$' && !is_in_double_quote &&
+                 position + 1 < source_text.length &&
+                 source_text[position + 1] == '\'')
+      {
+        is_in_ansi_c_quote = true;
+        is_quote_escape_pending = true;
+      } else if (byte == '\'' && !is_in_double_quote) {
+        is_in_single_quote = true;
+      } else if (byte == '"') {
+        is_in_double_quote = !is_in_double_quote;
+      }
 
       if (byte == '{') {
         has_open_brace = true;
@@ -920,7 +970,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         /* The quote that follows leaves the dollar sign literal. The word is
            read no further only when the quote also closes the word, and a
            dollar sign that carries text before it is ordinary prose. */
-        if (position + 1 < source_text.length &&
+        if (!was_quote_escape_pending && !was_in_parameter_expansion &&
+            is_in_double_quote && position + 1 < source_text.length &&
             source_text[position + 1] == '"')
         {
           if (position + 2 < source_text.length) {
@@ -928,6 +979,12 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           } else if (position > 0 && source_text[position - 1] == '"') {
             has_literal_dollar_in_quotes = true;
           }
+        }
+        if (!was_quote_escape_pending && !is_in_single_quote &&
+            !is_in_ansi_c_quote && position + 1 < source_text.length &&
+            source_text[position + 1] == '{')
+        {
+          parameter_expansion_depth++;
         }
       }
     }
@@ -962,10 +1019,15 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     SourceLocation split_eligible_location = arg_location;
 
     if (word != nullptr) {
-      for (let const &segment : word->segments) {
-        if (actx.is_posix_sh_shebang)
-          check_posix_word_portability(actx, segment, arg_location);
+      check_posix_word_portability(actx, *word, arg_location);
+    } else if (actx.is_posix_sh_shebang && locale_word != nullptr &&
+               locale_word->has_locale_translation_quote)
+    {
+      actx.report_diagnostic(diagnostic_id::sc3004, arg_location);
+    }
 
+    if (word != nullptr) {
+      for (let const &segment : word->segments) {
         if (should_scan_for_malformed_glob && !has_bracket_byte &&
             segment.has_live_glob_chars() &&
             segment.text.view().find_character('[').has_value())

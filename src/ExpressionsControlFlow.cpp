@@ -33,6 +33,39 @@ namespace expressions {
 
 using namespace internal;
 
+/* The header text a word loop shows in the trace and in BASH_COMMAND. Nothing
+   is appended when no observer is armed. A missing in clause walks the
+   positional parameters, which the header names by the word list the loop
+   behaves as if it carried. */
+static fn append_word_loop_header(EvalContext &cxt, String &header,
+                                  StringView keyword, StringView variable_name,
+                                  bool has_in_clause,
+                                  const ArrayList<const Token *> &words) throws
+    -> void
+{
+  if (!cxt.should_echo_expanded() && !cxt.bash_dynamic_variables_enabled() &&
+      !cxt.has_debug_trap())
+  {
+    return;
+  }
+
+  header.append(keyword);
+  header.push(' ');
+  header.append(variable_name);
+
+  if (!has_in_clause) {
+    header += " in \"$@\"";
+    return;
+  }
+
+  header += " in";
+  for (usize index = 0; index < words.count(); index++) {
+    ASSERT(words[index] != nullptr);
+    header.push(' ');
+    append_word_source_text(cxt, header, *words[index]);
+  }
+}
+
 CompoundCommand::CompoundCommand(SourceLocation location)
     : Command(steal(location))
 {}
@@ -620,6 +653,16 @@ fn SelectLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   let const values =
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
+
+  /* The header is announced once before the menu, and an empty word list still
+     announces it. */
+  let select_trace = String{cxt.scratch_allocator()};
+  append_word_loop_header(cxt, select_trace, "select", m_variable_name,
+                          m_has_in_clause, m_words);
+  publish_command_and_run_debug_trap(
+      cxt, [&] { return String{heap_allocator(), select_trace.view()}; });
+  cxt.write_xtrace(select_trace.view());
+
   if (values.is_empty()) return {};
 
   LOG(Debug, "the select loop offers %zu choices for '%.*s'", values.count(),
@@ -761,18 +804,11 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
       static_cast<int>(m_variable_name.length), m_variable_name.data,
       values.count());
 
+  /* The header text serves the trace and BASH_COMMAND, which both repeat it on
+     every iteration, so it is built once before the loop. */
   let loop_trace = String{cxt.scratch_allocator()};
-  if (cxt.should_echo_expanded()) {
-    loop_trace += "for ";
-    loop_trace.append(m_variable_name);
-    if (m_has_in_clause) {
-      loop_trace += " in";
-      if (!m_words.is_empty()) {
-        loop_trace.push(' ');
-        loop_trace += utils::merge_tokens_to_string(m_words);
-      }
-    }
-  }
+  append_word_loop_header(cxt, loop_trace, "for", m_variable_name,
+                          m_has_in_clause, m_words);
 
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
@@ -782,6 +818,8 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   status_result result{};
   for (let const &value : values) {
+    publish_command_and_run_debug_trap(
+        cxt, [&] { return String{heap_allocator(), loop_trace.view()}; });
     cxt.write_xtrace(loop_trace.view());
     cxt.set_shell_variable(m_variable_name, value);
     result = m_body->evaluate_status(cxt);
@@ -832,6 +870,8 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     if (t->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(t)->word();
     let const source_text = analysis_source_text(actx, t->source_location());
+
+    check_posix_word_portability(actx, word, t->source_location());
 
     let word_is_literal = true;
     let has_glob_character = false;
@@ -997,6 +1037,13 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
   cxt.set_terminal_exec_allowed(false);
   cxt.set_current_location(source_location());
 
+  publish_command_and_run_debug_trap(cxt, [&] {
+    let header_text = String{heap_allocator(), "case "};
+    header_text += m_word->raw_string();
+    header_text += " in";
+    return header_text;
+  });
+
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no globbing, so a pattern keeps its metacharacters. */
   let const do_expand_no_glob = [&cxt](const Token *t) -> String {
@@ -1141,6 +1188,8 @@ fn CaseClause::analyze(AnalysisContext &actx,
   if (m_word->kind() == Token::Kind::Word) {
     let const &case_word =
         static_cast<const tokens::WordToken *>(m_word)->word();
+    check_posix_word_portability(actx, case_word, m_word->source_location());
+
     for (let const &segment : case_word.segments) {
       if (segment.kind != WordSegment::Kind::VariableReference) continue;
       note_variable_reference(actx, segment, m_word->source_location());
@@ -1166,6 +1215,9 @@ fn CaseClause::analyze(AnalysisContext &actx,
       if (pattern->kind() != Token::Kind::Word) continue;
       let const &pattern_word =
           static_cast<const tokens::WordToken *>(pattern)->word();
+      check_posix_word_portability(actx, pattern_word,
+                                   pattern->source_location());
+
       for (let const &segment : pattern_word.segments) {
         if (segment.kind != WordSegment::Kind::VariableReference) continue;
         note_variable_reference(actx, segment, pattern->source_location());

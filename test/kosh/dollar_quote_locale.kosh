@@ -4,3 +4,13 @@ printf '[%s]\n' $"plain"
 printf '[%s]\n' $"hello $x"
 echo pre$"mid"post
 echo "a $"
+"$BIN" --mood posix --no-annoying-diagnostics -c \
+  'printf "[%s]\n" $"posix locale"'
+"$BIN" --mood posix --no-annoying-diagnostics -c \
+  'printf "[%s]\n" "${x:-$"posix modifier"}"'
+doubled_locale=$$"tail"
+printf '[%s]\n' "${doubled_locale#$$}"
+doubled_ansi=$$'a\tb'
+printf '[%s]\n' "${doubled_ansi#$$}"
+tripled_ansi=$$$'a\tb'
+printf '[%s]\n' "${tripled_ansi#$$}"

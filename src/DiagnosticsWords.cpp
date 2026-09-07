@@ -614,6 +614,18 @@ fn check_posix_word_portability(AnalysisContext &actx,
   }
 }
 
+fn check_posix_word_portability(AnalysisContext &actx, const Word &word,
+                                const SourceLocation &location) throws -> void
+{
+  if (!actx.is_posix_sh_shebang) return;
+
+  if (word.has_locale_translation_quote)
+    actx.report_diagnostic(diagnostic_id::sc3004, location);
+
+  for (let const &segment : word.segments)
+    check_posix_word_portability(actx, segment, location);
+}
+
 fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws
     -> void

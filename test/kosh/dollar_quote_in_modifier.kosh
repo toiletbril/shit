@@ -5,3 +5,5 @@ y=$'a\tb'
 printf '[%s]\n' "${y#$'a\t'}"
 printf '[%s]\n' "${y/$'\t'/-}"
 printf '[%s]\n' "${x:-$'\x41é'}"
+printf '[%s]\n' "${x:-$"a b"}"
+printf '[%s]\n' "${x:-pre$"mid"post}"

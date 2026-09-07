@@ -70,12 +70,6 @@ for piece in $*; do
 done
 echo "pieces=$n"
 
-# In POSIX mode the dollar before a double quote stays a literal dollar, the
-# bash locale-string meaning is suppressed, matching dash.
-echo $"x"
-v=val
-echo $"a $v b"
-
 # The re-splitting of an unquoted expansion under a custom IFS, checked against
 # dash. A non-whitespace IFS keeps an empty field between two adjacent
 # delimiters, while the default whitespace IFS folds runs and trims the ends.

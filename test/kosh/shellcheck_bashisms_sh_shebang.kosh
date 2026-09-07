@@ -13,6 +13,11 @@ word_only() {
   cat <(echo substituted)
   echo !(excluded)
   echo $'a\tb'
+  echo $"localized $HOME"
+  export locale_assignment=$"localized assignment"
+  echo operand=$"localized operand"
+  bare_assignment=$"localized bare"
+  echo $'\''$"escaped ansi quote"
   echo [^a]tail
   echo "$(<file)"
   echo "`<file`"
@@ -30,6 +35,17 @@ word_only() {
   echo "${text:-default}"
   echo "${#text}"
 }
+compound_word_only() {
+  for value in item=$"for locale"; do :; done
+  case item=$"case subject" in
+    item=$"case pattern") : ;;
+  esac
+  [[ value =~ prefix$"regex locale" ]]
+  for value in item=$'for ansi'; do :; done
+  case value in
+    item=$'case ansi') : ;;
+  esac
+}
 redirect_only() {
   echo both &>out.log
   echo append &>>out.log
@@ -39,6 +55,15 @@ redirect_only() {
   echo net >/dev/tcp/example.com/80
   echo glob >prefix*.log
   echo plain >plain.log 2>&1
+  echo locale >>$"locale.log"
+  cat <$'ansi.log'
+  cat < <(echo substituted)
+  cat <<$"DELIMITER"
+body
+DELIMITER
+  cat <<$'ANSIDELIMITER'
+body
+ANSIDELIMITER
 }
 operator_only() {
   ((counter + 1))
@@ -86,5 +111,6 @@ array_and_scope_only() {
 compound_redirect_only() {
   { echo grouped; } &>both.log
   { echo globbed; } >prefix*.log
+  { echo localized; } >$"compound.log"
 }
 echo done

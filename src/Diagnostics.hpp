@@ -306,6 +306,7 @@ enum class diagnostic_id : u16
   sc3001,
   sc3002,
   sc3003,
+  sc3004,
   sc3006,
   sc3012,
   sc3013,

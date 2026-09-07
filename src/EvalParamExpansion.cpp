@@ -278,6 +278,9 @@ fn EvalContext::expand_modifier_word_worker(
       i = j;
       continue;
     }
+    if (next == '"' && remove_quotes && !is_in_double_quote) {
+      continue;
+    }
     if (next == '{') {
       /* Scan the ${...} body to the matching } at brace depth one. A quote run
          or a backslash escape keeps its bytes literal so a } inside is never
