@@ -26,6 +26,9 @@ echo "== an explicit --mood wins:"
 "$BIN" --no-traces -I --mood kosh "$directory/bash-script"
 echo "== --dumb wins:"
 "$BIN" --no-traces -I --dumb "$directory/bash-script"
+echo "== an sh invocation name wins:"
+"$BIN" --no-traces -c 'exec -a sh "$1" --no-traces -I "$2"' \
+    shell "$BIN" "$directory/bash-script"
 
 echo "== the mimicked mood relaxes the strict options:"
 "$BIN" --no-traces -I "$directory/unset-script"

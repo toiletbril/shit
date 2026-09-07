@@ -1001,11 +1001,10 @@ fn kosh_main(int argc, char **argv) -> int
   usize ignored_eof_count = 0;
   koshka::analysis_diagnostic_totals lint_diagnostic_totals{};
 
-  /* --mood, --dumb, and --posix each name the mood outright, so a script
-     operand under mimicry keeps that choice and leaves its shebang unread. */
-  let const was_mood_named_on_command_line = FLAG_MOOD.is_set() ||
-                                             FLAG_DUMB.is_enabled() ||
-                                             FLAG_POSIX_COMPAT.is_enabled();
+  let const was_mood_named_on_command_line =
+      FLAG_MOOD.is_set() || FLAG_DUMB.is_enabled() ||
+      FLAG_POSIX_COMPAT.is_enabled() ||
+      invocation_mood != koshka::mimic_mood::Default;
 
   loop
   {

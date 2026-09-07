@@ -12,6 +12,8 @@ kosh
 kosh
 == --dumb wins:
 sh
+== an sh invocation name wins:
+sh
 == the mimicked mood relaxes the strict options:
 []
 rc=0
