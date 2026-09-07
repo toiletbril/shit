@@ -154,10 +154,14 @@ def main():
         selected_text = opened[
             selected_start + len(SELECTED_SGR):selected_end
         ]
+        longest_candidate_width = len("alpha-three")
+        expected_selected_text = (
+            b"  " + b"alpha-one".ljust(longest_candidate_width) + b"  "
+        )
         selected_highlight_ends_after_entry = (
             selected_start >= 0
             and selected_end >= 0
-            and len(selected_text) < 120
+            and selected_text == expected_selected_text
         )
 
         moved, _, accepted = run_menu(
