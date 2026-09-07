@@ -1,0 +1,37 @@
+id = "kosh"
+name = "Koshka"
+description = "Shell diagnostics, completion, and formatting from the Koshka shell."
+version = "0.1.0"
+schema_version = 1
+authors = ["toiletbril"]
+repository = "https://github.com/toiletbril/shit"
+
+[language_servers.kosh]
+name = "kosh"
+languages = [
+  "Shell Script",
+  "YAML",
+  "Markdown",
+  "JSON",
+  "JSONC",
+  "Dockerfile",
+  "Docker Compose",
+  "Make",
+]
+
+# Zed sends a lowercased language name as the identifier, and the shell reads
+# an identifier it does not recognize as a plain shell script. Every host
+# format is mapped onto the identifier the shell knows.
+#
+# Shell Script is left out on purpose. Its lowercased name reaches the shell
+# unrecognized, which lands on the shell path and leaves the extension of the
+# file to select the dialect. That is how a .kosh file keeps the kosh mood
+# while a .sh file gets the posix one.
+[language_servers.kosh.language_ids]
+"YAML" = "yaml"
+"Markdown" = "markdown"
+"JSON" = "json"
+"JSONC" = "jsonc"
+"Dockerfile" = "dockerfile"
+"Docker Compose" = "yaml"
+"Make" = "makefile"

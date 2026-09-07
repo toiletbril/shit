@@ -46,6 +46,13 @@ __pycache__/
 
 core.*
 
+# Editor integration build output
+vscode/node_modules/
+vscode/out/
+vscode/*.vsix
+zed/target/
+zed/extension.wasm
+
 # Nix
 result
 result-*

@@ -115,6 +115,23 @@ changes update this file.
   the mood. Bare koshkit completion works in the default mood and with the
   koshkit option.
 
+## Editor integrations
+
+- `nvim/lsp.lua` is a paste-in snippet. `vscode` holds a TypeScript extension
+  built with npm. `zed` holds a Rust extension built for `wasm32-wasip2`. Each
+  directory owns its own install document. None of them is installed by
+  `src/Makefile` or packaged by a release workflow.
+- Formatting reaches every client through `textDocument/formatting`. The
+  `kosh --format` command is the documented fallback for a setup without the
+  server.
+- A client document selector names only the language identifiers the format
+  detector compares against, which are `markdown`, `yaml`, `dockerfile`,
+  `makefile`, `json`, and `jsonc`, plus the shell identifiers. Any other
+  non-empty identifier makes the whole document parse as shell. A host format
+  the detector finds by name is matched by file name in the client.
+- Zed receives no identifier for Shell Script, which leaves the extension of
+  the file to select the mood.
+
 ## Diagnostics and storage
 
 - `DiagnosticsCatalog.cpp` owns analysis diagnostics.

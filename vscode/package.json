@@ -1,0 +1,212 @@
+{
+  "name": "kosh",
+  "displayName": "Koshka",
+  "description": "Shell diagnostics, completion, and formatting from the Koshka shell.",
+  "version": "0.1.0",
+  "publisher": "toiletbril",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toiletbril/shit"
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:shellscript",
+    "onLanguage:yaml",
+    "onLanguage:dockercompose",
+    "onLanguage:dockerfile",
+    "onLanguage:markdown",
+    "onLanguage:makefile",
+    "onLanguage:json",
+    "onLanguage:jsonc"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "kosh",
+        "aliases": [
+          "Koshka",
+          "kosh"
+        ],
+        "extensions": [
+          ".kosh"
+        ],
+        "filenames": [
+          "koshrc",
+          ".koshrc"
+        ],
+        "firstLine": "^#!.*\\bkosh\\b",
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "shit",
+        "aliases": [
+          "Shit",
+          "shit"
+        ],
+        "extensions": [
+          ".shit"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "title": "Koshka",
+      "type": "object",
+      "properties": {
+        "kosh.enable": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Run the Koshka language server."
+        },
+        "kosh.path": {
+          "type": "string",
+          "default": "kosh",
+          "scope": "machine-overridable",
+          "description": "Name or absolute path of the Koshka shell binary."
+        },
+        "kosh.arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "machine-overridable",
+          "description": "Extra arguments placed before the language server option."
+        },
+        "kosh.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "scope": "window",
+          "description": "Trace the messages exchanged with the language server."
+        }
+      }
+    },
+    "semanticTokenTypes": [
+      {
+        "id": "heredocDelimiter",
+        "superType": "string",
+        "description": "A here-document delimiter word."
+      }
+    ],
+    "semanticTokenModifiers": [
+      {
+        "id": "invalid",
+        "description": "The construct is not valid in the current mood."
+      },
+      {
+        "id": "unresolved",
+        "description": "The command or the path was not resolved."
+      },
+      {
+        "id": "partial",
+        "description": "The construct is incomplete."
+      },
+      {
+        "id": "path",
+        "description": "The word names a filesystem path."
+      },
+      {
+        "id": "command",
+        "description": "The word stands in command position."
+      },
+      {
+        "id": "heredoc",
+        "description": "The text belongs to a here-document body."
+      },
+      {
+        "id": "url",
+        "description": "The word names a URL."
+      },
+      {
+        "id": "set",
+        "description": "The variable has a known assignment."
+      },
+      {
+        "id": "unused",
+        "description": "The variable is assigned and never read."
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "scopes": {
+          "heredocDelimiter": [
+            "keyword.control.heredoc.shell"
+          ],
+          "string.heredoc": [
+            "string.unquoted.heredoc.shell"
+          ],
+          "*.invalid": [
+            "invalid.illegal.shell"
+          ],
+          "*.unresolved": [
+            "invalid.deprecated.shell"
+          ],
+          "*.unused": [
+            "comment.unused.shell"
+          ],
+          "*.path": [
+            "string.other.link.shell"
+          ],
+          "*.url": [
+            "markup.underline.link.shell"
+          ],
+          "function.command": [
+            "entity.name.function.call.shell"
+          ],
+          "variable.set": [
+            "variable.other.readwrite.shell"
+          ]
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "kosh.restartServer",
+        "title": "Restart the Koshka language server",
+        "category": "Koshka"
+      }
+    ],
+    "configurationDefaults": {
+      "[kosh]": {
+        "editor.semanticHighlighting.enabled": true,
+        "editor.defaultFormatter": "toiletbril.kosh"
+      },
+      "[shit]": {
+        "editor.semanticHighlighting.enabled": true,
+        "editor.defaultFormatter": "toiletbril.kosh"
+      },
+      "[shellscript]": {
+        "editor.semanticHighlighting.enabled": true
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --allow-missing-repository --out kosh.vsix"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^10.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/vscode": "^1.91.0",
+    "@vscode/vsce": "^3.9.2",
+    "typescript": "^5.9.3"
+  }
+}
