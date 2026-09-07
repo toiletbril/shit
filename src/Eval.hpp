@@ -555,8 +555,7 @@ public:
   {
     return m_shell_variables.find(name);
   }
-  fn get_history_limit(StringView name, usize fallback) const wontthrow
-      -> usize
+  fn get_history_limit(StringView name, usize fallback) const wontthrow -> usize
   {
     let const *value = lookup_shell_variable(name);
     if (value == nullptr) return fallback;

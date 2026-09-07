@@ -68,8 +68,7 @@ pure fn find_token_bounds(StringView line, usize cursor) wontthrow
     -> token_bounds;
 pure fn is_active_token_boundary(StringView line, usize position) wontthrow
     -> bool;
-fn is_in_command_position(StringView line, usize token_start) wontthrow
-    -> bool;
+fn is_in_command_position(StringView line, usize token_start) wontthrow -> bool;
 pure fn command_segment_start(StringView line, usize cursor) wontthrow -> usize;
 pure fn split_path_token(StringView token) wontthrow -> path_token;
 pure fn path_candidate_needs_quoting(StringView candidate) wontthrow -> bool;
