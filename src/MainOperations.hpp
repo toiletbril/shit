@@ -1427,7 +1427,7 @@ static fn expand_interactive_history(StringView source,
   let expanded = String{heap_allocator()};
 
   if (!source.is_empty() && source[0] == '^') {
-    let const selected_event = toiletline::relative_history_event(
+    let const selected_event = toiletline::get_relative_history_event(
         context.scratch_allocator(), 1, accepted_event_number);
     if (!selected_event.has_value()) throw Error{"!!: event not found"};
 
@@ -1541,7 +1541,7 @@ static fn expand_interactive_history(StringView source,
       if (next_byte == '!' || next_byte == ':' || next_byte == '^' ||
           next_byte == '$' || next_byte == '*' || next_byte == '%')
       {
-        selected_event = toiletline::relative_history_event(
+        selected_event = toiletline::get_relative_history_event(
             context.scratch_allocator(), 1, accepted_event_number);
         has_implicit_word_designator = next_byte != '!';
         if (has_implicit_word_designator) reference_end_position--;
@@ -1553,7 +1553,7 @@ static fn expand_interactive_history(StringView source,
         reference_end_position = *close_position < source.length
                                      ? *close_position + 1
                                      : *close_position;
-        selected_event = toiletline::containing_history_event(
+        selected_event = toiletline::get_containing_history_event(
             context.scratch_allocator(), needle, accepted_event_number);
         if (selected_event.has_value()) {
           let const matched_word =
@@ -1586,18 +1586,18 @@ static fn expand_interactive_history(StringView source,
           let const parsed = designator.substring(1).to<u64>();
           if (!parsed.is_error() && parsed.value() > 0 &&
               parsed.value() <= static_cast<u64>(static_cast<usize>(-1)))
-            selected_event = toiletline::relative_history_event(
+            selected_event = toiletline::get_relative_history_event(
                 context.scratch_allocator(), static_cast<usize>(parsed.value()),
                 accepted_event_number);
         } else if (designator.is_all_decimal_digits()) {
           let const parsed = designator.to<u64>();
           if (!parsed.is_error() &&
               parsed.value() <= static_cast<u64>(static_cast<usize>(-1)))
-            selected_event = toiletline::numbered_history_event(
+            selected_event = toiletline::get_numbered_history_event(
                 context.scratch_allocator(), static_cast<usize>(parsed.value()),
                 accepted_event_number);
         } else {
-          selected_event = toiletline::prefixed_history_event(
+          selected_event = toiletline::get_prefixed_history_event(
               context.scratch_allocator(), designator, accepted_event_number);
         }
       }

@@ -693,12 +693,12 @@ static fn replace_history_file(const Path &path, const Path &parent,
     -> history_replacement;
 static fn record_history_file_status(const Path &path) -> void;
 
-static fn history_file_path() -> koshka::Maybe<koshka::Path>
+static fn get_history_file_path() -> koshka::Maybe<koshka::Path>
 {
   return resolve_history_path("KOSH_HISTORY_FILE", DEFAULT_HISTORY_FILE);
 }
 
-static fn calc_history_file_path() -> koshka::Maybe<koshka::Path>
+static fn get_calc_history_file_path() -> koshka::Maybe<koshka::Path>
 {
   return resolve_history_path("KOSH_CALC_HISTORY", KOSH_CALC_HISTORY_FILE);
 }
@@ -708,33 +708,36 @@ static fn calc_history_file_path() -> koshka::Maybe<koshka::Path>
    reload. */
 fn enter_calc_history() -> void
 {
-  if (koshka::Maybe<koshka::Path> shell = history_file_path();
+  if (koshka::Maybe<koshka::Path> shell = get_history_file_path();
       shell.has_value())
     ::tl_history_dump(shell->c_str());
 
-  if (koshka::Maybe<koshka::Path> calc = calc_history_file_path();
+  if (koshka::Maybe<koshka::Path> calc = get_calc_history_file_path();
       calc.has_value())
     unused(load_history(*calc, true));
 }
 
 fn leave_calc_history() -> void
 {
-  if (koshka::Maybe<koshka::Path> calc = calc_history_file_path();
+  if (koshka::Maybe<koshka::Path> calc = get_calc_history_file_path();
       calc.has_value())
     ::tl_history_dump(calc->c_str());
 
-  if (koshka::Maybe<koshka::Path> shell = history_file_path();
+  if (koshka::Maybe<koshka::Path> shell = get_history_file_path();
       shell.has_value())
     unused(load_history(*shell, true));
 }
 
-fn history_path() -> koshka::Maybe<koshka::Path> { return history_file_path(); }
+fn get_history_path() -> koshka::Maybe<koshka::Path>
+{
+  return get_history_file_path();
+}
 
 /* Every entry is appended to the file as it is stored, so a write only has to
    drop the leading records the bounded list no longer reaches. */
 fn history_write() -> koshka::ErrorOr<koshka::Ok>
 {
-  let const path = history_file_path();
+  let const path = get_history_file_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
 
   let const parent = path->parent_or_current();
@@ -873,7 +876,7 @@ static fn record_history_file_status(const Path &path) -> void
 
 fn history_read() -> koshka::ErrorOr<koshka::Ok>
 {
-  let const path = history_file_path();
+  let const path = get_history_file_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
 
   return sync_history(*path, false);
@@ -881,7 +884,7 @@ fn history_read() -> koshka::ErrorOr<koshka::Ok>
 
 fn history_clear() -> koshka::ErrorOr<koshka::Ok>
 {
-  let const path = history_file_path();
+  let const path = get_history_file_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
   let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
@@ -915,7 +918,7 @@ struct history_event
   String command;
 };
 
-fn newest_history_event_number() -> koshka::Maybe<usize>
+fn get_newest_history_event_number() -> koshka::Maybe<usize>
 {
   if (history_read().is_error()) return koshka::None;
   if (::itl_g_history_count == 0) return koshka::None;
@@ -923,12 +926,12 @@ fn newest_history_event_number() -> koshka::Maybe<usize>
   return ::itl_g_history_total_count;
 }
 
-fn history_events(koshka::Allocator allocator,
-                  koshka::Maybe<usize> after_event_number)
+fn get_history_events(koshka::Allocator allocator,
+                      koshka::Maybe<usize> after_event_number)
     -> koshka::ErrorOr<koshka::ArrayList<history_event>>
 {
   let events = koshka::ArrayList<history_event>{allocator};
-  let const path = history_file_path();
+  let const path = get_history_file_path();
   if (!path.has_value()) return steal(events);
 
   /* The load is allowed to miss the file, so an absent history reads as an
@@ -999,8 +1002,8 @@ static fn find_history_event(koshka::Allocator allocator,
   return koshka::None;
 }
 
-fn relative_history_event(koshka::Allocator allocator, usize distance,
-                          koshka::Maybe<usize> before_event_number)
+fn get_relative_history_event(koshka::Allocator allocator, usize distance,
+                              koshka::Maybe<usize> before_event_number)
     -> koshka::Maybe<history_event>
 {
   if (distance == 0) return koshka::None;
@@ -1010,8 +1013,8 @@ fn relative_history_event(koshka::Allocator allocator, usize distance,
       [&](usize, StringView) { return --remaining_event_count == 0; });
 }
 
-fn numbered_history_event(koshka::Allocator allocator, usize wanted_number,
-                          koshka::Maybe<usize> before_event_number)
+fn get_numbered_history_event(koshka::Allocator allocator, usize wanted_number,
+                              koshka::Maybe<usize> before_event_number)
     -> koshka::Maybe<history_event>
 {
   return find_history_event(
@@ -1019,8 +1022,8 @@ fn numbered_history_event(koshka::Allocator allocator, usize wanted_number,
       [&](usize number, StringView) { return number == wanted_number; });
 }
 
-fn prefixed_history_event(koshka::Allocator allocator, StringView prefix,
-                          koshka::Maybe<usize> before_event_number)
+fn get_prefixed_history_event(koshka::Allocator allocator, StringView prefix,
+                              koshka::Maybe<usize> before_event_number)
     -> koshka::Maybe<history_event>
 {
   return find_history_event(
@@ -1028,8 +1031,8 @@ fn prefixed_history_event(koshka::Allocator allocator, StringView prefix,
       [&](usize, StringView command) { return command.starts_with(prefix); });
 }
 
-fn containing_history_event(koshka::Allocator allocator, StringView text,
-                            koshka::Maybe<usize> before_event_number)
+fn get_containing_history_event(koshka::Allocator allocator, StringView text,
+                                koshka::Maybe<usize> before_event_number)
     -> koshka::Maybe<history_event>
 {
   return find_history_event(allocator, before_event_number,
@@ -1046,7 +1049,7 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
     return koshka::None;
   }
 
-  let const path = history_file_path();
+  let const path = get_history_file_path();
   if (!path.has_value()) return koshka::None;
   let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
@@ -1085,7 +1088,7 @@ fn history_rewrite_event(usize number, StringView expected,
                          const koshka::ArrayList<koshka::String> &replacements)
     -> bool
 {
-  let const path = history_file_path();
+  let const path = get_history_file_path();
   if (!path.has_value()) return false;
   let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
@@ -1359,7 +1362,7 @@ fn is_active() -> bool { return ::itl_g_is_active; }
 
 fn initialize() -> void
 {
-  if (koshka::Maybe<koshka::Path> kosh_history = history_file_path();
+  if (koshka::Maybe<koshka::Path> kosh_history = get_history_file_path();
       kosh_history.has_value())
   {
     let const result = load_history(*kosh_history, true);
@@ -1380,7 +1383,7 @@ fn initialize() -> void
 
 static fn compact_history_file(usize entry_limit) -> bool
 {
-  let const path = history_file_path();
+  let const path = get_history_file_path();
   if (!path.has_value()) return true;
   let const parent = path->parent_or_current();
   let lock = os::acquire_process_lock(parent.text().view());
@@ -1482,7 +1485,7 @@ fn get_input(const String &prompt) -> input_result
   let const program_path_candidate_count_before =
       utils::debug_program_path_candidate_count();
 #endif
-  let const history_path = history_file_path();
+  let const history_path = get_history_file_path();
   if (history_path.has_value()) unused(sync_history(*history_path, true));
   ::itl_g_last_history_event_number = 0;
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());

@@ -535,7 +535,7 @@ fn enter_calc_history() -> void {}
 
 fn leave_calc_history() -> void {}
 
-fn history_path() -> koshka::Maybe<koshka::Path>
+fn get_history_path() -> koshka::Maybe<koshka::Path>
 {
   return koshka::internal::resolve_no_editor_history_path();
 }
@@ -544,7 +544,7 @@ fn history_path() -> koshka::Maybe<koshka::Path>
    drop the leading records the bounded list no longer reaches. */
 fn history_write() -> koshka::ErrorOr<koshka::Ok>
 {
-  let const path = history_path();
+  let const path = get_history_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
 
   let const parent = path->parent_or_current();
@@ -586,7 +586,7 @@ fn history_write() -> koshka::ErrorOr<koshka::Ok>
 
 fn history_read() -> koshka::ErrorOr<koshka::Ok>
 {
-  let const path = history_path();
+  let const path = get_history_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
 
   return koshka::internal::load_no_editor_history(*path, false);
@@ -594,7 +594,7 @@ fn history_read() -> koshka::ErrorOr<koshka::Ok>
 
 fn history_clear() -> koshka::ErrorOr<koshka::Ok>
 {
-  let const path = history_path();
+  let const path = get_history_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
 
   let const parent = path->parent_or_current();
@@ -649,9 +649,9 @@ fn set_history_limit(usize entry_count) -> void
   state.first_record_index = 0;
 }
 
-fn newest_history_event_number() -> koshka::Maybe<usize>
+fn get_newest_history_event_number() -> koshka::Maybe<usize>
 {
-  let const path = history_path();
+  let const path = get_history_path();
   if (!path.has_value()) return koshka::None;
 
   let const contents =
@@ -664,12 +664,12 @@ fn newest_history_event_number() -> koshka::Maybe<usize>
   return state.total_count;
 }
 
-fn history_events(koshka::Allocator allocator,
-                  koshka::Maybe<usize> after_event_number)
+fn get_history_events(koshka::Allocator allocator,
+                      koshka::Maybe<usize> after_event_number)
     -> koshka::ErrorOr<koshka::ArrayList<history_event>>
 {
   let events = koshka::ArrayList<history_event>{allocator};
-  let const path = history_path();
+  let const path = get_history_path();
   if (!path.has_value()) return steal(events);
 
   /* The read is allowed to miss the file, so an absent history reads as an
@@ -701,8 +701,8 @@ fn history_events(koshka::Allocator allocator,
   return steal(events);
 }
 
-fn relative_history_event(koshka::Allocator allocator, usize distance,
-                          koshka::Maybe<usize> before_event_number)
+fn get_relative_history_event(koshka::Allocator allocator, usize distance,
+                              koshka::Maybe<usize> before_event_number)
     -> koshka::Maybe<history_event>
 {
   if (distance == 0) return koshka::None;
@@ -712,8 +712,8 @@ fn relative_history_event(koshka::Allocator allocator, usize distance,
       [&](usize, StringView) { return --remaining_event_count == 0; });
 }
 
-fn numbered_history_event(koshka::Allocator allocator, usize number,
-                          koshka::Maybe<usize> before_event_number)
+fn get_numbered_history_event(koshka::Allocator allocator, usize number,
+                              koshka::Maybe<usize> before_event_number)
     -> koshka::Maybe<history_event>
 {
   return koshka::internal::find_no_editor_history_event(
@@ -722,8 +722,8 @@ fn numbered_history_event(koshka::Allocator allocator, usize number,
       });
 }
 
-fn prefixed_history_event(koshka::Allocator allocator, StringView prefix,
-                          koshka::Maybe<usize> before_event_number)
+fn get_prefixed_history_event(koshka::Allocator allocator, StringView prefix,
+                              koshka::Maybe<usize> before_event_number)
     -> koshka::Maybe<history_event>
 {
   return koshka::internal::find_no_editor_history_event(
@@ -731,8 +731,8 @@ fn prefixed_history_event(koshka::Allocator allocator, StringView prefix,
       [&](usize, StringView command) { return command.starts_with(prefix); });
 }
 
-fn containing_history_event(koshka::Allocator allocator, StringView text,
-                            koshka::Maybe<usize> before_event_number)
+fn get_containing_history_event(koshka::Allocator allocator, StringView text,
+                                koshka::Maybe<usize> before_event_number)
     -> koshka::Maybe<history_event>
 {
   return koshka::internal::find_no_editor_history_event(
@@ -748,7 +748,7 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   {
     return koshka::None;
   }
-  let const path = history_path();
+  let const path = get_history_path();
   if (!path.has_value()) return koshka::None;
   let const parent = path->parent_or_current();
   let lock = koshka::os::acquire_process_lock(parent.text().view());

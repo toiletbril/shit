@@ -47,7 +47,7 @@ bool completion_is_enabled();
 void enter_calc_history();
 void leave_calc_history();
 
-koshka::Maybe<koshka::Path> history_path();
+koshka::Maybe<koshka::Path> get_history_path();
 bool is_history_contents_valid(StringView contents);
 void encode_history_record(String &output, StringView command);
 koshka::ErrorOr<koshka::Ok> history_write();
@@ -66,19 +66,19 @@ struct history_event
    an increment pays for the increment alone. A missing file is an empty list.
  */
 koshka::ErrorOr<koshka::ArrayList<history_event>>
-history_events(koshka::Allocator allocator,
-               koshka::Maybe<usize> after_event_number = koshka::None);
-koshka::Maybe<usize> newest_history_event_number();
-koshka::Maybe<history_event>
-relative_history_event(koshka::Allocator allocator, usize distance,
-                       koshka::Maybe<usize> before_event_number = koshka::None);
-koshka::Maybe<history_event>
-numbered_history_event(koshka::Allocator allocator, usize number,
-                       koshka::Maybe<usize> before_event_number = koshka::None);
-koshka::Maybe<history_event>
-prefixed_history_event(koshka::Allocator allocator, StringView prefix,
-                       koshka::Maybe<usize> before_event_number = koshka::None);
-koshka::Maybe<history_event> containing_history_event(
+get_history_events(koshka::Allocator allocator,
+                   koshka::Maybe<usize> after_event_number = koshka::None);
+koshka::Maybe<usize> get_newest_history_event_number();
+koshka::Maybe<history_event> get_relative_history_event(
+    koshka::Allocator allocator, usize distance,
+    koshka::Maybe<usize> before_event_number = koshka::None);
+koshka::Maybe<history_event> get_numbered_history_event(
+    koshka::Allocator allocator, usize number,
+    koshka::Maybe<usize> before_event_number = koshka::None);
+koshka::Maybe<history_event> get_prefixed_history_event(
+    koshka::Allocator allocator, StringView prefix,
+    koshka::Maybe<usize> before_event_number = koshka::None);
+koshka::Maybe<history_event> get_containing_history_event(
     koshka::Allocator allocator, StringView text,
     koshka::Maybe<usize> before_event_number = koshka::None);
 koshka::Maybe<usize> history_append_event(StringView command);

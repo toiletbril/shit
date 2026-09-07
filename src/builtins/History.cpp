@@ -51,7 +51,7 @@ static fn report_history_file_failure(const ExecContext &ec, EvalContext &cxt,
                                       StringView action,
                                       StringView failure_message) throws -> void
 {
-  let const path = toiletline::history_path();
+  let const path = toiletline::get_history_path();
   if (!path.has_value()) {
     report_soft_builtin_error(ec, cxt, ec.source_location(),
                               StringView{"Unable to "} + action +
@@ -117,7 +117,8 @@ static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
     return false;
   }
 
-  let const read_events = toiletline::history_events(cxt.scratch_allocator());
+  let const read_events =
+      toiletline::get_history_events(cxt.scratch_allocator());
   if (read_events.is_error()) {
     report_history_file_failure(ec, cxt, "read", read_events.error().message());
     return false;
@@ -208,7 +209,7 @@ static fn append_contents_into_history(EvalContext &cxt,
                                        StringView source_text) throws
     -> ErrorOr<Ok>
 {
-  let const backing = toiletline::history_path();
+  let const backing = toiletline::get_history_path();
   if (!backing.has_value()) return Error{"the path is unavailable"};
 
   let const parent = backing->parent_or_current();
@@ -281,7 +282,7 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target,
     append_state.event_number = 0;
 
   usize newest_number = 0;
-  if (let const current_number = toiletline::newest_history_event_number();
+  if (let const current_number = toiletline::get_newest_history_event_number();
       current_number.has_value())
   {
     newest_number = *current_number;
@@ -289,7 +290,7 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target,
 
   if (append_state.event_number > newest_number) append_state.event_number = 0;
 
-  let const source_path = toiletline::history_path();
+  let const source_path = toiletline::get_history_path();
   if (should_append && source_path.has_value() && source_path->exists() &&
       target.exists() && source_path->is_same_file_as(target))
   {
@@ -301,8 +302,8 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target,
   Maybe<usize> written_above{None};
   if (should_append) written_above = append_state.event_number;
 
-  let const read_events =
-      TRY(toiletline::history_events(cxt.scratch_allocator(), written_above));
+  let const read_events = TRY(
+      toiletline::get_history_events(cxt.scratch_allocator(), written_above));
 
   let payload = String{cxt.scratch_allocator()};
   for (let const &event : read_events)
@@ -545,7 +546,8 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return 1;
     }
 
-    let const read_events = toiletline::history_events(cxt.scratch_allocator());
+    let const read_events =
+        toiletline::get_history_events(cxt.scratch_allocator());
     if (read_events.is_error()) {
       report_history_file_failure(ec, cxt, "read",
                                   read_events.error().message());

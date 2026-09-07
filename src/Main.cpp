@@ -816,7 +816,7 @@ fn kosh_main(int argc, char **argv) -> int
   context.set_shell_variable("KOSH_BUILD_MODE", KOSH_BUILD_MODE);
   context.set_shell_variable("KOSH_OS", KOSH_OS_INFO);
   if (context.lookup_shell_variable("KOSH_HISTORY_FILE") == nullptr) {
-    if (let const history_path = toiletline::history_path();
+    if (let const history_path = toiletline::get_history_path();
         history_path.has_value())
     {
       context.set_shell_variable("KOSH_HISTORY_FILE", history_path->text());
