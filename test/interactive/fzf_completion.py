@@ -114,7 +114,9 @@ def run_interrupt_scenario(directory):
     return output, elapsed
 
 
-def run_scenario(directory, selector, environment, typed, mode="external"):
+def run_scenario(
+    directory, selector, environment, typed, mode="external", tab_count=1
+):
     """Type the words, press tab, submit, and return the transcript and log."""
     log_path = os.path.join(directory, "selector-log")
     if os.path.exists(log_path):
@@ -140,8 +142,9 @@ def run_scenario(directory, selector, environment, typed, mode="external"):
     read_until_idle(master, 3)
     os.write(master, typed.encode())
     read_until_idle(master, 1)
-    os.write(master, b"\t")
-    read_until_idle(master, 3)
+    for _ in range(tab_count):
+        os.write(master, b"\t")
+        read_until_idle(master, 3)
     os.write(master, b"\n")
     output = read_until_idle(master, 2, b"MARKER-END")
     os.write(master, b"printf 'MARKER-END\\n'\nexit\n")
@@ -173,6 +176,8 @@ def main():
             open(os.path.join(tree, name), "w").close()
         open(os.path.join(tree, "beta only"), "w").close()
         open(os.path.join(tree, "beta two"), "w").close()
+        open(os.path.join(tree, "hash#one"), "w").close()
+        open(os.path.join(tree, "hash#two"), "w").close()
 
         selector = os.path.join(directory, "selector")
         with open(selector, "w") as handle:
@@ -181,8 +186,15 @@ def main():
 
         typed = "printf '<%s>\\n' alpha"
 
+        prefixed, prefixed_log = run_scenario(
+            directory, selector, {}, typed
+        )
+        first_tab_extends_the_prefix = (
+            prefixed_log == b"" and b"<alpha->" in prefixed
+        )
+
         picked, picked_log = run_scenario(
-            directory, selector, {"STUB_PICK": "3"}, typed
+            directory, selector, {"STUB_PICK": "3"}, typed, tab_count=2
         )
         selector_saw_every_candidate = (
             b"record alpha-one" in picked_log
@@ -192,17 +204,17 @@ def main():
         pick_replaced_the_token = b"<alpha-two>" in picked
 
         multi, _ = run_scenario(
-            directory, selector, {"STUB_PICK": "1 2"}, typed
+            directory, selector, {"STUB_PICK": "1 2"}, typed, tab_count=2
         )
         several_picks_are_joined = (
             b"<alpha-one>" in multi and b"<alpha-three>" in multi
         )
 
         cancelled, cancelled_log = run_scenario(
-            directory, selector, {"STUB_CANCEL": "1"}, typed
+            directory, selector, {"STUB_CANCEL": "1"}, typed, tab_count=2
         )
         cancel_ran_the_selector = b"ran\n" in cancelled_log
-        cancel_leaves_the_line_alone = b"<alpha>" in cancelled
+        cancel_leaves_the_line_alone = b"<alpha->" in cancelled
         # Falling back to the printed list here would dump every candidate over
         # the screen the user just dismissed.
         cancel_prints_no_list = (
@@ -228,10 +240,34 @@ def main():
             directory,
             selector,
             {"STUB_PICK": "1"},
-            "printf '<%s>\\n' beta",
+            "printf '<%s>\\n' bet",
+            tab_count=2,
         )
         quoting_survives_the_selector = (
             b"record 'beta only'" in quoted_log and b"<beta only>" in quoted
+        )
+
+        quoted_multi, _ = run_scenario(
+            directory,
+            selector,
+            {"STUB_PICK": "1 2"},
+            "printf '<%s>\\n' bet",
+            tab_count=2,
+        )
+        several_quoted_picks_are_joined = (
+            b"<beta only>" in quoted_multi and b"<beta two>" in quoted_multi
+        )
+
+        metacharacter, metacharacter_log = run_scenario(
+            directory,
+            selector,
+            {"STUB_PICK": "1"},
+            "printf '<%s>\\n' hash",
+            tab_count=2,
+        )
+        metacharacter_is_quoted = (
+            b"record 'hash#one'" in metacharacter_log
+            and b"<hash#one>" in metacharacter
         )
 
         prompt_stays_usable = b"MARKER-END" in picked
@@ -242,6 +278,7 @@ def main():
         interrupt_drops_the_candidates = b"late" not in interrupted
 
         results = {
+            "FIRST_TAB_EXTENDS_THE_PREFIX": first_tab_extends_the_prefix,
             "SELECTOR_SAW_EVERY_CANDIDATE": selector_saw_every_candidate,
             "PICK_REPLACED_THE_TOKEN": pick_replaced_the_token,
             "SEVERAL_PICKS_ARE_JOINED": several_picks_are_joined,
@@ -255,6 +292,8 @@ def main():
             "ONE_CANDIDATE_SKIPS_THE_SELECTOR": one_candidate_skips_the_selector,
             "ONE_CANDIDATE_IS_INSERTED": one_candidate_is_inserted,
             "QUOTING_SURVIVES_THE_SELECTOR": quoting_survives_the_selector,
+            "SEVERAL_QUOTED_PICKS_ARE_JOINED": several_quoted_picks_are_joined,
+            "METACHARACTER_IS_QUOTED": metacharacter_is_quoted,
             "PROMPT_STAYS_USABLE": prompt_stays_usable,
             "INTERRUPT_FREES_THE_PROMPT": interrupt_frees_the_prompt,
             "INTERRUPT_IS_PROMPT": interrupt_is_prompt,
