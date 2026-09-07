@@ -51,13 +51,19 @@ public:
   Maybe<os::descriptor> err_fd{};
 
   /* 2>&1 routes the standard error to wherever the standard output goes, and
-     1>&2 the reverse. Applied after the file descriptors are placed. When both
-     are present the source order decides the result, since each dup reads the
-     current target of its source descriptor, so was_output_to_error_last
-     records which one the source wrote last. */
+     1>&2 the reverse. Each dup reads the current target of its source
+     descriptor, so was_output_to_error_last records which one the source wrote
+     last when both are present. */
   bool should_duplicate_error_to_output{false};
   bool should_duplicate_output_to_error{false};
   bool was_output_to_error_last{false};
+
+  /* A redirection onto the source descriptor written after its dup moves only
+     that descriptor, so the dup keeps the stream the command inherits. The
+     pipeline places a pipe end without setting either flag, which leaves the
+     dup on the pipe the way bash routes it. */
+  bool did_output_file_follow_error_dup{false};
+  bool did_error_file_follow_output_dup{false};
 
   /* exec -c hands the program an empty environment. The flag rides the context
      to the spawn site, where the envp becomes a single null instead of environ.
@@ -92,29 +98,46 @@ public:
   fn set_program_path(Path path) throws -> void;
   pure fn builtin_kind() const wontthrow -> const Builtin::Kind &;
 
-  /* Apply the 2>&1 and 1>&2 cross-routing in the order the source wrote them.
-     Each duplication reads the current target of its source descriptor, so when
-     both are present the one that came last in the source must run last. The
-     two callables carry the platform's own way to point one descriptor at the
-     other, a posix_spawn file action, a dup2, or a Windows handle assignment.
-   */
-  template <typename ApplyErrToOut, typename ApplyOutToErr>
-  fn apply_dup_routing(ApplyErrToOut apply_err_to_out,
-                       ApplyOutToErr apply_out_to_err) const -> void
+  /* Place the standard output and standard error files and apply the 2>&1 and
+     1>&2 cross-routing in the order the source wrote them. A dup written before
+     the redirection of its source descriptor copies the inherited stream, and
+     one written after copies the file. When both dups are present the one that
+     came last in the source runs last. The four callables carry the platform's
+     own way to place a descriptor and to point one descriptor at the other, a
+     posix_spawn file action, a dup2, or a Windows handle assignment. */
+  template <typename PlaceOut, typename PlaceErr, typename ApplyErrToOut,
+            typename ApplyOutToErr>
+  fn apply_output_routing(PlaceOut place_out, PlaceErr place_err,
+                          ApplyErrToOut apply_err_to_out,
+                          ApplyOutToErr apply_out_to_err) const -> void
   {
-    if (should_duplicate_error_to_output && should_duplicate_output_to_error) {
-      if (was_output_to_error_last) {
-        apply_err_to_out();
-        apply_out_to_err();
-      } else {
-        apply_out_to_err();
-        apply_err_to_out();
+    let const do_apply_dups = [&](bool has_err_to_out, bool has_out_to_err) {
+      if (has_err_to_out && has_out_to_err) {
+        if (was_output_to_error_last) {
+          apply_err_to_out();
+          apply_out_to_err();
+        } else {
+          apply_out_to_err();
+          apply_err_to_out();
+        }
+
+        return;
       }
-    } else if (should_duplicate_error_to_output) {
-      apply_err_to_out();
-    } else if (should_duplicate_output_to_error) {
-      apply_out_to_err();
-    }
+
+      if (has_err_to_out) apply_err_to_out();
+      if (has_out_to_err) apply_out_to_err();
+    };
+
+    do_apply_dups(
+        should_duplicate_error_to_output && did_output_file_follow_error_dup,
+        should_duplicate_output_to_error && did_error_file_follow_output_dup);
+
+    place_out();
+    place_err();
+
+    do_apply_dups(
+        should_duplicate_error_to_output && !did_output_file_follow_error_dup,
+        should_duplicate_output_to_error && !did_error_file_follow_output_dup);
   }
 
 private:

@@ -849,12 +849,16 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
 
   startup_info.cb = sizeof(startup_info);
   startup_info.hStdInput = ec.in_fd.value_or(GetStdHandle(STD_INPUT_HANDLE));
-  startup_info.hStdOutput = ec.out_fd.value_or(GetStdHandle(STD_OUTPUT_HANDLE));
-  startup_info.hStdError = ec.err_fd.value_or(GetStdHandle(STD_ERROR_HANDLE));
+  startup_info.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+  startup_info.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 
-  /* Each dup reads the current target of its source, so the source order
-     decides a mixed 2>&1 1>&2. */
-  ec.apply_dup_routing(
+  ec.apply_output_routing(
+      [&]() {
+        if (ec.out_fd) startup_info.hStdOutput = *ec.out_fd;
+      },
+      [&]() {
+        if (ec.err_fd) startup_info.hStdError = *ec.err_fd;
+      },
       [&]() { startup_info.hStdError = startup_info.hStdOutput; },
       [&]() { startup_info.hStdOutput = startup_info.hStdError; });
 
@@ -1384,9 +1388,14 @@ fn replace_process(ExecContext &&ec) -> void
 fn redirect_self(const ExecContext &ec) -> void
 {
   if (ec.in_fd) replace_descriptor(0, *ec.in_fd);
-  if (ec.out_fd) replace_descriptor(1, *ec.out_fd);
-  if (ec.err_fd) replace_descriptor(2, *ec.err_fd);
-  ec.apply_dup_routing(
+
+  ec.apply_output_routing(
+      [&]() {
+        if (ec.out_fd) replace_descriptor(1, *ec.out_fd);
+      },
+      [&]() {
+        if (ec.err_fd) replace_descriptor(2, *ec.err_fd);
+      },
       [&]() { replace_descriptor(2, GetStdHandle(STD_OUTPUT_HANDLE)); },
       [&]() { replace_descriptor(1, GetStdHandle(STD_ERROR_HANDLE)); });
 }

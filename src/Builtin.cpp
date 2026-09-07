@@ -156,16 +156,21 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
   if (has_pipe_descriptors || has_dup_routing) {
     if (ec.in_fd)
       saved_descriptors.push(os::save_and_replace_descriptor(0, *ec.in_fd));
-    if (ec.out_fd)
-      saved_descriptors.push(os::save_and_replace_descriptor(1, *ec.out_fd));
-    if (ec.err_fd)
-      saved_descriptors.push(os::save_and_replace_descriptor(2, *ec.err_fd));
-    /* The cross-route runs after the files are placed on 0, 1, and 2, so 2>&1
-       copies the descriptor the standard output now points at. The saves push
-       onto the same stack after the file saves, so the restore unwinds the
-       route before the files, the reverse of the apply order. The same
-       came-last ordering the spawn paths use decides a mixed 2>&1 1>&2. */
-    ec.apply_dup_routing(
+    /* Every save pushes onto one stack in the order the routing applies it, so
+       the restore below unwinds the whole sequence in reverse. */
+    ec.apply_output_routing(
+        [&]() {
+          if (ec.out_fd) {
+            saved_descriptors.push(
+                os::save_and_replace_descriptor(1, *ec.out_fd));
+          }
+        },
+        [&]() {
+          if (ec.err_fd) {
+            saved_descriptors.push(
+                os::save_and_replace_descriptor(2, *ec.err_fd));
+          }
+        },
         [&]() {
           saved_descriptors.push(os::save_and_replace_descriptor(
               2, os::descriptor_for_shell_fd(1)));

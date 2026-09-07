@@ -229,6 +229,10 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   command.should_duplicate_output_to_error =
       ec.should_duplicate_output_to_error;
   command.was_output_to_error_last = ec.was_output_to_error_last;
+  command.did_output_file_follow_error_dup =
+      ec.did_output_file_follow_error_dup;
+  command.did_error_file_follow_output_dup =
+      ec.did_error_file_follow_output_dup;
   command.should_use_empty_environment = should_use_empty_environment;
   command.should_use_fallback_argv0 = has_custom_argv0;
 

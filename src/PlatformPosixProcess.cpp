@@ -192,16 +192,21 @@ hot fn execute_program(ExecContext &ec, script_fallback_policy fallback,
     posix_spawn_file_actions_adddup2(&file_actions, *ec.in_fd, STDIN_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, *ec.in_fd);
   }
-  if (ec.out_fd && *ec.out_fd != STDOUT_FILENO) {
-    posix_spawn_file_actions_adddup2(&file_actions, *ec.out_fd, STDOUT_FILENO);
-    posix_spawn_file_actions_addclose(&file_actions, *ec.out_fd);
-  }
-  if (ec.err_fd && *ec.err_fd != STDERR_FILENO) {
-    posix_spawn_file_actions_adddup2(&file_actions, *ec.err_fd, STDERR_FILENO);
-    posix_spawn_file_actions_addclose(&file_actions, *ec.err_fd);
-  }
-  /* The dups come after the files are placed, so 2>&1 sees the final stdout. */
-  ec.apply_dup_routing(
+  ec.apply_output_routing(
+      [&]() {
+        if (ec.out_fd && *ec.out_fd != STDOUT_FILENO) {
+          posix_spawn_file_actions_adddup2(&file_actions, *ec.out_fd,
+                                           STDOUT_FILENO);
+          posix_spawn_file_actions_addclose(&file_actions, *ec.out_fd);
+        }
+      },
+      [&]() {
+        if (ec.err_fd && *ec.err_fd != STDERR_FILENO) {
+          posix_spawn_file_actions_adddup2(&file_actions, *ec.err_fd,
+                                           STDERR_FILENO);
+          posix_spawn_file_actions_addclose(&file_actions, *ec.err_fd);
+        }
+      },
       [&]() {
         posix_spawn_file_actions_adddup2(&file_actions, STDOUT_FILENO,
                                          STDERR_FILENO);
@@ -610,15 +615,19 @@ fn replace_process(ExecContext &&ec) throws -> void
     check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
     if (*ec.in_fd != STDIN_FILENO) check_syscall(close(*ec.in_fd));
   }
-  if (ec.out_fd) {
-    check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
-    if (*ec.out_fd != STDOUT_FILENO) check_syscall(close(*ec.out_fd));
-  }
-  if (ec.err_fd) {
-    check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
-    if (*ec.err_fd != STDERR_FILENO) check_syscall(close(*ec.err_fd));
-  }
-  ec.apply_dup_routing(
+  ec.apply_output_routing(
+      [&]() {
+        if (ec.out_fd) {
+          check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
+          if (*ec.out_fd != STDOUT_FILENO) check_syscall(close(*ec.out_fd));
+        }
+      },
+      [&]() {
+        if (ec.err_fd) {
+          check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
+          if (*ec.err_fd != STDERR_FILENO) check_syscall(close(*ec.err_fd));
+        }
+      },
       [&]() { check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO)); },
       [&]() { check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO)); });
 

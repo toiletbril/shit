@@ -928,8 +928,16 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, 1, r.opened_fd);
       ec.should_duplicate_error_to_output = true;
       ec.was_output_to_error_last = false;
+      ec.did_output_file_follow_error_dup = false;
       break;
     case redirection_outcome::OpenedFile:
+      if (r.target_fd == 1 && ec.should_duplicate_error_to_output) {
+        ec.did_output_file_follow_error_dup = true;
+      }
+      if (r.target_fd == 2 && ec.should_duplicate_output_to_error) {
+        ec.did_error_file_follow_output_dup = true;
+      }
+
       assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, r.target_fd,
                          r.opened_fd);
       break;
@@ -939,9 +947,11 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       if (r.target_fd == 2 && r.dup_from_fd == 1) {
         ec.should_duplicate_error_to_output = true;
         ec.was_output_to_error_last = false;
+        ec.did_output_file_follow_error_dup = false;
       } else if (r.target_fd == 1 && r.dup_from_fd == 2) {
         ec.should_duplicate_output_to_error = true;
         ec.was_output_to_error_last = true;
+        ec.did_error_file_follow_output_dup = false;
       }
       break;
     }

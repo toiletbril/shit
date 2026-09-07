@@ -470,9 +470,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                     true);
           }
 
-          let stage_out = ec.out_fd;
-          let stage_err = ec.err_fd;
-          ec.apply_dup_routing(
+          let stage_out = Maybe<os::descriptor>{};
+          let stage_err = Maybe<os::descriptor>{};
+          ec.apply_output_routing(
+              [&]() { stage_out = ec.out_fd; },
+              [&]() { stage_err = ec.err_fd; },
               [&]() { stage_err = stage_out.value_or(KOSH_STDOUT); },
               [&]() { stage_out = stage_err.value_or(KOSH_STDERR); });
           try {
@@ -505,9 +507,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
         diagnostic += error.to_string(
             source != nullptr ? source->view() : StringView{}, &cxt);
         diagnostic.push('\n');
-        let diagnostic_out = ec.out_fd;
-        let diagnostic_err = ec.err_fd;
-        ec.apply_dup_routing(
+        let diagnostic_out = Maybe<os::descriptor>{};
+        let diagnostic_err = Maybe<os::descriptor>{};
+        ec.apply_output_routing(
+            [&]() { diagnostic_out = ec.out_fd; },
+            [&]() { diagnostic_err = ec.err_fd; },
             [&]() { diagnostic_err = diagnostic_out.value_or(KOSH_STDOUT); },
             [&]() { diagnostic_out = diagnostic_err.value_or(KOSH_STDERR); });
         os::signal_internal_diagnostic();

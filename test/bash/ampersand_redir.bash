@@ -123,3 +123,19 @@ nosuchcmd_zzqq 2>"$report" | cat
 echo "first_captured_status=$? first_captured=$(( $(wc -c < "$report") > 0 ))"
 rm -f "$report"
 echo unresolved_done
+
+# Each redirection on a stage applies where the source writes it. A dup written
+# before the redirection of its source descriptor keeps the stream the stage
+# inherits, and the file that follows moves only its own descriptor. The
+# surrounding subshell captures the inherited stream so both destinations are
+# observable.
+ordered=/tmp/kosh_bashdiff_ordered_$$
+ordered_out=/tmp/kosh_bashdiff_ordered_out_$$
+( echo x | /bin/sh -c 'echo E >&2; echo O' 2>&1 >"$ordered" ) >"$ordered_out"
+echo "ordered_file=[$(cat "$ordered")] ordered_inherited=[$(cat "$ordered_out")]"
+( echo x | /bin/sh -c 'echo E >&2; echo O' >"$ordered" 2>&1 ) >"$ordered_out"
+echo "merged_file=[$(sort "$ordered" | tr '\n' ' ')] merged_inherited=[$(cat "$ordered_out")]"
+( /bin/sh -c 'echo E >&2; echo O' 1>&2 2>"$ordered" ) 2>"$ordered_out"
+echo "swapped_file=[$(cat "$ordered")] swapped_inherited=[$(cat "$ordered_out")]"
+rm -f "$ordered" "$ordered_out"
+echo ordered_done
