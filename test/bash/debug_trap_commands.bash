@@ -176,4 +176,39 @@ trap - DEBUG
 printf 'value=%s group=%s\n' "$pipeline_value" "$pipeline_group_value"
 shopt -u lastpipe
 
+echo pipeline-compound-functrace
+set -T
+trap 'echo D-$BASH_COMMAND' DEBUG
+{ echo group-a; echo group-b; } | wc -l | tr -d ' '
+( echo subshell-stage ) | cat
+for word in a b; do echo for-$word; done | wc -l | tr -d ' '
+trap - DEBUG
+set +T
+
+echo pipeline-lastpipe-prepared
+set +m
+shopt -s lastpipe
+set -T
+trap 'echo D-$BASH_COMMAND' DEBUG
+printf 'lastpipe-traced\n' | read pipeline_traced_value
+trap - DEBUG
+set +T
+shopt -u lastpipe
+printf 'traced=%s\n' "$pipeline_traced_value"
+
+echo pipeline-stage-command-text
+printf 'x\n' | printf 'stage=%s\n' "$BASH_COMMAND"
+printf 'y\n' | { printf 'group=%s\n' "$BASH_COMMAND"; }
+
+echo pipeline-heredoc-stage
+trap 'echo D-$BASH_COMMAND' DEBUG
+cat <<'HEREDOC' | wc -l | tr -d ' '
+heredoc line one
+heredoc line two
+HEREDOC
+printf 'piped\n' | cat <<'TAIL'
+tail body
+TAIL
+trap - DEBUG
+
 echo done
