@@ -100,3 +100,17 @@ echo "read_status=$?"
 echo > /no/such/directory/file 2>/dev/null
 echo "write_status=$?"
 echo still_running
+
+# A pipeline stage whose command does not resolve applies its own redirections
+# before its diagnostic is written, so the stage decides where the message
+# lands. The message text differs between the shells, the checks assert the
+# routing and the status.
+report=/tmp/kosh_bashdiff_unresolved_$$
+echo x | nosuchcmd_zzqq 2>/dev/null
+echo "hidden_status=$?"
+echo x | nosuchcmd_zzqq 2>"$report"
+echo "captured_status=$? captured=$(( $(wc -c < "$report") > 0 ))"
+echo x | nosuchcmd_zzqq >"$report" 2>&1
+echo "merged_status=$? merged=$(( $(wc -c < "$report") > 0 ))"
+rm -f "$report"
+echo unresolved_done
