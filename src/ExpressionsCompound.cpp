@@ -491,7 +491,12 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
           !cxt.shell_option_state(shell_option_id::Monitor);
 
       let const *simple = stage->as_simple_command();
-      if (simple != nullptr) publish_simple_command(cxt, *simple);
+      if (simple != nullptr) {
+        publish_simple_command(cxt, *simple);
+        cxt.set_stage_boundary_published(true);
+      }
+
+      defer { cxt.set_stage_boundary_published(false); };
 
       /* The stage boundary was published above for a simple stage, so the
          stage itself must not publish a second one. */

@@ -359,7 +359,13 @@ fn publish_command_and_run_debug_trap(
     EvalContext &cxt, CommandTextBuilder do_build_command_text,
     root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> void
 {
-  if (cxt.bash_dynamic_variables_enabled() && !cxt.is_running_trap_action()) {
+  let const was_text_published =
+      mode == root_evaluation_mode::PreparedPipelineStage &&
+      cxt.was_stage_boundary_published();
+
+  if (cxt.bash_dynamic_variables_enabled() && !cxt.is_running_trap_action() &&
+      !was_text_published)
+  {
     cxt.set_current_command(do_build_command_text());
   }
 

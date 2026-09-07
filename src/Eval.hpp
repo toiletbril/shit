@@ -1498,6 +1498,19 @@ public:
   {
     return m_is_in_pipeline_stage;
   }
+
+  /* Whether this process already built the command text of the stage it is
+     about to evaluate. A pipeline publishes the boundary before it forks, so
+     the parent and the child it forked both carry the text and neither has to
+     build it again. A fresh evaluator starts without it and builds its own. */
+  fn set_stage_boundary_published(bool was_published) wontthrow -> void
+  {
+    m_was_stage_boundary_published = was_published;
+  }
+  pure fn was_stage_boundary_published() const wontthrow -> bool
+  {
+    return m_was_stage_boundary_published;
+  }
   pure fn terminal_exec_allowed() const wontthrow -> bool;
 
   fn sorted_variable_assignments() const throws -> ArrayList<String>;
@@ -1926,6 +1939,7 @@ protected:
   bool m_is_completion_function_running{false};
   bool m_is_prompt_command_running{false};
   bool m_is_in_pipeline_stage{false};
+  bool m_was_stage_boundary_published{false};
   BumpArena m_prompt_command_arena{};
   String m_prompt_command_cached_text{heap_allocator()};
   Expression *m_prompt_command_cached_ast{nullptr};
