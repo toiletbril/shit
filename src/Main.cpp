@@ -1439,6 +1439,11 @@ fn kosh_main(int argc, char **argv) -> int
       }
     };
 
+    /* Only the first chunk stands in for the pipeline stage the parent
+       prepared, so the mode is spent here whichever branch consumes it. */
+    let const evaluation_mode = inherited_evaluation_mode;
+    inherited_evaluation_mode = koshka::root_evaluation_mode::Normal;
+
     if (should_analyze_input) {
       script_contents.normalize_crlf_line_endings();
       if (FLAG_LINT.is_enabled()) {
@@ -1446,11 +1451,10 @@ fn kosh_main(int argc, char **argv) -> int
                                                ast_arena, source_filename,
                                                &lint_diagnostic_totals);
       } else {
-        exit_code = run_script_contents(
-            script_contents, context, ast_arena, source_filename, nullptr,
-            nullptr, history_event_number, nullptr, nullptr, true, false, true,
-            inherited_evaluation_mode);
-        inherited_evaluation_mode = koshka::root_evaluation_mode::Normal;
+        exit_code = run_script_contents(script_contents, context, ast_arena,
+                                        source_filename, nullptr, nullptr,
+                                        history_event_number, nullptr, nullptr,
+                                        true, false, true, evaluation_mode);
       }
     } else {
       exit_code = EXIT_FAILURE;
