@@ -1566,9 +1566,13 @@ fn EvalContext::apply_subshell_bootstrap(
   replay_runtime.set_option(shell_option_id::Xtrace, false);
   replay_runtime.restore(*this);
   m_disabled_bash_special_arrays = disabled_bash_special_arrays;
-  run_source(bootstrap.payload.view().substring_of_length(
-                 0, static_cast<usize>(bootstrap.source_length)),
-             "inherited shell state");
+  {
+    m_is_replaying_inherited_state = true;
+    defer { m_is_replaying_inherited_state = false; };
+    run_source(bootstrap.payload.view().substring_of_length(
+                   0, static_cast<usize>(bootstrap.source_length)),
+               "inherited shell state");
+  }
   if (is_restricted_shell_identity) request_restricted_shell();
   runtime.restore(*this);
 

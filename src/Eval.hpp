@@ -757,6 +757,7 @@ public:
   pure fn should_run_debug_trap() const wontthrow -> bool
   {
     return m_has_debug_trap && !is_posix_mode() &&
+           !m_is_replaying_inherited_state &&
            (m_runtime.option_is_enabled(shell_option_id::Functrace) ||
             (m_function_call_depth == 0 && m_subshell_depth == 0 &&
              m_substitution_depth == 0));
@@ -1906,6 +1907,7 @@ protected:
   i64 m_getopts_last_optind{0};
   StringMap<String> m_traps{heap_allocator()};
   bool m_has_debug_trap{false};
+  bool m_is_replaying_inherited_state{false};
   bool m_exit_trap_ran{false};
   /* True while run_pending_traps is draining, so a signal delivered during a
      trap action does not nest a second drain. */
