@@ -931,11 +931,31 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       ec.did_output_file_follow_error_dup = false;
       break;
     case redirection_outcome::OpenedFile:
+      /* A file already in the slot is what the pending dup read, so it moves
+         into the other slot and stays open while this file takes its place. An
+         empty slot means the dup read the stream the stage inherits, which the
+         ordering mark carries to the routing. */
       if (r.target_fd == 1 && ec.should_duplicate_error_to_output) {
-        ec.did_output_file_follow_error_dup = true;
+        if (ec.out_fd) {
+          if (ec.err_fd) os::close_fd(*ec.err_fd);
+
+          ec.err_fd = ec.out_fd;
+          ec.out_fd = {};
+          ec.should_duplicate_error_to_output = false;
+        } else {
+          ec.did_output_file_follow_error_dup = true;
+        }
       }
       if (r.target_fd == 2 && ec.should_duplicate_output_to_error) {
-        ec.did_error_file_follow_output_dup = true;
+        if (ec.err_fd) {
+          if (ec.out_fd) os::close_fd(*ec.out_fd);
+
+          ec.out_fd = ec.err_fd;
+          ec.err_fd = {};
+          ec.should_duplicate_output_to_error = false;
+        } else {
+          ec.did_error_file_follow_output_dup = true;
+        }
       }
 
       assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, r.target_fd,

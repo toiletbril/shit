@@ -158,5 +158,12 @@ ordered_err=/tmp/kosh_bashdiff_ordered_err_$$
 echo "pipe_dup_file=[$(tr '\n' ' ' < "$ordered")] pipe_dup_piped=[$(tr '\n' ' ' < "$ordered_out")]"
 ( /bin/sh -c 'echo E >&2; echo O' 1>&2 2>"$ordered" | sed 's/^/P:/' ) >"$ordered_out" 2>"$ordered_err"
 echo "pipe_swap_file=[$(tr '\n' ' ' < "$ordered")] pipe_swap_inherited=[$(tr '\n' ' ' < "$ordered_err")] pipe_swap_piped=[$(tr '\n' ' ' < "$ordered_out")]"
+
+# A second file on a descriptor whose dup already read the first one leaves that
+# first file open as the other stream, so the two files receive one stream each.
+( /bin/sh -c 'echo E >&2; echo O' >"$ordered" 2>&1 >"$ordered_out" | sed 's/^/P:/' ) >/dev/null
+echo "repeat_first=[$(tr '\n' ' ' < "$ordered")] repeat_second=[$(tr '\n' ' ' < "$ordered_out")]"
+( /bin/sh -c 'echo E >&2; echo O' 2>"$ordered" 1>&2 2>"$ordered_out" | sed 's/^/P:/' ) >/dev/null
+echo "swap_first=[$(tr '\n' ' ' < "$ordered")] swap_second=[$(tr '\n' ' ' < "$ordered_out")]"
 rm -f "$ordered" "$ordered_out" "$ordered_err"
 echo ordered_done
