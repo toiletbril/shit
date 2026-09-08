@@ -755,7 +755,8 @@ static pure fn should_reprint_source(StringView source) wontthrow -> bool
 }
 
 static fn append_reprinted_source(String &out, StringView source,
-                                  bool should_collapse_blanks) throws -> void;
+                                  bool should_collapse_blanks,
+                                  bool should_space_operators) throws -> void;
 
 /* The byte just past the double quote that closes the one opened before
    `position`, or the end of the source when the quote is unterminated. */
@@ -804,9 +805,120 @@ static pure fn trimmed_substitution_body(StringView body) wontthrow
   return body;
 }
 
-static fn append_reprinted_source(String &out, StringView source,
-                                  bool should_collapse_blanks) throws -> void
+/* The redirection a reprint spells. A duplication always prints its descriptor
+   and binds its target with no blank between them. Every other form prints a
+   descriptor only when it differs from the default the operator carries, and it
+   separates its target with one blank. */
+struct reprinted_redirection
 {
+  usize length;
+  StringView spelling;
+  i32 default_fd;
+  i32 fd;
+  bool is_duplication;
+};
+
+/* The redirection whose operator starts at `position`, or nothing when the
+   bytes there spell none. A leading descriptor counts only where a token
+   starts, since the digits of `a2>b` belong to the word before the operator. */
+static pure fn match_reprinted_redirection(StringView source, usize position,
+                                           bool is_token_start) wontthrow
+    -> Maybe<reprinted_redirection>
+{
+  usize scan = position;
+  i32 fd = -1;
+
+  if (lexer::is_number(source[scan])) {
+    if (!is_token_start) return {};
+
+    i64 parsed_fd = 0;
+    while (scan < source.length && lexer::is_number(source[scan])) {
+      parsed_fd = (parsed_fd * 10) + (source[scan] - '0');
+
+      if (parsed_fd > 0xffff) return {};
+
+      scan++;
+    }
+
+    if (scan >= source.length) return {};
+
+    if (source[scan] != '<' && source[scan] != '>') return {};
+
+    fd = static_cast<i32>(parsed_fd);
+  }
+
+  let const byte = source[scan];
+  let const next_byte = scan + 1 < source.length ? source[scan + 1] : '\0';
+  let const third_byte = scan + 2 < source.length ? source[scan + 2] : '\0';
+
+  reprinted_redirection redirection{};
+  redirection.default_fd = -1;
+  redirection.fd = fd;
+  redirection.is_duplication = false;
+
+  if (byte == '>') {
+    redirection.default_fd = 1;
+
+    if (next_byte == '&') {
+      redirection.spelling = StringView{">&"};
+      redirection.is_duplication = true;
+    } else if (next_byte == '>') {
+      redirection.spelling = StringView{">>"};
+    } else if (next_byte == '|') {
+      redirection.spelling = StringView{">|"};
+    } else {
+      redirection.spelling = StringView{">"};
+    }
+  } else if (byte == '<') {
+    redirection.default_fd = 0;
+
+    if (next_byte == '&') {
+      redirection.spelling = StringView{"<&"};
+      redirection.is_duplication = true;
+    } else if (next_byte == '<' && third_byte == '<') {
+      redirection.spelling = StringView{"<<<"};
+    } else if (next_byte == '<' && third_byte == '-') {
+      redirection.spelling = StringView{"<<-"};
+    } else if (next_byte == '<') {
+      redirection.spelling = StringView{"<<"};
+    } else if (next_byte == '>') {
+      redirection.spelling = StringView{"<>"};
+    } else {
+      redirection.spelling = StringView{"<"};
+    }
+  } else if (byte == '&' && next_byte == '>') {
+    redirection.spelling =
+        third_byte == '>' ? StringView{"&>>"} : StringView{"&>"};
+  } else {
+    return {};
+  }
+
+  redirection.length = (scan - position) + redirection.spelling.length;
+
+  return redirection;
+}
+
+/* Whether any byte past `position` still spells a command, which decides
+   whether a terminator that bash drops at the end is written. */
+static pure fn has_reprint_remainder(StringView source,
+                                     usize position) wontthrow -> bool
+{
+  while (position < source.length) {
+    if (!is_reprint_blank(source[position]) && source[position] != '\n') {
+      return true;
+    }
+
+    position++;
+  }
+
+  return false;
+}
+
+static fn append_reprinted_source(String &out, StringView source,
+                                  bool should_collapse_blanks,
+                                  bool should_space_operators) throws -> void
+{
+  let const start_length = out.length();
   usize position = 0;
 
   while (position < source.length) {
@@ -847,7 +959,7 @@ static fn append_reprinted_source(String &out, StringView source,
       out.push('"');
       append_reprinted_source(
           out, source.substring_of_length(position + 1, end - position - 1),
-          false);
+          false, false);
 
       if (end < source.length) {
         out.push('"');
@@ -885,9 +997,146 @@ static fn append_reprinted_source(String &out, StringView source,
             out,
             trimmed_substitution_body(
                 source.substring_of_length(position + 2, *end - position - 3)),
-            true);
+            true, true);
         out.push(')');
         position = *end;
+        continue;
+      }
+    }
+
+    if (should_space_operators) {
+      let const is_token_start = out.length() == start_length ||
+                                 out.back() == ' ' || out.back() == '\n';
+      let const next_byte =
+          position + 1 < source.length ? source[position + 1] : '\0';
+
+      let do_trim_trailing_blank = [&] {
+        while (out.length() > start_length && out.back() == ' ')
+          out.pop_back();
+      };
+
+      let do_skip_following_blanks = [&] {
+        while (position < source.length &&
+               (is_reprint_blank(source[position]) || source[position] == '\n'))
+        {
+          position++;
+        }
+      };
+
+      let do_append_operator = [&](StringView text, usize operator_length) {
+        do_trim_trailing_blank();
+
+        if (out.length() == start_length) text = text.substring(1);
+
+        out.append(text);
+        position += operator_length;
+        do_skip_following_blanks();
+      };
+
+      if (byte == '#' && is_token_start) {
+        while (position < source.length && source[position] != '\n')
+          position++;
+
+        do_trim_trailing_blank();
+        continue;
+      }
+
+      let const matched =
+          match_reprinted_redirection(source, position, is_token_start);
+      if (matched.has_value()) {
+        let const redirection = *matched;
+        i32 printed_fd = -1;
+
+        if (out.length() > start_length && out.back() != ' ') out.push(' ');
+
+        if (redirection.is_duplication) {
+          printed_fd =
+              redirection.fd != -1 ? redirection.fd : redirection.default_fd;
+        } else if (redirection.fd != -1 &&
+                   redirection.fd != redirection.default_fd)
+        {
+          printed_fd = redirection.fd;
+        }
+
+        if (printed_fd != -1) {
+          out += String::from(static_cast<i64>(printed_fd), heap_allocator());
+        }
+
+        out.append(redirection.spelling);
+        position += redirection.length;
+
+        if (!redirection.is_duplication) {
+          out.push(' ');
+          do_skip_following_blanks();
+        }
+
+        continue;
+      }
+
+      if (byte == ';' && (next_byte == ';' || next_byte == '&')) {
+        do_trim_trailing_blank();
+
+        while (position < source.length &&
+               (source[position] == ';' || source[position] == '&'))
+        {
+          out.push(source[position]);
+          position++;
+        }
+
+        do_skip_following_blanks();
+
+        if (position < source.length) out.push(' ');
+
+        continue;
+      }
+
+      if (byte == ';') {
+        position++;
+        do_trim_trailing_blank();
+
+        if (!has_reprint_remainder(source, position)) {
+          position = source.length;
+          continue;
+        }
+
+        out.append("; ");
+        do_skip_following_blanks();
+        continue;
+      }
+
+      if (byte == '&' && next_byte == '&') {
+        do_append_operator(StringView{" && "}, 2);
+        continue;
+      }
+
+      if (byte == '|' && next_byte == '|') {
+        do_append_operator(StringView{" || "}, 2);
+        continue;
+      }
+
+      /* Bash keeps no merging pipe of its own and reprints the merge as the
+         duplication it stands for. */
+      if (byte == '|' && next_byte == '&') {
+        do_append_operator(StringView{" 2>&1 | "}, 2);
+        continue;
+      }
+
+      if (byte == '|') {
+        do_append_operator(StringView{" | "}, 1);
+        continue;
+      }
+
+      if (byte == '&') {
+        position++;
+        do_trim_trailing_blank();
+
+        if (out.length() > start_length) out.push(' ');
+
+        out.push('&');
+        do_skip_following_blanks();
+
+        if (position < source.length) out.push(' ');
+
         continue;
       }
     }
@@ -906,7 +1155,8 @@ fn internal::reprinted_command_text(StringView source) throws -> String
   }
 
   text.reserve(source.length);
-  append_reprinted_source(text, source, true);
+  append_reprinted_source(text, source, true, false);
+
   return text;
 }
 

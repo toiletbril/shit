@@ -32,6 +32,24 @@ echo braced ${HOME}
 echo joined x$( echo  glued )y
 trap - DEBUG
 
+echo substitution-operators
+trap 'echo "D-$BASH_COMMAND"' DEBUG
+piped_value=$(echo a|cat)
+listed_value=$(echo b;echo c)
+trailing_value=$(echo d ;)
+chained_value=$(true&&false||true)
+redirected_value=$(cat </dev/null)
+tight_redirect_value=$(echo e>/dev/null)
+default_fd_value=$(echo f 1>/dev/null)
+duplicated_value=$(echo g 2>&1)
+bare_duplicate_value=$(true>&2)
+merged_value=$(printf 'i\n'|&cat)
+async_value=$(true& echo k)
+nested_value=$(echo $(echo l|cat))
+commented_value=$(echo m|cat # dropped
+)
+trap - DEBUG
+
 echo spacing
 trap 'echo "D-$BASH_COMMAND"' DEBUG
 echo  two   three
