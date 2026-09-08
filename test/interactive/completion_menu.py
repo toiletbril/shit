@@ -18,7 +18,7 @@ import tempfile
 import termios
 import time
 
-# Each scenario runs from a candidate tree, so the binary is resolved before any
+# Each scenario runs from a candidate tree. The binary is resolved before any
 # directory change.
 binary = os.path.abspath(sys.argv[1])
 
@@ -52,17 +52,21 @@ def run_menu(
     typed,
     keys,
     rows=24,
+    cols=120,
     resized_rows=None,
+    resized_cols=None,
     keys_before_resize=(),
 ):
     """Type the words, press tab twice, send the keys, and submit the line.
 
-    The transcript is split at the second tab, so a check can tell what the menu
+    The transcript is split at the second tab. A check can tell what the menu
     drew from what the accepted line printed.
     """
     pid, master = pty.fork()
     if pid == 0:
-        fcntl.ioctl(1, termios.TIOCSWINSZ, struct.pack("HHHH", rows, 120, 0, 0))
+        fcntl.ioctl(
+            1, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0)
+        )
         os.environ["TERM"] = "xterm-256color"
         os.environ["HOME"] = directory
         os.environ["KOSH_HISTORY"] = os.path.join(directory, "history")
@@ -77,7 +81,7 @@ def run_menu(
     os.write(master, typed.encode())
     read_until_idle(master, 1)
 
-    # The first tab only inserts the common prefix, so the menu belongs to the
+    # The first tab only inserts the common prefix. The menu belongs to the
     # second one.
     os.write(master, b"\t")
     read_until_idle(master, 2)
@@ -90,11 +94,13 @@ def run_menu(
         os.write(master, key)
         menu += read_until_idle(master, 1)
 
-    if resized_rows is not None:
+    if resized_rows is not None or resized_cols is not None:
+        new_rows = rows if resized_rows is None else resized_rows
+        new_cols = cols if resized_cols is None else resized_cols
         fcntl.ioctl(
             master,
             termios.TIOCSWINSZ,
-            struct.pack("HHHH", resized_rows, 120, 0, 0),
+            struct.pack("HHHH", new_rows, new_cols, 0, 0),
         )
         resized_menu = read_until_idle(master, 2)
 
@@ -163,15 +169,16 @@ def main():
         menu_opens_with_first_selection = SELECTED_SGR in opened
         # The dimmed first row names the source and the keys it answers.
         help_row_names_the_source = (
-            b"  " + GHOST_SGR + b"selecting completions, tab accepts" in opened
+            b"  " + GHOST_SGR + b"selecting completions. enter to run" in opened
         )
         selected_start = opened.find(SELECTED_SGR)
         selected_end = opened.find(HIGHLIGHT_RESET, selected_start)
         selected_text = opened[
             selected_start + len(SELECTED_SGR):selected_end
         ]
-        # The candidates carry no description, so the row ends right after the
-        # name and the highlight does not reach the width of the longest entry.
+        # The candidates carry no description. The row ends right after the
+        # name, and the highlight does not reach the width of the longest
+        # entry.
         expected_selected_text = b"  alpha-one  "
         selected_highlight_ends_after_entry = (
             selected_start >= 0
@@ -179,9 +186,9 @@ def main():
             and selected_text == expected_selected_text
         )
 
-        # The first tab already inserted the common prefix alpha-, so the
-        # preview of the first row is the rest of alpha-one, drawn dimmed on
-        # the line the menu opened on.
+        # The first tab inserted the common prefix alpha-. The preview of the
+        # first row is the rest of alpha-one, drawn dimmed on the line the menu
+        # opened on.
         preview_shows_the_selected_candidate = (
             GHOST_SGR + b"one" + HIGHLIGHT_RESET in opened
         )
@@ -216,12 +223,12 @@ def main():
         _, _, typed_through = run_menu(directory, "tree", typed, [b"x"])
         an_ordinary_key_reaches_the_line = b"<alpha-x>" in typed_through
 
-        # Typing narrows the list, so the Tab that follows is answered by the
-        # menu and not by the prompt. A closed menu would submit alpha-t.
+        # Typing narrows the list. The Tab that follows is answered by the
+        # menu. A closed menu would submit alpha-t.
         _, _, filtered = run_menu(directory, "tree", typed, [b"t", b"\t"])
         typing_narrows_the_list = b"<alpha-three>" in filtered
 
-        # Backspace widens the list back to every candidate, so the first row is
+        # Backspace widens the list back to every candidate. The first row is
         # alpha-one again. A closed menu would submit alpha- on its own.
         _, _, widened = run_menu(
             directory, "tree", typed, [b"t", b"\x7f", b"\t"]
@@ -236,8 +243,8 @@ def main():
         an_empty_search_keeps_the_menu_open = b"no matches" in emptied
         an_erase_recovers_the_list = b"<alpha-one>" in recovered
 
-        # Accepting a directory walks into it, so the second Tab answers the
-        # menu the directory opened. A closed menu would submit deep-one/.
+        # Accepting a directory walks into it. The second Tab answers the menu
+        # the directory opened. A closed menu would submit deep-one/.
         _, _, descended = run_menu(
             directory, "deep", deep_typed, [b"\t", b"\t"]
         )
@@ -245,7 +252,7 @@ def main():
             b"<deep-one/inner-alpha>" in descended
         )
 
-        # Escape puts back the line the menu opened on, so the narrowing key is
+        # Escape puts back the line the menu opened on. The narrowing key is
         # undone. A menu that cancelled in place would submit alpha-t.
         _, _, cancelled = run_menu(directory, "tree", typed, [b"t", b"\x1b"])
         escape_restores_the_opening_line = b"<alpha->" in cancelled
@@ -258,7 +265,7 @@ def main():
         )
         control_g_restores_the_opening_line = b"<deep->" in aborted
 
-        # Eight candidates in an eight row terminal cannot all be shown, so the
+        # Eight candidates in an eight row terminal cannot all be shown. The
         # menu bounds its rows and names the part it drew.
         bounded, _, _ = run_menu(directory, "tall", tall_typed, [], rows=8)
         a_long_list_is_bounded = b"showing 1-" in bounded and b" of 8" in bounded
@@ -297,6 +304,20 @@ def main():
             and b"menu-8" in selected_after_resize
         )
         resized_selection_is_accepted = b"<menu-8>" in selected_tail
+
+        # A narrow terminal rewraps the typed line over the whole block. The
+        # help row, the candidates, and the count row have no room left under
+        # it. A menu that drew them anyway would scroll the prompt off the top.
+        # Every row the repaint advances over carries its own newline, and the
+        # block and the menu together stay inside the terminal.
+        wrapped_typed = "printf '<%s>\\n'" + " " * 40 + "menu"
+        _, rewrapped, rewrapped_tail = run_menu(
+            directory, "tall", wrapped_typed, [], rows=8, resized_cols=12
+        )
+        a_rewrap_keeps_the_menu_inside_the_terminal = (
+            b"printf" in rewrapped and rewrapped.count(b"\r\n") + 1 <= 8
+        )
+        a_rewrap_keeps_the_prompt_usable = b"MARKER-END" in rewrapped_tail
 
         prompt_stays_usable = b"MARKER-END" in submitted
 
@@ -347,6 +368,12 @@ def main():
                 resize_keeps_the_selection_visible
             ),
             "RESIZED_SELECTION_IS_ACCEPTED": resized_selection_is_accepted,
+            "A_REWRAP_KEEPS_THE_MENU_INSIDE_THE_TERMINAL": (
+                a_rewrap_keeps_the_menu_inside_the_terminal
+            ),
+            "A_REWRAP_KEEPS_THE_PROMPT_USABLE": (
+                a_rewrap_keeps_the_prompt_usable
+            ),
             "PROMPT_STAYS_USABLE": prompt_stays_usable,
         }
 
