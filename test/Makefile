@@ -242,8 +242,15 @@ ZSH ?= /bin/zsh
 ASH ?= /bin/busybox
 YASH ?= /bin/yash
 PYTHON ?= python3
-BASHP ?= /bin/bash
 DASH ?= /bin/dash
+
+ifeq ($(origin BASHP), undefined)
+MODERN_BASH := $(shell ./find-modern-bash.sh)
+ifneq ($(MODERN_BASH),)
+BASHP := $(MODERN_BASH)
+endif
+endif
+BASHP ?= /bin/bash
 
 export BASHP DASH
 

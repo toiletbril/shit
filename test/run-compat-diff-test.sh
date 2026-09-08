@@ -149,7 +149,14 @@ if [ -z "$BASH_SKIP_REASON" ]; then
     compare_one "$BASHP" "$TEST_FILE" .bash bash bash
   done
 else
-  printf "\t%-64s skipped, %s\n" bashdiff "$BASH_SKIP_REASON"
+  MODERN_BASH=$(./find-modern-bash.sh)
+  if [ -n "$MODERN_BASH" ]; then
+    printf "\t%-64s FAILED :c\n" \
+      "bashdiff ($BASH_SKIP_REASON, $MODERN_BASH is suitable)"
+    RUNNER_STATUS=1
+  else
+    printf "\t%-64s skipped, %s\n" bashdiff "$BASH_SKIP_REASON"
+  fi
 fi
 
 if command -v "$DASH" >/dev/null 2>&1; then

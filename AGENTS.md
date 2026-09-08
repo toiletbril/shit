@@ -204,8 +204,10 @@ changes update this file.
   values. The native runner suppresses incidental diagnostics outside
   `shellcheck_static_*` tests.
 - Koshkit rm tests use `--dry-run`. Cleanup uses the system rm after a nonempty
-  path check. Bashdiff and mimicrydiff need Bash 5.3 or newer. Set `BASHP` to a
-  modern Bash on macOS.
+  path check. Bashdiff and mimicrydiff need Bash 5.3 or newer.
+  `test/find-modern-bash.sh` selects one from PATH, and `BASHP` overrides that
+  choice. An unsuitable `BASHP` fails the suite while a suitable Bash is
+  installed.
 - Golden comparisons use the resolved host diff on POSIX and koshkit diff on
   Windows through `test/bin/diff`.
 
