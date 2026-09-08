@@ -24,6 +24,8 @@ SELECTED_SGR = b"\x1b[7m"
 DIMMED_SGR = b"\x1b[90m"
 TITLE_SGR = b"\x1b[33m"
 HIGHLIGHT_RESET = b"\x1b[0m"
+COMMAND_SGR = b"\x1b[34m"
+STRING_SGR = b"\x1b[92m"
 
 # The word each command prints is an operand. A menu row never carries the
 # angle bracketed output that proves the entry ran.
@@ -112,8 +114,18 @@ def run_history_menu(directory, typed, keys, rows=24):
 def main():
     with tempfile.TemporaryDirectory() as directory:
         opened, _ = run_history_menu(directory, "", [])
+        # The operand of each entry follows the reset that closes the colored
+        # quoted word. The selected row is drawn plain and ends its reverse
+        # video after the operand.
         menu_lists_every_entry = (
-            b"' one" in opened and b"' two" in opened and b"' three" in opened
+            b"' one" in opened
+            or HIGHLIGHT_RESET + b" one" in opened
+        ) and (
+            b"' two" in opened
+            or HIGHLIGHT_RESET + b" two" in opened
+        ) and (
+            b"' three" in opened
+            or HIGHLIGHT_RESET + b" three" in opened
         )
         menu_opens_with_first_selection = SELECTED_SGR in opened
         # The first row names the source in yellow and lists the keys it
@@ -137,6 +149,21 @@ def main():
             selected_start >= 0
             and selected_end >= 0
             and selected_text == b" printf '<%s>\\n' three "
+        )
+
+        # An unselected row carries the colors the shell gives the same command
+        # on the line. The row prefix is two spaces, the command word is blue,
+        # and the quoted operand is bright green.
+        a_row_carries_the_command_colors = (
+            b"  "
+            + COMMAND_SGR
+            + b"printf"
+            + HIGHLIGHT_RESET
+            + b" "
+            + STRING_SGR
+            + b"'<%s>\\n'"
+            + HIGHLIGHT_RESET
+            in opened
         )
 
         accepted, marker = run_history_menu(directory, "", [b"\n"])
@@ -195,6 +222,9 @@ def main():
             "MENU_OPENS_WITH_FIRST_SELECTION": menu_opens_with_first_selection,
             "HELP_ROW_NAMES_THE_SOURCE": help_row_names_the_source,
             "THE_NEWEST_ENTRY_IS_SELECTED": the_newest_entry_is_selected,
+            "A_ROW_CARRIES_THE_COMMAND_COLORS": (
+                a_row_carries_the_command_colors
+            ),
             "ENTER_RUNS_THE_HIGHLIGHTED_ENTRY": (
                 enter_runs_the_highlighted_entry
             ),
