@@ -355,6 +355,7 @@ SimpleCommand::SimpleCommand(SourceLocation location,
     m_location.position = first.position;
     m_location.length =
         static_cast<u32>(last.position + last.length - first.position);
+    set_source_end_position(m_location.position + m_location.length);
   }
 }
 
