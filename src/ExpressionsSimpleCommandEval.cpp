@@ -855,8 +855,15 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     i64 function_ret = 0;
     try {
       function_ret = function_body->evaluate(cxt);
-      if (cxt.should_run_return_trap())
-        cxt.run_named_trap(StringView{"RETURN", 6});
+      if (cxt.should_run_return_trap()) {
+        /* A pending return has already replaced the status with the one it
+           supplies. The action reads the status the body left behind. */
+        let const is_return_pending =
+            cxt.has_pending_control_flow() &&
+            cxt.pending_control_flow().kind == control_flow::Kind::Return;
+        cxt.run_return_trap(is_return_pending ? cxt.status_before_return()
+                                              : cxt.last_exit_status());
+      }
     } catch (ErrorWithLocationAndDetails &error) {
       if (!error.was_rendered())
         if (let const windowed = window_function_body_error(cxt, error);

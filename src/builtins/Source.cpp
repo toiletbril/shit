@@ -82,6 +82,7 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   };
 
   i32 status = 0;
+  let status_before_return = Maybe<i32>{None};
   {
     let bash_argument_frame_context = EvalContext::BashArgumentFrameContext{};
     cxt.enter_bash_source_argument_frame(bash_argument_frame_context,
@@ -94,15 +95,21 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_positional_params(steal(params));
     }
 
-    status = cxt.run_source(*contents, "the file '" + path + "'",
-                            return_handling::Consume,
-                            ec.arg_location_at(path_index), StringView{path});
+    status =
+        cxt.run_source(*contents, "the file '" + path + "'",
+                       return_handling::Consume, ec.arg_location_at(path_index),
+                       StringView{path}, false, &status_before_return);
   }
 
   /* A sourced file runs in the current scope, and its finish fires the RETURN
      trap with no functrace option. The source frame is already left here, and
      the positional parameters are still the ones the file received. */
-  if (!cxt.is_posix_mode()) cxt.run_named_trap(StringView{"RETURN", 6});
+  if (!cxt.is_posix_mode()) {
+    if (status_before_return.has_value())
+      cxt.run_return_trap(*status_before_return);
+    else
+      cxt.run_return_trap(status);
+  }
 
   return status;
 }

@@ -144,6 +144,7 @@ fn EvalContext::request_return(i64 status, SourceLocation location) throws
     -> void
 {
   LOG(Debug, "return requested, status %lld", (long long) status);
+  m_status_before_return = m_last_exit_status;
   m_control_flow = control_flow{control_flow::Kind::Return, status, location,
                                 m_current_source, String{m_current_origin}};
 }

@@ -69,4 +69,27 @@ echo posix-source
   echo after-posix=$? )
 echo after-posix-source=$?
 
+echo function-status-in-action
+( set -T
+  trap 'echo "R-seen=$?"' RETURN
+  false_then_zero() { false; return 0; }
+  true_then_five() { true; return 5; }
+  falls_through() { false; }
+  bare_return() { false; return; }
+  false_then_zero
+  echo "after-false-then-zero=$?"
+  true_then_five
+  echo "after-true-then-five=$?"
+  falls_through
+  echo "after-falls-through=$?"
+  bare_return
+  echo "after-bare-return=$?" )
+echo after-function-status-in-action=$?
+
+echo source-status-in-action
+( trap 'echo "R-seen=$?"' RETURN
+  . bash/goldens/return_trap_status.bash
+  echo after-status=$? )
+echo after-source-status-in-action=$?
+
 echo return-trap-done

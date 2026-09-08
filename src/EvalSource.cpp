@@ -438,7 +438,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
                            return_handling handling,
                            Maybe<SourceLocation> call_site,
                            Maybe<StringView> filename,
-                           bool should_record_history) throws -> i32
+                           bool should_record_history,
+                           Maybe<i32> *status_before_return) throws -> i32
 {
   let normalized_source = String{source};
   normalized_source.normalize_crlf_line_endings();
@@ -542,6 +543,9 @@ fn EvalContext::run_source(StringView source, StringView origin,
         pending_control_flow().kind == control_flow::Kind::Return)
     {
       let const source_status = static_cast<i32>(pending_control_flow().value);
+      if (status_before_return != nullptr)
+        *status_before_return = m_status_before_return;
+
       clear_control_flow();
       set_last_exit_status(source_status);
       return source_status;

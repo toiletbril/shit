@@ -747,6 +747,13 @@ public:
   fn run_named_trap(StringView condition,
                     const SourceLocation *trigger_location = nullptr) throws
       -> void;
+  /* Run the RETURN action against the status the leaving frame left behind. The
+     caller owns the condition that decides whether the trap runs at all. */
+  fn run_return_trap(i32 status_before_return) throws -> void;
+  pure fn status_before_return() const wontthrow -> i32
+  {
+    return m_status_before_return;
+  }
   pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
   pure fn has_err_trap() const wontthrow -> bool { return m_has_err_trap; }
   pure fn should_run_err_trap() const wontthrow -> bool
@@ -1666,12 +1673,14 @@ public:
   /* Lex, parse, and evaluate a chunk of source in this context, without
      capturing output or snapshotting state. A dot-source consumes a return at
      the top of the chunk and ends there, an eval leaves it pending, so
-     consume_return is false for eval. */
+     consume_return is false for eval. A consumed return reports the status the
+     chunk held before it through status_before_return. */
   fn run_source(StringView source, StringView origin = "a sourced command",
                 return_handling handling = return_handling::Consume,
                 Maybe<SourceLocation> call_site = None,
                 Maybe<StringView> filename = None,
-                bool should_record_history = false) throws -> i32;
+                bool should_record_history = false,
+                Maybe<i32> *status_before_return = nullptr) throws -> i32;
   fn resolve_source_path(StringView path,
                          bool should_expand_tilde = false) throws
       -> Maybe<Path>;
@@ -1843,6 +1852,10 @@ protected:
   u64 m_field_separator_bits[4]{};
   pure fn is_field_separator(char c) const wontthrow -> bool;
   i32 m_last_exit_status{0};
+  /* The status the shell held when the return builtin last ran. The RETURN trap
+     action reads this status, and the frame it leaves takes the status the
+     return supplied only after the action has finished. */
+  i32 m_status_before_return{0};
 
   u64 m_last_command_duration_nanos{0};
 

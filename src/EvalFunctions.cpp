@@ -300,6 +300,17 @@ fn EvalContext::run_named_trap(StringView condition,
              return_handling::Reject, trigger_site);
 }
 
+fn EvalContext::run_return_trap(i32 status_before_return) throws -> void
+{
+  /* Bash never applies the status the return supplied before the action runs.
+     The action reads the status the last command of the frame left. */
+  let const saved_exit_status = m_last_exit_status;
+  m_last_exit_status = status_before_return;
+  defer { m_last_exit_status = saved_exit_status; };
+
+  run_named_trap(StringView{"RETURN", 6});
+}
+
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 {
   LOG(Info, "setting a trap for '%.*s' with a %zu byte action",
