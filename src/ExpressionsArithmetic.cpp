@@ -591,6 +591,7 @@ static fn arithmetic_clause_command_text(StringView clause) throws -> String
   command_text += "((";
   command_text.append(clause);
   command_text += "))";
+
   return command_text;
 }
 
@@ -752,9 +753,9 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   cxt.set_terminal_exec_allowed(false);
 
-  let const can_skip_condition_commands =
+  let const should_skip_condition_commands =
       !cxt.has_debug_trap() && !cxt.should_echo_expanded();
-  if (is_fully_eliminated() && can_skip_condition_commands) {
+  if (is_fully_eliminated() && should_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated c-style for as a no-op");
     cxt.publish_single_pipe_status(0);
     return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
@@ -797,7 +798,7 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   let const is_condition_blank = is_blank_clause(m_condition);
   let const is_condition_folded =
-      m_folded_condition.has_value() && can_skip_condition_commands;
+      m_folded_condition.has_value() && should_skip_condition_commands;
   let const is_step_blank = is_blank_clause(m_step);
 
   let const do_evaluate_condition = [&]() throws -> bool {

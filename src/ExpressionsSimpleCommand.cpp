@@ -446,8 +446,8 @@ fn bind_nonstandard_fd(ArrayList<nonstandard_descriptor> &nonstandard,
 
 /* Route an opened descriptor into the slot its target names, fd 0 to input, 1
    to output, 2 to error. Any other target keeps its own number and joins the
-   nonstandard list. The last redirection of a descriptor wins, so a descriptor
-   in the slot closes first. */
+   nonstandard list. The last redirection of a descriptor wins. A descriptor in
+   the slot closes first. */
 fn assign_redirected_fd(ExecContext &ec,
                         ArrayList<nonstandard_descriptor> &nonstandard, i32 fd,
                         os::descriptor file_fd) throws -> void
@@ -745,11 +745,17 @@ static pure fn should_reprint_source(StringView source) wontthrow -> bool
 
     let const previous_byte = source[position - 1];
 
-    if (byte == ' ' && previous_byte == ' ') return true;
+    if (byte == ' ' && previous_byte == ' ') {
+      return true;
+    }
 
-    if (byte == '(' && previous_byte == '$') return true;
+    if (byte == '(' && previous_byte == '$') {
+      return true;
+    }
 
-    if (byte == '\n' && previous_byte == '\\') return true;
+    if (byte == '\n' && previous_byte == '\\') {
+      return true;
+    }
   }
 
   return false;
@@ -843,7 +849,9 @@ static pure fn match_reprinted_redirection(StringView source, usize position,
 
     if (scan >= source.length) return {};
 
-    if (source[scan] != '<' && source[scan] != '>') return {};
+    if (source[scan] != '<' && source[scan] != '>') {
+      return {};
+    }
 
     fd = static_cast<i32>(parsed_fd);
   }
@@ -899,7 +907,7 @@ static pure fn match_reprinted_redirection(StringView source, usize position,
   return redirection;
 }
 
-/* Whether any byte past `position` still spells a command, which decides
+/* Whether any byte past `position` still spells a command. The answer decides
    whether a terminator that bash drops at the end is written. */
 static pure fn has_reprint_remainder(StringView source,
                                      usize position) wontthrow -> bool
@@ -926,6 +934,7 @@ static fn append_reprinted_subshell(String &out, StringView region) throws
       trimmed_reprint_body(region.substring_of_length(1, region.length - 2));
   if (body.is_empty()) {
     out.append(region);
+
     return;
   }
 
@@ -961,7 +970,10 @@ static fn append_reprinted_source(String &out, StringView source,
       while (position < source.length && is_reprint_blank(source[position]))
         position++;
 
-      if (out.length() != 0 && out.back() != ' ') out.push(' ');
+      if (out.length() != 0 && out.back() != ' ') {
+        out.push(' ');
+      }
+
       continue;
     }
 
@@ -1004,6 +1016,7 @@ static fn append_reprinted_source(String &out, StringView source,
                                                           closing_byte);
         if (!end.has_value()) {
           out.append(source.substring(position));
+
           return;
         }
 
@@ -1017,7 +1030,7 @@ static fn append_reprinted_source(String &out, StringView source,
             source.substring_of_length(position + 2, *end - position - 3));
 
         /* A body that opens a subshell would read as arithmetic when it follows
-           the dollar sign directly, so bash writes a blank between them. */
+           the dollar sign directly. Bash writes a blank between them. */
         out.append(!body.is_empty() && body[0] == '(' ? "$( " : "$(");
         append_reprinted_source(out, body, true, true, false);
         out.push(')');
@@ -1064,8 +1077,8 @@ static fn append_reprinted_source(String &out, StringView source,
       }
 
       /* A nested subshell carries the same layout as the one that holds it. A
-         doubled parenthesis opens an arithmetic command, which bash keeps the
-         way it is written. */
+         doubled parenthesis opens an arithmetic command. Bash keeps that
+         command the way it is written. */
       if (byte == '(' && is_token_start && next_byte != '(') {
         let const end =
             lexer::scan_balanced_shell_region(source, position + 1, ')');
@@ -1084,7 +1097,9 @@ static fn append_reprinted_source(String &out, StringView source,
         let const redirection = *matched;
         i32 printed_fd = -1;
 
-        if (out.length() > start_length && out.back() != ' ') out.push(' ');
+        if (out.length() > start_length && out.back() != ' ') {
+          out.push(' ');
+        }
 
         if (redirection.is_duplication) {
           printed_fd =
@@ -1188,6 +1203,7 @@ fn internal::reprinted_command_text(StringView source) throws -> String
   let text = String{heap_allocator()};
   if (!should_reprint_source(source)) {
     text.append(source);
+
     return text;
   }
 
@@ -1203,7 +1219,9 @@ fn internal::subshell_command_text(EvalContext &cxt,
 {
   let text = String{heap_allocator()};
   let const source = cxt.source_text_in_span(location, end_position);
-  if (source.length == 0 || source[0] != '(') return text;
+  if (source.length == 0 || source[0] != '(') {
+    return text;
+  }
 
   let const body_end = lexer::scan_balanced_shell_region(source, 1, ')');
   if (!body_end.has_value()) return text;
@@ -1225,6 +1243,7 @@ fn internal::append_word_source_text(EvalContext &cxt, String &out,
   let const text = cxt.source_text_in_span(word.source_location(), 0);
   if (text.length != 0) {
     out += reprinted_command_text(text);
+
     return;
   }
 
@@ -1255,7 +1274,7 @@ static fn append_redirection_descriptor(String &out, const Redirection &redir,
   out += String::from(static_cast<i64>(redir.fd), heap_allocator());
 }
 
-/* The descriptor a duplication carries, which bash prints even when it is the
+/* The descriptor a duplication carries. Bash prints it even when it is the
    form's own default. */
 static fn append_duplication_descriptor(String &out,
                                         const Redirection &redir) throws -> void
@@ -1263,8 +1282,8 @@ static fn append_duplication_descriptor(String &out,
   append_redirection_descriptor(out, redir, -1);
 }
 
-/* The heredoc terminator, which is the delimiter word without its quoting and
-   without the dash that requested the tab stripping. */
+/* The heredoc terminator. The terminator is the delimiter word without its
+   quoting and without the dash that requested the tab stripping. */
 static fn heredoc_terminator(const Redirection &redir) throws -> String
 {
   ASSERT(redir.heredoc_delimiter != nullptr);
@@ -1272,8 +1291,9 @@ static fn heredoc_terminator(const Redirection &redir) throws -> String
       static_cast<const tokens::WordToken *>(redir.heredoc_delimiter)
           ->word()
           .to_literal_string();
-  if (redir.should_strip_heredoc_tabs && !terminator.is_empty())
+  if (redir.should_strip_heredoc_tabs && !terminator.is_empty()) {
     return String{heap_allocator(), terminator.view().substring(1)};
+  }
 
   return terminator;
 }
@@ -1368,8 +1388,8 @@ static fn append_one_redirection(EvalContext &cxt, String &out,
   }
 }
 
-/* Whether the duplication is the one the parser adds behind &>file, which bash
-   spells as part of the operator and never prints on its own. */
+/* Whether the duplication is the one the parser adds behind &>file. Bash spells
+   it as part of the operator and never prints it on its own. */
 static pure fn
 is_synthesized_error_duplication(const Redirection &redir) wontthrow -> bool
 {
@@ -1442,8 +1462,8 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
   LOG(Debug, "applying %zu redirections to the pipeline stage",
       m_redirections.count());
 
-  /* A binding opened here is owned by the list until the context adopts it, so
-     a later redirection that throws still releases what the earlier ones
+  /* A binding opened here is owned by the list until the context adopts it. A
+     later redirection that throws still releases what the earlier ones
      opened. */
   ArrayList<nonstandard_descriptor> nonstandard{heap_allocator()};
   bool was_nonstandard_handed_off = false;
@@ -1469,10 +1489,10 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       ec.did_output_file_follow_error_dup = false;
       break;
     case redirection_outcome::OpenedFile:
-      /* A file already in the slot is what the pending dup read, so it moves
-         into the other slot and stays open while this file takes its place. An
-         empty slot means the dup read the stream the stage inherits, which the
-         ordering mark carries to the routing. */
+      /* A file already in the slot is what the pending dup read. It moves into
+         the other slot and stays open while this file takes its place. An empty
+         slot means the dup read the stream the stage inherits. The ordering
+         mark carries that stream to the routing. */
       if (r.target_fd == 1 && ec.should_duplicate_error_to_output) {
         if (ec.out_fd) {
           if (ec.err_fd) os::close_fd(*ec.err_fd);
@@ -1519,13 +1539,13 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
             nonstandard_descriptor{KOSH_INVALID_FD, r.target_fd, dup_from_fd});
       } else if (r.dup_from_fd == Redirection::DUP_FD_CLOSE) {
         /* One of the three standard descriptors closes after the routing places
-           it, so the close joins the list that runs last. */
+           it. The close joins the list that runs last. */
         bind_nonstandard_fd(nonstandard, nonstandard_descriptor{
                                              KOSH_INVALID_FD, r.target_fd, -1});
       } else {
         /* The source is a descriptor the shell holds and the stage never
-           carries, so the slot receives an independent copy of the same open
-           file. The context owns that copy and releases it with the rest. */
+           carries. The slot receives an independent copy of the same open file.
+           The context owns that copy and releases it with the rest. */
         let const copied = os::duplicate_shell_fd(r.dup_from_fd);
         if (copied == KOSH_INVALID_FD) {
           let const location = redir.target != nullptr

@@ -35,8 +35,8 @@ using namespace internal;
 
 /* The header text a word loop shows in the trace and in BASH_COMMAND. Nothing
    is appended when no observer is armed. A missing in clause walks the
-   positional parameters, which the header names by the word list the loop
-   behaves as if it carried. */
+   positional parameters. The header names those parameters by the word list
+   the loop behaves as if it carried. */
 static fn append_word_loop_header(EvalContext &cxt, String &header,
                                   StringView keyword, StringView variable_name,
                                   bool has_in_clause,
@@ -223,10 +223,10 @@ hot fn IfClause::evaluate_status_impl(EvalContext &cxt) const throws
     -> status_result
 {
   cxt.set_terminal_exec_allowed(false);
-  let const can_skip_condition_commands =
+  let const should_skip_condition_commands =
       !cxt.has_debug_trap() && !cxt.should_echo_expanded();
 
-  if (is_fully_eliminated() && can_skip_condition_commands) {
+  if (is_fully_eliminated() && should_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated if as a no-op");
     cxt.publish_single_pipe_status(1);
     return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
@@ -234,7 +234,7 @@ hot fn IfClause::evaluate_status_impl(EvalContext &cxt) const throws
 
   /* An index past the last branch means every condition failed, so the else
      body runs or the if yields 0. */
-  if (m_folded_branch.has_value() && can_skip_condition_commands) {
+  if (m_folded_branch.has_value() && should_skip_condition_commands) {
     LOG(Debug,
         "running the folded if branch %zu of %zu without testing conditions",
         *m_folded_branch, m_branches.count());
@@ -471,10 +471,10 @@ hot fn WhileLoop::evaluate_status_impl(EvalContext &cxt) const throws
   LOG(Debug, "entering the %s loop%s", is_until_loop ? "until" : "while",
       is_folded_to_skip ? ", folded to skip the body" : "");
 
-  let const can_skip_condition_commands =
+  let const should_skip_condition_commands =
       !cxt.has_debug_trap() && !cxt.should_echo_expanded();
   if ((is_folded_to_skip || is_fully_eliminated()) &&
-      can_skip_condition_commands)
+      should_skip_condition_commands)
   {
     cxt.publish_single_pipe_status(is_until_loop ? 0 : 1);
     return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
@@ -818,8 +818,8 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
       static_cast<int>(m_variable_name.length), m_variable_name.data,
       values.count());
 
-  /* The header text serves the trace and BASH_COMMAND, which both repeat it on
-     every iteration, so it is built once before the loop. */
+  /* The header text serves the trace and BASH_COMMAND. Both repeat it on every
+     iteration. The text is built once before the loop. */
   let loop_trace = String{cxt.scratch_allocator()};
   append_word_loop_header(cxt, loop_trace, "for", m_variable_name,
                           m_has_in_clause, m_words);
@@ -855,7 +855,7 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
   }
 
   /* An exit, a return, or an abandoned publish carries its own status, and the
-     loop reports that instead of the last body it ran. */
+     loop reports that status. */
   if (cxt.has_pending_control_flow()) {
     result.status = cxt.last_exit_status();
     return result;
