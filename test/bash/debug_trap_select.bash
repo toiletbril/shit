@@ -35,4 +35,17 @@ select item in $words "two words"; do
 done <<< '3'
 trap - DEBUG
 
+# The header of a select is announced once before the menu, and the rounds after
+# the first announce only the commands of the body.
+echo select-rounds
+trap 'echo "L-$LINENO-[$BASH_COMMAND]"' DEBUG
+select item in one two; do
+  echo round-$item
+  if [ "$item" = two ]; then
+    break
+  fi
+done <<< $'1\n2'
+trap - DEBUG
+echo after-select-rounds=$?
+
 echo done
