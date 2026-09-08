@@ -1368,6 +1368,12 @@ fn Expression::as_subshell() const wontthrow -> const expressions::Subshell *
   return nullptr;
 }
 
+fn Expression::as_redirected_command() const wontthrow
+    -> const expressions::RedirectedCommand *
+{
+  return nullptr;
+}
+
 fn Expression::error_report_location() const wontthrow -> SourceLocation
 {
   return source_location();

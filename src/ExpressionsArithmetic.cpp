@@ -972,8 +972,21 @@ fn Subshell::collapsed_body() const wontthrow -> const Expression *
     let const *list = current->as_compound_list();
     if (list == nullptr) break;
 
-    let const *inner = list->single_unconditional_subshell();
-    if (inner == nullptr) break;
+    let const *sole = list->single_unconditional_command();
+    if (sole == nullptr) break;
+
+    let const *inner = sole->as_subshell();
+    if (inner == nullptr) {
+      /* The redirections written around the inner parentheses still apply, so
+         the wrapper stands in for the list that holds it. */
+      let const *wrapper = sole->as_redirected_command();
+      if (wrapper == nullptr) break;
+
+      let const *wrapped = wrapper->child();
+      if (wrapped == nullptr || wrapped->as_subshell() == nullptr) break;
+
+      return sole;
+    }
 
     current = inner->m_body;
   }
@@ -1478,6 +1491,17 @@ fn RedirectedCommand::analyze(AnalysisContext &actx,
                                             !is_unconditional};
 
   check_redirection_lints(actx, lint_input);
+}
+
+fn RedirectedCommand::as_redirected_command() const wontthrow
+    -> const RedirectedCommand *
+{
+  return this;
+}
+
+fn RedirectedCommand::child() const wontthrow -> const Command *
+{
+  return m_child;
 }
 
 fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64

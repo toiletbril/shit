@@ -77,6 +77,7 @@ class CompoundList;
 class ForLoop;
 class CStyleForLoop;
 class Subshell;
+class RedirectedCommand;
 } /* namespace expressions */
 
 /* The getopts call whose result the enclosing loop body reads. The views point
@@ -729,6 +730,8 @@ public:
   virtual fn as_cstyle_for_loop() const wontthrow
       -> const expressions::CStyleForLoop *;
   virtual fn as_subshell() const wontthrow -> const expressions::Subshell *;
+  virtual fn as_redirected_command() const wontthrow
+      -> const expressions::RedirectedCommand *;
 
   /* This no-ops for arena storage and frees an ordinary heap node otherwise. */
   static fn operator delete(opaque *pointer) wontthrow->void;
@@ -1134,9 +1137,9 @@ public:
   fn has_single_test_command() const throws -> bool;
   fn append_node(const CompoundListCondition *node) throws -> void;
 
-  /* The subshell this list holds when it holds nothing else, and no connector,
+  /* The command this list holds when it holds nothing else, and no connector,
      negation, background operator, or timing prefix stands beside it. */
-  fn single_unconditional_subshell() const wontthrow -> const Subshell *;
+  fn single_unconditional_command() const wontthrow -> const Command *;
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
@@ -1547,6 +1550,12 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
+
+  fn as_redirected_command() const wontthrow
+      -> const RedirectedCommand * override;
+
+  /* The command the redirections are written around. */
+  pure fn child() const wontthrow -> const Command *;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;

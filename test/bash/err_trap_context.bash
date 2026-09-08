@@ -178,3 +178,16 @@ trap 'echo "E-$LINENO-[$BASH_COMMAND]"' ERR
 ( ( true ) )
 trap - ERR
 echo err-nested-subshell-fire-done
+
+# The redirections written around the inner parentheses are applied around the
+# body the outer parentheses run, and the inner parentheses still raise no fire.
+# A brace group written between the two raises its own.
+echo err-redirected-subshell-fire
+trap 'echo "E-$LINENO-[$BASH_COMMAND]"' ERR
+( ( false ) < /dev/null )
+( ( false ) 2>/dev/null )
+( ( false ) > /dev/null )
+( { ( false ) < /dev/null ; } )
+( ( ( false ) < /dev/null ) )
+trap - ERR
+echo err-redirected-subshell-fire-done
