@@ -254,6 +254,20 @@ fn EvalContext::run_named_trap(StringView condition,
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
 
+  /* The command that fired the trap observes its own status again after the
+     action. The restoration is deferred because an action that throws would
+     otherwise leave the status of the action behind. An absent array is
+     restored by removing the one the action created. */
+  defer
+  {
+    m_last_exit_status = saved_exit_status;
+
+    if (has_saved_pipe_statuses)
+      set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
+    else
+      m_indexed_arrays.erase("PIPESTATUS");
+  };
+
   /* A return in an action belongs to the enclosing function or sourced file.
      The action's own frame neither consumes it nor counts as a return scope.
      The triggering command is the call site, so a diagnostic raised inside the
@@ -261,9 +275,6 @@ fn EvalContext::run_named_trap(StringView condition,
   run_source(action->view(),
              "the " + String{heap_allocator(), condition} + " trap",
              return_handling::Reject, trigger_site);
-  m_last_exit_status = saved_exit_status;
-  if (has_saved_pipe_statuses)
-    set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
 }
 
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
@@ -332,6 +343,16 @@ fn EvalContext::run_pending_traps() throws -> void
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
 
+  defer
+  {
+    m_last_exit_status = saved_exit_status;
+
+    if (has_saved_pipe_statuses)
+      set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
+    else
+      m_indexed_arrays.erase("PIPESTATUS");
+  };
+
   for (i32 number = os::take_pending_signal(); number != 0;
        number = os::take_pending_signal())
   {
@@ -343,10 +364,6 @@ fn EvalContext::run_pending_traps() throws -> void
         run_source(action->view(), "the " + *name + " trap");
       }
   }
-
-  m_last_exit_status = saved_exit_status;
-  if (has_saved_pipe_statuses)
-    set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
 }
 
 pure fn EvalContext::traps() const wontthrow -> const StringMap<String> &
@@ -365,6 +382,25 @@ cold fn EvalContext::run_exit_trap() throws -> void
 
   m_trap_action_depth += 1;
   defer { m_trap_action_depth -= 1; };
+
+  let const saved_exit_status = m_last_exit_status;
+  let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
+  let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
+  ArrayList<String> saved_pipe_statuses{heap_allocator()};
+  if (has_saved_pipe_statuses)
+    saved_pipe_statuses = current_pipe_statuses->clone();
+
+  /* The shell exits with the status the action found, which an action that runs
+     exit replaces on its own path. */
+  defer
+  {
+    m_last_exit_status = saved_exit_status;
+
+    if (has_saved_pipe_statuses)
+      set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
+    else
+      m_indexed_arrays.erase("PIPESTATUS");
+  };
 
   if (let const *action = m_traps.find(StringView{"EXIT", 4});
       action != nullptr)
@@ -389,6 +425,28 @@ fn EvalContext::clear_inherited_exit_trap() throws -> void
 
 cold fn EvalContext::run_subshell_exit_trap() throws -> void
 {
+  /* The action keeps the command that triggered it in BASH_COMMAND, which the
+     depth reports to every publisher the action reaches. */
+  m_trap_action_depth += 1;
+  defer { m_trap_action_depth -= 1; };
+
+  let const saved_exit_status = m_last_exit_status;
+  let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
+  let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
+  ArrayList<String> saved_pipe_statuses{heap_allocator()};
+  if (has_saved_pipe_statuses)
+    saved_pipe_statuses = current_pipe_statuses->clone();
+
+  defer
+  {
+    m_last_exit_status = saved_exit_status;
+
+    if (has_saved_pipe_statuses)
+      set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
+    else
+      m_indexed_arrays.erase("PIPESTATUS");
+  };
+
   /* Only an EXIT action the subshell itself set is present, since the boundary
      cleared the inherited one on entry. It runs before restore_state returns
      the parent's traps. */

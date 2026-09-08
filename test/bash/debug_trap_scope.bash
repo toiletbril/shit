@@ -268,6 +268,17 @@ echo lineno-action-source
   trap - DEBUG )
 echo after-lineno-action-source=$?
 
+# An EXIT action a subshell sets keeps the command that triggered it and the
+# status that command left, the same way the shell's own EXIT action does.
+echo subshell-exit-command
+( trap 'echo "S-$?-[$BASH_COMMAND]"' EXIT
+  echo in-subshell
+  false )
+echo after-subshell-exit-command=$?
+( trap 'echo "S-$?-[$BASH_COMMAND]"' EXIT
+  echo in-subshell-clean )
+echo after-subshell-exit-clean=$?
+
 echo exit-command
-trap 'echo E-$BASH_COMMAND' EXIT
+trap 'echo "E-$?-[$BASH_COMMAND]"' EXIT
 echo last-command
