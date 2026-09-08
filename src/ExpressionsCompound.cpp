@@ -184,6 +184,10 @@ hot fn CompoundList::evaluate_root_status_impl(
         m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
     const bool should_ignore_errexit =
         !is_end_of_and_or_chain || n->is_negated();
+    /* The ERR trap belongs to a command only when the trap was already
+       installed as the command began. A function that installs one for itself
+       leaves its own call untraced. */
+    const bool was_err_trapped = cxt.has_err_trap();
     /* In bash mood an evaluation error fails the command and the list goes on,
        while a script-fatal error still aborts the run. */
     let const do_run_node = [&]() throws -> status_result {
@@ -294,7 +298,7 @@ hot fn CompoundList::evaluate_root_status_impl(
 
     if (was_command_failure_uncaught && !cxt.is_posix_mode()) {
       cxt.set_last_exit_status(ret.status);
-      if (cxt.should_run_err_trap()) {
+      if (was_err_trapped && cxt.should_run_err_trap()) {
         let const failed_location = n->command()->error_report_location();
         cxt.run_named_trap(StringView{"ERR", 3}, &failed_location);
       }

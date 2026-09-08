@@ -191,3 +191,34 @@ trap 'echo "E-$LINENO-[$BASH_COMMAND]"' ERR
 ( ( ( false ) < /dev/null ) )
 trap - ERR
 echo err-redirected-subshell-fire-done
+
+# The trap belongs to a command only when the trap was already installed as the
+# command began. A function that installs one for itself leaves its own call
+# untraced. The action outlives the call, and a second call to the same function
+# is traced.
+echo err-installed-inside-function
+installs_own_trap() {
+  trap 'echo "I-[$BASH_COMMAND]-[${FUNCNAME[0]}]"' ERR
+  false
+  return 2
+}
+installs_own_trap
+echo "first-status=$?"
+installs_own_trap
+echo "second-status=$?"
+trap - ERR
+echo err-installed-inside-function-done
+
+# An action that returns leaves the function the failing command runs in, and
+# the commands written after that command are not reached.
+echo err-action-return
+returns_from_action() {
+  trap 'echo in-action; return 6' ERR
+  false
+  echo unreachable
+  return 2
+}
+returns_from_action
+echo "status=$?"
+trap - ERR
+echo err-action-return-done

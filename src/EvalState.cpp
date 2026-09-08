@@ -840,6 +840,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
     m_traps = steal(snapshot.traps);
   }
   m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
+  m_has_err_trap = m_traps.find(StringView{"ERR", 3}) != nullptr;
   m_debug_trap_active_depth = snapshot.debug_trap_active_depth;
 
   if (!os::restore_current_directory(snapshot.working_directory))

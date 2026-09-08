@@ -748,6 +748,7 @@ public:
                     const SourceLocation *trigger_location = nullptr) throws
       -> void;
   pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
+  pure fn has_err_trap() const wontthrow -> bool { return m_has_err_trap; }
   pure fn should_run_err_trap() const wontthrow -> bool
   {
     return m_runtime.option_is_enabled(shell_option_id::Errtrace) ||
@@ -1966,6 +1967,7 @@ protected:
   i64 m_getopts_last_optind{0};
   StringMap<String> m_traps{heap_allocator()};
   bool m_has_debug_trap{false};
+  bool m_has_err_trap{false};
   /* The deepest frame the DEBUG action still reaches without functrace. An
      install records the frame it ran in, and a command deeper than that frame
      is not traced. */
