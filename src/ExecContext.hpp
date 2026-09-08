@@ -26,6 +26,18 @@
 
 namespace koshka {
 
+/* A stage redirection that is applied after the three standard slots are
+   placed. Its target is a descriptor above 2, or one of the three when the
+   redirection closes it. An opened file rides in file_fd and is owned by the
+   context. A duplication leaves file_fd invalid and names its source in
+   dup_from_fd, and a close leaves both unset. */
+struct nonstandard_descriptor
+{
+  os::descriptor file_fd{KOSH_INVALID_FD};
+  i32 target_fd{-1};
+  i32 dup_from_fd{-1};
+};
+
 class ExecContext
 {
 public:
@@ -53,6 +65,10 @@ public:
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
   Maybe<os::descriptor> err_fd{};
+
+  /* Almost every command redirects nothing outside the three standard slots, so
+     the list stays at one null pointer until a stage fills it. */
+  SparseList<nonstandard_descriptor> nonstandard_fds{};
 
   /* 2>&1 routes the standard error to wherever the standard output goes, and
      1>&2 the reverse. Each dup reads the current target of its source
@@ -143,6 +159,30 @@ public:
     do_apply_dups(
         should_duplicate_error_to_output && !did_output_file_follow_error_dup,
         should_duplicate_output_to_error && !did_error_file_follow_output_dup);
+  }
+
+  /* Place every redirection whose target is not one of the three standard
+     descriptors. It runs after the standard routing, so a duplication reads the
+     descriptor that routing already placed. The three callables carry the
+     platform's own way to move a file onto a descriptor, to point one
+     descriptor at another, and to close one. */
+  template <typename PlaceFile, typename PlaceDup, typename CloseTarget>
+  fn apply_nonstandard_routing(PlaceFile place_file, PlaceDup place_dup,
+                               CloseTarget close_target) const -> void
+  {
+    for (let const &binding : nonstandard_fds) {
+      if (binding.file_fd != KOSH_INVALID_FD) {
+        place_file(binding.file_fd, binding.target_fd);
+        continue;
+      }
+
+      if (binding.dup_from_fd >= 0) {
+        place_dup(binding.dup_from_fd, binding.target_fd);
+        continue;
+      }
+
+      close_target(binding.target_fd);
+    }
   }
 
 private:

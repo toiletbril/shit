@@ -616,6 +616,20 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
   return handle != nullptr ? handle : KOSH_INVALID_FD;
 }
 
+fn duplicate_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
+{
+  let const original = descriptor_for_shell_fd(shell_fd);
+  if (original == nullptr || original == INVALID_HANDLE_VALUE)
+    return KOSH_INVALID_FD;
+
+  HANDLE copy = INVALID_HANDLE_VALUE;
+  if (DuplicateHandle(GetCurrentProcess(), original, GetCurrentProcess(), &copy,
+                      0, TRUE, DUPLICATE_SAME_ACCESS) == FALSE)
+    return KOSH_INVALID_FD;
+
+  return copy;
+}
+
 fn descriptors_refer_to_same_file(os::descriptor first,
                                   os::descriptor second) wontthrow -> bool
 {

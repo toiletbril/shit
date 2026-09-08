@@ -205,3 +205,42 @@ echo "repeat_first=[$(tr '\n' ' ' < "$ordered")] repeat_second=[$(tr '\n' ' ' < 
 echo "swap_first=[$(tr '\n' ' ' < "$ordered")] swap_second=[$(tr '\n' ' ' < "$ordered_out")]"
 rm -f "$ordered" "$ordered_out" "$ordered_err"
 echo ordered_done
+
+# A stage redirection whose target is a descriptor above two keeps its own
+# number. The pipe stays on the standard output of the stage, and the file, the
+# duplication, and the close each reach the descriptor the source names.
+nonstd=/tmp/kosh_bashdiff_nonstd_$$
+nonstd_in=/tmp/kosh_bashdiff_nonstd_in_$$
+/bin/sh -c 'echo deep >&3' 3>"$nonstd" | cat
+echo "nonstd_file=[$(cat "$nonstd")]"
+echo piped_beside 3>"$nonstd" | cat
+echo "nonstd_pipe_kept=[$(cat "$nonstd")]"
+printf 'from three\n' > "$nonstd_in"
+/bin/sh -c 'read line <&3; echo "$line"' 3<"$nonstd_in" | cat
+/bin/sh -c 'echo dup4 >&4' 4>&1 | cat
+/bin/sh -c 'echo closed >&3' 3>&- 2>/dev/null | cat
+echo "nonstd_closed_status=$?"
+# The builtin stage runs inside the shell, so its binding is put back before the
+# next command reads the same descriptor.
+exec 3>"$nonstd"
+echo replaced 3>/dev/null | cat
+echo still_mine >&3
+exec 3>&-
+echo "nonstd_restored=[$(cat "$nonstd")]"
+# A standard descriptor of a stage can name a source the shell holds and the
+# stage never carries, and it can also be closed for that stage alone.
+exec 3>"$nonstd"
+echo to_three 1>&3 | cat
+exec 3>&-
+echo "nonstd_source=[$(cat "$nonstd")]"
+printf 'read through three\n' > "$nonstd_in"
+exec 3<"$nonstd_in"
+read line 0<&3
+exec 3<&-
+echo "nonstd_read=[$line]"
+echo dropped 1>&- 2>/dev/null | cat
+echo "nonstd_out_closed_status=$?"
+echo kept 2>&- | cat
+echo "nonstd_err_closed_status=$?"
+rm -f "$nonstd" "$nonstd_in"
+echo nonstandard_done

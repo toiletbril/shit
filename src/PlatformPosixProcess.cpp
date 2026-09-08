@@ -215,6 +215,32 @@ hot fn execute_program(ExecContext &ec, script_fallback_policy fallback,
         posix_spawn_file_actions_adddup2(&file_actions, STDERR_FILENO,
                                          STDOUT_FILENO);
       });
+  ec.apply_nonstandard_routing(
+      [&](os::descriptor file_fd, i32 target_fd) {
+        posix_spawn_file_actions_adddup2(&file_actions, file_fd, target_fd);
+        if (file_fd != target_fd)
+          posix_spawn_file_actions_addclose(&file_actions, file_fd);
+      },
+      [&](i32 dup_from_fd, i32 target_fd) {
+        posix_spawn_file_actions_adddup2(&file_actions, dup_from_fd, target_fd);
+      },
+      [&](i32 target_fd) {
+        /* A close action for a descriptor the child does not hold fails the
+           whole spawn on Darwin. The descriptor is gone when the parent never
+           opened it and when the standard routing already moved it onto its
+           slot and closed it. */
+        let const do_is_closed_by_slot = [&](const Maybe<os::descriptor> &slot,
+                                             i32 standard_fd) {
+          return slot.has_value() && *slot == target_fd && *slot != standard_fd;
+        };
+
+        if (do_is_closed_by_slot(ec.in_fd, STDIN_FILENO)) return;
+        if (do_is_closed_by_slot(ec.out_fd, STDOUT_FILENO)) return;
+        if (do_is_closed_by_slot(ec.err_fd, STDERR_FILENO)) return;
+
+        if (fcntl(target_fd, F_GETFD) != -1)
+          posix_spawn_file_actions_addclose(&file_actions, target_fd);
+      });
 
   posix_spawnattr_t attr;
   posix_spawnattr_init(&attr);
@@ -630,6 +656,15 @@ fn replace_process(ExecContext &&ec) throws -> void
       },
       [&]() { check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO)); },
       [&]() { check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO)); });
+  ec.apply_nonstandard_routing(
+      [&](os::descriptor file_fd, i32 target_fd) {
+        check_syscall(dup2(file_fd, target_fd));
+        if (file_fd != target_fd) check_syscall(close(file_fd));
+      },
+      [&](i32 dup_from_fd, i32 target_fd) {
+        check_syscall(dup2(dup_from_fd, target_fd));
+      },
+      [&](i32 target_fd) { close(target_fd); });
 
   sigset_t saved_signal_mask;
   struct sigaction saved_sigchild_action = {};

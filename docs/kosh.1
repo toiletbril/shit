@@ -151,17 +151,214 @@ skips startup files. The
 option alone does not enable this recovery. Another invalid invocation exits
 with status 2.
 .SH OPTIONS
-.SS Input and invocation
+.SS General options
 .TP
-.BR \-c " " \fICOMMAND\fR ", " \-\-command =\fICOMMAND\fR
-COMMAND is read and run. The option may be repeated. Command strings run in
-occurrence order.
+.B \-\-version
+The version and notices are displayed. The shell then exits.
+.TP
+.BR \-V ", " \-\-short\-version
+The short version is displayed. The shell then exits.
+.TP
+.B \-\-help
+Help is displayed. The shell then exits.
+.SS POSIX options
+.TP
+.BR \-i ", " \-\-interactive
+The shell runs interactively.
 .TP
 .BR \-s ", " \-\-stdin
 Commands are read from standard input.
 .TP
-.BR \-i ", " \-\-interactive
-Interactive operation is requested.
+.BR \-c " " \fICOMMAND\fR ", " \-\-command =\fICOMMAND\fR
+COMMAND is read and run. The option may be repeated, and the command strings
+run in the order they are given.
+.TP
+.BR \-e ", " \-\-error\-exit
+The shell exits after an unguarded failing command. A function called from a
+non-final operand of
+.B &&
+or
+.BR || ,
+or from a negation, stays guarded through its whole body.
+.TP
+.BR \-f ", " \-\-no\-glob
+Pathname expansion is disabled.
+.TP
+.BR \-t ", " \-\-one\-command
+One command is read and run. The shell then exits.
+.TP
+.BR \-v ", " \-\-verbose
+Each input line is printed as it is read.
+.TP
+.BR \-x ", " \-\-xtrace
+Each command is printed after expansion.
+.TP
+.BR \-a ", " \-\-export\-all
+Each later assignment is marked for export.
+.TP
+.BR \-C ", " \-\-no\-clobber
+An existing file is not overwritten by a plain output redirection.
+.TP
+.BR \-n ", " \-\-no\-exec
+Commands are parsed and analyzed without being run. The analysis stage runs in
+every mood under this option, and a compatibility mood still reports only the
+tiers selected by
+.BR \-W .
+A runtime
+.B set \-n
+also suppresses later commands in the current command list.
+.TP
+.BR \-u ", " \-\-no\-unset
+An unset variable read is an error.
+.TP
+.BR \-l ", " \-\-login
+The shell acts as a login shell.
+.TP
+.B \-h
+The option is accepted without effect for compatibility.
+.TP
+.B \-m
+The option is accepted without effect for compatibility.
+.TP
+.B \-\-
+Option parsing ends. The next operand is treated as the script name.
+.SS Bash options
+.TP
+.BR \-\-init\-file " " \fIFILE\fR ", " \-\-rcfile " " \fIFILE\fR
+FILE selects the interactive rc file. The last occurrence of either name is
+used.
+A leading tilde is expanded. The file replaces /etc/koshrc and ~/.koshrc in the
+.B kosh
+mood. The file replaces ~/.bashrc in an interactive non-login Bash mood. The
+system Bash rc is still read first.
+.TP
+.B \-\-norc
+The interactive non-login Bash rc and a custom rc file are skipped. Login
+profiles and noninteractive BASH_ENV processing are unchanged. The stock Bash
+completion script is not loaded.
+.TP
+.BR \-r ", " \-\-restricted
+The shell becomes restricted after the startup files finish.
+.TP
+.BR \-p ", " \-\-privileged
+Privileged mode is enabled. BASH_ENV is not sourced. When the real and
+effective ids differ, every startup file is skipped. Elevated ids are retained
+only when this option is present. The state is exposed through
+.BR $\- ,
+.BR SHELLOPTS ,
+and
+.BR "set \-o privileged" .
+.TP
+.B \-\-posix
+The
+.B bash-posix
+mood is selected.
+.SS Compatibility options
+.TP
+.BR \-M ", " \-\-mood =\fINAME\fR
+NAME selects
+.BR kosh ,
+.BR bash ,
+.BR sh ,
+or
+.BR bash-posix .
+The name
+.B default
+is accepted for kosh, and
+.B posix
+and
+.B dash
+are accepted for sh.
+.TP
+.BR \-L ", " \-\-init\-moods =\fILIST\fR
+Startup files for each listed mood are sourced in order. LIST accepts
+comma-separated names. The option may be repeated. The selected runtime mood
+is used when the option is omitted.
+.TP
+.BR \-I ", " \-\-enable\-mimicry
+A script with a recognized shell shebang runs under the corresponding mood.
+A script operand and a script run as a command are both covered. A recognized
+shell invocation name, an explicit
+.BR \-\-mood ,
+.BR \-\-dumb ,
+or
+.B \-\-posix
+is used instead. The current diagnostic setting is retained.
+.TP
+.B \-\-dumb
+The options
+.BR "\-\-mood sh" ,
+.BR \-\-no\-completion ,
+.BR "\-\-tab\-selector plain" ,
+and
+.B \-\-no\-diagnostics
+are applied. Color is disabled. An explicit
+.B \-\-tab\-selector
+is used instead, wherever it appears.
+.SS Auxiliary options
+.TP
+.B \-\-lint
+The option behaves like
+.B \-n
+with every diagnostic tier enabled at its normal severity. Diagnostic
+suppression from
+.B \-\-no\-diagnostics
+and
+.B \-\-no\-annoying\-diagnostics
+is overridden. Every startup file is skipped. Aliases, functions, and the search
+path from the invoking session do not affect the report.
+.PP
+A named input is detected from its path, extension, and recognizable content.
+Shell commands are extracted from GitHub Actions, Gitea Actions, Forgejo
+Actions, GitLab CI, Ansible, Dockerfile and Containerfile, Compose, Markdown,
+Makefile, Google Cloud Build, CircleCI, Azure Pipelines, Bitbucket Pipelines,
+Buildkite, Travis CI, Kubernetes, package.json scripts, Drone, Woodpecker,
+Taskfile, Justfile, RPM spec files, VSCode tasks, and Dev Container files. Only
+the extracted sh, bash, or kosh source is parsed and diagnosed. Jenkinsfile,
+Terraform, Nix, and an unrecognized
+YAML, JSON, or Markdown host are not treated as whole shell files.
+.PP
+With
+.BR \-\-apply ,
+safe structured fixes are written to each named file. The updated source is
+analyzed again, and only the remaining diagnostics are reported. The written
+fixes are then summarized, with one line for each diagnostic slug and its
+ShellCheck code, counted as warnings or errors. A warning-only result exits
+successfully. A remaining error or an input or write failure exits with status
+1.
+.TP
+.B \-\-format
+Shell source is formatted without being run. Structural keywords and compound
+braces are placed on separate lines. Each nested level uses two spaces. Direct
+.B test
+commands become bracket commands unless an earlier alias or function shadows
+the name. Code is wrapped at 80 columns when a safe token boundary exists.
+Standalone comments follow the surrounding code indentation and are not
+wrapped. Inline comments remain inline. Here-document bodies and terminators
+retain their layout, and the shell source around them is still formatted.
+Output uses LF line endings and one final newline for a nonempty script.
+Formatted source uses syntax colors when standard output is a terminal.
+With no file or a lone
+.B \-
+operand, source is read from standard input. One named file may be written to
+standard output.
+.TP
+.B \-\-apply
+Named files are updated with safe lint fixes under
+.BR \-\-lint ,
+or with formatted source under
+.BR \-\-format .
+The two modes may be combined. Before a changed file is replaced atomically, its
+contents and identity are checked again. File modes and symbolic links are
+retained. Other hard links continue to refer to the previous inode. Standard
+input,
+.BR \-s ,
+.BR \-i ,
+.BR \-c ,
+and a lone
+.B \-
+operand are rejected. This option is ignored in
+.BR KOSH_FLAGS .
 .TP
 .B \-\-as\-language\-server
 The language server protocol is run over standard input and standard output.
@@ -239,208 +436,10 @@ or
 .BR \-\-apply .
 It is ignored in
 .BR KOSH_FLAGS .
-.TP
-.BR \-l ", " \-\-login
-Login operation is requested.
-.TP
-.B \-\-
-Option parsing ends. The next operand is treated as the script name.
-.SS Mood and startup
-.TP
-.BR \-M ", " \-\-mood =\fINAME\fR
-NAME selects
-.BR kosh ,
-.BR bash ,
-.BR sh ,
-or
-.BR bash-posix .
-The name
-.B default
-is accepted for kosh, and
-.B posix
-and
-.B dash
-are accepted for sh.
-.TP
-.BR \-L ", " \-\-init\-moods =\fILIST\fR
-Startup files for each listed mood are sourced in order. LIST accepts
-comma-separated names. The option may be repeated. The selected runtime mood
-is used when the option is omitted.
-.TP
-.BR \-I ", " \-\-enable\-mimicry
-A script with a recognized shell shebang runs under the corresponding mood.
-A script operand and a script run as a command are both covered. A recognized
-shell invocation name, an explicit
-.BR \-\-mood ,
-.BR \-\-dumb ,
-or
-.B \-\-posix
-wins. The current diagnostic setting is retained.
-.TP
-.B \-\-dumb
-The options
-.BR "\-\-mood sh" ,
-.BR \-\-no\-completion ,
-.BR "\-\-tab\-selector plain" ,
-and
-.B \-\-no\-diagnostics
-are applied. Color is disabled. An explicit
-.B \-\-tab\-selector
-wins wherever it appears.
-.TP
-.BR \-\-tab\-selector " " \fIMODE\fR
-MODE selects how an explicit Tab presents several candidates. The names are
-.BR interactive ,
-.BR external ,
-and
-.BR plain .
-The default is
-.BR interactive .
-The behavior of each mode is described under
-.BR "LINE EDITING" .
-.TP
-.BR \-p ", " \-\-privileged
-Privileged mode is enabled. BASH_ENV is not sourced. When the real and
-effective ids differ, every startup file is skipped. Elevated ids are retained
-only when this option is present. The state is exposed through
-.BR $\- ,
-.BR SHELLOPTS ,
-and
-.BR "set \-o privileged" .
+.SS Koshka options
 .TP
 .BR \-Q ", " \-\-no\-init\-files
 No startup file is read. PATH is set to /usr/bin:/bin.
-.TP
-.BR \-\-init\-file " " \fIFILE\fR ", " \-\-rcfile " " \fIFILE\fR
-FILE selects the interactive rc file. The last occurrence of either alias wins.
-A leading tilde is expanded. The file replaces /etc/koshrc and ~/.koshrc in the
-.B kosh
-mood. The file replaces ~/.bashrc in an interactive non-login Bash mood. The
-system Bash rc is still read first.
-.TP
-.B \-\-norc
-The interactive non-login Bash rc and a custom rc file are skipped. Login
-profiles and noninteractive BASH_ENV processing are unchanged. The stock Bash
-completion script is not loaded.
-.TP
-.BR \-r ", " \-\-restricted
-Restricted mode is requested. Startup files run before the restrictions become
-active.
-.TP
-.B \-\-posix
-The
-.B bash-posix
-mood is selected.
-.SS Shell operation
-.TP
-.BR \-e ", " \-\-error\-exit
-The shell exits after an unguarded failing command. A function called from a
-non-final operand of
-.B &&
-or
-.BR || ,
-or from a negation, inherits the guarded condition for its complete body.
-.TP
-.BR \-f ", " \-\-no\-glob
-Pathname expansion is disabled.
-.TP
-.BR \-u ", " \-\-no\-unset
-An unset variable read is an error.
-.TP
-.BR \-C ", " \-\-no\-clobber
-An existing file is not overwritten by a plain output redirection.
-.TP
-.BR \-n ", " \-\-no\-exec
-Commands are parsed and analyzed without being run. The analysis stage runs in
-every mood under this option, and a compatibility mood still reports only the
-tiers selected by
-.BR \-W .
-A runtime
-.B set \-n
-also suppresses later commands in the current command list.
-.TP
-.BR \-t ", " \-\-one\-command
-One command is read and run. The shell then exits.
-.TP
-.BR \-x ", " \-\-xtrace
-Each command is printed after expansion.
-.TP
-.BR \-v ", " \-\-verbose
-Each input line is printed as it is read.
-.TP
-.BR \-a ", " \-\-export\-all
-Each later assignment is marked for export.
-.TP
-.B \-h
-The option is accepted without effect for compatibility.
-.TP
-.B \-m
-The option is accepted without effect for compatibility.
-.SS Formatting
-.TP
-.B \-\-format
-Shell source is formatted without being run. Structural keywords and compound
-braces are placed on separate lines. Each nested level uses two spaces. Direct
-.B test
-commands become bracket commands unless an earlier alias or function shadows
-the name. Code is wrapped at 80 columns when a safe token boundary exists.
-Standalone comments follow the surrounding code indentation and are not
-wrapped. Inline comments remain inline. Here-document bodies and terminators
-retain their layout. Surrounding shell source is formatted. Output uses LF line
-endings and one final newline for a nonempty script.
-Formatted source uses syntax colors when standard output is a terminal.
-With no file or a lone
-.B \-
-operand, source is read from standard input. One named file may be written to
-standard output.
-.TP
-.B \-\-apply
-Named files are updated with safe lint fixes under
-.BR \-\-lint ,
-or with formatted source under
-.BR \-\-format .
-The two modes may be combined. Before a changed file is replaced atomically, its
-contents and identity are checked again. File modes and symbolic links are
-retained. Other hard links continue to refer to the previous inode. Standard
-input,
-.BR \-s ,
-.BR \-i ,
-.BR \-c ,
-and a lone
-.B \-
-operand are rejected. This option is ignored in
-.BR KOSH_FLAGS .
-.SS Diagnostics
-.TP
-.B \-\-lint
-The option behaves like
-.B \-n
-with every diagnostic tier enabled at its normal severity. Diagnostic
-suppression from
-.B \-\-no\-diagnostics
-and
-.B \-\-no\-annoying\-diagnostics
-is overridden. Every startup file is skipped. Aliases, functions, and the search
-path from the invoking session do not affect the report.
-.PP
-A named input is detected from its path, extension, and recognizable content.
-Shell commands are extracted from GitHub Actions, Gitea Actions, Forgejo
-Actions, GitLab CI, Ansible, Dockerfile and Containerfile, Compose, Markdown,
-Makefile, Google Cloud Build, CircleCI, Azure Pipelines, Bitbucket Pipelines,
-Buildkite, Travis CI, Kubernetes, package.json scripts, Drone, Woodpecker,
-Taskfile, Justfile, RPM spec files, VSCode tasks, and Dev Container files. Only
-the extracted sh, bash, or kosh source is parsed and diagnosed. Other host text
-produces no shell diagnostic. Jenkinsfile, Terraform, Nix, and an unrecognized
-YAML, JSON, or Markdown host are not treated as whole shell files.
-.PP
-With
-.BR \-\-apply ,
-safe structured fixes are written to each named file. The updated source is
-analyzed again, and only the remaining diagnostics are reported. The written
-fixes are then summarized, with one line for each diagnostic slug and its
-ShellCheck code, counted as warnings or errors. A warning-only result exits
-successfully. A remaining error or an input or write failure exits with status
-1.
 .TP
 .BR \-W ", " \-WW ", " \-WWW
 The analysis stage has strict, lenient, and annoying tiers. In the default
@@ -461,11 +460,15 @@ also enables annoying diagnostics. An explicit
 .B set \-\-mood
 change clears the active level.
 .TP
-.B \-\-no\-annoying\-diagnostics
-The annoying tier is suppressed. Strict and lenient analysis is unchanged.
+.B \-\-list\-diagnostics
+The available analysis checks and their metadata are listed. The shell then
+exits.
 .TP
 .B \-\-no\-diagnostics
 The analysis stage is skipped. No warning or pre-run diagnostic is reported.
+.TP
+.B \-\-no\-annoying\-diagnostics
+The annoying tier is suppressed. Strict and lenient analysis is unchanged.
 .TP
 .B \-\-no\-init\-diagnostics
 Diagnostics and warnings are suppressed while startup files are sourced. The
@@ -475,17 +478,22 @@ previous settings are restored before interactive input begins.
 Source backtraces are suppressed. The primary message, source caret, note, and
 detail location remain visible when available.
 .TP
-.B \-\-list\-diagnostics
-The available analysis checks and their metadata are listed. The shell then
-exits.
-.SS Interactive operation
-.TP
 .BR \-T ", " \-\-no\-completion
 Tab completion and ghost text are disabled.
 .TP
 .B \-\-no\-syntax\-highlighting
 Syntax coloring and ghost text are disabled. Tab completion remains enabled.
-.SS Extensions
+.TP
+.BR \-\-tab\-selector " " \fIMODE\fR
+MODE selects how an explicit Tab presents several candidates. The names are
+.BR interactive ,
+.BR external ,
+and
+.BR plain .
+The default is
+.BR interactive .
+The behavior of each mode is described under
+.BR "LINE EDITING" .
 .TP
 .B \-\-enable\-koshkit
 Bundled utility names resolve directly as commands. The option is equivalent to
@@ -495,17 +503,7 @@ Bundled utility names resolve directly as commands. The option is equivalent to
 Arbitrary-precision integers and finite decimal values are enabled. The option
 is equivalent to
 .BR "set \-o extended\-arithmetic" .
-.SS Information
-.TP
-.B \-\-help
-Help is displayed. The shell then exits.
-.TP
-.B \-\-version
-The version and notices are displayed. The shell then exits.
-.TP
-.BR \-V ", " \-\-short\-version
-The short version is displayed. The shell then exits.
-.SS Debugging
+.SS Debug options
 .TP
 .BR \-A ", " \-\-show\-ast
 Syntax trees are printed before execution and during formatting or linting.
@@ -556,6 +554,14 @@ available only in a debug build.
 .B \-\-debug\-ghost\-at=LINE
 The ghost completion result and operation counts for LINE are printed. The
 shell then exits. This option is available only in a debug build.
+.TP
+.B \-\-debug\-arena\-lifetimes
+Arena lifetime identities are checked across every release and reset. This
+option is available only in a debug build.
+.TP
+.B \-\-debug\-toiletline\-allocation
+Allocation failure handling in the line editor is checked. This option is
+available only in a debug build.
 .TP
 .BR \-\-ftrace ", " \-\-strace
 Function or system-call tracing is enabled in a Cosmopolitan build. These
@@ -1760,20 +1766,19 @@ selects.
 .PP
 The interactive selector draws a menu of the candidates below the prompt. Tab
 and the down arrow move to the next row, the up arrow moves back, Enter accepts
-the highlighted row, and Escape or Ctrl\-G closes the menu and puts back the
-line the menu opened on. The rows are bounded by the terminal height, and a
-count row names the part that is drawn.
+the highlighted row, and Escape or Ctrl\-G closes the menu and restores the line
+it opened on. The terminal height bounds the number of rows, and a count row
+names the part that is drawn.
 .PP
-A printable key is inserted into the token and the menu is drawn again from the
-candidates that are left, which narrows the list. Backspace erases the last
-character of the token and widens the list again. Accepting a candidate that
-names a directory opens a menu on what the directory holds. The menu closes
-when no candidate is left and when any other key is pressed, and that key then
-does its own work on the line.
+A printable key is inserted into the token, and the menu is drawn again from the
+candidates that still match. Backspace erases the last character of the token
+and widens the list again. An accepted candidate that names a directory opens a
+menu of the entries it holds. The menu closes when no candidate is left and when
+any other key is pressed. That key then acts on the line.
 .PP
-The external selector hands the candidates to the program named by
+The external selector passes the candidates to the program named by
 .B KOSH_FZF_COMPLETION_COMMAND
-and what it prints replaces the token. The editor leaves raw mode while the
+and its output replaces the token. The editor leaves raw mode while the
 selector owns the terminal, then repaints the prompt. A selector that reports no
 match or is dismissed leaves the line alone and prints nothing. The plain
 listing is kept when one candidate remains and when the session has no
@@ -1786,7 +1791,7 @@ other than 0, 1, or 130 each report a message above the prompt and keep the
 plain listing.
 .PP
 The plain selector prints the candidates below the prompt as a static column
-list. A terminal that supports no decorations always gets the plain listing.
+list. A terminal without decoration support always receives the plain listing.
 .PP
 Completion identifies the command segment at the cursor across quoted
 separators, command substitutions, and here-document bodies. Directory prefixes

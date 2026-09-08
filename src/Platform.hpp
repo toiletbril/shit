@@ -756,6 +756,11 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor;
 fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void;
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
+
+/* Take an independent descriptor for the same open file the shell holds on
+   shell_fd. The result is owned by the caller and closes on exec, and a
+   shell_fd that is not open returns KOSH_INVALID_FD. */
+fn duplicate_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
 fn descriptors_refer_to_same_file(os::descriptor first,
                                   os::descriptor second) wontthrow -> bool;
 

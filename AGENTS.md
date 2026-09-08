@@ -67,6 +67,12 @@ changes update this file.
 - An asynchronous pipeline job owns and reaps every stage. POSIX stages share a
   process group. The last stage owns status and job output. Stream writes retry
   partial writes and reject zero-length writes while bytes remain.
+- A pipe has its writer and its reader in different processes whenever either
+  side can exceed the pipe buffer. A deferred stage report is written only after
+  every reading stage runs in a child.
+- A forked stage closes every descriptor the parent still owns before it reads.
+  The close-on-exec flag releases a stage that execs and keeps every descriptor
+  of a forked builtin, group, or subshell.
 - A named-pipe server connects before its child evaluates source. Thread launch
   order is not connection readiness.
 - A parent closes each unused pipe endpoint after CreateProcess so readers can

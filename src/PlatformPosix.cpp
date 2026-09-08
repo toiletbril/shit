@@ -304,6 +304,14 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
   return shell_fd;
 }
 
+fn duplicate_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
+{
+  const os::descriptor copy =
+      fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
+
+  return copy != -1 ? copy : KOSH_INVALID_FD;
+}
+
 fn descriptors_refer_to_same_file(os::descriptor first,
                                   os::descriptor second) wontthrow -> bool
 {

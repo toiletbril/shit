@@ -144,7 +144,8 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
      A single builtin that is not a pipeline stage carries no pipe fds, so it
      pays for none of this. */
   const bool has_pipe_descriptors =
-      ec.in_fd.has_value() || ec.out_fd.has_value() || ec.err_fd.has_value();
+      ec.in_fd.has_value() || ec.out_fd.has_value() || ec.err_fd.has_value() ||
+      !ec.nonstandard_fds.is_empty();
   /* A bare 2>&1 or 1>&2 on a builtin carries no file descriptor, only a routing
      flag, so the placement runs whenever either a descriptor or a cross-route
      is present. Otherwise `cd /bad 2>&1` would leave the builtin's stderr on
@@ -178,6 +179,21 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
         [&]() {
           saved_descriptors.push(os::save_and_replace_descriptor(
               1, os::descriptor_for_shell_fd(2)));
+        });
+    ec.apply_nonstandard_routing(
+        [&](os::descriptor file_fd, i32 target_fd) {
+          saved_descriptors.push(
+              os::save_and_replace_descriptor(target_fd, file_fd));
+        },
+        [&](i32 dup_from_fd, i32 target_fd) {
+          saved_descriptors.push(os::save_and_replace_descriptor(
+              target_fd, os::descriptor_for_shell_fd(dup_from_fd)));
+        },
+        [&](i32 target_fd) {
+          /* The backup carries the descriptor back after the builtin, and a
+             target that was never open restores to closed. */
+          saved_descriptors.push(os::save_descriptor(target_fd));
+          os::close_fd(os::descriptor_for_shell_fd(target_fd));
         });
   }
   defer

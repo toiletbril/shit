@@ -423,25 +423,53 @@ namespace {
 
 using expressions::Redirection;
 
-/* Route an opened descriptor into one of the three standard slots a stage
-   carries, fd 0 to input, 2 to error, any other to output. The last
-   redirection of a descriptor wins, so a descriptor in the slot closes first.
- */
-fn assign_standard_fd(Maybe<os::descriptor> &in_fd,
-                      Maybe<os::descriptor> &out_fd,
-                      Maybe<os::descriptor> &err_fd, i32 fd,
-                      os::descriptor file_fd) throws -> void
+/* Keep one binding for each nonstandard target. The last redirection of that
+   descriptor wins, and the file it replaces closes here. */
+fn bind_nonstandard_fd(ArrayList<nonstandard_descriptor> &nonstandard,
+                       nonstandard_descriptor binding) throws -> void
+{
+  for (let &existing : nonstandard) {
+    if (existing.target_fd != binding.target_fd) continue;
+
+    if (existing.file_fd != KOSH_INVALID_FD) os::close_fd(existing.file_fd);
+    existing = binding;
+
+    return;
+  }
+
+  nonstandard.push(binding);
+}
+
+/* Route an opened descriptor into the slot its target names, fd 0 to input, 1
+   to output, 2 to error. Any other target keeps its own number and joins the
+   nonstandard list. The last redirection of a descriptor wins, so a descriptor
+   in the slot closes first. */
+fn assign_redirected_fd(ExecContext &ec,
+                        ArrayList<nonstandard_descriptor> &nonstandard, i32 fd,
+                        os::descriptor file_fd) throws -> void
 {
   if (fd == 0) {
-    if (in_fd) os::close_fd(*in_fd);
-    in_fd = file_fd;
-  } else if (fd == 2) {
-    if (err_fd) os::close_fd(*err_fd);
-    err_fd = file_fd;
-  } else {
-    if (out_fd) os::close_fd(*out_fd);
-    out_fd = file_fd;
+    if (ec.in_fd) os::close_fd(*ec.in_fd);
+    ec.in_fd = file_fd;
+
+    return;
   }
+
+  if (fd == 1) {
+    if (ec.out_fd) os::close_fd(*ec.out_fd);
+    ec.out_fd = file_fd;
+
+    return;
+  }
+
+  if (fd == 2) {
+    if (ec.err_fd) os::close_fd(*ec.err_fd);
+    ec.err_fd = file_fd;
+
+    return;
+  }
+
+  bind_nonstandard_fd(nonstandard, nonstandard_descriptor{file_fd, fd, -1});
 }
 
 /* A resolved duplication target, the descriptor or close marker in fd, or the
@@ -917,15 +945,29 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
 {
   LOG(Debug, "applying %zu redirections to the pipeline stage",
       m_redirections.count());
+
+  /* A binding opened here is owned by the list until the context adopts it, so
+     a later redirection that throws still releases what the earlier ones
+     opened. */
+  ArrayList<nonstandard_descriptor> nonstandard{heap_allocator()};
+  bool was_nonstandard_handed_off = false;
+  defer
+  {
+    if (was_nonstandard_handed_off) return;
+
+    for (let const &binding : nonstandard) {
+      if (binding.file_fd != KOSH_INVALID_FD) os::close_fd(binding.file_fd);
+    }
+  };
+
   for (let const &redir : m_redirections) {
     let const r = resolve_redirection(redir, cxt, source_location());
     switch (r.kind) {
     case redirection_outcome::Heredoc:
-      if (ec.in_fd) os::close_fd(*ec.in_fd);
-      ec.in_fd = r.opened_fd;
+      assign_redirected_fd(ec, nonstandard, r.target_fd, r.opened_fd);
       break;
     case redirection_outcome::BothStreams:
-      assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, 1, r.opened_fd);
+      assign_redirected_fd(ec, nonstandard, 1, r.opened_fd);
       ec.should_duplicate_error_to_output = true;
       ec.was_output_to_error_last = false;
       ec.did_output_file_follow_error_dup = false;
@@ -958,8 +1000,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
         }
       }
 
-      assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, r.target_fd,
-                         r.opened_fd);
+      assign_redirected_fd(ec, nonstandard, r.target_fd, r.opened_fd);
       break;
     case redirection_outcome::Duplicate:
       if (r.dup_from_fd == r.target_fd) break;
@@ -972,10 +1013,41 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
         ec.should_duplicate_output_to_error = true;
         ec.was_output_to_error_last = true;
         ec.did_error_file_follow_output_dup = false;
+      } else if (r.target_fd > 2) {
+        /* A close leaves no source, and a duplication names the descriptor the
+           stage carries once the three standard slots are placed. */
+        let const dup_from_fd =
+            r.dup_from_fd == Redirection::DUP_FD_CLOSE ? -1 : r.dup_from_fd;
+        bind_nonstandard_fd(
+            nonstandard,
+            nonstandard_descriptor{KOSH_INVALID_FD, r.target_fd, dup_from_fd});
+      } else if (r.dup_from_fd == Redirection::DUP_FD_CLOSE) {
+        /* One of the three standard descriptors closes after the routing places
+           it, so the close joins the list that runs last. */
+        bind_nonstandard_fd(nonstandard, nonstandard_descriptor{
+                                             KOSH_INVALID_FD, r.target_fd, -1});
+      } else {
+        /* The source is a descriptor the shell holds and the stage never
+           carries, so the slot receives an independent copy of the same open
+           file. The context owns that copy and releases it with the rest. */
+        let const copied = os::duplicate_shell_fd(r.dup_from_fd);
+        if (copied == KOSH_INVALID_FD) {
+          let const location = redir.target != nullptr
+                                   ? redir.target->source_location()
+                                   : source_location();
+          throw ErrorWithLocation{
+              location, String::from(r.dup_from_fd, heap_allocator()) +
+                            ": Bad file descriptor"};
+        }
+
+        assign_redirected_fd(ec, nonstandard, r.target_fd, copied);
       }
       break;
     }
   }
+
+  ec.nonstandard_fds.fill(steal(nonstandard));
+  was_nonstandard_handed_off = true;
 }
 
 fn SimpleCommand::is_simple_command() const wontthrow -> bool { return true; }

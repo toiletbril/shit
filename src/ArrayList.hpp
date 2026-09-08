@@ -472,6 +472,9 @@ public:
     if (allocator.get_kind() == Allocator::Kind::Heap) m_list->shrink_to_fit();
   }
 
+  /* Drop every element and return the instance to one null pointer. */
+  fn clear() wontthrow -> void { release(); }
+
   hot mustuse pure fn is_empty() const wontthrow -> bool
   {
     return m_list == nullptr;

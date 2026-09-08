@@ -1424,6 +1424,11 @@ fn ExecContext::close_fds() throws -> void
     os::close_fd(*err_fd);
     err_fd.reset();
   }
+
+  for (let const &binding : nonstandard_fds) {
+    if (binding.file_fd != KOSH_INVALID_FD) os::close_fd(binding.file_fd);
+  }
+  nonstandard_fds.clear();
 }
 
 pure fn ExecContext::builtin_kind() const wontthrow -> const Builtin::Kind &

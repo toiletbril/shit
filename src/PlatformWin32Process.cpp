@@ -1398,6 +1398,15 @@ fn redirect_self(const ExecContext &ec) -> void
       },
       [&]() { replace_descriptor(2, GetStdHandle(STD_OUTPUT_HANDLE)); },
       [&]() { replace_descriptor(1, GetStdHandle(STD_ERROR_HANDLE)); });
+
+  ec.apply_nonstandard_routing(
+      [&](os::descriptor file_fd, i32 target_fd) {
+        replace_descriptor(target_fd, file_fd);
+      },
+      [&](i32 dup_from_fd, i32 target_fd) {
+        replace_descriptor(target_fd, descriptor_for_shell_fd(dup_from_fd));
+      },
+      [&](i32 target_fd) { close_shell_fd(target_fd); });
 }
 
 fn make_pipe() wontthrow -> Maybe<Pipe>
