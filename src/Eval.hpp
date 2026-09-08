@@ -742,9 +742,9 @@ public:
   pure fn traps() const wontthrow -> const StringMap<String> &;
   fn run_exit_trap() throws -> void;
 
-  /* The trigger location is the command that fired the trap, which $LINENO
-     reports inside the action. An absent location falls back to the current
-     one, which suits a trap that fires as a command runs. */
+  /* The trigger location is the command that fired the trap. $LINENO reports
+     it inside the action. An absent location falls back to the current one.
+     The current one suits a trap that fires as a command runs. */
   fn run_named_trap(StringView condition,
                     const SourceLocation *trigger_location = nullptr) throws
       -> void;
@@ -757,8 +757,8 @@ public:
   }
   pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
   pure fn has_err_trap() const wontthrow -> bool { return m_has_err_trap; }
-  /* The two hot conditions carry a flag beside the map, which every write to
-     the map refreshes. */
+  /* The two hot conditions carry a flag beside the map. Every write to the map
+     refreshes the flag. */
   fn refresh_trap_flags() wontthrow -> void
   {
     m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
@@ -772,7 +772,7 @@ public:
            nesting_depth() <= m_err_trap_active_depth;
   }
   /* How deep the current frame sits inside function calls, subshells, and
-     command substitutions together. Each of the three moves it by one, so one
+     command substitutions together. Each of the three moves it by one. One
      number orders every frame the DEBUG and ERR traps care about. */
   pure fn nesting_depth() const wontthrow -> usize
   {
@@ -832,9 +832,27 @@ public:
   {
     return m_trap_action_depth > 0;
   }
+  /* A subshell is a fresh shell for the trap engine. No action is running
+     inside it, and the condition that forked it fires again there. */
+  pure fn get_running_trap_conditions() const wontthrow -> u8
+  {
+    return m_running_trap_conditions;
+  }
+  fn set_running_trap_conditions(u8 conditions) wontthrow -> void
+  {
+    m_running_trap_conditions = conditions;
+  }
+  pure fn get_trap_action_depth() const wontthrow -> u32
+  {
+    return m_trap_action_depth;
+  }
+  fn set_trap_action_depth(u32 depth) wontthrow -> void
+  {
+    m_trap_action_depth = depth;
+  }
   /* The status an exit with no operand reports inside a trap action. It is the
-     status the shell had reached when the action began, which the commands of
-     the action itself replace in the ordinary exit status. */
+     status the shell had reached when the action began. The commands of the
+     action itself replace that status in the ordinary exit status. */
   pure fn get_trap_saved_exit_status() const wontthrow -> Maybe<i32>
   {
     return m_trap_saved_exit_status;
@@ -846,9 +864,9 @@ public:
   {
     return m_last_trap_action_status;
   }
-  /* The line $LINENO reports inside a trap action, which is the line of the
+  /* The line $LINENO reports inside a trap action. It is the line of the
      command that fired the trap. A function or a sourced file the action enters
-     carries its own lines, so the answer is empty there. */
+     carries its own lines. The answer is empty there. */
   pure fn trap_trigger_line_number() const wontthrow -> Maybe<usize>
   {
     if (m_trap_action_depth == 0) return None;
@@ -1241,7 +1259,7 @@ public:
   pure fn mood() const wontthrow -> mimic_mood { return m_runtime.mood; }
 
   /* The presentation the editor uses for a completion with several candidates.
-     The mood does not carry it, so a mood change leaves it alone. */
+     The mood does not carry it. A mood change leaves it alone. */
   fn set_tab_selector(tab_selector_mode selector) wontthrow -> void
   {
     m_runtime.tab_selector = selector;
@@ -1587,8 +1605,8 @@ public:
   }
 
   /* Whether this process already built the command text of the stage it is
-     about to evaluate. A pipeline publishes the boundary before it forks, so
-     the parent and the child it forked both carry the text and neither has to
+     about to evaluate. A pipeline publishes the boundary before it forks. The
+     parent and the child it forked both carry the text and neither has to
      build it again. A fresh evaluator starts without it and builds its own. */
   fn set_stage_boundary_published(bool was_published) wontthrow -> void
   {
@@ -1600,10 +1618,10 @@ public:
   }
 
   /* The end of the source span a redirected wrapper holds for the subshell it
-     evaluates next, so the text that subshell publishes reaches past its
-     closing parenthesis and over the redirections written after it. The
-     subshell takes the value and leaves the field clear, so a subshell nested
-     in that body publishes its own span. */
+     evaluates next. The text that subshell publishes reaches past its closing
+     parenthesis and over the redirections written after it. The subshell takes
+     the value and leaves the field clear. A subshell nested in that body
+     publishes its own span. */
   fn set_pending_subshell_end_position(u32 end_position) wontthrow -> void
   {
     m_pending_subshell_end_position = end_position;
@@ -1723,7 +1741,7 @@ public:
 
   /* Lex, parse, and evaluate a chunk of source in this context, without
      capturing output or snapshotting state. A dot-source consumes a return at
-     the top of the chunk and ends there, an eval leaves it pending, so
+     the top of the chunk and ends there, an eval leaves it pending.
      consume_return is false for eval. A consumed return reports the status the
      chunk held before it through status_before_return. */
   fn run_source(StringView source, StringView origin = "a sourced command",
@@ -1950,7 +1968,7 @@ protected:
      nothing. */
   ArrayList<environment_undo_entry> m_environment_undo_log{heap_allocator()};
   /* The names currently in the process environment, kept in step with every
-     environment write so an assignment tests membership in O(1). A key is the
+     environment write. An assignment tests membership in O(1). A key is the
      ASCII lowercase form of the name where the environment ignores case. */
   StringMap<exported_name_value> m_exported_names{heap_allocator()};
 #if !defined NDEBUG
@@ -2038,16 +2056,16 @@ protected:
      install records the frame it ran in, and a command deeper than that frame
      is not traced. */
   usize m_debug_trap_active_depth{0};
-  /* The same ceiling for the ERR action, which errtrace lifts. */
+  /* The same ceiling for the ERR action. Errtrace lifts it. */
   usize m_err_trap_active_depth{0};
   bool m_is_replaying_inherited_state{false};
   bool m_exit_trap_ran{false};
   /* One bit for each named condition whose action is running. Only the
-     condition that is running is blocked, so a signal action still fires the
-     DEBUG trap and a pending signal still drains inside a DEBUG action. */
+     condition that is running is blocked. A signal action still fires the DEBUG
+     trap and a pending signal still drains inside a DEBUG action. */
   u8 m_running_trap_conditions{0};
-  /* Nonzero while a trap action evaluates, so BASH_COMMAND keeps the command
-     that triggered the trap instead of the action's own commands. */
+  /* Nonzero while a trap action evaluates. BASH_COMMAND keeps the command that
+     triggered the trap. */
   u32 m_trap_action_depth{0};
   /* The line of the command that fired the running trap, together with the
      source and function nesting the action itself runs at. The action is parsed

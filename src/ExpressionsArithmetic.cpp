@@ -778,8 +778,8 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
         cxt, [&] { return arithmetic_clause_command_text(StringView{"1"}); });
   };
 
-  /* The loop is entered before the header is announced, so a break or a
-     continue a trap action requests on any clause names this loop. */
+  /* The loop is entered before the header is announced. A break or a continue
+     a trap action requests on any clause names this loop. */
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
 
@@ -953,7 +953,7 @@ Subshell::~Subshell() = default;
 
 fn Subshell::as_subshell() const wontthrow -> const Subshell * { return this; }
 
-/* Bash reports a subshell against its closing parenthesis, so a body written
+/* Bash reports a subshell against its closing parenthesis. A body written
    across several lines names its last line. */
 fn Subshell::error_report_location() const wontthrow -> SourceLocation
 {
@@ -977,8 +977,8 @@ fn Subshell::collapsed_body() const wontthrow -> const Expression *
 
     let const *inner = sole->as_subshell();
     if (inner == nullptr) {
-      /* The redirections written around the inner parentheses still apply, so
-         the wrapper stands in for the list that holds it. */
+      /* The redirections written around the inner parentheses still apply. The
+         wrapper stands in for the list that holds it. */
       let const *wrapper = sole->as_redirected_command();
       if (wrapper == nullptr) break;
 
@@ -1021,6 +1021,19 @@ static fn evaluate_subshell_in_process(const Expression *body,
   let const saved_loop_depth = cxt.loop_depth();
   cxt.set_loop_depth(0);
   defer { cxt.set_loop_depth(saved_loop_depth); };
+
+  /* The trap action that forked this subshell is not running inside it. Bash
+     lets the same condition fire again for the commands of the body, and each
+     of them publishes its own command text. */
+  let const saved_running_trap_conditions = cxt.get_running_trap_conditions();
+  let const saved_trap_action_depth = cxt.get_trap_action_depth();
+  cxt.set_running_trap_conditions(0);
+  cxt.set_trap_action_depth(0);
+  defer
+  {
+    cxt.set_running_trap_conditions(saved_running_trap_conditions);
+    cxt.set_trap_action_depth(saved_trap_action_depth);
+  };
 
   LOG(Debug, "entering the snapshot subshell");
 
@@ -1101,7 +1114,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const *body = collapsed_body();
 
   /* Bash traces the commands inside a subshell and fires nothing for the
-     subshell itself, so the text is published with no DEBUG fire. The parent
+     subshell itself. The text is published with no DEBUG fire. The parent
      publishes it after the body has run, because the in-process body leaves its
      own last command behind. */
   let const do_publish_subshell = [&]() throws -> void {

@@ -390,4 +390,30 @@ trap - DEBUG
 echo action-status=$saved_status
 echo action-status-done
 
+# A subshell inside a trap action is a fresh shell for the trap engine. The
+# same condition fires again for every command of the body.
+echo subshell-in-action
+shopt -s extdebug
+set -T
+trap 'echo "D-[$BASH_COMMAND]"; if [[ $BASH_COMMAND == for* ]]; then ( echo forked-body ); fi' DEBUG
+for item in a b; do
+  echo body-$item
+done
+trap - DEBUG
+set +T
+shopt -u extdebug
+echo subshell-in-action-done
+
+# A command substitution inside a trap action stays inside the running action.
+# The command it holds fires nothing.
+echo substitution-in-action
+shopt -s extdebug
+set -T
+trap 'echo "D-[$BASH_COMMAND]"; if [[ $BASH_COMMAND == echo\ probe* ]]; then echo got-$( echo value ); fi' DEBUG
+echo probe
+trap - DEBUG
+set +T
+shopt -u extdebug
+echo substitution-in-action-done
+
 echo done
