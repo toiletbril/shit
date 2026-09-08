@@ -96,4 +96,20 @@ echo subshell-exit-action-in-pipeline
   echo stage-body ) | cat
 echo after-subshell-exit-action-in-pipeline=$?
 
+echo subshell-bare-exit-keeps-entry-status
+( trap 'echo S-bare; true; exit' EXIT
+  false )
+echo after-subshell-bare-exit-keeps-entry-status=$?
+
+echo subshell-bare-exit-ignores-action-failure
+( trap 'echo S-bare-fail; false; exit' EXIT
+  true )
+echo after-subshell-bare-exit-ignores-action-failure=$?
+
+echo err-action-bare-exit
+( trap 'echo E-bare; true; exit' ERR
+  false
+  echo unreachable-after-err-bare-exit )
+echo after-err-action-bare-exit=$?
+
 echo done

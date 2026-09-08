@@ -281,6 +281,10 @@ fn EvalContext::run_named_trap(StringView condition,
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
 
+  let const outer_trap_exit_status = m_trap_saved_exit_status;
+  m_trap_saved_exit_status = saved_exit_status;
+  defer { m_trap_saved_exit_status = outer_trap_exit_status; };
+
   /* The command that fired the trap observes its own status again after the
      action. The restoration is deferred because an action that throws would
      otherwise leave the status of the action behind. An absent array is
@@ -420,6 +424,10 @@ fn EvalContext::run_pending_traps() throws -> void
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
 
+  let const outer_trap_exit_status = m_trap_saved_exit_status;
+  m_trap_saved_exit_status = saved_exit_status;
+  defer { m_trap_saved_exit_status = outer_trap_exit_status; };
+
   defer
   {
     m_last_exit_status = saved_exit_status;
@@ -474,6 +482,10 @@ cold fn EvalContext::run_exit_trap() throws -> void
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
 
+  let const outer_trap_exit_status = m_trap_saved_exit_status;
+  m_trap_saved_exit_status = saved_exit_status;
+  defer { m_trap_saved_exit_status = outer_trap_exit_status; };
+
   /* The shell exits with the status the action found, which an action that runs
      exit replaces on its own path. */
   defer
@@ -520,6 +532,10 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
+
+  let const outer_trap_exit_status = m_trap_saved_exit_status;
+  m_trap_saved_exit_status = saved_exit_status;
+  defer { m_trap_saved_exit_status = outer_trap_exit_status; };
 
   /* An exit the action ran replaces the status the subshell had reached. */
   let requested_status = Maybe<i32>{None};

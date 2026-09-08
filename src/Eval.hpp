@@ -832,6 +832,13 @@ public:
   {
     return m_trap_action_depth > 0;
   }
+  /* The status an exit with no operand reports inside a trap action. It is the
+     status the shell had reached when the action began, which the commands of
+     the action itself replace in the ordinary exit status. */
+  pure fn get_trap_saved_exit_status() const wontthrow -> Maybe<i32>
+  {
+    return m_trap_saved_exit_status;
+  }
   /* The line $LINENO reports inside a trap action, which is the line of the
      command that fired the trap. A function or a sourced file the action enters
      carries its own lines, so the answer is empty there. */
@@ -2043,6 +2050,9 @@ protected:
   usize m_trap_trigger_line_number{0};
   usize m_trap_action_source_frame_count{0};
   usize m_trap_action_function_depth{0};
+  /* The status the shell had reached when the innermost running action began.
+     An exit with no operand inside that action reports it. */
+  Maybe<i32> m_trap_saved_exit_status{None};
   /* The end of the source span a redirected wrapper holds for the subshell it
      evaluates next. Zero when no wrapper is waiting. */
   u32 m_pending_subshell_end_position{0};
