@@ -576,7 +576,9 @@ static fn create_process_utf8(StringView application_path,
     let *flags = inherited_fd_storage.begin() + sizeof(inherited_fd_count);
     let *handles = flags + inherited_fd_count;
     for (i32 shell_fd = 0; shell_fd < inherited_fd_count; shell_fd++) {
-      let const handle = descriptor_for_shell_fd(shell_fd);
+      let const handle = is_shell_fd_close_on_exec(shell_fd)
+                             ? INVALID_HANDLE_VALUE
+                             : descriptor_for_shell_fd(shell_fd);
       let const handle_value = reinterpret_cast<intptr_t>(handle);
       __builtin_memcpy(handles + sizeof(handle_value) * shell_fd, &handle_value,
                        sizeof(handle_value));

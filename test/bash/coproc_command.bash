@@ -75,3 +75,22 @@ printf '%s\n' "parent reply:$reply"
 eval "exec ${HOLD[1]}>&-"
 wait "$HOLD_PID"
 printf '%s\n' "subshell wait status:$?"
+
+# An external program receives neither descriptor. The diagnostic of the failed
+# redirection belongs to the child shell, so it is dropped here.
+echo "== descriptors across an exec =="
+coproc PASS { while read -r line; do printf '%s\n' "got:$line"; done; }
+if /bin/sh -c "printf 'x\n' >&${PASS[1]}" 2>/dev/null; then
+  echo "child write:open"
+else
+  echo "child write:closed"
+fi
+if /bin/sh -c "read -r probe <&${PASS[0]}" 2>/dev/null; then
+  echo "child read:open"
+else
+  echo "child read:closed"
+fi
+
+eval "exec ${PASS[1]}>&-"
+wait "$PASS_PID"
+printf '%s\n' "exec wait status:$?"

@@ -100,6 +100,40 @@ namespace os {
 static i32 HIGHEST_OPEN_SHELL_FD = 2;
 static bool HAS_SCANNED_INHERITED_SHELL_FDS = false;
 
+/* Windows has no descriptor flag for close on exec. The numbers a spawn must
+   keep away from its child are marked here instead. The table covers the
+   largest descriptor the C runtime will hand out. */
+static constexpr i32 TRACKED_SHELL_FD_COUNT = 8192;
+static constexpr i32 TRACKED_SHELL_FDS_PER_WORD = 64;
+static u64 CLOSE_ON_EXEC_SHELL_FDS[TRACKED_SHELL_FD_COUNT /
+                                   TRACKED_SHELL_FDS_PER_WORD];
+
+static fn set_shell_fd_close_on_exec(i32 shell_fd,
+                                     bool is_close_on_exec) wontthrow -> void
+{
+  if (shell_fd < 0 || shell_fd >= TRACKED_SHELL_FD_COUNT) return;
+
+  let const mask =
+      u64{1} << static_cast<u32>(shell_fd % TRACKED_SHELL_FDS_PER_WORD);
+  let &word = CLOSE_ON_EXEC_SHELL_FDS[shell_fd / TRACKED_SHELL_FDS_PER_WORD];
+
+  if (is_close_on_exec)
+    word |= mask;
+  else
+    word &= ~mask;
+}
+
+static fn is_shell_fd_close_on_exec(i32 shell_fd) wontthrow -> bool
+{
+  if (shell_fd < 0 || shell_fd >= TRACKED_SHELL_FD_COUNT) return false;
+
+  let const mask =
+      u64{1} << static_cast<u32>(shell_fd % TRACKED_SHELL_FDS_PER_WORD);
+
+  return (CLOSE_ON_EXEC_SHELL_FDS[shell_fd / TRACKED_SHELL_FDS_PER_WORD] &
+          mask) != 0;
+}
+
 static fn scan_inherited_shell_fds() wontthrow -> void
 {
   if (HAS_SCANNED_INHERITED_SHELL_FDS) return;
@@ -113,11 +147,15 @@ static fn scan_inherited_shell_fds() wontthrow -> void
 
 static fn note_shell_fd_opened(i32 shell_fd) wontthrow -> void
 {
+  set_shell_fd_close_on_exec(shell_fd, false);
+
   if (shell_fd > HIGHEST_OPEN_SHELL_FD) HIGHEST_OPEN_SHELL_FD = shell_fd;
 }
 
 static fn note_shell_fd_closed(i32 shell_fd) wontthrow -> void
 {
+  set_shell_fd_close_on_exec(shell_fd, false);
+
   if (shell_fd != HIGHEST_OPEN_SHELL_FD) return;
   while (HIGHEST_OPEN_SHELL_FD > 2 &&
          descriptor_from_fd_number(HIGHEST_OPEN_SHELL_FD) == KOSH_INVALID_FD)
@@ -637,6 +675,10 @@ fn move_descriptor_to_free_shell_fd(os::descriptor source,
   if (shell_fd < 0) return -1;
 
   if (!replace_descriptor(shell_fd, source)) return -1;
+
+  /* The POSIX peer places the descriptor with F_DUPFD_CLOEXEC. The mark keeps
+     the spawn path from handing this number to a child. */
+  set_shell_fd_close_on_exec(shell_fd, true);
 
   close_fd(source);
 
