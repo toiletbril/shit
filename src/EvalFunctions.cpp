@@ -235,8 +235,9 @@ fn EvalContext::run_named_trap(StringView condition,
   let const saved_trigger_line_number = m_trap_trigger_line_number;
   let const saved_action_source_depth = m_trap_action_source_depth;
   let const saved_action_function_depth = m_trap_action_function_depth;
-  m_trap_trigger_line_number = line_number_at_location(
-      trigger_location != nullptr ? *trigger_location : m_current_location);
+  let const trigger_site =
+      trigger_location != nullptr ? *trigger_location : m_current_location;
+  m_trap_trigger_line_number = line_number_at_location(trigger_site);
   m_trap_action_source_depth = m_source_frames.count() + 1;
   m_trap_action_function_depth = m_function_call_depth;
   defer
@@ -254,10 +255,12 @@ fn EvalContext::run_named_trap(StringView condition,
     saved_pipe_statuses = current_pipe_statuses->clone();
 
   /* A return in an action belongs to the enclosing function or sourced file.
-     The action's own frame neither consumes it nor counts as a return scope. */
+     The action's own frame neither consumes it nor counts as a return scope.
+     The triggering command is the call site, so a diagnostic raised inside the
+     action is traced back to the line that fired the trap. */
   run_source(action->view(),
              "the " + String{heap_allocator(), condition} + " trap",
-             return_handling::Reject);
+             return_handling::Reject, trigger_site);
   m_last_exit_status = saved_exit_status;
   if (has_saved_pipe_statuses)
     set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));

@@ -8,6 +8,20 @@ tail
 src-rc=3
 tail
 == a return with no function and no sourced file runs the traced command:
+1:37: error: Builtin `return`: can only `return' from a function or sourced script.
+     1 |  case "$BASH_COMMAND" in echo\ top*) return 5;; esac
+       |                                      ^~~~~~~~
+3:0: trace:
+     3 |  echo top-1
+       |  ^~~~
+1:0: trace:
+     1 |  KOSH --mood bash -c 'set -T
 top-1
+1:37: error: Builtin `return`: can only `return' from a function or sourced script.
+     1 |  case "$BASH_COMMAND" in echo\ top*) return 5;; esac
+       |                                      ^~~~~~~~
+4:0: trace:
+     4 |  echo top-2
+       |  ^~~~
 top-2
 tail

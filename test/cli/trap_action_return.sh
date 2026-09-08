@@ -41,4 +41,4 @@ trap '"'"'case "$BASH_COMMAND" in echo\ top*) return 5;; esac'"'"' DEBUG
 echo top-1
 echo top-2
 trap - DEBUG
-echo tail' 2>/dev/null
+echo tail' 2>&1 | ./normalize-trace.sh "$BIN"

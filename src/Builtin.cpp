@@ -245,9 +245,10 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
 {
   const ErrorWithLocation located{ec.source_location(),
                                   builtin_error_message(ec.program(), message)};
-  if (const String *source = cxt.current_source(); source != nullptr)
+  if (const String *source = cxt.current_source(); source != nullptr) {
     show_message(located.to_string(source->view(), &cxt));
-  else
+    cxt.print_source_backtrace(ec.source_location(), false);
+  } else
     print_error(builtin_error_message(ec.program(), message) + "\n");
 }
 
@@ -262,11 +263,12 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              SourceLocation location, StringView message) throws
     -> void
 {
-  const ErrorWithLocation located{steal(location),
+  const ErrorWithLocation located{location,
                                   builtin_error_message(ec.program(), message)};
-  if (const String *source = cxt.current_source(); source != nullptr)
+  if (const String *source = cxt.current_source(); source != nullptr) {
     show_message(located.to_string(source->view(), &cxt));
-  else
+    cxt.print_source_backtrace(location, false);
+  } else
     print_error(builtin_error_message(ec.program(), message) + "\n");
 }
 
