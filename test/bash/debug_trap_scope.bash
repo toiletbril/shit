@@ -289,6 +289,34 @@ echo after-subshell-exit-command=$?
   echo in-subshell-clean )
 echo after-subshell-exit-clean=$?
 
+# A loop header fires once for every round, and every one of those fires
+# reports the line of the header rather than the last body line.
+echo loop-header-lineno
+trap 'echo "L-$LINENO-[$BASH_COMMAND]"' DEBUG
+for header_value in 1 2; do
+  echo word-body-a-$header_value
+  echo word-body-b-$header_value
+done
+trap - DEBUG
+echo after-word-loop-header=$?
+
+trap 'echo "L-$LINENO-[$BASH_COMMAND]"' DEBUG
+for ((header_index = 0; header_index < 2; header_index++)); do
+  echo arith-body-a-$header_index
+  echo arith-body-b-$header_index
+done
+trap - DEBUG
+echo after-arithmetic-loop-header=$?
+
+header_counter=0
+trap 'echo "L-$LINENO-[$BASH_COMMAND]"' DEBUG
+while [ $header_counter -lt 2 ]; do
+  echo while-body-$header_counter
+  header_counter=$((header_counter + 1))
+done
+trap - DEBUG
+echo after-while-loop-header=$?
+
 echo exit-command
 trap 'echo "E-$?-[$BASH_COMMAND]"' EXIT
 echo last-command

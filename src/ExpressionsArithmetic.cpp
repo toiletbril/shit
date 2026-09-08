@@ -772,6 +772,8 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
   /* A blank clause carries no expression of its own, and bash publishes the
      ((1)) that stands for it. */
   let const do_publish_implied_clause = [&]() throws -> bool {
+    cxt.set_current_location(source_location());
+
     return publish_command_and_run_debug_trap(
         cxt, [&] { return arithmetic_clause_command_text(StringView{"1"}); });
   };
@@ -799,6 +801,8 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
   let const is_step_blank = is_blank_clause(m_step);
 
   let const do_evaluate_condition = [&]() throws -> bool {
+    cxt.set_current_location(source_location());
+
     let const should_run_condition =
         publish_command_and_run_debug_trap(cxt, [&] {
           return arithmetic_clause_command_text(
@@ -835,6 +839,8 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
     if (is_step_blank) {
       if (!do_publish_implied_clause()) break;
     } else {
+      cxt.set_current_location(source_location());
+
       let const should_run_step = publish_command_and_run_debug_trap(cxt, [&] {
         return arithmetic_clause_command_text(
             clause_without_leading_blanks(m_step));

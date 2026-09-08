@@ -832,6 +832,10 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   status_result result{};
   for (let const &value : values) {
+    /* The body of the previous iteration left its own location behind, and the
+       header fire reports the header line. */
+    cxt.set_current_location(source_location());
+
     let const should_run_iteration = publish_command_and_run_debug_trap(
         cxt, [&] { return String{heap_allocator(), loop_trace.view()}; });
     if (!should_run_iteration) break;
