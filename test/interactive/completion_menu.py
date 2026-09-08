@@ -165,10 +165,9 @@ def main():
         selected_text = opened[
             selected_start + len(SELECTED_SGR):selected_end
         ]
-        longest_candidate_width = len("alpha-three")
-        expected_selected_text = (
-            b"  " + b"alpha-one".ljust(longest_candidate_width) + b"  "
-        )
+        # The candidates carry no description, so the row ends right after the
+        # name and the highlight does not reach the width of the longest entry.
+        expected_selected_text = b"  alpha-one  "
         selected_highlight_ends_after_entry = (
             selected_start >= 0
             and selected_end >= 0
@@ -221,6 +220,19 @@ def main():
         a_directory_opens_its_own_menu = (
             b"<deep-one/inner-alpha>" in descended
         )
+
+        # Escape puts back the line the menu opened on, so the narrowing key is
+        # undone. A menu that cancelled in place would submit alpha-t.
+        _, _, cancelled = run_menu(directory, "tree", typed, [b"t", b"\x1b"])
+        escape_restores_the_opening_line = b"<alpha->" in cancelled
+
+        # Control G cancels the same way Escape does, here after the menu walked
+        # into a directory. A menu that cancelled in place would submit
+        # deep-one/.
+        _, _, aborted = run_menu(
+            directory, "deep", deep_typed, [b"\n", b"\x07"]
+        )
+        control_g_restores_the_opening_line = b"<deep->" in aborted
 
         # Eight candidates in an eight row terminal cannot all be shown, so the
         # menu bounds its rows and names the part it drew.
@@ -283,6 +295,12 @@ def main():
             "TYPING_NARROWS_THE_LIST": typing_narrows_the_list,
             "BACKSPACE_WIDENS_THE_LIST": backspace_widens_the_list,
             "A_DIRECTORY_OPENS_ITS_OWN_MENU": a_directory_opens_its_own_menu,
+            "ESCAPE_RESTORES_THE_OPENING_LINE": (
+                escape_restores_the_opening_line
+            ),
+            "CONTROL_G_RESTORES_THE_OPENING_LINE": (
+                control_g_restores_the_opening_line
+            ),
             "A_LONG_LIST_IS_BOUNDED": a_long_list_is_bounded,
             "THE_FIRST_CANDIDATE_IS_VISIBLE": the_first_candidate_is_visible,
             "LONG_CANDIDATE_USES_AVAILABLE_WIDTH": (

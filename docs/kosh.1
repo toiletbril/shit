@@ -1760,9 +1760,9 @@ selects.
 .PP
 The interactive selector draws a menu of the candidates below the prompt. Tab
 and the down arrow move to the next row, the up arrow moves back, Enter accepts
-the highlighted row, and Escape closes the menu and leaves the line alone. The
-rows are bounded by the terminal height, and a count row names the part that is
-drawn.
+the highlighted row, and Escape or Ctrl\-G closes the menu and puts back the
+line the menu opened on. The rows are bounded by the terminal height, and a
+count row names the part that is drawn.
 .PP
 A printable key is inserted into the token and the menu is drawn again from the
 candidates that are left, which narrows the list. Backspace erases the last
