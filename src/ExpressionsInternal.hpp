@@ -327,8 +327,8 @@ fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition;
    disappears, and a command substitution body loses its padding. */
 fn reprinted_command_text(StringView source) throws -> String;
 
-/* The command as its source spells it, which keeps the quoting that the parsed
-   words no longer carry. The builder answers for a node whose span is
+/* The command as its source spells it. The source keeps the quoting that the
+   parsed words no longer carry. The builder answers for a node whose span is
    unavailable. */
 template <typename CommandTextBuilder>
 fn source_command_text(EvalContext &cxt, const SourceLocation &location,
@@ -362,12 +362,20 @@ fn append_redirections_text(EvalContext &cxt, String &out,
                             const SparseList<Redirection> &redirections) throws
     -> void;
 
-/* Whether a reader can observe the command text this process publishes, which
-   decides whether the text is worth building. BASH_COMMAND belongs to the bash
-   mood, and a trap action keeps the command that triggered it. */
+/* Whether a reader can observe the command text this process publishes. The
+   answer decides whether the text is worth building. BASH_COMMAND belongs to
+   the bash mood, and a trap action keeps the command that triggered it. */
 inline fn command_text_is_observed(const EvalContext &cxt) wontthrow -> bool
 {
   return cxt.bash_dynamic_variables_enabled() && !cxt.is_running_trap_action();
+}
+
+/* Whether a reader can see the commands a folded or eliminated node would run.
+   The DEBUG trap and the xtrace echo are the two readers. A node with no reader
+   takes its fast path and evaluates nothing. */
+inline fn folded_commands_are_observed(const EvalContext &cxt) wontthrow -> bool
+{
+  return cxt.should_run_debug_trap() || cxt.should_echo_expanded();
 }
 
 /* The command text a DEBUG trap and BASH_COMMAND observe, published before the

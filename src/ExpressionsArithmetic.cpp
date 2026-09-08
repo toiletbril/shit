@@ -753,8 +753,7 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   cxt.set_terminal_exec_allowed(false);
 
-  let const should_skip_condition_commands =
-      !cxt.has_debug_trap() && !cxt.should_echo_expanded();
+  let const should_skip_condition_commands = !folded_commands_are_observed(cxt);
   if (is_fully_eliminated() && should_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated c-style for as a no-op");
     cxt.publish_single_pipe_status(0);

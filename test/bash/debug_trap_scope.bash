@@ -268,7 +268,7 @@ echo lineno-action-source
   trap - DEBUG )
 echo after-lineno-action-source=$?
 
-# A command substitution pushes a source frame of its own, so the action that
+# A command substitution pushes a source frame of its own. The action that
 # fires for a command inside it reports the line of that command.
 echo lineno-action-substitution
 ( trap 'echo "L-$LINENO-[$BASH_COMMAND]"' DEBUG
@@ -290,7 +290,7 @@ echo after-subshell-exit-command=$?
 echo after-subshell-exit-clean=$?
 
 # A loop header fires once for every round, and every one of those fires
-# reports the line of the header rather than the last body line.
+# reports the line of the header.
 echo loop-header-lineno
 trap 'echo "L-$LINENO-[$BASH_COMMAND]"' DEBUG
 for header_value in 1 2; do
@@ -318,7 +318,7 @@ trap - DEBUG
 echo after-while-loop-header=$?
 
 # A call that functrace does not trace runs its body without the DEBUG trap the
-# caller installed, so the body lists none and a removal it runs takes nothing
+# caller installed. The body lists none and a removal it runs takes nothing
 # away from the caller. A trap the body installs for itself stands after the
 # return, and functrace hands the body the caller's trap to remove.
 echo untraced-removal
@@ -355,6 +355,50 @@ echo after-traced-removal
 trap - DEBUG
 set +T
 echo traced-removal-done
+
+# A constant loop condition and a branch no test can take are folded away. The
+# fold is visible only where the DEBUG trap reaches, so the same constructs run
+# once inside a traced frame and once inside a frame functrace does not reach.
+echo folded-traced
+set -T
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+while false; do
+  echo unreachable-while
+done
+until true; do
+  echo unreachable-until
+done
+if false; then
+  echo unreachable-if
+fi
+for folded_value in; do
+  echo unreachable-for-$folded_value
+done
+for ((; 0; )); do
+  echo unreachable-arith
+done
+trap - DEBUG
+set +T
+echo folded-traced-done
+
+echo folded-untraced
+folded_function() {
+  while false; do
+    echo unreachable-while
+  done
+  if false; then
+    echo unreachable-if
+  fi
+  for ((; 0; )); do
+    echo unreachable-arith
+  done
+  echo in-folded-function
+}
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+folded_function
+echo after-folded-function=$?
+trap - DEBUG
+echo folded-untraced-done
 
 echo exit-command
 trap 'echo "E-$?-[$BASH_COMMAND]"' EXIT

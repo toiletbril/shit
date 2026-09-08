@@ -223,8 +223,7 @@ hot fn IfClause::evaluate_status_impl(EvalContext &cxt) const throws
     -> status_result
 {
   cxt.set_terminal_exec_allowed(false);
-  let const should_skip_condition_commands =
-      !cxt.has_debug_trap() && !cxt.should_echo_expanded();
+  let const should_skip_condition_commands = !folded_commands_are_observed(cxt);
 
   if (is_fully_eliminated() && should_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated if as a no-op");
@@ -471,8 +470,7 @@ hot fn WhileLoop::evaluate_status_impl(EvalContext &cxt) const throws
   LOG(Debug, "entering the %s loop%s", is_until_loop ? "until" : "while",
       is_folded_to_skip ? ", folded to skip the body" : "");
 
-  let const should_skip_condition_commands =
-      !cxt.has_debug_trap() && !cxt.should_echo_expanded();
+  let const should_skip_condition_commands = !folded_commands_are_observed(cxt);
   if ((is_folded_to_skip || is_fully_eliminated()) &&
       should_skip_condition_commands)
   {
