@@ -720,6 +720,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       steal(working_directory),
       os::get_file_creation_mask(),
       m_traps,
+      m_debug_trap_active_depth,
       m_variable_attributes,
       m_exported_names,
       m_environment_undo_log.count(),
@@ -839,6 +840,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
     m_traps = steal(snapshot.traps);
   }
   m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
+  m_debug_trap_active_depth = snapshot.debug_trap_active_depth;
 
   if (!os::restore_current_directory(snapshot.working_directory))
     LOG(Debug, "the subshell could not restore the working directory");

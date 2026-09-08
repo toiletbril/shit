@@ -68,6 +68,9 @@ struct eval_state_snapshot
   os::DirectoryReference working_directory;
   u32 file_creation_mask;
   StringMap<String> traps;
+  /* The nesting depth a DEBUG trap was installed at rides the snapshot beside
+     the trap map, because the depth decides which frames the action reaches. */
+  usize debug_trap_active_depth;
   /* Variable attributes ride the snapshot, so a declaration inside a
      subshell does not leak its marks to the parent. */
   StringMap<u8> variable_attributes;
