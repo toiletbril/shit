@@ -258,12 +258,15 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_current_location(source_location());
 
-  publish_command_and_run_debug_trap(cxt, [&] {
-    return source_command_text(
-        cxt, source_location(), source_end_position(), [&] {
-          return String{heap_allocator(), m_assignment->raw_string().view()};
-        });
-  });
+  let const should_run_assignment =
+      publish_command_and_run_debug_trap(cxt, [&] {
+        return source_command_text(
+            cxt, source_location(), source_end_position(), [&] {
+              return String{heap_allocator(),
+                            m_assignment->raw_string().view()};
+            });
+      });
+  if (!should_run_assignment) return cxt.last_exit_status();
 
   /* A command substitution in the value leaves the status of the last one, so
      the reset to 0 waits until after the expansion and a $? in the value reads
@@ -723,6 +726,190 @@ fn internal::allocate_redirection_descriptor(
   return allocated_fd;
 }
 
+static pure fn is_reprint_blank(char byte) wontthrow -> bool
+{
+  return byte == ' ' || byte == '\t';
+}
+
+/* A tab, a run of blanks, a line continuation, and a command substitution are
+   the only places where the source spelling and the bash reprint can differ. */
+static pure fn should_reprint_source(StringView source) wontthrow -> bool
+{
+  for (usize position = 0; position < source.length; position++) {
+    let const byte = source[position];
+
+    if (byte == '\t') return true;
+
+    if (position == 0) continue;
+
+    let const previous_byte = source[position - 1];
+
+    if (byte == ' ' && previous_byte == ' ') return true;
+
+    if (byte == '(' && previous_byte == '$') return true;
+
+    if (byte == '\n' && previous_byte == '\\') return true;
+  }
+
+  return false;
+}
+
+static fn append_reprinted_source(String &out, StringView source,
+                                  bool should_collapse_blanks) throws -> void;
+
+/* The byte just past the double quote that closes the one opened before
+   `position`, or the end of the source when the quote is unterminated. */
+static fn find_double_quote_end(StringView source, usize position) throws
+    -> usize
+{
+  while (position < source.length) {
+    let const byte = source[position];
+
+    if (byte == '\\' && position + 1 < source.length) {
+      position += 2;
+      continue;
+    }
+
+    if (byte == '"') return position;
+
+    if (byte == '$' && position + 1 < source.length &&
+        source[position + 1] == '(')
+    {
+      let const end =
+          lexer::scan_balanced_shell_region(source, position + 2, ')');
+      if (!end.has_value()) return source.length;
+
+      position = *end;
+      continue;
+    }
+
+    position++;
+  }
+
+  return source.length;
+}
+
+/* The body a command substitution reprints, with the padding bash drops
+   removed from both ends. */
+static pure fn trimmed_substitution_body(StringView body) wontthrow
+    -> StringView
+{
+  while (!body.is_empty() && (is_reprint_blank(body[0]) || body[0] == '\n'))
+    body = body.substring(1);
+
+  while (!body.is_empty() && (is_reprint_blank(body[body.length - 1]) ||
+                              body[body.length - 1] == '\n'))
+    body = body.substring_of_length(0, body.length - 1);
+
+  return body;
+}
+
+static fn append_reprinted_source(String &out, StringView source,
+                                  bool should_collapse_blanks) throws -> void
+{
+  usize position = 0;
+
+  while (position < source.length) {
+    let const byte = source[position];
+
+    if (byte == '\\' && position + 1 < source.length) {
+      if (source[position + 1] == '\n') {
+        position += 2;
+        continue;
+      }
+
+      out.push(byte);
+      out.push(source[position + 1]);
+      position += 2;
+      continue;
+    }
+
+    if (should_collapse_blanks && is_reprint_blank(byte)) {
+      while (position < source.length && is_reprint_blank(source[position]))
+        position++;
+
+      if (out.length() != 0 && out.back() != ' ') out.push(' ');
+      continue;
+    }
+
+    if (byte == '\'' || byte == '`') {
+      let const start = position++;
+      while (position < source.length && source[position] != byte)
+        position++;
+
+      if (position < source.length) position++;
+      out.append(source.substring_of_length(start, position - start));
+      continue;
+    }
+
+    if (byte == '"') {
+      let const end = find_double_quote_end(source, position + 1);
+      out.push('"');
+      append_reprinted_source(
+          out, source.substring_of_length(position + 1, end - position - 1),
+          false);
+
+      if (end < source.length) {
+        out.push('"');
+        position = end + 1;
+      } else {
+        position = end;
+      }
+
+      continue;
+    }
+
+    if (byte == '$' && position + 1 < source.length) {
+      let const next_byte = source[position + 1];
+
+      if (next_byte == '{' || next_byte == '(') {
+        let const is_arithmetic = next_byte == '(' &&
+                                  position + 2 < source.length &&
+                                  source[position + 2] == '(';
+        let const closing_byte = next_byte == '{' ? '}' : ')';
+        let const end = lexer::scan_balanced_shell_region(source, position + 2,
+                                                          closing_byte);
+        if (!end.has_value()) {
+          out.append(source.substring(position));
+          return;
+        }
+
+        if (next_byte == '{' || is_arithmetic) {
+          out.append(source.substring_of_length(position, *end - position));
+          position = *end;
+          continue;
+        }
+
+        out.append("$(");
+        append_reprinted_source(
+            out,
+            trimmed_substitution_body(
+                source.substring_of_length(position + 2, *end - position - 3)),
+            true);
+        out.push(')');
+        position = *end;
+        continue;
+      }
+    }
+
+    out.push(byte);
+    position++;
+  }
+}
+
+fn internal::reprinted_command_text(StringView source) throws -> String
+{
+  let text = String{heap_allocator()};
+  if (!should_reprint_source(source)) {
+    text.append(source);
+    return text;
+  }
+
+  text.reserve(source.length);
+  append_reprinted_source(text, source, true);
+  return text;
+}
+
 fn internal::append_word_source_text(EvalContext &cxt, String &out,
                                      const Token &word) throws -> void
 {
@@ -917,9 +1104,9 @@ fn internal::append_redirections_text(
 
 fn internal::publish_simple_command(EvalContext &cxt,
                                     const SimpleCommand &command,
-                                    root_evaluation_mode mode) throws -> void
+                                    root_evaluation_mode mode) throws -> bool
 {
-  publish_command_and_run_debug_trap(
+  return publish_command_and_run_debug_trap(
       cxt,
       [&] throws {
         let location = command.source_location();

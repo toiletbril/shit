@@ -321,6 +321,12 @@ enum class loop_disposition : u8
 
 fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition;
 
+/* The source text the way bash reprints a command from its own parse. Quoting,
+   arithmetic, a parameter expansion, and a backtick body keep their spelling. A
+   run of blanks outside them collapses to one blank, a line continuation
+   disappears, and a command substitution body loses its padding. */
+fn reprinted_command_text(StringView source) throws -> String;
+
 /* The command as its source spells it, which keeps the quoting that the parsed
    words no longer carry. The builder answers for a node whose span is
    unavailable. */
@@ -333,7 +339,7 @@ fn source_command_text(EvalContext &cxt, const SourceLocation &location,
   let const text = cxt.source_text_in_span(location, end_position);
   if (text.length == 0) return do_build_command_text();
 
-  return String{heap_allocator(), text};
+  return reprinted_command_text(text);
 }
 
 /* The word as its source spells it, which keeps the quoting the parsed word
@@ -353,11 +359,13 @@ fn append_redirections_text(EvalContext &cxt, String &out,
    because BASH_COMMAND belongs to the bash mood and a trap action keeps the
    command that triggered it. The text is heap owned, since the context holds it
    past the arena that carries the syntax node. A prepared pipeline stage takes
-   the text and leaves the trap to the boundary its pipeline already ran. */
+   the text and leaves the trap to the boundary its pipeline already ran. The
+   answer is false when the action leaves a pending exit, return, break, or
+   continue, since bash abandons the command the action traced. */
 template <typename CommandTextBuilder>
 fn publish_command_and_run_debug_trap(
     EvalContext &cxt, CommandTextBuilder do_build_command_text,
-    root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> void
+    root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> bool
 {
   let const was_text_published =
       mode == root_evaluation_mode::PreparedPipelineStage &&
@@ -371,14 +379,17 @@ fn publish_command_and_run_debug_trap(
 
   if (mode == root_evaluation_mode::Normal && cxt.should_run_debug_trap()) {
     cxt.run_named_trap(StringView{"DEBUG", 5});
+    return !cxt.has_pending_control_flow();
   }
+
+  return true;
 }
 
 /* The same publication for a simple command, whose text is built from its
    assignments, its words, and its redirections. */
 fn publish_simple_command(
     EvalContext &cxt, const SimpleCommand &command,
-    root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> void;
+    root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> bool;
 
 /* Whether the shell or the environment gives the name a value on its own, so a
    script that reads it without assigning it is correct. */

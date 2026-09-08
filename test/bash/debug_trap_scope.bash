@@ -43,6 +43,91 @@ capture_function() {
 echo captured $(capture_function)
 trap - DEBUG
 
+echo subshell-installed
+( trap 'echo D-$BASH_COMMAND' DEBUG; echo in-subshell )
+echo after-subshell-installed
+
+echo function-installed
+installing_function() {
+  trap 'echo D-$BASH_COMMAND' DEBUG
+  echo in-installing-function
+}
+untraced_function() {
+  echo in-untraced-function
+}
+installing_function
+untraced_function
+trap - DEBUG
+
+echo traced-function-installed
+set -T
+installing_function
+trap - DEBUG
+set +T
+
+echo substitution-installed
+# shellcheck disable=SC2046
+echo captured $(trap 'echo D-$BASH_COMMAND' DEBUG; echo in-substitution)
+trap - DEBUG
+
+echo exit-in-action-simple
+( trap 'exit 9' DEBUG; echo unreachable-simple )
+echo after-exit-in-action-simple=$?
+
+echo exit-in-action-word-loop
+( trap 'exit 9' DEBUG; for value in 1 2; do echo unreachable-$value; done )
+echo after-exit-in-action-word-loop=$?
+
+echo exit-in-action-case
+( trap 'exit 9' DEBUG; case x in x) echo unreachable-case ;; esac )
+echo after-exit-in-action-case=$?
+
+echo exit-in-action-arithmetic-loop
+( trap 'exit 9' DEBUG; for ((index = 0; index < 2; index++)); do echo unreachable-$index; done )
+echo after-exit-in-action-arithmetic-loop=$?
+
+echo exit-in-action-conditional
+( trap 'exit 9' DEBUG; [[ -n x ]]; echo unreachable-conditional )
+echo after-exit-in-action-conditional=$?
+
+echo exit-in-action-assignment
+( trap 'exit 9' DEBUG; assigned=1; echo unreachable-$assigned )
+echo after-exit-in-action-assignment=$?
+
+echo exit-in-action-function
+set -T
+exiting_function() {
+  trap 'exit 9' DEBUG
+  echo unreachable-function
+}
+( exiting_function )
+echo after-exit-in-action-function=$?
+set +T
+
+echo exit-in-action-pipeline
+( trap 'exit 9' DEBUG; echo unreachable-a | cat; echo unreachable-tail )
+echo after-exit-in-action-pipeline=$?
+
+echo exit-in-action-pipeline-three
+( trap 'exit 9' DEBUG; echo unreachable-a | cat | cat )
+echo after-exit-in-action-pipeline-three=$?
+
+echo exit-in-action-pipeline-compound
+( echo before-compound-pipeline; trap 'exit 9' DEBUG; { echo unreachable-a; } | cat )
+echo after-exit-in-action-pipeline-compound=$?
+
+echo exit-in-action-pipeline-loop-stage
+( echo before-loop-pipeline; trap 'exit 9' DEBUG; for value in 1; do echo unreachable-$value; done | cat )
+echo after-exit-in-action-pipeline-loop-stage=$?
+
+echo exit-in-action-pipeline-later-stage
+( trap 'if [[ $BASH_COMMAND == cat* ]]; then exit 9; fi' DEBUG; echo unreachable-a | cat | cat )
+echo after-exit-in-action-pipeline-later-stage=$?
+
+echo exit-in-action-pipeline-async
+( trap 'exit 9' DEBUG; echo unreachable-a | cat & wait )
+echo after-exit-in-action-pipeline-async=$?
+
 echo pinned-command
 trap 'echo D-$BASH_COMMAND; echo still-$BASH_COMMAND' DEBUG
 echo target

@@ -468,6 +468,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   i64 process_group_id = 0;
   let pending_pipe = Maybe<os::Pipe>{};
   let parent_stage_status = Maybe<i32>{};
+  bool was_pipeline_abandoned = false;
   let bootstrap = os::subshell_bootstrap{};
   let const should_launch_fresh_evaluator = !os::can_fork_evaluator();
   if (should_launch_fresh_evaluator) bootstrap = cxt.make_subshell_bootstrap();
@@ -492,7 +493,12 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
 
       let const *simple = stage->as_simple_command();
       if (simple != nullptr) {
-        publish_simple_command(cxt, *simple);
+        let const should_run_stage = publish_simple_command(cxt, *simple);
+        if (!should_run_stage) {
+          was_pipeline_abandoned = true;
+          break;
+        }
+
         cxt.set_stage_boundary_published(true);
       }
 
@@ -625,6 +631,15 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
     if (last_stdin != KOSH_INVALID_FD) os::close_fd(last_stdin);
     utils::terminate_and_reap_processes(children);
     throw;
+  }
+
+  /* A DEBUG action that exits abandons the stage it traced, and the stages
+     already spawned lose the consumer that would drain them. */
+  if (was_pipeline_abandoned) {
+    if (last_stdin != KOSH_INVALID_FD) os::close_fd(last_stdin);
+    utils::terminate_and_reap_processes(children);
+
+    return cxt.last_exit_status();
   }
 
   if (is_async()) {
@@ -761,7 +776,8 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* The location moves onto the stage first so a runtime warning from its
        words carets the stage that read the variable. */
     cxt.set_current_location(e->source_location());
-    publish_simple_command(cxt, *e);
+    let const should_run_stage = publish_simple_command(cxt, *e);
+    if (!should_run_stage) return cxt.last_exit_status();
 
     let stage_arg_locations =
         ArrayList<SourceLocation>{cxt.scratch_allocator()};

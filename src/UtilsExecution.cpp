@@ -263,11 +263,13 @@ fn terminate_and_reap_processes(const ArrayList<os::process> &processes,
        position++)
     unused(os::signal_process(processes[position], 9));
 
+  /* The shell asked for the kill, so the death of the child is not news the
+     user needs. A monitoring wait would announce every one of them. */
   for (usize position = first_process_position; position < processes.count();
        position++)
   {
     try {
-      os::wait_and_monitor_process(processes[position]);
+      os::reap_process_quietly(processes[position]);
     } catch (...) {}
   }
 }
