@@ -85,8 +85,8 @@ static fn codepoint_display_width(u32 codepoint) -> usize
   if (codepoint == '\t') return 1;
   if (codepoint < 0x20 || (codepoint >= 0x7f && codepoint < 0xa0)) return 0;
 
-  /* The first interval of either table begins at NARROW_CODEPOINT_LIMIT, so
-     everything below it is one column and skips both searches. */
+  /* The first interval of either table begins at NARROW_CODEPOINT_LIMIT.
+     Everything below it is one column and skips both searches. */
   if (codepoint < NARROW_CODEPOINT_LIMIT) return 1;
 
   if (codepoint_is_in(codepoint, ZERO_WIDTH_INTERVALS,
@@ -252,7 +252,7 @@ fn is_history_contents_valid(StringView contents) -> bool
   return true;
 }
 
-/* One record occupies one line, so a newline inside the command is written as
+/* One record occupies one line. A newline inside the command is written as
    backslash n and every backslash is doubled. The editor and the noninteractive
    store both read this form. */
 fn encode_history_record(String &output, StringView command) -> void

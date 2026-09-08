@@ -55,7 +55,7 @@ static pure fn is_unmatched_closing_paren(StringView line,
   return depth == 0;
 }
 
-/* A single quote that a dollar opens holds backslash escapes, so its run ends
+/* A single quote that a dollar opens holds backslash escapes. Its run ends
    past an escaped quote. An even run of backslashes leaves the dollar itself
    unescaped. */
 static pure fn opens_dollar_quote(StringView line, usize position) wontthrow

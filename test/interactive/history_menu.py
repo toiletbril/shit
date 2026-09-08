@@ -24,7 +24,7 @@ SELECTED_SGR = b"\x1b[7m"
 DIMMED_SGR = b"\x1b[90m"
 HIGHLIGHT_RESET = b"\x1b[0m"
 
-# The word each command prints is an operand, so a menu row never carries the
+# The word each command prints is an operand. A menu row never carries the
 # angle bracketed output that proves the entry ran.
 SEEDED_COMMANDS = (
     "printf '<%s>\\n' one",
@@ -55,8 +55,8 @@ def read_until_idle(master, timeout, required_output=None):
 def run_history_menu(directory, typed, keys, rows=24):
     """Seed the history, type the words, press ctrl-R, and send the keys.
 
-    The transcript is split at ctrl-R, so a check can tell what the menu drew
-    from what the accepted line printed.
+    The transcript is split at ctrl-R. A check can tell what the menu drew from
+    what the accepted line printed.
     """
     pid, master = pty.fork()
     if pid == 0:
@@ -87,7 +87,7 @@ def run_history_menu(directory, typed, keys, rows=24):
         os.write(master, key)
         menu += read_until_idle(master, 1)
 
-    # Accepting a row only rewrites the line, so the run needs a submit of its
+    # Accepting a row only rewrites the line. The run needs a submit of its
     # own.
     os.write(master, b"\n")
     menu += read_until_idle(master, 2)
@@ -117,10 +117,11 @@ def main():
         menu_opens_with_first_selection = SELECTED_SGR in opened
         # The dimmed first row names the source and the keys it answers.
         help_row_names_the_source = (
-            b"  " + DIMMED_SGR + b"incremental history search" in opened
+            b"  " + DIMMED_SGR + b"incremental history search. enter to accept"
+            in opened
         )
 
-        # The newest entry heads the list, so the highlight opens on the last
+        # The newest entry heads the list. The highlight opens on the last
         # command the session ran.
         selected_start = opened.find(SELECTED_SGR)
         selected_end = opened.find(HIGHLIGHT_RESET, selected_start)
@@ -134,12 +135,12 @@ def main():
         accepted, marker = run_history_menu(directory, "", [b"\n"])
         enter_runs_the_highlighted_entry = b"<three>" in accepted
 
-        # Typing narrows the list, so the Enter that follows is answered by the
+        # Typing narrows the list. The Enter that follows is answered by the
         # menu. A closed menu would submit the letters on their own.
         filtered, _ = run_history_menu(directory, "", [b"o", b"n", b"e", b"\n"])
         typing_narrows_the_list = b"<one>" in filtered
 
-        # Backspace widens the list back to every entry, so the newest command
+        # Backspace widens the list back to every entry. The newest command
         # heads it again.
         widened, _ = run_history_menu(
             directory, "", [b"o", b"n", b"e", b"\x7f", b"\x7f", b"\x7f", b"\n"]
@@ -158,8 +159,8 @@ def main():
         moved, _ = run_history_menu(directory, "", [b"\x1b[B", b"\n"])
         a_movement_key_reaches_an_older_entry = b"<two>" in moved
 
-        # Escape puts back the line the menu opened on, which is empty here, so
-        # the command typed afterwards runs on its own.
+        # Escape puts back the line the menu opened on. That line is empty here.
+        # The command typed afterwards runs on its own.
         cancelled, _ = run_history_menu(
             directory, "", [b"\x1b", b"printf '<%s>\\n' kept", b"\n"]
         )

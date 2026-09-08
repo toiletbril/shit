@@ -67,7 +67,7 @@ RESOLVED_BIN := $(strip $(shell \
 		echo "$$(cd "$$(dirname "$$found")" && $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/$$(basename "$$found")"; \
 	else echo "$(BIN)"; fi))
 # A directory probe that produces nothing leaves the original path in place.
-# Windows also takes SHELL from this variable, where an empty value makes every
+# Windows also takes SHELL from this variable. An empty value makes every
 # recipe fail with a bare status of 127.
 override BIN := $(if $(RESOLVED_BIN),$(RESOLVED_BIN),$(BIN))
 export BIN

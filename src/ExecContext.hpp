@@ -73,22 +73,22 @@ public:
   Maybe<os::descriptor> out_fd{};
   Maybe<os::descriptor> err_fd{};
 
-  /* Almost every command redirects nothing outside the three standard slots, so
-     the list stays at one null pointer until a stage fills it. */
+  /* Almost every command redirects nothing outside the three standard slots.
+     The list stays at one null pointer until a stage fills it. */
   SparseList<nonstandard_descriptor> nonstandard_fds{};
 
   /* 2>&1 routes the standard error to wherever the standard output goes, and
      1>&2 the reverse. Each dup reads the current target of its source
-     descriptor, so was_output_to_error_last records which one the source wrote
+     descriptor. was_output_to_error_last records which one the source wrote
      last when both are present. */
   bool should_duplicate_error_to_output{false};
   bool should_duplicate_output_to_error{false};
   bool was_output_to_error_last{false};
 
   /* A redirection onto the source descriptor written after its dup moves only
-     that descriptor, so the dup keeps the stream the command inherits. The
-     pipeline places a pipe end without setting either flag, which leaves the
-     dup on the pipe the way bash routes it. */
+     that descriptor. The dup keeps the stream the command inherits. The
+     pipeline places a pipe end without setting either flag. That leaves the dup
+     on the pipe the way bash routes it. */
   bool did_output_file_follow_error_dup{false};
   bool did_error_file_follow_output_dup{false};
 
@@ -169,7 +169,7 @@ public:
   }
 
   /* Place every redirection whose target is not one of the three standard
-     descriptors. It runs after the standard routing, so a duplication reads the
+     descriptors. It runs after the standard routing. A duplication reads the
      descriptor that routing already placed. The three callables carry the
      platform's own way to move a file onto a descriptor, to point one
      descriptor at another, and to close one. */

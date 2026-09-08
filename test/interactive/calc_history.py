@@ -2,9 +2,9 @@
 """The interactive calc prompt keeps its own history file.
 
 A calc session swaps the editor history to the calc file on entry and back on
-leave, so a shell command never lands in the calc file and a calc expression
-never lands in the shell file. Both files are named through the environment, so
-the session never reaches the real home directory.
+leave. A shell command never lands in the calc file and a calc expression never
+lands in the shell file. Both files are named through the environment. The
+session never reaches the real home directory.
 """
 
 import os

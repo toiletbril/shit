@@ -1,6 +1,6 @@
 # shellcheck disable=SC2154
 unset KOSH_FLAGS
-# A script operand under mimicry reads its own shebang, so `kosh -I script.sh`
+# A script operand under mimicry reads its own shebang. `kosh -I script.sh`
 # analyzes and runs the file under the mood its interpreter names, the same
 # mood the dispatch path picks for the script run as a command.
 directory=$(mktemp -d)

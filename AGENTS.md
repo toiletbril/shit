@@ -100,9 +100,9 @@ changes update this file.
   scanner and semantic roles. Completion, highlighting, and command lookup
   share directory indexes.
 - The interactive loop indexes the working directory before each prompt through
-  `utils::warm_directory_index`, so the ghost suggestion needs no tab. The ghost
-  runs for any non-empty token, which indexes a directory as soon as its slash
-  is typed.
+  `utils::warm_directory_index`. The ghost suggestion needs no tab. The ghost
+  runs for any non-empty token. A directory is indexed as soon as its slash is
+  typed.
 - Command completion reads keywords, builtins, bundled utilities, functions,
   aliases, and PATH. `KEYWORD_ENTRIES` is the sole keyword catalog.
 - Static koshkit completion names stay alphabetically sorted.
@@ -138,8 +138,8 @@ changes update this file.
 - Zed receives no identifier for Shell Script. The extension of the file
   selects the mood.
 - A client names no transport kind. The stdio kind appends a `--stdio` flag
-  that the shell rejects. An executable server with no transport already talks
-  over the standard streams of its child.
+  that the shell rejects. An executable server with no transport talks over the
+  standard streams of its child.
 - The client log of a real editor session confirms an integration change. The
   VS Code family writes one file for each extension output channel under its
   own log directory.

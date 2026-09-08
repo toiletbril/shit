@@ -405,8 +405,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
               redir.fd, os::descriptor_for_shell_fd(redir.fd));
           dup_saved_descriptors.push(saved);
 
-          /* A descriptor that was never open is already in the state the close
-             asks for. */
+          /* A descriptor that was never open is in the state the close asks
+             for. */
           if (!saved.was_open) break;
 
           if (!saved.is_dup2_ok) {
@@ -762,8 +762,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     defer { cxt.set_positional_params(steal(saved_params)); };
 
     /* Registered before the frame is entered so the restore runs after the
-       frame is left, where the depth the caller installed the action at is
-       reachable again. */
+       frame is left. Once the frame is left, the depth the caller installed
+       the action at is reachable again. */
     let saved_debug_action = cxt.save_untraced_debug_trap();
     defer { cxt.restore_untraced_debug_trap(steal(saved_debug_action)); };
     let saved_err_action = cxt.save_untraced_err_trap();
@@ -836,9 +836,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       FUNCTION_ARENA = command_function_storage.get_arena();
     defer { FUNCTION_ARENA = previous_function_arena; };
 
-    /* Bash traces the entry into the frame as a second DEBUG fire, which the
-       depth gate reaches only while functrace is on. LINENO names the line the
-       body opens on, and the call site is already behind the frame. */
+    /* Bash traces the entry into the frame as a second DEBUG fire. The depth
+       gate reaches that fire only while functrace is on. LINENO names the line
+       the body opens on, and the call site is already behind the frame. */
     if (cxt.should_run_debug_trap()) {
       let const saved_call_location = cxt.get_current_location();
       let const was_control_flow_pending = cxt.has_pending_control_flow();
@@ -858,8 +858,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     try {
       function_ret = function_body->evaluate(cxt);
       if (cxt.should_run_return_trap()) {
-        /* A pending return has already replaced the status with the one it
-           supplies. The action reads the status the body left behind. */
+        /* A pending return has replaced the status with the one it supplies.
+           The action reads the status the body left behind. */
         let const is_return_pending =
             cxt.has_pending_control_flow() &&
             cxt.pending_control_flow().kind == control_flow::Kind::Return;

@@ -56,8 +56,8 @@ enum class history_scan_outcome : u8
 };
 
 /* A replacement is computed from one exact snapshot of the file. When the file
-   no longer holds that snapshot the caller has to start over from fresh bytes,
-   which a plain failure would not tell it. */
+   no longer holds that snapshot the caller has to start over from fresh
+   bytes. */
 enum class history_replace_outcome : u8
 {
   Replaced,
@@ -216,7 +216,7 @@ static constexpr usize HISTORY_SPAN_READ_CHUNK_BYTE_COUNT = 512;
 
 /* Reads the encoded bytes of one record. A caller that needs a single record
    leaves the rest of the file unread. The returned text begins at the start of
-   the span, so its own span is zero based. */
+   the span. Its own span is zero based. */
 static fn read_no_editor_history_span(const Path &path,
                                       history_record_span span) throws
     -> Maybe<String>
@@ -510,8 +510,8 @@ static fn rewrite_no_editor_history_event(usize wanted_number,
     if (outcome == history_replace_outcome::Replaced) return true;
     if (outcome == history_replace_outcome::Failed) return false;
 
-    /* A writer outside the lock moved the file, so the snapshot the rewrite
-       was built from is gone and the next attempt starts from fresh bytes. */
+    /* A writer outside the lock moved the file. The snapshot the rewrite was
+       built from is gone and the next attempt starts from fresh bytes. */
     state.is_loaded = false;
   }
 
@@ -540,7 +540,7 @@ fn get_history_path() -> koshka::Maybe<koshka::Path>
   return koshka::internal::resolve_no_editor_history_path();
 }
 
-/* Every event is appended to the file as it is stored, so a write only has to
+/* Every event is appended to the file as it is stored. A write only has to
    drop the leading records the bounded list no longer reaches. */
 fn history_write() -> koshka::ErrorOr<koshka::Ok>
 {
@@ -576,8 +576,8 @@ fn history_write() -> koshka::ErrorOr<koshka::Ok>
     if (outcome == koshka::internal::history_replace_outcome::Failed)
       return koshka::Error{koshka::os::last_system_error_message()};
 
-    /* A writer outside the lock moved the file, so the offsets no longer
-       describe it and the next attempt starts from fresh bytes. */
+    /* A writer outside the lock moved the file. The offsets no longer describe
+       it and the next attempt starts from fresh bytes. */
     state.is_loaded = false;
   }
 
@@ -672,8 +672,8 @@ fn get_history_events(koshka::Allocator allocator,
   let const path = get_history_path();
   if (!path.has_value()) return steal(events);
 
-  /* The read is allowed to miss the file, so an absent history reads as an
-     empty list and a damaged or unreadable file reads as a failure. */
+  /* The read is allowed to miss the file. An absent history reads as an empty
+     list and a damaged or unreadable file reads as a failure. */
   let const contents =
       TRY(koshka::internal::read_no_editor_history_contents(*path, true));
   let &state = koshka::internal::get_no_editor_history_state();
@@ -766,8 +766,8 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
     return koshka::None;
   }
   if (!state.record_byte_offsets.is_empty()) {
-    /* The load above proved the offsets describe the file, so the duplicate
-       check reads the newest record alone. */
+    /* The load above proved the offsets describe the file. The duplicate check
+       reads the newest record alone. */
     let const newest_span = koshka::internal::get_history_record_span(
         state, state.record_byte_offsets.count() - 1);
     let const encoded =

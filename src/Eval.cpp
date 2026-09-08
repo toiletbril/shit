@@ -739,7 +739,7 @@ static constexpr usize EXPORTED_NAME_FOLD_BYTES = 64;
 
 /* A name that fits the buffer folds without touching an allocator, and a longer
    name folds into the caller's string. The result borrows from whichever of the
-   two holds it, so both outlive the lookup. */
+   two holds it. Both outlive the lookup. */
 static fn fold_exported_name(StringView name,
                              char (&buffer)[EXPORTED_NAME_FOLD_BYTES],
                              String &spill) throws -> StringView
@@ -767,8 +767,8 @@ static fn store_exported_name(StringMap<Value> &names, StringView key,
     unused(spelling);
     names.set(key, Nothing{});
   } else {
-    /* The empty default costs no allocation, so one probe both finds an
-       existing name and places a new one. */
+    /* The empty default costs no allocation. One probe both finds an existing
+       name and places a new one. */
     let const previous_count = names.count();
     let &display_name = names.get_or_create(key, String{heap_allocator()});
     if (names.count() != previous_count && key != spelling)

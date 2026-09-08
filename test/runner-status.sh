@@ -7,9 +7,9 @@
 
 # Reports whether a driver status means the harness failed instead of the
 # fixture. A timeout reports 124, the bounded driver reports 125, and a signal
-# reports 128 or above. A missing or non-executable driver reports 126 or 127,
-# which a fixture can report as well, so a comparison run lets its golden
-# decide while a refill run has no golden and must reject the truncated output.
+# reports 128 or above. A missing or non-executable driver reports 126 or 127.
+# A fixture can report those as well. A comparison run lets its golden decide.
+# A refill run has no golden and must reject the truncated output.
 is_driver_status_harness_failure()
 {
   case $1 in
@@ -33,7 +33,7 @@ is_driver_status_harness_failure()
 }
 
 # Binds GOLDEN_FAILURE_FILE to the file the caller appends one fixture diff to.
-# Each fixture owns its own file, so concurrent workers cannot interleave their
+# Each fixture owns its own file. Concurrent workers cannot interleave their
 # diffs. The suite driver appends every such file to the shared failure list
 # after the last worker has finished.
 set_golden_failure_file()

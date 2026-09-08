@@ -102,9 +102,8 @@ echo "write_status=$?"
 echo still_running
 
 # A pipeline stage whose command does not resolve applies its own redirections
-# before its diagnostic is written, so the stage decides where the message
-# lands. The message text differs between the shells, the checks assert the
-# routing and the status.
+# before its diagnostic is written. The message text differs between the
+# shells, the checks assert the routing and the status.
 report=/tmp/kosh_bashdiff_unresolved_$$
 : > "$report"
 { echo x | nosuchcmd_zzqq 2>/dev/null; } 2>"$report"
@@ -134,7 +133,7 @@ echo "last_merged=$(( $(wc -c < "$report") > 0 ))"
 rm -f "$report"
 # A diagnostic merged onto the pipe can be larger than the pipe buffer, and the
 # reading stage is launched after the stage that fails to resolve. The report
-# waits for every stage, so the reader is already draining the pipe.
+# waits for every stage. The reader is draining the pipe.
 long=x
 long_step=0
 while [ "$long_step" -lt 15 ]; do
@@ -143,8 +142,8 @@ while [ "$long_step" -lt 15 ]; do
 done
 long_bytes=$("$long" 2>&1 | wc -c | tr -d ' ')
 echo "long_merged=$(( long_bytes > 0 ))"
-# The reading stage is a group, which the shell runs in a forked child. That
-# child keeps the descriptors of a stage that has not reported yet, so the read
+# The reading stage is a group. The shell runs a group in a forked child. That
+# child keeps the descriptors of a stage that has not reported yet. The read
 # ends only after the report releases them.
 reader_line=$(nosuchcmd_zzqq 2>&1 | { read line; echo "$line"; })
 echo "group_reader=$(( ${#reader_line} > 0 ))"
@@ -189,8 +188,8 @@ echo "swapped_file=[$(cat "$ordered")] swapped_inherited=[$(cat "$ordered_out")]
 # The write end of a pipe is the stage's standard output before the stage
 # applies its own redirections. A 2>&1 written ahead of the file on the stage
 # carries the standard error onto the pipe, and a 1>&2 written ahead of the file
-# replaces the stage's standard output with the inherited standard error, which
-# leaves the pipe with nothing to carry.
+# replaces the stage's standard output with the inherited standard error. The
+# pipe is left with nothing to carry.
 ordered_err=/tmp/kosh_bashdiff_ordered_err_$$
 ( /bin/sh -c 'echo E >&2; echo O' 2>&1 >"$ordered" | sed 's/^/P:/' ) >"$ordered_out"
 echo "pipe_dup_file=[$(tr '\n' ' ' < "$ordered")] pipe_dup_piped=[$(tr '\n' ' ' < "$ordered_out")]"
@@ -198,7 +197,7 @@ echo "pipe_dup_file=[$(tr '\n' ' ' < "$ordered")] pipe_dup_piped=[$(tr '\n' ' ' 
 echo "pipe_swap_file=[$(tr '\n' ' ' < "$ordered")] pipe_swap_inherited=[$(tr '\n' ' ' < "$ordered_err")] pipe_swap_piped=[$(tr '\n' ' ' < "$ordered_out")]"
 
 # A second file on a descriptor whose dup already read the first one leaves that
-# first file open as the other stream, so the two files receive one stream each.
+# first file open as the other stream.
 ( /bin/sh -c 'echo E >&2; echo O' >"$ordered" 2>&1 >"$ordered_out" | sed 's/^/P:/' ) >/dev/null
 echo "repeat_first=[$(tr '\n' ' ' < "$ordered")] repeat_second=[$(tr '\n' ' ' < "$ordered_out")]"
 ( /bin/sh -c 'echo E >&2; echo O' 2>"$ordered" 1>&2 2>"$ordered_out" | sed 's/^/P:/' ) >/dev/null
@@ -220,7 +219,7 @@ printf 'from three\n' > "$nonstd_in"
 /bin/sh -c 'echo dup4 >&4' 4>&1 | cat
 /bin/sh -c 'echo closed >&3' 3>&- 2>/dev/null | cat
 echo "nonstd_closed_status=$?"
-# The builtin stage runs inside the shell, so its binding is put back before the
+# The builtin stage runs inside the shell. Its binding is put back before the
 # next command reads the same descriptor.
 exec 3>"$nonstd"
 echo replaced 3>/dev/null | cat
@@ -246,7 +245,7 @@ rm -f "$nonstd" "$nonstd_in"
 echo nonstandard_done
 
 # A pipeline stage whose redirection cannot be applied fails that stage alone.
-# The stage keeps the redirections written ahead of the failing one, so its
+# The stage keeps the redirections written ahead of the failing one. Its
 # diagnostic reaches the destination those redirections named, and the pipeline
 # still takes the status of its last stage. The message text differs between the
 # shells, the checks assert the statuses, the PIPESTATUS entries, and the
@@ -270,7 +269,7 @@ echo "merged_status=$? merged=$(( $(wc -c < "$redir_report") > 0 ))"
 { echo kept 2>"$redir_report" 1>/nonexistent_zzqq/x | cat; } 2>/dev/null
 echo "captured_status=$? captured=$(( $(wc -c < "$redir_report") > 0 ))"
 rm -f "$redir_report"
-# Every other stage of the pipeline still runs, so the reader observes the data
+# Every other stage of the pipeline still runs. The reader observes the data
 # the surviving stages write.
 echo pre_marker | { cat; echo reader_ran; } 2>/dev/null
 echo redir_fail_done

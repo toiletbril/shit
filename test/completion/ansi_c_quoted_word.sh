@@ -1,8 +1,6 @@
 # A word that opens with $'...' is decoded through the ANSI C escapes before the
-# candidates are looked up. Before the decoder learned the form the leading '$'
-# stayed in the prefix, the word was read as a variable expansion, and every
-# lookup returned nothing. A word that opens with $"..." is decoded the same way
-# and its body completes as a double quoted word. PATH is pinned to one
+# candidates are looked up. A word that opens with $"..." is decoded the same
+# way and its body completes as a double quoted word. PATH is pinned to one
 # directory so only the marker names join the candidates.
 dir=$(mktemp -d) || exit 1
 trap '[ -n "$dir" ] && "$TEST_SYSTEM_RM" -rf -- "$dir"' EXIT

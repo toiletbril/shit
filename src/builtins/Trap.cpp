@@ -55,7 +55,7 @@ fn normalize_condition(StringView raw, Allocator allocator) throws -> String
   return name;
 }
 
-/* The sh mood behaves like dash, which knows EXIT and the real signals and
+/* The sh mood behaves like dash. Dash knows EXIT and the real signals and
    reports DEBUG, ERR, and RETURN as a bad trap. Each of those three is also
    inert there, since every dispatch site holds them behind the mood. */
 fn is_valid_trap_condition(StringView condition, bool is_posix_mood) throws

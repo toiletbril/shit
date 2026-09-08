@@ -157,8 +157,8 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
   if (has_pipe_descriptors || has_dup_routing) {
     if (ec.in_fd)
       saved_descriptors.push(os::save_and_replace_descriptor(0, *ec.in_fd));
-    /* Every save pushes onto one stack in the order the routing applies it, so
-       the restore below unwinds the whole sequence in reverse. */
+    /* Every save pushes onto one stack in the order the routing applies it.
+       The restore below unwinds the whole sequence in reverse. */
     ec.apply_output_routing(
         [&]() {
           if (ec.out_fd) {

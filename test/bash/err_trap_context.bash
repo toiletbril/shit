@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Each fire publishes the line, the command text, and the status the action
-# entered with, which binds the fire to the construct that raised it.
+# entered with.
 trap 'echo "E-$LINENO-[$BASH_COMMAND]-[$?]"' ERR
 
 # A failure the && consumes raises no fire. The bare failure written after the
@@ -165,7 +165,7 @@ trap - ERR
 echo err-pipeline-site-done
 
 # Bash runs a subshell whose body is one subshell in the process it already
-# forked, so the inner parentheses raise no fire. A body that holds another
+# forked. The inner parentheses raise no fire. A body that holds another
 # command beside the parentheses, or wraps them in a brace group, keeps its own
 # fire.
 echo err-nested-subshell-fire

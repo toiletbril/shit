@@ -866,7 +866,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
       }
 
       /* $"..." is bash locale translation. With no catalog it is the plain
-         double-quoted string, so the dollar is dropped. It applies only at the
+         double-quoted string. The dollar is dropped. It applies only at the
          top level, since inside a double quote $" is a dollar then the close
          quote. The POSIX mood keeps the dollar to follow dash. */
       if (next == '"' && !is_in_double_quotes) {

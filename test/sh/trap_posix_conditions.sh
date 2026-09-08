@@ -32,8 +32,8 @@ trap RETURN 2>/dev/null
 echo reset-return-status=$?
 
 # Dash accepts no trap option. Each option form ends the subshell with the
-# status a special builtin reports for a usage error, so every case runs in
-# its own subshell and the parent reads the status back.
+# status a special builtin reports for a usage error. Every case runs in its
+# own subshell and the parent reads the status back.
 echo print-form
 ( trap 'echo U-fired' USR1; trap -p USR1; echo print-form-reached=$? ) 2>/dev/null
 echo print-form-status=$?
@@ -50,7 +50,7 @@ echo joined-option
 ( trap -HUP; echo joined-option-reached=$? ) 2>/dev/null
 echo joined-option-status=$?
 
-# A lone dash and the separator are operands, not options.
+# A lone dash and the separator are operands.
 echo lone-dash
 ( trap -; echo lone-dash-set=$? ) 2>/dev/null
 echo lone-dash-status=$?

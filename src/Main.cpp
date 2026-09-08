@@ -1155,7 +1155,7 @@ fn kosh_main(int argc, char **argv) -> int
               context.set_script_run(true);
               root_frame_call_site = operand_location;
 
-              /* Mimicry reads the shebang of a script operand, so `kosh -I
+              /* Mimicry reads the shebang of a script operand. `kosh -I
                  script.sh` picks the same mood the dispatch path picks for
                  `./script.sh`. A script with no shebang keeps the session
                  mood, and a mood a startup file chose explicitly wins. */
@@ -1443,7 +1443,7 @@ fn kosh_main(int argc, char **argv) -> int
     };
 
     /* Only the first chunk stands in for the pipeline stage the parent
-       prepared, so the mode is spent here whichever branch consumes it. */
+       prepared. The mode is spent here whichever branch consumes it. */
     let const evaluation_mode = inherited_evaluation_mode;
     inherited_evaluation_mode = koshka::root_evaluation_mode::Normal;
 

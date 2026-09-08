@@ -504,8 +504,8 @@ hot flatten fn Expression::evaluate_root(EvalContext &cxt,
     let const was_control_flow_pending = cxt.has_pending_control_flow();
     cxt.run_pending_traps();
 
-    /* A jump the action requested takes the place of this command, which the
-       enclosing list never reaches. */
+    /* A jump the action requested takes the place of this command. The
+       enclosing list never reaches this command. */
     if (!was_control_flow_pending && cxt.has_pending_control_flow())
       return cxt.last_exit_status();
   }
@@ -548,8 +548,8 @@ hot flatten fn Expression::evaluate_root_status(
     let const was_control_flow_pending = cxt.has_pending_control_flow();
     cxt.run_pending_traps();
 
-    /* A jump the action requested takes the place of this command, which the
-       enclosing list never reaches. */
+    /* A jump the action requested takes the place of this command. The
+       enclosing list never reaches this command. */
     if (!was_control_flow_pending && cxt.has_pending_control_flow())
       return {cxt.last_exit_status(), 0};
   }

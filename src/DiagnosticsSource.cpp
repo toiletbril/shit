@@ -427,7 +427,7 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
         } else if (at + 2 < source.length && source[at + 1] == '(' &&
                    source[at + 2] == '(')
         {
-          /* A redirection cannot open inside an arithmetic expansion, so the
+          /* A redirection cannot open inside an arithmetic expansion. The
              shift operator is not read as a here-document there. */
           arithmetic_paren_depth += 2;
           at += 2;
@@ -582,9 +582,9 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
       break;
     }
 
-    /* An escape case consumes its escaped byte, so the last consumed byte is
-       read here and not the byte the state switch dispatched on. An escape that
-       ends the source leaves nothing behind it to read. */
+    /* An escape case consumes its escaped byte. The last consumed byte is read
+       here. An escape that ends the source leaves nothing behind it to
+       read. */
     at++;
     if (at <= source.length && source[at - 1] == '\n') line_start = at;
   }

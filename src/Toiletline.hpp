@@ -62,9 +62,8 @@ struct history_event
   String command;
 };
 
-/* Only the events above after_event_number are decoded, so a caller that writes
-   an increment pays for the increment alone. A missing file is an empty list.
- */
+/* Only the events above after_event_number are decoded. A caller that writes an
+   increment pays for the increment alone. A missing file is an empty list. */
 koshka::ErrorOr<koshka::ArrayList<history_event>>
 get_history_events(koshka::Allocator allocator,
                    koshka::Maybe<usize> after_event_number = koshka::None);

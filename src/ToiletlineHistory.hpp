@@ -18,10 +18,10 @@ namespace toiletline {
    this many times before it reports the failure. */
 inline constexpr int HISTORY_RACE_ATTEMPT_COUNT = 3;
 
-/* The decoder writes one record into a fixed buffer, so a longer record cannot
-   be read back and is rejected before it reaches a file. The vendored
+/* The decoder writes one record into a fixed buffer. A longer record cannot be
+   read back and is rejected before it reaches a file. The vendored
    ITL_STRING_MAX_LEN holds the same value and is visible only to the editor
-   implementation, where Toiletline.cpp asserts that the two agree. */
+   implementation. Toiletline.cpp asserts that the two agree. */
 #if defined _WIN32
 inline constexpr usize HISTORY_RECORD_MAX_DECODED_BYTE_COUNT = 8191;
 #else

@@ -4,7 +4,7 @@
  *
  * This file defines the completion tab selector modes and their shared name
  * parser and printer. The mode reaches the runtime state, the command line, the
- * set builtin, and the interactive editor, so the names stay in one place.
+ * set builtin, and the interactive editor. The names stay in one place.
  */
 
 #pragma once

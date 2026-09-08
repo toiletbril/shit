@@ -18,7 +18,7 @@ EOF
 echo "rc=$?"
 
 # A body that opens on the defining file's first line sits one line ahead of
-# the header the definition copy carries, so its reported lines shift back.
+# the header the definition copy carries. Its reported lines shift back.
 first=$TEST_TEMP_DIRECTORY/function-body-warning-first
 cat > "$first" <<'EOF'
 first_fn() {

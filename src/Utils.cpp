@@ -134,7 +134,7 @@ hot fn decode_shell_word(StringView word, Allocator allocator,
     let const byte = word[position];
 
     /* A doubled dollar sign is the process id expansion. Its second byte is
-       already consumed, so it cannot open a locale quote. */
+       already consumed. It cannot open a locale quote. */
     let const was_after_unconsumed_dollar = is_after_unconsumed_dollar;
     is_after_unconsumed_dollar = false;
 
@@ -153,8 +153,8 @@ hot fn decode_shell_word(StringView word, Allocator allocator,
       usize body_end = body_start;
       let is_terminated = false;
 
-      /* An escape makes the decoded length differ from the source length, so
-         the whole construct becomes the source of every byte it produced. */
+      /* An escape makes the decoded length differ from the source length. The
+         whole construct becomes the source of every byte it produced. */
       let has_escape = false;
       while (body_end < word.length) {
         if (word[body_end] == '\\') {

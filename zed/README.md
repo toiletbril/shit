@@ -5,7 +5,7 @@ part of the shell binary. A `kosh` on your PATH is used when there is one, and
 the latest release is offered for download when there is not.
 
 No tree-sitter grammar is bundled. The server is attached to languages Zed
-already provides.
+provides.
 
 ## Installing
 

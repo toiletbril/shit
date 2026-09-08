@@ -129,8 +129,8 @@ pure fn EvalContext::resolve_render_source(
   return resolved_source;
 }
 
-/* The exact source a span covers, which keeps the quoting the parsed words
-   drop. A body window maps the span onto the stored definition first. The
+/* The exact source a span covers. It keeps the quoting the parsed words drop.
+   A body window maps the span onto the stored definition first. The
    answer is empty when the span reaches past the resolved source, the way a
    node the optimizer rewrote can. */
 pure fn EvalContext::source_text_in_span(const SourceLocation &location,
@@ -259,8 +259,9 @@ fn EvalContext::run_named_trap(StringView condition,
   defer { m_trap_action_depth -= 1; };
 
   /* The line is resolved here, while the triggering command is still current.
-     The action below replaces the current source, which the location alone
-     cannot be read against afterwards. run_source pushes exactly one frame. */
+     The action below replaces the current source. The location alone cannot be
+     read against the current source afterwards. run_source pushes exactly one
+     frame. */
   let const saved_trigger_line_number = m_trap_trigger_line_number;
   let const saved_action_source_frame_count = m_trap_action_source_frame_count;
   let const saved_action_function_depth = m_trap_action_function_depth;
@@ -303,7 +304,7 @@ fn EvalContext::run_named_trap(StringView condition,
 
   /* A return in an action belongs to the enclosing function or sourced file.
      The action's own frame neither consumes it nor counts as a return scope.
-     The triggering command is the call site, so a diagnostic raised inside the
+     The triggering command is the call site. A diagnostic raised inside the
      action is traced back to the line that fired the trap. */
   run_source(action->view(),
              "the " + String{heap_allocator(), condition} + " trap",
@@ -409,7 +410,7 @@ fn EvalContext::install_trap_dispositions() throws -> void
 }
 
 /* A signal an action sends to the shell is drained at the next boundary inside
-   that action, so the drain carries no guard of its own. The source depth cap
+   that action. The drain carries no guard of its own. The source depth cap
    bounds an action that keeps resending its own signal. */
 fn EvalContext::run_pending_traps() throws -> void
 {
@@ -490,8 +491,8 @@ cold fn EvalContext::run_exit_trap() throws -> void
   m_trap_saved_exit_status = saved_exit_status;
   defer { m_trap_saved_exit_status = outer_trap_exit_status; };
 
-  /* The shell exits with the status the action found, which an action that runs
-     exit replaces on its own path. */
+  /* The shell exits with the status the action found. An action that runs exit
+     replaces it on its own path. */
   defer
   {
     m_last_exit_status = saved_exit_status;
@@ -525,8 +526,8 @@ fn EvalContext::clear_inherited_exit_trap() throws -> void
 
 cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
 {
-  /* The action keeps the command that triggered it in BASH_COMMAND, which the
-     depth reports to every publisher the action reaches. */
+  /* The action keeps the command that triggered it in BASH_COMMAND. The depth
+     reports it to every publisher the action reaches. */
   m_trap_action_depth += 1;
   defer { m_trap_action_depth -= 1; };
 

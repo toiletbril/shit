@@ -411,7 +411,7 @@ fn read_directory_cached(
     directory_validation validation = directory_validation::Validate,
     directory_listing_order order = directory_listing_order::Unsorted) throws
     -> const ArrayList<Path::directory_child> *;
-/* Indexes the directory in the order the ghost completion asks for, so the
+/* Indexes the directory in the order the ghost completion asks for. The
    suggestion after the next keystroke costs no read. A directory that cannot be
    read is left out of the index. */
 fn warm_directory_index(const Path &directory) throws -> void;

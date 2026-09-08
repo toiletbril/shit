@@ -188,7 +188,7 @@ def run_scenario(
 
     read_until_idle(master, 3)
     os.write(master, typed.encode())
-    # What the tab draws is part of the result, so every read is kept.
+    # What the tab draws is part of the result. Every read is kept.
     output = read_until_idle(master, 1)
     for _ in range(tab_count):
         os.write(master, b"\t")

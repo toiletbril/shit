@@ -53,7 +53,7 @@ static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
   return matches;
 }
 
-/* An empty list is cached too, so a command with no manpage is not retried. A
+/* An empty list is cached too. A command with no manpage is not retried. A
    fork that was killed borrows EMPTY_HELP_ENTRIES for the reference it owes its
    caller until its attempts run out. */
 static StringMap<ArrayList<help_entry>> MANPAGE_OPTION_CACHE{heap_allocator()};
@@ -299,7 +299,7 @@ static fn build_man_subcommand_index(ProgramResolver &resolver) throws -> void
         .push(String{tail});
   });
 
-  /* A killed manpath fork hides every root the environment leaves out, so the
+  /* A killed manpath fork hides every root the environment leaves out. The
      index is incomplete until that fork settles and is built again. */
   is_man_subcommand_index_built = was_manpath_settled;
   LOG(Info, "indexed %zu section-1 pages", MAN_PAGE_FILE_PATHS.count());

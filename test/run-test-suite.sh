@@ -272,7 +272,7 @@ run_named_suite()
 }
 
 # Appends every recorded fixture diff to the shared failure list and prints the
-# result. A golden runner writes one file per failing fixture, so a concurrent
+# result. A golden runner writes one file per failing fixture. A concurrent
 # worker cannot interleave its diff with another one. The glob orders the
 # fixtures by name.
 finish_results()

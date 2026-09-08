@@ -281,8 +281,8 @@ struct subshell_saved_descriptor
 };
 
 /* How a function body's absolute source positions map onto the stored
-   definition copy. The copy holds a "name () " header then the body verbatim,
-   so an absolute position rebases by the body start and header length. The
+   definition copy. The copy holds a "name () " header then the body verbatim.
+   An absolute position rebases by the body start and header length. The
    header occupies the copy's first line, and the line offset restores the
    defining file's numbering. A body that starts on the first line needs a
    negative offset. */

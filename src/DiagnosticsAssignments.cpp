@@ -49,10 +49,10 @@ fn check_posix_redirection_portability(AnalysisContext &actx,
   if (redirection.is_both_streams_spelling)
     actx.report_diagnostic(diagnostic_id::sc3020, do_get_location());
 
-  /* A delimiter is matched literally and is never expanded, so only its
-     quoting form carries a portability difference. POSIX sh reads the dollar
-     sign of a quoting form as part of the delimiter and ends the document on a
-     different line than bash does. */
+  /* A delimiter is matched literally and is never expanded. Only its quoting
+     form carries a portability difference. POSIX sh reads the dollar sign of a
+     quoting form as part of the delimiter and ends the document on a different
+     line than bash does. */
   if (redirection.heredoc_delimiter != nullptr) {
     let const delimiter_location =
         redirection.heredoc_delimiter->source_location();
@@ -75,8 +75,8 @@ fn check_posix_redirection_portability(AnalysisContext &actx,
 
   if (redirection.target == nullptr) return;
 
-  /* A target expands like any other word, so the same segment checks the
-     operands use apply here. */
+  /* A target expands like any other word. The same segment checks the operands
+     use apply here. */
   if (redirection.target->kind() == Token::Kind::Word) {
     let const target_location = redirection.target->source_location();
     let const &target_word =

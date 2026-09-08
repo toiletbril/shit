@@ -180,7 +180,7 @@ cold static fn number_string_length(T value) wontthrow -> usize
 }
 
 /* The reported line of a zero-based line inside the rendered source. A window
-   that carries a synthesized header shifts backwards, so the sum is taken
+   that carries a synthesized header shifts backwards. The sum is taken
    signed. */
 cold static fn reported_line_number(usize rendered_line,
                                     isize line_offset) wontthrow -> usize
