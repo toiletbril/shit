@@ -914,6 +914,25 @@ static pure fn has_reprint_remainder(StringView source,
   return false;
 }
 
+/* The subshell region the way bash reprints it, with one blank inside each
+   parenthesis and the commands of a body written across several lines separated
+   by a semicolon and a blank. The region spans the opening parenthesis through
+   the closing one. */
+static fn append_reprinted_subshell(String &out, StringView region) throws
+    -> void
+{
+  let const body =
+      trimmed_reprint_body(region.substring_of_length(1, region.length - 2));
+  if (body.is_empty()) {
+    out.append(region);
+    return;
+  }
+
+  out.append("( ");
+  append_reprinted_source(out, body, true, true, true);
+  out.append(" )");
+}
+
 static fn append_reprinted_source(String &out, StringView source,
                                   bool should_collapse_blanks,
                                   bool should_space_operators,
@@ -993,11 +1012,13 @@ static fn append_reprinted_source(String &out, StringView source,
           continue;
         }
 
-        out.append("$(");
-        append_reprinted_source(out,
-                                trimmed_reprint_body(source.substring_of_length(
-                                    position + 2, *end - position - 3)),
-                                true, true, false);
+        let const body = trimmed_reprint_body(
+            source.substring_of_length(position + 2, *end - position - 3));
+
+        /* A body that opens a subshell would read as arithmetic when it follows
+           the dollar sign directly, so bash writes a blank between them. */
+        out.append(!body.is_empty() && body[0] == '(' ? "$( " : "$(");
+        append_reprinted_source(out, body, true, true, false);
         out.push(')');
         position = *end;
         continue;
@@ -1039,6 +1060,21 @@ static fn append_reprinted_source(String &out, StringView source,
 
         do_trim_trailing_blank();
         continue;
+      }
+
+      /* A nested subshell carries the same layout as the one that holds it. A
+         doubled parenthesis opens an arithmetic command, which bash keeps the
+         way it is written. */
+      if (byte == '(' && is_token_start && next_byte != '(') {
+        let const end =
+            lexer::scan_balanced_shell_region(source, position + 1, ')');
+
+        if (end.has_value()) {
+          append_reprinted_subshell(
+              out, source.substring_of_length(position, *end - position));
+          position = *end;
+          continue;
+        }
       }
 
       let const matched =
@@ -1171,14 +1207,8 @@ fn internal::subshell_command_text(EvalContext &cxt,
   let const body_end = lexer::scan_balanced_shell_region(source, 1, ')');
   if (!body_end.has_value()) return text;
 
-  let const body =
-      trimmed_reprint_body(source.substring_of_length(1, *body_end - 2));
-  if (body.is_empty()) return text;
-
   text.reserve(source.length + 2);
-  text.append("( ");
-  append_reprinted_source(text, body, true, true, true);
-  text.append(" )");
+  append_reprinted_subshell(text, source.substring_of_length(0, *body_end));
 
   if (*body_end < source.length) {
     append_reprinted_source(text, source.substring(*body_end), true, true,

@@ -105,3 +105,30 @@ trap 'echo "E-$LINENO-[$BASH_COMMAND]"' ERR
 { false; }
 trap - ERR
 echo err-subshell-text-done
+
+# A subshell nested inside another carries the same layout, and a doubled
+# parenthesis opens an arithmetic command that keeps the way it is written. A
+# substitution whose body opens a subshell takes a blank after the dollar sign,
+# because the two parentheses would otherwise read as arithmetic. Errtrace is
+# cleared so that each statement raises one fire and the reprint stands alone.
+echo err-nested-subshell-text
+set +E
+trap 'echo "E-[$BASH_COMMAND]"' ERR
+( ( false ) )
+( (false) )
+( ( false
+  ) )
+( ( echo nested-a
+    false ) )
+( ( ( false ) ) )
+( ((0)) )
+( { false; } )
+( echo "a  b" ; ( false ) )
+( true && ( false ) )
+( ( false ) > /dev/null )
+false $( ( echo nested-b ) )
+false $( (echo nested-c) )
+false $( ((1)) )
+trap - ERR
+set -E
+echo err-nested-subshell-text-done
