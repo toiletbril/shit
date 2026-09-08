@@ -264,6 +264,9 @@ changes update this file.
   before another command changes it. Single-quote literal shell arguments that
   contain backticks.
 - Place environment assignments before the command that receives them.
+- Place every option before a `--` separator, and keep only paths after it.
+- Quote an expansion whose exact spacing an assertion depends on, because word
+  splitting collapses a run of blanks in both shells.
 - Compare a delimiter-sensitive shell pattern with the literal observed value
   before running it.
 - When a host shell invokes a reference shell with `-c`, single-quote the source
