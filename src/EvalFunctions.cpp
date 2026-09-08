@@ -109,6 +109,10 @@ pure fn EvalContext::resolve_render_source(
   if (copy == nullptr || copy->count() <= info->header_length) {
     return resolved_source;
   }
+  if (location.source_name_index != info->source_name_index) {
+    return resolved_source;
+  }
+
   let const body_length = copy->count() - info->header_length;
   if (location.position < info->body_start_position ||
       location.position >= info->body_start_position + body_length)
