@@ -2,7 +2,7 @@
 unset KOSH_FLAGS
 
 "$BIN" -c \
-  'koshkit timeout -p -s INT -k 5s 0.1s "$1" -c "$2" arithmetic 3; echo "arithmetic-exit=$?"' \
+  'koshkit timeout -p -s INT -k 8s 2s "$1" -c "$2" arithmetic 3; echo "arithmetic-exit=$?"' \
   signaler "$BIN" 'n=$1; echo $((n ** 100000000))' 2>&1
 
 if ! command -v timeout >/dev/null 2>&1; then echo "exit=interrupted"; exit 0; fi

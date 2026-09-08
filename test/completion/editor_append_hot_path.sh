@@ -28,13 +28,18 @@ run_editor()
             "$transcript" >/dev/null 2>"$script_error" || recorder_status=$?
     elif [ -n "$expect_command" ]; then
         TRANSCRIPT="$transcript" COLUMNS="$columns" "$expect_command" -c '
-            set timeout 10
+            # A sanitized editor on a machine running the whole suite answers a
+            # key far more slowly than one running alone. Both bounds are named
+            # once and reported by name.
+            set idle_seconds 45
+            set wall_seconds 180
+            set timeout $idle_seconds
             log_user 0
             log_file -noappend $env(TRANSCRIPT)
             spawn -noecho /bin/sh -c "/bin/stty cols $env(COLUMNS) rows 24; exec \"$env(BIN)\" -i --rcfile \"$env(RCFILE)\" $env(EDITOR_OPTIONS)"
             set editor_pid [exp_pid]
-            set wall_timeout [after 30000 {
-                puts stderr "editor recorder exceeded 30 seconds"
+            set wall_timeout [after [expr {$wall_seconds * 1000}] {
+                puts stderr "editor recorder exceeded $wall_seconds seconds"
                 catch {exec /bin/kill -KILL $editor_pid}
                 close
                 wait
@@ -42,8 +47,8 @@ run_editor()
             }]
             set editor_eof 0
             interact -nobuffer "\n" { after 200 } \
-                -nobuffer "\003" { after 200 } timeout 10 {
-                puts stderr "editor recorder input was idle for 10 seconds"
+                -nobuffer "\003" { after 200 } timeout $idle_seconds {
+                puts stderr "editor recorder input was idle for $idle_seconds seconds"
                 catch {exec /bin/kill -KILL $editor_pid}
                 close
                 wait
@@ -56,7 +61,7 @@ run_editor()
                 expect {
                     eof {}
                     timeout {
-                        puts stderr "editor recorder output was idle for 10 seconds"
+                        puts stderr "editor recorder output was idle for $idle_seconds seconds"
                         catch {exec /bin/kill -KILL $editor_pid}
                         close
                         wait
