@@ -500,7 +500,16 @@ hot flatten fn Expression::evaluate_root(EvalContext &cxt,
     os::INTERRUPT_REQUESTED = 0;
     throw InterruptErrorWithLocation{source_location()};
   }
-  if (os::SIGNAL_PENDING) cxt.run_pending_traps();
+  if (os::SIGNAL_PENDING) {
+    let const was_control_flow_pending = cxt.has_pending_control_flow();
+    cxt.run_pending_traps();
+
+    /* A jump the action requested takes the place of this command, which the
+       enclosing list never reaches. */
+    if (!was_control_flow_pending && cxt.has_pending_control_flow())
+      return cxt.last_exit_status();
+  }
+
   cxt.add_evaluated_expression();
   if (is_compound_command()) {
     let const command = static_cast<const CompoundCommand *>(this);
@@ -535,7 +544,16 @@ hot flatten fn Expression::evaluate_root_status(
     throw InterruptErrorWithLocation{source_location()};
   }
   /* A trapped signal runs its action here at the command boundary. */
-  if (os::SIGNAL_PENDING) cxt.run_pending_traps();
+  if (os::SIGNAL_PENDING) {
+    let const was_control_flow_pending = cxt.has_pending_control_flow();
+    cxt.run_pending_traps();
+
+    /* A jump the action requested takes the place of this command, which the
+       enclosing list never reaches. */
+    if (!was_control_flow_pending && cxt.has_pending_control_flow())
+      return {cxt.last_exit_status(), 0};
+  }
+
   cxt.add_evaluated_expression();
   if (is_compound_command()) {
     let const command = static_cast<const CompoundCommand *>(this);

@@ -420,8 +420,15 @@ fn EvalContext::run_pending_traps() throws -> void
     if (let const *action = m_traps.find(name->view()); action != nullptr)
       if (action->count() > 0) {
         LOG(Info, "running the trap action for signal '%s'", name->c_str());
-        run_source(action->view(), "the " + *name + " trap");
+        /* A return in the action belongs to the function the signal
+           interrupted. The action's own frame is no return scope of its own. */
+        run_source(action->view(), "the " + *name + " trap",
+                   return_handling::Reject, m_current_location);
       }
+
+    /* A return, a break, or an exit the action requested leaves the remaining
+       arrivals for the next boundary. */
+    if (has_pending_control_flow()) break;
   }
 }
 
@@ -465,7 +472,7 @@ cold fn EvalContext::run_exit_trap() throws -> void
       action != nullptr)
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action at shell exit");
-      run_source(action->view(), "the EXIT trap");
+      run_source(action->view(), "the EXIT trap", return_handling::Reject);
     }
 }
 
@@ -513,7 +520,7 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> void
       action != nullptr)
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action the subshell set at its end");
-      run_source(action->view(), "the EXIT trap");
+      run_source(action->view(), "the EXIT trap", return_handling::Reject);
     }
 }
 
