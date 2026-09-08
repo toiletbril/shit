@@ -1,4 +1,4 @@
-status=1
+status=130
 1:1: error: Interrupted.
      1 |  value=$(echo ready > "$1"; while :; do :; done)
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -453,7 +453,11 @@ WarningWithDetails::WarningWithDetails(StringView message, StringView note)
 
 InterruptErrorWithLocation::InterruptErrorWithLocation(SourceLocation location)
     : ErrorWithLocation(steal(location), "Interrupted")
-{}
+{
+  /* An interrupted command reports 128 plus SIGINT, the status a shell gives a
+     command its signal ended. */
+  set_command_status(130);
+}
 
 cold fn Warning::get_severity() const wontthrow -> error_severity
 {
