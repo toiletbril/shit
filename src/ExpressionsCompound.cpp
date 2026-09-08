@@ -275,7 +275,11 @@ hot fn CompoundList::evaluate_root_status_impl(
     if (was_command_failure_uncaught && !cxt.is_posix_mode()) {
       cxt.set_last_exit_status(ret.status);
       if (cxt.should_run_err_trap()) {
-        let const failed_location = n->command()->source_location();
+        let const *failed_command = n->command();
+        let const failed_location =
+            failed_command->as_subshell() != nullptr
+                ? subshell_closing_location(*failed_command)
+                : failed_command->source_location();
         cxt.run_named_trap(StringView{"ERR", 3}, &failed_location);
       }
 

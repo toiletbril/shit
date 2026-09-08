@@ -1533,6 +1533,24 @@ public:
   {
     return m_was_stage_boundary_published;
   }
+
+  /* The end of the source span a redirected wrapper holds for the subshell it
+     evaluates next, so the text that subshell publishes reaches past its
+     closing parenthesis and over the redirections written after it. The
+     subshell takes the value and leaves the field clear, so a subshell nested
+     in that body publishes its own span. */
+  fn set_pending_subshell_end_position(u32 end_position) wontthrow -> void
+  {
+    m_pending_subshell_end_position = end_position;
+  }
+  fn take_pending_subshell_end_position() wontthrow -> u32
+  {
+    let const end_position = m_pending_subshell_end_position;
+    m_pending_subshell_end_position = 0;
+
+    return end_position;
+  }
+
   pure fn terminal_exec_allowed() const wontthrow -> bool;
 
   fn sorted_variable_assignments() const throws -> ArrayList<String>;
@@ -1963,6 +1981,9 @@ protected:
   usize m_trap_trigger_line_number{0};
   usize m_trap_action_source_frame_count{0};
   usize m_trap_action_function_depth{0};
+  /* The end of the source span a redirected wrapper holds for the subshell it
+     evaluates next. Zero when no wrapper is waiting. */
+  u32 m_pending_subshell_end_position{0};
   bool m_terminal_exec_allowed{false};
   bool m_is_completion_function_running{false};
   bool m_is_prompt_command_running{false};

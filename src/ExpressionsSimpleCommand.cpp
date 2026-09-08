@@ -756,7 +756,8 @@ static pure fn should_reprint_source(StringView source) wontthrow -> bool
 
 static fn append_reprinted_source(String &out, StringView source,
                                   bool should_collapse_blanks,
-                                  bool should_space_operators) throws -> void;
+                                  bool should_space_operators,
+                                  bool should_join_lines) throws -> void;
 
 /* The byte just past the double quote that closes the one opened before
    `position`, or the end of the source when the quote is unterminated. */
@@ -790,10 +791,9 @@ static fn find_double_quote_end(StringView source, usize position) throws
   return source.length;
 }
 
-/* The body a command substitution reprints, with the padding bash drops
-   removed from both ends. */
-static pure fn trimmed_substitution_body(StringView body) wontthrow
-    -> StringView
+/* The body a command substitution or a subshell reprints, with the padding bash
+   drops removed from both ends. */
+static pure fn trimmed_reprint_body(StringView body) wontthrow -> StringView
 {
   while (!body.is_empty() && (is_reprint_blank(body[0]) || body[0] == '\n'))
     body = body.substring(1);
@@ -916,7 +916,8 @@ static pure fn has_reprint_remainder(StringView source,
 
 static fn append_reprinted_source(String &out, StringView source,
                                   bool should_collapse_blanks,
-                                  bool should_space_operators) throws -> void
+                                  bool should_space_operators,
+                                  bool should_join_lines) throws -> void
 {
   let const start_length = out.length();
   usize position = 0;
@@ -959,7 +960,7 @@ static fn append_reprinted_source(String &out, StringView source,
       out.push('"');
       append_reprinted_source(
           out, source.substring_of_length(position + 1, end - position - 1),
-          false, false);
+          false, false, false);
 
       if (end < source.length) {
         out.push('"');
@@ -993,11 +994,10 @@ static fn append_reprinted_source(String &out, StringView source,
         }
 
         out.append("$(");
-        append_reprinted_source(
-            out,
-            trimmed_substitution_body(
-                source.substring_of_length(position + 2, *end - position - 3)),
-            true, true);
+        append_reprinted_source(out,
+                                trimmed_reprint_body(source.substring_of_length(
+                                    position + 2, *end - position - 3)),
+                                true, true, false);
         out.push(')');
         position = *end;
         continue;
@@ -1090,7 +1090,7 @@ static fn append_reprinted_source(String &out, StringView source,
         continue;
       }
 
-      if (byte == ';') {
+      if (byte == ';' || (should_join_lines && byte == '\n')) {
         position++;
         do_trim_trailing_blank();
 
@@ -1155,7 +1155,35 @@ fn internal::reprinted_command_text(StringView source) throws -> String
   }
 
   text.reserve(source.length);
-  append_reprinted_source(text, source, true, false);
+  append_reprinted_source(text, source, true, false, false);
+
+  return text;
+}
+
+fn internal::subshell_command_text(EvalContext &cxt,
+                                   const SourceLocation &location,
+                                   usize end_position) throws -> String
+{
+  let text = String{heap_allocator()};
+  let const source = cxt.source_text_in_span(location, end_position);
+  if (source.length == 0 || source[0] != '(') return text;
+
+  let const body_end = lexer::scan_balanced_shell_region(source, 1, ')');
+  if (!body_end.has_value()) return text;
+
+  let const body =
+      trimmed_reprint_body(source.substring_of_length(1, *body_end - 2));
+  if (body.is_empty()) return text;
+
+  text.reserve(source.length + 2);
+  text.append("( ");
+  append_reprinted_source(text, body, true, true, true);
+  text.append(" )");
+
+  if (*body_end < source.length) {
+    append_reprinted_source(text, source.substring(*body_end), true, true,
+                            false);
+  }
 
   return text;
 }

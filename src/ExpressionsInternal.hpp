@@ -342,6 +342,13 @@ fn source_command_text(EvalContext &cxt, const SourceLocation &location,
   return reprinted_command_text(text);
 }
 
+/* The subshell the way bash reprints it, with one blank inside each
+   parenthesis, its commands separated by a semicolon and a blank, and the
+   redirections the span carries kept after the closing parenthesis. The answer
+   is empty when the span is unavailable or spells no subshell. */
+fn subshell_command_text(EvalContext &cxt, const SourceLocation &location,
+                         usize end_position) throws -> String;
+
 /* The word as its source spells it, which keeps the quoting the parsed word
    drops. The parsed text answers for a word whose span is unavailable. */
 fn append_word_source_text(EvalContext &cxt, String &out,
@@ -353,6 +360,26 @@ fn append_word_source_text(EvalContext &cxt, String &out,
 fn append_redirections_text(EvalContext &cxt, String &out,
                             const SparseList<Redirection> &redirections) throws
     -> void;
+
+/* The closing parenthesis of a subshell, which is the site bash reports for it.
+   A body written across several lines therefore names its last line. */
+inline fn subshell_closing_location(const Expression &node) wontthrow
+    -> SourceLocation
+{
+  let const location = node.source_location();
+  if (node.source_end_position() <= location.position) return location;
+
+  return SourceLocation{node.source_end_position() - 1, 1,
+                        location.source_name_index};
+}
+
+/* Whether a reader can observe the command text this process publishes, which
+   decides whether the text is worth building. BASH_COMMAND belongs to the bash
+   mood, and a trap action keeps the command that triggered it. */
+inline fn command_text_is_observed(const EvalContext &cxt) wontthrow -> bool
+{
+  return cxt.bash_dynamic_variables_enabled() && !cxt.is_running_trap_action();
+}
 
 /* The command text a DEBUG trap and BASH_COMMAND observe, published before the
    command runs. The builder runs only when a reader can observe its result,
@@ -373,11 +400,8 @@ fn publish_command_and_run_debug_trap(
       mode == root_evaluation_mode::PreparedPipelineStage &&
       cxt.was_stage_boundary_published();
 
-  if (cxt.bash_dynamic_variables_enabled() && !cxt.is_running_trap_action() &&
-      !was_text_published)
-  {
+  if (command_text_is_observed(cxt) && !was_text_published)
     cxt.set_current_command(do_build_command_text());
-  }
 
   if (mode == root_evaluation_mode::Normal && cxt.should_run_debug_trap()) {
     let const was_control_flow_pending = cxt.has_pending_control_flow();

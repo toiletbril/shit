@@ -1045,6 +1045,29 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
+  /* A redirected wrapper hands down the span that reaches over its
+     redirections, and the bare subshell answers for its own. */
+  let const pending_end_position = cxt.take_pending_subshell_end_position();
+  let const end_position = pending_end_position != 0
+                               ? static_cast<usize>(pending_end_position)
+                               : source_end_position();
+
+  let const closing_location = internal::subshell_closing_location(*this);
+
+  /* Bash traces the commands inside a subshell and fires nothing for the
+     subshell itself, so the text is published with no DEBUG fire. The parent
+     publishes it after the body has run, because the in-process body leaves its
+     own last command behind. */
+  let const do_publish_subshell = [&]() throws -> void {
+    cxt.set_current_location(closing_location);
+
+    if (!command_text_is_observed(cxt)) return;
+
+    let text =
+        internal::subshell_command_text(cxt, source_location(), end_position);
+    if (!text.is_empty()) cxt.set_current_command(steal(text));
+  };
+
   koshka::flush();
   let const forked_child = os::try_fork_compound_stage(None, None, None);
   if (!forked_child.has_value()) {
@@ -1058,6 +1081,8 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
       if (cxt.is_posix_mode())
         status = static_cast<i32>(error.command_status());
     }
+
+    do_publish_subshell();
     cxt.publish_single_pipe_status(status);
     SET_AND_RETURN_EXIT_STATUS(cxt, status);
   }
@@ -1083,6 +1108,8 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   let was_stopped = false;
   let const status = os::wait_and_monitor_process(child, &was_stopped);
   unused(was_stopped);
+
+  do_publish_subshell();
   cxt.publish_single_pipe_status(status);
   SET_AND_RETURN_EXIT_STATUS(cxt, status);
 }
@@ -1513,6 +1540,14 @@ fn RedirectedCommand::evaluate_status_impl(EvalContext &cxt) const throws
       break;
     }
     }
+  }
+
+  /* A subshell publishes its own text, and only this wrapper knows the span
+     that reaches over the redirections written after the closing
+     parenthesis. */
+  if (m_child->as_subshell() != nullptr) {
+    cxt.set_pending_subshell_end_position(
+        static_cast<u32>(source_end_position()));
   }
 
   try {

@@ -88,3 +88,20 @@ false | true
 grep -q missing < /dev/null
 trap - ERR
 echo err-command-text-done
+
+# A failing subshell reports the parenthesized command and the line the closing
+# parenthesis is written on. The reprint lays out one blank inside each
+# parenthesis, separates the commands of a multiple line body with a semicolon
+# and a blank, and keeps the redirections written after the closing
+# parenthesis.
+echo err-subshell-text
+trap 'echo "E-$LINENO-[$BASH_COMMAND]"' ERR
+(false)
+(   false   )
+( echo subshell-a
+  false )
+( false ) > /dev/null
+( true ) && ( false )
+{ false; }
+trap - ERR
+echo err-subshell-text-done
