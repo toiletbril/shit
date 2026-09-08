@@ -72,6 +72,30 @@ fn is_valid_trap_condition(StringView condition) throws -> bool
   return os::signal_number_from_name(condition).has_value();
 }
 
+struct listed_trap
+{
+  i64 order;
+  StringView condition;
+  StringView action;
+};
+
+/* Bash walks EXIT, then every real signal in ascending number order, then
+   DEBUG, ERR, and RETURN. No signal number reaches the special base. */
+fn trap_listing_order(StringView condition) throws -> i64
+{
+  static constexpr i64 SPECIAL_CONDITION_BASE = 1000;
+
+  if (condition == "EXIT") return 0;
+  if (condition == "DEBUG") return SPECIAL_CONDITION_BASE;
+  if (condition == "ERR") return SPECIAL_CONDITION_BASE + 1;
+  if (condition == "RETURN") return SPECIAL_CONDITION_BASE + 2;
+
+  if (let const number = os::signal_number_from_name(condition))
+    return static_cast<i64>(*number);
+
+  return SPECIAL_CONDITION_BASE + 3;
+}
+
 fn format_listed_condition(StringView condition,
                            bool should_include_signal_prefix,
                            Allocator allocator) throws -> String
@@ -111,26 +135,54 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const has_filter = is_print_form && args.count() > 2;
 
     let out = String{cxt.scratch_allocator()};
-    cxt.traps().for_each([&](StringView condition, const String &action) {
-      if (has_filter) {
-        let was_requested = false;
-        for (usize i = 2; i < args.count(); i++)
-          if (normalize_condition(args[i], cxt.scratch_allocator()).view() ==
-              condition)
-          {
-            was_requested = true;
-            break;
-          }
-        if (!was_requested) return;
-      }
-
+    let const do_append_listing = [&](StringView condition, StringView action)
+                                      throws -> void {
       out += "trap -- ";
-      append_shell_quoted_arg(out, action.view());
+      append_shell_quoted_arg(out, action);
       out += ' ';
       out += format_listed_condition(condition, should_include_signal_prefix,
                                      cxt.scratch_allocator());
       out += '\n';
+    };
+
+    /* A filtered listing follows the operand order, prints a repeated operand
+       twice, and reports an operand that names no condition. */
+    if (has_filter) {
+      let has_invalid_operand = false;
+
+      for (usize i = 2; i < args.count(); i++) {
+        let const condition =
+            normalize_condition(args[i], cxt.scratch_allocator());
+        if (!is_valid_trap_condition(condition.view())) {
+          report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                    args[i] + ": invalid signal specification",
+                                    "List the signal names with `trap -l`");
+          has_invalid_operand = true;
+          continue;
+        }
+
+        let const *action = cxt.traps().find(condition.view());
+        if (action != nullptr)
+          do_append_listing(condition.view(), action->view());
+      }
+
+      ec.print_to_stdout(out);
+      return has_invalid_operand ? 1 : 0;
+    }
+
+    let listed = ArrayList<listed_trap>{cxt.scratch_allocator()};
+    cxt.traps().for_each([&](StringView condition, const String &action) {
+      listed.push(
+          listed_trap{trap_listing_order(condition), condition, action.view()});
     });
+
+    listed.sort([](const listed_trap &left, const listed_trap &right) {
+      return left.order < right.order;
+    });
+
+    for (usize i = 0; i < listed.count(); i++)
+      do_append_listing(listed[i].condition, listed[i].action);
+
     ec.print_to_stdout(out);
     return 0;
   }

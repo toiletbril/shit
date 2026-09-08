@@ -335,6 +335,8 @@ changes update this file.
   identifiers through the canonical packed table instead of declaration order.
 - Measure the reference shell on the exact construct before designing a
   compatibility fix, and design from the measured output alone.
+- Attribute an observed status to the branch that produced it before that status
+  is generalized to another branch of the same builtin.
 - Keep borrowed views within owner lifetimes. Prove bounds, spans, offsets,
   lengths, optionals, and static evidence. Install restoration guards before
   mutation.
