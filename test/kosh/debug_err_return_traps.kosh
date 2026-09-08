@@ -1,8 +1,9 @@
 #!/bin/env kosh
 echo "== DEBUG =="
-trap 'echo D' DEBUG
+trap 'echo "D-$?"' DEBUG
 echo one
-echo two
+false
+echo "rc=$?"
 trap - DEBUG
 echo "== ERR =="
 trap 'echo E' ERR

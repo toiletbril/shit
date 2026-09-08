@@ -2,11 +2,13 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "== DEBUG =="]
   [CompoundListCondition, None]
-    [SimpleCommand "trap" "echo D" "DEBUG"]
+    [SimpleCommand "trap" "echo "D-$?"" "DEBUG"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "one"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "two"]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
   [CompoundListCondition, None]
     [SimpleCommand "trap" "-" "DEBUG"]
   [CompoundListCondition, None]
@@ -64,7 +66,7 @@
   Unquoted "trap"
 ]
 [Word
-  Literal "echo D"
+  Literal "echo "D-$?""
 ]
 [Word
   Unquoted "DEBUG"
@@ -76,10 +78,14 @@
   Unquoted "one"
 ]
 [Word
+  Unquoted "false"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
-  Unquoted "two"
+  DoubleQuoted "rc="
+  Variable "?"
 ]
 [Word
   Unquoted "trap"
@@ -246,11 +252,12 @@
   Unquoted "ERR"
 ]
 == DEBUG ==
-D
+D-0
 one
-D
-two
-D
+D-0
+D-1
+rc=1
+D-0
 == ERR ==
 E
 == RETURN ==
