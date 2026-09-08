@@ -277,15 +277,18 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   {
     if (should_restore_fds) do_restore_fds();
   };
-  saved_fds.push(ec.in_fd.has_value()
-                     ? os::save_and_replace_descriptor(0, *ec.in_fd)
-                     : os::save_descriptor(0));
-  saved_fds.push(ec.out_fd.has_value()
-                     ? os::save_and_replace_descriptor(1, *ec.out_fd)
-                     : os::save_descriptor(1));
-  saved_fds.push(ec.err_fd.has_value()
-                     ? os::save_and_replace_descriptor(2, *ec.err_fd)
-                     : os::save_descriptor(2));
+  saved_fds.push(
+      ec.in_fd.has_value()
+          ? os::save_and_replace_descriptor_out_of_reach(0, *ec.in_fd)
+          : os::save_descriptor_out_of_reach(0));
+  saved_fds.push(
+      ec.out_fd.has_value()
+          ? os::save_and_replace_descriptor_out_of_reach(1, *ec.out_fd)
+          : os::save_descriptor_out_of_reach(1));
+  saved_fds.push(
+      ec.err_fd.has_value()
+          ? os::save_and_replace_descriptor_out_of_reach(2, *ec.err_fd)
+          : os::save_descriptor_out_of_reach(2));
   let const do_render_error = [&](const std::exception_ptr &error) {
     try {
       std::rethrow_exception(error);
@@ -564,8 +567,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
     }
     return last_exit_status();
   } catch (const InterruptErrorWithLocation &) {
-    /* An interrupt ends the whole shell command, so it passes through the
-       sourced file, the eval, and the trap action that was running. */
+    /* An interrupt ends the whole shell command. It passes through the sourced
+       file, the eval, and the trap action that was running. */
     throw;
   } catch (const ErrorWithLocationAndDetails &detailed_error) {
     show_message(detailed_error.to_string(source, this));

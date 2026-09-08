@@ -107,7 +107,7 @@ fn EvalContext::snapshot_subshell_descriptor(i32 shell_fd) throws -> void
       "backing up descriptor %d before a subshell exec moves it at depth %zu",
       shell_fd, m_subshell_depth);
   m_subshell_saved_descriptors.push(subshell_saved_descriptor{
-      m_subshell_depth, os::save_descriptor(shell_fd)});
+      m_subshell_depth, os::save_descriptor_out_of_reach(shell_fd)});
 }
 
 fn EvalContext::set_coprocess_descriptors(i32 read_fd, i32 write_fd) wontthrow
@@ -126,10 +126,9 @@ fn EvalContext::hide_coprocess_descriptors() throws -> void
   LOG(Debug, "taking the coprocess descriptors away at subshell depth %zu",
       m_subshell_depth);
 
-  /* The backup is what leave_subshell hands back, so an in-process subshell
+  /* The backup is what leave_subshell hands back. An in-process subshell
      returns the descriptors to the shell that owns them. Both backups are
-     taken before either close, because a backup is placed at the lowest free
-     number and would otherwise answer for the number just released. */
+     taken before either close. Each one then lands on a number of its own. */
   for (let const shell_fd : {m_coprocess_read_fd, m_coprocess_write_fd}) {
     if (shell_fd >= 0) snapshot_subshell_descriptor(shell_fd);
   }

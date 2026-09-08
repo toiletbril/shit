@@ -625,6 +625,21 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
   return result;
 }
 
+fn save_and_replace_descriptor_out_of_reach(i32 shell_fd,
+                                            os::descriptor target) wontthrow
+    -> saved_descriptor
+{
+  /* A standard descriptor is backed up by the original handle held in the
+     result, and any other descriptor by an unregistered duplicate. Neither
+     one carries a number a script can name. */
+  return save_and_replace_descriptor(shell_fd, target);
+}
+
+fn save_descriptor_out_of_reach(i32 shell_fd) wontthrow -> saved_descriptor
+{
+  return save_descriptor(shell_fd);
+}
+
 fn reopen_terminal_as_stdin() wontthrow -> bool
 {
   let const terminal = CreateFileW(L"CONIN$", GENERIC_READ | GENERIC_WRITE,

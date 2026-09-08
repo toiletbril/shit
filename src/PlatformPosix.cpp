@@ -232,10 +232,44 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void
   close(saved);
 }
 
-/* Backups live at or above this number so a script never sees them. */
+/* Backups live at or above this number. Bash uses the same floor for the
+   backup a command redirection takes, and a script can name it. */
 constexpr int SHELL_BACKUP_FD_FLOOR = 10;
 
-fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
+/* A backup that has to outlive the commands running above it is placed at or
+   below this number, away from the range a script writes by hand. */
+constexpr int SHELL_HIDDEN_FD_CEILING = 255;
+
+static fn highest_free_shell_fd() wontthrow -> int
+{
+  const int prior_errno = errno;
+  int ceiling_fd = SHELL_HIDDEN_FD_CEILING;
+
+  resource_limit open_file_limit{};
+  if (get_resource_limit(resource_kind::OpenFiles, open_file_limit) &&
+      open_file_limit.soft != RESOURCE_UNLIMITED &&
+      open_file_limit.soft <= static_cast<u64>(ceiling_fd))
+  {
+    ceiling_fd = static_cast<int>(open_file_limit.soft) - 1;
+  }
+
+  int placement_fd = SHELL_BACKUP_FD_FLOOR;
+  for (int candidate_fd = ceiling_fd; candidate_fd > SHELL_BACKUP_FD_FLOOR;
+       candidate_fd--)
+  {
+    if (fcntl(candidate_fd, F_GETFD) == -1 && errno == EBADF) {
+      placement_fd = candidate_fd;
+      break;
+    }
+  }
+
+  errno = prior_errno;
+
+  return placement_fd;
+}
+
+static fn save_and_replace_descriptor_at(i32 shell_fd, os::descriptor target,
+                                         int floor_fd) wontthrow
     -> saved_descriptor
 {
   saved_descriptor result{};
@@ -249,8 +283,15 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     return result;
   }
 
-  const os::descriptor backup =
-      fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
+  os::descriptor backup = fcntl(shell_fd, F_DUPFD_CLOEXEC, floor_fd);
+
+  /* A raised floor can exceed the real descriptor limit when the limit could
+     not be read. The backup is worth more on a visible number than not at
+     all. */
+  if (backup == -1 && errno != EBADF && floor_fd != SHELL_BACKUP_FD_FLOOR) {
+    backup = fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
+  }
+
   if (backup == -1 && errno != EBADF) {
     result.is_dup2_ok = false;
     return result;
@@ -262,6 +303,21 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   note_descriptor_rebound();
 
   return result;
+}
+
+fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
+    -> saved_descriptor
+{
+  return save_and_replace_descriptor_at(shell_fd, target,
+                                        SHELL_BACKUP_FD_FLOOR);
+}
+
+fn save_and_replace_descriptor_out_of_reach(i32 shell_fd,
+                                            os::descriptor target) wontthrow
+    -> saved_descriptor
+{
+  return save_and_replace_descriptor_at(shell_fd, target,
+                                        highest_free_shell_fd());
 }
 
 fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
@@ -283,16 +339,36 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
   note_descriptor_rebound();
 }
 
-fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
+static fn save_descriptor_at(i32 shell_fd, int floor_fd) wontthrow
+    -> saved_descriptor
 {
   saved_descriptor result{};
   result.shell_fd = shell_fd;
-  const os::descriptor backup =
-      fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
+
+  os::descriptor backup = fcntl(shell_fd, F_DUPFD_CLOEXEC, floor_fd);
+
+  /* A raised floor can exceed the real descriptor limit when the limit could
+     not be read. The backup is worth more on a visible number than not at
+     all. */
+  if (backup == -1 && errno != EBADF && floor_fd != SHELL_BACKUP_FD_FLOOR) {
+    backup = fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
+  }
+
   result.was_open = backup != -1;
   result.saved = backup;
   result.is_dup2_ok = backup != -1 || errno == EBADF;
+
   return result;
+}
+
+fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
+{
+  return save_descriptor_at(shell_fd, SHELL_BACKUP_FD_FLOOR);
+}
+
+fn save_descriptor_out_of_reach(i32 shell_fd) wontthrow -> saved_descriptor
+{
+  return save_descriptor_at(shell_fd, highest_free_shell_fd());
 }
 
 fn reopen_terminal_as_stdin() wontthrow -> bool

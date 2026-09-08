@@ -1,3 +1,6 @@
 script-ran
 got=data
 rc=0
+reachable:
+own=usable
+fds-rc=0

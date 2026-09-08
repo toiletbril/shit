@@ -753,6 +753,15 @@ struct saved_descriptor
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     -> saved_descriptor;
 fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor;
+
+/* Take the same backup the pair above takes and put it where a script is not
+   going to name it. Bash forks a subshell and execs a mimicked script, so it
+   needs no such backup. Kosh runs both in process and has to keep this one
+   alive underneath the script. */
+fn save_and_replace_descriptor_out_of_reach(i32 shell_fd,
+                                            os::descriptor target) wontthrow
+    -> saved_descriptor;
+fn save_descriptor_out_of_reach(i32 shell_fd) wontthrow -> saved_descriptor;
 fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void;
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
