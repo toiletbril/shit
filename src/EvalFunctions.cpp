@@ -13,7 +13,9 @@
 #include "Debug.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
+#include "PackedStringKey.hpp"
 #include "Platform.hpp"
+#include "StaticStringMap.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -30,6 +32,26 @@ constexpr const char *RESTRICTED_READONLY_NAMES[] = {"SHELL",
                                                      "KOSH_CALC_HISTORY",
                                                      "KOSH_DIRECTORY_HISTORY"};
 constexpr StringView BASH_IMPLICIT_READONLY_NAMES[] = {"BASHOPTS", "SHELLOPTS"};
+
+/* The named conditions run_named_trap serves. The position of a key is the bit
+   that marks its action as running. */
+constexpr PackedStringKey NAMED_TRAP_CONDITION_KEYS[] = {
+    SSK("DEBUG"),
+    SSK("ERR"),
+    SSK("RETURN"),
+};
+constexpr StaticStringSet NAMED_TRAP_CONDITIONS{NAMED_TRAP_CONDITION_KEYS};
+
+/* Every condition outside the table shares the bit above the named ones. */
+constexpr u8 OTHER_TRAP_CONDITION_BIT = 1u << 3;
+
+pure fn running_trap_bit(StringView condition) wontthrow -> u8
+{
+  if (let const index = NAMED_TRAP_CONDITIONS.find_index(condition))
+    return static_cast<u8>(1u << *index);
+
+  return OTHER_TRAP_CONDITION_BIT;
+}
 
 } /* namespace */
 
@@ -217,14 +239,15 @@ fn EvalContext::run_named_trap(StringView condition,
                                const SourceLocation *trigger_location) throws
     -> void
 {
-  if (m_running_traps) return;
+  let const condition_bit = running_trap_bit(condition);
+  if ((m_running_trap_conditions & condition_bit) != 0) return;
   const String *action = m_traps.find(condition);
   if (action == nullptr || action->count() == 0) {
     return;
   }
 
-  m_running_traps = true;
-  defer { m_running_traps = false; };
+  m_running_trap_conditions |= condition_bit;
+  defer { m_running_trap_conditions &= static_cast<u8>(~condition_bit); };
 
   m_trap_action_depth += 1;
   defer { m_trap_action_depth -= 1; };
@@ -322,12 +345,11 @@ fn EvalContext::install_trap_dispositions() throws -> void
   });
 }
 
+/* A signal an action sends to the shell is drained at the next boundary inside
+   that action, so the drain carries no guard of its own. The source depth cap
+   bounds an action that keeps resending its own signal. */
 fn EvalContext::run_pending_traps() throws -> void
 {
-  if (m_running_traps) return;
-  m_running_traps = true;
-  defer { m_running_traps = false; };
-
   m_trap_action_depth += 1;
   defer { m_trap_action_depth -= 1; };
 

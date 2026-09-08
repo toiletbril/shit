@@ -1948,9 +1948,10 @@ protected:
   usize m_debug_trap_active_depth{0};
   bool m_is_replaying_inherited_state{false};
   bool m_exit_trap_ran{false};
-  /* True while run_pending_traps is draining, so a signal delivered during a
-     trap action does not nest a second drain. */
-  bool m_running_traps{false};
+  /* One bit for each named condition whose action is running. Only the
+     condition that is running is blocked, so a signal action still fires the
+     DEBUG trap and a pending signal still drains inside a DEBUG action. */
+  u8 m_running_trap_conditions{0};
   /* Nonzero while a trap action evaluates, so BASH_COMMAND keeps the command
      that triggered the trap instead of the action's own commands. */
   u32 m_trap_action_depth{0};
