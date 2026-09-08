@@ -275,11 +275,7 @@ hot fn CompoundList::evaluate_root_status_impl(
     if (was_command_failure_uncaught && !cxt.is_posix_mode()) {
       cxt.set_last_exit_status(ret.status);
       if (cxt.should_run_err_trap()) {
-        let const *failed_command = n->command();
-        let const failed_location =
-            failed_command->as_subshell() != nullptr
-                ? subshell_closing_location(*failed_command)
-                : failed_command->source_location();
+        let const failed_location = n->command()->error_report_location();
         cxt.run_named_trap(StringView{"ERR", 3}, &failed_location);
       }
 
@@ -438,6 +434,23 @@ fn Pipeline::append_command(const Command *node) throws -> void
 
   m_location.length += node->source_location().length;
   m_commands.push(node);
+}
+
+/* Bash publishes the text and the site of a simple stage in the parent before
+   it forks that stage, so a failing pipeline answers for the last simple stage
+   it holds. A compound stage publishes nothing and leaves the stage written
+   before it in place. */
+fn Pipeline::error_report_location() const wontthrow -> SourceLocation
+{
+  for (usize index = m_commands.count(); index > 0; index--) {
+    let const *stage = m_commands[index - 1];
+    if (stage == nullptr) continue;
+
+    let const *simple = stage->as_simple_command();
+    if (simple != nullptr) return simple->source_location();
+  }
+
+  return source_location();
 }
 
 cold fn Pipeline::to_string() const throws -> String

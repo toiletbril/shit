@@ -132,3 +132,33 @@ false $( ((1)) )
 trap - ERR
 set -E
 echo err-nested-subshell-text-done
+
+# A failing pipeline reports the last simple stage it holds, because that is the
+# stage the parent published before it forked. A compound last stage publishes
+# nothing and leaves the stage written before it in place. Errtrace is cleared
+# so that each pipeline raises one fire.
+echo err-pipeline-site
+set +E
+trap 'echo "E-$LINENO-[$BASH_COMMAND]"' ERR
+false |
+  cat |
+  grep -q nothing
+true |
+  grep -q \
+    nothing
+! true |
+  cat
+true |
+  cat > /dev/null |
+  grep -q nothing
+true |
+  {
+    false
+  }
+true |
+  while read -r line; do
+    false
+  done
+trap - ERR
+set -E
+echo err-pipeline-site-done

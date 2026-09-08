@@ -361,18 +361,6 @@ fn append_redirections_text(EvalContext &cxt, String &out,
                             const SparseList<Redirection> &redirections) throws
     -> void;
 
-/* The closing parenthesis of a subshell, which is the site bash reports for it.
-   A body written across several lines therefore names its last line. */
-inline fn subshell_closing_location(const Expression &node) wontthrow
-    -> SourceLocation
-{
-  let const location = node.source_location();
-  if (node.source_end_position() <= location.position) return location;
-
-  return SourceLocation{node.source_end_position() - 1, 1,
-                        location.source_name_index};
-}
-
 /* Whether a reader can observe the command text this process publishes, which
    decides whether the text is worth building. BASH_COMMAND belongs to the bash
    mood, and a trap action keeps the command that triggered it. */

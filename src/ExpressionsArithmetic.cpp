@@ -953,6 +953,17 @@ Subshell::~Subshell() = default;
 
 fn Subshell::as_subshell() const wontthrow -> const Subshell * { return this; }
 
+/* Bash reports a subshell against its closing parenthesis, so a body written
+   across several lines names its last line. */
+fn Subshell::error_report_location() const wontthrow -> SourceLocation
+{
+  let const location = source_location();
+  if (source_end_position() <= location.position) return location;
+
+  return SourceLocation{source_end_position() - 1, 1,
+                        location.source_name_index};
+}
+
 cold fn Subshell::to_string() const throws -> String
 {
   let result = String{"Subshell"};
@@ -1052,7 +1063,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
                                ? static_cast<usize>(pending_end_position)
                                : source_end_position();
 
-  let const closing_location = internal::subshell_closing_location(*this);
+  let const closing_location = error_report_location();
 
   /* Bash traces the commands inside a subshell and fires nothing for the
      subshell itself, so the text is published with no DEBUG fire. The parent

@@ -690,6 +690,9 @@ public:
      its closing token so the whole span is recoverable. */
   pure fn source_end_position() const wontthrow -> usize;
   fn set_source_end_position(usize position) wontthrow -> void;
+  /* The site an ERR trap reports for this node. A node whose text spans several
+     lines does not always answer for the line it opens on. */
+  virtual fn error_report_location() const wontthrow -> SourceLocation;
   fn evaluate(EvalContext &cxt) const throws -> i64;
   fn evaluate_root(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> i64;
@@ -1183,6 +1186,7 @@ public:
       -> void override;
 
   fn as_simple_command() const wontthrow -> const SimpleCommand * override;
+  fn error_report_location() const wontthrow -> SourceLocation override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -1388,6 +1392,7 @@ public:
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
   fn as_subshell() const wontthrow -> const Subshell * override;
+  fn error_report_location() const wontthrow -> SourceLocation override;
 
   fn set_analysis_scope_definitions(
       ArrayList<analysis_scope_definition> definitions) throws -> void

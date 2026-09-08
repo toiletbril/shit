@@ -1368,6 +1368,11 @@ fn Expression::as_subshell() const wontthrow -> const expressions::Subshell *
   return nullptr;
 }
 
+fn Expression::error_report_location() const wontthrow -> SourceLocation
+{
+  return source_location();
+}
+
 fn Expression::try_static_condition_verdict(
     const AnalysisContext &actx) const wontthrow -> Maybe<bool>
 {
