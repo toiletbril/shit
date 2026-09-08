@@ -754,13 +754,26 @@ public:
            (m_function_call_depth == 0 && m_subshell_depth == 0 &&
             m_substitution_depth == 0);
   }
+  /* How deep the current frame sits inside function calls, subshells, and
+     command substitutions together. Each of the three moves it by one, so one
+     number orders every frame the DEBUG trap cares about. */
+  pure fn nesting_depth() const wontthrow -> usize
+  {
+    return m_function_call_depth + m_subshell_depth + m_substitution_depth;
+  }
   pure fn should_run_debug_trap() const wontthrow -> bool
   {
     return m_has_debug_trap && !is_posix_mode() &&
            !m_is_replaying_inherited_state &&
            (m_runtime.option_is_enabled(shell_option_id::Functrace) ||
-            (m_function_call_depth == 0 && m_subshell_depth == 0 &&
-             m_substitution_depth == 0));
+            nesting_depth() <= m_debug_trap_active_depth);
+  }
+  /* The trap installed inside a frame keeps running once that frame is left,
+     so leaving one lowers the depth the action is allowed to reach. */
+  fn lower_debug_trap_depth_to_current() wontthrow -> void
+  {
+    let const depth = nesting_depth();
+    if (m_debug_trap_active_depth > depth) m_debug_trap_active_depth = depth;
   }
   pure fn should_run_return_trap() const wontthrow -> bool
   {
@@ -1920,6 +1933,10 @@ protected:
   i64 m_getopts_last_optind{0};
   StringMap<String> m_traps{heap_allocator()};
   bool m_has_debug_trap{false};
+  /* The deepest frame the DEBUG action still reaches without functrace. An
+     install records the frame it ran in, and a command deeper than that frame
+     is not traced. */
+  usize m_debug_trap_active_depth{0};
   bool m_is_replaying_inherited_state{false};
   bool m_exit_trap_ran{false};
   /* True while run_pending_traps is draining, so a signal delivered during a

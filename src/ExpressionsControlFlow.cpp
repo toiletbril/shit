@@ -659,8 +659,10 @@ fn SelectLoop::evaluate_status_impl(EvalContext &cxt) const throws
   let select_trace = String{cxt.scratch_allocator()};
   append_word_loop_header(cxt, select_trace, "select", m_variable_name,
                           m_has_in_clause, m_words);
-  publish_command_and_run_debug_trap(
+  let const should_run_select = publish_command_and_run_debug_trap(
       cxt, [&] { return String{heap_allocator(), select_trace.view()}; });
+  if (!should_run_select) return {};
+
   cxt.write_xtrace(select_trace.view());
 
   if (values.is_empty()) return {};
@@ -818,8 +820,10 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   status_result result{};
   for (let const &value : values) {
-    publish_command_and_run_debug_trap(
+    let const should_run_iteration = publish_command_and_run_debug_trap(
         cxt, [&] { return String{heap_allocator(), loop_trace.view()}; });
+    if (!should_run_iteration) break;
+
     cxt.write_xtrace(loop_trace.view());
     cxt.set_shell_variable(m_variable_name, value);
     result = m_body->evaluate_status(cxt);
@@ -1037,12 +1041,13 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
   cxt.set_terminal_exec_allowed(false);
   cxt.set_current_location(source_location());
 
-  publish_command_and_run_debug_trap(cxt, [&] {
+  let const should_run_case = publish_command_and_run_debug_trap(cxt, [&] {
     let header_text = String{heap_allocator(), "case "};
     header_text += m_word->raw_string();
     header_text += " in";
     return header_text;
   });
+  if (!should_run_case) return {};
 
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no globbing, so a pattern keeps its metacharacters. */

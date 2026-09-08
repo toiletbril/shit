@@ -90,6 +90,7 @@ fn EvalContext::leave_subshell() wontthrow -> void
                                         1);
   }
   m_subshell_depth--;
+  lower_debug_trap_depth_to_current();
   LOG(Debug, "left a subshell, depth now %zu", m_subshell_depth);
 }
 
@@ -358,6 +359,7 @@ fn EvalContext::leave_function_call() wontthrow -> void
 {
   ASSERT(m_function_call_depth > 0);
   m_function_call_depth--;
+  lower_debug_trap_depth_to_current();
 }
 
 fn EvalContext::enter_substitution() throws -> void
@@ -374,6 +376,7 @@ fn EvalContext::leave_substitution() wontthrow -> void
 {
   ASSERT(m_substitution_depth > 0);
   m_substitution_depth--;
+  lower_debug_trap_depth_to_current();
 }
 
 pure fn EvalContext::get_substitution_depth() const wontthrow -> usize

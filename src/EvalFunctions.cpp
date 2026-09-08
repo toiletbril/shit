@@ -266,6 +266,9 @@ fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
       static_cast<int>(condition.length), condition.data, action.length);
   m_traps.set(condition, action);
   m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
+  /* A trap installed inside a function, a subshell, or a substitution traces
+     that frame even without functrace, which an inherited one does not. */
+  if (condition == "DEBUG") m_debug_trap_active_depth = nesting_depth();
   /* EXIT runs at the shell's end and needs no OS handler. An empty action
      installs the ignore disposition the way trap "" SIG asks. */
   if (condition == "EXIT") return;
