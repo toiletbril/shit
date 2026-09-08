@@ -3,38 +3,38 @@
 
 echo source-return
 ( trap 'echo R-source' RETURN
-  . bash/goldens/return_trap_inner.bash
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_inner.bash"
   echo after-source=$? )
 echo after-source-return=$?
 
 echo source-plain
 ( trap 'echo R-plain' RETURN
-  . bash/goldens/return_trap_plain.bash
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_plain.bash"
   echo after-plain=$? )
 echo after-source-plain=$?
 
 echo source-repeated
 ( trap 'echo R-repeated' RETURN
-  . bash/goldens/return_trap_plain.bash
-  . bash/goldens/return_trap_plain.bash
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_plain.bash"
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_plain.bash"
   echo after-repeated=$? )
 echo after-source-repeated=$?
 
 echo source-installs-trap
-( . bash/goldens/return_trap_setter.bash
+( . "${BASH_SOURCE[0]%/*}/goldens/return_trap_setter.bash"
   echo after-setter=$? )
 echo after-source-installs-trap=$?
 
 echo source-action-status
 ( trap 'false' RETURN
-  . bash/goldens/return_trap_inner.bash
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_inner.bash"
   echo after-action-status=$? )
 echo after-source-action-status=$?
 
 echo source-positional
 ( trap 'echo R-one=$1' RETURN
   set -- outer
-  . bash/goldens/return_trap_plain.bash sourced-arg
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_plain.bash" sourced-arg
   echo after-positional=$1 )
 echo after-source-positional=$?
 
@@ -65,7 +65,7 @@ echo after-nested-function-with-functrace=$?
 echo posix-source
 ( set -o posix
   trap 'echo R-posix' RETURN 2>/dev/null
-  . bash/goldens/return_trap_plain.bash
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_plain.bash"
   echo after-posix=$? )
 echo after-posix-source=$?
 
@@ -88,13 +88,13 @@ echo after-function-status-in-action=$?
 
 echo source-status-in-action
 ( trap 'echo "R-seen=$?"' RETURN
-  . bash/goldens/return_trap_status.bash
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_status.bash"
   echo after-status=$? )
 echo after-source-status-in-action=$?
 
 echo source-keyword-spelling
 ( trap 'echo R-keyword' RETURN
-  source bash/goldens/return_trap_inner.bash
+  source "${BASH_SOURCE[0]%/*}/goldens/return_trap_inner.bash"
   echo after-keyword=$? )
 echo after-source-keyword-spelling=$?
 

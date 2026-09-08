@@ -1,4 +1,4 @@
-#!/bin/env kosh
+#!/usr/bin/env kosh
 echo "== DEBUG =="
 trap 'echo "D-$?"' DEBUG
 echo one
@@ -32,3 +32,6 @@ for item in one two; do
 done
 echo "rc=$?"
 trap - ERR
+set --mood kosh
+echo "mood=$(set --mood)"
+echo "== DONE =="

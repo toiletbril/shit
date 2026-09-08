@@ -72,6 +72,12 @@
     [SimpleCommand "echo" "rc=$?"]
   [CompoundListCondition, None]
     [SimpleCommand "trap" "-" "ERR"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--mood" "kosh"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "mood=$(set --mood)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== DONE =="]
 [Word
   Unquoted "echo"
 ]
@@ -328,6 +334,28 @@
 [Word
   Unquoted "ERR"
 ]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "kosh"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "mood="
+  CommandSubstitution "set --mood"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== DONE =="
+]
 == DEBUG ==
 D-0
 one
@@ -347,3 +375,5 @@ R-source-1
 rc=3
 == GUARDED LOOP ==
 rc=1
+mood=kosh
+== DONE ==

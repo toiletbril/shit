@@ -29,7 +29,7 @@ echo tail'
 echo "== a break on a while condition ends the loop:"
 "$BIN" --mood bash -c 'set -T
 n=0
-trap '"'"'case "$BASH_COMMAND" in while*) break;; esac'"'"' DEBUG
+trap '"'"'case "$BASH_COMMAND" in *-lt\ 3*) break;; esac'"'"' DEBUG
 while [ $n -lt 3 ]; do echo w-$n; n=$((n + 1)); done
 trap - DEBUG
 echo n=$n'

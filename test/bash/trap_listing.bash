@@ -21,7 +21,7 @@ echo ignored-return
 echo after-ignored-return=$?
 
 echo printed-debug
-( trap 'echo D-$BASH_COMMAND' DEBUG; trap -p DEBUG )
+( trap 'echo "D-[$BASH_COMMAND]"' DEBUG; trap -p DEBUG )
 echo after-printed-debug=$?
 
 echo printed-err

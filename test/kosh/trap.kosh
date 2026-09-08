@@ -1,4 +1,4 @@
-#!/bin/env kosh
+#!/usr/bin/env kosh
 # shellcheck disable=SC2172
 trap "echo hi" INT
 trap INT

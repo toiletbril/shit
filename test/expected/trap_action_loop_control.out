@@ -15,10 +15,7 @@ outer-B
 after-inner
 tail
 == a break on a while condition ends the loop:
-w-0
-w-1
-w-2
-n=3
+n=0
 == a break on an arithmetic init clause runs the clause and ends the loop:
 i=0
 == a break on a case header ends the loop before the case runs:

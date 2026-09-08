@@ -1,12 +1,18 @@
 #!/bin/bash
 
-trap 'echo ERR' ERR
+# Each fire publishes the line, the command text, and the status the action
+# entered with, which binds the fire to the construct that raised it.
+trap 'echo "E-$LINENO-[$BASH_COMMAND]-[$?]"' ERR
 
+# A failure the && consumes raises no fire. The bare failure written after the
+# loop is the control that proves the trap is installed.
 echo guarded-loop
 for item in one two; do
   false && echo unreachable
 done
-echo "status=$?"
+echo "guarded-status=$?"
+false
+echo "control-status=$?"
 
 echo plain-loop
 for item in one two; do
@@ -45,6 +51,7 @@ echo "status=$?"
 echo errtrace-subshell
 (false)
 echo "status=$?"
+set +E
 
 echo return-plain
 trap 'echo RETURN' RETURN
@@ -69,7 +76,7 @@ lineno_function
 echo lineno-subshell
 (false)
 echo lineno-source
-. bash/goldens/err_trap_lineno_inner.bash
+. "${BASH_SOURCE[0]%/*}/goldens/err_trap_lineno_inner.bash"
 trap - ERR
 echo lineno-done
 
@@ -109,10 +116,8 @@ echo err-subshell-text-done
 # A subshell nested inside another carries the same layout, and a doubled
 # parenthesis opens an arithmetic command that keeps the way it is written. A
 # substitution whose body opens a subshell takes a blank after the dollar sign,
-# because the two parentheses would otherwise read as arithmetic. Errtrace is
-# cleared so that each statement raises one fire and the reprint stands alone.
+# because the two parentheses would otherwise read as arithmetic.
 echo err-nested-subshell-text
-set +E
 trap 'echo "E-[$BASH_COMMAND]"' ERR
 ( ( false ) )
 ( (false) )
@@ -130,15 +135,12 @@ false $( ( echo nested-b ) )
 false $( (echo nested-c) )
 false $( ((1)) )
 trap - ERR
-set -E
 echo err-nested-subshell-text-done
 
 # A failing pipeline reports the last simple stage it holds, because that is the
 # stage the parent published before it forked. A compound last stage publishes
-# nothing and leaves the stage written before it in place. Errtrace is cleared
-# so that each pipeline raises one fire.
+# nothing and leaves the stage written before it in place.
 echo err-pipeline-site
-set +E
 trap 'echo "E-$LINENO-[$BASH_COMMAND]"' ERR
 false |
   cat |
@@ -160,7 +162,6 @@ true |
     false
   done
 trap - ERR
-set -E
 echo err-pipeline-site-done
 
 # Bash runs a subshell whose body is one subshell in the process it already
@@ -282,3 +283,26 @@ fires_twice
 trap - ERR
 echo "s=$?"
 echo err-installed-outlives-done
+
+# An assignment whose value comes from a failing substitution takes the status of
+# that substitution and raises its own fire. The body of the substitution is
+# reached only under errtrace. A word substitution inside a command that succeeds
+# raises nothing without errtrace.
+echo err-substitution-scope
+trap 'echo "S-[$BASH_COMMAND]"' ERR
+captured=$(false)
+echo "assign-status=$?"
+echo "word=[$(false; echo word-tail)]"
+echo "word-status=$?"
+true $(false)
+echo "operand-status=$?"
+set -E
+captured=$(false)
+echo "assign-status=$?"
+echo "word=[$(false; echo word-tail)]"
+echo "word-status=$?"
+true $(false)
+echo "operand-status=$?"
+set +E
+trap - ERR
+echo err-substitution-scope-done

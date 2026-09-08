@@ -10,32 +10,32 @@ nested_function() {
 }
 
 echo untraced-function
-trap 'echo "D-$BASH_COMMAND"' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 body_function
 echo after-call
 trap - DEBUG
 
 echo nested-function
-trap 'echo "D-$BASH_COMMAND"' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 nested_function
 trap - DEBUG
 
 echo traced-function
 set -T
-trap 'echo "D-$BASH_COMMAND"' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 body_function
 trap - DEBUG
 set +T
 echo after-traced
 
 echo subshell
-trap 'echo "D-$BASH_COMMAND"' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 ( echo in-subshell )
 echo after-subshell
 trap - DEBUG
 
 echo substitution
-trap 'echo "D-$BASH_COMMAND"' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 capture_function() {
   echo in-substitution
 }
@@ -44,7 +44,7 @@ echo captured $(capture_function)
 trap - DEBUG
 
 echo subshell-installed
-( trap 'echo "D-$BASH_COMMAND"' DEBUG; echo in-subshell )
+( trap 'echo "D-[$BASH_COMMAND]"' DEBUG; echo in-subshell )
 echo after-subshell-installed
 
 echo debug-lineno
@@ -62,7 +62,7 @@ echo debug-lineno-done
 
 echo function-installed
 installing_function() {
-  trap 'echo "D-$BASH_COMMAND"' DEBUG
+  trap 'echo "D-[$BASH_COMMAND]"' DEBUG
   echo in-installing-function
 }
 untraced_function() {
@@ -80,31 +80,31 @@ set +T
 
 echo substitution-installed
 # shellcheck disable=SC2046
-echo captured $(trap 'echo "D-$BASH_COMMAND"' DEBUG; echo in-substitution)
+echo captured $(trap 'echo "D-[$BASH_COMMAND]"' DEBUG; echo in-substitution)
 trap - DEBUG
 
 echo exit-in-action-simple
-( trap 'exit 9' DEBUG; echo unreachable-simple )
+( echo before-simple; trap 'exit 9' DEBUG; echo unreachable-simple )
 echo after-exit-in-action-simple=$?
 
 echo exit-in-action-word-loop
-( trap 'exit 9' DEBUG; for value in 1 2; do echo unreachable-$value; done )
+( echo before-word-loop; trap 'exit 9' DEBUG; for value in 1 2; do echo unreachable-$value; done )
 echo after-exit-in-action-word-loop=$?
 
 echo exit-in-action-case
-( trap 'exit 9' DEBUG; case x in x) echo unreachable-case ;; esac )
+( echo before-case; trap 'exit 9' DEBUG; case x in x) echo unreachable-case ;; esac )
 echo after-exit-in-action-case=$?
 
 echo exit-in-action-arithmetic-loop
-( trap 'exit 9' DEBUG; for ((index = 0; index < 2; index++)); do echo unreachable-$index; done )
+( echo before-arithmetic-loop; trap 'exit 9' DEBUG; for ((index = 0; index < 2; index++)); do echo unreachable-$index; done )
 echo after-exit-in-action-arithmetic-loop=$?
 
 echo exit-in-action-conditional
-( trap 'exit 9' DEBUG; [[ -n x ]]; echo unreachable-conditional )
+( echo before-conditional; trap 'exit 9' DEBUG; [[ -n x ]]; echo unreachable-conditional )
 echo after-exit-in-action-conditional=$?
 
 echo exit-in-action-assignment
-( trap 'exit 9' DEBUG; assigned=1; echo unreachable-$assigned )
+( echo before-assignment; trap 'exit 9' DEBUG; assigned=1; echo unreachable-$assigned )
 echo after-exit-in-action-assignment=$?
 
 echo exit-in-action-function
@@ -113,7 +113,7 @@ exiting_function() {
   trap 'exit 9' DEBUG
   echo unreachable-function
 }
-( exiting_function )
+( echo before-function; exiting_function )
 echo after-exit-in-action-function=$?
 set +T
 
@@ -140,11 +140,11 @@ echo after-exit-in-action-function-entry=$?
 set +T
 
 echo exit-in-action-pipeline
-( trap 'exit 9' DEBUG; echo unreachable-a | cat; echo unreachable-tail )
+( echo before-pipeline; trap 'exit 9' DEBUG; echo unreachable-a | cat; echo unreachable-tail )
 echo after-exit-in-action-pipeline=$?
 
 echo exit-in-action-pipeline-three
-( trap 'exit 9' DEBUG; echo unreachable-a | cat | cat )
+( echo before-pipeline-three; trap 'exit 9' DEBUG; echo unreachable-a | cat | cat )
 echo after-exit-in-action-pipeline-three=$?
 
 echo exit-in-action-pipeline-compound
@@ -156,27 +156,27 @@ echo exit-in-action-pipeline-loop-stage
 echo after-exit-in-action-pipeline-loop-stage=$?
 
 echo exit-in-action-pipeline-later-stage
-( trap 'if [[ $BASH_COMMAND == cat* ]]; then exit 9; fi' DEBUG; echo unreachable-a | cat | cat )
+( echo before-pipeline-later-stage; trap 'if [[ $BASH_COMMAND == cat* ]]; then exit 9; fi' DEBUG; echo unreachable-a | cat | cat )
 echo after-exit-in-action-pipeline-later-stage=$?
 
 echo exit-in-action-pipeline-async
-( trap 'exit 9' DEBUG; echo unreachable-a | cat & wait )
+( echo before-pipeline-async; trap 'exit 9' DEBUG; echo unreachable-a | cat & wait )
 echo after-exit-in-action-pipeline-async=$?
 
 echo exit-in-action-select
-( trap 'exit 9' DEBUG; select choice in a b; do echo unreachable-$choice; done ) </dev/null
+( echo before-select; trap 'exit 9' DEBUG; select choice in a b; do echo unreachable-$choice; done ) </dev/null
 echo after-exit-in-action-select=$?
 
 echo exit-in-action-blank-init
-( index=0; trap 'exit 9' DEBUG; for ((; index < 2; index++)); do echo unreachable-$index; done )
+( echo before-blank-init; index=0; trap 'exit 9' DEBUG; for ((; index < 2; index++)); do echo unreachable-$index; done )
 echo after-exit-in-action-blank-init=$?
 
 echo exit-in-action-blank-condition
-( trap 'if [[ $BASH_COMMAND == "((1))" ]]; then exit 9; fi' DEBUG; for ((index = 0; ; index++)); do echo unreachable-$index; done )
+( echo before-blank-condition; trap 'if [[ $BASH_COMMAND == "((1))" ]]; then exit 9; fi' DEBUG; for ((index = 0; ; index++)); do echo unreachable-$index; done )
 echo after-exit-in-action-blank-condition=$?
 
 echo exit-in-action-blank-step
-( trap 'if [[ $BASH_COMMAND == "((1))" ]]; then exit 9; fi' DEBUG; for ((index = 0; index < 3; )); do echo body-$index; index=$((index + 1)); done )
+( echo before-blank-step; trap 'if [[ $BASH_COMMAND == "((1))" ]]; then exit 9; fi' DEBUG; for ((index = 0; index < 3; )); do echo body-$index; index=$((index + 1)); done )
 echo after-exit-in-action-blank-step=$?
 
 echo break-in-action
@@ -208,7 +208,7 @@ echo after-return-in-action=$?
 set +T
 
 echo pinned-command
-trap 'echo "D-$BASH_COMMAND"; echo "still-$BASH_COMMAND"' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"; echo "still-[$BASH_COMMAND]"' DEBUG
 echo target
 trap - DEBUG
 
@@ -233,7 +233,7 @@ echo after-action-calls-function=$?
 
 echo depth-gate-function
 ( installer_function() {
-    trap 'echo "D-$BASH_COMMAND"' DEBUG
+    trap 'echo "D-[$BASH_COMMAND]"' DEBUG
     echo at-install-depth
     deeper_function
   }
@@ -243,14 +243,14 @@ echo depth-gate-function
 echo after-depth-gate-function=$?
 
 echo depth-gate-subshell
-( trap 'echo "D-$BASH_COMMAND"' DEBUG
+( trap 'echo "D-[$BASH_COMMAND]"' DEBUG
   echo at-subshell-depth
   ( echo in-nested-subshell ) )
 echo after-depth-gate-subshell=$?
 
 echo depth-gate-substitution
 # shellcheck disable=SC2046
-( echo captured $(trap 'echo "D-$BASH_COMMAND"' DEBUG
+( echo captured $(trap 'echo "D-[$BASH_COMMAND]"' DEBUG
                   echo at-substitution-depth
                   echo nested $(echo in-nested-substitution)) )
 echo after-depth-gate-substitution=$?
@@ -263,7 +263,7 @@ echo lineno-action-function
 echo after-lineno-action-function=$?
 
 echo lineno-action-source
-( trap '. bash/goldens/debug_trap_action_source.bash' DEBUG
+( trap ". ${BASH_SOURCE[0]%/*}/goldens/debug_trap_action_source.bash" DEBUG
   echo triggering-source
   trap - DEBUG )
 echo after-lineno-action-source=$?
@@ -330,10 +330,10 @@ removing_function() {
   echo in-removing-function
 }
 replacing_function() {
-  trap 'echo "R-$BASH_COMMAND"' DEBUG
+  trap 'echo "R-[$BASH_COMMAND]"' DEBUG
   echo in-replacing-function
 }
-trap 'echo "D-$BASH_COMMAND"' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 listing_function
 removing_function
 echo after-removing-function
@@ -341,7 +341,7 @@ trap - DEBUG
 echo untraced-removal-done
 
 echo untraced-replacement
-trap 'echo "D-$BASH_COMMAND"' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 replacing_function
 echo after-replacing-function
 trap - DEBUG
@@ -349,7 +349,7 @@ echo untraced-replacement-done
 
 echo traced-removal
 set -T
-trap 'echo "D-$BASH_COMMAND"' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 removing_function
 echo after-traced-removal
 trap - DEBUG
