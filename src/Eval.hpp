@@ -994,6 +994,13 @@ public:
 
   fn set_current_location(SourceLocation location) wontthrow -> void;
 
+  /* The location a diagnostic and LINENO read. A caller that moves it for one
+     publication puts the saved value back. */
+  pure fn get_current_location() const wontthrow -> SourceLocation
+  {
+    return m_current_location;
+  }
+
   fn set_shell_option_state(shell_option_id option, bool enabled) wontthrow
       -> void
   {

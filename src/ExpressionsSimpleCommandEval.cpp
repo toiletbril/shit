@@ -832,8 +832,18 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
        depth gate reaches only while functrace is on. LINENO names the line the
        body opens on, and the call site is already behind the frame. */
     if (cxt.should_run_debug_trap()) {
+      let const saved_call_location = cxt.get_current_location();
+      let const was_control_flow_pending = cxt.has_pending_control_flow();
+
       cxt.set_current_location(function_body->source_location());
       cxt.run_named_trap(StringView{"DEBUG", 5});
+      cxt.set_current_location(saved_call_location);
+
+      /* An action that leaves an exit, a return, a break, or a continue
+         abandons the body the entry traced. */
+      if (!was_control_flow_pending && cxt.has_pending_control_flow()) {
+        return cxt.last_exit_status();
+      }
     }
 
     i64 function_ret = 0;

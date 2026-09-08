@@ -117,6 +117,28 @@ exiting_function() {
 echo after-exit-in-action-function=$?
 set +T
 
+echo entry-fire-text
+entry_body_function() {
+  echo in-entry-body
+}
+set -T
+trap 'echo "A-[$BASH_COMMAND]-$LINENO"' DEBUG
+entry_body_function
+trap - DEBUG
+set +T
+
+echo exit-in-action-function-entry
+counting_function() {
+  echo in-counting-body
+}
+set -T
+( fire_count=0
+  trap 'fire_count=$((fire_count + 1)); echo "C-$fire_count-[$BASH_COMMAND]"; if [ $fire_count -ge 2 ]; then exit 9; fi' DEBUG
+  counting_function
+  echo unreachable-counting-tail )
+echo after-exit-in-action-function-entry=$?
+set +T
+
 echo exit-in-action-pipeline
 ( trap 'exit 9' DEBUG; echo unreachable-a | cat; echo unreachable-tail )
 echo after-exit-in-action-pipeline=$?

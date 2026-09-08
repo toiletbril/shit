@@ -378,7 +378,11 @@ fn publish_command_and_run_debug_trap(
   }
 
   if (mode == root_evaluation_mode::Normal && cxt.should_run_debug_trap()) {
+    let const was_control_flow_pending = cxt.has_pending_control_flow();
     cxt.run_named_trap(StringView{"DEBUG", 5});
+
+    if (was_control_flow_pending) return true;
+
     return !cxt.has_pending_control_flow();
   }
 

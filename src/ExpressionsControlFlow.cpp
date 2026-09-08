@@ -509,6 +509,12 @@ hot fn WhileLoop::evaluate_status_impl(EvalContext &cxt) const throws
     if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
+
+  if (cxt.has_pending_control_flow()) {
+    result.status = cxt.last_exit_status();
+    return result;
+  }
+
   cxt.set_last_exit_status(result.status);
   return result;
 }
@@ -661,7 +667,7 @@ fn SelectLoop::evaluate_status_impl(EvalContext &cxt) const throws
                           m_has_in_clause, m_words);
   let const should_run_select = publish_command_and_run_debug_trap(
       cxt, [&] { return String{heap_allocator(), select_trace.view()}; });
-  if (!should_run_select) return {};
+  if (!should_run_select) return {cxt.last_exit_status()};
 
   cxt.write_xtrace(select_trace.view());
 
@@ -731,6 +737,12 @@ fn SelectLoop::evaluate_status_impl(EvalContext &cxt) const throws
     if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
+
+  if (cxt.has_pending_control_flow()) {
+    result.status = cxt.last_exit_status();
+    return result;
+  }
+
   cxt.set_last_exit_status(result.status);
   return result;
 }
@@ -830,6 +842,14 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
     if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
+
+  /* An exit, a return, or an abandoned publish carries its own status, and the
+     loop reports that instead of the last body it ran. */
+  if (cxt.has_pending_control_flow()) {
+    result.status = cxt.last_exit_status();
+    return result;
+  }
+
   cxt.set_last_exit_status(result.status);
   return result;
 }
@@ -1047,7 +1067,7 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
     header_text += " in ";
     return header_text;
   });
-  if (!should_run_case) return {};
+  if (!should_run_case) return {cxt.last_exit_status()};
 
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no globbing, so a pattern keeps its metacharacters. */

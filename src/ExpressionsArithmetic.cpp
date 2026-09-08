@@ -777,13 +777,13 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
   };
 
   if (is_blank_clause(m_init)) {
-    if (!do_publish_implied_clause()) return {};
+    if (!do_publish_implied_clause()) return {cxt.last_exit_status()};
   } else {
     let const should_run_init = publish_command_and_run_debug_trap(cxt, [&] {
       return arithmetic_clause_command_text(
           clause_without_leading_blanks(m_init));
     });
-    if (!should_run_init) return {};
+    if (!should_run_init) return {cxt.last_exit_status()};
 
     cxt.evaluate_arithmetic_nonzero(m_init);
   }
@@ -844,6 +844,12 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
           m_step, cache.tokens, cache.is_tokenized, cache.is_simple);
     }
   }
+
+  if (cxt.has_pending_control_flow()) {
+    result.status = cxt.last_exit_status();
+    return result;
+  }
+
   cxt.set_last_exit_status(result.status);
   return result;
 }
