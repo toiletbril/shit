@@ -126,6 +126,23 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
   }
 
+  /* Dash accepts no trap option at all. A leading operand that opens with a
+     dash and carries more than that dash is an illegal option there, and the
+     special builtin ends a non-interactive shell with status 2. A lone dash and
+     the separator stay operands. */
+  if (cxt.is_posix_mode() && args.count() > 1 && args[1].count() > 1 &&
+      args[1].starts_with("-") && args[1] != "--")
+  {
+    let option = String{cxt.scratch_allocator()};
+    option += args[1][1];
+
+    let bad_option = make_error_for_arg(
+        ec, 1, "'-" + option + "' is not a valid trap option",
+        "Use `--` before an operand that begins with a dash");
+    bad_option.set_command_status(2);
+    throw bad_option;
+  }
+
   if (!cxt.is_posix_mode() && args.count() == 2 &&
       (args[1] == "-l" || args[1] == "--list"))
   {
