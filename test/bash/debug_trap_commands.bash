@@ -351,4 +351,43 @@ set +T
 shopt -u extdebug
 echo extdebug-loop-body-done
 
+# The eval builtin is traced, and every command its argument parses into is
+# traced again inside it.
+echo eval-command
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+eval 'echo evaluated'
+eval "echo double"; eval 'a=1; echo joined-$a'
+trap - DEBUG
+echo eval-command-done
+
+# A function definition command is not traced. The call that follows it is.
+echo function-definition
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+defined_here() {
+  echo defined-body
+}
+function keyworded_here { echo keyworded-body; }
+defined_here
+keyworded_here
+trap - DEBUG
+echo function-definition-done
+
+# The time keyword is not traced. The command it measures is.
+echo time-keyword
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+time echo timed
+trap - DEBUG
+echo time-keyword-done
+
+# An action reads the status of the command before the traced one.
+echo action-status
+saved_status=0
+trap 'saved_status=$?; echo "S-$saved_status-[$BASH_COMMAND]"' DEBUG
+true
+false
+(exit 42)
+trap - DEBUG
+echo action-status=$saved_status
+echo action-status-done
+
 echo done
