@@ -547,6 +547,10 @@ fn EvalContext::run_source(StringView source, StringView origin,
       return source_status;
     }
     return last_exit_status();
+  } catch (const InterruptErrorWithLocation &) {
+    /* An interrupt ends the whole shell command, so it passes through the
+       sourced file, the eval, and the trap action that was running. */
+    throw;
   } catch (const ErrorWithLocationAndDetails &detailed_error) {
     show_message(detailed_error.to_string(source, this));
     show_message(detailed_error.details_to_string(source, this));
