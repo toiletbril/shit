@@ -107,4 +107,50 @@ echo quoted-round-trip
   trap -p USR1 )
 echo after-quoted-round-trip=$?
 
+# An empty listing prints nothing and reports success in both forms.
+echo empty-listing
+( trap; echo empty-listing-status=$? )
+echo after-empty-listing=$?
+
+echo empty-print-listing
+( trap -p; echo empty-print-listing-status=$? )
+echo after-empty-print-listing=$?
+
+# A separator ends the option list. The word after it is the action, and a
+# lone separator sets nothing.
+echo separator-set
+( trap -- 'echo H' HUP; echo separator-set-status=$?; trap -p HUP )
+echo after-separator-set=$?
+
+echo separator-only
+( trap --; echo separator-only-status=$? ) 2>/dev/null
+echo after-separator-only=$?
+
+echo separator-reset
+( trap 'echo H' HUP; trap -- - HUP; echo separator-reset-status=$?; trap -p HUP )
+echo after-separator-reset=$?
+
+# A single operand resets the condition. An unknown name reports 2 in that
+# form and 1 in every form that names more than one condition.
+echo reset-valid-single
+( trap 'echo H' HUP; trap HUP; echo reset-valid-single-status=$?; trap -p HUP )
+echo after-reset-valid-single=$?
+
+echo reset-invalid-single
+( trap NOSUCHSIGNAL; echo reset-invalid-single-status=$? ) 2>/dev/null
+echo after-reset-invalid-single=$?
+
+echo multi-reset
+( trap 'echo U' USR1 USR2; trap - USR1 USR2; echo multi-reset-status=$?; trap -p USR1 USR2 )
+echo after-multi-reset=$?
+
+echo multi-reset-invalid
+( trap 'echo H' HUP; trap - HUP NOSUCHSIGNAL; echo multi-reset-invalid-status=$?; trap -p HUP ) 2>/dev/null
+echo after-multi-reset-invalid=$?
+
+# An unknown name in a set form leaves the valid conditions installed.
+echo multi-set-invalid
+( trap 'echo N' HUP NOSUCHSIGNAL; echo multi-set-invalid-status=$?; trap -p HUP ) 2>/dev/null
+echo after-multi-set-invalid=$?
+
 echo trap-listing-done
