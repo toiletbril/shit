@@ -316,11 +316,12 @@ fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
   LOG(Info, "setting a trap for '%.*s' with a %zu byte action",
       static_cast<int>(condition.length), condition.data, action.length);
   m_traps.set(condition, action);
-  m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
-  m_has_err_trap = m_traps.find(StringView{"ERR", 3}) != nullptr;
+  refresh_trap_flags();
   /* A trap installed inside a function, a subshell, or a substitution traces
-     that frame even without functrace, which an inherited one does not. */
+     that frame without functrace or errtrace. An inherited trap needs the
+     option to reach the frame. */
   if (condition == "DEBUG") m_debug_trap_active_depth = nesting_depth();
+  if (condition == "ERR") m_err_trap_active_depth = nesting_depth();
   /* EXIT runs at the shell's end and needs no OS handler. An empty action
      installs the ignore disposition the way trap "" SIG asks. */
   if (condition == "EXIT") return;
@@ -337,48 +338,48 @@ fn EvalContext::remove_trap(StringView condition) throws -> void
   LOG(Info, "removing the trap for '%.*s'", static_cast<int>(condition.length),
       condition.data);
   m_traps.erase(condition);
-  m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
-  m_has_err_trap = m_traps.find(StringView{"ERR", 3}) != nullptr;
+  refresh_trap_flags();
   if (condition == "EXIT") return;
   if (let const number = os::signal_number_from_name(condition))
     os::clear_trap_handler(*number);
 }
 
-fn EvalContext::save_untraced_debug_trap() throws -> saved_debug_trap
+fn EvalContext::save_untraced_trap(StringView condition,
+                                   shell_option_id trace_option,
+                                   usize &active_depth) throws
+    -> saved_frame_trap
 {
-  saved_debug_trap saved{};
-  saved.active_depth = m_debug_trap_active_depth;
+  saved_frame_trap saved{};
+  saved.active_depth = active_depth;
 
-  if (!m_has_debug_trap ||
-      m_runtime.option_is_enabled(shell_option_id::Functrace))
-  {
-    return saved;
-  }
+  if (m_runtime.option_is_enabled(trace_option)) return saved;
 
-  let const *action = m_traps.find(StringView{"DEBUG", 5});
+  let const *action = m_traps.find(condition);
   if (action == nullptr) return saved;
 
-  LOG(Info, "taking a %zu byte DEBUG action away from an untraced body",
-      action->length());
+  LOG(Info, "taking a %zu byte '%.*s' action away from an untraced body",
+      action->length(), static_cast<int>(condition.length), condition.data);
   saved.action = String{heap_allocator(), action->view()};
-  m_traps.erase(StringView{"DEBUG", 5});
-  m_has_debug_trap = false;
+  m_traps.erase(condition);
+  refresh_trap_flags();
 
   return saved;
 }
 
-fn EvalContext::restore_untraced_debug_trap(saved_debug_trap &&saved) throws
-    -> void
+fn EvalContext::restore_untraced_trap(StringView condition,
+                                      saved_frame_trap &&saved,
+                                      usize &active_depth) throws -> void
 {
   if (!saved.action.has_value()) return;
   /* A trap the body installed for itself stands, the way bash keeps the one it
      finds on the return. */
-  if (m_traps.find(StringView{"DEBUG", 5}) != nullptr) return;
+  if (m_traps.find(condition) != nullptr) return;
 
-  LOG(Info, "restoring the DEBUG action an untraced body ran without");
-  m_traps.set(StringView{"DEBUG", 5}, saved.action->view());
-  m_has_debug_trap = true;
-  m_debug_trap_active_depth = saved.active_depth;
+  LOG(Info, "restoring the '%.*s' action an untraced body ran without",
+      static_cast<int>(condition.length), condition.data);
+  m_traps.set(condition, saved.action->view());
+  refresh_trap_flags();
+  active_depth = saved.active_depth;
 }
 
 fn EvalContext::install_trap_dispositions() throws -> void

@@ -756,15 +756,23 @@ public:
   }
   pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
   pure fn has_err_trap() const wontthrow -> bool { return m_has_err_trap; }
+  /* The two hot conditions carry a flag beside the map, which every write to
+     the map refreshes. */
+  fn refresh_trap_flags() wontthrow -> void
+  {
+    m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
+    m_has_err_trap = m_traps.find(StringView{"ERR", 3}) != nullptr;
+  }
+  /* A trap a frame installs for itself traces that frame without errtrace. An
+     inherited trap needs errtrace to reach the frame. */
   pure fn should_run_err_trap() const wontthrow -> bool
   {
     return m_runtime.option_is_enabled(shell_option_id::Errtrace) ||
-           (m_function_call_depth == 0 && m_subshell_depth == 0 &&
-            m_substitution_depth == 0);
+           nesting_depth() <= m_err_trap_active_depth;
   }
   /* How deep the current frame sits inside function calls, subshells, and
      command substitutions together. Each of the three moves it by one, so one
-     number orders every frame the DEBUG trap cares about. */
+     number orders every frame the DEBUG and ERR traps care about. */
   pure fn nesting_depth() const wontthrow -> usize
   {
     return m_function_call_depth + m_subshell_depth + m_substitution_depth;
@@ -776,19 +784,43 @@ public:
            (m_runtime.option_is_enabled(shell_option_id::Functrace) ||
             nesting_depth() <= m_debug_trap_active_depth);
   }
-  /* The trap installed inside a frame keeps running once that frame is left,
-     so leaving one lowers the depth the action is allowed to reach. */
-  fn lower_debug_trap_depth_to_current() wontthrow -> void
+  /* The trap installed inside a frame keeps running once that frame is left.
+     Leaving a frame lowers the depth each action is allowed to reach. */
+  fn lower_trap_depths_to_current() wontthrow -> void
   {
     let const depth = nesting_depth();
     if (m_debug_trap_active_depth > depth) m_debug_trap_active_depth = depth;
+    if (m_err_trap_active_depth > depth) m_err_trap_active_depth = depth;
   }
-  /* A function call that functrace does not trace runs its body without the
-     DEBUG trap the caller installed, so the body sees no trap listed and can
-     install one of its own. The saved action returns when the body left none
-     behind. */
-  mustuse fn save_untraced_debug_trap() throws -> saved_debug_trap;
-  fn restore_untraced_debug_trap(saved_debug_trap &&saved) throws -> void;
+  /* A function call the trace option does not follow runs its body without the
+     trap the caller installed. The body sees no trap listed and can install one
+     of its own. The saved action returns when the body left none behind. */
+  mustuse fn save_untraced_debug_trap() throws -> saved_frame_trap
+  {
+    return save_untraced_trap(StringView{"DEBUG", 5},
+                              shell_option_id::Functrace,
+                              m_debug_trap_active_depth);
+  }
+  fn restore_untraced_debug_trap(saved_frame_trap &&saved) throws -> void
+  {
+    restore_untraced_trap(StringView{"DEBUG", 5}, steal(saved),
+                          m_debug_trap_active_depth);
+  }
+  mustuse fn save_untraced_err_trap() throws -> saved_frame_trap
+  {
+    return save_untraced_trap(StringView{"ERR", 3}, shell_option_id::Errtrace,
+                              m_err_trap_active_depth);
+  }
+  fn restore_untraced_err_trap(saved_frame_trap &&saved) throws -> void
+  {
+    restore_untraced_trap(StringView{"ERR", 3}, steal(saved),
+                          m_err_trap_active_depth);
+  }
+  mustuse fn save_untraced_trap(StringView condition,
+                                shell_option_id trace_option,
+                                usize &active_depth) throws -> saved_frame_trap;
+  fn restore_untraced_trap(StringView condition, saved_frame_trap &&saved,
+                           usize &active_depth) throws -> void;
   pure fn should_run_return_trap() const wontthrow -> bool
   {
     return !is_posix_mode() &&
@@ -1985,6 +2017,8 @@ protected:
      install records the frame it ran in, and a command deeper than that frame
      is not traced. */
   usize m_debug_trap_active_depth{0};
+  /* The same ceiling for the ERR action, which errtrace lifts. */
+  usize m_err_trap_active_depth{0};
   bool m_is_replaying_inherited_state{false};
   bool m_exit_trap_ran{false};
   /* One bit for each named condition whose action is running. Only the

@@ -308,7 +308,9 @@ hot fn CompoundList::evaluate_root_status_impl(
       if (cxt.has_pending_control_flow()) break;
     }
 
-    if (is_fatal_exit) {
+    /* The action can turn errexit off or on, and the option decides the exit
+       only as it stands once the action has returned. */
+    if (was_command_failure_uncaught && cxt.error_exit()) {
       cxt.set_last_exit_status(ret.status);
       if (cxt.in_subshell()) {
         cxt.request_exit(ret.status, source_location());

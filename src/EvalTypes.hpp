@@ -395,10 +395,10 @@ struct function_runtime_state
   bool was_mood_set_explicitly;
 };
 
-/* The DEBUG action a function call takes away from its body, held with the
-   depth the caller installed it at. An empty action means the call left the
+/* The DEBUG or ERR action a function call takes away from its body, held with
+   the depth the caller installed it at. An empty action means the call left the
    trap in place. */
-struct saved_debug_trap
+struct saved_frame_trap
 {
   Maybe<String> action;
   usize active_depth{0};

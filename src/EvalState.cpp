@@ -73,6 +73,7 @@ pure fn EvalContext::get_subshell_depth() const wontthrow -> usize
 fn EvalContext::set_subshell_depth(usize depth) wontthrow -> void
 {
   m_subshell_depth = depth;
+  lower_trap_depths_to_current();
 }
 
 fn EvalContext::leave_subshell() wontthrow -> void
@@ -90,7 +91,7 @@ fn EvalContext::leave_subshell() wontthrow -> void
                                         1);
   }
   m_subshell_depth--;
-  lower_debug_trap_depth_to_current();
+  lower_trap_depths_to_current();
   LOG(Debug, "left a subshell, depth now %zu", m_subshell_depth);
 }
 
@@ -369,7 +370,7 @@ fn EvalContext::leave_function_call() wontthrow -> void
 {
   ASSERT(m_function_call_depth > 0);
   m_function_call_depth--;
-  lower_debug_trap_depth_to_current();
+  lower_trap_depths_to_current();
 }
 
 fn EvalContext::enter_substitution() throws -> void
@@ -386,7 +387,7 @@ fn EvalContext::leave_substitution() wontthrow -> void
 {
   ASSERT(m_substitution_depth > 0);
   m_substitution_depth--;
-  lower_debug_trap_depth_to_current();
+  lower_trap_depths_to_current();
 }
 
 pure fn EvalContext::get_substitution_depth() const wontthrow -> usize
@@ -722,6 +723,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       os::get_file_creation_mask(),
       m_traps,
       m_debug_trap_active_depth,
+      m_err_trap_active_depth,
       m_variable_attributes,
       m_exported_names,
       m_environment_undo_log.count(),
@@ -840,9 +842,9 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   } else {
     m_traps = steal(snapshot.traps);
   }
-  m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
-  m_has_err_trap = m_traps.find(StringView{"ERR", 3}) != nullptr;
+  refresh_trap_flags();
   m_debug_trap_active_depth = snapshot.debug_trap_active_depth;
+  m_err_trap_active_depth = snapshot.err_trap_active_depth;
 
   if (!os::restore_current_directory(snapshot.working_directory))
     LOG(Debug, "the subshell could not restore the working directory");
@@ -1606,6 +1608,7 @@ fn EvalContext::apply_subshell_bootstrap(
     install_bash_argument_arrays(steal(bash_argument_values),
                                  steal(bash_argument_frame_counts));
   m_function_call_depth = static_cast<usize>(function_call_depth);
+  lower_trap_depths_to_current();
   for (usize scope = 0; scope < static_cast<usize>(local_scope_depth); scope++)
     enter_function_scope();
   for (let const &name : function_call_names) {

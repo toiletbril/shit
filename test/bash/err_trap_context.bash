@@ -222,3 +222,63 @@ returns_from_action
 echo "status=$?"
 trap - ERR
 echo err-action-return-done
+
+# A trap the top level installs does not reach a subshell, a function, or a
+# command substitution. Errtrace lifts the action into each of them.
+echo err-inherited-scope
+trap 'echo T-inherited' ERR
+(false)
+inherit_probe() { false; }
+inherit_probe
+echo "captured=$(false; echo subst-tail)"
+set -E
+(false)
+inherit_probe
+echo "captured=$(false; echo subst-tail)"
+set +E
+trap - ERR
+echo err-inherited-scope-done
+
+# A frame that installs a trap for itself is traced without errtrace, and a
+# frame nested inside the installing one is traced as well.
+echo err-installed-scope
+( trap 'echo T-subshell' ERR; false; echo subshell-tail )
+( trap 'echo T-nested' ERR; ( false ); echo nested-tail )
+installs_in_substitution() { trap 'echo T-substitution' ERR; false; }
+echo "captured=$(installs_in_substitution)"
+echo "s=$?"
+echo err-installed-scope-done
+
+# The action a function installs outlives the call. The caller keeps it, and a
+# second failure in the same frame fires it again. A function that overrides the
+# inherited action leaves its own behind. A function that resets the action
+# leaves the inherited one standing.
+echo err-installed-outlives
+sets_own_action() { trap 'echo T-set-in-function' ERR; }
+sets_own_action
+echo "listed=[$(trap -p ERR)]"
+false
+echo tail
+trap - ERR
+trap 'echo T-outer' ERR
+overrides_action() { trap 'echo T-override' ERR; }
+overrides_action
+echo "listed=[$(trap -p ERR)]"
+false
+trap - ERR
+trap 'echo T-kept' ERR
+removes_action() { trap - ERR; }
+removes_action
+echo "listed=[$(trap -p ERR)]"
+false
+trap - ERR
+fires_twice() {
+  trap 'echo T-twice' ERR
+  false
+  false
+  echo twice-tail
+}
+fires_twice
+trap - ERR
+echo "s=$?"
+echo err-installed-outlives-done
