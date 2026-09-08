@@ -283,6 +283,8 @@ changes update this file.
   Shell text tools remain read-only probes.
 - Inspect the complete command string, including nested quoted source, for
   prohibited forms before execution.
+- Write a generated file with the write tool or with a `printf` redirection.
+  An interpreter chosen for convenience carries its own prohibited forms.
 - Keep Bash's `$(< file)` fast file read as the substitution's only command.
   Append a sentinel before the read when trailing newlines must be preserved.
 - Pass generated text through a literal `printf` format when the text contains
