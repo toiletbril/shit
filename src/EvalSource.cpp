@@ -459,6 +459,15 @@ fn EvalContext::run_source(StringView source, StringView origin,
   defer { leave_source(); };
 
   let const parent_source = call_site ? m_current_source : nullptr;
+  let const frame_is_sourced_file =
+      consume_return && filename.has_value() && !filename->is_empty();
+
+  /* The window opens before the frame is entered, and its restore runs after
+     the frame is left. The body of a sourced file the trace option does not
+     follow runs without the DEBUG action the caller installed. */
+  let saved_debug_action = saved_frame_trap{};
+  if (frame_is_sourced_file) saved_debug_action = save_untraced_debug_trap();
+  defer { restore_untraced_debug_trap(steal(saved_debug_action)); };
 
   m_source_frames.push(source_frame{
       String{origin},
@@ -468,8 +477,6 @@ fn EvalContext::run_source(StringView source, StringView origin,
       : String{heap_allocator()},
       false, false
   });
-  let const frame_is_sourced_file =
-      consume_return && filename.has_value() && !filename->is_empty();
   m_source_frames.back().should_defer_trace = frame_is_sourced_file;
   if (frame_is_sourced_file) m_sourced_file_frames++;
   if (reject_return) m_rejected_return_source_frames++;

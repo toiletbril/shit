@@ -81,6 +81,12 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (has_extra_args) cxt.set_positional_params(steal(saved_params));
   };
 
+  /* The RETURN action of a sourced file belongs to the frame the file ran in.
+     Functrace is required before the caller DEBUG action reaches it. The frame
+     is already left where the action runs, and this window covers it. */
+  let saved_debug_action = cxt.save_untraced_debug_trap();
+  defer { cxt.restore_untraced_debug_trap(steal(saved_debug_action)); };
+
   i32 status = 0;
   let status_before_return = Maybe<i32>{None};
   {
