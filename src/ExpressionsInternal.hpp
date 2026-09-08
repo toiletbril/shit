@@ -397,11 +397,21 @@ fn publish_command_and_run_debug_trap(
     cxt.run_named_trap(StringView{"DEBUG", 5});
 
     if (was_control_flow_pending) return true;
-    if (!cxt.has_pending_control_flow()) return true;
 
-    let const &control = cxt.pending_control_flow();
-    return control.kind == control_flow::Kind::Break ||
-           control.kind == control_flow::Kind::Continue;
+    if (cxt.has_pending_control_flow()) {
+      let const &control = cxt.pending_control_flow();
+      return control.kind == control_flow::Kind::Break ||
+             control.kind == control_flow::Kind::Continue;
+    }
+
+    /* The extdebug option takes the traced command away when the action leaves
+       a nonzero status. The command that never ran reports success. */
+    if (cxt.is_shopt_enabled(shopt_option_id::Extdebug) &&
+        cxt.get_last_trap_action_status() != 0)
+    {
+      cxt.set_last_exit_status(0);
+      return false;
+    }
   }
 
   return true;

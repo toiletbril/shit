@@ -243,6 +243,8 @@ fn EvalContext::run_named_trap(StringView condition,
                                const SourceLocation *trigger_location) throws
     -> void
 {
+  m_last_trap_action_status = 0;
+
   let const condition_bit = running_trap_bit(condition);
   if ((m_running_trap_conditions & condition_bit) != 0) return;
   const String *action = m_traps.find(condition);
@@ -306,6 +308,8 @@ fn EvalContext::run_named_trap(StringView condition,
   run_source(action->view(),
              "the " + String{heap_allocator(), condition} + " trap",
              return_handling::Reject, trigger_site);
+
+  m_last_trap_action_status = m_last_exit_status;
 }
 
 fn EvalContext::run_return_trap(i32 status_before_return) throws -> void

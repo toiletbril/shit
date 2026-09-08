@@ -286,4 +286,34 @@ tail body
 TAIL
 trap - DEBUG
 
+# The extdebug option takes the traced command away when the DEBUG action
+# leaves a nonzero status. The command that never ran reports success.
+echo extdebug-skip
+skipping_function() {
+  echo skipme
+  echo inner-status=$?
+  echo function-tail
+}
+shopt -s extdebug
+set -T
+trap '[ "$BASH_COMMAND" != "echo skipme" ]' DEBUG
+echo kept
+echo skipme
+echo skipped-status=$?
+skipping_function
+echo after-function=$?
+trap - DEBUG
+set +T
+shopt -u extdebug
+echo extdebug-skip-done
+
+echo extdebug-off
+set -T
+trap '[ "$BASH_COMMAND" != "echo skipme" ]' DEBUG
+echo skipme
+echo off-status=$?
+trap - DEBUG
+set +T
+echo extdebug-off-done
+
 echo done
