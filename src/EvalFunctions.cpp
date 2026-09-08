@@ -507,7 +507,7 @@ fn EvalContext::clear_inherited_exit_trap() throws -> void
   m_traps.erase(StringView{"EXIT", 4});
 }
 
-cold fn EvalContext::run_subshell_exit_trap() throws -> void
+cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
 {
   /* The action keeps the command that triggered it in BASH_COMMAND, which the
      depth reports to every publisher the action reaches. */
@@ -521,9 +521,12 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> void
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
 
+  /* An exit the action ran replaces the status the subshell had reached. */
+  let requested_status = Maybe<i32>{None};
   defer
   {
-    m_last_exit_status = saved_exit_status;
+    m_last_exit_status =
+        requested_status.has_value() ? *requested_status : saved_exit_status;
 
     if (has_saved_pipe_statuses)
       set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
@@ -539,7 +542,16 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> void
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action the subshell set at its end");
       run_source(action->view(), "the EXIT trap", return_handling::Reject);
+
+      if (has_pending_control_flow() &&
+          pending_control_flow().kind == control_flow::Kind::Exit)
+      {
+        requested_status = static_cast<i32>(pending_control_flow().value);
+        clear_control_flow();
+      }
     }
+
+  return requested_status;
 }
 
 fn EvalContext::mark_readonly(StringView name) throws -> void

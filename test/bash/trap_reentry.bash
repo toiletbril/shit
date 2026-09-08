@@ -65,4 +65,35 @@ exit_return_probe() {
 ( exit_return_probe; echo after-exit-probe=$? )
 echo after-exit-action-return=$?
 
+echo subshell-exit-action-status
+( trap 'echo S-status; exit 7' EXIT
+  echo sub-body )
+echo after-subshell-exit-action-status=$?
+
+echo subshell-exit-action-clears-failure
+( trap 'echo S-clear; exit 0' EXIT
+  false )
+echo after-subshell-exit-action-clears-failure=$?
+
+echo subshell-exit-action-over-explicit-exit
+( trap 'echo S-over; exit 9' EXIT
+  exit 2 )
+echo after-subshell-exit-action-over-explicit-exit=$?
+
+echo substitution-exit-action
+capture_value=$( trap 'echo S-sub; exit 3' EXIT
+  echo captured )
+echo "capture=[$capture_value] after-substitution-exit-action=$?"
+
+echo nested-subshell-exit-action
+( ( trap 'echo S-inner; exit 5' EXIT
+    echo inner-body )
+  echo after-inner=$? )
+echo after-nested-subshell-exit-action=$?
+
+echo subshell-exit-action-in-pipeline
+( trap 'echo S-stage; exit 6' EXIT
+  echo stage-body ) | cat
+echo after-subshell-exit-action-in-pipeline=$?
+
 echo done

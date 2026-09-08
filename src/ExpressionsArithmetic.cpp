@@ -1042,7 +1042,7 @@ static fn evaluate_subshell_in_process(const Expression *body,
       /* A script-fatal error is confined to the subshell in every mood, status
          1 the way bash answers it and 2 the way dash does. */
       if (!error.is_script_fatal()) {
-        cxt.run_subshell_exit_trap();
+        unused(cxt.run_subshell_exit_trap());
         throw;
       }
       LOG(Debug, "the subshell confined a script-fatal error: %s",
@@ -1071,7 +1071,11 @@ static fn evaluate_subshell_in_process(const Expression *body,
       }
     }
 
-    cxt.run_subshell_exit_trap();
+    if (let const requested_status = cxt.run_subshell_exit_trap();
+        requested_status.has_value())
+    {
+      ret = *requested_status;
+    }
   } catch (...) {
     if (did_enter_subshell) cxt.leave_subshell();
     cxt.restore_state(steal(snapshot));

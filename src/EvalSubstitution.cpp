@@ -517,7 +517,9 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
         }
         if (!error) {
           try {
-            run_subshell_exit_trap();
+            /* A status the action exits with lands in the exit status the
+               child process below reports. */
+            unused(run_subshell_exit_trap());
           } catch (...) {
             error = std::current_exception();
           }
@@ -667,10 +669,11 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
       clear_control_flow();
     }
     /* The substitution's own EXIT action runs while stdout still points at the
-       pipe, so its output joins the captured value. */
+       pipe, so its output joins the captured value. A status the action exits
+       with stays in the exit status the substitution reports. */
     if (!error) {
       try {
-        run_subshell_exit_trap();
+        unused(run_subshell_exit_trap());
       } catch (...) {
         error = std::current_exception();
       }

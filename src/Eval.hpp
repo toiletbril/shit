@@ -851,9 +851,9 @@ public:
   fn has_exit_trap() const wontthrow -> bool;
 
   /* A subshell clears the inherited EXIT action on entry and fires its own on
-     exit. */
+     exit. The status an exit inside the action asked for is returned. */
   fn clear_inherited_exit_trap() throws -> void;
-  fn run_subshell_exit_trap() throws -> void;
+  fn run_subshell_exit_trap() throws -> Maybe<i32>;
 
   fn mark_readonly(StringView name) throws -> void;
   fn unmark_readonly(StringView name) throws -> void;

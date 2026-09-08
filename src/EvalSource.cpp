@@ -314,10 +314,15 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     }
     if (!is_interrupt) {
       try {
-        if (is_subshell)
-          run_subshell_exit_trap();
-        else
+        if (is_subshell) {
+          if (let const requested_status = run_subshell_exit_trap();
+              requested_status.has_value())
+          {
+            final_status = *requested_status;
+          }
+        } else {
           run_exit_trap();
+        }
       } catch (...) {
         if (!error) {
           error = std::current_exception();
