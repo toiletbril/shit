@@ -404,8 +404,8 @@ fn publish_command_and_run_debug_trap(
              control.kind == control_flow::Kind::Continue;
     }
 
-    /* The extdebug option takes the traced command away when the action leaves
-       a nonzero status. The command that never ran reports success. */
+    /* Under the extdebug option a nonzero action status skips the traced
+       command. A skipped command reports success. */
     if (cxt.is_shopt_enabled(shopt_option_id::Extdebug) &&
         cxt.get_last_trap_action_status() != 0)
     {

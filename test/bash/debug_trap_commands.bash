@@ -286,8 +286,8 @@ tail body
 TAIL
 trap - DEBUG
 
-# The extdebug option takes the traced command away when the DEBUG action
-# leaves a nonzero status. The command that never ran reports success.
+# Under the extdebug option a nonzero DEBUG action status skips the traced
+# command. A skipped command reports success.
 echo extdebug-skip
 skipping_function() {
   echo skipme
@@ -315,5 +315,40 @@ echo off-status=$?
 trap - DEBUG
 set +T
 echo extdebug-off-done
+
+# A refused word loop header skips one iteration. The header fires once for
+# each value, no body runs, and the loop reports the action status.
+echo extdebug-loop-header
+shopt -s extdebug
+set -T
+trap 'echo "D-[$BASH_COMMAND]"; [[ $BASH_COMMAND != for* ]]' DEBUG
+for item in a b c; do
+  echo header-body-$item
+done
+echo header-status=$?
+set -- p q
+for positional; do
+  echo positional-body-$positional
+done
+echo positional-status=$?
+trap - DEBUG
+set +T
+shopt -u extdebug
+echo extdebug-loop-header-done
+
+# A refused body command leaves the loop running.
+echo extdebug-loop-body
+shopt -s extdebug
+set -T
+trap '[ "$BASH_COMMAND" != "echo skipme" ]' DEBUG
+for item in a b; do
+  echo skipme
+  echo loop-body-$item
+done
+echo loop-body-status=$?
+trap - DEBUG
+set +T
+shopt -u extdebug
+echo extdebug-loop-body-done
 
 echo done

@@ -839,9 +839,9 @@ public:
   {
     return m_trap_saved_exit_status;
   }
-  /* The status the last trap action left behind, read before the restoration
-     hands the triggering command its own status back. A condition that ran no
-     action leaves zero here. */
+  /* The status of the last trap action. It is recorded before the restoration
+     returns the triggering command's own status. A condition that ran no action
+     records zero. */
   pure fn get_last_trap_action_status() const wontthrow -> i32
   {
     return m_last_trap_action_status;
@@ -2060,8 +2060,8 @@ protected:
   /* The status the shell had reached when the innermost running action began.
      An exit with no operand inside that action reports it. */
   Maybe<i32> m_trap_saved_exit_status{None};
-  /* The status the last trap action left behind. The extdebug skip reads it
-     once the DEBUG action has returned. */
+  /* The status of the last trap action. The extdebug skip reads it once the
+     DEBUG action has returned. */
   i32 m_last_trap_action_status{0};
   /* The end of the source span a redirected wrapper holds for the subshell it
      evaluates next. Zero when no wrapper is waiting. */

@@ -838,7 +838,14 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
     let const should_run_iteration = publish_command_and_run_debug_trap(
         cxt, [&] { return String{heap_allocator(), loop_trace.view()}; });
-    if (!should_run_iteration) break;
+    if (!should_run_iteration) {
+      /* An exit or a return leaves the whole loop. An extdebug refusal skips
+         only this iteration and keeps the status its action reported. */
+      if (cxt.has_pending_control_flow()) break;
+
+      result.status = cxt.get_last_trap_action_status();
+      continue;
+    }
 
     cxt.write_xtrace(loop_trace.view());
     cxt.set_shell_variable(m_variable_name, value);
