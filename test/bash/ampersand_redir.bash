@@ -244,3 +244,33 @@ echo kept 2>&- | cat
 echo "nonstd_err_closed_status=$?"
 rm -f "$nonstd" "$nonstd_in"
 echo nonstandard_done
+
+# A pipeline stage whose redirection cannot be applied fails that stage alone.
+# The stage keeps the redirections written ahead of the failing one, so its
+# diagnostic reaches the destination those redirections named, and the pipeline
+# still takes the status of its last stage. The message text differs between the
+# shells, the checks assert the statuses, the PIPESTATUS entries, and the
+# routing.
+echo one 2>/dev/null 1>/nonexistent_zzqq/x | cat
+echo "redir_fail_status=$? redir_fail_ps=${PIPESTATUS[*]}"
+echo one 2>/dev/null 1>&7 | cat
+echo "bad_dup_status=$? bad_dup_ps=${PIPESTATUS[*]}"
+true | cat 2>/dev/null 1>/nonexistent_zzqq/x | cat
+echo "middle_fail_status=$? middle_fail_ps=${PIPESTATUS[*]}"
+cat </dev/null | echo two 2>/dev/null 1>/nonexistent_zzqq/x
+echo "last_fail_status=$? last_fail_ps=${PIPESTATUS[*]}"
+redir_report=/tmp/kosh_bashdiff_redirfail_$$
+: > "$redir_report"
+{ echo one 1>/nonexistent_zzqq/x 2>"$redir_report" | cat; } 2>/dev/null
+echo "reported_status=$? reported=$(( $(wc -c < "$redir_report") > 0 ))"
+: > "$redir_report"
+{ echo one 2>&1 1>/nonexistent_zzqq/x | cat; } >"$redir_report" 2>/dev/null
+echo "merged_status=$? merged=$(( $(wc -c < "$redir_report") > 0 ))"
+: > "$redir_report"
+{ echo kept 2>"$redir_report" 1>/nonexistent_zzqq/x | cat; } 2>/dev/null
+echo "captured_status=$? captured=$(( $(wc -c < "$redir_report") > 0 ))"
+rm -f "$redir_report"
+# Every other stage of the pipeline still runs, so the reader observes the data
+# the surviving stages write.
+echo pre_marker | { cat; echo reader_ran; } 2>/dev/null
+echo redir_fail_done

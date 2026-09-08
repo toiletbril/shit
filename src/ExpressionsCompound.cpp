@@ -836,7 +836,20 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     {
       if (!was_stage_redirect_handed_off) ec.close_fds();
     };
-    e->redirect_exec_context(ec, cxt);
+    try {
+      e->redirect_exec_context(ec, cxt);
+    } catch (const ErrorWithLocation &redirection_error) {
+      /* A redirection the stage cannot apply fails that stage alone. The stage
+         keeps the redirections written ahead of the failing one, so its
+         diagnostic reaches the destination they named and the remaining stages
+         still run. */
+      let const *error_source = cxt.current_source();
+      let const rendered = redirection_error.to_string(
+          error_source != nullptr ? error_source->view() : StringView{}, &cxt);
+      ec.set_unresolved(static_cast<i32>(redirection_error.command_status()),
+                        rendered.view());
+    }
+
     was_stage_redirect_handed_off = true;
     ecs.push(steal(ec));
   }

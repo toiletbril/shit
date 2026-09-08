@@ -62,6 +62,13 @@ public:
                             i32 resolution_status, StringView diagnostic) throws
       -> ExecContext;
 
+  /* Turn an already built context into an unresolved one, keeping the
+     descriptors its redirections placed. A stage whose redirection fails part
+     way through reports through the destinations the earlier redirections
+     named. */
+  fn set_unresolved(i32 resolution_status, StringView diagnostic) throws
+      -> void;
+
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
   Maybe<os::descriptor> err_fd{};

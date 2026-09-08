@@ -1598,4 +1598,11 @@ fn ExecContext::make_unresolved(const SourceLocation &location,
   return context;
 }
 
+fn ExecContext::set_unresolved(i32 resolution_status,
+                               StringView diagnostic) throws -> void
+{
+  m_kind = ResolvedCommand::from_unresolved(resolution_status);
+  m_unresolved_diagnostic = diagnostic;
+}
+
 } /* namespace koshka */
