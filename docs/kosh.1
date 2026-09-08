@@ -1783,7 +1783,7 @@ The interactive selector draws a menu of the candidates below the prompt. The
 down arrow moves to the next row, the up arrow moves back, Tab accepts the
 highlighted row, and Escape or Ctrl\-G closes the menu and restores the line it
 opened on. Enter closes the menu and runs the line as it stands. The highlighted
-row is left behind. A dimmed first row names the active source and the keys it
+row is not accepted. A dimmed first row names the active source and the keys it
 answers, reading
 .B selecting completions
 for the candidates of a token and
@@ -1819,8 +1819,8 @@ list. A terminal without decoration support always receives the plain listing.
 .PP
 Ctrl\-R reaches the history through the same selector. The line is the search
 query, and the entries that contain it are offered with the newest first. The
-interactive selector draws them in the menu, where typing narrows the list and
-an accepted row replaces the whole line. The external selector receives the same
+interactive selector draws them in the menu. Typing narrows the list, and an
+accepted row replaces the whole line. The external selector receives the same
 entries and the line it prints replaces the whole line. The plain selector keeps
 the incremental search inside the editor. A history that matches nothing leaves
 the line alone.
@@ -2147,7 +2147,9 @@ mood.
 .TP
 .BR FUNCNAME ", " BASH_SOURCE ", " BASH_LINENO ", " BASH_COMMAND
 These values describe the active call stack and command. Their array forms
-contain the complete stack. They are unavailable in the
+contain the complete stack. The text of BASH_COMMAND is the source as it was
+written. A compound command is laid out by Bash over several indented lines,
+and that layout is not reproduced. They are unavailable in the
 .B sh
 mood.
 .TP
