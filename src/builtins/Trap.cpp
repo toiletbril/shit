@@ -143,7 +143,9 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const do_append_listing = [&](StringView condition, StringView action)
                                       throws -> void {
       out += "trap -- ";
-      append_shell_quoted_arg(out, action);
+      /* Bash wraps every listed action in single quotes. An action holding no
+         character that needs them is wrapped as well. */
+      append_shell_quoted_arg(out, action, true);
       out += ' ';
       out += format_listed_condition(condition, should_include_signal_prefix,
                                      cxt.scratch_allocator());

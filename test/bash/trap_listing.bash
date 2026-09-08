@@ -85,4 +85,26 @@ echo filter-numeric
 ( trap 'echo X' EXIT; trap 'echo T' TERM; trap -p 15 0 )
 echo after-filter-numeric=$?
 
+# The listing wraps every action in single quotes. A bare word is wrapped as
+# well, and it survives the round trip back through eval.
+echo quoted-bare-action
+( trap true DEBUG; trap -p DEBUG )
+echo after-quoted-bare-action=$?
+
+echo quoted-embedded-quote
+( trap 'echo it'\''s here' USR1; trap -p USR1 )
+echo after-quoted-embedded-quote=$?
+
+echo quoted-dollar-action
+( trap 'echo $unset_name' USR2; trap -p USR2 )
+echo after-quoted-dollar-action=$?
+
+echo quoted-round-trip
+( trap true USR1
+  saved=$(trap -p USR1)
+  trap - USR1
+  eval "$saved"
+  trap -p USR1 )
+echo after-quoted-round-trip=$?
+
 echo trap-listing-done
