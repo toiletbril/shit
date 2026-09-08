@@ -379,7 +379,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   /* An unresolved stage keeps its descriptors and its diagnostic until every
      stage is spawned. A message merged onto the pipe can be larger than the
      pipe buffer, and a report written inside the loop would block against a
-     reader that has not been launched yet. */
+     reader that has not been launched yet. The last builtin stage of such a
+     pipeline is forked for the same reason, because a reader running in this
+     process cannot drain the pipe while this process writes the report. */
   let unresolved_stages = ArrayList<usize>{heap_allocator()};
 
   bool is_first = true;
@@ -392,9 +394,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
     let const is_last = (&ec == &ecs.back());
     let const should_fork_last_builtin =
-        is_last && !is_async && cxt.is_bash_compatible() &&
-        (!cxt.is_shopt_enabled("lastpipe") ||
-         cxt.shell_option_state(shell_option_id::Monitor));
+        is_last && !is_async &&
+        (!unresolved_stages.is_empty() ||
+         (cxt.is_bash_compatible() &&
+          (!cxt.is_shopt_enabled("lastpipe") ||
+           cxt.shell_option_state(shell_option_id::Monitor))));
 
     if (!is_last) {
       pipe = os::make_pipe();
@@ -598,6 +602,13 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           ec.out_fd = koshka::None;
           ec.err_fd = koshka::None;
           if (last_stdin != KOSH_INVALID_FD) os::close_fd(last_stdin);
+
+          /* A fork keeps the descriptors an exec would drop, so a stage that
+             still owes its diagnostic leaves its pipe end open in this reader
+             and the read never ends. */
+          for (let const unresolved_index : unresolved_stages)
+            ecs[unresolved_index].close_fds();
+
           cxt.set_in_pipeline_stage(true);
           cxt.enter_subshell();
           i32 child_status = 0;

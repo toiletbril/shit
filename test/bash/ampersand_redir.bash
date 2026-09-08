@@ -143,7 +143,34 @@ while [ "$long_step" -lt 15 ]; do
 done
 long_bytes=$("$long" 2>&1 | wc -c | tr -d ' ')
 echo "long_merged=$(( long_bytes > 0 ))"
+# The reading stage is a group, which the shell runs in a forked child. That
+# child keeps the descriptors of a stage that has not reported yet, so the read
+# ends only after the report releases them.
+reader_line=$(nosuchcmd_zzqq 2>&1 | { read line; echo "$line"; })
+echo "group_reader=$(( ${#reader_line} > 0 ))"
+long_reader=$("$long" 2>&1 | { cat; })
+echo "long_group_reader=$(( ${#long_reader} > 0 ))"
 echo unresolved_done
+
+# A builtin runs inside the shell and writes its own diagnostic through the
+# descriptor its redirections leave on the shell. The message text differs
+# between the shells, the checks assert the length and the status.
+builtin_report=/tmp/kosh_bashdiff_builtin_$$
+: > "$builtin_report"
+builtin_captured_text=$( { cd /nonexistent_zzqq 2>&1; } 2>/dev/null )
+echo "builtin_merged=$(( ${#builtin_captured_text} > 0 ))"
+cd /nonexistent_zzqq 2>"$builtin_report"
+echo "builtin_status=$? builtin_captured=$(( $(wc -c < "$builtin_report") > 0 ))"
+: > "$builtin_report"
+cd /nonexistent_zzqq 2>/dev/null
+echo "builtin_hidden_status=$? builtin_hidden=$(( $(wc -c < "$builtin_report") > 0 ))"
+unset -x 2>"$builtin_report"
+echo "unset_status=$? unset_captured=$(( $(wc -c < "$builtin_report") > 0 ))"
+: > "$builtin_report"
+read -Z 2>"$builtin_report" </dev/null
+echo "read_flag_status=$? read_flag_captured=$(( $(wc -c < "$builtin_report") > 0 ))"
+rm -f "$builtin_report"
+echo builtin_report_done
 
 # Each redirection on a stage applies where the source writes it. A dup written
 # before the redirection of its source descriptor keeps the stream the stage

@@ -898,9 +898,35 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
      stdout and stderr redirects already took effect on the real shell fds. */
   if (redirect_in_fd) ec.in_fd = redirect_in_fd.take();
 
-  let const ret = utils::execute_context(
-      steal(ec), cxt,
-      is_async() ? execution_mode::Background : execution_mode::Foreground);
+  /* The command's redirections sit on the real shell descriptors and the defers
+     in this frame put them back. A located error from a builtin is rendered
+     here while its own standard error still holds, and the list handler keeps
+     the status without a second render. */
+  i32 ret = 0;
+  try {
+    ret = utils::execute_context(steal(ec), cxt,
+                                 is_async() ? execution_mode::Background
+                                            : execution_mode::Foreground);
+  } catch (const InterruptErrorWithLocation &) {
+    throw;
+  } catch (ErrorWithLocation &error) {
+    if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
+
+    if (!error.was_rendered()) {
+      if (let const windowed = window_function_body_error(cxt, error);
+          windowed.has_value())
+      {
+        show_message(error.to_string(*windowed, &cxt));
+      } else {
+        const String *source = cxt.current_source();
+        show_message(error.to_string(
+            source != nullptr ? source->view() : StringView{}, &cxt));
+      }
+      error.set_rendered();
+    }
+
+    throw;
+  }
   cxt.set_last_argument(last_argument.view());
 
   /* An assignment builtin with NAME=(...) array arguments applies them after it
