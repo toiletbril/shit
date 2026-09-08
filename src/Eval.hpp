@@ -775,6 +775,12 @@ public:
     let const depth = nesting_depth();
     if (m_debug_trap_active_depth > depth) m_debug_trap_active_depth = depth;
   }
+  /* A function call that functrace does not trace runs its body without the
+     DEBUG trap the caller installed, so the body sees no trap listed and can
+     install one of its own. The saved action returns when the body left none
+     behind. */
+  mustuse fn save_untraced_debug_trap() throws -> saved_debug_trap;
+  fn restore_untraced_debug_trap(saved_debug_trap &&saved) throws -> void;
   pure fn should_run_return_trap() const wontthrow -> bool
   {
     return !is_posix_mode() &&

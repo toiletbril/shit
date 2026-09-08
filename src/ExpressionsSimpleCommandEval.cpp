@@ -761,6 +761,12 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     cxt.set_positional_params(steal(call_params));
     defer { cxt.set_positional_params(steal(saved_params)); };
 
+    /* Registered before the frame is entered so the restore runs after the
+       frame is left, where the depth the caller installed the action at is
+       reachable again. */
+    let saved_debug_action = cxt.save_untraced_debug_trap();
+    defer { cxt.restore_untraced_debug_trap(steal(saved_debug_action)); };
+
     /* Bound the call nesting so a function that recurses without a base case
        errors with a caret here rather than exhausting the native stack. */
     cxt.enter_function_call(source_location());

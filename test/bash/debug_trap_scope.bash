@@ -317,6 +317,45 @@ done
 trap - DEBUG
 echo after-while-loop-header=$?
 
+# A call that functrace does not trace runs its body without the DEBUG trap the
+# caller installed, so the body lists none and a removal it runs takes nothing
+# away from the caller. A trap the body installs for itself stands after the
+# return, and functrace hands the body the caller's trap to remove.
+echo untraced-removal
+listing_function() {
+  echo "listed: [$(trap -p DEBUG)]"
+}
+removing_function() {
+  trap - DEBUG
+  echo in-removing-function
+}
+replacing_function() {
+  trap 'echo "R-$BASH_COMMAND"' DEBUG
+  echo in-replacing-function
+}
+trap 'echo "D-$BASH_COMMAND"' DEBUG
+listing_function
+removing_function
+echo after-removing-function
+trap - DEBUG
+echo untraced-removal-done
+
+echo untraced-replacement
+trap 'echo "D-$BASH_COMMAND"' DEBUG
+replacing_function
+echo after-replacing-function
+trap - DEBUG
+echo untraced-replacement-done
+
+echo traced-removal
+set -T
+trap 'echo "D-$BASH_COMMAND"' DEBUG
+removing_function
+echo after-traced-removal
+trap - DEBUG
+set +T
+echo traced-removal-done
+
 echo exit-command
 trap 'echo "E-$?-[$BASH_COMMAND]"' EXIT
 echo last-command

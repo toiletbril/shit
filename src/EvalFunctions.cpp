@@ -331,6 +331,43 @@ fn EvalContext::remove_trap(StringView condition) throws -> void
     os::clear_trap_handler(*number);
 }
 
+fn EvalContext::save_untraced_debug_trap() throws -> saved_debug_trap
+{
+  saved_debug_trap saved{};
+  saved.active_depth = m_debug_trap_active_depth;
+
+  if (!m_has_debug_trap ||
+      m_runtime.option_is_enabled(shell_option_id::Functrace))
+  {
+    return saved;
+  }
+
+  let const *action = m_traps.find(StringView{"DEBUG", 5});
+  if (action == nullptr) return saved;
+
+  LOG(Info, "taking a %zu byte DEBUG action away from an untraced body",
+      action->length());
+  saved.action = String{heap_allocator(), action->view()};
+  m_traps.erase(StringView{"DEBUG", 5});
+  m_has_debug_trap = false;
+
+  return saved;
+}
+
+fn EvalContext::restore_untraced_debug_trap(saved_debug_trap &&saved) throws
+    -> void
+{
+  if (!saved.action.has_value()) return;
+  /* A trap the body installed for itself stands, the way bash keeps the one it
+     finds on the return. */
+  if (m_traps.find(StringView{"DEBUG", 5}) != nullptr) return;
+
+  LOG(Info, "restoring the DEBUG action an untraced body ran without");
+  m_traps.set(StringView{"DEBUG", 5}, saved.action->view());
+  m_has_debug_trap = true;
+  m_debug_trap_active_depth = saved.active_depth;
+}
+
 fn EvalContext::install_trap_dispositions() throws -> void
 {
   LOG(Info, "reinstalling the dispositions of %zu traps", m_traps.count());
