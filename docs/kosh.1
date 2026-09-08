@@ -485,7 +485,8 @@ Tab completion and ghost text are disabled.
 Syntax coloring and ghost text are disabled. Tab completion remains enabled.
 .TP
 .BR \-\-tab\-selector " " \fIMODE\fR
-MODE selects how an explicit Tab presents several candidates. The names are
+MODE selects how an explicit Tab presents several candidates and how Ctrl\-R
+presents the history. The names are
 .BR interactive ,
 .BR external ,
 and
@@ -1793,6 +1794,14 @@ plain listing.
 The plain selector prints the candidates below the prompt as a static column
 list. A terminal without decoration support always receives the plain listing.
 .PP
+Ctrl\-R reaches the history through the same selector. The line is the search
+query, and the entries that contain it are offered with the newest first. The
+interactive selector draws them in the menu, where typing narrows the list and
+an accepted row replaces the whole line. The external selector receives the same
+entries and the line it prints replaces the whole line. The plain selector keeps
+the incremental search inside the editor. A history that matches nothing leaves
+the line alone.
+.PP
 Completion identifies the command segment at the cursor across quoted
 separators, command substitutions, and here-document bodies. Directory prefixes
 that use quotes, escapes, variables, or tildes retain their typed form. An
@@ -1812,9 +1821,10 @@ The
 .B u
 key undoes the last edit in command mode. Ctrl-_ undoes it in either mode.
 Ctrl-^ redoes the edit in either mode. Ctrl-R redoes it in command mode.
-Ctrl-R opens incremental history search in insert mode. The slash key opens the
-same search in command mode. Enter accepts the highlighted match without
-running it. Ctrl-G cancels the search and restores the preceding line state.
+Ctrl-R opens the history search in insert mode. The slash key opens the same
+search in command mode. Under the plain selector the search is incremental,
+Enter accepts the highlighted match without running it, and Ctrl-G cancels the
+search and restores the preceding line state.
 .PP
 The colon key opens an ex command. The commands q, q!, wq, wq!, x, and quit
 exit the shell. The cursor is a bar in insert mode, a block in command mode,

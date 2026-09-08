@@ -271,8 +271,9 @@ fn build_selector_args(koshka::EvalContext &context,
   return args;
 }
 
-/* The selected records, with each description stripped back off. */
-fn parse_selector_reply(koshka::StringView reply) throws
+/* The selected records, with each description stripped back off. A source that
+   sent no descriptions keeps its tabs, since they are data there. */
+fn parse_selector_reply(koshka::StringView reply, bool has_descriptions) throws
     -> koshka::ArrayList<koshka::String>
 {
   let selected = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
@@ -281,8 +282,10 @@ fn parse_selector_reply(koshka::StringView reply) throws
     if (i != reply.length && reply[i] != '\0') continue;
     if (i > start) {
       let record = reply.substring_of_length(start, i - start);
-      if (let const tab = record.find_character('\t'); tab.has_value())
-        record = record.substring_of_length(0, *tab);
+      if (has_descriptions) {
+        if (let const tab = record.find_character('\t'); tab.has_value())
+          record = record.substring_of_length(0, *tab);
+      }
       /* fzf writes a trailing newline of its own under some option sets. */
       while (!record.is_empty() && record[record.length - 1] == '\n')
         record = record.substring_of_length(0, record.length - 1);
@@ -321,21 +324,15 @@ fn report_selector_failure(koshka::StringView message, koshka::StringView note,
   koshka::show_message(koshka::ErrorWithDetails{message, note}.to_string());
 }
 
-fn run_completion_selector(koshka::EvalContext &context,
-                           koshka::completion::completion_result &result,
-                           usize token_codepoint_count) throws
+/* Hand the framed records to the configured picker and collect what it printed
+   back. The editor screen belongs to the child for the length of the run, and
+   every failure leaves out_selected empty so the caller can answer the key on
+   its own. */
+fn run_selector_program(koshka::EvalContext &context, koshka::StringView input,
+                        bool has_descriptions,
+                        koshka::ArrayList<koshka::String> &out_selected) throws
     -> selector_outcome
 {
-  if (TAB_SELECTOR != koshka::tab_selector_mode::External)
-    return selector_outcome::NotRun;
-
-  if (::tl_utf8_strlen(result.longest_common_prefix.c_str()) >
-      token_codepoint_count)
-  {
-    return selector_outcome::NotRun;
-  }
-
-  if (result.candidates.count() < 2) return selector_outcome::NotRun;
   if (!::itl_g_is_active) return selector_outcome::NotRun;
   if (!koshka::os::shell_has_controlling_terminal())
     return selector_outcome::NotRun;
@@ -348,8 +345,7 @@ fn run_completion_selector(koshka::EvalContext &context,
   }
   let const &selector_program = program.value();
 
-  let const input = build_selector_input(result);
-  let const input_fd = koshka::os::write_to_temp_file(input.view());
+  let const input_fd = koshka::os::write_to_temp_file(input);
   if (!input_fd.has_value()) return selector_outcome::NotRun;
 
   let const output_pipe = koshka::os::make_pipe();
@@ -428,8 +424,33 @@ fn run_completion_selector(koshka::EvalContext &context,
 
   if (!captured.has_value()) return selector_outcome::NotRun;
 
-  let selected = parse_selector_reply(captured->view());
-  if (selected.is_empty()) return selector_outcome::Dismissed;
+  out_selected = parse_selector_reply(captured->view(), has_descriptions);
+  if (out_selected.is_empty()) return selector_outcome::Dismissed;
+
+  return selector_outcome::Selected;
+}
+
+fn run_completion_selector(koshka::EvalContext &context,
+                           koshka::completion::completion_result &result,
+                           usize token_codepoint_count) throws
+    -> selector_outcome
+{
+  if (TAB_SELECTOR != koshka::tab_selector_mode::External)
+    return selector_outcome::NotRun;
+
+  if (::tl_utf8_strlen(result.longest_common_prefix.c_str()) >
+      token_codepoint_count)
+  {
+    return selector_outcome::NotRun;
+  }
+
+  if (result.candidates.count() < 2) return selector_outcome::NotRun;
+
+  let selected = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
+  let const outcome =
+      run_selector_program(context, build_selector_input(result).view(),
+                           result.descriptions.count() > 0, selected);
+  if (outcome != selector_outcome::Selected) return outcome;
 
   /* Several picks join into one replacement, the same shape the inline glob
      expansion produces, so the token is rewritten once. */
@@ -446,6 +467,48 @@ fn run_completion_selector(koshka::EvalContext &context,
   result.candidates.push(steal(replacement));
   result.candidate_count = 1;
   return selector_outcome::Selected;
+}
+
+/* The history entry the picker last chose. Toiletline reads the pointer after
+   the callback returns, so the bytes outlive the call and are replaced by the
+   next one. */
+koshka::String SELECTED_HISTORY_ENTRY{koshka::heap_allocator()};
+
+/* Ctrl-R reaches the same picker the completion candidates use, with the
+   matching history entries as its records. A picker that runs and is dismissed
+   answers the key on its own, and every other path hands ctrl-R back to the
+   editor. */
+fn kosh_history_select_callback(const char *const *entries, size_t count,
+                                const char **out_selected) -> int
+{
+  if (COMPLETION_CONTEXT == nullptr) return 0;
+  if (TAB_SELECTOR != koshka::tab_selector_mode::External) return 0;
+  if (entries == nullptr || count == 0) return 0;
+
+  /* Toiletline calls this through a C function pointer, so a throw unwinding
+     past this frame is undefined behavior. */
+  try {
+    let input = koshka::String{koshka::heap_allocator()};
+    for (size_t i = 0; i < count; i++) {
+      input.append(koshka::StringView{entries[i]});
+      input.push('\0');
+    }
+
+    let selected = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
+    let const outcome = run_selector_program(*COMPLETION_CONTEXT, input.view(),
+                                             false, selected);
+    if (outcome == selector_outcome::NotRun) return 0;
+    if (outcome == selector_outcome::Dismissed) return -1;
+
+    /* A multiple selection has no meaning for one line, so the first pick wins.
+     */
+    SELECTED_HISTORY_ENTRY =
+        koshka::String{koshka::heap_allocator(), selected[0].view()};
+    *out_selected = SELECTED_HISTORY_ENTRY.c_str();
+    return 1;
+  } catch (...) {
+    return 0;
+  }
 }
 
 /* Toiletline edits in codepoints while the completion engine works in bytes. */
@@ -1360,6 +1423,7 @@ fn enable_completion(koshka::EvalContext &context) -> void
   ::tl_set_complete_callback(kosh_completion_callback);
   ::tl_set_highlight_callback(kosh_highlight_callback);
   ::tl_set_ghost_validate_callback(kosh_ghost_validate_callback);
+  ::tl_set_history_select_callback(kosh_history_select_callback);
 
   /* The selector configuration is seeded after the startup files have run, so a
      value they set wins and an unset one becomes visible and editable. */
@@ -1378,6 +1442,7 @@ fn disable_completion() -> void
   ::tl_set_complete_callback(nullptr);
   ::tl_set_highlight_callback(nullptr);
   ::tl_set_ghost_validate_callback(nullptr);
+  ::tl_set_history_select_callback(nullptr);
 }
 
 fn completion_is_enabled() -> bool { return COMPLETION_CONTEXT != nullptr; }
