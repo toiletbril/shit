@@ -505,8 +505,9 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   cxt.set_current_location(source_location());
 
-  publish_command_and_run_debug_trap(
+  let const should_run_conditional = publish_command_and_run_debug_trap(
       cxt, [&] { return conditional_command_text(m_elements); });
+  if (!should_run_conditional) return cxt.last_exit_status();
 
   i64 status;
   try {
@@ -596,8 +597,9 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_current_location(source_location());
 
-  publish_command_and_run_debug_trap(
+  let const should_run_clause = publish_command_and_run_debug_trap(
       cxt, [&] { return arithmetic_clause_command_text(m_expression); });
+  if (!should_run_clause) return cxt.last_exit_status();
 
   if (is_blank_clause(m_expression)) {
     cxt.publish_single_pipe_status(1);
@@ -763,11 +765,22 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
       static_cast<int>(m_condition.length), m_condition.data,
       static_cast<int>(m_step.length), m_step.data);
 
-  if (!is_blank_clause(m_init)) {
-    publish_command_and_run_debug_trap(cxt, [&] {
+  /* A blank clause carries no expression of its own, and bash publishes the
+     ((1)) that stands for it. */
+  let const do_publish_implied_clause = [&]() throws -> bool {
+    return publish_command_and_run_debug_trap(
+        cxt, [&] { return arithmetic_clause_command_text(StringView{"1"}); });
+  };
+
+  if (is_blank_clause(m_init)) {
+    if (!do_publish_implied_clause()) return {};
+  } else {
+    let const should_run_init = publish_command_and_run_debug_trap(cxt, [&] {
       return arithmetic_clause_command_text(
           clause_without_leading_blanks(m_init));
     });
+    if (!should_run_init) return {};
+
     cxt.evaluate_arithmetic_nonzero(m_init);
   }
 
@@ -780,10 +793,12 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
   let const is_step_blank = is_blank_clause(m_step);
 
   let const do_evaluate_condition = [&]() throws -> bool {
-    publish_command_and_run_debug_trap(cxt, [&] {
-      return arithmetic_clause_command_text(
-          clause_without_leading_blanks(m_condition));
-    });
+    let const should_run_condition =
+        publish_command_and_run_debug_trap(cxt, [&] {
+          return arithmetic_clause_command_text(
+              clause_without_leading_blanks(m_condition));
+        });
+    if (!should_run_condition) return false;
 
     let &cache = get_clause_cache(m_condition_cache);
 
@@ -791,24 +806,34 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
         m_condition, cache.tokens, cache.is_tokenized, cache.is_simple);
   };
 
+  /* A blank condition is always true, the way for ((;;)) loops forever. */
+  let const do_test_condition = [&]() throws -> bool {
+    if (is_condition_blank) return do_publish_implied_clause();
+
+    if (is_condition_folded) {
+      return cxt.is_extended_arithmetic_enabled()
+                 ? m_is_exact_folded_condition_nonzero
+                 : *m_folded_condition != 0;
+    }
+
+    return do_evaluate_condition();
+  };
+
   status_result result{};
-  /* An empty condition is always true, the way for ((;;)) loops forever. */
-  while (is_condition_blank ||
-         (is_condition_folded ? (cxt.is_extended_arithmetic_enabled()
-                                     ? m_is_exact_folded_condition_nonzero
-                                     : *m_folded_condition != 0)
-                              : do_evaluate_condition()))
-  {
+  while (do_test_condition()) {
     result = m_body->evaluate_status(cxt);
     if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
     /* The step runs after the body on every iteration, including one ended by a
        continue. */
-    if (!is_step_blank) {
-      publish_command_and_run_debug_trap(cxt, [&] {
+    if (is_step_blank) {
+      if (!do_publish_implied_clause()) break;
+    } else {
+      let const should_run_step = publish_command_and_run_debug_trap(cxt, [&] {
         return arithmetic_clause_command_text(
             clause_without_leading_blanks(m_step));
       });
+      if (!should_run_step) break;
 
       let &cache = get_clause_cache(m_step_cache);
       cxt.evaluate_arithmetic_cached_clause_nonzero(

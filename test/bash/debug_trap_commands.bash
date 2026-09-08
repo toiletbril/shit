@@ -39,6 +39,15 @@ for ((index = 0; index < 2; index++)); do
 done
 trap - DEBUG
 
+echo cstyle-blank-clauses
+trap 'echo "D-$BASH_COMMAND"' DEBUG
+for ((;;)); do break; done
+index=0
+for ((; index < 2; index++)); do echo blank-init-$index; done
+for ((index = 0; ; index++)); do break; done
+for ((index = 0; index < 1;)); do break; done
+trap - DEBUG
+
 echo arithmetic-command
 trap 'echo D-$BASH_COMMAND' DEBUG
 (( 1 + 1 ))
