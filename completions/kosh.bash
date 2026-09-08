@@ -52,11 +52,11 @@ _kosh_complete()
 --no-diagnostics --no-annoying-diagnostics --no-init-diagnostics --no-traces --no-completion --no-syntax-highlighting \
 --enable-koshkit --enable-extended-arithmetic \
 --show-ast \
---show-optimizer-diagnostics --show-exit-code --show-lexed-words --show-stats --show-memory \
+--show-optimizer-diagnostics --show-exit-code --show-all-exit-codes --show-lexed-words --show-stats --show-memory \
 "
 
   local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -r -p -M -L -I -W -WW -WWW \
--Q -T -A -E -R"
+-Q -T -A -N -R"
 
   if [[ $current_word == --* ]]; then
     _kosh_compgen -W "$long_flags" -- "$current_word"
@@ -99,12 +99,12 @@ _kosh_set_complete()
 hashall keyword monitor noexec no-exec nounset no-unset verbose xtrace braceexpand \
 histexpand history ignoreeof interactive-comments nolog \
 noclobber no-clobber errtrace physical functrace onecmd pipefail failglob koshkit vi emacs \
-posix show-ast show-lexed-words show-exit-code mimicry extended-arithmetic annoying-diagnostics \
+posix show-ast show-lexed-words show-exit-code show-all-exit-codes mimicry extended-arithmetic annoying-diagnostics \
 show-stats no-diagnostics show-memory login rcfile"
   local tab_selectors="interactive external plain"
   local switches="--help --options --mood --init-moods --tab-selector -o +o -M -L \
--a -b -e -f -h -k -m -n -t -u -v -x -B -C -E -H -P -T -A -R -W -WW -WWW -I -S -G \
-+a +b +e +f +h +k +m +n +t +u +v +x +B +C +E +H +P +T +A +R +W +WW +WWW +I +S +G"
+-a -b -e -f -h -k -m -n -t -u -v -x -B -C -E -H -N -P -T -A -R -W -WW -WWW -I -S -G \
++a +b +e +f +h +k +m +n +t +u +v +x +B +C +E +H +N +P +T +A +R +W +WW +WWW +I +S +G"
 
   case $previous_word in
     -o|+o)

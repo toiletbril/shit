@@ -1,2 +1,2 @@
-KOSH_FLAGS='-E' "$BIN" -c 'echo env-flag'
+KOSH_FLAGS='-N' "$BIN" -c 'echo env-flag'
 echo "rc=$?"

@@ -275,11 +275,15 @@ hot fn CompoundList::evaluate_root_status_impl(
         !ret.has(status_flag::ErrResolved);
     const bool is_fatal_exit = cxt.error_exit() && was_command_failure_uncaught;
 
-    if (cxt.show_exit_code() && did_execute && ret.status != 0 &&
-        ret.status != NOTHING_WAS_EXECUTED &&
-        !ret.has(status_flag::ExitCodeReported))
-    {
-      let message = String{cxt.scratch_allocator(), "Non-zero exit code ("};
+    const bool is_reportable_status =
+        did_execute && ret.status != NOTHING_WAS_EXECUTED &&
+        !ret.has(status_flag::ExitCodeReported) &&
+        (ret.status != 0 || cxt.show_all_exit_codes());
+
+    if (cxt.show_exit_code() && is_reportable_status) {
+      let message =
+          String{cxt.scratch_allocator(),
+                 ret.status != 0 ? "Non-zero exit code (" : "Exit code ("};
       message += String::from(ret.status, cxt.scratch_allocator());
       message += ')';
       if (is_fatal_exit) {

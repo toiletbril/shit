@@ -1795,7 +1795,18 @@ fn EvalContext::set_show_exit_code(bool enabled) wontthrow -> void
 
 pure fn EvalContext::show_exit_code() const wontthrow -> bool
 {
-  return m_runtime.option_is_enabled(shell_option_id::ShowExitCode);
+  return m_runtime.option_is_enabled(shell_option_id::ShowExitCode) ||
+         m_runtime.option_is_enabled(shell_option_id::ShowAllExitCodes);
+}
+
+fn EvalContext::set_show_all_exit_codes(bool enabled) wontthrow -> void
+{
+  m_runtime.set_option(shell_option_id::ShowAllExitCodes, enabled);
+}
+
+pure fn EvalContext::show_all_exit_codes() const wontthrow -> bool
+{
+  return m_runtime.option_is_enabled(shell_option_id::ShowAllExitCodes);
 }
 
 fn EvalContext::set_memory_stats_enabled(bool enabled) wontthrow -> void

@@ -105,6 +105,7 @@ enum class shell_option_id : u8
   ShowAst,
   ShowLexedWords,
   ShowExitCode,
+  ShowAllExitCodes,
   ShowStats,
   ShowMemory,
   Onecmd,
@@ -1811,6 +1812,8 @@ public:
   pure fn show_lexed_words() const wontthrow -> bool;
   fn set_show_exit_code(bool enabled) wontthrow -> void;
   pure fn show_exit_code() const wontthrow -> bool;
+  fn set_show_all_exit_codes(bool enabled) wontthrow -> void;
+  pure fn show_all_exit_codes() const wontthrow -> bool;
 
   /* The granular memory report at exit, requested by --show-memory. */
   fn set_memory_stats_enabled(bool enabled) wontthrow -> void;

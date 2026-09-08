@@ -515,11 +515,21 @@ a lenient analysis diagnostic. The final line reports the number of eliminated
 statements. A compatibility mood reports these diagnostics only under
 .BR \-WW .
 .TP
-.BR \-E ", " \-\-show\-exit\-code
+.B \-\-show\-exit\-code
 A located diagnostic is printed when a command returns a non-zero status. A
 warning is printed when execution continues. An error is printed before
 errexit exits. A successful command prints nothing. A pipeline reports its
-effective status after pipefail is applied.
+effective status after pipefail is applied. The
+.B "set \-o show\-exit\-code"
+form turns the diagnostic on while the shell runs.
+.TP
+.BR \-N ", " \-\-show\-all\-exit\-codes
+Every command status is reported, including a successful zero. A zero status is
+always a warning. A non-zero status keeps the wording and the severity of
+.BR \-\-show\-exit\-code .
+The
+.BR "set \-N" " and " "set +N"
+forms turn the diagnostic on and off while the shell runs.
 .TP
 .BR \-R ", " \-\-show\-lexed\-words
 The escape bitmap is printed after each parsed command.
@@ -1013,6 +1023,10 @@ and
 .B \-B
 forms control errtrace, history expansion, physical directory resolution,
 functrace, and brace expansion. The
+.B \-N
+form controls the exit code diagnostic that
+.B \-\-show\-all\-exit\-codes
+enables at startup, and it reports a successful zero as well. The
 .B \-t
 form and the
 .B onecmd
@@ -1765,17 +1779,26 @@ candidates are presented the way
 .B \-\-tab\-selector
 selects.
 .PP
-The interactive selector draws a menu of the candidates below the prompt. Tab
-and the down arrow move to the next row, the up arrow moves back, Enter accepts
-the highlighted row, and Escape or Ctrl\-G closes the menu and restores the line
-it opened on. The terminal height bounds the number of rows, and a count row
-names the part that is drawn.
+The interactive selector draws a menu of the candidates below the prompt. The
+down arrow moves to the next row, the up arrow moves back, Tab accepts the
+highlighted row, and Escape or Ctrl\-G closes the menu and restores the line it
+opened on. Enter closes the menu and runs the line as it stands. The highlighted
+row is left behind. A dimmed first row names the active source and the keys it
+answers, reading
+.B selecting completions
+for the candidates of a token and
+.B incremental history search
+for the history of the session. The terminal height bounds the number of rows,
+and a count row names the part that is drawn.
 .PP
 A printable key is inserted into the token, and the menu is drawn again from the
 candidates that still match. Backspace erases the last character of the token
-and widens the list again. An accepted candidate that names a directory opens a
-menu of the entries it holds. The menu closes when no candidate is left and when
-any other key is pressed. That key then acts on the line.
+and widens the list again. A search that matches nothing keeps the menu open on a
+dimmed row reading
+.BR "no matches, erase to widen the search" ,
+and a backspace brings the list back. An accepted candidate that names a
+directory opens a menu of the entries it holds. The menu closes when any other
+key is pressed. That key then acts on the line.
 .PP
 The external selector passes the candidates to the program named by
 .B KOSH_FZF_COMPLETION_COMMAND

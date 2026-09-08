@@ -146,8 +146,10 @@ FLAG(AST, Bool, 'A', "show-ast", Debug,
 FLAG(OPTIMIZER_DIAGNOSTICS, Bool, '\0', "show-optimizer-diagnostics", Debug,
      "Trace the optimizer prepass and report every folded and eliminated node "
      "as an analysis diagnostic.");
-FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", Debug,
+FLAG(EXIT_CODE, Bool, '\0', "show-exit-code", Debug,
      "Show diagnostics for every non-zero exit code.");
+FLAG(ALL_EXIT_CODES, Bool, 'N', "show-all-exit-codes", Debug,
+     "Show diagnostics for every exit code, including zero.");
 FLAG(ESCAPE_MAP, Bool, 'R', "show-lexed-words", Debug,
      "Print escape bitmap after each parsed command.");
 FLAG(
@@ -751,6 +753,7 @@ fn kosh_main(int argc, char **argv) -> int
   context.set_show_ast(FLAG_AST.is_enabled());
   context.set_show_lexed_words(FLAG_ESCAPE_MAP.is_enabled());
   context.set_show_exit_code(FLAG_EXIT_CODE.is_enabled());
+  context.set_show_all_exit_codes(FLAG_ALL_EXIT_CODES.is_enabled());
   context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
   context.set_diagnostics_disabled(FLAG_SUPPRESS_DIAGNOSTICS.is_enabled() &&
                                    !FLAG_LINT.is_enabled());
