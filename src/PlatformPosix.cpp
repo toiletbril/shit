@@ -312,6 +312,18 @@ fn duplicate_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
   return copy != -1 ? copy : KOSH_INVALID_FD;
 }
 
+fn move_descriptor_to_free_shell_fd(os::descriptor source,
+                                    i32 floor_fd) wontthrow -> i32
+{
+  let const moved = fcntl(source, F_DUPFD_CLOEXEC, floor_fd);
+  if (moved == -1) return -1;
+
+  close(source);
+  note_descriptor_rebound();
+
+  return moved;
+}
+
 fn descriptors_refer_to_same_file(os::descriptor first,
                                   os::descriptor second) wontthrow -> bool
 {

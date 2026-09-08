@@ -971,7 +971,7 @@ public:
   const heredoc_contents *heredoc;
   const Token *fd_allocation_name_token;
   /* The delimiter word of a heredoc, kept for analysis. The delimiter is
-     matched literally and never expanded, so it is not a target. */
+     matched literally and never expanded. It is not a target. */
   const Token *heredoc_delimiter;
   i32 fd;
   /* The literal descriptor to copy from, or DUP_FD_CLOSE for the close form,
@@ -1388,6 +1388,29 @@ protected:
   const Expression *m_body;
 };
 
+/* A bash coprocess, coproc [NAME] command. The body runs in the background and
+   two pipes connect it to the shell. NAME[0] reads what the body writes,
+   NAME[1] writes what the body reads, and NAME_PID holds the process id. */
+class CoprocCommand : public CompoundCommand
+{
+public:
+  CoprocCommand(SourceLocation location, StringView name,
+                const Expression *body);
+  ~CoprocCommand() override;
+
+  fn to_string() const throws -> String override;
+  fn to_ast_string(usize layer = 0) const throws -> String override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
+
+protected:
+  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+
+  /* The name is a slice of the arena that holds this node. */
+  StringView m_name;
+  const Expression *m_body;
+};
+
 class Subshell : public CompoundCommand
 {
 public:
@@ -1411,8 +1434,8 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   /* The body bash runs in the process it already forked. A chain of bare
-     parentheses collapses to the innermost body, which raises no fire and
-     costs no fork of its own. */
+     parentheses collapses to the innermost body. The innermost body raises no
+     fire and costs no fork of its own. */
   fn collapsed_body() const wontthrow -> const Expression *;
 
   const Expression *m_body;

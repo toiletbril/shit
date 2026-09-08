@@ -630,6 +630,19 @@ fn duplicate_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
   return copy;
 }
 
+fn move_descriptor_to_free_shell_fd(os::descriptor source,
+                                    i32 floor_fd) wontthrow -> i32
+{
+  let const shell_fd = allocate_free_shell_fd(floor_fd);
+  if (shell_fd < 0) return -1;
+
+  if (!replace_descriptor(shell_fd, source)) return -1;
+
+  close_fd(source);
+
+  return shell_fd;
+}
+
 fn descriptors_refer_to_same_file(os::descriptor first,
                                   os::descriptor second) wontthrow -> bool
 {

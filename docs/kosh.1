@@ -740,6 +740,22 @@ zero.
 .PP
 An if command with no selected branch and no else command returns status zero.
 This rule also applies at the end of a sourced file.
+.SS Coprocesses
+.EX
+coproc [NAME] command [redirections]
+.EE
+.PP
+The
+.B bash
+mood accepts a coprocess. The command runs asynchronously and two pipes connect
+it to the shell. NAME[0] is read from, NAME[1] is written to, and NAME_PID holds
+the process id. The default name is COPROC.
+.PP
+A word before the command names the coprocess only when a compound command
+follows that word. In
+.B coproc NAME cat
+the word NAME is the first word of a simple command and the coprocess takes the
+default name. The launch itself returns status zero.
 .SH QUOTING
 Single quotes preserve every enclosed byte. Double quotes retain parameter,
 command, and arithmetic expansion. A backslash quotes the next byte where the
@@ -1878,6 +1894,9 @@ builtin returns that stored status without waiting for the process again. The
 and
 .B bg
 builtins resume every stage of the job.
+.PP
+A coprocess is one asynchronous job and sets $!. Its descriptors are numbered
+above 9 and are closed across an exec.
 .SH SIGNALS
 The main shell ignores SIGPIPE. A forked child restores the default SIGPIPE
 action. A producer terminated by SIGPIPE therefore returns status 141.
@@ -2090,6 +2109,15 @@ mood.
 These values expose set options, shopt options, subshell depth, argument zero,
 the current command string, and a monotonic millisecond count. The two option
 lists are read-only. These names are unavailable in the
+.B sh
+mood.
+.TP
+.BR COPROC ", " COPROC_PID
+The
+.B coproc
+command binds these to the descriptors and the process id of an unnamed
+coprocess. A named coprocess binds NAME and NAME_PID and leaves these unset.
+These names are unavailable in the
 .B sh
 mood.
 .TP

@@ -39,17 +39,18 @@ enum struct balanced_scan_keyword : u8
    still recognized after it. */
 constexpr static_string_entry<balanced_scan_keyword>
     BALANCED_SCAN_KEYWORD_ENTRIES[] = {
-        {SSK("case"),  balanced_scan_keyword::case_word   },
-        {SSK("do"),    balanced_scan_keyword::command_word},
-        {SSK("elif"),  balanced_scan_keyword::command_word},
-        {SSK("else"),  balanced_scan_keyword::command_word},
-        {SSK("esac"),  balanced_scan_keyword::esac_word   },
-        {SSK("if"),    balanced_scan_keyword::command_word},
-        {SSK("in"),    balanced_scan_keyword::in_word     },
-        {SSK("then"),  balanced_scan_keyword::command_word},
-        {SSK("time"),  balanced_scan_keyword::command_word},
-        {SSK("until"), balanced_scan_keyword::command_word},
-        {SSK("while"), balanced_scan_keyword::command_word},
+        {SSK("case"),   balanced_scan_keyword::case_word   },
+        {SSK("coproc"), balanced_scan_keyword::command_word},
+        {SSK("do"),     balanced_scan_keyword::command_word},
+        {SSK("elif"),   balanced_scan_keyword::command_word},
+        {SSK("else"),   balanced_scan_keyword::command_word},
+        {SSK("esac"),   balanced_scan_keyword::esac_word   },
+        {SSK("if"),     balanced_scan_keyword::command_word},
+        {SSK("in"),     balanced_scan_keyword::in_word     },
+        {SSK("then"),   balanced_scan_keyword::command_word},
+        {SSK("time"),   balanced_scan_keyword::command_word},
+        {SSK("until"),  balanced_scan_keyword::command_word},
+        {SSK("while"),  balanced_scan_keyword::command_word},
 };
 
 constexpr StaticStringMap BALANCED_SCAN_KEYWORDS{BALANCED_SCAN_KEYWORD_ENTRIES};

@@ -3,10 +3,10 @@
  *    See the top-level LICENSE file for the licensing information.
  *
  * This file implements asynchronous compound commands, if clauses, loops,
- * case clauses, and brace groups. It applies break, continue, return,
- * redirection, folding, and branch dataflow semantics across control-flow
- * nodes. The split keeps branch and loop behavior separate from pipeline
- * process machinery.
+ * case clauses, brace groups, and coprocesses. It applies break, continue,
+ * return, redirection, folding, and branch dataflow semantics across
+ * control-flow nodes. The split keeps branch and loop behavior separate from
+ * pipeline process machinery.
  */
 
 #include "Arena.hpp"
@@ -1434,6 +1434,171 @@ fn BraceGroup::analyze(AnalysisContext &actx,
   ASSERT(m_body != nullptr);
 
   m_body->analyze(actx, is_unconditional);
+}
+
+CoprocCommand::CoprocCommand(SourceLocation location, StringView name,
+                             const Expression *body)
+    : CompoundCommand(steal(location)), m_name(name), m_body(body)
+{}
+
+CoprocCommand::~CoprocCommand() = default;
+
+cold fn CoprocCommand::to_string() const throws -> String
+{
+  let result = String{"Coproc "};
+  result += m_name;
+  append_ast_execution_flags(result);
+  return result;
+}
+
+cold fn CoprocCommand::to_ast_string(usize layer) const throws -> String
+{
+  ASSERT(m_body != nullptr);
+
+  let const pad = indent_for_layer(layer);
+  return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
+         m_body->to_ast_string(layer + 1);
+}
+
+fn CoprocCommand::analyze(AnalysisContext &actx,
+                          bool is_unconditional) const throws -> void
+{
+  ASSERT(m_body != nullptr);
+
+  m_body->analyze(actx, is_unconditional);
+}
+
+/* A coprocess descriptor is numbered above 9. Bash numbers them the same way.
+ */
+static constexpr i32 COPROCESS_FD_FLOOR = 10;
+
+fn CoprocCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_body != nullptr);
+
+  let const source = cxt.current_source();
+  let command_text = StringView{};
+  if (source != nullptr) {
+    let command_end_position =
+        source_location().position + source_location().length;
+    if (source_end_position() > command_end_position)
+      command_end_position = source_end_position();
+    command_text = source->view().substring_of_length(
+        source_location().position,
+        command_end_position - source_location().position);
+  }
+
+  /* One pipe carries what the shell writes to the coprocess, the other carries
+     what the coprocess writes back. */
+  let toward_child = os::make_pipe();
+  if (!toward_child.has_value()) {
+    throw ErrorWithLocation{source_location(),
+                            "Could not open a coprocess pipe"};
+  }
+
+  let away_from_child = os::make_pipe();
+  if (!away_from_child.has_value()) {
+    os::close_fd(toward_child->in);
+    os::close_fd(toward_child->out);
+    throw ErrorWithLocation{source_location(),
+                            "Could not open a coprocess pipe"};
+  }
+
+  LOG(Debug, "launching the coprocess '%.*s'", static_cast<int>(m_name.length),
+      m_name.data);
+
+  let bootstrap = os::subshell_bootstrap{};
+  let const should_launch_fresh_evaluator = !os::can_fork_evaluator();
+  if (should_launch_fresh_evaluator) bootstrap = cxt.make_subshell_bootstrap();
+
+  let const launch = os::launch_compound_stage(
+      command_text, toward_child->in, away_from_child->out, None, cxt.mood(),
+      source_location(), source != nullptr ? source->view() : StringView{},
+      os::process_group_mode::NewBackground, 0,
+      should_launch_fresh_evaluator ? &bootstrap : nullptr, cxt.shell_name(),
+      cxt.last_exit_status(), os::get_shell_process_id(),
+      cxt.get_subshell_depth() + 1);
+  let const child = launch.child;
+
+  if (launch.should_evaluate_child) {
+    /* The coprocess keeps neither end the shell owns. A kept write end would
+       stop its own reader from ever seeing end of file. */
+    os::close_fd(toward_child->out);
+    os::close_fd(away_from_child->in);
+
+    i32 status = 1;
+    try {
+      cxt.enter_subshell();
+      status = static_cast<i32>(m_body->evaluate(cxt));
+      if (cxt.has_pending_control_flow() &&
+          cxt.pending_control_flow().kind == control_flow::Kind::Exit)
+      {
+        status = static_cast<i32>(cxt.pending_control_flow().value);
+      }
+    } catch (const BrokenPipeExit &) {
+      status = KOSH_BROKEN_PIPE_EXIT_STATUS;
+    } catch (const ErrorWithLocation &e) {
+      koshka::show_message(
+          e.to_string(source != nullptr ? source->view() : StringView{}, &cxt));
+      status = static_cast<i32>(e.command_status());
+    } catch (const Error &e) {
+      koshka::show_message(e.to_string());
+      status = static_cast<i32>(e.command_status());
+    } catch (...) {
+      LOG(Debug, "the coprocess child swallowed an unknown error");
+    }
+    koshka::flush();
+    os::exit_process_immediately(status);
+  }
+
+  /* The shell keeps neither end the coprocess owns. */
+  os::close_fd(toward_child->in);
+  os::close_fd(away_from_child->out);
+
+  let const read_fd = os::move_descriptor_to_free_shell_fd(away_from_child->in,
+                                                           COPROCESS_FD_FLOOR);
+  let const write_fd = os::move_descriptor_to_free_shell_fd(toward_child->out,
+                                                            COPROCESS_FD_FLOOR);
+  if (read_fd < 0 || write_fd < 0) {
+    if (read_fd < 0)
+      os::close_fd(away_from_child->in);
+    else
+      os::close_shell_fd(read_fd);
+
+    if (write_fd < 0)
+      os::close_fd(toward_child->out);
+    else
+      os::close_shell_fd(write_fd);
+
+    throw ErrorWithLocation{source_location(),
+                            "Could not place the coprocess descriptors"};
+  }
+
+  let descriptors = ArrayList<String>{heap_allocator()};
+  descriptors.push(String::from(read_fd, heap_allocator()));
+  descriptors.push(String::from(write_fd, heap_allocator()));
+  cxt.set_indexed_array(m_name, steal(descriptors));
+
+  let const process_id = os::process_id_of(child);
+  let pid_name = String{m_name};
+  pid_name += "_PID";
+  cxt.set_shell_variable(
+      pid_name.view(),
+      String::from(static_cast<u64>(process_id), heap_allocator()));
+
+  cxt.set_last_background_pid(process_id);
+
+  let command = String{command_text};
+  command += " &";
+  let const id = cxt.register_job(child, command.view(), process_id);
+  if (cxt.shell_is_interactive()) {
+    koshka::print_error(
+        "[" + String::from(id, heap_allocator()) + "] " +
+        String::from(static_cast<u64>(process_id), heap_allocator()) + "\n");
+  }
+
+  cxt.publish_single_pipe_status(0);
+  SET_AND_RETURN_EXIT_STATUS(cxt, 0);
 }
 
 } /* namespace expressions */

@@ -1210,6 +1210,7 @@ enum class command_position_word : u8
   BraceClose,
   Conditional,
   Select,
+  Coproc,
 };
 
 /* Returns a command, a compound command, or nullptr when a list terminator is
@@ -1282,6 +1283,10 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
             if (view.length == 6 && view == "select")
               position_word = command_position_word::Select;
             break;
+          case 'c':
+            if (view.length == 6 && view == "coproc")
+              position_word = command_position_word::Coproc;
+            break;
           default: break;
           }
         }
@@ -1308,6 +1313,12 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
            text in bash mode. */
         if (m_lexer.is_bash_compatible())
           return attach_trailing_redirections(parse_select());
+        break;
+      case command_position_word::Coproc:
+        /* Coproc is not a reserved word in the lexer either, so it is matched
+           on the text in bash mode. */
+        if (m_lexer.is_bash_compatible())
+          return attach_trailing_redirections(parse_coproc());
         break;
       case command_position_word::None: break;
       }

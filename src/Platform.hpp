@@ -761,6 +761,12 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
    shell_fd. The result is owned by the caller and closes on exec, and a
    shell_fd that is not open returns KOSH_INVALID_FD. */
 fn duplicate_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
+
+/* Move an owned descriptor onto a free shell fd at or above floor_fd and close
+   the original. The result is the shell fd number a script can name, and a
+   failure returns -1 with the original still open. */
+fn move_descriptor_to_free_shell_fd(os::descriptor source,
+                                    i32 floor_fd) wontthrow -> i32;
 fn descriptors_refer_to_same_file(os::descriptor first,
                                   os::descriptor second) wontthrow -> bool;
 

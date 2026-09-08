@@ -64,24 +64,25 @@ enum formatter_keyword_flag : u8
 };
 
 constexpr static_string_entry<u8> FORMATTER_KEYWORD_ENTRIES[] = {
-    {SSK("!"),     formatter_keyword_prefix                              },
-    {SSK("[["),    formatter_keyword_conditional                         },
-    {SSK("["),     formatter_keyword_conditional                         },
-    {SSK("case"),  formatter_keyword_case                                },
-    {SSK("do"),    formatter_keyword_vertical | formatter_keyword_indents},
-    {SSK("done"),  formatter_keyword_closes | formatter_keyword_vertical },
-    {SSK("elif"),  formatter_keyword_closes | formatter_keyword_elif     },
-    {SSK("else"),  formatter_keyword_closes | formatter_keyword_vertical |
-                      formatter_keyword_indents         },
-    {SSK("esac"),  formatter_keyword_closes | formatter_keyword_vertical |
-                      formatter_keyword_esac            },
-    {SSK("fi"),    formatter_keyword_closes | formatter_keyword_vertical },
-    {SSK("if"),    formatter_keyword_prefix                              },
-    {SSK("test"),  formatter_keyword_conditional                         },
-    {SSK("then"),  formatter_keyword_vertical | formatter_keyword_indents},
-    {SSK("time"),  formatter_keyword_prefix                              },
-    {SSK("until"), formatter_keyword_prefix                              },
-    {SSK("while"), formatter_keyword_prefix                              },
+    {SSK("!"),      formatter_keyword_prefix                              },
+    {SSK("[["),     formatter_keyword_conditional                         },
+    {SSK("["),      formatter_keyword_conditional                         },
+    {SSK("case"),   formatter_keyword_case                                },
+    {SSK("coproc"), formatter_keyword_prefix                              },
+    {SSK("do"),     formatter_keyword_vertical | formatter_keyword_indents},
+    {SSK("done"),   formatter_keyword_closes | formatter_keyword_vertical },
+    {SSK("elif"),   formatter_keyword_closes | formatter_keyword_elif     },
+    {SSK("else"),   formatter_keyword_closes | formatter_keyword_vertical |
+                      formatter_keyword_indents          },
+    {SSK("esac"),   formatter_keyword_closes | formatter_keyword_vertical |
+                      formatter_keyword_esac             },
+    {SSK("fi"),     formatter_keyword_closes | formatter_keyword_vertical },
+    {SSK("if"),     formatter_keyword_prefix                              },
+    {SSK("test"),   formatter_keyword_conditional                         },
+    {SSK("then"),   formatter_keyword_vertical | formatter_keyword_indents},
+    {SSK("time"),   formatter_keyword_prefix                              },
+    {SSK("until"),  formatter_keyword_prefix                              },
+    {SSK("while"),  formatter_keyword_prefix                              },
 };
 constexpr StaticStringMap FORMATTER_KEYWORDS{FORMATTER_KEYWORD_ENTRIES};
 

@@ -185,6 +185,7 @@ private:
   mustuse fn parse_while_or_until(bool is_until) throws -> Command *;
   mustuse fn parse_for() throws -> Command *;
   mustuse fn parse_select() throws -> Command *;
+  mustuse fn parse_coproc() throws -> Command *;
   mustuse fn parse_optional_in_clause_words(
       ArrayList<const Token *> &words) throws -> bool;
   mustuse fn parse_case() throws -> Command *;

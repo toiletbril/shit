@@ -335,8 +335,8 @@ hot fn Parser::parse_select() throws -> Command *
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'select'"};
   }
-  /* The menu variable must be a plain name, so a $ expansion such as select $f,
-     a quoted word, or a non-identifier is rejected. */
+  /* The menu variable must be a plain name. A $ expansion such as select $f, a
+     quoted word, or a non-identifier is rejected. */
   let const &name_word =
       static_cast<const tokens::WordToken *>(name_token)->word();
   let is_name_plain =
@@ -377,6 +377,81 @@ hot fn Parser::parse_select() throws -> Command *
   loop_node->set_source_end_position(parsed_body.done_location.position +
                                      parsed_body.done_location.length);
   return loop_node;
+}
+
+/* The shell_command productions a coprocess body can open with. */
+hot pure static fn token_opens_compound_command(const Token *token) wontthrow
+    -> bool
+{
+  if (token == nullptr) return false;
+
+  switch (token->kind()) {
+  case Token::Kind::If:
+  case Token::Kind::While:
+  case Token::Kind::Until:
+  case Token::Kind::For:
+  case Token::Kind::Case:
+  case Token::Kind::LeftParen: return true;
+  default: break;
+  }
+
+  return is_unquoted_word(token, "{") || is_unquoted_word(token, "[[") ||
+         is_unquoted_word(token, "select") || is_unquoted_word(token, "coproc");
+}
+
+/* A bash coprocess, coproc [NAME] command. A word after the keyword names the
+   coprocess only when a compound command opens behind it. In coproc cat the
+   word is the first word of a simple command and the coprocess takes the
+   default name. */
+hot fn Parser::parse_coproc() throws -> Command *
+{
+  Token *keyword = m_lexer.next_shell_token();
+  ASSERT(keyword != nullptr);
+  ASSERT(is_unquoted_word(keyword, "coproc"));
+  let const location = keyword->source_location();
+
+  LOG(Debug, "parsing a coprocess at byte %u", location.position);
+
+  let name = StringView{"COPROC"};
+  Token *leading_token = nullptr;
+
+  Token *candidate = m_lexer.peek_shell_token();
+  if (candidate != nullptr && candidate->kind() == Token::Kind::Word) {
+    let const &word = static_cast<const tokens::WordToken *>(candidate)->word();
+    let is_plain_name =
+        word.segments.count() == 1 &&
+        word.segments[0].kind == WordSegment::Kind::UnquotedText;
+    if (is_plain_name) {
+      is_plain_name =
+          lexer::word_is_variable_name(word.segments[0].text.view());
+    }
+
+    if (is_plain_name) {
+      /* The candidate is consumed either way. A compound opener behind it makes
+         the word the coprocess name, and anything else makes it the first word
+         of a simple command. */
+      candidate = m_lexer.next_shell_token();
+
+      if (token_opens_compound_command(m_lexer.peek_shell_token()))
+        name = word.segments[0].text.view();
+      else
+        leading_token = candidate;
+    }
+  }
+
+  Command *body = parse_simple_command(leading_token);
+  if (body == nullptr) {
+    throw ErrorWithLocation{location, "Expected a command after 'coproc'"};
+  }
+
+  let end_position = body->source_end_position();
+  let const keyword_end_position = location.position + location.length;
+  if (end_position < keyword_end_position) end_position = keyword_end_position;
+
+  let node = m_lexer.arena().create<CoprocCommand>(location, name, body);
+  node->set_source_end_position(end_position);
+
+  return node;
 }
 
 /* In a case word or pattern a NAME=VALUE token is a plain word, rebuilt into a

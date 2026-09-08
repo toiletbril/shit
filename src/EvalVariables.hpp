@@ -335,6 +335,14 @@ inline constexpr static_string_entry<shell_variable_description>
         {SSK("PPID"),
          {"The value is the process id of the parent.",
           shell_variable_fact::Dynamic | shell_variable_fact::BashOnly}       },
+        {SSK("COPROC"),
+         {"The coproc command binds this array to the descriptors of an "
+          "unnamed coprocess. Element zero is read from and element one is "
+          "written to.",
+          shell_variable_fact::Array | shell_variable_fact::BashOnly}         },
+        {SSK("COPROC_PID"),
+         {"The value is the process id of the unnamed coprocess.",
+          shell_variable_fact::BashOnly}                                      },
         {SSK("UID"),
          {"The value is the real user id.",
           shell_variable_fact::Dynamic | shell_variable_fact::BashOnly}       },
