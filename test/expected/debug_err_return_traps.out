@@ -40,6 +40,22 @@
   [CompoundListCondition, None]
     [SimpleCommand "trap" "-" "RETURN"]
   [CompoundListCondition, None]
+    [SimpleCommand "echo" "== RETURN SOURCE =="]
+  [CompoundListCondition, None]
+    [Assign source_file=$TEST_TEMP_DIRECTORY/kosh-return-source-$$]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "echo sourced-body\nfalse\nreturn 3\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo "R-source-$?"" "RETURN"]
+  [CompoundListCondition, None]
+    [SimpleCommand "." "$source_file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-" "RETURN"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "unlink" "$source_file"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "== GUARDED LOOP =="]
   [CompoundListCondition, None]
     [SimpleCommand "set" "--mood" "bash"]
@@ -185,6 +201,67 @@
   Unquoted "echo"
 ]
 [Word
+  DoubleQuoted "== RETURN SOURCE =="
+]
+[Word
+  Unquoted "source_file="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/kosh-return-source-"
+  Variable "$"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "echo sourced-body\nfalse\nreturn 3\n"
+]
+[Word
+  Variable "source_file"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "echo "R-source-$?""
+]
+[Word
+  Unquoted "RETURN"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Variable "source_file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "RETURN"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "unlink"
+]
+[Word
+  Variable "source_file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
   DoubleQuoted "== GUARDED LOOP =="
 ]
 [Word
@@ -264,5 +341,9 @@ E
 body
 R
 rc=7
+== RETURN SOURCE ==
+sourced-body
+R-source-1
+rc=3
 == GUARDED LOOP ==
 rc=1

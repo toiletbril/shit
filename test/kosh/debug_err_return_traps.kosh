@@ -16,6 +16,14 @@ trap 'echo R' RETURN
 f
 echo "rc=$?"
 trap - RETURN
+echo "== RETURN SOURCE =="
+source_file=$TEST_TEMP_DIRECTORY/kosh-return-source-$$
+printf 'echo sourced-body\nfalse\nreturn 3\n' > "$source_file"
+trap 'echo "R-source-$?"' RETURN
+. "$source_file"
+echo "rc=$?"
+trap - RETURN
+koshkit unlink "$source_file"
 echo "== GUARDED LOOP =="
 set --mood bash
 trap 'echo unexpected' ERR

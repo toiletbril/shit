@@ -92,4 +92,44 @@ echo source-status-in-action
   echo after-status=$? )
 echo after-source-status-in-action=$?
 
+echo source-keyword-spelling
+( trap 'echo R-keyword' RETURN
+  source bash/goldens/return_trap_inner.bash
+  echo after-keyword=$? )
+echo after-source-keyword-spelling=$?
+
+echo action-removes-trap
+( set -T
+  trap 'echo R-once; trap - RETURN' RETURN
+  first_call() { echo first-body; }
+  second_call() { echo second-body; }
+  first_call
+  second_call
+  echo after-removal=$? )
+echo after-action-removes-trap=$?
+
+echo traced-function-pipeline
+( set -T
+  trap 'echo R-stage' RETURN
+  staged_function() { echo staged-body; return 3; }
+  staged_function | cat
+  echo after-pipeline=$? )
+echo after-traced-function-pipeline=$?
+
+echo functrace-long-form
+( set -o functrace
+  trap 'echo R-long' RETURN
+  long_form_function() { echo long-body; }
+  long_form_function
+  echo after-long-form=$? )
+echo after-functrace-long-form=$?
+
+echo function-action-failure
+( set -T
+  trap 'false' RETURN
+  failing_action_function() { echo action-body; return 4; }
+  failing_action_function
+  echo after-action-failure=$? )
+echo after-function-action-failure=$?
+
 echo return-trap-done
