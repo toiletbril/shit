@@ -307,8 +307,9 @@ hot fn CompoundList::evaluate_root_status_impl(
         cxt.run_named_trap(StringView{"ERR", 3}, &failed_location);
       }
 
-      /* The action can request an exit, a return, or a loop jump of its own,
-         which stops the rest of this list the same way a node would. */
+      /* The action can request an exit, a return, or a loop jump of its own.
+         Such a request stops the rest of this list the same way a node
+         would. */
       if (cxt.has_pending_control_flow()) break;
     }
 
@@ -467,8 +468,8 @@ fn Pipeline::append_command(const Command *node) throws -> void
 }
 
 /* Bash publishes the text and the site of a simple stage in the parent before
-   it forks that stage, so a failing pipeline answers for the last simple stage
-   it holds. A compound stage publishes nothing and leaves the stage written
+   it forks that stage. A failing pipeline answers for the last simple stage it
+   holds. A compound stage publishes nothing and leaves the stage written
    before it in place. */
 fn Pipeline::error_report_location() const wontthrow -> SourceLocation
 {
@@ -555,8 +556,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
 
       defer { cxt.set_stage_boundary_published(false); };
 
-      /* The stage boundary was published above for a simple stage, so the
-         stage itself must not publish a second one. */
+      /* The stage boundary was published above for a simple stage. The stage
+         itself must not publish a second one. */
       let const stage_mode = simple != nullptr
                                  ? root_evaluation_mode::PreparedPipelineStage
                                  : root_evaluation_mode::Normal;
@@ -637,6 +638,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         i32 stage_status = 0;
         try {
           cxt.enter_subshell();
+          cxt.hide_coprocess_descriptors();
           stage_status =
               static_cast<i32>(stage->evaluate_root(cxt, stage_mode));
           if (cxt.has_pending_control_flow() &&
@@ -855,9 +857,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
           cxt.get_program_resolver(), steal(stage_arg_locations));
     } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       /* The stage still applies its own redirections. A > onto its stdout takes
-         the slot ahead of the pipe, so the next stage still sees EOF. The
-         message is rendered here and written once the pipeline has placed every
-         descriptor, so a stage that merges into the pipe carries it there. */
+         the slot ahead of the pipe. The next stage still sees EOF. The message
+         is rendered here and written once the pipeline has placed every
+         descriptor. A stage that merges into the pipe carries it there. */
       let const *error_source = cxt.current_source();
       let const rendered = resolution_error.to_string(
           error_source != nullptr ? error_source->view() : StringView{}, &cxt);
@@ -887,9 +889,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
       e->redirect_exec_context(ec, cxt);
     } catch (const ErrorWithLocation &redirection_error) {
       /* A redirection the stage cannot apply fails that stage alone. The stage
-         keeps the redirections written ahead of the failing one, so its
-         diagnostic reaches the destination they named and the remaining stages
-         still run. */
+         keeps the redirections written ahead of the failing one. Its diagnostic
+         reaches the destination they named and the remaining stages still
+         run. */
       let const *error_source = cxt.current_source();
       let const rendered = redirection_error.to_string(
           error_source != nullptr ? error_source->view() : StringView{}, &cxt);

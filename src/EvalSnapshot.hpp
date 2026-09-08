@@ -101,6 +101,10 @@ struct eval_state_snapshot
   ArrayList<job> jobs;
   ArrayList<os::process> detached_job_processes;
   i32 next_job_id;
+  /* The shell descriptors of the live coprocess ride the snapshot, so a
+     coprocess started inside a subshell leaves the outer record alone. */
+  i32 coprocess_read_fd;
+  i32 coprocess_write_fd;
 };
 
 /* Owns one compiled regex and frees it on destruction, so the regex cache

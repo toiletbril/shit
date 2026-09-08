@@ -1896,7 +1896,8 @@ and
 builtins resume every stage of the job.
 .PP
 A coprocess is one asynchronous job and sets $!. Its descriptors are numbered
-above 9 and are closed across an exec.
+above 9 and are closed across an exec. A subshell receives neither descriptor,
+while NAME and NAME_PID stay readable there.
 .SH SIGNALS
 The main shell ignores SIGPIPE. A forked child restores the default SIGPIPE
 action. A producer terminated by SIGPIPE therefore returns status 141.

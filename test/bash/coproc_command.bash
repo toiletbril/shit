@@ -48,3 +48,30 @@ coproc LAST { exit 7; }
 printf '%s\n' "launch status:$?"
 wait "$LAST_PID"
 printf '%s\n' "body status:$?"
+
+# A forked subshell loses both descriptors. The diagnostic of a failed
+# redirection names the script, so it is dropped here.
+echo "== descriptors in a subshell =="
+coproc HOLD { while read -r line; do printf '%s\n' "got:$line"; done; }
+( if printf 'x\n' 2>/dev/null >&"${HOLD[1]}"; then
+    echo "subshell write:open"
+  else
+    echo "subshell write:closed"
+  fi )
+( if read -r probe 2>/dev/null <&"${HOLD[0]}"; then
+    echo "subshell read:open value=$probe"
+  else
+    echo "subshell read:closed"
+  fi )
+
+# The array and the process id stay readable in the subshell. Only the
+# descriptors behind them are gone.
+( printf '%s\n' "elements in subshell:${#HOLD[@]}" )
+( printf '%s\n' "pid in subshell:${HOLD_PID:+yes}" )
+
+printf 'parent\n' >&"${HOLD[1]}"
+read -r reply <&"${HOLD[0]}"
+printf '%s\n' "parent reply:$reply"
+eval "exec ${HOLD[1]}>&-"
+wait "$HOLD_PID"
+printf '%s\n' "subshell wait status:$?"

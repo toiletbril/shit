@@ -250,6 +250,7 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
   if (launch.should_evaluate_child) {
     if (launch.child_close_fd.has_value()) os::close_fd(*launch.child_close_fd);
     enter_subshell();
+    hide_coprocess_descriptors();
     i32 status = 0;
     let const previous_source = m_current_source;
     let const previous_origin = m_current_origin;
@@ -498,6 +499,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
         os::close_fd(pipe->in);
         m_shell_is_interactive = false;
         enter_subshell();
+        hide_coprocess_descriptors();
         if (mood() == mimic_mood::Bash && !is_shopt_enabled("inherit_errexit"))
         {
           set_error_exit(false);
@@ -653,6 +655,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
        it and must not escape into the enclosing loop, function, or shell. */
     enter_subshell();
     did_enter_subshell = true;
+    hide_coprocess_descriptors();
     if (mood() == mimic_mood::Bash && !is_shopt_enabled("inherit_errexit")) {
       set_error_exit(false);
     }
@@ -669,7 +672,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
       clear_control_flow();
     }
     /* The substitution's own EXIT action runs while stdout still points at the
-       pipe, so its output joins the captured value. A status the action exits
+       pipe. Its output joins the captured value. A status the action exits
        with stays in the exit status the substitution reports. */
     if (!error) {
       try {

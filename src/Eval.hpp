@@ -1017,6 +1017,14 @@ public:
      wins. */
   fn snapshot_subshell_descriptor(i32 shell_fd) throws -> void;
 
+  /* Record the descriptors a coprocess launch bound, so a subshell entered
+     later knows which two to take away. */
+  fn set_coprocess_descriptors(i32 read_fd, i32 write_fd) wontthrow -> void;
+  /* Take the coprocess descriptors away from the subshell that is being
+     entered. Bash gives a subshell neither end, and a forgotten writer in a
+     child would keep the reader in the shell from ever seeing end of file. */
+  fn hide_coprocess_descriptors() throws -> void;
+
   fn request_loop_control(control_flow::Kind kind, i64 level,
                           SourceLocation location) throws -> void;
   fn request_break(i64 level, SourceLocation location) throws -> void;
@@ -1955,6 +1963,11 @@ protected:
   Maybe<i64> m_last_background_pid{};
   StringMap<FunctionBodyHandle> m_functions{heap_allocator()};
   usize m_subshell_depth{0};
+  /* The shell descriptors the live coprocess is reached through, -1 when no
+     coprocess runs. Only one coprocess is live at a time, the way bash counts
+     them. */
+  i32 m_coprocess_read_fd{-1};
+  i32 m_coprocess_write_fd{-1};
   /* The descriptors bare execs moved inside live in-process subshells, kept
      as a stack so leave_subshell unwinds its own depth's entries in reverse. */
   ArrayList<subshell_saved_descriptor> m_subshell_saved_descriptors{

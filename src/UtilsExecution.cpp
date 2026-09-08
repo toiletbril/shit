@@ -263,8 +263,8 @@ fn terminate_and_reap_processes(const ArrayList<os::process> &processes,
        position++)
     unused(os::signal_process(processes[position], 9));
 
-  /* The shell asked for the kill, so the death of the child is not news the
-     user needs. A monitoring wait would announce every one of them. */
+  /* The shell asked for the kill. The death of the child is not news the user
+     needs. A monitoring wait would announce every one of them. */
   for (usize position = first_process_position; position < processes.count();
        position++)
   {
@@ -275,7 +275,7 @@ fn terminate_and_reap_processes(const ArrayList<os::process> &processes,
 }
 
 /* The diagnostic for a stage whose command did not resolve goes to the stage's
-   own standard error, so 2>/dev/null on that stage hides it and 2>&1 carries it
+   own standard error. 2>/dev/null on that stage hides it and 2>&1 carries it
    onto the pipe. The message is written from here because a stage only owns its
    pipe end after the loop below places it. */
 static fn report_unresolved_stage(EvalContext &cxt,
@@ -408,7 +408,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
         throw ErrorWithLocation{ec.source_location(), "Could not open a pipe"};
       }
       /* The write end is the stage's standard output before the stage applies
-         its own redirections, so a dup written ahead of them reads the pipe.
+         its own redirections. A dup written ahead of them reads the pipe.
          2>&1 >file on a stage is 2>pipe 1>file. */
       let const has_leading_error_dup = ec.should_duplicate_error_to_output &&
                                         ec.did_output_file_follow_error_dup;
@@ -424,7 +424,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       }
 
       /* An explicit > takes the stage's stdout, and a leading 1>&2 replaces it
-         with the inherited standard error, so the pipe end closes unused. */
+         with the inherited standard error. The pipe end closes unused. */
       if (!ec.out_fd && !has_leading_output_dup && !did_stage_take_pipe) {
         ec.out_fd = pipe->out;
         did_stage_take_pipe = true;
@@ -605,7 +605,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           ec.err_fd = koshka::None;
           if (last_stdin != KOSH_INVALID_FD) os::close_fd(last_stdin);
 
-          /* A fork keeps the descriptors an exec would drop, so a stage that
+          /* A fork keeps the descriptors an exec would drop. A stage that
              still owes its diagnostic leaves its pipe end open in this reader
              and the read never ends. */
           for (let const unresolved_index : unresolved_stages)
@@ -613,6 +613,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
           cxt.set_in_pipeline_stage(true);
           cxt.enter_subshell();
+          cxt.hide_coprocess_descriptors();
           i32 child_status = 0;
           try {
             child_status = execute_builtin(steal(ec), cxt);

@@ -1046,6 +1046,7 @@ static fn evaluate_subshell_in_process(const Expression *body,
     cxt.set_terminal_exec_allowed(false);
     cxt.enter_subshell();
     did_enter_subshell = true;
+    cxt.hide_coprocess_descriptors();
     /* The inherited EXIT action belongs to the parent and must not fire at the
        subshell's end. An EXIT action the body sets survives this clear. */
     cxt.clear_inherited_exit_trap();

@@ -100,6 +100,7 @@ fn CompoundCommand::evaluate_async(EvalContext &cxt) const throws -> i64
     i32 status = 1;
     try {
       cxt.enter_subshell();
+      cxt.hide_coprocess_descriptors();
       status = static_cast<i32>(evaluate_impl(cxt));
       if (cxt.has_pending_control_flow() &&
           cxt.pending_control_flow().kind == control_flow::Kind::Exit)
@@ -1573,6 +1574,8 @@ fn CoprocCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     throw ErrorWithLocation{source_location(),
                             "Could not place the coprocess descriptors"};
   }
+
+  cxt.set_coprocess_descriptors(read_fd, write_fd);
 
   let descriptors = ArrayList<String>{heap_allocator()};
   descriptors.push(String::from(read_fd, heap_allocator()));

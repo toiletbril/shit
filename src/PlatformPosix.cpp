@@ -241,6 +241,14 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   saved_descriptor result{};
   result.shell_fd = shell_fd;
 
+  /* The backup is placed at the lowest free number at or above the floor, and
+     a closed source names a number in that same range. The source is proven
+     open before anything moves, so a backup can never answer for it. */
+  if (fcntl(target, F_GETFD) == -1) {
+    result.is_dup2_ok = false;
+    return result;
+  }
+
   const os::descriptor backup =
       fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
   if (backup == -1 && errno != EBADF) {

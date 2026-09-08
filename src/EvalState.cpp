@@ -110,6 +110,38 @@ fn EvalContext::snapshot_subshell_descriptor(i32 shell_fd) throws -> void
       m_subshell_depth, os::save_descriptor(shell_fd)});
 }
 
+fn EvalContext::set_coprocess_descriptors(i32 read_fd, i32 write_fd) wontthrow
+    -> void
+{
+  LOG(Debug, "the live coprocess is read on %d and written on %d", read_fd,
+      write_fd);
+  m_coprocess_read_fd = read_fd;
+  m_coprocess_write_fd = write_fd;
+}
+
+fn EvalContext::hide_coprocess_descriptors() throws -> void
+{
+  if (m_coprocess_read_fd < 0 && m_coprocess_write_fd < 0) return;
+
+  LOG(Debug, "taking the coprocess descriptors away at subshell depth %zu",
+      m_subshell_depth);
+
+  /* The backup is what leave_subshell hands back, so an in-process subshell
+     returns the descriptors to the shell that owns them. Both backups are
+     taken before either close, because a backup is placed at the lowest free
+     number and would otherwise answer for the number just released. */
+  for (let const shell_fd : {m_coprocess_read_fd, m_coprocess_write_fd}) {
+    if (shell_fd >= 0) snapshot_subshell_descriptor(shell_fd);
+  }
+
+  for (let const shell_fd : {m_coprocess_read_fd, m_coprocess_write_fd}) {
+    if (shell_fd >= 0) unused(os::close_shell_fd(shell_fd));
+  }
+
+  m_coprocess_read_fd = -1;
+  m_coprocess_write_fd = -1;
+}
+
 pure fn EvalContext::in_subshell() const wontthrow -> bool
 {
   return m_subshell_depth > 0;
@@ -164,7 +196,7 @@ pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
 
 /* A break or a continue stops every later command until a loop consumes it. A
    return and an exit unwind through their own boundaries, and a trap action
-   runs under a pending one, so neither of them answers here. */
+   runs under a pending one. Neither of them answers here. */
 pure fn EvalContext::has_pending_loop_jump() const wontthrow -> bool
 {
   return m_control_flow.kind == control_flow::Kind::Break ||
@@ -747,7 +779,9 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_terminal_exec_allowed,
       steal(m_jobs),
       steal(m_detached_job_processes),
-      m_next_job_id};
+      m_next_job_id,
+      m_coprocess_read_fd,
+      m_coprocess_write_fd};
   m_next_job_id = 1;
   return snapshot;
 }
@@ -823,6 +857,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_jobs = steal(snapshot.jobs);
   m_detached_job_processes = steal(snapshot.detached_job_processes);
   m_next_job_id = snapshot.next_job_id;
+  m_coprocess_read_fd = snapshot.coprocess_read_fd;
+  m_coprocess_write_fd = snapshot.coprocess_write_fd;
 
   m_variable_attributes = steal(snapshot.variable_attributes);
   m_exported_names = steal(snapshot.exported_names);
