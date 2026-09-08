@@ -163,6 +163,50 @@ echo exit-in-action-pipeline-async
 ( trap 'exit 9' DEBUG; echo unreachable-a | cat & wait )
 echo after-exit-in-action-pipeline-async=$?
 
+echo exit-in-action-select
+( trap 'exit 9' DEBUG; select choice in a b; do echo unreachable-$choice; done ) </dev/null
+echo after-exit-in-action-select=$?
+
+echo exit-in-action-blank-init
+( index=0; trap 'exit 9' DEBUG; for ((; index < 2; index++)); do echo unreachable-$index; done )
+echo after-exit-in-action-blank-init=$?
+
+echo exit-in-action-blank-condition
+( trap 'if [[ $BASH_COMMAND == "((1))" ]]; then exit 9; fi' DEBUG; for ((index = 0; ; index++)); do echo unreachable-$index; done )
+echo after-exit-in-action-blank-condition=$?
+
+echo exit-in-action-blank-step
+( trap 'if [[ $BASH_COMMAND == "((1))" ]]; then exit 9; fi' DEBUG; for ((index = 0; index < 3; )); do echo body-$index; index=$((index + 1)); done )
+echo after-exit-in-action-blank-step=$?
+
+echo break-in-action
+( trap 'case "$BASH_COMMAND" in echo\ body*) break ;; esac' DEBUG
+  for value in 1 2 3; do echo body-$value; echo after-$value; done
+  trap - DEBUG
+  echo break-tail )
+echo after-break-in-action=$?
+
+echo continue-in-action
+( trap 'case "$BASH_COMMAND" in echo\ after*) continue ;; esac' DEBUG
+  for value in 1 2 3; do echo body-$value; echo after-$value; echo skipped-$value; done
+  trap - DEBUG
+  echo continue-tail )
+echo after-continue-in-action=$?
+
+echo return-in-action
+set -T
+returning_function() {
+  trap 'case "$BASH_COMMAND" in echo\ inner*) return 9 ;; esac' DEBUG
+  echo inner-body
+  trap - DEBUG
+  echo unreachable-return
+}
+( returning_function
+  echo returned=$?
+  echo return-tail )
+echo after-return-in-action=$?
+set +T
+
 echo pinned-command
 trap 'echo "D-$BASH_COMMAND"; echo "still-$BASH_COMMAND"' DEBUG
 echo target
