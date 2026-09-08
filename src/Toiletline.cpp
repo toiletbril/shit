@@ -118,7 +118,7 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 #endif
 
 /* The shell-facing limit is declared where the implementation macro is not
-   visible, so the two values are compared here. */
+   visible. The two values are compared here. */
 static_assert(toiletline::HISTORY_RECORD_MAX_DECODED_BYTE_COUNT ==
               ITL_STRING_MAX_LEN);
 
@@ -145,14 +145,14 @@ koshka::tab_selector_mode TAB_SELECTOR{koshka::tab_selector_mode::Interactive};
 
 /* The external selector hands the candidates to a filtering program, and what
    it prints replaces them. The engine, the replaced token span, and the quoting
-   are untouched, so only the presentation moves. Every failure below leaves the
-   result alone, so the printed list still appears. */
+   are untouched. Only the presentation moves. Every failure below leaves the
+   result alone. The printed list still appears. */
 constexpr koshka::StringView SELECTOR_COMMAND_VARIABLE{
     "KOSH_FZF_COMPLETION_COMMAND"};
 constexpr koshka::StringView SELECTOR_OPTIONS_VARIABLE{
     "KOSH_FZF_COMPLETION_OPTS"};
 
-/* Seeded into the shell before the first prompt, so the picker and its
+/* Seeded into the shell before the first prompt. The picker and its
    presentation are visible and editable. The record framing is absent, since
    --read0 and --print0 are the protocol between the shell and the picker. */
 constexpr koshka::StringView DEFAULT_SELECTOR_COMMAND{"fzf"};
@@ -184,8 +184,8 @@ fn resolve_selector_program(koshka::EvalContext &context) throws
   return koshka::Path{resolved[0].text()};
 }
 
-/* The variables the external selector reads, with the value each one holds
-   now. Every selector failure carries this as its note. */
+/* The variables the external selector reads, with the value each one holds.
+   Every selector failure carries this as its note. */
 fn selector_variable_note(koshka::EvalContext &context) throws -> koshka::String
 {
   let note = koshka::String{koshka::heap_allocator()};
@@ -252,14 +252,14 @@ fn build_selector_args(koshka::EvalContext &context,
   let args = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
   args.push(koshka::String{program.text().view()});
 
-  /* The records travel NUL separated in both directions, so the framing belongs
+  /* The records travel NUL separated in both directions. The framing belongs
      to the shell and stays out of the variable. */
   args.push(koshka::String{"--read0"});
   args.push(koshka::String{"--print0"});
 
   /* The value is split on blanks with no expansion, since a completion
      keystroke must never run a substitution. An unset variable carries the
-     defaults, which is what the seeded value holds. */
+     defaults. The seeded value holds the defaults. */
   let const options = context.get_variable_value(SELECTOR_OPTIONS_VARIABLE);
   let const option_text =
       options.has_value() ? options->view() : DEFAULT_SELECTOR_OPTIONS;
@@ -308,10 +308,10 @@ enum class selector_outcome : u8
   Dismissed,
 };
 
-/* Handing the editor screen back erases every row below the prompt, so a
-   message survives only after that. A failure that happens before the picker
-   starts cycles the screen itself to reach the same place, which leaves the
-   message above the repainted prompt. */
+/* Handing the editor screen back erases every row below the prompt. A message
+   survives only after that. A failure that happens before the picker starts
+   cycles the screen itself to reach the same place. The message is left above
+   the repainted prompt. */
 fn report_selector_failure(koshka::StringView message, koshka::StringView note,
                            bool should_hand_back_screen) throws -> void
 {
@@ -408,7 +408,8 @@ fn run_selector_program(koshka::EvalContext &context, koshka::StringView input,
 
   /* A picker reports 0 for a selection, 1 when nothing matched, and 130 when it
      was dismissed. A status it never uses for either says the picker could not
-     do its work, which is reported before the printed list answers the key. */
+     do its work. The failure is reported before the printed list answers the
+     key. */
   if (status != 0) {
     if (status == 1 || status == 130) return selector_outcome::Dismissed;
 
@@ -470,7 +471,7 @@ fn run_completion_selector(koshka::EvalContext &context,
 }
 
 /* The history entry the picker last chose. Toiletline reads the pointer after
-   the callback returns, so the bytes outlive the call and are replaced by the
+   the callback returns. The bytes outlive the call and are replaced by the
    next one. */
 koshka::String SELECTED_HISTORY_ENTRY{koshka::heap_allocator()};
 
@@ -485,8 +486,8 @@ fn kosh_history_select_callback(const char *const *entries, size_t count,
   if (TAB_SELECTOR != koshka::tab_selector_mode::External) return 0;
   if (entries == nullptr || count == 0) return 0;
 
-  /* Toiletline calls this through a C function pointer, so a throw unwinding
-     past this frame is undefined behavior. */
+  /* Toiletline calls this through a C function pointer. A throw unwinding past
+     this frame is undefined behavior. */
   try {
     let input = koshka::String{koshka::heap_allocator()};
     for (size_t i = 0; i < count; i++) {
@@ -500,8 +501,7 @@ fn kosh_history_select_callback(const char *const *entries, size_t count,
     if (outcome == selector_outcome::NotRun) return 0;
     if (outcome == selector_outcome::Dismissed) return -1;
 
-    /* A multiple selection has no meaning for one line, so the first pick wins.
-     */
+    /* A multiple selection has no meaning for one line. The first pick wins. */
     SELECTED_HISTORY_ENTRY =
         koshka::String{koshka::heap_allocator(), selected[0].view()};
     *out_selected = SELECTED_HISTORY_ENTRY.c_str();
@@ -521,8 +521,8 @@ fn kosh_completion_callback(const char *buffer, size_t cursor,
     return 0;
   }
 
-  /* Toiletline calls this through a C function pointer, so a throw unwinding
-     past this frame is undefined behavior. The body is guarded and any throw is
+  /* Toiletline calls this through a C function pointer. A throw unwinding past
+     this frame is undefined behavior. The body is guarded and any throw is
      swallowed. */
   try {
     let const is_explicit_completion = for_listing != 0;
@@ -807,8 +807,8 @@ static fn get_calc_history_file_path() -> koshka::Maybe<koshka::Path>
 
 static bool IS_CALC_HISTORY_ACTIVE = false;
 
-/* Every read and append resolves the file the swap currently points at, so a
-   calc prompt never reloads the shell file over the calc entries. */
+/* Every read and append resolves the file the swap currently points at. A calc
+   prompt never reloads the shell file over the calc entries. */
 static fn get_active_history_file_path() -> koshka::Maybe<koshka::Path>
 {
   if (IS_CALC_HISTORY_ACTIVE) return get_calc_history_file_path();
@@ -850,7 +850,7 @@ fn get_history_path() -> koshka::Maybe<koshka::Path>
   return get_history_file_path();
 }
 
-/* Every entry is appended to the file as it is stored, so a write only has to
+/* Every entry is appended to the file as it is stored. A write only has to
    drop the leading records the bounded list no longer reaches. */
 fn history_write() -> koshka::ErrorOr<koshka::Ok>
 {
@@ -880,8 +880,8 @@ fn history_write() -> koshka::ErrorOr<koshka::Ok>
     return koshka::Error{os::last_system_error_message()};
   }
 
-  /* The rename dropped a leading span and left the retained bytes untouched, so
-     the shift describes the new file exactly and a rescan would only read it
+  /* The rename dropped a leading span and left the retained bytes untouched.
+     The shift describes the new file exactly and a rescan would only read it
      back. */
   ::itl_history_offsets_shift(first_offset);
   record_history_file_status(*path);
@@ -949,7 +949,7 @@ static fn sync_history(const Path &path, bool should_allow_missing)
   return load_history(path, should_allow_missing);
 }
 
-/* The replacement is written beside the history file and renamed over it, so no
+/* The replacement is written beside the history file and renamed over it. No
    reader observes a partial file. The caller holds the process lock. */
 static fn commit_history_replacement(const Path &path, const Path &parent,
                                      StringView name_prefix,
@@ -978,7 +978,7 @@ static fn replace_history_file(const Path &path, const Path &parent,
 }
 
 /* A session that does not hold the process lock can append between the write
-   and the stat, so a size the vendored state does not track leaves the status
+   and the stat. A size the vendored state does not track leaves the status
    unrecorded and the next sync loads the file. */
 static fn record_history_file_status(const Path &path) -> void
 {
@@ -1049,12 +1049,12 @@ fn get_history_events(koshka::Allocator allocator,
 {
   let events = koshka::ArrayList<history_event>{allocator};
   let const path = get_history_file_path();
-  if (!path.has_value()) return steal(events);
+  if (!path.has_value()) return events;
 
-  /* The load is allowed to miss the file, so an absent history reads as an
-     empty list and a damaged or unreadable file reads as a failure. */
+  /* The load is allowed to miss the file. An absent history reads as an empty
+     list and a damaged or unreadable file reads as a failure. */
   TRY(sync_history(*path, true));
-  if (::itl_g_history_count == 0) return steal(events);
+  if (::itl_g_history_count == 0) return events;
   if (!::itl_history_ensure_read_buffer())
     return koshka::Error{"the file contains invalid data"};
 
@@ -1082,7 +1082,7 @@ fn get_history_events(koshka::Allocator allocator,
     });
   }
 
-  return steal(events);
+  return events;
 }
 
 template <class Match>
@@ -1425,7 +1425,7 @@ fn enable_completion(koshka::EvalContext &context) -> void
   ::tl_set_ghost_validate_callback(kosh_ghost_validate_callback);
   ::tl_set_history_select_callback(kosh_history_select_callback);
 
-  /* The selector configuration is seeded after the startup files have run, so a
+  /* The selector configuration is seeded after the startup files have run. A
      value they set wins and an unset one becomes visible and editable. */
   if (!context.get_variable_value(SELECTOR_COMMAND_VARIABLE).has_value())
     context.set_shell_variable(SELECTOR_COMMAND_VARIABLE,
