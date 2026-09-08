@@ -60,6 +60,20 @@ trap 'echo D-$BASH_COMMAND' DEBUG
 [[ x = x && -n y ]]
 trap - DEBUG
 
+echo branch-headers
+trap 'echo D-$BASH_COMMAND' DEBUG
+if true; then echo if-body; fi
+if false; then echo skipped; elif true; then echo elif-body; fi
+if false; then echo skipped; else echo else-body; fi
+trap - DEBUG
+
+echo loop-headers
+loop_index=0
+trap 'echo D-$BASH_COMMAND' DEBUG
+while [ $loop_index -lt 2 ]; do loop_index=$((loop_index + 1)); done
+until [ $loop_index -ge 3 ]; do loop_index=$((loop_index + 1)); done
+trap - DEBUG
+
 echo pipeline-commands
 trap 'echo D-$BASH_COMMAND' DEBUG
 printf 'payload\n' | wc -l
