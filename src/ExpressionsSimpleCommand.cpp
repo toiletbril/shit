@@ -1223,7 +1223,7 @@ fn internal::append_word_source_text(EvalContext &cxt, String &out,
 {
   let const text = cxt.source_text_in_span(word.source_location(), 0);
   if (text.length != 0) {
-    out.append(text);
+    out += reprinted_command_text(text);
     return;
   }
 

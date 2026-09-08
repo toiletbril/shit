@@ -37,6 +37,28 @@ esac
 case  $subject  in
   match) echo spaced-matched ;;
 esac
+case $(  echo match  ) in
+  match) echo substituted-matched ;;
+esac
+case "a   b" in
+  "a   b") echo quoted-blanks-matched ;;
+esac
+trap - DEBUG
+
+echo word-loop-header
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+for   word   in   one    two
+do
+  echo word-$word
+done
+for word in $(  echo three  ); do
+  echo word-$word
+done
+trap - DEBUG
+
+echo redirection-target
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+echo target > $(  echo /dev/null  )
 trap - DEBUG
 
 echo cstyle-header

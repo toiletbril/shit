@@ -349,8 +349,9 @@ fn source_command_text(EvalContext &cxt, const SourceLocation &location,
 fn subshell_command_text(EvalContext &cxt, const SourceLocation &location,
                          usize end_position) throws -> String;
 
-/* The word as its source spells it, which keeps the quoting the parsed word
-   drops. The parsed text answers for a word whose span is unavailable. */
+/* The word the way bash reprints it from its own parse. The source quoting the
+   parsed word drops is kept. The parsed text answers for a word whose span is
+   unavailable. */
 fn append_word_source_text(EvalContext &cxt, String &out,
                            const Token &word) throws -> void;
 
