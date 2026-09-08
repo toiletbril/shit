@@ -21,6 +21,7 @@ import time
 binary = os.path.abspath(sys.argv[1])
 
 SELECTED_SGR = b"\x1b[7m"
+DIMMED_SGR = b"\x1b[90m"
 HIGHLIGHT_RESET = b"\x1b[0m"
 
 # The word each command prints is an operand, so a menu row never carries the
@@ -114,6 +115,10 @@ def main():
             b"' one" in opened and b"' two" in opened and b"' three" in opened
         )
         menu_opens_with_first_selection = SELECTED_SGR in opened
+        # The dimmed first row names the source and the keys it answers.
+        help_row_names_the_source = (
+            b"  " + DIMMED_SGR + b"incremental history search" in opened
+        )
 
         # The newest entry heads the list, so the highlight opens on the last
         # command the session ran.
@@ -141,6 +146,14 @@ def main():
         )
         backspace_widens_the_list = b"<three>" in widened
 
+        # A search that matches nothing keeps the menu open on the row that says
+        # so, and the erase that follows brings the list back for the Enter.
+        emptied, _ = run_history_menu(
+            directory, "", [b"z", b"z", b"\x7f", b"\x7f", b"\n"]
+        )
+        an_empty_search_keeps_the_menu_open = b"no matches" in emptied
+        an_erase_recovers_the_list = b"<three>" in emptied
+
         # The down arrow reaches the entry below the newest one.
         moved, _ = run_history_menu(directory, "", [b"\x1b[B", b"\n"])
         a_movement_key_reaches_an_older_entry = b"<two>" in moved
@@ -164,12 +177,17 @@ def main():
         results = {
             "MENU_LISTS_EVERY_ENTRY": menu_lists_every_entry,
             "MENU_OPENS_WITH_FIRST_SELECTION": menu_opens_with_first_selection,
+            "HELP_ROW_NAMES_THE_SOURCE": help_row_names_the_source,
             "THE_NEWEST_ENTRY_IS_SELECTED": the_newest_entry_is_selected,
             "ENTER_RUNS_THE_HIGHLIGHTED_ENTRY": (
                 enter_runs_the_highlighted_entry
             ),
             "TYPING_NARROWS_THE_LIST": typing_narrows_the_list,
             "BACKSPACE_WIDENS_THE_LIST": backspace_widens_the_list,
+            "AN_EMPTY_SEARCH_KEEPS_THE_MENU_OPEN": (
+                an_empty_search_keeps_the_menu_open
+            ),
+            "AN_ERASE_RECOVERS_THE_LIST": an_erase_recovers_the_list,
             "A_MOVEMENT_KEY_REACHES_AN_OLDER_ENTRY": (
                 a_movement_key_reaches_an_older_entry
             ),

@@ -161,6 +161,10 @@ def main():
             and b"alpha-three" in opened
         )
         menu_opens_with_first_selection = SELECTED_SGR in opened
+        # The dimmed first row names the source and the keys it answers.
+        help_row_names_the_source = (
+            b"  " + GHOST_SGR + b"selecting completions, tab accepts" in opened
+        )
         selected_start = opened.find(SELECTED_SGR)
         selected_end = opened.find(HIGHLIGHT_RESET, selected_start)
         selected_text = opened[
@@ -182,7 +186,7 @@ def main():
             GHOST_SGR + b"one" + HIGHLIGHT_RESET in opened
         )
 
-        moved, _, accepted = run_menu(
+        moved, _, submitted = run_menu(
             directory, "tree", typed, [b"\x1b[B", b"\n"]
         )
         a_movement_key_highlights_a_row = SELECTED_SGR in moved
@@ -191,17 +195,16 @@ def main():
         preview_follows_the_highlight = (
             GHOST_SGR + b"three" + HIGHLIGHT_RESET in moved
         )
-        enter_accepts_the_highlighted_row = (
-            b"<alpha-one>" in accepted
-            or b"<alpha-two>" in accepted
-            or b"<alpha-three>" in accepted
-        )
+        # Enter leaves the highlighted row behind and runs the line the first
+        # tab grew to the common prefix. The key loop collects the output of
+        # that run, since the trailing newline of the driver comes later.
+        enter_submits_the_line = b"<alpha->" in moved
 
         _, _, tab_accepted = run_menu(directory, "tree", typed, [b"\t"])
         tab_accepts_current_selection = b"<alpha-one>" in tab_accepted
 
         shifted, _, shifted_accepted = run_menu(
-            directory, "tree", typed, [b"\x1b[Z", b"\n"]
+            directory, "tree", typed, [b"\x1b[Z", b"\t"]
         )
         shift_tab_wraps_backward = (
             SELECTED_SGR in shifted and b"<alpha-two>" in shifted_accepted
@@ -213,22 +216,30 @@ def main():
         _, _, typed_through = run_menu(directory, "tree", typed, [b"x"])
         an_ordinary_key_reaches_the_line = b"<alpha-x>" in typed_through
 
-        # Typing narrows the list, so the Enter that follows is answered by the
+        # Typing narrows the list, so the Tab that follows is answered by the
         # menu and not by the prompt. A closed menu would submit alpha-t.
-        _, _, filtered = run_menu(directory, "tree", typed, [b"t", b"\n"])
+        _, _, filtered = run_menu(directory, "tree", typed, [b"t", b"\t"])
         typing_narrows_the_list = b"<alpha-three>" in filtered
 
         # Backspace widens the list back to every candidate, so the first row is
         # alpha-one again. A closed menu would submit alpha- on its own.
         _, _, widened = run_menu(
-            directory, "tree", typed, [b"t", b"\x7f", b"\n"]
+            directory, "tree", typed, [b"t", b"\x7f", b"\t"]
         )
         backspace_widens_the_list = b"<alpha-one>" in widened
 
-        # Accepting a directory walks into it, so the second Enter answers the
+        # A search that matches nothing keeps the menu open on the row that says
+        # so, and the erase that follows brings the list back for the Tab.
+        emptied, _, recovered = run_menu(
+            directory, "tree", typed, [b"z", b"z", b"\x7f", b"\x7f", b"\t"]
+        )
+        an_empty_search_keeps_the_menu_open = b"no matches" in emptied
+        an_erase_recovers_the_list = b"<alpha-one>" in recovered
+
+        # Accepting a directory walks into it, so the second Tab answers the
         # menu the directory opened. A closed menu would submit deep-one/.
         _, _, descended = run_menu(
-            directory, "deep", deep_typed, [b"\n", b"\n"]
+            directory, "deep", deep_typed, [b"\t", b"\t"]
         )
         a_directory_opens_its_own_menu = (
             b"<deep-one/inner-alpha>" in descended
@@ -243,7 +254,7 @@ def main():
         # into a directory. A menu that cancelled in place would submit
         # deep-one/.
         _, _, aborted = run_menu(
-            directory, "deep", deep_typed, [b"\n", b"\x07"]
+            directory, "deep", deep_typed, [b"\t", b"\x07"]
         )
         control_g_restores_the_opening_line = b"<deep->" in aborted
 
@@ -276,7 +287,7 @@ def main():
             directory,
             "tall",
             tall_typed,
-            [b"\n"],
+            [b"\t"],
             rows=14,
             resized_rows=8,
             keys_before_resize=(b"\x1b[B",) * 7,
@@ -287,11 +298,12 @@ def main():
         )
         resized_selection_is_accepted = b"<menu-8>" in selected_tail
 
-        prompt_stays_usable = b"MARKER-END" in accepted
+        prompt_stays_usable = b"MARKER-END" in submitted
 
         results = {
             "MENU_LISTS_EVERY_CANDIDATE": menu_lists_every_candidate,
             "MENU_OPENS_WITH_FIRST_SELECTION": menu_opens_with_first_selection,
+            "HELP_ROW_NAMES_THE_SOURCE": help_row_names_the_source,
             "SELECTED_HIGHLIGHT_ENDS_AFTER_ENTRY": (
                 selected_highlight_ends_after_entry
             ),
@@ -300,9 +312,7 @@ def main():
             ),
             "PREVIEW_FOLLOWS_THE_HIGHLIGHT": preview_follows_the_highlight,
             "A_MOVEMENT_KEY_HIGHLIGHTS_A_ROW": a_movement_key_highlights_a_row,
-            "ENTER_ACCEPTS_THE_HIGHLIGHTED_ROW": (
-                enter_accepts_the_highlighted_row
-            ),
+            "ENTER_SUBMITS_THE_LINE": enter_submits_the_line,
             "TAB_ACCEPTS_CURRENT_SELECTION": tab_accepts_current_selection,
             "SHIFT_TAB_WRAPS_BACKWARD": shift_tab_wraps_backward,
             "ESCAPE_LEAVES_THE_LINE_ALONE": escape_leaves_the_line_alone,
@@ -311,6 +321,10 @@ def main():
             ),
             "TYPING_NARROWS_THE_LIST": typing_narrows_the_list,
             "BACKSPACE_WIDENS_THE_LIST": backspace_widens_the_list,
+            "AN_EMPTY_SEARCH_KEEPS_THE_MENU_OPEN": (
+                an_empty_search_keeps_the_menu_open
+            ),
+            "AN_ERASE_RECOVERS_THE_LIST": an_erase_recovers_the_list,
             "A_DIRECTORY_OPENS_ITS_OWN_MENU": a_directory_opens_its_own_menu,
             "ESCAPE_RESTORES_THE_OPENING_LINE": (
                 escape_restores_the_opening_line
