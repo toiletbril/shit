@@ -76,23 +76,35 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     for (usize i = path_index + 1; i < ec.args().count(); i++)
       params.push_managed(ec.args()[i]);
   }
-  let bash_argument_frame_context = EvalContext::BashArgumentFrameContext{};
-  cxt.enter_bash_source_argument_frame(bash_argument_frame_context,
-                                       has_extra_args ? &params : nullptr,
-                                       path.view());
   defer
   {
-    cxt.leave_bash_argument_frame(bash_argument_frame_context);
     if (has_extra_args) cxt.set_positional_params(steal(saved_params));
   };
-  if (has_extra_args) {
-    saved_params = cxt.take_positional_params();
-    cxt.set_positional_params(steal(params));
+
+  i32 status = 0;
+  {
+    let bash_argument_frame_context = EvalContext::BashArgumentFrameContext{};
+    cxt.enter_bash_source_argument_frame(bash_argument_frame_context,
+                                         has_extra_args ? &params : nullptr,
+                                         path.view());
+    defer { cxt.leave_bash_argument_frame(bash_argument_frame_context); };
+
+    if (has_extra_args) {
+      saved_params = cxt.take_positional_params();
+      cxt.set_positional_params(steal(params));
+    }
+
+    status = cxt.run_source(*contents, "the file '" + path + "'",
+                            return_handling::Consume,
+                            ec.arg_location_at(path_index), StringView{path});
   }
 
-  return cxt.run_source(*contents, "the file '" + path + "'",
-                        return_handling::Consume,
-                        ec.arg_location_at(path_index), StringView{path});
+  /* A sourced file runs in the current scope, and its finish fires the RETURN
+     trap with no functrace option. The source frame is already left here, and
+     the positional parameters are still the ones the file received. */
+  if (!cxt.is_posix_mode()) cxt.run_named_trap(StringView{"RETURN", 6});
+
+  return status;
 }
 
 } /* namespace koshka */
