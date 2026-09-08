@@ -240,6 +240,12 @@ def main():
         _, _, filtered = run_menu(directory, "tree", typed, [b"t", b"\t"])
         typing_narrows_the_list = b"<alpha-three>" in filtered
 
+        # The narrowing reaches a candidate the typed bytes neither open nor
+        # spell out. The bytes of alpha-hr appear in order inside alpha-three.
+        # A list narrowed by prefix alone would have emptied here.
+        _, _, fuzzy = run_menu(directory, "tree", typed, [b"h", b"r", b"\t"])
+        a_fuzzy_search_reaches_a_candidate = b"<alpha-three>" in fuzzy
+
         # Backspace widens the list back to every candidate. The first row is
         # alpha-one again. A closed menu would submit alpha- on its own.
         _, _, widened = run_menu(
@@ -380,6 +386,9 @@ def main():
                 an_ordinary_key_reaches_the_line
             ),
             "TYPING_NARROWS_THE_LIST": typing_narrows_the_list,
+            "A_FUZZY_SEARCH_REACHES_A_CANDIDATE": (
+                a_fuzzy_search_reaches_a_candidate
+            ),
             "BACKSPACE_WIDENS_THE_LIST": backspace_widens_the_list,
             "AN_EMPTY_SEARCH_KEEPS_THE_MENU_OPEN": (
                 an_empty_search_keeps_the_menu_open

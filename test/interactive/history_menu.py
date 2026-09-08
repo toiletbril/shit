@@ -147,6 +147,14 @@ def main():
         filtered, _ = run_history_menu(directory, "", [b"o", b"n", b"e", b"\n"])
         typing_narrows_the_list = b"<one>" in filtered
 
+        # The narrowing reaches an entry the typed bytes do not spell out. The
+        # bytes of fone appear in order inside the command that prints one, and
+        # no entry holds them side by side.
+        fuzzy, _ = run_history_menu(
+            directory, "", [b"f", b"o", b"n", b"e", b"\n"]
+        )
+        a_fuzzy_search_reaches_an_entry = b"<one>" in fuzzy
+
         # Backspace widens the list back to every entry. The newest command
         # heads it again.
         widened, _ = run_history_menu(
@@ -191,6 +199,9 @@ def main():
                 enter_runs_the_highlighted_entry
             ),
             "TYPING_NARROWS_THE_LIST": typing_narrows_the_list,
+            "A_FUZZY_SEARCH_REACHES_AN_ENTRY": (
+                a_fuzzy_search_reaches_an_entry
+            ),
             "BACKSPACE_WIDENS_THE_LIST": backspace_widens_the_list,
             "AN_EMPTY_SEARCH_KEEPS_THE_MENU_OPEN": (
                 an_empty_search_keeps_the_menu_open

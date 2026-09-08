@@ -1825,7 +1825,12 @@ for the history of the session. The terminal height bounds the number of rows,
 and a count row names the part that is drawn.
 .PP
 A printable key is inserted into the token, and the menu is drawn again from the
-candidates that still match. Backspace erases the last character of the token
+candidates that still match. A candidate matches when the token opens it, when
+the token appears inside it whole, or when the bytes of the token appear inside
+it in order. The three kinds are drawn in that order, and each kind keeps the
+order the candidates arrived in. Letters are compared without case. The
+narrowing reads the list the search last produced. A key costs no new search of
+the file system or the history. Backspace erases the last character of the token
 and widens the list again. A search that matches nothing keeps the menu open on a
 dimmed row reading
 .BR "no matches, erase to widen the search" ,
@@ -1851,7 +1856,8 @@ The plain selector prints the candidates below the prompt as a static column
 list. A terminal without decoration support always receives the plain listing.
 .PP
 Ctrl\-R reaches the history through the same selector. The line is the search
-query, and the entries that contain it are offered with the newest first. The
+query, and the entries it matches are offered by the same three kinds, with the
+newest first inside each kind. The
 interactive selector draws them in the menu. Typing narrows the list, and an
 accepted row replaces the whole line. The external selector receives the same
 entries and the line it prints replaces the whole line. The plain selector keeps
