@@ -1,0 +1,27 @@
+== a break on a word loop header ends the loop with its variable bound:
+v=1
+== a break on a body command runs that command and ends the loop:
+body-1
+tail
+== a continue on a body command skips the rest of that iteration:
+body-1
+body-2
+body-3
+tail
+== an inner header break leaves the outer loop running:
+outer-A
+after-inner
+outer-B
+after-inner
+tail
+== a break on a while condition ends the loop:
+w-0
+w-1
+w-2
+n=3
+== a break on an arithmetic init clause runs the clause and ends the loop:
+i=0
+== a break on a case header ends the loop before the case runs:
+tail
+== an exit in an action abandons the traced command:
+rc=7

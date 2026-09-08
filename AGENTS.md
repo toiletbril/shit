@@ -333,6 +333,8 @@ changes update this file.
   different values from a shared prefix.
 - Verify option defaults against the reference shell. Resolve compact option
   identifiers through the canonical packed table instead of declaration order.
+- Measure the reference shell on the exact construct before designing a
+  compatibility fix, and design from the measured output alone.
 - Keep borrowed views within owner lifetimes. Prove bounds, spans, offsets,
   lengths, optionals, and static evidence. Install restoration guards before
   mutation.

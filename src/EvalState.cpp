@@ -160,6 +160,15 @@ pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
   return m_control_flow.kind != control_flow::Kind::Normal;
 }
 
+/* A break or a continue stops every later command until a loop consumes it. A
+   return and an exit unwind through their own boundaries, and a trap action
+   runs under a pending one, so neither of them answers here. */
+pure fn EvalContext::has_pending_loop_jump() const wontthrow -> bool
+{
+  return m_control_flow.kind == control_flow::Kind::Break ||
+         m_control_flow.kind == control_flow::Kind::Continue;
+}
+
 fn EvalContext::pending_control_flow() wontthrow -> control_flow &
 {
   return m_control_flow;

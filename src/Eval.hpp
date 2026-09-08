@@ -944,6 +944,7 @@ public:
   fn request_return(i64 status, SourceLocation location) throws -> void;
   fn request_exit(i64 status, SourceLocation location) throws -> void;
   pure fn has_pending_control_flow() const wontthrow -> bool;
+  pure fn has_pending_loop_jump() const wontthrow -> bool;
   fn pending_control_flow() wontthrow -> control_flow &;
   pure fn pending_control_flow() const wontthrow -> const control_flow &;
   fn clear_control_flow() wontthrow -> void;

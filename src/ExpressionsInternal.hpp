@@ -360,8 +360,10 @@ fn append_redirections_text(EvalContext &cxt, String &out,
    command that triggered it. The text is heap owned, since the context holds it
    past the arena that carries the syntax node. A prepared pipeline stage takes
    the text and leaves the trap to the boundary its pipeline already ran. The
-   answer is false when the action leaves a pending exit, return, break, or
-   continue, since bash abandons the command the action traced. */
+   answer is false when the action leaves a pending exit or return, since bash
+   unwinds past the command the action traced. A break or a continue keeps the
+   answer true, because bash runs the traced command and hands the jump to the
+   enclosing loop afterwards. */
 template <typename CommandTextBuilder>
 fn publish_command_and_run_debug_trap(
     EvalContext &cxt, CommandTextBuilder do_build_command_text,
@@ -382,8 +384,11 @@ fn publish_command_and_run_debug_trap(
     cxt.run_named_trap(StringView{"DEBUG", 5});
 
     if (was_control_flow_pending) return true;
+    if (!cxt.has_pending_control_flow()) return true;
 
-    return !cxt.has_pending_control_flow();
+    let const &control = cxt.pending_control_flow();
+    return control.kind == control_flow::Kind::Break ||
+           control.kind == control_flow::Kind::Continue;
   }
 
   return true;

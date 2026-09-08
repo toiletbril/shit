@@ -115,6 +115,10 @@ hot fn CompoundList::evaluate_root_status_impl(
   for (usize index = 0; index < m_nodes.count(); index++) {
     if (cxt.no_exec()) break;
 
+    /* A break or a continue a trap action requested before this list was
+       entered runs nothing here and stays pending for the enclosing loop. */
+    if (cxt.has_pending_loop_jump()) break;
+
     const CompoundListCondition *n = m_nodes[index];
     ASSERT(n != nullptr);
 

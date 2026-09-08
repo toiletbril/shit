@@ -776,6 +776,11 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
         cxt, [&] { return arithmetic_clause_command_text(StringView{"1"}); });
   };
 
+  /* The loop is entered before the header is announced, so a break or a
+     continue a trap action requests on any clause names this loop. */
+  cxt.enter_loop();
+  defer { cxt.leave_loop(); };
+
   if (is_blank_clause(m_init)) {
     if (!do_publish_implied_clause()) return {cxt.last_exit_status()};
   } else {
@@ -787,9 +792,6 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
     cxt.evaluate_arithmetic_nonzero(m_init);
   }
-
-  cxt.enter_loop();
-  defer { cxt.leave_loop(); };
 
   let const is_condition_blank = is_blank_clause(m_condition);
   let const is_condition_folded =
