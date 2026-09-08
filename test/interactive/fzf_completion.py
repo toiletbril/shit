@@ -10,6 +10,7 @@ is the same subset contract fzf has.
 import fcntl
 import os
 import pty
+import re
 import select
 import signal
 import struct
@@ -21,6 +22,15 @@ import time
 # Each scenario runs from the candidate tree, so the binary is resolved before
 # any directory change.
 binary = os.path.abspath(sys.argv[1])
+
+# A diagnostic is colored on a terminal. A reset sequence sits between the
+# severity word and the colon that follows it.
+ANSI = re.compile(rb"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07")
+
+
+def without_ansi(data):
+    return ANSI.sub(b"", data)
+
 
 SELECTOR_SOURCE = """#!/usr/bin/env python3
 import os
@@ -326,6 +336,20 @@ def main():
         a_missing_command_skips_the_selector = missing_log == b""
         a_missing_command_prints_the_list = b"alpha-three" in missing
 
+        # The failure carries the severity of a real error and a note naming
+        # both variables with the values they hold.
+        missing_plain = without_ansi(missing)
+        a_missing_command_is_an_error = (
+            b"error: The tab selector" in missing_plain
+        )
+        a_missing_command_names_its_command_variable = (
+            b"note: KOSH_FZF_COMPLETION_COMMAND is "
+            b"'kosh_absent_selector_zzqq'" in missing_plain
+        )
+        a_missing_command_names_its_options_variable = (
+            b"KOSH_FZF_COMPLETION_OPTS is " in missing_plain
+        )
+
         failed, failed_log = run_scenario(
             directory, selector, {"STUB_FAIL": "3"}, typed, tab_count=2
         )
@@ -370,6 +394,13 @@ def main():
             ),
             "A_MISSING_COMMAND_PRINTS_THE_LIST": (
                 a_missing_command_prints_the_list
+            ),
+            "A_MISSING_COMMAND_IS_AN_ERROR": a_missing_command_is_an_error,
+            "A_MISSING_COMMAND_NAMES_ITS_COMMAND_VARIABLE": (
+                a_missing_command_names_its_command_variable
+            ),
+            "A_MISSING_COMMAND_NAMES_ITS_OPTIONS_VARIABLE": (
+                a_missing_command_names_its_options_variable
             ),
             "A_FAILING_SELECTOR_RAN": a_failing_selector_ran,
             "A_FAILING_SELECTOR_IS_REPORTED": a_failing_selector_is_reported,

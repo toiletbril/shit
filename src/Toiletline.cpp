@@ -184,6 +184,43 @@ fn resolve_selector_program(koshka::EvalContext &context) throws
   return koshka::Path{resolved[0].text()};
 }
 
+/* The variables the external selector reads, with the value each one holds
+   now. Every selector failure carries this as its note. */
+fn selector_variable_note(koshka::EvalContext &context) throws -> koshka::String
+{
+  let note = koshka::String{koshka::heap_allocator()};
+
+  let const do_append_variable =
+      [&note, &context](koshka::StringView name,
+                        koshka::StringView fallback) -> void {
+    note.append(name);
+    note.append(" is ");
+
+    let const value = context.get_variable_value(name);
+    if (!value.has_value()) {
+      note.append("unset and defaults to '");
+      note.append(fallback);
+      note.push('\'');
+      return;
+    }
+
+    note.push('\'');
+    note.append(value->view());
+    note.push('\'');
+  };
+
+  do_append_variable(SELECTOR_COMMAND_VARIABLE, DEFAULT_SELECTOR_COMMAND);
+  note.append(", and ");
+  do_append_variable(SELECTOR_OPTIONS_VARIABLE, DEFAULT_SELECTOR_OPTIONS);
+
+  note.append(". Set ");
+  note.append(SELECTOR_COMMAND_VARIABLE);
+  note.append(" to a program that filters the candidates, or choose another "
+              "presentation with `set --tab-selector`");
+
+  return note;
+}
+
 /* Records are NUL separated in both directions, so a candidate carrying a
    newline still travels as one field. A description rides after a tab, which
    makes it searchable while never reaching the line. */
@@ -272,7 +309,7 @@ enum class selector_outcome : u8
    message survives only after that. A failure that happens before the picker
    starts cycles the screen itself to reach the same place, which leaves the
    message above the repainted prompt. */
-fn report_selector_failure(koshka::StringView message,
+fn report_selector_failure(koshka::StringView message, koshka::StringView note,
                            bool should_hand_back_screen) throws -> void
 {
   if (should_hand_back_screen) {
@@ -281,7 +318,7 @@ fn report_selector_failure(koshka::StringView message,
     if (::tl_end_external_screen() != TL_SUCCESS) return;
   }
 
-  koshka::show_message(message);
+  koshka::show_message(koshka::ErrorWithDetails{message, note}.to_string());
 }
 
 fn run_completion_selector(koshka::EvalContext &context,
@@ -305,7 +342,8 @@ fn run_completion_selector(koshka::EvalContext &context,
 
   let const program = resolve_selector_program(context);
   if (program.is_error()) {
-    report_selector_failure(program.error().message(), true);
+    let const note = selector_variable_note(context);
+    report_selector_failure(program.error().message(), note.view(), true);
     return selector_outcome::NotRun;
   }
   let const &selector_program = program.value();
@@ -378,11 +416,12 @@ fn run_completion_selector(koshka::EvalContext &context,
   if (status != 0) {
     if (status == 1 || status == 130) return selector_outcome::Dismissed;
 
+    let const note = selector_variable_note(context);
     report_selector_failure(
         koshka::StringView{"The tab selector '"} +
             selector_program.text().view() + "' exited with status " +
             koshka::String::from(status, koshka::heap_allocator()),
-        false);
+        note.view(), false);
 
     return selector_outcome::NotRun;
   }
