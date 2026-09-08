@@ -47,6 +47,19 @@ echo subshell-installed
 ( trap 'echo D-$BASH_COMMAND' DEBUG; echo in-subshell )
 echo after-subshell-installed
 
+echo debug-lineno
+lineno_body_function() {
+  echo in-lineno-function
+}
+set -T
+trap 'echo "L-$LINENO-[$BASH_COMMAND]"' DEBUG
+echo first
+echo second
+lineno_body_function
+trap - DEBUG
+set +T
+echo debug-lineno-done
+
 echo function-installed
 installing_function() {
   trap 'echo D-$BASH_COMMAND' DEBUG

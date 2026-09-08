@@ -72,3 +72,19 @@ echo lineno-source
 . bash/goldens/err_trap_lineno_inner.bash
 trap - ERR
 echo lineno-done
+
+echo err-command-text
+trap 'echo "E-[$BASH_COMMAND]"' ERR
+false
+command_text_function() {
+  false
+}
+command_text_function
+! true
+[ 1 -eq 2 ]
+(( 0 ))
+[[ -n "" ]]
+false | true
+grep -q missing < /dev/null
+trap - ERR
+echo err-command-text-done

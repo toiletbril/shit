@@ -505,8 +505,12 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   cxt.set_current_location(source_location());
 
-  let const should_run_conditional = publish_command_and_run_debug_trap(
-      cxt, [&] { return conditional_command_text(m_elements); });
+  let const should_run_conditional =
+      publish_command_and_run_debug_trap(cxt, [&] {
+        return source_command_text(
+            cxt, source_location(), source_end_position(),
+            [&] { return conditional_command_text(m_elements); });
+      });
   if (!should_run_conditional) return cxt.last_exit_status();
 
   i64 status;

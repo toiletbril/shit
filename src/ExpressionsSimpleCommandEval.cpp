@@ -143,7 +143,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
 
   cxt.set_current_location(source_location());
 
-  publish_simple_command(cxt, *this, mode);
+  let const should_run_command = publish_simple_command(cxt, *this, mode);
+  if (!should_run_command) return cxt.last_exit_status();
 
   /* The check reads the typed command word before its expansion, so a pattern
      that happens to match a single file is still caught. */
@@ -828,8 +829,12 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     defer { FUNCTION_ARENA = previous_function_arena; };
 
     /* Bash traces the entry into the frame as a second DEBUG fire, which the
-       depth gate reaches only while functrace is on. */
-    if (cxt.should_run_debug_trap()) cxt.run_named_trap(StringView{"DEBUG", 5});
+       depth gate reaches only while functrace is on. LINENO names the line the
+       body opens on, and the call site is already behind the frame. */
+    if (cxt.should_run_debug_trap()) {
+      cxt.set_current_location(function_body->source_location());
+      cxt.run_named_trap(StringView{"DEBUG", 5});
+    }
 
     i64 function_ret = 0;
     try {
