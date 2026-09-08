@@ -10,6 +10,20 @@ rc=0
 src-rc=3
 tail
 rc=0
+== a return in an action leaves the function a sourced file defined:
+after-call
+src-rc=0
+tail
+rc=0
+== a return in a RETURN action fires the trap once for each frame:
+inner
+fire-1-f
+after-f
+fire-2-h
+h-rc=0
+n=2
+tail
+rc=0
 == a return with no function and no sourced file runs the traced command:
 1:37: error: Builtin `return`: can only `return' from a function or sourced script.
      1 |  case "$BASH_COMMAND" in echo\ top*) return 5;; esac

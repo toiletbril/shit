@@ -34,6 +34,25 @@ trap '"'"'case "$BASH_COMMAND" in echo\ sourced*) return 3;; esac'"'"' DEBUG
 echo src-rc=$?
 trap - DEBUG
 echo tail' 2>&1 | sed "s|$d|DIR|g" | ./normalize-trace.sh "$BIN"; echo "rc=${PIPESTATUS[0]}"
+echo "== a return in an action leaves the function a sourced file defined:"
+printf 'g() {\n  echo g-1\n  echo g-2\n}\ng\necho after-call\n' > "$d/frame.sh"
+"$BIN" --mood bash -c 'set -T
+trap '"'"'case "$BASH_COMMAND" in echo\ g-1*) return 4;; esac'"'"' DEBUG
+. '"$d"'/frame.sh
+echo src-rc=$?
+trap - DEBUG
+echo tail' 2>&1 | sed "s|$d|DIR|g" | ./normalize-trace.sh "$BIN"; echo "rc=${PIPESTATUS[0]}"
+echo "== a return in a RETURN action fires the trap once for each frame:"
+"$BIN" --mood bash -c 'set -T
+f() { echo inner; }
+h() { f; echo after-f; }
+n=0
+trap '"'"'n=$((n + 1)); echo fire-$n-${FUNCNAME-none}; [ "$n" = 1 ] && return 6'"'"' RETURN
+h
+echo h-rc=$?
+trap - RETURN
+echo n=$n
+echo tail'; echo "rc=$?"
 echo "== a return with no function and no sourced file runs the traced command:"
 "$BIN" --mood bash -c 'set -T
 trap '"'"'case "$BASH_COMMAND" in echo\ top*) return 5;; esac'"'"' DEBUG
