@@ -132,6 +132,16 @@ def main():
         for index in range(1, 9):
             open(os.path.join(tall, "menu-%d" % index), "w").close()
 
+        deep = os.path.join(directory, "deep")
+        os.mkdir(deep)
+        for name, entries in (
+            ("deep-one", ("inner-alpha", "inner-beta")),
+            ("deep-two", ("inner-gamma",)),
+        ):
+            os.mkdir(os.path.join(deep, name))
+            for entry in entries:
+                open(os.path.join(deep, name, entry), "w").close()
+
         wide = os.path.join(directory, "wide")
         os.mkdir(wide)
         long_candidate_prefix = "Blackmagic Design-DaVinci Resolve-"
@@ -140,6 +150,7 @@ def main():
 
         typed = "printf '<%s>\\n' alpha"
         tall_typed = "printf '<%s>\\n' menu"
+        deep_typed = "printf '<%s>\\n' deep"
         wide_typed = "printf '<%s>\\n' Blackmagic"
 
         opened, _, _ = run_menu(directory, "tree", typed, [])
@@ -189,6 +200,27 @@ def main():
 
         _, _, typed_through = run_menu(directory, "tree", typed, [b"x"])
         an_ordinary_key_reaches_the_line = b"<alpha-x>" in typed_through
+
+        # Typing narrows the list, so the Enter that follows is answered by the
+        # menu and not by the prompt. A closed menu would submit alpha-t.
+        _, _, filtered = run_menu(directory, "tree", typed, [b"t", b"\n"])
+        typing_narrows_the_list = b"<alpha-three>" in filtered
+
+        # Backspace widens the list back to every candidate, so the first row is
+        # alpha-one again. A closed menu would submit alpha- on its own.
+        _, _, widened = run_menu(
+            directory, "tree", typed, [b"t", b"\x7f", b"\n"]
+        )
+        backspace_widens_the_list = b"<alpha-one>" in widened
+
+        # Accepting a directory walks into it, so the second Enter answers the
+        # menu the directory opened. A closed menu would submit deep-one/.
+        _, _, descended = run_menu(
+            directory, "deep", deep_typed, [b"\n", b"\n"]
+        )
+        a_directory_opens_its_own_menu = (
+            b"<deep-one/inner-alpha>" in descended
+        )
 
         # Eight candidates in an eight row terminal cannot all be shown, so the
         # menu bounds its rows and names the part it drew.
@@ -248,6 +280,9 @@ def main():
             "AN_ORDINARY_KEY_REACHES_THE_LINE": (
                 an_ordinary_key_reaches_the_line
             ),
+            "TYPING_NARROWS_THE_LIST": typing_narrows_the_list,
+            "BACKSPACE_WIDENS_THE_LIST": backspace_widens_the_list,
+            "A_DIRECTORY_OPENS_ITS_OWN_MENU": a_directory_opens_its_own_menu,
             "A_LONG_LIST_IS_BOUNDED": a_long_list_is_bounded,
             "THE_FIRST_CANDIDATE_IS_VISIBLE": the_first_candidate_is_visible,
             "LONG_CANDIDATE_USES_AVAILABLE_WIDTH": (

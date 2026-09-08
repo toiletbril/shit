@@ -1760,9 +1760,16 @@ selects.
 .PP
 The interactive selector draws a menu of the candidates below the prompt. Tab
 and the down arrow move to the next row, the up arrow moves back, Enter accepts
-the highlighted row, and Escape closes the menu and leaves the line alone. Any
-other key closes the menu and then does its own work on the line. The rows are
-bounded by the terminal height, and a count row names the part that is drawn.
+the highlighted row, and Escape closes the menu and leaves the line alone. The
+rows are bounded by the terminal height, and a count row names the part that is
+drawn.
+.PP
+A printable key is inserted into the token and the menu is drawn again from the
+candidates that are left, which narrows the list. Backspace erases the last
+character of the token and widens the list again. Accepting a candidate that
+names a directory opens a menu on what the directory holds. The menu closes
+when no candidate is left and when any other key is pressed, and that key then
+does its own work on the line.
 .PP
 The external selector hands the candidates to the program named by
 .B KOSH_FZF_COMPLETION_COMMAND
