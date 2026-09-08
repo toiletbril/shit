@@ -212,6 +212,62 @@ trap 'echo "D-$BASH_COMMAND"; echo "still-$BASH_COMMAND"' DEBUG
 echo target
 trap - DEBUG
 
+echo action-no-reentry
+( trap 'echo action-once' DEBUG
+  echo target-command
+  trap - DEBUG )
+echo after-action-no-reentry=$?
+
+echo action-nested-commands
+( trap 'echo one; echo two; echo three' DEBUG
+  echo single-target
+  trap - DEBUG )
+echo after-action-nested-commands=$?
+
+echo action-calls-function
+( reentry_function() { echo in-reentry-function; echo second-in-function; }
+  trap 'reentry_function' DEBUG
+  echo target-of-function-action
+  trap - DEBUG )
+echo after-action-calls-function=$?
+
+echo depth-gate-function
+( installer_function() {
+    trap 'echo "D-$BASH_COMMAND"' DEBUG
+    echo at-install-depth
+    deeper_function
+  }
+  deeper_function() { echo in-deeper; }
+  installer_function
+  echo after-installer )
+echo after-depth-gate-function=$?
+
+echo depth-gate-subshell
+( trap 'echo "D-$BASH_COMMAND"' DEBUG
+  echo at-subshell-depth
+  ( echo in-nested-subshell ) )
+echo after-depth-gate-subshell=$?
+
+echo depth-gate-substitution
+# shellcheck disable=SC2046
+( echo captured $(trap 'echo "D-$BASH_COMMAND"' DEBUG
+                  echo at-substitution-depth
+                  echo nested $(echo in-nested-substitution)) )
+echo after-depth-gate-substitution=$?
+
+echo lineno-action-function
+( action_reporter() { echo action-function-lineno=$LINENO; }
+  trap 'action_reporter' DEBUG
+  echo triggering-function
+  trap - DEBUG )
+echo after-lineno-action-function=$?
+
+echo lineno-action-source
+( trap '. bash/goldens/debug_trap_action_source.bash' DEBUG
+  echo triggering-source
+  trap - DEBUG )
+echo after-lineno-action-source=$?
+
 echo exit-command
 trap 'echo E-$BASH_COMMAND' EXIT
 echo last-command

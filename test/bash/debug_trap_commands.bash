@@ -186,6 +186,29 @@ trap - DEBUG
 false | true
 echo pipestatus-untrapped=${PIPESTATUS[*]}
 
+echo failing-action-status
+( trap 'false' DEBUG
+  true
+  echo after-true=$?
+  ( exit 3 )
+  echo after-subshell=$?
+  trap - DEBUG )
+echo after-failing-action-status=$?
+
+echo failing-action-pipestatus
+( trap 'false' DEBUG
+  true | false | true
+  echo "after-pipeline=$? pipestatus=${PIPESTATUS[*]}"
+  trap - DEBUG )
+echo after-failing-action-pipestatus=$?
+
+echo action-pipeline-pipestatus
+( trap 'echo A | grep -q B' DEBUG
+  false | true | false
+  echo "after-pipeline=$? pipestatus=${PIPESTATUS[*]}"
+  trap - DEBUG )
+echo after-action-pipeline-pipestatus=$?
+
 echo pipeline-mutation
 pipeline_value=before
 pipeline_debug_count=0
