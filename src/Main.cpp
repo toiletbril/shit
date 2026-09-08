@@ -1198,6 +1198,9 @@ fn kosh_main(int argc, char **argv) -> int
               !FLAG_NO_SYNTAX_HIGHLIGHTING.is_enabled();
           toiletline::set_highlight_enabled(should_highlight);
           toiletline::set_ghost_enabled(should_highlight);
+          /* The editor reads no environment of its own. NO_COLOR and a dumb
+             terminal reach it through this switch. */
+          toiletline::set_colors_enabled(koshka::colors::stdout_wants_color());
           if (let const welcome = context.get_variable_value("KOSH_WELCOME");
               welcome.has_value())
           {

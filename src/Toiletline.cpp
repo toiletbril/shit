@@ -1464,6 +1464,11 @@ fn set_highlight_enabled(bool enabled) -> void
   ::tl_set_highlight_callback(enabled ? kosh_highlight_callback : nullptr);
 }
 
+fn set_colors_enabled(bool enabled) -> void
+{
+  ::tl_set_colors_enabled(enabled ? 1 : 0);
+}
+
 fn set_edit_mode(edit_mode mode) -> void
 {
   ::tl_set_edit_mode(mode == edit_mode::Vi ? TL_EDIT_MODE_VI_INSERT

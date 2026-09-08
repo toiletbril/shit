@@ -24,6 +24,7 @@ binary = os.path.abspath(sys.argv[1])
 
 SELECTED_SGR = b"\x1b[7m"
 GHOST_SGR = b"\x1b[90m"
+TITLE_SGR = b"\x1b[33m"
 HIGHLIGHT_RESET = b"\x1b[0m"
 
 
@@ -56,11 +57,13 @@ def run_menu(
     resized_rows=None,
     resized_cols=None,
     keys_before_resize=(),
+    environment=None,
+    open_key=b"\t",
 ):
-    """Type the words, press tab twice, send the keys, and submit the line.
+    """Type the words, press the opening key twice, send the keys, and submit.
 
-    The transcript is split at the second tab. A check can tell what the menu
-    drew from what the accepted line printed.
+    The transcript is split at the second opening key. A check can tell what the
+    menu drew from what the accepted line printed.
     """
     pid, master = pty.fork()
     if pid == 0:
@@ -70,6 +73,8 @@ def run_menu(
         os.environ["TERM"] = "xterm-256color"
         os.environ["HOME"] = directory
         os.environ["KOSH_HISTORY_FILE"] = os.path.join(directory, "history")
+        for name, value in (environment or {}).items():
+            os.environ[name] = value
         os.chdir(os.path.join(directory, tree))
         os.execv(
             binary,
@@ -81,12 +86,12 @@ def run_menu(
     os.write(master, typed.encode())
     read_until_idle(master, 1)
 
-    # The first tab only inserts the common prefix. The menu belongs to the
+    # The first press only inserts the common prefix. The menu belongs to the
     # second one.
-    os.write(master, b"\t")
+    os.write(master, open_key)
     read_until_idle(master, 2)
 
-    os.write(master, b"\t")
+    os.write(master, open_key)
     menu = read_until_idle(master, 2)
     resized_menu = b""
 
@@ -167,9 +172,16 @@ def main():
             and b"alpha-three" in opened
         )
         menu_opens_with_first_selection = SELECTED_SGR in opened
-        # The dimmed first row names the source and the keys it answers.
+        # The first row names the source in yellow and lists the keys it
+        # answers in the dim of every other secondary text.
         help_row_names_the_source = (
-            b"  " + GHOST_SGR + b"selecting completions. enter to run" in opened
+            b"  "
+            + TITLE_SGR
+            + b"selecting completions"
+            + HIGHLIGHT_RESET
+            + GHOST_SGR
+            + b", enter to run"
+            in opened
         )
         selected_start = opened.find(SELECTED_SGR)
         selected_end = opened.find(HIGHLIGHT_RESET, selected_start)
@@ -319,6 +331,33 @@ def main():
         )
         a_rewrap_keeps_the_prompt_usable = b"MARKER-END" in rewrapped_tail
 
+        # A refused color leaves the editor drawing plain text. The reversed
+        # band of the selected row survives, since reverse video carries no
+        # color of its own.
+        plain, _, plain_accepted = run_menu(
+            directory,
+            "tree",
+            typed,
+            [b"\t"],
+            environment={"NO_COLOR": "1"},
+        )
+        no_color_drops_the_help_title_color = (
+            b"  selecting completions, enter to run" in plain
+            and TITLE_SGR not in plain
+        )
+        no_color_keeps_the_selection_band = SELECTED_SGR in plain
+        no_color_keeps_the_menu_usable = b"<alpha-one>" in plain_accepted
+
+        # Control space carries the null byte a terminal sends, and the editor
+        # answers it the way it answers Tab.
+        by_control_space, _, control_space_accepted = run_menu(
+            directory, "tree", typed, [b"\t"], open_key=b"\x00"
+        )
+        control_space_opens_the_menu = SELECTED_SGR in by_control_space
+        control_space_accepts_a_candidate = (
+            b"<alpha-one>" in control_space_accepted
+        )
+
         prompt_stays_usable = b"MARKER-END" in submitted
 
         results = {
@@ -373,6 +412,17 @@ def main():
             ),
             "A_REWRAP_KEEPS_THE_PROMPT_USABLE": (
                 a_rewrap_keeps_the_prompt_usable
+            ),
+            "NO_COLOR_DROPS_THE_HELP_TITLE_COLOR": (
+                no_color_drops_the_help_title_color
+            ),
+            "NO_COLOR_KEEPS_THE_SELECTION_BAND": (
+                no_color_keeps_the_selection_band
+            ),
+            "NO_COLOR_KEEPS_THE_MENU_USABLE": no_color_keeps_the_menu_usable,
+            "CONTROL_SPACE_OPENS_THE_MENU": control_space_opens_the_menu,
+            "CONTROL_SPACE_ACCEPTS_A_CANDIDATE": (
+                control_space_accepts_a_candidate
             ),
             "PROMPT_STAYS_USABLE": prompt_stays_usable,
         }

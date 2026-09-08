@@ -92,6 +92,8 @@ void set_ghost_enabled(bool enabled);
 
 void set_highlight_enabled(bool enabled);
 
+void set_colors_enabled(bool enabled);
+
 enum class edit_mode : u8
 {
   Emacs,

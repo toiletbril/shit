@@ -858,6 +858,8 @@ fn set_ghost_enabled(bool enabled) -> void { unused(enabled); }
 
 fn set_highlight_enabled(bool enabled) -> void { unused(enabled); }
 
+fn set_colors_enabled(bool enabled) -> void { unused(enabled); }
+
 fn set_edit_mode(edit_mode mode) -> void { unused(mode); }
 
 fn set_tab_selector(koshka::tab_selector_mode selector) -> void

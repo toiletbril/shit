@@ -22,6 +22,7 @@ binary = os.path.abspath(sys.argv[1])
 
 SELECTED_SGR = b"\x1b[7m"
 DIMMED_SGR = b"\x1b[90m"
+TITLE_SGR = b"\x1b[33m"
 HIGHLIGHT_RESET = b"\x1b[0m"
 
 # The word each command prints is an operand. A menu row never carries the
@@ -115,9 +116,15 @@ def main():
             b"' one" in opened and b"' two" in opened and b"' three" in opened
         )
         menu_opens_with_first_selection = SELECTED_SGR in opened
-        # The dimmed first row names the source and the keys it answers.
+        # The first row names the source in yellow and lists the keys it
+        # answers in the dim of every other secondary text.
         help_row_names_the_source = (
-            b"  " + DIMMED_SGR + b"incremental history search. enter to accept"
+            b"  "
+            + TITLE_SGR
+            + b"incremental history search"
+            + HIGHLIGHT_RESET
+            + DIMMED_SGR
+            + b", enter to accept"
             in opened
         )
 
