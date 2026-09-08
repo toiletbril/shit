@@ -60,3 +60,14 @@ rc=0
 == -V applies to every -a resolution:
 tsort is a shell builtin
 The tsort utility is bundled with the shell.
+== the bash mood names a function and prints its body:
+f is a function
+f () 
+{ echo hi; }
+== the bash mood keeps the body under -a:
+f is a function
+f () 
+{ echo hi; }
+== the bash mood leaves the terse forms alone:
+function
+rc=0

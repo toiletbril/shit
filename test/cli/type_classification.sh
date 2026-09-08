@@ -75,3 +75,12 @@ echo "== a terse flag ignores -V:"
 "$BIN" -c 'f(){ :; }; type -V -t f'
 "$BIN" -c 'type -V -p echo'; echo "rc=$?"
 echo "== -V applies to every -a resolution:"; PATH= "$BIN" -c 'type -V -a tsort'
+# Bash names a function without the shell word and prints its body from the
+# plain form. The terse flags keep the shape they have in every other mood.
+echo "== the bash mood names a function and prints its body:"
+"$BIN" --mood bash -c 'f(){ echo hi; }; type f'
+echo "== the bash mood keeps the body under -a:"
+"$BIN" --mood bash -c 'f(){ echo hi; }; type -a f'
+echo "== the bash mood leaves the terse forms alone:"
+"$BIN" --mood bash -c 'f(){ echo hi; }; type -t f'
+"$BIN" --mood bash -c 'f(){ echo hi; }; type -p f'; echo "rc=$?"

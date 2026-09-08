@@ -63,6 +63,11 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                    !should_print_word && !should_print_path &&
                                    !should_force_path;
 
+  /* Bash names a function without the shell word and prints its body from the
+     plain form. Dash names a shell function and prints nothing after it, and
+     the default mood follows dash. */
+  let const is_bash_function_report = cxt.is_bash_compatible();
+
   let out = String{cxt.scratch_allocator()};
   let missing_names = ArrayList<String>{cxt.scratch_allocator()};
   bool did_find_all = true;
@@ -131,7 +136,8 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       } else if (type_word == "keyword") {
         out += " is a shell keyword";
       } else if (type_word == "function") {
-        out += " is a shell function";
+        out +=
+            is_bash_function_report ? " is a function" : " is a shell function";
 
         if (should_print_verbose) {
           if (let const *info = cxt.function_definition_info_of(name.view());
@@ -155,16 +161,22 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       out += "\n";
 
-      if (!should_print_verbose) return;
-
       if (type_word == "function") {
+        if (!should_print_verbose && !is_bash_function_report) return;
+
         if (let const *source = cxt.find_function_source(name.view());
             source != nullptr && !source->is_empty())
         {
           out += *source;
           out += "\n";
         }
-      } else if (builtin_kind.has_value()) {
+
+        return;
+      }
+
+      if (!should_print_verbose) return;
+
+      if (builtin_kind.has_value()) {
         if (let const description = builtin_help_description(*builtin_kind);
             !description.is_empty())
         {
