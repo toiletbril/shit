@@ -8,6 +8,14 @@ body-1
 body-2
 body-3
 tail
+== a continue on a word loop header skips every body:
+v=3
+== an inner header continue leaves the outer body running:
+outer-A
+after-inner
+outer-B
+after-inner
+tail
 == an inner header break leaves the outer loop running:
 outer-A
 after-inner

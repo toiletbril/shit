@@ -1,12 +1,15 @@
 == a return in an action leaves the function with its status:
 f-rc=7
 tail
+rc=0
 == a return in an action abandons the loop around the traced command:
 f-rc=9
 tail
+rc=0
 == a return in an action leaves the sourced file with its status:
 src-rc=3
 tail
+rc=0
 == a return with no function and no sourced file runs the traced command:
 1:37: error: Builtin `return`: can only `return' from a function or sourced script.
      1 |  case "$BASH_COMMAND" in echo\ top*) return 5;; esac
@@ -25,3 +28,4 @@ top-1
        |  ^~~~
 top-2
 tail
+rc=0

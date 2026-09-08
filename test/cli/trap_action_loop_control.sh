@@ -20,6 +20,18 @@ trap '"'"'case "$BASH_COMMAND" in echo\ body*) continue;; esac'"'"' DEBUG
 for v in 1 2 3; do echo body-$v; echo after-$v; done
 trap - DEBUG
 echo tail'
+echo "== a continue on a word loop header skips every body:"
+"$BIN" --mood bash -c 'set -T
+trap '"'"'case "$BASH_COMMAND" in for\ v*) continue;; esac'"'"' DEBUG
+for v in 1 2 3; do echo body-$v; done
+trap - DEBUG
+echo v=${v-unset}'
+echo "== an inner header continue leaves the outer body running:"
+"$BIN" --mood bash -c 'set -T
+trap '"'"'case "$BASH_COMMAND" in for\ v*) continue;; esac'"'"' DEBUG
+for o in A B; do echo outer-$o; for v in 1 2; do echo body-$v; done; echo after-inner; done
+trap - DEBUG
+echo tail'
 echo "== an inner header break leaves the outer loop running:"
 "$BIN" --mood bash -c 'set -T
 trap '"'"'case "$BASH_COMMAND" in for\ v*) break;; esac'"'"' DEBUG
