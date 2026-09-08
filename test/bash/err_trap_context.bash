@@ -162,3 +162,19 @@ true |
 trap - ERR
 set -E
 echo err-pipeline-site-done
+
+# Bash runs a subshell whose body is one subshell in the process it already
+# forked, so the inner parentheses raise no fire. A body that holds another
+# command beside the parentheses, or wraps them in a brace group, keeps its own
+# fire.
+echo err-nested-subshell-fire
+trap 'echo "E-$LINENO-[$BASH_COMMAND]"' ERR
+( ( false ) )
+( ( ( false ) ) )
+( false )
+( echo nested-body; ( false ) )
+( true && ( false ) )
+( { ( false ); } )
+( ( true ) )
+trap - ERR
+echo err-nested-subshell-fire-done

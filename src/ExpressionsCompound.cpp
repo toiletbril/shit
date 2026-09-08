@@ -60,6 +60,26 @@ fn CompoundList::append_node(const CompoundListCondition *node) throws -> void
   m_nodes.push(node);
 }
 
+fn CompoundList::single_unconditional_subshell() const wontthrow
+    -> const Subshell *
+{
+  if (m_nodes.count() != 1) return nullptr;
+
+  let const *node = m_nodes[0];
+  if (node == nullptr) return nullptr;
+
+  if (node->kind() != CompoundListCondition::Kind::None || node->is_negated()) {
+    return nullptr;
+  }
+
+  let const *command = node->command();
+  if (command == nullptr) return nullptr;
+
+  if (command->is_async() || command->is_timed()) return nullptr;
+
+  return command->as_subshell();
+}
+
 cold fn CompoundList::to_string() const throws -> String
 {
   return "CompoundList";

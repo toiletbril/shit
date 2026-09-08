@@ -1134,6 +1134,10 @@ public:
   fn has_single_test_command() const throws -> bool;
   fn append_node(const CompoundListCondition *node) throws -> void;
 
+  /* The subshell this list holds when it holds nothing else, and no connector,
+     negation, background operator, or timing prefix stands beside it. */
+  fn single_unconditional_subshell() const wontthrow -> const Subshell *;
+
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
@@ -1402,6 +1406,11 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+
+  /* The body bash runs in the process it already forked. A chain of bare
+     parentheses collapses to the innermost body, which raises no fire and
+     costs no fork of its own. */
+  fn collapsed_body() const wontthrow -> const Expression *;
 
   const Expression *m_body;
   SparseList<analysis_scope_definition> m_analysis_scope_definitions{};

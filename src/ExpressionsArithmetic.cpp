@@ -964,6 +964,23 @@ fn Subshell::error_report_location() const wontthrow -> SourceLocation
                         location.source_name_index};
 }
 
+fn Subshell::collapsed_body() const wontthrow -> const Expression *
+{
+  const Expression *current = m_body;
+
+  while (current != nullptr) {
+    let const *list = current->as_compound_list();
+    if (list == nullptr) break;
+
+    let const *inner = list->single_unconditional_subshell();
+    if (inner == nullptr) break;
+
+    current = inner->m_body;
+  }
+
+  return current;
+}
+
 cold fn Subshell::to_string() const throws -> String
 {
   let result = String{"Subshell"};
@@ -1064,6 +1081,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
                                : source_end_position();
 
   let const closing_location = error_report_location();
+  let const *body = collapsed_body();
 
   /* Bash traces the commands inside a subshell and fires nothing for the
      subshell itself, so the text is published with no DEBUG fire. The parent
@@ -1084,7 +1102,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (!forked_child.has_value()) {
     i32 status = 1;
     try {
-      status = static_cast<i32>(evaluate_subshell_in_process(m_body, cxt));
+      status = static_cast<i32>(evaluate_subshell_in_process(body, cxt));
     } catch (const ErrorBase &error) {
       let const source = cxt.current_source();
       show_message(error.to_string(
@@ -1102,7 +1120,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (os::process_id_of(child) == 0) {
     i32 status = 1;
     try {
-      status = static_cast<i32>(evaluate_subshell_in_process(m_body, cxt));
+      status = static_cast<i32>(evaluate_subshell_in_process(body, cxt));
     } catch (const ErrorBase &error) {
       let const source = cxt.current_source();
       show_message(error.to_string(
