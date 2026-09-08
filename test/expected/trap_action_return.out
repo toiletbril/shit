@@ -1,0 +1,13 @@
+== a return in an action leaves the function with its status:
+f-rc=7
+tail
+== a return in an action abandons the loop around the traced command:
+f-rc=9
+tail
+== a return in an action leaves the sourced file with its status:
+src-rc=3
+tail
+== a return with no function and no sourced file runs the traced command:
+top-1
+top-2
+tail

@@ -253,8 +253,11 @@ fn EvalContext::run_named_trap(StringView condition,
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
 
+  /* A return in an action belongs to the enclosing function or sourced file.
+     The action's own frame neither consumes it nor counts as a return scope. */
   run_source(action->view(),
-             "the " + String{heap_allocator(), condition} + " trap");
+             "the " + String{heap_allocator(), condition} + " trap",
+             return_handling::Reject);
   m_last_exit_status = saved_exit_status;
   if (has_saved_pipe_statuses)
     set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
