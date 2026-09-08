@@ -10,32 +10,32 @@ nested_function() {
 }
 
 echo untraced-function
-trap 'echo D-$BASH_COMMAND' DEBUG
+trap 'echo "D-$BASH_COMMAND"' DEBUG
 body_function
 echo after-call
 trap - DEBUG
 
 echo nested-function
-trap 'echo D-$BASH_COMMAND' DEBUG
+trap 'echo "D-$BASH_COMMAND"' DEBUG
 nested_function
 trap - DEBUG
 
 echo traced-function
 set -T
-trap 'echo D-$BASH_COMMAND' DEBUG
+trap 'echo "D-$BASH_COMMAND"' DEBUG
 body_function
 trap - DEBUG
 set +T
 echo after-traced
 
 echo subshell
-trap 'echo D-$BASH_COMMAND' DEBUG
+trap 'echo "D-$BASH_COMMAND"' DEBUG
 ( echo in-subshell )
 echo after-subshell
 trap - DEBUG
 
 echo substitution
-trap 'echo D-$BASH_COMMAND' DEBUG
+trap 'echo "D-$BASH_COMMAND"' DEBUG
 capture_function() {
   echo in-substitution
 }
@@ -44,7 +44,7 @@ echo captured $(capture_function)
 trap - DEBUG
 
 echo subshell-installed
-( trap 'echo D-$BASH_COMMAND' DEBUG; echo in-subshell )
+( trap 'echo "D-$BASH_COMMAND"' DEBUG; echo in-subshell )
 echo after-subshell-installed
 
 echo debug-lineno
@@ -62,7 +62,7 @@ echo debug-lineno-done
 
 echo function-installed
 installing_function() {
-  trap 'echo D-$BASH_COMMAND' DEBUG
+  trap 'echo "D-$BASH_COMMAND"' DEBUG
   echo in-installing-function
 }
 untraced_function() {
@@ -80,7 +80,7 @@ set +T
 
 echo substitution-installed
 # shellcheck disable=SC2046
-echo captured $(trap 'echo D-$BASH_COMMAND' DEBUG; echo in-substitution)
+echo captured $(trap 'echo "D-$BASH_COMMAND"' DEBUG; echo in-substitution)
 trap - DEBUG
 
 echo exit-in-action-simple
@@ -142,7 +142,7 @@ echo exit-in-action-pipeline-async
 echo after-exit-in-action-pipeline-async=$?
 
 echo pinned-command
-trap 'echo D-$BASH_COMMAND; echo still-$BASH_COMMAND' DEBUG
+trap 'echo "D-$BASH_COMMAND"; echo "still-$BASH_COMMAND"' DEBUG
 echo target
 trap - DEBUG
 
