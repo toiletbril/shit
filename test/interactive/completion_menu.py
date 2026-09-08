@@ -23,6 +23,7 @@ import time
 binary = os.path.abspath(sys.argv[1])
 
 SELECTED_SGR = b"\x1b[7m"
+GHOST_SGR = b"\x1b[90m"
 HIGHLIGHT_RESET = b"\x1b[0m"
 
 
@@ -174,10 +175,22 @@ def main():
             and selected_text == expected_selected_text
         )
 
+        # The first tab already inserted the common prefix alpha-, so the
+        # preview of the first row is the rest of alpha-one, drawn dimmed on
+        # the line the menu opened on.
+        preview_shows_the_selected_candidate = (
+            GHOST_SGR + b"one" + HIGHLIGHT_RESET in opened
+        )
+
         moved, _, accepted = run_menu(
             directory, "tree", typed, [b"\x1b[B", b"\n"]
         )
         a_movement_key_highlights_a_row = SELECTED_SGR in moved
+        # The down arrow moves to alpha-three, since shift tab reaches
+        # alpha-two as the last row, and the preview follows the highlight.
+        preview_follows_the_highlight = (
+            GHOST_SGR + b"three" + HIGHLIGHT_RESET in moved
+        )
         enter_accepts_the_highlighted_row = (
             b"<alpha-one>" in accepted
             or b"<alpha-two>" in accepted
@@ -282,6 +295,10 @@ def main():
             "SELECTED_HIGHLIGHT_ENDS_AFTER_ENTRY": (
                 selected_highlight_ends_after_entry
             ),
+            "PREVIEW_SHOWS_THE_SELECTED_CANDIDATE": (
+                preview_shows_the_selected_candidate
+            ),
+            "PREVIEW_FOLLOWS_THE_HIGHLIGHT": preview_follows_the_highlight,
             "A_MOVEMENT_KEY_HIGHLIGHTS_A_ROW": a_movement_key_highlights_a_row,
             "ENTER_ACCEPTS_THE_HIGHLIGHTED_ROW": (
                 enter_accepts_the_highlighted_row
