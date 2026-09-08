@@ -270,3 +270,16 @@ case $((sum)) in
 60) echo "sum is sixty" ;;
 *) echo "sum is $sum" ;;
 esac
+
+# The parenthesis that closes a case pattern must not end the substitution that
+# holds the case. An esac in pattern position ends the case at once, and the
+# parenthesis after it does close the substitution.
+echo "sub=$(case x in x) echo unparenthesized ;; esac)"
+echo "sub=$(case x in (x) echo parenthesized ;; esac)"
+echo "sub=`case x in x) echo backtick ;; esac`"
+echo "sub=$(case b in a|b) echo alternation ;; esac)"
+echo "sub=$( (case x in x) echo subshell ;; esac) )"
+echo "sub=$(case x in x) case y in y) echo nested ;; esac ;; esac)"
+echo "sub=$(for item in one; do case $item in one) echo loop-$item ;; esac; done)"
+echo "sub=$(case esac in esac) echo word-esac ;; esac)"
+echo "sub=$(case x in x) echo body-$( echo inner ) ;; esac)"

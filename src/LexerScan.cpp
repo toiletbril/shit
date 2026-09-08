@@ -27,6 +27,33 @@ struct balanced_scan_heredoc
   bool should_strip_tabs;
 };
 
+enum struct balanced_scan_keyword : u8
+{
+  case_word,
+  in_word,
+  esac_word,
+  command_word,
+};
+
+/* A command word keeps the next word at command position, so a case header is
+   still recognized after it. */
+constexpr static_string_entry<balanced_scan_keyword>
+    BALANCED_SCAN_KEYWORD_ENTRIES[] = {
+        {SSK("case"),  balanced_scan_keyword::case_word   },
+        {SSK("do"),    balanced_scan_keyword::command_word},
+        {SSK("elif"),  balanced_scan_keyword::command_word},
+        {SSK("else"),  balanced_scan_keyword::command_word},
+        {SSK("esac"),  balanced_scan_keyword::esac_word   },
+        {SSK("if"),    balanced_scan_keyword::command_word},
+        {SSK("in"),    balanced_scan_keyword::in_word     },
+        {SSK("then"),  balanced_scan_keyword::command_word},
+        {SSK("time"),  balanced_scan_keyword::command_word},
+        {SSK("until"), balanced_scan_keyword::command_word},
+        {SSK("while"), balanced_scan_keyword::command_word},
+};
+
+constexpr StaticStringMap BALANCED_SCAN_KEYWORDS{BALANCED_SCAN_KEYWORD_ENTRIES};
+
 fn unquote_heredoc_delimiter(StringView word, Allocator allocator) throws
     -> String
 {
@@ -132,9 +159,13 @@ fn scan_balanced_shell_region(StringView source, usize position,
                               char closing_byte) throws -> Maybe<usize>
 {
   let pending_heredocs = ArrayList<balanced_scan_heredoc>{heap_allocator()};
+  let case_pattern_depths = ArrayList<usize>{heap_allocator()};
   usize depth = 1;
   char quote = 0;
   char previous_byte = 0;
+  bool has_seen_case_keyword = false;
+  bool is_case_pattern_expected = false;
+  bool is_command_position = true;
   let const opening_byte = closing_byte == ')' ? '(' : '{';
 
   while (position < source.length) {
@@ -159,6 +190,61 @@ fn scan_balanced_shell_region(StringView source, usize position,
       previous_byte = byte;
       continue;
     }
+
+    /* A case pattern ends with a parenthesis that closes no region. Keywords
+       are recognized so a pattern position is known. */
+    if (byte >= 'a' && byte <= 'z' &&
+        (previous_byte == 0 || is_whitespace(previous_byte) ||
+         is_shell_sentinel(previous_byte)))
+    {
+      let const word_start = position - 1;
+      let const word_end = balanced_scan_delimiter_end(source, word_start);
+      let const word =
+          source.substring_of_length(word_start, word_end - word_start);
+      let const keyword = BALANCED_SCAN_KEYWORDS.find(word);
+      bool did_match_keyword = keyword.has_value();
+      bool is_next_command = false;
+
+      if (did_match_keyword) {
+        switch (*keyword) {
+        case balanced_scan_keyword::case_word:
+          did_match_keyword = is_command_position;
+          has_seen_case_keyword = did_match_keyword;
+          break;
+
+        case balanced_scan_keyword::in_word:
+          did_match_keyword = has_seen_case_keyword;
+          if (did_match_keyword) {
+            has_seen_case_keyword = false;
+            case_pattern_depths.push(depth);
+            is_case_pattern_expected = true;
+          }
+          break;
+
+        case balanced_scan_keyword::esac_word:
+          did_match_keyword = !case_pattern_depths.is_empty() &&
+                              (is_command_position || is_case_pattern_expected);
+          if (did_match_keyword) {
+            case_pattern_depths.pop_back();
+            is_case_pattern_expected = false;
+          }
+          break;
+
+        case balanced_scan_keyword::command_word:
+          did_match_keyword = is_command_position;
+          is_next_command = did_match_keyword;
+          break;
+        }
+      }
+
+      if (did_match_keyword) {
+        position = word_end;
+        previous_byte = source[word_end - 1];
+        is_command_position = is_next_command;
+        continue;
+      }
+    }
+
     switch (byte) {
     case '\\':
       if (position < source.length) {
@@ -193,6 +279,7 @@ fn scan_balanced_shell_region(StringView source, usize position,
         pending_heredocs.clear();
       }
       previous_byte = '\n';
+      is_command_position = true;
       continue;
 
     case '<':
@@ -237,10 +324,38 @@ fn scan_balanced_shell_region(StringView source, usize position,
 
     if (byte == opening_byte) {
       depth++;
+      is_command_position = true;
     } else if (byte == closing_byte) {
+      if (is_case_pattern_expected && !case_pattern_depths.is_empty() &&
+          depth == case_pattern_depths.back())
+      {
+        is_case_pattern_expected = false;
+        is_command_position = true;
+        previous_byte = byte;
+        continue;
+      }
+
       depth--;
       if (depth == 0) return position;
     }
+
+    if (byte == ';' || byte == '&' || byte == '|') {
+      is_command_position = true;
+
+      if (byte == ';' && !case_pattern_depths.is_empty() &&
+          position < source.length &&
+          (source[position] == ';' || source[position] == '&'))
+      {
+        is_case_pattern_expected = true;
+      }
+    } else if (byte == '{' || byte == '}' || byte == '!') {
+      is_command_position = true;
+    } else if (!is_whitespace(byte) && byte != opening_byte &&
+               byte != closing_byte)
+    {
+      is_command_position = false;
+    }
+
     previous_byte = byte;
   }
 
