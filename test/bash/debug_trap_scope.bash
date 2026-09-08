@@ -268,6 +268,16 @@ echo lineno-action-source
   trap - DEBUG )
 echo after-lineno-action-source=$?
 
+# A command substitution pushes a source frame of its own, so the action that
+# fires for a command inside it reports the line of that command.
+echo lineno-action-substitution
+( trap 'echo "L-$LINENO-[$BASH_COMMAND]"' DEBUG
+  echo plain-target
+  captured=$(echo substituted-target)
+  echo "$captured"
+  trap - DEBUG )
+echo after-lineno-action-substitution=$?
+
 # An EXIT action a subshell sets keeps the command that triggered it and the
 # status that command left, the same way the shell's own EXIT action does.
 echo subshell-exit-command

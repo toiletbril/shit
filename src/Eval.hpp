@@ -791,7 +791,8 @@ public:
   pure fn trap_trigger_line_number() const wontthrow -> Maybe<usize>
   {
     if (m_trap_action_depth == 0) return None;
-    if (m_source_frames.count() != m_trap_action_source_depth) return None;
+    if (m_source_frames.count() != m_trap_action_source_frame_count)
+      return None;
     if (m_function_call_depth != m_trap_action_function_depth) return None;
 
     return m_trap_trigger_line_number;
@@ -1956,9 +1957,10 @@ protected:
   /* The line of the command that fired the running trap, together with the
      source and function nesting the action itself runs at. The action is parsed
      as its own source, whose first line would otherwise be the only line
-     $LINENO can report. */
+     $LINENO can report. The frame count is not the source depth, because a
+     command substitution pushes a frame without entering a source. */
   usize m_trap_trigger_line_number{0};
-  usize m_trap_action_source_depth{0};
+  usize m_trap_action_source_frame_count{0};
   usize m_trap_action_function_depth{0};
   bool m_terminal_exec_allowed{false};
   bool m_is_completion_function_running{false};

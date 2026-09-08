@@ -233,17 +233,17 @@ fn EvalContext::run_named_trap(StringView condition,
      The action below replaces the current source, which the location alone
      cannot be read against afterwards. run_source pushes exactly one frame. */
   let const saved_trigger_line_number = m_trap_trigger_line_number;
-  let const saved_action_source_depth = m_trap_action_source_depth;
+  let const saved_action_source_frame_count = m_trap_action_source_frame_count;
   let const saved_action_function_depth = m_trap_action_function_depth;
   let const trigger_site =
       trigger_location != nullptr ? *trigger_location : m_current_location;
   m_trap_trigger_line_number = line_number_at_location(trigger_site);
-  m_trap_action_source_depth = m_source_frames.count() + 1;
+  m_trap_action_source_frame_count = m_source_frames.count() + 1;
   m_trap_action_function_depth = m_function_call_depth;
   defer
   {
     m_trap_trigger_line_number = saved_trigger_line_number;
-    m_trap_action_source_depth = saved_action_source_depth;
+    m_trap_action_source_frame_count = saved_action_source_frame_count;
     m_trap_action_function_depth = saved_action_function_depth;
   };
 
