@@ -1273,6 +1273,10 @@ public:
   {
     m_current_command = steal(text);
   }
+  pure fn get_current_command() const wontthrow -> StringView
+  {
+    return m_current_command.view();
+  }
 
   /* While listing makefile targets for completion, the bundled make parser
      leaves $(shell ...) unrun, so a tab never forks the makefile's commands and

@@ -132,4 +132,23 @@ echo function-action-failure
   echo after-action-failure=$? )
 echo after-function-action-failure=$?
 
+echo sourced-action-command
+( trap 'echo "R-[$BASH_COMMAND]"' RETURN
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_plain.bash"
+  echo after-untraced=$? )
+echo after-sourced-action-command=$?
+
+echo sourced-action-command-traced
+( set -T
+  trap 'echo "R-[$BASH_COMMAND]"' RETURN
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_plain.bash"
+  echo after-traced=$? )
+echo after-sourced-action-command-traced=$?
+
+echo sourced-action-command-early-return
+( trap 'echo "R-[$BASH_COMMAND]"' RETURN
+  . "${BASH_SOURCE[0]%/*}/goldens/return_trap_inner.bash"
+  echo after-early-return=$? )
+echo after-sourced-action-command-early-return=$?
+
 echo return-trap-done

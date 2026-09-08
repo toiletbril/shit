@@ -87,6 +87,11 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let saved_debug_action = cxt.save_untraced_debug_trap();
   defer { cxt.restore_untraced_debug_trap(steal(saved_debug_action)); };
 
+  /* Bash reports the source invocation in BASH_COMMAND while the RETURN action
+     runs. The commands of the file publish their own text over it. */
+  let saved_current_command =
+      String{heap_allocator(), cxt.get_current_command()};
+
   i32 status = 0;
   let status_before_return = Maybe<i32>{None};
   {
@@ -110,6 +115,8 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* A sourced file runs in the current scope, and its finish fires the RETURN
      trap with no functrace option. The source frame is already left here, and
      the positional parameters are still the ones the file received. */
+  cxt.set_current_command(steal(saved_current_command));
+
   if (!cxt.is_posix_mode()) {
     if (status_before_return.has_value())
       cxt.run_return_trap(*status_before_return);
