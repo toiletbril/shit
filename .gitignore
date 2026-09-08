@@ -68,3 +68,4 @@ deploy/alpine/*
 !deploy/alpine/kosh.post-install
 !deploy/alpine/kosh.post-upgrade
 !deploy/alpine/kosh.pre-deinstall
+/.test-work

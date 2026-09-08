@@ -69,7 +69,7 @@ def run_menu(
         )
         os.environ["TERM"] = "xterm-256color"
         os.environ["HOME"] = directory
-        os.environ["KOSH_HISTORY"] = os.path.join(directory, "history")
+        os.environ["KOSH_HISTORY_FILE"] = os.path.join(directory, "history")
         os.chdir(os.path.join(directory, tree))
         os.execv(
             binary,
@@ -179,7 +179,7 @@ def main():
         # The candidates carry no description. The row ends right after the
         # name, and the highlight does not reach the width of the longest
         # entry.
-        expected_selected_text = b"  alpha-one  "
+        expected_selected_text = b" alpha-one "
         selected_highlight_ends_after_entry = (
             selected_start >= 0
             and selected_end >= 0

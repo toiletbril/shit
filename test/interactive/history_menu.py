@@ -63,7 +63,7 @@ def run_history_menu(directory, typed, keys, rows=24):
         fcntl.ioctl(1, termios.TIOCSWINSZ, struct.pack("HHHH", rows, 120, 0, 0))
         os.environ["TERM"] = "xterm-256color"
         os.environ["HOME"] = directory
-        os.environ["KOSH_HISTORY"] = os.path.join(directory, "history")
+        os.environ["KOSH_HISTORY_FILE"] = os.path.join(directory, "history")
         os.chdir(directory)
         os.execv(
             binary,
@@ -129,7 +129,7 @@ def main():
         the_newest_entry_is_selected = (
             selected_start >= 0
             and selected_end >= 0
-            and selected_text == b"  printf '<%s>\\n' three  "
+            and selected_text == b" printf '<%s>\\n' three "
         )
 
         accepted, marker = run_history_menu(directory, "", [b"\n"])
