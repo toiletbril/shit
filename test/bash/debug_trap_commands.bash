@@ -25,10 +25,16 @@ trap - DEBUG
 
 echo case-header
 subject=match
-trap 'echo D-$BASH_COMMAND' DEBUG
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 case $subject in
   match) echo matched ;;
   *) echo other ;;
+esac
+case "$subject" in
+  match) echo quoted-matched ;;
+esac
+case  $subject  in
+  match) echo spaced-matched ;;
 esac
 trap - DEBUG
 

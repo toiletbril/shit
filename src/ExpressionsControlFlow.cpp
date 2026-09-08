@@ -1043,8 +1043,8 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
 
   let const should_run_case = publish_command_and_run_debug_trap(cxt, [&] {
     let header_text = String{heap_allocator(), "case "};
-    header_text += m_word->raw_string();
-    header_text += " in";
+    append_word_source_text(cxt, header_text, *m_word);
+    header_text += " in ";
     return header_text;
   });
   if (!should_run_case) return {};
