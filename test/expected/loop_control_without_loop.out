@@ -1,0 +1,48 @@
+== the bash mood names the builtin and keeps running:
+a
+1:9: error: Builtin `break`: only meaningful in a `for', `while', or `until' loop.
+     1 |  echo a; break; echo b; continue; echo c
+       |          ^~~~~
+b
+1:24: error: Builtin `continue`: only meaningful in a `for', `while', or `until' loop.
+     1 |  echo a; break; echo b; continue; echo c
+       |                         ^~~~~~~~
+c
+rc=0
+== the status of each report is zero:
+1:1: error: Builtin `break`: only meaningful in a `for', `while', or `until' loop.
+     1 |  break; echo break_rc=$?; continue; echo continue_rc=$?
+       |  ^~~~~
+break_rc=0
+1:26: error: Builtin `continue`: only meaningful in a `for', `while', or `until' loop.
+     1 |  break; echo break_rc=$?; continue; echo continue_rc=$?
+       |                           ^~~~~~~~
+continue_rc=0
+== a count argument does not change the report:
+1:1: error: Builtin `break`: only meaningful in a `for', `while', or `until' loop.
+     1 |  break 2; continue 3
+       |  ^~~~~~~
+1:10: error: Builtin `continue`: only meaningful in a `for', `while', or `until' loop.
+     1 |  break 2; continue 3
+       |           ^~~~~~~~~~
+rc=0
+== the posix mood stays silent:
+a
+b
+c
+rc=0
+== the dropped jump does not leave a function:
+1:7: error: Builtin `break`: only meaningful in a `for', `while', or `until' loop.
+     1 |  f() { break; echo after_break; }; f; echo tail
+       |        ^~~~~
+after_break
+tail
+== the dropped jump does not leave a subshell:
+1:3: error: Builtin `continue`: only meaningful in a `for', `while', or `until' loop.
+     1 |  ( continue; echo after_continue ); echo tail
+       |    ^~~~~~~~
+after_continue
+tail
+== an enclosing loop still takes the jump:
+1
+done

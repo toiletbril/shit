@@ -41,6 +41,7 @@ fn Continue::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (cxt.loop_depth() == 0) {
     LOG(All, "continue outside a loop does nothing");
+    report_loop_control_without_loop(ec, cxt);
     return 0;
   }
 

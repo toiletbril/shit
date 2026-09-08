@@ -431,6 +431,12 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              SourceLocation location, StringView message,
                              StringView note) throws -> void;
 
+/* Report a break or a continue that no loop encloses. The bash mood names the
+   builtin and keeps running. The posix option form and dash stay silent, so
+   every other mood reports nothing. */
+fn report_loop_control_without_loop(const ExecContext &ec,
+                                    EvalContext &cxt) throws -> void;
+
 fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
                       StringView program_name) throws -> i32;
 

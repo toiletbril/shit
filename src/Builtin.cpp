@@ -278,6 +278,15 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
   show_message(Note{String{note}}.to_string());
 }
 
+fn report_loop_control_without_loop(const ExecContext &ec,
+                                    EvalContext &cxt) throws -> void
+{
+  if (!cxt.is_bash_compatible() || cxt.is_posix_option_on()) return;
+
+  report_soft_builtin_error(
+      ec, cxt, "only meaningful in a `for', `while', or `until' loop");
+}
+
 fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
                       StringView program_name) throws -> i32
 {

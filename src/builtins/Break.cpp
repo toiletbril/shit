@@ -54,6 +54,12 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
   }
 
+  if (cxt.loop_depth() == 0) {
+    LOG(All, "break outside a loop does nothing");
+    report_loop_control_without_loop(ec, cxt);
+    return 0;
+  }
+
   i64 level = 1;
   if (ec.args().count() > 1) {
     let const parsed_level = ec.args()[1].to<i64>();
