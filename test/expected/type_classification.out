@@ -33,3 +33,30 @@ runnable
      1 |  type missing_xyz
        |  ^~~~~~~~~~~~~~~~
 rc=1
+== -V prints a function body:
+f is a shell function on line 1
+f () 
+{ :; }
+== -V reports the line a later definition starts on:
+g is a shell function on line 2
+g () 
+{
+  echo body
+}
+== -V names the file a sourced function came from:
+named
+== -V describes a builtin:
+echo is a shell builtin
+The echo builtin prints its arguments followed by a newline.
+== -V describes a bundled utility:
+tsort is a shell builtin
+The tsort utility is bundled with the shell.
+== -V adds nothing to a keyword or an alias:
+for is a shell keyword
+g is an alias for git
+== a terse flag ignores -V:
+function
+rc=0
+== -V applies to every -a resolution:
+tsort is a shell builtin
+The tsort utility is bundled with the shell.

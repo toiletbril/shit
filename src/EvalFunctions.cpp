@@ -76,6 +76,16 @@ fn EvalContext::register_function(StringView name,
         utils::line_number_at(m_current_source->view(), body_start_position));
     info.line_offset = body_line - 2;
   }
+
+  /* The header line is what type -V reports as the origin of the name. The
+     body line already recorded above can sit further down. */
+  if (m_current_source != nullptr &&
+      definition_location.position < m_current_source->count())
+  {
+    info.definition_line = utils::line_number_at(m_current_source->view(),
+                                                 definition_location.position);
+  }
+
   info.source_name_index = definition_location.source_name_index;
   info.defining_runtime = RuntimeState::capture(*this);
   body_storage.set_definition(definition_text, info);

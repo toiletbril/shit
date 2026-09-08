@@ -43,3 +43,35 @@ else
 fi
 test -n "$type_path" && rm -rf "$type_path"
 echo "== a missing name reports not found:"; "$BIN" -c 'type missing_xyz'; echo "rc=$?"
+# The -V form adds everything the shell holds beyond the class word. A function
+# carries the line its definition starts on and the body as the shell recorded
+# it, a builtin and a bundled utility carry their description, and a keyword and
+# an alias carry nothing more. A terse flag keeps its own shape and ignores -V.
+echo "== -V prints a function body:"; "$BIN" -c 'f(){ :; }
+type -V f'
+echo "== -V reports the line a later definition starts on:"; "$BIN" -c 'x=1
+g() {
+  echo body
+}
+type -V g'
+echo "== -V names the file a sourced function came from:"
+type_source=$(mktemp -d)
+printf '%s\n' 'sourced_helper() {' '  echo helper' '}' > "$type_source/helper.sh"
+normalized_source=$(printf '%s\n' "$type_source" | tr '\\' '/')
+sourced_head=$("$BIN" -c '. "$1/helper.sh"; type -V sourced_helper' kosh \
+    "$type_source" | head -n 1 | tr '\\' '/')
+if test "$sourced_head" = "sourced_helper is a shell function defined in $normalized_source/helper.sh on line 1"
+then
+    echo named
+else
+    echo "unexpected: $sourced_head"
+fi
+test -n "$type_source" && rm -rf "$type_source"
+echo "== -V describes a builtin:"; "$BIN" -c 'type -V echo'
+echo "== -V describes a bundled utility:"; PATH= "$BIN" -c 'type -V tsort'
+echo "== -V adds nothing to a keyword or an alias:"
+"$BIN" -c 'alias g=git; type -V for; type -V g'
+echo "== a terse flag ignores -V:"
+"$BIN" -c 'f(){ :; }; type -V -t f'
+"$BIN" -c 'type -V -p echo'; echo "rc=$?"
+echo "== -V applies to every -a resolution:"; PATH= "$BIN" -c 'type -V -a tsort'

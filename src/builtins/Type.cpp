@@ -32,6 +32,9 @@ FLAG(TYPE_FORCE_PATH, Bool, 'P', "",
 FLAG(TYPE_ALL, Bool, 'a', "",
      "Print every location of each name, the keyword, alias, function, or "
      "builtin and every matching file on the PATH.");
+FLAG(TYPE_VERBOSE, Bool, 'V', "",
+     "Print everything the shell holds about each name, the file and line a "
+     "function was defined on, its body, and the description of a builtin.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Type);
@@ -53,6 +56,12 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const should_print_word = FLAG_TYPE_WORD.is_enabled();
   let const should_print_path = FLAG_TYPE_PATH.is_enabled();
   let const should_force_path = FLAG_TYPE_FORCE_PATH.is_enabled();
+
+  /* Every terse form already names one thing per line, and the extra detail
+     would break the shape a caller reads. */
+  let const should_print_verbose = FLAG_TYPE_VERBOSE.is_enabled() &&
+                                   !should_print_word && !should_print_path &&
+                                   !should_force_path;
 
   let out = String{cxt.scratch_allocator()};
   let missing_names = ArrayList<String>{cxt.scratch_allocator()};
@@ -88,6 +97,8 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     StringView word{};
     Maybe<String> alias_value;
+    Maybe<Builtin::Kind> builtin_kind;
+    bool is_bundled_utility = false;
     if (utils::is_posix_reserved_word(name.view()) || name.view() == "[[" ||
         name.view() == "]]" || name.view() == "function" ||
         name.view() == "time")
@@ -99,8 +110,9 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       alias_value = alias;
     } else if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
       word = "function";
-    } else if (search_builtin(name.view()).has_value()) {
+    } else if (let const kind = search_builtin(name.view()); kind.has_value()) {
       word = "builtin";
+      builtin_kind = kind;
     } else if ((cxt.koshkit() || cxt.mood() == mimic_mood::Default) &&
                koshkit::find_util(name.view()).has_value() &&
                cxt.get_program_resolver().get_status(
@@ -108,6 +120,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                    ProgramResolver::Status::Missing)
     {
       word = "builtin";
+      is_bundled_utility = true;
     }
 
     let const do_describe_resolution = [&](StringView type_word) throws {
@@ -119,10 +132,50 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         out += " is a shell keyword";
       } else if (type_word == "function") {
         out += " is a shell function";
+
+        if (should_print_verbose) {
+          if (let const *info = cxt.function_definition_info_of(name.view());
+              info != nullptr)
+          {
+            let const source_name = source_name_at(info->source_name_index);
+            if (source_name.has_value() && !source_name->is_empty()) {
+              out += " defined in ";
+              out += *source_name;
+            }
+
+            if (info->definition_line != 0) {
+              out += " on line ";
+              out +=
+                  String::from(info->definition_line, cxt.scratch_allocator());
+            }
+          }
+        }
       } else {
         out += " is a shell builtin";
       }
       out += "\n";
+
+      if (!should_print_verbose) return;
+
+      if (type_word == "function") {
+        if (let const *source = cxt.find_function_source(name.view());
+            source != nullptr && !source->is_empty())
+        {
+          out += *source;
+          out += "\n";
+        }
+      } else if (builtin_kind.has_value()) {
+        if (let const description = builtin_help_description(*builtin_kind);
+            !description.is_empty())
+        {
+          out += description;
+          out += "\n";
+        }
+      } else if (is_bundled_utility) {
+        out += "The ";
+        out += name;
+        out += " utility is bundled with the shell.\n";
+      }
     };
 
     if (FLAG_TYPE_ALL.is_enabled()) {
