@@ -376,6 +376,12 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     stage_status.push(0);
   let child_stage = ArrayList<usize>{heap_allocator()};
 
+  /* An unresolved stage keeps its descriptors and its diagnostic until every
+     stage is spawned. A message merged onto the pipe can be larger than the
+     pipe buffer, and a report written inside the loop would block against a
+     reader that has not been launched yet. */
+  let unresolved_stages = ArrayList<usize>{heap_allocator()};
+
   bool is_first = true;
   usize stage_index = 0;
   let bootstrap = os::subshell_bootstrap{};
@@ -433,8 +439,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
     if (ec.is_unresolved()) {
       stage_status[stage_index] = ec.get_unresolved_status();
-      report_unresolved_stage(cxt, ec);
-      ec.close_fds();
+      unresolved_stages.push(stage_index);
     } else if (!ec.is_builtin()) {
       let const source = cxt.current_source();
       unused(cxt.materialize_kosh_identity());
@@ -634,6 +639,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
     is_first = false;
     stage_index++;
+  }
+
+  for (let const unresolved_index : unresolved_stages) {
+    report_unresolved_stage(cxt, ecs[unresolved_index]);
+    ecs[unresolved_index].close_fds();
   }
 
   if (is_async) {

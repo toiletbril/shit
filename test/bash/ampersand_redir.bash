@@ -132,6 +132,17 @@ echo "piped_hidden=$piped_hidden"
 ( echo x | nosuchcmd_zzqq 2>&1 ) >"$report" 2>/dev/null
 echo "last_merged=$(( $(wc -c < "$report") > 0 ))"
 rm -f "$report"
+# A diagnostic merged onto the pipe can be larger than the pipe buffer, and the
+# reading stage is launched after the stage that fails to resolve. The report
+# waits for every stage, so the reader is already draining the pipe.
+long=x
+long_step=0
+while [ "$long_step" -lt 15 ]; do
+  long=$long$long
+  long_step=$(( long_step + 1 ))
+done
+long_bytes=$("$long" 2>&1 | wc -c | tr -d ' ')
+echo "long_merged=$(( long_bytes > 0 ))"
 echo unresolved_done
 
 # Each redirection on a stage applies where the source writes it. A dup written
