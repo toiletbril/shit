@@ -257,7 +257,8 @@ changes update this file.
   only when required. Resolve wildcard paths before searching, and pass only
   existing matches. Run independent searches independently.
 - Put `--glob` before the pattern and every path. Keep short options separate
-  when any option accepts a value.
+  when any option accepts a value. Never pass `-r` to ripgrep, because it names
+  the replacement text and rewrites every printed match.
 - A command that runs ripgrep must not contain `&&` or `||`.
 - Run an expected no-match search as its own command, since its status must not
   stop later checks.
