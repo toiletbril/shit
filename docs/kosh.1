@@ -1889,8 +1889,11 @@ Each offered entry is drawn with the syntax colors the line itself receives. The
 selected row is drawn plain under its reverse video. Typing narrows the list,
 and an accepted row replaces the whole line. The external selector receives the
 same entries, and the line it prints replaces the whole line. The plain selector
-keeps the incremental search inside the editor. A history that matches nothing
-leaves the line alone.
+keeps the incremental search inside the editor and answers the keys the menu
+answers. The down arrow and Ctrl\-R step back to an older match, the up arrow
+and Ctrl\-F step forward to a newer one, Enter or Tab accepts the match without
+running it, and Escape or Ctrl\-G cancels the search and restores the preceding
+line state. A history that matches nothing leaves the line alone.
 .PP
 Completion identifies the command segment at the cursor across quoted
 separators, command substitutions, and here-document bodies. Directory prefixes
@@ -1912,9 +1915,7 @@ The
 key undoes the last edit in command mode. Ctrl\-_ undoes it in either mode.
 Ctrl\-^ redoes the edit in either mode. Ctrl\-R redoes it in command mode.
 Ctrl\-R opens the history search in insert mode. The slash key opens the same
-search in command mode. Under the plain selector the search is incremental,
-Enter accepts the highlighted match without running it, and Ctrl\-G cancels the
-search and restores the preceding line state.
+search in command mode.
 .PP
 The colon key opens an ex command. The commands q, q!, wq, wq!, x, and quit
 exit the shell. The cursor is a bar in insert mode, a block in command mode,
