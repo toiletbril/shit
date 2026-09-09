@@ -394,6 +394,8 @@ changes update this file.
   mode to every counter or diagnostic hook the fixture requires.
 - Rebuild the required mode. Verify platform, mode, and revision when relevant.
   Compile release after changing assertion-only locals.
+- Force-sign a relinked macOS binary and prove it runs one command before a
+  suite is started. An invalid signature kills every invocation with signal 9.
 - Run owners sharing result or artifact paths sequentially. Rebuild the required
   configuration before its tests. Use finite workloads, event-based
   synchronization, bounded polling, and preserved session ids.
