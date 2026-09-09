@@ -22,7 +22,6 @@ binary = os.path.abspath(sys.argv[1])
 
 SELECTED_SGR = b"\x1b[7m"
 DIMMED_SGR = b"\x1b[90m"
-TITLE_SGR = b"\x1b[33m"
 HIGHLIGHT_RESET = b"\x1b[0m"
 COMMAND_SGR = b"\x1b[34m"
 STRING_SGR = b"\x1b[92m"
@@ -128,11 +127,11 @@ def main():
             or HIGHLIGHT_RESET + b" three" in opened
         )
         menu_opens_with_first_selection = SELECTED_SGR in opened
-        # The first row names the source in yellow and lists the keys it
-        # answers in the dim of every other secondary text.
+        # The first row names the source and lists the keys it answers in the
+        # dim of every other secondary text.
         help_row_names_the_source = (
             b"  "
-            + TITLE_SGR
+            + DIMMED_SGR
             + b"incremental history search"
             + HIGHLIGHT_RESET
             + DIMMED_SGR

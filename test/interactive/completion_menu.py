@@ -24,7 +24,6 @@ binary = os.path.abspath(sys.argv[1])
 
 SELECTED_SGR = b"\x1b[7m"
 GHOST_SGR = b"\x1b[90m"
-TITLE_SGR = b"\x1b[33m"
 HIGHLIGHT_RESET = b"\x1b[0m"
 
 
@@ -172,11 +171,11 @@ def main():
             and b"alpha-three" in opened
         )
         menu_opens_with_first_selection = SELECTED_SGR in opened
-        # The first row names the source in yellow and lists the keys it
-        # answers in the dim of every other secondary text.
+        # The first row names the source and lists the keys it answers in the
+        # dim of every other secondary text.
         help_row_names_the_source = (
             b"  "
-            + TITLE_SGR
+            + GHOST_SGR
             + b"selecting completions"
             + HIGHLIGHT_RESET
             + GHOST_SGR
@@ -347,9 +346,9 @@ def main():
             [b"\t"],
             environment={"NO_COLOR": "1"},
         )
-        no_color_drops_the_help_title_color = (
+        no_color_drops_the_help_row_color = (
             b"  selecting completions, enter to run" in plain
-            and TITLE_SGR not in plain
+            and GHOST_SGR not in plain
         )
         no_color_keeps_the_selection_band = SELECTED_SGR in plain
         no_color_keeps_the_menu_usable = b"<alpha-one>" in plain_accepted
@@ -422,8 +421,8 @@ def main():
             "A_REWRAP_KEEPS_THE_PROMPT_USABLE": (
                 a_rewrap_keeps_the_prompt_usable
             ),
-            "NO_COLOR_DROPS_THE_HELP_TITLE_COLOR": (
-                no_color_drops_the_help_title_color
+            "NO_COLOR_DROPS_THE_HELP_ROW_COLOR": (
+                no_color_drops_the_help_row_color
             ),
             "NO_COLOR_KEEPS_THE_SELECTION_BAND": (
                 no_color_keeps_the_selection_band
