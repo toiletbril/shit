@@ -100,10 +100,12 @@ fn EvalContext::function_definition_info_of(StringView name) const wontthrow
 }
 
 pure fn EvalContext::resolve_render_source(
-    const SourceLocation &location) const wontthrow -> resolved_render_source
+    const SourceLocation &location,
+    const String *fallback_source) const wontthrow -> resolved_render_source
 {
   let resolved_source = resolved_render_source{};
-  resolved_source.text = m_current_source;
+  resolved_source.text =
+      fallback_source != nullptr ? fallback_source : m_current_source;
 
   if (m_function_call_names.is_empty()) return resolved_source;
   let const *storage = m_function_call_storages.is_empty()

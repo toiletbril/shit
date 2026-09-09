@@ -444,7 +444,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         case dynamic_var::BASH_SOURCE:
           return String{heap_allocator(), bash_source_frame_at(0)};
         case dynamic_var::BASH_LINENO:
-          if (funcname_frame_count() > 0)
+          if (bash_source_frame_count() > 0)
             return String::from(funcname_line_at(0), heap_allocator());
           return koshka::None;
         case dynamic_var::BASH_COMMAND:

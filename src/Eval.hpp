@@ -685,7 +685,12 @@ public:
                  : absolute_position;
     }
   };
-  pure fn resolve_render_source(const SourceLocation &location) const wontthrow
+  /* A caller that holds the text the location was stamped in passes it as
+     fallback_source. The current source answers when the caller has none, which
+     is wrong for a location that outlives the text being evaluated now. */
+  pure fn
+  resolve_render_source(const SourceLocation &location,
+                        const String *fallback_source = nullptr) const wontthrow
       -> resolved_render_source;
   pure fn source_text_in_span(const SourceLocation &location,
                               usize end_position) const wontthrow -> StringView;
@@ -1003,8 +1008,9 @@ public:
       -> String;
   pure fn is_bash_argument_array(StringView name) const wontthrow -> bool;
 
-  mustuse fn
-  line_number_at_location(const SourceLocation &location) const throws -> usize;
+  mustuse fn line_number_at_location(
+      const SourceLocation &location,
+      const String *fallback_source = nullptr) const throws -> usize;
   fn set_script_run(bool is_script_run) wontthrow -> void
   {
     m_is_script_run = is_script_run;
@@ -2154,6 +2160,10 @@ protected:
   /* The call-site location of each active function call, parallel to
      m_function_call_names, read by BASH_LINENO. */
   ArrayList<SourceLocation> m_function_call_locations{heap_allocator()};
+  /* The text each call-site location was stamped in, parallel to
+     m_function_call_locations. A trap action replaces the current source while
+     it runs, and the recorded pointer keeps the line resolvable. */
+  ArrayList<const String *> m_function_call_sources{heap_allocator()};
   bool m_is_script_run{false};
   /* The count of source frames that carry a file path, for the FUNCNAME
      classification. */

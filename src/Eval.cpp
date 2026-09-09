@@ -1094,9 +1094,11 @@ fn EvalContext::push_function_call_name(
   m_function_call_names.reserve(m_function_call_names.count() + 1);
   m_function_call_storages.reserve(m_function_call_storages.count() + 1);
   m_function_call_locations.reserve(m_function_call_locations.count() + 1);
+  m_function_call_sources.reserve(m_function_call_sources.count() + 1);
   m_function_call_names.push(steal(owned_name));
   m_function_call_storages.push(body_storage);
   m_function_call_locations.push(m_current_location);
+  m_function_call_sources.push(m_current_source);
 }
 
 fn EvalContext::pop_function_call_name() wontthrow -> void
@@ -1105,6 +1107,7 @@ fn EvalContext::pop_function_call_name() wontthrow -> void
     m_function_call_names.remove(m_function_call_names.count() - 1);
     m_function_call_storages.remove(m_function_call_storages.count() - 1);
     m_function_call_locations.remove(m_function_call_locations.count() - 1);
+    m_function_call_sources.remove(m_function_call_sources.count() - 1);
   }
 }
 
@@ -1125,9 +1128,10 @@ fn EvalContext::funcname_frame_at(usize index) const wontthrow -> StringView
 }
 
 fn EvalContext::line_number_at_location(
-    const SourceLocation &location) const throws -> usize
+    const SourceLocation &location, const String *fallback_source) const throws
+    -> usize
 {
-  let const resolved_source = resolve_render_source(location);
+  let const resolved_source = resolve_render_source(location, fallback_source);
   usize line = 1;
   if (resolved_source.text != nullptr) {
     const usize render_position =
@@ -1143,12 +1147,16 @@ fn EvalContext::line_number_at_location(
 
 fn EvalContext::funcname_line_at(usize index) const throws -> usize
 {
-  /* A frame whose defining file was sourced and freed can misnumber, the
-     innermost frame and a single-source script are exact. */
+  /* Each frame resolves against the text its call site was stamped in, so a
+     trap action running under a different source still reports the script
+     line. */
   let const call_count = m_function_call_names.count();
-  if (index < call_count)
-    return line_number_at_location(
-        m_function_call_locations[call_count - 1 - index]);
+  if (index < call_count) {
+    let const storage_index = call_count - 1 - index;
+    return line_number_at_location(m_function_call_locations[storage_index],
+                                   m_function_call_sources[storage_index]);
+  }
+
   return 0;
 }
 
@@ -1253,8 +1261,10 @@ fn EvalContext::dynamic_array_element_count(DynamicArray which) const throws
                : m_bash_argument_arrays->values.count();
   }
   case DynamicArray::SourcePath: return bash_source_frame_count();
-  case DynamicArray::FunctionName:
-  case DynamicArray::LineNumber: return funcname_frame_count();
+  case DynamicArray::FunctionName: return funcname_frame_count();
+  /* Bash keeps BASH_LINENO parallel to BASH_SOURCE, so a script with no
+     function call still holds one zero. */
+  case DynamicArray::LineNumber: return bash_source_frame_count();
   }
 
   return 0;
