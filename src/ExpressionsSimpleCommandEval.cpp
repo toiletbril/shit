@@ -930,6 +930,7 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     return status;
   }
   let ec = resolved_ec.take();
+  ec.has_stripped_array_operands = !m_array_args.is_empty();
 
   /* The exec context now owns and closes the staged input descriptor. The
      stdout and stderr redirects already took effect on the real shell fds. */

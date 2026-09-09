@@ -102,6 +102,12 @@ public:
      binary behind it. */
   bool is_multicall{false};
 
+  /* The parser lifts NAME=(...) out of the argument vector of an assignment
+     builtin and the evaluator applies it after the builtin runs. The builtin
+     still received an operand, and its listing branch belongs to an invocation
+     that received none. */
+  bool has_stripped_array_operands{false};
+
   pure fn is_builtin() const wontthrow -> bool;
   pure fn is_unresolved() const wontthrow -> bool;
   pure fn get_unresolved_status() const wontthrow -> i32;

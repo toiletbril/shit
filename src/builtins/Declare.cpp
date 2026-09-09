@@ -330,7 +330,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return false;
   };
 
-  if (should_print && i >= args.count()) {
+  if (should_print && i >= args.count() && !ec.has_stripped_array_operands) {
     let const do_matches_attribute_filter = [&](StringView name) -> bool {
       if (should_export && !os::get_environment_variable(name).has_value()) {
         return false;

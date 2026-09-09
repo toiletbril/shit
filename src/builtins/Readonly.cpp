@@ -44,7 +44,7 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* A bare readonly lists every read-only variable, in the declare -r form
      under the bash mood and the POSIX readonly form otherwise. */
-  if (args.count() == 1) {
+  if (args.count() == 1 && !ec.has_stripped_array_operands) {
     let const is_declare_form = cxt.is_bash_compatible();
     let out = String{cxt.scratch_allocator()};
     for (let const &name : cxt.readonly_names()) {
