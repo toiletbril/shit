@@ -135,8 +135,13 @@ fn take_pending_signal() wontthrow -> i32
 }
 
 static u32 REAPED_CHILD_COUNT = 0;
+static bool DID_REAPED_CHILD_ARRIVE = false;
 
-fn note_child_reaped() wontthrow -> void { REAPED_CHILD_COUNT += 1; }
+fn note_child_reaped() wontthrow -> void
+{
+  REAPED_CHILD_COUNT += 1;
+  DID_REAPED_CHILD_ARRIVE = true;
+}
 
 fn take_reaped_child_count() wontthrow -> u32
 {
@@ -144,6 +149,16 @@ fn take_reaped_child_count() wontthrow -> u32
   REAPED_CHILD_COUNT = 0;
 
   return reaped_count;
+}
+
+fn has_reaped_child_arrival() wontthrow -> bool
+{
+  return DID_REAPED_CHILD_ARRIVE;
+}
+
+fn clear_reaped_child_arrival() wontthrow -> void
+{
+  DID_REAPED_CHILD_ARRIVE = false;
 }
 
 fn get_shell_process_id() wontthrow -> i64

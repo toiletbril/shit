@@ -1064,6 +1064,8 @@ fn take_pending_signal() wontthrow -> i32;
 
 fn note_child_reaped() wontthrow -> void;
 mustuse fn take_reaped_child_count() wontthrow -> u32;
+mustuse fn has_reaped_child_arrival() wontthrow -> bool;
+fn clear_reaped_child_arrival() wontthrow -> void;
 
 fn monotonic_nanos() wontthrow -> u64;
 

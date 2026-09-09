@@ -487,7 +487,15 @@ fn EvalContext::run_pending_traps() throws -> void
      drains again rather than dropping the arrival. */
   os::SIGNAL_PENDING = 0;
 
+  let const child_condition = StringView{"CHLD", 4};
   let const reaped_child_count = os::take_reaped_child_count();
+  if (let const *queued = m_traps.find(child_condition);
+      queued != nullptr && queued->count() > 0)
+  {
+    m_pending_child_trap_count += reaped_child_count;
+  } else {
+    os::clear_reaped_child_arrival();
+  }
 
   let const saved_exit_status = m_last_exit_status;
   let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
@@ -532,18 +540,22 @@ fn EvalContext::run_pending_traps() throws -> void
     if (has_pending_control_flow()) break;
   }
 
-  let const child_condition = StringView{"CHLD", 4};
   let const child_bit = running_trap_bit(child_condition);
-  if (reaped_child_count > 0 && (m_running_trap_conditions & child_bit) == 0) {
+  if (m_pending_child_trap_count > 0 &&
+      (m_running_trap_conditions & child_bit) == 0 &&
+      os::has_reaped_child_arrival())
+  {
     if (let const *installed = m_traps.find(child_condition);
         installed != nullptr && installed->count() > 0)
     {
       let const action = String{heap_allocator(), installed->view()};
+      let const fire_count = m_pending_child_trap_count;
 
       m_running_trap_conditions |= child_bit;
       defer { m_running_trap_conditions &= static_cast<u8>(~child_bit); };
 
-      for (u32 fire = 0; fire < reaped_child_count; fire++) {
+      u32 fired_count = 0;
+      for (; fired_count < fire_count; fired_count++) {
         if (has_pending_control_flow()) break;
 
         LOG(Info, "running the trap action for signal 'CHLD'");
@@ -551,7 +563,8 @@ fn EvalContext::run_pending_traps() throws -> void
                    m_current_location);
       }
 
-      (void) os::take_reaped_child_count();
+      m_pending_child_trap_count -= fired_count;
+      os::clear_reaped_child_arrival();
     }
   }
 

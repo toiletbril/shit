@@ -2112,6 +2112,7 @@ protected:
      condition that is running is blocked. A signal action still fires the DEBUG
      trap and a pending signal still drains inside a DEBUG action. */
   u8 m_running_trap_conditions{0};
+  u32 m_pending_child_trap_count{0};
   /* Nonzero while a trap action evaluates. BASH_COMMAND keeps the command that
      triggered the trap. */
   u32 m_trap_action_depth{0};
