@@ -911,7 +911,8 @@ public:
   }
 
   /* Run the action of every signal whose flag the handler set, at the command
-     boundary. A re-entrancy guard keeps a triggered signal from nesting. */
+     boundary. The pending flag is cleared before the flags are consumed, and a
+     signal that arrives during the drain is taken at the next boundary. */
   fn run_pending_traps() throws -> void;
   fn has_exit_trap() const wontthrow -> bool;
 

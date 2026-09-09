@@ -42,15 +42,12 @@ constexpr PackedStringKey NAMED_TRAP_CONDITION_KEYS[] = {
 };
 constexpr StaticStringSet NAMED_TRAP_CONDITIONS{NAMED_TRAP_CONDITION_KEYS};
 
-/* Every condition outside the table shares the bit above the named ones. */
-constexpr u8 OTHER_TRAP_CONDITION_BIT = 1u << 3;
-
 pure fn running_trap_bit(StringView condition) wontthrow -> u8
 {
-  if (let const index = NAMED_TRAP_CONDITIONS.find_index(condition))
-    return static_cast<u8>(1u << *index);
+  let const index = NAMED_TRAP_CONDITIONS.find_index(condition);
+  ASSERT(index.has_value());
 
-  return OTHER_TRAP_CONDITION_BIT;
+  return static_cast<u8>(1u << *index);
 }
 
 } /* namespace */
