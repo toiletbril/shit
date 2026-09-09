@@ -175,6 +175,8 @@ volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
 volatile sig_atomic_t SIGNAL_PENDING = 0;
 
 static constexpr i32 SIGNAL_FLAG_COUNT = 128;
+/* Windows raises no child signal, and no number is reserved for one. */
+static constexpr i32 CHILD_SIGNAL_NUMBER = 0;
 static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
 static volatile LONG64 CHILD_USER_TICKS = 0;
 static volatile LONG64 CHILD_SYSTEM_TICKS = 0;

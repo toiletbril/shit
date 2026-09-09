@@ -36,7 +36,8 @@ for TEST_FILE in "$@"; do
     history_noninteractive|read_behavior|language_server|koshkit_fuser|\
     koshkit_timeout|transaction_lock_lifetime|\
     subshell_spawn_state|wait_on_stopped_job|\
-    trap_action_return|trap_action_loop_control)
+    trap_action_return|trap_action_loop_control|\
+    trap_during_blocking_builtin)
     SHOULD_BOUND_CLI_TEST=yes
     ;;
   esac

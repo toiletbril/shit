@@ -86,6 +86,7 @@ volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
 volatile sig_atomic_t SIGNAL_PENDING = 0;
 
 static constexpr i32 SIGNAL_FLAG_COUNT = 128;
+static constexpr i32 CHILD_SIGNAL_NUMBER = SIGCHLD;
 static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
 
 /* The signals a trap install unblocked. Clearing the trap gives each of them

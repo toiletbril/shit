@@ -831,7 +831,7 @@ fn wait_for_child_state_change() wontthrow -> void
   sigset_t previous_mask;
   if (sigprocmask(SIG_BLOCK, &blocked_signals, &previous_mask) != 0) return;
 
-  while (CHILD_STATE_CHANGED == 0) {
+  while (CHILD_STATE_CHANGED == 0 && peek_pending_signal_besides_child() == 0) {
     let wait_mask = previous_mask;
     sigdelset(&wait_mask, SIGCHLD);
     sigsuspend(&wait_mask);

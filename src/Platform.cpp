@@ -134,6 +134,20 @@ fn take_pending_signal() wontthrow -> i32
   return 0;
 }
 
+/* A child arrival reaches its action through the reaped count, and a blocking
+   wait keeps running against it. Every other queued signal is left in place for
+   the drain at the next boundary. */
+fn peek_pending_signal_besides_child() wontthrow -> i32
+{
+  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
+    if (number == CHILD_SIGNAL_NUMBER) continue;
+
+    if (PENDING_SIGNAL_FLAGS[number] != 0) return number;
+  }
+
+  return 0;
+}
+
 static u32 REAPED_CHILD_COUNT = 0;
 static bool DID_REAPED_CHILD_ARRIVE = false;
 

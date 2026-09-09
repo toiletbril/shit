@@ -1966,6 +1966,16 @@ counts as none. Windows raises no child signal, and the reap itself reaches
 that boundary. The Windows
 .B kill
 builtin sends only KILL and TERM. A script there cannot raise CHLD by hand.
+.PP
+A trapped signal that arrives while
+.B wait
+blocks ends the wait. The action runs at the boundary the builtin returns to,
+and
+.B wait
+reports 128 plus the signal number. The job it was waiting on is left running,
+and the operands it has not reached are abandoned. A child arrival leaves the
+wait blocked. Every external command reaps a child, and a wake for each one
+would end every wait.
 .SH DIAGNOSTICS
 Errors, warnings, and analysis diagnostics include source locations when a
 mapping exists. A diagnostic may include a source line, caret, detail location,

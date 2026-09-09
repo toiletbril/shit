@@ -41,10 +41,24 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   i32 status = 0;
 
+  /* A trapped signal that arrives while the wait blocks ends it, and its
+     action runs at the boundary the builtin returns to. */
+  let const do_was_interrupted = [] wontthrow -> bool {
+    return os::peek_pending_signal_besides_child() != 0;
+  };
+
   if (args.count() == 1) {
     LOG(Debug, "wait blocking on every job of %zu", cxt.jobs().count());
-    for (job &job : cxt.jobs())
-      cxt.wait_for_job_processes(job);
+
+    for (job &job : cxt.jobs()) {
+      status = cxt.wait_for_job_processes(job);
+
+      if (do_was_interrupted()) {
+        cxt.forget_done_jobs();
+        return status;
+      }
+    }
+
     cxt.forget_done_jobs();
     return 0;
   }
@@ -89,6 +103,11 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         status =
             matched != nullptr ? cxt.wait_for_job_processes(*matched) : 127;
       }
+    }
+
+    if (do_was_interrupted()) {
+      cxt.forget_done_jobs();
+      return status;
     }
   }
 

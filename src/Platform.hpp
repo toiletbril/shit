@@ -1074,6 +1074,11 @@ fn clear_trap_handler(i32 signal_number) throws -> void;
 
 fn take_pending_signal() wontthrow -> i32;
 
+/* Report the lowest queued signal that is not the child signal, leaving its
+   flag in place for the drain. A blocking wait breaks out on this and reports
+   128 plus the number, the way bash reports an interrupted wait. */
+mustuse fn peek_pending_signal_besides_child() wontthrow -> i32;
+
 fn note_child_reaped() wontthrow -> void;
 mustuse fn take_reaped_child_count() wontthrow -> u32;
 mustuse fn has_reaped_child_arrival() wontthrow -> bool;

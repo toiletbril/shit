@@ -175,6 +175,15 @@ fn EvalContext::wait_for_job_processes(job &job, bool *was_stopped) throws
         if (was_stopped != nullptr) *was_stopped = true;
         return job.stopped_status;
       }
+
+      if (let const number = os::peek_pending_signal_besides_child();
+          number != 0)
+      {
+        LOG(Info, "signal %d interrupted the wait on job %d", number, job.id);
+        if (was_stopped != nullptr) *was_stopped = false;
+        return 128 + number;
+      }
+
       os::wait_for_child_state_change();
     }
   }

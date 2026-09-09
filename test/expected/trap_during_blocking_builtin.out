@@ -1,0 +1,20 @@
+== a trapped signal ends a blocking wait in the default mood:
+action-default
+status=derived
+rc=0
+== a trapped signal ends a blocking wait in the sh mood:
+action-sh
+status=derived
+rc=0
+== the interrupted wait leaves its job running:
+action-alive
+child-alive=0
+rc=0
+== a child arrival leaves the wait blocked:
+chld-fired
+chld-fired
+chld-wait-status=6
+rc=0
+== a signal with no action leaves the wait blocked:
+ignored-wait-status=5
+rc=0
