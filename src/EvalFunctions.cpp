@@ -47,6 +47,7 @@ constexpr PackedStringKey NAMED_TRAP_CONDITION_KEYS[] = {
     SSK("DEBUG"),
     SSK("ERR"),
     SSK("RETURN"),
+    SSK("CHLD"),
 };
 constexpr StaticStringSet NAMED_TRAP_CONDITIONS{NAMED_TRAP_CONDITION_KEYS};
 
@@ -273,6 +274,10 @@ fn EvalContext::run_named_trap(StringView condition,
   m_trap_action_depth += 1;
   defer { m_trap_action_depth -= 1; };
 
+  let const was_terminal_exec_allowed = terminal_exec_allowed();
+  set_terminal_exec_allowed(false);
+  defer { set_terminal_exec_allowed(was_terminal_exec_allowed); };
+
   /* The line is resolved here, while the triggering command is still current.
      The action below replaces the current source. The location alone cannot be
      read against the current source afterwards. run_source pushes exactly one
@@ -473,10 +478,16 @@ fn EvalContext::run_pending_traps() throws -> void
   m_trap_action_depth += 1;
   defer { m_trap_action_depth -= 1; };
 
+  let const was_terminal_exec_allowed = terminal_exec_allowed();
+  set_terminal_exec_allowed(false);
+  defer { set_terminal_exec_allowed(was_terminal_exec_allowed); };
+
   /* The fast flag is cleared before the per-signal flags are consumed, so a
      signal that arrives during the drain re-sets it and the next boundary
      drains again rather than dropping the arrival. */
   os::SIGNAL_PENDING = 0;
+
+  let const reaped_child_count = os::take_reaped_child_count();
 
   let const saved_exit_status = m_last_exit_status;
   let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
@@ -505,6 +516,8 @@ fn EvalContext::run_pending_traps() throws -> void
   {
     let const name = os::signal_name_from_number(number);
     if (!name.has_value()) continue;
+    if (name->view() == "CHLD") continue;
+
     if (let const *action = m_traps.find(name->view()); action != nullptr)
       if (action->count() > 0) {
         LOG(Info, "running the trap action for signal '%s'", name->c_str());
@@ -517,6 +530,29 @@ fn EvalContext::run_pending_traps() throws -> void
     /* A return, a break, or an exit the action requested leaves the remaining
        arrivals for the next boundary. */
     if (has_pending_control_flow()) break;
+  }
+
+  let const child_condition = StringView{"CHLD", 4};
+  let const child_bit = running_trap_bit(child_condition);
+  if (reaped_child_count > 0 && (m_running_trap_conditions & child_bit) == 0) {
+    if (let const *installed = m_traps.find(child_condition);
+        installed != nullptr && installed->count() > 0)
+    {
+      let const action = String{heap_allocator(), installed->view()};
+
+      m_running_trap_conditions |= child_bit;
+      defer { m_running_trap_conditions &= static_cast<u8>(~child_bit); };
+
+      for (u32 fire = 0; fire < reaped_child_count; fire++) {
+        if (has_pending_control_flow()) break;
+
+        LOG(Info, "running the trap action for signal 'CHLD'");
+        run_source(action.view(), "the CHLD trap", return_handling::Reject,
+                   m_current_location);
+      }
+
+      (void) os::take_reaped_child_count();
+    }
   }
 
   restore_trap_pipe_statuses(has_saved_pipe_statuses,

@@ -134,6 +134,18 @@ fn take_pending_signal() wontthrow -> i32
   return 0;
 }
 
+static u32 REAPED_CHILD_COUNT = 0;
+
+fn note_child_reaped() wontthrow -> void { REAPED_CHILD_COUNT += 1; }
+
+fn take_reaped_child_count() wontthrow -> u32
+{
+  let const reaped_count = REAPED_CHILD_COUNT;
+  REAPED_CHILD_COUNT = 0;
+
+  return reaped_count;
+}
+
 fn get_shell_process_id() wontthrow -> i64
 {
   return static_cast<i64>(PARENT_SHELL_PID);

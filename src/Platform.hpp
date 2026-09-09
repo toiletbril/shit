@@ -1062,6 +1062,9 @@ fn clear_trap_handler(i32 signal_number) throws -> void;
 
 fn take_pending_signal() wontthrow -> i32;
 
+fn note_child_reaped() wontthrow -> void;
+mustuse fn take_reaped_child_count() wontthrow -> u32;
+
 fn monotonic_nanos() wontthrow -> u64;
 
 fn realtime_microseconds() wontthrow -> u64;

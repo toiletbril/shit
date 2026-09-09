@@ -788,6 +788,8 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
     break;
   }
 
+  if (!WIFSTOPPED(status) && !WIFCONTINUED(status)) note_child_reaped();
+
   if (was_stopped != nullptr && WIFSTOPPED(status)) {
     *was_stopped = true;
     return 128 + WSTOPSIG(status);
@@ -860,6 +862,8 @@ fn reap_process_quietly(process pid) throws -> i32
     if (check_syscall(w) == pid) break;
   }
 
+  note_child_reaped();
+
   if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
   if (WIFEXITED(status)) return WEXITSTATUS(status);
   return 1;
@@ -884,6 +888,9 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
     return process_state::Stopped;
   }
   if (WIFCONTINUED(status)) return process_state::Running;
+
+  note_child_reaped();
+
   if (WIFSIGNALED(status)) {
     status_out = 128 + WTERMSIG(status);
     return process_state::Exited;
