@@ -1957,6 +1957,12 @@ The main shell ignores SIGPIPE. A forked child restores the default SIGPIPE
 action. A producer terminated by SIGPIPE therefore returns status 141.
 .PP
 On Windows, a background process runs in its own console process group.
+.PP
+The CHLD trap runs its action once for every child the shell reaps, at the next
+command boundary. Windows raises no child signal, and the reap itself reaches
+that boundary. The Windows
+.B kill
+builtin sends only KILL and TERM. A script there cannot raise CHLD by hand.
 .SH DIAGNOSTICS
 Errors, warnings, and analysis diagnostics include source locations when a
 mapping exists. A diagnostic may include a source line, caret, detail location,

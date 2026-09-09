@@ -139,6 +139,11 @@ static bool DID_REAPED_CHILD_ARRIVE = false;
 
 volatile sig_atomic_t CHILD_TRAP_ARMED = 0;
 
+fn set_child_trap_armed(bool is_armed) wontthrow -> void
+{
+  CHILD_TRAP_ARMED = is_armed ? 1 : 0;
+}
+
 fn note_child_reaped() wontthrow -> void
 {
   if (CHILD_TRAP_ARMED == 0) return;

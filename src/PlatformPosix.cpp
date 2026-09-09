@@ -1429,7 +1429,6 @@ fn set_trap_handler(i32 signal_number) throws -> void
      signal is delivered the moment it is unblocked, and the default action for
      most signals ends the shell. */
   if (signal_number == SIGCHLD) {
-    CHILD_TRAP_ARMED = 1;
     install_child_state_handler();
   } else {
     struct sigaction sa = {};
@@ -1446,7 +1445,6 @@ fn set_trap_ignore(i32 signal_number) throws -> void
   if (!is_trappable_signal(signal_number)) return;
   LOG(Info, "ignoring signal %d", signal_number);
   if (signal_number == SIGCHLD) {
-    CHILD_TRAP_ARMED = 0;
     install_child_state_handler();
     return;
   }
@@ -1465,7 +1463,6 @@ fn clear_trap_handler(i32 signal_number) throws -> void
   reblock_signal_after_trap(signal_number);
 
   if (signal_number == SIGCHLD) {
-    CHILD_TRAP_ARMED = 0;
     install_child_state_handler();
     return;
   }

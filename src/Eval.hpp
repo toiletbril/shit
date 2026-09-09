@@ -765,11 +765,16 @@ public:
   pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
   pure fn has_err_trap() const wontthrow -> bool { return m_has_err_trap; }
   /* The two hot conditions carry a flag beside the map. Every write to the map
-     refreshes the flag. */
+     refreshes the flag. The child wake is armed from the same place, because
+     the CHLD action is the only reader of a reaped child. */
   fn refresh_trap_flags() wontthrow -> void
   {
     m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
     m_has_err_trap = m_traps.find(StringView{"ERR", 3}) != nullptr;
+
+    let const *child_action = m_traps.find(StringView{"CHLD", 4});
+    os::set_child_trap_armed(child_action != nullptr &&
+                             child_action->count() > 0);
   }
   /* A trap a frame installs for itself traces that frame without errtrace. An
      inherited trap needs errtrace to reach the frame. The subshell bootstrap
