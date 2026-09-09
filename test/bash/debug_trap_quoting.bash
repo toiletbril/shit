@@ -83,6 +83,18 @@ cat <<< 'here  string' > /dev/null
 cat 0<> /dev/null
 trap - DEBUG
 
+echo process-substitutions
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+cat < <( echo procsub ) > /dev/null
+cat < <(echo tight) > /dev/null
+echo tail > >( cat > /dev/null )
+diff <( echo a ) <( echo b ) > /dev/null
+cat < <( echo one; echo two ) > /dev/null
+cat <( echo nested <( echo deep ) ) > /dev/null
+echo "literal <( a )  b"
+echo 'raw <( a )'
+trap - DEBUG
+
 echo heredocs
 trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 cat <<EOF > /dev/null

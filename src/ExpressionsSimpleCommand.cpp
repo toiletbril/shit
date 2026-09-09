@@ -732,8 +732,9 @@ static pure fn is_reprint_blank(char byte) wontthrow -> bool
   return byte == ' ' || byte == '\t';
 }
 
-/* A tab, a run of blanks, a line continuation, and a command substitution are
-   the only places where the source spelling and the bash reprint can differ. */
+/* A tab, a run of blanks, a line continuation, a command substitution, and a
+   process substitution are the only places where the source spelling and the
+   bash reprint can differ. */
 static pure fn should_reprint_source(StringView source) wontthrow -> bool
 {
   for (usize position = 0; position < source.length; position++) {
@@ -749,7 +750,9 @@ static pure fn should_reprint_source(StringView source) wontthrow -> bool
       return true;
     }
 
-    if (byte == '(' && previous_byte == '$') {
+    if (byte == '(' &&
+        (previous_byte == '$' || previous_byte == '<' || previous_byte == '>'))
+    {
       return true;
     }
 
@@ -1033,6 +1036,34 @@ static fn append_reprinted_source(String &out, StringView source,
            the dollar sign directly. Bash writes a blank between them. */
         out.append(!body.is_empty() && body[0] == '(' ? "$( " : "$(");
         append_reprinted_source(out, body, true, true, false);
+        out.push(')');
+        position = *end;
+        continue;
+      }
+    }
+
+    /* Bash reprints a process substitution from its body and writes no blank
+       inside either parenthesis. A double quote makes the same bytes literal,
+       and the quoted pass asks for no blank collapsing. */
+    if (should_collapse_blanks && (byte == '<' || byte == '>') &&
+        position + 1 < source.length && source[position + 1] == '(')
+    {
+      let const end =
+          lexer::scan_balanced_shell_region(source, position + 2, ')');
+
+      if (end.has_value()) {
+        if (should_space_operators && out.length() > start_length &&
+            out.back() != ' ')
+        {
+          out.push(' ');
+        }
+
+        out.push(byte);
+        out.push('(');
+        append_reprinted_source(out,
+                                trimmed_reprint_body(source.substring_of_length(
+                                    position + 2, *end - position - 3)),
+                                true, true, true);
         out.push(')');
         position = *end;
         continue;
