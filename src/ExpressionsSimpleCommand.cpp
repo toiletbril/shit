@@ -688,6 +688,21 @@ fn internal::resolve_redirection(const Redirection &redir, EvalContext &cxt,
                               file_fd, -1, /*is_cached=*/false};
 }
 
+/* The value a descriptor allocation target holds. An unset array element reads
+   as an empty value, which names no descriptor. */
+static fn read_fd_allocation_value(EvalContext &cxt,
+                                   const fd_allocation_target &target) throws
+    -> Maybe<String>
+{
+  if (!target.has_subscript) return cxt.get_variable_value(target.name);
+
+  let value =
+      cxt.read_array_element_arithmetic_text(target.name, target.subscript);
+  if (value.is_empty()) return None;
+
+  return value;
+}
+
 fn internal::allocate_redirection_descriptor(
     const Redirection &redir, const resolved_redirection &resolved,
     EvalContext &cxt, const SourceLocation &location,
@@ -695,16 +710,18 @@ fn internal::allocate_redirection_descriptor(
 {
   if (redir.fd_allocation_name_token == nullptr) return redir.fd;
 
-  let const allocation_name =
+  let const &allocation_word =
       static_cast<const tokens::WordToken *>(redir.fd_allocation_name_token)
-          ->word()
-          .fd_allocation_name();
+          ->word();
+  let const target = allocation_word.get_fd_allocation_target();
+  ASSERT(target.has_value());
+  let const allocation_name = allocation_word.fd_allocation_name();
   ASSERT(allocation_name.has_value());
 
   if (resolved.kind == redirection_outcome::Duplicate &&
       resolved.dup_from_fd == Redirection::DUP_FD_CLOSE)
   {
-    let const current_value = cxt.get_variable_value(*allocation_name);
+    let const current_value = read_fd_allocation_value(cxt, *target);
     if (current_value.has_value()) {
       let const parsed = current_value->view().to<i64>();
       if (!parsed.is_error() && parsed.value() >= 0)
@@ -722,8 +739,14 @@ fn internal::allocate_redirection_descriptor(
     throw ErrorWithLocation{location, "Could not allocate a file descriptor"};
   }
 
-  cxt.set_shell_variable(*allocation_name,
-                         String::from(allocated_fd, heap_allocator()));
+  let const allocated_text = String::from(allocated_fd, heap_allocator());
+  if (target->has_subscript) {
+    cxt.assign_array_element(target->name, target->subscript,
+                             allocated_text.view(), /*is_append=*/false);
+  } else {
+    cxt.set_shell_variable(target->name, allocated_text.view());
+  }
+
   return allocated_fd;
 }
 

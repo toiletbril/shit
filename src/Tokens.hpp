@@ -21,6 +21,7 @@ class BumpArena;
 class Expression;
 
 struct word_assignment_split;
+struct fd_allocation_target;
 
 struct arith_token
 {
@@ -551,6 +552,9 @@ public:
 
   pure fn fd_allocation_name() const wontthrow -> Maybe<StringView>;
 
+  pure fn get_fd_allocation_target() const wontthrow
+      -> Maybe<fd_allocation_target>;
+
   pure fn runs_substitution() const wontthrow -> bool;
 
   fn get_assignment_split() const throws -> Maybe<word_assignment_split>;
@@ -605,6 +609,15 @@ struct word_assignment_split
   String name;
   Word value;
   bool is_append;
+};
+
+/* The base name and the array subscript of a descriptor allocation target. A
+   plain name leaves the subscript empty. */
+struct fd_allocation_target
+{
+  StringView name;
+  StringView subscript;
+  bool has_subscript;
 };
 
 class Token

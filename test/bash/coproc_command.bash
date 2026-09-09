@@ -94,3 +94,15 @@ fi
 eval "exec ${PASS[1]}>&-"
 wait "$PASS_PID"
 printf '%s\n' "exec wait status:$?"
+
+# The descriptor variable form takes an array element. Each coprocess descriptor
+# is closed here without an eval around a numeric close.
+echo "== element close =="
+coproc ELEM { read -r line; printf '%s\n' "element got:$line"; }
+printf 'direct\n' >&"${ELEM[1]}"
+exec {ELEM[1]}>&-
+read -r element_reply <&"${ELEM[0]}"
+exec {ELEM[0]}<&-
+printf '%s\n' "$element_reply"
+wait "$ELEM_PID"
+printf '%s\n' "element wait status:$?"

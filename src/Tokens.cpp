@@ -246,7 +246,8 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
   return has_seen_digit;
 }
 
-pure fn Word::fd_allocation_name() const wontthrow -> Maybe<StringView>
+pure fn Word::get_fd_allocation_target() const wontthrow
+    -> Maybe<fd_allocation_target>
 {
   if (segments.count() != 1) return None;
 
@@ -262,12 +263,54 @@ pure fn Word::fd_allocation_name() const wontthrow -> Maybe<StringView>
     return None;
   }
 
-  let const name = text.substring_of_length(1, text.length - 2);
-  if (!lexer::is_variable_name_start(name[0])) return None;
-  for (usize i = 1; i < name.length; i++)
-    if (!lexer::is_variable_name(name[i])) return None;
+  let const inner = text.substring_of_length(1, text.length - 2);
+  if (!lexer::is_variable_name_start(inner[0])) return None;
 
-  return name;
+  usize name_length = 1;
+  while (name_length < inner.length &&
+         lexer::is_variable_name(inner[name_length]))
+    name_length++;
+
+  if (name_length == inner.length) {
+    return fd_allocation_target{inner, StringView{}, false};
+  }
+
+  if (inner[name_length] != '[') return None;
+
+  /* The subscript of an array element is scanned with balanced brackets, and
+     its closing bracket is the last byte of the name. */
+  usize position = name_length + 1;
+  usize open_count = 1;
+  while (position < inner.length && open_count > 0) {
+    if (inner[position] == '[')
+      open_count++;
+    else if (inner[position] == ']')
+      open_count--;
+
+    position++;
+  }
+
+  if (open_count != 0 || position != inner.length) return None;
+
+  let const subscript_length = inner.length - name_length - 2;
+  if (subscript_length == 0) return None;
+
+  return fd_allocation_target{
+      inner.substring_of_length(0, name_length),
+      inner.substring_of_length(name_length + 1, subscript_length), true};
+}
+
+pure fn Word::fd_allocation_name() const wontthrow -> Maybe<StringView>
+{
+  let const target = get_fd_allocation_target();
+  if (!target.has_value()) return None;
+
+  if (!target->has_subscript) return target->name;
+
+  /* The whole inner text is the name a redirection reprints, and the base name
+     and the subscript are contiguous inside it. */
+  return StringView{target->name.data,
+                    target->subscript.length + target->name.length + 2};
 }
 
 pure fn Word::runs_substitution() const wontthrow -> bool

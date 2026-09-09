@@ -56,6 +56,39 @@ cat "$tmp"
 
 echo literal {brace} stays a word
 
+# The descriptor variable is allowed an array subscript, and the allocated
+# number is written into that element. An indexed subscript, an associative key,
+# and an arithmetic subscript are each accepted, and the close form reads the
+# number back from the element. A base that is not an identifier, a doubled
+# subscript, and an unclosed subscript are rejected the way an unknown command
+# is.
+declare -a fdarr
+exec {fdarr[0]}>"$tmp"
+echo "element>=10: $(( fdarr[0] >= 10 ))"
+printf 'into the element\n' >&"${fdarr[0]}"
+exec {fdarr[0]}>&-
+cat "$tmp"
+
+declare -A fdmap
+exec {fdmap[out]}>"$tmp"
+echo "key>=10: $(( fdmap[out] >= 10 ))"
+printf 'into the key\n' >&"${fdmap[out]}"
+exec {fdmap[out]}>&-
+cat "$tmp"
+
+index=2
+exec {fdarr[index+1]}>/dev/null
+echo "computed>=10: $(( fdarr[3] >= 10 ))"
+echo "computed elements: ${#fdarr[@]}"
+exec {fdarr[3]}>&-
+
+( exec {1bad}>/dev/null ) 2>/dev/null
+echo "bad name: $?"
+( exec {fdarr[0][1]}>/dev/null ) 2>/dev/null
+echo "bad subscript: $?"
+( exec {fdarr[}>/dev/null ) 2>/dev/null
+echo "unclosed subscript: $?"
+
 rm -f "$tmp"
 
 # Bash here-string <<<, checked byte-for-byte against bash. Feeds the expanded
