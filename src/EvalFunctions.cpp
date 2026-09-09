@@ -31,7 +31,8 @@ constexpr const char *RESTRICTED_READONLY_NAMES[] = {"SHELL",
                                                      "KOSH_HISTORY_SIZE",
                                                      "KOSH_CALC_HISTORY",
                                                      "KOSH_DIRECTORY_HISTORY"};
-constexpr StringView BASH_IMPLICIT_READONLY_NAMES[] = {"BASHOPTS", "SHELLOPTS"};
+constexpr StringView BASH_IMPLICIT_READONLY_NAMES[] = {"BASHOPTS", "SHELLOPTS",
+                                                       "EUID", "PPID", "UID"};
 
 /* The named conditions run_named_trap serves. The position of a key is the bit
    that marks its action as running. */

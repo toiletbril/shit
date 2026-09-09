@@ -117,61 +117,73 @@ enum class dynamic_var : u8
   FUNCNAME,
 };
 
+/* Bash takes an assignment to a name whose value it computes on every read,
+   reports success, and throws the value away. The reader keeps answering. */
+enum class dynamic_write : u8
+{
+  Settable,
+  Discarded,
+};
+
 struct dynamic_variable_info
 {
   StringView name;
   dynamic_var kind;
   bool is_process_sensitive;
+  dynamic_write write;
 };
 
-#define DYNAMIC_VARIABLE(name, kind, process_sensitive)                        \
+#define DYNAMIC_VARIABLE(name, kind, process_sensitive, write)                 \
   {                                                                            \
     SSK(name),                                                                 \
     {                                                                          \
-      StringView{name, sizeof(name) - 1}, dynamic_var::kind, process_sensitive \
+      StringView{name, sizeof(name) - 1}, dynamic_var::kind,                   \
+          process_sensitive, dynamic_write::write                              \
     }                                                                          \
   }
 
 constexpr static_string_entry<dynamic_variable_info> ALWAYS_DYNAMIC_ENTRIES[] =
     {
-        DYNAMIC_VARIABLE("IFS", IFS, false),
-        DYNAMIC_VARIABLE("LINENO", LINENO, false),
-        DYNAMIC_VARIABLE("KOSH_GIT_BRANCH", KOSH_GIT_BRANCH, false),
-        DYNAMIC_VARIABLE("KOSH_GIT_AHEAD", KOSH_GIT_AHEAD, false),
-        DYNAMIC_VARIABLE("KOSH_GIT_BEHIND", KOSH_GIT_BEHIND, false),
-        DYNAMIC_VARIABLE("KOSH_IDENTITY", KOSH_IDENTITY, false),
+        DYNAMIC_VARIABLE("IFS", IFS, false, Settable),
+        DYNAMIC_VARIABLE("LINENO", LINENO, false, Discarded),
+        DYNAMIC_VARIABLE("KOSH_GIT_BRANCH", KOSH_GIT_BRANCH, false, Settable),
+        DYNAMIC_VARIABLE("KOSH_GIT_AHEAD", KOSH_GIT_AHEAD, false, Settable),
+        DYNAMIC_VARIABLE("KOSH_GIT_BEHIND", KOSH_GIT_BEHIND, false, Settable),
+        DYNAMIC_VARIABLE("KOSH_IDENTITY", KOSH_IDENTITY, false, Settable),
 };
 constexpr StaticStringMap ALWAYS_DYNAMIC{ALWAYS_DYNAMIC_ENTRIES};
 
 /* Every name here is a bash extension, so membership answers the bash-only
-   diagnostic. */
+   diagnostic. BASHOPTS, SHELLOPTS, EUID, PPID, and UID stay settable. The
+   implicit read only attribute rejects their assignment first. */
 constexpr static_string_entry<dynamic_variable_info> BASH_DYNAMIC_ENTRIES[] = {
-    DYNAMIC_VARIABLE("BASH_ARGC", BASH_ARGC, false),
-    DYNAMIC_VARIABLE("BASH_ARGV", BASH_ARGV, false),
-    DYNAMIC_VARIABLE("BASH_COMMAND", BASH_COMMAND, false),
-    DYNAMIC_VARIABLE("BASH_EXECUTION_STRING", BASH_EXECUTION_STRING, false),
-    DYNAMIC_VARIABLE("BASH_LINENO", BASH_LINENO, false),
-    DYNAMIC_VARIABLE("BASH_MONOSECONDS", BASH_MONOSECONDS, false),
-    DYNAMIC_VARIABLE("BASHOPTS", BASHOPTS, false),
-    DYNAMIC_VARIABLE("BASH_SOURCE", BASH_SOURCE, false),
-    DYNAMIC_VARIABLE("BASH_SUBSHELL", BASH_SUBSHELL, false),
-    DYNAMIC_VARIABLE("BASH_ARGV0", BASH_ARGV0, false),
-    DYNAMIC_VARIABLE("BASHPID", BASHPID, true),
-    DYNAMIC_VARIABLE("EPOCHREALTIME", EPOCHREALTIME, false),
-    DYNAMIC_VARIABLE("EPOCHSECONDS", EPOCHSECONDS, false),
-    DYNAMIC_VARIABLE("EUID", EUID, false),
-    DYNAMIC_VARIABLE("FUNCNAME", FUNCNAME, false),
-    DYNAMIC_VARIABLE("GROUPS", GROUPS, false),
-    DYNAMIC_VARIABLE("HOSTNAME", HOSTNAME, false),
-    DYNAMIC_VARIABLE("HOSTTYPE", HOSTTYPE, false),
-    DYNAMIC_VARIABLE("MACHTYPE", MACHTYPE, false),
-    DYNAMIC_VARIABLE("OSTYPE", OSTYPE, false),
-    DYNAMIC_VARIABLE("PPID", PPID, true),
-    DYNAMIC_VARIABLE("RANDOM", RANDOM, true),
-    DYNAMIC_VARIABLE("SECONDS", SECONDS, false),
-    DYNAMIC_VARIABLE("SHELLOPTS", SHELLOPTS, false),
-    DYNAMIC_VARIABLE("SRANDOM", SRANDOM, true),
-    DYNAMIC_VARIABLE("UID", UID, false),
+    DYNAMIC_VARIABLE("BASH_ARGC", BASH_ARGC, false, Discarded),
+    DYNAMIC_VARIABLE("BASH_ARGV", BASH_ARGV, false, Discarded),
+    DYNAMIC_VARIABLE("BASH_COMMAND", BASH_COMMAND, false, Discarded),
+    DYNAMIC_VARIABLE("BASH_EXECUTION_STRING", BASH_EXECUTION_STRING, false,
+                     Settable),
+    DYNAMIC_VARIABLE("BASH_LINENO", BASH_LINENO, false, Discarded),
+    DYNAMIC_VARIABLE("BASH_MONOSECONDS", BASH_MONOSECONDS, false, Discarded),
+    DYNAMIC_VARIABLE("BASHOPTS", BASHOPTS, false, Settable),
+    DYNAMIC_VARIABLE("BASH_SOURCE", BASH_SOURCE, false, Discarded),
+    DYNAMIC_VARIABLE("BASH_SUBSHELL", BASH_SUBSHELL, false, Discarded),
+    DYNAMIC_VARIABLE("BASH_ARGV0", BASH_ARGV0, false, Settable),
+    DYNAMIC_VARIABLE("BASHPID", BASHPID, true, Discarded),
+    DYNAMIC_VARIABLE("EPOCHREALTIME", EPOCHREALTIME, false, Discarded),
+    DYNAMIC_VARIABLE("EPOCHSECONDS", EPOCHSECONDS, false, Discarded),
+    DYNAMIC_VARIABLE("EUID", EUID, false, Settable),
+    DYNAMIC_VARIABLE("FUNCNAME", FUNCNAME, false, Discarded),
+    DYNAMIC_VARIABLE("GROUPS", GROUPS, false, Discarded),
+    DYNAMIC_VARIABLE("HOSTNAME", HOSTNAME, false, Settable),
+    DYNAMIC_VARIABLE("HOSTTYPE", HOSTTYPE, false, Settable),
+    DYNAMIC_VARIABLE("MACHTYPE", MACHTYPE, false, Settable),
+    DYNAMIC_VARIABLE("OSTYPE", OSTYPE, false, Settable),
+    DYNAMIC_VARIABLE("PPID", PPID, true, Settable),
+    DYNAMIC_VARIABLE("RANDOM", RANDOM, true, Settable),
+    DYNAMIC_VARIABLE("SECONDS", SECONDS, false, Settable),
+    DYNAMIC_VARIABLE("SHELLOPTS", SHELLOPTS, false, Settable),
+    DYNAMIC_VARIABLE("SRANDOM", SRANDOM, true, Discarded),
+    DYNAMIC_VARIABLE("UID", UID, false, Settable),
 };
 constexpr StaticStringMap BASH_DYNAMIC{BASH_DYNAMIC_ENTRIES};
 
@@ -239,6 +251,22 @@ pure fn EvalContext::variable_requires_dynamic_lookup(
 
   return bash_dynamic_variables_enabled() &&
          BASH_DYNAMIC.find(name).has_value();
+}
+
+pure fn EvalContext::is_write_discarded_dynamic_variable(
+    StringView name) const wontthrow -> bool
+{
+  if (name.is_empty() || !is_dynamic_first_byte(name[0])) {
+    return false;
+  }
+
+  if (let const info = ALWAYS_DYNAMIC.find(name); info.has_value())
+    return info->write == dynamic_write::Discarded;
+
+  if (!bash_dynamic_variables_enabled()) return false;
+
+  let const info = BASH_DYNAMIC.find(name);
+  return info.has_value() && info->write == dynamic_write::Discarded;
 }
 
 hot fn EvalContext::get_variable_value(StringView name) const throws

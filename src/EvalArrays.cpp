@@ -147,7 +147,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
 {
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
-  if (is_bash_argument_array(name)) return;
+  if (is_write_discarded_dynamic_variable(name)) return;
 
   /* POSIX mode has no arrays, so a bash array literal stands in as an empty
      scalar. */
@@ -221,7 +221,7 @@ fn EvalContext::set_array_element(StringView name, usize index,
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
-  if (is_bash_argument_array(name)) return;
+  if (is_write_discarded_dynamic_variable(name)) return;
 
   if (is_bash_directory_stack_special(name)) {
     set_bash_directory_stack_element(index, value);

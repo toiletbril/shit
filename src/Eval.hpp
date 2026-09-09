@@ -1007,6 +1007,10 @@ public:
                                         Allocator result_allocator) const throws
       -> String;
   pure fn is_bash_argument_array(StringView name) const wontthrow -> bool;
+  /* Bash reports success for an assignment to a name it recomputes on every
+     read, then throws the value away. */
+  pure fn is_write_discarded_dynamic_variable(StringView name) const wontthrow
+      -> bool;
 
   mustuse fn line_number_at_location(
       const SourceLocation &location,

@@ -212,6 +212,15 @@ trap 'echo "D-[$BASH_COMMAND]"; echo "still-[$BASH_COMMAND]"' DEBUG
 echo target
 trap - DEBUG
 
+echo assigned-command
+trap 'BASH_COMMAND=overwritten; echo "D-[$BASH_COMMAND]"' DEBUG
+echo assigned-target
+trap - DEBUG
+echo "after=[$BASH_COMMAND]"
+BASH_COMMAND=plain-write
+echo "plain=[$BASH_COMMAND]"
+echo after-assigned-command=$?
+
 echo action-no-reentry
 ( trap 'echo action-once' DEBUG
   echo target-command

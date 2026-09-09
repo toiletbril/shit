@@ -251,7 +251,7 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
-  if (is_bash_argument_array(name)) return;
+  if (is_write_discarded_dynamic_variable(name)) return;
 
   if (name == BASH_ALIASES_VARIABLE &&
       is_bash_special_array_active(bash_special_array_id::Aliases))
@@ -426,7 +426,7 @@ fn EvalContext::set_indexed_array(StringView name,
       static_cast<int>(name.length), name.data, values.count());
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
-  if (is_bash_argument_array(name)) return;
+  if (is_write_discarded_dynamic_variable(name)) return;
   if (is_bash_directory_stack_special(name)) {
     for (usize index = 0; index < values.count(); index++)
       set_bash_directory_stack_element(index, values[index].view());
@@ -484,7 +484,7 @@ fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 fn EvalContext::append_indexed_array(StringView name,
                                      ArrayList<String> values) throws -> void
 {
-  if (is_bash_argument_array(name)) return;
+  if (is_write_discarded_dynamic_variable(name)) return;
 
   if (let *existing = m_indexed_arrays.find(name); existing != nullptr) {
     LOG(All, "appending %zu elements to the existing array '%.*s'",
