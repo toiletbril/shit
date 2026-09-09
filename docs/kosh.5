@@ -37,7 +37,7 @@ This is the first user Bash login candidate.
 .I ~/.bash_login
 This is the second user Bash login candidate.
 .TP
-.I "/etc/bash/bashrc or /etc/bash.bashrc"
+.IR /etc/bash/bashrc " or " /etc/bash.bashrc
 The first readable path is the system configuration file for an interactive
 non-login Bash mood.
 .TP
@@ -46,22 +46,21 @@ This is the default user configuration file for an interactive non-login Bash
 mood.
 .TP
 .I /usr/share/bash-completion/bash_completion
-This file supplies Bash programmable completion if the Bash startup chain has
-already sourced an rc file. It is skipped if a default completion specification
-or BASH_COMPLETION_VERSINFO already exists.
+This file supplies Bash programmable completion after the Bash startup chain
+sources an rc file. It is skipped when completion is disabled, when a default
+completion specification exists, and when BASH_COMPLETION_VERSINFO is already
+set.
 .PP
 The
-.BR \-\-rcfile ,
-.BR \-\-init-file ,
-.BR ENV ,
+.B \-\-rcfile
 and
-.B BASH_ENV
-may select a different file. See
+.B \-\-init\-file
+options and the ENV and BASH_ENV variables may select a different file. See
 .BR kosh (1)
 for their conditions and expansion rules.
 .SH SYNTAX
-The complete file is shell source. LF and CRLF terminate a line. A CRLF pair is
-one newline. A lone carriage return remains source text.
+LF and CRLF terminate a line. A CRLF pair is one newline. A lone carriage return
+remains source text.
 .PP
 A number sign begins a shell comment where the shell lexical rules recognize a
 comment. Assignments, shell options, functions, aliases, and commands take
@@ -70,7 +69,7 @@ select a runtime mood with
 .B set \-\-mood
 or request another startup chain with
 .BR "set \-\-init\-moods" .
-Recursive initialization of a mood already being sourced is skipped.
+A mood whose files are already being sourced is not reentered.
 .SH ERRORS
 A missing optional file, custom rc file, or BASH_ENV file is skipped. An
 existing custom rc or BASH_ENV file is skipped with a diagnostic if it cannot
