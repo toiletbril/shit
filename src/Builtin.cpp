@@ -67,6 +67,14 @@ flatten fn search_builtin(StringView builtin_name) throws
   return BUILTINS.find(builtin_name);
 }
 
+pure fn builtin_is_hidden_by_mood(Builtin::Kind kind, mimic_mood mood) wontthrow
+    -> bool
+{
+  if (mood != mimic_mood::Posix) return false;
+
+  return kind == Builtin::Kind::Let || kind == Builtin::Kind::Time;
+}
+
 /* The per-kind flag lists, a zero-initialized table immune to static-init
    order, filled by each builtin file's registrar after its FLAG_LIST is
    built, since both sit in the same translation unit in order. */

@@ -1295,7 +1295,9 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     let const &word_text = word.segments[0].text;
     let const keyword =
         KEYWORDS.find(StringView{word_text.data(), word_text.count()});
-    if (keyword.has_value()) {
+    if (keyword.has_value() &&
+        !(*keyword == Token::Kind::Time && is_posix_mode()))
+    {
       switch (*keyword) {
         KW_SWITCH_CASES();
       default: unreachable("unhandled keyword of type %d", ENUM(*keyword));

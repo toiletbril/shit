@@ -14,6 +14,7 @@
 #include "Cli.hpp"
 #include "Common.hpp"
 #include "Maybe.hpp"
+#include "MimicMood.hpp"
 #include "Platform.hpp"
 
 namespace koshka {
@@ -324,6 +325,9 @@ public:
 };
 
 Maybe<Builtin::Kind> search_builtin(StringView builtin_name) throws;
+
+pure fn builtin_is_hidden_by_mood(Builtin::Kind kind, mimic_mood mood) wontthrow
+    -> bool;
 
 /* True when the name is one of the POSIX special builtins, the set whose prefix
    assignments persist after the command and whose errors abort a

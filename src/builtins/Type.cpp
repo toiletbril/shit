@@ -62,10 +62,21 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                    !should_force_path;
 
   let const is_bash_function_report = cxt.is_bash_compatible();
+  let const is_posix_report = cxt.mood() == mimic_mood::Posix;
 
   let out = String{cxt.scratch_allocator()};
   let missing_names = ArrayList<String>{cxt.scratch_allocator()};
   bool did_find_all = true;
+
+  let const do_report_missing = [&](const String &name) throws {
+    if (is_posix_report) {
+      out += name;
+      out += ": not found\n";
+      return;
+    }
+
+    missing_names.push_managed(name);
+  };
 
   for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
@@ -99,10 +110,13 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     Maybe<String> alias_value;
     Maybe<Builtin::Kind> builtin_kind;
     bool is_bundled_utility = false;
-    if (utils::is_posix_reserved_word(name.view()) || name.view() == "[[" ||
-        name.view() == "]]" || name.view() == "function" ||
-        name.view() == "time")
-    {
+    let const is_bash_keyword_name =
+        cxt.mood() != mimic_mood::Posix &&
+        (name.view() == "[[" || name.view() == "]]" ||
+         name.view() == "function" || name.view() == "select" ||
+         name.view() == "time");
+
+    if (utils::is_posix_reserved_word(name.view()) || is_bash_keyword_name) {
       word = "keyword";
     } else if (let const alias = cxt.get_alias(name.view()); alias.has_value())
     {
@@ -110,7 +124,10 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       alias_value = alias;
     } else if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
       word = "function";
-    } else if (let const kind = search_builtin(name.view()); kind.has_value()) {
+    } else if (let const kind = search_builtin(name.view());
+               kind.has_value() &&
+               !builtin_is_hidden_by_mood(*kind, cxt.mood()))
+    {
       word = "builtin";
       builtin_kind = kind;
     } else if ((cxt.koshkit() || cxt.mood() == mimic_mood::Default) &&
@@ -216,7 +233,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       if (!has_any) {
         if (!should_print_word && !should_print_path) {
-          missing_names.push_managed(name);
+          do_report_missing(name);
         }
         did_find_all = false;
       }
@@ -252,7 +269,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
     } else {
       if (!should_print_word && !should_print_path) {
-        missing_names.push_managed(name);
+        do_report_missing(name);
       }
       did_find_all = false;
     }
@@ -264,7 +281,9 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     report_soft_builtin_error(ec, cxt,
                               "The command '" + name + "' was not found");
 
-  return did_find_all ? 0 : 1;
+  if (did_find_all) return 0;
+
+  return is_posix_report ? 127 : 1;
 }
 
 } /* namespace koshka */

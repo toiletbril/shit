@@ -115,7 +115,9 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
         did_find_any = true;
         continue;
       }
-      if (search_builtin(name.view()).has_value()) {
+      if (let const kind = search_builtin(name.view());
+          kind.has_value() && !builtin_is_hidden_by_mood(*kind, cxt.mood()))
+      {
         ec.print_to_stdout(is_verbose ? name + " is a shell builtin\n"
                                       : name + "\n");
         did_find_any = true;
@@ -146,13 +148,20 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
         did_find_any = true;
         continue;
       }
+      if (cxt.mood() == mimic_mood::Posix) {
+        if (is_verbose) ec.print_to_stdout(name + ": not found\n");
+        continue;
+      }
+
       if (is_verbose) {
         report_soft_builtin_error(ec, cxt,
                                   "The command '" + name + "' was not found");
       }
     }
 
-    return did_find_any ? 0 : 1;
+    if (did_find_any) return 0;
+
+    return cxt.mood() == mimic_mood::Posix ? 127 : 1;
   }
 
   let operand_args = ArrayList<String>{heap_allocator()};

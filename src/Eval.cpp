@@ -1500,9 +1500,9 @@ fn ExecContext::make_from(const SourceLocation &location, StringView source,
   if (!os::has_directory_separator(program.view())) {
     resolved_builtin = search_builtin(program.view());
 
-    /* let is a bash extension absent from POSIX sh, the sh mood reports it not
-       found the way dash does. */
-    if (resolved_builtin == Builtin::Kind::Let && mood == mimic_mood::Posix) {
+    if (resolved_builtin.has_value() &&
+        builtin_is_hidden_by_mood(*resolved_builtin, mood))
+    {
       resolved_builtin = None;
     }
 
