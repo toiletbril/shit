@@ -19,3 +19,7 @@ echo "hosttype=$HOSTTYPE"
 echo "machtype=$MACHTYPE"
 [ "$GROUPS" -ge 0 ] && echo "groups present"
 [ -n "$SRANDOM" ] && echo "srandom present"
+for name in EUID UID PPID BASHPID RANDOM SECONDS SRANDOM LINENO; do
+  declaration=$(declare -p "$name")
+  echo "${declaration%%=*}"
+done

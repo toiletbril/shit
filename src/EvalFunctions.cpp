@@ -34,6 +34,13 @@ constexpr const char *RESTRICTED_READONLY_NAMES[] = {"SHELL",
 constexpr StringView BASH_IMPLICIT_READONLY_NAMES[] = {"BASHOPTS", "SHELLOPTS",
                                                        "EUID", "PPID", "UID"};
 
+constexpr PackedStringKey BASH_IMPLICIT_INTEGER_KEYS[] = {
+    SSK("BASHPID"), SSK("EUID"),    SSK("PPID"), SSK("RANDOM"),
+    SSK("SECONDS"), SSK("SRANDOM"), SSK("UID"),
+};
+constexpr StaticStringSet BASH_IMPLICIT_INTEGER_NAMES{
+    BASH_IMPLICIT_INTEGER_KEYS};
+
 /* The named conditions run_named_trap serves. The position of a key is the bit
    that marks its action as running. */
 constexpr PackedStringKey NAMED_TRAP_CONDITION_KEYS[] = {
@@ -712,6 +719,12 @@ fn EvalContext::unmark_integer(StringView name) throws -> void
 
 fn EvalContext::is_integer_variable(StringView name) const wontthrow -> bool
 {
+  if (bash_dynamic_variables_enabled() &&
+      BASH_IMPLICIT_INTEGER_NAMES.contains(name))
+  {
+    return true;
+  }
+
   return (variable_attributes(name) &
           static_cast<u8>(variable_attribute::Integer)) != 0;
 }
