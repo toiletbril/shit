@@ -505,6 +505,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
           set_error_exit(false);
         }
         clear_inherited_exit_trap();
+        reset_inherited_signal_traps();
         std::exception_ptr error;
         try {
           ast->evaluate(*this);
@@ -660,6 +661,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
       set_error_exit(false);
     }
     clear_inherited_exit_trap();
+    reset_inherited_signal_traps();
     std::exception_ptr error;
     try {
       ast->evaluate(*this);
@@ -692,6 +694,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
 
     did_begin_restoration = true;
     restore_state(steal(snapshot));
+    note_subshell_child_exit();
 
     if (error) {
       /* A throw inside the substitution is contained to its subshell the way
@@ -713,6 +716,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
       let const error = std::current_exception();
       try {
         restore_state(steal(snapshot));
+        note_subshell_child_exit();
       } catch (...) {
         LOG(Debug, "restoring an interrupted command substitution failed");
       }
