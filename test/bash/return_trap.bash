@@ -222,4 +222,70 @@ echo action-return-supplies-the-frame-status
   echo m=$m )
 echo after-action-return-supplies-the-frame-status=$?
 
+# A call that functrace does not trace runs its body without the RETURN trap
+# the caller installed, and the return raises no fire. The body lists none, and
+# a removal it runs takes nothing away from the caller. A trap the body
+# installs for itself fires for its own return and is taken away afterwards.
+# Under functrace the body shares the trap of the caller. A removal and a
+# replacement both reach the caller there.
+return_listing_function() {
+  echo "listed: [$(trap -p RETURN)]"
+}
+return_removing_function() {
+  trap - RETURN
+  echo in-return-removing-function
+}
+return_replacing_function() {
+  trap 'echo R-return' RETURN
+  echo in-return-replacing-function
+}
+plain_function() {
+  echo in-plain-function
+}
+
+echo return-untraced-removal
+trap 'echo T-return' RETURN
+return_listing_function
+return_removing_function
+plain_function
+echo after-return-untraced-removal
+trap - RETURN
+echo return-untraced-removal-done
+
+echo return-untraced-replacement
+trap 'echo T-return' RETURN
+return_replacing_function
+plain_function
+echo after-return-untraced-replacement
+trap - RETURN
+echo return-untraced-replacement-done
+
+echo return-traced-listing
+set -T
+trap 'echo T-return' RETURN
+return_listing_function
+trap - RETURN
+set +T
+echo return-traced-listing-done
+
+echo return-traced-removal
+set -T
+trap 'echo T-return' RETURN
+return_removing_function
+plain_function
+echo after-return-traced-removal
+trap - RETURN
+set +T
+echo return-traced-removal-done
+
+echo return-traced-replacement
+set -T
+trap 'echo T-return' RETURN
+return_replacing_function
+plain_function
+echo after-return-traced-replacement
+trap - RETURN
+set +T
+echo return-traced-replacement-done
+
 echo return-trap-done

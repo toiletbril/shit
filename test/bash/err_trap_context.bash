@@ -344,3 +344,67 @@ true && false
 echo "and-tail-status=$?"
 trap - ERR
 echo err-suppression-context-done
+
+# A call that errtrace does not trace runs its body without the ERR trap the
+# caller installed. The body lists none, and a removal it runs takes nothing
+# away from the caller. A trap the body installs for itself stands after the
+# return. Under errtrace the body shares the trap of the caller. A removal and
+# a replacement both reach the caller there.
+err_listing_function() {
+  echo "listed: [$(trap -p ERR)]"
+}
+err_removing_function() {
+  trap - ERR
+  echo in-err-removing-function
+}
+err_replacing_function() {
+  trap 'echo "R-err-[$BASH_COMMAND]"' ERR
+  echo in-err-replacing-function
+}
+
+echo err-untraced-removal
+trap 'echo "E-[$BASH_COMMAND]"' ERR
+err_listing_function
+err_removing_function
+false
+echo after-err-untraced-removal
+trap - ERR
+echo err-untraced-removal-done
+
+echo err-untraced-replacement
+trap 'echo "E-[$BASH_COMMAND]"' ERR
+err_replacing_function
+false
+echo after-err-untraced-replacement
+trap - ERR
+echo err-untraced-replacement-done
+
+echo err-traced-listing
+set -E
+trap 'echo "E-[$BASH_COMMAND]"' ERR
+err_listing_function
+trap - ERR
+set +E
+echo err-traced-listing-done
+
+echo err-traced-removal
+set -E
+trap 'echo "E-[$BASH_COMMAND]"' ERR
+err_removing_function
+false
+echo after-err-traced-removal
+trap - ERR
+set +E
+echo err-traced-removal-done
+
+echo err-traced-replacement
+set -E
+trap 'echo "E-[$BASH_COMMAND]"' ERR
+err_replacing_function
+false
+echo after-err-traced-replacement
+trap - ERR
+set +E
+echo err-traced-replacement-done
+
+echo err-trap-context-done
