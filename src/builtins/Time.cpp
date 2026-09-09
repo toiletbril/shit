@@ -76,10 +76,15 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const user_cpu = user_after - user_before;
   let const system_cpu = system_after - system_before;
 
+  let const layout =
+      FLAG_TIME_POSIX.is_enabled() ? utils::time_report_layout::Posix
+      : cxt.is_bash_compatible()   ? utils::time_report_layout::Bash
+                                   : utils::time_report_layout::Rich;
+
   let const time_format = cxt.get_variable_value("TIMEFORMAT");
-  let const report = utils::format_time_report(
-      FLAG_TIME_POSIX.is_enabled(), FLAG_TIME_RSS.is_enabled(), time_format,
-      real_seconds, user_cpu, system_cpu, rss_after);
+  let const report =
+      utils::format_time_report(layout, FLAG_TIME_RSS.is_enabled(), time_format,
+                                real_seconds, user_cpu, system_cpu, rss_after);
 
   if (!report.is_empty()) {
     koshka::print_error(report);

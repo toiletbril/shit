@@ -1202,8 +1202,11 @@ The command or pipeline is timed. The
 .B \-p
 and
 .B \-\-posix
-options select the POSIX report. The default report includes the peak resident
-set size when the platform supplies a nonzero value. The
+options select the POSIX report. Under the bash mood the report is a blank line
+followed by three tab separated rows in the minutes form. The default mood
+indents the same three rows and adds a processor busy row. The default report
+includes the peak resident set size when the platform supplies a nonzero value.
+The
 .B \-R
 option always adds the same row, including when TIMEFORMAT selects a custom or
 empty report.

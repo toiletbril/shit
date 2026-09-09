@@ -109,6 +109,19 @@ static fn format_time_report_posix(double real_seconds, double user_seconds,
   return report;
 }
 
+/* The layout of the bash default TIMEFORMAT, a blank line and three tab
+   separated lines in the minutes form. */
+static fn format_time_report_bash(double real_seconds, double user_seconds,
+                                  double system_seconds) throws -> String
+{
+  let report = String{heap_allocator()};
+  report += "\nreal\t" + format_minutes_seconds(real_seconds) + "\n";
+  report += "user\t" + format_minutes_seconds(user_seconds) + "\n";
+  report += "sys\t" + format_minutes_seconds(system_seconds) + "\n";
+
+  return report;
+}
+
 static fn format_time_report_pretty(double real_seconds, double user_seconds,
                                     double system_seconds) throws -> String
 {
@@ -214,30 +227,41 @@ static fn format_time_report_custom(StringView format, double real_seconds,
   return report;
 }
 
-fn format_time_report(bool should_use_posix_format, bool should_report_rss,
+fn format_time_report(time_report_layout layout, bool should_report_rss,
                       const Maybe<String> &time_format, double real_seconds,
                       double user_seconds, double system_seconds,
                       u64 peak_rss_bytes) throws -> String
 {
   let report = String{heap_allocator()};
   let const should_use_pretty_format =
-      !should_use_posix_format && !time_format.has_value();
+      layout == time_report_layout::Rich && !time_format.has_value();
 
-  if (should_use_posix_format) {
+  if (layout == time_report_layout::Posix) {
     report =
         format_time_report_posix(real_seconds, user_seconds, system_seconds);
-  } else if (should_use_pretty_format) {
+  } else if (time_format.has_value()) {
+    if (!time_format->is_empty()) {
+      report = format_time_report_custom(time_format->view(), real_seconds,
+                                         user_seconds, system_seconds);
+    }
+  } else if (layout == time_report_layout::Bash) {
+    report =
+        format_time_report_bash(real_seconds, user_seconds, system_seconds);
+  } else {
     report =
         format_time_report_pretty(real_seconds, user_seconds, system_seconds);
-  } else if (!time_format->is_empty()) {
-    report = format_time_report_custom(time_format->view(), real_seconds,
-                                       user_seconds, system_seconds);
   }
 
   if (should_report_rss || (should_use_pretty_format && peak_rss_bytes > 0)) {
-    report += "  rss    " +
-              koshkit::format_human_size(peak_rss_bytes, heap_allocator()) +
-              "\n";
+    /* The peak resident line carries the separator of the layout it joins. */
+    switch (layout) {
+    case time_report_layout::Bash: report += "rss\t"; break;
+    case time_report_layout::Posix: report += "rss "; break;
+    case time_report_layout::Rich: report += "  rss    "; break;
+    }
+
+    report += koshkit::format_human_size(peak_rss_bytes, heap_allocator());
+    report += "\n";
   }
 
   return report;

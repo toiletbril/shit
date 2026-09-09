@@ -226,11 +226,22 @@ fn uint_to_text_into(u64 value, char *buffer, usize buffer_size) wontthrow
 
 fn format_minutes_seconds(double seconds) throws -> String;
 
+/* The layout of a time report with no TIMEFORMAT in effect. Rich indents the
+   three lines and adds the cpu and peak resident lines. Bash prints the three
+   tab separated lines of the bash default. Posix prints the plain seconds the
+   -p flag asks for, and it ignores TIMEFORMAT. */
+enum class time_report_layout : u8
+{
+  Rich,
+  Bash,
+  Posix,
+};
+
 /* The bash conversions are honored, %%, a literal percent, %[p][l]R, %[p][l]U,
    and %[p][l]S for the real, user, and system seconds, and %P for the cpu busy
    percent, where p is a precision from zero to six and l selects the minutes
    form. */
-fn format_time_report(bool should_use_posix_format, bool should_report_rss,
+fn format_time_report(time_report_layout layout, bool should_report_rss,
                       const Maybe<String> &time_format, double real_seconds,
                       double user_seconds, double system_seconds,
                       u64 peak_rss_bytes) throws -> String;

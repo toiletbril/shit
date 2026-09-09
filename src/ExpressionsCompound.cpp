@@ -430,10 +430,15 @@ hot fn CompoundListCondition::evaluate_root_status_impl(
     let const user_cpu = user_after - user_before;
     let const system_cpu = system_after - system_before;
 
+    let const layout =
+        m_cmd->time_uses_posix_format() ? utils::time_report_layout::Posix
+        : cxt.is_bash_compatible()      ? utils::time_report_layout::Bash
+                                        : utils::time_report_layout::Rich;
+
     let const time_format = cxt.get_variable_value("TIMEFORMAT");
     let const report = utils::format_time_report(
-        m_cmd->time_uses_posix_format(), m_cmd->should_time_report_rss(),
-        time_format, real_seconds, user_cpu, system_cpu, rss_after);
+        layout, m_cmd->should_time_report_rss(), time_format, real_seconds,
+        user_cpu, system_cpu, rss_after);
 
     if (!report.is_empty()) {
       print_error(report);
