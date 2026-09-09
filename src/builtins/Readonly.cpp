@@ -19,6 +19,9 @@ HELP_DESCRIPTION_DECL(
     "The readonly builtin marks each named variable read-only.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+/* The value of this flag is never read. The operand count alone decides the
+   listing. Bash marks the named variables and prints nothing when -p is given
+   operands. */
 FLAG(READONLY_PRINT, Bool, 'p', "",
      "List the read-only variables in a reusable form.");
 

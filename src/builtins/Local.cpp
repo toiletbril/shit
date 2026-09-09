@@ -16,7 +16,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-aAilnrux] name[=value] ...");
+HELP_SYNOPSIS_DECL("[-aAilnprux] name[=value] ...");
 HELP_DESCRIPTION_DECL(
     "The local builtin declares each named variable local to the current "
     "function.");
@@ -31,6 +31,8 @@ FLAG(LOCAL_INTEGER, Bool, 'i', "",
 FLAG(LOCAL_LOWERCASE, Bool, 'l', "",
      "Convert every assigned value to lowercase in this scope.");
 FLAG(LOCAL_NAMEREF, Bool, 'n', "", "Accepted without effect.");
+FLAG(LOCAL_PRINT, Bool, 'p', "",
+     "Print the reusable declaration of each named local.");
 FLAG(LOCAL_READONLY, Bool, 'r', "",
      "Make the local variable read-only after its initial assignment.");
 FLAG(LOCAL_UPPERCASE, Bool, 'u', "",
@@ -67,6 +69,7 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool should_mark_readonly = false;
   bool should_mark_uppercase = false;
   bool should_mark_export = false;
+  bool should_print_declaration = false;
   usize first_name = 1;
   for (; first_name < args.count(); first_name++) {
     let const arg = args[first_name].view();
@@ -83,6 +86,7 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case 'A': should_make_associative = true; break;
       case 'i': should_mark_integer = true; break;
       case 'l': should_mark_lowercase = true; break;
+      case 'p': should_print_declaration = true; break;
       case 'r': should_mark_readonly = true; break;
       case 'u': should_mark_uppercase = true; break;
       case 'x': should_mark_export = true; break;
@@ -138,6 +142,25 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                 String{identifier} +
                                     ": variable may not be assigned value");
       status = 1;
+      continue;
+    }
+
+    /* A -p operand asks for the declaration of a name this scope already owns.
+       The print binds nothing, and a global of the same name stays out of
+       reach. */
+    if (should_print_declaration) {
+      let line = String{cxt.scratch_allocator()};
+      if (!cxt.is_local_in_current_scope(identifier) ||
+          !append_variable_declaration(cxt, identifier, line))
+      {
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                  StringView{"'"} + identifier +
+                                      "' is not defined");
+        status = 1;
+        continue;
+      }
+
+      ec.print_to_stdout(line.view());
       continue;
     }
 

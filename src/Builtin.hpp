@@ -484,6 +484,14 @@ fn parse_directory_stack_rotation(StringView arg, usize ring_count,
    printed line reloads to the same value the way bash quotes it. */
 fn quote_for_declare(StringView value) throws -> String;
 
+/* Append the reusable declaration of one variable to out, the way declare -p
+   lays it out, with a trailing newline. An indexed array, an associative array,
+   a scalar and its attributes, an attribute-only name, and an exported name
+   each take their own form. False means the name holds nothing to print and out
+   is left untouched. */
+fn append_variable_declaration(EvalContext &cxt, StringView name,
+                               String &out) throws -> bool;
+
 /* The optional first integer argument of a builtin such as exit, return, break,
    continue, and shift, or default_value when no argument is given. A malformed
    argument propagates its parse error to the caller. */

@@ -979,6 +979,11 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     /* The -r flag sits in the builtin's arguments, so it is read off them. */
     let is_readonly_request =
         array_command_kind == assignment_builtin::Readonly;
+    let did_request_readonly_flag = false;
+    /* Bash prints the reusable declaration of each array once the assignment
+       has landed. The print replaces the attribute pass that -r belongs to, and
+       the name is left writable. */
+    let should_print_declaration = false;
     /* The -A flag routes to the string-keyed store rather than the indexed
        one. */
     let is_associative_request = false;
@@ -994,11 +999,14 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
         if (text.length() >= 2 &&
             (text.view()[0] == '-' || text.view()[0] == '+'))
         {
-          if (!is_readonly_request && text.view()[0] == '-' &&
+          if (text.view()[0] == '-' &&
               text.view().find_character('r').has_value())
           {
-            is_readonly_request = true;
+            did_request_readonly_flag = true;
           }
+          if (text.view()[0] == '-' &&
+              text.view().find_character('p').has_value())
+            should_print_declaration = true;
           if (text.view()[0] == '-' &&
               text.view().find_character('A').has_value())
             is_associative_request = true;
@@ -1023,6 +1031,11 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       should_unmark_lowercase = true;
       should_unmark_uppercase = true;
     }
+
+    if (did_request_readonly_flag && !should_print_declaration) {
+      is_readonly_request = true;
+    }
+
     for (let const &assignment : m_array_args) {
       if (is_local || is_function_local) {
         cxt.declare_local(assignment.name, true);
@@ -1062,6 +1075,17 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       }
       if (is_export) cxt.mark_exported(assignment.name);
       if (is_readonly_request) cxt.mark_readonly(assignment.name);
+
+      /* The redirections of the command still sit on the real descriptors here,
+         and the defers of this frame put them back after the print. */
+      if (should_print_declaration) {
+        let line = String{cxt.scratch_allocator()};
+        if (append_variable_declaration(cxt, assignment.name, line)) {
+          if (!os::write_all(KOSH_STDOUT, line.data(), line.count()))
+            throw Error{"Unable to write to stdout: " +
+                        os::last_system_error_message()};
+        }
+      }
     }
   }
 

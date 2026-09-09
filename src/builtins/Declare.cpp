@@ -209,125 +209,12 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let const do_print_declaration = [&](StringView name) throws -> bool {
-    let const is_directory_stack = cxt.is_bash_directory_stack_special(name);
-    let const is_argument_array = cxt.is_bash_argument_array(name);
-    let const *elements = cxt.lookup_indexed_array(name);
-    if (elements != nullptr || is_directory_stack || is_argument_array) {
-      let line = String{cxt.scratch_allocator(), "declare -a"};
-      if (cxt.is_integer_variable(name)) line += 'i';
-      if (cxt.is_lowercase_variable(name)) line += 'l';
-      if (cxt.is_readonly(name)) line += 'r';
-      if (cxt.is_uppercase_variable(name)) line += 'u';
-      line += ' ';
-      line.append(name);
-      line += "=(";
-      let element_count = elements != nullptr ? elements->count() : 0;
-      if (is_directory_stack)
-        element_count = cxt.bash_directory_stack_element_count();
-      else if (is_argument_array)
-        element_count = cxt.dynamic_array_element_count(
-            name == BASH_ARGUMENT_COUNT_VARIABLE
-                ? EvalContext::DynamicArray::ArgumentCount
-                : EvalContext::DynamicArray::ArgumentValue);
-      for (usize e = 0; e < element_count; e++) {
-        if (e > 0) line += ' ';
-        line += '[';
-        char index_text[24];
-        line.append(utils::int_to_text_into(static_cast<i64>(e), index_text,
-                                            sizeof(index_text)));
-        line += "]=\"";
-        let directory_stack_element = Maybe<String>{};
-        let argument_array_element = String{cxt.scratch_allocator()};
-        let element = StringView{};
-        if (is_directory_stack) {
-          directory_stack_element =
-              cxt.get_bash_directory_stack_element(e, cxt.scratch_allocator());
-          element = directory_stack_element->view();
-        } else if (is_argument_array) {
-          argument_array_element = cxt.dynamic_array_element_text(
-              name == BASH_ARGUMENT_COUNT_VARIABLE
-                  ? EvalContext::DynamicArray::ArgumentCount
-                  : EvalContext::DynamicArray::ArgumentValue,
-              e, cxt.scratch_allocator());
-          element = argument_array_element.view();
-        } else {
-          element = (*elements)[e].view();
-        }
-        line += quote_for_declare(element);
-        line += '"';
-      }
-      line += ")\n";
-      ec.print_to_stdout(line.view());
-      return true;
-    }
+    let line = String{cxt.scratch_allocator()};
+    if (!append_variable_declaration(cxt, name, line)) return false;
 
-    if (cxt.is_associative_array(name)) {
-      let const keys = cxt.associative_keys(name);
-      let const values = cxt.associative_values(name);
-      let line = String{cxt.scratch_allocator(), "declare -A"};
-      if (cxt.is_integer_variable(name)) line += 'i';
-      if (cxt.is_lowercase_variable(name)) line += 'l';
-      if (cxt.is_readonly(name)) line += 'r';
-      if (cxt.is_uppercase_variable(name)) line += 'u';
-      line += ' ';
-      line.append(name);
-      line += "=(";
-      for (usize e = 0; e < keys.count(); e++) {
-        line += '[';
-        line.append(keys[e].view());
-        line += "]=\"";
-        if (e < values.count()) line += quote_for_declare(values[e].view());
-        line += "\" ";
-      }
-      line += ")\n";
-      ec.print_to_stdout(line.view());
-      return true;
-    }
+    ec.print_to_stdout(line.view());
 
-    if (const Maybe<String> value = cxt.get_variable_value(name)) {
-      let attribute = String{cxt.scratch_allocator(), "-"};
-      if (cxt.is_integer_variable(name)) attribute += 'i';
-      if (cxt.is_lowercase_variable(name)) attribute += 'l';
-      if (cxt.is_readonly(name)) attribute += 'r';
-      if (cxt.is_uppercase_variable(name)) attribute += 'u';
-      if (os::get_environment_variable(name).has_value()) attribute += 'x';
-      if (attribute.count() == 1) attribute += '-';
-      let line = String{cxt.scratch_allocator(), "declare "};
-      line.append(attribute.view());
-      line += ' ';
-      line.append(name);
-      line += "=\"";
-      line += quote_for_declare(value->view());
-      line += "\"\n";
-      ec.print_to_stdout(line.view());
-      return true;
-    }
-
-    if (cxt.is_integer_variable(name) || cxt.is_lowercase_variable(name) ||
-        cxt.is_uppercase_variable(name))
-    {
-      let line = String{cxt.scratch_allocator(), "declare -"};
-      if (cxt.is_integer_variable(name)) line += 'i';
-      if (cxt.is_lowercase_variable(name)) line += 'l';
-      if (cxt.is_readonly(name)) line += 'r';
-      if (cxt.is_uppercase_variable(name)) line += 'u';
-      if (cxt.is_exported(name)) line += 'x';
-      line += ' ';
-      line.append(name);
-      line += '\n';
-      ec.print_to_stdout(line.view());
-      return true;
-    }
-
-    if (cxt.is_exported(name)) {
-      let line = String{cxt.scratch_allocator(), "declare -x "};
-      line.append(name);
-      line += '\n';
-      ec.print_to_stdout(line.view());
-      return true;
-    }
-
-    return false;
+    return true;
   };
 
   if (should_print && i >= args.count() && !ec.has_stripped_array_operands) {
