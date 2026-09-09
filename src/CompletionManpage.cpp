@@ -78,6 +78,10 @@ static bool is_man_subcommand_index_built = false;
 /* A fork that runs past this budget is killed so the prompt never freezes. */
 static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
 
+/* A shell with no prompt has nothing to freeze, and a loaded machine can hold a
+   first execution well past the interactive budget. */
+static constexpr u64 HELP_FORK_BATCH_TIMEOUT_NANOS = 8'000'000'000;
+
 /* A killed fork is retried until this many attempts have been spent on one key,
    and the empty answer is then cached for the session. A first execution that
    the platform serializes recovers on the retry, while a command that always
@@ -102,27 +106,43 @@ static fn should_retry_killed_fork(StringView kind, StringView name) throws
 
 static bool was_manpath_settled = false;
 
+/* A one-shot completion request has no later request to spend a retry on, so a
+   shell that is not interactive takes the longer budget and spends every
+   attempt here. */
 static fn
-capture_completion_program_output(const ArrayList<String> &arguments) wontthrow
+capture_completion_program_output(EvalContext &context,
+                                  const ArrayList<String> &arguments) wontthrow
     -> Maybe<String>
 {
-  return os::capture_program_output(arguments, HELP_FORK_TIMEOUT_NANOS);
+  let const is_prompt_waiting = context.shell_is_interactive();
+  let const timeout_nanos = is_prompt_waiting ? HELP_FORK_TIMEOUT_NANOS
+                                              : HELP_FORK_BATCH_TIMEOUT_NANOS;
+  let const attempt_limit = is_prompt_waiting ? 1u : KILLED_FORK_ATTEMPT_LIMIT;
+
+  Maybe<String> output;
+  for (u32 attempt_count = 0; attempt_count < attempt_limit; attempt_count++) {
+    output = os::capture_program_output(arguments, timeout_nanos);
+    if (output.has_value()) break;
+  }
+
+  return output;
 }
 
 /* An empty $MANPATH segment stands for the system defaults at that position,
    the manpath(1) reading. */
-static fn manpage_section1_directories(ProgramResolver &resolver) throws
+static fn manpage_section1_directories(EvalContext &context) throws
     -> ArrayList<Path>;
 
 /* A trusted `manpath` or `man --path` run reports every man root the system
    resolves, including the macOS CommandLineTools root a bare $MANPATH leaves
    out. A result line is colon-separated. The fork happens once and the output
    is cached for the session. */
-static fn manpath_command_output(ProgramResolver &resolver) throws -> StringView
+static fn manpath_command_output(EvalContext &context) throws -> StringView
 {
   static String cached{heap_allocator()};
   if (was_manpath_settled) return cached.view();
 
+  let &resolver = context.get_program_resolver();
   let const man_paths =
       resolver.search("manpath", ProgramResolver::SearchMode::First,
                       ProgramResolver::Requirement::Runnable,
@@ -146,7 +166,7 @@ static fn manpath_command_output(ProgramResolver &resolver) throws -> StringView
       argv.push(String{"--path"});
     }
 
-    Maybe<String> output = capture_completion_program_output(argv);
+    Maybe<String> output = capture_completion_program_output(context, argv);
     if (!output.has_value()) {
       if (should_retry_killed_fork("manpath", "")) {
         LOG(Debug, "the manpath fork was killed, retrying on the next request");
@@ -166,7 +186,7 @@ static fn manpath_command_output(ProgramResolver &resolver) throws -> StringView
   return cached.view();
 }
 
-static fn manpage_section1_directories(ProgramResolver &resolver) throws
+static fn manpage_section1_directories(EvalContext &context) throws
     -> ArrayList<Path>
 {
   let directories = ArrayList<Path>{heap_allocator()};
@@ -183,7 +203,7 @@ static fn manpage_section1_directories(ProgramResolver &resolver) throws
     do_push_man1_of_root("/usr/share/man");
   };
   let const do_push_command_roots = [&]() {
-    let const view = manpath_command_output(resolver);
+    let const view = manpath_command_output(context);
     usize segment_start = 0;
     for (usize i = 0; i <= view.length; i++) {
       if (i != view.length && view[i] != os::PATH_DELIMITER &&
@@ -266,10 +286,10 @@ static pure fn strip_man1_suffix(StringView entry) wontthrow
 
 /* The tail is a subcommand only when the head page exists too, so xdg-open
    invents no xdg, and a digit-leading version tail is none. */
-static fn build_man_subcommand_index(ProgramResolver &resolver) throws -> void
+static fn build_man_subcommand_index(EvalContext &context) throws -> void
 {
   MAN_SUBCOMMAND_INDEX.clear();
-  for (let const &directory : manpage_section1_directories(resolver)) {
+  for (let const &directory : manpage_section1_directories(context)) {
     LOG(Info, "scanning man1 directory '%s'", directory.text().c_str());
     let entries = Path::read_directory(directory);
     if (!entries.has_value()) {
@@ -466,7 +486,7 @@ fn internal::complete_from_man_subcommands(StringView line, StringView token,
 
   if (!is_man_subcommand_index_built) {
     if (!for_listing) return None;
-    build_man_subcommand_index(context.get_program_resolver());
+    build_man_subcommand_index(context);
   }
 
   let const subcommands = MAN_SUBCOMMAND_INDEX.find(command);
@@ -646,7 +666,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   let argv = ArrayList<String>{heap_allocator()};
   argv.push(String{man_paths[0].text().view()});
   argv.push(String{page_name});
-  Maybe<String> page = capture_completion_program_output(argv);
+  Maybe<String> page = capture_completion_program_output(context, argv);
   if (!page.has_value()) {
     LOG(Debug,
         "the man fork for '%.*s' was killed or failed to start, leaving the "
@@ -692,7 +712,7 @@ fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
   locate_argv.push(String{man_paths[0].text().view()});
   locate_argv.push(String{"-w"});
   locate_argv.push(String{page_name});
-  let const location = capture_completion_program_output(locate_argv);
+  let const location = capture_completion_program_output(context, locate_argv);
   if (!location.has_value()) {
     LOG(Debug,
         "the man location fork for '%.*s' was killed or failed to start, "
@@ -710,7 +730,7 @@ fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
   let argv = ArrayList<String>{heap_allocator()};
   argv.push(String{man_paths[0].text().view()});
   argv.push(String{page_name});
-  Maybe<String> page = capture_completion_program_output(argv);
+  Maybe<String> page = capture_completion_program_output(context, argv);
   if (!page.has_value()) {
     LOG(Debug,
         "the man fork for '%.*s' was killed or failed to start, leaving the "
@@ -764,8 +784,7 @@ fn internal::complete_from_manpage(StringView line, StringView token,
   if (let const subcommand_word = second_word_of(line);
       subcommand_word.has_value())
   {
-    if (!is_man_subcommand_index_built)
-      build_man_subcommand_index(context.get_program_resolver());
+    if (!is_man_subcommand_index_built) build_man_subcommand_index(context);
     let combined = String{command};
     combined.push('-');
     combined.append(*subcommand_word);
@@ -798,13 +817,14 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
 /* The fork passes two gates, the command is on the allowlist and resolves into
    a trusted directory. The resolved absolute path runs as the only argv entry,
    not through a shell, so no alias shadows it. */
-static fn help_text_for(ProgramResolver &resolver, StringView command,
+static fn help_text_for(EvalContext &context, StringView command,
                         StringView subcommand = {}) throws -> Maybe<String>
 {
   let help_argument = HELP_ALLOWLIST.find(command);
-  let const paths = resolver.search(command, ProgramResolver::SearchMode::First,
-                                    ProgramResolver::Requirement::Runnable,
-                                    ProgramResolver::CachePolicy::Bypass);
+  let const paths = context.get_program_resolver().search(
+      command, ProgramResolver::SearchMode::First,
+      ProgramResolver::Requirement::Runnable,
+      ProgramResolver::CachePolicy::Bypass);
   if (help_argument.has_value() && !paths.is_empty() &&
       command_directory_is_trusted(paths[0].text().view()))
   {
@@ -823,7 +843,7 @@ static fn help_text_for(ProgramResolver &resolver, StringView command,
         [&](StringView word) throws { argv.push(String{word}); });
     LOG(Debug, "forking '%.*s' for its --help text",
         static_cast<int>(command.length), command.data);
-    Maybe<String> output = capture_completion_program_output(argv);
+    Maybe<String> output = capture_completion_program_output(context, argv);
     if (!output.has_value()) {
       LOG(Debug,
           "the --help fork for '%.*s' was killed or failed to start, leaving "
@@ -866,7 +886,7 @@ fn internal::help_text_of(StringView command, EvalContext &context) throws
   if (let const cached = HELP_TEXT_CACHE.find(command); cached != nullptr)
     return cached->view();
 
-  let text = help_text_for(context.get_program_resolver(), command);
+  let text = help_text_for(context, command);
   if (!text.has_value()) return StringView{};
 
   return HELP_TEXT_CACHE.set(command, steal(*text))->view();
@@ -915,14 +935,14 @@ static fn help_cache_key(StringView command, StringView subcommand) throws
 
 /* HELP_PARSED gates the fork so a second tab reads the parsed caches. A key is
    recorded only after the fork settles. */
-static fn ensure_help_parsed(ProgramResolver &resolver, StringView command,
+static fn ensure_help_parsed(EvalContext &context, StringView command,
                              StringView subcommand = {}) throws -> void
 {
   let const key = help_cache_key(command, subcommand);
   if (HELP_PARSED.contains(key.view())) return;
   /* A killed fork still fills both caches so the caller has a reference to
      return, and the key stays unparsed while attempts remain. */
-  let const text = help_text_for(resolver, command, subcommand);
+  let const text = help_text_for(context, command, subcommand);
   let const parsed = text.has_value() ? text->view() : StringView{};
   HELP_OPTION_CACHE.set(key.view(), parse_help_option_entries(parsed));
   HELP_SUBCOMMAND_CACHE.set(key.view(),
@@ -932,19 +952,19 @@ static fn ensure_help_parsed(ProgramResolver &resolver, StringView command,
 }
 
 static fn help_entries_for(StringMap<ArrayList<help_entry>> &cache,
-                           ProgramResolver &resolver, StringView command,
+                           EvalContext &context, StringView command,
                            StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
 {
-  ensure_help_parsed(resolver, command, subcommand);
+  ensure_help_parsed(context, command, subcommand);
   return *cache.find(help_cache_key(command, subcommand).view());
 }
 
-static fn help_options_for(ProgramResolver &resolver, StringView command,
+static fn help_options_for(EvalContext &context, StringView command,
                            StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
 {
-  return help_entries_for(HELP_OPTION_CACHE, resolver, command, subcommand);
+  return help_entries_for(HELP_OPTION_CACHE, context, command, subcommand);
 }
 
 static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
@@ -1151,20 +1171,19 @@ static fn parse_help_subcommands(StringView text, StringView command) throws
   return subcommands;
 }
 
-static fn help_subcommands_for(ProgramResolver &resolver, StringView command,
+static fn help_subcommands_for(EvalContext &context, StringView command,
                                StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
 {
-  return help_entries_for(HELP_SUBCOMMAND_CACHE, resolver, command, subcommand);
+  return help_entries_for(HELP_SUBCOMMAND_CACHE, context, command, subcommand);
 }
 
-static fn is_known_help_subcommand(ProgramResolver &resolver,
-                                   StringView command,
+static fn is_known_help_subcommand(EvalContext &context, StringView command,
                                    StringView subcommand_prefix,
                                    StringView word) throws -> bool
 {
   for (let const &entry :
-       help_subcommands_for(resolver, command, subcommand_prefix))
+       help_subcommands_for(context, command, subcommand_prefix))
     if (entry.name.view() == word) return true;
   return false;
 }
@@ -1172,7 +1191,7 @@ static fn is_known_help_subcommand(ProgramResolver &resolver,
 /* A line past this depth stops forking, so the fork count is bounded. */
 static constexpr usize MAX_SUBCOMMAND_DEPTH = 4;
 
-static fn settled_subcommand_chain(ProgramResolver &resolver,
+static fn settled_subcommand_chain(EvalContext &context,
                                    StringView resolved_command, StringView line,
                                    usize token_start) throws -> String
 {
@@ -1196,7 +1215,7 @@ static fn settled_subcommand_chain(ProgramResolver &resolver,
       break;
     }
     if (word[0] == '-') break;
-    if (!is_known_help_subcommand(resolver, resolved_command, chain.view(),
+    if (!is_known_help_subcommand(context, resolved_command, chain.view(),
                                   word))
       break;
 
@@ -1224,11 +1243,11 @@ fn internal::complete_from_help(StringView line, StringView token,
 
   let const resolved_name = resolve_completion_alias(surface_command, context);
 
-  let const chain = settled_subcommand_chain(
-      context.get_program_resolver(), resolved_name.view(), line, token_start);
+  let const chain = settled_subcommand_chain(context, resolved_name.view(),
+                                             line, token_start);
 
-  let const &options = help_options_for(context.get_program_resolver(),
-                                        resolved_name.view(), chain.view());
+  let const &options =
+      help_options_for(context, resolved_name.view(), chain.view());
   if (options.is_empty()) return None;
 
   let matches = matches_from_help_entries(options, token, descriptions);
@@ -1261,8 +1280,8 @@ fn internal::complete_from_help_subcommands(
 
   /* An empty chain at the first-argument position lists the base subcommands.
    */
-  let const chain = settled_subcommand_chain(
-      context.get_program_resolver(), resolved_name.view(), line, token_start);
+  let const chain = settled_subcommand_chain(context, resolved_name.view(),
+                                             line, token_start);
   if (chain.is_empty()) {
     if (!is_first_argument_token(line, token_start)) {
       LOG(Debug, "help subcommands bail because the token is not the first "
@@ -1271,8 +1290,8 @@ fn internal::complete_from_help_subcommands(
     }
   }
 
-  let const &subcommands = help_subcommands_for(
-      context.get_program_resolver(), resolved_name.view(), chain.view());
+  let const &subcommands =
+      help_subcommands_for(context, resolved_name.view(), chain.view());
   if (subcommands.is_empty()) {
     LOG(Debug, "help subcommands bail because the parsed subcommands are "
                "empty");
