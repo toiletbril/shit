@@ -740,7 +740,10 @@ public:
   fn set_trap(StringView condition, StringView action) throws -> void;
   fn remove_trap(StringView condition) throws -> void;
   pure fn traps() const wontthrow -> const StringMap<String> &;
-  fn run_exit_trap() throws -> void;
+  /* A caller that ends the shell with a chosen status names it here. The
+     action reads it through $?, and a bare exit inside the action reports it
+     again. */
+  fn run_exit_trap(Maybe<i32> final_status = None) throws -> void;
 
   /* The trigger location is the command that fired the trap. $LINENO reports
      it inside the action. An absent location falls back to the current one.

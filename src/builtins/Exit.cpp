@@ -78,7 +78,7 @@ fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return static_cast<i32>(masked_status);
   }
 
-  cxt.run_exit_trap();
+  cxt.run_exit_trap(static_cast<i32>(status & 0xFF));
   utils::quit(static_cast<i32>(status), utils::farewell_policy::Goodbye);
 }
 

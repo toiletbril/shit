@@ -478,10 +478,12 @@ pure fn EvalContext::traps() const wontthrow -> const StringMap<String> &
   return m_traps;
 }
 
-cold fn EvalContext::run_exit_trap() throws -> void
+cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
 {
   if (m_exit_trap_ran) return;
   m_exit_trap_ran = true;
+
+  if (final_status.has_value()) m_last_exit_status = *final_status;
 
   /* A Ctrl-C that ended the last command leaves the interrupt flag set, so it
      is dropped before the action evaluates. */

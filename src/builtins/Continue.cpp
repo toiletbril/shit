@@ -63,7 +63,7 @@ fn Continue::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           return 2;
         }
 
-        cxt.run_exit_trap();
+        cxt.run_exit_trap(2);
         utils::quit(2, utils::farewell_policy::Goodbye);
       }
 
