@@ -117,7 +117,13 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      the positional parameters are still the ones the file received. */
   cxt.set_current_command(steal(saved_current_command));
 
-  if (!cxt.is_posix_mode()) {
+  /* An exit is on its way out of the shell. The frame it leaves behind runs no
+     action. */
+  let const is_exit_pending =
+      cxt.has_pending_control_flow() &&
+      cxt.pending_control_flow().kind == control_flow::Kind::Exit;
+
+  if (!cxt.is_posix_mode() && !is_exit_pending) {
     if (status_before_return.has_value())
       cxt.run_return_trap(*status_before_return);
     else

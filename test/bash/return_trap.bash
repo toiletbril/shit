@@ -177,4 +177,18 @@ echo nested-body-installs-trap
   trap -p RETURN )
 echo after-nested-body-installs-trap=$?
 
+echo function-exit-in-body
+( set -T
+  trap 'echo R-exit' RETURN
+  exits_body() { echo exit-body; exit 4; }
+  ( exits_body )
+  echo after-function-exit=$? )
+echo after-function-exit-in-body=$?
+
+echo sourced-exit-in-body
+( trap 'echo R-src-exit' RETURN
+  ( . "${BASH_SOURCE[0]%/*}/goldens/return_trap_exit.bash" )
+  echo after-sourced-exit=$? )
+echo after-sourced-exit-in-body=$?
+
 echo return-trap-done

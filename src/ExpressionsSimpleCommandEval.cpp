@@ -860,13 +860,18 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     try {
       function_ret = function_body->evaluate(cxt);
       if (cxt.should_run_return_trap()) {
-        /* A pending return has replaced the status with the one it supplies.
-           The action reads the status the body left behind. */
-        let const is_return_pending =
-            cxt.has_pending_control_flow() &&
-            cxt.pending_control_flow().kind == control_flow::Kind::Return;
-        cxt.run_return_trap(is_return_pending ? cxt.status_before_return()
-                                              : cxt.last_exit_status());
+        let const pending_kind = cxt.has_pending_control_flow()
+                                     ? cxt.pending_control_flow().kind
+                                     : control_flow::Kind::Normal;
+
+        /* An exit is on its way out of the shell. The frame it leaves behind
+           runs no action. A pending return has replaced the status with the one
+           it supplies, and the action reads the status the body left. */
+        if (pending_kind != control_flow::Kind::Exit) {
+          cxt.run_return_trap(pending_kind == control_flow::Kind::Return
+                                  ? cxt.status_before_return()
+                                  : cxt.last_exit_status());
+        }
       }
     } catch (ErrorWithLocationAndDetails &error) {
       if (!error.was_rendered())
