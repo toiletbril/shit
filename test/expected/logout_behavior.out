@@ -10,3 +10,16 @@ rc=1
        |  ^~~~~~~~~~
 note: `exit` may be used instead.
 rc=1
+== logout runs the EXIT action with its operand:
+body
+action-ran
+rc=5
+== bare logout keeps the status the action found:
+action-ran
+rc=0
+== an external last command in the action keeps the logout status:
+external-last
+rc=6
+== an exit inside the action replaces the logout status:
+head
+rc=9
