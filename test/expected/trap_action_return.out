@@ -15,13 +15,14 @@ after-call
 src-rc=0
 tail
 rc=0
-== a return in a RETURN action fires the trap once for each frame:
+== a return in a RETURN action fires the trap again for the same frame:
 inner
 fire-1-f
+fire-2-f
 after-f
-fire-2-h
+fire-3-h
 h-rc=0
-n=2
+n=3
 tail
 rc=0
 == a return with no function and no sourced file runs the traced command:

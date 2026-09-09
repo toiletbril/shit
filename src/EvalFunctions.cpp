@@ -331,7 +331,33 @@ fn EvalContext::run_return_trap(i32 status_before_return) throws -> void
   m_last_exit_status = status_before_return;
   defer { m_last_exit_status = saved_exit_status; };
 
-  run_named_trap(StringView{"RETURN", 6});
+  /* The frame is already leaving through a request of its own, and that request
+     would stop the action after its first command. It is held here for the
+     whole action, and an answer the action gives replaces it. */
+  let frame_control_flow = steal(m_control_flow);
+  clear_control_flow();
+
+  /* Bash fires the trap again after each action that returns, and the last such
+     return supplies the status of the frame. An action that keeps returning
+     keeps the loop running, the way bash keeps firing. */
+  let action_control_flow = control_flow{};
+  let did_action_return = false;
+  while (true) {
+    run_named_trap(StringView{"RETURN", 6});
+    if (!has_pending_control_flow()) break;
+
+    /* A break, a continue, or an exit leaves the frame on its own terms. */
+    if (m_control_flow.kind != control_flow::Kind::Return) return;
+
+    LOG(Info, "the RETURN action returned with status %lld, firing again",
+        (long long) m_control_flow.value);
+    action_control_flow = steal(m_control_flow);
+    clear_control_flow();
+    did_action_return = true;
+  }
+
+  m_control_flow = did_action_return ? steal(action_control_flow)
+                                     : steal(frame_control_flow);
 }
 
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void

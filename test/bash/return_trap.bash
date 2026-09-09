@@ -191,4 +191,35 @@ echo sourced-exit-in-body
   echo after-sourced-exit=$? )
 echo after-sourced-exit-in-body=$?
 
+echo whole-action-list-under-a-returning-frame
+( set -T
+  trap 'echo A; echo B' RETURN
+  returns_three() { return 3; }
+  returns_three
+  echo after-list=$? )
+echo after-whole-action-list=$?
+
+echo action-return-refires-the-trap
+( set -T
+  n=0
+  inner_call() { echo inner; }
+  outer_call() { inner_call; echo after-inner; }
+  trap 'n=$((n + 1)); echo fire-$n-${FUNCNAME-none}; [ "$n" = 1 ] && return 6' RETURN
+  outer_call
+  echo after-outer=$?
+  trap - RETURN
+  echo n=$n )
+echo after-action-return-refires-the-trap=$?
+
+echo action-return-supplies-the-frame-status
+( set -T
+  m=0
+  returns_three() { echo three-body; return 3; }
+  trap 'm=$((m + 1)); echo m-fire-$m-status=$?; [ "$m" = 1 ] && return 9' RETURN
+  returns_three
+  echo after-three=$?
+  trap - RETURN
+  echo m=$m )
+echo after-action-return-supplies-the-frame-status=$?
+
 echo return-trap-done

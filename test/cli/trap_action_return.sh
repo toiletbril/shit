@@ -42,7 +42,7 @@ trap '"'"'case "$BASH_COMMAND" in echo\ g-1*) return 4;; esac'"'"' DEBUG
 echo src-rc=$?
 trap - DEBUG
 echo tail' 2>&1 | sed "s|$d|DIR|g" | ./normalize-trace.sh "$BIN"; echo "rc=${PIPESTATUS[0]}"
-echo "== a return in a RETURN action fires the trap once for each frame:"
+echo "== a return in a RETURN action fires the trap again for the same frame:"
 "$BIN" --mood bash -c 'set -T
 f() { echo inner; }
 h() { f; echo after-f; }
