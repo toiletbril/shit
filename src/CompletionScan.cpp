@@ -633,6 +633,7 @@ static fn push_variable_name_candidates(StringView token, EvalContext &context,
 
 fn internal::complete_from_builtin_flags(StringView line, StringView token,
                                          usize token_start,
+                                         completion_mode mode,
                                          EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
@@ -832,6 +833,17 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
     for (let const &name : builtin_names())
       do_push_matching(name.view());
     if (!candidates.is_empty()) return candidates;
+    return None;
+  }
+
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Type &&
+      wants_operand)
+  {
+    if (token.is_empty() && mode != completion_mode::Listing) return None;
+
+    let names =
+        complete_command_names(token, command_match_mode::Prefix, context);
+    if (!names.is_empty()) return names;
     return None;
   }
 

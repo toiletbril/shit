@@ -1107,7 +1107,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
           complete_from_process_arguments(line, stage_token, token_start, mode);
       if (!from_stage.has_value())
         from_stage = complete_from_builtin_flags(line, stage_token, token_start,
-                                                 context);
+                                                 mode, context);
       if (!from_stage.has_value())
         from_stage = complete_from_spec(line, stage_token, cursor, mode,
                                         context, descriptions);

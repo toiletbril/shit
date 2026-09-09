@@ -1,0 +1,15 @@
+== alias and function operands:
+zzalias
+zzfunc
+== builtin operand:
+unalias
+== keyword operand:
+while
+== absent operand:
+== flags still answer:
+--help
+-P
+-V
+-a
+-p
+-t

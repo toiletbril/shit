@@ -104,7 +104,9 @@ changes update this file.
   runs for any non-empty token. A directory is indexed as soon as its slash is
   typed.
 - Command completion reads keywords, builtins, bundled utilities, functions,
-  aliases, and PATH. `KEYWORD_ENTRIES` is the sole keyword catalog.
+  aliases, and PATH. `KEYWORD_ENTRIES` is the sole keyword catalog. A `type`
+  operand reads the same catalog. An empty operand is answered only in the
+  listing mode.
 - Static koshkit completion names stay alphabetically sorted.
 - The language server wraps completion in `begin_explicit_completion` and loads
   command documentation lazily. Mood selection checks the shebang, language
@@ -262,7 +264,9 @@ changes update this file.
   existing matches. Run independent searches independently.
 - Put `--glob` before the pattern and every path. Keep short options separate
   when any option accepts a value. Never pass `-r` to ripgrep, because it names
-  the replacement text and rewrites every printed match.
+  the replacement text and rewrites every printed match. Give `--glob` a
+  concrete pattern. A zero count from a filtered search stays unproven until the
+  filter is checked.
 - A command that runs ripgrep must not contain `&&` or `||`.
 - Run an expected no-match search as its own command, since its status must not
   stop later checks.
@@ -332,6 +336,12 @@ changes update this file.
   case scopes, and standard helper declarations. Repeat the unrestricted
   literal symbol search after the edit.
 - Recheck every break and continue when moving a loop body into a lambda.
+- Place a gate on the single producer of the value it governs. A gate added at
+  one consumer leaves every other consumer unchanged.
+- Read the declaration of an aggregate before writing or reading its positional
+  initializer. Read the access label that governs a member before calling it.
+- Search for every golden that reads a shared name table before the table gains
+  an entry.
 - Write and read framed fields in identical order. Review both sides together
   whenever a framed format changes.
 - Inspect exact-length stream readers for read-ahead and end-of-file dependence
@@ -402,6 +412,13 @@ changes update this file.
   setter. Importing an environment value does not prove that the setter ran.
 - Isolate each operation in a hanging command before identifying the cause.
   Repeated probes start with a verified unused or clean path.
+- Give each section of an interactive fixture its own temporary directory.
+- Read the owner that computes a default before a fixture asserts it.
+- Measure a divergence between the two shells for each assertion of a
+  compatibility fixture before the fixture is written.
+- Run a status or PIPESTATUS capture in the same shell and the same order the
+  fixture will use. Read a process-sensitive name with a builtin print in the
+  current shell, because a command substitution reports the child identity.
 - Trace native creation and open requests before changing platform access,
   sharing, or security. Verify both payload and status in every direction.
 - Normalize platform branches to the same output before changing a shared
@@ -442,7 +459,10 @@ changes update this file.
 - Inspect vendored formatting rules before formatting a touched vendor file.
 - Verify git identity. Keep commit subjects within the limit and bodies within
   72 columns. Commit locally. Never push or create external artifacts without
-  an explicit request.
+  an explicit request. Run `git add` on every new path before that path appears
+  in a commit pathspec.
+- Read the commit and prose guidance against a drafted commit body before the
+  commit command is composed. Every consequence clause becomes its own sentence.
 - Pass an explicit pathspec to every commit, because the index can hold a path
   that another worker staged in the same working copy. A status reading goes
   stale as soon as another command runs.

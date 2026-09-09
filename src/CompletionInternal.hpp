@@ -141,7 +141,9 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
                                     EvalContext &context) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_builtin_flags(StringView line, StringView token,
-                               usize token_start, EvalContext &context) throws
+                               usize token_start,
+                               completion::completion_mode mode,
+                               EvalContext &context) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_spec(StringView line, StringView token, usize cursor,
                       completion::completion_mode mode, EvalContext &context,
