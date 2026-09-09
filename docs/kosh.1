@@ -903,6 +903,18 @@ A function called from a guarded and-or operand or a negation inherits that
 condition. The
 .B errexit
 option remains suppressed throughout the guarded function body.
+.PP
+In the default mood the RETURN trap fires at the boundary of every function
+body. The
+.B bash
+and
+.B bash-posix
+moods reach a body the
+.B functrace
+option follows and a body that installs its own action. A sourced file fires
+the trap in all of these moods. The
+.B sh
+mood rejects the RETURN condition.
 .SH BUILTINS
 The shell provides the POSIX and Bash builtins listed below. The standard forms
 follow the active compatibility mood unless a difference is stated here.
