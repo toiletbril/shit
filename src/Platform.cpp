@@ -137,8 +137,12 @@ fn take_pending_signal() wontthrow -> i32
 static u32 REAPED_CHILD_COUNT = 0;
 static bool DID_REAPED_CHILD_ARRIVE = false;
 
+volatile sig_atomic_t CHILD_TRAP_ARMED = 0;
+
 fn note_child_reaped() wontthrow -> void
 {
+  if (CHILD_TRAP_ARMED == 0) return;
+
   REAPED_CHILD_COUNT += 1;
   DID_REAPED_CHILD_ARRIVE = true;
 }

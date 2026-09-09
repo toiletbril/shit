@@ -1308,6 +1308,12 @@ static fn sigchild_handler(int signal_number, siginfo_t *siginfo,
   unused(context);
   unused(siginfo);
   CHILD_STATE_CHANGED = 1;
+
+  /* The drain is woken only for a CHLD trap that has an action. Every external
+     command reaps a child, and a wake for each one would drain a signal that
+     an outer action left queued. */
+  if (CHILD_TRAP_ARMED == 0) return;
+
   if (is_trappable_signal(signal_number))
     PENDING_SIGNAL_FLAGS[signal_number] = 1;
   SIGNAL_PENDING = 1;
@@ -1333,6 +1339,7 @@ fn reset_signal_handlers() throws -> void
 
   struct sigaction sa = {};
   sa.sa_handler = SIG_DFL;
+  CHILD_TRAP_ARMED = 0;
   install_child_state_handler();
   check_syscall(sigaction(SIGINT, &sa, nullptr));
 
@@ -1422,6 +1429,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
      signal is delivered the moment it is unblocked, and the default action for
      most signals ends the shell. */
   if (signal_number == SIGCHLD) {
+    CHILD_TRAP_ARMED = 1;
     install_child_state_handler();
   } else {
     struct sigaction sa = {};
@@ -1438,6 +1446,7 @@ fn set_trap_ignore(i32 signal_number) throws -> void
   if (!is_trappable_signal(signal_number)) return;
   LOG(Info, "ignoring signal %d", signal_number);
   if (signal_number == SIGCHLD) {
+    CHILD_TRAP_ARMED = 0;
     install_child_state_handler();
     return;
   }
@@ -1456,6 +1465,7 @@ fn clear_trap_handler(i32 signal_number) throws -> void
   reblock_signal_after_trap(signal_number);
 
   if (signal_number == SIGCHLD) {
+    CHILD_TRAP_ARMED = 0;
     install_child_state_handler();
     return;
   }

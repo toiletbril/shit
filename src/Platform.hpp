@@ -1049,6 +1049,11 @@ extern volatile sig_atomic_t CHILD_STATE_CHANGED;
    the per-signal flags. */
 extern volatile sig_atomic_t SIGNAL_PENDING;
 
+/* Raised while a CHLD trap action is installed. The child handler wakes the
+   trap drain only under this flag. A child that no action observes leaves a
+   signal that is already queued for the next boundary of its own. */
+extern volatile sig_atomic_t CHILD_TRAP_ARMED;
+
 /* A signal the startup blocked is unblocked here, after its disposition is in
    place. */
 fn set_trap_handler(i32 signal_number) throws -> void;
