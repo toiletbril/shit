@@ -1976,6 +1976,11 @@ reports 128 plus the signal number. The job it was waiting on is left running,
 and the operands it has not reached are abandoned. A child arrival leaves the
 wait blocked. Every external command reaps a child, and a wake for each one
 would end every wait.
+.PP
+A redirection whose open blocks, such as a named pipe with no peer, resumes
+after a trapped signal runs its action. The file is still opened and the
+command runs against it. An untrapped interrupt ends the open, and the shell
+reports the interrupt against the redirection.
 .SH DIAGNOSTICS
 Errors, warnings, and analysis diagnostics include source locations when a
 mapping exists. A diagnostic may include a source line, caret, detail location,

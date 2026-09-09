@@ -671,6 +671,12 @@ fn internal::resolve_redirection(const Redirection &redir, EvalContext &cxt,
   let opened = os::open_file_descriptor(target_path, mode);
   if (!opened) {
     if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
+
+    /* An interrupt ends the shell, and the open never reached the file. The
+       flag stays set so the command boundary above still sees the interrupt. */
+    if (os::INTERRUPT_REQUESTED)
+      throw InterruptErrorWithLocation{redir.target->source_location()};
+
     throw ErrorWithLocation{redir.target->source_location(),
                             "Could not open '" + target_path +
                                 "': " + redirection_open_error(target_path)};
