@@ -911,6 +911,10 @@ public:
   fn is_readonly(StringView name) const wontthrow -> bool;
   fn readonly_names() const throws -> ArrayList<String>;
 
+  fn mark_declared(StringView name) throws -> void;
+  fn is_declared(StringView name) const wontthrow -> bool;
+  fn append_attributed_names(HashSet &out) const throws -> void;
+
   fn mark_integer(StringView name) throws -> void;
   fn unmark_integer(StringView name) throws -> void;
   fn is_integer_variable(StringView name) const wontthrow -> bool;

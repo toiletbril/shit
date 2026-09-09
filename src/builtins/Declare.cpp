@@ -249,6 +249,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let names = cxt.variable_names(cxt.scratch_allocator());
     for (let const &environment_name : os::environment_names())
       names.add(environment_name.view());
+    cxt.append_attributed_names(names);
 
     let sorted_names = ArrayList<String>{cxt.scratch_allocator()};
     names.for_each([&](StringView name) { sorted_names.push_managed(name); });
@@ -365,6 +366,12 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (should_unmark_uppercase_attribute) cxt.unmark_uppercase(name);
     if (should_mark_lowercase_attribute) cxt.mark_lowercase(name);
     if (should_mark_uppercase_attribute) cxt.mark_uppercase(name);
+
+    if (!equals.has_value() && !has_subscript && !should_make_associative &&
+        !should_make_indexed)
+    {
+      cxt.mark_declared(name);
+    }
 
     LOG(All, "declare applying attributes to '%.*s'",
         static_cast<int>(name.length), name.data);

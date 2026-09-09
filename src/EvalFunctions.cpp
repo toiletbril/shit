@@ -734,6 +734,22 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
   return out;
 }
 
+fn EvalContext::mark_declared(StringView name) throws -> void
+{
+  set_variable_attribute(name, variable_attribute::Declared, true);
+}
+
+fn EvalContext::is_declared(StringView name) const wontthrow -> bool
+{
+  return (variable_attributes(name) &
+          static_cast<u8>(variable_attribute::Declared)) != 0;
+}
+
+fn EvalContext::append_attributed_names(HashSet &out) const throws -> void
+{
+  m_variable_attributes.for_each([&](StringView name, u8) { out.add(name); });
+}
+
 fn EvalContext::mark_integer(StringView name) throws -> void
 {
   set_variable_attribute(name, variable_attribute::Integer, true);

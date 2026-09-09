@@ -185,6 +185,12 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (should_mark_lowercase) cxt.mark_lowercase(name);
     if (should_mark_uppercase) cxt.mark_uppercase(name);
 
+    if (!equals_position.has_value() && !should_make_associative &&
+        !should_make_indexed)
+    {
+      cxt.mark_declared(name);
+    }
+
     if (should_make_associative) {
       cxt.declare_associative_array(name);
     } else if (should_make_indexed) {

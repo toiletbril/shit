@@ -98,6 +98,7 @@ enum class variable_attribute : u8
   Integer = 1U << 1,
   Lowercase = 1U << 2,
   Uppercase = 1U << 3,
+  Declared = 1U << 4,
 };
 
 /* A candidate argument after variable expansion and field splitting. The
