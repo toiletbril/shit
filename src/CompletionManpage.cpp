@@ -78,8 +78,6 @@ static bool is_man_subcommand_index_built = false;
 /* A fork that runs past this budget is killed so the prompt never freezes. */
 static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
 
-/* A shell with no prompt has nothing to freeze, and a loaded machine can hold a
-   first execution well past the interactive budget. */
 static constexpr u64 HELP_FORK_BATCH_TIMEOUT_NANOS = 8'000'000'000;
 
 /* A killed fork is retried until this many attempts have been spent on one key,
@@ -106,9 +104,6 @@ static fn should_retry_killed_fork(StringView kind, StringView name) throws
 
 static bool was_manpath_settled = false;
 
-/* A one-shot completion request has no later request to spend a retry on, so a
-   shell that is not interactive takes the longer budget and spends every
-   attempt here. */
 static fn
 capture_completion_program_output(EvalContext &context,
                                   const ArrayList<String> &arguments) wontthrow

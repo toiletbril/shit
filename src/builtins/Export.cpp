@@ -96,9 +96,6 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return has_error ? 1 : 0;
   }
 
-  /* An operand takes the builtin away from its listing, and the -p flag with an
-     operand still assigns. A NAME=(...) operand reaches the evaluator, and the
-     argument vector never holds it. */
   if (args.count() == 1 && !ec.has_stripped_array_operands) {
     let const is_declare_form = cxt.is_bash_compatible();
     let names = os::environment_names();

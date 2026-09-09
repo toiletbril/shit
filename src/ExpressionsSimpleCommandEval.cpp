@@ -864,9 +864,6 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
                                      ? cxt.pending_control_flow().kind
                                      : control_flow::Kind::Normal;
 
-        /* An exit is on its way out of the shell. The frame it leaves behind
-           runs no action. A pending return has replaced the status with the one
-           it supplies, and the action reads the status the body left. */
         if (pending_kind != control_flow::Kind::Exit) {
           cxt.run_return_trap(pending_kind == control_flow::Kind::Return
                                   ? cxt.status_before_return()
@@ -980,9 +977,6 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     let is_readonly_request =
         array_command_kind == assignment_builtin::Readonly;
     let did_request_readonly_flag = false;
-    /* Bash prints the reusable declaration of each array once the assignment
-       has landed. The print replaces the attribute pass that -r belongs to, and
-       the name is left writable. */
     let should_print_declaration = false;
     /* The -A flag routes to the string-keyed store rather than the indexed
        one. */
@@ -1076,8 +1070,6 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       if (is_export) cxt.mark_exported(assignment.name);
       if (is_readonly_request) cxt.mark_readonly(assignment.name);
 
-      /* The redirections of the command still sit on the real descriptors here,
-         and the defers of this frame put them back after the print. */
       if (should_print_declaration) {
         let line = String{cxt.scratch_allocator()};
         if (append_variable_declaration(cxt, assignment.name, line)) {

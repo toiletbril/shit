@@ -306,11 +306,6 @@ fn source_list_from_operands(const ArrayList<String> &operands,
   return sources;
 }
 
-/* Bash lays the table out in five columns, right-aligns each number in two
-   places, separates the entries with a tab, and breaks the line after every
-   fifth one. A table whose length is not a multiple of five still ends with a
-   newline. The entries are ordered by number, which the platform table is free
-   not to be. */
 fn format_signal_list() throws -> String
 {
   static const usize COLUMN_COUNT = 5;

@@ -117,8 +117,6 @@ enum class dynamic_var : u8
   FUNCNAME,
 };
 
-/* Bash takes an assignment to a name whose value it computes on every read,
-   reports success, and throws the value away. The reader keeps answering. */
 enum class dynamic_write : u8
 {
   Settable,

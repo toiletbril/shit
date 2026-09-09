@@ -688,8 +688,6 @@ fn internal::resolve_redirection(const Redirection &redir, EvalContext &cxt,
                               file_fd, -1, /*is_cached=*/false};
 }
 
-/* The value a descriptor allocation target holds. An unset array element reads
-   as an empty value, which names no descriptor. */
 static fn read_fd_allocation_value(EvalContext &cxt,
                                    const fd_allocation_target &target) throws
     -> Maybe<String>
@@ -755,9 +753,6 @@ static pure fn is_reprint_blank(char byte) wontthrow -> bool
   return byte == ' ' || byte == '\t';
 }
 
-/* A tab, a run of blanks, a line continuation, a command substitution, a
-   process substitution, and an ANSI-C quoted word are the only places where the
-   source spelling and the bash reprint can differ. */
 static pure fn should_reprint_source(StringView source,
                                      bool are_bash_additions_enabled) wontthrow
     -> bool
@@ -793,8 +788,6 @@ static pure fn should_reprint_source(StringView source,
   return false;
 }
 
-/* The byte just past the quote that closes an ANSI-C body opened at
-   `body_start`. A backslash escapes the byte behind it. */
 static pure fn scan_ansi_c_quote_end(StringView source,
                                      usize body_start) wontthrow -> Maybe<usize>
 {
@@ -1059,9 +1052,6 @@ static fn append_reprinted_source(String &out, StringView source,
     if (byte == '$' && position + 1 < source.length) {
       let const next_byte = source[position + 1];
 
-      /* Bash lowers an ANSI-C word to the bytes it stands for and writes the
-         result inside plain single quotes. A double quote makes the same bytes
-         literal, and the quoted pass asks for no blank collapsing. */
       if (next_byte == '\'' && should_collapse_blanks &&
           are_bash_additions_enabled)
       {
@@ -1111,9 +1101,6 @@ static fn append_reprinted_source(String &out, StringView source,
       }
     }
 
-    /* Bash reprints a process substitution from its body and writes no blank
-       inside either parenthesis. A double quote makes the same bytes literal,
-       and the quoted pass asks for no blank collapsing. */
     if (should_collapse_blanks && (byte == '<' || byte == '>') &&
         position + 1 < source.length && source[position + 1] == '(')
     {

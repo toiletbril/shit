@@ -913,9 +913,6 @@ fn process_from_pid(i64 pid) wontthrow -> process
   return static_cast<process>(pid);
 }
 
-/* The number behind a name differs between the systems this file builds for,
-   and a name absent from one of them is guarded. Only canonical names are
-   listed, since an alias would print a second time in the signal listing. */
 static const utils::signal_pair SIGNAL_PAIRS[] = {
     {SIGHUP,    "HUP"   },
     {SIGINT,    "INT"   },

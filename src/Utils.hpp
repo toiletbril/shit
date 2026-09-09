@@ -226,10 +226,6 @@ fn uint_to_text_into(u64 value, char *buffer, usize buffer_size) wontthrow
 
 fn format_minutes_seconds(double seconds) throws -> String;
 
-/* The layout of a time report with no TIMEFORMAT in effect. Rich indents the
-   three lines and adds the cpu and peak resident lines. Bash prints the three
-   tab separated lines of the bash default. Posix prints the plain seconds the
-   -p flag asks for, and it ignores TIMEFORMAT. */
 enum class time_report_layout : u8
 {
   Rich,

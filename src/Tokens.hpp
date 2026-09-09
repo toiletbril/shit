@@ -611,8 +611,6 @@ struct word_assignment_split
   bool is_append;
 };
 
-/* The base name and the array subscript of a descriptor allocation target. A
-   plain name leaves the subscript empty. */
 struct fd_allocation_target
 {
   StringView name;

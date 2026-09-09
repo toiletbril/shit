@@ -57,15 +57,10 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const should_print_path = FLAG_TYPE_PATH.is_enabled();
   let const should_force_path = FLAG_TYPE_FORCE_PATH.is_enabled();
 
-  /* Every terse form already names one thing per line, and the extra detail
-     would break the shape a caller reads. */
   let const should_print_verbose = FLAG_TYPE_VERBOSE.is_enabled() &&
                                    !should_print_word && !should_print_path &&
                                    !should_force_path;
 
-  /* Bash names a function without the shell word and prints its body from the
-     plain form. Dash names a shell function and prints nothing after it, and
-     the default mood follows dash. */
   let const is_bash_function_report = cxt.is_bash_compatible();
 
   let out = String{cxt.scratch_allocator()};

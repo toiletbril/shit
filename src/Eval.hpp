@@ -434,11 +434,6 @@ public:
   fn set_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
   fn publish_single_pipe_status(i32 status) throws -> void;
-  /* Store the stage statuses of a pipeline. The shell owns PIPESTATUS, and a
-     read-only mark on it governs a user assignment alone. An existing array is
-     still written and nothing is raised. A mark placed before any array exists
-     keeps the name empty for the rest of the shell. Bash reports the same
-     through its dynamic reader. */
   fn publish_pipe_statuses(ArrayList<String> values) throws -> void;
   fn append_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
@@ -685,9 +680,6 @@ public:
                  : absolute_position;
     }
   };
-  /* A caller that holds the text the location was stamped in passes it as
-     fallback_source. The current source answers when the caller has none, which
-     is wrong for a location that outlives the text being evaluated now. */
   pure fn
   resolve_render_source(const SourceLocation &location,
                         const String *fallback_source = nullptr) const wontthrow
@@ -751,9 +743,6 @@ public:
   fn set_trap(StringView condition, StringView action) throws -> void;
   fn remove_trap(StringView condition) throws -> void;
   pure fn traps() const wontthrow -> const StringMap<String> &;
-  /* A caller that ends the shell with a chosen status names it here. The
-     action reads it through $?, and a bare exit inside the action reports it
-     again. */
   fn run_exit_trap(Maybe<i32> final_status = None) throws -> void;
 
   /* The trigger location is the command that fired the trap. $LINENO reports
@@ -765,11 +754,6 @@ public:
   /* Run the RETURN action against the status the leaving frame left behind. The
      caller owns the condition that decides whether the trap runs at all. */
   fn run_return_trap(i32 status_before_return) throws -> void;
-  /* Put the PIPESTATUS a trap action found back where the action left it. The
-     restore is shell bookkeeping and it takes none of the assignment rules. A
-     read-only mark the action set never rejects it. An absent array is restored
-     by removing the one the action created. The erase leaves a tombstone the
-     same key reclaims, and no branch allocates. */
   fn restore_trap_pipe_statuses(bool has_saved_pipe_statuses,
                                 ArrayList<String> saved_pipe_statuses) wontthrow
       -> void;
@@ -842,10 +826,6 @@ public:
     restore_untraced_trap(StringView{"ERR", 3}, steal(saved),
                           &m_err_trap_active_depth);
   }
-  /* The default mood follows every function return. The bash mood takes the
-     action away from a body functrace does not reach, and only the action the
-     body installs for itself fires at its boundary. RETURN has no depth gate.
-     No depth travels with the saved action. */
   mustuse fn save_untraced_return_trap() throws -> saved_frame_trap
   {
     if (!is_bash_compatible()) return saved_frame_trap{};
@@ -1007,8 +987,6 @@ public:
                                         Allocator result_allocator) const throws
       -> String;
   pure fn is_bash_argument_array(StringView name) const wontthrow -> bool;
-  /* Bash reports success for an assignment to a name it recomputes on every
-     read, then throws the value away. */
   pure fn is_write_discarded_dynamic_variable(StringView name) const wontthrow
       -> bool;
 
@@ -2164,9 +2142,6 @@ protected:
   /* The call-site location of each active function call, parallel to
      m_function_call_names, read by BASH_LINENO. */
   ArrayList<SourceLocation> m_function_call_locations{heap_allocator()};
-  /* The text each call-site location was stamped in, parallel to
-     m_function_call_locations. A trap action replaces the current source while
-     it runs, and the recorded pointer keeps the line resolvable. */
   ArrayList<const String *> m_function_call_sources{heap_allocator()};
   bool m_is_script_run{false};
   /* The count of source frames that carry a file path, for the FUNCNAME

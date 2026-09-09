@@ -277,8 +277,6 @@ pure fn Word::get_fd_allocation_target() const wontthrow
 
   if (inner[name_length] != '[') return None;
 
-  /* The subscript of an array element is scanned with balanced brackets, and
-     its closing bracket is the last byte of the name. */
   usize position = name_length + 1;
   usize open_count = 1;
   while (position < inner.length && open_count > 0) {
@@ -307,8 +305,6 @@ pure fn Word::fd_allocation_name() const wontthrow -> Maybe<StringView>
 
   if (!target->has_subscript) return target->name;
 
-  /* The whole inner text is the name a redirection reprints, and the base name
-     and the subscript are contiguous inside it. */
   return StringView{target->name.data,
                     target->subscript.length + target->name.length + 2};
 }

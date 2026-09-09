@@ -1147,9 +1147,6 @@ fn EvalContext::line_number_at_location(
 
 fn EvalContext::funcname_line_at(usize index) const throws -> usize
 {
-  /* Each frame resolves against the text its call site was stamped in, so a
-     trap action running under a different source still reports the script
-     line. */
   let const call_count = m_function_call_names.count();
   if (index < call_count) {
     let const storage_index = call_count - 1 - index;
@@ -1262,8 +1259,6 @@ fn EvalContext::dynamic_array_element_count(DynamicArray which) const throws
   }
   case DynamicArray::SourcePath: return bash_source_frame_count();
   case DynamicArray::FunctionName: return funcname_frame_count();
-  /* Bash keeps BASH_LINENO parallel to BASH_SOURCE, so a script with no
-     function call still holds one zero. */
   case DynamicArray::LineNumber: return bash_source_frame_count();
   }
 

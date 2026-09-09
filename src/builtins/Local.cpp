@@ -145,9 +145,6 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    /* A -p operand asks for the declaration of a name this scope already owns.
-       The print binds nothing, and a global of the same name stays out of
-       reach. */
     if (should_print_declaration) {
       let line = String{cxt.scratch_allocator()};
       if (!cxt.is_local_in_current_scope(identifier) ||

@@ -82,8 +82,6 @@ fn EvalContext::register_function(StringView name,
     info.line_offset = body_line - 2;
   }
 
-  /* The header line is what type -V reports as the origin of the name. The
-     body line already recorded above can sit further down. */
   if (m_current_source != nullptr &&
       definition_location.position < m_current_source->count())
   {
@@ -359,22 +357,15 @@ fn EvalContext::run_return_trap(i32 status_before_return) throws -> void
   m_last_exit_status = status_before_return;
   defer { m_last_exit_status = saved_exit_status; };
 
-  /* The frame is already leaving through a request of its own, and that request
-     would stop the action after its first command. It is held here for the
-     whole action, and an answer the action gives replaces it. */
   let frame_control_flow = steal(m_control_flow);
   clear_control_flow();
 
-  /* Bash fires the trap again after each action that returns, and the last such
-     return supplies the status of the frame. An action that keeps returning
-     keeps the loop running, the way bash keeps firing. */
   let action_control_flow = control_flow{};
   let did_action_return = false;
   while (true) {
     run_named_trap(StringView{"RETURN", 6});
     if (!has_pending_control_flow()) break;
 
-    /* A break, a continue, or an exit leaves the frame on its own terms. */
     if (m_control_flow.kind != control_flow::Kind::Return) return;
 
     LOG(Info, "the RETURN action returned with status %lld, firing again",

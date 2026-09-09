@@ -109,8 +109,6 @@ static fn format_time_report_posix(double real_seconds, double user_seconds,
   return report;
 }
 
-/* The layout of the bash default TIMEFORMAT, a blank line and three tab
-   separated lines in the minutes form. */
 static fn format_time_report_bash(double real_seconds, double user_seconds,
                                   double system_seconds) throws -> String
 {
@@ -253,7 +251,6 @@ fn format_time_report(time_report_layout layout, bool should_report_rss,
   }
 
   if (should_report_rss || (should_use_pretty_format && peak_rss_bytes > 0)) {
-    /* The peak resident line carries the separator of the layout it joins. */
     switch (layout) {
     case time_report_layout::Bash: report += "rss\t"; break;
     case time_report_layout::Posix: report += "rss "; break;
