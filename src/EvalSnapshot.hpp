@@ -73,6 +73,7 @@ struct eval_state_snapshot
      reaches. */
   usize debug_trap_active_depth;
   usize err_trap_active_depth;
+  bool did_reset_inherited_signal_traps;
   /* Variable attributes ride the snapshot, so a declaration inside a
      subshell does not leak its marks to the parent. */
   StringMap<u8> variable_attributes;

@@ -742,6 +742,7 @@ public:
   /* A signal condition installs the shell's handler. */
   fn set_trap(StringView condition, StringView action) throws -> void;
   fn remove_trap(StringView condition) throws -> void;
+  fn discard_inherited_signal_traps() throws -> void;
   pure fn traps() const wontthrow -> const StringMap<String> &;
   fn run_exit_trap(Maybe<i32> final_status = None) throws -> void;
 
@@ -905,6 +906,10 @@ public:
      exit. The status an exit inside the action asked for is returned. */
   fn clear_inherited_exit_trap() throws -> void;
   fn run_subshell_exit_trap() throws -> Maybe<i32>;
+
+  fn reset_inherited_signal_traps() wontthrow -> void;
+  pure fn did_reset_inherited_signal_traps() const wontthrow -> bool;
+  fn note_subshell_child_exit() wontthrow -> void;
 
   fn mark_readonly(StringView name) throws -> void;
   fn unmark_readonly(StringView name) throws -> void;
@@ -2112,6 +2117,7 @@ protected:
      condition that is running is blocked. A signal action still fires the DEBUG
      trap and a pending signal still drains inside a DEBUG action. */
   u8 m_running_trap_conditions{0};
+  bool m_did_reset_inherited_signal_traps{false};
   u32 m_pending_child_trap_count{0};
   /* Nonzero while a trap action evaluates. BASH_COMMAND keeps the command that
      triggered the trap. */

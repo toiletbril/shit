@@ -1050,6 +1050,7 @@ static fn evaluate_subshell_in_process(const Expression *body,
     /* The inherited EXIT action belongs to the parent and must not fire at the
        subshell's end. An EXIT action the body sets survives this clear. */
     cxt.clear_inherited_exit_trap();
+    cxt.reset_inherited_signal_traps();
     try {
       ret = body->evaluate(cxt);
     } catch (const ErrorBase &error) {
@@ -1093,10 +1094,12 @@ static fn evaluate_subshell_in_process(const Expression *body,
   } catch (...) {
     if (did_enter_subshell) cxt.leave_subshell();
     cxt.restore_state(steal(snapshot));
+    cxt.note_subshell_child_exit();
     throw;
   }
   cxt.leave_subshell();
   cxt.restore_state(steal(snapshot));
+  cxt.note_subshell_child_exit();
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 

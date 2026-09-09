@@ -755,6 +755,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_traps,
       m_debug_trap_active_depth,
       m_err_trap_active_depth,
+      m_did_reset_inherited_signal_traps,
       m_variable_attributes,
       m_exported_names,
       m_environment_undo_log.count(),
@@ -880,6 +881,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   refresh_trap_flags();
   m_debug_trap_active_depth = snapshot.debug_trap_active_depth;
   m_err_trap_active_depth = snapshot.err_trap_active_depth;
+  m_did_reset_inherited_signal_traps =
+      snapshot.did_reset_inherited_signal_traps;
 
   if (!os::restore_current_directory(snapshot.working_directory))
     LOG(Debug, "the subshell could not restore the working directory");

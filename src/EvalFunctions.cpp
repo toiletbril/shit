@@ -384,10 +384,51 @@ fn EvalContext::run_return_trap(i32 status_before_return) throws -> void
                                      : steal(frame_control_flow);
 }
 
+fn EvalContext::reset_inherited_signal_traps() wontthrow -> void
+{
+  LOG(Debug, "the subshell holds its inherited signal actions unfired");
+  m_did_reset_inherited_signal_traps = true;
+}
+
+pure fn EvalContext::did_reset_inherited_signal_traps() const wontthrow -> bool
+{
+  return m_did_reset_inherited_signal_traps;
+}
+
+fn EvalContext::note_subshell_child_exit() wontthrow -> void
+{
+  if (m_did_reset_inherited_signal_traps) return;
+
+  LOG(Debug, "counting the finished subshell as one reaped child");
+  os::note_child_reaped();
+}
+
+fn EvalContext::discard_inherited_signal_traps() throws -> void
+{
+  if (!m_did_reset_inherited_signal_traps) return;
+
+  m_did_reset_inherited_signal_traps = false;
+
+  ArrayList<String> discarded{heap_allocator()};
+  m_traps.for_each([&](StringView condition, const String &action) {
+    unused(action);
+    if (!os::signal_number_from_name(condition).has_value()) return;
+    discarded.push(String{heap_allocator(), condition});
+  });
+
+  LOG(Info, "the subshell discarded %zu inherited signal actions",
+      discarded.count());
+  for (let const &condition : discarded)
+    m_traps.erase(condition.view());
+
+  refresh_trap_flags();
+}
+
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 {
   LOG(Info, "setting a trap for '%.*s' with a %zu byte action",
       static_cast<int>(condition.length), condition.data, action.length);
+  discard_inherited_signal_traps();
   m_traps.set(condition, action);
   refresh_trap_flags();
   /* A trap installed inside a function, a subshell, or a substitution traces
@@ -410,6 +451,7 @@ fn EvalContext::remove_trap(StringView condition) throws -> void
 {
   LOG(Info, "removing the trap for '%.*s'", static_cast<int>(condition.length),
       condition.data);
+  discard_inherited_signal_traps();
   m_traps.erase(condition);
   refresh_trap_flags();
   if (condition == "EXIT") return;
@@ -489,8 +531,10 @@ fn EvalContext::run_pending_traps() throws -> void
 
   let const child_condition = StringView{"CHLD", 4};
   let const reaped_child_count = os::take_reaped_child_count();
-  if (let const *queued = m_traps.find(child_condition);
-      queued != nullptr && queued->count() > 0)
+  if (m_did_reset_inherited_signal_traps) {
+    os::clear_reaped_child_arrival();
+  } else if (let const *queued = m_traps.find(child_condition);
+             queued != nullptr && queued->count() > 0)
   {
     m_pending_child_trap_count += reaped_child_count;
   } else {
@@ -525,6 +569,7 @@ fn EvalContext::run_pending_traps() throws -> void
     let const name = os::signal_name_from_number(number);
     if (!name.has_value()) continue;
     if (name->view() == "CHLD") continue;
+    if (m_did_reset_inherited_signal_traps) continue;
 
     if (let const *action = m_traps.find(name->view()); action != nullptr)
       if (action->count() > 0) {
@@ -541,7 +586,7 @@ fn EvalContext::run_pending_traps() throws -> void
   }
 
   let const child_bit = running_trap_bit(child_condition);
-  if (m_pending_child_trap_count > 0 &&
+  if (m_pending_child_trap_count > 0 && !m_did_reset_inherited_signal_traps &&
       (m_running_trap_conditions & child_bit) == 0 &&
       os::has_reaped_child_arrival())
   {
@@ -563,7 +608,11 @@ fn EvalContext::run_pending_traps() throws -> void
                    m_current_location);
       }
 
-      m_pending_child_trap_count -= fired_count;
+      if (fired_count > m_pending_child_trap_count)
+        m_pending_child_trap_count = 0;
+      else
+        m_pending_child_trap_count -= fired_count;
+
       os::clear_reaped_child_arrival();
     }
   }
