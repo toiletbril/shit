@@ -306,19 +306,45 @@ fn source_list_from_operands(const ArrayList<String> &operands,
   return sources;
 }
 
+/* Bash lays the table out in five columns, right-aligns each number in two
+   places, separates the entries with a tab, and breaks the line after every
+   fifth one. A table whose length is not a multiple of five still ends with a
+   newline. The entries are ordered by number, which the platform table is free
+   not to be. */
 fn format_signal_list() throws -> String
 {
-  let out = String{heap_allocator()};
+  static const usize COLUMN_COUNT = 5;
+  static const usize NUMBER_WIDTH = 2;
+
+  let numbered = ArrayList<utils::signal_pair>{heap_allocator()};
   for (let const name : os::signal_names()) {
     if (let const number = os::signal_number_from_name(name);
         number.has_value())
     {
-      out += String::from(*number, heap_allocator());
-      out += ") SIG";
-      out += name;
-      out += '\n';
+      numbered.push(utils::signal_pair{*number, name});
     }
   }
+
+  numbered.sort(
+      [](const utils::signal_pair &left, const utils::signal_pair &right) {
+        return left.number < right.number;
+      });
+
+  let out = String{heap_allocator()};
+  for (usize index = 0; index < numbered.count(); index++) {
+    let const number = String::from(numbered[index].number, heap_allocator());
+
+    for (usize pad = number.length(); pad < NUMBER_WIDTH; pad++)
+      out += ' ';
+
+    out += number;
+    out += ") SIG";
+    out += numbered[index].name;
+    out += (index + 1) % COLUMN_COUNT == 0 ? '\n' : '\t';
+  }
+
+  if (numbered.count() % COLUMN_COUNT != 0) out += '\n';
+
   return out;
 }
 

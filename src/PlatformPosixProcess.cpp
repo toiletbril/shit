@@ -913,20 +913,53 @@ fn process_from_pid(i64 pid) wontthrow -> process
   return static_cast<process>(pid);
 }
 
+/* The number behind a name differs between the systems this file builds for,
+   and a name absent from one of them is guarded. Only canonical names are
+   listed, since an alias would print a second time in the signal listing. */
 static const utils::signal_pair SIGNAL_PAIRS[] = {
-    {SIGHUP,  "HUP" },
-    {SIGINT,  "INT" },
-    {SIGQUIT, "QUIT"},
-    {SIGKILL, "KILL"},
-    {SIGTERM, "TERM"},
-    {SIGSTOP, "STOP"},
-    {SIGTSTP, "TSTP"},
-    {SIGCONT, "CONT"},
-    {SIGUSR1, "USR1"},
-    {SIGUSR2, "USR2"},
-    {SIGABRT, "ABRT"},
-    {SIGALRM, "ALRM"},
-    {SIGPIPE, "PIPE"},
+    {SIGHUP,    "HUP"   },
+    {SIGINT,    "INT"   },
+    {SIGQUIT,   "QUIT"  },
+    {SIGILL,    "ILL"   },
+    {SIGTRAP,   "TRAP"  },
+    {SIGABRT,   "ABRT"  },
+#ifdef SIGEMT
+    {SIGEMT,    "EMT"   },
+#endif
+    {SIGFPE,    "FPE"   },
+    {SIGKILL,   "KILL"  },
+    {SIGBUS,    "BUS"   },
+    {SIGSEGV,   "SEGV"  },
+    {SIGSYS,    "SYS"   },
+    {SIGPIPE,   "PIPE"  },
+    {SIGALRM,   "ALRM"  },
+    {SIGTERM,   "TERM"  },
+    {SIGURG,    "URG"   },
+    {SIGSTOP,   "STOP"  },
+    {SIGTSTP,   "TSTP"  },
+    {SIGCONT,   "CONT"  },
+    {SIGCHLD,   "CHLD"  },
+    {SIGTTIN,   "TTIN"  },
+    {SIGTTOU,   "TTOU"  },
+#ifdef SIGIO
+    {SIGIO,     "IO"    },
+#endif
+    {SIGXCPU,   "XCPU"  },
+    {SIGXFSZ,   "XFSZ"  },
+    {SIGVTALRM, "VTALRM"},
+    {SIGPROF,   "PROF"  },
+    {SIGWINCH,  "WINCH" },
+#ifdef SIGINFO
+    {SIGINFO,   "INFO"  },
+#endif
+    {SIGUSR1,   "USR1"  },
+    {SIGUSR2,   "USR2"  },
+#ifdef SIGSTKFLT
+    {SIGSTKFLT, "STKFLT"},
+#endif
+#ifdef SIGPWR
+    {SIGPWR,    "PWR"   },
+#endif
 };
 
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>

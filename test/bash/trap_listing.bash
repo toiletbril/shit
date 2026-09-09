@@ -153,4 +153,32 @@ echo multi-set-invalid
 ( trap 'echo N' HUP NOSUCHSIGNAL; echo multi-set-invalid-status=$?; trap -p HUP ) 2>/dev/null
 echo after-multi-set-invalid=$?
 
+# The numbers past the fifth entry differ between systems, so only the layout
+# of the first line and a few fixed entries are asserted.
+echo signal-list
+signal_table=$(trap -l)
+first_line=${signal_table%%$'\n'*}
+echo "first-line=[$first_line]"
+column_count=0
+for field in $first_line; do
+  case $field in
+    *")") column_count=$((column_count + 1)) ;;
+  esac
+done
+echo "first-line-columns=$column_count"
+case $signal_table in
+  " 1) SIGHUP"*) echo padded-first-number=yes ;;
+  *) echo padded-first-number=no ;;
+esac
+case $signal_table in
+  *"15) SIGTERM"*) echo has-sigterm=yes ;;
+  *) echo has-sigterm=no ;;
+esac
+case $signal_table in
+  *"13) SIGPIPE"*) echo has-sigpipe=yes ;;
+  *) echo has-sigpipe=no ;;
+esac
+echo "kill-list-agrees=$([ "$(kill -l)" = "$signal_table" ] && echo yes || echo no)"
+echo after-signal-list=$?
+
 echo trap-listing-done

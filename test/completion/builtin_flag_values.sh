@@ -1,17 +1,18 @@
 # A flag whose value comes from a closed set answers from that table instead of
 # the filename fallback. The spaced form and the joined equals form are both
 # accepted. HUP, INT, QUIT, KILL, and TERM are the signal names every platform
-# carries. The last check reads its prefix from the platform table itself, and
-# the golden is the same where that table is smaller.
+# carries. A signal prefix that a platform-only name also answers is filtered
+# down to the portable answers. The last check reads its prefix from the
+# platform table itself, and the golden is the same where that table is smaller.
 echo "== kill -s signal names:"
 "$BIN" --debug-complete-at 'kill -s ' </dev/null |
   grep -E '^(HUP|INT|KILL|QUIT|TERM)$'
 echo "== kill -s prefix:"
-"$BIN" --debug-complete-at 'kill -s IN' </dev/null
+"$BIN" --debug-complete-at 'kill -s QU' </dev/null
 echo "== kill -n prefix:"
 "$BIN" --debug-complete-at 'kill -n TE' </dev/null
 echo "== trap special conditions:"
-"$BIN" --debug-complete-at 'trap handler E' </dev/null
+"$BIN" --debug-complete-at 'trap handler E' </dev/null | grep -E '^(ERR|EXIT)$'
 echo "== trap condition after the print flag:"
 "$BIN" --debug-complete-at 'trap -p RET' </dev/null
 echo "== trap action position is a filename:"

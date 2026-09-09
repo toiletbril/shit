@@ -5,7 +5,7 @@ KILL
 QUIT
 TERM
 == kill -s prefix:
-INT
+QUIT
 == kill -n prefix:
 TERM
 == trap special conditions:
