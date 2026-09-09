@@ -324,8 +324,10 @@ fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition;
 /* The source text the way bash reprints a command from its own parse. Quoting,
    arithmetic, a parameter expansion, and a backtick body keep their spelling. A
    run of blanks outside them collapses to one blank, a line continuation
-   disappears, and a command substitution body loses its padding. */
-fn reprinted_command_text(StringView source) throws -> String;
+   disappears, and a command substitution body loses its padding. An ANSI-C word
+   becomes its value in single quotes under a mood that reads the form. */
+fn reprinted_command_text(StringView source,
+                          bool are_bash_additions_enabled) throws -> String;
 
 /* The command as its source spells it. The source keeps the quoting that the
    parsed words no longer carry. The builder answers for a node whose span is
@@ -339,7 +341,7 @@ fn source_command_text(EvalContext &cxt, const SourceLocation &location,
   let const text = cxt.source_text_in_span(location, end_position);
   if (text.length == 0) return do_build_command_text();
 
-  return reprinted_command_text(text);
+  return reprinted_command_text(text, cxt.bash_additions_enabled());
 }
 
 /* The subshell the way bash reprints it, with one blank inside each

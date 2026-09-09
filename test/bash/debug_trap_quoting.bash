@@ -95,6 +95,27 @@ echo "literal <( a )  b"
 echo 'raw <( a )'
 trap - DEBUG
 
+echo ansi-c-quotes
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+echo $'plain'
+echo $'ansi\tc'
+echo $'with space'
+echo $'quote\'inside'
+echo $'newline\nhere'
+echo $'back\\slash'
+echo $'bell\a' > /dev/null
+echo $'\x41\102'
+echo $''
+echo pre $'a\tb' post
+ansi_value=$'k\tv'
+cat <<< $'1\n2' > /dev/null
+echo captured $( echo $'a\tb' )
+( echo $'c\td' )
+echo procsub < <( echo $'e\tf' )
+echo "dq $'g\th'"
+echo 'raw $'
+trap - DEBUG
+
 echo heredocs
 trap 'echo "D-[$BASH_COMMAND]"' DEBUG
 cat <<EOF > /dev/null

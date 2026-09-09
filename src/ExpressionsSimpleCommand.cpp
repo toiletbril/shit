@@ -732,10 +732,12 @@ static pure fn is_reprint_blank(char byte) wontthrow -> bool
   return byte == ' ' || byte == '\t';
 }
 
-/* A tab, a run of blanks, a line continuation, a command substitution, and a
-   process substitution are the only places where the source spelling and the
-   bash reprint can differ. */
-static pure fn should_reprint_source(StringView source) wontthrow -> bool
+/* A tab, a run of blanks, a line continuation, a command substitution, a
+   process substitution, and an ANSI-C quoted word are the only places where the
+   source spelling and the bash reprint can differ. */
+static pure fn should_reprint_source(StringView source,
+                                     bool are_bash_additions_enabled) wontthrow
+    -> bool
 {
   for (usize position = 0; position < source.length; position++) {
     let const byte = source[position];
@@ -756,6 +758,10 @@ static pure fn should_reprint_source(StringView source) wontthrow -> bool
       return true;
     }
 
+    if (byte == '\'' && previous_byte == '$' && are_bash_additions_enabled) {
+      return true;
+    }
+
     if (byte == '\n' && previous_byte == '\\') {
       return true;
     }
@@ -764,10 +770,26 @@ static pure fn should_reprint_source(StringView source) wontthrow -> bool
   return false;
 }
 
+/* The byte just past the quote that closes an ANSI-C body opened at
+   `body_start`. A backslash escapes the byte behind it. */
+static pure fn scan_ansi_c_quote_end(StringView source,
+                                     usize body_start) wontthrow -> Maybe<usize>
+{
+  for (usize position = body_start; position < source.length; position++) {
+    if (source[position] == '\'') return position + 1;
+
+    if (source[position] == '\\') position++;
+  }
+
+  return None;
+}
+
 static fn append_reprinted_source(String &out, StringView source,
                                   bool should_collapse_blanks,
                                   bool should_space_operators,
-                                  bool should_join_lines) throws -> void;
+                                  bool should_join_lines,
+                                  bool are_bash_additions_enabled) throws
+    -> void;
 
 /* The byte just past the double quote that closes the one opened before
    `position`, or the end of the source when the quote is unterminated. */
@@ -930,7 +952,8 @@ static pure fn has_reprint_remainder(StringView source,
    parenthesis and the commands of a body written across several lines separated
    by a semicolon and a blank. The region spans the opening parenthesis through
    the closing one. */
-static fn append_reprinted_subshell(String &out, StringView region) throws
+static fn append_reprinted_subshell(String &out, StringView region,
+                                    bool are_bash_additions_enabled) throws
     -> void
 {
   let const body =
@@ -942,14 +965,17 @@ static fn append_reprinted_subshell(String &out, StringView region) throws
   }
 
   out.append("( ");
-  append_reprinted_source(out, body, true, true, true);
+  append_reprinted_source(out, body, true, true, true,
+                          are_bash_additions_enabled);
   out.append(" )");
 }
 
 static fn append_reprinted_source(String &out, StringView source,
                                   bool should_collapse_blanks,
                                   bool should_space_operators,
-                                  bool should_join_lines) throws -> void
+                                  bool should_join_lines,
+                                  bool are_bash_additions_enabled) throws
+    -> void
 {
   let const start_length = out.length();
   usize position = 0;
@@ -995,7 +1021,7 @@ static fn append_reprinted_source(String &out, StringView source,
       out.push('"');
       append_reprinted_source(
           out, source.substring_of_length(position + 1, end - position - 1),
-          false, false, false);
+          false, false, false, are_bash_additions_enabled);
 
       if (end < source.length) {
         out.push('"');
@@ -1009,6 +1035,25 @@ static fn append_reprinted_source(String &out, StringView source,
 
     if (byte == '$' && position + 1 < source.length) {
       let const next_byte = source[position + 1];
+
+      /* Bash lowers an ANSI-C word to the bytes it stands for and writes the
+         result inside plain single quotes. A double quote makes the same bytes
+         literal, and the quoted pass asks for no blank collapsing. */
+      if (next_byte == '\'' && should_collapse_blanks &&
+          are_bash_additions_enabled)
+      {
+        let const end = scan_ansi_c_quote_end(source, position + 2);
+
+        if (end.has_value()) {
+          let decoded = String{heap_allocator()};
+          utils::decode_ansi_c_escapes(
+              decoded,
+              source.substring_of_length(position + 2, *end - position - 3));
+          append_shell_quoted_arg(out, decoded.view(), true);
+          position = *end;
+          continue;
+        }
+      }
 
       if (next_byte == '{' || next_byte == '(') {
         let const is_arithmetic = next_byte == '(' &&
@@ -1035,7 +1080,8 @@ static fn append_reprinted_source(String &out, StringView source,
         /* A body that opens a subshell would read as arithmetic when it follows
            the dollar sign directly. Bash writes a blank between them. */
         out.append(!body.is_empty() && body[0] == '(' ? "$( " : "$(");
-        append_reprinted_source(out, body, true, true, false);
+        append_reprinted_source(out, body, true, true, false,
+                                are_bash_additions_enabled);
         out.push(')');
         position = *end;
         continue;
@@ -1063,7 +1109,7 @@ static fn append_reprinted_source(String &out, StringView source,
         append_reprinted_source(out,
                                 trimmed_reprint_body(source.substring_of_length(
                                     position + 2, *end - position - 3)),
-                                true, true, true);
+                                true, true, true, are_bash_additions_enabled);
         out.push(')');
         position = *end;
         continue;
@@ -1116,7 +1162,8 @@ static fn append_reprinted_source(String &out, StringView source,
 
         if (end.has_value()) {
           append_reprinted_subshell(
-              out, source.substring_of_length(position, *end - position));
+              out, source.substring_of_length(position, *end - position),
+              are_bash_additions_enabled);
           position = *end;
           continue;
         }
@@ -1229,17 +1276,20 @@ static fn append_reprinted_source(String &out, StringView source,
   }
 }
 
-fn internal::reprinted_command_text(StringView source) throws -> String
+fn internal::reprinted_command_text(StringView source,
+                                    bool are_bash_additions_enabled) throws
+    -> String
 {
   let text = String{heap_allocator()};
-  if (!should_reprint_source(source)) {
+  if (!should_reprint_source(source, are_bash_additions_enabled)) {
     text.append(source);
 
     return text;
   }
 
   text.reserve(source.length);
-  append_reprinted_source(text, source, true, false, false);
+  append_reprinted_source(text, source, true, false, false,
+                          are_bash_additions_enabled);
 
   return text;
 }
@@ -1257,12 +1307,15 @@ fn internal::subshell_command_text(EvalContext &cxt,
   let const body_end = lexer::scan_balanced_shell_region(source, 1, ')');
   if (!body_end.has_value()) return text;
 
+  let const are_bash_additions_enabled = cxt.bash_additions_enabled();
+
   text.reserve(source.length + 2);
-  append_reprinted_subshell(text, source.substring_of_length(0, *body_end));
+  append_reprinted_subshell(text, source.substring_of_length(0, *body_end),
+                            are_bash_additions_enabled);
 
   if (*body_end < source.length) {
     append_reprinted_source(text, source.substring(*body_end), true, true,
-                            false);
+                            false, are_bash_additions_enabled);
   }
 
   return text;
@@ -1273,7 +1326,7 @@ fn internal::append_word_source_text(EvalContext &cxt, String &out,
 {
   let const text = cxt.source_text_in_span(word.source_location(), 0);
   if (text.length != 0) {
-    out += reprinted_command_text(text);
+    out += reprinted_command_text(text, cxt.bash_additions_enabled());
 
     return;
   }
