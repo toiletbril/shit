@@ -10,3 +10,23 @@ bash-posix
 bracket-works
 == --posix does not enter the sh mood:
 b
+== --posix accepts the DEBUG condition:
+D
+traced
+D
+== --posix accepts the ERR condition:
+E
+after-false
+== --posix accepts the RETURN condition under functrace:
+body
+body
+R
+== --posix fires RETURN for a body that installs its own action:
+g-body
+own
+after-g
+== --posix lists all three conditions:
+D
+trap -- 'echo D' DEBUG
+trap -- 'echo E' ERR
+trap -- 'echo R' RETURN

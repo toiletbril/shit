@@ -15,3 +15,18 @@ echo "== --mood bash-posix keeps [[ working:"
 "$BIN" --mood bash-posix -c '[[ x == x ]] && echo bracket-works'
 echo "== --posix does not enter the sh mood:"
 "$BIN" --posix -c 'arr=(a b c); echo "${arr[1]}"'
+# The sh mood rejects DEBUG, ERR, and RETURN. The bash-posix mood keeps all
+# three, and RETURN follows the bash rule of firing under functrace and for a
+# body that installs an action for itself.
+echo "== --posix accepts the DEBUG condition:"
+"$BIN" --posix -c 'trap "echo D" DEBUG; echo traced; trap - DEBUG'
+echo "== --posix accepts the ERR condition:"
+"$BIN" --posix -c 'trap "echo E" ERR; false; echo after-false'
+echo "== --posix accepts the RETURN condition under functrace:"
+"$BIN" --posix -c \
+  'f() { echo body; }; trap "echo R" RETURN; f; set -T; f; trap - RETURN'
+echo "== --posix fires RETURN for a body that installs its own action:"
+"$BIN" --posix -c 'g() { trap "echo own" RETURN; echo g-body; }; g; echo after-g'
+echo "== --posix lists all three conditions:"
+"$BIN" --posix -c \
+  'trap "echo E" ERR; trap "echo R" RETURN; trap "echo D" DEBUG; trap -p'
