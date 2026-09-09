@@ -440,10 +440,25 @@ fn EvalContext::set_indexed_array(StringView name,
   m_indexed_arrays.set(name, steal(values));
 }
 
+fn EvalContext::publish_pipe_statuses(ArrayList<String> values) throws -> void
+{
+  if (is_readonly("PIPESTATUS")) {
+    if (let *current = m_indexed_arrays.find("PIPESTATUS"); current != nullptr)
+      *current = steal(values);
+
+    return;
+  }
+
+  set_indexed_array("PIPESTATUS", steal(values));
+}
+
 fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 {
-  if (is_readonly("PIPESTATUS"))
-    throw Error{"Unable to assign 'PIPESTATUS' because it is read only"};
+  if (is_readonly("PIPESTATUS") &&
+      m_indexed_arrays.find("PIPESTATUS") == nullptr)
+  {
+    return;
+  }
 
   if (let *values = m_indexed_arrays.find("PIPESTATUS");
       values != nullptr && values->count() == 1 &&

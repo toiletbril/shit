@@ -692,7 +692,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   pipe_status.reserve(stage_count);
   for (usize i = 0; i < stage_count; i++)
     pipe_status.push(String::from(stage_status[i], heap_allocator()));
-  cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
+  cxt.publish_pipe_statuses(steal(pipe_status));
 
   /* pipefail reports the rightmost failing stage, otherwise the last stage. */
   if (cxt.pipefail()) {

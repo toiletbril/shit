@@ -300,16 +300,16 @@ fn EvalContext::run_named_trap(StringView condition,
 
   /* The command that fired the trap observes its own status again after the
      action. The restoration is deferred because an action that throws would
-     otherwise leave the status of the action behind. An absent array is
-     restored by removing the one the action created. */
+     otherwise leave the status of the action behind. */
+  let was_pipe_status_restored = false;
   defer
   {
     m_last_exit_status = saved_exit_status;
 
-    if (has_saved_pipe_statuses)
-      set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
-    else
-      m_indexed_arrays.erase("PIPESTATUS");
+    if (!was_pipe_status_restored) {
+      restore_trap_pipe_statuses(has_saved_pipe_statuses,
+                                 steal(saved_pipe_statuses));
+    }
   };
 
   /* A return in an action belongs to the enclosing function or sourced file.
@@ -320,7 +320,28 @@ fn EvalContext::run_named_trap(StringView condition,
              "the " + String{heap_allocator(), condition} + " trap",
              return_handling::Reject, trigger_site);
 
+  restore_trap_pipe_statuses(has_saved_pipe_statuses,
+                             steal(saved_pipe_statuses));
+  was_pipe_status_restored = true;
+
   m_last_trap_action_status = m_last_exit_status;
+}
+
+fn EvalContext::restore_trap_pipe_statuses(
+    bool has_saved_pipe_statuses,
+    ArrayList<String> saved_pipe_statuses) wontthrow -> void
+{
+  if (!has_saved_pipe_statuses) {
+    m_indexed_arrays.erase("PIPESTATUS");
+    return;
+  }
+
+  if (let *current = m_indexed_arrays.find("PIPESTATUS"); current != nullptr) {
+    *current = steal(saved_pipe_statuses);
+    return;
+  }
+
+  m_indexed_arrays.set("PIPESTATUS", steal(saved_pipe_statuses));
 }
 
 fn EvalContext::run_return_trap(i32 status_before_return) throws -> void
@@ -470,14 +491,15 @@ fn EvalContext::run_pending_traps() throws -> void
   m_trap_saved_exit_status = saved_exit_status;
   defer { m_trap_saved_exit_status = outer_trap_exit_status; };
 
+  let was_pipe_status_restored = false;
   defer
   {
     m_last_exit_status = saved_exit_status;
 
-    if (has_saved_pipe_statuses)
-      set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
-    else
-      m_indexed_arrays.erase("PIPESTATUS");
+    if (!was_pipe_status_restored) {
+      restore_trap_pipe_statuses(has_saved_pipe_statuses,
+                                 steal(saved_pipe_statuses));
+    }
   };
 
   for (i32 number = os::take_pending_signal(); number != 0;
@@ -498,6 +520,10 @@ fn EvalContext::run_pending_traps() throws -> void
        arrivals for the next boundary. */
     if (has_pending_control_flow()) break;
   }
+
+  restore_trap_pipe_statuses(has_saved_pipe_statuses,
+                             steal(saved_pipe_statuses));
+  was_pipe_status_restored = true;
 }
 
 pure fn EvalContext::traps() const wontthrow -> const StringMap<String> &
@@ -532,14 +558,15 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
 
   /* The shell exits with the status the action found. An action that runs exit
      replaces it on its own path. */
+  let was_pipe_status_restored = false;
   defer
   {
     m_last_exit_status = saved_exit_status;
 
-    if (has_saved_pipe_statuses)
-      set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
-    else
-      m_indexed_arrays.erase("PIPESTATUS");
+    if (!was_pipe_status_restored) {
+      restore_trap_pipe_statuses(has_saved_pipe_statuses,
+                                 steal(saved_pipe_statuses));
+    }
   };
 
   if (let const *action = m_traps.find(StringView{"EXIT", 4});
@@ -548,6 +575,10 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
       LOG(Info, "running the EXIT trap action at shell exit");
       run_source(action->view(), "the EXIT trap", return_handling::Reject);
     }
+
+  restore_trap_pipe_statuses(has_saved_pipe_statuses,
+                             steal(saved_pipe_statuses));
+  was_pipe_status_restored = true;
 }
 
 fn EvalContext::has_exit_trap() const wontthrow -> bool
@@ -583,15 +614,16 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
 
   /* An exit the action ran replaces the status the subshell had reached. */
   let requested_status = Maybe<i32>{None};
+  let was_pipe_status_restored = false;
   defer
   {
     m_last_exit_status =
         requested_status.has_value() ? *requested_status : saved_exit_status;
 
-    if (has_saved_pipe_statuses)
-      set_indexed_array("PIPESTATUS", steal(saved_pipe_statuses));
-    else
-      m_indexed_arrays.erase("PIPESTATUS");
+    if (!was_pipe_status_restored) {
+      restore_trap_pipe_statuses(has_saved_pipe_statuses,
+                                 steal(saved_pipe_statuses));
+    }
   };
 
   /* Only an EXIT action the subshell itself set is present, since the boundary
@@ -610,6 +642,10 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
         clear_control_flow();
       }
     }
+
+  restore_trap_pipe_statuses(has_saved_pipe_statuses,
+                             steal(saved_pipe_statuses));
+  was_pipe_status_restored = true;
 
   return requested_status;
 }

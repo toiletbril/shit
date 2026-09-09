@@ -434,6 +434,12 @@ public:
   fn set_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
   fn publish_single_pipe_status(i32 status) throws -> void;
+  /* Store the stage statuses of a pipeline. The shell owns PIPESTATUS, and a
+     read-only mark on it governs a user assignment alone. An existing array is
+     still written and nothing is raised. A mark placed before any array exists
+     keeps the name empty for the rest of the shell. Bash reports the same
+     through its dynamic reader. */
+  fn publish_pipe_statuses(ArrayList<String> values) throws -> void;
   fn append_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
   fn set_array_element(StringView name, usize index, StringView value) throws
@@ -754,6 +760,14 @@ public:
   /* Run the RETURN action against the status the leaving frame left behind. The
      caller owns the condition that decides whether the trap runs at all. */
   fn run_return_trap(i32 status_before_return) throws -> void;
+  /* Put the PIPESTATUS a trap action found back where the action left it. The
+     restore is shell bookkeeping and it takes none of the assignment rules. A
+     read-only mark the action set never rejects it. An absent array is restored
+     by removing the one the action created. The erase leaves a tombstone the
+     same key reclaims, and no branch allocates. */
+  fn restore_trap_pipe_statuses(bool has_saved_pipe_statuses,
+                                ArrayList<String> saved_pipe_statuses) wontthrow
+      -> void;
   pure fn status_before_return() const wontthrow -> i32
   {
     return m_status_before_return;
@@ -768,11 +782,14 @@ public:
     m_has_err_trap = m_traps.find(StringView{"ERR", 3}) != nullptr;
   }
   /* A trap a frame installs for itself traces that frame without errtrace. An
-     inherited trap needs errtrace to reach the frame. */
+     inherited trap needs errtrace to reach the frame. The subshell bootstrap
+     emits the trap dispositions ahead of the state it replays. A failing replay
+     step belongs to the shell. */
   pure fn should_run_err_trap() const wontthrow -> bool
   {
-    return m_runtime.option_is_enabled(shell_option_id::Errtrace) ||
-           nesting_depth() <= m_err_trap_active_depth;
+    return !m_is_replaying_inherited_state &&
+           (m_runtime.option_is_enabled(shell_option_id::Errtrace) ||
+            nesting_depth() <= m_err_trap_active_depth);
   }
   /* How deep the current frame sits inside function calls, subshells, and
      command substitutions together. Each of the three moves it by one. One

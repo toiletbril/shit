@@ -736,7 +736,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
     utils::terminate_and_reap_processes(children, waited_child_count);
     throw;
   }
-  cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
+  cxt.publish_pipe_statuses(steal(pipe_status));
 
   i32 ret = stage_status.is_empty() ? 0 : stage_status.back();
   if (cxt.pipefail()) {
