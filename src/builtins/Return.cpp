@@ -57,22 +57,16 @@ fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return 2;
     }
 
-    if (ec.args().count() > 2) {
+    /* dash takes the first operand and says nothing about the rest. The sh
+       mood follows it. Every other mood reports the error and leaves the
+       scope with the status bash uses. */
+    if (ec.args().count() > 2 && !cxt.is_posix_mode()) {
       report_soft_builtin_error(
           ec, cxt, ec.arg_location_at(2), "too many arguments",
           "return takes at most one status, e.g. `return 1`");
 
-      if (cxt.in_subshell()) {
-        cxt.request_exit(1, ec.source_location());
-        return 1;
-      }
-
-      if (!cxt.shell_is_interactive()) {
-        cxt.run_exit_trap(1);
-        utils::quit(1, utils::farewell_policy::Goodbye);
-      }
-
-      return 1;
+      cxt.request_return(2, ec.source_location());
+      return 2;
     }
 
     status = parsed_value.value();
