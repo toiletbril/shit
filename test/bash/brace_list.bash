@@ -1,4 +1,5 @@
 #!/bin/bash
+# compat-stderr: exact
 # Bash brace expansion of the comma-list form {a,b,c}, checked byte-for-byte
 # against bash. Covers a preamble and postamble, multiple groups in a cartesian
 # product, nesting, empty alternatives, a variable in an alternative, and the

@@ -1,4 +1,5 @@
 #!/bin/bash
+# compat-stderr: exact
 # shellcheck disable=SC2034,SC2086,SC2249
 
 echo select-header

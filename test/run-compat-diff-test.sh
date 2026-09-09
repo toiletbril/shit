@@ -21,8 +21,20 @@ capture_command() {
   CAPTURED_STDERR=${CAPTURED_STDERR%X}
 }
 
-have_same_stderr_presence() {
-  if [ -z "$1" ]; then
+STDERR_DIRECTIVE='# compat-stderr: exact'
+
+# A kosh diagnostic is worded and located its own way, and the default
+# comparison asks only that both shells stayed silent or both wrote something. A
+# fixture whose error output is meant to agree byte for byte names the exact
+# comparison in a directive on a line of its own.
+wants_exact_stderr() {
+  grep -q -x -F -- "$STDERR_DIRECTIVE" "$1"
+}
+
+have_matching_stderr() {
+  if [ "$EXACT_STDERR" -eq 1 ]; then
+    [ "$1" = "$2" ]
+  elif [ -z "$1" ]; then
     [ -z "$2" ]
   else
     [ -n "$2" ]
@@ -60,6 +72,11 @@ compare_one() {
   local ALTERNATIVE_STATUS
   local EXPLICIT_MATCHES=0 MIMIC_MATCHES=0
   local FAILURE_LABEL
+  local EXACT_STDERR=0
+
+  if wants_exact_stderr "$TEST_FILE"; then
+    EXACT_STDERR=1
+  fi
 
   capture_command "$BIN" --no-traces --mood "$MOOD" "$TEST_FILE"
   EXPLICIT_STDOUT=$CAPTURED_STDOUT
@@ -75,12 +92,12 @@ compare_one() {
   REFERENCE_STATUS=$CAPTURED_STATUS
 
   if [ "$EXPLICIT_STDOUT" = "$REFERENCE_STDOUT" ] && \
-    have_same_stderr_presence "$EXPLICIT_STDERR" "$REFERENCE_STDERR" && \
+    have_matching_stderr "$EXPLICIT_STDERR" "$REFERENCE_STDERR" && \
     [ "$EXPLICIT_STATUS" -eq "$REFERENCE_STATUS" ]; then
     EXPLICIT_MATCHES=1
   fi
   if [ "$MIMIC_STDOUT" = "$REFERENCE_STDOUT" ] && \
-    have_same_stderr_presence "$MIMIC_STDERR" "$REFERENCE_STDERR" && \
+    have_matching_stderr "$MIMIC_STDERR" "$REFERENCE_STDERR" && \
     [ "$MIMIC_STATUS" -eq "$REFERENCE_STATUS" ]; then
     MIMIC_MATCHES=1
   fi
@@ -94,12 +111,12 @@ compare_one() {
     ALTERNATIVE_STDERR=$CAPTURED_STDERR
     ALTERNATIVE_STATUS=$CAPTURED_STATUS
     if [ "$EXPLICIT_STDOUT" = "$ALTERNATIVE_STDOUT" ] && \
-      have_same_stderr_presence "$EXPLICIT_STDERR" "$ALTERNATIVE_STDERR" && \
+      have_matching_stderr "$EXPLICIT_STDERR" "$ALTERNATIVE_STDERR" && \
       [ "$EXPLICIT_STATUS" -eq "$ALTERNATIVE_STATUS" ]; then
       EXPLICIT_MATCHES=1
     fi
     if [ "$MIMIC_STDOUT" = "$ALTERNATIVE_STDOUT" ] && \
-      have_same_stderr_presence "$MIMIC_STDERR" "$ALTERNATIVE_STDERR" && \
+      have_matching_stderr "$MIMIC_STDERR" "$ALTERNATIVE_STDERR" && \
       [ "$MIMIC_STATUS" -eq "$ALTERNATIVE_STATUS" ]; then
       MIMIC_MATCHES=1
     fi

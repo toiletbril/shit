@@ -210,6 +210,10 @@ changes update this file.
   installed.
 - Golden comparisons use the resolved host diff on POSIX and koshkit diff on
   Windows through `test/bin/diff`.
+- A compat fixture compares its standard output and status exactly. Its error
+  output compares only presence, because a kosh diagnostic is worded and located
+  its own way. A fixture whose error output is meant to agree byte for byte
+  carries `# compat-stderr: exact` on a line of its own.
 
 ## Workflow
 
