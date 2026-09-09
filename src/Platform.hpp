@@ -1049,7 +1049,8 @@ extern volatile sig_atomic_t CHILD_STATE_CHANGED;
    the per-signal flags. */
 extern volatile sig_atomic_t SIGNAL_PENDING;
 
-/* A signal the startup blocked is unblocked here. */
+/* A signal the startup blocked is unblocked here, after its disposition is in
+   place. */
 fn set_trap_handler(i32 signal_number) throws -> void;
 
 /* Install the ignore disposition for a signal, for a trap with an empty action
@@ -1057,7 +1058,8 @@ fn set_trap_handler(i32 signal_number) throws -> void;
 fn set_trap_ignore(i32 signal_number) throws -> void;
 
 /* Restore a signal's default disposition when its trap is removed. SIGINT
-   returns to the shell's interrupt handler, every other signal to SIG_DFL. */
+   returns to the shell's interrupt handler, every other signal to SIG_DFL. A
+   signal the install unblocked is blocked again. */
 fn clear_trap_handler(i32 signal_number) throws -> void;
 
 fn take_pending_signal() wontthrow -> i32;

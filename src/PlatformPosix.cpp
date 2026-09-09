@@ -88,6 +88,10 @@ volatile sig_atomic_t SIGNAL_PENDING = 0;
 static constexpr i32 SIGNAL_FLAG_COUNT = 128;
 static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
 
+/* The signals a trap install unblocked. Clearing the trap gives each of them
+   its blocked state back. */
+static sigset_t SIGNALS_UNBLOCKED_BY_TRAP = {};
+
 } /* namespace os */
 } /* namespace koshka */
 
@@ -1325,6 +1329,7 @@ fn reset_signal_handlers() throws -> void
   sigset_t sm;
   sigfillset(&sm);
   check_syscall(sigprocmask(SIG_UNBLOCK, &sm, nullptr));
+  sigemptyset(&SIGNALS_UNBLOCKED_BY_TRAP);
 
   struct sigaction sa = {};
   sa.sa_handler = SIG_DFL;
@@ -1376,27 +1381,56 @@ static fn handle_trapped_signal(int signal_number) wontthrow -> void
   SIGNAL_PENDING = 1;
 }
 
+static fn unblock_signal_for_trap(i32 signal_number) throws -> void
+{
+  sigset_t wanted;
+  sigemptyset(&wanted);
+  sigaddset(&wanted, signal_number);
+
+  sigset_t previous;
+  sigemptyset(&previous);
+  check_syscall(sigprocmask(SIG_UNBLOCK, &wanted, &previous));
+
+  if (sigismember(&previous, signal_number) == 1) {
+    LOG(Info, "signal %d was blocked, clearing its trap will block it again",
+        signal_number);
+    sigaddset(&SIGNALS_UNBLOCKED_BY_TRAP, signal_number);
+  }
+}
+
+static fn reblock_signal_after_trap(i32 signal_number) throws -> void
+{
+  if (sigismember(&SIGNALS_UNBLOCKED_BY_TRAP, signal_number) != 1) return;
+
+  LOG(Info, "blocking signal %d again, its trap install had unblocked it",
+      signal_number);
+
+  sigset_t wanted;
+  sigemptyset(&wanted);
+  sigaddset(&wanted, signal_number);
+  check_syscall(sigprocmask(SIG_BLOCK, &wanted, nullptr));
+  sigdelset(&SIGNALS_UNBLOCKED_BY_TRAP, signal_number);
+}
+
 fn set_trap_handler(i32 signal_number) throws -> void
 {
   if (!is_trappable_signal(signal_number)) return;
 
   LOG(Info, "installing the trap handler for signal %d", signal_number);
 
-  /* A signal the startup blocked must be unblocked so the handler runs. */
-  sigset_t sm;
-  sigemptyset(&sm);
-  sigaddset(&sm, signal_number);
-  check_syscall(sigprocmask(SIG_UNBLOCK, &sm, nullptr));
-
+  /* The disposition is installed before the unblock. A pending instance of the
+     signal is delivered the moment it is unblocked, and the default action for
+     most signals ends the shell. */
   if (signal_number == SIGCHLD) {
     install_child_state_handler();
-    return;
+  } else {
+    struct sigaction sa = {};
+    check_syscall(sigemptyset(&sa.sa_mask));
+    sa.sa_handler = handle_trapped_signal;
+    check_syscall(sigaction(signal_number, &sa, nullptr));
   }
 
-  struct sigaction sa = {};
-  check_syscall(sigemptyset(&sa.sa_mask));
-  sa.sa_handler = handle_trapped_signal;
-  check_syscall(sigaction(signal_number, &sa, nullptr));
+  unblock_signal_for_trap(signal_number);
 }
 
 fn set_trap_ignore(i32 signal_number) throws -> void
@@ -1418,6 +1452,9 @@ fn clear_trap_handler(i32 signal_number) throws -> void
 {
   if (!is_trappable_signal(signal_number)) return;
   LOG(Info, "clearing the trap for signal %d", signal_number);
+
+  reblock_signal_after_trap(signal_number);
+
   if (signal_number == SIGCHLD) {
     install_child_state_handler();
     return;
