@@ -306,3 +306,41 @@ echo "operand-status=$?"
 set +E
 trap - ERR
 echo err-substitution-scope-done
+
+# A command whose status a condition consumes raises no fire. An if condition, a
+# while condition, an until condition, an elif chain, a function called as a
+# condition, and the left operand of || are all such places. The body of a case
+# arm and the right operand of && keep their own fire.
+echo err-suppression-context
+trap 'echo "C-$LINENO-[$BASH_COMMAND]"' ERR
+if false; then echo unreachable; fi
+echo "if-status=$?"
+while false; do echo unreachable; done
+echo "while-status=$?"
+until true; do echo unreachable; done
+echo "until-status=$?"
+false || echo or-tail
+echo "or-status=$?"
+if false; then
+  echo unreachable
+elif false; then
+  echo unreachable
+else
+  echo elif-else
+fi
+echo "elif-status=$?"
+condition_function() { false; }
+if condition_function; then echo unreachable; fi
+echo "condition-function-status=$?"
+case body in
+  body) false ;;
+esac
+echo "case-status=$?"
+if [ 1 -eq 2 ]; then echo unreachable; fi
+echo "test-condition-status=$?"
+while [[ no = yes ]]; do echo unreachable; done
+echo "conditional-condition-status=$?"
+true && false
+echo "and-tail-status=$?"
+trap - ERR
+echo err-suppression-context-done
