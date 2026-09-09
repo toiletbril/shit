@@ -768,6 +768,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     defer { cxt.restore_untraced_debug_trap(steal(saved_debug_action)); };
     let saved_err_action = cxt.save_untraced_err_trap();
     defer { cxt.restore_untraced_err_trap(steal(saved_err_action)); };
+    let saved_return_action = cxt.save_untraced_return_trap();
+    defer { cxt.restore_untraced_return_trap(steal(saved_return_action)); };
 
     /* Bound the call nesting so a function that recurses without a base case
        errors with a caret here rather than exhausting the native stack. */

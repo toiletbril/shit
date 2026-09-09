@@ -803,33 +803,46 @@ public:
   {
     return save_untraced_trap(StringView{"DEBUG", 5},
                               shell_option_id::Functrace,
-                              m_debug_trap_active_depth);
+                              &m_debug_trap_active_depth);
   }
   fn restore_untraced_debug_trap(saved_frame_trap &&saved) throws -> void
   {
     restore_untraced_trap(StringView{"DEBUG", 5}, steal(saved),
-                          m_debug_trap_active_depth);
+                          &m_debug_trap_active_depth);
   }
   mustuse fn save_untraced_err_trap() throws -> saved_frame_trap
   {
     return save_untraced_trap(StringView{"ERR", 3}, shell_option_id::Errtrace,
-                              m_err_trap_active_depth);
+                              &m_err_trap_active_depth);
   }
   fn restore_untraced_err_trap(saved_frame_trap &&saved) throws -> void
   {
     restore_untraced_trap(StringView{"ERR", 3}, steal(saved),
-                          m_err_trap_active_depth);
+                          &m_err_trap_active_depth);
+  }
+  /* The default mood follows every function return. The bash mood takes the
+     action away from a body functrace does not reach, and only the action the
+     body installs for itself fires at its boundary. RETURN has no depth gate.
+     No depth travels with the saved action. */
+  mustuse fn save_untraced_return_trap() throws -> saved_frame_trap
+  {
+    if (!is_bash_compatible()) return saved_frame_trap{};
+
+    return save_untraced_trap(StringView{"RETURN", 6},
+                              shell_option_id::Functrace, nullptr);
+  }
+  fn restore_untraced_return_trap(saved_frame_trap &&saved) throws -> void
+  {
+    restore_untraced_trap(StringView{"RETURN", 6}, steal(saved), nullptr);
   }
   mustuse fn save_untraced_trap(StringView condition,
                                 shell_option_id trace_option,
-                                usize &active_depth) throws -> saved_frame_trap;
+                                usize *active_depth) throws -> saved_frame_trap;
   fn restore_untraced_trap(StringView condition, saved_frame_trap &&saved,
-                           usize &active_depth) throws -> void;
+                           usize *active_depth) throws -> void;
   pure fn should_run_return_trap() const wontthrow -> bool
   {
-    return !is_posix_mode() &&
-           (!is_bash_compatible() ||
-            m_runtime.option_is_enabled(shell_option_id::Functrace));
+    return !is_posix_mode();
   }
   pure fn is_running_trap_action() const wontthrow -> bool
   {

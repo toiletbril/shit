@@ -151,4 +151,30 @@ echo sourced-action-command-early-return
   echo after-early-return=$? )
 echo after-sourced-action-command-early-return=$?
 
+echo function-installs-own-trap
+( installs_own() {
+    trap 'echo "R-own=$?"' RETURN
+    return 4
+  }
+  installs_own
+  echo after-own=$?
+  plain_after() { echo plain-body; }
+  plain_after
+  echo after-plain-following=$?
+  trap -p RETURN
+  echo after-listing=$? )
+echo after-function-installs-own-trap=$?
+
+echo nested-body-installs-trap
+( set -T
+  trap 'echo R-outer' RETURN
+  replaces_inherited() {
+    trap 'echo R-inner' RETURN
+    echo replacing-body
+  }
+  replaces_inherited
+  echo after-replacement=$?
+  trap -p RETURN )
+echo after-nested-body-installs-trap=$?
+
 echo return-trap-done
