@@ -351,7 +351,9 @@ changes update this file.
 - Verify option defaults against the reference shell. Resolve compact option
   identifiers through the canonical packed table instead of declaration order.
 - Measure the reference shell on the exact construct before designing a
-  compatibility fix, and design from the measured output alone.
+  compatibility fix, and design from the measured output alone. The channel
+  that carries the source belongs to the construct. Measure through a script
+  file, standard input, and `-c` before a rule is generalized across them.
 - Attribute an observed status to the branch that produced it before that status
   is generalized to another branch of the same builtin.
 - Keep borrowed views within owner lifetimes. Prove bounds, spans, offsets,
