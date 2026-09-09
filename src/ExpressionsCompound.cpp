@@ -321,6 +321,7 @@ hot fn CompoundList::evaluate_root_status_impl(
         cxt.request_exit(ret.status, source_location());
         break;
       }
+      cxt.run_exit_trap(ret.status & 0xFF);
       utils::quit(ret.status, utils::farewell_policy::Goodbye);
     }
 

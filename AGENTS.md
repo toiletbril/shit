@@ -436,6 +436,8 @@ changes update this file.
   their debug option without `-c`.
 - Poll long work to its final exit. A full suite passes only after every shard
   finishes and no partial failure artifact remains.
+- Leave the machine idle while a suite runs. The editor recorder tests are timed
+  against wall clock, and a concurrent probe makes one of them time out.
 
 ## Performance and finish
 
