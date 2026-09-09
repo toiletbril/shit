@@ -109,6 +109,7 @@ enum class dynamic_var : u8
   BASH_COMMAND,
   PPID,
   UID,
+  HISTCMD,
   HOSTNAME,
   HOSTTYPE,
   GROUPS,
@@ -172,6 +173,7 @@ constexpr static_string_entry<dynamic_variable_info> BASH_DYNAMIC_ENTRIES[] = {
     DYNAMIC_VARIABLE("EUID", EUID, false, Settable),
     DYNAMIC_VARIABLE("FUNCNAME", FUNCNAME, false, Discarded),
     DYNAMIC_VARIABLE("GROUPS", GROUPS, false, Discarded),
+    DYNAMIC_VARIABLE("HISTCMD", HISTCMD, false, Discarded),
     DYNAMIC_VARIABLE("HOSTNAME", HOSTNAME, false, Settable),
     DYNAMIC_VARIABLE("HOSTTYPE", HOSTTYPE, false, Settable),
     DYNAMIC_VARIABLE("MACHTYPE", MACHTYPE, false, Settable),
@@ -481,6 +483,19 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return String::from(os::get_parent_process_id(), heap_allocator());
         case dynamic_var::UID:
           return String::from(os::get_real_user_id(), heap_allocator());
+        case dynamic_var::HISTCMD: {
+          usize event_number = 0;
+          if (shell_is_interactive()) {
+            if (let const newest =
+                    toiletline::get_newest_history_event_number();
+                newest.has_value())
+            {
+              event_number = *newest;
+            }
+          }
+
+          return String::from(event_number, heap_allocator());
+        }
         case dynamic_var::HOSTNAME:
           if (let host = os::get_hostname(); host.has_value())
             return steal(*host);

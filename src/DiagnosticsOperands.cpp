@@ -621,6 +621,7 @@ constexpr PackedStringKey SHELL_MAINTAINED_VARIABLE_KEYS[] = {
     SSK("ENV"),
     SSK("FCEDIT"),
     SSK("GLOBIGNORE"),
+    SSK("HISTCMD"),
     SSK("HOME"),
     SSK("LANG"),
     SSK("LC_ALL"),

@@ -35,8 +35,8 @@ constexpr StringView BASH_IMPLICIT_READONLY_NAMES[] = {"BASHOPTS", "SHELLOPTS",
                                                        "EUID", "PPID", "UID"};
 
 constexpr PackedStringKey BASH_IMPLICIT_INTEGER_KEYS[] = {
-    SSK("BASHPID"), SSK("EUID"),    SSK("PPID"), SSK("RANDOM"),
-    SSK("SECONDS"), SSK("SRANDOM"), SSK("UID"),
+    SSK("BASHPID"), SSK("EUID"),    SSK("HISTCMD"), SSK("OPTIND"), SSK("PPID"),
+    SSK("RANDOM"),  SSK("SECONDS"), SSK("SRANDOM"), SSK("UID"),
 };
 constexpr StaticStringSet BASH_IMPLICIT_INTEGER_NAMES{
     BASH_IMPLICIT_INTEGER_KEYS};

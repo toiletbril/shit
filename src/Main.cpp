@@ -881,6 +881,8 @@ fn kosh_main(int argc, char **argv) -> int
   if (!koshka::os::has_environment_variable("PS4"))
     context.set_shell_variable("PS4", "+ ");
 
+  context.set_shell_variable("OPTIND", "1");
+
   /* COLUMNS and LINES carry the terminal size so a config that divides by
      COLUMNS, such as ble.sh, sees a non-zero width. They are seeded once and
      not tracked across a later resize. */

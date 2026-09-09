@@ -335,6 +335,10 @@ inline constexpr static_string_entry<shell_variable_description>
         {SSK("PPID"),
          {"The value is the process id of the parent.",
           shell_variable_fact::Dynamic | shell_variable_fact::BashOnly}       },
+        {SSK("HISTCMD"),
+         {"The value is the history number of the current command, and a "
+          "non-interactive shell reports zero.",
+          shell_variable_fact::Dynamic | shell_variable_fact::BashOnly}       },
         {SSK("COPROC"),
          {"The coproc command binds this array to the descriptors of an "
           "unnamed coprocess. Element zero is read from and element one is "
