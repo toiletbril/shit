@@ -57,6 +57,7 @@ echo order-mixed
   trap 'echo X' EXIT
   trap 'echo I' INT
   trap 'echo E' ERR
+  trap 'echo C' CHLD
   trap 'echo H' HUP
   trap -p ) </dev/null
 echo after-order-mixed=$?
@@ -180,5 +181,70 @@ case $signal_table in
 esac
 echo "kill-list-agrees=$([ "$(kill -l)" = "$signal_table" ] && echo yes || echo no)"
 echo after-signal-list=$?
+
+# A condition name is folded to upper case, a SIG prefix on input is dropped,
+# and a number names the condition it belongs to.
+echo lower-case-condition
+( trap 'echo H' hup; trap -p HUP )
+echo after-lower-case-condition=$?
+
+echo sig-prefixed-condition
+( trap 'echo H' SIGHUP; trap -p HUP )
+echo after-sig-prefixed-condition=$?
+
+echo sig-prefixed-lower
+( trap 'echo U' sigusr1; trap -p USR1 )
+echo after-sig-prefixed-lower=$?
+
+echo numeric-exit-condition
+( trap 'echo X' 0; trap -p EXIT )
+echo after-numeric-exit-condition=$?
+
+echo numeric-exit-reset
+( trap 'echo X' 0; trap - 0; trap -p EXIT; echo numeric-exit-reset-status=$? )
+echo after-numeric-exit-reset=$?
+
+# A number past the end of the signal table names no condition in any form.
+echo out-of-range-set
+( trap 'echo N' 9999; echo out-of-range-set-status=$? ) 2>/dev/null
+echo after-out-of-range-set=$?
+
+echo out-of-range-reset
+( trap - 9999; echo out-of-range-reset-status=$? ) 2>/dev/null
+echo after-out-of-range-reset=$?
+
+echo out-of-range-print
+( trap -p 9999; echo out-of-range-print-status=$? ) 2>/dev/null
+echo after-out-of-range-print=$?
+
+echo out-of-range-single
+( trap 9999; echo out-of-range-single-status=$? ) 2>/dev/null
+echo after-out-of-range-single=$?
+
+# The options are read the way getopt reads them. A joined cluster is accepted,
+# the separator ends the options, and the list form wins over the print form.
+echo print-separator-condition
+( trap 'echo D' DEBUG; trap -p -- DEBUG; echo print-separator-status=$? )
+echo after-print-separator-condition=$?
+
+echo print-separator-only
+( trap 'echo H' HUP; trap -p --; echo print-separator-only-status=$? )
+echo after-print-separator-only=$?
+
+echo print-repeated-option
+( trap 'echo H' HUP; trap -pp HUP; echo print-repeated-option-status=$? )
+echo after-print-repeated-option=$?
+
+echo print-with-list
+( trap 'echo D' DEBUG; trap -p -l > /dev/null; echo print-with-list-status=$? ) 2>/dev/null
+echo after-print-with-list=$?
+
+echo list-with-operand
+( trap -l EXIT > /dev/null; echo list-with-operand-status=$? )
+echo after-list-with-operand=$?
+
+echo unknown-option
+( trap -x 'echo H' HUP; echo unknown-option-status=$?; trap -p HUP ) 2>/dev/null
+echo after-unknown-option=$?
 
 echo trap-listing-done

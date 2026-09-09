@@ -16,13 +16,14 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[action condition ...]");
+HELP_SYNOPSIS_DECL("[-lp] [--] [action condition ...]");
 
 HELP_DESCRIPTION_DECL(
     "The trap builtin sets the action to run for each named condition.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(TRAP_PRINT, Bool, 'p', "", "Print the set traps in a reusable form.");
+FLAG(TRAP_LIST, Bool, 'l', "list", "Print the table of signal names.");
 
 REGISTER_BUILTIN_FLAGS(Trap);
 
@@ -143,18 +144,65 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw bad_option;
   }
 
-  if (!cxt.is_posix_mode() && args.count() == 2 &&
-      (args[1] == "-l" || args[1] == "--list"))
-  {
+  /* Bash reads the trap options with getopt. Every option word ahead of the
+     first operand is read, a joined cluster is accepted, the list form wins
+     over the print form, and `--` ends the options. The sh mood has already
+     rejected every option above, and the separator remains an operand marker
+     there. */
+  usize operand_index = 1;
+  let should_print_listing = false;
+  let should_list_signals = false;
+
+  while (operand_index < args.count()) {
+    let const &word = args[operand_index];
+
+    if (word == "--") {
+      operand_index++;
+      break;
+    }
+
+    if (cxt.is_posix_mode()) break;
+
+    if (word.count() < 2 || !word.starts_with("-")) break;
+
+    if (word == "--list") {
+      should_list_signals = true;
+      operand_index++;
+      continue;
+    }
+
+    for (usize i = 1; i < word.count(); i++) {
+      if (word[i] == 'l') {
+        should_list_signals = true;
+        continue;
+      }
+
+      if (word[i] == 'p') {
+        should_print_listing = true;
+        continue;
+      }
+
+      let option = String{cxt.scratch_allocator()};
+      option += word[i];
+
+      report_soft_builtin_error(
+          ec, cxt, ec.arg_location_at(operand_index),
+          "'-" + option + "' is not a valid trap option",
+          "Use `--` before an operand that begins with a dash");
+      return 2;
+    }
+
+    operand_index++;
+  }
+
+  if (should_list_signals) {
     ec.print_to_stdout(koshkit::format_signal_list());
     return 0;
   }
 
-  let const is_print_form =
-      !cxt.is_posix_mode() && args.count() >= 2 && args[1] == "-p";
-  if (args.count() == 1 || is_print_form) {
+  let const has_filter = should_print_listing && operand_index < args.count();
+  if (operand_index >= args.count() || has_filter) {
     let const should_include_signal_prefix = cxt.is_bash_compatible();
-    let const has_filter = is_print_form && args.count() > 2;
 
     let out = String{cxt.scratch_allocator()};
     let const do_append_listing = [&](StringView condition, StringView action)
@@ -174,7 +222,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (has_filter) {
       let has_invalid_operand = false;
 
-      for (usize i = 2; i < args.count(); i++) {
+      for (usize i = operand_index; i < args.count(); i++) {
         let const condition =
             normalize_condition(args[i], cxt.scratch_allocator());
         if (!is_valid_trap_condition(condition.view(), cxt.is_posix_mode())) {
@@ -211,11 +259,9 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  ASSERT(args.count() > 1);
+  ASSERT(operand_index < args.count());
 
-  usize action_index = 1;
-  if (args[action_index] == "--") action_index++;
-  if (action_index >= args.count()) return 0;
+  let const action_index = operand_index;
 
   if (action_index + 1 == args.count()) {
     let const condition =
