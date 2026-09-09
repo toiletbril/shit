@@ -1472,16 +1472,6 @@ fn join_thread(thread t) wontthrow -> void
   CloseHandle(t.handle);
 }
 
-/* Windows raises no child signal, and every reap here is the whole of what the
-   CHLD trap can observe. The drain is woken from the reap itself. */
-static fn note_child_reaped_and_wake() wontthrow -> void
-{
-  if (CHILD_TRAP_ARMED == 0) return;
-
-  note_child_reaped();
-  SIGNAL_PENDING = 1;
-}
-
 fn wait_and_monitor_process(process p, bool *was_stopped) -> i32
 {
   unused(was_stopped);
@@ -1490,7 +1480,7 @@ fn wait_and_monitor_process(process p, bool *was_stopped) -> i32
     throw Error{"Could not wait for the process to finish: " +
                 last_system_error_message()};
   record_child_process_usage(p);
-  note_child_reaped_and_wake();
+  note_child_reaped();
 
   DWORD code = -1;
   if (GetExitCodeProcess(p, &code) == 0)
@@ -1509,7 +1499,7 @@ fn reap_process_quietly(process p) -> i32
     throw Error{"Could not wait for the process to finish: " +
                 last_system_error_message()};
   record_child_process_usage(p);
-  note_child_reaped_and_wake();
+  note_child_reaped();
   DWORD code = 1;
   GetExitCodeProcess(p, &code);
   return static_cast<i32>(code);
@@ -1525,7 +1515,7 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
     return process_state::Exited;
   }
   record_child_process_usage(p);
-  note_child_reaped_and_wake();
+  note_child_reaped();
 
   DWORD code = 0;
   if (GetExitCodeProcess(p, &code) == 0) {

@@ -1959,7 +1959,10 @@ action. A producer terminated by SIGPIPE therefore returns status 141.
 On Windows, a background process runs in its own console process group.
 .PP
 The CHLD trap runs its action once for every child the shell reaps, at the next
-command boundary. Windows raises no child signal, and the reap itself reaches
+command boundary. Under
+.B set -m
+a job that stops counts as one arrival of its own, and a job that is continued
+counts as none. Windows raises no child signal, and the reap itself reaches
 that boundary. The Windows
 .B kill
 builtin sends only KILL and TERM. A script there cannot raise CHLD by hand.

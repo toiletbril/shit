@@ -1049,9 +1049,9 @@ extern volatile sig_atomic_t CHILD_STATE_CHANGED;
    the per-signal flags. */
 extern volatile sig_atomic_t SIGNAL_PENDING;
 
-/* Raised while a CHLD trap action is installed. The child handler wakes the
-   trap drain only under this flag. A child that no action observes leaves a
-   signal that is already queued for the next boundary of its own. */
+/* Raised while a CHLD trap action is installed. An arrival is recorded and the
+   trap drain is woken only under this flag. A child that no action observes
+   leaves a signal that is already queued for the next boundary of its own. */
 extern volatile sig_atomic_t CHILD_TRAP_ARMED;
 
 /* Arm or disarm the child wake from the trap table. The evaluator calls this

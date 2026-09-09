@@ -150,6 +150,7 @@ fn note_child_reaped() wontthrow -> void
 
   REAPED_CHILD_COUNT += 1;
   DID_REAPED_CHILD_ARRIVE = true;
+  SIGNAL_PENDING = 1;
 }
 
 fn take_reaped_child_count() wontthrow -> u32
