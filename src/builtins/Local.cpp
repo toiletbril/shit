@@ -108,6 +108,16 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     should_mark_uppercase = false;
   }
 
+  if (should_print_declaration && first_name >= args.count()) {
+    let listing = String{cxt.scratch_allocator()};
+    cxt.for_each_local_name_in_current_scope([&](StringView local_name) throws {
+      append_variable_declaration(cxt, local_name, listing);
+    });
+    ec.print_to_stdout(listing.view());
+
+    return 0;
+  }
+
   i32 status = 0;
   for (usize i = first_name; i < args.count(); i++) {
     let const &arg = args[i];

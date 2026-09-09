@@ -1009,6 +1009,15 @@ public:
   fn pop_root_source_frame() wontthrow -> void;
   fn declare_local(StringView name, bool should_inherit_value) throws -> void;
   mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;
+  template <typename Callback>
+  fn for_each_local_name_in_current_scope(Callback callback) const throws
+      -> void
+  {
+    if (m_local_scope_depth == 0) return;
+
+    for (let const &binding : m_local_scopes[m_local_scope_depth - 1])
+      callback(binding.name.view());
+  }
 
   fn set_alias(StringView name, StringView value) throws -> void;
   fn remove_alias(StringView name) throws -> bool;

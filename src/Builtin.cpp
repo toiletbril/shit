@@ -468,14 +468,19 @@ fn append_variable_declaration(EvalContext &cxt, StringView name,
   }
 
   if (cxt.is_integer_variable(name) || cxt.is_lowercase_variable(name) ||
-      cxt.is_uppercase_variable(name))
+      cxt.is_uppercase_variable(name) || cxt.is_readonly(name) ||
+      cxt.is_local_in_current_scope(name))
   {
-    let line = String{cxt.scratch_allocator(), "declare -"};
-    if (cxt.is_integer_variable(name)) line += 'i';
-    if (cxt.is_lowercase_variable(name)) line += 'l';
-    if (cxt.is_readonly(name)) line += 'r';
-    if (cxt.is_uppercase_variable(name)) line += 'u';
-    if (cxt.is_exported(name)) line += 'x';
+    let attribute = String{cxt.scratch_allocator(), "-"};
+    if (cxt.is_integer_variable(name)) attribute += 'i';
+    if (cxt.is_lowercase_variable(name)) attribute += 'l';
+    if (cxt.is_readonly(name)) attribute += 'r';
+    if (cxt.is_uppercase_variable(name)) attribute += 'u';
+    if (cxt.is_exported(name)) attribute += 'x';
+    if (attribute.count() == 1) attribute += '-';
+
+    let line = String{cxt.scratch_allocator(), "declare "};
+    line.append(attribute.view());
     line += ' ';
     line.append(name);
     line += '\n';
