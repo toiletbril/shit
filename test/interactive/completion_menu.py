@@ -269,6 +269,23 @@ def main():
             b"<deep-one/inner-alpha>" in descended
         )
 
+        # A slash typed into an open menu names a directory. The rows become the
+        # entries of that directory, and the Tab that follows accepts one of
+        # them. A menu that only narrowed its parent listing would submit
+        # deep-one/ on its own.
+        walked, _, _ = run_menu(
+            directory, "deep", deep_typed, [b"o", b"n", b"e", b"/"]
+        )
+        a_slash_walks_into_the_directory = b"inner-alpha" in walked
+
+        _, _, walked_accepted = run_menu(
+            directory, "deep", deep_typed,
+            [b"o", b"n", b"e", b"/", b"\t"]
+        )
+        a_walked_menu_accepts_an_entry = (
+            b"<deep-one/inner-alpha>" in walked_accepted
+        )
+
         # Escape puts back the line the menu opened on. The narrowing key is
         # undone. A menu that cancelled in place would submit alpha-t.
         _, _, cancelled = run_menu(directory, "tree", typed, [b"t", b"\x1b"])
@@ -395,6 +412,10 @@ def main():
             ),
             "AN_ERASE_RECOVERS_THE_LIST": an_erase_recovers_the_list,
             "A_DIRECTORY_OPENS_ITS_OWN_MENU": a_directory_opens_its_own_menu,
+            "A_SLASH_WALKS_INTO_THE_DIRECTORY": (
+                a_slash_walks_into_the_directory
+            ),
+            "A_WALKED_MENU_ACCEPTS_AN_ENTRY": a_walked_menu_accepts_an_entry,
             "ESCAPE_RESTORES_THE_OPENING_LINE": (
                 escape_restores_the_opening_line
             ),

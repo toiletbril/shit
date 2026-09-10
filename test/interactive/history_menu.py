@@ -135,7 +135,7 @@ def main():
             + b"incremental history search"
             + HIGHLIGHT_RESET
             + DIMMED_SGR
-            + b", enter to accept"
+            + b", enter/tab to accept"
             in opened
         )
 
