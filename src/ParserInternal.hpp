@@ -15,6 +15,7 @@
 namespace koshka {
 
 class Token;
+class SegmentText;
 
 namespace internal {
 
@@ -24,6 +25,8 @@ consteval fn token_kind_mask(Kinds... kinds) -> u64
   return ((u64{1} << static_cast<u8>(kinds)) | ... | u64{0});
 }
 
+hot pure fn get_unquoted_word_text(const Token *token) wontthrow
+    -> const SegmentText *;
 hot pure fn is_unquoted_word(const Token *token, StringView expected) wontthrow
     -> bool;
 cold [[noreturn]] fn throw_unterminated(const SourceLocation &opener,

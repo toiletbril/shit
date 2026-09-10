@@ -22,6 +22,7 @@ namespace koshka {
 
 using namespace tokens;
 using namespace expressions;
+using internal::get_unquoted_word_text;
 using internal::is_unquoted_word;
 using internal::throw_unterminated;
 using internal::token_kind_mask;
@@ -395,8 +396,19 @@ hot pure static fn token_opens_compound_command(const Token *token) wontthrow
   default: break;
   }
 
-  return is_unquoted_word(token, "{") || is_unquoted_word(token, "[[") ||
-         is_unquoted_word(token, "select") || is_unquoted_word(token, "coproc");
+  let const *unquoted_text = get_unquoted_word_text(token);
+  if (unquoted_text == nullptr) return false;
+
+  let const text = unquoted_text->view();
+  if (text.is_empty()) return false;
+
+  switch (text[0]) {
+  case '{': return text == "{";
+  case '[': return text == "[[";
+  case 's': return text == "select";
+  case 'c': return text == "coproc";
+  default: return false;
+  }
 }
 
 /* A bash coprocess, coproc [NAME] command. A word after the keyword names the

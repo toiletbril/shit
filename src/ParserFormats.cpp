@@ -15,6 +15,7 @@
 #include "MimicMood.hpp"
 #include "Path.hpp"
 #include "StaticStringMap.hpp"
+#include "Utils.hpp"
 
 namespace koshka {
 
@@ -106,8 +107,13 @@ static pure fn path_ends_with(StringView path, StringView suffix) wontthrow
 static pure fn path_holds(StringView path, StringView part) wontthrow -> bool
 {
   if (part.length > path.length) return false;
+  if (part.is_empty()) return true;
+
+  let const wanted_leading_byte = utils::ascii_to_lower(part[0]);
 
   for (usize position = 0; position + part.length <= path.length; position++) {
+    if (utils::ascii_to_lower(path[position]) != wanted_leading_byte) continue;
+
     if (parser_format_ascii_equal(
             path.substring_of_length(position, part.length), part))
       return true;
@@ -263,12 +269,15 @@ static fn make_analysis_source(StringView host_source, usize host_start,
   let analysis_source = String{heap_allocator()};
   analysis_source.reserve(host_end);
 
-  for (usize position = 0; position < host_end; position++) {
-    let byte = host_source[position];
-    if (byte != '\n' && (position < host_start || position >= host_end))
-      byte = ' ';
-    analysis_source.push(byte);
+  let const literal_start = host_start < host_end ? host_start : host_end;
+
+  for (usize position = 0; position < literal_start; position++) {
+    let const byte = host_source[position];
+    analysis_source.push(byte == '\n' ? '\n' : ' ');
   }
+
+  analysis_source.append(
+      host_source.substring_of_length(literal_start, host_end - literal_start));
 
   return analysis_source;
 }
@@ -599,12 +608,22 @@ fn parser_format_add_json_fragment(parsed_format_document &document,
   fragment.shell_source = steal(decoded);
   let masked = String{heap_allocator()};
   masked.reserve(end);
-  for (usize host_position = 0; host_position < end; host_position++) {
+  let const literal_start = start < end ? start : end;
+
+  for (usize host_position = 0; host_position < literal_start; host_position++)
+  {
+    let const byte = source[host_position];
+    masked.push(byte == '\n' ? '\n' : ' ');
+  }
+
+  for (usize host_position = literal_start; host_position < end;
+       host_position++)
+  {
     let byte = source[host_position];
-    if (host_position < start || host_position >= end)
-      byte = byte == '\n' ? '\n' : ' ';
-    else if (byte == '\\' && host_position + 1 < end)
+    if (byte == '\\' && host_position + 1 < end) {
       byte = ' ';
+    }
+
     masked.push(byte);
   }
   fragment.analysis_source = steal(masked);

@@ -24,6 +24,7 @@ namespace koshka {
 
 using namespace tokens;
 using namespace expressions;
+using internal::get_unquoted_word_text;
 using internal::is_unquoted_word;
 using internal::throw_unterminated;
 using internal::token_kind_mask;
@@ -118,7 +119,7 @@ static_assert(static_cast<u8>(Token::Kind::Function) < 64);
 /* A brace is a reserved word only when a token is exactly '{' or '}' as a
    single unquoted segment, so a quoted or escaped brace is rejected. */
 /* [[ and ]] arrive from the lexer as ordinary single unquoted words. */
-hot pure static fn get_unquoted_word_text(const Token *token) wontthrow
+hot pure fn internal::get_unquoted_word_text(const Token *token) wontthrow
     -> const SegmentText *
 {
   if (token == nullptr || token->kind() != Token::Kind::Word) return nullptr;

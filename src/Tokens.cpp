@@ -237,11 +237,10 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
     case WordSegment::Kind::ProcessSubstitution: break;
     }
 
-    for (usize i = 0; i < segment.text.count(); i++) {
-      const char c = segment.text[i];
-      if (c < '0' || c > '9') return false;
-      has_seen_digit = true;
-    }
+    if (segment.text.count() == 0) continue;
+
+    if (!segment.text.is_all_decimal_digits()) return false;
+    has_seen_digit = true;
   }
   return has_seen_digit;
 }

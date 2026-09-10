@@ -366,10 +366,10 @@ cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
   {
     if (position >= m_source.length) break;
     let const line_start = position;
-    usize line_end_position = line_start;
-    while (line_end_position < m_source.length &&
-           m_source[line_end_position] != '\n')
-      line_end_position++;
+    let const line_remaining = m_source.substring(line_start);
+    let const line_newline = line_remaining.find_character('\n');
+    let const line_end_position =
+        line_start + line_newline.value_or(line_remaining.length);
     let const has_newline = line_end_position < m_source.length;
     position = has_newline ? line_end_position + 1 : line_end_position;
 
@@ -525,12 +525,9 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
     /* The newline is left in place so it still terminates the command. */
     case '#': {
       let const comment_start = i;
-      loop
-      {
-        let const comment_byte = chop_character(i);
-        if (comment_byte == '\n' || comment_byte == lexer::CEOF) break;
-        i++;
-      }
+      let const comment_remaining = m_source.substring(m_cursor_position + i);
+      i += comment_remaining.find_character('\n').value_or(
+          comment_remaining.length);
       if (m_should_collect_analysis_metadata) {
         let comment = m_source.substring_of_length(
             m_cursor_position + comment_start, i - comment_start);
@@ -746,9 +743,10 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
         quote_char.reset();
       } else {
         let const run_start = byte_count;
-        while (chop_character(byte_count) != '\'' &&
-               chop_character(byte_count) != lexer::CEOF)
-          byte_count++;
+        let const quote_remaining =
+            m_source.substring(m_cursor_position + byte_count);
+        byte_count += quote_remaining.find_character('\'').value_or(
+            quote_remaining.length);
         do_append_run(
             WordSegment::Kind::LiteralText,
             m_source.substring_of_length(m_cursor_position + run_start,
@@ -797,7 +795,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 
     if (is_in_double_quotes) did_quote_enclose_content = true;
 
-    if (is_in_double_quotes && ch != '\\' && ch != '$' && ch != '`') {
+    if (is_in_double_quotes && ch != '$' && ch != '`') {
       let const run_start = byte_count;
       while (true) {
         let const next = chop_character(byte_count);

@@ -27,8 +27,17 @@ namespace {
    folded. */
 pure fn is_constant_arithmetic_byte(char byte) wontthrow -> bool
 {
-  if (lexer::is_number(byte)) return true;
   switch (byte) {
+  case '0':
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7':
+  case '8':
+  case '9':
   case ' ':
   case '\t':
   case '\n':
@@ -699,12 +708,12 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
   let const trimmed = trim_arithmetic_whitespace(condition);
   if (trimmed.length == 0) return false;
 
-  /* Inlining a recorded constant for the counter the condition reads would
-     freeze the loop at its first verdict, so only an identifier-free condition
+  /* A condition that reads the counter would freeze the loop at its first
+     verdict. Only a condition built entirely from constant arithmetic bytes
      folds. */
   for (usize i = 0; i < trimmed.length; i++) {
-    if (lexer::is_variable_name_start(trimmed[i])) {
-      LOG(All, "the c-style-for fold declines, the condition reads a variable");
+    if (!is_constant_arithmetic_byte(trimmed[i])) {
+      LOG(All, "the c-style-for fold declines, the condition is not constant");
       return false;
     }
   }
