@@ -382,6 +382,10 @@ changes update this file.
   multi-valued override as one space-separated value.
 - Add variant compiler definitions through `BUILD_DEFINITIONS`. An early
   override of accumulated compiler flags can suppress later platform flags.
+- Read the variable that receives an override before a build is retried with it.
+  A simple assignment discards the environment value of the same name. The
+  environment `CXXFLAGS` reaches both the compile and the link recipe, and its
+  text is stamped into a metadata define.
 - Preserve argument zero and input origin when parsing MAKEFLAGS. Exclude parent
   bookkeeping and assignments from operands. Recipe exports use macro
   precedence.

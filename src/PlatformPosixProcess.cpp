@@ -967,20 +967,65 @@ static const utils::signal_pair SIGNAL_PAIRS[] = {
 #endif
 };
 
+static fn build_signal_pairs() throws -> ArrayList<utils::signal_pair>
+{
+  let pairs = ArrayList<utils::signal_pair>{heap_allocator()};
+  pairs.reserve(countof(SIGNAL_PAIRS));
+
+  for (usize i = 0; i < countof(SIGNAL_PAIRS); i++)
+    pairs.push(SIGNAL_PAIRS[i]);
+
+#if defined SIGRTMIN && defined SIGRTMAX
+  let const lowest = static_cast<i32>(SIGRTMIN);
+  let const highest = static_cast<i32>(SIGRTMAX);
+
+  for (i32 number = lowest; number <= highest; number++) {
+    let const from_lowest = number - lowest;
+    let const from_highest = highest - number;
+    let const is_near_lowest = from_lowest <= from_highest;
+    let const offset = is_near_lowest ? from_lowest : from_highest;
+
+    let name = String{heap_allocator(), is_near_lowest ? StringView{"RTMIN"}
+                                                       : StringView{"RTMAX"}};
+    if (offset > 0) {
+      name.push(is_near_lowest ? '+' : '-');
+      name.append(String::from(offset, heap_allocator()).view());
+    }
+
+    pairs.push(
+        utils::signal_pair{number, name.view().copy_to(heap_allocator())});
+  }
+#endif
+
+  return pairs;
+}
+
+static fn signal_pairs() throws -> const ArrayList<utils::signal_pair> &
+{
+  static ArrayList<utils::signal_pair> pairs = build_signal_pairs();
+
+  return pairs;
+}
+
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 {
-  return utils::find_signal_number(SIGNAL_PAIRS, countof(SIGNAL_PAIRS), name);
+  let const &pairs = signal_pairs();
+
+  return utils::find_signal_number(pairs.begin(), pairs.count(), name);
 }
 
 fn signal_name_from_number(i32 number) throws -> Maybe<String>
 {
-  return utils::find_signal_name(SIGNAL_PAIRS, countof(SIGNAL_PAIRS), number);
+  let const &pairs = signal_pairs();
+
+  return utils::find_signal_name(pairs.begin(), pairs.count(), number);
 }
 
 fn signal_names() throws -> const ArrayList<StringView> &
 {
+  let const &pairs = signal_pairs();
   static ArrayList<StringView> names =
-      utils::collect_signal_names(SIGNAL_PAIRS, countof(SIGNAL_PAIRS));
+      utils::collect_signal_names(pairs.begin(), pairs.count());
 
   return names;
 }
