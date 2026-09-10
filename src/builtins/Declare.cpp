@@ -12,6 +12,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Formatter.hpp"
 #include "../Platform.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
@@ -174,7 +175,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         } else if (const String *source = cxt.find_function_source(name.view());
                    source != nullptr)
         {
-          line.append(source->view());
+          line.append(format_bash_function_source(source->view()).view());
         }
         line += '\n';
         ec.print_to_stdout(line.view());
@@ -199,7 +200,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                  source != nullptr)
       {
         if (!source->is_empty()) {
-          let line = String{cxt.scratch_allocator(), source->view()};
+          let line = String{cxt.scratch_allocator(),
+                            format_bash_function_source(source->view()).view()};
           line += '\n';
           ec.print_to_stdout(line.view());
         }

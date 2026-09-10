@@ -35,13 +35,15 @@ struct format_piece
   u32 source_position;
   format_piece_kind kind;
   bool is_at_line_start{false};
+  bool should_strip_tabs{false};
 
   format_piece(StringView text, usize source_position, format_piece_kind kind,
-               bool is_at_line_start) wontthrow
+               bool is_at_line_start, bool should_strip_tabs = false) wontthrow
       : text{text},
         source_position{static_cast<u32>(source_position)},
         kind{kind},
-        is_at_line_start{is_at_line_start}
+        is_at_line_start{is_at_line_start},
+        should_strip_tabs{should_strip_tabs}
   {}
 };
 
@@ -370,7 +372,8 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
         if (body_end > body_start) {
           pieces.push(format_piece{
               source.substring_of_length(body_start, body_end - body_start),
-              body_start, format_piece_kind::Raw, true});
+              body_start, format_piece_kind::Raw, true,
+              pending.should_strip_tabs});
         }
         if (!did_find_terminator) break;
       }
@@ -505,6 +508,12 @@ pure fn piece_begins_redirection(const ArrayList<format_piece> &pieces,
              pieces[index + 1].source_position;
 }
 
+struct format_layout
+{
+  usize indent_step{2};
+  bool is_bash_declaration{false};
+};
+
 class FormatWriter
 {
 public:
@@ -512,12 +521,23 @@ public:
 
   fn set_indent(usize indent) wontthrow -> void { m_indent = indent; }
 
+  fn set_wrapping(bool should_wrap) wontthrow -> void
+  {
+    m_should_wrap = should_wrap;
+  }
+
+  mustuse pure fn has_line_text() const wontthrow -> bool
+  {
+    return m_line_has_text;
+  }
+
   fn append_token(StringView token) throws -> void
   {
     start_line();
     let const separator_length = m_line_has_text ? 1u : 0u;
     let const token_width = toiletline::display_width(token);
-    if (m_column + separator_length + token_width > MAX_LINE_WIDTH &&
+    if (m_should_wrap &&
+        m_column + separator_length + token_width > MAX_LINE_WIDTH &&
         m_line_has_text)
     {
       break_with_continuation(m_indent + 2);
@@ -596,6 +616,14 @@ public:
     m_column = 0;
   }
 
+  fn finish_padded_line() throws -> void
+  {
+    if (!m_output.is_empty() && m_output[m_output.count() - 1] != '\n')
+      m_output.append(" \n");
+    m_line_has_text = false;
+    m_column = 0;
+  }
+
   fn ensure_blank_line() throws -> void
   {
     finish_line();
@@ -628,6 +656,7 @@ private:
   usize m_indent{0};
   usize m_column{0};
   bool m_line_has_text{false};
+  bool m_should_wrap{true};
 };
 
 struct option_wrap_position
@@ -754,8 +783,8 @@ fn first_test_shadow_position(const ArrayList<format_piece> &pieces) throws
 }
 
 fn render_format_pieces(const ArrayList<format_piece> &pieces,
-                        usize initial_indent, usize recursion_depth) throws
-    -> String;
+                        usize initial_indent, usize recursion_depth,
+                        format_layout layout = {}) throws -> String;
 
 fn format_word_substitutions(StringView word, usize indent,
                              usize recursion_depth) throws -> Maybe<String>
@@ -860,11 +889,19 @@ fn format_word_substitutions(StringView word, usize indent,
 }
 
 fn render_format_pieces(const ArrayList<format_piece> &pieces,
-                        usize initial_indent = 0,
-                        usize recursion_depth = 0) throws -> String
+                        usize initial_indent = 0, usize recursion_depth = 0,
+                        format_layout layout) throws -> String
 {
   let writer = FormatWriter{};
   writer.set_indent(initial_indent);
+  writer.set_wrapping(!layout.is_bash_declaration);
+  let const indent_step = layout.indent_step;
+  let const is_bash = layout.is_bash_declaration;
+  bool has_pending_statement_end = false;
+  bool should_pad_pending_line = false;
+  bool did_join_pending_end = false;
+  let loop_do_join_states = ArrayList<bool>{heap_allocator()};
+  let pending_fi_counts = ArrayList<usize>{heap_allocator()};
   let const test_shadow_position = first_test_shadow_position(pieces);
   let const option_wrap_positions = collect_option_wrap_positions(pieces);
   usize option_wrap_index = 0;
@@ -875,6 +912,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   let case_pattern_states = ArrayList<bool>{heap_allocator()};
   bool should_attach_heredoc_delimiter = false;
   bool should_attach_redirection_operand = false;
+  bool should_space_redirection_operand = false;
   bool should_attach_case_pattern = false;
   bool should_command_start_after_redirection = false;
   bool has_pending_declaration_separator = false;
@@ -964,6 +1002,11 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   };
   let const do_begin_statement = [&](bool is_declaration, bool is_structural)
                                      throws -> void {
+    if (is_bash) {
+      has_pending_declaration_separator = false;
+      has_pending_structural_separator = false;
+      return;
+    }
     if (!has_pending_declaration_separator && !has_pending_structural_separator)
     {
       return;
@@ -984,12 +1027,107 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
     is_current_statement_declaration = false;
     has_classified_current_statement = false;
   };
+  let const do_is_bash_join_keyword = [&](StringView word) wontthrow -> bool {
+    if (should_pad_pending_line) return false;
+    if (word == "then") return true;
+
+    return word == "do" && !loop_do_join_states.is_empty() &&
+           loop_do_join_states.back();
+  };
+  let const do_flush_statement_end = [&](usize flush_index) throws -> void {
+    did_join_pending_end = false;
+    if (!has_pending_statement_end) return;
+    has_pending_statement_end = false;
+    if (!writer.has_line_text() && !should_pad_pending_line) return;
+    let const &next = pieces[flush_index];
+    if (next.kind == format_piece_kind::Operator && next.text == ";") {
+      has_pending_statement_end = true;
+      return;
+    }
+
+    bool should_suppress_terminator = should_pad_pending_line;
+    bool should_suppress_break = false;
+
+    if (next.kind == format_piece_kind::Word &&
+        do_is_bash_join_keyword(next.text))
+    {
+      writer.append_attached(";");
+      did_join_pending_end = true;
+      return;
+    }
+
+    if (piece_begins_redirection(pieces, flush_index)) {
+      should_suppress_terminator = true;
+      should_suppress_break = true;
+    }
+    if (next.kind == format_piece_kind::Raw) should_suppress_terminator = true;
+
+    if (next.kind == format_piece_kind::Operator) {
+      let const operator_kind =
+          FORMAT_OPERATORS.find(next.text).value_or(format_operator::Other);
+      if (operator_kind == format_operator::CloseBrace ||
+          operator_kind == format_operator::CaseTerminator)
+      {
+        should_suppress_terminator = true;
+      }
+      if (operator_kind == format_operator::CloseParen && subshell_depth > 0) {
+        should_suppress_terminator = true;
+        should_suppress_break = true;
+      }
+      if (operator_kind == format_operator::Pipe ||
+          operator_kind == format_operator::Continuation)
+      {
+        should_suppress_terminator = true;
+        should_suppress_break = true;
+      }
+    }
+
+    if (!should_suppress_terminator) writer.append_attached(";");
+    if (should_suppress_break) {
+      should_pad_pending_line = false;
+      return;
+    }
+
+    if (should_pad_pending_line) {
+      should_pad_pending_line = false;
+      writer.finish_padded_line();
+      return;
+    }
+    writer.finish_line();
+  };
 
   for (usize index = 0; index < pieces.count(); index++) {
     let const &piece = pieces[index];
     let const text = piece.text;
+    if (is_bash && piece.kind != format_piece_kind::Newline)
+      do_flush_statement_end(index);
     if (piece.kind == format_piece_kind::Raw) {
-      writer.append_raw(text);
+      if (!is_bash) {
+        writer.append_raw(text);
+        continue;
+      }
+      if (piece.should_strip_tabs) {
+        let stripped = String{heap_allocator()};
+        usize line_start = 0;
+
+        while (line_start < text.length) {
+          usize line_end = line_start;
+          while (line_end < text.length && text[line_end] != '\n')
+            line_end++;
+          usize content_start = line_start;
+          while (content_start < line_end && text[content_start] == '\t')
+            content_start++;
+          stripped.append(text.substring_of_length(content_start,
+                                                   line_end - content_start));
+          if (line_end < text.length) stripped.push('\n');
+          line_start = line_end < text.length ? line_end + 1 : line_end;
+        }
+
+        writer.append_raw(stripped.view());
+      } else {
+        writer.append_raw(text);
+      }
+      writer.ensure_blank_line();
       continue;
     }
     if (piece.kind == format_piece_kind::Comment) {
@@ -1036,6 +1174,10 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         has_continued_declaration_statement = false;
       }
       do_finish_command();
+      if (is_bash) {
+        if (writer.has_line_text()) has_pending_statement_end = true;
+        continue;
+      }
       writer.finish_line();
       continue;
     }
@@ -1072,12 +1214,29 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
             pieces[index - 1].source_position + pieces[index - 1].text.count() <
                 piece.source_position &&
             (text.starts_with("<(") || text.starts_with(">("));
-        if (is_separated_process_substitution_operand)
-          writer.append_token(text);
-        else
-          writer.append_attached(text);
+        let quoted_heredoc_delimiter = String{heap_allocator()};
+        let rendered_operand = text;
+        if (is_bash && should_attach_heredoc_delimiter) {
+          let const unquoted =
+              lexer::unquote_heredoc_delimiter(text, heap_allocator());
+          if (unquoted.view() != text) {
+            quoted_heredoc_delimiter.push('\'');
+            quoted_heredoc_delimiter.append(unquoted.view());
+            quoted_heredoc_delimiter.push('\'');
+            rendered_operand = quoted_heredoc_delimiter.view();
+          }
+        }
+        if (is_separated_process_substitution_operand ||
+            (should_attach_redirection_operand &&
+             should_space_redirection_operand))
+        {
+          writer.append_token(rendered_operand);
+        } else {
+          writer.append_attached(rendered_operand);
+        }
         should_attach_heredoc_delimiter = false;
         should_attach_redirection_operand = false;
+        should_space_redirection_operand = false;
         is_command_start = should_command_start_after_redirection;
         should_command_start_after_redirection = false;
         continue;
@@ -1114,15 +1273,15 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if ((keyword_flags & formatter_keyword_closes) != 0) {
         do_finish_command();
         writer.finish_line();
-        if (is_case_body_esac && indent >= 2) indent -= 2;
-        if (indent >= 2) indent -= 2;
+        if (is_case_body_esac && indent >= indent_step) indent -= indent_step;
+        if (indent >= indent_step) indent -= indent_step;
         writer.set_indent(indent);
       }
       if ((keyword_flags & formatter_keyword_vertical) != 0 || is_case_in) {
         do_begin_statement(false, true);
         if (!is_case_in) {
           do_finish_command();
-          writer.finish_line();
+          if (!did_join_pending_end) writer.finish_line();
         }
         writer.append_token(rendered_text);
         if (index + 1 < pieces.count() &&
@@ -1136,14 +1295,37 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
             (keyword_flags & formatter_keyword_closes) != 0 &&
             (keyword_flags & formatter_keyword_indents) == 0;
         if (is_compound_terminator) has_completed_structural_statement = true;
-        if (!is_followed_by_continuation && !is_followed_by_inline_comment &&
-            !(is_compound_terminator && is_followed_by_redirection))
+        if (is_bash) {
+          if (rendered_text == "done" && !loop_do_join_states.is_empty())
+            loop_do_join_states.pop_back();
+          if (rendered_text == "fi" && !pending_fi_counts.is_empty()) {
+            let const extra_count = pending_fi_counts.back();
+            pending_fi_counts.pop_back();
+
+            for (usize repeat = 0; repeat < extra_count; repeat++) {
+              writer.append_attached(";");
+              writer.finish_line();
+              if (indent >= indent_step) indent -= indent_step;
+              writer.set_indent(indent);
+              writer.append_token("fi");
+            }
+          }
+          if (is_case_in) {
+            writer.finish_padded_line();
+          } else if (is_compound_terminator) {
+            has_pending_statement_end = true;
+          } else {
+            writer.finish_line();
+          }
+        } else if (!is_followed_by_continuation &&
+                   !is_followed_by_inline_comment &&
+                   !(is_compound_terminator && is_followed_by_redirection))
         {
           writer.finish_line();
         }
 
         if ((keyword_flags & formatter_keyword_indents) != 0 || is_case_in)
-          indent += 2;
+          indent += indent_step;
         writer.set_indent(indent);
         is_expecting_case_in = false;
         if (is_case_in) case_pattern_states.push(true);
@@ -1154,12 +1336,30 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       }
       if ((keyword_flags & formatter_keyword_elif) != 0) {
         do_begin_statement(false, true);
+        if (is_bash) {
+          writer.append_token("else");
+          writer.finish_line();
+          indent += indent_step;
+          writer.set_indent(indent);
+          if (!pending_fi_counts.is_empty()) pending_fi_counts.back()++;
+          writer.append_token("if");
+          is_command_start = true;
+          continue;
+        }
         writer.append_token(rendered_text);
         is_command_start = true;
         continue;
       }
       if ((keyword_flags & formatter_keyword_case) != 0)
         is_expecting_case_in = true;
+      if (is_bash && is_reserved_position) {
+        if (rendered_text == "while" || rendered_text == "until")
+          loop_do_join_states.push(true);
+        else if (rendered_text == "for" || rendered_text == "select")
+          loop_do_join_states.push(false);
+        else if (rendered_text == "if")
+          pending_fi_counts.push(0);
+      }
       let should_rewrite_test =
           is_command_start && !is_case_pattern && rendered_text == "test" &&
           !has_prior_test_shadow(test_shadow_position, piece.source_position);
@@ -1209,10 +1409,15 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       is_waiting_for_continued_statement = false;
       has_completed_structural_statement = false;
       do_begin_statement(false, false);
-      writer.finish_line();
+      if (!is_bash) writer.finish_line();
       writer.append_token(text);
-      if (!is_followed_by_inline_comment) writer.finish_line();
-      indent += 2;
+      if (is_bash) {
+        has_pending_statement_end = true;
+        should_pad_pending_line = true;
+      } else if (!is_followed_by_inline_comment) {
+        writer.finish_line();
+      }
+      indent += indent_step;
       writer.set_indent(indent);
       do_finish_command();
       continue;
@@ -1231,8 +1436,13 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       has_completed_structural_statement = false;
       do_begin_statement(false, false);
       writer.append_token(text);
+      if (is_bash) {
+        subshell_depth++;
+        do_finish_command();
+        continue;
+      }
       if (!is_followed_by_inline_comment) writer.finish_line();
-      indent += 2;
+      indent += indent_step;
       subshell_depth++;
       writer.set_indent(indent);
       do_finish_command();
@@ -1241,10 +1451,14 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       do_begin_statement(false, true);
       do_finish_command();
       writer.finish_line();
-      if (indent >= 2) indent -= 2;
+      if (indent >= indent_step) indent -= indent_step;
       writer.set_indent(indent);
       writer.append_token(text);
       has_completed_structural_statement = true;
+      if (is_bash) {
+        has_pending_statement_end = true;
+        continue;
+      }
       if (!is_followed_by_continuation && !is_followed_by_inline_comment &&
           !is_followed_by_redirection)
       {
@@ -1257,7 +1471,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       has_completed_structural_statement = false;
       do_finish_command();
       writer.finish_line();
-      if (indent >= 2) indent -= 2;
+      if (indent >= indent_step) indent -= indent_step;
       writer.set_indent(indent);
       writer.append_token(text);
       if (!is_followed_by_inline_comment) writer.finish_line();
@@ -1294,6 +1508,11 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       has_completed_structural_statement = false;
       has_continued_declaration_statement = false;
       is_waiting_for_continued_statement = false;
+      if (is_bash) {
+        if (writer.has_line_text()) has_pending_statement_end = true;
+        do_finish_command();
+        continue;
+      }
       if (!is_followed_by_inline_comment) writer.finish_line();
       do_finish_command();
       continue;
@@ -1307,7 +1526,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if (is_case_pattern) {
         writer.append_attached(text);
         if (!is_followed_by_inline_comment) writer.finish_line();
-        indent += 2;
+        indent += indent_step;
         writer.set_indent(indent);
         case_pattern_states.back() = false;
         should_attach_case_pattern = false;
@@ -1315,14 +1534,25 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       } else if (subshell_depth > 0) {
         do_begin_statement(false, true);
         do_finish_command();
+        if (is_bash) {
+          subshell_depth--;
+          writer.append_token(text);
+          has_completed_structural_statement = true;
+          has_pending_statement_end = true;
+          continue;
+        }
         writer.finish_line();
-        if (indent >= 2) indent -= 2;
+        if (indent >= indent_step) indent -= indent_step;
         subshell_depth--;
         writer.set_indent(indent);
         writer.append_token(text);
         has_completed_structural_statement = true;
       } else {
         writer.append_attached(text);
+        if (is_bash) {
+          has_pending_statement_end = true;
+          should_pad_pending_line = true;
+        }
       }
       continue;
     }
@@ -1346,13 +1576,37 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         do_begin_statement(is_current_statement_declaration, false);
       }
       should_command_start_after_redirection = is_command_start;
-      if (index > 0 && pieces[index - 1].kind == format_piece_kind::Word &&
+      bool is_attached_to_previous_word =
+          index > 0 && pieces[index - 1].kind == format_piece_kind::Word &&
           pieces[index - 1].source_position + pieces[index - 1].text.count() ==
-              piece.source_position)
-        writer.append_attached(text);
+              piece.source_position;
+      let default_descriptor_operator = String{heap_allocator()};
+      let rendered_operator = text;
+      let const is_descriptor_duplication =
+          is_bash && (text == ">&" || text == "<&") &&
+          index + 1 < pieces.count() &&
+          (pieces[index + 1].text == "-" ||
+           pieces[index + 1].text.is_all_decimal_digits());
+      if (is_descriptor_duplication) {
+        if (pieces[index + 1].text == "-") rendered_operator = StringView{">&"};
+        let const has_explicit_descriptor =
+            is_attached_to_previous_word &&
+            pieces[index - 1].text.is_all_decimal_digits();
+        if (!has_explicit_descriptor) {
+          default_descriptor_operator.push(text == ">&" ? '1' : '0');
+          default_descriptor_operator.append(rendered_operator);
+          rendered_operator = default_descriptor_operator.view();
+          is_attached_to_previous_word = false;
+        }
+      }
+      if (is_attached_to_previous_word)
+        writer.append_attached(rendered_operator);
       else
-        writer.append_token(text);
+        writer.append_token(rendered_operator);
       should_attach_redirection_operand = true;
+      should_space_redirection_operand = is_bash && text != "<<" &&
+                                         text != "<<-" &&
+                                         text[text.length - 1] != '&';
       continue;
     }
 
@@ -1412,6 +1666,24 @@ fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
     errors = steal(formatted_errors);
     return None;
   }
+
+  return formatted;
+}
+
+fn format_bash_function_source(StringView source) throws -> String
+{
+  let normalized = String{heap_allocator()};
+  let source_view = source;
+  if (source.find_character('\r').has_value()) {
+    normalized = String{source};
+    normalized.normalize_crlf_line_endings();
+    source_view = normalized.view();
+  }
+
+  let const pieces = scan_format_pieces(source_view);
+  let formatted = render_format_pieces(pieces, 0, 0, format_layout{4, true});
+  while (!formatted.is_empty() && formatted.back() == '\n')
+    formatted.pop_back();
 
   return formatted;
 }

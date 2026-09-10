@@ -1,0 +1,171 @@
+p ()<SP>
+{<SP>
+    if a; then
+        b;
+    else
+        if c; then
+            d;
+        else
+            if e; then
+                f;
+            else
+                g;
+            fi;
+        fi;
+    fi
+}
+q ()<SP>
+{<SP>
+    echo one;
+    {<SP>
+        echo grp
+    };
+    echo two
+}
+r ()<SP>
+{<SP>
+    echo a;
+    echo b
+}
+s ()<SP>
+{<SP>
+    for i in 1 2;
+    do
+        echo "$i";
+    done;
+    echo tail
+}
+t ()<SP>
+{<SP>
+    case $x in<SP>
+        a)
+            echo A
+        ;;
+    esac;
+    echo after
+}
+rc=0
+u ()<SP>
+{<SP>
+    ( echo a;
+    echo b );
+    echo c
+}
+v ()<SP>
+{<SP>
+    echo a | /bin/cat | /usr/bin/wc -l
+}
+w ()<SP>
+{<SP>
+    if a; then
+        ( b;
+        c );
+    fi
+}
+x ()<SP>
+{<SP>
+    while read -r l; do
+        echo "$l";
+    done < /dev/null
+}
+y ()<SP>
+{<SP>
+    a && {<SP>
+        b;
+        c
+    } || d
+}
+z ()<SP>
+{<SP>
+    local v="a b";
+    echo "${v}" $((1+2)) `echo t`
+}
+rc=0
+r1 ()<SP>
+{<SP>
+    echo x 1>&2
+}
+r2 ()<SP>
+{<SP>
+    read v 0<&3
+}
+r3 ()<SP>
+{<SP>
+    echo x 1>&-
+}
+r4 ()<SP>
+{<SP>
+    echo x 0>&-
+}
+r5 ()<SP>
+{<SP>
+    echo x >&file
+}
+r6 ()<SP>
+{<SP>
+    echo x 1>&2
+}
+r7 ()<SP>
+{<SP>
+    exec 3<&0
+}
+r8 ()<SP>
+{<SP>
+    exec 3>&-
+}
+r9 ()<SP>
+{<SP>
+    echo hi > /dev/null 2>&1
+}
+ra ()<SP>
+{<SP>
+    echo x &> file
+}
+rb ()<SP>
+{<SP>
+    echo x &>> file
+}
+rc ()<SP>
+{<SP>
+    echo x >> log
+}
+rd ()<SP>
+{<SP>
+    read -r v <<< "$q"
+}
+re ()<SP>
+{<SP>
+    cat <(echo p)
+}
+rc=0
+h1 ()<SP>
+{<SP>
+    cat <<EOF
+body
+EOF
+
+    echo tail
+}
+h2 ()<SP>
+{<SP>
+    cat <<'E1'
+$x
+E1
+
+}
+h3 ()<SP>
+{<SP>
+    cat <<'E2'
+$x
+E2
+
+}
+h4 ()<SP>
+{<SP>
+    cat <<-E3
+tabbed
+E3
+
+    echo after
+}
+rc=0

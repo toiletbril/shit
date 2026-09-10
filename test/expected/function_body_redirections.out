@@ -269,16 +269,33 @@
   Unquoted "keyword"
 ]
 plain () 
-{ echo hi; }
+{ 
+    echo hi
+}
 truncated () 
-{ echo hi; } >/dev/null
+{ 
+    echo hi
+} > /dev/null
 paired () 
-{ echo hi; } >/dev/null 2>&1
+{ 
+    echo hi
+} > /dev/null 2>&1
 closed () 
-{ :; } 2>&-
+{ 
+    :
+} 2>&-
 heredoc () 
-{ cat; } <<EOF
+{ 
+    cat
+} <<EOF
 herestring () 
-{ cat; } <<< here
+{ 
+    cat
+} <<< here
 keyword () 
-{ for i in 1 2; do :; done; } >/dev/null
+{ 
+    for i in 1 2;
+    do
+        :;
+    done
+} > /dev/null
