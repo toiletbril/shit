@@ -32,8 +32,7 @@ namespace koshkit {
 
 static fn is_blank(char c) wontthrow -> bool
 {
-  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
-         c == '\v';
+  return c == ' ' || (c >= '\t' && c <= '\r');
 }
 
 struct wc_row
@@ -68,8 +67,8 @@ static fn append_counts(String &line, u64 lines, u64 words, u64 bytes,
     if (has_field) line += ' ';
 
     let const digits = String::from(value, line.allocator());
-    for (usize i = digits.count(); i < field_width; i++)
-      line += ' ';
+    if (digits.count() < field_width)
+      line.append_repeated(' ', field_width - digits.count());
 
     line += digits.view();
     has_field = true;

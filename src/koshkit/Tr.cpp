@@ -209,15 +209,21 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
       return 1;
     }
     if (*read_count == 0) break;
+
     usize output_count = 0;
-    for (usize i = 0; i < *read_count; i++) {
-      let const byte = static_cast<unsigned char>(input[i]);
-      if (!is_in_set1[byte]) {
-        output[output_count++] = static_cast<char>(byte);
-      } else if (!is_deleting) {
-        output[output_count++] = static_cast<char>(translation[byte]);
+    if (is_deleting) {
+      for (usize i = 0; i < *read_count; i++) {
+        let const byte = static_cast<unsigned char>(input[i]);
+        if (!is_in_set1[byte]) output[output_count++] = static_cast<char>(byte);
       }
+    } else {
+      for (usize i = 0; i < *read_count; i++)
+        output[i] = static_cast<char>(
+            translation[static_cast<unsigned char>(input[i])]);
+
+      output_count = *read_count;
     }
+
     if (output_count > 0) ec.print_to_stdout(StringView{output, output_count});
   }
 

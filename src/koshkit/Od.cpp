@@ -37,8 +37,9 @@ static fn append_od_padded(String &output, u64 value, usize width,
 {
   let const digits =
       String::from_in_base(value, false, base, output.allocator());
-  for (usize position = digits.length(); position < width; position++)
-    output += '0';
+  if (digits.length() < width)
+    output.append_repeated('0', width - digits.length());
+
   output += digits.view();
 }
 
@@ -46,32 +47,51 @@ static fn append_od_character(String &output, u8 byte) throws -> void
 {
   static constexpr StringView NAMES[8] = {"nul", "soh", "stx", "etx",
                                           "eot", "enq", "ack", "bel"};
-  if (byte < 8) {
-    output += NAMES[byte];
-  } else if (byte == '\b') {
-    output += " \\b";
-  } else if (byte == '\t') {
-    output += " \\t";
-  } else if (byte == '\n') {
-    output += " \\n";
-  } else if (byte == '\f') {
-    output += " \\f";
-  } else if (byte == '\r') {
-    output += " \\r";
-  } else if (byte >= 0x20 && byte <= 0x7e) {
+
+  switch (byte) {
+  case 0:
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+  case 5:
+  case 6:
+  case 7: output += NAMES[byte]; return;
+
+  case '\b': output += " \\b"; return;
+  case '\t': output += " \\t"; return;
+  case '\n': output += " \\n"; return;
+  case '\f': output += " \\f"; return;
+  case '\r': output += " \\r"; return;
+
+  default: break;
+  }
+
+  if (byte >= 0x20 && byte <= 0x7e) {
     output += "  ";
     output += static_cast<char>(byte);
-  } else {
-    append_od_padded(output, byte, 3, int_base::octal);
+    return;
   }
+
+  append_od_padded(output, byte, 3, int_base::octal);
 }
 
 static fn od_base(char radix) wontthrow -> int_base
 {
-  return radix == 'x'   ? int_base::hex
-         : radix == 'd' ? int_base::decimal
-                        : int_base::octal;
+  switch (radix) {
+  case 'x': return int_base::hex;
+  case 'd': return int_base::decimal;
+  default: return int_base::octal;
+  }
 }
+
+struct od_format
+{
+  int_base base;
+  usize unit_size;
+  usize width;
+  bool is_character;
+};
 
 Od::Od() = default;
 
@@ -89,13 +109,23 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
 
   char address_radix = 'o';
   if (FLAG_OD_ADDRESS.is_set()) {
-    if (FLAG_OD_ADDRESS.value().length != 1 ||
-        (FLAG_OD_ADDRESS.value()[0] != 'd' &&
-         FLAG_OD_ADDRESS.value()[0] != 'o' &&
-         FLAG_OD_ADDRESS.value()[0] != 'x' &&
-         FLAG_OD_ADDRESS.value()[0] != 'n'))
-      throw Error{"od: address radix must be d, o, x, or n"};
-    address_radix = FLAG_OD_ADDRESS.value()[0];
+    let const radix_value = FLAG_OD_ADDRESS.value();
+    let is_valid_radix = false;
+
+    if (radix_value.length == 1) {
+      switch (radix_value[0]) {
+      case 'd':
+      case 'o':
+      case 'x':
+      case 'n': is_valid_radix = true; break;
+
+      default: break;
+      }
+    }
+
+    if (!is_valid_radix) throw Error{"od: address radix must be d, o, x, or n"};
+
+    address_radix = radix_value[0];
   }
 
   u64 skip_count = 0;
@@ -159,7 +189,53 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
   if (byte_limit < available) available = static_cast<usize>(byte_limit);
   let const bytes = input_bytes.view().substring_of_length(first, available);
   let output = String{cxt.scratch_allocator()};
-  let type_count = FLAG_OD_TYPE.count();
+  let const type_count = FLAG_OD_TYPE.count();
+  let const format_count = type_count == 0 ? 1 : type_count;
+  let formats = ArrayList<od_format>{cxt.scratch_allocator()};
+  formats.reserve(format_count);
+
+  for (usize format_index = 0; format_index < format_count; format_index++) {
+    let const format =
+        type_count == 0 ? StringView{"o2"} : FLAG_OD_TYPE.get(format_index);
+    if (format == "c") {
+      formats.push(od_format{int_base::octal, 1, 0, true});
+      continue;
+    }
+
+    let const radix = format.is_empty() ? 'o' : format[0];
+    usize unit_size = 2;
+    if (format.length > 1 && format[1] >= '1' && format[1] <= '8')
+      unit_size = static_cast<usize>(format[1] - '0');
+
+    int_base base = int_base::decimal;
+    usize width = unit_size * 3;
+    switch (radix) {
+    case 'x':
+      base = int_base::hex;
+      width = unit_size * 2;
+      break;
+
+    case 'o':
+      base = int_base::octal;
+      width = (unit_size * 8 + 2) / 3;
+      break;
+
+    case 'd':
+    case 'u': break;
+
+    default:
+      throw Error{"od: unsupported output type '" + String{format} + "'"};
+    }
+
+    if (unit_size != 1 && unit_size != 2 && unit_size != 4 && unit_size != 8)
+      throw Error{"od: unsupported integer width"};
+
+    formats.push(od_format{base, unit_size, width, false});
+  }
+
+  let const address_base = od_base(address_radix);
+  let const should_print_address = address_radix != 'n';
+  let const is_verbose = FLAG_OD_VERBOSE.is_enabled();
   StringView previous_row;
   bool did_suppress = false;
 
@@ -167,66 +243,54 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
     let const row_length =
         bytes.length - row_start < 16 ? bytes.length - row_start : 16;
     let const row = bytes.substring_of_length(row_start, row_length);
-    if (!FLAG_OD_VERBOSE.is_enabled() && row == previous_row) {
+    if (!is_verbose && row == previous_row) {
       if (!did_suppress) output += "*\n";
       did_suppress = true;
       continue;
     }
+
     previous_row = row;
     did_suppress = false;
-    let const format_count = type_count == 0 ? 1 : type_count;
 
     for (usize format_index = 0; format_index < format_count; format_index++) {
-      if (address_radix != 'n' && format_index == 0) {
-        append_od_padded(output, first + row_start, 7, od_base(address_radix));
+      if (should_print_address && format_index == 0) {
+        append_od_padded(output, first + row_start, 7, address_base);
       } else {
         output += "       ";
       }
 
-      let const format =
-          type_count == 0 ? StringView{"o2"} : FLAG_OD_TYPE.get(format_index);
-      if (format == "c") {
+      let const &format = formats[format_index];
+      if (format.is_character) {
         for (usize position = 0; position < row_length; position++) {
           output += ' ';
           append_od_character(output,
                               static_cast<u8>(bytes[row_start + position]));
         }
       } else {
-        let const radix = format.is_empty() ? 'o' : format[0];
-        usize unit_size = 2;
-        if (format.length > 1 && format[1] >= '1' && format[1] <= '8')
-          unit_size = static_cast<usize>(format[1] - '0');
-        if (radix != 'd' && radix != 'o' && radix != 'u' && radix != 'x')
-          throw Error{"od: unsupported output type '" + String{format} + "'"};
-        if (unit_size != 1 && unit_size != 2 && unit_size != 4 &&
-            unit_size != 8)
-          throw Error{"od: unsupported integer width"};
-
-        for (usize position = 0; position < row_length; position += unit_size) {
+        for (usize position = 0; position < row_length;
+             position += format.unit_size)
+        {
           u64 value = 0;
-          let const current_size = row_length - position < unit_size
+          let const current_size = row_length - position < format.unit_size
                                        ? row_length - position
-                                       : unit_size;
+                                       : format.unit_size;
+
           for (usize byte_index = 0; byte_index < current_size; byte_index++)
             value |= static_cast<u64>(static_cast<u8>(
                          bytes[row_start + position + byte_index]))
                      << (byte_index * 8);
+
           output += ' ';
-          let const base = radix == 'x'   ? int_base::hex
-                           : radix == 'o' ? int_base::octal
-                                          : int_base::decimal;
-          let const width = radix == 'x'   ? unit_size * 2
-                            : radix == 'o' ? (unit_size * 8 + 2) / 3
-                                           : unit_size * 3;
-          append_od_padded(output, value, width, base);
+          append_od_padded(output, value, format.width, format.base);
         }
       }
+
       output += '\n';
     }
   }
 
-  if (address_radix != 'n') {
-    append_od_padded(output, first + bytes.length, 7, od_base(address_radix));
+  if (should_print_address) {
+    append_od_padded(output, first + bytes.length, 7, address_base);
     output += '\n';
   }
   ec.print_to_stdout(output);

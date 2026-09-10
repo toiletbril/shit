@@ -52,19 +52,39 @@ static fn parse_nl_unsigned(StringView value, StringView name) throws -> u64
   return parsed.value();
 }
 
-static fn nl_style_numbers(StringView style, bool is_empty, u64 &blank_count,
+enum class nl_style : uchar
+{
+  All,
+  NonEmpty,
+  None,
+};
+
+static constexpr static_string_entry<nl_style> NL_STYLE_ENTRIES[] = {
+    {SSK("a"), nl_style::All     },
+    {SSK("t"), nl_style::NonEmpty},
+    {SSK("n"), nl_style::None    },
+};
+static constexpr StaticStringMap NL_STYLES{NL_STYLE_ENTRIES};
+
+static fn nl_style_numbers(nl_style style, bool is_empty, u64 &blank_count,
                            u64 blank_group) wontthrow -> bool
 {
-  if (style == "n") return false;
-  if (style == "a") {
+  switch (style) {
+  case nl_style::None: return false;
+
+  case nl_style::All:
     if (!is_empty) {
       blank_count = 0;
       return true;
     }
+
     blank_count++;
     if (blank_count < blank_group) return false;
+
     blank_count = 0;
     return true;
+
+  case nl_style::NonEmpty: break;
   }
 
   blank_count = 0;
@@ -108,16 +128,17 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.count() > 1) return report_usage_error(ec, cxt, args[0].view());
 
-  let const body_style =
-      FLAG_NL_BODY.is_set() ? FLAG_NL_BODY.value() : StringView{"t"};
-  let const header_style =
-      FLAG_NL_HEADER.is_set() ? FLAG_NL_HEADER.value() : StringView{"n"};
-  let const footer_style =
-      FLAG_NL_FOOTER.is_set() ? FLAG_NL_FOOTER.value() : StringView{"n"};
-  if ((body_style != "a" && body_style != "t" && body_style != "n") ||
-      (header_style != "a" && header_style != "t" && header_style != "n") ||
-      (footer_style != "a" && footer_style != "t" && footer_style != "n"))
+  let const body_style = NL_STYLES.find(
+      FLAG_NL_BODY.is_set() ? FLAG_NL_BODY.value() : StringView{"t"});
+  let const header_style = NL_STYLES.find(
+      FLAG_NL_HEADER.is_set() ? FLAG_NL_HEADER.value() : StringView{"n"});
+  let const footer_style = NL_STYLES.find(
+      FLAG_NL_FOOTER.is_set() ? FLAG_NL_FOOTER.value() : StringView{"n"});
+  if (!body_style.has_value() || !header_style.has_value() ||
+      !footer_style.has_value())
+  {
     throw Error{"nl: unsupported numbering style"};
+  }
 
   let const number_format_name =
       FLAG_NL_FORMAT.is_set() ? FLAG_NL_FORMAT.value() : StringView{"rn"};
@@ -173,7 +194,7 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
 
   let reader = utils::BufferedLineReader{input->descriptor};
   let output = String{cxt.scratch_allocator()};
-  StringView section_style = body_style;
+  nl_style section_style = *body_style;
   i64 number = static_cast<i64>(start_value);
   u64 blank_count = 0;
 
@@ -199,9 +220,9 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
           line.substring_of_length(position * delimiter.length,
                                    delimiter.length) == delimiter;
     if (is_section_delimiter) {
-      section_style = delimiter_count == 3   ? header_style
-                      : delimiter_count == 2 ? body_style
-                                             : footer_style;
+      section_style = delimiter_count == 3   ? *header_style
+                      : delimiter_count == 2 ? *body_style
+                                             : *footer_style;
       if (!FLAG_NL_NO_RESET.is_enabled())
         number = static_cast<i64>(start_value);
       blank_count = 0;
@@ -219,8 +240,7 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
       else
         number += static_cast<i64>(increment);
     } else {
-      for (usize position = 0; position < width_value; position++)
-        output += ' ';
+      output.append_repeated(' ', static_cast<usize>(width_value));
       output += separator;
     }
     output += line;

@@ -77,6 +77,10 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
   let output = String{cxt.scratch_allocator()};
+  let const is_field_mode = FLAG_CUT_FIELDS.is_set();
+  let const is_byte_mode = FLAG_CUT_BYTES.is_set();
+  let const should_keep_characters_whole = FLAG_CUT_NO_SPLIT.is_enabled();
+  let const should_suppress_undelimited = FLAG_CUT_SUPPRESS.is_enabled();
   i32 status = 0;
 
   for (let const source : sources) {
@@ -110,9 +114,9 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
       }
 
       let const line = reader.get_line();
-      if (!FLAG_CUT_FIELDS.is_set()) {
-        if (FLAG_CUT_BYTES.is_set()) {
-          if (FLAG_CUT_NO_SPLIT.is_enabled()) {
+      if (!is_field_mode) {
+        if (is_byte_mode) {
+          if (should_keep_characters_whole) {
             usize byte_position = 0;
             while (byte_position < line.length) {
               let const decoded = utils::decode_utf8(line, byte_position, 0);
@@ -141,28 +145,38 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
           }
         }
         output += '\n';
-      } else if (!line.find_character(delimiter).has_value()) {
-        if (!FLAG_CUT_SUPPRESS.is_enabled()) {
-          output += line;
+      } else {
+        let const first_delimiter = line.find_character(delimiter);
+        if (!first_delimiter.has_value()) {
+          if (!should_suppress_undelimited) {
+            output += line;
+            output += '\n';
+          }
+        } else {
+          usize field_start = 0;
+          usize field_number = 1;
+          bool has_output_field = false;
+
+          for (usize position = *first_delimiter; position <= line.length;
+               position++)
+          {
+            if (position != line.length && line[position] != delimiter)
+              continue;
+
+            if (text_position_is_selected(field_number, *ranges)) {
+              if (has_output_field) output += delimiter;
+
+              output +=
+                  line.substring_of_length(field_start, position - field_start);
+              has_output_field = true;
+            }
+
+            field_start = position + 1;
+            field_number++;
+          }
+
           output += '\n';
         }
-      } else {
-        usize field_start = 0;
-        usize field_number = 1;
-        bool has_output_field = false;
-
-        for (usize position = 0; position <= line.length; position++) {
-          if (position != line.length && line[position] != delimiter) continue;
-          if (text_position_is_selected(field_number, *ranges)) {
-            if (has_output_field) output += delimiter;
-            output +=
-                line.substring_of_length(field_start, position - field_start);
-            has_output_field = true;
-          }
-          field_start = position + 1;
-          field_number++;
-        }
-        output += '\n';
       }
 
       if (output.length() >= 65536) {

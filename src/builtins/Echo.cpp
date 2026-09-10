@@ -62,20 +62,24 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         break;
       }
       let is_all_option_letters = true;
-      for (usize k = 1; k < arg.length; k++)
-        if (arg[k] != 'n' && arg[k] != 'e' && arg[k] != 'E') {
-          is_all_option_letters = false;
-          break;
-        }
-      if (!is_all_option_letters) break;
+      let candidate_suppress_newline = should_suppress_newline;
+      let candidate_interpret_escapes = should_interpret_escapes;
+
       for (usize k = 1; k < arg.length; k++) {
-        if (arg[k] == 'n')
-          should_suppress_newline = true;
-        else if (arg[k] == 'e')
-          should_interpret_escapes = true;
-        else if (arg[k] == 'E')
-          should_interpret_escapes = false;
+        switch (arg[k]) {
+        case 'n': candidate_suppress_newline = true; continue;
+        case 'e': candidate_interpret_escapes = true; continue;
+        case 'E': candidate_interpret_escapes = false; continue;
+        default: is_all_option_letters = false; break;
+        }
+
+        break;
       }
+
+      if (!is_all_option_letters) break;
+
+      should_suppress_newline = candidate_suppress_newline;
+      should_interpret_escapes = candidate_interpret_escapes;
       start++;
     }
   } else {
@@ -92,9 +96,13 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (i > start) output += ' ';
 
     let const &arg = args[i];
+    if (!should_interpret_escapes) {
+      output += arg.view();
+      continue;
+    }
+
     for (usize j = 0; j < arg.length(); j++) {
-      if (!should_interpret_escapes || arg[j] != '\\' || j + 1 >= arg.length())
-      {
+      if (arg[j] != '\\' || j + 1 >= arg.length()) {
         output += arg[j];
         continue;
       }

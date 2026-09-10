@@ -32,15 +32,14 @@ namespace koshka {
 
 namespace koshkit {
 
-static fn number_prefix(i64 line_number, Allocator allocator) throws -> String
+static fn append_number_prefix(String &output, i64 line_number,
+                               Allocator allocator) throws -> void
 {
   let const digits = String::from(line_number, allocator);
-  String prefix{allocator};
-  for (usize i = digits.count(); i < 6; i++)
-    prefix += ' ';
-  prefix += digits.view();
-  prefix += '\t';
-  return prefix;
+  if (digits.count() < 6) output.append_repeated(' ', 6 - digits.count());
+
+  output += digits.view();
+  output += '\t';
 }
 
 static fn append_cat_source(String &output, StringView source,
@@ -63,13 +62,14 @@ static fn append_cat_source(String &output, StringView source,
   let highlight_cache = completion::shell_highlight_cache{};
   usize line_start = 0;
   while (line_start < source.length) {
-    let line_end = line_start;
-    while (line_end < source.length && source[line_end] != '\n')
-      line_end++;
-    if (line_end < source.length) line_end++;
+    let const remaining = source.substring(line_start);
+    let const newline_offset = remaining.find_character('\n');
+    let const line_end = newline_offset.has_value()
+                             ? line_start + *newline_offset + 1
+                             : source.length;
 
-    if (should_number && is_at_output_line_start) {
-      output += number_prefix(line_number, context.scratch_allocator());
+    if (is_at_output_line_start) {
+      append_number_prefix(output, line_number, context.scratch_allocator());
       line_number++;
     }
 
@@ -161,8 +161,8 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
     }
     let const should_highlight_source =
         should_highlight_output &&
-        !content->view().find_character('\0').has_value() &&
-        Path{source}.is_shell_source(content->view());
+        Path{source}.is_shell_source(content->view()) &&
+        !content->view().find_character('\0').has_value();
     append_cat_source(output, content->view(), FLAG_CAT_NUMBER.is_enabled(),
                       should_highlight_source, line_number,
                       is_at_output_line_start, cxt);

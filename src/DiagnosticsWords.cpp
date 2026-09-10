@@ -669,19 +669,23 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
     Maybe<SourceLocation> or_location{};
     for (usize i = 1; i < args.count(); i++) {
       let const literal = args[i]->raw_string();
+      let const view = literal.view();
+      let const leading = view.is_empty() ? '\0' : view[0];
 
-      if (is_before_path_operand && !is_find_leading_option(literal.view())) {
+      if (is_before_path_operand && !is_find_leading_option(view)) {
         is_before_path_operand = false;
-        has_path_operand = literal.view() == "-f" ||
-                           (!literal.is_empty() && literal[0] != '-' &&
-                            literal.view() != "(" && literal.view() != "!");
+        has_path_operand =
+            view == "-f" ||
+            (!view.is_empty() && leading != '-' && view != "(" && view != "!");
       }
 
-      if (literal.view() == "-exec" || literal.view() == "-execdir") {
+      if (leading == '-' && (view == "-exec" || view == "-execdir")) {
         has_exec = true;
         is_inside_exec_action = true;
         exec_location = args[i]->source_location();
-      } else if (has_exec && (literal.view() == ";" || literal.view() == "+")) {
+      } else if (has_exec && view.length == 1 &&
+                 (leading == ';' || leading == '+'))
+      {
         has_exec_terminator = true;
         is_inside_exec_action = false;
       } else if (is_inside_exec_action &&
@@ -689,13 +693,14 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
       {
         actx.report_diagnostic(diagnostic_id::sc2014,
                                args[i]->source_location());
-      } else if (literal.view() == "-o") {
+      } else if (leading == '-' && view == "-o") {
         has_or = true;
         or_location = args[i]->source_location();
-      } else if (literal.view() == "(" || literal.view() == ")") {
+      } else if (view.length == 1 && (leading == '(' || leading == ')')) {
         has_group = true;
       }
-      if (is_find_action(literal.view())) has_action = true;
+
+      if (is_find_action(view)) has_action = true;
     }
     if (has_exec && !has_exec_terminator && exec_location.has_value())
       actx.report_diagnostic(diagnostic_id::sc2067, *exec_location);
@@ -985,6 +990,12 @@ fn note_formatted_target(AnalysisContext &actx, const command_lint_input &input,
       name, location, assignment_binder::FormattedText, input.is_conditional);
 }
 
+constexpr PackedStringKey FIND_PATTERN_PREDICATE_KEYS[] = {
+    SSK("-name"), SSK("-iname"), SSK("-path"), SSK("-ipath"), SSK("-regex"),
+};
+
+constexpr StaticStringSet FIND_PATTERN_PREDICATES{FIND_PATTERN_PREDICATE_KEYS};
+
 fn check_operand_lints_after_scan(AnalysisContext &actx,
                                   const command_lint_input &input) throws
     -> void
@@ -1223,10 +1234,9 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
   case command_name_id::Find:
     for (usize i = 1; i + 1 < args.count(); i++) {
       let const predicate = args[i]->raw_string();
-      if (predicate.view() == "-name" || predicate.view() == "-iname" ||
-          predicate.view() == "-path" || predicate.view() == "-ipath" ||
-          predicate.view() == "-regex")
-      {
+      let const predicate_view = predicate.view();
+
+      if (FIND_PATTERN_PREDICATES.contains(predicate_view)) {
         if (args[i + 1]->kind() == Token::Kind::Word &&
             word_is_bare_glob(
                 static_cast<const tokens::WordToken *>(args[i + 1])->word()))
@@ -1234,7 +1244,7 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
                                  args[i + 1]->source_location());
       }
 
-      if (predicate.view() == "-exec" || predicate.view() == "-execdir") {
+      if (predicate_view == "-exec" || predicate_view == "-execdir") {
         /* find launches the action itself, so a shell function is never found,
            shellcheck SC2033. */
         let const action = args[i + 1]->raw_string();

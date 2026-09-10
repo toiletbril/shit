@@ -28,20 +28,30 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Strings);
 
 namespace koshka::koshkit {
 
+static pure fn is_strings_printable(u8 byte) wontthrow -> bool
+{
+  return (byte >= 0x20 && byte <= 0x7e) || byte == '\t';
+}
+
 static fn append_strings_record(String &output, StringView text, u64 offset,
                                 char radix) throws -> void
 {
   if (radix != '\0') {
-    let const base = radix == 'o'   ? int_base::octal
-                     : radix == 'x' ? int_base::hex
-                                    : int_base::decimal;
+    int_base base = int_base::decimal;
+    switch (radix) {
+    case 'o': base = int_base::octal; break;
+    case 'x': base = int_base::hex; break;
+    default: break;
+    }
+
     let const digits =
         String::from_in_base(offset, false, base, output.allocator());
-    for (usize position = digits.length(); position < 7; position++)
-      output += ' ';
+    if (digits.length() < 7) output.append_repeated(' ', 7 - digits.length());
+
     output += digits.view();
     output += ' ';
   }
+
   output += text;
   output += '\n';
 }
@@ -72,12 +82,23 @@ fn Strings::execute(const ExecContext &ec, EvalContext &cxt,
   }
   char radix = '\0';
   if (FLAG_STRINGS_RADIX.is_set()) {
-    if (FLAG_STRINGS_RADIX.value().length != 1 ||
-        (FLAG_STRINGS_RADIX.value()[0] != 'd' &&
-         FLAG_STRINGS_RADIX.value()[0] != 'o' &&
-         FLAG_STRINGS_RADIX.value()[0] != 'x'))
+    let const radix_value = FLAG_STRINGS_RADIX.value();
+    let is_valid_radix = false;
+
+    if (radix_value.length == 1) {
+      switch (radix_value[0]) {
+      case 'd':
+      case 'o':
+      case 'x': is_valid_radix = true; break;
+
+      default: break;
+      }
+    }
+
+    if (!is_valid_radix)
       throw Error{"strings: offset format must be d, o, or x"};
-    radix = FLAG_STRINGS_RADIX.value()[0];
+
+    radix = radix_value[0];
   }
 
   let const sources =
@@ -128,15 +149,25 @@ fn Strings::execute(const ExecContext &ec, EvalContext &cxt,
         break;
       }
 
-      for (usize position = 0; position < *read_count; position++) {
-        let const byte = static_cast<u8>(buffer[position]);
-        if ((byte >= 0x20 && byte <= 0x7e) || byte == '\t') {
-          if (run.is_empty()) run_offset = byte_offset;
-          run += static_cast<char>(byte);
-        } else {
+      usize position = 0;
+      while (position < *read_count) {
+        if (!is_strings_printable(static_cast<u8>(buffer[position]))) {
           do_flush();
+          position++;
+          byte_offset++;
+          continue;
         }
-        byte_offset++;
+
+        usize run_end = position;
+        while (run_end < *read_count &&
+               is_strings_printable(static_cast<u8>(buffer[run_end])))
+          run_end++;
+
+        if (run.is_empty()) run_offset = byte_offset;
+
+        run.append(StringView{buffer + position, run_end - position});
+        byte_offset += run_end - position;
+        position = run_end;
       }
     }
   }

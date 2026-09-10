@@ -25,6 +25,11 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Expand);
 
 namespace koshka::koshkit {
 
+static pure fn is_expand_control(char byte) wontthrow -> bool
+{
+  return byte == '\t' || byte == '\n' || byte == '\r' || byte == '\b';
+}
+
 Expand::Expand() = default;
 
 pure fn Expand::kind() const wontthrow -> Utility::Kind { return Kind::Expand; }
@@ -63,29 +68,50 @@ fn Expand::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
+    let const text = content->view();
     usize column = 0;
-    for (usize position = 0; position < content->length(); position++) {
-      let const byte = (*content)[position];
-      if (byte == '\t') {
+    usize position = 0;
+
+    while (position < text.length) {
+      let const byte = text[position];
+      switch (byte) {
+      case '\t': {
         let const target = next_tab_column(column, tab_stops);
         if (target == column) {
           output += '\t';
         } else {
-          while (column < target) {
-            output += ' ';
-            column++;
-          }
+          output.append_repeated(' ', target - column);
+          column = target;
         }
-      } else {
-        output += byte;
-        if (byte == '\n' || byte == '\r')
-          column = 0;
-        else if (byte == '\b') {
-          if (column > 0) column--;
-        } else {
-          column++;
-        }
+
+        position++;
       }
+        continue;
+
+      case '\n':
+      case '\r':
+        output += byte;
+        column = 0;
+        position++;
+        continue;
+
+      case '\b':
+        output += byte;
+        if (column > 0) column--;
+
+        position++;
+        continue;
+
+      default: break;
+      }
+
+      usize run_end = position;
+      while (run_end < text.length && !is_expand_control(text[run_end]))
+        run_end++;
+
+      output.append(text.substring_of_length(position, run_end - position));
+      column += run_end - position;
+      position = run_end;
     }
   }
 

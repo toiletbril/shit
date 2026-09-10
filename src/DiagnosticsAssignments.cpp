@@ -341,25 +341,31 @@ fn check_test_operand_lints(AnalysisContext &actx,
   /* Obsolescent or redundant test forms. -a or -o joining two conditions is
      SC2166, warned only past the first operand and not after a !. A negated -z
      or -n is SC2236 and SC2237. */
+  /* The literal of the previous word, empty for a non-word predecessor. */
+  let previous_literal = String{heap_allocator()};
+  if (args.count() > 1 && args[0]->kind() == Token::Kind::Word) {
+    previous_literal = static_cast<const tokens::WordToken *>(args[0])
+                           ->word()
+                           .to_literal_string();
+  }
+
   for (usize i = 1; i < args.count(); i++) {
-    if (args[i]->kind() != Token::Kind::Word) continue;
-    let const literal = static_cast<const tokens::WordToken *>(args[i])
-                            ->word()
-                            .to_literal_string();
+    if (args[i]->kind() != Token::Kind::Word) {
+      previous_literal.clear();
+      continue;
+    }
+
+    let literal = static_cast<const tokens::WordToken *>(args[i])
+                      ->word()
+                      .to_literal_string();
     let const view = literal.view();
-    /* The literal of the previous word, empty for a non-word predecessor. */
-    let const previous_literal =
-        args[i - 1]->kind() == Token::Kind::Word
-            ? static_cast<const tokens::WordToken *>(args[i - 1])
-                  ->word()
-                  .to_literal_string()
-            : String{heap_allocator()};
+    let const is_previous_binary_operator =
+        is_test_binary_operator_word(previous_literal.view());
+
     /* == is a bashism in test, shellcheck SC3014, warned only when == sits in
        the operator slot so [ x = == ] comparing the literal == is left
        alone. */
-    if (view == "==" && i >= 2 &&
-        !is_test_binary_operator_word(previous_literal.view()))
-    {
+    if (view == "==" && i >= 2 && !is_previous_binary_operator) {
       actx.report_diagnostic(diagnostic_id::sc3014, args[i]->source_location());
     }
     let const previous_is_bang = previous_literal.view() == "!";
@@ -406,8 +412,7 @@ fn check_test_operand_lints(AnalysisContext &actx,
        shellcheck SC2050. The file comparisons read the filesystem and are left
        alone. */
     if (i >= 2 && i + 1 < operand_end && is_test_binary_operator_word(view) &&
-        !is_test_file_comparison_word(view) &&
-        !is_test_binary_operator_word(previous_literal.view()) &&
+        !is_test_file_comparison_word(view) && !is_previous_binary_operator &&
         args[i - 1]->kind() == Token::Kind::Word &&
         args[i + 1]->kind() == Token::Kind::Word)
     {
@@ -463,7 +468,7 @@ fn check_test_operand_lints(AnalysisContext &actx,
           actx.report_diagnostic(diagnostic_id::sc2245,
                                  args[i]->source_location(),
                                  {previous, written});
-        } else if (!is_test_binary_operator_word(previous)) {
+        } else if (!is_previous_binary_operator) {
           actx.report_diagnostic(diagnostic_id::sc2202,
                                  args[i]->source_location(), {written});
         }
@@ -476,8 +481,7 @@ fn check_test_operand_lints(AnalysisContext &actx,
     }
 
     if (is_posix) {
-      let const is_operator_slot =
-          i >= 2 && !is_test_binary_operator_word(previous_literal.view());
+      let const is_operator_slot = i >= 2 && !is_previous_binary_operator;
       if ((view == "<" || view == ">") && is_operator_slot) {
         actx.report_diagnostic(diagnostic_id::sc3012,
                                args[i]->source_location(), {view});
@@ -531,6 +535,8 @@ fn check_test_operand_lints(AnalysisContext &actx,
         }
       }
     }
+
+    previous_literal = steal(literal);
   }
 
   /* A test with no operand always fails, shellcheck SC2212. */

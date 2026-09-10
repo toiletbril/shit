@@ -64,10 +64,15 @@ static fn split_diff_lines(StringView contents, Allocator allocator) throws
   if (contents.length > UINT32_MAX) throw std::bad_alloc{};
 
   let end_positions = ArrayList<u32>{allocator};
-  for (usize position = 0; position < contents.length; position++) {
+  usize scan_position = 0;
+  while (scan_position < contents.length) {
     if (os::INTERRUPT_REQUESTED) break;
-    if (contents[position] == '\n')
-      end_positions.push(static_cast<u32>(position + 1));
+
+    let const newline = contents.substring(scan_position).find_character('\n');
+    if (!newline.has_value()) break;
+
+    scan_position += *newline + 1;
+    end_positions.push(static_cast<u32>(scan_position));
   }
   if (!contents.is_empty() && contents[contents.length - 1] != '\n')
     end_positions.push(static_cast<u32>(contents.length));
@@ -84,8 +89,6 @@ static fn diff_lines_equal(StringView left, StringView right,
   usize right_position = 0;
   loop
   {
-    if (os::INTERRUPT_REQUESTED) return false;
-
     while (left_position < left.length &&
            is_ascii_whitespace(left[left_position]))
       left_position++;

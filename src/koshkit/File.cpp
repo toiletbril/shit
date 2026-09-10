@@ -119,7 +119,18 @@ static fn decode_magic_text(StringView encoded, String &decoded) throws -> void
 {
   for (usize position = 0; position < encoded.length; position++) {
     let const byte = encoded[position];
-    if (byte != '\\' || position + 1 == encoded.length) {
+    if (byte != '\\') {
+      let const remaining = encoded.substring(position);
+      let const next_escape = remaining.find_character('\\');
+      let const run_length =
+          next_escape.has_value() ? *next_escape : remaining.length;
+
+      decoded.append(remaining.substring_of_length(0, run_length));
+      position += run_length - 1;
+      continue;
+    }
+
+    if (position + 1 == encoded.length) {
       decoded.push(byte);
       continue;
     }
@@ -189,25 +200,39 @@ static fn parse_magic_type(StringView text, file_magic_rule &rule) throws
     -> bool
 {
   usize position = 0;
-  if (text.starts_with("string")) {
-    rule.kind = file_magic_kind::String;
-    position = 6;
-  } else if (text.starts_with("byte")) {
+  switch (text[0]) {
+  case 's':
+    if (text.starts_with("string")) {
+      rule.kind = file_magic_kind::String;
+      position = 6;
+    } else if (text.starts_with("short")) {
+      rule.kind = file_magic_kind::Signed;
+      rule.byte_count = 2;
+      position = 5;
+    } else {
+      rule.kind = file_magic_kind::String;
+      position = 1;
+    }
+    break;
+
+  case 'b':
+    if (!text.starts_with("byte")) return false;
+
     rule.kind = file_magic_kind::Signed;
     rule.byte_count = 1;
     position = 4;
-  } else if (text.starts_with("short")) {
-    rule.kind = file_magic_kind::Signed;
-    rule.byte_count = 2;
-    position = 5;
-  } else if (text.starts_with("long")) {
+    break;
+
+  case 'l':
+    if (!text.starts_with("long")) return false;
+
     rule.kind = file_magic_kind::Signed;
     rule.byte_count = 4;
     position = 4;
-  } else if (text[0] == 's') {
-    rule.kind = file_magic_kind::String;
-    position = 1;
-  } else if (text[0] == 'd' || text[0] == 'u') {
+    break;
+
+  case 'd':
+  case 'u': {
     rule.kind =
         text[0] == 'd' ? file_magic_kind::Signed : file_magic_kind::Unsigned;
     position = 1;
@@ -248,8 +273,9 @@ static fn parse_magic_type(StringView text, file_magic_rule &rule) throws
       }
       }
     }
-  } else {
-    return false;
+  } break;
+
+  default: return false;
   }
 
   if (rule.kind == file_magic_kind::String) return position == text.length;
@@ -409,9 +435,8 @@ static fn format_magic_message(const file_magic_rule &rule, u64 number,
     case 'X': {
       let formatted =
           String::from_in_base(number, false, int_base::hex, allocator);
-      formatted.lowercase_ascii();
-      for (usize index = 0; index < formatted.count(); index++)
-        output.push(static_cast<char>(std::toupper(formatted[index])));
+      formatted.uppercase_ascii();
+      output += formatted.view();
       break;
     }
     case 'o':
@@ -465,12 +490,13 @@ static pure fn file_content_description(StringView bytes) wontthrow
   if (bytes.length >= 2 && bytes[0] == '#' && bytes[1] == '!')
     return "script text executable";
 
+  static constexpr u32 TEXT_CONTROL_MASK =
+      (1U << '\b') | (1U << '\t') | (1U << '\n') | (1U << '\f') | (1U << '\r');
+
   bool is_text = true;
   for (usize position = 0; position < bytes.length; position++) {
     let const byte = static_cast<u8>(bytes[position]);
-    if (byte == 0 || (byte < 0x20 && byte != '\n' && byte != '\r' &&
-                      byte != '\t' && byte != '\f' && byte != '\b'))
-    {
+    if (byte < 0x20 && ((TEXT_CONTROL_MASK >> byte) & 1U) == 0) {
       is_text = false;
       break;
     }
