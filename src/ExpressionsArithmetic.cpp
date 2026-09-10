@@ -1027,12 +1027,15 @@ static fn evaluate_subshell_in_process(const Expression *body,
      of them publishes its own command text. */
   let const saved_running_trap_conditions = cxt.get_running_trap_conditions();
   let const saved_trap_action_depth = cxt.get_trap_action_depth();
+  let const saved_trap_exit_status = cxt.get_trap_saved_exit_status();
   cxt.set_running_trap_conditions(0);
   cxt.set_trap_action_depth(0);
+  cxt.set_trap_saved_exit_status(Maybe<i32>{});
   defer
   {
     cxt.set_running_trap_conditions(saved_running_trap_conditions);
     cxt.set_trap_action_depth(saved_trap_action_depth);
+    cxt.set_trap_saved_exit_status(saved_trap_exit_status);
   };
 
   LOG(Debug, "entering the snapshot subshell");

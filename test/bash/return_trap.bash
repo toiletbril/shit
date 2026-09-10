@@ -288,4 +288,54 @@ trap - RETURN
 set +T
 echo return-traced-replacement-done
 
+# A break or a continue the action requests names a loop the frame of the action
+# holds. The loop the call runs in is out of its reach, so neither jump finds
+# one and the loop runs to its end.
+returns_plain() { return 0; }
+echo return-action-break
+set -T
+trap 'echo "R-break-$item"; break' RETURN
+for item in 1 2 3; do
+  returns_plain
+  echo "body-$item"
+done
+echo "break-status=$?"
+trap - RETURN
+set +T
+echo return-action-break-done
+
+echo return-action-continue
+set -T
+trap 'echo "R-cont-$item"; continue' RETURN
+for item in 1 2 3; do
+  returns_plain
+  echo "body-$item"
+done
+echo "continue-status=$?"
+trap - RETURN
+set +T
+echo return-action-continue-done
+
+# The action is free to call a function. The trap is blocked while its own
+# action runs, so the call raises no second fire.
+echo return-action-calls-function
+return_helper() { echo "helper-[${FUNCNAME[0]}]"; }
+set -T
+trap 'echo R-enter; return_helper; echo R-tail' RETURN
+returns_plain
+echo "status=$?"
+trap - RETURN
+set +T
+echo return-action-calls-function-done
+
+# An exit the action requests ends the shell it runs in, and the commands
+# written after the call are not reached.
+echo return-action-exit
+( set -T
+  trap 'echo R-exit; exit 3' RETURN
+  returns_plain
+  echo unreachable )
+echo "exit-status=$?"
+echo return-action-exit-done
+
 echo return-trap-done

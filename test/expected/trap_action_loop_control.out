@@ -1,32 +1,43 @@
 == a break on a word loop header ends the loop with its variable bound:
 v=1
+rc=0
 == a break on a body command runs that command and ends the loop:
 body-1
 tail
+rc=0
 == a continue on a body command skips the rest of that iteration:
 body-1
 body-2
 body-3
 tail
+rc=0
 == a continue on a word loop header skips every body:
 v=3
+rc=0
 == an inner header continue leaves the outer body running:
 outer-A
 after-inner
 outer-B
 after-inner
 tail
-== an inner header break leaves the outer loop running:
+rc=0
+== an inner header break of two levels ends the outer loop:
 outer-A
-after-inner
-outer-B
-after-inner
 tail
+rc=0
+== an inner header continue of two levels starts the next outer round:
+outer-A
+outer-B
+tail
+rc=0
 == a break on a while condition ends the loop:
 n=0
+rc=0
 == a break on an arithmetic init clause runs the clause and ends the loop:
 i=0
+rc=0
 == a break on a case header ends the loop before the case runs:
 tail
+rc=0
 == an exit in an action abandons the traced command:
 rc=7

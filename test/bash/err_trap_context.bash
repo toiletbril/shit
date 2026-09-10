@@ -407,4 +407,55 @@ trap - ERR
 set +E
 echo err-traced-replacement-done
 
+# A command that fails inside the action raises no second fire, because the ERR
+# trap is blocked while its own action runs. The status the failing command left
+# stands after the action returns.
+echo err-action-fails
+trap 'echo A-enter; false; echo A-tail' ERR
+false
+echo "status=$?"
+trap - ERR
+echo err-action-fails-done
+
+# A break the action requests leaves the loop the failing command runs in, and
+# the loop is not failed a second time by the same status.
+echo err-action-break
+trap 'echo "B-$item"; break' ERR
+for item in 1 2 3; do
+  false
+  echo "body-$item"
+done
+echo "break-status=$?"
+trap - ERR
+echo err-action-break-done
+
+# A continue the action requests skips the rest of the iteration and the loop
+# runs to its end.
+echo err-action-continue
+trap 'echo "C-$item"; continue' ERR
+for item in 1 2 3; do
+  false
+  echo "body-$item"
+done
+echo "continue-status=$?"
+trap - ERR
+echo err-action-continue-done
+
+# A bare exit inside a subshell of an action takes the status of the last
+# command the subshell ran. The status the action was entered with is not the
+# one the subshell leaves with.
+echo err-action-subshell-exit
+trap 'echo A-enter; ( true; exit ); echo "sub-true=$?"; ( false; exit ); echo "sub-false=$?"' ERR
+false
+echo "after=$?"
+trap - ERR
+echo err-action-subshell-exit-done
+
+echo err-action-subshell-failure
+trap 'echo "E-enter"; ( false; echo "sub-tail=$?" ); echo "E-tail"' ERR
+false
+echo "after=$?"
+trap - ERR
+echo err-action-subshell-failure-done
+
 echo err-trap-context-done

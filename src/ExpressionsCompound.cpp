@@ -310,7 +310,10 @@ hot fn CompoundList::evaluate_root_status_impl(
       /* The action can request an exit, a return, or a loop jump of its own.
          Such a request stops the rest of this list the same way a node
          would. */
-      if (cxt.has_pending_control_flow()) break;
+      if (cxt.has_pending_control_flow()) {
+        ret.set(status_flag::ErrResolved);
+        break;
+      }
     }
 
     /* The action can turn errexit off or on, and the option decides the exit

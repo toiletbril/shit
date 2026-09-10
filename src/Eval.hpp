@@ -855,7 +855,7 @@ public:
                               shell_option_id::Functrace,
                               &m_debug_trap_active_depth);
   }
-  fn restore_untraced_debug_trap(saved_frame_trap &&saved) throws -> void
+  fn restore_untraced_debug_trap(saved_frame_trap &&saved) wontthrow -> void
   {
     restore_untraced_trap(StringView{"DEBUG", 5}, steal(saved),
                           &m_debug_trap_active_depth);
@@ -865,7 +865,7 @@ public:
     return save_untraced_trap(StringView{"ERR", 3}, shell_option_id::Errtrace,
                               &m_err_trap_active_depth);
   }
-  fn restore_untraced_err_trap(saved_frame_trap &&saved) throws -> void
+  fn restore_untraced_err_trap(saved_frame_trap &&saved) wontthrow -> void
   {
     restore_untraced_trap(StringView{"ERR", 3}, steal(saved),
                           &m_err_trap_active_depth);
@@ -877,7 +877,7 @@ public:
     return save_untraced_trap(StringView{"RETURN", 6},
                               shell_option_id::Functrace, nullptr);
   }
-  fn restore_untraced_return_trap(saved_frame_trap &&saved) throws -> void
+  fn restore_untraced_return_trap(saved_frame_trap &&saved) wontthrow -> void
   {
     restore_untraced_trap(StringView{"RETURN", 6}, steal(saved), nullptr);
   }
@@ -885,7 +885,7 @@ public:
                                 shell_option_id trace_option,
                                 usize *active_depth) throws -> saved_frame_trap;
   fn restore_untraced_trap(StringView condition, saved_frame_trap &&saved,
-                           usize *active_depth) throws -> void;
+                           usize *active_depth) wontthrow -> void;
   pure fn should_run_return_trap() const wontthrow -> bool
   {
     return !is_posix_mode();
@@ -918,6 +918,10 @@ public:
   pure fn get_trap_saved_exit_status() const wontthrow -> Maybe<i32>
   {
     return m_trap_saved_exit_status;
+  }
+  fn set_trap_saved_exit_status(Maybe<i32> status) wontthrow -> void
+  {
+    m_trap_saved_exit_status = status;
   }
   /* The status of the last trap action. It is recorded before the restoration
      returns the triggering command's own status. A condition that ran no action

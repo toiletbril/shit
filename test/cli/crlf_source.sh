@@ -37,6 +37,12 @@ lone_carriage_return=$(printf 'a\rb')
 "$BIN" -c 'value=$1; printf "lone=%s\n" "${#value}"' crlf-driver \
     "$lone_carriage_return"
 
+debug_action=$(printf 'echo D-a\recho D-b_')
+debug_action=${debug_action%_}
+"$BIN" --mood bash -c \
+    'trap "$1" DEBUG; echo one; echo two; trap - DEBUG; echo tail' \
+    crlf-driver "$debug_action"
+
 execution_string=$(printf '[ "$BASH_EXECUTION_STRING" = "$1" ] || exit 1\r\necho execution-string=exact\r\n_')
 execution_string=${execution_string%_}
 "$BIN" --mood bash -c "$execution_string" crlf-driver "$execution_string"

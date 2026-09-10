@@ -8,6 +8,12 @@ eval-one
 eval-two
 fallback
 lone=3
+D-aecho D-b
+one
+D-aecho D-b
+two
+D-aecho D-b
+tail
 execution-string=exact
 empty-execution-string=set:0
 diagnostic=clean

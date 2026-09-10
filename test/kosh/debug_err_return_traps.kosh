@@ -16,6 +16,13 @@ trap 'echo R' RETURN
 f
 echo "rc=$?"
 trap - RETURN
+echo "== RETURN NESTED =="
+inner_call() { echo inner-body; }
+outer_call() { inner_call; echo outer-body; }
+trap 'echo "R-nested-$?"' RETURN
+outer_call
+echo "rc=$?"
+trap - RETURN
 echo "== RETURN SOURCE =="
 source_file=$TEST_TEMP_DIRECTORY/kosh-return-source-$$
 printf 'echo sourced-body\nfalse\nreturn 3\n' > "$source_file"

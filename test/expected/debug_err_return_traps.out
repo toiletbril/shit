@@ -40,6 +40,30 @@
   [CompoundListCondition, None]
     [SimpleCommand "trap" "-" "RETURN"]
   [CompoundListCondition, None]
+    [SimpleCommand "echo" "== RETURN NESTED =="]
+  [CompoundListCondition, None]
+    [FunctionDefinition "inner_call"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "inner-body"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "outer_call"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "inner_call"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "outer-body"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo "R-nested-$?"" "RETURN"]
+  [CompoundListCondition, None]
+    [SimpleCommand "outer_call"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-" "RETURN"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "== RETURN SOURCE =="]
   [CompoundListCondition, None]
     [Assign source_file=$TEST_TEMP_DIRECTORY/kosh-return-source-$$]
@@ -186,6 +210,73 @@
 ]
 [Word
   Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "RETURN"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== RETURN NESTED =="
+]
+[Word
+  Unquoted "inner_call"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "inner-body"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "outer_call"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "inner_call"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "outer-body"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "echo "R-nested-$?""
+]
+[Word
+  Unquoted "RETURN"
+]
+[Word
+  Unquoted "outer_call"
 ]
 [Word
   Unquoted "echo"
@@ -369,6 +460,12 @@ E
 body
 R
 rc=7
+== RETURN NESTED ==
+inner-body
+R-nested-0
+outer-body
+R-nested-0
+rc=0
 == RETURN SOURCE ==
 sourced-body
 R-source-1

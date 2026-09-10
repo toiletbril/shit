@@ -1,0 +1,13 @@
+== a signal ignored at entry lists with an empty action:
+trap -- '' SIGUSR1
+sep
+trap -- '' SIGUSR1
+rc=0
+== an action installed for that signal does not replace the listing:
+trap -- '' SIGUSR1
+sep
+trap -- '' SIGUSR1
+rc=0
+== a signal that is not ignored at entry lists its action:
+trap -- 'echo caught' SIGUSR1
+rc=0

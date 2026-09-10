@@ -409,6 +409,26 @@ echo after-folded-function=$?
 trap - DEBUG
 echo folded-untraced-done
 
+# A DEBUG action fires for the commands a substitution runs, and the action
+# writes into the captured output. The subshell of a plain group publishes no
+# fire of its own, and each command of the body publishes one.
+echo debug-substitution-body
+set -T
+trap 'echo "D-[$BASH_COMMAND]"' DEBUG
+v=$(echo inner)
+echo "v=$v"
+trap - DEBUG
+set +T
+echo debug-substitution-body-done
+
+echo debug-subshell-body
+set -T
+trap 'echo "D2-[$BASH_COMMAND]"' DEBUG
+( echo sub-one; echo sub-two )
+trap - DEBUG
+set +T
+echo debug-subshell-body-done
+
 echo exit-command
 trap 'echo "E-$?-[$BASH_COMMAND]"' EXIT
 echo last-command

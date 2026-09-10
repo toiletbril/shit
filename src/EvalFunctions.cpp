@@ -597,7 +597,7 @@ fn EvalContext::save_untraced_trap(StringView condition,
 
 fn EvalContext::restore_untraced_trap(StringView condition,
                                       saved_frame_trap &&saved,
-                                      usize *active_depth) throws -> void
+                                      usize *active_depth) wontthrow -> void
 {
   if (!saved.action.has_value()) return;
   /* A trap the body installed for itself stands, the way bash keeps the one it
@@ -606,8 +606,14 @@ fn EvalContext::restore_untraced_trap(StringView condition,
 
   LOG(Info, "restoring the '%.*s' action an untraced body ran without",
       static_cast<int>(condition.length), condition.data);
-  m_traps.set(condition, saved.action->view());
-  refresh_trap_flags();
+  try {
+    m_traps.set(condition, saved.action->view());
+    refresh_trap_flags();
+  } catch (...) {
+    LOG(Info, "the '%.*s' action of an untraced body could not be restored",
+        static_cast<int>(condition.length), condition.data);
+    return;
+  }
 
   if (active_depth != nullptr) *active_depth = saved.active_depth;
 }

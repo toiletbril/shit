@@ -1,32 +1,61 @@
 == --posix keeps [[ working:
 bracket-works
+rc=0
 == --posix seeds BASH_VERSION:
 BASH_VERSION=5.3.0(1)-kosh
+rc=0
 == --posix seeds BASH_VERSINFO:
 BASH_VERSINFO=5.3.0.1
+rc=0
 == --posix reports the bash-posix mood:
 bash-posix
+rc=0
 == --mood bash-posix keeps [[ working:
 bracket-works
+rc=0
 == --posix does not enter the sh mood:
 b
+rc=0
 == --posix accepts the DEBUG condition:
 D
 traced
 D
+rc=0
 == --posix accepts the ERR condition:
 E
 after-false
+rc=0
 == --posix accepts the RETURN condition under functrace:
 body
 body
 R
+rc=0
 == --posix fires RETURN for a body that installs its own action:
 g-body
 own
 after-g
+rc=0
 == --posix lists all three conditions:
 D
 trap -- 'echo D' DEBUG
 trap -- 'echo E' ERR
 trap -- 'echo R' RETURN
+rc=0
+== --posix fires RETURN when a sourced file finishes:
+inner-body
+R-src
+after=0
+rc=0
+== --mood bash-posix fires RETURN when a sourced file finishes:
+inner-body
+R-src
+after=0
+rc=0
+== the sh mood rejects RETURN for a sourced file:
+1:19: error: Builtin `trap`: RETURN: invalid signal specification.
+     1 |  trap "echo R-src" RETURN; . "$1"; echo "after=$?"
+       |                    ^~~~~~
+note: List the signal names with `trap -l`.
+inner-body
+after=0
+rc=0
