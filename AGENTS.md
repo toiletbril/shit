@@ -361,7 +361,9 @@ changes update this file.
   is generalized to another branch of the same builtin.
 - Keep borrowed views within owner lifetimes. Prove bounds, spans, offsets,
   lengths, optionals, and static evidence. Install restoration guards before
-  mutation.
+  mutation. A view copied into heap storage needs a named owner, and the macOS
+  sanitizer build reports no leak. A Linux run is the only place such a leak is
+  reported.
 - Handle zero and empty containers before indexed access. Check saturated
   accumulators before subtraction. Narrow values only at command-status edges.
 - Order packed fields by alignment and assert important sizes. Use the project
@@ -449,6 +451,14 @@ changes update this file.
   finishes and no partial failure artifact remains.
 - Leave the machine idle while a suite runs. The editor recorder tests are timed
   against wall clock, and a concurrent probe makes one of them time out.
+- Name the target of every suite invocation. A directory make invocation with no
+  target runs the first ordinary target of that makefile.
+- A helper that moves a process into a new session forks when the caller already
+  leads a process group. The new identity is read from the process that owns it,
+  and the completion of the work is read from a value that process publishes.
+- A container command with no allocated terminal has no controlling terminal.
+  A shell that cannot enable job control there takes a different branch, and the
+  fixture result belongs to the environment.
 
 ## Performance and finish
 

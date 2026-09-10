@@ -4,6 +4,9 @@ GOLDEN=$1
 TIMEOUT_SECONDS=${CLI_TEST_TIMEOUT_SECONDS:-60}
 GOLDEN_PROCESS=
 GOLDEN_SESSION=
+LAUNCH_PROCESS=
+GOLDEN_SESSION_FILE=
+GOLDEN_STATUS_FILE=
 HOST_SYSTEM=$(uname -s)
 CLEANUP_IS_ARMED=yes
 PENDING_EXIT_STATUS=
@@ -104,9 +107,17 @@ cleanup_golden_tree()
     if ! terminate_golden_tree; then
       printf 'golden session discovery failed\n'
     fi
-    if [ -n "$GOLDEN_PROCESS" ]; then
-      wait "$GOLDEN_PROCESS" 2>/dev/null || true
+    if [ -n "$LAUNCH_PROCESS" ]; then
+      wait "$LAUNCH_PROCESS" 2>/dev/null || true
     fi
+  fi
+
+  if [ -n "$GOLDEN_SESSION_FILE" ]; then
+    rm -f "$GOLDEN_SESSION_FILE"
+  fi
+
+  if [ -n "$GOLDEN_STATUS_FILE" ]; then
+    rm -f "$GOLDEN_STATUS_FILE"
   fi
 }
 
@@ -126,32 +137,24 @@ trap 'request_exit 129' HUP
 # Job control keeps the golden shell at the default signal dispositions. A
 # background job of a shell without it inherits SIGINT and SIGQUIT ignored, and
 # no descendant can undo an ignore it was started with.
-set -m
 if [ "${OS-}" = Windows_NT ]; then
+  set -m
   BIN=$BIN BOUNDED_GOLDEN=$GOLDEN BOUNDED_TIMEOUT_SECONDS=$TIMEOUT_SECONDS \
     KOSH_TEST_TIMEOUT_JOB_LIFETIME=leader \
     "$BIN" -p --mood sh -c \
     'koshkit timeout "$BOUNDED_TIMEOUT_SECONDS" "$BIN" --mood sh -c '\''unset KOSH_TEST_TIMEOUT_JOB_LIFETIME; sh "$BOUNDED_GOLDEN"'\''' &
-elif command -v setsid >/dev/null 2>&1; then
-  BIN=$BIN setsid /bin/sh "$GOLDEN" &
-elif command -v perl >/dev/null 2>&1; then
-  BIN=$BIN perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' \
-    /bin/sh "$GOLDEN" &
-else
-  printf 'cannot create a CLI golden session\n'
-  exit 125
-fi
-GOLDEN_PROCESS=$!
-set +m
-GOLDEN_SESSION=$GOLDEN_PROCESS
-if [ -n "$PENDING_EXIT_STATUS" ]; then
-  exit "$PENDING_EXIT_STATUS"
-fi
+  GOLDEN_PROCESS=$!
+  set +m
+  LAUNCH_PROCESS=$GOLDEN_PROCESS
+  GOLDEN_SESSION=$GOLDEN_PROCESS
+  if [ -n "$PENDING_EXIT_STATUS" ]; then
+    exit "$PENDING_EXIT_STATUS"
+  fi
 
-if [ "${OS-}" = Windows_NT ]; then
   wait "$GOLDEN_PROCESS"
   GOLDEN_STATUS=$?
   GOLDEN_PROCESS=
+  LAUNCH_PROCESS=
   CLEANUP_IS_ARMED=no
   if [ "$GOLDEN_STATUS" -eq 124 ]; then
     printf 'golden timed out\n'
@@ -159,20 +162,68 @@ if [ "${OS-}" = Windows_NT ]; then
   exit "$GOLDEN_STATUS"
 fi
 
+GOLDEN_SESSION_FILE=$(mktemp) || GOLDEN_SESSION_FILE=
+GOLDEN_STATUS_FILE=$(mktemp) || GOLDEN_STATUS_FILE=
+if [ -z "$GOLDEN_SESSION_FILE" ] || [ -z "$GOLDEN_STATUS_FILE" ]; then
+  printf 'cannot create a CLI golden session\n'
+  exit 125
+fi
+
+GOLDEN_LAUNCHER='printf "%s\n" "$$" > "$GOLDEN_SESSION_FILE"
+/bin/sh "$1"
+printf "%s\n" "$?" > "$GOLDEN_STATUS_FILE"'
+
+set -m
+if command -v setsid >/dev/null 2>&1; then
+  BIN=$BIN GOLDEN_SESSION_FILE=$GOLDEN_SESSION_FILE \
+    GOLDEN_STATUS_FILE=$GOLDEN_STATUS_FILE \
+    setsid /bin/sh -c "$GOLDEN_LAUNCHER" golden "$GOLDEN" &
+elif command -v perl >/dev/null 2>&1; then
+  BIN=$BIN GOLDEN_SESSION_FILE=$GOLDEN_SESSION_FILE \
+    GOLDEN_STATUS_FILE=$GOLDEN_STATUS_FILE \
+    perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' \
+    /bin/sh -c "$GOLDEN_LAUNCHER" golden "$GOLDEN" &
+else
+  printf 'cannot create a CLI golden session\n'
+  exit 125
+fi
+LAUNCH_PROCESS=$!
+set +m
+
+ATTEMPT_COUNT=0
+while [ ! -s "$GOLDEN_SESSION_FILE" ] && [ "$ATTEMPT_COUNT" -lt 100 ]; do
+  sleep 0.1
+  ATTEMPT_COUNT=$((ATTEMPT_COUNT + 1))
+done
+
+if [ ! -s "$GOLDEN_SESSION_FILE" ]; then
+  printf 'cannot create a CLI golden session\n'
+  kill -KILL "$LAUNCH_PROCESS" 2>/dev/null || true
+  wait "$LAUNCH_PROCESS" 2>/dev/null || true
+  exit 125
+fi
+
+IFS= read -r GOLDEN_SESSION < "$GOLDEN_SESSION_FILE"
+GOLDEN_PROCESS=$GOLDEN_SESSION
+if [ -n "$PENDING_EXIT_STATUS" ]; then
+  exit "$PENDING_EXIT_STATUS"
+fi
+
 ATTEMPT_COUNT=0
 ATTEMPT_LIMIT=$((TIMEOUT_SECONDS * 10))
-while kill -0 "$GOLDEN_PROCESS" 2>/dev/null &&
+while [ ! -s "$GOLDEN_STATUS_FILE" ] &&
   [ "$ATTEMPT_COUNT" -lt "$ATTEMPT_LIMIT" ]; do
   sleep 0.1
   ATTEMPT_COUNT=$((ATTEMPT_COUNT + 1))
 done
 
-if kill -0 "$GOLDEN_PROCESS" 2>/dev/null; then
+if [ ! -s "$GOLDEN_STATUS_FILE" ]; then
   printf 'golden timed out\n'
   TERMINATION_STATUS=0
   terminate_golden_tree || TERMINATION_STATUS=$?
-  wait "$GOLDEN_PROCESS" 2>/dev/null || true
+  wait "$LAUNCH_PROCESS" 2>/dev/null || true
   GOLDEN_PROCESS=
+  LAUNCH_PROCESS=
   CLEANUP_IS_ARMED=no
   if [ "$TERMINATION_STATUS" -ne 0 ]; then
     printf 'golden session discovery failed\n'
@@ -181,9 +232,19 @@ if kill -0 "$GOLDEN_PROCESS" 2>/dev/null; then
   exit 124
 fi
 
-wait "$GOLDEN_PROCESS"
-GOLDEN_STATUS=$?
+IFS= read -r GOLDEN_STATUS < "$GOLDEN_STATUS_FILE"
+case $GOLDEN_STATUS in
+''|*[!0-9]*)
+  printf 'golden status is unreadable\n'
+  terminate_golden_tree 2>/dev/null || true
+  CLEANUP_IS_ARMED=no
+  exit 125
+  ;;
+esac
+
+wait "$LAUNCH_PROCESS" 2>/dev/null || true
 GOLDEN_PROCESS=
+LAUNCH_PROCESS=
 ATTEMPT_COUNT=0
 HAS_LIVING_DESCENDANT=yes
 SESSION_DISCOVERY_FAILED=no
