@@ -1235,12 +1235,34 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
             body[body.length - 1] == '\n'))
       body = body.substring_of_length(0, body.length - 1);
 
-    if (body.starts_with(StringView{"-e "}) ||
-        body.starts_with(StringView{"-f "}) ||
-        body.starts_with(StringView{"-d "}) ||
-        body.starts_with(StringView{"-n "}) ||
-        body.starts_with(StringView{"-z "}))
-    {
+    let is_unary_test_prefix = false;
+    if (body.length >= 3 && body[0] == '-') {
+      switch (body[1]) {
+      case 'd':
+        is_unary_test_prefix = body.starts_with(StringView{"-d "});
+        break;
+
+      case 'e':
+        is_unary_test_prefix = body.starts_with(StringView{"-e "});
+        break;
+
+      case 'f':
+        is_unary_test_prefix = body.starts_with(StringView{"-f "});
+        break;
+
+      case 'n':
+        is_unary_test_prefix = body.starts_with(StringView{"-n "});
+        break;
+
+      case 'z':
+        is_unary_test_prefix = body.starts_with(StringView{"-z "});
+        break;
+
+      default: break;
+      }
+    }
+
+    if (is_unary_test_prefix) {
       actx.report_diagnostic(was_analyzing_condition ? diagnostic_id::sc2205
                                                      : diagnostic_id::sc2204,
                              source_location());

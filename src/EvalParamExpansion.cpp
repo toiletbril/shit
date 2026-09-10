@@ -715,10 +715,11 @@ hot fn EvalContext::apply_parameter_expansion(
   const usize op_index = is_colon_form ? 1 : 0;
   if (op_index >= rest.length) return expand_variable(name);
 
+  let const is_all_parameters = name == "@" || name == "*";
+
   if (is_colon_form) {
     let const after_colon = rest[op_index];
-    if (!is_colon_modifier_operator(after_colon) && name != "@" && name != "*")
-    {
+    if (!is_colon_modifier_operator(after_colon) && !is_all_parameters) {
       let const substring_body = rest.substring(1);
       let substring_location = SourceLocation{};
       return apply_substring_expansion(
@@ -727,24 +728,27 @@ hot fn EvalContext::apply_parameter_expansion(
     }
   }
 
-  if (!is_colon_form && rest[0] == '/' && name != "@" && name != "*") {
-    let rest_location = SourceLocation{};
-    return apply_pattern_replacement(
-        name, rest, do_source_location_for(rest, rest_location));
-  }
+  if (!is_colon_form && !is_all_parameters) {
+    switch (rest[0]) {
+    case '/': {
+      let rest_location = SourceLocation{};
+      return apply_pattern_replacement(
+          name, rest, do_source_location_for(rest, rest_location));
+    }
+    case '^':
+    case ',':
+    case '~': {
+      let rest_location = SourceLocation{};
+      return apply_case_modification(
+          name, rest, do_source_location_for(rest, rest_location));
+    }
+    case '@':
+      if (rest.length >= 2 && mood() != mimic_mood::Posix)
+        return apply_parameter_transform(name, rest[1]);
 
-  if (!is_colon_form && (rest[0] == '^' || rest[0] == ',' || rest[0] == '~') &&
-      name != "@" && name != "*")
-  {
-    let rest_location = SourceLocation{};
-    return apply_case_modification(name, rest,
-                                   do_source_location_for(rest, rest_location));
-  }
-
-  if (!is_colon_form && rest[0] == '@' && rest.length >= 2 &&
-      mood() != mimic_mood::Posix && name != "@" && name != "*")
-  {
-    return apply_parameter_transform(name, rest[1]);
+      break;
+    default: break;
+    }
   }
 
   let const op = rest[op_index];
@@ -1003,10 +1007,11 @@ fn EvalContext::pattern_replace_value(
     return String{scratch_allocator(), value};
 
   let out = String{scratch_allocator()};
+  let const is_extglob_enabled = extglob_enabled();
 
   if (is_anchored_at_start) {
     if (let const matched = longest_pattern_match_at(
-            pattern.view(), pattern_active, value, 0, extglob_enabled()))
+            pattern.view(), pattern_active, value, 0, is_extglob_enabled))
     {
       append_pattern_replacement(out, replacement.view(),
                                  value.substring_of_length(0, *matched));
@@ -1020,7 +1025,7 @@ fn EvalContext::pattern_replace_value(
   if (is_anchored_at_end) {
     for (usize start = 0; start <= value.length; start++) {
       if (utils::glob_matches(pattern.view(), value.substring(start),
-                              pattern_active, 0, extglob_enabled()))
+                              pattern_active, 0, is_extglob_enabled))
       {
         out.append(value.substring_of_length(0, start));
         append_pattern_replacement(out, replacement.view(),
@@ -1039,7 +1044,7 @@ fn EvalContext::pattern_replace_value(
     Maybe<usize> matched;
     if (!has_replaced || should_replace_all) {
       matched = longest_pattern_match_at(pattern.view(), pattern_active, value,
-                                         i, extglob_enabled());
+                                         i, is_extglob_enabled);
     }
     if (matched.has_value()) {
       append_pattern_replacement(out, replacement.view(),
@@ -1198,6 +1203,7 @@ fn EvalContext::apply_case_modification_to_value(
   }
 
   let const pattern_matches_any = pattern_word.is_empty();
+  let const is_extglob_enabled = extglob_enabled();
   let out = String{scratch_allocator()};
   out.reserve(value.length);
   for (usize i = 0; i < value.length; i++) {
@@ -1206,7 +1212,7 @@ fn EvalContext::apply_case_modification_to_value(
     if (is_affected &&
         (pattern_matches_any ||
          utils::glob_matches(pattern.view(), value.substring_of_length(i, 1),
-                             pattern_active, 0, extglob_enabled())))
+                             pattern_active, 0, is_extglob_enabled)))
     {
       const unsigned char byte = static_cast<unsigned char>(character);
       if (op == '^') {

@@ -167,12 +167,13 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
 {
   LOG(All, "assigning variable '%.*s' to a value of %zu bytes",
       static_cast<int>(name.length), name.data, value.length);
-  if (name == "IFS") set_field_separators(value);
+  let const first_byte = name.is_empty() ? '\0' : name[0];
+  if (first_byte == 'I' && name == "IFS") set_field_separators(value);
   if (write_dynamic_variable(name, value)) return;
 
   if (utils::environment_name_is_path(name))
     m_program_resolver.assign_path(String{value});
-  if (name == "IGNOREEOF")
+  if (first_byte == 'I' && name == "IGNOREEOF")
     m_runtime.set_option(shell_option_id::Ignoreeof, true);
   if (m_confined_write_depth > 0) [[unlikely]] {
     let const *previous = lookup_shell_variable(name);
@@ -500,22 +501,18 @@ fn EvalContext::publish_pipe_statuses(ArrayList<String> values) throws -> void
 
 fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 {
-  if (is_readonly("PIPESTATUS") &&
-      m_indexed_arrays.find("PIPESTATUS") == nullptr)
-  {
-    return;
-  }
+  let *existing = m_indexed_arrays.find("PIPESTATUS");
+  if (existing == nullptr && is_readonly("PIPESTATUS")) return;
 
-  if (let *values = m_indexed_arrays.find("PIPESTATUS");
-      values != nullptr && values->count() == 1 &&
+  if (existing != nullptr && existing->count() == 1 &&
       !m_sparse_array_names.contains("PIPESTATUS"))
   {
     m_shell_variables.erase("PIPESTATUS");
     char status_text_buffer[32];
     let const status_text = utils::int_to_text_into(status, status_text_buffer,
                                                     sizeof(status_text_buffer));
-    if ((*values)[0] != status_text)
-      (*values)[0] = String{values->allocator(), status_text};
+    if ((*existing)[0] != status_text)
+      (*existing)[0] = String{existing->allocator(), status_text};
     return;
   }
 

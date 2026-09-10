@@ -47,37 +47,50 @@ fn EvalContext::next_random_u32() const wontthrow -> u32
 
 struct ansi_color_variable
 {
-  const char *name;
-  const char *escape;
+  StringView name;
+  StringView escape;
 };
 
-static constexpr ansi_color_variable KOSH_ANSI_COLORS[] = {
-    {"KOSH_ANSI_BLACK",          "\x1b[30m"},
-    {"KOSH_ANSI_RED",            "\x1b[31m"},
-    {"KOSH_ANSI_GREEN",          "\x1b[32m"},
-    {"KOSH_ANSI_YELLOW",         "\x1b[33m"},
-    {"KOSH_ANSI_BLUE",           "\x1b[34m"},
-    {"KOSH_ANSI_MAGENTA",        "\x1b[35m"},
-    {"KOSH_ANSI_CYAN",           "\x1b[36m"},
-    {"KOSH_ANSI_WHITE",          "\x1b[37m"},
-    {"KOSH_ANSI_BRIGHT_BLACK",   "\x1b[90m"},
-    {"KOSH_ANSI_BRIGHT_RED",     "\x1b[91m"},
-    {"KOSH_ANSI_BRIGHT_GREEN",   "\x1b[92m"},
-    {"KOSH_ANSI_BRIGHT_YELLOW",  "\x1b[93m"},
-    {"KOSH_ANSI_BRIGHT_BLUE",    "\x1b[94m"},
-    {"KOSH_ANSI_BRIGHT_MAGENTA", "\x1b[95m"},
-    {"KOSH_ANSI_BRIGHT_CYAN",    "\x1b[96m"},
-    {"KOSH_ANSI_BRIGHT_WHITE",   "\x1b[97m"},
-    {"KOSH_ANSI_BOLD",           "\x1b[1m" },
-    {"KOSH_ANSI_DIM",            "\x1b[2m" },
-    {"KOSH_ANSI_RESET",          "\x1b[0m" },
+#define ANSI_COLOR_VARIABLE(name, escape)                                      \
+  {                                                                            \
+    SSK(name),                                                                 \
+    {                                                                          \
+      StringView{name, sizeof(name) - 1},                                      \
+          StringView{escape, sizeof(escape) - 1}                               \
+    }                                                                          \
+  }
+
+constexpr static_string_entry<ansi_color_variable> KOSH_ANSI_COLOR_ENTRIES[] = {
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BLACK", "\x1b[30m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_RED", "\x1b[31m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_GREEN", "\x1b[32m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_YELLOW", "\x1b[33m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BLUE", "\x1b[34m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_MAGENTA", "\x1b[35m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_CYAN", "\x1b[36m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_WHITE", "\x1b[37m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BRIGHT_BLACK", "\x1b[90m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BRIGHT_RED", "\x1b[91m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BRIGHT_GREEN", "\x1b[92m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BRIGHT_YELLOW", "\x1b[93m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BRIGHT_BLUE", "\x1b[94m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BRIGHT_MAGENTA", "\x1b[95m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BRIGHT_CYAN", "\x1b[96m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BRIGHT_WHITE", "\x1b[97m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_BOLD", "\x1b[1m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_DIM", "\x1b[2m"),
+    ANSI_COLOR_VARIABLE("KOSH_ANSI_RESET", "\x1b[0m"),
 };
+constexpr StaticStringMap KOSH_ANSI_COLORS{KOSH_ANSI_COLOR_ENTRIES};
+
+#undef ANSI_COLOR_VARIABLE
 
 static fn ansi_escape_for_color(StringView name) throws -> Maybe<StringView>
 {
-  for (let const &color : KOSH_ANSI_COLORS)
-    if (StringView{color.name} == name) return StringView{color.escape};
-  return None;
+  let const found = KOSH_ANSI_COLORS.find(name);
+  if (!found.has_value()) return None;
+
+  return found->escape;
 }
 
 enum class dynamic_var : u8
@@ -191,15 +204,10 @@ constexpr StaticStringMap BASH_DYNAMIC{BASH_DYNAMIC_ENTRIES};
 
 pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool
 {
-  if (ALWAYS_DYNAMIC.find(name).has_value() ||
-      BASH_DYNAMIC.find(name).has_value() || name == BASH_ALIASES_VARIABLE ||
-      name == DIRSTACK_VARIABLE)
-    return true;
-
-  for (let const &color : KOSH_ANSI_COLORS)
-    if (StringView{color.name} == name) return true;
-
-  return false;
+  return ALWAYS_DYNAMIC.find(name).has_value() ||
+         BASH_DYNAMIC.find(name).has_value() ||
+         KOSH_ANSI_COLORS.find(name).has_value() ||
+         name == BASH_ALIASES_VARIABLE || name == DIRSTACK_VARIABLE;
 }
 
 pure fn is_bash_only_dynamic_variable_name(StringView name) wontthrow -> bool
@@ -272,8 +280,19 @@ pure fn EvalContext::is_write_discarded_dynamic_variable(
 static pure fn dynamic_reader_of(StringView name) wontthrow
     -> Maybe<dynamic_reader_id>
 {
-  if (name == "SECONDS") return dynamic_reader_id::Seconds;
-  if (name == "RANDOM") return dynamic_reader_id::Random;
+  if (name.is_empty()) return None;
+
+  switch (name[0]) {
+  case 'S':
+    if (name == "SECONDS") return dynamic_reader_id::Seconds;
+    break;
+
+  case 'R':
+    if (name == "RANDOM") return dynamic_reader_id::Random;
+    break;
+
+  default: break;
+  }
 
   return None;
 }
@@ -303,15 +322,21 @@ pure fn EvalContext::is_dynamic_write_owner(StringView name) const wontthrow
     -> bool
 {
   if (!bash_dynamic_variables_enabled()) return false;
-  if (is_dynamic_reader_unset(name)) return false;
 
-  return name == "SECONDS" || name == "RANDOM";
+  let const id = dynamic_reader_of(name);
+
+  return id.has_value() &&
+         (m_unset_dynamic_readers & dynamic_reader_mask(*id)) == 0;
 }
 
 hot fn EvalContext::write_dynamic_variable(StringView name,
                                            StringView value) throws -> bool
 {
-  if (!is_dynamic_write_owner(name)) return false;
+  if (!bash_dynamic_variables_enabled()) return false;
+
+  let const id = dynamic_reader_of(name);
+  if (!id.has_value()) return false;
+  if ((m_unset_dynamic_readers & dynamic_reader_mask(*id)) != 0) return false;
   /* A local declaration turns the name into an ordinary frozen variable for the
      length of the call, and the outer state keeps moving underneath it. */
   if (is_local_in_any_active_scope(name)) return false;
@@ -319,7 +344,7 @@ hot fn EvalContext::write_dynamic_variable(StringView name,
   let const parsed = value.to<i64>();
   let const assigned = parsed.is_error() ? i64{0} : parsed.value();
 
-  if (name == "RANDOM") {
+  if (*id == dynamic_reader_id::Random) {
     LOG(Debug, "seeding $RANDOM from '%.*s'", static_cast<int>(value.length),
         value.data);
     m_random_state = (static_cast<u64>(assigned) + 0x9e3779b97f4a7c15ULL) *
@@ -597,8 +622,8 @@ fn EvalContext::append_dynamic_variable_names(
   for (let const &entry : ALWAYS_DYNAMIC.entries)
     out.push(entry.value.name);
 
-  for (let const &color : KOSH_ANSI_COLORS)
-    out.push(StringView{color.name});
+  for (let const &color : KOSH_ANSI_COLOR_ENTRIES)
+    out.push(color.value.name);
 
   if (!bash_dynamic_variables_enabled()) return;
 

@@ -989,35 +989,48 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     let should_mark_uppercase = false;
     let should_unmark_uppercase = false;
     if (is_declare || is_local || is_readonly_kind) {
+      let text_storage = String{heap_allocator()};
       for (let const arg : m_args) {
-        let const text = arg->raw_string();
-        if (text.length() >= 2 &&
-            (text.view()[0] == '-' || text.view()[0] == '+'))
-        {
-          if (text.view()[0] == '-' &&
-              text.view().find_character('r').has_value())
-          {
-            did_request_readonly_flag = true;
-          }
-          if (!is_readonly_kind && text.view()[0] == '-' &&
-              text.view().find_character('p').has_value())
-          {
-            should_print_declaration = true;
-          }
-          if (text.view()[0] == '-' &&
-              text.view().find_character('A').has_value())
-            is_associative_request = true;
-          if (text.view().find_character('i').has_value()) {
-            should_mark_integer = text.view()[0] == '-';
-            should_unmark_integer = text.view()[0] == '+';
-          }
-          if (text.view().find_character('l').has_value()) {
-            should_mark_lowercase = text.view()[0] == '-';
-            should_unmark_lowercase = text.view()[0] == '+';
-          }
-          if (text.view().find_character('u').has_value()) {
-            should_mark_uppercase = text.view()[0] == '-';
-            should_unmark_uppercase = text.view()[0] == '+';
+        let const text = borrowed_token_text(arg, text_storage);
+        if (text.length < 2) continue;
+
+        let const lead = text[0];
+        if (lead != '-' && lead != '+') continue;
+
+        let const is_set_request = lead == '-';
+
+        for (usize i = 1; i < text.length; ++i) {
+          switch (text[i]) {
+          case 'r':
+            if (is_set_request) did_request_readonly_flag = true;
+            break;
+
+          case 'p':
+            if (is_set_request && !is_readonly_kind) {
+              should_print_declaration = true;
+            }
+            break;
+
+          case 'A':
+            if (is_set_request) is_associative_request = true;
+            break;
+
+          case 'i':
+            should_mark_integer = is_set_request;
+            should_unmark_integer = !is_set_request;
+            break;
+
+          case 'l':
+            should_mark_lowercase = is_set_request;
+            should_unmark_lowercase = !is_set_request;
+            break;
+
+          case 'u':
+            should_mark_uppercase = is_set_request;
+            should_unmark_uppercase = !is_set_request;
+            break;
+
+          default: break;
           }
         }
       }

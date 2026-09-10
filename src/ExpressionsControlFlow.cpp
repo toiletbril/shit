@@ -1100,6 +1100,8 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
 
   LOG(Debug, "the case subject expanded to '%s'", subject.c_str());
 
+  let const is_extglob_enabled = cxt.extglob_enabled();
+
   let const do_arm_matches = [&](const case_item &item) throws -> bool {
     for (let const pattern_token : item.patterns) {
       /* A quoted or escaped metacharacter in the pattern is a literal, so the
@@ -1132,7 +1134,7 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
           pattern_active.push(true);
       }
       if (utils::glob_matches(pattern, subject, pattern_active, 0,
-                              cxt.extglob_enabled()))
+                              is_extglob_enabled))
         return true;
     }
     return false;

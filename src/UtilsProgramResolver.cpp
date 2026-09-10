@@ -479,8 +479,11 @@ fn ProgramResolver::deduplicate_path_dirs(
     const ArrayList<String> &directories) throws -> ArrayList<String>
 {
   let unique_directories = ArrayList<String>{heap_allocator()};
+  unique_directories.reserve(directories.count());
+
+  let seen = HashSet{heap_allocator()};
   for (let const &directory : directories)
-    if (!unique_directories.find(directory.view()).has_value())
+    if (seen.add(directory.view()))
       unique_directories.push(String{directory.view()});
 
   return unique_directories;

@@ -25,16 +25,21 @@ namespace koshka {
 
 namespace {
 
-constexpr const char *RESTRICTED_READONLY_NAMES[] = {"SHELL",
-                                                     "PATH",
-                                                     "ENV",
-                                                     "BASH_ENV",
-                                                     "KOSH_HISTORY_FILE",
-                                                     "KOSH_HISTORY_SIZE",
-                                                     "KOSH_CALC_HISTORY",
-                                                     "KOSH_DIRECTORY_HISTORY"};
-constexpr StringView BASH_IMPLICIT_READONLY_NAMES[] = {"BASHOPTS", "SHELLOPTS",
-                                                       "EUID", "PPID", "UID"};
+constexpr PackedStringKey RESTRICTED_READONLY_KEYS[] = {
+    SSK("SHELL"),
+    SSK("PATH"),
+    SSK("ENV"),
+    SSK("BASH_ENV"),
+    SSK("KOSH_HISTORY_FILE"),
+    SSK("KOSH_HISTORY_SIZE"),
+    SSK("KOSH_CALC_HISTORY"),
+    SSK("KOSH_DIRECTORY_HISTORY")};
+constexpr StaticStringSet RESTRICTED_READONLY_NAMES{RESTRICTED_READONLY_KEYS};
+
+constexpr PackedStringKey BASH_IMPLICIT_READONLY_KEYS[] = {
+    SSK("BASHOPTS"), SSK("SHELLOPTS"), SSK("EUID"), SSK("PPID"), SSK("UID")};
+constexpr StaticStringSet BASH_IMPLICIT_READONLY_NAMES{
+    BASH_IMPLICIT_READONLY_KEYS};
 
 constexpr PackedStringKey BASH_IMPLICIT_INTEGER_KEYS[] = {
     SSK("BASHPID"), SSK("EUID"),    SSK("HISTCMD"), SSK("OPTIND"), SSK("PPID"),
@@ -876,14 +881,15 @@ fn EvalContext::unmark_readonly(StringView name) throws -> void
 
 fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 {
-  if (bash_dynamic_variables_enabled())
-    for (let const readonly_name : BASH_IMPLICIT_READONLY_NAMES)
-      if (name == readonly_name) return true;
+  if (bash_dynamic_variables_enabled() &&
+      BASH_IMPLICIT_READONLY_NAMES.contains(name))
+  {
+    return true;
+  }
+
   if (restricted_enforcement_active()) {
     if (utils::environment_name_is_path(name)) return true;
-
-    for (let const restricted_name : RESTRICTED_READONLY_NAMES)
-      if (name == restricted_name) return true;
+    if (RESTRICTED_READONLY_NAMES.contains(name)) return true;
   }
 
   return (variable_attributes(name) &
@@ -894,22 +900,28 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
   out.reserve(m_variable_attributes.count() +
-              countof(RESTRICTED_READONLY_NAMES) +
-              countof(BASH_IMPLICIT_READONLY_NAMES));
+              countof(RESTRICTED_READONLY_KEYS) +
+              countof(BASH_IMPLICIT_READONLY_KEYS));
   m_variable_attributes.for_each([&](StringView name, u8 attributes) {
     if ((attributes & static_cast<u8>(variable_attribute::Readonly)) != 0)
       out.push_managed(name);
   });
+
+  let const do_push_implicit = [&](const PackedStringKey &key) throws {
+    let name = key.to_string();
+    if ((variable_attributes(name.view()) &
+         static_cast<u8>(variable_attribute::Readonly)) == 0)
+      out.push(steal(name));
+  };
+
   if (bash_dynamic_variables_enabled())
-    for (let const readonly_name : BASH_IMPLICIT_READONLY_NAMES)
-      if ((variable_attributes(readonly_name) &
-           static_cast<u8>(variable_attribute::Readonly)) == 0)
-        out.push_managed(readonly_name);
+    for (let const &key : BASH_IMPLICIT_READONLY_KEYS)
+      do_push_implicit(key);
+
   if (restricted_enforcement_active())
-    for (let const restricted_name : RESTRICTED_READONLY_NAMES)
-      if ((variable_attributes(restricted_name) &
-           static_cast<u8>(variable_attribute::Readonly)) == 0)
-        out.push_managed(restricted_name);
+    for (let const &key : RESTRICTED_READONLY_KEYS)
+      do_push_implicit(key);
+
   out.sort();
   return out;
 }
@@ -996,17 +1008,18 @@ fn EvalContext::set_variable_attribute(StringView name,
                                        variable_attribute attribute,
                                        bool is_enabled) throws -> void
 {
-  let attributes = variable_attributes(name);
   let const mask = static_cast<u8>(attribute);
-  if (is_enabled)
-    attributes |= mask;
-  else
-    attributes &= static_cast<u8>(~mask);
 
-  if (attributes == 0)
-    m_variable_attributes.erase(name);
-  else
-    m_variable_attributes.set(name, attributes);
+  if (is_enabled) {
+    m_variable_attributes.get_or_create(name, u8{0}) |= mask;
+    return;
+  }
+
+  let *attributes = m_variable_attributes.find(name);
+  if (attributes == nullptr) return;
+
+  *attributes &= static_cast<u8>(~mask);
+  if (*attributes == 0) m_variable_attributes.erase(name);
 }
 
 fn EvalContext::apply_variable_case(StringView name,

@@ -109,21 +109,32 @@ static fn shell_word_expansion_end(StringView word,
     return position;
   }
 
-  if ((next_byte >= '0' && next_byte <= '9') || next_byte == '@' ||
-      next_byte == '*' || next_byte == '#' || next_byte == '?' ||
-      next_byte == '-' || next_byte == '$' || next_byte == '!')
-  {
-    return expansion_start + 2;
-  }
+  if (next_byte >= '0' && next_byte <= '9') return expansion_start + 2;
 
-  return expansion_start;
+  switch (next_byte) {
+  case '!':
+  case '#':
+  case '$':
+  case '*':
+  case '-':
+  case '?':
+  case '@': return expansion_start + 2;
+
+  default: return expansion_start;
+  }
 }
 
 hot fn decode_shell_word(StringView word, Allocator allocator,
                          bool should_map_source) throws -> decoded_shell_word
 {
   let decoded = decoded_shell_word{allocator};
-  if (should_map_source) decoded.raw_positions.push(0);
+  decoded.text.reserve(word.length);
+  decoded.glob_active.reserve(word.length);
+
+  if (should_map_source) {
+    decoded.raw_positions.reserve(word.length + 1);
+    decoded.raw_positions.push(0);
+  }
 
   char quote_character = 0;
   let is_scanning_tilde_prefix = false;
@@ -138,15 +149,15 @@ hot fn decode_shell_word(StringView word, Allocator allocator,
     let const was_after_unconsumed_dollar = is_after_unconsumed_dollar;
     is_after_unconsumed_dollar = false;
 
-    if (quote_character == 0 && !was_after_unconsumed_dollar && byte == '$' &&
-        position + 1 < word.length && word[position + 1] == '"')
-    {
+    let const is_unquoted_dollar = byte == '$' && quote_character == 0 &&
+                                   !was_after_unconsumed_dollar &&
+                                   position + 1 < word.length;
+
+    if (is_unquoted_dollar && word[position + 1] == '"') {
       decoded.has_shell_syntax = true;
       continue;
     }
-    if (quote_character == 0 && !was_after_unconsumed_dollar && byte == '$' &&
-        position + 1 < word.length && word[position + 1] == '\'')
-    {
+    if (is_unquoted_dollar && word[position + 1] == '\'') {
       decoded.has_shell_syntax = true;
 
       let const body_start = position + 2;
