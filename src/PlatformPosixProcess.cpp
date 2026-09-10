@@ -967,18 +967,26 @@ static const utils::signal_pair SIGNAL_PAIRS[] = {
 #endif
 };
 
-static fn build_signal_pairs() throws -> ArrayList<utils::signal_pair>
+static fn build_signal_pairs(ArrayList<String> &names) throws
+    -> ArrayList<utils::signal_pair>
 {
   let pairs = ArrayList<utils::signal_pair>{heap_allocator()};
-  pairs.reserve(countof(SIGNAL_PAIRS));
+
+#if defined SIGRTMIN && defined SIGRTMAX
+  let const lowest = static_cast<i32>(SIGRTMIN);
+  let const highest = static_cast<i32>(SIGRTMAX);
+  let const generated_count = static_cast<usize>(highest - lowest + 1);
+#else
+  let const generated_count = usize{0};
+#endif
+
+  pairs.reserve(countof(SIGNAL_PAIRS) + generated_count);
+  names.reserve(generated_count);
 
   for (usize i = 0; i < countof(SIGNAL_PAIRS); i++)
     pairs.push(SIGNAL_PAIRS[i]);
 
 #if defined SIGRTMIN && defined SIGRTMAX
-  let const lowest = static_cast<i32>(SIGRTMIN);
-  let const highest = static_cast<i32>(SIGRTMAX);
-
   for (i32 number = lowest; number <= highest; number++) {
     let const from_lowest = number - lowest;
     let const from_highest = highest - number;
@@ -992,8 +1000,8 @@ static fn build_signal_pairs() throws -> ArrayList<utils::signal_pair>
       name.append(String::from(offset, heap_allocator()).view());
     }
 
-    pairs.push(
-        utils::signal_pair{number, name.view().copy_to(heap_allocator())});
+    names.push(steal(name));
+    pairs.push(utils::signal_pair{number, names.back().view()});
   }
 #endif
 
@@ -1002,7 +1010,8 @@ static fn build_signal_pairs() throws -> ArrayList<utils::signal_pair>
 
 static fn signal_pairs() throws -> const ArrayList<utils::signal_pair> &
 {
-  static ArrayList<utils::signal_pair> pairs = build_signal_pairs();
+  static ArrayList<String> names = ArrayList<String>{heap_allocator()};
+  static ArrayList<utils::signal_pair> pairs = build_signal_pairs(names);
 
   return pairs;
 }
