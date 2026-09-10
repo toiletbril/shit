@@ -331,9 +331,11 @@ if [ "${OS-}" = Windows_NT ]; then
     echo rc=130
     echo contained
 else
+    set -m
     "$BIN" -c "koshkit timeout 0 /bin/sh -c 'echo \$\$ > '$d/child-pid'; (sleep 0.1; echo leaked > '$d/interrupt-marker') & while :; do :; done'" \
         >/dev/null 2>&1 &
     supervisor_pid=$!
+    set +m
     waited=0
     while [ ! -s "$d/child-pid" ] && [ "$waited" -lt 1000 ]; do
         /bin/sleep 0.01

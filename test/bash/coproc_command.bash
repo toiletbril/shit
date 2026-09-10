@@ -4,6 +4,7 @@
 # are never printed, because the numbers a shell picks are its own business.
 echo "== named compound =="
 coproc UPPER { while read -r line; do printf '%s\n' "${line}!"; done; }
+upper_pid=$UPPER_PID
 printf '%s\n' "elements:${#UPPER[@]}"
 printf '%s\n' "pid set:${UPPER_PID:+yes}"
 printf '%s\n' "bang matches:$([ "$!" = "$UPPER_PID" ] && echo yes || echo no)"
@@ -15,20 +16,22 @@ read -r reply <&"${UPPER[0]}"
 printf '%s\n' "reply:$reply"
 
 # The read loop ends at end of file. The write descriptor is closed to reach it,
-# otherwise the wait below never returns.
+# otherwise the wait below never returns. Each wait reads a saved copy of the
+# process id, because a reaped coprocess unsets the variable that holds it.
 eval "exec ${UPPER[1]}>&-"
-wait "$UPPER_PID"
+wait "$upper_pid"
 printf '%s\n' "named wait status:$?"
 printf '%s\n' "COPROC unset:${COPROC+set}"
 
 echo "== unnamed simple =="
 coproc cat
+unnamed_pid=$COPROC_PID
 printf '%s\n' "elements:${#COPROC[@]}"
 printf 'plain\n' >&"${COPROC[1]}"
 read -r out <&"${COPROC[0]}"
 printf '%s\n' "out:$out"
 eval "exec ${COPROC[1]}>&-"
-wait "$COPROC_PID"
+wait "$unnamed_pid"
 printf '%s\n' "unnamed wait status:$?"
 
 # A word names the coprocess only when a compound command follows it. Here the
@@ -36,23 +39,26 @@ printf '%s\n' "unnamed wait status:$?"
 echo "== word that is not a name =="
 NOTANAME() { printf 'ran:%s\n' "$*"; }
 coproc NOTANAME cat
+word_pid=$COPROC_PID
 printf '%s\n' "elements:${#COPROC[@]}"
 read -r line <&"${COPROC[0]}"
 printf '%s\n' "line:$line"
-wait "$COPROC_PID"
+wait "$word_pid"
 printf '%s\n' "word wait status:$?"
 
 # The launch reports its own status. The status of the body is reached by wait.
 echo "== status of the coproc command =="
 coproc LAST { exit 7; }
 printf '%s\n' "launch status:$?"
-wait "$LAST_PID"
+last_pid=$LAST_PID
+wait "$last_pid"
 printf '%s\n' "body status:$?"
 
 # A forked subshell loses both descriptors. The diagnostic of a failed
 # redirection names the script, so it is dropped here.
 echo "== descriptors in a subshell =="
 coproc HOLD { while read -r line; do printf '%s\n' "got:$line"; done; }
+hold_pid=$HOLD_PID
 ( if printf 'x\n' 2>/dev/null >&"${HOLD[1]}"; then
     echo "subshell write:open"
   else
@@ -73,13 +79,14 @@ printf 'parent\n' >&"${HOLD[1]}"
 read -r reply <&"${HOLD[0]}"
 printf '%s\n' "parent reply:$reply"
 eval "exec ${HOLD[1]}>&-"
-wait "$HOLD_PID"
+wait "$hold_pid"
 printf '%s\n' "subshell wait status:$?"
 
 # An external program receives neither descriptor. The diagnostic of the failed
 # redirection belongs to the child shell, so it is dropped here.
 echo "== descriptors across an exec =="
 coproc PASS { while read -r line; do printf '%s\n' "got:$line"; done; }
+pass_pid=$PASS_PID
 if /bin/sh -c "printf 'x\n' >&${PASS[1]}" 2>/dev/null; then
   echo "child write:open"
 else
@@ -92,7 +99,7 @@ else
 fi
 
 eval "exec ${PASS[1]}>&-"
-wait "$PASS_PID"
+wait "$pass_pid"
 printf '%s\n' "exec wait status:$?"
 
 # The descriptor variable form takes an array element. Each coprocess descriptor

@@ -123,6 +123,10 @@ trap 'request_exit 130' INT
 trap 'request_exit 143' TERM
 trap 'request_exit 129' HUP
 
+# Job control keeps the golden shell at the default signal dispositions. A
+# background job of a shell without it inherits SIGINT and SIGQUIT ignored, and
+# no descendant can undo an ignore it was started with.
+set -m
 if [ "${OS-}" = Windows_NT ]; then
   BIN=$BIN BOUNDED_GOLDEN=$GOLDEN BOUNDED_TIMEOUT_SECONDS=$TIMEOUT_SECONDS \
     KOSH_TEST_TIMEOUT_JOB_LIFETIME=leader \
@@ -138,6 +142,7 @@ else
   exit 125
 fi
 GOLDEN_PROCESS=$!
+set +m
 GOLDEN_SESSION=$GOLDEN_PROCESS
 if [ -n "$PENDING_EXIT_STATUS" ]; then
   exit "$PENDING_EXIT_STATUS"

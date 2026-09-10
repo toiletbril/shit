@@ -29,4 +29,5 @@ echo "== --posix fires RETURN for a body that installs its own action:"
 "$BIN" --posix -c 'g() { trap "echo own" RETURN; echo g-body; }; g; echo after-g'
 echo "== --posix lists all three conditions:"
 "$BIN" --posix -c \
-  'trap "echo E" ERR; trap "echo R" RETURN; trap "echo D" DEBUG; trap -p'
+  'trap "echo E" ERR; trap "echo R" RETURN; trap "echo D" DEBUG
+   trap -p DEBUG ERR RETURN'

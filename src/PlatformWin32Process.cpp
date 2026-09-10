@@ -1825,6 +1825,8 @@ fn set_trap_ignore(i32 signal_number) -> void
   signal(signal_number, SIG_IGN);
 }
 
+fn entry_ignored_signals() wontthrow -> u64 { return 0; }
+
 fn clear_trap_handler(i32 signal_number) -> void
 {
   if (!is_trappable_signal(signal_number)) return;

@@ -1067,6 +1067,10 @@ fn set_trap_handler(i32 signal_number) throws -> void;
    such as trap "" INT, so the signal is discarded. */
 fn set_trap_ignore(i32 signal_number) throws -> void;
 
+constexpr i32 ENTRY_IGNORED_SIGNAL_LIMIT = 64;
+
+fn entry_ignored_signals() wontthrow -> u64;
+
 /* Restore a signal's default disposition when its trap is removed. SIGINT
    returns to the shell's interrupt handler, every other signal to SIG_DFL. A
    signal the install unblocked is blocked again. */

@@ -924,7 +924,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 }
 
 static constexpr u32 SUBSHELL_BOOTSTRAP_MAGIC = 0x4b534842U;
-static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 10U;
+static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 11U;
 static constexpr u32 NO_BOOTSTRAP_PROCESS = UINT32_MAX;
 static constexpr u8 SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS = 0x3fU;
 
@@ -1349,6 +1349,8 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   for (let const process : m_detached_job_processes)
     append_subshell_bootstrap_u32(body, do_reference_process(process));
 
+  append_subshell_bootstrap_u64(body, m_startup_ignored_signals);
+
   if (body.count() > UINT32_MAX) throw std::bad_alloc{};
   append_subshell_bootstrap_u32(source, SUBSHELL_BOOTSTRAP_MAGIC);
   append_subshell_bootstrap_u32(source, SUBSHELL_BOOTSTRAP_VERSION);
@@ -1604,6 +1606,8 @@ fn EvalContext::apply_subshell_bootstrap(
     detached_processes.push(KOSH_INVALID_PROCESS);
   }
 
+  let const startup_ignored_signals = reader.read_u64();
+
   if (!reader.is_valid || reader.position != encoded.length ||
       process_references.count() != bootstrap.processes.count())
   {
@@ -1662,6 +1666,7 @@ fn EvalContext::apply_subshell_bootstrap(
   m_random_state = random_state;
   m_shell_start_time = shell_start_time;
   m_seconds_base = seconds_base;
+  m_startup_ignored_signals = startup_ignored_signals;
   m_getopts_char_index = getopts_char_index;
   m_getopts_last_optind = getopts_last_optind;
   m_shopt_option_overrides = shopt_option_overrides;

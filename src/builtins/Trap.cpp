@@ -233,6 +233,11 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           continue;
         }
 
+        if (cxt.is_signal_ignored_at_startup(condition.view())) {
+          do_append_listing(condition.view(), "");
+          continue;
+        }
+
         let const *action = cxt.traps().find(condition.view());
         if (action != nullptr)
           do_append_listing(condition.view(), action->view());
@@ -247,6 +252,24 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       listed.push(
           listed_trap{trap_listing_order(condition), condition, action.view()});
     });
+
+    let const ignored_signals = cxt.get_startup_ignored_signals();
+    let ignored_names = ArrayList<String>{cxt.scratch_allocator()};
+    if (ignored_signals != 0) {
+      ignored_names.reserve(os::ENTRY_IGNORED_SIGNAL_LIMIT);
+
+      for (i32 number = 1; number <= os::ENTRY_IGNORED_SIGNAL_LIMIT; number++) {
+        if ((ignored_signals & (u64{1} << (number - 1))) == 0) continue;
+
+        let name = os::signal_name_from_number(number);
+        if (!name.has_value()) continue;
+        if (cxt.traps().find(name->view()) != nullptr) continue;
+
+        ignored_names.push(String{cxt.scratch_allocator(), name->view()});
+        listed.push(listed_trap{static_cast<i64>(number),
+                                ignored_names.back().view(), ""});
+      }
+    }
 
     listed.sort([](const listed_trap &left, const listed_trap &right) {
       return left.order < right.order;

@@ -33,7 +33,9 @@ trap '"'"'case "$BASH_COMMAND" in echo\ sourced*) return 3;; esac'"'"' DEBUG
 . '"$d"'/sourced.sh
 echo src-rc=$?
 trap - DEBUG
-echo tail' 2>&1 | sed "s|$d|DIR|g" | ./normalize-trace.sh "$BIN"; echo "rc=${PIPESTATUS[0]}"
+echo tail' > "$d/captured.out" 2>&1
+rc=$?
+sed "s|$d|DIR|g" < "$d/captured.out" | ./normalize-trace.sh "$BIN"; echo "rc=$rc"
 echo "== a return in an action leaves the function a sourced file defined:"
 printf 'g() {\n  echo g-1\n  echo g-2\n}\ng\necho after-call\n' > "$d/frame.sh"
 "$BIN" --mood bash -c 'set -T
@@ -41,7 +43,9 @@ trap '"'"'case "$BASH_COMMAND" in echo\ g-1*) return 4;; esac'"'"' DEBUG
 . '"$d"'/frame.sh
 echo src-rc=$?
 trap - DEBUG
-echo tail' 2>&1 | sed "s|$d|DIR|g" | ./normalize-trace.sh "$BIN"; echo "rc=${PIPESTATUS[0]}"
+echo tail' > "$d/captured.out" 2>&1
+rc=$?
+sed "s|$d|DIR|g" < "$d/captured.out" | ./normalize-trace.sh "$BIN"; echo "rc=$rc"
 echo "== a return in a RETURN action fires the trap again for the same frame:"
 "$BIN" --mood bash -c 'set -T
 f() { echo inner; }
@@ -59,4 +63,6 @@ trap '"'"'case "$BASH_COMMAND" in echo\ top*) return 5;; esac'"'"' DEBUG
 echo top-1
 echo top-2
 trap - DEBUG
-echo tail' 2>&1 | ./normalize-trace.sh "$BIN"; echo "rc=${PIPESTATUS[0]}"
+echo tail' > "$d/captured.out" 2>&1
+rc=$?
+./normalize-trace.sh "$BIN" < "$d/captured.out"; echo "rc=$rc"

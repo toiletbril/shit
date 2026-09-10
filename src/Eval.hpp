@@ -952,6 +952,17 @@ public:
 
   fn reset_inherited_signal_traps() wontthrow -> void;
   pure fn did_reset_inherited_signal_traps() const wontthrow -> bool;
+
+  pure fn get_startup_ignored_signals() const wontthrow -> u64
+  {
+    return is_bash_compatible() ? m_startup_ignored_signals : 0;
+  }
+  fn set_startup_ignored_signals(u64 signals) wontthrow -> void
+  {
+    m_startup_ignored_signals = signals;
+  }
+  pure fn is_signal_ignored_at_startup(StringView condition) const wontthrow
+      -> bool;
   fn note_subshell_child_exit() wontthrow -> void;
 
   fn mark_readonly(StringView name) throws -> void;
@@ -2206,6 +2217,7 @@ protected:
      trap and a pending signal still drains inside a DEBUG action. */
   u8 m_running_trap_conditions{0};
   bool m_did_reset_inherited_signal_traps{false};
+  u64 m_startup_ignored_signals{0};
   u32 m_pending_child_trap_count{0};
   /* Nonzero while a trap action evaluates. BASH_COMMAND keeps the command that
      triggered the trap. */

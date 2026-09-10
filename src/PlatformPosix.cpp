@@ -1372,6 +1372,26 @@ static fn handle_interrupt(int s) wontthrow -> void
   INTERRUPT_REQUESTED = 1;
 }
 
+static u64 ENTRY_IGNORED_SIGNALS = 0;
+
+static fn capture_entry_ignored_signals() wontthrow -> void
+{
+  for (i32 signal_number = 1; signal_number <= ENTRY_IGNORED_SIGNAL_LIMIT;
+       signal_number++)
+  {
+    if (signal_number == SIGKILL || signal_number == SIGSTOP) continue;
+
+    struct sigaction sa = {};
+    if (sigaction(signal_number, nullptr, &sa) != 0) continue;
+    if (sa.sa_handler != SIG_IGN) continue;
+
+    LOG(Info, "signal %d is already ignored at shell entry", signal_number);
+    ENTRY_IGNORED_SIGNALS |= u64{1} << (signal_number - 1);
+  }
+}
+
+fn entry_ignored_signals() wontthrow -> u64 { return ENTRY_IGNORED_SIGNALS; }
+
 fn set_default_signal_handlers(signal_profile profile) throws -> void
 {
   let const is_interactive = profile == signal_profile::Interactive;
@@ -1387,9 +1407,11 @@ fn set_default_signal_handlers(signal_profile profile) throws -> void
 
   install_child_state_handler();
 
-  struct sigaction si = {};
-  si.sa_handler = handle_interrupt;
-  check_syscall(sigaction(SIGINT, &si, nullptr));
+  if ((ENTRY_IGNORED_SIGNALS & (u64{1} << (SIGINT - 1))) == 0) {
+    struct sigaction si = {};
+    si.sa_handler = handle_interrupt;
+    check_syscall(sigaction(SIGINT, &si, nullptr));
+  }
 
   struct sigaction sp = {};
   sp.sa_handler = SIG_IGN;
@@ -1677,6 +1699,7 @@ fn initialize_platform_runtime() wontthrow -> void
 #if KOSH_PLATFORM_IS KOSH_PLATFORM_COSMO
   ShowCrashReports();
 #endif
+  capture_entry_ignored_signals();
 }
 
 } /* namespace os */

@@ -19,10 +19,12 @@ cleanup()
 }
 trap cleanup EXIT
 
+set -m
 "$BIN" --mood bash -c \
     'value=$(echo ready > "$1"; while :; do :; done)' \
     shell "$d/ready" >"$d/output" 2>&1 &
 shell_pid=$!
+set +m
 
 waited=0
 while [ ! -s "$d/ready" ] && [ "$waited" -lt 1000 ]; do

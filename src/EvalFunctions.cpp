@@ -508,8 +508,27 @@ fn EvalContext::discard_inherited_signal_traps() throws -> void
   refresh_trap_flags();
 }
 
+pure fn EvalContext::is_signal_ignored_at_startup(
+    StringView condition) const wontthrow -> bool
+{
+  let const ignored = get_startup_ignored_signals();
+  if (ignored == 0) return false;
+
+  let const number = os::signal_number_from_name(condition);
+  if (!number.has_value()) return false;
+  if (*number < 1 || *number > os::ENTRY_IGNORED_SIGNAL_LIMIT) return false;
+
+  return (ignored & (u64{1} << (*number - 1))) != 0;
+}
+
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 {
+  if (is_signal_ignored_at_startup(condition)) {
+    LOG(Info, "keeping '%.*s' ignored because the shell inherited it ignored",
+        static_cast<int>(condition.length), condition.data);
+    return;
+  }
+
   LOG(Info, "setting a trap for '%.*s' with a %zu byte action",
       static_cast<int>(condition.length), condition.data, action.length);
   discard_inherited_signal_traps();
@@ -533,6 +552,12 @@ fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 
 fn EvalContext::remove_trap(StringView condition) throws -> void
 {
+  if (is_signal_ignored_at_startup(condition)) {
+    LOG(Info, "keeping '%.*s' ignored because the shell inherited it ignored",
+        static_cast<int>(condition.length), condition.data);
+    return;
+  }
+
   LOG(Info, "removing the trap for '%.*s'", static_cast<int>(condition.length),
       condition.data);
   discard_inherited_signal_traps();

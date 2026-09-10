@@ -49,6 +49,7 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   set_field_separators(m_field_separators.view());
 
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
+  m_startup_ignored_signals = os::entry_ignored_signals();
 
   os::for_each_environment_name(this, [](opaque *context, StringView name) {
     static_cast<EvalContext *>(context)->mark_exported(name);
