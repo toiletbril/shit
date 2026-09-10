@@ -96,13 +96,16 @@ wait "$PASS_PID"
 printf '%s\n' "exec wait status:$?"
 
 # The descriptor variable form takes an array element. Each coprocess descriptor
-# is closed here without an eval around a numeric close.
+# is closed here without an eval around a numeric close. The body drains its
+# input to the end so the coprocess stays alive across both closes. A reaped
+# coprocess unsets the array and the process id variable.
 echo "== element close =="
-coproc ELEM { read -r line; printf '%s\n' "element got:$line"; }
+coproc ELEM { read -r line; printf '%s\n' "element got:$line"; while read -r _; do :; done; }
+elem_pid=$ELEM_PID
 printf 'direct\n' >&"${ELEM[1]}"
-exec {ELEM[1]}>&-
 read -r element_reply <&"${ELEM[0]}"
 exec {ELEM[0]}<&-
+exec {ELEM[1]}>&-
 printf '%s\n' "$element_reply"
-wait "$ELEM_PID"
+wait "$elem_pid"
 printf '%s\n' "element wait status:$?"
