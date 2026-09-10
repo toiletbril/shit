@@ -45,7 +45,9 @@ if pid == 0:
     os.environ.pop("CAT_BRACED_UNSET", None)
     os.environ.pop("CAT_ARITHMETIC_UNSET", None)
     command = "koshkit cat --syntax-highlighting '%s'" % source_path
-    os.execv(binary, [binary, "-c", command])
+    os.execv(
+        binary, [binary, "--norc", "--no-diagnostics", "-c", command]
+    )
 
 output = b""
 deadline = time.monotonic() + 10
@@ -144,5 +146,23 @@ print("SYNTAX_FORMS_USE_REQUESTED_PALETTE:", syntax_forms_use_requested_palette)
 print("HEREDOC_FORMS_SEPARATED:", heredoc_forms_are_separated)
 print("NO_UNDERLINE:", has_no_underline)
 print("EXACT_SOURCE_BYTES:", has_exact_source_bytes)
+if not has_exact_source_bytes:
+    difference_position = 0
+    while (
+        difference_position < len(plain_output_bytes)
+        and difference_position < len(source_contents)
+        and plain_output_bytes[difference_position]
+        == source_contents[difference_position]
+    ):
+        difference_position += 1
+
+    window_start = max(0, difference_position - 24)
+    window_end = difference_position + 24
+    print("DIFFERENCE_POSITION:", difference_position)
+    print("EXPECTED_LENGTH:", len(source_contents))
+    print("RECEIVED_LENGTH:", len(plain_output_bytes))
+    print("EXPECTED_WINDOW:", source_contents[window_start:window_end])
+    print("RECEIVED_WINDOW:", plain_output_bytes[window_start:window_end])
+    print("RAW_HEAD:", output[:160])
 print("TERMINAL_HIGHLIGHTING:", passed)
 sys.exit(0 if passed else 1)

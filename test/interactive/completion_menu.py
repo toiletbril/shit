@@ -58,6 +58,8 @@ def run_menu(
     keys_before_resize=(),
     environment=None,
     open_key=b"\t",
+    opened_required=None,
+    first_key_required=None,
 ):
     """Type the words, press the opening key twice, send the keys, and submit.
 
@@ -91,7 +93,7 @@ def run_menu(
     read_until_idle(master, 2)
 
     os.write(master, open_key)
-    menu = read_until_idle(master, 2)
+    menu = read_until_idle(master, 2, opened_required)
     resized_menu = b""
 
     for key in keys_before_resize:
@@ -108,9 +110,10 @@ def run_menu(
         )
         resized_menu = read_until_idle(master, 2)
 
-    for key in keys:
+    for index, key in enumerate(keys):
         os.write(master, key)
-        menu += read_until_idle(master, 1)
+        required = first_key_required if index == 0 else None
+        menu += read_until_idle(master, 1, required)
 
     os.write(master, b"\n")
     tail = read_until_idle(master, 2, b"MARKER-END")
@@ -164,7 +167,13 @@ def main():
         deep_typed = "printf '<%s>\\n' deep"
         wide_typed = "printf '<%s>\\n' Blackmagic"
 
-        opened, _, _ = run_menu(directory, "tree", typed, [])
+        opened, _, _ = run_menu(
+            directory,
+            "tree",
+            typed,
+            [],
+            opened_required=GHOST_SGR + b"one" + HIGHLIGHT_RESET,
+        )
         menu_lists_every_candidate = (
             b"alpha-one" in opened
             and b"alpha-two" in opened
@@ -205,7 +214,11 @@ def main():
         )
 
         moved, _, submitted = run_menu(
-            directory, "tree", typed, [b"\x1b[B", b"\n"]
+            directory,
+            "tree",
+            typed,
+            [b"\x1b[B", b"\n"],
+            first_key_required=GHOST_SGR + b"three" + HIGHLIGHT_RESET,
         )
         a_movement_key_highlights_a_row = SELECTED_SGR in moved
         # The down arrow moves to alpha-three, since shift tab reaches
