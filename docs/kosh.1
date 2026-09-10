@@ -1372,8 +1372,16 @@ option is accepted without effect.
 .B readonly
 Each named variable is marked read-only. The
 .B \-p
-option lists the read-only variables in a reusable form. No attribute letter is
-accepted.
+option lists the read-only variables in a reusable form. The
+.B \-a
+option treats each name as an indexed array, and
+.B \-A
+treats each name as an associative array. The
+.B \-f
+option marks each named function read-only. A read-only function cannot be
+redefined and cannot be unset. A bare
+.B \-f
+lists each read-only function with its body.
 .TP
 .BR "mapfile, readarray"
 The
@@ -1965,7 +1973,9 @@ a job that stops counts as one arrival of its own, and a job that is continued
 counts as none. Windows raises no child signal, and the reap itself reaches
 that boundary. The Windows
 .B kill
-builtin sends only KILL and TERM. A script there cannot raise CHLD by hand.
+builtin sends only KILL and TERM. A script there cannot raise CHLD by hand. A
+CHLD action that returns from the function it fired inside leaves the condition
+installed, and the action fires again for the next child the shell reaps.
 .PP
 A trapped signal that arrives while
 .B wait
@@ -2168,8 +2178,15 @@ moves the base the elapsed count is measured from. An assignment to
 .B RANDOM
 seeds the generator, and a repeated seed repeats the sequence. A
 .B local
-declaration of either name freezes it for the length of the call. They are
-unavailable in the
+declaration of either name freezes it for the length of the call. An
+.B unset
+of
+.B SECONDS
+or
+.B RANDOM
+takes the dynamic reader away for the rest of the shell. The name then reads
+empty, an assignment stores an ordinary value, and a subshell inherits the
+destroyed reader. They are unavailable in the
 .B sh
 mood.
 .TP

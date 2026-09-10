@@ -609,13 +609,20 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       let const stage_source = cxt.current_source();
       let stage_text = StringView{};
       if (stage_source != nullptr) {
+        let stage_start_position = usize{stage_location.position};
         let stage_end_position =
-            stage_location.position + stage_location.length;
+            usize{stage_location.position} + usize{stage_location.length};
         if (stage->source_end_position() > stage_end_position)
           stage_end_position = stage->source_end_position();
+
+        if (simple != nullptr) {
+          stage_start_position = simple->full_source_start_position();
+          if (simple->full_source_end_position() > stage_end_position)
+            stage_end_position = simple->full_source_end_position();
+        }
+
         stage_text = stage_source->view().substring_of_length(
-            stage_location.position,
-            stage_end_position - stage_location.position);
+            stage_start_position, stage_end_position - stage_start_position);
       }
 
       let const process_group =
@@ -838,6 +845,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     cxt.set_current_location(e->source_location());
     let const should_run_stage = publish_simple_command(cxt, *e);
     if (!should_run_stage) return cxt.last_exit_status();
+
+    let const stage_write_mark = cxt.begin_confined_variable_writes();
+    defer { cxt.rollback_confined_variable_writes(stage_write_mark); };
 
     let stage_arg_locations =
         ArrayList<SourceLocation>{cxt.scratch_allocator()};

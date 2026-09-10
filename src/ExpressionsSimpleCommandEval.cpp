@@ -974,8 +974,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     let const is_function_local = is_declare && cxt.in_function_scope();
     let const is_export = array_command_kind == assignment_builtin::Export;
     /* The -r flag sits in the builtin's arguments, so it is read off them. */
-    let is_readonly_request =
+    let const is_readonly_kind =
         array_command_kind == assignment_builtin::Readonly;
+    let is_readonly_request = is_readonly_kind;
     let did_request_readonly_flag = false;
     let should_print_declaration = false;
     /* The -A flag routes to the string-keyed store rather than the indexed
@@ -987,7 +988,7 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     let should_unmark_lowercase = false;
     let should_mark_uppercase = false;
     let should_unmark_uppercase = false;
-    if (is_declare || is_local) {
+    if (is_declare || is_local || is_readonly_kind) {
       for (let const arg : m_args) {
         let const text = arg->raw_string();
         if (text.length() >= 2 &&
@@ -998,9 +999,11 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
           {
             did_request_readonly_flag = true;
           }
-          if (text.view()[0] == '-' &&
+          if (!is_readonly_kind && text.view()[0] == '-' &&
               text.view().find_character('p').has_value())
+          {
             should_print_declaration = true;
+          }
           if (text.view()[0] == '-' &&
               text.view().find_character('A').has_value())
             is_associative_request = true;

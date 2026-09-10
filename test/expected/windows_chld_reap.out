@@ -1,0 +1,18 @@
+== a reaped child reaches the next command boundary:
+reaped=1
+background=1
+redirected=1
+rc=0
+== the reap reaches the boundary and not the middle of a list:
+chld-arrived
+after-the-child
+after-the-removal
+rc=0
+== raising CHLD by hand follows the platform:
+hand-raise-follows-the-platform
+rc=0
+== KILL and TERM reach a child on both platforms:
+term-accepted
+kill-accepted
+both-signals-checked
+rc=0

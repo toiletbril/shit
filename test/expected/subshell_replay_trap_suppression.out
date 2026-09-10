@@ -1,0 +1,57 @@
+== a subshell publishes its own commands and none of the replay:
+debug=[trap "echo err=[\$BASH_COMMAND]" ERR]
+debug=[echo inner]
+inner
+debug=[myfn]
+debug=[myfn]
+debug=[echo fn]
+fn
+debug=[false]
+debug=[false]
+err=[false]
+debug=[( echo inner; myfn; false )]
+err=[( echo inner; myfn; false )]
+debug=[echo tail]
+tail
+rc=0
+== a large inherited state stays invisible to the traps:
+debug=[echo "arr=${arr[1]}"]
+arr=b
+debug=[echo "map=${map[k]}"]
+map=v
+debug=[echo "frozen=$frozen"]
+frozen=cold
+debug=[echo tail]
+tail
+rc=0
+== a nested subshell replays twice and publishes once:
+debug=[deep]
+debug=[deep]
+debug=[echo deep]
+deep
+debug=[echo tail]
+tail
+rc=0
+== a pipeline stage and a substitution suppress the replay too:
+debug=[/bin/cat]
+debug=[helper]
+debug=[helper]
+debug=[echo helper]
+helper
+debug=[captured=$(helper)]
+debug=[echo "captured=$captured"]
+captured=debug=[helper]
+debug=[helper]
+debug=[echo helper]
+helper
+debug=[echo tail]
+tail
+rc=0
+== the trap survives the fork and still fires in the parent:
+debug=[echo child]
+child
+debug=[trap -p DEBUG]
+trap -- 'echo debug=[$BASH_COMMAND]' DEBUG
+debug=[echo tail]
+tail
+rc=0

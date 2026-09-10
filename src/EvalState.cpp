@@ -255,7 +255,8 @@ fn EvalContext::push_root_source_frame(const String *parent_source,
   m_source_frames.push(source_frame{
       String{heap_allocator(), StringView{"the command line"}},
       call_site,
-      parent_source, String{heap_allocator()},
+      parent_source, source_generation_for(parent_source),
+      String{heap_allocator()},
       true, is_only_root_source
   });
 }
@@ -299,22 +300,25 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
   };
   let const do_frame_identity_match = [&](const source_frame &left,
                                           const source_frame &right) {
+    let const *left_source = borrowed_frame_source(left);
+    let const *right_source = borrowed_frame_source(right);
+
     return left.is_cli_root == right.is_cli_root &&
            do_location_match(left.call_site, right.call_site) &&
            left.origin == right.origin &&
            left.source_path == right.source_path &&
-           left.parent_source_length == right.parent_source_length &&
-           (left.parent_source == right.parent_source ||
-            (left.parent_source != nullptr && right.parent_source != nullptr &&
-             left.parent_source->view() == right.parent_source->view()));
+           (left_source == right_source ||
+            (left_source != nullptr && right_source != nullptr &&
+             left_source->view() == right_source->view()));
   };
   let const do_frame_render = [&](const source_frame &frame) {
-    return frame.parent_source != nullptr && !do_frame_repeat_error(frame);
+    return borrowed_frame_source(frame) != nullptr &&
+           !do_frame_repeat_error(frame);
   };
 
   let has_traceable_source_frame = false;
   for (let const &frame : m_source_frames)
-    if (frame.parent_source != nullptr &&
+    if (borrowed_frame_source(frame) != nullptr &&
         (!frame.is_cli_root || !frame.is_only_root_source))
     {
       has_traceable_source_frame = true;
@@ -344,8 +348,9 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
       continue;
     }
 
+    let const *frame_source = borrowed_frame_source(frame);
     let const sourced_here = TraceWithLocation{frame.call_site};
-    show_message(sourced_here.to_string(*frame.parent_source, this));
+    show_message(sourced_here.to_string(*frame_source, this));
     frame.was_printed = true;
   }
 }
@@ -764,12 +769,15 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_init_moods_sourcing,
       m_initialized_moods,
       m_disabled_bash_special_arrays,
+      m_unset_dynamic_readers,
       m_was_mood_set_explicitly,
       m_mood_mutation_revision,
       m_warning_mutation_revision,
       m_diagnostics_mutation_revision,
       m_annoying_diagnostics_mutation_revision,
       m_random_state,
+      m_shell_start_time,
+      m_seconds_base,
       m_shell_option_mutations,
       m_local_scopes,
       m_local_scope_depth,
@@ -828,6 +836,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_init_moods_sourcing = snapshot.init_moods_sourcing;
   m_initialized_moods = snapshot.initialized_moods;
   m_disabled_bash_special_arrays = snapshot.disabled_bash_special_arrays;
+  m_unset_dynamic_readers = snapshot.unset_dynamic_readers;
   m_was_mood_set_explicitly = snapshot.was_mood_set_explicitly;
   m_mood_mutation_revision = snapshot.mood_mutation_revision;
   m_warning_mutation_revision = snapshot.warning_mutation_revision;
@@ -835,6 +844,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_annoying_diagnostics_mutation_revision =
       snapshot.annoying_diagnostics_mutation_revision;
   m_random_state = snapshot.random_state;
+  m_shell_start_time = snapshot.shell_start_time;
+  m_seconds_base = snapshot.seconds_base;
   m_shell_option_mutations = snapshot.option_mutations;
   m_local_scopes = steal(snapshot.local_scopes);
   m_local_scope_depth = snapshot.local_scope_depth;
@@ -913,7 +924,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 }
 
 static constexpr u32 SUBSHELL_BOOTSTRAP_MAGIC = 0x4b534842U;
-static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 9U;
+static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 10U;
 static constexpr u32 NO_BOOTSTRAP_PROCESS = UINT32_MAX;
 static constexpr u8 SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS = 0x3fU;
 
@@ -1246,6 +1257,8 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   if (m_last_background_pid.has_value())
     append_subshell_bootstrap_i64(body, *m_last_background_pid);
   append_subshell_bootstrap_u64(body, m_random_state);
+  append_subshell_bootstrap_i64(body, m_shell_start_time);
+  append_subshell_bootstrap_i64(body, m_seconds_base);
   append_subshell_bootstrap_u64(body, static_cast<u64>(m_getopts_char_index));
   append_subshell_bootstrap_i64(body, m_getopts_last_optind);
   append_subshell_bootstrap_i32(body, m_next_job_id);
@@ -1253,6 +1266,7 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   append_subshell_bootstrap_u64(body, m_shopt_option_overrides);
   append_subshell_bootstrap_u64(body, m_shopt_option_values);
   body.push(static_cast<char>(m_disabled_bash_special_arrays));
+  body.push(static_cast<char>(m_unset_dynamic_readers));
   body.push(static_cast<char>(m_is_restricted_shell));
   body.push(static_cast<char>(m_bash_argument_arrays != nullptr));
   if (m_bash_argument_arrays != nullptr) {
@@ -1373,6 +1387,8 @@ fn EvalContext::apply_subshell_bootstrap(
   let last_background_pid = Maybe<i64>{None};
   if (has_last_background_pid) last_background_pid = reader.read_i64();
   let const random_state = reader.read_u64();
+  let const shell_start_time = reader.read_i64();
+  let const seconds_base = reader.read_i64();
   let const getopts_char_index_bits = reader.read_u64();
   let const getopts_last_optind = reader.read_i64();
   let const next_job_id = reader.read_i32();
@@ -1382,6 +1398,7 @@ fn EvalContext::apply_subshell_bootstrap(
   let const shopt_option_overrides = reader.read_u64();
   let const shopt_option_values = reader.read_u64();
   let const disabled_bash_special_arrays = reader.read_u8();
+  let const unset_dynamic_readers = reader.read_u8();
   let const is_restricted_shell_identity = reader.read_u8() != 0;
   bool has_bash_argument_arrays = false;
   if (!read_subshell_bootstrap_bool(reader, has_bash_argument_arrays))
@@ -1435,10 +1452,15 @@ fn EvalContext::apply_subshell_bootstrap(
   static_assert(static_cast<u8>(bash_special_array_id::Count) <= 8);
   constexpr u8 VALID_BASH_SPECIAL_ARRAY_MASK =
       (1U << static_cast<u8>(bash_special_array_id::Count)) - 1U;
+  static_assert(static_cast<u8>(dynamic_reader_id::Count) <= 8);
+  constexpr u8 VALID_DYNAMIC_READER_MASK =
+      (1U << static_cast<u8>(dynamic_reader_id::Count)) - 1U;
   if (getopts_char_index_bits == 0 || getopts_char_index_bits > SIZE_MAX ||
       next_job_id < 1 || (shopt_option_values & ~shopt_option_overrides) != 0 ||
       (disabled_bash_special_arrays &
        static_cast<u8>(~VALID_BASH_SPECIAL_ARRAY_MASK)) != 0 ||
+      (unset_dynamic_readers & static_cast<u8>(~VALID_DYNAMIC_READER_MASK)) !=
+          0 ||
       function_call_depth > MAX_FUNCTION_CALL_DEPTH ||
       local_scope_depth > MAX_FUNCTION_CALL_DEPTH)
   {
@@ -1622,6 +1644,7 @@ fn EvalContext::apply_subshell_bootstrap(
   replay_runtime.set_option(shell_option_id::Xtrace, false);
   replay_runtime.restore(*this);
   m_disabled_bash_special_arrays = disabled_bash_special_arrays;
+  m_unset_dynamic_readers = unset_dynamic_readers;
   {
     m_is_replaying_inherited_state = true;
     defer { m_is_replaying_inherited_state = false; };
@@ -1637,6 +1660,8 @@ fn EvalContext::apply_subshell_bootstrap(
   m_last_argument = steal(last_argument);
   m_last_background_pid = last_background_pid;
   m_random_state = random_state;
+  m_shell_start_time = shell_start_time;
+  m_seconds_base = seconds_base;
   m_getopts_char_index = getopts_char_index;
   m_getopts_last_optind = getopts_last_optind;
   m_shopt_option_overrides = shopt_option_overrides;

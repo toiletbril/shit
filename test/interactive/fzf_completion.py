@@ -284,7 +284,7 @@ def main():
             tab_count=2,
         )
         quoting_survives_the_selector = (
-            b"record 'beta only'" in quoted_log and b"<beta only>" in quoted
+            b"record beta\\ only" in quoted_log and b"<beta only>" in quoted
         )
 
         quoted_multi, _ = run_scenario(
@@ -306,7 +306,7 @@ def main():
             tab_count=2,
         )
         metacharacter_is_quoted = (
-            b"record 'hash#one'" in metacharacter_log
+            b"record hash\\#one" in metacharacter_log
             and b"<hash#one>" in metacharacter
         )
 

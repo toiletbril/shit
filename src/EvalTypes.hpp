@@ -177,23 +177,26 @@ struct control_flow
   String origin{heap_allocator()};
 };
 
+static constexpr u64 EXTERNAL_SOURCE_GENERATION = UINT64_MAX;
+
 struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
-               const String *parent_source, String source_path,
-               bool is_cli_root, bool is_only_root_source)
+               const String *parent_source, u64 parent_source_generation,
+               String source_path, bool is_cli_root, bool is_only_root_source)
       : origin(steal(origin)), call_site(steal(call_site)),
-        parent_source(parent_source), source_path(steal(source_path)),
-        parent_source_length(parent_source != nullptr ? parent_source->length()
-                                                      : 0),
-        is_cli_root(is_cli_root), is_only_root_source(is_only_root_source)
+        parent_source(parent_source),
+        parent_source_generation(parent_source_generation),
+        source_path(steal(source_path)), is_cli_root(is_cli_root),
+        is_only_root_source(is_only_root_source)
   {}
 
   String origin;
   SourceLocation call_site;
   const String *parent_source;
+  u64 parent_source_generation;
   String source_path;
-  usize parent_source_length;
+  usize function_call_depth{0};
   bool is_cli_root;
   bool is_only_root_source;
   bool was_printed{false};

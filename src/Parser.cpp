@@ -1225,6 +1225,7 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
   let local_vars = ArrayList<PrefixAssignment>{heap_allocator()};
   let array_args = ArrayList<array_builtin_assignment>{heap_allocator()};
   let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
+  let full_end_position = usize{0};
 
   if (leading_token != nullptr) {
     source_location = leading_token->source_location();
@@ -1246,6 +1247,7 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
     if (local_vars.count() != 0) c->set_local_vars(steal(local_vars));
     if (!array_args.is_empty()) c->set_array_args(steal(array_args));
     if (!redirections.is_empty()) c->set_redirections(steal(redirections));
+    c->set_full_source_end_position(full_end_position);
     return c;
   };
 
@@ -1433,9 +1435,11 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
               assignment_builtin::None)
           {
             ArrayList<const Token *> elements = consume_bash_array_assignment();
-            array_args.push(
-                array_builtin_assignment{a->key().clone(), steal(elements),
-                                         a->source_location(), a->is_append()});
+            let const assignment_end_position =
+                static_cast<u32>(m_lexer.cursor_position());
+            array_args.push(array_builtin_assignment{
+                a->key().clone(), steal(elements), a->source_location(),
+                assignment_end_position, a->is_append()});
             break;
           }
         }
@@ -1447,9 +1451,11 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
          downgrades it to an empty scalar at evaluation. */
       if (is_array_assignment) {
         ArrayList<const Token *> elements = consume_bash_array_assignment();
-        array_args.push(
-            array_builtin_assignment{a->key().clone(), steal(elements),
-                                     a->source_location(), a->is_append()});
+        let const assignment_end_position =
+            static_cast<u32>(m_lexer.cursor_position());
+        array_args.push(array_builtin_assignment{
+            a->key().clone(), steal(elements), a->source_location(),
+            assignment_end_position, a->is_append()});
         break;
       }
 
@@ -1500,6 +1506,8 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
 
     default: return do_build_command();
     }
+
+    full_end_position = m_lexer.cursor_position();
   }
 
   unreachable("the simple-command parser loop terminated without returning");

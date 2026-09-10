@@ -1,0 +1,14 @@
+== bare assignment:
+koshdir/
+koshfile.txt
+== assignment as operand:
+koshdir/
+koshfile.txt
+== append assignment:
+koshdir/
+koshfile.txt
+== subscripted assignment:
+koshdir/
+koshfile.txt
+== command position without an equals sign:
+koshkit

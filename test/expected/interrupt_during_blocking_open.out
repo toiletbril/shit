@@ -1,0 +1,24 @@
+== an untrapped interrupt ends a blocking read open:
+3:16: error: Interrupted.
+     3 |  read -r line < "$fifo"
+       |                 ^~~~~~~
+1:1: error: Interrupted.
+     1 |  fifo=$1
+       |  ^
+rc=130
+== an untrapped interrupt ends a blocking write open:
+3:16: error: Interrupted.
+     3 |  echo payload > "$fifo"
+       |                 ^~~~~~~
+1:1: error: Interrupted.
+     1 |  fifo=$1
+       |  ^
+rc=130
+== an exec redirection reports the interrupt once:
+3:9: error: Interrupted.
+     3 |  exec 9< "$fifo"
+       |          ^~~~~~~
+rc=130
+== an ignored interrupt leaves the open blocked until its peer arrives:
+kept=[payload] status=0
+rc=0

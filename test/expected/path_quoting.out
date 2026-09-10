@@ -1,9 +1,9 @@
-== a space in the match quotes it:
-'spacey file.txt'
+== a space in the match escapes it:
+spacey\ file.txt
 == a plain match stays unquoted:
 plainfile.txt
-== a dollar in the match quotes it:
-'dollar$x.txt'
+== a dollar in the match escapes it:
+dollar\$x.txt
 == inside a single quote the space match completes bare within it:
 'spacey file.txt
 == inside a double quote the space match completes bare within it:
@@ -29,8 +29,8 @@ foo_b"ar_baz
 == an adjacent open double quote keeps variable expansion active:
 $QUOTED_COMPLETION_UNIQUE
 == a closed quoted directory continues through an unquoted slash:
-'PATH'/'space file.txt'
 'PATH'/plain.txt
+'PATH'/space\ file.txt
 'PATH'/star-one.txt
 'PATH'/tool
 == a partial basename follows a closed quoted directory:
@@ -52,12 +52,12 @@ space\ dir/mixed.txt
 "$HOME/home.txt
 "$HOME/space file.txt
 == an active tilde directory expands:
-~/'space file.txt'
 ~/home.txt
+~/space\ file.txt
 == tilde user completion ignores malformed passwd records:
 ~fixture-valid/
-== an active tilde stays outside a quoted match:
-~/'space file.txt'
+== an active tilde stays outside an escaped match:
+~/space\ file.txt
 == an active variable uses escapes for a matched space:
 $HOME/space\ file.txt
 == a quoted tilde directory remains literal:
@@ -70,6 +70,6 @@ $HO"ME"/literal-variable.txt
 $HO\ME/literal-variable.txt
 == a quoted glob remains literal:
 == an unquoted glob after a quoted directory expands:
-'PATH'/plain.txt 'PATH'/'space file.txt' 'PATH'/star-one.txt
+'PATH'/plain.txt 'PATH'/space\ file.txt 'PATH'/star-one.txt
 == command position keeps only runnable files:
 'PATH'/tool

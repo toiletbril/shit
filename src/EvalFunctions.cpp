@@ -13,7 +13,9 @@
 #include "Debug.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
+#include "Lexer.hpp"
 #include "PackedStringKey.hpp"
+#include "Parser.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
 #include "Trace.hpp"
@@ -71,6 +73,11 @@ fn EvalContext::register_function(StringView name,
   ASSERT(body_storage.has_value());
   ASSERT(body_storage.get_body() != nullptr);
 
+  if (m_readonly_functions.contains(name)) {
+    throw Error{"Unable to redefine '" + name +
+                "' because it is a read only function"};
+  }
+
   let info = function_definition_info{};
   info.body_start_position = body_start_position;
   info.header_length = name.length + StringView{" () \n"}.length;
@@ -115,33 +122,33 @@ pure fn EvalContext::resolve_render_source(
       fallback_source != nullptr ? fallback_source : m_current_source;
 
   if (m_function_call_names.is_empty()) return resolved_source;
-  let const *storage = m_function_call_storages.is_empty()
-                           ? nullptr
-                           : &m_function_call_storages.back();
-  let const *info =
-      storage != nullptr ? storage->get_definition_info() : nullptr;
-  if (info == nullptr) return resolved_source;
-  let const *copy = storage->get_source();
-  if (copy == nullptr || copy->count() <= info->header_length) {
-    return resolved_source;
-  }
-  if (location.source_name_index != info->source_name_index) {
+
+  for (usize depth = m_function_call_storages.count(); depth > 0; depth--) {
+    let const &storage = m_function_call_storages[depth - 1];
+    let const *info = storage.get_definition_info();
+    if (info == nullptr) continue;
+
+    let const *copy = storage.get_source();
+    if (copy == nullptr || copy->count() <= info->header_length) continue;
+
+    if (location.source_name_index != info->source_name_index) continue;
+
+    let const body_length = copy->count() - info->header_length;
+    if (location.position < info->body_start_position ||
+        location.position >= info->body_start_position + body_length)
+    {
+      continue;
+    }
+
+    resolved_source.text = copy;
+    resolved_source.is_windowed = true;
+    resolved_source.body_start_position = info->body_start_position;
+    resolved_source.header_length = info->header_length;
+    resolved_source.line_offset = info->line_offset;
+    resolved_source.source_name_index = info->source_name_index;
     return resolved_source;
   }
 
-  let const body_length = copy->count() - info->header_length;
-  if (location.position < info->body_start_position ||
-      location.position >= info->body_start_position + body_length)
-  {
-    return resolved_source;
-  }
-
-  resolved_source.text = copy;
-  resolved_source.is_windowed = true;
-  resolved_source.body_start_position = info->body_start_position;
-  resolved_source.header_length = info->header_length;
-  resolved_source.line_offset = info->line_offset;
-  resolved_source.source_name_index = info->source_name_index;
   return resolved_source;
 }
 
@@ -210,9 +217,39 @@ pure fn EvalContext::function_storage_stats() const wontthrow
 
 fn EvalContext::unset_function(StringView name) throws -> void
 {
+  if (m_readonly_functions.contains(name)) {
+    throw Error{"Unable to unset '" + name +
+                "' because it is a read only function"};
+  }
+
   LOG(Info, "unsetting function '%.*s'", static_cast<int>(name.length),
       name.data);
   m_functions.erase(name);
+}
+
+fn EvalContext::mark_function_readonly(StringView name) throws -> void
+{
+  LOG(Info, "marking function '%.*s' read only", static_cast<int>(name.length),
+      name.data);
+  m_readonly_functions.add(name);
+}
+
+pure fn EvalContext::is_function_readonly(StringView name) const wontthrow
+    -> bool
+{
+  return m_readonly_functions.contains(name);
+}
+
+fn EvalContext::sorted_readonly_function_names() const throws
+    -> ArrayList<String>
+{
+  let out = ArrayList<String>{heap_allocator()};
+  out.reserve(m_readonly_functions.count());
+  m_functions.for_each([&](StringView name, const FunctionBodyHandle &) {
+    if (m_readonly_functions.contains(name)) out.push_managed(name);
+  });
+  out.sort();
+  return out;
 }
 
 fn EvalContext::function_names() const throws -> HashSet
@@ -253,6 +290,46 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
   m_debug_variable_name_enumeration_count += names.count();
 #endif
   return names;
+}
+
+fn EvalContext::cached_trap_body(StringView condition, StringView action) throws
+    -> FunctionBodyHandle
+{
+  if (action.find_character('\r').has_value()) return FunctionBodyHandle{};
+
+  if (let const *cached = m_trap_bodies.find(condition); cached != nullptr) {
+    let const *cached_source = cached->get_source();
+    if (cached->get_body() != nullptr && cached_source != nullptr &&
+        cached_source->view() == action)
+    {
+      return *cached;
+    }
+  }
+
+  LOG(Debug, "parsing the '%.*s' trap action of %zu bytes for reuse",
+      static_cast<int>(condition.length), condition.data, action.length);
+
+  let body_storage = FunctionBodyHandle::create();
+  body_storage.set_definition(action, function_definition_info{});
+
+  let const *stored_action = body_storage.get_source();
+  ASSERT(stored_action != nullptr);
+
+  let const previous_function_arena = FUNCTION_ARENA;
+  FUNCTION_ARENA = body_storage.get_arena();
+  defer { FUNCTION_ARENA = previous_function_arena; };
+
+  let parser = Parser{
+      Lexer{stored_action->view(), *body_storage.get_arena(), false, None,
+            mood()}
+  };
+  let const parsed_action = parser.construct_ast();
+  if (parsed_action == nullptr) return FunctionBodyHandle{};
+
+  body_storage.set_body(parsed_action);
+  m_trap_bodies.set(condition, body_storage);
+
+  return body_storage;
 }
 
 fn EvalContext::run_named_trap(StringView condition,
@@ -314,6 +391,7 @@ fn EvalContext::run_named_trap(StringView condition,
   let was_pipe_status_restored = false;
   defer
   {
+    m_last_trap_action_status = m_last_exit_status;
     m_last_exit_status = saved_exit_status;
 
     if (!was_pipe_status_restored) {
@@ -326,32 +404,38 @@ fn EvalContext::run_named_trap(StringView condition,
      The action's own frame neither consumes it nor counts as a return scope.
      The triggering command is the call site. A diagnostic raised inside the
      action is traced back to the line that fired the trap. */
+  let const cached_action = cached_trap_body(condition, action->view());
+
   run_source(action->view(),
              "the " + String{heap_allocator(), condition} + " trap",
-             return_handling::Reject, trigger_site);
+             return_handling::Reject, trigger_site, None, false, nullptr,
+             cached_action.has_value() ? &cached_action : nullptr);
 
   restore_trap_pipe_statuses(has_saved_pipe_statuses,
                              steal(saved_pipe_statuses));
   was_pipe_status_restored = true;
-
-  m_last_trap_action_status = m_last_exit_status;
 }
 
 fn EvalContext::restore_trap_pipe_statuses(
     bool has_saved_pipe_statuses,
     ArrayList<String> saved_pipe_statuses) wontthrow -> void
 {
-  if (!has_saved_pipe_statuses) {
-    m_indexed_arrays.erase("PIPESTATUS");
-    return;
-  }
+  try {
+    if (!has_saved_pipe_statuses) {
+      m_indexed_arrays.erase("PIPESTATUS");
+      return;
+    }
 
-  if (let *current = m_indexed_arrays.find("PIPESTATUS"); current != nullptr) {
-    *current = steal(saved_pipe_statuses);
-    return;
-  }
+    if (let *current = m_indexed_arrays.find("PIPESTATUS"); current != nullptr)
+    {
+      *current = steal(saved_pipe_statuses);
+      return;
+    }
 
-  m_indexed_arrays.set("PIPESTATUS", steal(saved_pipe_statuses));
+    m_indexed_arrays.set("PIPESTATUS", steal(saved_pipe_statuses));
+  } catch (...) {
+    LOG(Info, "the PIPESTATUS restore of a trap action could not allocate");
+  }
 }
 
 fn EvalContext::run_return_trap(i32 status_before_return) throws -> void
@@ -576,8 +660,13 @@ fn EvalContext::run_pending_traps() throws -> void
         LOG(Info, "running the trap action for signal '%s'", name->c_str());
         /* A return in the action belongs to the function the signal
            interrupted. The action's own frame is no return scope of its own. */
+        let const cached_action =
+            cached_trap_body(name->view(), action->view());
+
         run_source(action->view(), "the " + *name + " trap",
-                   return_handling::Reject, m_current_location);
+                   return_handling::Reject, m_current_location, None, false,
+                   nullptr,
+                   cached_action.has_value() ? &cached_action : nullptr);
       }
 
     /* A return, a break, or an exit the action requested leaves the remaining
@@ -599,13 +688,17 @@ fn EvalContext::run_pending_traps() throws -> void
       m_running_trap_conditions |= child_bit;
       defer { m_running_trap_conditions &= static_cast<u8>(~child_bit); };
 
+      let const child_body = cached_trap_body(child_condition, action.view());
+      let const *cached_child_body =
+          child_body.has_value() ? &child_body : nullptr;
+
       u32 fired_count = 0;
       for (; fired_count < fire_count; fired_count++) {
         if (has_pending_control_flow()) break;
 
         LOG(Info, "running the trap action for signal 'CHLD'");
         run_source(action.view(), "the CHLD trap", return_handling::Reject,
-                   m_current_location);
+                   m_current_location, None, false, nullptr, cached_child_body);
       }
 
       if (fired_count > m_pending_child_trap_count)
@@ -824,7 +917,7 @@ fn EvalContext::unmark_integer(StringView name) throws -> void
 
 fn EvalContext::is_integer_variable(StringView name) const wontthrow -> bool
 {
-  if (bash_dynamic_variables_enabled() &&
+  if (bash_dynamic_variables_enabled() && !is_dynamic_reader_unset(name) &&
       BASH_IMPLICIT_INTEGER_NAMES.contains(name))
   {
     return true;

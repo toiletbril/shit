@@ -420,8 +420,9 @@ fn EvalContext::push_substitution_source_frame(const SourceLocation &location,
   m_source_frames.push(source_frame{
       String{heap_allocator(), origin},
       location, current_source(),
-      String{heap_allocator()},
-      false, false
+      source_generation_for(current_source()), String{heap_allocator()},
+      false,
+      false
   });
   return true;
 }

@@ -289,8 +289,9 @@ def main():
         the_first_candidate_is_visible = b"menu-1" in bounded
 
         wide_menu, _, _ = run_menu(directory, "wide", wide_typed, [])
+        escaped_prefix = long_candidate_prefix.replace(" ", "\\ ").encode()
         long_candidate_uses_available_width = (
-            long_candidate_prefix.encode() + b"Fusion" in wide_menu
+            escaped_prefix + b"Fusion" in wide_menu
         )
 
         _, expanded, _ = run_menu(

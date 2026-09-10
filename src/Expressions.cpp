@@ -576,7 +576,9 @@ hot flatten fn Expression::evaluate_root_status(
 fn Expression::evaluate_root_impl(EvalContext &cxt,
                                   root_evaluation_mode mode) const throws -> i64
 {
+  ASSERT(mode == root_evaluation_mode::Normal);
   unused(mode);
+
   return evaluate_impl(cxt);
 }
 
@@ -590,7 +592,9 @@ fn Expression::evaluate_root_status_impl(EvalContext &cxt,
                                          root_evaluation_mode mode) const throws
     -> status_result
 {
+  ASSERT(mode == root_evaluation_mode::Normal);
   unused(mode);
+
   return evaluate_status_impl(cxt);
 }
 

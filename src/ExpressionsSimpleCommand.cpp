@@ -361,6 +361,50 @@ SimpleCommand::SimpleCommand(SourceLocation location,
 
 SimpleCommand::~SimpleCommand() = default;
 
+fn SimpleCommand::set_full_source_end_position(usize position) wontthrow -> void
+{
+  m_full_source_end_position = static_cast<u32>(position);
+}
+
+pure fn SimpleCommand::full_source_start_position() const wontthrow -> usize
+{
+  let start_position = usize{m_location.position};
+  for (let const &var : m_local_vars) {
+    let const assignment_position = var.get_location().position;
+    if (assignment_position < start_position)
+      start_position = assignment_position;
+  }
+
+  return start_position;
+}
+
+pure fn SimpleCommand::assignments_source_end_position() const wontthrow
+    -> usize
+{
+  let end_position = source_end_position();
+  for (let const &var : m_local_vars) {
+    let const location = var.get_location();
+    let const var_end_position = usize{location.position} + location.length;
+    if (var_end_position > end_position) end_position = var_end_position;
+  }
+
+  for (let const &assignment : m_array_args) {
+    let const assignment_end_position = usize{assignment.end_position};
+    if (assignment_end_position > end_position)
+      end_position = assignment_end_position;
+  }
+
+  return end_position;
+}
+
+pure fn SimpleCommand::full_source_end_position() const wontthrow -> usize
+{
+  let const words_end_position = source_end_position();
+  return m_full_source_end_position > words_end_position
+             ? m_full_source_end_position
+             : words_end_position;
+}
+
 fn SimpleCommand::can_evaluate_in_process_substitution(
     const EvalContext &cxt, HashSet &active_functions) const throws -> bool
 {
@@ -1539,22 +1583,28 @@ fn internal::publish_simple_command(EvalContext &cxt,
       cxt,
       [&] throws {
         let location = command.source_location();
-        for (let const &var : command.local_vars()) {
-          let const assignment_position = var.get_location().position;
-          if (assignment_position >= location.position) continue;
-
-          location.length += location.position - assignment_position;
-          location.position = assignment_position;
+        let const start_position =
+            static_cast<u32>(command.full_source_start_position());
+        if (start_position < location.position) {
+          location.length += location.position - start_position;
+          location.position = start_position;
         }
 
         let text = source_command_text(
-            cxt, location, command.source_end_position(),
+            cxt, location, command.assignments_source_end_position(),
             [&] { return utils::merge_tokens_to_string(command.args()); });
         append_redirections_text(cxt, text, command.redirections());
         return text;
       },
       mode);
 }
+
+struct stage_fd_allocation_restore
+{
+  fd_allocation_target target;
+  String previous_value;
+  bool was_set;
+};
 
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                                         EvalContext &cxt) const throws -> void
@@ -1576,11 +1626,56 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
     }
   };
 
+  ArrayList<stage_fd_allocation_restore> allocation_restores{heap_allocator()};
+  defer
+  {
+    for (usize i = allocation_restores.count(); i > 0; i--) {
+      let const &restore = allocation_restores[i - 1];
+      try {
+        if (restore.was_set) {
+          if (restore.target.has_subscript) {
+            cxt.assign_array_element(restore.target.name,
+                                     restore.target.subscript,
+                                     restore.previous_value.view(),
+                                     /*is_append=*/false);
+          } else {
+            cxt.set_shell_variable(restore.target.name,
+                                   restore.previous_value.view());
+          }
+        } else if (restore.target.has_subscript) {
+          cxt.unset_array_element(restore.target.name,
+                                  restore.target.subscript);
+        } else {
+          cxt.unset_shell_variable(restore.target.name);
+        }
+      } catch (...) {}
+    }
+  };
+
   for (let const &redir : m_redirections) {
     let const r = resolve_redirection(redir, cxt, source_location());
+
+    if (redir.fd_allocation_name_token != nullptr) {
+      let const &allocation_word =
+          static_cast<const tokens::WordToken *>(redir.fd_allocation_name_token)
+              ->word();
+      let const allocation_target = allocation_word.get_fd_allocation_target();
+      ASSERT(allocation_target.has_value());
+
+      let previous = read_fd_allocation_value(cxt, *allocation_target);
+      let record = stage_fd_allocation_restore{
+          *allocation_target,
+          previous.has_value() ? steal(*previous) : String{heap_allocator()},
+          previous.has_value()};
+      allocation_restores.push(steal(record));
+    }
+
+    let const target_fd =
+        allocate_redirection_descriptor(redir, r, cxt, source_location());
+
     switch (r.kind) {
     case redirection_outcome::Heredoc:
-      assign_redirected_fd(ec, nonstandard, r.target_fd, r.opened_fd);
+      assign_redirected_fd(ec, nonstandard, target_fd, r.opened_fd);
       break;
     case redirection_outcome::BothStreams:
       assign_redirected_fd(ec, nonstandard, 1, r.opened_fd);
@@ -1593,7 +1688,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
          the other slot and stays open while this file takes its place. An empty
          slot means the dup read the stream the stage inherits. The ordering
          mark carries that stream to the routing. */
-      if (r.target_fd == 1 && ec.should_duplicate_error_to_output) {
+      if (target_fd == 1 && ec.should_duplicate_error_to_output) {
         if (ec.out_fd) {
           if (ec.err_fd) os::close_fd(*ec.err_fd);
 
@@ -1604,7 +1699,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
           ec.did_output_file_follow_error_dup = true;
         }
       }
-      if (r.target_fd == 2 && ec.should_duplicate_output_to_error) {
+      if (target_fd == 2 && ec.should_duplicate_output_to_error) {
         if (ec.err_fd) {
           if (ec.out_fd) os::close_fd(*ec.out_fd);
 
@@ -1616,32 +1711,32 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
         }
       }
 
-      assign_redirected_fd(ec, nonstandard, r.target_fd, r.opened_fd);
+      assign_redirected_fd(ec, nonstandard, target_fd, r.opened_fd);
       break;
     case redirection_outcome::Duplicate:
-      if (r.dup_from_fd == r.target_fd) break;
+      if (r.dup_from_fd == target_fd) break;
 
-      if (r.target_fd == 2 && r.dup_from_fd == 1) {
+      if (target_fd == 2 && r.dup_from_fd == 1) {
         ec.should_duplicate_error_to_output = true;
         ec.was_output_to_error_last = false;
         ec.did_output_file_follow_error_dup = false;
-      } else if (r.target_fd == 1 && r.dup_from_fd == 2) {
+      } else if (target_fd == 1 && r.dup_from_fd == 2) {
         ec.should_duplicate_output_to_error = true;
         ec.was_output_to_error_last = true;
         ec.did_error_file_follow_output_dup = false;
-      } else if (r.target_fd > 2) {
+      } else if (target_fd > 2) {
         /* A close leaves no source, and a duplication names the descriptor the
            stage carries once the three standard slots are placed. */
         let const dup_from_fd =
             r.dup_from_fd == Redirection::DUP_FD_CLOSE ? -1 : r.dup_from_fd;
         bind_nonstandard_fd(
             nonstandard,
-            nonstandard_descriptor{KOSH_INVALID_FD, r.target_fd, dup_from_fd});
+            nonstandard_descriptor{KOSH_INVALID_FD, target_fd, dup_from_fd});
       } else if (r.dup_from_fd == Redirection::DUP_FD_CLOSE) {
         /* One of the three standard descriptors closes after the routing places
            it. The close joins the list that runs last. */
-        bind_nonstandard_fd(nonstandard, nonstandard_descriptor{
-                                             KOSH_INVALID_FD, r.target_fd, -1});
+        bind_nonstandard_fd(nonstandard, nonstandard_descriptor{KOSH_INVALID_FD,
+                                                                target_fd, -1});
       } else {
         /* The source is a descriptor the shell holds and the stage never
            carries. The slot receives an independent copy of the same open file.
@@ -1656,7 +1751,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                             ": Bad file descriptor"};
         }
 
-        assign_redirected_fd(ec, nonstandard, r.target_fd, copied);
+        assign_redirected_fd(ec, nonstandard, target_fd, copied);
       }
       break;
     }

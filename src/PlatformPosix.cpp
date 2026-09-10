@@ -93,6 +93,8 @@ static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
    its blocked state back. */
 static sigset_t SIGNALS_UNBLOCKED_BY_TRAP = {};
 
+static sigset_t SIGNALS_WITH_TRAP_ACTION = {};
+
 } /* namespace os */
 } /* namespace koshka */
 
@@ -1344,6 +1346,18 @@ fn reset_signal_handlers() throws -> void
   install_child_state_handler();
   check_syscall(sigaction(SIGINT, &sa, nullptr));
 
+  for (i32 signal_number = 1; signal_number < SIGNAL_FLAG_COUNT;
+       signal_number++)
+  {
+    if (sigismember(&SIGNALS_WITH_TRAP_ACTION, signal_number) != 1) continue;
+
+    LOG(Debug, "restoring the default action for trapped signal %d",
+        signal_number);
+    (void) sigaction(signal_number, &sa, nullptr);
+  }
+
+  sigemptyset(&SIGNALS_WITH_TRAP_ACTION);
+
   /* The shell ignores SIGPIPE, the child restores the default so a producer
      dies on a broken pipe. */
   check_syscall(sigaction(SIGPIPE, &sa, nullptr));
@@ -1436,6 +1450,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
     check_syscall(sigemptyset(&sa.sa_mask));
     sa.sa_handler = handle_trapped_signal;
     check_syscall(sigaction(signal_number, &sa, nullptr));
+    sigaddset(&SIGNALS_WITH_TRAP_ACTION, signal_number);
   }
 
   unblock_signal_for_trap(signal_number);
@@ -1454,6 +1469,7 @@ fn set_trap_ignore(i32 signal_number) throws -> void
   check_syscall(sigemptyset(&sa.sa_mask));
   sa.sa_handler = SIG_IGN;
   check_syscall(sigaction(signal_number, &sa, nullptr));
+  sigdelset(&SIGNALS_WITH_TRAP_ACTION, signal_number);
 }
 
 fn clear_trap_handler(i32 signal_number) throws -> void
@@ -1476,6 +1492,7 @@ fn clear_trap_handler(i32 signal_number) throws -> void
   else
     sa.sa_handler = SIG_DFL;
   check_syscall(sigaction(signal_number, &sa, nullptr));
+  sigdelset(&SIGNALS_WITH_TRAP_ACTION, signal_number);
 }
 
 /* The field 0 name of the first colon line whose field at id_field_index equals

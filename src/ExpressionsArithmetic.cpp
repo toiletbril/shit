@@ -1110,12 +1110,24 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A redirected wrapper hands down the span that reaches over its
      redirections, and the bare subshell answers for its own. */
   let const pending_end_position = cxt.take_pending_subshell_end_position();
+  let const should_elide_fork = cxt.take_pending_subshell_fork_elision();
   let const end_position = pending_end_position != 0
                                ? static_cast<usize>(pending_end_position)
                                : source_end_position();
 
   let const closing_location = error_report_location();
   let const *body = collapsed_body();
+
+  let const *redirected_body = body->as_redirected_command();
+  let const should_elide_body_fork =
+      redirected_body != nullptr && redirected_body->child() != nullptr &&
+      redirected_body->child()->as_subshell() != nullptr;
+
+  let const do_run_body = [&]() throws -> i64 {
+    if (should_elide_body_fork) cxt.set_pending_subshell_fork_elision();
+
+    return evaluate_subshell_in_process(body, cxt);
+  };
 
   /* Bash traces the commands inside a subshell and fires nothing for the
      subshell itself. The text is published with no DEBUG fire. The parent
@@ -1132,11 +1144,13 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   };
 
   koshka::flush();
-  let const forked_child = os::try_fork_compound_stage(None, None, None);
+  let const forked_child = should_elide_fork
+                               ? Maybe<os::process>{None}
+                               : os::try_fork_compound_stage(None, None, None);
   if (!forked_child.has_value()) {
     i32 status = 1;
     try {
-      status = static_cast<i32>(evaluate_subshell_in_process(body, cxt));
+      status = static_cast<i32>(do_run_body());
     } catch (const ErrorBase &error) {
       let const source = cxt.current_source();
       show_message(error.to_string(
@@ -1154,7 +1168,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (os::process_id_of(child) == 0) {
     i32 status = 1;
     try {
-      status = static_cast<i32>(evaluate_subshell_in_process(body, cxt));
+      status = static_cast<i32>(do_run_body());
     } catch (const ErrorBase &error) {
       let const source = cxt.current_source();
       show_message(error.to_string(
@@ -1538,6 +1552,8 @@ fn RedirectedCommand::evaluate_status_impl(EvalContext &cxt) const throws
   LOG(Debug, "applying %zu redirections around the compound command",
       m_redirections.count());
 
+  let const should_elide_child_fork = cxt.take_pending_subshell_fork_elision();
+
   cxt.set_current_location(source_location());
 
   /* The mark is taken before the expansion below so this command reaps only the
@@ -1622,6 +1638,7 @@ fn RedirectedCommand::evaluate_status_impl(EvalContext &cxt) const throws
   if (m_child->as_subshell() != nullptr) {
     cxt.set_pending_subshell_end_position(
         static_cast<u32>(source_end_position()));
+    if (should_elide_child_fork) cxt.set_pending_subshell_fork_elision();
   }
 
   try {

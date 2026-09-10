@@ -44,7 +44,13 @@ fn Unset::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const &name = names[i];
     if (should_unset_function) {
       LOG(All, "unset removing function '%s'", name.c_str());
-      cxt.unset_function(name);
+      try {
+        cxt.unset_function(name);
+      } catch (const Error &error) {
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                  error.message().view());
+        has_error = true;
+      }
     } else if (let const bracket = name.view().find_character('[');
                bracket.has_value() && name.view()[name.count() - 1] == ']')
     {
@@ -70,12 +76,19 @@ fn Unset::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     {
       LOG(All, "unset removing function '%s' since no variable is set",
           name.c_str());
-      cxt.unset_function(name);
+      try {
+        cxt.unset_function(name);
+      } catch (const Error &error) {
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                  error.message().view());
+        has_error = true;
+      }
     } else {
       /* A read-only name throws, the rest are still unset, matching dash. */
       LOG(All, "unset removing variable '%s'", name.c_str());
       try {
         cxt.unset_shell_variable(name);
+        cxt.unset_dynamic_reader(name.view());
       } catch (const Error &error) {
         LOG(All, "unset swallowed a read-only variable error: %s",
             error.message().c_str());

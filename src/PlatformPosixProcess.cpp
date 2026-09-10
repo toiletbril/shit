@@ -805,9 +805,9 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
        newline, every other signal prints the located process message. */
     if (sig == SIGPIPE) {
     } else if (sig != SIGINT) {
-      koshka::print("[Process " + String::from(changed_pid, heap_allocator()) +
-                    ": " + sig_desc + ", signal " +
-                    String::from(sig, heap_allocator()) + "]\n");
+      koshka::print_error(
+          "[Process " + String::from(changed_pid, heap_allocator()) + ": " +
+          sig_desc + ", signal " + String::from(sig, heap_allocator()) + "]\n");
     } else {
       koshka::print("\n");
     }

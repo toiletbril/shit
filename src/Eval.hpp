@@ -119,6 +119,14 @@ enum class bash_special_array_id : u8
   Count,
 };
 
+/* The dynamic names an unset can take the reader away from. */
+enum class dynamic_reader_id : u8
+{
+  Seconds,
+  Random,
+  Count,
+};
+
 inline constexpr StringView BASH_ALIASES_VARIABLE{"BASH_ALIASES"};
 inline constexpr StringView BASH_ARGUMENT_COUNT_VARIABLE{"BASH_ARGC"};
 inline constexpr StringView BASH_ARGUMENT_VALUE_VARIABLE{"BASH_ARGV"};
@@ -126,6 +134,11 @@ inline constexpr StringView DIRSTACK_VARIABLE{"DIRSTACK"};
 
 constexpr pure fn bash_special_array_mask(bash_special_array_id id) wontthrow
     -> u8
+{
+  return static_cast<u8>(1U << static_cast<u8>(id));
+}
+
+constexpr pure fn dynamic_reader_mask(dynamic_reader_id id) wontthrow -> u8
 {
   return static_cast<u8>(1U << static_cast<u8>(id));
 }
@@ -405,6 +418,8 @@ public:
   fn disable_ignoreeof() throws -> void;
   fn restore_temporary_shell_variable(
       StringView name, const Maybe<String> &previous_value) throws -> void;
+  fn begin_confined_variable_writes() wontthrow -> usize;
+  fn rollback_confined_variable_writes(usize mark) throws -> void;
   fn get_program_resolver() wontthrow -> ProgramResolver &
   {
     return m_program_resolver;
@@ -556,6 +571,14 @@ public:
   fn append_dynamic_variable_names(ArrayList<StringView> &out) const throws
       -> void;
 
+  /* Answer whether an unset has already taken the reader of the name away. */
+  pure fn is_dynamic_reader_unset(StringView name) const wontthrow -> bool;
+
+  /* Take the reader of the name away for the rest of the shell. The name keeps
+     whatever ordinary storage a later assignment gives it, and the value stays
+     frozen. A subshell inherits the loss. */
+  fn unset_dynamic_reader(StringView name) wontthrow -> void;
+
   /* The closest name the shell currently holds, or None when nothing is close
      enough. The walk covers every name the shell knows and runs only on the
      unset diagnostic path. */
@@ -705,6 +728,9 @@ public:
   pure fn has_aliases() const wontthrow -> bool;
   fn unset_function(StringView name) throws -> void;
   fn clear_functions() wontthrow -> void;
+  fn mark_function_readonly(StringView name) throws -> void;
+  pure fn is_function_readonly(StringView name) const wontthrow -> bool;
+  mustuse fn sorted_readonly_function_names() const throws -> ArrayList<String>;
 
   fn function_names() const throws -> HashSet;
   template <typename Callback>
@@ -762,6 +788,8 @@ public:
   fn run_named_trap(StringView condition,
                     const SourceLocation *trigger_location = nullptr) throws
       -> void;
+  fn cached_trap_body(StringView condition, StringView action) throws
+      -> FunctionBodyHandle;
   /* Run the RETURN action against the status the leaving frame left behind. The
      caller owns the condition that decides whether the trap runs at all. */
   fn run_return_trap(i32 status_before_return) throws -> void;
@@ -984,6 +1012,20 @@ public:
                                       StringView source_path) throws -> void;
   fn leave_bash_argument_frame(
       BashArgumentFrameContext &frame_context) wontthrow -> void;
+  struct MergedFrame
+  {
+    enum class Kind : u8
+    {
+      Function,
+      Source,
+      Main,
+    };
+
+    Kind kind{Kind::Main};
+    usize storage_index{0};
+  };
+  mustuse fn merged_frame_at(usize index) const wontthrow -> MergedFrame;
+  mustuse fn script_source_frame_index() const wontthrow -> Maybe<usize>;
   /* The FUNCNAME frame list bash exposes, the function calls innermost first,
      one "source" per sourced file, and "main" at the bottom of a script run. */
   mustuse fn funcname_frame_count() const wontthrow -> usize;
@@ -1031,6 +1073,10 @@ public:
                             SourceLocation call_site,
                             bool is_only_root_source) throws -> void;
   fn pop_root_source_frame() wontthrow -> void;
+  pure fn retained_source_generation() const wontthrow -> u64;
+  pure fn source_generation_for(const String *source) const wontthrow -> u64;
+  pure fn borrowed_frame_source(const source_frame &frame) const wontthrow
+      -> const String *;
   fn declare_local(StringView name, bool should_inherit_value) throws -> void;
   mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;
   /* Answer whether any active frame binds the name, the reach a dynamic name
@@ -1702,6 +1748,18 @@ public:
     return end_position;
   }
 
+  fn set_pending_subshell_fork_elision() wontthrow -> void
+  {
+    m_should_elide_pending_subshell_fork = true;
+  }
+  fn take_pending_subshell_fork_elision() wontthrow -> bool
+  {
+    let const should_elide = m_should_elide_pending_subshell_fork;
+    m_should_elide_pending_subshell_fork = false;
+
+    return should_elide;
+  }
+
   pure fn terminal_exec_allowed() const wontthrow -> bool;
 
   fn sorted_variable_assignments() const throws -> ArrayList<String>;
@@ -1817,7 +1875,8 @@ public:
                 Maybe<SourceLocation> call_site = None,
                 Maybe<StringView> filename = None,
                 bool should_record_history = false,
-                Maybe<i32> *status_before_return = nullptr) throws -> i32;
+                Maybe<i32> *status_before_return = nullptr,
+                const FunctionBodyHandle *cached_body = nullptr) throws -> i32;
   fn resolve_source_path(StringView path,
                          bool should_expand_tilde = false) throws
       -> Maybe<Path>;
@@ -2022,6 +2081,7 @@ protected:
   ArrayList<String> m_directory_stack{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
   StringMap<FunctionBodyHandle> m_functions{heap_allocator()};
+  HashSet m_readonly_functions{heap_allocator()};
   usize m_subshell_depth{0};
   /* The shell descriptors the live coprocess is reached through, -1 when no
      coprocess runs. Only one coprocess is live at a time, the way bash counts
@@ -2040,6 +2100,8 @@ protected:
      only while m_subshell_depth is above zero, so a top-level export pays
      nothing. */
   ArrayList<environment_undo_entry> m_environment_undo_log{heap_allocator()};
+  ArrayList<environment_undo_entry> m_confined_write_log{heap_allocator()};
+  usize m_confined_write_depth{0};
   /* The names currently in the process environment, kept in step with every
      environment write. An assignment tests membership in O(1). A key is the
      ASCII lowercase form of the name where the environment ignores case. */
@@ -2096,6 +2158,7 @@ protected:
      nested run_source that grows the list never moves an earlier buffer and
      leaves m_current_source or a control_flow::source dangling. */
   ArrayList<String *> m_retained_sources{heap_allocator()};
+  u64 m_retained_source_generation{0};
 
   /* The mood and the diagnostic and strictness toggles, grouped as one runtime
      state so a scope that swaps them saves and restores the whole set with one
@@ -2105,6 +2168,8 @@ protected:
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   u8 m_disabled_bash_special_arrays{0};
+  /* One bit per dynamic_reader_id whose reader an unset has taken away. */
+  u8 m_unset_dynamic_readers{0};
   bool m_was_mood_set_explicitly{false};
   u64 m_mood_mutation_revision{0};
   u64 m_warning_mutation_revision{0};
@@ -2125,6 +2190,7 @@ protected:
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
   StringMap<String> m_traps{heap_allocator()};
+  StringMap<FunctionBodyHandle> m_trap_bodies{heap_allocator()};
   bool m_has_debug_trap{false};
   bool m_has_err_trap{false};
   /* The deepest frame the DEBUG action still reaches without functrace. An
@@ -2161,6 +2227,7 @@ protected:
   /* The end of the source span a redirected wrapper holds for the subshell it
      evaluates next. Zero when no wrapper is waiting. */
   u32 m_pending_subshell_end_position{0};
+  bool m_should_elide_pending_subshell_fork{false};
   bool m_terminal_exec_allowed{false};
   bool m_is_completion_function_running{false};
   bool m_is_prompt_command_running{false};
@@ -2186,9 +2253,6 @@ protected:
   ArrayList<SourceLocation> m_function_call_locations{heap_allocator()};
   ArrayList<const String *> m_function_call_sources{heap_allocator()};
   bool m_is_script_run{false};
-  /* The count of source frames that carry a file path, for the FUNCNAME
-     classification. */
-  usize m_sourced_file_frames{0};
 
   ArrayList<job> m_jobs{heap_allocator()};
   ArrayList<os::process> m_detached_job_processes{heap_allocator()};

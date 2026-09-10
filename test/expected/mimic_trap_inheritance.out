@@ -1,0 +1,87 @@
+== an sh shebang rejects the three bash conditions:
+TMPDIR/sh-script:2:20: error: Builtin `trap`: ERR: invalid signal specification.
+     2 |  trap "echo action" ERR
+       |                     ^~~
+note: List the signal names with `trap -l`.
+err-rc=1
+TMPDIR/sh-script:4:20: error: Builtin `trap`: RETURN: invalid signal specification.
+     4 |  trap "echo action" RETURN
+       |                     ^~~~~~
+note: List the signal names with `trap -l`.
+return-rc=1
+TMPDIR/sh-script:6:20: error: Builtin `trap`: DEBUG: invalid signal specification.
+     6 |  trap "echo action" DEBUG
+       |                     ^~~~~
+note: List the signal names with `trap -l`.
+debug-rc=1
+body
+rc=0
+== a bash shebang accepts all three:
+err-rc=0
+return-rc=0
+action
+debug-rc=0
+action
+body
+rc=0
+== the shebang is unread without mimicry:
+TMPDIR/sh-script:2:20: error: The `ERR` condition is a bash extension absent from POSIX sh. (SC3047)
+     2 |  trap "echo action" ERR
+       |                     ^~~
+note: Check the status after each command under a `sh` shebang.
+rc=1
+== an explicit bash mood wins over an sh shebang:
+err-rc=0
+return-rc=0
+action
+debug-rc=0
+action
+body
+rc=0
+== an explicit sh mood wins over a bash shebang:
+TMPDIR/bash-script:2:20: error: Builtin `trap`: ERR: invalid signal specification.
+     2 |  trap "echo action" ERR
+       |                     ^~~
+note: List the signal names with `trap -l`.
+err-rc=1
+TMPDIR/bash-script:4:20: error: Builtin `trap`: RETURN: invalid signal specification.
+     4 |  trap "echo action" RETURN
+       |                     ^~~~~~
+note: List the signal names with `trap -l`.
+return-rc=1
+TMPDIR/bash-script:6:20: error: Builtin `trap`: DEBUG: invalid signal specification.
+     6 |  trap "echo action" DEBUG
+       |                     ^~~~~
+note: List the signal names with `trap -l`.
+debug-rc=1
+TMPDIR/bash-script:8:8: error: Builtin `trap`: DEBUG: invalid signal specification.
+     8 |  trap - DEBUG
+       |         ^~~~~
+note: List the signal names with `trap -l`.
+body
+rc=0
+== a mimicked script run as a command reads the same shebang:
+TMPDIR/sh-script:2:20: error: Builtin `trap`: ERR: invalid signal specification.
+     2 |  trap "echo action" ERR
+       |                     ^~~
+note: List the signal names with `trap -l`.
+err-rc=1
+TMPDIR/sh-script:4:20: error: Builtin `trap`: RETURN: invalid signal specification.
+     4 |  trap "echo action" RETURN
+       |                     ^~~~~~
+note: List the signal names with `trap -l`.
+return-rc=1
+TMPDIR/sh-script:6:20: error: Builtin `trap`: DEBUG: invalid signal specification.
+     6 |  trap "echo action" DEBUG
+       |                     ^~~~~
+note: List the signal names with `trap -l`.
+debug-rc=1
+body
+rc=0
+== the EXIT trap reaches every mood:
+sh-body
+sh-exit
+rc=0
+bash-body
+bash-exit
+rc=0

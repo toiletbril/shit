@@ -538,12 +538,9 @@ static fn build_filesystem_candidate(
   }
 
   if (preserve_directory_spelling) {
-    if (!inside_quote && path_candidate_needs_quoting(entry_name.view())) {
-      if (decoded_word.is_leading_variable_active)
-        entry_name = escape_path_candidate(entry_name.view());
-      else
-        entry_name = quote_path_candidate(entry_name.view());
-    }
+    if (!inside_quote && path_candidate_needs_quoting(entry_name.view()))
+      entry_name = escape_path_candidate(entry_name.view());
+
     return String{completion_allocator(), raw_directory_part} + entry_name;
   }
 
@@ -557,12 +554,12 @@ static fn build_filesystem_candidate(
   } else if (decoded_word.is_leading_tilde_active && !inside_quote) {
     candidate = String{completion_allocator(), raw_directory_part};
     if (path_candidate_needs_quoting(entry_name.view()))
-      entry_name = quote_path_candidate(entry_name.view());
+      entry_name = escape_path_candidate(entry_name.view());
     candidate += entry_name;
   } else {
     candidate += entry_name;
     if (!inside_quote && path_candidate_needs_quoting(candidate.view())) {
-      candidate = quote_path_candidate(candidate.view());
+      candidate = escape_path_candidate(candidate.view());
     }
   }
 
@@ -945,7 +942,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
   let token_end = bounds.end;
   let replacement_token_end = bounds.end;
   let token = line.substring_of_length(token_start, token_end - token_start);
-  let const is_command = is_in_command_position(line, token_start);
+  let is_command = is_in_command_position(line, token_start);
 
   let const token_prefix =
       line.substring_of_length(token_start, cursor - token_start);
@@ -968,14 +965,16 @@ fn complete(StringView line, usize cursor, EvalContext &context,
     token = token_prefix;
   }
 
-  /* An option-value word such as --exit-node=host completes only the value
-     after the equals sign, the way bash splits on the equals through
-     COMP_WORDBREAKS. A command-position word is left whole, since an assignment
-     such as name=value is its own token there. */
-  if (!is_command && token.length >= 2 && token[0] == '-') {
+  /* An option-value word such as --exit-node=host and an assignment word such
+     as name=value complete only the value after the equals sign, the way bash
+     splits on the equals through COMP_WORDBREAKS. */
+  let const is_option_value_word =
+      !is_command && token.length >= 2 && token[0] == '-';
+  if (is_option_value_word || lexer::word_looks_like_assignment(token)) {
     if (let const equals = token.find_character('='); equals.has_value()) {
       token_start = token_start + *equals + 1;
       token = line.substring_of_length(token_start, token_end - token_start);
+      is_command = false;
     }
   }
 

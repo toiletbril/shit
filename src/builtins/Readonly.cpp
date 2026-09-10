@@ -13,7 +13,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[name[=value] ...]");
+HELP_SYNOPSIS_DECL("[-aAf] [-p] [name[=value] ...]");
 
 HELP_DESCRIPTION_DECL(
     "The readonly builtin marks each named variable read-only.");
@@ -21,6 +21,10 @@ HELP_DESCRIPTION_DECL(
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(READONLY_PRINT, Bool, 'p', "",
      "List the read-only variables in a reusable form.");
+FLAG(READONLY_INDEXED, Bool, 'a', "", "Treat each name as an indexed array.");
+FLAG(READONLY_ASSOCIATIVE, Bool, 'A', "",
+     "Treat each name as an associative array.");
+FLAG(READONLY_FUNCTION, Bool, 'f', "", "Treat each name as a function.");
 
 REGISTER_BUILTIN_FLAGS(Readonly);
 
@@ -41,6 +45,43 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   ASSERT(!args.is_empty());
+
+  if (FLAG_READONLY_FUNCTION.is_enabled()) {
+    if (args.count() == 1) {
+      let out = String{cxt.scratch_allocator()};
+      for (let const &name : cxt.sorted_readonly_function_names()) {
+        if (const String *source = cxt.find_function_source(name.view());
+            source != nullptr && !source->is_empty())
+        {
+          out.append(source->view());
+          out += "\n";
+        }
+
+        out += "declare -fr ";
+        out.append(name.view());
+        out += "\n";
+      }
+      ec.print_to_stdout(out);
+      return 0;
+    }
+
+    let has_function_error = false;
+    for (usize i = 1; i < args.count(); i++) {
+      let const name = args[i].view();
+      if (cxt.find_function(name) == nullptr) {
+        let const loc = i < operand_locations.count() ? operand_locations[i]
+                                                      : ec.source_location();
+        report_soft_builtin_error(
+            ec, cxt, loc, StringView{"'"} + name + "' is not a function");
+        has_function_error = true;
+        continue;
+      }
+
+      cxt.mark_function_readonly(name);
+    }
+
+    return has_function_error ? 1 : 0;
+  }
 
   /* A bare readonly lists every read-only variable, in the declare -r form
      under the bash mood and the POSIX readonly form otherwise. */

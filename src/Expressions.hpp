@@ -834,6 +834,7 @@ struct array_builtin_assignment
   String name;
   ArrayList<const Token *> elements;
   SourceLocation location;
+  u32 end_position;
   bool is_append;
 };
 
@@ -1033,6 +1034,12 @@ public:
   fn set_array_args(ArrayList<array_builtin_assignment> &&array_args) throws
       -> void;
 
+  fn set_full_source_end_position(usize position) wontthrow -> void;
+
+  pure fn full_source_start_position() const wontthrow -> usize;
+  pure fn full_source_end_position() const wontthrow -> usize;
+  pure fn assignments_source_end_position() const wontthrow -> usize;
+
   fn redirect_exec_context(ExecContext &ec, EvalContext &cxt) const throws
       -> void;
 
@@ -1071,6 +1078,8 @@ protected:
   ArrayList<const Token *> m_args{heap_allocator()};
 
   mutable Maybe<bool> m_command_word_is_glob{};
+
+  u32 m_full_source_end_position{0};
 
   SparseList<Redirection> m_redirections{};
   SparseList<array_builtin_assignment> m_array_args{};

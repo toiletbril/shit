@@ -1,0 +1,22 @@
+== the action fires again after a return jump:
+fired
+after_first=4 count=1
+fired
+after_second=4 count=2
+after_removal=2
+rc=0
+== the listing still holds the action after a return jump:
+1:1: error: Builtin `return`: can only `return' from a function or sourced script.
+     1 |  return 4
+       |  ^~~~~~~~
+trap -- 'return 4' SIGCHLD
+rc=0
+== a child reaped outside a function still fires the action:
+1:31: error: Builtin `return`: can only `return' from a function or sourced script.
+     1 |  chld_count=$((chld_count+1)); return 4
+       |                                ^~~~~~~~
+1:31: error: Builtin `return`: can only `return' from a function or sourced script.
+     1 |  chld_count=$((chld_count+1)); return 4
+       |                                ^~~~~~~~
+top_level_count=2
+rc=0

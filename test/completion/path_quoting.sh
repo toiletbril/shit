@@ -1,7 +1,7 @@
-# A filesystem completion whose match carries a special byte is wrapped in
-# single quotes rather than backslash-escaped, while a plain name stays bare. A
-# hermetic temp directory keeps the candidates stable across machines. The typed
-# prefix is one token, the special byte lives in the matched entry.
+# A filesystem completion whose match carries a special byte is backslash
+# escaped, while a plain name stays bare. A hermetic temp directory keeps the
+# candidates stable across machines. The typed prefix is one token, the special
+# byte lives in the matched entry.
 dir=$(mktemp -d)
 trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 : > "$dir/spacey file.txt"
@@ -30,11 +30,11 @@ chmod +x "$dir/PATH/tool"
 cd "$dir"
 HOME="$dir/home"
 export HOME
-echo "== a space in the match quotes it:"
+echo "== a space in the match escapes it:"
 "$BIN" --debug-complete-at 'cat spacey' </dev/null
 echo "== a plain match stays unquoted:"
 "$BIN" --debug-complete-at 'cat plain' </dev/null
-echo "== a dollar in the match quotes it:"
+echo "== a dollar in the match escapes it:"
 "$BIN" --debug-complete-at 'cat dollar' </dev/null
 echo "== inside a single quote the space match completes bare within it:"
 "$BIN" --debug-complete-at "cat 'spacey" </dev/null
@@ -83,7 +83,7 @@ echo "== an active tilde directory expands:"
 echo "== tilde user completion ignores malformed passwd records:"
 KOSH_TEST_PASSWD="$dir/passwd" \
     "$BIN" --debug-complete-at 'cat ~fixture-' </dev/null
-echo "== an active tilde stays outside a quoted match:"
+echo "== an active tilde stays outside an escaped match:"
 "$BIN" --debug-complete-at 'cat ~/sp' </dev/null
 echo "== an active variable uses escapes for a matched space:"
 "$BIN" --debug-complete-at 'cat $HOME/sp' </dev/null

@@ -173,6 +173,13 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
     m_program_resolver.assign_path(String{value});
   if (name == "IGNOREEOF")
     m_runtime.set_option(shell_option_id::Ignoreeof, true);
+  if (m_confined_write_depth > 0) [[unlikely]] {
+    let const *previous = lookup_shell_variable(name);
+    let saved = Maybe<String>{};
+    if (previous != nullptr) saved = String{previous->view()};
+    m_confined_write_log.push(
+        environment_undo_entry{String{name}, steal(saved)});
+  }
   m_shell_variables.set(name, value);
   if (is_exported(name)) {
     if (m_subshell_depth > 0)
@@ -189,6 +196,42 @@ fn EvalContext::restore_temporary_shell_variable(
     m_shell_variables.set(name, previous_value->view());
   else
     m_shell_variables.erase(name);
+}
+
+fn EvalContext::begin_confined_variable_writes() wontthrow -> usize
+{
+  LOG(Debug, "confining variable writes above mark %zu",
+      m_confined_write_log.count());
+  m_confined_write_depth++;
+  return m_confined_write_log.count();
+}
+
+fn EvalContext::rollback_confined_variable_writes(usize mark) throws -> void
+{
+  ASSERT(m_confined_write_depth > 0);
+  m_confined_write_depth--;
+  LOG(Debug, "rewinding %zu confined variable writes",
+      m_confined_write_log.count() - mark);
+
+  while (m_confined_write_log.count() > mark) {
+    let const &entry = m_confined_write_log.back();
+    let const name = entry.name.view();
+    restore_temporary_shell_variable(name, entry.previous_value);
+    let const restored = entry.previous_value.has_value()
+                             ? entry.previous_value->view()
+                             : StringView{};
+
+    if (name == "IFS") set_field_separators(restored);
+    if (utils::environment_name_is_path(name))
+      m_program_resolver.assign_path(String{restored});
+    if (is_exported(name)) {
+      if (entry.previous_value.has_value())
+        os::set_environment_variable(name, restored);
+      else
+        os::unset_environment_variable(name);
+    }
+    m_confined_write_log.pop_back();
+  }
 }
 
 fn EvalContext::set_field_separators(StringView value) throws -> void
@@ -1113,19 +1156,96 @@ fn EvalContext::pop_function_call_name() wontthrow -> void
   }
 }
 
+pure fn EvalContext::script_source_frame_index() const wontthrow -> Maybe<usize>
+{
+  if (!m_is_script_run) return None;
+
+  for (usize i = 0; i < m_source_frames.count(); i++) {
+    let const &path = m_source_frames[i].source_path;
+    if (path.is_empty()) continue;
+
+    if (path.view() == m_shell_name.view()) return i;
+
+    return None;
+  }
+
+  return None;
+}
+
+pure fn EvalContext::merged_frame_at(usize index) const wontthrow -> MergedFrame
+{
+  let const total = bash_source_frame_count();
+  if (index >= total) return MergedFrame{MergedFrame::Kind::Main, 0};
+
+  let const target = total - 1 - index;
+  let const script_source_index = script_source_frame_index();
+  usize emitted = 0;
+
+  if (m_is_script_run && !script_source_index.has_value()) {
+    if (target == 0) return MergedFrame{MergedFrame::Kind::Main, 0};
+    emitted = 1;
+  }
+
+  let const function_count = m_function_call_names.count();
+  usize function_index = 0;
+  usize source_index = 0;
+
+  loop
+  {
+    while (source_index < m_source_frames.count() &&
+           m_source_frames[source_index].source_path.is_empty())
+    {
+      source_index++;
+    }
+
+    let const has_source = source_index < m_source_frames.count();
+    let const has_function = function_index < function_count;
+    if (!has_source && !has_function) break;
+
+    if (has_source &&
+        m_source_frames[source_index].function_call_depth <= function_index)
+    {
+      if (emitted == target) {
+        if (script_source_index.has_value() &&
+            *script_source_index == source_index)
+        {
+          return MergedFrame{MergedFrame::Kind::Main, source_index};
+        }
+
+        return MergedFrame{MergedFrame::Kind::Source, source_index};
+      }
+
+      emitted++;
+      source_index++;
+      continue;
+    }
+
+    if (emitted == target)
+      return MergedFrame{MergedFrame::Kind::Function, function_index};
+
+    emitted++;
+    function_index++;
+  }
+
+  return MergedFrame{MergedFrame::Kind::Main, 0};
+}
+
 fn EvalContext::funcname_frame_count() const wontthrow -> usize
 {
   if (m_function_call_names.is_empty()) return 0;
-  return m_function_call_names.count() + m_sourced_file_frames +
-         (m_is_script_run ? 1 : 0);
+  return bash_source_frame_count();
 }
 
 fn EvalContext::funcname_frame_at(usize index) const wontthrow -> StringView
 {
-  let const call_count = m_function_call_names.count();
-  if (index < call_count)
-    return m_function_call_names[call_count - 1 - index].view();
-  if (index < call_count + m_sourced_file_frames) return StringView{"source"};
+  let const frame = merged_frame_at(index);
+  switch (frame.kind) {
+  case MergedFrame::Kind::Function:
+    return m_function_call_names[frame.storage_index].view();
+  case MergedFrame::Kind::Source: return StringView{"source"};
+  case MergedFrame::Kind::Main: break;
+  }
+
   return StringView{"main"};
 }
 
@@ -1149,11 +1269,18 @@ fn EvalContext::line_number_at_location(
 
 fn EvalContext::funcname_line_at(usize index) const throws -> usize
 {
-  let const call_count = m_function_call_names.count();
-  if (index < call_count) {
-    let const storage_index = call_count - 1 - index;
-    return line_number_at_location(m_function_call_locations[storage_index],
-                                   m_function_call_sources[storage_index]);
+  let const frame = merged_frame_at(index);
+  switch (frame.kind) {
+  case MergedFrame::Kind::Function:
+    return line_number_at_location(
+        m_function_call_locations[frame.storage_index],
+        m_function_call_sources[frame.storage_index]);
+  case MergedFrame::Kind::Source: {
+    let const &source = m_source_frames[frame.storage_index];
+    return line_number_at_location(source.call_site,
+                                   borrowed_frame_source(source));
+  }
+  case MergedFrame::Kind::Main: break;
   }
 
   return 0;
@@ -1186,11 +1313,13 @@ pure fn EvalContext::funcname_source_at(usize index) const wontthrow
 pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
     -> StringView
 {
-  if (index < m_function_call_names.count()) {
-    let const call_count = m_function_call_names.count();
-    let const storage_index = call_count - 1 - index;
+  if (index >= bash_source_frame_count()) return StringView{};
+
+  let const frame = merged_frame_at(index);
+  switch (frame.kind) {
+  case MergedFrame::Kind::Function: {
     let const *info =
-        m_function_call_storages[storage_index].get_definition_info();
+        m_function_call_storages[frame.storage_index].get_definition_info();
     if (info != nullptr) {
       if (let const name = source_name_at(info->source_name_index);
           name.has_value())
@@ -1201,42 +1330,23 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
 
     return m_shell_name.view();
   }
-
-  usize frame_index = m_function_call_names.count();
-  let outermost_source_path = StringView{};
-  for (usize i = m_source_frames.count(); i > 0; i--) {
-    let const &path = m_source_frames[i - 1].source_path;
-    if (path.is_empty()) continue;
-
-    if (frame_index == index) return path.view();
-    frame_index++;
-    outermost_source_path = path.view();
+  case MergedFrame::Kind::Source:
+    return m_source_frames[frame.storage_index].source_path.view();
+  case MergedFrame::Kind::Main: break;
   }
 
-  /* The script closes the stack unless it is already the outermost source. */
-  if (m_is_script_run && index == frame_index &&
-      outermost_source_path != m_shell_name.view())
-  {
-    return m_shell_name.view();
-  }
-
-  return StringView{};
+  return m_shell_name.view();
 }
 
 pure fn EvalContext::bash_source_frame_count() const wontthrow -> usize
 {
   usize frame_count = m_function_call_names.count();
 
-  let outermost_source_path = StringView{};
-  for (usize i = m_source_frames.count(); i > 0; i--) {
-    let const &path = m_source_frames[i - 1].source_path;
-    if (path.is_empty()) continue;
-
-    frame_count++;
-    outermost_source_path = path.view();
+  for (usize i = 0; i < m_source_frames.count(); i++) {
+    if (!m_source_frames[i].source_path.is_empty()) frame_count++;
   }
 
-  if (m_is_script_run && outermost_source_path != m_shell_name.view())
+  if (m_is_script_run && !script_source_frame_index().has_value())
     frame_count++;
 
   return frame_count;

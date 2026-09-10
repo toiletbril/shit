@@ -249,7 +249,7 @@ pure fn EvalContext::variable_requires_dynamic_lookup(
   if (is_bash_aliases_special(name)) return true;
   if (is_bash_directory_stack_special(name)) return true;
 
-  return bash_dynamic_variables_enabled() &&
+  return bash_dynamic_variables_enabled() && !is_dynamic_reader_unset(name) &&
          BASH_DYNAMIC.find(name).has_value();
 }
 
@@ -269,10 +269,41 @@ pure fn EvalContext::is_write_discarded_dynamic_variable(
   return info.has_value() && info->write == dynamic_write::Discarded;
 }
 
+static pure fn dynamic_reader_of(StringView name) wontthrow
+    -> Maybe<dynamic_reader_id>
+{
+  if (name == "SECONDS") return dynamic_reader_id::Seconds;
+  if (name == "RANDOM") return dynamic_reader_id::Random;
+
+  return None;
+}
+
+pure fn EvalContext::is_dynamic_reader_unset(StringView name) const wontthrow
+    -> bool
+{
+  if (m_unset_dynamic_readers == 0) return false;
+
+  let const id = dynamic_reader_of(name);
+
+  return id.has_value() &&
+         (m_unset_dynamic_readers & dynamic_reader_mask(*id)) != 0;
+}
+
+fn EvalContext::unset_dynamic_reader(StringView name) wontthrow -> void
+{
+  let const id = dynamic_reader_of(name);
+  if (!id.has_value()) return;
+
+  LOG(Debug, "taking the dynamic reader of '%.*s' away",
+      static_cast<int>(name.length), name.data);
+  m_unset_dynamic_readers |= dynamic_reader_mask(*id);
+}
+
 pure fn EvalContext::is_dynamic_write_owner(StringView name) const wontthrow
     -> bool
 {
   if (!bash_dynamic_variables_enabled()) return false;
+  if (is_dynamic_reader_unset(name)) return false;
 
   return name == "SECONDS" || name == "RANDOM";
 }
@@ -450,7 +481,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       }
     }
 
-    if (bash_dynamic_variables_enabled()) {
+    if (bash_dynamic_variables_enabled() && !is_dynamic_reader_unset(name)) {
       if (let const info = BASH_DYNAMIC.find(name); info.has_value()) {
         switch (info->kind) {
         case dynamic_var::RANDOM:
@@ -571,8 +602,12 @@ fn EvalContext::append_dynamic_variable_names(
 
   if (!bash_dynamic_variables_enabled()) return;
 
-  for (let const &entry : BASH_DYNAMIC.entries)
+  for (let const &entry : BASH_DYNAMIC.entries) {
+    if (is_dynamic_reader_unset(entry.value.name)) continue;
+
     out.push(entry.value.name);
+  }
+
   if (is_bash_special_array_active(bash_special_array_id::Aliases))
     out.push(BASH_ALIASES_VARIABLE);
   if (is_bash_directory_stack_special(DIRSTACK_VARIABLE))

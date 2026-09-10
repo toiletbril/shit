@@ -125,6 +125,9 @@ fn internal::quote_path_candidate(StringView candidate) throws -> String
 
 fn internal::escape_path_candidate(StringView candidate) throws -> String
 {
+  if (candidate.find_character('\n').has_value())
+    return quote_path_candidate(candidate);
+
   let escaped = String{completion_allocator()};
 
   for (usize position = 0; position < candidate.length; position++) {
@@ -176,20 +179,13 @@ static fn open_quote_candidate_boundary(StringView typed, usize typed_boundary,
   return typed_boundary < candidate.length ? typed_boundary : candidate.length;
 }
 
-static fn
-append_candidate_suffix(String &candidate, StringView suffix,
-                        const utils::decoded_shell_word &decoded_word) throws
+static fn append_candidate_suffix(String &candidate, StringView suffix) throws
     -> void
 {
   if (suffix.is_empty()) return;
 
-  if (decoded_word.is_leading_variable_active) {
-    candidate += escape_path_candidate(suffix);
-    return;
-  }
-
   if (path_candidate_needs_quoting(suffix))
-    candidate += quote_path_candidate(suffix);
+    candidate += escape_path_candidate(suffix);
   else
     candidate += suffix;
 }
@@ -216,7 +212,7 @@ fn internal::rebuild_shell_syntax_candidate(
                                   decoded_word.quote_character);
     } else {
       candidate.append(raw_token);
-      append_candidate_suffix(candidate, suffix, decoded_word);
+      append_candidate_suffix(candidate, suffix);
     }
     return candidate;
   }
@@ -226,8 +222,7 @@ fn internal::rebuild_shell_syntax_candidate(
         decoded_candidate.starts_with("~"))
     {
       candidate.push('~');
-      append_candidate_suffix(candidate, decoded_candidate.substring(1),
-                              decoded_word);
+      append_candidate_suffix(candidate, decoded_candidate.substring(1));
       return candidate;
     }
 
@@ -241,7 +236,7 @@ fn internal::rebuild_shell_syntax_candidate(
       return candidate;
     }
 
-    append_candidate_suffix(candidate, decoded_candidate, decoded_word);
+    append_candidate_suffix(candidate, decoded_candidate);
     return candidate;
   }
 

@@ -1,0 +1,57 @@
+== a compound stage publishes one boundary without functrace:
+debug=[/bin/cat]
+one
+two
+debug=[/bin/cat]
+i=1
+i=2
+debug=[/bin/cat]
+sub
+debug=[echo tail]
+tail
+rc=0
+== a compound stage publishes every inner boundary under functrace:
+debug=[/bin/cat]
+debug=[echo one]
+one
+debug=[echo two]
+two
+debug=[/bin/cat]
+debug=[for i in 1 2]
+debug=[echo "i=$i"]
+i=1
+debug=[for i in 1 2]
+debug=[echo "i=$i"]
+i=2
+debug=[/bin/cat]
+debug=[echo sub]
+sub
+debug=[echo tail]
+tail
+rc=0
+== a nested pipeline inside a stage carries the mode further:
+debug=[/bin/cat]
+debug=[echo deep]
+debug=[/bin/cat]
+deep
+debug=[echo tail]
+tail
+rc=0
+== clearing functrace between two stages narrows the later one:
+debug=[/bin/cat]
+debug=[echo staged]
+staged
+debug=[set +o functrace]
+debug=[/bin/cat]
+quiet
+debug=[echo tail]
+tail
+rc=0
+== a failing command inside a stage publishes its own boundary:
+debug=[/bin/cat]
+debug=[echo before]
+before
+debug=[false]
+debug=[echo "status=$?"]
+status=0
+rc=0

@@ -86,12 +86,15 @@ struct eval_state_snapshot
   u8 init_moods_sourcing;
   u8 initialized_moods;
   u8 disabled_bash_special_arrays;
+  u8 unset_dynamic_readers;
   bool was_mood_set_explicitly;
   u64 mood_mutation_revision;
   u64 warning_mutation_revision;
   u64 diagnostics_mutation_revision;
   u64 annoying_diagnostics_mutation_revision;
   u64 random_state;
+  i64 shell_start_time;
+  i64 seconds_base;
   shell_option_mutations option_mutations;
   ArrayList<ArrayList<local_binding>> local_scopes;
   usize local_scope_depth;
