@@ -543,6 +543,16 @@ public:
   pure fn variable_requires_dynamic_lookup(StringView name) const wontthrow
       -> bool;
 
+  /* Answer whether a dynamic reader claims every write of the name. */
+  pure fn is_dynamic_write_owner(StringView name) const wontthrow -> bool;
+
+  /* Give a dynamic name its assigned value and answer whether the name owns the
+     write. SECONDS moves the base its elapsed count is measured from. RANDOM
+     seeds the generator, and a repeated seed repeats the sequence. A name that
+     answers true keeps no ordinary storage, because ordinary storage shadows
+     the reader. */
+  fn write_dynamic_variable(StringView name, StringView value) throws -> bool;
+
   fn append_dynamic_variable_names(ArrayList<StringView> &out) const throws
       -> void;
 
@@ -1023,6 +1033,11 @@ public:
   fn pop_root_source_frame() wontthrow -> void;
   fn declare_local(StringView name, bool should_inherit_value) throws -> void;
   mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;
+  /* Answer whether any active frame binds the name, the reach a dynamic name
+     needs. A local declaration shadows the dynamic reader for every deeper
+     frame as well as its own. */
+  mustuse fn is_local_in_any_active_scope(StringView name) const wontthrow
+      -> bool;
   template <typename Callback>
   fn for_each_local_name_in_current_scope(Callback callback) const throws
       -> void
@@ -2103,6 +2118,8 @@ protected:
   usize m_mimicry_depth{0};
   /* The base $SECONDS counts from. */
   i64 m_shell_start_time{0};
+  /* The offset an assignment to SECONDS puts on the elapsed count. */
+  i64 m_seconds_base{0};
   mutable u64 m_random_state{0};
   bool m_glob_exempt_for_test{false};
   usize m_getopts_char_index{1};

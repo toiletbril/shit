@@ -203,6 +203,8 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                : cxt.evaluate_arithmetic_text(value.view());
     }
 
+    if (has_new_value) cxt.write_dynamic_variable(name.view(), value.view());
+
     /* The unset here is this move, not a user unset, so the integer mark it
        clears is put back. */
     LOG(All, "export moving '%s' into the environment", name.c_str());

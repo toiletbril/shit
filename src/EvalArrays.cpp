@@ -644,13 +644,19 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
   let const previous_was_exported = is_exported(name);
 
   let previous_value = Maybe<String>{};
-  if (let const *scalar = m_shell_variables.find(name); scalar != nullptr)
+  if (let const *scalar = m_shell_variables.find(name); scalar != nullptr) {
     previous_value = *scalar;
-  else if (previous_array.has_value() && !previous_array->is_empty())
+  } else if (previous_array.has_value() && !previous_array->is_empty()) {
     previous_value = previous_array->front();
-  else if (previous_was_exported || (variable_requires_dynamic_lookup(name) &&
-                                     !was_bash_directory_stack_special))
+  } else if (!is_dynamic_write_owner(name) &&
+             (previous_was_exported ||
+              (variable_requires_dynamic_lookup(name) &&
+               !was_bash_directory_stack_special)))
+  {
+    /* A name whose writer owns the value keeps no saved copy, so the scope pop
+       clears the local storage and leaves the dynamic reader running. */
     previous_value = get_variable_value(name);
+  }
 
   m_local_scopes[m_local_scope_depth - 1].push(local_binding{
       String{name}, steal(previous_value), steal(previous_array),

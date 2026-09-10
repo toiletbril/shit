@@ -269,6 +269,45 @@ pure fn EvalContext::is_write_discarded_dynamic_variable(
   return info.has_value() && info->write == dynamic_write::Discarded;
 }
 
+pure fn EvalContext::is_dynamic_write_owner(StringView name) const wontthrow
+    -> bool
+{
+  if (!bash_dynamic_variables_enabled()) return false;
+
+  return name == "SECONDS" || name == "RANDOM";
+}
+
+hot fn EvalContext::write_dynamic_variable(StringView name,
+                                           StringView value) throws -> bool
+{
+  if (!is_dynamic_write_owner(name)) return false;
+  /* A local declaration turns the name into an ordinary frozen variable for the
+     length of the call, and the outer state keeps moving underneath it. */
+  if (is_local_in_any_active_scope(name)) return false;
+
+  let const parsed = value.to<i64>();
+  let const assigned = parsed.is_error() ? i64{0} : parsed.value();
+
+  if (name == "RANDOM") {
+    LOG(Debug, "seeding $RANDOM from '%.*s'", static_cast<int>(value.length),
+        value.data);
+    m_random_state = (static_cast<u64>(assigned) + 0x9e3779b97f4a7c15ULL) *
+                     0x2545f4914f6cdd1dULL;
+    /* A zero state reads as unseeded and would draw a fresh seed from the
+       clock. */
+    if (m_random_state == 0) m_random_state = 0x9e3779b97f4a7c15ULL;
+
+    return true;
+  }
+
+  LOG(Debug, "moving the $SECONDS base to '%.*s'",
+      static_cast<int>(value.length), value.data);
+  m_seconds_base =
+      assigned - (static_cast<i64>(std::time(nullptr)) - m_shell_start_time);
+
+  return true;
+}
+
 hot fn EvalContext::get_variable_value(StringView name) const throws
     -> Maybe<String>
 {
@@ -419,7 +458,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                               heap_allocator());
         case dynamic_var::SECONDS:
           return String::from(static_cast<i64>(std::time(nullptr)) -
-                                  m_shell_start_time,
+                                  m_shell_start_time + m_seconds_base,
                               heap_allocator());
         case dynamic_var::BASHOPTS: return enabled_shopt_option_names(*this);
         case dynamic_var::SHELLOPTS: {

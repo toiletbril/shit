@@ -167,6 +167,8 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   LOG(All, "assigning variable '%.*s' to a value of %zu bytes",
       static_cast<int>(name.length), name.data, value.length);
   if (name == "IFS") set_field_separators(value);
+  if (write_dynamic_variable(name, value)) return;
+
   if (utils::environment_name_is_path(name))
     m_program_resolver.assign_path(String{value});
   if (name == "IGNOREEOF")
@@ -510,12 +512,12 @@ fn EvalContext::append_indexed_array(StringView name,
   if (note.is_empty()) {
     Error error{message};
     error.set_script_fatal();
-    throw error;
+    throw steal(error);
   }
 
   ErrorWithDetails error{message, note};
   error.set_script_fatal();
-  throw error;
+  throw steal(error);
 }
 
 cold fn EvalContext::show_runtime_warning(StringView message) wontthrow -> void
@@ -692,7 +694,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
     ErrorWithLocationAndDetails error{reference, message,
                                       empty_expansion_note.view()};
     error.set_script_fatal();
-    throw error;
+    throw steal(error);
   }
   if (is_completion_function_running()) return;
   if (is_warning_suppressed(suppressible_warning::UnsetTestOperand)) return;
@@ -1307,6 +1309,16 @@ fn EvalContext::is_local_in_current_scope(StringView name) const wontthrow
   if (m_local_scope_depth == 0) return false;
   for (let const &binding : m_local_scopes[m_local_scope_depth - 1])
     if (binding.name.view() == name) return true;
+  return false;
+}
+
+fn EvalContext::is_local_in_any_active_scope(StringView name) const wontthrow
+    -> bool
+{
+  for (usize frame_index = m_local_scope_depth; frame_index-- > 0;)
+    for (let const &binding : m_local_scopes[frame_index])
+      if (binding.name.view() == name) return true;
+
   return false;
 }
 

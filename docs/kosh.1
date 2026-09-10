@@ -2162,7 +2162,14 @@ when color is disabled. An explicit assignment takes precedence.
 .TP
 .BR RANDOM ", " SRANDOM ", " SECONDS ", " EPOCHSECONDS ", " EPOCHREALTIME
 These dynamic values supply random numbers, elapsed time, and wall clock time.
-They are unavailable in the
+An assignment to
+.B SECONDS
+moves the base the elapsed count is measured from. An assignment to
+.B RANDOM
+seeds the generator, and a repeated seed repeats the sequence. A
+.B local
+declaration of either name freezes it for the length of the call. They are
+unavailable in the
 .B sh
 mood.
 .TP
