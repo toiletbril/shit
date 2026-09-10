@@ -1369,12 +1369,7 @@ evaluate_make_function(EvalContext &cxt, makefile &mk, StringView function_name,
     let const source = do_expand(source_argument_index);
     let const words = split_word_views(source.view(), allocator);
     if (spec.kind == make_function_kind::Words) {
-      char count_text[32];
-      let const count_length = static_cast<usize>(
-          std::snprintf(count_text, sizeof(count_text), "%zu", words.count()));
-      return String{
-          allocator, StringView{count_text, count_length}
-      };
+      return String::from(words.count(), allocator);
     }
     if (words.is_empty()) return String{allocator};
     if (spec.kind == make_function_kind::Firstword)
@@ -1524,10 +1519,8 @@ evaluate_make_function(EvalContext &cxt, makefile &mk, StringView function_name,
     for (usize argument_index = 0; argument_index < binding_count;
          argument_index++)
     {
-      char numeric_name[32];
-      let const name_length = static_cast<usize>(std::snprintf(
-          numeric_name, sizeof(numeric_name), "%zu", argument_index));
-      let const name = StringView{numeric_name, name_length};
+      let const numeric_name = String::from(argument_index, allocator);
+      let const name = numeric_name.view();
       snapshots.push(save_make_variable(mk, name, allocator));
       let const value = argument_index < expanded_arguments.count()
                             ? expanded_arguments[argument_index].view()

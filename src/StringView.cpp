@@ -110,10 +110,10 @@ fn StringView::find_character(char wanted) const wontthrow -> Maybe<usize>
 {
   if (length == 0) return None;
   let const found =
-      std::memchr(data, static_cast<unsigned char>(wanted), length);
+      byte_scan::find_byte(data, length, static_cast<unsigned char>(wanted));
   if (found == nullptr) return None;
 
-  return static_cast<usize>(static_cast<const char *>(found) - data);
+  return static_cast<usize>(found - data);
 }
 
 fn StringView::find_substring(StringView needle, usize from) const wontthrow
@@ -128,12 +128,12 @@ fn StringView::find_substring(StringView needle, usize from) const wontthrow
   while (position <= last_start) {
     let const scan_length = last_start - position + 1;
     let const found =
-        std::memchr(data + position, static_cast<unsigned char>(needle.data[0]),
-                    scan_length);
+        byte_scan::find_byte(data + position, scan_length,
+                             static_cast<unsigned char>(needle.data[0]));
     if (found == nullptr) return None;
-    let const candidate =
-        static_cast<usize>(static_cast<const char *>(found) - data);
-    if (std::memcmp(data + candidate, needle.data, needle.length) == 0)
+    let const candidate = static_cast<usize>(found - data);
+    if (byte_scan::are_bytes_equal(data + candidate, needle.data,
+                                   needle.length))
       return candidate;
     position = candidate + 1;
   }
@@ -185,9 +185,8 @@ fn StringView::next_ascii_whitespace_word(usize &position) const wontthrow
 fn StringView::starts_with(StringView prefix) const wontthrow -> bool
 {
   if (prefix.length > length) return false;
-  /* The length guard keeps a null data pointer out of memcmp. */
   return prefix.length == 0 ||
-         std::memcmp(data, prefix.data, prefix.length) == 0;
+         byte_scan::are_bytes_equal(data, prefix.data, prefix.length);
 }
 
 } /* namespace koshka */

@@ -71,15 +71,7 @@ template <class T>
   requires std::is_integral_v<T>
 fn value_to_log_string(T value) -> String
 {
-  char buffer[32];
-  if constexpr (std::is_signed_v<T>) {
-    std::snprintf(buffer, sizeof(buffer), "%lld",
-                  static_cast<long long>(value));
-  } else {
-    std::snprintf(buffer, sizeof(buffer), "%llu",
-                  static_cast<unsigned long long>(value));
-  }
-  return String{buffer};
+  return String::from(value, heap_allocator());
 }
 
 template <class T>

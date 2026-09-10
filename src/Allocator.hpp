@@ -79,6 +79,19 @@ public:
     return std::malloc(usize{1} << shift);
   }
 
+  hot static fn regrow(opaque *pointer, usize old_length,
+                       usize new_length) wontthrow -> opaque *
+  {
+    let const old_shift = class_shift_for(old_length);
+    let const new_shift = class_shift_for(new_length);
+
+    if (old_shift == new_shift && new_shift <= MAX_CLASS_SHIFT) return pointer;
+
+    let const target_length =
+        new_shift <= MAX_CLASS_SHIFT ? (usize{1} << new_shift) : new_length;
+    return std::realloc(pointer, target_length);
+  }
+
   hot fn give(opaque *pointer, usize length) wontthrow -> void
   {
     if (pointer == nullptr) return;
@@ -162,6 +175,17 @@ hot inline fn heap_alloc(usize length, usize alignment) wontthrow -> opaque *
   return heap_pool_instance().take(length);
 #endif
 }
+hot inline fn heap_realloc(opaque *pointer, usize old_length,
+                           usize new_length) wontthrow -> opaque *
+{
+#if defined KOSH_HAS_ADDRESS_SANITIZER
+  unused(old_length);
+  return std::realloc(pointer, new_length);
+#else
+  return HeapPool::regrow(pointer, old_length, new_length);
+#endif
+}
+
 hot inline fn heap_free(opaque *pointer, usize length,
                         usize alignment) wontthrow -> void
 {
@@ -252,10 +276,19 @@ public:
       raw_free(pointer, old_length, alignment);
       return nullptr;
     }
-    if (get_kind() == Kind::UncachedHeap && alignment <= alignof(max_align_t)) {
-      let const replacement = std::realloc(pointer, new_length);
-      if (replacement == nullptr) throw std::bad_alloc{};
-      return replacement;
+    if (alignment <= alignof(max_align_t)) {
+      if (get_kind() == Kind::UncachedHeap) {
+        let const replacement = std::realloc(pointer, new_length);
+        if (replacement == nullptr) throw std::bad_alloc{};
+        return replacement;
+      }
+
+      if (get_kind() == Kind::Heap) {
+        let const replacement =
+            allocators::heap_realloc(pointer, old_length, new_length);
+        if (replacement == nullptr) throw std::bad_alloc{};
+        return replacement;
+      }
     }
 
     let const replacement = raw_alloc(new_length, alignment);

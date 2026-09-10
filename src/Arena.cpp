@@ -52,7 +52,7 @@ BumpArena::~BumpArena()
   release_destructor_chunks(0);
 
   for (block &block : m_blocks)
-    uncached_heap_allocator().free_array(block.base, block.size);
+    heap_allocator().free_array(block.base, block.size);
 }
 
 fn BumpArena::push_destructor(pending_destructor pending) throws -> void
@@ -119,7 +119,7 @@ cold fn BumpArena::add_block(usize minimum_size, usize preferred_size) throws
   let size = preferred_size;
   if (minimum_size > size) size = minimum_size;
 
-  let const base = uncached_heap_allocator().alloc_array<u8>(size);
+  let const base = heap_allocator().alloc_array<u8>(size);
   if (base == nullptr) throw std::bad_alloc{};
 
   ASSERT(size >= minimum_size, "fresh block must fit the requested allocation");
@@ -129,7 +129,7 @@ cold fn BumpArena::add_block(usize minimum_size, usize preferred_size) throws
   try {
     m_blocks.push(block{base, size, 0});
   } catch (...) {
-    uncached_heap_allocator().free_array(base, size);
+    heap_allocator().free_array(base, size);
     throw;
   }
 
@@ -282,7 +282,7 @@ cold fn BumpArena::reset() wontthrow -> void
   m_active_lifetime_slots.clear();
 
   for (usize i = 1; i < m_blocks.count(); i++)
-    uncached_heap_allocator().free_array(m_blocks[i].base, m_blocks[i].size);
+    heap_allocator().free_array(m_blocks[i].base, m_blocks[i].size);
   while (m_blocks.count() > 1)
     m_blocks.pop_back();
   if (!m_blocks.is_empty()) m_blocks.front().used = 0;

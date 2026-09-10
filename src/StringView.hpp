@@ -20,6 +20,71 @@ pure constexpr fn is_ascii_whitespace(char byte) wontthrow -> bool
          byte == '\f' || byte == '\r';
 }
 
+namespace byte_scan {
+
+static constexpr u64 LOW_BITS = UINT64_C(0x0101010101010101);
+static constexpr u64 HIGH_BITS = UINT64_C(0x8080808080808080);
+static constexpr usize LIBRARY_SCAN_CROSSOVER = 64;
+
+hot inline fn load_word(const char *bytes) wontthrow -> u64
+{
+  u64 word = 0;
+  __builtin_memcpy(&word, bytes, 8);
+  return word;
+}
+
+hot inline fn are_bytes_equal(const char *left, const char *right,
+                              usize count) wontthrow -> bool
+{
+  if (count <= 8) {
+    u64 left_word = 0;
+    u64 right_word = 0;
+    __builtin_memcpy(&left_word, left, count);
+    __builtin_memcpy(&right_word, right, count);
+    return left_word == right_word;
+  }
+
+  if (count <= 16) {
+    return load_word(left) == load_word(right) &&
+           load_word(left + count - 8) == load_word(right + count - 8);
+  }
+
+  return __builtin_memcmp(left, right, count) == 0;
+}
+
+hot inline fn find_byte(const char *bytes, usize count,
+                        unsigned char wanted) wontthrow -> const char *
+{
+  if (count >= LIBRARY_SCAN_CROSSOVER) {
+    return static_cast<const char *>(std::memchr(bytes, wanted, count));
+  }
+
+  usize position = 0;
+
+#if defined __BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  let const broadcast = LOW_BITS * wanted;
+  while (position + 8 <= count) {
+    let const word = load_word(bytes + position) ^ broadcast;
+    let const marks = (word - LOW_BITS) & ~word & HIGH_BITS;
+    if (marks != 0) {
+      let const offset = static_cast<usize>(__builtin_ctzll(marks)) >> 3;
+      return bytes + position + offset;
+    }
+
+    position += 8;
+  }
+#endif
+
+  while (position < count) {
+    if (bytes[position] == static_cast<char>(wanted)) return bytes + position;
+    position++;
+  }
+
+  return nullptr;
+}
+
+} /* namespace byte_scan */
+
 template <class T>
 class ErrorOr;
 class String;
@@ -60,26 +125,7 @@ public:
     if (length != other.length) return false;
     if (length == 0) return true;
 
-    if (length <= 8) {
-      u64 left = 0;
-      u64 right = 0;
-      __builtin_memcpy(&left, data, length);
-      __builtin_memcpy(&right, other.data, length);
-      return left == right;
-    }
-    if (length <= 16) {
-      u64 left_head = 0;
-      u64 right_head = 0;
-      u64 left_tail = 0;
-      u64 right_tail = 0;
-      __builtin_memcpy(&left_head, data, 8);
-      __builtin_memcpy(&right_head, other.data, 8);
-      __builtin_memcpy(&left_tail, data + length - 8, 8);
-      __builtin_memcpy(&right_tail, other.data + length - 8, 8);
-      return left_head == right_head && left_tail == right_tail;
-    }
-
-    return __builtin_memcmp(data, other.data, length) == 0;
+    return byte_scan::are_bytes_equal(data, other.data, length);
   }
   hot flatten mustuse pure fn operator!=(StringView other) const wontthrow->bool
   {
