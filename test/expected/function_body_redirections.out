@@ -288,6 +288,9 @@ heredoc ()
 { 
     cat
 } <<EOF
+data
+EOF
+
 herestring () 
 { 
     cat

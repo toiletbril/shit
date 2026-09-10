@@ -1589,6 +1589,8 @@ public:
   /* The command the redirections are written around. */
   pure fn child() const wontthrow -> const Command *;
 
+  pure fn redirections() const wontthrow -> const SparseList<Redirection> &;
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
   fn evaluate_status_impl(EvalContext &cxt) const throws

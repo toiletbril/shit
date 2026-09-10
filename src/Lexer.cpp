@@ -461,6 +461,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
     m_cursor_position =
         walk_heredoc_body(m_cursor_position, pending.delimiter.view(),
                           pending.should_strip_tabs, do_append_body_line);
+    pending.contents->source_end_position = m_cursor_position;
     LOG(Debug, "capturing a heredoc body of %zu bytes for delimiter '%s'",
         collected.count(), pending.delimiter.c_str());
     pending.contents->text = steal(collected);

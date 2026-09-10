@@ -10,6 +10,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Formatter.hpp"
 #include "../Koshkit.hpp"
 #include "../Path.hpp"
 #include "../Trace.hpp"
@@ -179,7 +180,10 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (let const *source = cxt.find_function_source(name.view());
             source != nullptr && !source->is_empty())
         {
-          out += *source;
+          if (is_bash_function_report)
+            out += format_bash_function_source(source->view());
+          else
+            out += *source;
           out += "\n";
         }
 

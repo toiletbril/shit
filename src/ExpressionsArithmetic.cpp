@@ -1347,17 +1347,28 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The recorded definition is a "name () " line then the body's source span,
      the shape bash prints from declare -f. ble.sh clones a function by
      replacing the leading name and greps the "name ()" line, so both matter. */
+  let body_end_position = m_body->source_end_position();
+  if (const RedirectedCommand *redirected = m_body->as_redirected_command();
+      redirected != nullptr)
+  {
+    for (let const &redirection : redirected->redirections()) {
+      if (redirection.heredoc == nullptr) continue;
+      if (redirection.heredoc->source_end_position > body_end_position)
+        body_end_position = redirection.heredoc->source_end_position;
+    }
+  }
+
   let definition_text = String{cxt.scratch_allocator()};
   if (const String *source = cxt.current_source();
       source != nullptr &&
-      m_body->source_end_position() > m_body->source_location().position &&
-      m_body->source_end_position() <= source->count())
+      body_end_position > m_body->source_location().position &&
+      body_end_position <= source->count())
   {
     definition_text.append(m_name.view());
     definition_text.append(StringView{" () \n"});
     definition_text.append(source->view().substring_of_length(
         m_body->source_location().position,
-        m_body->source_end_position() - m_body->source_location().position));
+        body_end_position - m_body->source_location().position));
   }
   LOG(Info, "registering the function '%s'%s", m_name.c_str(),
       definition_text.is_empty() ? " without recorded definition text" : "");
@@ -1537,6 +1548,12 @@ fn RedirectedCommand::as_redirected_command() const wontthrow
 fn RedirectedCommand::child() const wontthrow -> const Command *
 {
   return m_child;
+}
+
+fn RedirectedCommand::redirections() const wontthrow
+    -> const SparseList<Redirection> &
+{
+  return m_redirections;
 }
 
 fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64

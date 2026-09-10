@@ -603,6 +603,7 @@ public:
   fn append_raw(StringView raw) throws -> void
   {
     finish_line();
+    m_has_trailing_blank_line = false;
     m_output.append(raw);
     m_line_has_text = !raw.is_empty() && raw[raw.length - 1] != '\n';
     m_column = 0;
@@ -624,7 +625,7 @@ public:
     m_column = 0;
   }
 
-  fn ensure_blank_line() throws -> void
+  fn ensure_blank_line(bool should_keep_at_end = false) throws -> void
   {
     finish_line();
     if (!m_output.is_empty() &&
@@ -632,13 +633,17 @@ public:
     {
       m_output.push('\n');
     }
+    m_has_trailing_blank_line = should_keep_at_end;
   }
 
   fn take() throws -> String
   {
     while (!m_output.is_empty() && m_output[m_output.count() - 1] == '\n')
       m_output.pop_back();
-    if (!m_output.is_empty()) m_output.push('\n');
+    if (!m_output.is_empty()) {
+      m_output.push('\n');
+      if (m_has_trailing_blank_line) m_output.push('\n');
+    }
 
     return steal(m_output);
   }
@@ -646,6 +651,7 @@ public:
 private:
   fn start_line() throws -> void
   {
+    m_has_trailing_blank_line = false;
     if (m_line_has_text || m_column != 0) return;
     for (usize position = 0; position < m_indent; position++)
       m_output.push(' ');
@@ -657,6 +663,7 @@ private:
   usize m_column{0};
   bool m_line_has_text{false};
   bool m_should_wrap{true};
+  bool m_has_trailing_blank_line{false};
 };
 
 struct option_wrap_position
@@ -1127,7 +1134,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       } else {
         writer.append_raw(text);
       }
-      writer.ensure_blank_line();
+      writer.ensure_blank_line(is_bash);
       continue;
     }
     if (piece.kind == format_piece_kind::Comment) {
@@ -1682,8 +1689,13 @@ fn format_bash_function_source(StringView source) throws -> String
 
   let const pieces = scan_format_pieces(source_view);
   let formatted = render_format_pieces(pieces, 0, 0, format_layout{4, true});
-  while (!formatted.is_empty() && formatted.back() == '\n')
+  usize trailing_newline_count = 0;
+  while (!formatted.is_empty() && formatted.back() == '\n') {
     formatted.pop_back();
+    trailing_newline_count++;
+  }
+  for (usize index = 1; index < trailing_newline_count; index++)
+    formatted += '\n';
 
   return formatted;
 }

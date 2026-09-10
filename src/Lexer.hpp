@@ -29,6 +29,7 @@ struct heredoc_contents
 
   String text;
   usize source_position{0};
+  usize source_end_position{0};
   bool has_contiguous_source;
 };
 
