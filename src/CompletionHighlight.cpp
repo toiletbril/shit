@@ -86,8 +86,20 @@ static fn command_word_prefixes_any(StringView word,
   if (word.is_empty()) return false;
   if (os::has_directory_separator(word)) return false;
 
+  let const is_case_sensitive = utils::token_has_uppercase(word);
+
   let const do_has_prefix = [&](StringView name) -> bool {
-    return utils::smart_case_prefix_matches(name, word);
+    if (name.starts_with(word)) return true;
+    if (is_case_sensitive || name.length < word.length) return false;
+
+    for (usize position = 0; position < word.length; position++)
+      if (utils::ascii_to_lower(name[position]) !=
+          utils::ascii_to_lower(word[position]))
+      {
+        return false;
+      }
+
+    return true;
   };
 
   for (let const &builtin_name : builtin_names())
@@ -150,23 +162,32 @@ static pure fn is_highlight_function_name_char(char c) wontthrow -> bool
   }
 }
 
-/* A brace pair holding `..` is a range expansion and an unpaired brace is a
+/* The shell looks a command word up in the function table before it treats the
+   word as a path, so a name such as ble/util/put is a call and not a file. A
+   brace pair holding `..` is a range expansion and an unpaired brace is a
    fragment, so neither one belongs to a name. */
-static pure fn word_braces_are_literal(StringView word) wontthrow -> bool
+pure fn internal::word_is_function_name(StringView word) wontthrow -> bool
 {
+  if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
+
   usize brace_depth = 0;
-  for (usize i = 0; i < word.length; i++) {
-    if (word[i] == '{') {
+  for (usize i = 1; i < word.length; i++) {
+    let const byte = word[i];
+    if (!is_highlight_function_name_char(byte)) return false;
+
+    if (byte == '{') {
       brace_depth++;
       continue;
     }
-    if (word[i] == '}') {
+
+    if (byte == '}') {
       if (brace_depth == 0) return false;
 
       brace_depth--;
       continue;
     }
-    if (brace_depth > 0 && word[i] == '.' && i + 1 < word.length &&
+
+    if (brace_depth > 0 && byte == '.' && i + 1 < word.length &&
         word[i + 1] == '.')
     {
       return false;
@@ -174,21 +195,6 @@ static pure fn word_braces_are_literal(StringView word) wontthrow -> bool
   }
 
   return brace_depth == 0;
-}
-
-/* The shell looks a command word up in the function table before it treats the
-   word as a path, so a name such as ble/util/put is a call and not a file. */
-pure fn internal::word_is_function_name(StringView word) wontthrow -> bool
-{
-  if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
-
-  let has_brace = false;
-  for (usize i = 1; i < word.length; i++) {
-    if (!is_highlight_function_name_char(word[i])) return false;
-    if (word[i] == '{' || word[i] == '}') has_brace = true;
-  }
-
-  return !has_brace || word_braces_are_literal(word);
 }
 
 pure fn internal::word_defines_function(StringView line, usize word_end,
@@ -539,13 +545,22 @@ static fn word_is_terminated_by_separator(StringView line, usize word_end,
 {
   if (word_end >= line_length) return false;
 
-  let const next_byte = line[word_end];
-  return next_byte == ' ' || next_byte == '\t' || next_byte == '\n' ||
-         next_byte == ';' || next_byte == '|' || next_byte == '&' ||
-         next_byte == '<' || next_byte == '>' || next_byte == '(' ||
-         next_byte == ')' ||
-         (next_byte == '\r' && word_end + 1 < line_length &&
-          line[word_end + 1] == '\n');
+  switch (line[word_end]) {
+  case ' ':
+  case '\t':
+  case '\n':
+  case ';':
+  case '|':
+  case '&':
+  case '<':
+  case '>':
+  case '(':
+  case ')': return true;
+
+  case '\r': return word_end + 1 < line_length && line[word_end + 1] == '\n';
+
+  default: return false;
+  }
 }
 
 /* Path coloring receives source spelling rather than an expanded word. On
@@ -933,6 +948,14 @@ static constexpr static_string_entry<name_operand_role>
 };
 static constexpr StaticStringMap NAME_OPERAND_COMMANDS{
     NAME_OPERAND_COMMAND_ENTRIES};
+
+static constexpr PackedStringKey TIME_OPTION_KEYS[] = {
+    SSK("--help"),
+    SSK("--posix"),
+    SSK("-R"),
+    SSK("-p"),
+};
+static constexpr StaticStringSet TIME_OPTIONS{TIME_OPTION_KEYS};
 
 /* An alias name reaches as wide as a function name, so the operand keeps every
    byte before the equals sign. */
@@ -1452,8 +1475,7 @@ fn internal::scan_highlight_range(
     };
 
     if (is_command_position && is_time_option_pending) {
-      if (word == "-p" || word == "--posix" || word == "-R" || word == "--help")
-      {
+      if (TIME_OPTIONS.contains(word)) {
         do_push(word_start, word_end, highlight_role::flag);
         continue;
       }
@@ -1702,9 +1724,9 @@ fn internal::scan_highlight_range(
       } else if (word_defines_function(line, word_end, end)) {
         do_push(word_start, word_end, highlight_role::function_name);
         line_functions.add(word);
-      } else if (!do_names_known_function(word) &&
-                 os::has_directory_separator(word) &&
-                 !word_has_erased_directory_separator(word))
+      } else if (os::has_directory_separator(word) &&
+                 !word_has_erased_directory_separator(word) &&
+                 !do_names_known_function(word))
       {
         color_path_argument(word_start, word, is_word_terminated, false,
                             word[0] == '~', spans);

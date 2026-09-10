@@ -331,9 +331,8 @@ static fn cleaned_synopsis_of_page(StringView source) throws -> String
     let const line = source.substring_of_length(line_start, i - line_start);
     line_start = i + 1;
     if (line.starts_with(".SH") || line.starts_with(".Sh")) {
-      let is_synopsis_heading = false;
-      for (usize j = 0; j + 8 <= line.length && !is_synopsis_heading; j++)
-        is_synopsis_heading = line.substring(j).starts_with("SYNOPSIS");
+      let const is_synopsis_heading =
+          line.find_substring(StringView{"SYNOPSIS"}).has_value();
       if (is_inside_synopsis && !is_synopsis_heading) break;
       is_inside_synopsis = is_synopsis_heading;
       continue;
@@ -1056,11 +1055,9 @@ static fn line_is_subcommand_group_header(StringView trimmed) wontthrow -> bool
   if (line_opens_subcommand_section(trimmed)) return true;
   if (trimmed[trimmed.length - 1] == ')') return true;
   let const do_contains = [&](StringView needle) {
-    if (needle.length > trimmed.length) return false;
-    for (usize i = 0; i + needle.length <= trimmed.length; i++)
-      if (trimmed.substring_of_length(i, needle.length) == needle) return true;
-    return false;
+    return trimmed.find_substring(needle).has_value();
   };
+
   return do_contains(StringView{"(see also"}) ||
          do_contains(StringView{"see also:"});
 }

@@ -64,15 +64,20 @@ static pure fn candidate_match(StringView token, StringView candidate,
 {
   if (candidate.starts_with(token)) return match_tier::exact_prefix;
 
-  if (!is_case_sensitive && candidate.length >= token.length) {
-    bool is_prefix = true;
-    for (usize i = 0; i < token.length; i++)
+  if (candidate.length < token.length) return None;
+
+  if (!is_case_sensitive &&
+      utils::ascii_to_lower(candidate[0]) == utils::ascii_to_lower(token[0]))
+  {
+    let is_prefix = true;
+    for (usize i = 1; i < token.length; i++)
       if (utils::ascii_to_lower(candidate[i]) !=
           utils::ascii_to_lower(token[i]))
       {
         is_prefix = false;
         break;
       }
+
     if (is_prefix) return match_tier::prefix;
   }
 
@@ -82,13 +87,25 @@ static pure fn candidate_match(StringView token, StringView candidate,
   if (token.length < 2 || !lexer::is_variable_name(token[0])) return None;
 
   usize matched_count = 0;
-  for (usize i = 0; i < candidate.length && matched_count < token.length; i++) {
-    let const is_equal = is_case_sensitive
-                             ? candidate[i] == token[matched_count]
-                             : utils::ascii_to_lower(candidate[i]) ==
-                                   utils::ascii_to_lower(token[matched_count]);
-    if (is_equal) matched_count++;
+  if (is_case_sensitive) {
+    usize position = 0;
+    while (matched_count < token.length) {
+      let const found =
+          candidate.substring(position).find_character(token[matched_count]);
+      if (!found.has_value()) break;
+
+      position += *found + 1;
+      matched_count++;
+    }
+  } else {
+    for (usize i = 0; i < candidate.length && matched_count < token.length; i++)
+      if (utils::ascii_to_lower(candidate[i]) ==
+          utils::ascii_to_lower(token[matched_count]))
+      {
+        matched_count++;
+      }
   }
+
   if (matched_count == token.length) return match_tier::subsequence;
 
   return None;
@@ -322,6 +339,23 @@ collect_command_names(StringView token, command_match_mode match_mode,
       utils::token_has_uppercase(normalized_path_token.view());
   let seen = BorrowedStringSet{};
 
+  let const do_prefix_matches = [](StringView candidate, StringView prefix,
+                                   bool is_prefix_case_sensitive) -> bool {
+    if (candidate.starts_with(prefix)) return true;
+    if (is_prefix_case_sensitive || candidate.length < prefix.length) {
+      return false;
+    }
+
+    for (usize position = 0; position < prefix.length; position++)
+      if (utils::ascii_to_lower(candidate[position]) !=
+          utils::ascii_to_lower(prefix[position]))
+      {
+        return false;
+      }
+
+    return true;
+  };
+
   let const do_add = [&](StringView name) throws {
     collector.note_source_candidate();
     let const tier = command_name_match(name, token, token_is_glob,
@@ -348,7 +382,7 @@ collect_command_names(StringView token, command_match_mode match_mode,
   if (context.koshkit_utilities_are_reachable()) {
     for (const String &util_name : koshkit::util_names()) {
       if (!token_is_glob && !collector.allows_fuzzy_fallback() &&
-          !utils::smart_case_prefix_matches(util_name.view(), token))
+          !do_prefix_matches(util_name.view(), token, is_case_sensitive))
         continue;
       do_add(util_name.view());
     }
@@ -371,8 +405,8 @@ collect_command_names(StringView token, command_match_mode match_mode,
       (!token.is_empty() || collector.allows_fuzzy_fallback()))
   {
     for (let const &path_name : path_names)
-      if (utils::smart_case_prefix_matches(path_name.view(),
-                                           normalized_path_token.view()))
+      if (do_prefix_matches(path_name.view(), normalized_path_token.view(),
+                            path_is_case_sensitive))
         do_add_path(path_name.view());
   }
 

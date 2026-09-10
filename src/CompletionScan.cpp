@@ -90,11 +90,14 @@ static fn make_target_is_artifact(StringView name, const Path &directory) throws
     -> bool
 {
   if (os::has_directory_separator(name)) return true;
-  if (name == StringView{"GNUmakefile"} || name == StringView{"Makefile"} ||
-      name == StringView{"makefile"})
-  {
-    return true;
-  }
+  static constexpr PackedStringKey MAKEFILE_NAME_KEYS[] = {
+      SSK("GNUmakefile"),
+      SSK("Makefile"),
+      SSK("makefile"),
+  };
+  static constexpr StaticStringSet MAKEFILE_NAMES{MAKEFILE_NAME_KEYS};
+
+  if (MAKEFILE_NAMES.contains(name)) return true;
 
   let candidate = directory.clone();
   candidate.push_component(name);
@@ -184,15 +187,10 @@ static fn parse_package_json_scripts(StringView text) throws
 {
   let scripts = ArrayList<String>{heap_allocator()};
   let const section = StringView{"\"scripts\""};
-  usize at = 0;
-  let is_found = false;
-  for (; at + section.length <= text.length; at++)
-    if (text.substring_of_length(at, section.length) == section) {
-      is_found = true;
-      break;
-    }
-  if (!is_found) return scripts;
-  let i = at + section.length;
+  let const section_start = text.find_substring(section);
+  if (!section_start.has_value()) return scripts;
+
+  let i = *section_start + section.length;
   while (i < text.length && text[i] != '{')
     i++;
   if (i >= text.length) return scripts;
@@ -259,12 +257,16 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
         while (k < row.length && row[k] != ' ' && row[k] != '\t')
           k++;
         let const name = row.substring_of_length(start, k - start);
-        if (!name.find_character('*').has_value() &&
-            !name.find_character('?').has_value() &&
-            !name.find_character('!').has_value())
-        {
-          do_push_unique(name);
+        let is_pattern_host = false;
+        for (usize position = 0; position < name.length; position++) {
+          let const byte = name[position];
+          if (byte == '*' || byte == '?' || byte == '!') {
+            is_pattern_host = true;
+            break;
+          }
         }
+
+        if (!is_pattern_host) do_push_unique(name);
       }
     }
   }
@@ -1187,9 +1189,9 @@ fn internal::advance_shell_lexical_state(
 
     if (state.is_in_heredoc) {
       let const &heredoc = state.pending_heredocs[state.active_heredoc_index];
-      let line_end = i;
-      while (line_end < end && source[line_end] != '\n')
-        line_end++;
+      let const heredoc_newline =
+          source.substring_of_length(i, end - i).find_character('\n');
+      let line_end = heredoc_newline.has_value() ? i + *heredoc_newline : end;
       if (line_end == end && end < source.length) {
         i = end;
         break;
@@ -1349,12 +1351,22 @@ fn internal::advance_shell_lexical_state(
 
     let &frame =
         state.frames.is_empty() ? state.root_frame : state.frames.back();
-    let const is_word_boundary =
-        i == frame.body_start || source[i - 1] == ' ' ||
-        source[i - 1] == '\t' || source[i - 1] == '\n' ||
-        source[i - 1] == ';' || source[i - 1] == '&' || source[i - 1] == '|' ||
-        source[i - 1] == '(' || source[i - 1] == ')';
-    if (is_command_code && c == '#' && is_word_boundary) {
+    let const do_is_word_boundary = [&]() wontthrow -> bool {
+      if (i == frame.body_start) return true;
+
+      switch (source[i - 1]) {
+      case ' ':
+      case '\t':
+      case '\n':
+      case ';':
+      case '&':
+      case '|':
+      case '(':
+      case ')': return true;
+      default: return false;
+      }
+    };
+    if (c == '#' && is_command_code && do_is_word_boundary()) {
       state.is_in_comment = true;
       i++;
       continue;
@@ -1371,12 +1383,24 @@ fn internal::advance_shell_lexical_state(
               source[word_end + 1] == '\n');
     };
 
-    let const is_word_start =
-        i == frame.body_start || lexer::is_whitespace(source[i - 1]) ||
-        source[i - 1] == '\n' || source[i - 1] == ';' || source[i - 1] == '&' ||
-        source[i - 1] == '|' || source[i - 1] == '(' || source[i - 1] == ')';
-    if (is_word_start && !frame.is_in_array_value &&
-        lexer::is_part_of_identifier(c))
+    let const do_is_word_start = [&]() wontthrow -> bool {
+      if (i == frame.body_start) return true;
+
+      let const previous = source[i - 1];
+      if (lexer::is_whitespace(previous)) return true;
+
+      switch (previous) {
+      case '\n':
+      case ';':
+      case '&':
+      case '|':
+      case '(':
+      case ')': return true;
+      default: return false;
+      }
+    };
+    if (!frame.is_in_array_value && lexer::is_part_of_identifier(c) &&
+        do_is_word_start())
     {
       let word_end = i;
       while (word_end < end && !lexer::is_whitespace(source[word_end]) &&

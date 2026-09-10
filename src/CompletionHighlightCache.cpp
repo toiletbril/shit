@@ -307,10 +307,13 @@ fn shell_highlight_cache::spans_for(StringView source, usize line_start,
     while (m_next_checkpoint_threshold < source.length &&
            m_next_checkpoint_threshold < target)
     {
-      usize checkpoint_position = m_next_checkpoint_threshold;
-      while (checkpoint_position < source.length &&
-             source[checkpoint_position - 1] != '\n')
-        checkpoint_position++;
+      let const newline_position =
+          source.substring(m_next_checkpoint_threshold - 1)
+              .find_character('\n');
+      let const checkpoint_position =
+          newline_position.has_value()
+              ? m_next_checkpoint_threshold + *newline_position
+              : source.length;
       if (checkpoint_position >= source.length) {
         m_next_checkpoint_threshold = source.length;
         break;

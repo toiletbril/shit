@@ -228,6 +228,24 @@ static fn timeout_option_takes_next_word(StringView word) wontthrow -> bool
   return false;
 }
 
+static pure fn word_decodes_to_itself(StringView word) wontthrow -> bool
+{
+  for (usize position = 0; position < word.length; position++) {
+    switch (word[position]) {
+    case '\'':
+    case '"':
+    case '\\':
+    case '$':
+    case '`':
+    case '~': return false;
+
+    default: break;
+    }
+  }
+
+  return true;
+}
+
 static fn timeout_managed_command_start(StringView line,
                                         usize position) wontthrow
     -> Maybe<usize>
@@ -237,25 +255,28 @@ static fn timeout_managed_command_start(StringView line,
   {
     let const word = next_completion_prefix_word(line, position);
     if (!word.has_value()) return None;
+
+    let const is_plain_word = word_decodes_to_itself(*word);
     let const decoded_word =
-        utils::decode_shell_word(*word, completion_allocator());
+        is_plain_word ? utils::decoded_shell_word(completion_allocator())
+                      : utils::decode_shell_word(*word, completion_allocator());
+    let const word_text = is_plain_word ? *word : decoded_word.text.view();
 
     if (should_skip_value) {
       should_skip_value = false;
       continue;
     }
 
-    if (decoded_word.text == "-") return None;
+    if (word_text == "-") return None;
 
-    if (decoded_word.text == "--") {
+    if (word_text == "--") {
       let const duration = next_completion_prefix_word(line, position);
       if (!duration.has_value()) return None;
       return skip_blanks(line, position);
     }
 
-    if (decoded_word.text.length() > 1 && decoded_word.text[0] == '-') {
-      should_skip_value =
-          timeout_option_takes_next_word(decoded_word.text.view());
+    if (word_text.length > 1 && word_text[0] == '-') {
+      should_skip_value = timeout_option_takes_next_word(word_text);
       continue;
     }
 
@@ -270,23 +291,34 @@ static fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
   {
     let const word = next_completion_prefix_word(line, position);
     if (!word.has_value()) return None;
-    let const decoded_word =
-        utils::decode_shell_word(*word, completion_allocator());
 
-    if (decoded_word.text == "timeout")
+    let const is_plain_word = word_decodes_to_itself(*word);
+    let const decoded_word =
+        is_plain_word ? utils::decoded_shell_word(completion_allocator())
+                      : utils::decode_shell_word(*word, completion_allocator());
+    let const word_text = is_plain_word ? *word : decoded_word.text.view();
+
+    if (word_text == "timeout")
       return timeout_managed_command_start(line, position);
 
-    if (decoded_word.text == "koshkit") {
+    if (word_text == "koshkit") {
       let const utility = next_completion_prefix_word(line, position);
       if (!utility.has_value()) return None;
+
+      let const is_plain_utility = word_decodes_to_itself(*utility);
       let const decoded_utility =
-          utils::decode_shell_word(*utility, completion_allocator());
-      if (decoded_utility.text == "timeout")
+          is_plain_utility
+              ? utils::decoded_shell_word(completion_allocator())
+              : utils::decode_shell_word(*utility, completion_allocator());
+      let const utility_text =
+          is_plain_utility ? *utility : decoded_utility.text.view();
+
+      if (utility_text == "timeout")
         return timeout_managed_command_start(line, position);
       return None;
     }
 
-    if (!is_transparent_command_prefix(decoded_word.text.view())) return None;
+    if (!is_transparent_command_prefix(word_text)) return None;
   }
 }
 
