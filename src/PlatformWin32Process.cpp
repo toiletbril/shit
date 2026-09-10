@@ -235,14 +235,14 @@ static fn append_windows_quoted_arg(String &out, StringView arg) throws -> void;
 
 static pure fn is_batch_program(StringView path) wontthrow -> bool;
 
-static fn create_process_utf8(StringView application_path,
-                              StringView command_line,
-                              StringView working_directory,
-                              DWORD creation_flags, LPVOID environment_block,
-                              const STARTUPINFOW &startup_info,
-                              const HANDLE *inherited_handles,
-                              usize inherited_handle_count,
-                              PROCESS_INFORMATION &process_info) throws -> bool;
+static fn
+create_process_utf8(StringView application_path, StringView command_line,
+                    StringView working_directory, DWORD creation_flags,
+                    LPVOID environment_block, const STARTUPINFOW &startup_info,
+                    const HANDLE *inherited_handles,
+                    usize inherited_handle_count,
+                    PROCESS_INFORMATION &process_info,
+                    const ExecContext *stage_context = nullptr) throws -> bool;
 
 fn capture_program_output(const ArrayList<String> &argv,
                           u64 timeout_nanos) wontthrow -> Maybe<String>
@@ -516,7 +516,8 @@ static fn create_process_utf8(StringView application_path,
                               const STARTUPINFOW &startup_info,
                               const HANDLE *inherited_handles,
                               usize inherited_handle_count,
-                              PROCESS_INFORMATION &process_info) throws -> bool
+                              PROCESS_INFORMATION &process_info,
+                              const ExecContext *stage_context) throws -> bool
 {
   if ((startup_info.dwFlags & STARTF_USESTDHANDLES) != 0 &&
       (startup_info.hStdInput == nullptr ||
@@ -560,9 +561,25 @@ static fn create_process_utf8(StringView application_path,
        handle_position++)
     do_add_unique_handle(inherited_handles[handle_position]);
 
+  let const do_raise_highest_fd = [](i32 &highest, i32 target_fd) wontthrow {
+    if (target_fd > highest) highest = target_fd;
+  };
+  i32 highest_inherited_fd = HIGHEST_OPEN_SHELL_FD;
+  if (stage_context != nullptr)
+    stage_context->apply_nonstandard_routing(
+        [&](os::descriptor, i32 target_fd) {
+          do_raise_highest_fd(highest_inherited_fd, target_fd);
+        },
+        [&](i32, i32 target_fd) {
+          do_raise_highest_fd(highest_inherited_fd, target_fd);
+        },
+        [&](i32 target_fd) {
+          do_raise_highest_fd(highest_inherited_fd, target_fd);
+        });
+
   let inherited_fd_storage = ArrayList<u8>{heap_allocator()};
-  if (HIGHEST_OPEN_SHELL_FD > 2) {
-    let const inherited_fd_count = HIGHEST_OPEN_SHELL_FD + 1;
+  if (highest_inherited_fd > 2) {
+    let const inherited_fd_count = highest_inherited_fd + 1;
     let const storage_size = sizeof(i32) +
                              static_cast<usize>(inherited_fd_count) +
                              sizeof(intptr_t) * inherited_fd_count;
@@ -577,19 +594,54 @@ static fn create_process_utf8(StringView application_path,
                      sizeof(inherited_fd_count));
     let *flags = inherited_fd_storage.begin() + sizeof(inherited_fd_count);
     let *handles = flags + inherited_fd_count;
-    for (i32 shell_fd = 0; shell_fd < inherited_fd_count; shell_fd++) {
-      let const handle = is_shell_fd_close_on_exec(shell_fd)
-                             ? INVALID_HANDLE_VALUE
-                             : descriptor_for_shell_fd(shell_fd);
+
+    let const do_place_inherited_fd = [&](i32 shell_fd,
+                                          HANDLE handle) wontthrow {
+      if (shell_fd < 0 || shell_fd >= inherited_fd_count) return;
+
       let const handle_value = reinterpret_cast<intptr_t>(handle);
       __builtin_memcpy(handles + sizeof(handle_value) * shell_fd, &handle_value,
                        sizeof(handle_value));
-      if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {
-        continue;
-      }
-      flags[shell_fd] = 1;
-      do_add_unique_handle(handle);
+      flags[shell_fd] =
+          (handle == nullptr || handle == INVALID_HANDLE_VALUE) ? 0 : 1;
+    };
+    let const do_read_inherited_fd = [&](i32 shell_fd) wontthrow -> HANDLE {
+      if (shell_fd < 0 || shell_fd >= inherited_fd_count)
+        return INVALID_HANDLE_VALUE;
+
+      intptr_t handle_value = 0;
+      __builtin_memcpy(&handle_value, handles + sizeof(handle_value) * shell_fd,
+                       sizeof(handle_value));
+
+      return reinterpret_cast<HANDLE>(handle_value);
+    };
+
+    for (i32 shell_fd = 0; shell_fd < inherited_fd_count; shell_fd++)
+      do_place_inherited_fd(shell_fd, is_shell_fd_close_on_exec(shell_fd)
+                                          ? INVALID_HANDLE_VALUE
+                                          : descriptor_for_shell_fd(shell_fd));
+
+    if ((startup_info.dwFlags & STARTF_USESTDHANDLES) != 0) {
+      do_place_inherited_fd(0, startup_info.hStdInput);
+      do_place_inherited_fd(1, startup_info.hStdOutput);
+      do_place_inherited_fd(2, startup_info.hStdError);
     }
+
+    if (stage_context != nullptr)
+      stage_context->apply_nonstandard_routing(
+          [&](os::descriptor file_fd, i32 target_fd) {
+            do_place_inherited_fd(target_fd, file_fd);
+          },
+          [&](i32 dup_from_fd, i32 target_fd) {
+            do_place_inherited_fd(target_fd, do_read_inherited_fd(dup_from_fd));
+          },
+          [&](i32 target_fd) {
+            do_place_inherited_fd(target_fd, INVALID_HANDLE_VALUE);
+          });
+
+    for (i32 shell_fd = 0; shell_fd < inherited_fd_count; shell_fd++)
+      if (flags[shell_fd] != 0)
+        do_add_unique_handle(do_read_inherited_fd(shell_fd));
   }
 
   static SRWLOCK launch_lock = SRWLOCK_INIT;
@@ -914,7 +966,7 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
           working_directory != nullptr ? StringView{working_directory}
                                        : StringView{},
           creation_flags, environment_block, startup_info, inherited_handles,
-          inherited_handle_count, process_info))
+          inherited_handle_count, process_info, &ec))
   {
     if (allow_script_fallback && GetLastError() == ERROR_BAD_EXE_FORMAT) {
       if (!resolved_program_path_storage.is_empty())

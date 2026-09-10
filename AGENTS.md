@@ -91,6 +91,9 @@ changes update this file.
 - Descriptor-rebinding wrappers increment the descriptor epoch. Cached color
   decisions refresh against it. Forks, process groups, filesystems, and processor
   counts also use platform wrappers.
+- A routed platform fragment is included into `src/Platform.cpp` and owns no
+  object of its own. Compile such a fragment through `Platform.o` of the active
+  target and mode.
 
 ## Completion and language server
 
@@ -375,6 +378,8 @@ changes update this file.
 
 - Place conditionals and immediate expansions after their variables. Assign
   deferred tools after parse-time probes.
+- A repeated command-line override keeps only its last assignment. Pass a
+  multi-valued override as one space-separated value.
 - Add variant compiler definitions through `BUILD_DEFINITIONS`. An early
   override of accumulated compiler flags can suppress later platform flags.
 - Preserve argument zero and input origin when parsing MAKEFLAGS. Exclude parent
