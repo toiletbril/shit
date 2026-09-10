@@ -5,6 +5,7 @@ expect_command=$(command -v expect || :)
 RCFILE="$d/editor-rc"
 export RCFILE
 printf '%s\n' \
+    "PS1='> '" \
     "PROMPT_COMMAND='printf ready > \"\$EDITOR_READY_FILE\"; unset PROMPT_COMMAND'" \
     > "$RCFILE"
 
@@ -218,6 +219,7 @@ send_unhighlighted_input()
 
 printf '%s\n' \
     "set --tab-selector=plain" \
+    "PS1='> '" \
     "PROMPT_COMMAND='printf ready > \"\$EDITOR_READY_FILE\"; unset PROMPT_COMMAND'" \
     > "$d/unhighlighted-rc"
 send_unhighlighted_input | TERM=xterm-256color PATH="$d/path" \
@@ -256,6 +258,7 @@ send_tab_input()
 
 printf '%s\n' \
     "set --tab-selector=plain" \
+    "PS1='> '" \
     "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
     > "$d/tab-rc"
 send_tab_input | PATH="$d/path" KOSH_TEST_EDITOR_STATS=1 \
@@ -438,6 +441,7 @@ send_help_retry_input()
 
 printf '%s\n' \
   "set --tab-selector=plain" \
+  "PS1='> '" \
   "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
   > "$d/help-retry-rc"
 send_help_retry_input | TERM=xterm-256color \
@@ -453,7 +457,7 @@ echo 'timed out help completion stops after two attempts'
 
 mkdir "$d/manpath-bin" "$d/recovered-man"
 mkdir "$d/recovered-man/man1"
-printf '#!/bin/sh\n' > "$d/manpath-bin/git"
+printf '#!/bin/sh\n' > "$d/manpath-bin/koshmanprobe"
 printf '%s\n' \
   '#!/bin/sh' \
   'printf "attempted\\n" >> "$KOSH_MANPATH_MARKER"' \
@@ -464,17 +468,17 @@ printf '%s\n' \
   '  printf "%s\\n" "$KOSH_MANPATH_ROOT"' \
   'fi' \
   > "$d/manpath-bin/manpath"
-chmod +x "$d/manpath-bin/git" "$d/manpath-bin/manpath"
-printf '%s\n' '.TH GIT 1' '.SH SYNOPSIS' '\fBgit\fR' \
-  > "$d/recovered-man/man1/git.1"
-printf '%s\n' '.TH GIT-RECOVERED 1' '.SH SYNOPSIS' \
-  '\fBgit\fR \fBrecovered\fR' \
-  > "$d/recovered-man/man1/git-recovered.1"
+chmod +x "$d/manpath-bin/koshmanprobe" "$d/manpath-bin/manpath"
+printf '%s\n' '.TH KOSHMANPROBE 1' '.SH SYNOPSIS' '\fBkoshmanprobe\fR' \
+  > "$d/recovered-man/man1/koshmanprobe.1"
+printf '%s\n' '.TH KOSHMANPROBE-RECOVERED 1' '.SH SYNOPSIS' \
+  '\fBkoshmanprobe\fR \fBrecovered\fR' \
+  > "$d/recovered-man/man1/koshmanprobe-recovered.1"
 
 send_manpath_retry_input()
 {
   wait_for_prompt_count "$d/manpath-ready" 1 || exit 1
-  printf 'git rec\t'
+  printf 'koshmanprobe rec\t'
   wait_for_marker_count "$d/manpath-marker" 1 || exit 1
   sleep 1.1
   printf '\t'
@@ -487,6 +491,7 @@ send_manpath_retry_input()
 
 printf '%s\n' \
   "set --tab-selector=plain" \
+  "PS1='> '" \
   "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
   > "$d/manpath-rc"
 send_manpath_retry_input | TERM=xterm-256color MANPATH= \
@@ -569,6 +574,7 @@ send_navigation_input()
 }
 
 printf '%s\n' \
+    "PS1='> '" \
     "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
     > "$d/navigation-rc"
 send_navigation_input | TERM=xterm-256color \
