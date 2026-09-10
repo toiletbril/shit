@@ -653,6 +653,7 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
   LOG(All, "dropping %zu retained sources and %zu retained asts",
       m_retained_sources.count(), m_retained_source_asts.count());
 
+#if !defined NDEBUG
   for (let const &frame : m_source_frames) {
     if (frame.parent_source == nullptr) continue;
     for (let const *retained : m_retained_sources) {
@@ -660,6 +661,7 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
              "a live source frame still borrows a dropped source");
     }
   }
+#endif
 
   m_retained_source_asts.clear();
 
