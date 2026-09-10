@@ -29,13 +29,15 @@ namespace koshka {
 /* A stage redirection that is applied after the three standard slots are
    placed. Its target is a descriptor above 2, or one of the three when the
    redirection closes it. An opened file rides in file_fd and is owned by the
-   context. A duplication leaves file_fd invalid and names its source in
-   dup_from_fd, and a close leaves both unset. */
+   context unless is_file_borrowed marks it as the property of the loop
+   redirection cache. A duplication leaves file_fd invalid and names its source
+   in dup_from_fd, and a close leaves both unset. */
 struct nonstandard_descriptor
 {
   os::descriptor file_fd{KOSH_INVALID_FD};
   i32 target_fd{-1};
   i32 dup_from_fd{-1};
+  bool is_file_borrowed{false};
 };
 
 class ExecContext
@@ -72,6 +74,12 @@ public:
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
   Maybe<os::descriptor> err_fd{};
+
+  /* A slot descriptor that the loop redirection cache owns is borrowed. The
+     cache closes it when its loop ends, and the context leaves it open. */
+  bool is_in_fd_borrowed{false};
+  bool is_out_fd_borrowed{false};
+  bool is_err_fd_borrowed{false};
 
   /* Almost every command redirects nothing outside the three standard slots.
      The list stays at one null pointer until a stage fills it. */

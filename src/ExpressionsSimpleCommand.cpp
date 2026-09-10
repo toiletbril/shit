@@ -472,14 +472,16 @@ namespace {
 using expressions::Redirection;
 
 /* Keep one binding for each nonstandard target. The last redirection of that
-   descriptor wins, and the file it replaces closes here. */
+   descriptor wins, and the file it replaces closes here unless the loop
+   redirection cache owns it. */
 fn bind_nonstandard_fd(ArrayList<nonstandard_descriptor> &nonstandard,
                        nonstandard_descriptor binding) throws -> void
 {
   for (let &existing : nonstandard) {
     if (existing.target_fd != binding.target_fd) continue;
 
-    if (existing.file_fd != KOSH_INVALID_FD) os::close_fd(existing.file_fd);
+    if (existing.file_fd != KOSH_INVALID_FD && !existing.is_file_borrowed)
+      os::close_fd(existing.file_fd);
     existing = binding;
 
     return;
@@ -491,33 +493,38 @@ fn bind_nonstandard_fd(ArrayList<nonstandard_descriptor> &nonstandard,
 /* Route an opened descriptor into the slot its target names, fd 0 to input, 1
    to output, 2 to error. Any other target keeps its own number and joins the
    nonstandard list. The last redirection of a descriptor wins. A descriptor in
-   the slot closes first. */
+   the slot closes first unless the loop redirection cache owns it. */
 fn assign_redirected_fd(ExecContext &ec,
                         ArrayList<nonstandard_descriptor> &nonstandard, i32 fd,
-                        os::descriptor file_fd) throws -> void
+                        os::descriptor file_fd,
+                        bool is_file_borrowed = false) throws -> void
 {
   if (fd == 0) {
-    if (ec.in_fd) os::close_fd(*ec.in_fd);
+    if (ec.in_fd && !ec.is_in_fd_borrowed) os::close_fd(*ec.in_fd);
     ec.in_fd = file_fd;
+    ec.is_in_fd_borrowed = is_file_borrowed;
 
     return;
   }
 
   if (fd == 1) {
-    if (ec.out_fd) os::close_fd(*ec.out_fd);
+    if (ec.out_fd && !ec.is_out_fd_borrowed) os::close_fd(*ec.out_fd);
     ec.out_fd = file_fd;
+    ec.is_out_fd_borrowed = is_file_borrowed;
 
     return;
   }
 
   if (fd == 2) {
-    if (ec.err_fd) os::close_fd(*ec.err_fd);
+    if (ec.err_fd && !ec.is_err_fd_borrowed) os::close_fd(*ec.err_fd);
     ec.err_fd = file_fd;
+    ec.is_err_fd_borrowed = is_file_borrowed;
 
     return;
   }
 
-  bind_nonstandard_fd(nonstandard, nonstandard_descriptor{file_fd, fd, -1});
+  bind_nonstandard_fd(
+      nonstandard, nonstandard_descriptor{file_fd, fd, -1, is_file_borrowed});
 }
 
 /* A resolved duplication target, the descriptor or close marker in fd, or the
@@ -1613,8 +1620,8 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       m_redirections.count());
 
   /* A binding opened here is owned by the list until the context adopts it. A
-     later redirection that throws still releases what the earlier ones
-     opened. */
+     later redirection that throws still releases what the earlier ones opened.
+     A binding the loop redirection cache owns stays open. */
   ArrayList<nonstandard_descriptor> nonstandard{heap_allocator()};
   bool was_nonstandard_handed_off = false;
   defer
@@ -1622,7 +1629,8 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
     if (was_nonstandard_handed_off) return;
 
     for (let const &binding : nonstandard) {
-      if (binding.file_fd != KOSH_INVALID_FD) os::close_fd(binding.file_fd);
+      if (binding.file_fd != KOSH_INVALID_FD && !binding.is_file_borrowed)
+        os::close_fd(binding.file_fd);
     }
   };
 
@@ -1653,7 +1661,9 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
   };
 
   for (let const &redir : m_redirections) {
-    let const r = resolve_redirection(redir, cxt, source_location());
+    let const r = resolve_redirection(redir, cxt, source_location(),
+                                      /*open_or_stage_failed=*/nullptr,
+                                      /*should_allow_fd_memoization=*/true);
 
     if (redir.fd_allocation_name_token != nullptr) {
       let const &allocation_word =
@@ -1675,10 +1685,11 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
 
     switch (r.kind) {
     case redirection_outcome::Heredoc:
-      assign_redirected_fd(ec, nonstandard, target_fd, r.opened_fd);
+      assign_redirected_fd(ec, nonstandard, target_fd, r.opened_fd,
+                           r.is_cached);
       break;
     case redirection_outcome::BothStreams:
-      assign_redirected_fd(ec, nonstandard, 1, r.opened_fd);
+      assign_redirected_fd(ec, nonstandard, 1, r.opened_fd, r.is_cached);
       ec.should_duplicate_error_to_output = true;
       ec.was_output_to_error_last = false;
       ec.did_output_file_follow_error_dup = false;
@@ -1690,10 +1701,12 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
          mark carries that stream to the routing. */
       if (target_fd == 1 && ec.should_duplicate_error_to_output) {
         if (ec.out_fd) {
-          if (ec.err_fd) os::close_fd(*ec.err_fd);
+          if (ec.err_fd && !ec.is_err_fd_borrowed) os::close_fd(*ec.err_fd);
 
           ec.err_fd = ec.out_fd;
+          ec.is_err_fd_borrowed = ec.is_out_fd_borrowed;
           ec.out_fd = {};
+          ec.is_out_fd_borrowed = false;
           ec.should_duplicate_error_to_output = false;
         } else {
           ec.did_output_file_follow_error_dup = true;
@@ -1701,17 +1714,20 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       }
       if (target_fd == 2 && ec.should_duplicate_output_to_error) {
         if (ec.err_fd) {
-          if (ec.out_fd) os::close_fd(*ec.out_fd);
+          if (ec.out_fd && !ec.is_out_fd_borrowed) os::close_fd(*ec.out_fd);
 
           ec.out_fd = ec.err_fd;
+          ec.is_out_fd_borrowed = ec.is_err_fd_borrowed;
           ec.err_fd = {};
+          ec.is_err_fd_borrowed = false;
           ec.should_duplicate_output_to_error = false;
         } else {
           ec.did_error_file_follow_output_dup = true;
         }
       }
 
-      assign_redirected_fd(ec, nonstandard, target_fd, r.opened_fd);
+      assign_redirected_fd(ec, nonstandard, target_fd, r.opened_fd,
+                           r.is_cached);
       break;
     case redirection_outcome::Duplicate:
       if (r.dup_from_fd == target_fd) break;

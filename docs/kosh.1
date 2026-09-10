@@ -873,6 +873,15 @@ A redirection of the form {var}> or {var}< allocates a descriptor numbered ten
 or greater and assigns its number to var. The form {var}>&\- closes the
 descriptor named by var.
 .PP
+An appending redirection written inside a loop body opens its file once and
+keeps that descriptor for the rest of the loop. The same file and descriptor
+number are reused on every iteration, and the descriptor is closed when the loop
+ends. Up to sixteen such descriptors are kept at a time, and a loop that appends
+to more files than that reopens the ones beyond the limit on every iteration. A
+descriptor is held across the iterations whether the command stands alone or
+runs as a pipeline stage. Writes therefore continue to the original file even
+after that file is renamed or removed. Bash reopens the file on every iteration.
+.PP
 A diagnostic inside a tab-stripped here-document carries no source caret.
 .SH COMMAND EXECUTION
 Command lookup checks functions, builtins, cached program paths, PATH, and

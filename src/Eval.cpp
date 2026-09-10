@@ -1553,20 +1553,24 @@ fn ExecContext::set_program_path(Path path) throws -> void
 fn ExecContext::close_fds() throws -> void
 {
   if (in_fd.has_value()) {
-    os::close_fd(*in_fd);
+    if (!is_in_fd_borrowed) os::close_fd(*in_fd);
     in_fd.reset();
+    is_in_fd_borrowed = false;
   }
   if (out_fd.has_value()) {
-    os::close_fd(*out_fd);
+    if (!is_out_fd_borrowed) os::close_fd(*out_fd);
     out_fd.reset();
+    is_out_fd_borrowed = false;
   }
   if (err_fd.has_value()) {
-    os::close_fd(*err_fd);
+    if (!is_err_fd_borrowed) os::close_fd(*err_fd);
     err_fd.reset();
+    is_err_fd_borrowed = false;
   }
 
   for (let const &binding : nonstandard_fds) {
-    if (binding.file_fd != KOSH_INVALID_FD) os::close_fd(binding.file_fd);
+    if (binding.file_fd != KOSH_INVALID_FD && !binding.is_file_borrowed)
+      os::close_fd(binding.file_fd);
   }
   nonstandard_fds.clear();
 }
