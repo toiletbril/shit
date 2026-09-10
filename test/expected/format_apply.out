@@ -396,3 +396,25 @@ adjacent-status=0
 ((a))
 (( a = 1 ))
 adjacent-idempotent=yes
+makefile-format-status=0 errors=no
+NAMES ?= $(shell if command -v ps >/dev/null 2>&1; \
+	then \
+	  ps -p $$$$ -o comm= 2>/dev/null; \
+	fi)
+CMDLINE ?= $(shell powershell.exe -Command "(Get-CimInstance Win32_Process).CommandLine" 2>/dev/null)
+
+all:
+	@echo one; \
+	if [ -n "x" ]; \
+	then \
+	  echo two; \
+	fi
+makefile-idempotent=yes
+dockerfile-format-status=0 errors=no
+FROM alpine
+RUN apk add curl && if [ -f /etc/os-release ]; \
+    then \
+      cat /etc/os-release; \
+    fi && echo done
+CMD echo hi
+dockerfile-idempotent=yes

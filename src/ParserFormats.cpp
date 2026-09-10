@@ -14,6 +14,7 @@
 
 #include "MimicMood.hpp"
 #include "Path.hpp"
+#include "StaticStringMap.hpp"
 
 namespace koshka {
 
@@ -689,12 +690,127 @@ pure fn parser_format_fragment_at(const parsed_format_document &document,
   return None;
 }
 
+constexpr PackedStringKey LIST_OPENER_KEYS[] = {
+    SSK(";"),  SSK("&"),  SSK("|"),    SSK("&&"), SSK("||"),
+    SSK("("),  SSK("{"),  SSK("then"), SSK("do"), SSK("else"),
+    SSK(";;"), SSK(";&"), SSK(";;&"),
+};
+constexpr StaticStringSet LIST_OPENERS{LIST_OPENER_KEYS};
+
+constexpr PackedStringKey ARM_TERMINATOR_KEYS[] = {
+    SSK(";;"),
+    SSK(";&"),
+    SSK(";;&"),
+};
+constexpr StaticStringSet ARM_TERMINATORS{ARM_TERMINATOR_KEYS};
+
+pure static fn line_first_token(StringView line) wontthrow -> StringView
+{
+  usize start = 0;
+  while (start < line.length && (line[start] == ' ' || line[start] == '\t'))
+    start++;
+
+  usize end = start;
+  while (end < line.length && line[end] != ' ' && line[end] != '\t')
+    end++;
+
+  return line.substring_of_length(start, end - start);
+}
+
+pure static fn line_last_token(StringView line) wontthrow -> StringView
+{
+  usize end = line.length;
+  while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
+    end--;
+
+  usize start = end;
+  while (start > 0 && line[start - 1] != ' ' && line[start - 1] != '\t')
+    start--;
+
+  return line.substring_of_length(start, end - start);
+}
+
+static fn trimmed_of_trailing_newlines(StringView text) wontthrow -> StringView
+{
+  usize length = text.length;
+  while (length > 0 && text[length - 1] == '\n')
+    length--;
+
+  return text.substring_of_length(0, length);
+}
+
+static fn encode_continued(const parser_format_fragment &fragment,
+                           StringView replacement, String &encoded) throws
+    -> void
+{
+  let const body = trimmed_of_trailing_newlines(replacement);
+  let lines = ArrayList<StringView>{heap_allocator()};
+  usize position = 0;
+
+  while (position < body.length) {
+    let const line = body.next_line(position);
+    if (!line_first_token(line).is_empty()) lines.push(line);
+  }
+
+  bool is_expecting_case_pattern = false;
+
+  for (usize index = 0; index < lines.count(); index++) {
+    let line = lines[index];
+    let const first = line_first_token(line);
+    let last = line_last_token(line);
+    let const is_wrapped = last == "\\";
+    if (is_wrapped) {
+      usize length = line.length;
+      while (length > 0 && line[length - 1] == '\\')
+        length--;
+      while (length > 0 &&
+             (line[length - 1] == ' ' || line[length - 1] == '\t'))
+        length--;
+      line = line.substring_of_length(0, length);
+      last = line_last_token(line);
+    }
+
+    let const is_case_pattern = is_expecting_case_pattern && first != "esac";
+    let const is_case_header = first == "case" && last == "in";
+    if (!is_wrapped) {
+      is_expecting_case_pattern =
+          is_case_header || ARM_TERMINATORS.contains(last);
+    }
+
+    if (index > 0) {
+      encoded.append(" \\\n");
+      encoded.append_repeated(fragment.continuation_byte,
+                              fragment.indent_length);
+    }
+
+    encoded.append(line);
+    if (index + 1 >= lines.count()) break;
+
+    let const next_first = line_first_token(lines[index + 1]);
+    if (is_wrapped || is_case_pattern || is_case_header ||
+        LIST_OPENERS.contains(last) || ARM_TERMINATORS.contains(next_first) ||
+        next_first == ")")
+    {
+      continue;
+    }
+
+    encoded.push(';');
+  }
+}
+
 fn parser_format_encode(const parser_format_fragment &fragment,
                         StringView replacement) throws -> Maybe<String>
 {
   let encoded = String{heap_allocator()};
   switch (fragment.codec) {
-  case parser_format_codec::Direct: encoded.append(replacement); return encoded;
+  case parser_format_codec::Direct:
+    encoded.append(trimmed_of_trailing_newlines(replacement));
+
+    return encoded;
+  case parser_format_codec::Continued:
+    encode_continued(fragment, replacement, encoded);
+
+    return encoded;
   case parser_format_codec::JsonString:
     for (usize position = 0; position < replacement.length; position++) {
       switch (replacement[position]) {

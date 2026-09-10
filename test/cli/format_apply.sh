@@ -516,3 +516,37 @@ printf '%s\n' "$adjacent"
 adjacent_second=$(printf '%s\n' "$adjacent" | "$BIN" --format)
 printf 'adjacent-idempotent=%s\n' \
   "$([ "$adjacent" = "$adjacent_second" ] && printf yes)"
+
+mkdir -p "$root/make-first" "$root/make-second"
+printf 'NAMES ?= \044(shell \\\n\tif command -v ps >/dev/null 2>&1; then \\\n\t\tps -p \044\044\044\044 -o comm= 2>/dev/null; \\\n\tfi)\nCMDLINE ?= \044(shell powershell.exe -Command "(Get-CimInstance Win32_Process).CommandLine" 2>/dev/null)\n\nall:\n\t@echo one; \\\n\tif [ -n "x" ]; then \\\n\techo two; \\\n\tfi\n' \
+  > "$root/make-first/Makefile"
+"$BIN" --format "$root/make-first/Makefile" \
+  > "$root/make-first/formatted" 2> "$root/make-first/errors"
+makefile_status=$?
+makefile_errors=$([ -s "$root/make-first/errors" ] && printf yes || printf no)
+printf 'makefile-format-status=%s errors=%s\n' \
+  "$makefile_status" "$makefile_errors"
+cat "$root/make-first/formatted"
+cp "$root/make-first/formatted" "$root/make-second/Makefile"
+"$BIN" --format "$root/make-second/Makefile" \
+  > "$root/make-second/formatted" 2>/dev/null
+printf 'makefile-idempotent=%s\n' \
+  "$(cmp -s "$root/make-first/formatted" "$root/make-second/formatted" && \
+      printf yes)"
+
+mkdir -p "$root/docker-first" "$root/docker-second"
+printf 'FROM alpine\nRUN apk add curl \\\n    && if [ -f /etc/os-release ]; then \\\n    cat /etc/os-release; \\\n    fi \\\n    && echo done\nCMD echo hi\n' \
+  > "$root/docker-first/Dockerfile"
+"$BIN" --format "$root/docker-first/Dockerfile" \
+  > "$root/docker-first/formatted" 2> "$root/docker-first/errors"
+dockerfile_status=$?
+dockerfile_errors=$([ -s "$root/docker-first/errors" ] && printf yes || printf no)
+printf 'dockerfile-format-status=%s errors=%s\n' \
+  "$dockerfile_status" "$dockerfile_errors"
+cat "$root/docker-first/formatted"
+cp "$root/docker-first/formatted" "$root/docker-second/Dockerfile"
+"$BIN" --format "$root/docker-second/Dockerfile" \
+  > "$root/docker-second/formatted" 2>/dev/null
+printf 'dockerfile-idempotent=%s\n' \
+  "$(cmp -s "$root/docker-first/formatted" "$root/docker-second/formatted" && \
+      printf yes)"

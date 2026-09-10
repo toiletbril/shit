@@ -74,6 +74,7 @@ enum class parser_format_codec : u8
   Direct,
   Indented,
   JsonString,
+  Continued,
 };
 
 struct parser_format_json_key
@@ -90,6 +91,7 @@ struct parser_format_fragment
   parser_format_codec codec{parser_format_codec::Direct};
   bool should_silence_unresolved_commands{false};
   bool should_select_end{false};
+  char continuation_byte{' '};
   usize host_start{0};
   usize host_end{0};
   usize indent_length{0};

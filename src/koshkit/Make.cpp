@@ -1903,10 +1903,16 @@ static fn make_expansion_end(StringView text, usize start_position,
       position += 2;
       continue;
     }
-    if (text[position] == close_stack.back()) {
+    let const current_closer = close_stack.back();
+    if (text[position] == current_closer) {
       close_stack.pop_back();
       if (close_stack.is_empty()) return position;
+    } else if ((current_closer == ')' && text[position] == '(') ||
+               (current_closer == '}' && text[position] == '{'))
+    {
+      close_stack.push(current_closer);
     }
+
     position++;
   }
 
