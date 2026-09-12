@@ -19,6 +19,17 @@ rc=130
      3 |  exec 9< "$fifo"
        |          ^~~~~~~
 rc=130
+== wc buffers completed rows before an interrupted source:
+1:1: error: Interrupted.
+     1 |  directory=$1
+       |  ^
+rc=130
+== cksum prints completed rows before an interrupted source:
+2715464726 6 first
+1:1: error: Interrupted.
+     1 |  directory=$1
+       |  ^
+rc=130
 == an ignored interrupt leaves the open blocked until its peer arrives:
 kept=[payload] status=0
 rc=0

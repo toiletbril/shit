@@ -58,6 +58,24 @@ static t__forceinline fn update_checksum(u32 checksum, const char *bytes,
   return checksum;
 }
 
+struct checksum_source_state
+{
+  u32 checksum{0};
+  u64 byte_count{0};
+  i32 error_number{0};
+  bool is_complete{false};
+};
+
+static fn finish_checksum(u32 checksum, u64 byte_count) wontthrow -> u32
+{
+  for (u64 length = byte_count; length != 0; length >>= 8) {
+    let const byte = static_cast<u8>(length);
+    checksum = (checksum << 8) ^ CHECKSUM_TABLE.values[(checksum >> 24) ^ byte];
+  }
+
+  return ~checksum;
+}
+
 Cksum::Cksum() = default;
 
 pure fn Cksum::kind() const wontthrow -> Utility::Kind { return Kind::Cksum; }
@@ -74,66 +92,63 @@ fn Cksum::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
+  let source_states = ArrayList<checksum_source_state>{cxt.scratch_allocator()};
+  source_states.reserve(sources.count());
+  for (usize source_index = 0; source_index < sources.count(); source_index++)
+    source_states.push({});
+
+  let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
+  usize next_output_index = 0;
   i32 status = 0;
+  loop
+  {
+    let const read_result = reader.read_next(chunks);
+    if (read_result == SourceBatchReader::ReadResult::Interrupted) return 130;
 
-  for (let const source : sources) {
-    let const input = open_named_or_stdin(ec, source);
-    if (!input.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "cksum: cannot read '" +
-                                    String{cxt.scratch_allocator(), source} +
-                                    "': " + os::last_system_error_message());
-      status = 1;
-      continue;
+    for (let const &chunk : chunks) {
+      let &state = source_states[chunk.source_index];
+      if (chunk.error_number != 0) {
+        state.error_number = chunk.error_number;
+        state.is_complete = true;
+        continue;
+      }
+
+      state.checksum = update_checksum(state.checksum, chunk.content.data,
+                                       chunk.content.length);
+      state.byte_count += chunk.content.length;
+      state.is_complete = chunk.is_complete;
     }
-    defer
-    {
-      if (input->should_close) os::close_fd(input->descriptor);
-    };
 
-    u32 checksum = 0;
-    u64 byte_count = 0;
-    bool did_read_fail = false;
-    char buffer[65536];
-
-    loop
+    while (next_output_index < sources.count() &&
+           source_states[next_output_index].is_complete)
     {
-      let const read_count =
-          os::read_fd(input->descriptor, buffer, sizeof(buffer));
-      if (!read_count.has_value()) {
-        if (os::INTERRUPT_REQUESTED) return 130;
+      let const &state = source_states[next_output_index];
+      let const source = sources[next_output_index];
+      if (state.error_number != 0) {
+        os::set_last_system_error(state.error_number);
         report_soft_koshkit_error(ec, cxt,
                                   "cksum: cannot read '" +
                                       String{cxt.scratch_allocator(), source} +
                                       "': " + os::last_system_error_message());
         status = 1;
-        did_read_fail = true;
-        break;
+      } else {
+        let output =
+            String::from(finish_checksum(state.checksum, state.byte_count),
+                         cxt.scratch_allocator());
+        output += ' ';
+        output += String::from(state.byte_count, cxt.scratch_allocator());
+        if (!operands.is_empty()) {
+          output += ' ';
+          output += source;
+        }
+        output += '\n';
+        ec.print_to_stdout(output);
       }
-      if (*read_count == 0) break;
-
-      checksum = update_checksum(checksum, buffer, *read_count);
-      byte_count += *read_count;
+      next_output_index++;
     }
 
-    if (did_read_fail) continue;
-
-    for (u64 length = byte_count; length != 0; length >>= 8) {
-      let const byte = static_cast<u8>(length);
-      checksum =
-          (checksum << 8) ^ CHECKSUM_TABLE.values[(checksum >> 24) ^ byte];
-    }
-    checksum = ~checksum;
-
-    let output = String::from(checksum, cxt.scratch_allocator());
-    output += ' ';
-    output += String::from(byte_count, cxt.scratch_allocator());
-    if (!operands.is_empty()) {
-      output += ' ';
-      output += source;
-    }
-    output += '\n';
-    ec.print_to_stdout(output);
+    if (read_result == SourceBatchReader::ReadResult::Complete) break;
   }
 
   return status;

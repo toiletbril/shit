@@ -5,7 +5,9 @@ unset KOSH_FLAGS
 # still opened once the peer arrives.
 directory=$(mktemp -d)
 trap '[ -n "$directory" ] && /bin/rm -rf "$directory"' EXIT
-mkfifo "$directory/read" "$directory/write" "$directory/exec" "$directory/kept"
+mkfifo "$directory/read" "$directory/write" "$directory/exec" "$directory/kept" \
+  "$directory/wc" "$directory/cksum"
+printf 'first\n' > "$directory/first"
 
 echo "== an untrapped interrupt ends a blocking read open:"
 "$BIN" --no-traces --mood bash -c 'fifo=$1
@@ -29,6 +31,28 @@ echo "== an exec redirection reports the interrupt once:"
 exec 9< "$fifo"
 echo unreached
 wait' shell "$directory/exec" 2>&1
+echo "rc=$?"
+
+echo "== wc buffers completed rows before an interrupted source:"
+"$BIN" --no-traces --mood bash -c 'directory=$1
+fifo=$2
+cd "$directory"
+( exec 9> "$fifo"; /bin/sleep 2 ) &
+( /bin/sleep 1; kill -INT $$ ) &
+koshkit wc -c first "$fifo"
+echo "wc-status=$?"
+wait' shell "$directory" "$directory/wc" 2>&1
+echo "rc=$?"
+
+echo "== cksum prints completed rows before an interrupted source:"
+"$BIN" --no-traces --mood bash -c 'directory=$1
+fifo=$2
+cd "$directory"
+( exec 9> "$fifo"; /bin/sleep 2 ) &
+( /bin/sleep 1; kill -INT $$ ) &
+koshkit cksum first "$fifo"
+echo "cksum-status=$?"
+wait' shell "$directory" "$directory/cksum" 2>&1
 echo "rc=$?"
 
 echo "== an ignored interrupt leaves the open blocked until its peer arrives:"
