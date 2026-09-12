@@ -33,12 +33,18 @@ fn Tty::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (!operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
+  if (!operands.is_empty()) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                            "unexpected operand '" + operands[0] + "'");
+    return 2;
+  }
+
   let const name = os::terminal_name(ec.in_fd.value_or(KOSH_STDIN));
   if (!name.has_value()) {
     if (!FLAG_TTY_SILENT.is_enabled()) ec.print_to_stdout("not a tty\n");

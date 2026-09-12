@@ -272,3 +272,29 @@ note: select one of the two modes.
 1:16: error: unlink: cannot unlink '.': it is a directory.
      1 |  koshkit unlink .
        |                 ^
+=== tty operand location ===
+1:13: error: tty: unexpected operand 'extra'.
+     1 |  koshkit tty extra
+       |              ^~~~~
+=== uname operand location ===
+1:15: error: uname: unexpected operand 'extra'.
+     1 |  koshkit uname extra
+       |                ^~~~~
+=== who first operand location ===
+1:13: error: who: unexpected operand 'wrong'.
+     1 |  koshkit who wrong
+       |              ^~~~~
+note: the only operand form is `am i`.
+=== who missing second operand location ===
+1:13: error: who: expected 'i' after 'am'.
+     1 |  koshkit who am
+       |              ^~
+=== who second operand location ===
+1:16: error: who: expected 'i' after 'am'.
+     1 |  koshkit who am wrong
+       |                 ^~~~~
+=== who extra operand location ===
+1:18: error: who: unexpected operand 'extra'.
+     1 |  koshkit who am i extra
+       |                   ^~~~~
+note: the only operand form is `am i`.

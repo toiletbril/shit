@@ -47,15 +47,38 @@ fn Who::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (!operands.is_empty() &&
-      (operands.count() != 2 || operands[0].view() != "am" ||
-       operands[1].view() != "i"))
-    return report_usage_error(ec, cxt, args[0].view());
+  if (!operands.is_empty()) {
+    if (operands[0].view() != "am") {
+      KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                              "unexpected operand '" + operands[0] + "'",
+                              "the only operand form is `am i`");
+      return 2;
+    }
+
+    if (operands.count() == 1) {
+      KOSHKIT_REPORT_ERROR_AT(operand_locations[0], "expected 'i' after 'am'");
+      return 2;
+    }
+
+    if (operands[1].view() != "i") {
+      KOSHKIT_REPORT_ERROR_AT(operand_locations[1], "expected 'i' after 'am'");
+      return 2;
+    }
+
+    if (operands.count() > 2) {
+      KOSHKIT_REPORT_ERROR_AT(operand_locations[2],
+                              "unexpected operand '" + operands[2] + "'",
+                              "the only operand form is `am i`");
+      return 2;
+    }
+  }
+
   let const is_current = FLAG_WHO_CURRENT.is_enabled() || !operands.is_empty();
   if (!is_current) {
     let const has_nonuser_selection =

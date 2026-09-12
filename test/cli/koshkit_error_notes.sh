@@ -178,3 +178,21 @@ echo "=== unlink missing path location ==="
 
 echo "=== unlink directory location ==="
 "$BIN" -c 'koshkit unlink .' 2>&1
+
+echo "=== tty operand location ==="
+"$BIN" -c 'koshkit tty extra' 2>&1
+
+echo "=== uname operand location ==="
+"$BIN" -c 'koshkit uname extra' 2>&1
+
+echo "=== who first operand location ==="
+"$BIN" -c 'koshkit who wrong' 2>&1
+
+echo "=== who missing second operand location ==="
+"$BIN" -c 'koshkit who am' 2>&1
+
+echo "=== who second operand location ==="
+"$BIN" -c 'koshkit who am wrong' 2>&1
+
+echo "=== who extra operand location ==="
+"$BIN" -c 'koshkit who am i extra' 2>&1
