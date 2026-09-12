@@ -44,8 +44,9 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -57,31 +58,41 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
                              : specification;
   let const group_text =
       colon.has_value() ? specification.substring(*colon + 1) : StringView{};
-  if (owner_text.is_empty() && !colon.has_value())
-    throw Error{"chown: invalid owner '" + operands[0] + "'"};
-  if (colon.has_value() && group_text.is_empty())
-    throw Error{"chown: invalid specification '" + operands[0] + "'"};
+  if (owner_text.is_empty() && !colon.has_value()) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                            "invalid owner '" + operands[0] + "'",
+                            "use an owner name or an unsigned decimal user id");
+    return 1;
+  }
+  if (colon.has_value() && group_text.is_empty()) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                            "invalid specification '" + operands[0] + "'",
+                            "use owner, owner:group, or :group");
+    return 1;
+  }
 
   i64 owner_id = -1;
   i64 group_id = -1;
   if (!owner_text.is_empty()) {
     let const resolved = resolve_user_id(owner_text);
-    if (!resolved.has_value())
-      throw Error{
-          "chown: invalid owner '" +
-          String{cxt.scratch_allocator(), owner_text}
-          + "'"
-      };
+    if (!resolved.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(
+          operand_locations[0],
+          "invalid owner '" + String{cxt.scratch_allocator(), owner_text} + "'",
+          "use an owner name or an unsigned decimal user id");
+      return 1;
+    }
     owner_id = *resolved;
   }
   if (!group_text.is_empty()) {
     let const resolved = resolve_group_id(group_text);
-    if (!resolved.has_value())
-      throw Error{
-          "chown: invalid group '" +
-          String{cxt.scratch_allocator(), group_text}
-          + "'"
-      };
+    if (!resolved.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(
+          operand_locations[0],
+          "invalid group '" + String{cxt.scratch_allocator(), group_text} + "'",
+          "use a group name or an unsigned decimal group id");
+      return 1;
+    }
     group_id = *resolved;
   }
 

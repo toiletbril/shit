@@ -152,6 +152,21 @@ echo "=== cal month location ==="
 echo "=== cal year location ==="
 "$BIN" -c 'koshkit cal 1 0' 2>&1
 
+echo "=== chgrp group location ==="
+"$BIN" -c 'koshkit chgrp KOSH_MISSING_GROUP LICENSE' 2>&1
+
+echo "=== chmod mode location ==="
+"$BIN" -c 'koshkit chmod u=rz LICENSE' 2>&1
+
+echo "=== chown owner location ==="
+"$BIN" -c 'koshkit chown KOSH_MISSING_USER LICENSE' 2>&1
+
+echo "=== chown specification location ==="
+"$BIN" -c 'koshkit chown 0: LICENSE' 2>&1
+
+echo "=== chown group location ==="
+"$BIN" -c 'koshkit chown :KOSH_MISSING_GROUP LICENSE' 2>&1
+
 echo "=== evildisk color value location ==="
 "$BIN" -c 'koshkit evildisk --color invalid' 2>&1
 

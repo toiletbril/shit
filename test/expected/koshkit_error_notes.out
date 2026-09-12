@@ -242,6 +242,31 @@ note: use a month from 1 through 12.
      1 |  koshkit cal 1 0
        |                ^
 note: use a positive decimal year no greater than 9223372036854775807.
+=== chgrp group location ===
+1:15: error: chgrp: invalid group 'KOSH_MISSING_GROUP'.
+     1 |  koshkit chgrp KOSH_MISSING_GROUP LICENSE
+       |                ^~~~~~~~~~~~~~~~~~
+note: use a group name or an unsigned decimal group id.
+=== chmod mode location ===
+1:15: error: chmod: invalid mode 'u=rz'.
+     1 |  koshkit chmod u=rz LICENSE
+       |                ^~~~
+note: use one to four octal digits or symbolic clauses such as u+x,g-w.
+=== chown owner location ===
+1:15: error: chown: invalid owner 'KOSH_MISSING_USER'.
+     1 |  koshkit chown KOSH_MISSING_USER LICENSE
+       |                ^~~~~~~~~~~~~~~~~
+note: use an owner name or an unsigned decimal user id.
+=== chown specification location ===
+1:15: error: chown: invalid specification '0:'.
+     1 |  koshkit chown 0: LICENSE
+       |                ^~
+note: use owner, owner:group, or :group.
+=== chown group location ===
+1:15: error: chown: invalid group 'KOSH_MISSING_GROUP'.
+     1 |  koshkit chown :KOSH_MISSING_GROUP LICENSE
+       |                ^~~~~~~~~~~~~~~~~~~
+note: use a group name or an unsigned decimal group id.
 === evildisk color value location ===
 1:26: error: evildisk: invalid color mode.
      1 |  koshkit evildisk --color invalid

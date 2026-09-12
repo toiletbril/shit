@@ -44,15 +44,20 @@ fn Chgrp::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
   let const group_id = resolve_group_id(operands[0].view());
-  if (!group_id.has_value())
-    throw Error{"chgrp: invalid group '" + operands[0] + "'"};
+  if (!group_id.has_value()) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                            "invalid group '" + operands[0] + "'",
+                            "use a group name or an unsigned decimal group id");
+    return 1;
+  }
 
   let const should_recurse = FLAG_CHGRP_RECURSIVE.is_enabled();
   let traversal_position = FLAG_CHGRP_COMMAND_LINE_FOLLOW.position();

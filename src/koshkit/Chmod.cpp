@@ -42,12 +42,7 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
   let const parsed =
       parse_file_mode(expression, status.mode, os::get_file_creation_mask(),
                       os::file_type_letter(status.mode) == 'd');
-  if (!parsed.has_value())
-    throw Error{
-        "chmod: invalid mode '" + String{cxt.scratch_allocator(), expression}
-          +
-        "'"
-    };
+  ASSERT(parsed.has_value());
 
   bool did_succeed = true;
   if (!os::set_file_mode(path.text().view(), *parsed)) {
@@ -86,13 +81,21 @@ fn Chmod::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
   let const expression = operands[0].view();
+  if (!parse_file_mode(expression, 0, 0, false).has_value()) {
+    KOSHKIT_REPORT_ERROR_AT(
+        operand_locations[0], "invalid mode '" + operands[0] + "'",
+        "use one to four octal digits or symbolic clauses such as u+x,g-w");
+    return 1;
+  }
+
   i32 status = 0;
 
   for (usize index = 1; index < operands.count(); index++)
