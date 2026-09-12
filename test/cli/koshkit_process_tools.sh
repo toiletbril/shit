@@ -86,20 +86,13 @@ esac
 printf 'evilio-process-shape=%s\n' "$process_shape"
 printf 'evilio-process-scope=%s\n' "$process_scope"
 
-process_idle=$(printf '%s\n' "$process_report" | {
-  process_idle=excluded
-  while read -r process_pid process_read process_write process_read_iops \
-    process_write_iops process_command; do
-    if [ "$process_pid" != PROCESSES ] && [ "$process_pid" != PID ]; then
-      if [ "$process_read:$process_write:$process_read_iops:$process_write_iops" = \
-        0:0:0:0 ]; then
-        process_idle=present
-      fi
-    fi
-  done
-  printf '%s' "$process_idle"
-})
-printf 'evilio-process-idle=%s\n' "$process_idle"
+process_line_count=$(printf '%s\n' "$process_report" | wc -l)
+if [ "$process_line_count" -gt 1 ]; then
+  process_rows=present
+else
+  process_rows=missing
+fi
+printf 'evilio-process-rows=%s\n' "$process_rows"
 
 "$BIN" -c \
   'koshkit evilio --cumulative --ps -1 0.05 --color never' \

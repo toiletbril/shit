@@ -91,6 +91,7 @@ fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
        process_position++)
   {
     let const &process = processes[process_position];
+    if (process.pid <= 0) continue;
     if (selected_pid.has_value() && process.pid != *selected_pid) continue;
 
     process_ids.push(process.pid);
@@ -591,9 +592,9 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     let const after_rows = read_process_io_rows(allocator, selected_pid, true);
     let const elapsed_nanoseconds =
         os::monotonic_nanos() - started_at_nanoseconds;
-    let const sampled_rows =
-        sample_process_io_rows(before_rows, after_rows, elapsed_nanoseconds,
-                               allocator, selected_pid.has_value());
+    let const sampled_rows = sample_process_io_rows(
+        before_rows, after_rows, elapsed_nanoseconds, allocator,
+        FLAG_EVILIO_PS.is_enabled() || selected_pid.has_value());
     let output = String{allocator};
     append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
                                   should_color);
