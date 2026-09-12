@@ -602,6 +602,59 @@ struct source_read_result
   i32 error_number{0};
 };
 
+class SourceBatchReader
+{
+public:
+  enum class ReadResult : u8
+  {
+    Chunks,
+    Complete,
+    Interrupted,
+  };
+
+  struct Chunk
+  {
+    StringView content;
+    usize source_index{0};
+    i32 error_number{0};
+    bool is_complete{false};
+  };
+
+  SourceBatchReader(const ExecContext &ec, const ArrayList<StringView> &sources,
+                    Allocator allocator) throws;
+  ~SourceBatchReader();
+
+  fn read_next(ArrayList<Chunk> &chunks) throws -> ReadResult;
+
+  SourceBatchReader(const SourceBatchReader &) = delete;
+  fn operator=(const SourceBatchReader &)->SourceBatchReader & = delete;
+
+private:
+  struct Reader
+  {
+    ArrayList<char> buffer{heap_allocator()};
+    u64 byte_offset{0};
+    usize source_index{0};
+    os::descriptor descriptor{KOSH_INVALID_FD};
+    bool should_close{false};
+    bool is_complete{false};
+  };
+
+  static fn close_reader(Reader &reader) wontthrow -> void;
+  fn retire_completed_readers() throws -> void;
+  fn fill_readers(ArrayList<Chunk> &chunks) throws -> void;
+  fn read_seekable(ArrayList<Chunk> &chunks) throws -> ReadResult;
+  fn read_sequential(ArrayList<Chunk> &chunks) throws -> ReadResult;
+
+  const ExecContext &m_ec;
+  const ArrayList<StringView> &m_sources;
+  ArrayList<Reader> m_readers;
+  Maybe<Reader> m_sequential_reader;
+  os::Batch m_batch;
+  ArrayList<os::batch_result> m_results;
+  usize m_source_index{0};
+};
+
 fn read_named_or_stdin_batch(const ExecContext &ec,
                              const ArrayList<StringView> &sources,
                              Allocator allocator) throws
