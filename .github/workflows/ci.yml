@@ -42,7 +42,7 @@ jobs:
         run: NO_TOILETLINE=1 make test
 
       - name: Build release binary
-        run: make clean && make CXX=g++ LINKER_SELECTION_FLAG= MODE=rel kosh
+        run: make clean && make CXX=g++ LINKER_SELECTION_FLAG= MODE=rel kosh && du -sh kosh
 
       - name: Run benchmark
         run: >-
