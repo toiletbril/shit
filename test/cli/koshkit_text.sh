@@ -33,6 +33,21 @@ echo "--- strings reads later files after a missing operand ---"
 "$BIN" -c \
   'koshkit strings cat-first.txt missing.txt cat-last.txt; printf "status=%s\n" "$?"' \
   2>&1
+"$BIN" -c "koshkit yes x | koshkit tr -d '\n' | koshkit head -c 65535" \
+  > cut-boundary.txt
+printf ':tail\n' >> cut-boundary.txt
+echo "--- cut preserves a line across chunks ---"
+"$BIN" -c 'koshkit cut -d : -f 2 cut-boundary.txt'
+"$BIN" -c "koshkit yes x | koshkit tr -d '\n' | koshkit head -c 65535" \
+  > cut-utf8-boundary.txt
+printf '\303\251z' >> cut-utf8-boundary.txt
+echo "--- cut preserves split UTF-8 at final line ---"
+"$BIN" -c \
+  'koshkit cut -c 65536-65537 cut-utf8-boundary.txt | koshkit od -An -tx1; koshkit cut -b 65537 -n cut-utf8-boundary.txt | koshkit od -An -tx1'
+echo "--- cut reads later files after a missing operand ---"
+"$BIN" -c \
+  'koshkit cut -c 1-5 cat-first.txt missing.txt cat-last.txt; printf "status=%s\n" "$?"' \
+  2>&1
 echo "--- wc multi-chunk input with a missing operand ---"
 "$BIN" -c \
   'koshkit wc -c batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"' \

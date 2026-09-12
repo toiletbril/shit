@@ -81,108 +81,127 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
   let const is_byte_mode = FLAG_CUT_BYTES.is_set();
   let const should_keep_characters_whole = FLAG_CUT_NO_SPLIT.is_enabled();
   let const should_suppress_undelimited = FLAG_CUT_SUPPRESS.is_enabled();
+  let line = String{cxt.scratch_allocator()};
+  let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
   i32 status = 0;
+  let const do_process_line = [&](StringView line_view) throws -> void {
+    if (!is_field_mode) {
+      if (is_byte_mode) {
+        if (should_keep_characters_whole) {
+          usize byte_position = 0;
+          while (byte_position < line_view.length) {
+            let const decoded = utils::decode_utf8(line_view, byte_position, 0);
+            if (text_position_is_selected(byte_position + decoded.length,
+                                          *ranges))
+            {
+              output +=
+                  line_view.substring_of_length(byte_position, decoded.length);
+            }
+            byte_position += decoded.length;
+          }
+        } else {
+          for (usize position = 0; position < line_view.length; position++)
+            if (text_position_is_selected(position + 1, *ranges))
+              output += line_view[position];
+        }
+      } else {
+        usize byte_position = 0;
+        usize character_position = 1;
 
-  for (let const source : sources) {
-    let const input = open_named_or_stdin(ec, source);
-    if (!input.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "cut: cannot read '" +
-                                    String{cxt.scratch_allocator(), source} +
-                                    "': " + os::last_system_error_message());
-      status = 1;
-      continue;
+        while (byte_position < line_view.length) {
+          let const decoded = utils::decode_utf8(line_view, byte_position, 0);
+
+          if (text_position_is_selected(character_position, *ranges))
+            output +=
+                line_view.substring_of_length(byte_position, decoded.length);
+          byte_position += decoded.length;
+          character_position++;
+        }
+      }
+      output += '\n';
+    } else {
+      let const first_delimiter = line_view.find_character(delimiter);
+      if (!first_delimiter.has_value()) {
+        if (!should_suppress_undelimited) {
+          output += line_view;
+          output += '\n';
+        }
+      } else {
+        usize field_start = 0;
+        usize field_number = 1;
+        bool has_output_field = false;
+
+        for (usize position = *first_delimiter; position <= line_view.length;
+             position++)
+        {
+          if (position != line_view.length && line_view[position] != delimiter)
+          {
+            continue;
+          }
+
+          if (text_position_is_selected(field_number, *ranges)) {
+            if (has_output_field) output += delimiter;
+
+            output += line_view.substring_of_length(field_start,
+                                                    position - field_start);
+            has_output_field = true;
+          }
+
+          field_start = position + 1;
+          field_number++;
+        }
+
+        output += '\n';
+      }
     }
-    defer
-    {
-      if (input->should_close) os::close_fd(input->descriptor);
-    };
 
-    let reader = utils::BufferedLineReader{input->descriptor};
-    loop
-    {
-      let const result = reader.next();
-      if (result == utils::BufferedLineReader::Result::End) break;
-      if (result == utils::BufferedLineReader::Result::Error) {
-        if (os::INTERRUPT_REQUESTED) return 130;
+    if (output.length() >= 65536) {
+      ec.print_to_stdout(output);
+      output.clear();
+    }
+  };
+
+  loop
+  {
+    let const read_result = reader.read_next_ordered(chunks);
+    if (read_result == SourceBatchReader::ReadResult::Complete) break;
+    if (read_result == SourceBatchReader::ReadResult::Interrupted) return 130;
+
+    for (let const &chunk : chunks) {
+      usize position = 0;
+      while (position < chunk.content.length) {
+        usize delimiter_position = position;
+        while (delimiter_position < chunk.content.length &&
+               chunk.content[delimiter_position] != '\n')
+        {
+          delimiter_position++;
+        }
+
+        line.append(chunk.content.substring_of_length(
+            position, delimiter_position - position));
+        position = delimiter_position;
+        if (position == chunk.content.length) break;
+
+        position++;
+        do_process_line(line.view());
+        line.clear();
+      }
+
+      if (!chunk.is_complete) continue;
+
+      let const source = sources[chunk.source_index];
+      if (chunk.error_number != 0) {
+        line.clear();
+        os::set_last_system_error(chunk.error_number);
         report_soft_koshkit_error(ec, cxt,
                                   "cut: cannot read '" +
                                       String{cxt.scratch_allocator(), source} +
                                       "': " + os::last_system_error_message());
         status = 1;
-        break;
-      }
-
-      let const line = reader.get_line();
-      if (!is_field_mode) {
-        if (is_byte_mode) {
-          if (should_keep_characters_whole) {
-            usize byte_position = 0;
-            while (byte_position < line.length) {
-              let const decoded = utils::decode_utf8(line, byte_position, 0);
-              if (text_position_is_selected(byte_position + decoded.length,
-                                            *ranges))
-                output +=
-                    line.substring_of_length(byte_position, decoded.length);
-              byte_position += decoded.length;
-            }
-          } else {
-            for (usize position = 0; position < line.length; position++)
-              if (text_position_is_selected(position + 1, *ranges))
-                output += line[position];
-          }
-        } else {
-          usize byte_position = 0;
-          usize character_position = 1;
-
-          while (byte_position < line.length) {
-            let const decoded = utils::decode_utf8(line, byte_position, 0);
-
-            if (text_position_is_selected(character_position, *ranges))
-              output += line.substring_of_length(byte_position, decoded.length);
-            byte_position += decoded.length;
-            character_position++;
-          }
-        }
-        output += '\n';
-      } else {
-        let const first_delimiter = line.find_character(delimiter);
-        if (!first_delimiter.has_value()) {
-          if (!should_suppress_undelimited) {
-            output += line;
-            output += '\n';
-          }
-        } else {
-          usize field_start = 0;
-          usize field_number = 1;
-          bool has_output_field = false;
-
-          for (usize position = *first_delimiter; position <= line.length;
-               position++)
-          {
-            if (position != line.length && line[position] != delimiter) {
-              continue;
-            }
-
-            if (text_position_is_selected(field_number, *ranges)) {
-              if (has_output_field) output += delimiter;
-
-              output +=
-                  line.substring_of_length(field_start, position - field_start);
-              has_output_field = true;
-            }
-
-            field_start = position + 1;
-            field_number++;
-          }
-
-          output += '\n';
-        }
-      }
-
-      if (output.length() >= 65536) {
-        ec.print_to_stdout(output);
-        output.clear();
+      } else if (!line.is_empty()) {
+        do_process_line(line.view());
+        line.clear();
       }
     }
   }
