@@ -1483,11 +1483,17 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
 
     let const published_tail = initial_tail + queued_count;
     __atomic_store_n(ring.submission_tail, published_tail, __ATOMIC_RELEASE);
-    let const do_fail_pending = [&](i32 error_number) wontthrow -> void {
+    let const do_fail_unfinished = [&](i32 error_number) wontthrow -> void {
       close_io_uring_batch(ring);
       for (usize chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
         if (!was_queued[chunk_index] || was_completed[chunk_index]) continue;
         results[operation_start + chunk_index].error_number = error_number;
+      }
+      for (usize remaining_index = operation_start + chunk_count;
+           remaining_index < operation_count; remaining_index++)
+      {
+        results[remaining_index] = {operations[remaining_index].request_id, 0,
+                                    error_number};
       }
     };
     while (__atomic_load_n(ring.submission_head, __ATOMIC_ACQUIRE) !=
@@ -1500,12 +1506,12 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
                                             pending_count, 0, 0, nullptr, 0);
       if (submitted_count < 0 && errno == EINTR) {
         if (!INTERRUPT_REQUESTED) continue;
-        do_fail_pending(EINTR);
+        do_fail_unfinished(EINTR);
         return true;
       }
       if (submitted_count < 0) {
         let const error_number = errno;
-        do_fail_pending(error_number);
+        do_fail_unfinished(error_number);
         return true;
       }
     }
@@ -1522,12 +1528,12 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
                       IORING_ENTER_GETEVENTS, nullptr, 0);
         if (wait_result < 0 && errno == EINTR) {
           if (!INTERRUPT_REQUESTED) continue;
-          do_fail_pending(EINTR);
+          do_fail_unfinished(EINTR);
           return true;
         }
         if (wait_result < 0) {
           let const error_number = errno;
-          do_fail_pending(error_number);
+          do_fail_unfinished(error_number);
           return true;
         }
         continue;
