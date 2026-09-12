@@ -180,8 +180,8 @@ fn EvalContext::expand_path_once(const glob_field &field,
   let directory_batch = os::Batch{scratch};
   directory_batch.reserve(uncertain_paths.count());
   for (usize index = 0; index < uncertain_paths.count(); index++)
-    directory_batch.add(os::BatchOperation::stat(uncertain_paths[index],
-                                                 uncertain_statuses[index]));
+    directory_batch.add(os::batch_operation::stat(uncertain_paths[index],
+                                                  uncertain_statuses[index]));
   let const directory_results = directory_batch.execute();
   for (usize index = 0; index < uncertain_paths.count(); index++)
     should_include[uncertain_positions[index]] =

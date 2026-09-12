@@ -775,8 +775,8 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
     target_statuses.push({});
   }
   for (usize index = 0; index < targets.count(); index++) {
-    target_batch.add(os::BatchOperation::stat(target_paths[index],
-                                              target_statuses[index]));
+    target_batch.add(
+        os::batch_operation::stat(target_paths[index], target_statuses[index]));
   }
   let const target_results = target_batch.execute();
 
@@ -814,7 +814,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
     file_batch.reserve(file_target_indices.count());
     for (usize index = 0; index < file_target_indices.count(); index++) {
       file_statuses.push({});
-      file_batch.add(os::BatchOperation::lstat(
+      file_batch.add(os::batch_operation::lstat(
           target_paths[file_target_indices[index]], file_statuses[index]));
     }
     let const file_results = file_batch.execute();

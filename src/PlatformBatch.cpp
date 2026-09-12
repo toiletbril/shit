@@ -11,10 +11,10 @@
 
 namespace koshka::os {
 
-fn BatchOperation::read(descriptor fd, char *buffer, usize byte_count,
-                        u64 byte_offset) wontthrow -> BatchOperation
+fn batch_operation::read(descriptor fd, char *buffer, usize byte_count,
+                         u64 byte_offset) wontthrow -> batch_operation
 {
-  BatchOperation operation;
+  batch_operation operation;
   operation.syscall_id = Kind::Read;
   operation.fd = fd;
   operation.output_buffer = buffer;
@@ -23,10 +23,10 @@ fn BatchOperation::read(descriptor fd, char *buffer, usize byte_count,
   return operation;
 }
 
-fn BatchOperation::write(descriptor fd, const char *buffer, usize byte_count,
-                         u64 byte_offset) wontthrow -> BatchOperation
+fn batch_operation::write(descriptor fd, const char *buffer, usize byte_count,
+                          u64 byte_offset) wontthrow -> batch_operation
 {
-  BatchOperation operation;
+  batch_operation operation;
   operation.syscall_id = Kind::Write;
   operation.fd = fd;
   operation.input_buffer = buffer;
@@ -35,20 +35,20 @@ fn BatchOperation::write(descriptor fd, const char *buffer, usize byte_count,
   return operation;
 }
 
-fn BatchOperation::lstat(const Path &path, file_status &status) wontthrow
-    -> BatchOperation
+fn batch_operation::lstat(const Path &path, file_status &status) wontthrow
+    -> batch_operation
 {
-  BatchOperation operation;
+  batch_operation operation;
   operation.syscall_id = Kind::Lstat;
   operation.path = &path;
   operation.status = &status;
   return operation;
 }
 
-fn BatchOperation::stat(const Path &path, file_status &status) wontthrow
-    -> BatchOperation
+fn batch_operation::stat(const Path &path, file_status &status) wontthrow
+    -> batch_operation
 {
-  BatchOperation operation;
+  batch_operation operation;
   operation.syscall_id = Kind::Stat;
   operation.path = &path;
   operation.status = &status;
@@ -62,7 +62,7 @@ fn Batch::reserve(usize operation_count) throws -> void
   m_operations.reserve(operation_count);
 }
 
-fn Batch::add(BatchOperation operation) throws -> void
+fn Batch::add(batch_operation operation) throws -> void
 {
   operation.request_id = m_operations.count();
   m_operations.push(steal(operation));
@@ -75,8 +75,8 @@ static pure fn is_same_metadata_request(
     const batch_internal::batched_syscall &right) wontthrow -> bool
 {
   if (left.syscall_id != right.syscall_id) return false;
-  if (left.syscall_id != BatchOperation::Kind::Lstat &&
-      left.syscall_id != BatchOperation::Kind::Stat)
+  if (left.syscall_id != batch_operation::Kind::Lstat &&
+      left.syscall_id != batch_operation::Kind::Stat)
   {
     return false;
   }
@@ -89,8 +89,8 @@ static pure fn is_metadata_request(
     const batch_internal::batched_syscall &operation) wontthrow -> bool
 {
   return operation.path != nullptr &&
-         (operation.syscall_id == BatchOperation::Kind::Lstat ||
-          operation.syscall_id == BatchOperation::Kind::Stat);
+         (operation.syscall_id == batch_operation::Kind::Lstat ||
+          operation.syscall_id == batch_operation::Kind::Stat);
 }
 
 static fn find_canonical_operation_positions(

@@ -721,11 +721,11 @@ fn Stat::execute(const ExecContext &ec, EvalContext &cxt,
     }
     for (usize index = 0; index < operands.count(); index++) {
       if (should_follow) {
-        batch.add(os::BatchOperation::stat(operand_paths[index],
-                                           file_statuses[index]));
-      } else {
-        batch.add(os::BatchOperation::lstat(operand_paths[index],
+        batch.add(os::batch_operation::stat(operand_paths[index],
                                             file_statuses[index]));
+      } else {
+        batch.add(os::batch_operation::lstat(operand_paths[index],
+                                             file_statuses[index]));
       }
     }
     results = batch.execute();

@@ -236,8 +236,8 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
     operand_statuses.push({});
   }
   for (usize index = 0; index < operands.count(); index++)
-    operand_batch.add(os::BatchOperation::lstat(operand_paths[index],
-                                                operand_statuses[index]));
+    operand_batch.add(os::batch_operation::lstat(operand_paths[index],
+                                                 operand_statuses[index]));
   let const operand_results = operand_batch.execute();
   for (usize index = 0; index < operands.count(); index++) {
     if (operand_results[index].error_number != 0) {

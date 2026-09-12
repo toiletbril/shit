@@ -74,9 +74,9 @@ static fn refill_readers(buffered_byte_reader &left,
       continue;
     }
 
-    batch.add(os::BatchOperation::read(reader->descriptor, reader->buffer,
-                                       sizeof(reader->buffer),
-                                       reader->byte_offset));
+    batch.add(os::batch_operation::read(reader->descriptor, reader->buffer,
+                                        sizeof(reader->buffer),
+                                        reader->byte_offset));
     batched_readers[operation_count] = reader;
     operation_count++;
   }

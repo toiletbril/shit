@@ -291,8 +291,8 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
     root_statuses.push({});
   }
   for (usize root_index = 0; root_index < roots.count(); root_index++) {
-    batch.add(os::BatchOperation::lstat(root_paths[root_index],
-                                        root_statuses[root_index]));
+    batch.add(os::batch_operation::lstat(root_paths[root_index],
+                                         root_statuses[root_index]));
   }
   let const results = batch.execute();
 

@@ -14,7 +14,7 @@
 
 namespace koshka::os {
 
-struct BatchOperation
+struct batch_operation
 {
   enum class Kind : u8
   {
@@ -25,21 +25,21 @@ struct BatchOperation
   };
 
   static fn read(descriptor fd, char *buffer, usize byte_count,
-                 u64 byte_offset = 0) wontthrow -> BatchOperation;
+                 u64 byte_offset = 0) wontthrow -> batch_operation;
   static fn write(descriptor fd, const char *buffer, usize byte_count,
-                  u64 byte_offset = 0) wontthrow -> BatchOperation;
+                  u64 byte_offset = 0) wontthrow -> batch_operation;
   static fn lstat(const Path &path, file_status &status) wontthrow
-      -> BatchOperation;
+      -> batch_operation;
   static fn stat(const Path &path, file_status &status) wontthrow
-      -> BatchOperation;
+      -> batch_operation;
   static fn lstat(Path &&path, file_status &status) wontthrow
-      -> BatchOperation = delete;
+      -> batch_operation = delete;
   static fn lstat(const Path &&path, file_status &status) wontthrow
-      -> BatchOperation = delete;
+      -> batch_operation = delete;
   static fn stat(Path &&path, file_status &status) wontthrow
-      -> BatchOperation = delete;
+      -> batch_operation = delete;
   static fn stat(const Path &&path, file_status &status) wontthrow
-      -> BatchOperation = delete;
+      -> batch_operation = delete;
 
   const Path *path{nullptr};
   const char *input_buffer{nullptr};
@@ -52,7 +52,7 @@ struct BatchOperation
   Kind syscall_id{Kind::Read};
 
 private:
-  BatchOperation() = default;
+  batch_operation() = default;
   friend class Batch;
 };
 
@@ -65,9 +65,9 @@ struct BatchResult
 
 namespace batch_internal {
 
-using batched_syscall_id = BatchOperation::Kind;
+using batched_syscall_id = batch_operation::Kind;
 using batched_syscall_result = BatchResult;
-using batched_syscall = BatchOperation;
+using batched_syscall = batch_operation;
 
 fn execute_batch_operations(const batched_syscall *operations,
                             usize operation_count,
@@ -81,7 +81,7 @@ public:
   explicit Batch(Allocator allocator);
 
   fn reserve(usize operation_count) throws -> void;
-  fn add(BatchOperation operation) throws -> void;
+  fn add(batch_operation operation) throws -> void;
   fn clear() wontthrow -> void;
   fn execute(ArrayList<BatchResult> &results) const throws -> void;
   fn execute() const throws -> ArrayList<BatchResult>;
@@ -89,7 +89,7 @@ public:
   pure fn count() const wontthrow -> usize;
 
 private:
-  ArrayList<BatchOperation> m_operations;
+  ArrayList<batch_operation> m_operations;
 };
 
 } /* namespace koshka::os */

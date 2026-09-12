@@ -198,7 +198,8 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
   batch.reserve(targets.count());
   for (usize index = 0; index < targets.count(); index++) {
     target_statuses.push({});
-    batch.add(os::BatchOperation::lstat(targets[index], target_statuses[index]));
+    batch.add(
+        os::batch_operation::lstat(targets[index], target_statuses[index]));
   }
   let const target_results = batch.execute();
   for (let const &result : target_results)

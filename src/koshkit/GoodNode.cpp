@@ -301,8 +301,8 @@ fn GoodNode::execute(
     report_statuses.push({});
   }
   for (usize index = 0; index < paths.count(); index++)
-    report_batch.add(
-        os::BatchOperation::lstat(report_paths[index], report_statuses[index]));
+    report_batch.add(os::batch_operation::lstat(report_paths[index],
+                                                report_statuses[index]));
   let const report_results = report_batch.execute();
 
   for (usize index = 0; index < paths.count(); index++) {

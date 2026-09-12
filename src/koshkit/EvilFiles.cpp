@@ -305,8 +305,8 @@ fn EvilFiles::execute(
     for (usize position = 0; position < matching_positions.count(); position++)
       file_statuses.push({});
     for (usize position = 0; position < matching_positions.count(); position++)
-      metadata_batch.add(os::BatchOperation::stat(matching_paths[position],
-                                                  file_statuses[position]));
+      metadata_batch.add(os::batch_operation::stat(matching_paths[position],
+                                                   file_statuses[position]));
     let const metadata_results = metadata_batch.execute();
     let const owner = os::process_owner_name(static_cast<u32>(process.pid),
                                              process.owner_id, allocator);

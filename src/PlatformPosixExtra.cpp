@@ -2122,8 +2122,8 @@ fn read_process_io_statuses(const ArrayList<i64> &process_ids,
   let const do_flush_probes = [&]() throws -> void {
     batch.clear();
     for (usize index = 0; index < probe_count; index++) {
-      batch.add(BatchOperation::read(probes[index].fd, probes[index].bytes,
-                                     sizeof(probes[index].bytes)));
+      batch.add(batch_operation::read(probes[index].fd, probes[index].bytes,
+                                      sizeof(probes[index].bytes)));
     }
     batch.execute(results);
     for (usize index = 0; index < probe_count; index++) {

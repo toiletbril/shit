@@ -201,11 +201,11 @@ fn GoodStat::execute(
   }
   for (usize index = 0; index < operands.count(); index++) {
     if (FLAG_GOODSTAT_DEREFERENCE.is_enabled()) {
-      batch.add(
-          os::BatchOperation::stat(operand_paths[index], file_statuses[index]));
-    } else {
-      batch.add(os::BatchOperation::lstat(operand_paths[index],
+      batch.add(os::batch_operation::stat(operand_paths[index],
                                           file_statuses[index]));
+    } else {
+      batch.add(os::batch_operation::lstat(operand_paths[index],
+                                           file_statuses[index]));
     }
   }
   let const results = batch.execute();

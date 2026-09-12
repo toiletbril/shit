@@ -380,7 +380,7 @@ cold static fn list_directory_status_fallback(StringView dir,
     paths.push(PathBuilder{dir}.append(entry.child.name.view()).build());
   }
   for (usize index = 0; index < entries.count(); index++)
-    batch.add(BatchOperation::lstat(paths[index], entries[index].status));
+    batch.add(batch_operation::lstat(paths[index], entries[index].status));
 
   let const results = batch.execute();
   for (usize index = 0; index < entries.count(); index++)

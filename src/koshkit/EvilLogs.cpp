@@ -400,7 +400,7 @@ fn collect_log_entries(StringView directory, Allocator allocator) throws
   let const do_flush_probes = [&]() throws -> void {
     batch.clear();
     for (usize index = 0; index < probe_count; index++) {
-      batch.add(os::BatchOperation::read(
+      batch.add(os::batch_operation::read(
           probes[index].descriptor, probes[index].bytes, MAGIC_BYTE_COUNT));
     }
     batch.execute(results);

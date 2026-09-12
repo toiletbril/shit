@@ -863,7 +863,7 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize operand_position = 0; operand_position < operands.count();
        operand_position++)
   {
-    metadata_batch.add(os::BatchOperation::lstat(
+    metadata_batch.add(os::batch_operation::lstat(
         operand_paths[operand_position], file_statuses[operand_position]));
   }
   let const metadata_results = metadata_batch.execute();
