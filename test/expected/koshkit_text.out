@@ -17,6 +17,16 @@ status=1
 first
 middle
 last
+--- strings preserves a run across chunks ---
+65547
+tail
+--- strings reads later files after a missing operand ---
+1:1: error: strings: cannot read 'missing.txt': No such file or directory.
+     1 |  koshkit strings cat-first.txt missing.txt cat-last.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+first
+last
+status=1
 --- wc multi-chunk input with a missing operand ---
 1:1: error: wc: missing.txt: No such file or directory.
      1 |  koshkit wc -c batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"

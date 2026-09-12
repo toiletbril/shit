@@ -104,54 +104,28 @@ fn Strings::execute(const ExecContext &ec, EvalContext &cxt,
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
   let output = String{cxt.scratch_allocator()};
+  let run = String{cxt.scratch_allocator()};
+  let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
+  u64 byte_offset = 0;
+  u64 run_offset = 0;
   i32 status = 0;
+  let const do_flush = [&]() throws -> void {
+    if (run.length() >= minimum_length)
+      append_strings_record(output, run.view(), run_offset, radix);
+    run.clear();
+  };
 
-  for (let const source : sources) {
-    let const input = open_named_or_stdin(ec, source);
-    if (!input.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "strings: cannot read '" +
-                                    String{cxt.scratch_allocator(), source} +
-                                    "': " + os::last_system_error_message());
-      status = 1;
-      continue;
-    }
-    defer
-    {
-      if (input->should_close) os::close_fd(input->descriptor);
-    };
+  loop
+  {
+    let const read_result = reader.read_next_ordered(chunks);
+    if (read_result == SourceBatchReader::ReadResult::Complete) break;
+    if (read_result == SourceBatchReader::ReadResult::Interrupted) return 130;
 
-    String run{cxt.scratch_allocator()};
-    u64 byte_offset = 0;
-    u64 run_offset = 0;
-    char buffer[65536];
-    let const do_flush = [&]() throws -> void {
-      if (run.length() >= minimum_length)
-        append_strings_record(output, run.view(), run_offset, radix);
-      run.clear();
-    };
-
-    loop
-    {
-      let const read_count =
-          os::read_fd(input->descriptor, buffer, sizeof(buffer));
-      if (!read_count.has_value()) {
-        if (os::INTERRUPT_REQUESTED) return 130;
-        report_soft_koshkit_error(ec, cxt,
-                                  "strings: cannot read '" +
-                                      String{cxt.scratch_allocator(), source} +
-                                      "': " + os::last_system_error_message());
-        status = 1;
-        break;
-      }
-      if (*read_count == 0) {
-        do_flush();
-        break;
-      }
-
+    for (let const &chunk : chunks) {
       usize position = 0;
-      while (position < *read_count) {
-        if (!is_strings_printable(static_cast<u8>(buffer[position]))) {
+      while (position < chunk.content.length) {
+        if (!is_strings_printable(static_cast<u8>(chunk.content[position]))) {
           do_flush();
           position++;
           byte_offset++;
@@ -159,16 +133,36 @@ fn Strings::execute(const ExecContext &ec, EvalContext &cxt,
         }
 
         usize run_end = position;
-        while (run_end < *read_count &&
-               is_strings_printable(static_cast<u8>(buffer[run_end])))
+        while (run_end < chunk.content.length &&
+               is_strings_printable(static_cast<u8>(chunk.content[run_end])))
+        {
           run_end++;
+        }
 
         if (run.is_empty()) run_offset = byte_offset;
 
-        run.append(StringView{buffer + position, run_end - position});
+        run.append(
+            chunk.content.substring_of_length(position, run_end - position));
         byte_offset += run_end - position;
         position = run_end;
       }
+
+      if (!chunk.is_complete) continue;
+
+      let const source = sources[chunk.source_index];
+      if (chunk.error_number != 0) {
+        run.clear();
+        os::set_last_system_error(chunk.error_number);
+        report_soft_koshkit_error(ec, cxt,
+                                  "strings: cannot read '" +
+                                      String{cxt.scratch_allocator(), source} +
+                                      "': " + os::last_system_error_message());
+        status = 1;
+      } else {
+        do_flush();
+      }
+
+      byte_offset = 0;
     }
   }
 

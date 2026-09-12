@@ -23,6 +23,16 @@ echo "--- cat multi-chunk input with a missing operand ---"
 echo "--- cat reads standard input between files ---"
 printf 'middle\n' | "$BIN" -c \
   'koshkit cat cat-first.txt - cat-last.txt'
+"$BIN" -c "koshkit yes x | koshkit tr -d '\n' | koshkit head -c 65534" \
+  > strings-boundary.txt
+printf 'tail\0' >> strings-boundary.txt
+echo "--- strings preserves a run across chunks ---"
+"$BIN" -c \
+  'koshkit strings -t d strings-boundary.txt | koshkit wc -c; koshkit strings strings-boundary.txt | koshkit tail -c 5'
+echo "--- strings reads later files after a missing operand ---"
+"$BIN" -c \
+  'koshkit strings cat-first.txt missing.txt cat-last.txt; printf "status=%s\n" "$?"' \
+  2>&1
 echo "--- wc multi-chunk input with a missing operand ---"
 "$BIN" -c \
   'koshkit wc -c batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"' \
