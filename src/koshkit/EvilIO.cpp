@@ -78,6 +78,15 @@ pure fn counter_rate(u64 before, u64 after, u64 elapsed_nanoseconds) wontthrow
                           elapsed_nanoseconds);
 }
 
+pure fn is_idle_process_io(const os::process_io_status &status) wontthrow
+    -> bool
+{
+  return status.read_bytes == 0 && status.written_bytes == 0 &&
+         (!status.has_operation_counts ||
+          (status.read_operation_count == 0 &&
+           status.write_operation_count == 0));
+}
+
 fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
                         bool should_include_idle) throws -> ArrayList<io_row>
 {
@@ -108,9 +117,7 @@ fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
 
     let const &process = processes[process_positions[query_position]];
     let const &status = statuses[query_position];
-    if (!should_include_idle && !selected_pid.has_value() &&
-        status.read_bytes == 0 && status.written_bytes == 0)
-    {
+    if (!should_include_idle && is_idle_process_io(status)) {
       continue;
     }
 
@@ -129,8 +136,8 @@ fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
 
 fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
                           const ArrayList<io_row> &after_rows,
-                          u64 elapsed_nanoseconds, Allocator allocator,
-                          bool should_include_idle) throws -> ArrayList<io_row>
+                          u64 elapsed_nanoseconds,
+                          Allocator allocator) throws -> ArrayList<io_row>
 {
   let sampled_rows = ArrayList<io_row>{allocator};
   usize before_position = 0;
@@ -169,13 +176,7 @@ fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
         status.has_operation_counts = true;
       }
     }
-    if (!should_include_idle && status.read_bytes == 0 &&
-        status.written_bytes == 0 &&
-        (!status.has_operation_counts || (status.read_operation_count == 0 &&
-                                          status.write_operation_count == 0)))
-    {
-      continue;
-    }
+    if (is_idle_process_io(status)) continue;
 
     sampled_rows.push(io_row{
         String{allocator, after.name.view()},
@@ -593,8 +594,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     let const elapsed_nanoseconds =
         os::monotonic_nanos() - started_at_nanoseconds;
     let const sampled_rows = sample_process_io_rows(
-        before_rows, after_rows, elapsed_nanoseconds, allocator,
-        FLAG_EVILIO_PS.is_enabled() || selected_pid.has_value());
+        before_rows, after_rows, elapsed_nanoseconds, allocator);
     let output = String{allocator};
     append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
                                   should_color);
@@ -603,8 +603,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (should_show_processes) {
-    let rows = read_process_io_rows(allocator, selected_pid,
-                                    FLAG_EVILIO_PS.is_enabled());
+    let rows = read_process_io_rows(allocator, selected_pid, false);
     u64 total_read_bytes = 0;
     u64 total_written_bytes = 0;
     u64 total_read_operation_count = 0;

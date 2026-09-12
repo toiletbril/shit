@@ -86,13 +86,17 @@ esac
 printf 'evilio-process-shape=%s\n' "$process_shape"
 printf 'evilio-process-scope=%s\n' "$process_scope"
 
-process_line_count=$(printf '%s\n' "$process_report" | wc -l)
-if [ "$process_line_count" -gt 1 ]; then
-  process_rows=present
-else
-  process_rows=missing
-fi
-printf 'evilio-process-rows=%s\n' "$process_rows"
+process_report_path=$TEST_TEMP_DIRECTORY/evilio-process-report
+printf '%s\n' "$process_report" > "$process_report_path"
+process_idle=excluded
+while read -r process_pid process_read process_write process_read_iops \
+  process_write_iops process_command; do
+  case "$process_pid:$process_read:$process_write:$process_read_iops:$process_write_iops" in
+    [0-9]*:0:0:0:0) process_idle=present ;;
+    [0-9]*:0:0:-:-) process_idle=present ;;
+  esac
+done < "$process_report_path"
+printf 'evilio-process-idle=%s\n' "$process_idle"
 
 "$BIN" -c \
   'koshkit evilio --cumulative --ps -1 0.05 --color never' \
