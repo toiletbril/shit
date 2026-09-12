@@ -30,30 +30,73 @@ enum class byte_read_result : u8
 {
   Byte,
   End,
-  Error,
 };
 
 struct buffered_byte_reader
 {
   os::descriptor descriptor;
+  u64 byte_offset{0};
   usize position{0};
   usize length{0};
+  bool is_seekable{false};
+  bool has_ended{false};
   char buffer[65536];
 
   hot fn next(u8 &byte) wontthrow -> byte_read_result
   {
-    if (position == length) {
-      let const read_count = os::read_fd(descriptor, buffer, sizeof(buffer));
-      if (!read_count.has_value()) return byte_read_result::Error;
-      if (*read_count == 0) return byte_read_result::End;
-      position = 0;
-      length = *read_count;
-    }
+    if (position == length) return byte_read_result::End;
 
     byte = static_cast<u8>(buffer[position++]);
     return byte_read_result::Byte;
   }
 };
+
+static fn refill_readers(buffered_byte_reader &left,
+                         buffered_byte_reader &right, os::Batch &batch,
+                         ArrayList<os::BatchResult> &results) throws
+    -> bool
+{
+  buffered_byte_reader *readers[] = {&left, &right};
+  buffered_byte_reader *batched_readers[2]{};
+  usize operation_count = 0;
+  batch.clear();
+
+  for (let *reader : readers) {
+    if (reader->position != reader->length || reader->has_ended) continue;
+
+    if (!reader->is_seekable) {
+      let const read_count = os::read_fd(reader->descriptor, reader->buffer,
+                                         sizeof(reader->buffer));
+      if (!read_count.has_value()) return false;
+      reader->position = 0;
+      reader->length = *read_count;
+      reader->has_ended = *read_count == 0;
+      continue;
+    }
+
+    batch.add(os::BatchOperation::read(reader->descriptor, reader->buffer,
+                                       sizeof(reader->buffer),
+                                       reader->byte_offset));
+    batched_readers[operation_count] = reader;
+    operation_count++;
+  }
+
+  batch.execute(results);
+  for (usize index = 0; index < operation_count; index++) {
+    if (results[index].error_number != 0) {
+      os::set_last_system_error(results[index].error_number);
+      return false;
+    }
+
+    let &reader = *batched_readers[index];
+    reader.position = 0;
+    reader.length = results[index].transferred_byte_count;
+    reader.byte_offset += results[index].transferred_byte_count;
+    reader.has_ended = results[index].transferred_byte_count == 0;
+  }
+
+  return true;
+}
 
 static fn append_padded_number(String &output, u64 value, usize width,
                                int_base base) throws -> void
@@ -111,29 +154,45 @@ fn Cmp::execute(const ExecContext &ec, EvalContext &cxt,
     if (right_input->should_close) os::close_fd(right_input->descriptor);
   };
 
-  buffered_byte_reader left{left_input->descriptor, 0, 0, {}};
-  buffered_byte_reader right{right_input->descriptor, 0, 0, {}};
+  buffered_byte_reader left{left_input->descriptor,
+                            0,
+                            0,
+                            0,
+                            os::descriptor_is_seekable(left_input->descriptor),
+                            false,
+                            {}};
+  buffered_byte_reader right{
+      right_input->descriptor,
+      0,
+      0,
+      0,
+      os::descriptor_is_seekable(right_input->descriptor),
+      false,
+      {}};
   u64 byte_position = 1;
   u64 line_number = 1;
   bool has_difference = false;
-  let output = String{cxt.scratch_allocator()};
+  let const allocator = cxt.scratch_allocator();
+  let output = String{allocator};
+  let batch = os::Batch{allocator};
+  let results = ArrayList<os::BatchResult>{allocator};
+  batch.reserve(2);
+  results.reserve(2);
 
   loop
   {
-    u8 left_byte = 0;
-    u8 right_byte = 0;
-    let const left_result = left.next(left_byte);
-    let const right_result = right.next(right_byte);
-
-    if (left_result == byte_read_result::Error ||
-        right_result == byte_read_result::Error)
-    {
+    if (!refill_readers(left, right, batch, results)) {
       if (os::INTERRUPT_REQUESTED) return 130;
       if (!FLAG_CMP_SILENT.is_enabled())
         report_soft_koshkit_error(ec, cxt,
                                   "cmp: " + os::last_system_error_message());
       return 2;
     }
+
+    u8 left_byte = 0;
+    u8 right_byte = 0;
+    let const left_result = left.next(left_byte);
+    let const right_result = right.next(right_byte);
 
     if (left_result == byte_read_result::End ||
         right_result == byte_read_result::End)
