@@ -30,6 +30,8 @@ echo "=== logname operand location ==="
 
 echo "=== nice increment location ==="
 "$BIN" -c 'koshkit nice -n nope true' 2>&1
+echo "=== nice increment range ==="
+"$BIN" -c 'koshkit nice -n 2147483648 true' 2>&1
 echo "=== nice command location ==="
 "$BIN" -c 'koshkit nice KOSH_MISSING_COMMAND' 2>&1
 

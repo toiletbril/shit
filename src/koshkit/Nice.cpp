@@ -40,8 +40,7 @@ fn Nice::execute(const ExecContext &ec, EvalContext &cxt,
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   let const operands =
-      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
-  defer { reset_flags(FLAG_LIST); };
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -49,19 +48,16 @@ fn Nice::execute(const ExecContext &ec, EvalContext &cxt,
   i64 increment = 10;
   if (FLAG_NICE_INCREMENT.is_set()) {
     let const parsed = utils::parse_decimal_i64(FLAG_NICE_INCREMENT.value());
-    if (parsed.is_error()) {
-      report_soft_koshkit_util_error(
-          ec, cxt, FLAG_NICE_INCREMENT.value_location(), args[0].view(),
-          "invalid increment '" + String{FLAG_NICE_INCREMENT.value()} + "'");
+    if (parsed.is_error() || parsed.value() < INT32_MIN ||
+        parsed.value() > INT32_MAX)
+    {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_NICE_INCREMENT.value_location(),
+          "invalid increment '" + String{FLAG_NICE_INCREMENT.value()} + "'",
+          "use a decimal integer from -2147483648 through 2147483647");
       return 2;
     }
     increment = parsed.value();
-  }
-  if (increment < INT32_MIN || increment > INT32_MAX) {
-    report_soft_koshkit_util_error(ec, cxt,
-                                   FLAG_NICE_INCREMENT.value_location(),
-                                   args[0].view(), "increment is out of range");
-    return 2;
   }
 
   let command = ArrayList<String>{cxt.scratch_allocator()};
