@@ -108,6 +108,13 @@ echo "--- leading ---"
 for x in **/f*; do echo "$x"; done
 echo "--- base trailing ---"
 for x in a/**; do echo "$x"; done
+ln -s a dir-link
+ln -s f0 file-link
+ln -s missing dangling-link
+echo "--- links trailing ---"
+for x in **; do echo "$x"; done
+echo "--- links dirs ---"
+for x in **/; do echo "$x"; done
 echo "--- off ---"
 shopt -u globstar
 for x in **; do echo "$x"; done

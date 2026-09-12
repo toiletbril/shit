@@ -251,7 +251,102 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
   let const entries = Path::read_directory_typed(dir);
   if (!entries.has_value()) return;
 
-  for (let const &entry : *entries) {
+  let is_directory = Bitset{allocator};
+  let is_symbolic_link = Bitset{allocator};
+  let uncertain_positions = ArrayList<usize>{allocator};
+  let uncertain_paths = ArrayList<Path>{allocator};
+  let uncertain_statuses = ArrayList<os::file_status>{allocator};
+  is_directory.reset(entries->count());
+  is_symbolic_link.reset(entries->count());
+
+  usize uncertain_count = 0;
+  usize unknown_count = 0;
+  for (usize index = 0; index < entries->count(); index++) {
+    let const &entry = (*entries)[index];
+    let const name = entry.name.view();
+    let const should_skip =
+        !should_match_dotfiles && !name.is_empty() && name[0] == '.';
+    switch (entry.kind) {
+    case Path::entry_kind::Directory: is_directory.set(index); break;
+    case Path::entry_kind::Symlink:
+      is_symbolic_link.set(index);
+      if (!should_skip) uncertain_count++;
+      break;
+    case Path::entry_kind::Unknown:
+      if (!should_skip) {
+        uncertain_count++;
+        unknown_count++;
+      }
+      break;
+    case Path::entry_kind::Regular:
+    case Path::entry_kind::Other: break;
+    }
+  }
+
+  uncertain_positions.reserve(uncertain_count);
+  uncertain_paths.reserve(uncertain_count);
+  uncertain_statuses.reserve(uncertain_count);
+
+  for (usize index = 0; index < entries->count(); index++) {
+    let const &entry = (*entries)[index];
+    let const name = entry.name.view();
+    if (!should_match_dotfiles && !name.is_empty() && name[0] == '.') {
+      continue;
+    }
+    switch (entry.kind) {
+    case Path::entry_kind::Symlink:
+    case Path::entry_kind::Unknown: break;
+    case Path::entry_kind::Directory:
+    case Path::entry_kind::Regular:
+    case Path::entry_kind::Other: continue;
+    }
+
+    let child_path = dir;
+    child_path.push_component(name);
+    uncertain_positions.push(index);
+    uncertain_paths.push(steal(child_path));
+    uncertain_statuses.push({});
+  }
+
+  let lstat_batch = os::Batch{allocator};
+  lstat_batch.reserve(unknown_count);
+  for (usize index = 0; index < uncertain_paths.count(); index++)
+    if ((*entries)[uncertain_positions[index]].kind ==
+        Path::entry_kind::Unknown)
+    {
+      lstat_batch.add(os::batch_operation::lstat(uncertain_paths[index],
+                                                 uncertain_statuses[index]));
+    }
+  let const lstat_results = lstat_batch.execute();
+  usize lstat_result_index = 0;
+  for (usize index = 0; index < uncertain_paths.count(); index++) {
+    if ((*entries)[uncertain_positions[index]].kind !=
+        Path::entry_kind::Unknown)
+    {
+      continue;
+    }
+
+    is_symbolic_link.set(
+        uncertain_positions[index],
+        lstat_results[lstat_result_index].error_number == 0 &&
+            os::file_type_letter(uncertain_statuses[index].mode) == 'l');
+    lstat_result_index++;
+  }
+
+  let stat_batch = os::Batch{allocator};
+  stat_batch.reserve(uncertain_paths.count());
+  for (usize index = 0; index < uncertain_paths.count(); index++)
+    stat_batch.add(os::batch_operation::stat(uncertain_paths[index],
+                                             uncertain_statuses[index]));
+  let const stat_results = stat_batch.execute();
+  for (usize index = 0; index < uncertain_paths.count(); index++)
+    is_directory.set(uncertain_positions[index],
+                     stat_results[index].error_number == 0 &&
+                         os::file_type_letter(uncertain_statuses[index].mode) ==
+                             'd');
+
+  for (usize index = 0; index < entries->count(); index++) {
+    let const &entry = (*entries)[index];
     let const name = entry.name.view();
     if (!should_match_dotfiles && !name.is_empty() && name[0] == '.') {
       continue;
@@ -259,22 +354,6 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
 
     let child_dir = dir;
     child_dir.push_component(name);
-
-    bool is_directory = false;
-    bool is_symbolic_link = false;
-    switch (entry.kind) {
-    case Path::entry_kind::Directory: is_directory = true; break;
-    case Path::entry_kind::Symlink:
-      is_symbolic_link = true;
-      is_directory = child_dir.is_directory();
-      break;
-    case Path::entry_kind::Regular:
-    case Path::entry_kind::Other: break;
-    case Path::entry_kind::Unknown:
-      is_symbolic_link = child_dir.is_symbolic_link();
-      is_directory = child_dir.is_directory();
-      break;
-    }
 
     let child_relative = String{allocator};
     child_relative.reserve(relative.length + name.length + 1);
@@ -284,12 +363,12 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
     }
     child_relative.append(name);
 
-    if (!directories_only || is_directory) {
+    if (!directories_only || is_directory[index]) {
       out.push(String{allocator, child_relative.view()});
     }
     /* A directory symlink is a match but is not descended into, so a self or
        parent symlink does not spin the walk to the depth cap. */
-    if (is_directory && !is_symbolic_link) {
+    if (is_directory[index] && !is_symbolic_link[index]) {
       collect_globstar_paths(child_dir, child_relative.view(), directories_only,
                              should_match_dotfiles, false, depth + 1, allocator,
                              out);
