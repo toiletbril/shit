@@ -43,6 +43,64 @@ struct wc_row
   u64 byte_count;
 };
 
+struct wc_source_state
+{
+  u64 line_count{0};
+  u64 word_count{0};
+  u64 byte_count{0};
+  i32 error_number{0};
+  bool is_in_word{false};
+};
+
+static fn update_wc_source(wc_source_state &state, StringView content,
+                           u8 scan_mode, bool should_count_bytes) wontthrow
+    -> void
+{
+  if (should_count_bytes) state.byte_count += content.length;
+
+  switch (scan_mode) {
+  case 0: break;
+  case 1: {
+    let remaining = content;
+    loop
+    {
+      let const newline = remaining.find_character('\n');
+      if (!newline.has_value()) break;
+      state.line_count++;
+      remaining = remaining.substring(*newline + 1);
+    }
+    break;
+  }
+  case 2:
+    for (usize byte_position = 0; byte_position < content.length;
+         byte_position++)
+    {
+      let const byte = content[byte_position];
+      if (is_blank(byte)) {
+        state.is_in_word = false;
+      } else if (!state.is_in_word) {
+        state.is_in_word = true;
+        state.word_count++;
+      }
+    }
+    break;
+  case 3:
+    for (usize byte_position = 0; byte_position < content.length;
+         byte_position++)
+    {
+      let const byte = content[byte_position];
+      if (byte == '\n') state.line_count++;
+      if (is_blank(byte)) {
+        state.is_in_word = false;
+      } else if (!state.is_in_word) {
+        state.is_in_word = true;
+        state.word_count++;
+      }
+    }
+    break;
+  }
+}
+
 static fn decimal_digit_count(u64 value) wontthrow -> usize
 {
   usize digit_count = 1;
@@ -111,91 +169,55 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
+  let source_states = ArrayList<wc_source_state>{cxt.scratch_allocator()};
+  source_states.reserve(sources.count());
+  for (usize source_index = 0; source_index < sources.count(); source_index++)
+    source_states.push({});
+
+  let const scan_mode = static_cast<u8>((should_show_lines ? 1 : 0) |
+                                        (should_show_words ? 2 : 0));
+  let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
+  loop
+  {
+    let const read_result = reader.read_next(chunks);
+    if (read_result == SourceBatchReader::ReadResult::Interrupted) return 130;
+    if (read_result == SourceBatchReader::ReadResult::Complete) break;
+
+    for (let const &chunk : chunks) {
+      let &state = source_states[chunk.source_index];
+      if (chunk.error_number != 0) {
+        state.error_number = chunk.error_number;
+        continue;
+      }
+      update_wc_source(state, chunk.content, scan_mode, should_show_bytes);
+    }
+  }
 
   ArrayList<wc_row> rows{cxt.scratch_allocator()};
   u64 total_lines = 0;
   u64 total_words = 0;
   u64 total_bytes = 0;
   i32 status = 0;
-  for (const StringView &source : sources) {
-    let const input = open_named_or_stdin(ec, source);
-    if (!input.has_value()) {
+  for (usize source_index = 0; source_index < sources.count(); source_index++) {
+    let const &state = source_states[source_index];
+    if (state.error_number != 0) {
+      os::set_last_system_error(state.error_number);
       report_soft_koshkit_error(
           ec, cxt,
-          "wc: " + String{cxt.scratch_allocator(), source} + ": " +
-              os::last_system_error_message());
+          "wc: " + String{cxt.scratch_allocator(), sources[source_index]} +
+              ": " + os::last_system_error_message());
       status = 1;
       continue;
     }
-    defer
-    {
-      if (input->should_close) os::close_fd(input->descriptor);
-    };
-    u64 lines = 0;
-    u64 words = 0;
-    u64 bytes = 0;
-    bool is_in_word = false;
-    bool did_read_fail = false;
-    char buffer[65536];
 
-    loop
-    {
-      let const read_size =
-          os::read_fd(input->descriptor, buffer, sizeof(buffer));
-      if (!read_size.has_value()) {
-        if (os::INTERRUPT_REQUESTED) return 130;
-        report_soft_koshkit_error(
-            ec, cxt,
-            "wc: " + String{cxt.scratch_allocator(), source} + ": " +
-                os::last_system_error_message());
-        status = 1;
-        did_read_fail = true;
-        break;
-      }
-      if (*read_size == 0) break;
-      bytes += *read_size;
+    total_lines += state.line_count;
+    total_words += state.word_count;
+    total_bytes += state.byte_count;
 
-      if (should_show_words && should_show_lines) {
-        for (usize i = 0; i < *read_size; i++) {
-          let const c = buffer[i];
-          if (c == '\n') lines++;
-          if (is_blank(c)) {
-            is_in_word = false;
-          } else if (!is_in_word) {
-            is_in_word = true;
-            words++;
-          }
-        }
-      } else if (should_show_words) {
-        for (usize i = 0; i < *read_size; i++) {
-          let const c = buffer[i];
-          if (is_blank(c)) {
-            is_in_word = false;
-          } else if (!is_in_word) {
-            is_in_word = true;
-            words++;
-          }
-        }
-      } else if (should_show_lines) {
-        let remaining = StringView{buffer, *read_size};
-
-        loop
-        {
-          let const newline = remaining.find_character('\n');
-          if (!newline.has_value()) break;
-          lines++;
-          remaining = remaining.substring(*newline + 1);
-        }
-      }
-    }
-    if (did_read_fail) continue;
-
-    total_lines += lines;
-    total_words += words;
-    total_bytes += bytes;
-
-    let const name = source == "-" ? StringView{} : source;
-    rows.push(wc_row{name, lines, words, bytes});
+    let const name = operands.is_empty() ? StringView{} : sources[source_index];
+    rows.push(
+        wc_row{name, state.line_count, state.word_count, state.byte_count});
   }
 
   u64 max_count = 0;

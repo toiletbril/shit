@@ -12,6 +12,24 @@ echo "--- wc ---"
 "$BIN" -c 'koshkit wc fruit.txt'
 echo "--- wc -l ---"
 "$BIN" -c 'koshkit wc -l fruit.txt'
+"$BIN" -c 'koshkit seq 20000' > batch-input.txt
+: > empty.txt
+echo "--- wc multi-chunk input with a missing operand ---"
+"$BIN" -c \
+  'koshkit wc -c batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"' \
+  2>&1
+echo "--- wc repeated explicit standard input ---"
+printf 'abc\n' | "$BIN" -c 'koshkit wc -c - -'
+echo "--- wc implicit standard input ---"
+printf 'abc\n' | "$BIN" -c 'koshkit wc -c'
+echo "--- cksum multi-chunk input with a missing operand ---"
+"$BIN" -c \
+  'koshkit cksum batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"' \
+  2>&1
+echo "--- cksum repeated explicit standard input ---"
+printf 'abc\n' | "$BIN" -c 'koshkit cksum - -'
+echo "--- cksum implicit standard input ---"
+printf 'abc\n' | "$BIN" -c 'koshkit cksum'
 echo "--- head -n 2 ---"
 "$BIN" -c 'koshkit head -n 2 fruit.txt'
 echo "--- tail -n 1 ---"

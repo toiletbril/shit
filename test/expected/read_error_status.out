@@ -1,4 +1,5 @@
 cat=1
+cksum=1
 head=1
 sort=2
 tail=1

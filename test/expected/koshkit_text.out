@@ -7,6 +7,32 @@
  4  4 26 fruit.txt
 --- wc -l ---
 4 fruit.txt
+--- wc multi-chunk input with a missing operand ---
+1:1: error: wc: missing.txt: No such file or directory.
+     1 |  koshkit wc -c batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+108894 batch-input.txt
+     0 empty.txt
+108894 total
+status=1
+--- wc repeated explicit standard input ---
+4 -
+0 -
+4 total
+--- wc implicit standard input ---
+4
+--- cksum multi-chunk input with a missing operand ---
+3231941463 108894 batch-input.txt
+1:1: error: cksum: cannot read 'missing.txt': No such file or directory.
+     1 |  koshkit cksum batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+4294967295 0 empty.txt
+status=1
+--- cksum repeated explicit standard input ---
+1112837078 4 -
+4294967295 0 -
+--- cksum implicit standard input ---
+1112837078 4
 --- head -n 2 ---
 banana
 apple
