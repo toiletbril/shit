@@ -330,9 +330,8 @@ cold fn list_directory_typed(StringView dir) throws
   return entries;
 }
 
-
 cold static fn list_directory_status_fallback(StringView dir,
-                                               Allocator allocator) throws
+                                              Allocator allocator) throws
     -> Maybe<ArrayList<directory_status_entry>>
 {
   const String dir_string{dir};
@@ -812,7 +811,6 @@ static fn fill_file_status(const struct stat &info,
   status.change_nanoseconds = static_cast<u32>(info.st_ctim.tv_nsec);
   status.blocks = static_cast<u64>(info.st_blocks);
 }
-
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
 {

@@ -75,24 +75,19 @@ static fn directory_kind_from_vnode_type(fsobj_type_t type) wontthrow
   }
 }
 
-static fn fill_bulk_file_status(const attribute_set_t &returned,
-                                fsobj_type_t type, dev_t device,
-                                const timespec &modification_time,
-                                const timespec &change_time,
-                                const timespec &access_time, uid_t owner,
-                                gid_t group, u32 access_mode, u32 flags,
-                                u64 file_id, u32 directory_link_count,
-                                off_t directory_allocated_size,
-                                off_t directory_size, u32 file_link_count,
-                                off_t file_size, off_t file_allocated_size,
-                                u32 special_device,
-                                file_status &status) wontthrow -> bool
+static fn fill_bulk_file_status(
+    const attribute_set_t &returned, fsobj_type_t type, dev_t device,
+    const timespec &modification_time, const timespec &change_time,
+    const timespec &access_time, uid_t owner, gid_t group, u32 access_mode,
+    u32 flags, u64 file_id, u32 directory_link_count,
+    off_t directory_allocated_size, off_t directory_size, u32 file_link_count,
+    off_t file_size, off_t file_allocated_size, u32 special_device,
+    file_status &status) wontthrow -> bool
 {
   constexpr attrgroup_t REQUIRED_COMMON =
-      ATTR_CMN_DEVID | ATTR_CMN_OBJTYPE | ATTR_CMN_MODTIME |
-      ATTR_CMN_CHGTIME | ATTR_CMN_ACCTIME | ATTR_CMN_OWNERID |
-      ATTR_CMN_GRPID | ATTR_CMN_ACCESSMASK | ATTR_CMN_FLAGS |
-      ATTR_CMN_FILEID;
+      ATTR_CMN_DEVID | ATTR_CMN_OBJTYPE | ATTR_CMN_MODTIME | ATTR_CMN_CHGTIME |
+      ATTR_CMN_ACCTIME | ATTR_CMN_OWNERID | ATTR_CMN_GRPID |
+      ATTR_CMN_ACCESSMASK | ATTR_CMN_FLAGS | ATTR_CMN_FILEID;
   if ((returned.commonattr & REQUIRED_COMMON) != REQUIRED_COMMON) return false;
 
   status.device_id = static_cast<u64>(device);
@@ -103,8 +98,7 @@ static fn fill_bulk_file_status(const attribute_set_t &returned,
   status.access_time = access_time.tv_sec;
   status.access_nanoseconds = static_cast<u32>(access_time.tv_nsec);
   status.modification_time = modification_time.tv_sec;
-  status.modification_nanoseconds =
-      static_cast<u32>(modification_time.tv_nsec);
+  status.modification_nanoseconds = static_cast<u32>(modification_time.tv_nsec);
   status.change_time = change_time.tv_sec;
   status.change_nanoseconds = static_cast<u32>(change_time.tv_nsec);
   status.has_file_identity = true;
@@ -131,8 +125,8 @@ static fn fill_bulk_file_status(const attribute_set_t &returned,
   return (flags & SF_FIRMLINK) == 0;
 }
 
-static fn list_directory_status_bulk(StringView dir, Allocator allocator)
-    throws -> Maybe<ArrayList<directory_status_entry>>
+static fn list_directory_status_bulk(StringView dir, Allocator allocator) throws
+    -> Maybe<ArrayList<directory_status_entry>>
 {
   const String dir_string{dir};
   let const directory_descriptor = ::open(dir_string.c_str(), O_RDONLY);
@@ -145,8 +139,7 @@ static fn list_directory_status_bulk(StringView dir, Allocator allocator)
       ATTR_CMN_RETURNED_ATTRS | ATTR_CMN_NAME | ATTR_CMN_DEVID |
       ATTR_CMN_OBJTYPE | ATTR_CMN_MODTIME | ATTR_CMN_CHGTIME |
       ATTR_CMN_ACCTIME | ATTR_CMN_OWNERID | ATTR_CMN_GRPID |
-      ATTR_CMN_ACCESSMASK | ATTR_CMN_FLAGS | ATTR_CMN_FILEID |
-      ATTR_CMN_ERROR;
+      ATTR_CMN_ACCESSMASK | ATTR_CMN_FLAGS | ATTR_CMN_FILEID | ATTR_CMN_ERROR;
   attributes.dirattr = ATTR_DIR_LINKCOUNT | ATTR_DIR_MOUNTSTATUS |
                        ATTR_DIR_ALLOCSIZE | ATTR_DIR_DATALENGTH;
   attributes.fileattr = ATTR_FILE_LINKCOUNT | ATTR_FILE_TOTALSIZE |
@@ -157,8 +150,8 @@ static fn list_directory_status_bulk(StringView dir, Allocator allocator)
   let entries = ArrayList<directory_status_entry>{allocator};
   loop
   {
-    let const entry_count = ::getattrlistbulk(
-        directory_descriptor, &attributes, buffer, sizeof(buffer), 0);
+    let const entry_count = ::getattrlistbulk(directory_descriptor, &attributes,
+                                              buffer, sizeof(buffer), 0);
     if (entry_count < 0) return None;
     if (entry_count == 0) return entries;
 
@@ -167,7 +160,8 @@ static fn list_directory_status_bulk(StringView dir, Allocator allocator)
       u32 record_byte_count = 0;
       __builtin_memcpy(&record_byte_count, record, sizeof(record_byte_count));
       if (record_byte_count < sizeof(record_byte_count) ||
-          record_byte_count > static_cast<usize>(buffer + sizeof(buffer) - record))
+          record_byte_count >
+              static_cast<usize>(buffer + sizeof(buffer) - record))
       {
         return None;
       }
@@ -229,23 +223,18 @@ static fn list_directory_status_bulk(StringView dir, Allocator allocator)
                                         field, end, file_id) ||
           !read_returned_bulk_attribute(returned.dirattr, ATTR_DIR_LINKCOUNT,
                                         field, end, directory_link_count) ||
-          !read_returned_bulk_attribute(returned.dirattr,
-                                        ATTR_DIR_MOUNTSTATUS, field, end,
-                                        directory_mount_status) ||
+          !read_returned_bulk_attribute(returned.dirattr, ATTR_DIR_MOUNTSTATUS,
+                                        field, end, directory_mount_status) ||
           !read_returned_bulk_attribute(returned.dirattr, ATTR_DIR_ALLOCSIZE,
-                                        field, end,
-                                        directory_allocated_size) ||
+                                        field, end, directory_allocated_size) ||
           !read_returned_bulk_attribute(returned.dirattr, ATTR_DIR_DATALENGTH,
                                         field, end, directory_size) ||
-          !read_returned_bulk_attribute(returned.fileattr,
-                                        ATTR_FILE_LINKCOUNT, field, end,
-                                        file_link_count) ||
-          !read_returned_bulk_attribute(returned.fileattr,
-                                        ATTR_FILE_TOTALSIZE, field, end,
-                                        file_size) ||
-          !read_returned_bulk_attribute(returned.fileattr,
-                                        ATTR_FILE_ALLOCSIZE, field, end,
-                                        file_allocated_size) ||
+          !read_returned_bulk_attribute(returned.fileattr, ATTR_FILE_LINKCOUNT,
+                                        field, end, file_link_count) ||
+          !read_returned_bulk_attribute(returned.fileattr, ATTR_FILE_TOTALSIZE,
+                                        field, end, file_size) ||
+          !read_returned_bulk_attribute(returned.fileattr, ATTR_FILE_ALLOCSIZE,
+                                        field, end, file_allocated_size) ||
           !read_returned_bulk_attribute(returned.fileattr, ATTR_FILE_DEVTYPE,
                                         field, end, special_device))
       {
@@ -268,10 +257,9 @@ static fn list_directory_status_bulk(StringView dir, Allocator allocator)
       {
         return None;
       }
-      let const name_length =
-          name_start[name_reference.attr_length - 1] == '\0'
-              ? name_reference.attr_length - 1
-              : name_reference.attr_length;
+      let const name_length = name_start[name_reference.attr_length - 1] == '\0'
+                                  ? name_reference.attr_length - 1
+                                  : name_reference.attr_length;
       let const name = StringView{name_start, name_length};
       if (name == StringView{"."} || name == StringView{".."}) {
         record = end;
@@ -307,8 +295,7 @@ static fn list_directory_status_bulk(StringView dir, Allocator allocator)
 }
 
 static fn find_path_from_file_id(StringView filesystem_path,
-                                 u64 file_id) wontthrow
-    -> Maybe<Path>
+                                 u64 file_id) wontthrow -> Maybe<Path>
 {
   const String filesystem_path_string{filesystem_path};
   struct statfs filesystem{};
@@ -327,8 +314,8 @@ static fn find_path_from_file_id(StringView filesystem_path,
 
 #else
 
-static fn list_directory_status_bulk(StringView dir, Allocator allocator)
-    throws -> Maybe<ArrayList<directory_status_entry>>
+static fn list_directory_status_bulk(StringView dir, Allocator allocator) throws
+    -> Maybe<ArrayList<directory_status_entry>>
 {
   unused(dir);
   unused(allocator);
@@ -419,8 +406,8 @@ static pure fn linux_filesystem_type_name(u64 type_id) wontthrow -> StringView
 }
 
 static fn fill_native_filesystem_identity(const String &path,
-                                           filesystem_status &status)
-    wontthrow -> void
+                                          filesystem_status &status) wontthrow
+    -> void
 {
   struct statfs type_info{};
   if (::statfs(path.c_str(), &type_info) != 0) return;
@@ -435,8 +422,8 @@ static fn fill_native_filesystem_identity(const String &path,
 #elif defined __APPLE__ || defined BSD
 
 static fn fill_native_filesystem_identity(const String &path,
-                                           filesystem_status &status)
-    wontthrow -> void
+                                          filesystem_status &status) wontthrow
+    -> void
 {
   struct statfs type_info{};
   if (::statfs(path.c_str(), &type_info) != 0) return;
@@ -447,8 +434,8 @@ static fn fill_native_filesystem_identity(const String &path,
 #else
 
 static fn fill_native_filesystem_identity(const String &path,
-                                           filesystem_status &status)
-    wontthrow -> void
+                                          filesystem_status &status) wontthrow
+    -> void
 {
   unused(path);
   unused(status);
@@ -574,8 +561,8 @@ static fn read_volume_identity(mounted_filesystem &filesystem) wontthrow -> void
 
 #endif
 
-static fn append_mounted_filesystems(
-    ArrayList<mounted_filesystem> &result) throws -> void
+static fn
+append_mounted_filesystems(ArrayList<mounted_filesystem> &result) throws -> void
 {
 #if defined __linux__
   let *mount_file = setmntent("/proc/self/mounts", "r");
@@ -625,8 +612,7 @@ fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
 #if defined __linux__
 
 static fn read_native_filesystem_error_counters(
-    StringView path, filesystem_error_counters &counters) throws
-    -> bool
+    StringView path, filesystem_error_counters &counters) throws -> bool
 {
   let const absolute_path = Path{path}.to_absolute();
   let const filesystems = mounted_filesystems();
@@ -1015,13 +1001,12 @@ static fn finish_suspended_aio(aiocb &control,
   let const transferred_byte_count = ::aio_return(&control);
   let const return_error_number = errno;
   if (transferred_byte_count >= 0) {
-    result.transferred_byte_count =
-        static_cast<usize>(transferred_byte_count);
+    result.transferred_byte_count = static_cast<usize>(transferred_byte_count);
   } else if (error_number > 0) {
     result.error_number = error_number;
   } else {
-    result.error_number = return_error_number != 0 ? return_error_number
-                                                   : status_error_number;
+    result.error_number =
+        return_error_number != 0 ? return_error_number : status_error_number;
   }
 
   return true;
@@ -1064,10 +1049,9 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
 
   usize operation_start = 0;
   while (operation_start < operation_count) {
-    let const chunk_count =
-        operation_count - operation_start > AIO_LISTIO_MAX
-            ? static_cast<usize>(AIO_LISTIO_MAX)
-            : operation_count - operation_start;
+    let const chunk_count = operation_count - operation_start > AIO_LISTIO_MAX
+                                ? static_cast<usize>(AIO_LISTIO_MAX)
+                                : operation_count - operation_start;
     aiocb controls[AIO_LISTIO_MAX]{};
     bool is_queued[AIO_LISTIO_MAX]{};
     bool is_completed[AIO_LISTIO_MAX]{};
@@ -1148,10 +1132,9 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
       }
 
       struct kevent64_s events[AIO_LISTIO_MAX]{};
-      let const event_count =
-          ::kevent64(queue_descriptor, nullptr, 0, events,
-                     static_cast<i32>(queued_count - completed_count), 0,
-                     nullptr);
+      let const event_count = ::kevent64(
+          queue_descriptor, nullptr, 0, events,
+          static_cast<i32>(queued_count - completed_count), 0, nullptr);
       if (event_count < 0) {
         if (errno == EINTR) {
           if (!INTERRUPT_REQUESTED) continue;
@@ -1181,7 +1164,8 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
         let const control_address =
             static_cast<uintptr>(events[event_index].ident);
         let const controls_begin = reinterpret_cast<uintptr>(controls);
-        let const controls_end = reinterpret_cast<uintptr>(controls + chunk_count);
+        let const controls_end =
+            reinterpret_cast<uintptr>(controls + chunk_count);
         if (control_address < controls_begin || control_address >= controls_end)
           continue;
         let const byte_offset = control_address - controls_begin;
@@ -1432,9 +1416,10 @@ static fn open_io_uring_batch(io_uring_batch &ring) wontthrow -> bool
   return is_usable;
 }
 
-static fn io_uring_batch_supports_operations(
-    const io_uring_batch &ring, const batched_syscall *operations,
-    usize operation_count) wontthrow -> bool
+static fn io_uring_batch_supports_operations(const io_uring_batch &ring,
+                                             const batched_syscall *operations,
+                                             usize operation_count) wontthrow
+    -> bool
 {
   for (usize index = 0; index < operation_count; index++) {
     switch (operations[index].syscall_id) {
@@ -1734,7 +1719,7 @@ fn execute_batch_operations(const batched_syscall *operations,
   }
 }
 
-}
+} // namespace batch_internal
 
-}
-}
+} // namespace os
+} // namespace koshka

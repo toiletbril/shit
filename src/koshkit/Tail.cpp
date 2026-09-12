@@ -99,30 +99,65 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_print_headers = sources.count() > 1;
   let output = String{cxt.scratch_allocator()};
   i32 status = 0;
-  for (usize source_index = 0; source_index < sources.count(); source_index++) {
-    let const content = read_named_or_stdin(ec, sources[source_index]);
+  let const do_append_header = [&](usize source_index) throws -> void {
+    if (!should_print_headers) return;
+    if (source_index > 0) output += '\n';
+    output += "==> ";
+    output += sources[source_index] == "-" ? StringView{"standard input"}
+                                           : sources[source_index];
+    output += " <==\n";
+  };
+  let const do_report_read_error = [&](usize source_index, i32 error_number)
+                                       throws -> void {
+    os::set_last_system_error(error_number);
+    report_soft_koshkit_error(
+        ec, cxt,
+        "tail: cannot open '" +
+            String{cxt.scratch_allocator(), sources[source_index]} +
+            "': " + os::last_system_error_message());
+    status = 1;
+  };
+
+  if (is_byte_mode) {
+    let byte_reads = read_regular_tail_bytes(sources, origin, count,
+                                             cxt.scratch_allocator());
     if (os::INTERRUPT_REQUESTED) return 130;
-    if (!content.has_value()) {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "tail: cannot open '" +
-              String{cxt.scratch_allocator(), sources[source_index]} +
-              "': " + os::last_system_error_message());
-      status = 1;
+    if (byte_reads.has_value()) {
+      for (usize source_index = 0; source_index < sources.count();
+           source_index++)
+      {
+        let const &read = (*byte_reads)[source_index];
+        if (read.error_number != 0) {
+          do_report_read_error(source_index, read.error_number);
+          continue;
+        }
+
+        do_append_header(source_index);
+        if (read.received_byte_count != 0)
+          output += StringView{read.bytes.begin(), read.received_byte_count};
+      }
+
+      ec.print_to_stdout(output);
+      return status;
+    }
+  }
+
+  let source_results =
+      read_named_or_stdin_batch(ec, sources, cxt.scratch_allocator());
+  if (os::INTERRUPT_REQUESTED) return 130;
+
+  for (usize source_index = 0; source_index < sources.count(); source_index++) {
+    let &source_result = source_results[source_index];
+    if (!source_result.content.has_value()) {
+      do_report_read_error(source_index, source_result.error_number);
       continue;
     }
 
-    if (should_print_headers) {
-      if (source_index > 0) output += '\n';
-      output += "==> ";
-      output += sources[source_index] == "-" ? StringView{"standard input"}
-                                             : sources[source_index];
-      output += " <==\n";
-    }
+    do_append_header(source_index);
 
     if (is_byte_mode) {
       let const wanted_count = static_cast<usize>(count);
-      let const text = content->view();
+      let const text = source_result.content->view();
       let start = origin == count_origin::FromStart
                       ? (count > 0 ? static_cast<usize>(count - 1) : 0)
                       : sub_sat(text.length, wanted_count);
@@ -132,7 +167,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    let const text = content->view();
+    let const text = source_result.content->view();
     let const wanted_count = static_cast<usize>(count);
     usize start = 0;
     if (origin == count_origin::FromStart) {

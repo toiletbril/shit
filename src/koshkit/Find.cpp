@@ -302,14 +302,13 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
     let const root = roots[root_index];
     if (results[root_index].error_number != 0) {
       report_soft_koshkit_error(ec, cxt,
-                                "find: '" +
-                                    String{allocator, root} +
+                                "find: '" + String{allocator, root} +
                                     "': no such file or directory");
       status = 1;
       continue;
     }
-    find_walk(ec, cxt, root_paths[root_index], root, 0, options, output,
-              status, allocator, &root_statuses[root_index]);
+    find_walk(ec, cxt, root_paths[root_index], root, 0, options, output, status,
+              allocator, &root_statuses[root_index]);
   }
 
   ec.print_to_stdout(output);

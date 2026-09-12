@@ -10,7 +10,7 @@
 
 #include "Arena.hpp"
 #include "Builtin.hpp"
-#include "CliColors.hpp"
+#include "CLIColors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
 #include "CompletionPolicy.hpp"
@@ -949,12 +949,12 @@ static fn push_spec_candidate(StringView entry, ArrayList<String> &candidates,
     let const description =
         entry.substring_of_length(*paren + 1, entry.length - *paren - 2);
     if (!name.is_empty()) {
-      candidates.push(String{name});
-      if (!description.is_empty()) descriptions.set(name, String{description});
+      candidates.push(String{completion_allocator(), name});
+      if (!description.is_empty()) descriptions.set(name, description);
       return;
     }
   }
-  candidates.push(String{entry});
+  candidates.push(String{completion_allocator(), entry});
 }
 
 fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
@@ -988,7 +988,7 @@ fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
   /* The surface name wins when it has a spec of its own, otherwise it resolves
      through an alias and a symlink. */
   const completion_spec *spec = context.lookup_completion_spec(command);
-  String resolved_command{heap_allocator()};
+  String resolved_command{completion_allocator()};
   if (spec == nullptr &&
       context.is_shopt_enabled(shopt_option_id::ProgcompAlias))
   {
@@ -1004,6 +1004,16 @@ fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
       spec != nullptr ? spec->function_name.c_str() : "",
       spec != nullptr ? spec->word_list.length() : 0);
 
+  Maybe<ArrayList<String>> completion_words = None;
+  usize completion_cword = 0;
+  let const do_completion_words = [&]() throws -> const ArrayList<String> & {
+    if (!completion_words.has_value()) {
+      completion_words = split_completion_words(line, cursor, completion_cword);
+    }
+
+    return *completion_words;
+  };
+
   /* No command-specific spec. The default -D loader sources the per-command
      file and returns 124 to ask for a retry, otherwise it produced the
      candidates itself. */
@@ -1011,17 +1021,14 @@ fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
     if (!for_listing) return None;
     const completion_spec *def = context.default_completion_spec();
     if (def == nullptr || def->function_name.is_empty()) return None;
-    let const default_spec = def->clone(heap_allocator());
-    usize default_cword = 0;
-    let const default_words =
-        split_completion_words(line, cursor, default_cword);
+    let const default_spec = def->clone(completion_allocator());
     i32 status = 0;
     let const reply = context.run_completion_function(
-        default_spec.function_name.view(), default_words, default_cword, line,
-        cursor, &status);
+        default_spec.function_name.view(), do_completion_words(),
+        completion_cword, line, cursor, &status);
     if (status != 124) {
       let const wants_dash_entries = !token.is_empty() && token[0] == '-';
-      let loaded = ArrayList<String>{heap_allocator()};
+      let loaded = ArrayList<String>{completion_allocator()};
       for (let const &entry : reply) {
         if (entry_is_unrequested_dash_word(entry.view(), wants_dash_entries))
           continue;
@@ -1036,8 +1043,8 @@ fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
     if (spec == nullptr) return None;
   }
 
-  let const active_spec = spec->clone(heap_allocator());
-  let candidates = ArrayList<String>{heap_allocator()};
+  let const active_spec = spec->clone(completion_allocator());
+  let candidates = ArrayList<String>{completion_allocator()};
 
   let const should_offer_dash_words = !token.is_empty() && token[0] == '-';
 
@@ -1055,17 +1062,18 @@ fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
     {
       if (entry_is_unrequested_dash_word(word.view(), should_offer_dash_words))
         continue;
-      if (word.view().starts_with(token)) candidates.push(String{word.view()});
+      if (word.view().starts_with(token)) {
+        candidates.push(String{completion_allocator(), word.view()});
+      }
     }
   }
 
   /* COMPREPLY is already filtered to the current word, so its entries are taken
      as they are under the same dash gate. */
   if (for_listing && !active_spec.function_name.is_empty()) {
-    usize cword = 0;
-    let const words = split_completion_words(line, cursor, cword);
     let const reply = context.run_completion_function(
-        active_spec.function_name.view(), words, cword, line, cursor);
+        active_spec.function_name.view(), do_completion_words(),
+        completion_cword, line, cursor);
     for (let const &entry : reply) {
       if (entry_is_unrequested_dash_word(entry.view(), should_offer_dash_words))
         continue;

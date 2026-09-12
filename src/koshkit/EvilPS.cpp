@@ -178,7 +178,7 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
   }
 }
 
-}
+} // namespace
 
 EvilPS::EvilPS() = default;
 
@@ -286,8 +286,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     nodes[root_position].was_rendered = true;
     append_label(output, nodes[root_position], allocator, should_color);
     rendered_count++;
-    render_children(output, nodes, root_pid, String{allocator}, 0,
-                    allocator, should_color, output_limit, rendered_count);
+    render_children(output, nodes, root_pid, String{allocator}, 0, allocator,
+                    should_color, output_limit, rendered_count);
     ec.print_to_stdout(output);
     return 0;
   }
@@ -319,12 +319,12 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     nodes[position].was_rendered = true;
     append_label(output, nodes[position], allocator, should_color);
     rendered_count++;
-    render_children(output, nodes, nodes[position].pid, String{allocator},
-                    0, allocator, should_color, output_limit, rendered_count);
+    render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
+                    allocator, should_color, output_limit, rendered_count);
   }
 
   ec.print_to_stdout(output);
   return 0;
 }
 
-}
+} // namespace koshka::koshkit

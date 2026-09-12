@@ -88,27 +88,42 @@ fn EvalContext::run_completion_function(StringView function_name,
                            definition_state_exit::RestoreCaller);
   };
 
-  let comp_words = ArrayList<String>{heap_allocator()};
+  let const do_reset_array = [&](StringView name)
+                                 throws -> ArrayList<String> & {
+    if (is_readonly(name)) {
+      throw Error{"Unable to assign '" + name + "' because it is read only"};
+    }
+
+    m_shell_variables.erase(name);
+    clear_sparse_array(name);
+    let &storage = m_indexed_arrays.get_or_create(
+        name, ArrayList<String>{heap_allocator()});
+    storage.clear();
+
+    return storage;
+  };
+
+  let &comp_words = do_reset_array("COMP_WORDS");
   comp_words.reserve(words.count());
   for (let const &word : words)
     comp_words.push_managed(word.view());
-  set_indexed_array("COMP_WORDS", steal(comp_words));
-  set_shell_variable("COMP_CWORD",
-                     String::from(static_cast<i64>(cword), heap_allocator()));
-  set_shell_variable("COMP_LINE", line);
-  set_shell_variable("COMP_POINT",
-                     String::from(static_cast<i64>(point), heap_allocator()));
-  /* bash-completion reassembles the words against COMP_WORDBREAKS, so it is set
-     for the function run when a non-bash session left it unset. */
-  if (!get_variable_value("COMP_WORDBREAKS").has_value())
-    set_shell_variable("COMP_WORDBREAKS", StringView{" \t\n\"'><=;|&(:"});
 
-  /* bash empties COMPREPLY before each completion, so a function that appends
-     with COMPREPLY+=() starts clean, and the previous completion on the same
-     command does not leak its entries into this one. */
-  set_indexed_array("COMPREPLY", ArrayList<String>{heap_allocator()});
+  char number_buffer[32];
+  set_shell_variable("COMP_CWORD", utils::int_to_text_into(
+                                       static_cast<i64>(cword), number_buffer,
+                                       sizeof(number_buffer)));
+  set_shell_variable("COMP_LINE", line);
+  set_shell_variable("COMP_POINT", utils::int_to_text_into(
+                                       static_cast<i64>(point), number_buffer,
+                                       sizeof(number_buffer)));
+  if (!has_variable_name("COMP_WORDBREAKS")) {
+    set_shell_variable("COMP_WORDBREAKS", StringView{" \t\n\"'><=;|&(:"});
+  }
+
+  do_reset_array("COMPREPLY");
 
   let call_params = ArrayList<String>{heap_allocator()};
+  call_params.reserve(3);
   call_params.push(words.is_empty()
                        ? String{heap_allocator()}
                        : String{heap_allocator(), words[0].view()});
@@ -171,12 +186,10 @@ fn EvalContext::run_completion_function(StringView function_name,
   if (has_pending_control_flow()) clear_control_flow();
 
   let result = ArrayList<String>{heap_allocator()};
-  if (const ArrayList<String> *reply = lookup_indexed_array("COMPREPLY");
+  if (ArrayList<String> *reply = m_indexed_arrays.find("COMPREPLY");
       !was_interrupted && reply != nullptr)
   {
-    result.reserve(reply->count());
-    for (let const &entry : *reply)
-      result.push_managed(entry.view());
+    result = steal(*reply);
   }
   LOG(Info, "completion function '%.*s' returned %zu candidates with status %d",
       static_cast<int>(function_name.length), function_name.data,

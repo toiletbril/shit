@@ -1072,20 +1072,6 @@ fn EvalContext::pattern_replace_value(
   return out;
 }
 
-static fn append_shell_quoted(String &out, StringView arg) throws -> void
-{
-  if (utils::append_ansi_c_quote_if_needed(out, arg)) return;
-
-  out.push('\'');
-  for (usize i = 0; i < arg.length; i++) {
-    if (arg[i] == '\'')
-      out += "'\\''";
-    else
-      out.push(arg[i]);
-  }
-  out.push('\'');
-}
-
 /* Q quotes for reuse, U u L change the case, E expands backslash escapes, A
    prints a recreating assignment, and a lists the attribute letters. */
 fn EvalContext::apply_parameter_transform(StringView name, char op) throws
@@ -1129,13 +1115,13 @@ fn EvalContext::apply_parameter_transform_to_value(StringView text, char op,
   case 'k':
     /* On a bare name K and k quote the value the way Q does, the key-and-value
        listing is the ${a[@]@K} array-field form on the element path. */
-    append_shell_quoted(out, text);
+    utils::append_shell_quoted(out, text);
     return out;
   case 'P': return toiletline::expand_prompt_template(text, *this);
   case 'A':
     out.append(name);
     out += '=';
-    append_shell_quoted(out, text);
+    utils::append_shell_quoted(out, text);
     return out;
   case 'E':
     for (usize i = 0; i < text.length; i++) {

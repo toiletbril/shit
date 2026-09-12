@@ -20,11 +20,9 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-sh] [path ...]");
 
-HELP_DESCRIPTION_DECL(
-    "The du utility prints the disk usage of each path.");
+HELP_DESCRIPTION_DECL("The du utility prints the disk usage of each path.");
 
-FLAG(DU_SUMMARY, Bool, 's', "",
-     "Print only the total for each path.");
+FLAG(DU_SUMMARY, Bool, 's', "", "Print only the total for each path.");
 FLAG(DU_HUMAN, Bool, 'h', "",
      "Print the size in a human-readable form such as 4.0K or 1.5M.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -54,9 +52,10 @@ fn append_output_row(ArrayList<du_output_row> &rows, u64 size, StringView path,
   let rendered_size = FLAG_DU_HUMAN.is_enabled()
                           ? format_human_size(size, allocator)
                           : String::from(size, allocator);
-  if (rendered_size.length() > size_width)
-    size_width = rendered_size.length();
-  rows.push({size, steal(rendered_size), String{allocator, path}});
+  if (rendered_size.length() > size_width) size_width = rendered_size.length();
+  rows.push({
+      size, steal(rendered_size), String{allocator, path}
+  });
 }
 
 static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
@@ -70,8 +69,8 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   if (known_status == nullptr) {
     if (!os::stat_path(path.text().view(), queried_status)) {
       report_soft_koshkit_error(ec, cxt,
-                                "du: cannot read '" + path.text() + "': " +
-                                    os::last_system_error_message());
+                                "du: cannot read '" + path.text() +
+                                    "': " + os::last_system_error_message());
       has_failure = true;
       return None;
     }
@@ -84,15 +83,15 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       known_status->link_count > 1)
   {
     const u64 identity[] = {known_status->device_id, known_status->file_id};
-    let const key = StringView{reinterpret_cast<const char *>(identity),
-                               sizeof(identity)};
+    let const key =
+        StringView{reinterpret_cast<const char *>(identity), sizeof(identity)};
     if (!seen_links.add(key)) return du_size_result{0, false};
   }
 
   if (known_status->blocks > UINT64_MAX / 512) {
-    report_soft_koshkit_error(
-        ec, cxt,
-        "du: cannot read '" + path.text() + "': the total size is too large");
+    report_soft_koshkit_error(ec, cxt,
+                              "du: cannot read '" + path.text() +
+                                  "': the total size is too large");
     has_failure = true;
     return None;
   }
@@ -104,8 +103,8 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
         os::list_directory_status(path.text().view(), heap_allocator());
     if (!children.has_value()) {
       report_soft_koshkit_error(ec, cxt,
-                                "du: cannot read '" + path.text() + "': " +
-                                    os::last_system_error_message());
+                                "du: cannot read '" + path.text() +
+                                    "': " + os::last_system_error_message());
       has_failure = true;
       return None;
     }
@@ -123,18 +122,17 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
                             .build();
       let const child_status =
           child_entry.has_status ? &child_entry.status : nullptr;
-      let const child_size = total_size(ec, cxt, child, has_failure, output_rows,
-                                        size_width, seen_links, allocator,
-                                        child_status);
+      let const child_size =
+          total_size(ec, cxt, child, has_failure, output_rows, size_width,
+                     seen_links, allocator, child_status);
       if (!child_size.has_value()) {
         if (os::INTERRUPT_REQUESTED) return None;
         continue;
       }
       if (child_size->size_bytes > UINT64_MAX - total_bytes) {
-        report_soft_koshkit_error(
-            ec, cxt,
-            "du: cannot read '" + child.text() +
-                "': the total size is too large");
+        report_soft_koshkit_error(ec, cxt,
+                                  "du: cannot read '" + child.text() +
+                                      "': the total size is too large");
         has_failure = true;
         return None;
       }
@@ -155,8 +153,8 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   return du_size_result{allocated_size_bytes, true};
 }
 
-fn append_size_line(String &output, const du_output_row &row,
-                    usize size_width, bool should_color) throws -> void
+fn append_size_line(String &output, const du_output_row &row, usize size_width,
+                    bool should_color) throws -> void
 {
   append_report_column(output, row.size.view(), size_width, true,
                        colors::ansi::BOLD_GREEN, should_color);
@@ -222,10 +220,10 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    let const total = total_size(
-        ec, cxt, target, has_failure,
-        FLAG_DU_SUMMARY.is_enabled() ? nullptr : &output_rows, size_width,
-        seen_links, allocator, &target_statuses[index]);
+    let const total =
+        total_size(ec, cxt, target, has_failure,
+                   FLAG_DU_SUMMARY.is_enabled() ? nullptr : &output_rows,
+                   size_width, seen_links, allocator, &target_statuses[index]);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!total.has_value()) {
       status = 1;

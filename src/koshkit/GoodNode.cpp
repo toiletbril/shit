@@ -181,8 +181,7 @@ fn find_inode(const Path &path, const os::file_status &status, u64 inode,
     let const child_path =
         PathBuilder{path.text().view()}.append(child.child.name.view()).build();
 
-    if (find_inode(child_path, child.status, inode, found_path))
-      return true;
+    if (find_inode(child_path, child.status, inode, found_path)) return true;
   }
 
   return false;
@@ -202,7 +201,7 @@ pure fn path_is_beneath(const Path &root, const Path &candidate) wontthrow
           os::is_directory_separator(candidate_text[root_text.length]));
 }
 
-}
+} // namespace
 
 GoodNode::GoodNode() = default;
 
@@ -317,12 +316,12 @@ fn GoodNode::execute(
     }
 
     if (!output.is_empty()) output += '\n';
-    append_node_report(output, ec, path.view(), report_statuses[index], should_color,
-                       allocator);
+    append_node_report(output, ec, path.view(), report_statuses[index],
+                       should_color, allocator);
   }
 
   ec.print_to_stdout(output);
   return exit_status;
 }
 
-}
+} // namespace koshka::koshkit

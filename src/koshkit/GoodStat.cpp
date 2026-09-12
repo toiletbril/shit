@@ -148,7 +148,7 @@ fn append_subject(String &output, StringView operand,
   append_report_body(output, body.view());
 }
 
-}
+} // namespace
 
 GoodStat::GoodStat() = default;
 
@@ -230,4 +230,4 @@ fn GoodStat::execute(
   return status;
 }
 
-}
+} // namespace koshka::koshkit

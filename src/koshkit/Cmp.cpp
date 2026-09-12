@@ -53,8 +53,7 @@ struct buffered_byte_reader
 
 static fn refill_readers(buffered_byte_reader &left,
                          buffered_byte_reader &right, os::Batch &batch,
-                         ArrayList<os::batch_result> &results) throws
-    -> bool
+                         ArrayList<os::batch_result> &results) throws -> bool
 {
   buffered_byte_reader *readers[] = {&left, &right};
   buffered_byte_reader *batched_readers[2]{};

@@ -94,7 +94,7 @@ fn build_command_source(const ArrayList<String> &operands,
   return source;
 }
 
-}
+} // namespace
 
 Retry::Retry() = default;
 
@@ -208,4 +208,4 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-}
+} // namespace koshka::koshkit

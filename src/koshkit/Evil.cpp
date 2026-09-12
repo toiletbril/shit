@@ -155,7 +155,7 @@ fn names_text(const ArrayList<String> &names, Allocator allocator) throws
   return result;
 }
 
-}
+} // namespace
 
 Evil::Evil() = default;
 
@@ -491,4 +491,4 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-}
+} // namespace koshka::koshkit

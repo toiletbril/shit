@@ -1,7 +1,5 @@
-# The koshkit builtin completes its utility names in the first operand slot and
-# each utility's flags after it, all from the registered FLAG lists. A bare
-# utility name completes its own flags when the koshkit option resolves it as a
-# command.
+# The koshkit catalog supplies utility names and registered utility flags.
+# Bare utility flags are completed when the koshkit option resolves the command.
 DIRECTORY=$(mktemp -d) || exit 1
 trap '[ -n "$DIRECTORY" ] && /bin/rm -rf "$DIRECTORY"' EXIT
 printf '#!/bin/sh\nexit 0\n' > "$DIRECTORY/ls"
@@ -17,6 +15,11 @@ echo "== timeout flags through koshkit:"
 "$BIN" --debug-complete-at 'koshkit timeout -' </dev/null
 echo "== nproc flags through koshkit:"
 "$BIN" --debug-complete-at 'koshkit nproc -' </dev/null
+for utility in evil evildisk evilfiles evilfs evilio evillogs evilnet evilps \
+  evilss goodcore goodfsw goodnode goodstat retry stat sync watch; do
+  echo "== $utility flags through koshkit:"
+  "$BIN" --debug-complete-at "koshkit $utility -" </dev/null
+done
 echo "== cat flags through koshkit:"
 "$BIN" --debug-complete-at 'koshkit cat --s' </dev/null
 echo "== date format directives through koshkit:"

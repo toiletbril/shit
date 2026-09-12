@@ -209,7 +209,7 @@ fn remove_stage(const Path &stage) throws -> void
   unused(remove_path(stage.text().view(), removal_mode::Recursive));
 }
 
-}
+} // namespace
 
 GoodCore::GoodCore() = default;
 
@@ -516,4 +516,4 @@ fn GoodCore::execute(
   return 0;
 }
 
-}
+} // namespace koshka::koshkit

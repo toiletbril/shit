@@ -85,9 +85,8 @@ pure fn is_idle_process_io(const os::process_io_status &status) wontthrow
     -> bool
 {
   return status.read_bytes == 0 && status.written_bytes == 0 &&
-         (!status.has_operation_counts ||
-          (status.read_operation_count == 0 &&
-           status.write_operation_count == 0));
+         (!status.has_operation_counts || (status.read_operation_count == 0 &&
+                                           status.write_operation_count == 0));
 }
 
 fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
@@ -139,8 +138,8 @@ fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
 
 fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
                           const ArrayList<io_row> &after_rows,
-                          u64 elapsed_nanoseconds,
-                          Allocator allocator) throws -> ArrayList<io_row>
+                          u64 elapsed_nanoseconds, Allocator allocator) throws
+    -> ArrayList<io_row>
 {
   let sampled_rows = ArrayList<io_row>{allocator};
   usize before_position = 0;

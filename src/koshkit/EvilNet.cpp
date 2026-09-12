@@ -215,8 +215,7 @@ fn append_network_traffic_report(String &output, ArrayList<String> &warnings,
 }
 
 fn append_tcp_report(String &output, ArrayList<String> &warnings,
-                     Allocator allocator,
-                     bool should_color) throws -> bool
+                     Allocator allocator, bool should_color) throws -> bool
 {
   os::tcp_statistics statistics{};
   if (!os::read_tcp_statistics(statistics)) return false;

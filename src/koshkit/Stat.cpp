@@ -677,7 +677,7 @@ fn resolve_format(String &format, bool &should_append_newline,
   }
 }
 
-}
+} // namespace
 
 Stat::Stat() = default;
 
@@ -783,4 +783,4 @@ fn Stat::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-}
+} // namespace koshka::koshkit

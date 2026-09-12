@@ -18,8 +18,8 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-tgex] [-n seconds] command [argument ...]");
 
-HELP_DESCRIPTION_DECL(
-    "The watch utility runs a command at fixed intervals and shows its output.");
+HELP_DESCRIPTION_DECL("The watch utility runs a command at fixed intervals and "
+                      "shows its output.");
 
 FLAG(WATCH_INTERVAL, String, 'n', "interval",
      "Wait this many seconds between runs. The default is two.");
@@ -103,7 +103,7 @@ fn append_truncated_lines(String &output, StringView body,
   }
 }
 
-}
+} // namespace
 
 Watch::Watch() = default;
 
@@ -204,4 +204,4 @@ fn Watch::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-}
+} // namespace koshka::koshkit

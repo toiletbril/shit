@@ -192,7 +192,7 @@ fn sort_entries(ArrayList<watched_entry> &entries) throws -> void
   });
 }
 
-}
+} // namespace
 
 GoodFSW::GoodFSW() = default;
 
@@ -334,4 +334,4 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-}
+} // namespace koshka::koshkit

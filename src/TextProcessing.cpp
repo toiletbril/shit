@@ -157,4 +157,4 @@ pure fn next_tab_column(usize column,
   return column;
 }
 
-}
+} // namespace koshka::koshkit

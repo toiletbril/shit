@@ -13,7 +13,7 @@
 
 #include "Arena.hpp"
 #include "Builtin.hpp"
-#include "CliColors.hpp"
+#include "CLIColors.hpp"
 #include "CompletionInternal.hpp"
 #include "CompletionPolicy.hpp"
 #include "Debug.hpp"
@@ -233,6 +233,8 @@ public:
 
   pure fn allows_fuzzy_fallback() const wontthrow -> bool { return true; }
 
+  pure fn wants_empty_token_listing() const wontthrow -> bool { return true; }
+
   fn take() throws -> ArrayList<String> { return candidates.best(); }
   pure fn source_scans() const wontthrow -> usize { return source_scan_count; }
   pure fn materialized() const wontthrow -> usize { return materialized_count; }
@@ -241,6 +243,34 @@ private:
   TieredCandidates candidates{};
   usize source_scan_count{0};
   usize materialized_count{0};
+};
+
+class PrefixListCollector
+{
+public:
+  PrefixListCollector() = default;
+
+  fn add(StringView name, match_tier tier) throws -> void
+  {
+    if (tier != match_tier::exact_prefix) return;
+
+    names.push(String{completion_allocator(), name});
+  }
+
+  fn note_source_candidate() wontthrow -> void {}
+
+  pure fn has_exact() const wontthrow -> bool { return !names.is_empty(); }
+  pure fn has_prefix() const wontthrow -> bool { return !names.is_empty(); }
+  pure fn allows_fuzzy_fallback() const wontthrow -> bool { return false; }
+
+  pure fn wants_empty_token_listing() const wontthrow -> bool { return true; }
+
+  fn take() throws -> ArrayList<String> { return steal(names); }
+  pure fn source_scans() const wontthrow -> usize { return 0; }
+  pure fn materialized() const wontthrow -> usize { return names.count(); }
+
+private:
+  ArrayList<String> names{completion_allocator()};
 };
 
 static pure fn common_prefix_length(StringView left, StringView right,
@@ -309,6 +339,7 @@ public:
   pure fn has_exact() const wontthrow -> bool { return best_tier == 0; }
   pure fn has_prefix() const wontthrow -> bool { return best_tier <= 1; }
   pure fn allows_fuzzy_fallback() const wontthrow -> bool { return false; }
+  pure fn wants_empty_token_listing() const wontthrow -> bool { return false; }
   pure fn count() const wontthrow -> usize { return match_count; }
   pure fn source_scans() const wontthrow -> usize { return source_scan_count; }
   pure fn materialized() const wontthrow -> usize { return 0; }
@@ -389,7 +420,7 @@ collect_command_names(StringView token, command_match_mode match_mode,
           ? ProgramResolver::ValidationScope::All
           : ProgramResolver::ValidationScope::Prefix);
   if (!token_is_glob &&
-      (!token.is_empty() || collector.allows_fuzzy_fallback()))
+      (!token.is_empty() || collector.wants_empty_token_listing()))
   {
     for (let const &path_name : path_names)
       if (utils::smart_case_prefix_matches(path_name.view(),
@@ -451,6 +482,17 @@ fn complete_command_names(
   return collector.take();
 }
 
+fn complete_command_names_by_prefix(StringView token,
+                                    EvalContext &context) throws
+    -> ArrayList<String>
+{
+  let collector = PrefixListCollector{};
+
+  collect_command_names(token, command_match_mode::Prefix, context, collector,
+                        nullptr);
+  return collector.take();
+}
+
 static fn entry_is_executable(const Path &directory, StringView name) throws
     -> bool
 {
@@ -470,6 +512,12 @@ enum class path_text_mode : u8
 {
   ShellSyntax,
   Literal,
+};
+
+enum class directory_suffix_mode : u8
+{
+  Marked,
+  Bare,
 };
 
 struct filesystem_listing
@@ -533,13 +581,14 @@ static fn check_filesystem_entry(const filesystem_listing &listing,
 
 static fn build_filesystem_candidate(
     StringView directory_part, StringView raw_directory_part, StringView name,
-    bool is_directory, path_text_mode text_mode, StringView raw_token,
+    bool is_directory, directory_suffix_mode suffix_mode,
+    path_text_mode text_mode, StringView raw_token,
     const utils::decoded_shell_word &decoded_word) throws -> String
 {
   let const inside_quote = text_mode == path_text_mode::Literal;
   let const preserve_directory_spelling = raw_directory_part != directory_part;
   let entry_name = String{completion_allocator(), name};
-  if (is_directory) {
+  if (is_directory && suffix_mode == directory_suffix_mode::Marked) {
     let separator = '/';
     if (!directory_part.is_empty() &&
         os::is_directory_separator(directory_part[directory_part.length - 1]))
@@ -591,12 +640,11 @@ static fn build_filesystem_candidate(
 }
 
 template <typename Collector>
-static fn
-collect_filesystem_matches(StringView token,
-                           const utils::decoded_shell_word &decoded_word,
-                           const Path &base_directory, path_text_mode text_mode,
-                           filesystem_entry_filter filter, EvalContext &context,
-                           Collector &collector) throws -> void
+static fn collect_filesystem_matches(
+    StringView token, const utils::decoded_shell_word &decoded_word,
+    const Path &base_directory, path_text_mode text_mode,
+    filesystem_entry_filter filter, directory_suffix_mode suffix_mode,
+    EvalContext &context, Collector &collector) throws -> void
 {
   let const inside_quote = text_mode == path_text_mode::Literal;
   let listing = open_filesystem_listing(decoded_word, base_directory, context);
@@ -625,9 +673,10 @@ collect_filesystem_matches(StringView token,
     let const eligible_entry = check_filesystem_entry(*listing, entry, filter);
     if (!eligible_entry.has_value()) return;
 
-    let candidate = build_filesystem_candidate(
-        parts.directory_part, raw_directory_part, name,
-        eligible_entry->is_directory, text_mode, token, decoded_word);
+    let candidate =
+        build_filesystem_candidate(parts.directory_part, raw_directory_part,
+                                   name, eligible_entry->is_directory,
+                                   suffix_mode, text_mode, token, decoded_word);
     collector.add(candidate.view(), *tier);
   };
 
@@ -652,7 +701,8 @@ collect_filesystem_matches(StringView token,
 template <typename Collector>
 static fn complete_filesystem_with(
     StringView token, const Path &base_directory, path_text_mode text_mode,
-    filesystem_entry_filter filter, EvalContext &context, Collector collector,
+    filesystem_entry_filter filter, directory_suffix_mode suffix_mode,
+    EvalContext &context, Collector collector,
     const utils::decoded_shell_word *decoded = nullptr) throws -> Collector
 {
   let decoded_storage = utils::decoded_shell_word{completion_allocator()};
@@ -664,7 +714,7 @@ static fn complete_filesystem_with(
     decoded = &decoded_storage;
   }
   collect_filesystem_matches(token, *decoded, base_directory, text_mode, filter,
-                             context, collector);
+                             suffix_mode, context, collector);
 
   return collector;
 }
@@ -677,8 +727,8 @@ complete_filesystem(StringView token, const Path &base_directory,
     -> ArrayList<String>
 {
   let collector = complete_filesystem_with<CommandListCollector>(
-      token, base_directory, text_mode, filter, context, CommandListCollector{},
-      decoded);
+      token, base_directory, text_mode, filter, directory_suffix_mode::Marked,
+      context, CommandListCollector{}, decoded);
   return collector.take();
 }
 
@@ -690,6 +740,29 @@ fn complete_filesystem_names(StringView token, EvalContext &context,
                              filesystem_entry_filter::All, context);
 }
 
+fn complete_filesystem_names_by_prefix(StringView token, EvalContext &context,
+                                       const Path &base_directory,
+                                       bool should_list_directories_only) throws
+    -> ArrayList<String>
+{
+  let const filter = should_list_directories_only
+                         ? filesystem_entry_filter::DirectoriesOnly
+                         : filesystem_entry_filter::All;
+  let collector = complete_filesystem_with<PrefixListCollector>(
+      token, base_directory, path_text_mode::Literal, filter,
+      directory_suffix_mode::Bare, context, PrefixListCollector{});
+  return collector.take();
+}
+
+ScopedCompletionScratch::ScopedCompletionScratch()
+    : m_saved(internal::COMPLETION_ARENA.mark())
+{}
+
+ScopedCompletionScratch::~ScopedCompletionScratch()
+{
+  internal::COMPLETION_ARENA.release(m_saved);
+}
+
 static fn complete_filesystem_prefix(
     StringView token, const Path &base_directory, path_text_mode text_mode,
     filesystem_entry_filter filter, EvalContext &context,
@@ -697,7 +770,8 @@ static fn complete_filesystem_prefix(
     -> GhostPrefixCollector
 {
   return complete_filesystem_with<GhostPrefixCollector>(
-      token, base_directory, text_mode, filter, context,
+      token, base_directory, text_mode, filter, directory_suffix_mode::Marked,
+      context,
       GhostPrefixCollector{GhostPrefixCollector::Selection::FirstMatch},
       decoded);
 }
@@ -751,8 +825,8 @@ static fn complete_glob(StringView token, const Path &base_directory,
             : parts.directory_part;
     let candidate = build_filesystem_candidate(
         parts.directory_part, raw_directory_part, name,
-        eligible_entry->is_directory, path_text_mode::ShellSyntax, token,
-        decoded_word);
+        eligible_entry->is_directory, directory_suffix_mode::Marked,
+        path_text_mode::ShellSyntax, token, decoded_word);
 
     candidates.push(steal(candidate));
   }
@@ -1193,15 +1267,19 @@ fn complete(StringView line, usize cursor, EvalContext &context,
     if (for_listing) {
       candidates.sort();
 
-      let unique_candidates = ArrayList<String>{candidates.allocator()};
-      unique_candidates.reserve(candidates.count());
-
+      usize kept_count = 0;
       for (usize i = 0; i < candidates.count(); i++) {
-        if (unique_candidates.is_empty() ||
-            unique_candidates.back().view() != candidates[i].view())
-          unique_candidates.push(steal(candidates[i]));
+        if (kept_count > 0 &&
+            candidates[kept_count - 1].view() == candidates[i].view())
+        {
+          continue;
+        }
+
+        if (kept_count != i) candidates[kept_count] = steal(candidates[i]);
+
+        kept_count++;
       }
-      candidates = steal(unique_candidates);
+      candidates.truncate(kept_count);
 
       if (extension_hint != nullptr && stage_token.is_empty()) {
         candidates = keep_hinted_extension(steal(candidates),

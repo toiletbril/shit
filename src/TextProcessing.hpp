@@ -39,4 +39,4 @@ fn parse_tab_stop_list(StringView text, Allocator allocator) throws
 pure fn next_tab_column(usize column,
                         const ArrayList<usize> &tab_stops) wontthrow -> usize;
 
-}
+} // namespace koshka::koshkit

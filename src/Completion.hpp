@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Arena.hpp"
 #include "Common.hpp"
 #include "Eval.hpp"
 #include "HashSet.hpp"
@@ -64,6 +65,26 @@ fn complete_command_names(
 fn complete_filesystem_names(StringView token, EvalContext &context,
                              const Path &base_directory) throws
     -> ArrayList<String>;
+
+fn complete_command_names_by_prefix(StringView token,
+                                    EvalContext &context) throws
+    -> ArrayList<String>;
+fn complete_filesystem_names_by_prefix(
+    StringView token, EvalContext &context, const Path &base_directory,
+    bool should_list_directories_only = false) throws -> ArrayList<String>;
+
+class ScopedCompletionScratch
+{
+public:
+  ScopedCompletionScratch() throws;
+  ~ScopedCompletionScratch();
+
+  ScopedCompletionScratch(const ScopedCompletionScratch &) = delete;
+  ScopedCompletionScratch &operator=(const ScopedCompletionScratch &) = delete;
+
+private:
+  BumpArena::Mark m_saved;
+};
 
 /* The spans come back sorted by start and non-overlapping. */
 enum class shell_lexical_frame_kind : u8
