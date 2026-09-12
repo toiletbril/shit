@@ -806,8 +806,6 @@ struct file_status
 
 static_assert(sizeof(usize) != 8 || sizeof(file_status) == 104);
 
-#include "PlatformBatch.hpp"
-
 struct directory_status_entry
 {
   Path::directory_child child;
@@ -1678,3 +1676,5 @@ fn redirect_self(const ExecContext &ec) throws -> void;
 } /* namespace os */
 
 } /* namespace koshka */
+
+#include "PlatformBatch.hpp"

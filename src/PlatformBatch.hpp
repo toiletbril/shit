@@ -9,6 +9,11 @@
 
 #pragma once
 
+#include "Common.hpp"
+#include "Platform.hpp"
+
+namespace koshka::os {
+
 struct BatchOperation
 {
   enum class Kind : u8
@@ -97,3 +102,5 @@ public:
 private:
   ArrayList<internal::batched_syscall> m_operations;
 };
+
+}
