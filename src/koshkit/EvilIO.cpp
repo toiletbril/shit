@@ -748,31 +748,40 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let operands =
-      parse_util_operands(FLAG_LIST, args, &arg_locations, nullptr, true, true);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands = PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(
+      args, arg_locations, operand_locations, true, true);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   let const allocator = cxt.scratch_allocator();
   let process_limit_operand = Maybe<StringView>{};
+  let process_limit_location = Maybe<SourceLocation>{};
   let sample_duration_operand = Maybe<StringView>{};
-  if (FLAG_EVILIO_CUMULATIVE.has_value())
+  let sample_duration_location = Maybe<SourceLocation>{};
+  if (FLAG_EVILIO_CUMULATIVE.has_value()) {
     sample_duration_operand = FLAG_EVILIO_CUMULATIVE.value();
+    sample_duration_location = FLAG_EVILIO_CUMULATIVE.value_location();
+  }
 
-  for (let const &operand : operands) {
+  for (usize operand_index = 0; operand_index < operands.count();
+       operand_index++)
+  {
+    let const &operand = operands[operand_index];
     let const is_process_limit = operand.length() > 1 && operand[0] == '-';
     if (is_process_limit && !process_limit_operand.has_value()) {
       process_limit_operand = operand.view();
+      process_limit_location = operand_locations[operand_index];
       continue;
     }
     if (!is_process_limit && !sample_duration_operand.has_value()) {
       sample_duration_operand = operand.view();
+      sample_duration_location = operand_locations[operand_index];
       continue;
     }
 
-    report_soft_koshkit_error(
-        ec, cxt, "evilio: unexpected operand",
+    KOSHKIT_REPORT_ERROR_AT(
+        operand_locations[operand_index], "unexpected operand",
         "use at most one sample duration and one -NUMBER limit");
     return 1;
   }
@@ -780,8 +789,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   if (sample_duration_operand.has_value() &&
       !FLAG_EVILIO_CUMULATIVE.is_enabled())
   {
-    report_soft_koshkit_error(ec, cxt, "evilio: unexpected operand",
-                              "a sample duration requires --cumulative");
+    KOSHKIT_REPORT_ERROR_AT(*sample_duration_location, "unexpected operand",
+                            "a sample duration requires --cumulative");
     return 1;
   }
 
@@ -790,8 +799,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     sample_duration_seconds = parse_koshkit_duration_seconds(
         *sample_duration_operand, "evilio", allocator);
     if (sample_duration_seconds <= 0.0) {
-      report_soft_koshkit_error(ec, cxt, "evilio: invalid duration",
-                                "the duration must be greater than zero");
+      KOSHKIT_REPORT_ERROR_AT(*sample_duration_location, "invalid duration",
+                              "the duration must be greater than zero");
       return 1;
     }
   }
@@ -799,15 +808,21 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   usize row_limit = FLAG_EVILIO_PS.is_enabled() ? SIZE_MAX : 10;
   if (process_limit_operand.has_value()) {
     if (FLAG_EVILIO_COUNT.is_set()) {
-      report_soft_koshkit_error(ec, cxt, "evilio: conflicting process limits",
-                                "use either -NUMBER or --count");
+      let conflict_location = *process_limit_location;
+      if (FLAG_EVILIO_COUNT.value_location().position >
+          conflict_location.position)
+      {
+        conflict_location = FLAG_EVILIO_COUNT.value_location();
+      }
+      KOSHKIT_REPORT_ERROR_AT(conflict_location, "conflicting process limits",
+                              "use either -NUMBER or --count");
       return 1;
     }
     let const parsed = utils::parse_integer_in_base(
         process_limit_operand->substring(1), int_base::decimal);
     if (parsed.is_error() || parsed.value() < 1 || parsed.value() > 100000) {
-      report_soft_koshkit_error(ec, cxt, "evilio: invalid count",
-                                "the count must be from 1 through 100000");
+      KOSHKIT_REPORT_ERROR_AT(*process_limit_location, "invalid count",
+                              "the count must be from 1 through 100000");
       return 1;
     }
     row_limit = static_cast<usize>(parsed.value());
@@ -816,8 +831,9 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     let const parsed = utils::parse_integer_in_base(FLAG_EVILIO_COUNT.value(),
                                                     int_base::decimal);
     if (parsed.is_error() || parsed.value() < 1 || parsed.value() > 100000) {
-      report_soft_koshkit_error(ec, cxt, "evilio: invalid count",
-                                "the count must be from 1 through 100000");
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILIO_COUNT.value_location(),
+                              "invalid count",
+                              "the count must be from 1 through 100000");
       return 1;
     }
     row_limit = static_cast<usize>(parsed.value());
@@ -828,8 +844,9 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     let const parsed = utils::parse_integer_in_base(FLAG_EVILIO_PID.value(),
                                                     int_base::decimal);
     if (parsed.is_error() || parsed.value() <= 0) {
-      report_soft_koshkit_error(ec, cxt, "evilio: invalid process id",
-                                "the process id must be a positive integer");
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILIO_PID.value_location(),
+                              "invalid process id",
+                              "the process id must be a positive integer");
       return 1;
     }
     selected_pid = parsed.value();
@@ -839,8 +856,9 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_EVILIO_COLOR.is_set()) {
     let const parsed = parse_cli_color_mode(FLAG_EVILIO_COLOR.value());
     if (!parsed.has_value()) {
-      report_soft_koshkit_error(ec, cxt, "evilio: invalid color mode",
-                                "use always, auto, or never");
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILIO_COLOR.value_location(),
+                              "invalid color mode",
+                              "use always, auto, or never");
       return 1;
     }
     color_mode = *parsed;
@@ -853,8 +871,16 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_EVILIO_ALL.is_enabled() &&
       (FLAG_EVILIO_CUMULATIVE.is_enabled() || FLAG_EVILIO_LIVE.is_enabled()))
   {
-    report_soft_koshkit_error(ec, cxt, "evilio: conflicting report modes",
-                              "use --all without --cumulative or --live");
+    let conflict_location = FLAG_EVILIO_ALL.value_location();
+    if (FLAG_EVILIO_CUMULATIVE.position() > FLAG_EVILIO_ALL.position())
+      conflict_location = FLAG_EVILIO_CUMULATIVE.value_location();
+    if (FLAG_EVILIO_LIVE.position() > FLAG_EVILIO_ALL.position() &&
+        FLAG_EVILIO_LIVE.position() > FLAG_EVILIO_CUMULATIVE.position())
+    {
+      conflict_location = FLAG_EVILIO_LIVE.value_location();
+    }
+    KOSHKIT_REPORT_ERROR_AT(conflict_location, "conflicting report modes",
+                            "use --all without --cumulative or --live");
     return 1;
   }
 

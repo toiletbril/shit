@@ -85,3 +85,54 @@ echo "=== evilnet operand location ==="
 
 echo "=== evilss operand location ==="
 "$BIN" -c 'koshkit evilss extra' 2>&1
+
+echo "=== evilps limit location ==="
+"$BIN" -c 'koshkit evilps -0' 2>&1
+
+echo "=== evilps extra operand location ==="
+"$BIN" -c 'koshkit evilps 1 2' 2>&1
+
+echo "=== evilps sort value location ==="
+"$BIN" -c 'koshkit evilps --sort invalid' 2>&1
+
+echo "=== evilps process location ==="
+"$BIN" -c 'koshkit evilps invalid' 2>&1
+
+echo "=== evilps absent process location ==="
+"$BIN" -c 'koshkit evilps 9223372036854775807' 2>&1
+
+echo "=== evilio extra operand location ==="
+"$BIN" -c 'koshkit evilio 1 2' 2>&1
+
+echo "=== evilio duration mode location ==="
+"$BIN" -c 'koshkit evilio 1' 2>&1
+
+echo "=== evilio duration value location ==="
+"$BIN" -c 'koshkit evilio --cumulative=0' 2>&1
+
+echo "=== evilio process limit location ==="
+"$BIN" -c 'koshkit evilio -0' 2>&1
+
+echo "=== evilio later count location ==="
+"$BIN" -c 'koshkit evilio -5 --count 2' 2>&1
+
+echo "=== evilio later compact limit location ==="
+"$BIN" -c 'koshkit evilio --count 2 -5' 2>&1
+
+echo "=== evilio count value location ==="
+"$BIN" -c 'koshkit evilio --count 0' 2>&1
+
+echo "=== evilio process value location ==="
+"$BIN" -c 'koshkit evilio --pid 0' 2>&1
+
+echo "=== evilio color value location ==="
+"$BIN" -c 'koshkit evilio --color invalid' 2>&1
+
+echo "=== evilio report mode location ==="
+"$BIN" -c 'koshkit evilio --all --cumulative' 2>&1
+
+echo "=== evilio later all location ==="
+"$BIN" -c 'koshkit evilio --cumulative --all' 2>&1
+
+echo "=== evilio live mode location ==="
+"$BIN" -c 'koshkit evilio --all --live' 2>&1

@@ -124,3 +124,88 @@ note: this utility accepts no operands.
      1 |  koshkit evilss extra
        |                 ^~~~~
 note: this utility accepts no operands.
+=== evilps limit location ===
+1:16: error: evilps: invalid process limit.
+     1 |  koshkit evilps -0
+       |                 ^~
+note: the limit must be a positive integer.
+=== evilps extra operand location ===
+1:18: error: evilps: too many operands.
+     1 |  koshkit evilps 1 2
+       |                   ^
+note: name at most one process id.
+=== evilps sort value location ===
+1:23: error: evilps: invalid sort key.
+     1 |  koshkit evilps --sort invalid
+       |                        ^~~~~~~
+note: use name, pid, cpu, or memory.
+=== evilps process location ===
+1:16: error: evilps: invalid process id 'invalid'.
+     1 |  koshkit evilps invalid
+       |                 ^~~~~~~
+note: provide a decimal process id.
+=== evilps absent process location ===
+1:16: error: evilps: no process has the id 9223372036854775807.
+     1 |  koshkit evilps 9223372036854775807
+       |                 ^~~~~~~~~~~~~~~~~~~
+note: read the current identifiers with ps.
+=== evilio extra operand location ===
+1:18: error: evilio: unexpected operand.
+     1 |  koshkit evilio 1 2
+       |                   ^
+note: use at most one sample duration and one -NUMBER limit.
+=== evilio duration mode location ===
+1:16: error: evilio: unexpected operand.
+     1 |  koshkit evilio 1
+       |                 ^
+note: a sample duration requires --cumulative.
+=== evilio duration value location ===
+1:29: error: evilio: invalid duration.
+     1 |  koshkit evilio --cumulative=0
+       |                              ^
+note: the duration must be greater than zero.
+=== evilio process limit location ===
+1:16: error: evilio: invalid count.
+     1 |  koshkit evilio -0
+       |                 ^~
+note: the count must be from 1 through 100000.
+=== evilio later count location ===
+1:27: error: evilio: conflicting process limits.
+     1 |  koshkit evilio -5 --count 2
+       |                            ^
+note: use either -NUMBER or --count.
+=== evilio later compact limit location ===
+1:26: error: evilio: conflicting process limits.
+     1 |  koshkit evilio --count 2 -5
+       |                           ^~
+note: use either -NUMBER or --count.
+=== evilio count value location ===
+1:24: error: evilio: invalid count.
+     1 |  koshkit evilio --count 0
+       |                         ^
+note: the count must be from 1 through 100000.
+=== evilio process value location ===
+1:22: error: evilio: invalid process id.
+     1 |  koshkit evilio --pid 0
+       |                       ^
+note: the process id must be a positive integer.
+=== evilio color value location ===
+1:24: error: evilio: invalid color mode.
+     1 |  koshkit evilio --color invalid
+       |                         ^~~~~~~
+note: use always, auto, or never.
+=== evilio report mode location ===
+1:22: error: evilio: conflicting report modes.
+     1 |  koshkit evilio --all --cumulative
+       |                       ^~~~~~~~~~~~
+note: use --all without --cumulative or --live.
+=== evilio later all location ===
+1:29: error: evilio: conflicting report modes.
+     1 |  koshkit evilio --cumulative --all
+       |                              ^~~~~
+note: use --all without --cumulative or --live.
+=== evilio live mode location ===
+1:22: error: evilio: conflicting report modes.
+     1 |  koshkit evilio --all --live
+       |                       ^~~~~~
+note: use --all without --cumulative or --live.
