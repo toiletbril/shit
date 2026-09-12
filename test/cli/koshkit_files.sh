@@ -19,6 +19,8 @@ echo "--- ls a ---"
 echo "--- file batched operands ---"
 "$BIN" -c 'koshkit file nums.txt stamp sym missing.txt' 2>&1
 echo "file-status=$?"
+echo "--- stat preserves nonadjacent repeated operands ---"
+"$BIN" -c 'koshkit stat -c "%n=%s" nums.txt stamp nums.txt'
 # The owner, the group, and the time of a long row vary by machine, so only the
 # mode, the link count, the size, and the name are kept for a stable golden.
 echo "--- ls -l sym (mode nlink size name) ---"

@@ -133,19 +133,76 @@ static pure fn is_same_metadata_request(
   return left.path->text().view() == right.path->text().view();
 }
 
-static pure fn has_repeated_metadata_request(
-    const ArrayList<internal::batched_syscall> &operations) wontthrow -> bool
+static pure fn is_metadata_request(
+    const internal::batched_syscall &operation) wontthrow -> bool
 {
-  for (usize index = 1; index < operations.count(); index++)
-    if (is_same_metadata_request(operations[index - 1], operations[index]))
-      return true;
+  return operation.path != nullptr &&
+         (operation.syscall_id == BatchOperation::Kind::Lstat ||
+          operation.syscall_id == BatchOperation::Kind::Stat);
+}
 
-  return false;
+static fn find_canonical_operation_positions(
+    const ArrayList<internal::batched_syscall> &operations,
+    ArrayList<usize> &canonical_positions) throws -> bool
+{
+  usize metadata_count = 0;
+  for (let const &operation : operations)
+    if (is_metadata_request(operation)) metadata_count++;
+
+  if (metadata_count < 2 ||
+      metadata_count > ArrayList<usize>::MAXIMUM_ELEMENT_COUNT / 4)
+  {
+    return false;
+  }
+
+  canonical_positions.clear();
+  canonical_positions.reserve(operations.count());
+  for (usize index = 0; index < operations.count(); index++)
+    canonical_positions.push(index);
+
+  usize bucket_count = 4;
+  while (bucket_count < metadata_count * 2)
+    bucket_count *= 2;
+
+  let buckets = ArrayList<usize>{operations.allocator()};
+  buckets.reserve(bucket_count);
+  for (usize index = 0; index < bucket_count; index++)
+    buckets.push(SIZE_MAX);
+
+  bool has_repeated_request = false;
+  for (usize index = 0; index < operations.count(); index++) {
+    let const &operation = operations[index];
+    if (!is_metadata_request(operation)) continue;
+
+    let const path = operation.path->text().view();
+    let const kind_hash =
+        static_cast<u64>(operation.syscall_id) * 0x9e3779b97f4a7c15ull;
+    usize bucket =
+        static_cast<usize>(hash_bytes(path) ^ kind_hash) & (bucket_count - 1);
+    loop
+    {
+      let const existing_position = buckets[bucket];
+      if (existing_position == SIZE_MAX) {
+        buckets[bucket] = index;
+        break;
+      }
+      if (is_same_metadata_request(operations[existing_position], operation)) {
+        canonical_positions[index] = existing_position;
+        has_repeated_request = true;
+        break;
+      }
+
+      bucket = (bucket + 1) & (bucket_count - 1);
+    }
+  }
+
+  return has_repeated_request;
 }
 
 fn Batch::execute(ArrayList<BatchResult> &results) const throws -> void
 {
-  if (!has_repeated_metadata_request(m_operations)) {
+  let canonical_positions = ArrayList<usize>{m_operations.allocator()};
+  if (!find_canonical_operation_positions(m_operations, canonical_positions)) {
     results.clear();
     results.reserve(m_operations.count());
     for (usize index = 0; index < m_operations.count(); index++)
@@ -161,16 +218,15 @@ fn Batch::execute(ArrayList<BatchResult> &results) const throws -> void
   let optimized_positions = ArrayList<usize>{m_operations.allocator()};
   optimized_operations.reserve(m_operations.count());
   optimized_positions.reserve(m_operations.count());
-  for (let const &operation : m_operations) {
-    if (!optimized_operations.is_empty() &&
-        is_same_metadata_request(optimized_operations.back(), operation))
-    {
-      optimized_positions.push(optimized_operations.count() - 1);
+  for (usize index = 0; index < m_operations.count(); index++) {
+    let const canonical_position = canonical_positions[index];
+    if (canonical_position != index) {
+      optimized_positions.push(optimized_positions[canonical_position]);
       continue;
     }
 
     optimized_positions.push(optimized_operations.count());
-    optimized_operations.push(operation);
+    optimized_operations.push(m_operations[index]);
   }
 
   let optimized_results = ArrayList<BatchResult>{m_operations.allocator()};
@@ -210,4 +266,4 @@ fn Batch::execute() const throws -> ArrayList<BatchResult>
 
 pure fn Batch::count() const wontthrow -> usize { return m_operations.count(); }
 
-}
+} /* namespace koshka::os */
