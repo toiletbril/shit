@@ -1979,8 +1979,8 @@ The CHLD trap runs its action once for every child the shell reaps, at the next
 command boundary. Under
 .B set -m
 a job that stops counts as one arrival of its own, and a job that is continued
-counts as none. Windows raises no child signal, and the reap itself reaches
-that boundary. The Windows
+counts as none. No child signal is raised on Windows, and the reap alone
+reaches that boundary. The Windows
 .B kill
 builtin sends only KILL and TERM. A script there cannot raise CHLD by hand. A
 CHLD action that returns from the function it fired inside leaves the condition
@@ -1993,8 +1993,7 @@ and
 .B wait
 reports 128 plus the signal number. The job it was waiting on is left running,
 and the operands it has not reached are abandoned. A child arrival leaves the
-wait blocked. Every external command reaps a child, and a wake for each one
-would end every wait.
+wait blocked.
 .PP
 A redirection whose open blocks, such as a named pipe with no peer, resumes
 after a trapped signal runs its action. The file is still opened and the
@@ -2193,9 +2192,9 @@ of
 .B SECONDS
 or
 .B RANDOM
-takes the dynamic reader away for the rest of the shell. The name then reads
-empty, an assignment stores an ordinary value, and a subshell inherits the
-destroyed reader. They are unavailable in the
+makes the name ordinary for the rest of the shell. The name then reads empty,
+an assignment stores an ordinary value, and a subshell inherits it that way.
+They are unavailable in the
 .B sh
 mood.
 .TP
