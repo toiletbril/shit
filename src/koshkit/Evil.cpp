@@ -95,9 +95,9 @@ fn resolve_color(const ExecContext &ec, EvalContext &cxt,
 
   let const selected = parse_cli_color_mode(FLAG_EVIL_COLOR.value());
   if (!selected.has_value()) {
-    report_soft_koshkit_error(
-        ec, cxt,
-        "evil: invalid color mode '" +
+    report_soft_koshkit_util_error(
+        ec, cxt, FLAG_EVIL_COLOR.value_location(), "evil",
+        "invalid color mode '" +
             String{cxt.scratch_allocator(), FLAG_EVIL_COLOR.value()} + "'",
         "the value is always, auto, or never");
     return false;
@@ -166,14 +166,15 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (!operands.is_empty()) {
-    report_soft_koshkit_error(ec, cxt, "evil: unexpected operand",
-                              "this utility reads no operand");
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0], "unexpected operand",
+                            "this utility reads no operand");
     return 1;
   }
 

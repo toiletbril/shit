@@ -339,6 +339,21 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
     }                                                                          \
   } while (false)
 
+#define PARSE_KOSHKIT_ARGS(args, arg_locations, ...)                           \
+  parse_util_operands(FLAG_LIST, (args), &(arg_locations),                     \
+                      nullptr __VA_OPT__(, ) __VA_ARGS__);                     \
+  defer { reset_flags(FLAG_LIST); }
+
+#define PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations,                 \
+                                          operand_locations, ...)              \
+  parse_util_operands(FLAG_LIST, (args), &(arg_locations),                     \
+                      &(operand_locations) __VA_OPT__(, ) __VA_ARGS__);        \
+  defer { reset_flags(FLAG_LIST); }
+
+#define KOSHKIT_REPORT_ERROR_AT(location, ...)                                 \
+  report_soft_koshkit_util_error((ec), (cxt), (location), (args)[0].view(),    \
+                                 __VA_ARGS__)
+
 #define U_CASE(util)                                                           \
   case Utility::Kind::util: {                                                  \
     util utility;                                                              \
@@ -729,6 +744,13 @@ cold noinline fn report_soft_koshkit_util_error(const ExecContext &ec,
 cold noinline fn report_soft_koshkit_util_error(
     const ExecContext &ec, EvalContext &cxt, SourceLocation location,
     StringView utility_name, StringView message) throws -> void;
+
+cold noinline fn report_soft_koshkit_util_error(const ExecContext &ec,
+                                                EvalContext &cxt,
+                                                SourceLocation location,
+                                                StringView utility_name,
+                                                StringView message,
+                                                StringView note) throws -> void;
 
 } /* namespace koshkit */
 

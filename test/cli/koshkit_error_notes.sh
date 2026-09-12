@@ -67,3 +67,9 @@ echo "=== logger priority location ==="
 
 echo "=== nohup command location ==="
 "$BIN" -c 'koshkit nohup KOSH_MISSING_COMMAND' 2>&1
+
+echo "=== evil operand location ==="
+"$BIN" -c 'koshkit evil extra' 2>&1
+
+echo "=== evil color value location ==="
+"$BIN" -c 'koshkit evil --color invalid' 2>&1

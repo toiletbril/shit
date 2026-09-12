@@ -94,3 +94,13 @@ note: Pass `f`, `d`, or `l` after `-type`.
 1:15: error: nohup: cannot run 'KOSH_MISSING_COMMAND': No such file or directory.
      1 |  koshkit nohup KOSH_MISSING_COMMAND
        |                ^~~~~~~~~~~~~~~~~~~~
+=== evil operand location ===
+1:14: error: evil: unexpected operand.
+     1 |  koshkit evil extra
+       |               ^~~~~
+note: this utility reads no operand.
+=== evil color value location ===
+1:22: error: evil: invalid color mode 'invalid'.
+     1 |  koshkit evil --color invalid
+       |                       ^~~~~~~
+note: the value is always, auto, or never.
