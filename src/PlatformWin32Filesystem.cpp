@@ -1527,7 +1527,8 @@ fn execute_batch_operations(const batched_syscall *operations,
   if (operations == nullptr || results == nullptr) return;
   if (INTERRUPT_REQUESTED) {
     for (usize index = 0; index < operation_count; index++)
-      results[index] = {operations[index].request_id, 0, EINTR};
+      results[index] = {operations[index].request_id, 0,
+                        ERROR_OPERATION_ABORTED};
     return;
   }
 
@@ -1538,7 +1539,7 @@ fn execute_batch_operations(const batched_syscall *operations,
     if (operation.byte_count > static_cast<usize>(MAXDWORD) ||
         operation.byte_offset > 0x7fffffffffffffffULL)
     {
-      result.error_number = EINVAL;
+      result.error_number = ERROR_INVALID_PARAMETER;
       continue;
     }
 
@@ -1551,7 +1552,7 @@ fn execute_batch_operations(const batched_syscall *operations,
       if (operation.fd == KOSH_INVALID_FD ||
           (buffer == nullptr && operation.byte_count != 0))
       {
-        result.error_number = EINVAL;
+        result.error_number = ERROR_INVALID_PARAMETER;
         continue;
       }
 
@@ -1589,14 +1590,14 @@ fn execute_batch_operations(const batched_syscall *operations,
         result.transferred_byte_count = *transferred;
       } else {
         result.error_number = static_cast<i32>(GetLastError());
-        if (result.error_number == 0) result.error_number = errno;
+        if (result.error_number == 0) result.error_number = ERROR_GEN_FAILURE;
       }
       break;
     }
     case batched_syscall_id::Lstat:
     case batched_syscall_id::Stat:
       if (operation.path == nullptr || operation.status == nullptr) {
-        result.error_number = EINVAL;
+        result.error_number = ERROR_INVALID_PARAMETER;
         continue;
       }
       SetLastError(ERROR_SUCCESS);
@@ -1606,10 +1607,10 @@ fn execute_batch_operations(const batched_syscall *operations,
                                       *operation.status)))
       {
         result.error_number = static_cast<i32>(GetLastError());
-        if (result.error_number == 0) result.error_number = errno;
+        if (result.error_number == 0) result.error_number = ERROR_GEN_FAILURE;
       }
       break;
-    default: result.error_number = EINVAL; break;
+    default: result.error_number = ERROR_INVALID_PARAMETER; break;
     }
   }
 }
