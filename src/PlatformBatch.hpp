@@ -22,6 +22,7 @@ struct batch_operation
     Write = 1,
     Lstat = 2,
     Stat = 3,
+    Exists = 4,
   };
 
   static fn read(descriptor fd, char *buffer, usize byte_count,
@@ -32,6 +33,7 @@ struct batch_operation
       -> batch_operation;
   static fn stat(const Path &path, file_status &status) wontthrow
       -> batch_operation;
+  static fn exists(const Path &path) wontthrow -> batch_operation;
   static fn lstat(Path &&path, file_status &status) wontthrow
       -> batch_operation = delete;
   static fn lstat(const Path &&path, file_status &status) wontthrow
@@ -40,6 +42,8 @@ struct batch_operation
       -> batch_operation = delete;
   static fn stat(const Path &&path, file_status &status) wontthrow
       -> batch_operation = delete;
+  static fn exists(Path &&path) wontthrow -> batch_operation = delete;
+  static fn exists(const Path &&path) wontthrow -> batch_operation = delete;
 
   const Path *path{nullptr};
   const char *input_buffer{nullptr};
@@ -61,7 +65,10 @@ struct batch_result
   u64 request_id{0};
   usize transferred_byte_count{0};
   i32 error_number{0};
+  bool is_existing{false};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(batch_result) == 24);
 
 namespace batch_internal {
 

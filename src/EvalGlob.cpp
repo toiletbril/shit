@@ -384,11 +384,42 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
   let const scratch = scratch_allocator();
   let result = ArrayList<glob_field>{scratch};
 
-  for (let &field : fields) {
-    let const text = field.text.view();
+  let glob_indices = ArrayList<Maybe<usize>>{scratch};
+  glob_indices.reserve(fields.count());
+  let should_batch_literals = !fields.is_empty();
+  for (let const &field : fields) {
+    let const glob_index = first_active_glob(
+        field.text.view(), field.glob_active, extglob_enabled());
+    if (glob_index.has_value()) should_batch_literals = false;
+    glob_indices.push(glob_index);
+  }
 
-    let const glob_index =
-        first_active_glob(text, field.glob_active, extglob_enabled());
+  if (should_batch_literals) {
+    let literal_paths = ArrayList<Path>{scratch};
+    literal_paths.reserve(fields.count());
+    for (let const &field : fields)
+      literal_paths.push(Path{field.text.view()});
+
+    let literal_batch = os::Batch{scratch};
+    literal_batch.reserve(fields.count());
+    for (usize index = 0; index < fields.count(); index++)
+      literal_batch.add(os::batch_operation::exists(literal_paths[index]));
+    let const literal_results = literal_batch.execute();
+
+    for (usize index = 0; index < fields.count(); index++)
+      if (literal_results[index].error_number == 0 &&
+          literal_results[index].is_existing)
+      {
+        result.push(steal(fields[index]));
+      }
+
+    return result;
+  }
+
+  for (usize field_index = 0; field_index < fields.count(); field_index++) {
+    let &field = fields[field_index];
+    let const text = field.text.view();
+    let const glob_index = glob_indices[field_index];
 
     if (!glob_index) {
       /* This field is a literal suffix appended after an earlier glob, so keep

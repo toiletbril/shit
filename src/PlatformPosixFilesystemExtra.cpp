@@ -815,6 +815,8 @@ static fn validate_batched_syscall(const batched_syscall &operation) wontthrow
   case batched_syscall_id::Stat:
     return operation.path == nullptr || operation.status == nullptr ? EINVAL
                                                                     : 0;
+  case batched_syscall_id::Exists:
+    return operation.path == nullptr ? EINVAL : 0;
   }
 
   return EINVAL;
@@ -867,6 +869,9 @@ execute_batched_syscall_direct(const batched_syscall &operation,
   case batched_syscall_id::Stat:
     if (!stat_path_following(operation.path->text().view(), *operation.status))
       result.error_number = errno;
+    return;
+  case batched_syscall_id::Exists:
+    result.is_existing = path_exists(operation.path->text().view());
     return;
   }
 }
@@ -1044,7 +1049,8 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
       if (result.error_number != 0) continue;
 
       if (operation.syscall_id == batched_syscall_id::Lstat ||
-          operation.syscall_id == batched_syscall_id::Stat)
+          operation.syscall_id == batched_syscall_id::Stat ||
+          operation.syscall_id == batched_syscall_id::Exists)
       {
         execute_batched_syscall_direct(operation, result);
         continue;
@@ -1408,6 +1414,7 @@ static fn io_uring_batch_supports_operations(
       break;
     case batched_syscall_id::Lstat:
     case batched_syscall_id::Stat:
+    case batched_syscall_id::Exists:
       if (!ring.has_stat) return false;
       break;
     }
@@ -1492,6 +1499,7 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
         break;
       case batched_syscall_id::Lstat:
       case batched_syscall_id::Stat:
+      case batched_syscall_id::Exists:
         entry.opcode = IORING_OP_STATX;
         entry.fd = AT_FDCWD;
         entry.addr = reinterpret_cast<u64>(operation.path->c_str());
@@ -1578,22 +1586,24 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
         let const operation_index = static_cast<usize>(completion.user_data);
         let const chunk_index = operation_index - operation_start;
         let &result = results[operation_index];
+        let const operation_kind = operations[operation_index].syscall_id;
         if (completion.res < 0) {
           let const error_number = -completion.res;
-          let const operation_kind = operations[operation_index].syscall_id;
-          if ((operation_kind == batched_syscall_id::Read ||
-               operation_kind == batched_syscall_id::Write) &&
-              (error_number == EOPNOTSUPP || error_number == EINVAL ||
-               error_number == ESPIPE))
+          if (operation_kind == batched_syscall_id::Exists) {
+            execute_batched_syscall_direct(operations[operation_index], result);
+          } else if ((operation_kind == batched_syscall_id::Read ||
+                      operation_kind == batched_syscall_id::Write) &&
+                     (error_number == EOPNOTSUPP || error_number == EINVAL ||
+                      error_number == ESPIPE))
           {
             execute_batched_syscall_direct(operations[operation_index], result);
           } else {
             result.error_number = error_number;
           }
-        } else if (operations[operation_index].syscall_id ==
-                       batched_syscall_id::Lstat ||
-                   operations[operation_index].syscall_id ==
-                       batched_syscall_id::Stat)
+        } else if (operation_kind == batched_syscall_id::Exists) {
+          result.is_existing = true;
+        } else if (operation_kind == batched_syscall_id::Lstat ||
+                   operation_kind == batched_syscall_id::Stat)
         {
           fill_file_status(status_records[chunk_index],
                            *operations[operation_index].status);

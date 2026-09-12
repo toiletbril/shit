@@ -1677,6 +1677,13 @@ fn execute_batch_operations(const batched_syscall *operations,
       execute_positioned_file_operation(operation, result);
       break;
     }
+    case batched_syscall_id::Exists:
+      if (operation.path == nullptr) {
+        result.error_number = ERROR_INVALID_PARAMETER;
+        continue;
+      }
+      result.is_existing = path_exists(operation.path->text().view());
+      break;
     case batched_syscall_id::Lstat:
     case batched_syscall_id::Stat:
       if (operation.path == nullptr || operation.status == nullptr) {

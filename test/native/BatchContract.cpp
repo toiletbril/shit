@@ -3,9 +3,10 @@
  *    See the top-level LICENSE file for the licensing information.
  *
  * This file tests the portable Batch queue against a deterministic backend.
- * It covers request ordering, result reuse, metadata deduplication, and failed
- * metadata requests without depending on a platform filesystem. Minimal
- * allocation definitions keep the test independent from the shell entrypoint.
+ * It covers request ordering, result reuse, metadata deduplication, existence
+ * results, and failed metadata requests without depending on a platform
+ * filesystem. Minimal allocation definitions keep the test independent from
+ * the shell entrypoint.
  */
 
 #include "Platform.hpp"
@@ -21,6 +22,7 @@ struct observed_operation
   descriptor fd{KOSH_INVALID_FD};
   char *output_buffer{nullptr};
   const char *input_buffer{nullptr};
+  const Path *path{nullptr};
   u64 request_id{0};
   u64 byte_offset{0};
   usize byte_count{0};
@@ -31,6 +33,7 @@ usize execution_count = 0;
 usize observed_operation_count = 0;
 usize failure_count = 0;
 bool should_fail_metadata = false;
+bool should_report_existing = true;
 
 fn expect(bool is_true, const char *message) wontthrow -> void
 {
@@ -192,12 +195,54 @@ fn test_failed_metadata_deduplication() throws -> void
          "failed metadata requests do not copy status data");
 }
 
+fn test_exists_results_and_deduplication() throws -> void
+{
+  let batch = Batch{heap_allocator()};
+  let first_path = Path{};
+  let second_path = Path{};
+  char read_buffer[1]{};
+
+  batch.add(batch_operation::exists(first_path));
+  batch.add(batch_operation::read(KOSH_STDIN, read_buffer, 1, 4));
+  batch.add(batch_operation::exists(second_path));
+
+  reset_observations();
+  let results = batch.execute();
+  expect(observed_operation_count == 2,
+         "duplicate existence requests collapse before execution");
+  expect(observed_operations[0].syscall_id == batch_operation::Kind::Exists &&
+             observed_operations[0].path == &first_path,
+         "the existence operation keeps its path");
+  if (results.count() != 3) {
+    expect(false, "existence results preserve the original request count");
+    return;
+  }
+
+  for (usize index = 0; index < results.count(); index++)
+    expect(results[index].request_id == index,
+           "existence results preserve request order");
+  expect(results[0].is_existing && results[2].is_existing,
+         "a true existence result reaches every duplicate");
+  expect(results[0].error_number == 0 && results[0].transferred_byte_count == 0,
+         "an existence result is not a transfer or path error");
+
+  should_report_existing = false;
+  reset_observations();
+  batch.execute(results);
+  should_report_existing = true;
+  expect(!results[0].is_existing && !results[2].is_existing,
+         "a false existence result remains a successful observation");
+  expect(results[0].error_number == 0 && results[2].error_number == 0,
+         "a missing path is not a batch error");
+}
+
 fn run_batch_contract() -> int
 {
   try {
     test_io_order_and_reuse();
     test_metadata_deduplication();
     test_failed_metadata_deduplication();
+    test_exists_results_and_deduplication();
   } catch (...) {
     std::fprintf(stderr, "Batch contract failed with an exception.\n");
     return 1;
@@ -262,9 +307,9 @@ fn execute_batch_operations(const batched_syscall *operations,
   for (usize index = 0; index < operation_count; index++) {
     let const &operation = operations[index];
     observed_operations[index] = {
-        operation.syscall_id,   operation.fd,         operation.output_buffer,
-        operation.input_buffer, operation.request_id, operation.byte_offset,
-        operation.byte_count};
+        operation.syscall_id,   operation.fd,        operation.output_buffer,
+        operation.input_buffer, operation.path,      operation.request_id,
+        operation.byte_offset,  operation.byte_count};
 
     let &result = results[index];
     result.request_id = operation.request_id;
@@ -274,6 +319,13 @@ fn execute_batch_operations(const batched_syscall *operations,
 
     if (operation.output_buffer != nullptr && operation.byte_count != 0) {
       operation.output_buffer[0] = static_cast<char>('A' + index);
+    }
+
+    if (operation.syscall_id == batched_syscall_id::Exists) {
+      result.transferred_byte_count = 0;
+      result.error_number = 0;
+      result.is_existing = should_report_existing;
+      continue;
     }
 
     if (operation.status == nullptr) continue;

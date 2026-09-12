@@ -115,6 +115,10 @@ echo "--- links trailing ---"
 for x in **; do echo "$x"; done
 echo "--- links dirs ---"
 for x in **/; do echo "$x"; done
+mkdir -p s0 s1 s2 s3 s4 s5 s6 s7 s8 s9
+touch s0/needle s3/needle s7/needle s9/needle
+echo "--- literal suffix ---"
+for x in s*/needle; do echo "$x"; done
 echo "--- off ---"
 shopt -u globstar
 for x in **; do echo "$x"; done

@@ -55,6 +55,14 @@ fn batch_operation::stat(const Path &path, file_status &status) wontthrow
   return operation;
 }
 
+fn batch_operation::exists(const Path &path) wontthrow -> batch_operation
+{
+  batch_operation operation;
+  operation.syscall_id = Kind::Exists;
+  operation.path = &path;
+  return operation;
+}
+
 Batch::Batch(Allocator allocator) : m_operations(allocator) {}
 
 fn Batch::reserve(usize operation_count) throws -> void
@@ -75,10 +83,12 @@ static pure fn is_same_metadata_request(
     const batch_internal::batched_syscall &right) wontthrow -> bool
 {
   if (left.syscall_id != right.syscall_id) return false;
-  if (left.syscall_id != batch_operation::Kind::Lstat &&
-      left.syscall_id != batch_operation::Kind::Stat)
-  {
-    return false;
+  switch (left.syscall_id) {
+  case batch_operation::Kind::Lstat:
+  case batch_operation::Kind::Stat:
+  case batch_operation::Kind::Exists: break;
+  case batch_operation::Kind::Read:
+  case batch_operation::Kind::Write: return false;
   }
   if (left.path == nullptr || right.path == nullptr) return false;
 
@@ -88,9 +98,17 @@ static pure fn is_same_metadata_request(
 static pure fn is_metadata_request(
     const batch_internal::batched_syscall &operation) wontthrow -> bool
 {
-  return operation.path != nullptr &&
-         (operation.syscall_id == batch_operation::Kind::Lstat ||
-          operation.syscall_id == batch_operation::Kind::Stat);
+  if (operation.path == nullptr) return false;
+
+  switch (operation.syscall_id) {
+  case batch_operation::Kind::Lstat:
+  case batch_operation::Kind::Stat:
+  case batch_operation::Kind::Exists: return true;
+  case batch_operation::Kind::Read:
+  case batch_operation::Kind::Write: return false;
+  }
+
+  return false;
 }
 
 static fn find_canonical_operation_positions(
