@@ -89,8 +89,9 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
   do_append_field("Device", String::from(status.device_id, allocator));
   do_append_field("Links", String::from(status.link_count, allocator));
   do_append_field("Logical size", format_human_size(status.size, allocator));
-  do_append_field("Allocated",
-                  format_human_size(status.blocks * 512, allocator));
+  do_append_field("Allocated", format_human_size(scaled_filesystem_blocks(
+                                                     status.blocks, 512, 1),
+                                                 allocator));
 
   os::filesystem_status filesystem{};
   if (os::stat_filesystem(path, filesystem)) {
