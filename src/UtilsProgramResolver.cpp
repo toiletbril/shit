@@ -928,6 +928,63 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
     directories = &get_path_dirs();
   }
 
+  if (search_mode == SearchMode::All) {
+    let candidate_paths = ArrayList<Path>{heap_allocator()};
+    let candidate_statuses = ArrayList<os::file_status>{heap_allocator()};
+    let candidate_batch = os::Batch{heap_allocator()};
+    let const suffix_count = name_info.extension == os::program_extension::None
+                                 ? os::PROGRAM_SUFFIXES.count()
+                                 : 1;
+    if (directories->count() <=
+        ArrayList<Path>::MAXIMUM_ELEMENT_COUNT / suffix_count)
+    {
+      let const candidate_count = directories->count() * suffix_count;
+      candidate_paths.reserve(candidate_count);
+      candidate_statuses.reserve(candidate_count);
+    }
+
+    for (let const &dir_string : *directories) {
+      let full_path = Path{dir_string.view()};
+      full_path.push_component(program_name);
+      if (name_info.extension != os::program_extension::None) {
+        candidate_paths.push(steal(full_path));
+        candidate_statuses.push({});
+        continue;
+      }
+
+      for (let const &suffix : os::PROGRAM_SUFFIXES) {
+        if (suffix.text.is_empty())
+          candidate_paths.push(full_path.clone());
+        else
+          candidate_paths.push(Path{(full_path.text() + suffix.text).view()});
+        candidate_statuses.push({});
+      }
+    }
+
+    candidate_batch.reserve(candidate_paths.count());
+    for (usize index = 0; index < candidate_paths.count(); index++)
+      candidate_batch.add(os::batch_operation::stat(candidate_paths[index],
+                                                    candidate_statuses[index]));
+
+#if !defined NDEBUG
+    DEBUG_PROGRAM_PATH_CANDIDATE_COUNT += candidate_paths.count();
+#endif
+    let const candidate_results = candidate_batch.execute();
+    for (usize index = 0; index < candidate_paths.count(); index++) {
+      if (candidate_results[index].error_number != 0 ||
+          os::file_type_letter(candidate_statuses[index].mode) != '-')
+      {
+        continue;
+      }
+
+      let const is_runnable = candidate_paths[index].is_executable();
+      if (requirement == Requirement::Regular || is_runnable)
+        result.push(steal(candidate_paths[index]));
+    }
+
+    return result;
+  }
+
   for (let const &dir_string : *directories) {
     let const directory = Path{dir_string.view()};
 
@@ -948,10 +1005,6 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
         if (!try_path.is_regular_file()) continue;
         let const is_runnable = try_path.is_executable();
         let const is_match = requirement == Requirement::Regular || is_runnable;
-        if (search_mode == SearchMode::All) {
-          if (is_match) result.push(try_path);
-          continue;
-        }
         if (is_match) {
           result.push(try_path);
           if ((cache_policy == CachePolicy::Remember ||
@@ -973,9 +1026,7 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
       if (!full_path.is_regular_file()) continue;
       let const is_runnable = full_path.is_executable();
       let const is_match = requirement == Requirement::Regular || is_runnable;
-      if (search_mode == SearchMode::All) {
-        if (is_match) result.push(full_path);
-      } else if (is_match) {
+      if (is_match) {
         result.push(full_path);
         if ((cache_policy == CachePolicy::Remember ||
              cache_policy == CachePolicy::RememberUnchecked) &&
