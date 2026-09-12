@@ -1822,10 +1822,20 @@ cold fn last_system_error_message() throws -> String
   return err;
 }
 
+fn get_last_system_error_number() wontthrow -> i32
+{
+  return static_cast<i32>(GetLastError());
+}
+
 fn last_system_error_is_missing_file() wontthrow -> bool
 {
   let const error = GetLastError();
   return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+}
+
+fn last_system_error_is_descriptor_quota() wontthrow -> bool
+{
+  return GetLastError() == ERROR_TOO_MANY_OPEN_FILES;
 }
 
 fn set_last_system_error(i32 error_number) wontthrow -> void

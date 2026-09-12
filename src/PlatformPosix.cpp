@@ -1590,9 +1590,16 @@ cold fn last_system_error_message() throws -> String
   return String{strerror(errno)};
 }
 
+fn get_last_system_error_number() wontthrow -> i32 { return errno; }
+
 fn last_system_error_is_missing_file() wontthrow -> bool
 {
   return errno == ENOENT;
+}
+
+fn last_system_error_is_descriptor_quota() wontthrow -> bool
+{
+  return errno == EMFILE || errno == ENFILE;
 }
 
 fn set_last_system_error(i32 error_number) wontthrow -> void

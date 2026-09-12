@@ -450,7 +450,9 @@ fn set_file_creation_mask(u32 mask) wontthrow -> void;
 fn make_os_args(const ArrayList<String> &args) throws -> os_args;
 
 fn last_system_error_message() throws -> String;
+fn get_last_system_error_number() wontthrow -> i32;
 fn last_system_error_is_missing_file() wontthrow -> bool;
+fn last_system_error_is_descriptor_quota() wontthrow -> bool;
 fn set_last_system_error(i32 error_number) wontthrow -> void;
 
 fn wait_and_monitor_process(process p, bool *was_stopped = nullptr) throws
