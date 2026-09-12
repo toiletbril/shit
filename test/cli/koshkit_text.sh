@@ -22,6 +22,14 @@ echo "--- sort -r ---"
 "$BIN" -c 'koshkit sort -r fruit.txt'
 echo "--- sort then uniq -c ---"
 "$BIN" -c 'koshkit sort fruit.txt | koshkit uniq -c'
+printf 'zulu\nalpha\n' > sort-a.txt
+printf 'middle\nbeta\n' > sort-b.txt
+echo "--- sort multiple files with a missing operand ---"
+"$BIN" -c \
+  'koshkit sort sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"' \
+  2>&1
+echo "--- sort repeated standard input ---"
+printf 'delta\nalpha\n' | "$BIN" -c 'koshkit sort - -'
 echo "--- grep an ---"
 "$BIN" -c 'koshkit grep an fruit.txt'
 echo "--- grep -v apple ---"

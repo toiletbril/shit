@@ -351,6 +351,132 @@ fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
   return read_fd_to_string(*fd);
 }
 
+struct source_read_probe
+{
+  ArrayList<char> buffer;
+  u64 byte_offset;
+  usize source_index;
+  os::descriptor fd;
+};
+
+fn read_named_or_stdin_batch(const ExecContext &ec,
+                             const ArrayList<StringView> &sources,
+                             Allocator allocator) throws
+    -> ArrayList<source_read_result>
+{
+  constexpr usize SOURCE_READ_BATCH_COUNT = 16;
+  constexpr usize SOURCE_READ_BYTE_COUNT = 64 * 1024;
+
+  let results = ArrayList<source_read_result>{allocator};
+  results.reserve(sources.count());
+  for (usize source_index = 0; source_index < sources.count(); source_index++)
+    results.push({None, 0});
+
+  let active = ArrayList<source_read_probe>{heap_allocator()};
+  active.reserve(SOURCE_READ_BATCH_COUNT);
+  defer
+  {
+    for (let const &probe : active)
+      os::close_fd(probe.fd);
+  };
+
+  let const do_flush_active = [&]() throws -> void {
+    while (!active.is_empty()) {
+      if (os::INTERRUPT_REQUESTED) return;
+
+      let batch = os::Batch{heap_allocator()};
+      batch.reserve(active.count());
+      for (let &probe : active)
+        batch.add(os::batch_operation::read(probe.fd, probe.buffer.begin(),
+                                            SOURCE_READ_BYTE_COUNT,
+                                            probe.byte_offset));
+
+      let const read_results = batch.execute();
+      for (usize remaining_count = active.count(); remaining_count > 0;
+           remaining_count--)
+      {
+        let const probe_index = remaining_count - 1;
+        let &probe = active[probe_index];
+        let &result = results[probe.source_index];
+        let const &read_result = read_results[probe_index];
+        if (read_result.error_number != 0) {
+          result.content.reset();
+          result.error_number = read_result.error_number;
+          os::close_fd(probe.fd);
+          active.remove(probe_index);
+          continue;
+        }
+        if (read_result.transferred_byte_count == 0) {
+          os::close_fd(probe.fd);
+          active.remove(probe_index);
+          continue;
+        }
+
+        result.content->append(StringView{probe.buffer.begin(),
+                                          read_result.transferred_byte_count});
+        probe.byte_offset += read_result.transferred_byte_count;
+      }
+    }
+  };
+
+  for (usize source_index = 0; source_index < sources.count(); source_index++) {
+    let const source = sources[source_index];
+    if (source == "-") {
+      do_flush_active();
+      if (os::INTERRUPT_REQUESTED) return results;
+
+      results[source_index].content = os::read_fd_to_string(
+          ec.in_fd.value_or(KOSH_STDIN), heap_allocator());
+      if (!results[source_index].content.has_value())
+        results[source_index].error_number = os::get_last_system_error_number();
+      if (os::INTERRUPT_REQUESTED) return results;
+      continue;
+    }
+
+    let fd = os::open_file_descriptor(source, os::file_open_mode::Read);
+    if (!fd.has_value() && os::last_system_error_is_descriptor_quota() &&
+        !active.is_empty())
+    {
+      do_flush_active();
+      if (os::INTERRUPT_REQUESTED) return results;
+      fd = os::open_file_descriptor(source, os::file_open_mode::Read);
+    }
+    if (!fd.has_value()) {
+      results[source_index].error_number = os::get_last_system_error_number();
+      if (os::INTERRUPT_REQUESTED) return results;
+      continue;
+    }
+
+    bool should_close = true;
+    defer
+    {
+      if (should_close) os::close_fd(*fd);
+    };
+
+    if (!os::descriptor_is_seekable(*fd)) {
+      do_flush_active();
+      if (os::INTERRUPT_REQUESTED) return results;
+
+      results[source_index].content =
+          os::read_fd_to_string(*fd, heap_allocator());
+      if (!results[source_index].content.has_value())
+        results[source_index].error_number = os::get_last_system_error_number();
+      if (os::INTERRUPT_REQUESTED) return results;
+      continue;
+    }
+
+    results[source_index].content = String{heap_allocator()};
+    active.push({ArrayList<char>{heap_allocator()}, 0, source_index, *fd});
+    active.back().buffer.reserve(SOURCE_READ_BYTE_COUNT);
+    should_close = false;
+
+    if (active.count() == SOURCE_READ_BATCH_COUNT) do_flush_active();
+  }
+
+  do_flush_active();
+  return results;
+}
+
 fn open_named_or_stdin(const ExecContext &ec, StringView path) wontthrow
     -> Maybe<input_descriptor>
 {

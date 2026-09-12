@@ -595,6 +595,17 @@ fn copy_file_contents(StringView source, StringView destination,
 fn make_directories(const Path &directory, u32 mode) wontthrow -> bool;
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
     -> Maybe<String>;
+
+struct source_read_result
+{
+  Maybe<String> content;
+  i32 error_number{0};
+};
+
+fn read_named_or_stdin_batch(const ExecContext &ec,
+                             const ArrayList<StringView> &sources,
+                             Allocator allocator) throws
+    -> ArrayList<source_read_result>;
 fn print_environment(const ExecContext &ec, EvalContext &cxt) throws -> void;
 
 struct input_descriptor

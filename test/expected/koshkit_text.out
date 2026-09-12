@@ -26,6 +26,18 @@ apple
       2 apple
       1 banana
       1 cherry
+--- sort multiple files with a missing operand ---
+1:1: error: sort: cannot read 'missing.txt': No such file or directory.
+     1 |  koshkit sort sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+alpha
+beta
+middle
+zulu
+status=2
+--- sort repeated standard input ---
+alpha
+delta
 --- grep an ---
 banana
 --- grep -v apple ---
