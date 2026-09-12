@@ -73,3 +73,15 @@ echo "=== evil operand location ==="
 
 echo "=== evil color value location ==="
 "$BIN" -c 'koshkit evil --color invalid' 2>&1
+
+echo "=== evilfs operand location ==="
+"$BIN" -c 'koshkit evilfs extra' 2>&1
+
+echo "=== evillogs operand location ==="
+"$BIN" -c 'koshkit evillogs extra' 2>&1
+
+echo "=== evilnet operand location ==="
+"$BIN" -c 'koshkit evilnet extra' 2>&1
+
+echo "=== evilss operand location ==="
+"$BIN" -c 'koshkit evilss extra' 2>&1

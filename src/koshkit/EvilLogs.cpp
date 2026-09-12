@@ -520,14 +520,15 @@ fn EvilLogs::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (!operands.is_empty()) {
-    report_soft_koshkit_error(ec, cxt, "evillogs: unexpected operand",
-                              "this utility reads no operand");
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0], "unexpected operand",
+                            "this utility reads no operand");
     return 1;
   }
 

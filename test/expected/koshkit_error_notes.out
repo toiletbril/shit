@@ -104,3 +104,23 @@ note: this utility reads no operand.
      1 |  koshkit evil --color invalid
        |                       ^~~~~~~
 note: the value is always, auto, or never.
+=== evilfs operand location ===
+1:16: error: evilfs: unexpected operand.
+     1 |  koshkit evilfs extra
+       |                 ^~~~~
+note: this utility accepts no operands.
+=== evillogs operand location ===
+1:18: error: evillogs: unexpected operand.
+     1 |  koshkit evillogs extra
+       |                   ^~~~~
+note: this utility reads no operand.
+=== evilnet operand location ===
+1:17: error: evilnet: unexpected operand.
+     1 |  koshkit evilnet extra
+       |                  ^~~~~
+note: this utility accepts no operands.
+=== evilss operand location ===
+1:16: error: evilss: unexpected operand.
+     1 |  koshkit evilss extra
+       |                 ^~~~~
+note: this utility accepts no operands.
