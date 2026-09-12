@@ -30,6 +30,12 @@ echo "--- sort multiple files with a missing operand ---"
   2>&1
 echo "--- sort repeated standard input ---"
 printf 'delta\nalpha\n' | "$BIN" -c 'koshkit sort - -'
+echo "--- paste multiple files with a missing operand ---"
+"$BIN" -c \
+  'koshkit paste -d , sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"' \
+  2>&1
+echo "--- paste repeated standard input ---"
+printf 'left\nright\n' | "$BIN" -c 'koshkit paste -d , - -'
 echo "--- grep an ---"
 "$BIN" -c 'koshkit grep an fruit.txt'
 echo "--- grep -v apple ---"

@@ -38,6 +38,16 @@ status=2
 --- sort repeated standard input ---
 alpha
 delta
+--- paste multiple files with a missing operand ---
+1:1: error: paste: cannot read 'missing.txt': No such file or directory.
+     1 |  koshkit paste -d , sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+zulu,,middle
+alpha,,beta
+status=1
+--- paste repeated standard input ---
+left,
+right,
 --- grep an ---
 banana
 --- grep -v apple ---
