@@ -175,13 +175,15 @@ if [ "$host_system" = Darwin ]; then
   printf '%s\n' '#!/bin/sh' \
     'printf "%s\n" "SMART data unavailable"' > "$evildisk_tools/smartctl"
   printf '%s\n' '#!/bin/sh' \
-    'printf "%s\n" "Device Identifier: disk-test" "SMART Status: Verified" "Device / Media Name: Mock Disk" "Protocol: Mock"' \
+    'printf "%s\n" "Device Identifier: disk-test" "SMART Status: Verified" "Device / Media Name: Mock Disk" "Protocol: NVMe" "Temperature: 42 Celsius" "Percentage Used: 7%" "Power On Hours: 123" "Unsafe Shutdowns: 2" "Media and Data Integrity Errors: 3" "Data Units Read: 1,000" "Data Units Written: 2,000"' \
     > "$evildisk_tools/diskutil"
   chmod 755 "$evildisk_tools/smartctl" "$evildisk_tools/diskutil"
   evildisk_report=$(PATH="$evildisk_tools:$PATH" "$BIN" -c \
     'koshkit evildisk -a --color never /dev/null')
   case $evildisk_report in
-    *disk-test*Verified*) evildisk_fallback=passed ;;
+    *disk-test*Verified*temperature*"42 Celsius"*"used 7%"*"media errors 3"*)
+      evildisk_fallback=passed
+      ;;
     *) evildisk_fallback=failed ;;
   esac
 else

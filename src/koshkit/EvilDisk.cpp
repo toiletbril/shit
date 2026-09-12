@@ -49,6 +49,13 @@ struct smart_row
   String status{heap_allocator()};
   String model{heap_allocator()};
   String protocol{heap_allocator()};
+  String statistics{heap_allocator()};
+};
+
+struct smart_statistic_field
+{
+  StringView report_name;
+  StringView label;
 };
 
 fn usage_style(u64 percent) wontthrow -> StringView
@@ -77,6 +84,34 @@ fn report_value(StringView report, const StringView *names, usize name_count,
   return String{allocator};
 }
 
+fn format_smart_statistics(StringView report, Allocator allocator) throws
+    -> String
+{
+  static constexpr smart_statistic_field FIELDS[] = {
+      {"Temperature",                     "temperature"     },
+      {"Percentage Used",                 "used"            },
+      {"Power On Hours",                  "power-on hours"  },
+      {"Unsafe Shutdowns",                "unsafe shutdowns"},
+      {"Media and Data Integrity Errors", "media errors"    },
+      {"Data Units Read",                 "read"            },
+      {"Data Units Written",              "written"         },
+  };
+
+  let statistics = String{allocator};
+  for (let const &field : FIELDS) {
+    let const value = report_value(report, &field.report_name, 1, allocator);
+    if (value.is_empty()) continue;
+
+    if (!statistics.is_empty()) statistics += ", ";
+    statistics += field.label;
+    statistics += " ";
+    statistics += value.view();
+  }
+
+  if (statistics.is_empty()) statistics += "-";
+  return statistics;
+}
+
 fn parse_smart_report(StringView report, StringView fallback_device,
                       smart_row &row, Allocator allocator) throws -> bool
 {
@@ -102,6 +137,7 @@ fn parse_smart_report(StringView report, StringView fallback_device,
   row.protocol =
       report_value(report, PROTOCOL_NAMES, countof(PROTOCOL_NAMES), allocator);
   if (row.protocol.is_empty()) row.protocol = String{allocator, "-"};
+  row.statistics = format_smart_statistics(report, allocator);
   return true;
 }
 
@@ -120,7 +156,7 @@ fn read_smart_rows(EvalContext &cxt,
     bool has_row = false;
     if (smartctl.has_value() && filesystem.source.starts_with("/dev/")) {
       let arguments = ArrayList<String>{heap_allocator()};
-      arguments.push(String{"-H"});
+      arguments.push(String{"-a"});
       arguments.push(filesystem.source.clone());
       let const report = capture_util_program_output(
           *smartctl, steal(arguments), 10'000'000'000);
@@ -389,12 +425,15 @@ fn EvilDisk::execute(
       usize device_width = 6;
       usize status_width = 6;
       usize model_width = 5;
+      usize protocol_width = 8;
       for (let const &row : smart_rows) {
         if (row.device.length() > device_width)
           device_width = row.device.length();
         if (row.status.length() > status_width)
           status_width = row.status.length();
         if (row.model.length() > model_width) model_width = row.model.length();
+        if (row.protocol.length() > protocol_width)
+          protocol_width = row.protocol.length();
       }
 
       output += "  ";
@@ -407,7 +446,10 @@ fn EvilDisk::execute(
       append_report_column(output, "MODEL", model_width, false,
                            colors::ansi::BOLD_CYAN, should_color);
       output += "  ";
-      append_report_text(output, "PROTOCOL", colors::ansi::BOLD_CYAN,
+      append_report_column(output, "PROTOCOL", protocol_width, false,
+                           colors::ansi::BOLD_CYAN, should_color);
+      output += "  ";
+      append_report_text(output, "STATS", colors::ansi::BOLD_CYAN,
                          should_color);
       output += "\n";
       for (let const &row : smart_rows) {
@@ -426,8 +468,11 @@ fn EvilDisk::execute(
         append_report_column(output, row.model.view(), model_width, false, {},
                              should_color);
         output += "  ";
-        append_report_text(output, row.protocol.view(),
-                           colors::ansi::BOLD_MAGENTA, should_color);
+        append_report_column(output, row.protocol.view(), protocol_width, false,
+                             colors::ansi::BOLD_MAGENTA, should_color);
+        output += "  ";
+        append_report_text(output, row.statistics.view(), colors::ansi::CYAN,
+                           should_color);
         output += "\n";
       }
     }
