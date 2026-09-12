@@ -1911,8 +1911,9 @@ option adds processor usage, paging, scheduler state, pressure stalls, disk
 activity, and swap rates from a one second sample.
 Nonzero stall rates and disk failures are highlighted. The
 .B \-\-cumulative
-option prints only disk byte rates and IOPS. An optional duration selects the
-sample interval and defaults to one second. With
+option prints disk throughput, operation rates, busy time, latency, average
+queue depth, current queue depth, errors, and retries. Its optional value sets
+the sample interval in seconds and defaults to one second. With
 .BR \-\-ps ,
 each mode prints per-process data. The
 .BR \-l " and " \-\-live
