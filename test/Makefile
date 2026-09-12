@@ -157,6 +157,7 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_history_behavior \
 	cli_interrupt_during_blocking_open \
 	cli_job_state_running_then_stopped \
+	cli_koshkit_evilio_live \
 	cli_koshkit_stty \
 	cli_mkdir_mode_umask \
 	cli_path_cache_behavior \

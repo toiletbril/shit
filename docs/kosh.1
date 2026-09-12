@@ -1915,6 +1915,11 @@ option prints only disk byte rates and IOPS. An optional duration selects the
 sample interval and defaults to one second. With
 .BR \-\-ps ,
 each mode prints per-process data. The
+.BR \-l " and " \-\-live
+options refresh the rate report until interrupted. Terminal output uses the
+alternate screen and restores the previous contents on exit. The optional
+.B \-\-cumulative
+duration also sets the live refresh interval. The
 .BR \-\-ps ,
 .BR \-n ,
 .BR \-p ,

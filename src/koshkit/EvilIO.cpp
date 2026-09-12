@@ -16,7 +16,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] [--cumulative [duration]] "
+HELP_SYNOPSIS_DECL("[-a] [--live] [--cumulative [duration]] "
                    "[--ps | -NUMBER | -n count | -p pid] [--color when]");
 
 HELP_DESCRIPTION_DECL(
@@ -38,6 +38,8 @@ static koshka::FlagOptionalValue FLAG_EVILIO_CUMULATIVE{
     "Show only rates and IOPS over an optional sample duration.",
     is_evilio_sample_duration};
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
+FLAG(EVILIO_LIVE, Bool, 'l', "live",
+     "Refresh rate and IOPS samples until interrupted.");
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");
 FLAG(EVILIO_COLOR, String, '\0', "color",
@@ -334,6 +336,71 @@ fn append_disk_io_rate_report(String &output,
   }
 }
 
+fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
+                       usize row_limit, f64 sample_duration_seconds,
+                       bool is_terminal, bool should_color) throws -> i32
+{
+  let const allocator = heap_allocator();
+  let before_rows = read_process_io_rows(allocator, selected_pid, true);
+  if (selected_pid.has_value() && before_rows.is_empty()) return 1;
+
+  loop
+  {
+    let const started_at_nanoseconds = os::monotonic_nanos();
+    os::sleep_for_seconds(sample_duration_seconds);
+    if (os::INTERRUPT_REQUESTED != 0) {
+      os::INTERRUPT_REQUESTED = 0;
+      return 130;
+    }
+
+    let after_rows = read_process_io_rows(allocator, selected_pid, true);
+    if (selected_pid.has_value() && after_rows.is_empty()) return 1;
+
+    let const elapsed_nanoseconds =
+        os::monotonic_nanos() - started_at_nanoseconds;
+    let const sampled_rows = sample_process_io_rows(
+        before_rows, after_rows, elapsed_nanoseconds, allocator);
+    let output = String{allocator};
+    if (is_terminal) output += "\x1b[H\x1b[2J";
+    append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
+                                  should_color);
+    ec.print_to_stdout(output);
+    before_rows = steal(after_rows);
+  }
+}
+
+fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
+                    bool is_terminal, bool should_color) throws -> i32
+{
+  let const allocator = heap_allocator();
+  let before_snapshot = os::read_disk_io_snapshot(allocator);
+
+  loop
+  {
+    os::sleep_for_seconds(sample_duration_seconds);
+    if (os::INTERRUPT_REQUESTED != 0) {
+      os::INTERRUPT_REQUESTED = 0;
+      return 130;
+    }
+
+    let after_snapshot = os::read_disk_io_snapshot(allocator);
+    u64 elapsed_nanoseconds = 0;
+    if (after_snapshot.sampled_at_nanoseconds >=
+        before_snapshot.sampled_at_nanoseconds)
+    {
+      elapsed_nanoseconds = after_snapshot.sampled_at_nanoseconds -
+                            before_snapshot.sampled_at_nanoseconds;
+    }
+
+    let output = String{allocator};
+    if (is_terminal) output += "\x1b[H\x1b[2J";
+    append_disk_io_rate_report(output, before_snapshot, after_snapshot,
+                               elapsed_nanoseconds, allocator, should_color);
+    ec.print_to_stdout(output);
+    before_snapshot = steal(after_snapshot);
+  }
+}
+
 fn percent_text(u64 part, u64 total, Allocator allocator) throws -> String
 {
   if (total == 0) return String{allocator, "0.0%"};
@@ -576,10 +643,31 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
       selected_pid.has_value() || process_limit_operand.has_value();
 
-  if (FLAG_EVILIO_ALL.is_enabled() && FLAG_EVILIO_CUMULATIVE.is_enabled()) {
+  if (FLAG_EVILIO_ALL.is_enabled() &&
+      (FLAG_EVILIO_CUMULATIVE.is_enabled() || FLAG_EVILIO_LIVE.is_enabled()))
+  {
     report_soft_koshkit_error(ec, cxt, "evilio: conflicting report modes",
-                              "use either --all or --cumulative");
+                              "use --all without --cumulative or --live");
     return 1;
+  }
+
+  if (FLAG_EVILIO_LIVE.is_enabled()) {
+    let const is_terminal = colors::stdout_is_a_terminal();
+    bool is_alternate_screen_active = false;
+    if (is_terminal) is_alternate_screen_active = enter_alternate_screen(ec);
+    defer
+    {
+      if (is_alternate_screen_active) leave_alternate_screen(ec);
+    };
+
+    if (should_show_processes) {
+      return run_live_process_io(ec, selected_pid, row_limit,
+                                 sample_duration_seconds, is_terminal,
+                                 should_color);
+    }
+
+    return run_live_disk_io(ec, sample_duration_seconds, is_terminal,
+                            should_color);
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {

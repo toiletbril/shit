@@ -169,7 +169,7 @@ _koshkit_util_flags()
     evildisk)      echo "-a --all --color" ;;
     evilfiles)     echo "-t --terse -p --pid -u --user -c --command -i --network" ;;
     evilfs)        echo "-a --all" ;;
-    evilio)        echo "-a --all --cumulative --ps -n --count -p --pid --color" ;;
+    evilio)        echo "-a --all --cumulative -l --live --ps -n --count -p --pid --color" ;;
     evillogs)      echo "--cores --logs" ;;
     evilnet)       echo "-a --all" ;;
     goodnode)      echo "-i --inode -r --root --color" ;;
