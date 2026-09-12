@@ -32,17 +32,18 @@ struct BatchOperation
       -> BatchOperation;
   static fn stat(const Path &path, file_status &status) wontthrow
       -> BatchOperation;
-
-  pure fn get_kind() const wontthrow -> Kind;
-  pure fn get_descriptor() const wontthrow -> descriptor;
-  pure fn get_input_buffer() const wontthrow -> const char *;
-  pure fn get_output_buffer() const wontthrow -> char *;
-  pure fn get_byte_count() const wontthrow -> usize;
-  pure fn get_byte_offset() const wontthrow -> u64;
-  pure fn get_path() const wontthrow -> const Path &;
-  pure fn get_status() const wontthrow -> file_status &;
+  static fn lstat(Path &&path, file_status &status) wontthrow
+      -> BatchOperation = delete;
+  static fn lstat(const Path &&path, file_status &status) wontthrow
+      -> BatchOperation = delete;
+  static fn stat(Path &&path, file_status &status) wontthrow
+      -> BatchOperation = delete;
+  static fn stat(const Path &&path, file_status &status) wontthrow
+      -> BatchOperation = delete;
 
 private:
+  BatchOperation() = default;
+
   Kind m_kind{Kind::Read};
   descriptor m_descriptor{KOSH_INVALID_FD};
   const char *m_input_buffer{nullptr};
@@ -84,7 +85,7 @@ fn execute_batch_operations(const batched_syscall *operations,
                             usize operation_count,
                             BatchResult *results) wontthrow -> void;
 
-}
+} /* namespace internal */
 
 class Batch
 {
@@ -103,4 +104,4 @@ private:
   ArrayList<internal::batched_syscall> m_operations;
 };
 
-}
+} /* namespace koshka::os */

@@ -55,45 +55,6 @@ fn BatchOperation::stat(const Path &path, file_status &status) wontthrow
   return operation;
 }
 
-pure fn BatchOperation::get_kind() const wontthrow -> Kind { return m_kind; }
-
-pure fn BatchOperation::get_descriptor() const wontthrow -> descriptor
-{
-  return m_descriptor;
-}
-
-pure fn BatchOperation::get_input_buffer() const wontthrow -> const char *
-{
-  return m_input_buffer;
-}
-
-pure fn BatchOperation::get_output_buffer() const wontthrow -> char *
-{
-  return m_output_buffer;
-}
-
-pure fn BatchOperation::get_byte_count() const wontthrow -> usize
-{
-  return m_byte_count;
-}
-
-pure fn BatchOperation::get_byte_offset() const wontthrow -> u64
-{
-  return m_byte_offset;
-}
-
-pure fn BatchOperation::get_path() const wontthrow -> const Path &
-{
-  ASSERT(m_path != nullptr, "batch operation has no path");
-  return *m_path;
-}
-
-pure fn BatchOperation::get_status() const wontthrow -> file_status &
-{
-  ASSERT(m_status != nullptr, "batch operation has no status output");
-  return *m_status;
-}
-
 Batch::Batch(Allocator allocator) : m_operations(allocator) {}
 
 fn Batch::reserve(usize operation_count) throws -> void
