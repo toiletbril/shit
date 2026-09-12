@@ -11,6 +11,7 @@ descriptor_pid=
 preserve_pid=
 supervisor_pid=
 watchdog_pid=
+interrupter_pid=
 host_system=$(uname -s)
 process_is_alive()
 {
@@ -31,7 +32,8 @@ process_is_alive()
 cleanup()
 {
     for cleanup_pid in "$query_reader_pid" "$descendant_pid" "$descriptor_pid" \
-        "$preserve_pid" "$supervisor_pid" "$watchdog_pid"; do
+        "$preserve_pid" "$supervisor_pid" "$watchdog_pid" \
+        "$interrupter_pid"; do
         if [ -n "$cleanup_pid" ]; then
             kill -KILL "$cleanup_pid" 2>/dev/null || true
             wait "$cleanup_pid" 2>/dev/null || true
@@ -331,32 +333,35 @@ if [ "${OS-}" = Windows_NT ]; then
     echo rc=130
     echo contained
 else
-    set -m
-    "$BIN" -c "koshkit timeout 0 /bin/sh -c 'echo \$\$ > '$d/child-pid'; (sleep 0.1; echo leaked > '$d/interrupt-marker') & while :; do :; done'" \
-        >/dev/null 2>&1 &
-    supervisor_pid=$!
-    set +m
-    waited=0
-    while [ ! -s "$d/child-pid" ] && [ "$waited" -lt 1000 ]; do
-        /bin/sleep 0.01
-        waited=$((waited + 1))
-    done
-    if [ -s "$d/child-pid" ]; then
-        kill -INT "$supervisor_pid"
-        "$BIN" -p --mood sh -c \
-            'koshkit sleep 10; kill -KILL "$1" 2>/dev/null' \
-            shell "$supervisor_pid" &
-        watchdog_pid=$!
-        wait "$supervisor_pid"
-        supervisor_status=$?
-        supervisor_pid=
-        kill "$watchdog_pid" 2>/dev/null
-        wait "$watchdog_pid" 2>/dev/null
-        watchdog_pid=
-    else
-        kill -KILL "$supervisor_pid" 2>/dev/null
-        wait "$supervisor_pid" 2>/dev/null
-        supervisor_pid=
+    "$BIN" -p --mood sh -c \
+        'waited=0
+         while [ "$waited" -lt 1000 ]; do
+             if [ -s "$1" ] && [ -s "$2" ]; then
+                 kill -INT "$(cat "$1")" 2>/dev/null
+                 exit 0
+             fi
+             /bin/sleep 0.01
+             waited=$((waited + 1))
+         done' \
+        shell "$d/supervisor-pid" "$d/child-pid" &
+    interrupter_pid=$!
+    "$BIN" -p --mood sh -c \
+        'koshkit sleep 10
+         if [ -s "$1" ]; then
+             kill -KILL "$(cat "$1")" 2>/dev/null
+         fi' \
+        shell "$d/supervisor-pid" &
+    watchdog_pid=$!
+    "$BIN" -c "echo \$\$ > '$d/supervisor-pid'; koshkit timeout 0 /bin/sh -c 'echo \$\$ > '$d/child-pid'; (sleep 0.1; echo leaked > '$d/interrupt-marker') & while :; do :; done'" \
+        >/dev/null 2>&1 </dev/null
+    supervisor_status=$?
+    kill "$interrupter_pid" 2>/dev/null
+    wait "$interrupter_pid" 2>/dev/null
+    interrupter_pid=
+    kill "$watchdog_pid" 2>/dev/null
+    wait "$watchdog_pid" 2>/dev/null
+    watchdog_pid=
+    if [ ! -s "$d/child-pid" ]; then
         supervisor_status=125
     fi
     echo "rc=$supervisor_status"
