@@ -7,6 +7,16 @@
  4  4 26 fruit.txt
 --- wc -l ---
 4 fruit.txt
+--- cat multi-chunk input with a missing operand ---
+1:1: error: cat: missing.txt: No such file or directory.
+     1 |  koshkit cat batch-input.txt cat-first.txt missing.txt cat-last.txt > cat-output.txt; printf "status=%s\n" "$?"; koshkit cksum cat-output.txt
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+status=1
+578497766 108905 cat-output.txt
+--- cat reads standard input between files ---
+first
+middle
+last
 --- wc multi-chunk input with a missing operand ---
 1:1: error: wc: missing.txt: No such file or directory.
      1 |  koshkit wc -c batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"

@@ -14,6 +14,15 @@ echo "--- wc -l ---"
 "$BIN" -c 'koshkit wc -l fruit.txt'
 "$BIN" -c 'koshkit seq 20000' > batch-input.txt
 : > empty.txt
+printf 'first\n' > cat-first.txt
+printf 'last\n' > cat-last.txt
+echo "--- cat multi-chunk input with a missing operand ---"
+"$BIN" -c \
+  'koshkit cat batch-input.txt cat-first.txt missing.txt cat-last.txt > cat-output.txt; printf "status=%s\n" "$?"; koshkit cksum cat-output.txt' \
+  2>&1
+echo "--- cat reads standard input between files ---"
+printf 'middle\n' | "$BIN" -c \
+  'koshkit cat cat-first.txt - cat-last.txt'
 echo "--- wc multi-chunk input with a missing operand ---"
 "$BIN" -c \
   'koshkit wc -c batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"' \

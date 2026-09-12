@@ -106,49 +106,41 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
 
-  let output = String{cxt.scratch_allocator()};
   let const should_highlight_output =
       FLAG_CAT_SYNTAX_HIGHLIGHTING.is_enabled() && colors::stdout_wants_color();
+  if (!FLAG_CAT_NUMBER.is_enabled() && !should_highlight_output) {
+    let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
+    let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
+    i32 status = 0;
+
+    loop
+    {
+      let const read_result = reader.read_next_ordered(chunks);
+      if (read_result == SourceBatchReader::ReadResult::Complete) break;
+      if (read_result == SourceBatchReader::ReadResult::Interrupted) return 130;
+
+      for (let const &chunk : chunks) {
+        if (!chunk.content.is_empty()) ec.print_to_stdout(chunk.content);
+        if (!chunk.is_complete || chunk.error_number == 0) continue;
+
+        os::set_last_system_error(chunk.error_number);
+        report_soft_koshkit_error(
+            ec, cxt,
+            "cat: " +
+                String{cxt.scratch_allocator(), sources[chunk.source_index]} +
+                ": " + os::last_system_error_message());
+        status = 1;
+      }
+    }
+
+    return status;
+  }
+
+  let output = String{cxt.scratch_allocator()};
   i64 line_number = 1;
   let is_at_output_line_start = true;
   i32 status = 0;
   for (let const &source : sources) {
-    if (!FLAG_CAT_NUMBER.is_enabled() && !should_highlight_output) {
-      let const input = open_named_or_stdin(ec, source);
-      if (!input.has_value()) {
-        report_soft_koshkit_error(
-            ec, cxt,
-            "cat: " + String{cxt.scratch_allocator(), source} + ": " +
-                os::last_system_error_message());
-        status = 1;
-        continue;
-      }
-      defer
-      {
-        if (input->should_close) os::close_fd(input->descriptor);
-      };
-      char buffer[65536];
-
-      loop
-      {
-        let const read_size =
-            os::read_fd(input->descriptor, buffer, sizeof(buffer));
-        if (!read_size.has_value()) {
-          if (os::INTERRUPT_REQUESTED) return 130;
-          report_soft_koshkit_error(
-              ec, cxt,
-              "cat: " + String{cxt.scratch_allocator(), source} + ": " +
-                  os::last_system_error_message());
-          status = 1;
-          break;
-        }
-        if (*read_size == 0) break;
-        ec.print_to_stdout(StringView{buffer, *read_size});
-      }
-
-      continue;
-    }
-
     let const content = read_named_or_stdin(ec, source);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
