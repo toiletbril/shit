@@ -431,6 +431,9 @@ fn publish_command_and_run_debug_trap(
 fn publish_simple_command(
     EvalContext &cxt, const SimpleCommand &command,
     root_evaluation_mode mode = root_evaluation_mode::Normal) throws -> bool;
+fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args,
+                          ArrayList<SourceLocation> &arg_locations) throws
+    -> void;
 
 /* Whether the shell or the environment gives the name a value on its own, so a
    script that reads it without assigning it is correct. */

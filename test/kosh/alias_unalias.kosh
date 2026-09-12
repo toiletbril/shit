@@ -10,3 +10,5 @@ unalias greet; echo "rm=$?"
 unalias missing 2>&1; echo "miss=$?"
 alias a=1 b=2; unalias -a; alias; echo "all=$?"
 hash -r; echo "hash=$?"
+alias piped='echo pipeline'
+piped | koshkit grep '^pipeline$'

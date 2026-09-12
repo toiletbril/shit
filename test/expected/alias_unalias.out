@@ -31,6 +31,12 @@
     [SimpleCommand "hash" "-r"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "hash=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "alias" "piped=echo pipeline"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "piped"]
+      [SimpleCommand "koshkit" "grep" "^pipeline$"]
 [Word
   Unquoted "alias"
 ]
@@ -130,6 +136,25 @@
   DoubleQuoted "hash="
   Variable "?"
 ]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "piped="
+  Literal "echo pipeline"
+]
+[Word
+  Unquoted "piped"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "^pipeline$"
+]
 alias greet='echo hello'
 hello
 rm=0
@@ -139,3 +164,4 @@ rm=0
 miss=1
 all=0
 hash=0
+pipeline

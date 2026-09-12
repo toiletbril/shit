@@ -32,15 +32,13 @@ namespace expressions {
 
 using namespace internal;
 
-namespace {
-
 /* Replace a command word that names an alias with the alias body. The body is
    split on whitespace, and a name already expanded is not expanded again so a
    self-referential alias terminates. A quoted space inside the body is not
    preserved, since the full tokenizer is not re-run. */
-fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args,
-                          ArrayList<SourceLocation> &arg_locations) throws
-    -> void
+fn internal::expand_command_aliases(
+    EvalContext &cxt, ArrayList<String> &args,
+    ArrayList<SourceLocation> &arg_locations) throws -> void
 {
   if (!cxt.has_aliases() || !cxt.is_shopt_enabled("expand_aliases")) return;
 
@@ -97,6 +95,8 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args,
     arg_locations = steal(rebuilt_locations);
   }
 }
+
+namespace {
 
 /* Whether the command word is itself a glob pattern. The lone [ that opens a
    test command carries no closing ] in the same word and is left alone. */

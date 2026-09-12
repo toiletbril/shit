@@ -857,6 +857,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     let stage_args =
         cxt.process_args(e->args(), argument_lifetime::Transient,
                          argument_context::Command, &stage_arg_locations);
+    expand_command_aliases(cxt, stage_args, stage_arg_locations);
 
     if (stage_args.is_empty()) {
       throw ErrorWithLocation{e->source_location(),
