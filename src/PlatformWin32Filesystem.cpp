@@ -651,12 +651,21 @@ cold fn list_directory_status(StringView dir, Allocator allocator) throws
 
   let entries = ArrayList<directory_status_entry>{allocator};
   entries.reserve(children->count());
-  for (let &child : *children) {
-    let const path = PathBuilder{dir}.append(child.name.view()).build();
-    directory_status_entry entry{steal(child)};
-    entry.has_status = stat_path(path.text().view(), entry.status);
-    entries.push(steal(entry));
-  }
+  for (let &child : *children)
+    entries.push(directory_status_entry{steal(child)});
+
+  let paths = ArrayList<Path>{allocator};
+  let batch = Batch{allocator};
+  paths.reserve(entries.count());
+  batch.reserve(entries.count());
+  for (let const &entry : entries)
+    paths.push(PathBuilder{dir}.append(entry.child.name.view()).build());
+  for (usize index = 0; index < entries.count(); index++)
+    batch.add(batch_operation::lstat(paths[index], entries[index].status));
+
+  let const results = batch.execute();
+  for (usize index = 0; index < entries.count(); index++)
+    entries[index].has_status = results[index].error_number == 0;
 
   return entries;
 }
@@ -1689,7 +1698,7 @@ fn execute_batch_operations(const batched_syscall *operations,
   }
 }
 
-}
+} // namespace batch_internal
 
 fn format_mode_string(u32 mode) throws -> String
 {
