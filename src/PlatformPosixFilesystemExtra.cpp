@@ -785,7 +785,7 @@ fn sync_path(StringView path, bool is_data_only) wontthrow -> bool
   return sync_native_descriptor(path_fd, is_data_only);
 }
 
-namespace internal {
+namespace batch_internal {
 
 static fn validate_batched_syscall(const batched_syscall &operation) wontthrow
     -> i32

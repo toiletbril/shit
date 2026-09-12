@@ -64,7 +64,7 @@ fn Batch::reserve(usize operation_count) throws -> void
 
 fn Batch::add(BatchOperation operation) throws -> void
 {
-  internal::batched_syscall record{};
+  batch_internal::batched_syscall record{};
   record.path = operation.m_path;
   record.input_buffer = operation.m_input_buffer;
   record.output_buffer = operation.m_output_buffer;
@@ -80,8 +80,8 @@ fn Batch::add(BatchOperation operation) throws -> void
 fn Batch::clear() wontthrow -> void { m_operations.clear(); }
 
 static pure fn is_same_metadata_request(
-    const internal::batched_syscall &left,
-    const internal::batched_syscall &right) wontthrow -> bool
+    const batch_internal::batched_syscall &left,
+    const batch_internal::batched_syscall &right) wontthrow -> bool
 {
   if (left.syscall_id != right.syscall_id) return false;
   if (left.syscall_id != BatchOperation::Kind::Lstat &&
@@ -95,7 +95,7 @@ static pure fn is_same_metadata_request(
 }
 
 static pure fn is_metadata_request(
-    const internal::batched_syscall &operation) wontthrow -> bool
+    const batch_internal::batched_syscall &operation) wontthrow -> bool
 {
   return operation.path != nullptr &&
          (operation.syscall_id == BatchOperation::Kind::Lstat ||
@@ -103,7 +103,7 @@ static pure fn is_metadata_request(
 }
 
 static fn find_canonical_operation_positions(
-    const ArrayList<internal::batched_syscall> &operations,
+    const ArrayList<batch_internal::batched_syscall> &operations,
     ArrayList<usize> &canonical_positions) throws -> bool
 {
   usize metadata_count = 0;
@@ -169,13 +169,13 @@ fn Batch::execute(ArrayList<BatchResult> &results) const throws -> void
     for (usize index = 0; index < m_operations.count(); index++)
       results.push({});
 
-    internal::execute_batch_operations(m_operations.begin(),
-                                       m_operations.count(), results.begin());
+    batch_internal::execute_batch_operations(
+        m_operations.begin(), m_operations.count(), results.begin());
     return;
   }
 
   let optimized_operations =
-      ArrayList<internal::batched_syscall>{m_operations.allocator()};
+      ArrayList<batch_internal::batched_syscall>{m_operations.allocator()};
   let optimized_positions = ArrayList<usize>{m_operations.allocator()};
   optimized_operations.reserve(m_operations.count());
   optimized_positions.reserve(m_operations.count());
@@ -195,9 +195,9 @@ fn Batch::execute(ArrayList<BatchResult> &results) const throws -> void
   for (usize index = 0; index < optimized_operations.count(); index++)
     optimized_results.push({});
 
-  internal::execute_batch_operations(optimized_operations.begin(),
-                                     optimized_operations.count(),
-                                     optimized_results.begin());
+  batch_internal::execute_batch_operations(optimized_operations.begin(),
+                                           optimized_operations.count(),
+                                           optimized_results.begin());
 
   results.clear();
   results.reserve(m_operations.count());

@@ -1517,7 +1517,7 @@ fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
   return resolved.has_value() && stat_path(resolved->text().view(), status);
 }
 
-namespace internal {
+namespace batch_internal {
 
 fn execute_batch_operations(const batched_syscall *operations,
                             usize operation_count,

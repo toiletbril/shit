@@ -63,7 +63,7 @@ struct BatchResult
   i32 error_number{0};
 };
 
-namespace internal {
+namespace batch_internal {
 
 using batched_syscall_id = BatchOperation::Kind;
 using batched_syscall_result = BatchResult;
@@ -85,7 +85,7 @@ fn execute_batch_operations(const batched_syscall *operations,
                             usize operation_count,
                             BatchResult *results) wontthrow -> void;
 
-} /* namespace internal */
+} /* namespace batch_internal */
 
 class Batch
 {
@@ -101,7 +101,7 @@ public:
   pure fn count() const wontthrow -> usize;
 
 private:
-  ArrayList<internal::batched_syscall> m_operations;
+  ArrayList<batch_internal::batched_syscall> m_operations;
 };
 
 } /* namespace koshka::os */
