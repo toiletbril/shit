@@ -804,6 +804,7 @@ static fn validate_batched_syscall(const batched_syscall &operation) wontthrow
                                                                     : 0;
   case batched_syscall_id::Exists:
     return operation.path == nullptr ? EINVAL : 0;
+  case batched_syscall_id::Invalid: return EINVAL;
   }
 
   return EINVAL;
@@ -875,6 +876,7 @@ execute_batched_syscall_direct(const batched_syscall &operation,
   case batched_syscall_id::Exists:
     result.is_existing = path_exists(operation.path->text().view());
     return;
+  case batched_syscall_id::Invalid: result.error_number = EINVAL; return;
   }
 }
 
@@ -1036,6 +1038,7 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
     case batched_syscall_id::Lstat:
     case batched_syscall_id::Stat:
     case batched_syscall_id::Exists: break;
+    case batched_syscall_id::Invalid: return false;
     }
   }
 
@@ -1449,6 +1452,7 @@ static fn io_uring_batch_supports_operations(const io_uring_batch &ring,
     case batched_syscall_id::Exists:
       if (!ring.has_stat) return false;
       break;
+    case batched_syscall_id::Invalid: return false;
     }
   }
 
@@ -1549,6 +1553,7 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
                                 : 0;
         entry.addr2 = reinterpret_cast<u64>(&status_records[chunk_index]);
         break;
+      case batched_syscall_id::Invalid: continue;
       }
       ring.submission_array[submission_index] = submission_index;
       was_queued[chunk_index] = true;

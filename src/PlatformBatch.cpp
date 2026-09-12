@@ -100,7 +100,8 @@ static pure fn is_same_metadata_request(
   case batch_operation::Kind::Exists: break;
   case batch_operation::Kind::Read:
   case batch_operation::Kind::Write:
-  case batch_operation::Kind::WriteCurrent: return false;
+  case batch_operation::Kind::WriteCurrent:
+  case batch_operation::Kind::Invalid: return false;
   }
   if (left.path == nullptr || right.path == nullptr) return false;
 
@@ -118,7 +119,8 @@ static pure fn is_metadata_request(
   case batch_operation::Kind::Exists: return true;
   case batch_operation::Kind::Read:
   case batch_operation::Kind::Write:
-  case batch_operation::Kind::WriteCurrent: return false;
+  case batch_operation::Kind::WriteCurrent:
+  case batch_operation::Kind::Invalid: return false;
   }
 
   return false;

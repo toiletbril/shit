@@ -24,6 +24,7 @@ struct batch_operation
     Lstat = 3,
     Stat = 4,
     Exists = 5,
+    Invalid = 127,
   };
 
   static fn read(descriptor fd, char *buffer, usize byte_count,
@@ -56,7 +57,7 @@ struct batch_operation
   u64 byte_offset{0};
   usize byte_count{0};
   descriptor fd{KOSH_INVALID_FD};
-  Kind syscall_id{Kind::Read};
+  Kind syscall_id{Kind::Invalid};
 
 private:
   batch_operation() = default;
