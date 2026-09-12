@@ -1016,15 +1016,30 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
                                    batched_syscall_result *results) wontthrow
     -> bool
 {
+  constexpr usize MINIMUM_AIO_BYTE_COUNT = 1024 * 1024;
   usize aio_operation_count = 0;
+  usize aio_byte_count = 0;
+
   for (usize index = 0; index < operation_count; index++) {
-    if (operations[index].syscall_id == batched_syscall_id::Read ||
-        operations[index].syscall_id == batched_syscall_id::Write)
-    {
+    let const &operation = operations[index];
+    switch (operation.syscall_id) {
+    case batched_syscall_id::Read:
+    case batched_syscall_id::Write:
       aio_operation_count++;
+      if (operation.byte_count >= MINIMUM_AIO_BYTE_COUNT - aio_byte_count)
+        aio_byte_count = MINIMUM_AIO_BYTE_COUNT;
+      else
+        aio_byte_count += operation.byte_count;
+      break;
+    case batched_syscall_id::Lstat:
+    case batched_syscall_id::Stat:
+    case batched_syscall_id::Exists: break;
     }
   }
-  if (aio_operation_count < 2) return false;
+
+  if (aio_operation_count < 2 || aio_byte_count < MINIMUM_AIO_BYTE_COUNT) {
+    return false;
+  }
 
   let const queue_descriptor = ::kqueue();
   if (queue_descriptor < 0) return false;
