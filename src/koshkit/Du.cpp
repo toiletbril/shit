@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements the du utility. It recursively totals file sizes without
- * following symbolic links and formats either byte counts or human-readable
+ * This file implements the du utility. It recursively totals allocated disk
+ * space without following symbolic links and formats byte or human-readable
  * totals.
  */
 
@@ -11,6 +11,7 @@
 #include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../HashSet.hpp"
 #include "../Koshkit.hpp"
 #include "../Path.hpp"
 #include "../Utils.hpp"
@@ -20,7 +21,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-sh] [path ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The du utility prints the total byte size of each path.");
+    "The du utility prints the disk usage of each path.");
 
 FLAG(DU_SUMMARY, Bool, 's', "",
      "Print only the total for each path.");
@@ -41,6 +42,12 @@ struct du_output_row
   String path;
 };
 
+struct du_size_result
+{
+  u64 size_bytes;
+  bool should_emit;
+};
+
 fn append_output_row(ArrayList<du_output_row> &rows, u64 size, StringView path,
                      usize &size_width, Allocator allocator) throws -> void
 {
@@ -54,9 +61,10 @@ fn append_output_row(ArrayList<du_output_row> &rows, u64 size, StringView path,
 
 static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
                      bool &has_failure, ArrayList<du_output_row> *output_rows,
-                     usize &size_width, Allocator allocator,
+                     usize &size_width, HashSet &seen_links,
+                     Allocator allocator,
                      const os::file_status *known_status = nullptr) throws
-    -> Maybe<u64>
+    -> Maybe<du_size_result>
 {
   os::file_status queried_status{};
   if (known_status == nullptr) {
@@ -72,8 +80,26 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   }
 
   let const type_letter = os::file_type_letter(known_status->mode);
+  if (type_letter != 'd' && known_status->has_file_identity &&
+      known_status->link_count > 1)
+  {
+    const u64 identity[] = {known_status->device_id, known_status->file_id};
+    let const key = StringView{reinterpret_cast<const char *>(identity),
+                               sizeof(identity)};
+    if (!seen_links.add(key)) return du_size_result{0, false};
+  }
+
+  if (known_status->blocks > UINT64_MAX / 512) {
+    report_soft_koshkit_error(
+        ec, cxt,
+        "du: cannot read '" + path.text() + "': the total size is too large");
+    has_failure = true;
+    return None;
+  }
+
+  let const allocated_size_bytes = known_status->blocks * 512;
   if (type_letter == 'd') {
-    u64 total_bytes = 0;
+    u64 total_bytes = allocated_size_bytes;
     let children =
         os::list_directory_status(path.text().view(), heap_allocator());
     if (!children.has_value()) {
@@ -98,12 +124,13 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       let const child_status =
           child_entry.has_status ? &child_entry.status : nullptr;
       let const child_size = total_size(ec, cxt, child, has_failure, output_rows,
-                                        size_width, allocator, child_status);
+                                        size_width, seen_links, allocator,
+                                        child_status);
       if (!child_size.has_value()) {
         if (os::INTERRUPT_REQUESTED) return None;
         continue;
       }
-      if (*child_size > UINT64_MAX - total_bytes) {
+      if (child_size->size_bytes > UINT64_MAX - total_bytes) {
         report_soft_koshkit_error(
             ec, cxt,
             "du: cannot read '" + child.text() +
@@ -111,21 +138,21 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
         has_failure = true;
         return None;
       }
-      total_bytes += *child_size;
+      total_bytes += child_size->size_bytes;
     }
 
     if (output_rows != nullptr)
       append_output_row(*output_rows, total_bytes, path.text().view(),
                         size_width, allocator);
 
-    return total_bytes;
+    return du_size_result{total_bytes, true};
   }
 
   if (output_rows != nullptr)
-    append_output_row(*output_rows, known_status->size, path.text().view(),
+    append_output_row(*output_rows, allocated_size_bytes, path.text().view(),
                       size_width, allocator);
 
-  return known_status->size;
+  return du_size_result{allocated_size_bytes, true};
 }
 
 fn append_size_line(String &output, const du_output_row &row,
@@ -179,6 +206,7 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
 
   let output_rows = ArrayList<du_output_row>{allocator};
   output_rows.reserve(targets.count());
+  let seen_links = HashSet{allocator};
   usize size_width = 0;
   i32 status = 0;
   bool has_failure = false;
@@ -196,15 +224,15 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
     let const total = total_size(
         ec, cxt, target, has_failure,
         FLAG_DU_SUMMARY.is_enabled() ? nullptr : &output_rows, size_width,
-        allocator, &target_statuses[index]);
+        seen_links, allocator, &target_statuses[index]);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!total.has_value()) {
       status = 1;
       continue;
     }
-    if (FLAG_DU_SUMMARY.is_enabled())
-      append_output_row(output_rows, *total, target.text().view(), size_width,
-                        allocator);
+    if (FLAG_DU_SUMMARY.is_enabled() && total->should_emit)
+      append_output_row(output_rows, total->size_bytes, target.text().view(),
+                        size_width, allocator);
   }
 
   output_rows.sort([](const du_output_row &left, const du_output_row &right) {

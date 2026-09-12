@@ -46,15 +46,11 @@ cp-hardlink-status=1 contents=same-file
 mv-interactive-no=old source=present
 mv-interactive-yes=new source=missing
 --- du -s nums.txt ---
-6  nums.txt
+du-file-allocation=matched
 --- du with no operand lists every entry and the total ---
-19  .
-10  ./long-name
- 3  ./sub
- 3  ./sub-link
- 3  ./sub/c
- 2  ./b
- 1  ./a
+du-order=descending
+du-recursion=complete
+du-hardlinks=deduplicated
 du-unreadable=ok
 --- basename ---
 libfoo

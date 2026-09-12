@@ -78,7 +78,14 @@ printf 'mv-interactive-no=%s source=%s\n' "$(cat mv-target.txt)" "$([ -e mv-sour
 printf 'y\n' | "$BIN" -c 'koshkit mv -i mv-source.txt mv-target.txt' 2>/dev/null
 printf 'mv-interactive-yes=%s source=%s\n' "$(cat mv-target.txt)" "$([ -e mv-source.txt ] && echo present || echo missing)"
 echo "--- du -s nums.txt ---"
-"$BIN" -c 'koshkit du -s nums.txt'
+du_file_output=$("$BIN" -c 'koshkit du -s nums.txt')
+set -- $du_file_output
+du_file_blocks=$("$BIN" -c 'koshkit stat -c %b nums.txt')
+if [ "$1" -eq "$((du_file_blocks * 512))" ]; then
+  echo "du-file-allocation=matched"
+else
+  echo "du-file-allocation=wrong"
+fi
 mkdir -p du-default/sub
 printf a > du-default/a
 printf bb > du-default/b
@@ -86,7 +93,44 @@ printf 1234567890 > du-default/long-name
 printf ccc > du-default/sub/c
 ln -s sub du-default/sub-link
 echo "--- du with no operand lists every entry and the total ---"
-(cd du-default && "$BIN" -c 'koshkit du')
+du_report=$d/du-default.out
+(cd du-default && "$BIN" -c 'koshkit du') > "$du_report"
+du_order=descending
+du_path_mask=0
+previous_size=
+while read -r current_size current_path; do
+  if [ -n "$previous_size" ] && [ "$current_size" -gt "$previous_size" ]; then
+    du_order=wrong
+  fi
+  previous_size=$current_size
+  case $current_path in
+    .) du_path_mask=$((du_path_mask | 1)) ;;
+    ./a) du_path_mask=$((du_path_mask | 2)) ;;
+    ./b) du_path_mask=$((du_path_mask | 4)) ;;
+    ./long-name) du_path_mask=$((du_path_mask | 8)) ;;
+    ./sub) du_path_mask=$((du_path_mask | 16)) ;;
+    ./sub/c) du_path_mask=$((du_path_mask | 32)) ;;
+    ./sub-link) du_path_mask=$((du_path_mask | 64)) ;;
+    *) du_path_mask=-1 ;;
+  esac
+done < "$du_report"
+printf 'du-order=%s\n' "$du_order"
+if [ "$du_path_mask" -eq 127 ]; then
+  echo "du-recursion=complete"
+else
+  echo "du-recursion=incomplete"
+fi
+mkdir du-links
+printf x > du-links/a
+ln du-links/a du-links/b
+du_links_report=$d/du-links.out
+"$BIN" -c 'koshkit du -s du-links/a du-links/b' > "$du_links_report"
+du_link_line_count=$(wc -l < "$du_links_report")
+if [ "$du_link_line_count" -eq 1 ]; then
+  echo "du-hardlinks=deduplicated"
+else
+  echo "du-hardlinks=repeated"
+fi
 mkdir unreadable
 touch unreadable/entry
 chmod 000 unreadable
