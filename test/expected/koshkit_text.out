@@ -48,6 +48,17 @@ status=1
 --- paste repeated standard input ---
 left,
 right,
+--- pr merge with a missing operand ---
+1:1: error: pr: cannot read 'missing.txt': No such file or directory.
+     1 |  koshkit pr -t -m -s , sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+zulu,middle
+alpha,beta
+status=1
+--- pr merge suppresses a missing warning ---
+zulu,middle
+alpha,beta
+status=1
 --- grep an ---
 banana
 --- grep -v apple ---

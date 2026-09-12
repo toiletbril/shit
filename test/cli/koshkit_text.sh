@@ -36,6 +36,14 @@ echo "--- paste multiple files with a missing operand ---"
   2>&1
 echo "--- paste repeated standard input ---"
 printf 'left\nright\n' | "$BIN" -c 'koshkit paste -d , - -'
+echo "--- pr merge with a missing operand ---"
+"$BIN" -c \
+  'koshkit pr -t -m -s , sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"' \
+  2>&1
+echo "--- pr merge suppresses a missing warning ---"
+"$BIN" -c \
+  'koshkit pr -r -t -m -s , sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"' \
+  2>&1
 echo "--- grep an ---"
 "$BIN" -c 'koshkit grep an fruit.txt'
 echo "--- grep -v apple ---"

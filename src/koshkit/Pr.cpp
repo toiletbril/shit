@@ -124,18 +124,25 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_PR_MERGE.is_enabled()) {
     let contents = ArrayList<String>{cxt.scratch_allocator()};
     contents.reserve(sources.count());
-    for (let const source : sources) {
-      let content = read_named_or_stdin(ec, source);
-      if (!content.has_value()) {
-        if (!FLAG_PR_NO_ERRORS.is_enabled())
+    let source_results =
+        read_named_or_stdin_batch(ec, sources, cxt.scratch_allocator());
+    if (os::INTERRUPT_REQUESTED) return 130;
+
+    for (usize source_index = 0; source_index < sources.count(); source_index++)
+    {
+      let &source_result = source_results[source_index];
+      if (!source_result.content.has_value()) {
+        if (!FLAG_PR_NO_ERRORS.is_enabled()) {
+          os::set_last_system_error(source_result.error_number);
           report_soft_koshkit_error(
               ec, cxt,
-              "pr: cannot read '" + String{source} +
+              "pr: cannot read '" + String{sources[source_index]} +
                   "': " + os::last_system_error_message());
+        }
         status = 1;
         contents.push(String{cxt.scratch_allocator()});
       } else {
-        contents.push(steal(*content));
+        contents.push(source_result.content.take());
       }
     }
     let columns = ArrayList<ArrayList<StringView>>{cxt.scratch_allocator()};
