@@ -5,6 +5,7 @@ as-language-server=<--as-language-server>
 extended-arithmetic=<--enable-extended-arithmetic>
 interactive-comments=<interactive-comments>
 calc-flags=<-i --interactive -p --pipe>
+evil-flags=<-a --all -s --short -u --users --color>
 head-flags=<-n -c>
 killall-flags=<-s --signal -l --list>
 ls-flags=<-a -A -1 -l -h>

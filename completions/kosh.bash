@@ -164,7 +164,7 @@ _koshkit_util_flags()
     cut)           echo "-b --bytes -c --characters -f --fields -d --delimiter -n --no-split -s --only-delimited" ;;
     diff)          echo "-u --unified -w --ignore-all-space -a --text -L --label" ;;
     file)          echo "-d --default-tests -h --no-dereference -i --regular-only -L --dereference -m --magic-file -M --magic-only" ;;
-    evil)          echo "-a --all -s --short --color" ;;
+    evil)          echo "-a --all -s --short -u --users --color" ;;
     goodcore)      echo "-p --pid -b --binary -o --output -q --quiet --no-compress" ;;
     evildisk)      echo "-a --all --color" ;;
     evilfiles)     echo "-t --terse -p --pid -u --user -c --command -i --network" ;;

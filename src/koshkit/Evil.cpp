@@ -14,11 +14,10 @@
 #include "../Path.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
-#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-as] [--color when]");
+HELP_SYNOPSIS_DECL("[-asu] [--color when]");
 
 HELP_DESCRIPTION_DECL(
     "The evil utility reports what the machine is and how it is running.");
@@ -26,6 +25,7 @@ HELP_DESCRIPTION_DECL(
 FLAG(EVIL_ALL, Bool, 'a', "all", "Print additional system details.");
 FLAG(EVIL_SHORT, Bool, 's', "short",
      "Print system identity without resource usage.");
+FLAG(EVIL_USERS, Bool, 'u', "users", "Print every local user account.");
 FLAG(EVIL_COLOR, String, '\0', "color",
      "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -141,22 +141,17 @@ fn append_system_configuration(String &output, StringView name,
                       colors::ansi::BOLD_CYAN, should_color);
 }
 
-fn account_names(StringView path, Allocator allocator) throws -> Maybe<String>
+fn names_text(const ArrayList<String> &names, Allocator allocator) throws
+    -> Maybe<String>
 {
-  let const contents = Path{path}.read_entire_file();
-  if (!contents.has_value()) return None;
+  if (names.is_empty()) return None;
 
   let result = String{allocator};
-  for (let const line : utils::split_lines(contents->view(), allocator, false))
-  {
-    let const delimiter = line.find_character(':');
-    if (!delimiter.has_value() || *delimiter == 0) continue;
-
+  for (let const &name : names) {
     if (!result.is_empty()) result += ", ";
-    result += line.substring_of_length(0, *delimiter);
+    result += name.view();
   }
 
-  if (result.is_empty()) return None;
   return result;
 }
 
@@ -309,11 +304,7 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
     append_report_field(output, "Supplementary groups", group_list.view(),
                         colors::ansi::BOLD_CYAN, should_color);
 
-    let const users = account_names("/etc/passwd", allocator);
-    if (users.has_value())
-      append_report_field(output, "Users", users->view(),
-                          colors::ansi::BOLD_CYAN, should_color);
-    let const groups = account_names("/etc/group", allocator);
+    let const groups = names_text(os::enumerate_groups(), allocator);
     if (groups.has_value())
       append_report_field(output, "Groups", groups->view(),
                           colors::ansi::BOLD_CYAN, should_color);
@@ -321,6 +312,14 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
     let const terminal = os::terminal_name(KOSH_STDIN);
     if (terminal.has_value()) {
       append_report_field(output, "Terminal", terminal->view(),
+                          colors::ansi::BOLD_CYAN, should_color);
+    }
+  }
+
+  if (FLAG_EVIL_USERS.is_enabled()) {
+    let const users = names_text(os::enumerate_users(), allocator);
+    if (users.has_value()) {
+      append_report_field(output, "Users", users->view(),
                           colors::ansi::BOLD_CYAN, should_color);
     }
   }

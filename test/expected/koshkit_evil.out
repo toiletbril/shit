@@ -7,6 +7,32 @@
             [SimpleCommand "koshkit" "evil" "--color" "invalid"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "invalid-color=$?"]
+  [CompoundListCondition, None]
+    [Assign test_passwd=$TEST_TEMP_DIRECTORY/evil-passwd]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "first:x\nsecond:x\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "KOSH_TEST_PASSWD=$test_passwd"]
+  [CompoundListCondition, None]
+    [Assign evil_all=$(koshkit evil -as --color never)]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "all-users=present"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "all-users=absent"]
+  [CompoundListCondition, None]
+    [Assign evil_users=$(koshkit evil -su --color never)]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "users=present"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "users=missing"]
 [Word
   Unquoted "koshkit"
 ]
@@ -32,4 +58,97 @@
   DoubleQuoted "invalid-color="
   Variable "?"
 ]
+[Word
+  Unquoted "test_passwd="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/evil-passwd"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "first:x\nsecond:x\n"
+]
+[Word
+  Variable "test_passwd"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "KOSH_TEST_PASSWD="
+  Variable "test_passwd"
+]
+[Word
+  Unquoted "evil_all="
+  CommandSubstitution "koshkit evil -as --color never"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "evil_all"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "*Users:*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "all-users=present"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "all-users=absent"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "evil_users="
+  CommandSubstitution "koshkit evil -su --color never"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "evil_users"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "*"
+  Literal "Users: first, second"
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "users=present"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "users=missing"
+]
+[Word
+  Unquoted "esac"
+]
 invalid-color=1
+all-users=absent
+users=present

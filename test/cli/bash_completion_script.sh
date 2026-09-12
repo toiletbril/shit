@@ -31,6 +31,7 @@ _kosh_set_complete
 printf 'interactive-comments=<%s>\n' "${COMPREPLY[0]}"
 
 printf 'calc-flags=<%s>\n' "$(_koshkit_util_flags calc)"
+printf 'evil-flags=<%s>\n' "$(_koshkit_util_flags evil)"
 printf 'head-flags=<%s>\n' "$(_koshkit_util_flags head)"
 printf 'killall-flags=<%s>\n' "$(_koshkit_util_flags killall)"
 printf 'ls-flags=<%s>\n' "$(_koshkit_util_flags ls)"
