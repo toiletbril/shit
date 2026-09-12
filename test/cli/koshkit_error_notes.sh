@@ -176,6 +176,9 @@ echo "=== cut delimiter location ==="
 echo "=== expand tab list location ==="
 "$BIN" -c 'koshkit expand -t 8,4' 2>&1
 
+echo "=== fold width location ==="
+"$BIN" -c 'koshkit fold -w 0' 2>&1
+
 echo "=== evildisk color value location ==="
 "$BIN" -c 'koshkit evildisk --color invalid' 2>&1
 

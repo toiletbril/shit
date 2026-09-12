@@ -60,20 +60,21 @@ fn Fold::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let const operands = PARSE_KOSHKIT_ARGS(args, arg_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   u64 width_value = 80;
   if (FLAG_FOLD_WIDTH.is_set()) {
     let const parsed = utils::parse_decimal_u64(FLAG_FOLD_WIDTH.value());
-    if (parsed.is_error() || parsed.value() == 0 || parsed.value() > SIZE_MAX)
-      throw Error{
-          "fold: invalid width '" +
-          String{cxt.scratch_allocator(), FLAG_FOLD_WIDTH.value()}
-          + "'"
-      };
+    if (parsed.is_error() || parsed.value() == 0 || parsed.value() > SIZE_MAX) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_FOLD_WIDTH.value_location(),
+          "invalid width '" +
+              String{cxt.scratch_allocator(), FLAG_FOLD_WIDTH.value()} + "'",
+          "use a positive decimal width");
+      return 1;
+    }
     width_value = parsed.value();
   }
   let const width = static_cast<usize>(width_value);

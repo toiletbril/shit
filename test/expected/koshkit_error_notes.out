@@ -281,6 +281,11 @@ note: positions start at 1 and use N, N-M, -M, or N- separated by commas or blan
      1 |  koshkit expand -t 8,4
        |                    ^~~
 note: use increasing positive columns separated by commas or blanks.
+=== fold width location ===
+1:17: error: fold: invalid width '0'.
+     1 |  koshkit fold -w 0
+       |                  ^
+note: use a positive decimal width.
 === evildisk color value location ===
 1:26: error: evildisk: invalid color mode.
      1 |  koshkit evildisk --color invalid
