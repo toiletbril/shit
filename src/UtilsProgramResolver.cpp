@@ -285,17 +285,47 @@ fn read_directory_cached(const Path &directory, directory_validation validation,
   let entries = Path::read_directory_typed(directory);
   if (!entries.has_value()) return nullptr;
 
-  for (let &child : *entries) {
-    if (child.kind != Path::entry_kind::Unknown) continue;
+  usize unknown_count = 0;
+  for (let const &child : *entries)
+    if (child.kind == Path::entry_kind::Unknown) unknown_count++;
 
-    let full_path = directory.clone();
-    full_path.push_component(child.name.view());
-    if (full_path.is_directory())
-      child.kind = Path::entry_kind::Directory;
-    else if (full_path.is_regular_file())
-      child.kind = Path::entry_kind::Regular;
-    else
-      child.kind = Path::entry_kind::Other;
+  if (unknown_count != 0) {
+    let unknown_paths = ArrayList<Path>{heap_allocator()};
+    let unknown_statuses = ArrayList<os::file_status>{heap_allocator()};
+    let batch = os::Batch{heap_allocator()};
+    unknown_paths.reserve(unknown_count);
+    unknown_statuses.reserve(unknown_count);
+    batch.reserve(unknown_count);
+
+    for (let const &child : *entries) {
+      if (child.kind != Path::entry_kind::Unknown) continue;
+
+      let full_path = directory.clone();
+      full_path.push_component(child.name.view());
+      unknown_paths.push(steal(full_path));
+      unknown_statuses.push({});
+    }
+
+    for (usize index = 0; index < unknown_count; index++)
+      batch.add(os::batch_operation::stat(unknown_paths[index],
+                                          unknown_statuses[index]));
+
+    let const results = batch.execute();
+    usize result_index = 0;
+    for (let &child : *entries) {
+      if (child.kind != Path::entry_kind::Unknown) continue;
+
+      if (results[result_index].error_number != 0) {
+        child.kind = Path::entry_kind::Other;
+      } else {
+        switch (os::file_type_letter(unknown_statuses[result_index].mode)) {
+        case 'd': child.kind = Path::entry_kind::Directory; break;
+        case '-': child.kind = Path::entry_kind::Regular; break;
+        default: child.kind = Path::entry_kind::Other; break;
+        }
+      }
+      result_index++;
+    }
   }
 
   cached_directory_listing fresh{};
