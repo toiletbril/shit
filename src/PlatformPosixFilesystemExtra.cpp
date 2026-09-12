@@ -1442,6 +1442,16 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
 
   usize operation_start = 0;
   while (operation_start < operation_count) {
+    if (INTERRUPT_REQUESTED) {
+      for (usize remaining_index = operation_start;
+           remaining_index < operation_count; remaining_index++)
+      {
+        results[remaining_index] = {operations[remaining_index].request_id, 0,
+                                    EINTR};
+      }
+      return true;
+    }
+
     let const available_count = static_cast<usize>(*ring.submission_count);
     let const chunk_count = operation_count - operation_start > available_count
                                 ? available_count

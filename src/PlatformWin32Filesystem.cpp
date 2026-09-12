@@ -1525,14 +1525,18 @@ fn execute_batch_operations(const batched_syscall *operations,
 {
   if (operation_count == 0) return;
   if (operations == nullptr || results == nullptr) return;
-  if (INTERRUPT_REQUESTED) {
-    for (usize index = 0; index < operation_count; index++)
-      results[index] = {operations[index].request_id, 0,
-                        ERROR_OPERATION_ABORTED};
-    return;
-  }
 
   for (usize index = 0; index < operation_count; index++) {
+    if (INTERRUPT_REQUESTED) {
+      for (usize remaining_index = index; remaining_index < operation_count;
+           remaining_index++)
+      {
+        results[remaining_index] = {operations[remaining_index].request_id, 0,
+                                    ERROR_OPERATION_ABORTED};
+      }
+      return;
+    }
+
     let const &operation = operations[index];
     let &result = results[index];
     result = {operation.request_id, 0, 0};
