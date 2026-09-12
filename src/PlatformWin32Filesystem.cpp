@@ -1529,8 +1529,8 @@ fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
 namespace batch_internal {
 
 static fn execute_shared_positioned_file_operation(
-    const batched_syscall &operation,
-    batched_syscall_result &result) wontthrow -> void
+    const batched_syscall &operation, batched_syscall_result &result) wontthrow
+    -> void
 {
   LARGE_INTEGER zero{};
   LARGE_INTEGER saved_position{};
@@ -1559,8 +1559,7 @@ static fn execute_shared_positioned_file_operation(
 
   let const transferred =
       operation.syscall_id == batched_syscall_id::Read
-          ? read_fd(operation.fd, operation.output_buffer,
-                    operation.byte_count)
+          ? read_fd(operation.fd, operation.output_buffer, operation.byte_count)
           : write_fd(operation.fd, operation.input_buffer,
                      operation.byte_count);
   if (transferred.has_value()) {
@@ -1572,65 +1571,117 @@ static fn execute_shared_positioned_file_operation(
   if (result.error_number == 0) result.error_number = ERROR_GEN_FAILURE;
 }
 
-static fn execute_positioned_file_operation(
-    const batched_syscall &operation,
-    batched_syscall_result &result) wontthrow -> void
+struct win32_batch_request
+{
+  OVERLAPPED control{};
+  HANDLE positioned_handle{INVALID_HANDLE_VALUE};
+  bool is_submitted{false};
+};
+
+static fn close_win32_batch_request(win32_batch_request &request) wontthrow
+    -> void
+{
+  if (request.control.hEvent != nullptr) {
+    unused(CloseHandle(request.control.hEvent));
+    request.control.hEvent = nullptr;
+  }
+  if (request.positioned_handle != INVALID_HANDLE_VALUE) {
+    unused(CloseHandle(request.positioned_handle));
+    request.positioned_handle = INVALID_HANDLE_VALUE;
+  }
+  request.is_submitted = false;
+}
+
+static fn
+submit_positioned_file_operation(const batched_syscall &operation,
+                                 batched_syscall_result &result,
+                                 win32_batch_request &request) wontthrow -> void
 {
   let const desired_access = operation.syscall_id == batched_syscall_id::Read
-                                  ? GENERIC_READ
-                                  : GENERIC_WRITE;
-  let const positioned_handle =
+                                 ? GENERIC_READ
+                                 : GENERIC_WRITE;
+  request.positioned_handle =
       ReOpenFile(operation.fd, desired_access,
                  FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_FLAG_OVERLAPPED);
-  if (positioned_handle == INVALID_HANDLE_VALUE) {
+  if (request.positioned_handle == INVALID_HANDLE_VALUE) {
     execute_shared_positioned_file_operation(operation, result);
     return;
   }
-  defer { unused(CloseHandle(positioned_handle)); };
 
-  OVERLAPPED control{};
-  control.Offset = static_cast<DWORD>(operation.byte_offset & MAXDWORD);
-  control.OffsetHigh = static_cast<DWORD>(operation.byte_offset >> 32);
+  request.control.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  if (request.control.hEvent == nullptr) {
+    close_win32_batch_request(request);
+    execute_shared_positioned_file_operation(operation, result);
+    return;
+  }
+  request.control.Offset = static_cast<DWORD>(operation.byte_offset & MAXDWORD);
+  request.control.OffsetHigh = static_cast<DWORD>(operation.byte_offset >> 32);
   let const requested_byte_count = static_cast<DWORD>(operation.byte_count);
-  let const was_started = operation.syscall_id == batched_syscall_id::Read
-                              ? ReadFile(positioned_handle,
-                                         operation.output_buffer,
-                                         requested_byte_count, nullptr,
-                                         &control)
-                              : WriteFile(positioned_handle,
-                                          operation.input_buffer,
-                                          requested_byte_count, nullptr,
-                                          &control);
+  let const was_started =
+      operation.syscall_id == batched_syscall_id::Read
+          ? ReadFile(request.positioned_handle, operation.output_buffer,
+                     requested_byte_count, nullptr, &request.control)
+          : WriteFile(request.positioned_handle, operation.input_buffer,
+                      requested_byte_count, nullptr, &request.control);
   if (was_started == FALSE) {
     let const error_number = GetLastError();
     if (error_number != ERROR_IO_PENDING) {
       if (operation.syscall_id == batched_syscall_id::Read &&
           error_number == ERROR_HANDLE_EOF)
       {
+        close_win32_batch_request(request);
         return;
       }
 
       result.error_number = static_cast<i32>(error_number);
+      close_win32_batch_request(request);
       return;
     }
   }
 
+  request.is_submitted = true;
+}
+
+static fn finish_positioned_file_operation(const batched_syscall &operation,
+                                           batched_syscall_result &result,
+                                           win32_batch_request &request,
+                                           bool should_wait) wontthrow -> void
+{
   DWORD transferred_byte_count = 0;
-  if (GetOverlappedResult(positioned_handle, &control,
-                          &transferred_byte_count, TRUE) == FALSE)
+  if (GetOverlappedResult(request.positioned_handle, &request.control,
+                          &transferred_byte_count,
+                          should_wait ? TRUE : FALSE) == FALSE)
   {
     let const error_number = GetLastError();
     if (operation.syscall_id == batched_syscall_id::Read &&
         error_number == ERROR_HANDLE_EOF)
     {
+      close_win32_batch_request(request);
       return;
     }
 
     result.error_number = static_cast<i32>(error_number);
+    close_win32_batch_request(request);
     return;
   }
 
   result.transferred_byte_count = transferred_byte_count;
+  close_win32_batch_request(request);
+}
+
+static fn
+execute_current_file_operation(const batched_syscall &operation,
+                               batched_syscall_result &result) wontthrow -> void
+{
+  let const transferred =
+      write_fd(operation.fd, operation.input_buffer, operation.byte_count);
+  if (transferred.has_value()) {
+    result.transferred_byte_count = *transferred;
+    return;
+  }
+
+  result.error_number = static_cast<i32>(GetLastError());
+  if (result.error_number == 0) result.error_number = ERROR_GEN_FAILURE;
 }
 
 fn execute_batch_operations(const batched_syscall *operations,
@@ -1640,68 +1691,175 @@ fn execute_batch_operations(const batched_syscall *operations,
   if (operation_count == 0) return;
   if (operations == nullptr || results == nullptr) return;
 
-  for (usize index = 0; index < operation_count; index++) {
-    if (INTERRUPT_REQUESTED) {
-      for (usize remaining_index = index; remaining_index < operation_count;
-           remaining_index++)
+  constexpr usize REQUEST_COUNT = 64;
+  let const do_mark_remaining = [&](usize first_index) wontthrow -> void {
+    for (usize index = first_index; index < operation_count; index++)
+      results[index] = {operations[index].request_id, 0,
+                        ERROR_OPERATION_ABORTED};
+  };
+
+  usize operation_start = 0;
+  while (operation_start < operation_count) {
+    let const chunk_count = operation_count - operation_start > REQUEST_COUNT
+                                ? REQUEST_COUNT
+                                : operation_count - operation_start;
+    win32_batch_request requests[REQUEST_COUNT]{};
+    bool was_interrupted = false;
+
+    for (usize chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
+      let const operation_index = operation_start + chunk_index;
+      if (INTERRUPT_REQUESTED) {
+        do_mark_remaining(operation_index);
+        was_interrupted = true;
+        break;
+      }
+
+      let const &operation = operations[operation_index];
+      let &result = results[operation_index];
+      result = {operation.request_id, 0, 0};
+      if (operation.byte_count > static_cast<usize>(MAXDWORD) ||
+          operation.byte_offset > 0x7fffffffffffffffULL)
       {
-        results[remaining_index] = {operations[remaining_index].request_id, 0,
+        result.error_number = ERROR_INVALID_PARAMETER;
+        continue;
+      }
+
+      switch (operation.syscall_id) {
+      case batched_syscall_id::Read:
+      case batched_syscall_id::Write: {
+        let const buffer = operation.syscall_id == batched_syscall_id::Read
+                               ? operation.output_buffer
+                               : operation.input_buffer;
+        if (operation.fd == KOSH_INVALID_FD ||
+            (buffer == nullptr && operation.byte_count != 0))
+        {
+          result.error_number = ERROR_INVALID_PARAMETER;
+          continue;
+        }
+
+        submit_positioned_file_operation(operation, result,
+                                         requests[chunk_index]);
+        break;
+      }
+      case batched_syscall_id::WriteCurrent:
+        if (operation.fd == KOSH_INVALID_FD ||
+            (operation.input_buffer == nullptr && operation.byte_count != 0))
+        {
+          result.error_number = ERROR_INVALID_PARAMETER;
+          continue;
+        }
+
+        execute_current_file_operation(operation, result);
+        break;
+      case batched_syscall_id::Exists:
+        if (operation.path == nullptr) {
+          result.error_number = ERROR_INVALID_PARAMETER;
+          continue;
+        }
+        result.is_existing = path_exists(operation.path->text().view());
+        break;
+      case batched_syscall_id::Lstat:
+      case batched_syscall_id::Stat:
+        if (operation.path == nullptr || operation.status == nullptr) {
+          result.error_number = ERROR_INVALID_PARAMETER;
+          continue;
+        }
+        SetLastError(ERROR_SUCCESS);
+        if (!(operation.syscall_id == batched_syscall_id::Lstat
+                  ? stat_path(operation.path->text().view(), *operation.status)
+                  : stat_path_following(operation.path->text().view(),
+                                        *operation.status)))
+        {
+          result.error_number = static_cast<i32>(GetLastError());
+          if (result.error_number == 0) result.error_number = ERROR_GEN_FAILURE;
+        }
+        break;
+      default: result.error_number = ERROR_INVALID_PARAMETER; break;
+      }
+    }
+
+    let const do_cancel_outstanding = [&]() wontthrow -> void {
+      for (usize chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
+        let &request = requests[chunk_index];
+        if (!request.is_submitted) continue;
+
+        unused(CancelIoEx(request.positioned_handle, &request.control));
+      }
+    };
+    if (!was_interrupted && INTERRUPT_REQUESTED) {
+      do_mark_remaining(operation_start + chunk_count);
+      was_interrupted = true;
+    }
+    if (was_interrupted) do_cancel_outstanding();
+
+    i32 wait_error_number = 0;
+    loop
+    {
+      HANDLE completion_events[REQUEST_COUNT]{};
+      usize request_positions[REQUEST_COUNT]{};
+      DWORD event_count = 0;
+      for (usize chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
+        let const &request = requests[chunk_index];
+        if (!request.is_submitted) continue;
+
+        completion_events[event_count] = request.control.hEvent;
+        request_positions[event_count] = chunk_index;
+        event_count++;
+      }
+      if (event_count == 0) break;
+
+      let const wait_result =
+          WaitForMultipleObjects(event_count, completion_events, FALSE,
+                                 was_interrupted ? INFINITE : 10);
+      if (wait_result == WAIT_TIMEOUT) {
+        if (!INTERRUPT_REQUESTED) continue;
+
+        do_mark_remaining(operation_start + chunk_count);
+        was_interrupted = true;
+        do_cancel_outstanding();
+        continue;
+      }
+      if (wait_result == WAIT_FAILED) {
+        wait_error_number = static_cast<i32>(GetLastError());
+        if (wait_error_number == 0) wait_error_number = ERROR_GEN_FAILURE;
+        do_cancel_outstanding();
+        break;
+      }
+
+      let const event_index = wait_result - WAIT_OBJECT_0;
+      if (event_index >= event_count) {
+        wait_error_number = ERROR_GEN_FAILURE;
+        do_cancel_outstanding();
+        break;
+      }
+
+      let const chunk_index = request_positions[event_index];
+      let const operation_index = operation_start + chunk_index;
+      finish_positioned_file_operation(operations[operation_index],
+                                       results[operation_index],
+                                       requests[chunk_index], false);
+      if (was_interrupted) {
+        results[operation_index] = {operations[operation_index].request_id, 0,
                                     ERROR_OPERATION_ABORTED};
       }
-      return;
     }
 
-    let const &operation = operations[index];
-    let &result = results[index];
-    result = {operation.request_id, 0, 0};
-    if (operation.byte_count > static_cast<usize>(MAXDWORD) ||
-        operation.byte_offset > 0x7fffffffffffffffULL)
-    {
-      result.error_number = ERROR_INVALID_PARAMETER;
-      continue;
+    if (wait_error_number != 0) {
+      for (usize chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
+        let &request = requests[chunk_index];
+        if (!request.is_submitted) continue;
+
+        let const operation_index = operation_start + chunk_index;
+        finish_positioned_file_operation(operations[operation_index],
+                                         results[operation_index], request,
+                                         true);
+        results[operation_index].error_number = wait_error_number;
+        results[operation_index].transferred_byte_count = 0;
+      }
     }
 
-    switch (operation.syscall_id) {
-    case batched_syscall_id::Read:
-    case batched_syscall_id::Write: {
-      let const buffer = operation.syscall_id == batched_syscall_id::Read
-                             ? operation.output_buffer
-                             : operation.input_buffer;
-      if (operation.fd == KOSH_INVALID_FD ||
-          (buffer == nullptr && operation.byte_count != 0))
-      {
-        result.error_number = ERROR_INVALID_PARAMETER;
-        continue;
-      }
-
-      execute_positioned_file_operation(operation, result);
-      break;
-    }
-    case batched_syscall_id::Exists:
-      if (operation.path == nullptr) {
-        result.error_number = ERROR_INVALID_PARAMETER;
-        continue;
-      }
-      result.is_existing = path_exists(operation.path->text().view());
-      break;
-    case batched_syscall_id::Lstat:
-    case batched_syscall_id::Stat:
-      if (operation.path == nullptr || operation.status == nullptr) {
-        result.error_number = ERROR_INVALID_PARAMETER;
-        continue;
-      }
-      SetLastError(ERROR_SUCCESS);
-      if (!(operation.syscall_id == batched_syscall_id::Lstat
-                ? stat_path(operation.path->text().view(), *operation.status)
-                : stat_path_following(operation.path->text().view(),
-                                      *operation.status)))
-      {
-        result.error_number = static_cast<i32>(GetLastError());
-        if (result.error_number == 0) result.error_number = ERROR_GEN_FAILURE;
-      }
-      break;
-    default: result.error_number = ERROR_INVALID_PARAMETER; break;
-    }
+    if (was_interrupted) return;
+    operation_start += chunk_count;
   }
 }
 

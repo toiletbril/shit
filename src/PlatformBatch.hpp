@@ -20,15 +20,18 @@ struct batch_operation
   {
     Read = 0,
     Write = 1,
-    Lstat = 2,
-    Stat = 3,
-    Exists = 4,
+    WriteCurrent = 2,
+    Lstat = 3,
+    Stat = 4,
+    Exists = 5,
   };
 
   static fn read(descriptor fd, char *buffer, usize byte_count,
                  u64 byte_offset = 0) wontthrow -> batch_operation;
   static fn write(descriptor fd, const char *buffer, usize byte_count,
                   u64 byte_offset = 0) wontthrow -> batch_operation;
+  static fn write_current(descriptor fd, const char *buffer,
+                          usize byte_count) wontthrow -> batch_operation;
   static fn lstat(const Path &path, file_status &status) wontthrow
       -> batch_operation;
   static fn stat(const Path &path, file_status &status) wontthrow

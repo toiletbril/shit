@@ -56,26 +56,30 @@ fn test_io_order_and_reuse() throws -> void
   let results = ArrayList<batch_result>{heap_allocator()};
   char read_buffer[4]{};
   const char write_buffer[]{'x', 'y'};
+  const char current_write_buffer[]{'a', 'b', 'c'};
 
   expect(batch.count() == 0, "a new queue is empty");
   batch.add(
       batch_operation::read(KOSH_STDIN, read_buffer, sizeof(read_buffer), 12));
   batch.add(batch_operation::write(KOSH_STDOUT, write_buffer,
                                    sizeof(write_buffer), 20));
-  expect(batch.count() == 2, "add updates the queue count");
+  batch.add(batch_operation::write_current(KOSH_STDOUT, current_write_buffer,
+                                           sizeof(current_write_buffer)));
+  expect(batch.count() == 3, "add updates the queue count");
 
   reset_observations();
   batch.execute(results);
   expect(execution_count == 1, "execute invokes the backend once");
-  expect(observed_operation_count == 2,
+  expect(observed_operation_count == 3,
          "the backend receives every queued operation");
-  if (results.count() != 2) {
+  if (results.count() != 3) {
     expect(false, "execute returns one result per request");
     return;
   }
 
   expect(observed_operations[0].request_id == 0 &&
-             observed_operations[1].request_id == 1,
+             observed_operations[1].request_id == 1 &&
+             observed_operations[2].request_id == 2,
          "request identifiers follow insertion order");
   expect(observed_operations[0].syscall_id == batch_operation::Kind::Read,
          "the read operation keeps its kind");
@@ -95,12 +99,25 @@ fn test_io_order_and_reuse() throws -> void
   expect(observed_operations[1].byte_count == sizeof(write_buffer) &&
              observed_operations[1].byte_offset == 20,
          "the write operation keeps its byte range");
-  expect(results[0].request_id == 0 && results[1].request_id == 1,
+  expect(observed_operations[2].syscall_id ==
+             batch_operation::Kind::WriteCurrent,
+         "the current write operation keeps its kind");
+  expect(observed_operations[2].fd == KOSH_STDOUT,
+         "the current write operation keeps its descriptor");
+  expect(observed_operations[2].input_buffer == current_write_buffer,
+         "the current write operation keeps its buffer");
+  expect(observed_operations[2].byte_count == sizeof(current_write_buffer) &&
+             observed_operations[2].byte_offset == 0,
+         "the current write operation has no positioned offset");
+  expect(results[0].request_id == 0 && results[1].request_id == 1 &&
+             results[2].request_id == 2,
          "results preserve request order");
   expect(results[0].transferred_byte_count == 16 &&
-             results[1].transferred_byte_count == 22,
+             results[1].transferred_byte_count == 22 &&
+             results[2].transferred_byte_count == 3,
          "backend transfer counts are preserved");
-  expect(results[0].error_number == 30 && results[1].error_number == 31,
+  expect(results[0].error_number == 30 && results[1].error_number == 31 &&
+             results[2].error_number == 32,
          "backend errors are preserved");
   expect(read_buffer[0] == 'A', "the backend receives the read buffer");
 
@@ -145,8 +162,7 @@ fn test_metadata_deduplication() throws -> void
              observed_operations[2].syscall_id == batch_operation::Kind::Stat,
          "different metadata kinds remain separate");
   if (results.count() != 5) {
-    expect(false,
-           "deduplicated results expand to the original request count");
+    expect(false, "deduplicated results expand to the original request count");
     return;
   }
 
@@ -184,8 +200,7 @@ fn test_failed_metadata_deduplication() throws -> void
   expect(observed_operation_count == 1,
          "failed duplicate metadata requests still collapse");
   if (results.count() != 2) {
-    expect(false,
-           "failed duplicates expand to the original request count");
+    expect(false, "failed duplicates expand to the original request count");
     return;
   }
 

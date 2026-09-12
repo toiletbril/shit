@@ -805,6 +805,7 @@ static fn validate_batched_syscall(const batched_syscall &operation) wontthrow
     }
     return 0;
   case batched_syscall_id::Write:
+  case batched_syscall_id::WriteCurrent:
     if (operation.fd == KOSH_INVALID_FD ||
         (operation.input_buffer == nullptr && operation.byte_count != 0))
     {
@@ -852,6 +853,21 @@ execute_batched_syscall_direct(const batched_syscall &operation,
       let const transferred_byte_count =
           ::pwrite(operation.fd, operation.input_buffer, operation.byte_count,
                    static_cast<off_t>(operation.byte_offset));
+      if (transferred_byte_count >= 0) {
+        result.transferred_byte_count =
+            static_cast<usize>(transferred_byte_count);
+        return;
+      }
+      if (errno != EINTR || INTERRUPT_REQUESTED) {
+        result.error_number = errno;
+        return;
+      }
+    }
+  case batched_syscall_id::WriteCurrent:
+    loop
+    {
+      let const transferred_byte_count =
+          ::write(operation.fd, operation.input_buffer, operation.byte_count);
       if (transferred_byte_count >= 0) {
         result.transferred_byte_count =
             static_cast<usize>(transferred_byte_count);
@@ -1031,6 +1047,7 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
       else
         aio_byte_count += operation.byte_count;
       break;
+    case batched_syscall_id::WriteCurrent: return false;
     case batched_syscall_id::Lstat:
     case batched_syscall_id::Stat:
     case batched_syscall_id::Exists: break;
@@ -1427,6 +1444,21 @@ static fn io_uring_batch_supports_operations(
     case batched_syscall_id::Write:
       if (!ring.has_write) return false;
       break;
+    case batched_syscall_id::WriteCurrent:
+      if (!ring.has_write ||
+          (ring.parameters.features & IORING_FEAT_RW_CUR_POS) == 0)
+      {
+        return false;
+      }
+      for (usize previous_index = 0; previous_index < index; previous_index++) {
+        if (operations[previous_index].syscall_id ==
+                batched_syscall_id::WriteCurrent &&
+            operations[previous_index].fd == operations[index].fd)
+        {
+          return false;
+        }
+      }
+      break;
     case batched_syscall_id::Lstat:
     case batched_syscall_id::Stat:
     case batched_syscall_id::Exists:
@@ -1447,7 +1479,8 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
   for (usize index = 0; index < operation_count; index++) {
     let const &operation = operations[index];
     if ((operation.syscall_id == batched_syscall_id::Read ||
-         operation.syscall_id == batched_syscall_id::Write) &&
+         operation.syscall_id == batched_syscall_id::Write ||
+         operation.syscall_id == batched_syscall_id::WriteCurrent) &&
         operation.byte_count > UINT32_MAX)
     {
       return false;
@@ -1509,6 +1542,13 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
         entry.opcode = IORING_OP_WRITE;
         entry.fd = operation.fd;
         entry.off = operation.byte_offset;
+        entry.addr = reinterpret_cast<u64>(operation.input_buffer);
+        entry.len = static_cast<u32>(operation.byte_count);
+        break;
+      case batched_syscall_id::WriteCurrent:
+        entry.opcode = IORING_OP_WRITE;
+        entry.fd = operation.fd;
+        entry.off = UINT64_MAX;
         entry.addr = reinterpret_cast<u64>(operation.input_buffer);
         entry.len = static_cast<u32>(operation.byte_count);
         break;
@@ -1607,7 +1647,8 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
           if (operation_kind == batched_syscall_id::Exists) {
             execute_batched_syscall_direct(operations[operation_index], result);
           } else if ((operation_kind == batched_syscall_id::Read ||
-                      operation_kind == batched_syscall_id::Write) &&
+                      operation_kind == batched_syscall_id::Write ||
+                      operation_kind == batched_syscall_id::WriteCurrent) &&
                      (error_number == EOPNOTSUPP || error_number == EINVAL ||
                       error_number == ESPIPE))
           {

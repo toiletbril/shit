@@ -35,6 +35,17 @@ fn batch_operation::write(descriptor fd, const char *buffer, usize byte_count,
   return operation;
 }
 
+fn batch_operation::write_current(descriptor fd, const char *buffer,
+                                  usize byte_count) wontthrow -> batch_operation
+{
+  batch_operation operation;
+  operation.syscall_id = Kind::WriteCurrent;
+  operation.fd = fd;
+  operation.input_buffer = buffer;
+  operation.byte_count = byte_count;
+  return operation;
+}
+
 fn batch_operation::lstat(const Path &path, file_status &status) wontthrow
     -> batch_operation
 {
@@ -88,7 +99,8 @@ static pure fn is_same_metadata_request(
   case batch_operation::Kind::Stat:
   case batch_operation::Kind::Exists: break;
   case batch_operation::Kind::Read:
-  case batch_operation::Kind::Write: return false;
+  case batch_operation::Kind::Write:
+  case batch_operation::Kind::WriteCurrent: return false;
   }
   if (left.path == nullptr || right.path == nullptr) return false;
 
@@ -105,7 +117,8 @@ static pure fn is_metadata_request(
   case batch_operation::Kind::Stat:
   case batch_operation::Kind::Exists: return true;
   case batch_operation::Kind::Read:
-  case batch_operation::Kind::Write: return false;
+  case batch_operation::Kind::Write:
+  case batch_operation::Kind::WriteCurrent: return false;
   }
 
   return false;
