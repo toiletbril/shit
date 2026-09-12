@@ -460,6 +460,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
     break;
   case file_open_mode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
   case file_open_mode::Read: flags = O_RDONLY; break;
+  case file_open_mode::ReadNonblocking: flags = O_RDONLY | O_NONBLOCK; break;
   case file_open_mode::ReadWrite: flags = O_RDWR | O_CREAT; break;
   }
 

@@ -11,7 +11,6 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -71,51 +70,17 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const should_print_names = sources.count() > 1;
   let output = String{cxt.scratch_allocator()};
+  let line = String{cxt.scratch_allocator()};
+  let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
   bool has_any_match = false;
   i32 status = 0;
-  for (usize source_position = 0; source_position < sources.count();
-       source_position++)
-  {
-    let const source = sources[source_position];
-    let const source_location = source_position + 1 < operand_locations.count()
-                                    ? operand_locations[source_position + 1]
-                                    : ec.source_location();
-    let const input = open_named_or_stdin(ec, source);
-    if (!input.has_value()) {
-      report_soft_koshkit_util_error(ec, cxt, source_location, args[0].view(),
-                                     String{cxt.scratch_allocator(), source} +
-                                         ": " +
-                                         os::last_system_error_message());
-      status = 2;
-      continue;
-    }
-    defer
-    {
-      if (input->should_close) os::close_fd(input->descriptor);
-    };
-    let const display_name =
-        source == "-" ? StringView{"(standard input)"} : source;
-    let reader = utils::BufferedLineReader{input->descriptor};
-    loop
-    {
-      let const result = reader.next();
-      if (result == utils::BufferedLineReader::Result::End) break;
-      if (result == utils::BufferedLineReader::Result::Error) {
-        if (os::INTERRUPT_REQUESTED) return 130;
-        report_soft_koshkit_util_error(ec, cxt, source_location, args[0].view(),
-                                       String{cxt.scratch_allocator(), source} +
-                                           ": " +
-                                           os::last_system_error_message());
-        status = 2;
-        break;
-      }
-      let const line = reader.get_line();
-      let const is_match = os::regex_matches_null_terminated(compiled, line);
-      if (is_match == should_invert) continue;
-
+  let const do_process_line = [&](StringView source) throws -> void {
+    let const is_match = os::regex_matches_null_terminated(compiled, line);
+    if (is_match != should_invert) {
       has_any_match = true;
       if (should_print_names) {
-        output += display_name;
+        output += source == "-" ? StringView{"(standard input)"} : source;
         output += ':';
       }
       output += line;
@@ -124,6 +89,53 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
         ec.print_to_stdout(output);
         output.clear();
       }
+    }
+    line.clear();
+  };
+
+  loop
+  {
+    let const read_result = reader.read_next_ordered(chunks);
+    if (read_result == SourceBatchReader::ReadResult::Complete) break;
+    if (read_result == SourceBatchReader::ReadResult::Interrupted) return 130;
+
+    for (let const &chunk : chunks) {
+      let const source = sources[chunk.source_index];
+      usize position = 0;
+      while (position < chunk.content.length) {
+        let delimiter_position = position;
+        while (delimiter_position < chunk.content.length &&
+               chunk.content[delimiter_position] != '\n')
+        {
+          delimiter_position++;
+        }
+
+        line.append(chunk.content.substring_of_length(
+            position, delimiter_position - position));
+        position = delimiter_position;
+        if (position == chunk.content.length) break;
+
+        position++;
+        do_process_line(source);
+      }
+
+      if (!chunk.is_complete) continue;
+      if (chunk.error_number != 0) {
+        line.clear();
+        os::set_last_system_error(chunk.error_number);
+        let const source_location =
+            chunk.source_index + 1 < operand_locations.count()
+                ? operand_locations[chunk.source_index + 1]
+                : ec.source_location();
+        report_soft_koshkit_util_error(ec, cxt, source_location, args[0].view(),
+                                       String{cxt.scratch_allocator(), source} +
+                                           ": " +
+                                           os::last_system_error_message());
+        status = 2;
+        continue;
+      }
+
+      if (!line.is_empty()) do_process_line(source);
     }
   }
 

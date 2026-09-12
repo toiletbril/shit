@@ -30,6 +30,9 @@ rc=130
      1 |  directory=$1
        |  ^
 rc=130
+== grep reads an earlier regular file before opening a later pipe:
+grep-status=143
+grep-first=printed
 == an ignored interrupt leaves the open blocked until its peer arrives:
 kept=[payload] status=0
 rc=0

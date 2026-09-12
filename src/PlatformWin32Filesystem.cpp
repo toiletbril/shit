@@ -673,7 +673,10 @@ cold fn list_directory_status(StringView dir, Allocator allocator) throws
 fn open_file_descriptor(StringView path, file_open_mode mode)
     -> Maybe<descriptor>
 {
-  DWORD access = (mode == file_open_mode::Read) ? GENERIC_READ : GENERIC_WRITE;
+  DWORD access =
+      (mode == file_open_mode::Read || mode == file_open_mode::ReadNonblocking)
+          ? GENERIC_READ
+          : GENERIC_WRITE;
   if (mode == file_open_mode::ReadWrite) access = GENERIC_READ | GENERIC_WRITE;
   if (mode == file_open_mode::Append) access = FILE_APPEND_DATA;
   DWORD disposition = OPEN_EXISTING;
@@ -682,6 +685,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
   case file_open_mode::TruncateNoClobber: disposition = CREATE_NEW; break;
   case file_open_mode::Append: disposition = OPEN_ALWAYS; break;
   case file_open_mode::Read: disposition = OPEN_EXISTING; break;
+  case file_open_mode::ReadNonblocking: disposition = OPEN_EXISTING; break;
   case file_open_mode::ReadWrite: disposition = OPEN_ALWAYS; break;
   }
   if (path.starts_with(StringView{"\\\\.\\pipe\\"}))

@@ -70,9 +70,20 @@ echo "--- grep -i APPLE ---"
 "$BIN" -c 'koshkit grep -i APPLE fruit.txt'
 echo "--- grep stdin ---"
 printf 'pear\nplum\n' | "$BIN" -c 'koshkit grep plum'
+echo "--- grep unterminated final line ---"
+printf 'tail' | "$BIN" -c 'koshkit grep tail'
 printf 'pear\n' > pear.txt
 echo "--- grep multiple files ---"
 "$BIN" -c 'koshkit grep pear fruit.txt pear.txt'
+"$BIN" -c "koshkit yes x | koshkit tr -d '\n' | koshkit head -c 65534" \
+  > grep-boundary.txt
+printf 'needle\n' >> grep-boundary.txt
+echo "--- grep match across chunk boundary ---"
+"$BIN" -c 'koshkit grep needle grep-boundary.txt | koshkit wc -c'
+echo "--- grep multiple files with a missing operand ---"
+"$BIN" -c \
+  'koshkit grep a sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"' \
+  2>&1
 echo "--- tr to lower ---"
 "$BIN" -c 'printf "AbC\n" | koshkit tr A-Z a-z'
 echo "--- tr -d digits ---"

@@ -400,7 +400,8 @@ fn SourceBatchReader::retire_completed_readers() throws -> void
   }
 }
 
-fn SourceBatchReader::fill_readers() throws -> void
+fn SourceBatchReader::fill_readers(bool should_preserve_open_order) throws
+    -> void
 {
   constexpr usize READER_COUNT = 16;
   constexpr usize READ_BYTE_COUNT = 64 * 1024;
@@ -420,7 +421,20 @@ fn SourceBatchReader::fill_readers() throws -> void
       break;
     }
 
-    let descriptor = os::open_file_descriptor(source, os::file_open_mode::Read);
+    if (should_preserve_open_order && !m_readers.is_empty()) {
+      os::file_status status;
+      if (!os::stat_path_following(source, status) ||
+          os::file_type_letter(status.mode) != '-')
+      {
+        break;
+      }
+    }
+
+    let const should_probe_nonblocking =
+        should_preserve_open_order && !m_readers.is_empty();
+    let descriptor = os::open_file_descriptor(
+        source, should_probe_nonblocking ? os::file_open_mode::ReadNonblocking
+                                         : os::file_open_mode::Read);
     if (!descriptor.has_value()) {
       if (os::last_system_error_is_descriptor_quota() && !m_readers.is_empty())
       {
@@ -437,6 +451,12 @@ fn SourceBatchReader::fill_readers() throws -> void
       break;
     }
 
+    let const is_seekable = os::descriptor_is_seekable(*descriptor);
+    if (should_probe_nonblocking && !is_seekable) {
+      os::close_fd(*descriptor);
+      break;
+    }
+
     Reader reader;
     reader.buffer.reserve(READ_BYTE_COUNT);
     reader.source_index = source_index;
@@ -444,7 +464,7 @@ fn SourceBatchReader::fill_readers() throws -> void
     reader.should_close = true;
     m_source_index++;
 
-    if (!os::descriptor_is_seekable(*descriptor)) {
+    if (!is_seekable) {
       m_sequential_reader = steal(reader);
       break;
     }
@@ -561,14 +581,15 @@ fn SourceBatchReader::append_pending_chunks(ArrayList<Chunk> &chunks,
 }
 
 fn SourceBatchReader::read_next_internal(ArrayList<Chunk> &chunks,
-                                         bool should_emit_one) throws
+                                         bool should_emit_one,
+                                         bool should_preserve_open_order) throws
     -> ReadResult
 {
   chunks.clear();
   retire_completed_readers();
   if (os::INTERRUPT_REQUESTED) return ReadResult::Interrupted;
 
-  fill_readers();
+  fill_readers(should_preserve_open_order);
   if (os::INTERRUPT_REQUESTED) return ReadResult::Interrupted;
 
   if (!m_readers.is_empty()) {
@@ -592,13 +613,13 @@ fn SourceBatchReader::read_next_internal(ArrayList<Chunk> &chunks,
 
 fn SourceBatchReader::read_next(ArrayList<Chunk> &chunks) throws -> ReadResult
 {
-  return read_next_internal(chunks, false);
+  return read_next_internal(chunks, false, false);
 }
 
 fn SourceBatchReader::read_next_ordered(ArrayList<Chunk> &chunks) throws
     -> ReadResult
 {
-  return read_next_internal(chunks, true);
+  return read_next_internal(chunks, true, true);
 }
 
 fn read_named_or_stdin_batch(const ExecContext &ec,

@@ -95,8 +95,19 @@ apple
 apple
 --- grep stdin ---
 plum
+--- grep unterminated final line ---
+tail
 --- grep multiple files ---
 pear.txt:pear
+--- grep match across chunk boundary ---
+65541
+--- grep multiple files with a missing operand ---
+1:27: error: grep: missing.txt: No such file or directory.
+     1 |  koshkit grep a sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"
+       |                            ^~~~~~~~~~~
+sort-a.txt:alpha
+sort-b.txt:beta
+status=2
 --- tr to lower ---
 abc
 --- tr -d digits ---

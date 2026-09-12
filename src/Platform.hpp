@@ -415,6 +415,7 @@ enum class file_open_mode : u8
   Append,            /* >> create or append for writing */
   Read,              /* <  open an existing file for reading */
   ReadWrite,         /* <> create or open for reading and writing */
+  ReadNonblocking,
 };
 
 fn open_file_descriptor(StringView path, file_open_mode mode) throws
