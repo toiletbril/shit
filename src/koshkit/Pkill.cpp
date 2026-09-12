@@ -75,8 +75,9 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -86,14 +87,19 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
-  if (operands.count() != 1)
-    throw ErrorWithDetails{"pkill expects one pattern",
-                           "Pass one pattern, e.g. `pkill ssh`"};
+  if (operands.count() != 1) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[1], "expects one pattern",
+                            "pass one pattern, e.g. `pkill ssh`");
+    return 1;
+  }
 
   let const pattern = operands[0].view();
-  if (pattern.is_empty())
-    throw ErrorWithDetails{"pkill requires a non-empty pattern",
-                           "Pass a pattern, e.g. `pkill ssh`"};
+  if (pattern.is_empty()) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                            "requires a non-empty pattern",
+                            "pass a pattern, e.g. `pkill ssh`");
+    return 1;
+  }
 
   let const signal_number = resolve_koshkit_signal(
       FLAG_PKILL_SIGNAL.is_set() ? FLAG_PKILL_SIGNAL.value() : StringView{},

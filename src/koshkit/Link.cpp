@@ -33,16 +33,23 @@ fn Link::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.count() != 2) return report_usage_error(ec, cxt, args[0].view());
+  if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
+  if (operands.count() > 2) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[2],
+                            "extra operand '" + operands[2] + "'");
+    return 1;
+  }
+
   if (os::create_hard_link(operands[0].view(), operands[1].view())) return 0;
-  report_soft_koshkit_error(ec, cxt,
-                            "link: cannot create '" + operands[1] +
-                                "': " + os::last_system_error_message());
+  KOSHKIT_REPORT_ERROR_AT(operand_locations[1],
+                          "cannot create '" + operands[1] +
+                              "': " + os::last_system_error_message());
   return 1;
 }
 

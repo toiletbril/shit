@@ -1,8 +1,8 @@
 === killall arg count ===
-1:1: error: killall expects one process name.
+1:19: error: killall: expects one process name.
      1 |  koshkit killall a b
-       |  ^~~~~~~~~~~~~~~~~~~
-note: Pass one name, e.g. `killall firefox`.
+       |                    ^
+note: pass one name, e.g. `killall firefox`.
 === seq zero increment ===
 1:1: error: seq: the increment must not be zero.
      1 |  koshkit seq 1 0 10
@@ -298,3 +298,33 @@ note: the only operand form is `am i`.
      1 |  koshkit who am i extra
        |                   ^~~~~
 note: the only operand form is `am i`.
+=== killall missing process location ===
+1:17: error: killall: KOSH_MISSING_PROCESS: no process found.
+     1 |  koshkit killall KOSH_MISSING_PROCESS
+       |                  ^~~~~~~~~~~~~~~~~~~~
+=== pkill extra pattern location ===
+1:21: error: pkill: expects one pattern.
+     1 |  koshkit pkill first second
+       |                      ^~~~~~
+note: pass one pattern, e.g. `pkill ssh`.
+=== pkill empty pattern location ===
+1:15: error: pkill: requires a non-empty pattern.
+     1 |  koshkit pkill ""
+       |                ^~
+note: pass a pattern, e.g. `pkill ssh`.
+=== link extra operand location ===
+1:27: error: link: extra operand 'third'.
+     1 |  koshkit link first second third
+       |                            ^~~~~
+=== link destination location ===
+1:34: error: link: cannot create 'KOSH_MISSING_DESTINATION': No such file or directory.
+     1 |  koshkit link KOSH_MISSING_SOURCE KOSH_MISSING_DESTINATION
+       |                                   ^~~~~~~~~~~~~~~~~~~~~~~~
+=== realpath operand location ===
+1:18: error: realpath: 'KOSH_MISSING_PATH': No such file or directory.
+     1 |  koshkit realpath KOSH_MISSING_PATH
+       |                   ^~~~~~~~~~~~~~~~~
+=== rmdir operand location ===
+1:15: error: rmdir: failed to remove 'KOSH_MISSING_DIRECTORY': No such file or directory.
+     1 |  koshkit rmdir KOSH_MISSING_DIRECTORY
+       |                ^~~~~~~~~~~~~~~~~~~~~~

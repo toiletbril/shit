@@ -196,3 +196,24 @@ echo "=== who second operand location ==="
 
 echo "=== who extra operand location ==="
 "$BIN" -c 'koshkit who am i extra' 2>&1
+
+echo "=== killall missing process location ==="
+"$BIN" -c 'koshkit killall KOSH_MISSING_PROCESS' 2>&1
+
+echo "=== pkill extra pattern location ==="
+"$BIN" -c 'koshkit pkill first second' 2>&1
+
+echo "=== pkill empty pattern location ==="
+"$BIN" -c 'koshkit pkill ""' 2>&1
+
+echo "=== link extra operand location ==="
+"$BIN" -c 'koshkit link first second third' 2>&1
+
+echo "=== link destination location ==="
+"$BIN" -c 'koshkit link KOSH_MISSING_SOURCE KOSH_MISSING_DESTINATION' 2>&1
+
+echo "=== realpath operand location ==="
+"$BIN" -c 'koshkit realpath KOSH_MISSING_PATH' 2>&1
+
+echo "=== rmdir operand location ==="
+"$BIN" -c 'koshkit rmdir KOSH_MISSING_DIRECTORY' 2>&1

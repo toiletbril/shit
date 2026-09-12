@@ -42,8 +42,9 @@ fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -53,9 +54,11 @@ fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
-  if (operands.count() != 1)
-    throw ErrorWithDetails{"killall expects one process name",
-                           "Pass one name, e.g. `killall firefox`"};
+  if (operands.count() != 1) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[1], "expects one process name",
+                            "pass one name, e.g. `killall firefox`");
+    return 1;
+  }
 
   let const wanted = operands[0].view();
   let const signal_number = resolve_koshkit_signal(
@@ -73,11 +76,11 @@ fn Killall::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  if (!has_signaled_any)
-    report_soft_koshkit_error(
-        ec, cxt,
-        "killall: " + String{cxt.scratch_allocator(), wanted} +
-            ": no process found");
+  if (!has_signaled_any) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                            String{cxt.scratch_allocator(), wanted} +
+                                ": no process found");
+  }
   return has_signaled_any ? 0 : 1;
 }
 
