@@ -68,6 +68,22 @@ note: use a decimal integer from -2147483648 through 2147483647.
 1:21: error: renice: invalid identifier 'nope'.
      1 |  koshkit renice -n 1 nope
        |                      ^~~~
+note: use a nonnegative decimal identifier.
+=== renice user location ===
+1:24: error: renice: invalid identifier 'KOSH_MISSING_USER'.
+     1 |  koshkit renice -n 1 -u KOSH_MISSING_USER
+       |                         ^~~~~~~~~~~~~~~~~
+note: use a user name or a nonnegative decimal user id.
+=== renice increment location ===
+1:19: error: renice: invalid increment 'nope'.
+     1 |  koshkit renice -n nope 1
+       |                    ^~~~
+note: use a decimal integer from -2147483648 through 2147483647.
+=== renice increment range ===
+1:19: error: renice: invalid increment '2147483648'.
+     1 |  koshkit renice -n 2147483648 1
+       |                    ^~~~~~~~~~
+note: use a decimal integer from -2147483648 through 2147483647.
 === date operand location ===
 1:14: error: date: setting the system clock is unsupported.
      1 |  koshkit date 2026

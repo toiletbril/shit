@@ -57,8 +57,7 @@ fn Renice::execute(const ExecContext &ec, EvalContext &cxt,
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   let const operands =
-      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
-  defer { reset_flags(FLAG_LIST); };
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -72,9 +71,10 @@ fn Renice::execute(const ExecContext &ec, EvalContext &cxt,
   if (parsed.is_error() || parsed.value() < INT32_MIN ||
       parsed.value() > INT32_MAX)
   {
-    report_soft_koshkit_util_error(
-        ec, cxt, FLAG_RENICE_INCREMENT.value_location(), args[0].view(),
-        "invalid increment '" + String{FLAG_RENICE_INCREMENT.value()} + "'");
+    KOSHKIT_REPORT_ERROR_AT(
+        FLAG_RENICE_INCREMENT.value_location(),
+        "invalid increment '" + String{FLAG_RENICE_INCREMENT.value()} + "'",
+        "use a decimal integer from -2147483648 through 2147483647");
     return 2;
   }
   let const increment = parsed.value();
@@ -89,9 +89,11 @@ fn Renice::execute(const ExecContext &ec, EvalContext &cxt,
     let const &operand = operands[operand_position];
     let const id = renice_identifier(operand.view(), target);
     if (!id.has_value()) {
-      report_soft_koshkit_util_error(
-          ec, cxt, operand_locations[operand_position], args[0].view(),
-          "invalid identifier '" + operand + "'");
+      let const note = target == os::priority_target::User
+                           ? "use a user name or a nonnegative decimal user id"
+                           : "use a nonnegative decimal identifier";
+      KOSHKIT_REPORT_ERROR_AT(operand_locations[operand_position],
+                              "invalid identifier '" + operand + "'", note);
       result = 1;
       continue;
     }

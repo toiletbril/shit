@@ -46,6 +46,15 @@ echo "=== mv source location ==="
 echo "=== renice identifier location ==="
 "$BIN" -c 'koshkit renice -n 1 nope' 2>&1
 
+echo "=== renice user location ==="
+"$BIN" -c 'koshkit renice -n 1 -u KOSH_MISSING_USER' 2>&1
+
+echo "=== renice increment location ==="
+"$BIN" -c 'koshkit renice -n nope 1' 2>&1
+
+echo "=== renice increment range ==="
+"$BIN" -c 'koshkit renice -n 2147483648 1' 2>&1
+
 echo "=== date operand location ==="
 "$BIN" -c 'koshkit date 2026' 2>&1
 
