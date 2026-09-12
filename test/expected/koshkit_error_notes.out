@@ -286,6 +286,16 @@ note: use increasing positive columns separated by commas or blanks.
      1 |  koshkit fold -w 0
        |                  ^
 note: use a positive decimal width.
+=== nproc ignore count location ===
+1:24: error: nproc: invalid number '-1'.
+     1 |  koshkit nproc --ignore=-1
+       |                         ^~
+note: use an unsigned decimal count.
+=== nproc operand location ===
+1:15: error: nproc: unexpected operand 'extra'.
+     1 |  koshkit nproc extra
+       |                ^~~~~
+note: nproc accepts flags without operands.
 === evildisk color value location ===
 1:26: error: evildisk: invalid color mode.
      1 |  koshkit evildisk --color invalid

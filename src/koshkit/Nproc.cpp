@@ -40,25 +40,28 @@ cold fn Nproc::execute(
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   let const operands =
-      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
-  defer { reset_flags(FLAG_LIST); };
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (!operands.is_empty())
-    throw ErrorWithLocation{operand_locations[0],
-                            "nproc: unexpected operand '" + operands[0] + "'"};
+  if (!operands.is_empty()) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                            "unexpected operand '" + operands[0] + "'",
+                            "nproc accepts flags without operands");
+    return 1;
+  }
 
   u64 ignored_count = 0;
   if (FLAG_NPROC_IGNORE.is_set()) {
     let const parsed = FLAG_NPROC_IGNORE.value().to<u64>();
-    if (parsed.is_error())
-      throw ErrorWithLocation{
+    if (parsed.is_error()) {
+      KOSHKIT_REPORT_ERROR_AT(
           FLAG_NPROC_IGNORE.value_location(),
           "invalid number '" +
-              String{cxt.scratch_allocator(), FLAG_NPROC_IGNORE.value()}
-              + "'"
-      };
+              String{cxt.scratch_allocator(), FLAG_NPROC_IGNORE.value()} + "'",
+          "use an unsigned decimal count");
+      return 1;
+    }
     ignored_count = parsed.value();
   }
 

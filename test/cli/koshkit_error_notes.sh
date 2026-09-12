@@ -179,6 +179,12 @@ echo "=== expand tab list location ==="
 echo "=== fold width location ==="
 "$BIN" -c 'koshkit fold -w 0' 2>&1
 
+echo "=== nproc ignore count location ==="
+"$BIN" -c 'koshkit nproc --ignore=-1' 2>&1
+
+echo "=== nproc operand location ==="
+"$BIN" -c 'koshkit nproc extra' 2>&1
+
 echo "=== evildisk color value location ==="
 "$BIN" -c 'koshkit evildisk --color invalid' 2>&1
 
