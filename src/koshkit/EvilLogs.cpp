@@ -394,7 +394,7 @@ fn collect_log_entries(StringView directory, Allocator allocator) throws
   format_probe probes[FORMAT_BATCH_COUNT]{};
   usize probe_count = 0;
   let batch = os::Batch{allocator};
-  let results = ArrayList<os::BatchResult>{allocator};
+  let results = ArrayList<os::batch_result>{allocator};
   batch.reserve(FORMAT_BATCH_COUNT);
   results.reserve(FORMAT_BATCH_COUNT);
   let const do_flush_probes = [&]() throws -> void {

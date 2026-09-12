@@ -56,7 +56,7 @@ private:
   friend class Batch;
 };
 
-struct BatchResult
+struct batch_result
 {
   u64 request_id{0};
   usize transferred_byte_count{0};
@@ -66,12 +66,12 @@ struct BatchResult
 namespace batch_internal {
 
 using batched_syscall_id = batch_operation::Kind;
-using batched_syscall_result = BatchResult;
+using batched_syscall_result = batch_result;
 using batched_syscall = batch_operation;
 
 fn execute_batch_operations(const batched_syscall *operations,
                             usize operation_count,
-                            BatchResult *results) wontthrow -> void;
+                            batch_result *results) wontthrow -> void;
 
 } /* namespace batch_internal */
 
@@ -83,8 +83,8 @@ public:
   fn reserve(usize operation_count) throws -> void;
   fn add(batch_operation operation) throws -> void;
   fn clear() wontthrow -> void;
-  fn execute(ArrayList<BatchResult> &results) const throws -> void;
-  fn execute() const throws -> ArrayList<BatchResult>;
+  fn execute(ArrayList<batch_result> &results) const throws -> void;
+  fn execute() const throws -> ArrayList<batch_result>;
 
   pure fn count() const wontthrow -> usize;
 

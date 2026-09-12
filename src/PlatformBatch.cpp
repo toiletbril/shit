@@ -151,7 +151,7 @@ static fn find_canonical_operation_positions(
   return has_repeated_request;
 }
 
-fn Batch::execute(ArrayList<BatchResult> &results) const throws -> void
+fn Batch::execute(ArrayList<batch_result> &results) const throws -> void
 {
   let canonical_positions = ArrayList<usize>{m_operations.allocator()};
   if (!find_canonical_operation_positions(m_operations, canonical_positions)) {
@@ -181,7 +181,7 @@ fn Batch::execute(ArrayList<BatchResult> &results) const throws -> void
     optimized_operations.push(m_operations[index]);
   }
 
-  let optimized_results = ArrayList<BatchResult>{m_operations.allocator()};
+  let optimized_results = ArrayList<batch_result>{m_operations.allocator()};
   optimized_results.reserve(optimized_operations.count());
   for (usize index = 0; index < optimized_operations.count(); index++)
     optimized_results.push({});
@@ -209,9 +209,9 @@ fn Batch::execute(ArrayList<BatchResult> &results) const throws -> void
   }
 }
 
-fn Batch::execute() const throws -> ArrayList<BatchResult>
+fn Batch::execute() const throws -> ArrayList<batch_result>
 {
-  let results = ArrayList<BatchResult>{m_operations.allocator()};
+  let results = ArrayList<batch_result>{m_operations.allocator()};
   execute(results);
   return results;
 }

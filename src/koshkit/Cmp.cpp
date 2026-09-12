@@ -53,7 +53,7 @@ struct buffered_byte_reader
 
 static fn refill_readers(buffered_byte_reader &left,
                          buffered_byte_reader &right, os::Batch &batch,
-                         ArrayList<os::BatchResult> &results) throws
+                         ArrayList<os::batch_result> &results) throws
     -> bool
 {
   buffered_byte_reader *readers[] = {&left, &right};
@@ -175,7 +175,7 @@ fn Cmp::execute(const ExecContext &ec, EvalContext &cxt,
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
   let batch = os::Batch{allocator};
-  let results = ArrayList<os::BatchResult>{allocator};
+  let results = ArrayList<os::batch_result>{allocator};
   batch.reserve(2);
   results.reserve(2);
 

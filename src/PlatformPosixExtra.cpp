@@ -2116,7 +2116,7 @@ fn read_process_io_statuses(const ArrayList<i64> &process_ids,
   process_io_probe probes[PROCESS_IO_BATCH_COUNT]{};
   usize probe_count = 0;
   let batch = Batch{statuses.allocator()};
-  let results = ArrayList<BatchResult>{statuses.allocator()};
+  let results = ArrayList<batch_result>{statuses.allocator()};
   batch.reserve(PROCESS_IO_BATCH_COUNT);
   results.reserve(PROCESS_IO_BATCH_COUNT);
   let const do_flush_probes = [&]() throws -> void {

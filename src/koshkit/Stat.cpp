@@ -710,7 +710,7 @@ fn Stat::execute(const ExecContext &ec, EvalContext &cxt,
   let operand_paths = ArrayList<Path>{allocator};
   let file_statuses = ArrayList<os::file_status>{allocator};
   let batch = os::Batch{allocator};
-  let results = ArrayList<os::BatchResult>{allocator};
+  let results = ArrayList<os::batch_result>{allocator};
   if (!is_filesystem_mode) {
     operand_paths.reserve(operands.count());
     file_statuses.reserve(operands.count());
