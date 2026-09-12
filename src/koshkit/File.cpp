@@ -7,6 +7,7 @@
  * matching descriptions.
  */
 
+#include "../Bitset.hpp"
 #include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
@@ -767,6 +768,9 @@ static pure fn file_content_description(StringView bytes) wontthrow
   return is_text ? StringView{"text"} : StringView{"data"};
 }
 
+constexpr usize FILE_CONTENT_SAMPLE_BYTE_COUNT = 8192;
+constexpr usize FILE_CONTENT_SAMPLE_BATCH_COUNT = 32;
+
 fn describe_file_type(StringView path, const os::file_status &status,
                       Allocator allocator) throws -> Maybe<String>
 {
@@ -785,13 +789,20 @@ fn describe_file_type(StringView path, const os::file_status &status,
   if (!descriptor.has_value()) return None;
   defer { os::close_fd(*descriptor); };
 
-  char buffer[8192];
+  char buffer[FILE_CONTENT_SAMPLE_BYTE_COUNT];
   let const read_count = os::read_fd(*descriptor, buffer, sizeof(buffer));
   if (!read_count.has_value()) return None;
 
   return String{allocator,
                 file_content_description(StringView{buffer, *read_count})};
 }
+
+struct file_content_probe
+{
+  os::descriptor descriptor{KOSH_INVALID_FD};
+  usize operand_position{0};
+  char bytes[FILE_CONTENT_SAMPLE_BYTE_COUNT]{};
+};
 
 File::File() = default;
 
@@ -868,6 +879,83 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
   }
   let const metadata_results = metadata_batch.execute();
 
+  let default_samples = ArrayList<String>{allocator};
+  let default_sample_errors = Bitset{allocator};
+  let const should_batch_default_samples =
+      !FLAG_FILE_REGULAR_ONLY.is_enabled() && magic_rules.is_empty();
+  if (should_batch_default_samples) {
+    default_samples.reserve(operands.count());
+    for (usize operand_position = 0; operand_position < operands.count();
+         operand_position++)
+    {
+      default_samples.push(String{allocator});
+    }
+    default_sample_errors.reset(operands.count());
+
+    file_content_probe probes[FILE_CONTENT_SAMPLE_BATCH_COUNT]{};
+    usize probe_count = 0;
+    let content_batch = os::Batch{allocator};
+    let content_results = ArrayList<os::batch_result>{allocator};
+    content_batch.reserve(FILE_CONTENT_SAMPLE_BATCH_COUNT);
+    content_results.reserve(FILE_CONTENT_SAMPLE_BATCH_COUNT);
+    defer
+    {
+      for (usize index = 0; index < probe_count; index++)
+        if (probes[index].descriptor != KOSH_INVALID_FD)
+          unused(os::close_fd(probes[index].descriptor));
+    };
+    let const do_flush_probes = [&]() throws -> void {
+      content_batch.clear();
+      for (usize index = 0; index < probe_count; index++) {
+        content_batch.add(os::batch_operation::read(
+            probes[index].descriptor, probes[index].bytes,
+            FILE_CONTENT_SAMPLE_BYTE_COUNT));
+      }
+      content_batch.execute(content_results);
+      for (usize index = 0; index < probe_count; index++) {
+        let const operand_position = probes[index].operand_position;
+        let const &result = content_results[index];
+        if (result.error_number == 0) {
+          default_samples[operand_position] =
+              String{allocator,
+                     file_content_description(StringView{
+                         probes[index].bytes, result.transferred_byte_count})};
+        } else {
+          os::set_last_system_error(result.error_number);
+          default_samples[operand_position] = os::last_system_error_message();
+          default_sample_errors.set(operand_position);
+        }
+        unused(os::close_fd(probes[index].descriptor));
+        probes[index].descriptor = KOSH_INVALID_FD;
+      }
+      probe_count = 0;
+    };
+
+    for (usize operand_position = 0; operand_position < operands.count();
+         operand_position++)
+    {
+      if (metadata_results[operand_position].error_number != 0 ||
+          os::file_type_letter(file_statuses[operand_position].mode) != '-')
+      {
+        continue;
+      }
+
+      let const descriptor = os::open_file_descriptor(
+          operands[operand_position].view(), os::file_open_mode::Read);
+      if (!descriptor.has_value()) {
+        default_samples[operand_position] = os::last_system_error_message();
+        default_sample_errors.set(operand_position);
+        continue;
+      }
+
+      probes[probe_count].descriptor = *descriptor;
+      probes[probe_count].operand_position = operand_position;
+      probe_count++;
+      if (probe_count == FILE_CONTENT_SAMPLE_BATCH_COUNT) do_flush_probes();
+    }
+    if (probe_count != 0) do_flush_probes();
+  }
+
   for (usize operand_position = 0; operand_position < operands.count();
        operand_position++)
   {
@@ -901,6 +989,18 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
     let const is_regular = os::file_type_letter(file_status.mode) == '-';
     if (is_regular && FLAG_FILE_REGULAR_ONLY.is_enabled()) {
       description += "regular file";
+    } else if (is_regular && magic_rules.is_empty() &&
+               !default_samples[operand_position].is_empty())
+    {
+      if (default_sample_errors[operand_position]) {
+        report_soft_koshkit_util_error(
+            ec, cxt, operand_locations[operand_position], args[0].view(),
+            "cannot read '" + operand +
+                "': " + default_samples[operand_position]);
+        status = 1;
+        continue;
+      }
+      description += default_samples[operand_position].view();
     } else if (!is_regular || magic_rules.is_empty()) {
       let const default_description =
           describe_file_type(operand.view(), file_status, allocator);
