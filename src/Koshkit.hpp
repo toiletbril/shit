@@ -625,6 +625,7 @@ public:
   ~SourceBatchReader();
 
   fn read_next(ArrayList<Chunk> &chunks) throws -> ReadResult;
+  fn read_next_ordered(ArrayList<Chunk> &chunks) throws -> ReadResult;
 
   SourceBatchReader(const SourceBatchReader &) = delete;
   fn operator=(const SourceBatchReader &)->SourceBatchReader & = delete;
@@ -635,16 +636,23 @@ private:
     ArrayList<char> buffer{heap_allocator()};
     u64 byte_offset{0};
     usize source_index{0};
+    usize pending_byte_count{0};
     os::descriptor descriptor{KOSH_INVALID_FD};
+    i32 pending_error_number{0};
     bool should_close{false};
     bool is_complete{false};
+    bool has_pending_chunk{false};
   };
 
   static fn close_reader(Reader &reader) wontthrow -> void;
   fn retire_completed_readers() throws -> void;
-  fn fill_readers(ArrayList<Chunk> &chunks) throws -> void;
-  fn read_seekable(ArrayList<Chunk> &chunks) throws -> ReadResult;
-  fn read_sequential(ArrayList<Chunk> &chunks) throws -> ReadResult;
+  fn fill_readers() throws -> void;
+  fn read_seekable() throws -> ReadResult;
+  fn read_sequential() throws -> ReadResult;
+  fn append_pending_chunks(ArrayList<Chunk> &chunks,
+                           bool should_emit_one) throws -> void;
+  fn read_next_internal(ArrayList<Chunk> &chunks, bool should_emit_one) throws
+      -> ReadResult;
 
   const ExecContext &m_ec;
   const ArrayList<StringView> &m_sources;
@@ -652,6 +660,7 @@ private:
   Maybe<Reader> m_sequential_reader;
   os::Batch m_batch;
   ArrayList<os::batch_result> m_results;
+  ArrayList<usize> m_reader_positions;
   usize m_source_index{0};
 };
 

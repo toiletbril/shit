@@ -358,12 +358,14 @@ SourceBatchReader::SourceBatchReader(const ExecContext &ec,
       m_sources(sources),
       m_readers(allocator),
       m_batch(allocator),
-      m_results(allocator)
+      m_results(allocator),
+      m_reader_positions(allocator)
 {
   constexpr usize READER_COUNT = 16;
   m_readers.reserve(READER_COUNT);
   m_batch.reserve(READER_COUNT);
   m_results.reserve(READER_COUNT);
+  m_reader_positions.reserve(READER_COUNT);
 }
 
 SourceBatchReader::~SourceBatchReader()
@@ -386,15 +388,19 @@ fn SourceBatchReader::retire_completed_readers() throws -> void
        remaining_count--)
   {
     let const reader_index = remaining_count - 1;
-    if (m_readers[reader_index].is_complete) m_readers.remove(reader_index);
+    let const &reader = m_readers[reader_index];
+    if (reader.is_complete && !reader.has_pending_chunk)
+      m_readers.remove(reader_index);
   }
 
-  if (m_sequential_reader.has_value() && m_sequential_reader->is_complete) {
+  if (m_sequential_reader.has_value() && m_sequential_reader->is_complete &&
+      !m_sequential_reader->has_pending_chunk)
+  {
     m_sequential_reader.reset();
   }
 }
 
-fn SourceBatchReader::fill_readers(ArrayList<Chunk> &chunks) throws -> void
+fn SourceBatchReader::fill_readers() throws -> void
 {
   constexpr usize READER_COUNT = 16;
   constexpr usize READ_BYTE_COUNT = 64 * 1024;
@@ -421,7 +427,12 @@ fn SourceBatchReader::fill_readers(ArrayList<Chunk> &chunks) throws -> void
         break;
       }
 
-      chunks.push({{}, source_index, os::get_last_system_error_number(), true});
+      Reader reader;
+      reader.source_index = source_index;
+      reader.pending_error_number = os::get_last_system_error_number();
+      reader.is_complete = true;
+      reader.has_pending_chunk = true;
+      m_readers.push(steal(reader));
       m_source_index++;
       break;
     }
@@ -442,51 +453,59 @@ fn SourceBatchReader::fill_readers(ArrayList<Chunk> &chunks) throws -> void
   }
 }
 
-fn SourceBatchReader::read_seekable(ArrayList<Chunk> &chunks) throws
-    -> ReadResult
+fn SourceBatchReader::read_seekable() throws -> ReadResult
 {
   constexpr usize READ_BYTE_COUNT = 64 * 1024;
 
   m_batch.clear();
-  for (let &reader : m_readers) {
-    m_batch.add(os::batch_operation::read(reader.descriptor,
-                                          reader.buffer.begin(),
-                                          READ_BYTE_COUNT, reader.byte_offset));
-  }
-  m_batch.execute(m_results);
-  if (os::INTERRUPT_REQUESTED) return ReadResult::Interrupted;
-
+  m_reader_positions.clear();
   for (usize reader_index = 0; reader_index < m_readers.count(); reader_index++)
   {
     let &reader = m_readers[reader_index];
-    let const &result = m_results[reader_index];
+    if (reader.has_pending_chunk || reader.is_complete) continue;
+
+    m_batch.add(os::batch_operation::read(reader.descriptor,
+                                          reader.buffer.begin(),
+                                          READ_BYTE_COUNT, reader.byte_offset));
+    m_reader_positions.push(reader_index);
+  }
+  if (m_batch.count() == 0) return ReadResult::Chunks;
+
+  m_batch.execute(m_results);
+  if (os::INTERRUPT_REQUESTED) return ReadResult::Interrupted;
+
+  for (usize result_index = 0; result_index < m_results.count(); result_index++)
+  {
+    let const reader_index = m_reader_positions[result_index];
+    let &reader = m_readers[reader_index];
+    let const &result = m_results[result_index];
     if (result.error_number != 0) {
       close_reader(reader);
-      chunks.push({{}, reader.source_index, result.error_number, true});
+      reader.pending_error_number = result.error_number;
+      reader.has_pending_chunk = true;
       continue;
     }
     if (result.transferred_byte_count == 0) {
       close_reader(reader);
-      chunks.push({{}, reader.source_index, 0, true});
+      reader.has_pending_chunk = true;
       continue;
     }
 
-    chunks.push({
-        StringView{reader.buffer.begin(), result.transferred_byte_count},
-        reader.source_index, 0, false
-    });
+    reader.pending_byte_count = result.transferred_byte_count;
+    reader.has_pending_chunk = true;
     reader.byte_offset += result.transferred_byte_count;
   }
 
   return ReadResult::Chunks;
 }
 
-fn SourceBatchReader::read_sequential(ArrayList<Chunk> &chunks) throws
-    -> ReadResult
+fn SourceBatchReader::read_sequential() throws -> ReadResult
 {
   constexpr usize READ_BYTE_COUNT = 64 * 1024;
 
   let &reader = *m_sequential_reader;
+  if (reader.has_pending_chunk || reader.is_complete) return ReadResult::Chunks;
+
   let const read_count =
       os::read_fd(reader.descriptor, reader.buffer.begin(), READ_BYTE_COUNT);
   if (!read_count.has_value()) {
@@ -494,49 +513,92 @@ fn SourceBatchReader::read_sequential(ArrayList<Chunk> &chunks) throws
 
     let const error_number = os::get_last_system_error_number();
     close_reader(reader);
-    chunks.push({{}, reader.source_index, error_number, true});
+    reader.pending_error_number = error_number;
+    reader.has_pending_chunk = true;
     return ReadResult::Chunks;
   }
   if (*read_count == 0) {
     close_reader(reader);
-    chunks.push({{}, reader.source_index, 0, true});
+    reader.has_pending_chunk = true;
     return ReadResult::Chunks;
   }
 
-  chunks.push({
-      StringView{reader.buffer.begin(), *read_count},
-      reader.source_index, 0,
-      false
-  });
+  reader.pending_byte_count = *read_count;
+  reader.has_pending_chunk = true;
   return ReadResult::Chunks;
 }
 
-fn SourceBatchReader::read_next(ArrayList<Chunk> &chunks) throws -> ReadResult
+fn SourceBatchReader::append_pending_chunks(ArrayList<Chunk> &chunks,
+                                            bool should_emit_one) throws -> void
+{
+  let const emit_capacity =
+      should_emit_one ? usize{1}
+                      : m_readers.count() +
+                            static_cast<usize>(m_readers.is_empty() &&
+                                               m_sequential_reader.has_value());
+  chunks.reserve(emit_capacity);
+
+  let const do_append = [&](Reader &reader) throws -> bool {
+    if (!reader.has_pending_chunk) return false;
+
+    chunks.push({
+        StringView{reader.buffer.begin(), reader.pending_byte_count},
+        reader.source_index, reader.pending_error_number, reader.is_complete
+    });
+    reader.pending_byte_count = 0;
+    reader.pending_error_number = 0;
+    reader.has_pending_chunk = false;
+    return true;
+  };
+
+  for (let &reader : m_readers) {
+    if (!do_append(reader)) continue;
+    if (should_emit_one) return;
+  }
+
+  if (m_readers.is_empty() && m_sequential_reader.has_value())
+    unused(do_append(*m_sequential_reader));
+}
+
+fn SourceBatchReader::read_next_internal(ArrayList<Chunk> &chunks,
+                                         bool should_emit_one) throws
+    -> ReadResult
 {
   chunks.clear();
   retire_completed_readers();
   if (os::INTERRUPT_REQUESTED) return ReadResult::Interrupted;
 
-  fill_readers(chunks);
+  fill_readers();
   if (os::INTERRUPT_REQUESTED) return ReadResult::Interrupted;
 
   if (!m_readers.is_empty()) {
-    let const result = read_seekable(chunks);
+    let const result = read_seekable();
     if (result == ReadResult::Interrupted) return result;
   } else if (m_sequential_reader.has_value()) {
-    let const result = read_sequential(chunks);
+    let const result = read_sequential();
     if (result == ReadResult::Interrupted) return result;
   }
 
-  if (!chunks.is_empty()) {
-    chunks.sort([](const Chunk &left, const Chunk &right) {
-      return left.source_index < right.source_index;
-    });
-    return ReadResult::Chunks;
+  append_pending_chunks(chunks, should_emit_one);
+  if (!chunks.is_empty()) return ReadResult::Chunks;
+  if (m_source_index == m_sources.count() && m_readers.is_empty() &&
+      !m_sequential_reader.has_value())
+  {
+    return ReadResult::Complete;
   }
-  if (m_source_index == m_sources.count()) return ReadResult::Complete;
 
   return ReadResult::Chunks;
+}
+
+fn SourceBatchReader::read_next(ArrayList<Chunk> &chunks) throws -> ReadResult
+{
+  return read_next_internal(chunks, false);
+}
+
+fn SourceBatchReader::read_next_ordered(ArrayList<Chunk> &chunks) throws
+    -> ReadResult
+{
+  return read_next_internal(chunks, true);
 }
 
 fn read_named_or_stdin_batch(const ExecContext &ec,
