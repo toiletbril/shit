@@ -1519,6 +1519,111 @@ fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
 
 namespace batch_internal {
 
+static fn execute_shared_positioned_file_operation(
+    const batched_syscall &operation,
+    batched_syscall_result &result) wontthrow -> void
+{
+  LARGE_INTEGER zero{};
+  LARGE_INTEGER saved_position{};
+  if (SetFilePointerEx(operation.fd, zero, &saved_position, FILE_CURRENT) ==
+      FALSE)
+  {
+    result.error_number = static_cast<i32>(GetLastError());
+    return;
+  }
+  defer
+  {
+    let const was_restored =
+        SetFilePointerEx(operation.fd, saved_position, nullptr, FILE_BEGIN);
+    if (was_restored == FALSE && result.error_number == 0)
+      result.error_number = static_cast<i32>(GetLastError());
+  };
+
+  LARGE_INTEGER requested_position{};
+  requested_position.QuadPart = static_cast<LONGLONG>(operation.byte_offset);
+  if (SetFilePointerEx(operation.fd, requested_position, nullptr, FILE_BEGIN) ==
+      FALSE)
+  {
+    result.error_number = static_cast<i32>(GetLastError());
+    return;
+  }
+
+  let const transferred =
+      operation.syscall_id == batched_syscall_id::Read
+          ? read_fd(operation.fd, operation.output_buffer,
+                    operation.byte_count)
+          : write_fd(operation.fd, operation.input_buffer,
+                     operation.byte_count);
+  if (transferred.has_value()) {
+    result.transferred_byte_count = *transferred;
+    return;
+  }
+
+  result.error_number = static_cast<i32>(GetLastError());
+  if (result.error_number == 0) result.error_number = ERROR_GEN_FAILURE;
+}
+
+static fn execute_positioned_file_operation(
+    const batched_syscall &operation,
+    batched_syscall_result &result) wontthrow -> void
+{
+  let const desired_access = operation.syscall_id == batched_syscall_id::Read
+                                  ? GENERIC_READ
+                                  : GENERIC_WRITE;
+  let const positioned_handle =
+      ReOpenFile(operation.fd, desired_access,
+                 FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_FLAG_OVERLAPPED);
+  if (positioned_handle == INVALID_HANDLE_VALUE) {
+    execute_shared_positioned_file_operation(operation, result);
+    return;
+  }
+  defer { unused(CloseHandle(positioned_handle)); };
+
+  OVERLAPPED control{};
+  control.Offset = static_cast<DWORD>(operation.byte_offset & MAXDWORD);
+  control.OffsetHigh = static_cast<DWORD>(operation.byte_offset >> 32);
+  let const requested_byte_count = static_cast<DWORD>(operation.byte_count);
+  let const was_started = operation.syscall_id == batched_syscall_id::Read
+                              ? ReadFile(positioned_handle,
+                                         operation.output_buffer,
+                                         requested_byte_count, nullptr,
+                                         &control)
+                              : WriteFile(positioned_handle,
+                                          operation.input_buffer,
+                                          requested_byte_count, nullptr,
+                                          &control);
+  if (was_started == FALSE) {
+    let const error_number = GetLastError();
+    if (error_number != ERROR_IO_PENDING) {
+      if (operation.syscall_id == batched_syscall_id::Read &&
+          error_number == ERROR_HANDLE_EOF)
+      {
+        return;
+      }
+
+      result.error_number = static_cast<i32>(error_number);
+      return;
+    }
+  }
+
+  DWORD transferred_byte_count = 0;
+  if (GetOverlappedResult(positioned_handle, &control,
+                          &transferred_byte_count, TRUE) == FALSE)
+  {
+    let const error_number = GetLastError();
+    if (operation.syscall_id == batched_syscall_id::Read &&
+        error_number == ERROR_HANDLE_EOF)
+    {
+      return;
+    }
+
+    result.error_number = static_cast<i32>(error_number);
+    return;
+  }
+
+  result.transferred_byte_count = transferred_byte_count;
+}
+
 fn execute_batch_operations(const batched_syscall *operations,
                             usize operation_count,
                             batched_syscall_result *results) wontthrow -> void
@@ -1560,42 +1665,7 @@ fn execute_batch_operations(const batched_syscall *operations,
         continue;
       }
 
-      LARGE_INTEGER zero{};
-      LARGE_INTEGER saved_position{};
-      if (SetFilePointerEx(operation.fd, zero, &saved_position, FILE_CURRENT) ==
-          FALSE)
-      {
-        result.error_number = static_cast<i32>(GetLastError());
-        continue;
-      }
-      defer
-      {
-        unused(SetFilePointerEx(operation.fd, saved_position, nullptr,
-                                FILE_BEGIN));
-      };
-
-      LARGE_INTEGER requested_position{};
-      requested_position.QuadPart =
-          static_cast<LONGLONG>(operation.byte_offset);
-      if (SetFilePointerEx(operation.fd, requested_position, nullptr,
-                           FILE_BEGIN) == FALSE)
-      {
-        result.error_number = static_cast<i32>(GetLastError());
-        continue;
-      }
-
-      let const transferred =
-          operation.syscall_id == batched_syscall_id::Read
-              ? read_fd(operation.fd, operation.output_buffer,
-                        operation.byte_count)
-              : write_fd(operation.fd, operation.input_buffer,
-                         operation.byte_count);
-      if (transferred.has_value()) {
-        result.transferred_byte_count = *transferred;
-      } else {
-        result.error_number = static_cast<i32>(GetLastError());
-        if (result.error_number == 0) result.error_number = ERROR_GEN_FAILURE;
-      }
+      execute_positioned_file_operation(operation, result);
       break;
     }
     case batched_syscall_id::Lstat:

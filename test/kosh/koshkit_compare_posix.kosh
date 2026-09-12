@@ -16,6 +16,13 @@ koshkit cmp -s first second
 echo "cmp-different=$?"
 koshkit cmp -l first second
 echo "cmp-list=$?"
+{
+  koshkit cmp -s - /dev/null
+  echo "cmp-heredoc=$?"
+  koshkit cat
+} <<'EOF'
+abc
+EOF
 
 koshkit comm left right
 koshkit comm -12 left right

@@ -30,6 +30,16 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "cmp-list=$?"]
   [CompoundListCondition, None]
+    [RedirectedCommand]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "cmp" "-s" "-" "/dev/null"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "cmp-heredoc=$?"]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "cat"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "comm" "left" "right"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "comm" "-12" "left" "right"]
@@ -190,6 +200,43 @@
   Variable "?"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cmp"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cmp-heredoc="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Literal "EOF"
+]
+[Word
   Unquoted "koshkit"
 ]
 [Word
@@ -316,6 +363,8 @@ cmp-equal=0
 cmp-different=1
      3 143 144
 cmp-list=1
+cmp-heredoc=1
+abc
 a
 	b
 		c
