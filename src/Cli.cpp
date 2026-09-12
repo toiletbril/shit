@@ -9,6 +9,7 @@
 
 #include "Cli.hpp"
 
+#include "CliColors.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -997,55 +998,289 @@ cold fn wrap_text(StringView text, usize indent, usize width,
   return out;
 }
 
-cold fn make_flag_help(const FlagList &flags) throws -> String
+fn parse_cli_color_mode(StringView text) wontthrow -> Maybe<cli_color_mode>
+{
+  constexpr static_string_entry<cli_color_mode> MODE_ENTRIES[] = {
+      {SSK("auto"),   cli_color_mode::Auto  },
+      {SSK("tty"),    cli_color_mode::Auto  },
+      {SSK("if-tty"), cli_color_mode::Auto  },
+      {SSK("always"), cli_color_mode::Always},
+      {SSK("yes"),    cli_color_mode::Always},
+      {SSK("force"),  cli_color_mode::Always},
+      {SSK("never"),  cli_color_mode::Never },
+      {SSK("no"),     cli_color_mode::Never },
+      {SSK("none"),   cli_color_mode::Never },
+  };
+  constexpr StaticStringMap MODES{MODE_ENTRIES};
+  return MODES.find(text);
+}
+
+fn stdout_wants_color(cli_color_mode mode) throws -> bool
+{
+  switch (mode) {
+  case cli_color_mode::Always: return true;
+  case cli_color_mode::Never: return false;
+  case cli_color_mode::Auto: return colors::stdout_wants_color();
+  }
+
+  unreachable("invalid CLI color mode %d", ENUM(mode));
+}
+
+fn append_report_text(String &output, StringView text, StringView style,
+                      bool should_color) throws -> void
+{
+  if (text.is_empty()) return;
+
+  let const is_styled = should_color && !style.is_empty();
+  if (is_styled) output += style;
+  output += text;
+  if (is_styled) output += colors::ansi::RESET;
+}
+
+fn append_report_column(String &output, StringView text, usize width,
+                        bool is_right_aligned, StringView style,
+                        bool should_color) throws -> void
+{
+  let const padding_length = text.length < width ? width - text.length : 0;
+  if (is_right_aligned) output.append_repeated(' ', padding_length);
+
+  append_report_text(output, text, style, should_color);
+
+  if (!is_right_aligned) output.append_repeated(' ', padding_length);
+}
+
+fn append_report_field(String &output, StringView name, StringView value,
+                       StringView style, bool should_color) throws -> void
+{
+  if (value.is_empty()) return;
+
+  append_report_text(output, name, style, should_color);
+  output += ": ";
+  output += value;
+  output += '\n';
+}
+
+fn append_report_inline_field(String &output, StringView name, StringView value,
+                              StringView style, bool should_color) throws
+    -> void
+{
+  if (value.is_empty()) return;
+
+  append_report_text(output, name, style, should_color);
+  output += ": ";
+  output += value;
+}
+
+static pure fn report_indentation_width(StringView indentation) wontthrow
+    -> usize
+{
+  usize width = 0;
+  for (usize index = 0; index < indentation.length; index++) {
+    let const byte = indentation[index];
+    if (byte == '\t') {
+      width += 8 - (width % 8);
+      continue;
+    }
+
+    width++;
+  }
+  return width;
+}
+
+fn append_report_name_section(String &output, StringView title,
+                              const ArrayList<StringView> &names,
+                              bool should_color, StringView indentation) throws
+    -> void
+{
+  output += indentation;
+  append_report_text(output, title, colors::ansi::BOLD_BLUE, should_color);
+  output += '\n';
+
+  usize longest_length = 0;
+  for (let const name : names)
+    if (name.length > longest_length) longest_length = name.length;
+
+  let const column_width = longest_length + 2;
+  let const indentation_width = report_indentation_width(indentation) + 2;
+  let const available_width =
+      indentation_width < 80 ? 80 - indentation_width : usize{1};
+  let const column_count = column_width >= available_width
+                               ? usize{1}
+                               : available_width / column_width;
+  for (usize index = 0; index < names.count(); index++) {
+    let const name = names[index];
+    if (index % column_count == 0) {
+      output += indentation;
+      output += "  ";
+    }
+    output += name;
+    let const is_last_in_row =
+        index % column_count == column_count - 1 || index + 1 == names.count();
+    if (is_last_in_row) {
+      output += '\n';
+    } else {
+      output.append_repeated(' ', column_width - name.length);
+    }
+  }
+  output += '\n';
+}
+
+fn append_indented_report(String &output, StringView report,
+                          StringView indentation) throws -> void
+{
+  usize line_start = 0;
+  bool is_title = true;
+  while (line_start < report.length) {
+    usize line_end = line_start;
+    while (line_end < report.length && report[line_end] != '\n')
+      line_end++;
+
+    if (!is_title && line_end > line_start) output += indentation;
+    output += report.substring_of_length(line_start, line_end - line_start);
+    if (line_end < report.length) output += '\n';
+
+    is_title = false;
+    line_start = line_end + 1;
+  }
+}
+
+fn append_report_body(String &output, StringView body,
+                      StringView indentation) throws -> void
+{
+  usize line_start = 0;
+  while (line_start < body.length) {
+    usize line_end = line_start;
+    while (line_end < body.length && body[line_end] != '\n')
+      line_end++;
+
+    if (line_end > line_start) output += indentation;
+    output += body.substring_of_length(line_start, line_end - line_start);
+    if (line_end < body.length) output += '\n';
+    line_start = line_end + 1;
+  }
+}
+
+fn format_cli_help(StringView text, bool should_color) throws -> String
+{
+  if (!should_color) return String{text};
+
+  enum class help_section : u8
+  {
+    Other,
+    Description,
+    Synopsis,
+  };
+
+  let output = String{heap_allocator()};
+  help_section section = help_section::Other;
+  usize line_start = 0;
+  while (line_start < text.length) {
+    usize line_end = line_start;
+    while (line_end < text.length && text[line_end] != '\n')
+      line_end++;
+    let const line =
+        text.substring_of_length(line_start, line_end - line_start);
+
+    bool is_heading = !line.is_empty();
+    bool has_heading_letter = false;
+    for (usize index = 0; index < line.length && is_heading; index++) {
+      let const byte = line[index];
+      has_heading_letter = has_heading_letter || (byte >= 'A' && byte <= 'Z');
+      is_heading = byte == ' ' || (byte >= 'A' && byte <= 'Z');
+    }
+    is_heading = is_heading && has_heading_letter;
+
+    if (is_heading) {
+      append_report_text(output, line, colors::ansi::BOLD_BLUE, true);
+      if (line == "DESCRIPTION")
+        section = help_section::Description;
+      else if (line == "SYNOPSIS")
+        section = help_section::Synopsis;
+      else
+        section = help_section::Other;
+    } else if (!line.is_empty() && section == help_section::Description) {
+      output += line;
+    } else if (!line.is_empty() && section == help_section::Synopsis) {
+      append_report_text(output, line, colors::ansi::GREEN, true);
+    } else {
+      output += line;
+    }
+
+    if (line_end < text.length) output += '\n';
+    line_start = line_end + 1;
+  }
+
+  return output;
+}
+
+fn format_cli_help(StringView text) throws -> String
+{
+  return format_cli_help(text, colors::stdout_wants_color());
+}
+
+cold fn make_flag_help(const FlagList &flags, bool should_color) throws
+    -> String
 {
   let s = String{heap_allocator()};
 
-  static constexpr usize DESCRIPTION_COLUMN = 26;
+  static constexpr usize DESCRIPTION_COLUMN = 40;
   static constexpr usize TEXT_WIDTH = HELP_WRAP_WIDTH - DESCRIPTION_COLUMN;
 
   let const do_render_flag = [&](const koshka::Flag *f) throws {
     s += "\n";
 
-    let left = String{heap_allocator()};
+    let flag_name = String{heap_allocator()};
+    let flag_value = String{heap_allocator()};
     if (f->short_name() != '\0') {
-      left += "  -";
-      left += f->short_name();
+      flag_name += "  -";
+      flag_name += f->short_name();
       if (f->kind() == koshka::Flag::Kind::RepeatedBool) {
-        left += "[";
-        left += f->short_name();
-        left += "..]";
+        flag_name += "[";
+        flag_name += f->short_name();
+        flag_name += "..]";
       }
-      if (!f->long_name().is_empty()) left += ", ";
+      if (!f->long_name().is_empty()) flag_name += ", ";
     } else if (!f->long_name().is_empty()) {
-      left += "      ";
+      flag_name += "      ";
     } else {
-      left += "  ";
+      flag_name += "  ";
     }
 
     if (!f->long_name().is_empty()) {
-      left += "--";
-      left += f->long_name();
+      flag_name += "--";
+      flag_name += f->long_name();
       switch (f->kind()) {
-      case koshka::Flag::Kind::String: left += "=<...>"; break;
-      case koshka::Flag::Kind::ManyStrings: left += "=<.., ..>"; break;
-      case koshka::Flag::Kind::OptionalValue: left += "[=<...>]"; break;
+      case koshka::Flag::Kind::String:
+        flag_name += '=';
+        flag_value += "<...>";
+        break;
+      case koshka::Flag::Kind::ManyStrings:
+        flag_name += '=';
+        flag_value += "<.., ..>";
+        break;
+      case koshka::Flag::Kind::OptionalValue:
+        flag_name += "[=";
+        flag_value += "<...>]";
+        break;
       case koshka::Flag::Kind::Bool:
       case koshka::Flag::Kind::RepeatedBool: break;
       }
     }
 
-    s += left;
+    append_report_text(s, flag_name.view(), {}, should_color);
+    append_report_text(s, flag_value.view(), colors::ansi::DIM, should_color);
 
-    if (left.length() + 2 > DESCRIPTION_COLUMN) {
+    let const flag_width = flag_name.length() + flag_value.length();
+    if (flag_width + 2 > DESCRIPTION_COLUMN) {
       s += '\n';
       for (usize i = 0; i < DESCRIPTION_COLUMN; i++)
         s += ' ';
     } else {
-      for (usize i = left.length(); i < DESCRIPTION_COLUMN; i++)
+      for (usize i = flag_width; i < DESCRIPTION_COLUMN; i++)
         s += ' ';
     }
 
+    let description_text = String{heap_allocator()};
     let const description = f->description();
     usize line_used = 0;
     usize word_start = 0;
@@ -1058,20 +1293,23 @@ cold fn make_flag_help(const FlagList &flags) throws -> String
       let const word_length = i - word_start;
       if (word_length > 0) {
         if (line_used > 0 && line_used + 1 + word_length > TEXT_WIDTH) {
-          s += '\n';
+          description_text += '\n';
           for (usize j = 0; j < DESCRIPTION_COLUMN; j++)
-            s += ' ';
+            description_text += ' ';
           line_used = 0;
         }
         if (line_used > 0) {
-          s += ' ';
+          description_text += ' ';
           line_used++;
         }
-        s += description.substring_of_length(word_start, word_length);
+        description_text +=
+            description.substring_of_length(word_start, word_length);
         line_used += word_length;
       }
       word_start = i + 1;
     }
+    append_report_text(s, description_text.view(), colors::ansi::DIM,
+                       should_color);
   };
 
   static const StringView SECTION_HEADERS[] = {

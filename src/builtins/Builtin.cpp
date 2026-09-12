@@ -9,6 +9,7 @@
 #include "../Builtin.hpp"
 
 #include "../Cli.hpp"
+#include "../CliColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
@@ -44,17 +45,90 @@ static fn sorted_builtin_names(Allocator allocator) throws -> ArrayList<String>
   return names;
 }
 
+enum class builtin_section : u8
+{
+  Posix,
+  Bash,
+  Koshka,
+};
+
+static pure fn get_builtin_section(Builtin::Kind kind,
+                                   StringView name) wontthrow -> builtin_section
+{
+  if (name == "source") return builtin_section::Bash;
+
+  switch (kind) {
+  case Builtin::Kind::Assimilate:
+  case Builtin::Kind::Bench:
+  case Builtin::Kind::Koshkit:
+  case Builtin::Kind::Z: return builtin_section::Koshka;
+  case Builtin::Kind::Alias:
+  case Builtin::Kind::Bg:
+  case Builtin::Kind::Break:
+  case Builtin::Kind::Cd:
+  case Builtin::Kind::CommandBuiltin:
+  case Builtin::Kind::Continue:
+  case Builtin::Kind::Echo:
+  case Builtin::Kind::Eval:
+  case Builtin::Kind::Exec:
+  case Builtin::Kind::Exit:
+  case Builtin::Kind::Export:
+  case Builtin::Kind::False:
+  case Builtin::Kind::Fc:
+  case Builtin::Kind::Fg:
+  case Builtin::Kind::Getopts:
+  case Builtin::Kind::Hash:
+  case Builtin::Kind::Jobs:
+  case Builtin::Kind::Kill:
+  case Builtin::Kind::Newgrp:
+  case Builtin::Kind::Printf:
+  case Builtin::Kind::Pwd:
+  case Builtin::Kind::Read:
+  case Builtin::Kind::Readonly:
+  case Builtin::Kind::Return:
+  case Builtin::Kind::Set:
+  case Builtin::Kind::Shift:
+  case Builtin::Kind::Source:
+  case Builtin::Kind::Test:
+  case Builtin::Kind::Times:
+  case Builtin::Kind::Trap:
+  case Builtin::Kind::True:
+  case Builtin::Kind::Type:
+  case Builtin::Kind::Ulimit:
+  case Builtin::Kind::Umask:
+  case Builtin::Kind::Unalias:
+  case Builtin::Kind::Unset:
+  case Builtin::Kind::Wait: return builtin_section::Posix;
+  default: return builtin_section::Bash;
+  }
+}
+
 static fn print_builtin_columns(ExecContext &ec, Allocator allocator) throws
     -> void
 {
   let const sorted = sorted_builtin_names(allocator);
+  let posix_names = ArrayList<StringView>{allocator};
+  let bash_names = ArrayList<StringView>{allocator};
+  let koshka_names = ArrayList<StringView>{allocator};
+
+  for (let const &name : sorted) {
+    let const kind = search_builtin(name.view());
+    ASSERT(kind.has_value());
+    switch (get_builtin_section(*kind, name.view())) {
+    case builtin_section::Posix: posix_names.push(name.view()); break;
+    case builtin_section::Bash: bash_names.push(name.view()); break;
+    case builtin_section::Koshka: koshka_names.push(name.view()); break;
+    }
+  }
 
   let out = String{allocator};
   out += "Koshka has ";
   out += String::from(static_cast<i64>(sorted.count()), allocator);
   out += " builtins:\n\n";
-  utils::append_name_columns(out, sorted.count(),
-                             [&](usize index) { return sorted[index].view(); });
+  let const should_color = colors::stdout_wants_color();
+  append_report_name_section(out, "POSIX", posix_names, should_color);
+  append_report_name_section(out, "BASH", bash_names, should_color);
+  append_report_name_section(out, "Koshka", koshka_names, should_color);
   ec.print_to_stdout(out.view());
 }
 

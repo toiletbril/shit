@@ -91,7 +91,7 @@ fn Help::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       out += " - ";
       out.append(description);
       out.push('\n');
-      ec.print_to_stdout(out);
+      ec.print_to_stdout(format_cli_help(out.view()));
       continue;
     }
     if (FLAG_MANPAGE.is_enabled() && synopsis != nullptr) {

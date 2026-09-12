@@ -333,13 +333,14 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
                    "variable. A flag "
                    "on the command line overrides one set there.\n\n",
                    HELP_INDENT, HELP_WRAP_WIDTH);
-    h += make_flag_help(FLAG_LIST);
+    let const should_color = colors::stderr_wants_color();
+    h += make_flag_help(FLAG_LIST, should_color);
     h += '\n';
     h += '\n';
     h += "Report bugs and suggest features at "
          "<https://github.com/toiletbril/kosh>";
     h += '\n';
-    print_error(h);
+    print_error(format_cli_help(h.view(), should_color));
     return EXIT_SUCCESS;
   }
   if (FLAG_LIST_CHECKS.is_enabled()) {

@@ -301,10 +301,42 @@ fn show_short_version() throws -> void;
 
 fn make_synopsis(StringView program_name, const SynopsisList &lines) throws
     -> String;
-fn make_flag_help(const FlagList &flags) throws -> String;
+fn make_flag_help(const FlagList &flags, bool should_color = false) throws
+    -> String;
 
 fn wrap_text(StringView text, usize indent, usize width,
              const Maybe<usize> &continuation_indent = {}) throws -> String;
+
+enum class cli_color_mode : u8
+{
+  Auto,
+  Always,
+  Never,
+};
+
+fn parse_cli_color_mode(StringView text) wontthrow -> Maybe<cli_color_mode>;
+fn stdout_wants_color(cli_color_mode mode) throws -> bool;
+
+fn append_report_text(String &output, StringView text, StringView style,
+                      bool should_color) throws -> void;
+fn append_report_column(String &output, StringView text, usize width,
+                        bool is_right_aligned, StringView style,
+                        bool should_color) throws -> void;
+fn append_report_field(String &output, StringView name, StringView value,
+                       StringView style, bool should_color) throws -> void;
+fn append_report_inline_field(String &output, StringView name, StringView value,
+                              StringView style, bool should_color) throws
+    -> void;
+fn append_report_name_section(String &output, StringView title,
+                              const ArrayList<StringView> &names,
+                              bool should_color,
+                              StringView indentation = {}) throws -> void;
+fn append_indented_report(String &output, StringView report,
+                          StringView indentation = "  ") throws -> void;
+fn append_report_body(String &output, StringView body,
+                      StringView indentation = "  ") throws -> void;
+fn format_cli_help(StringView text, bool should_color) throws -> String;
+fn format_cli_help(StringView text) throws -> String;
 
 fn show_message(StringView err) throws -> void;
 

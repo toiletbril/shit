@@ -12,6 +12,7 @@
 #include "Builtin.hpp"
 
 #include "Cli.hpp"
+#include "CliColors.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -50,7 +51,8 @@ cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
   }
   help_text += make_synopsis(ec.args()[0].view(), synopsis_lines);
   help_text += '\n';
-  help_text += make_flag_help(flags);
+  let const should_color = colors::stdout_wants_color();
+  help_text += make_flag_help(flags, should_color);
   help_text += '\n';
   /* The per-builtin generated text, the OPTION SWITCHES table of set and the
      OPTION NAMES list of shopt, lands after the flag sections. */
@@ -58,7 +60,7 @@ cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
     help_text += extra_sections;
     help_text += '\n';
   }
-  ec.print_to_stdout(help_text);
+  ec.print_to_stdout(format_cli_help(help_text.view(), should_color));
 }
 
 flatten fn search_builtin(StringView builtin_name) throws
