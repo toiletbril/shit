@@ -7,7 +7,7 @@
  * names.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
@@ -71,15 +71,32 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
     return 2;
   }
 
-  let queries = ArrayList<os::process_file_query>{cxt.scratch_allocator()};
+  let const allocator = cxt.scratch_allocator();
+  let operand_paths = ArrayList<Path>{allocator};
+  let file_statuses = ArrayList<os::file_status>{allocator};
+  let batch = os::Batch{allocator};
+  operand_paths.reserve(operands.count());
+  file_statuses.reserve(operands.count());
+  batch.reserve(operands.count());
+  for (let const &operand : operands) {
+    operand_paths.push(Path{operand.view()});
+    file_statuses.push({});
+  }
+  for (usize operand_position = 0; operand_position < operands.count();
+       operand_position++)
+  {
+    batch.add(os::BatchOperation::stat(operand_paths[operand_position],
+                                       file_statuses[operand_position]));
+  }
+  let const results = batch.execute();
+
+  let queries = ArrayList<os::process_file_query>{allocator};
   i32 status = 0;
   for (usize operand_position = 0; operand_position < operands.count();
        operand_position++)
   {
-    os::file_status file_status{};
-    if (!os::stat_path_following(operands[operand_position].view(),
-                                 file_status))
-    {
+    if (results[operand_position].error_number != 0) {
+      os::set_last_system_error(results[operand_position].error_number);
       report_soft_koshkit_util_error(
           ec, cxt, operand_locations[operand_position], args[0].view(),
           "'" + operands[operand_position] +
@@ -88,6 +105,7 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
+    let const &file_status = file_statuses[operand_position];
     if (!os::process_file_query_is_supported(
             file_status, FLAG_FUSER_FILESYSTEM.is_enabled()))
     {

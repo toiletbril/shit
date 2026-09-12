@@ -6,7 +6,7 @@
  * and writes buffered copies until output closes or interruption is requested.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 

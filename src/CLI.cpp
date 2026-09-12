@@ -7,9 +7,9 @@
  * usage errors.
  */
 
-#include "Cli.hpp"
+#include "CLI.hpp"
 
-#include "CliColors.hpp"
+#include "CLIColors.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -781,6 +781,25 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
   }
 
   return args;
+}
+
+fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
+                       const ArrayList<SourceLocation> *arg_locations,
+                       ArrayList<SourceLocation> *operand_locations,
+                       bool should_accept_negative_number_operand,
+                       bool should_allow_options_after_operands,
+                       bool should_accept_unknown_flag_operand) throws
+    -> ArrayList<String>
+{
+  let operands = parse_flags_vec(
+      flags, args, 0, NULL, arg_locations, operand_locations, {},
+      should_accept_negative_number_operand,
+      should_allow_options_after_operands, should_accept_unknown_flag_operand);
+  if (!operands.is_empty()) operands.remove(0);
+  if (operand_locations != nullptr && !operand_locations->is_empty())
+    operand_locations->remove(0);
+
+  return operands;
 }
 
 pure fn arg_needs_shell_quoting(StringView arg) wontthrow -> bool

@@ -7,7 +7,7 @@
  * interactive output.
  */
 
-#include "CliColors.hpp"
+#include "CLIColors.hpp"
 
 #include "Platform.hpp"
 #include "Trace.hpp"

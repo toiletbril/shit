@@ -6,8 +6,8 @@
  * interface addresses in deterministic content-derived columns.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -24,7 +24,7 @@ HELP_DESCRIPTION_DECL(
 FLAG(EVILNET_ALL, Bool, 'a', "all", "Include interface traffic and TCP data.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Evilnet);
+REGISTER_KOSHKIT_UTIL_FLAGS(EvilNet);
 
 namespace koshka::koshkit {
 
@@ -264,14 +264,14 @@ fn append_tcp_report(String &output, Allocator allocator,
 
 }
 
-Evilnet::Evilnet() = default;
+EvilNet::EvilNet() = default;
 
-pure fn Evilnet::kind() const wontthrow -> Utility::Kind
+pure fn EvilNet::kind() const wontthrow -> Utility::Kind
 {
-  return Kind::Evilnet;
+  return Kind::EvilNet;
 }
 
-fn Evilnet::execute(const ExecContext &ec, EvalContext &cxt,
+fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<String> &args,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
@@ -290,11 +290,15 @@ fn Evilnet::execute(const ExecContext &ec, EvalContext &cxt,
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
   let const should_color = colors::stdout_wants_color();
-  append_report_text(output, "INTERFACES", colors::ansi::BOLD_BLUE,
-                     should_color);
-  output += "\n";
+  let const should_show_sections = FLAG_EVILNET_ALL.is_enabled();
+  if (should_show_sections) {
+    append_report_text(output, "INTERFACES", colors::ansi::BOLD_BLUE,
+                       should_color);
+    output += "\n";
+  }
   let const address_count =
-      append_network_interface_report(output, should_color, "  ");
+      append_network_interface_report(output, should_color,
+                                      should_show_sections ? "  " : "");
   usize traffic_count = 0;
   bool has_tcp_statistics = false;
   if (FLAG_EVILNET_ALL.is_enabled()) {

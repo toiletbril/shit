@@ -7,8 +7,8 @@
  * stops on an interrupt, on a failing status, or on a change of the output.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

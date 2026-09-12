@@ -7,8 +7,8 @@
  * with optional identifiers, owners, and command lines.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -33,7 +33,7 @@ FLAG(EVILPS_SORT, String, '\0', "sort",
      "Sort children by name, pid, cpu, or memory.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Evilps);
+REGISTER_KOSHKIT_UTIL_FLAGS(EvilPS);
 
 namespace koshka::koshkit {
 
@@ -166,13 +166,13 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
     nodes[position].was_rendered = true;
 
     append_report_text(output, prefix.view(), colors::ansi::CYAN, should_color);
-    append_report_text(output, is_last ? "`-- " : "|-- ", colors::ansi::CYAN,
+    append_report_text(output, is_last ? "└── " : "├── ", colors::ansi::CYAN,
                        should_color);
     append_label(output, nodes[position], allocator, should_color);
     rendered_count++;
 
     let child_prefix = String{allocator, prefix.view()};
-    child_prefix += is_last ? "    " : "|   ";
+    child_prefix += is_last ? "    " : "│   ";
     render_children(output, nodes, nodes[position].pid, child_prefix, depth + 1,
                     allocator, should_color, output_limit, rendered_count);
   }
@@ -180,11 +180,11 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
 
 }
 
-Evilps::Evilps() = default;
+EvilPS::EvilPS() = default;
 
-pure fn Evilps::kind() const wontthrow -> Utility::Kind { return Kind::Evilps; }
+pure fn EvilPS::kind() const wontthrow -> Utility::Kind { return Kind::EvilPS; }
 
-fn Evilps::execute(const ExecContext &ec, EvalContext &cxt,
+fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<String> &args,
                    const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
@@ -281,16 +281,12 @@ fn Evilps::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let const should_color = colors::stdout_wants_color();
   usize rendered_count = 0;
-  append_report_text(output, "PROCESSES", colors::ansi::BOLD_BLUE,
-                     should_color);
-  output += "\n";
 
   if (root_position < nodes.count()) {
     nodes[root_position].was_rendered = true;
-    output += "  ";
     append_label(output, nodes[root_position], allocator, should_color);
     rendered_count++;
-    render_children(output, nodes, root_pid, String{allocator, "  "}, 0,
+    render_children(output, nodes, root_pid, String{allocator}, 0,
                     allocator, should_color, output_limit, rendered_count);
     ec.print_to_stdout(output);
     return 0;
@@ -321,10 +317,9 @@ fn Evilps::execute(const ExecContext &ec, EvalContext &cxt,
     if (has_visible_parent) continue;
 
     nodes[position].was_rendered = true;
-    output += "  ";
     append_label(output, nodes[position], allocator, should_color);
     rendered_count++;
-    render_children(output, nodes, nodes[position].pid, String{allocator, "  "},
+    render_children(output, nodes, nodes[position].pid, String{allocator},
                     0, allocator, should_color, output_limit, rendered_count);
   }
 

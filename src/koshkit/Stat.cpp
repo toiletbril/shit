@@ -7,7 +7,7 @@
  * default, terse, and filesystem layouts that a caller selects with a flag.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

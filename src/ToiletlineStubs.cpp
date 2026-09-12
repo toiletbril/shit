@@ -6,7 +6,7 @@
  * history and inert implementations of terminal-dependent editor operations.
  */
 
-#include "CliColors.hpp"
+#include "CLIColors.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"

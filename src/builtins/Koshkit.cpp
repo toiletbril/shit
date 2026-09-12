@@ -10,8 +10,8 @@
 #include "../Koshkit.hpp"
 
 #include "../Builtin.hpp"
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
@@ -51,18 +51,18 @@ static pure fn get_utility_section(koshkit::Utility::Kind kind) wontthrow
 {
   switch (kind) {
   case koshkit::Utility::Kind::Evil:
-  case koshkit::Utility::Kind::Evilfiles:
-  case koshkit::Utility::Kind::Evilfs:
-  case koshkit::Utility::Kind::Evilnet:
-  case koshkit::Utility::Kind::Goodnode:
-  case koshkit::Utility::Kind::Evilps:
-  case koshkit::Utility::Kind::Goodstat:
-  case koshkit::Utility::Kind::Evildisk:
-  case koshkit::Utility::Kind::Evilio:
-  case koshkit::Utility::Kind::Evillogs:
-  case koshkit::Utility::Kind::Goodcore:
-  case koshkit::Utility::Kind::Evilss:
-  case koshkit::Utility::Kind::Goodfsw: return utility_section::Koshka;
+  case koshkit::Utility::Kind::EvilFiles:
+  case koshkit::Utility::Kind::EvilFS:
+  case koshkit::Utility::Kind::EvilNet:
+  case koshkit::Utility::Kind::GoodNode:
+  case koshkit::Utility::Kind::EvilPS:
+  case koshkit::Utility::Kind::GoodStat:
+  case koshkit::Utility::Kind::EvilDisk:
+  case koshkit::Utility::Kind::EvilIO:
+  case koshkit::Utility::Kind::EvilLogs:
+  case koshkit::Utility::Kind::GoodCore:
+  case koshkit::Utility::Kind::EvilSS:
+  case koshkit::Utility::Kind::GoodFSW: return utility_section::Koshka;
   default: return utility_section::Posix;
   }
 }
@@ -156,6 +156,7 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                "  ");
     append_report_name_section(listing, "Koshka", koshka_names, should_color,
                                "  ");
+    listing.pop_back();
 
     ec.print_to_stdout(format_cli_help(listing.view()));
     return 0;

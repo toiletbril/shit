@@ -13,8 +13,8 @@
    not included. */
 
 #include "Allocator.hpp"
-#include "Cli.hpp"
-#include "CliColors.hpp"
+#include "CLI.hpp"
+#include "CLIColors.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"
 #include "ErrorOr.hpp"

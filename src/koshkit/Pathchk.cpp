@@ -6,7 +6,7 @@
  * limits, portable filename bytes, and leading-hyphen components.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

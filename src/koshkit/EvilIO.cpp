@@ -6,8 +6,8 @@
  * scheduler, stall, disk, swap, and process I/O activity.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -16,23 +16,35 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a | --cumulative] [--ps | -NUMBER | -n count | -p pid] "
-                   "[--color when]");
+HELP_SYNOPSIS_DECL("[-a] [--cumulative [duration]] "
+                   "[--ps | -NUMBER | -n count | -p pid] [--color when]");
 
 HELP_DESCRIPTION_DECL(
     "The evilio utility reports system and process I/O activity.");
 
+static pure fn is_evilio_sample_duration(koshka::StringView value) wontthrow
+    -> bool
+{
+  return !value.is_empty() &&
+         ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
+}
+
 FLAG(EVILIO_ALL, Bool, 'a', "all", "Include sampled system activity.");
-FLAG(EVILIO_CUMULATIVE, Bool, '\0', "cumulative",
-     "Show only sampled byte rates and IOPS.");
-FLAG(EVILIO_PS, Bool, '\0', "ps", "Show process I/O counters.");
+static koshka::FlagOptionalValue FLAG_EVILIO_CUMULATIVE{
+    FLAG_LIST,
+    '\0',
+    "cumulative",
+    koshka::flag_section::NoSection,
+    "Show only rates and IOPS over an optional sample duration.",
+    is_evilio_sample_duration};
+FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");
 FLAG(EVILIO_COLOR, String, '\0', "color",
      "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Evilio);
+REGISTER_KOSHKIT_UTIL_FLAGS(EvilIO);
 
 namespace koshka::koshkit {
 
@@ -166,9 +178,6 @@ fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
                                  usize row_limit, Allocator allocator,
                                  bool should_color) throws -> void
 {
-  append_report_text(output, "PROCESSES", colors::ansi::BOLD_BLUE,
-                     should_color);
-  output += "\n  ";
   append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
                        should_color);
   output += "  ";
@@ -190,7 +199,6 @@ fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
   let const shown_count = rows.count() < row_limit ? rows.count() : row_limit;
   for (usize index = 0; index < shown_count; index++) {
     let const &row = rows[index];
-    output += "  ";
     append_report_column(output, String::from(row.pid, allocator).view(), 8,
                          true, colors::ansi::BOLD_MAGENTA, should_color);
     output += "  ";
@@ -239,8 +247,6 @@ fn append_disk_io_rate_report(String &output,
                               u64 elapsed_nanoseconds, Allocator allocator,
                               bool should_color) throws -> void
 {
-  append_report_text(output, "DISKS", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n  ";
   append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
                        should_color);
   output += "  ";
@@ -276,7 +282,6 @@ fn append_disk_io_rate_report(String &output,
 
   for (let const &after : after_snapshot.disks) {
     let const before = find_disk_io_status(before_snapshot, after.name.view());
-    output += "  ";
     append_report_column(output, after.name.view(), 16, false,
                          colors::ansi::BOLD_GREEN, should_color);
 
@@ -436,11 +441,11 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
 
 }
 
-Evilio::Evilio() = default;
+EvilIO::EvilIO() = default;
 
-pure fn Evilio::kind() const wontthrow -> Utility::Kind { return Kind::Evilio; }
+pure fn EvilIO::kind() const wontthrow -> Utility::Kind { return Kind::EvilIO; }
 
-fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
+fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<String> &args,
                    const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
@@ -452,24 +457,56 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   let const allocator = cxt.scratch_allocator();
-  if (operands.count() > 1 ||
-      (!operands.is_empty() &&
-       (operands[0].length() < 2 || operands[0][0] != '-')))
-  {
-    report_soft_koshkit_error(ec, cxt, "evilio: unexpected operand",
-                              "use --ps, -NUMBER, --count, or --pid");
+  let process_limit_operand = Maybe<StringView>{};
+  let sample_duration_operand = Maybe<StringView>{};
+  if (FLAG_EVILIO_CUMULATIVE.has_value())
+    sample_duration_operand = FLAG_EVILIO_CUMULATIVE.value();
+
+  for (let const &operand : operands) {
+    let const is_process_limit = operand.length() > 1 && operand[0] == '-';
+    if (is_process_limit && !process_limit_operand.has_value()) {
+      process_limit_operand = operand.view();
+      continue;
+    }
+    if (!is_process_limit && !sample_duration_operand.has_value()) {
+      sample_duration_operand = operand.view();
+      continue;
+    }
+
+    report_soft_koshkit_error(
+        ec, cxt, "evilio: unexpected operand",
+        "use at most one sample duration and one -NUMBER limit");
     return 1;
   }
 
-  usize row_limit = 10;
-  if (!operands.is_empty()) {
+  if (sample_duration_operand.has_value() &&
+      !FLAG_EVILIO_CUMULATIVE.is_enabled())
+  {
+    report_soft_koshkit_error(ec, cxt, "evilio: unexpected operand",
+                              "a sample duration requires --cumulative");
+    return 1;
+  }
+
+  f64 sample_duration_seconds = 1.0;
+  if (sample_duration_operand.has_value()) {
+    sample_duration_seconds = parse_koshkit_duration_seconds(
+        *sample_duration_operand, "evilio", allocator);
+    if (sample_duration_seconds <= 0.0) {
+      report_soft_koshkit_error(ec, cxt, "evilio: invalid duration",
+                                "the duration must be greater than zero");
+      return 1;
+    }
+  }
+
+  usize row_limit = FLAG_EVILIO_PS.is_enabled() ? SIZE_MAX : 10;
+  if (process_limit_operand.has_value()) {
     if (FLAG_EVILIO_COUNT.is_set()) {
       report_soft_koshkit_error(ec, cxt, "evilio: conflicting process limits",
                                 "use either -NUMBER or --count");
       return 1;
     }
     let const parsed = utils::parse_integer_in_base(
-        operands[0].view().substring(1), int_base::decimal);
+        process_limit_operand->substring(1), int_base::decimal);
     if (parsed.is_error() || parsed.value() < 1 || parsed.value() > 100000) {
       report_soft_koshkit_error(ec, cxt, "evilio: invalid count",
                                 "the count must be from 1 through 100000");
@@ -513,7 +550,7 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_color = stdout_wants_color(color_mode);
   let const should_show_processes =
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
-      selected_pid.has_value() || !operands.is_empty();
+      selected_pid.has_value() || process_limit_operand.has_value();
 
   if (FLAG_EVILIO_ALL.is_enabled() && FLAG_EVILIO_CUMULATIVE.is_enabled()) {
     report_soft_koshkit_error(ec, cxt, "evilio: conflicting report modes",
@@ -524,7 +561,7 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {
     let const before_rows = read_process_io_rows(allocator, selected_pid, true);
     let const started_at_nanoseconds = os::monotonic_nanos();
-    os::sleep_for_seconds(1.0);
+    os::sleep_for_seconds(sample_duration_seconds);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
@@ -543,7 +580,8 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (should_show_processes) {
-    let rows = read_process_io_rows(allocator, selected_pid, false);
+    let rows = read_process_io_rows(allocator, selected_pid,
+                                    FLAG_EVILIO_PS.is_enabled());
     u64 total_read_bytes = 0;
     u64 total_written_bytes = 0;
     u64 total_read_operation_count = 0;
@@ -584,12 +622,13 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
   os::swap_status swap_before{};
   os::swap_status swap_after{};
   os::disk_io_snapshot disk_before{};
-  let disk_after = os::read_disk_io_snapshot(allocator);
+  os::disk_io_snapshot disk_after{};
   bool has_activity_before = false;
   bool has_activity_after = false;
   bool has_swap_before = false;
   bool has_swap_after = false;
   u64 elapsed_nanoseconds = 0;
+  disk_after = os::read_disk_io_snapshot(allocator);
   if (FLAG_EVILIO_ALL.is_enabled()) {
     has_activity_before = os::read_system_activity_status(activity_before);
     has_swap_before = os::read_swap_status(swap_before);
@@ -605,7 +644,7 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
     }
   } else if (FLAG_EVILIO_CUMULATIVE.is_enabled()) {
     disk_before = steal(disk_after);
-    os::sleep_for_seconds(1.0);
+    os::sleep_for_seconds(sample_duration_seconds);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
@@ -845,7 +884,7 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
     }
     if (activity_after.has_field(os::system_activity_field::Blocked)) {
       append_report_field(
-          scheduler_body, "I O blocked",
+          scheduler_body, "I/O blocked",
           String::from(activity_after.blocked_process_count, allocator),
           colors::ansi::BOLD_CYAN, should_color);
     }
@@ -904,7 +943,7 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
         activity_after.has_field(os::system_activity_field::IoSomeStall))
     {
       append_stall_field(
-          stalls, "I O some",
+          stalls, "I/O some",
           counter_rate(activity_before.io_some_stall_microseconds,
                        activity_after.io_some_stall_microseconds,
                        elapsed_nanoseconds),
@@ -914,7 +953,7 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
         activity_after.has_field(os::system_activity_field::IoFullStall))
     {
       append_stall_field(
-          stalls, "I O full",
+          stalls, "I/O full",
           counter_rate(activity_before.io_full_stall_microseconds,
                        activity_after.io_full_stall_microseconds,
                        elapsed_nanoseconds),
@@ -1215,7 +1254,7 @@ fn Evilio::execute(const ExecContext &ec, EvalContext &cxt,
     append_report_inline_field(swap_body, "Status", status.view(),
                                colors::ansi::BOLD_CYAN, should_color);
     swap_body += "\n";
-    if (swap_after.has_activity) {
+    if (FLAG_EVILIO_ALL.is_enabled() && swap_after.has_activity) {
       let activity = String{allocator};
       if (FLAG_EVILIO_ALL.is_enabled() && has_swap_before &&
           swap_before.has_activity)

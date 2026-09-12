@@ -397,7 +397,7 @@ REGEX_COMPILER_FLAGS := $(filter-out -std=c++23 -fno-rtti,$(CXXFLAGS)) -std=c11 
 
 COMMIT_HASH_STAMP := $(OBJECT_DIRECTORY)/.commit-hash
 COMMIT_HASH_OBJECTS := \
-	$(OBJECT_DIRECTORY)/Cli.o \
+	$(OBJECT_DIRECTORY)/CLI.o \
 	$(OBJECT_DIRECTORY)/Main.o
 STORED_COMMIT_HASH := $(shell cat $(COMMIT_HASH_STAMP) 2>/dev/null)
 

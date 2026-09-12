@@ -6,7 +6,7 @@
  * files and recursively traverses directories when requested.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

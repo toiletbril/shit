@@ -6,7 +6,7 @@
  * predicates, then walks directory trees without following symbolic links.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -279,20 +279,37 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (roots.is_empty()) roots.push(StringView{"."});
 
-  let output = String{cxt.scratch_allocator()};
-  i32 status = 0;
+  let const allocator = cxt.scratch_allocator();
+  let root_paths = ArrayList<Path>{allocator};
+  let root_statuses = ArrayList<os::file_status>{allocator};
+  let batch = os::Batch{allocator};
+  root_paths.reserve(roots.count());
+  root_statuses.reserve(roots.count());
+  batch.reserve(roots.count());
   for (let const &root : roots) {
-    let const root_path = Path{root};
-    if (!root_path.exists()) {
+    root_paths.push(Path{root});
+    root_statuses.push({});
+  }
+  for (usize root_index = 0; root_index < roots.count(); root_index++) {
+    batch.add(os::BatchOperation::lstat(root_paths[root_index],
+                                        root_statuses[root_index]));
+  }
+  let const results = batch.execute();
+
+  let output = String{allocator};
+  i32 status = 0;
+  for (usize root_index = 0; root_index < roots.count(); root_index++) {
+    let const root = roots[root_index];
+    if (results[root_index].error_number != 0) {
       report_soft_koshkit_error(ec, cxt,
                                 "find: '" +
-                                    String{cxt.scratch_allocator(), root} +
+                                    String{allocator, root} +
                                     "': no such file or directory");
       status = 1;
       continue;
     }
-    find_walk(ec, cxt, root_path, root, 0, options, output, status,
-              cxt.scratch_allocator());
+    find_walk(ec, cxt, root_paths[root_index], root, 0, options, output,
+              status, allocator, &root_statuses[root_index]);
   }
 
   ec.print_to_stdout(output);

@@ -6,7 +6,7 @@
  * operand pairs, emits a stable topological order, and reports cycles.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

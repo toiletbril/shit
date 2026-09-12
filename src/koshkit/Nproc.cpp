@@ -6,7 +6,7 @@
  * configured logical processor count and subtracts a bounded ignored count.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

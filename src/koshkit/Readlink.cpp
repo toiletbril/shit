@@ -6,7 +6,7 @@
  * through the platform interface and controls the trailing newline.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"

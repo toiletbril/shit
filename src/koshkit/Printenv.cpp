@@ -6,7 +6,7 @@
  * process environment or the values of named variables in operand order.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"

@@ -6,7 +6,7 @@
  * display-column width and can choose blank boundaries for each break.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

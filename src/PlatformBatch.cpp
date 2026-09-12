@@ -118,15 +118,87 @@ fn Batch::add(BatchOperation operation) throws -> void
 
 fn Batch::clear() wontthrow -> void { m_operations.clear(); }
 
+static pure fn is_same_metadata_request(
+    const internal::batched_syscall &left,
+    const internal::batched_syscall &right) wontthrow -> bool
+{
+  if (left.syscall_id != right.syscall_id) return false;
+  if (left.syscall_id != BatchOperation::Kind::Lstat &&
+      left.syscall_id != BatchOperation::Kind::Stat)
+  {
+    return false;
+  }
+  if (left.path == nullptr || right.path == nullptr) return false;
+
+  return left.path->text().view() == right.path->text().view();
+}
+
+static pure fn has_repeated_metadata_request(
+    const ArrayList<internal::batched_syscall> &operations) wontthrow -> bool
+{
+  for (usize index = 1; index < operations.count(); index++)
+    if (is_same_metadata_request(operations[index - 1], operations[index]))
+      return true;
+
+  return false;
+}
+
 fn Batch::execute(ArrayList<BatchResult> &results) const throws -> void
 {
+  if (!has_repeated_metadata_request(m_operations)) {
+    results.clear();
+    results.reserve(m_operations.count());
+    for (usize index = 0; index < m_operations.count(); index++)
+      results.push({});
+
+    internal::execute_batch_operations(m_operations.begin(),
+                                       m_operations.count(), results.begin());
+    return;
+  }
+
+  let optimized_operations =
+      ArrayList<internal::batched_syscall>{m_operations.allocator()};
+  let optimized_positions = ArrayList<usize>{m_operations.allocator()};
+  optimized_operations.reserve(m_operations.count());
+  optimized_positions.reserve(m_operations.count());
+  for (let const &operation : m_operations) {
+    if (!optimized_operations.is_empty() &&
+        is_same_metadata_request(optimized_operations.back(), operation))
+    {
+      optimized_positions.push(optimized_operations.count() - 1);
+      continue;
+    }
+
+    optimized_positions.push(optimized_operations.count());
+    optimized_operations.push(operation);
+  }
+
+  let optimized_results = ArrayList<BatchResult>{m_operations.allocator()};
+  optimized_results.reserve(optimized_operations.count());
+  for (usize index = 0; index < optimized_operations.count(); index++)
+    optimized_results.push({});
+
+  internal::execute_batch_operations(optimized_operations.begin(),
+                                     optimized_operations.count(),
+                                     optimized_results.begin());
+
   results.clear();
   results.reserve(m_operations.count());
-  for (usize index = 0; index < m_operations.count(); index++)
-    results.push({});
+  for (usize index = 0; index < m_operations.count(); index++) {
+    let const optimized_position = optimized_positions[index];
+    let result = optimized_results[optimized_position];
+    result.request_id = index;
+    results.push(result);
 
-  internal::execute_batch_operations(m_operations.begin(),
-                                     m_operations.count(), results.begin());
+    let const &operation = m_operations[index];
+    let const &optimized_operation = optimized_operations[optimized_position];
+    if (result.error_number == 0 && operation.status != nullptr &&
+        optimized_operation.status != nullptr &&
+        operation.status != optimized_operation.status)
+    {
+      *operation.status = *optimized_operation.status;
+    }
+  }
 }
 
 fn Batch::execute() const throws -> ArrayList<BatchResult>

@@ -6,8 +6,8 @@
  * numbers lines, and optionally applies the shared shell syntax highlighter.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Completion.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"

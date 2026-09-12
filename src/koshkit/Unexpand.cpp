@@ -6,11 +6,11 @@
  * replaces eligible blank runs with tabs under default or explicit tab stops.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "TextProcessing.hpp"
+#include "../TextProcessing.hpp"
 
 FLAG_LIST_DECL();
 

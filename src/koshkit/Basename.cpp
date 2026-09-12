@@ -6,7 +6,7 @@
  * separators, selects the final path component, and strips an optional suffix.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

@@ -873,6 +873,71 @@ execute_batched_syscall_direct(const batched_syscall &operation,
 
 #if defined __APPLE__
 
+static fn
+execute_getattrlistbulk_batch(const batched_syscall *operations,
+                              usize operation_count,
+                              batched_syscall_result *results) wontthrow -> bool
+{
+  if (operation_count < 2) return false;
+
+  for (usize index = 0; index < operation_count; index++) {
+    if (operations[index].syscall_id != batched_syscall_id::Lstat ||
+        validate_batched_syscall(operations[index]) != 0)
+    {
+      return false;
+    }
+  }
+
+  try {
+    usize group_start = 0;
+    while (group_start < operation_count) {
+      let const group_parent =
+          operations[group_start].path->parent_or_current();
+      usize group_end = group_start + 1;
+      while (group_end < operation_count) {
+        let const candidate_parent =
+            operations[group_end].path->parent_or_current();
+        if (candidate_parent.text().view() != group_parent.text().view()) break;
+        group_end++;
+      }
+
+      if (group_end - group_start == 1) {
+        execute_batched_syscall_direct(operations[group_start],
+                                       results[group_start]);
+        group_start = group_end;
+        continue;
+      }
+
+      let const entries = list_directory_status_bulk(group_parent.text().view(),
+                                                     heap_allocator());
+      for (usize index = group_start; index < group_end; index++) {
+        let const &operation = operations[index];
+        let &result = results[index];
+        result = {operation.request_id, 0, 0};
+
+        bool has_status = false;
+        if (entries.has_value()) {
+          let const filename = operation.path->filename();
+          for (let const &entry : *entries) {
+            if (entry.has_status && entry.child.name.view() == filename) {
+              *operation.status = entry.status;
+              has_status = true;
+              break;
+            }
+          }
+        }
+        if (!has_status) execute_batched_syscall_direct(operation, result);
+      }
+
+      group_start = group_end;
+    }
+
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
 static fn finish_suspended_aio(aiocb &control,
                                batched_syscall_result &result) wontthrow -> bool
 {
@@ -1033,6 +1098,9 @@ static fn execute_native_batch(const batched_syscall *operations,
                                batched_syscall_result *results) wontthrow
     -> bool
 {
+  if (execute_getattrlistbulk_batch(operations, operation_count, results))
+    return true;
+
   return execute_kqueue_aio_batch(operations, operation_count, results);
 }
 

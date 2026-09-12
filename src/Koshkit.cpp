@@ -12,8 +12,8 @@
 #include "Koshkit.hpp"
 
 #include "Builtin.hpp"
-#include "Cli.hpp"
-#include "CliColors.hpp"
+#include "CLI.hpp"
+#include "CLIColors.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "ProgramResolver.hpp"
@@ -226,26 +226,6 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
     show_message(String{util_name} + ": unexpected error");
     return 1;
   }
-}
-
-fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
-                       const ArrayList<SourceLocation> *arg_locations,
-                       ArrayList<SourceLocation> *operand_locations,
-                       bool should_accept_negative_number_operand,
-                       bool should_allow_options_after_operands,
-                       bool should_accept_unknown_flag_operand) throws
-    -> ArrayList<String>
-{
-  ArrayList<String> operands = parse_flags_vec(
-      flags, args, 0, NULL, arg_locations, operand_locations, {},
-      should_accept_negative_number_operand,
-      should_allow_options_after_operands, should_accept_unknown_flag_operand);
-  /* The first operand is the utility name, dropped to leave the real arguments.
-   */
-  if (!operands.is_empty()) operands.remove(0);
-  if (operand_locations != nullptr && !operand_locations->is_empty())
-    operand_locations->remove(0);
-  return operands;
 }
 
 fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,

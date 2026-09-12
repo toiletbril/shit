@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include "Cli.hpp"
+#include "CLI.hpp"
 #include "Common.hpp"
 #include "Maybe.hpp"
 #include "MimicMood.hpp"

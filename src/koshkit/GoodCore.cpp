@@ -7,8 +7,8 @@
  * metadata, and creates a compressed debugging archive.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -35,7 +35,7 @@ FLAG(GOODCORE_NO_COMPRESS, Bool, '\0', "no-compress",
      "Create an uncompressed tar archive.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Goodcore);
+REGISTER_KOSHKIT_UTIL_FLAGS(GoodCore);
 
 namespace koshka::koshkit {
 
@@ -211,14 +211,14 @@ fn remove_stage(const Path &stage) throws -> void
 
 }
 
-Goodcore::Goodcore() = default;
+GoodCore::GoodCore() = default;
 
-pure fn Goodcore::kind() const wontthrow -> Utility::Kind
+pure fn GoodCore::kind() const wontthrow -> Utility::Kind
 {
-  return Kind::Goodcore;
+  return Kind::GoodCore;
 }
 
-fn Goodcore::execute(
+fn GoodCore::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {

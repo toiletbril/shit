@@ -6,7 +6,7 @@
  * one representative line, and optionally prefixes the run length.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

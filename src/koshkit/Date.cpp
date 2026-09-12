@@ -6,7 +6,7 @@
  * formats local or Coordinated Universal Time with strftime directives.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

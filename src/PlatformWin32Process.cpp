@@ -10,7 +10,7 @@
  * lifecycle and inspection interfaces to one backend fragment.
  */
 
-#include "Cli.hpp"
+#include "CLI.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"

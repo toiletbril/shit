@@ -6,8 +6,8 @@
  * sources, targets, types, and options in content-derived columns.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -24,13 +24,13 @@ FLAG(EVILFS_ALL, Bool, 'a', "all",
      "Show volume identity and operating system metadata.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Evilfs);
+REGISTER_KOSHKIT_UTIL_FLAGS(EvilFS);
 
 namespace koshka::koshkit {
 
-Evilfs::Evilfs() = default;
+EvilFS::EvilFS() = default;
 
-pure fn Evilfs::kind() const wontthrow -> Utility::Kind { return Kind::Evilfs; }
+pure fn EvilFS::kind() const wontthrow -> Utility::Kind { return Kind::EvilFS; }
 
 static fn append_filesystem_id(String &output, StringView name, u64 value,
                                Allocator allocator, bool should_color) throws
@@ -107,7 +107,7 @@ static fn append_detailed_filesystem(String &output,
   append_report_body(output, metadata.view(), "      ");
 }
 
-fn Evilfs::execute(const ExecContext &ec, EvalContext &cxt,
+fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<String> &args,
                    const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32

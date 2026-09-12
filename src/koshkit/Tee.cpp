@@ -7,7 +7,7 @@
  * file. With -a it appends to the files. The default truncates them.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

@@ -8,8 +8,8 @@
  */
 
 #include "Arena.hpp"
-#include "Cli.hpp"
-#include "CliColors.hpp"
+#include "CLI.hpp"
+#include "CLIColors.hpp"
 #include "Common.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"
@@ -311,8 +311,10 @@ fn kosh_main(int argc, char **argv) -> int
     file_names = koshka::parse_flags(FLAG_LIST, parse_argc, parse_argv, 0,
                                      &FLAG_COMMAND);
   } catch (const koshka::ErrorWithLocation &e) {
-    koshka::show_message(
-        e.to_string(koshka::join_command_line(parse_argc, parse_argv)));
+    let const source = koshka::join_command_line(parse_argc, parse_argv);
+    let highlight_context = koshka::EvalContext{
+        false, false, false, false, false, koshka::String{parse_argv[0]}};
+    koshka::show_message(e.to_string(source, &highlight_context));
     if (!is_login_invocation) {
       return 2;
     }

@@ -11,8 +11,8 @@
 
 #include "Builtin.hpp"
 
-#include "Cli.hpp"
-#include "CliColors.hpp"
+#include "CLI.hpp"
+#include "CLIColors.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"

@@ -6,8 +6,8 @@
  * metadata as a labeled terminal report.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -26,7 +26,7 @@ FLAG(GOODSTAT_COLOR, String, '\0', "color",
      "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Goodstat);
+REGISTER_KOSHKIT_UTIL_FLAGS(GoodStat);
 
 namespace koshka::koshkit {
 
@@ -150,14 +150,14 @@ fn append_subject(String &output, StringView operand,
 
 }
 
-Goodstat::Goodstat() = default;
+GoodStat::GoodStat() = default;
 
-pure fn Goodstat::kind() const wontthrow -> Utility::Kind
+pure fn GoodStat::kind() const wontthrow -> Utility::Kind
 {
-  return Kind::Goodstat;
+  return Kind::GoodStat;
 }
 
-fn Goodstat::execute(
+fn GoodStat::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {

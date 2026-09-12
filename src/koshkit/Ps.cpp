@@ -7,7 +7,7 @@
  * standard or user-oriented columns.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"

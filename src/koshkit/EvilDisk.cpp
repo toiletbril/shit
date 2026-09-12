@@ -6,8 +6,8 @@
  * counters, and available SMART data for mounted filesystems or named paths.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -25,7 +25,7 @@ FLAG(EVILDISK_COLOR, String, '\0', "color",
      "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Evildisk);
+REGISTER_KOSHKIT_UTIL_FLAGS(EvilDisk);
 
 namespace koshka::koshkit {
 
@@ -144,14 +144,14 @@ fn read_smart_rows(EvalContext &cxt,
 
 }
 
-Evildisk::Evildisk() = default;
+EvilDisk::EvilDisk() = default;
 
-pure fn Evildisk::kind() const wontthrow -> Utility::Kind
+pure fn EvilDisk::kind() const wontthrow -> Utility::Kind
 {
-  return Kind::Evildisk;
+  return Kind::EvilDisk;
 }
 
-fn Evildisk::execute(
+fn EvilDisk::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {

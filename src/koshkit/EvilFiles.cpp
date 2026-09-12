@@ -6,8 +6,8 @@
  * processes and filters them by process, owner, command, and path.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -31,7 +31,7 @@ FLAG(EVILFILES_COMMAND, String, 'c', "command",
      "List only the processes whose name starts with this text.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Evilfiles);
+REGISTER_KOSHKIT_UTIL_FLAGS(EvilFiles);
 
 namespace koshka::koshkit {
 
@@ -169,14 +169,14 @@ fn matches_path_operands(StringView path,
 
 }
 
-Evilfiles::Evilfiles() = default;
+EvilFiles::EvilFiles() = default;
 
-pure fn Evilfiles::kind() const wontthrow -> Utility::Kind
+pure fn EvilFiles::kind() const wontthrow -> Utility::Kind
 {
-  return Kind::Evilfiles;
+  return Kind::EvilFiles;
 }
 
-fn Evilfiles::execute(
+fn EvilFiles::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
@@ -251,19 +251,55 @@ fn Evilfiles::execute(
     let const files = os::list_process_open_files(process.pid, allocator);
     if (files.is_empty()) continue;
 
+    if (FLAG_EVILFILES_TERSE.is_enabled()) {
+      bool did_match_this_process = false;
+      for (let const &file : files) {
+        if (!matches_path_operands(file.path.view(), operands)) continue;
+
+        did_match = true;
+        did_match_this_process = true;
+        break;
+      }
+      if (did_match_this_process) {
+        terse_output +=
+            String::from(static_cast<u64>(process.pid), allocator).view();
+        terse_output += "\n";
+      }
+      continue;
+    }
+
+    let matching_positions = ArrayList<usize>{allocator};
+    let matching_paths = ArrayList<Path>{allocator};
+    for (usize file_position = 0; file_position < files.count();
+         file_position++)
+    {
+      if (!matches_path_operands(files[file_position].path.view(), operands))
+        continue;
+
+      matching_positions.push(file_position);
+      matching_paths.push(Path{files[file_position].path.view()});
+    }
+    if (matching_positions.is_empty()) continue;
+
+    did_match = true;
+    let file_statuses = ArrayList<os::file_status>{allocator};
+    let metadata_batch = os::Batch{allocator};
+    file_statuses.reserve(matching_positions.count());
+    metadata_batch.reserve(matching_positions.count());
+    for (usize position = 0; position < matching_positions.count(); position++)
+      file_statuses.push({});
+    for (usize position = 0; position < matching_positions.count(); position++)
+      metadata_batch.add(os::BatchOperation::stat(matching_paths[position],
+                                                  file_statuses[position]));
+    let const metadata_results = metadata_batch.execute();
     let const owner = os::process_owner_name(static_cast<u32>(process.pid),
                                              process.owner_id, allocator);
-    bool did_match_this_process = false;
 
-    for (let const &file : files) {
-      if (!matches_path_operands(file.path.view(), operands)) continue;
-
-      did_match = true;
-      did_match_this_process = true;
-      if (FLAG_EVILFILES_TERSE.is_enabled()) break;
-
-      os::file_status status{};
-      let const did_stat = os::stat_path_following(file.path.view(), status);
+    for (usize position = 0; position < matching_positions.count(); position++)
+    {
+      let const &file = files[matching_positions[position]];
+      let const &status = file_statuses[position];
+      let const did_stat = metadata_results[position].error_number == 0;
 
       open_file_row row{
           String{allocator, process.name.view()                                                         },
@@ -291,12 +327,6 @@ fn Evilfiles::execute(
       widen(widths.size, row.size);
       widen(widths.node, row.node);
       rows.push(steal(row));
-    }
-
-    if (FLAG_EVILFILES_TERSE.is_enabled() && did_match_this_process) {
-      terse_output +=
-          String::from(static_cast<u64>(process.pid), allocator).view();
-      terse_output += "\n";
     }
   }
 

@@ -7,8 +7,8 @@
  * root.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -29,7 +29,7 @@ FLAG(GOODNODE_COLOR, String, '\0', "color",
      "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Goodnode);
+REGISTER_KOSHKIT_UTIL_FLAGS(GoodNode);
 
 namespace koshka::koshkit {
 
@@ -147,32 +147,22 @@ fn find_inode(const Path &path, const os::file_status &status, u64 inode,
   }
   if (os::file_type_letter(status.mode) != 'd') return false;
 
-  let names = Path::read_directory(path);
-  if (!names.has_value()) return false;
-  names->sort();
+  let children =
+      os::list_directory_status(path.text().view(), heap_allocator());
+  if (!children.has_value()) return false;
+  children->sort([](const os::directory_status_entry &left,
+                    const os::directory_status_entry &right) {
+    return left.child.name < right.child.name;
+  });
 
-  let child_paths = ArrayList<Path>{heap_allocator()};
-  let child_statuses = ArrayList<os::file_status>{heap_allocator()};
-  let batch = os::Batch{heap_allocator()};
-  child_paths.reserve(names->count());
-  child_statuses.reserve(names->count());
-  batch.reserve(names->count());
-  for (let const &name : *names) {
-    child_paths.push(
-        PathBuilder{path.text().view()}.append(name.view()).build());
-    child_statuses.push({});
-  }
-  for (usize index = 0; index < child_paths.count(); index++)
-    batch.add(
-        os::BatchOperation::lstat(child_paths[index], child_statuses[index]));
-  let const results = batch.execute();
-
-  for (usize index = 0; index < child_paths.count(); index++) {
+  for (let const &child : *children) {
     if (os::INTERRUPT_REQUESTED) return false;
-    if (results[index].error_number != 0) continue;
+    if (!child.has_status) continue;
 
-    if (find_inode(child_paths[index], child_statuses[index], inode,
-                   found_path))
+    let const child_path =
+        PathBuilder{path.text().view()}.append(child.child.name.view()).build();
+
+    if (find_inode(child_path, child.status, inode, found_path))
       return true;
   }
 
@@ -195,14 +185,14 @@ pure fn path_is_beneath(const Path &root, const Path &candidate) wontthrow
 
 }
 
-Goodnode::Goodnode() = default;
+GoodNode::GoodNode() = default;
 
-pure fn Goodnode::kind() const wontthrow -> Utility::Kind
+pure fn GoodNode::kind() const wontthrow -> Utility::Kind
 {
-  return Kind::Goodnode;
+  return Kind::GoodNode;
 }
 
-fn Goodnode::execute(
+fn GoodNode::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
@@ -281,9 +271,25 @@ fn Goodnode::execute(
 
   let output = String{allocator};
   i32 exit_status = 0;
+  let report_paths = ArrayList<Path>{allocator};
+  let report_statuses = ArrayList<os::file_status>{allocator};
+  let report_batch = os::Batch{allocator};
+  report_paths.reserve(paths.count());
+  report_statuses.reserve(paths.count());
+  report_batch.reserve(paths.count());
   for (let const &path : paths) {
-    os::file_status status{};
-    if (!os::stat_path(path.view(), status)) {
+    report_paths.push(Path{path.view()});
+    report_statuses.push({});
+  }
+  for (usize index = 0; index < paths.count(); index++)
+    report_batch.add(
+        os::BatchOperation::lstat(report_paths[index], report_statuses[index]));
+  let const report_results = report_batch.execute();
+
+  for (usize index = 0; index < paths.count(); index++) {
+    let const &path = paths[index];
+    if (report_results[index].error_number != 0) {
+      os::set_last_system_error(report_results[index].error_number);
       report_soft_koshkit_error(ec, cxt,
                                 "goodnode: cannot inspect '" + path +
                                     "': " + os::last_system_error_message());
@@ -292,7 +298,7 @@ fn Goodnode::execute(
     }
 
     if (!output.is_empty()) output += '\n';
-    append_node_report(output, ec, path.view(), status, should_color,
+    append_node_report(output, ec, path.view(), report_statuses[index], should_color,
                        allocator);
   }
 

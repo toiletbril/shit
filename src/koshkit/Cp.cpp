@@ -6,7 +6,7 @@
  * handles overwrite policy, and optionally preserves modes and timestamps.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

@@ -6,7 +6,7 @@
  * weekdays, then renders one month or a complete year.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

@@ -7,8 +7,8 @@
  * names by file type, and renders compact, long, recursive, or tree listings.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -49,7 +49,7 @@ FLAG(LS_COLOR, String, '\0', "color",
      "colors a terminal alone.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Ls);
+REGISTER_KOSHKIT_UTIL_FLAGS(LS);
 
 namespace koshka {
 
@@ -259,6 +259,15 @@ static fn classify_status(const Path &path, const os::file_status &status,
                                     : entry_type::Regular;
 }
 
+static fn set_entry_status(listing_entry &entry, const Path &path,
+                           const os::file_status &status,
+                           const listing_options &options) wontthrow -> void
+{
+  entry.status = status;
+  entry.has_status = true;
+  entry.type = classify_status(path, entry.status, options.should_color);
+}
+
 static fn
 make_entry(const Path &path, StringView name, const listing_options &options,
            Path::entry_kind kind, Allocator allocator,
@@ -280,16 +289,13 @@ make_entry(const Path &path, StringView name, const listing_options &options,
   if (known_entry != nullptr) {
     if (!known_entry->has_status) return entry;
 
-    entry.status = known_entry->status;
-    entry.has_status = true;
-    entry.type = classify_status(path, entry.status, options.should_color);
+    set_entry_status(entry, path, known_entry->status, options);
     return entry;
   }
 
-  if (os::stat_path(path.text().view(), entry.status)) {
-    entry.has_status = true;
-    entry.type = classify_status(path, entry.status, options.should_color);
-  }
+  os::file_status status{};
+  if (os::stat_path(path.text().view(), status))
+    set_entry_status(entry, path, status, options);
 
   return entry;
 }
@@ -598,7 +604,7 @@ static fn render_tree_level(StringView directory,
     let const is_last = index + 1 == entries.count();
 
     output += prefix.view();
-    output += is_last ? StringView{"`-- "} : StringView{"|-- "};
+    output += is_last ? StringView{"└── "} : StringView{"├── "};
     append_decorated_name(output, entry, options);
     output += '\n';
 
@@ -608,7 +614,7 @@ static fn render_tree_level(StringView directory,
     if (!is_descending) continue;
 
     let const kept_length = prefix.count();
-    prefix += is_last ? StringView{"    "} : StringView{"|   "};
+    prefix += is_last ? StringView{"    "} : StringView{"│   "};
     let const child = PathBuilder{directory}.append(entry.name.view()).build();
     render_tree_level(child.text().view(), options, depth + 1, prefix, output,
                       allocator);
@@ -701,11 +707,11 @@ static fn resolve_depth_limit(const ExecContext &ec, EvalContext &cxt,
   return true;
 }
 
-Ls::Ls() = default;
+LS::LS() = default;
 
-pure fn Ls::kind() const wontthrow -> Utility::Kind { return Kind::Ls; }
+pure fn LS::kind() const wontthrow -> Utility::Kind { return Kind::LS; }
 
-fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
+fn LS::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<String> &args,
                const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
@@ -748,7 +754,8 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
   options.needs_type = options.should_color || options.should_classify ||
                        options.is_recursive || options.is_tree;
 
-  ArrayList<StringView> targets{cxt.scratch_allocator()};
+  let const allocator = cxt.scratch_allocator();
+  ArrayList<StringView> targets{allocator};
   if (operands.is_empty())
     targets.push(StringView{"."});
   else
@@ -757,32 +764,77 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
 
   targets.sort();
 
-  ArrayList<listing_entry> file_entries{cxt.scratch_allocator()};
-  ArrayList<StringView> dir_targets{cxt.scratch_allocator()};
-  ArrayList<id_name_entry> uid_cache{cxt.scratch_allocator()};
-  ArrayList<id_name_entry> gid_cache{cxt.scratch_allocator()};
-  let output = String{cxt.scratch_allocator()};
+  let target_paths = ArrayList<Path>{allocator};
+  let target_statuses = ArrayList<os::file_status>{allocator};
+  let target_batch = os::Batch{allocator};
+  target_paths.reserve(targets.count());
+  target_statuses.reserve(targets.count());
+  target_batch.reserve(targets.count());
+  for (let const target : targets) {
+    target_paths.push(Path{target});
+    target_statuses.push({});
+  }
+  for (usize index = 0; index < targets.count(); index++) {
+    target_batch.add(os::BatchOperation::stat(target_paths[index],
+                                              target_statuses[index]));
+  }
+  let const target_results = target_batch.execute();
+
+  ArrayList<listing_entry> file_entries{allocator};
+  ArrayList<usize> file_target_indices{allocator};
+  ArrayList<StringView> dir_targets{allocator};
+  ArrayList<id_name_entry> uid_cache{allocator};
+  ArrayList<id_name_entry> gid_cache{allocator};
+  let output = String{allocator};
   i32 status = 0;
 
-  for (const StringView &target : targets) {
-    let const path = Path{target};
-    if (!path.exists()) {
+  for (usize index = 0; index < targets.count(); index++) {
+    let const target = targets[index];
+    if (target_results[index].error_number != 0) {
       report_soft_koshkit_error(ec, cxt,
                                 "ls: cannot access '" +
-                                    String{cxt.scratch_allocator(), target} +
+                                    String{allocator, target} +
                                     "': no such file or directory");
       status = 2;
       continue;
     }
 
-    if (path.is_directory()) {
+    if (os::file_type_letter(target_statuses[index].mode) == 'd') {
       dir_targets.push(target);
       continue;
     }
 
-    file_entries.push(make_entry(path, target, options,
-                                 Path::entry_kind::Unknown,
-                                 cxt.scratch_allocator()));
+    file_target_indices.push(index);
+  }
+
+  if (options.needs_full_status || options.needs_type) {
+    let file_statuses = ArrayList<os::file_status>{allocator};
+    let file_batch = os::Batch{allocator};
+    file_statuses.reserve(file_target_indices.count());
+    file_batch.reserve(file_target_indices.count());
+    for (usize index = 0; index < file_target_indices.count(); index++) {
+      file_statuses.push({});
+      file_batch.add(os::BatchOperation::lstat(
+          target_paths[file_target_indices[index]], file_statuses[index]));
+    }
+    let const file_results = file_batch.execute();
+
+    for (usize index = 0; index < file_target_indices.count(); index++) {
+      let const target_index = file_target_indices[index];
+      let entry = listing_entry{allocator};
+      entry.name = String{allocator, targets[target_index]};
+      if (file_results[index].error_number == 0) {
+        set_entry_status(entry, target_paths[target_index],
+                         file_statuses[index], options);
+      }
+      file_entries.push(steal(entry));
+    }
+  } else {
+    for (let const target_index : file_target_indices) {
+      file_entries.push(make_entry(target_paths[target_index],
+                                   targets[target_index], options,
+                                   Path::entry_kind::Unknown, allocator));
+    }
   }
 
   let const should_print_headers =
@@ -792,7 +844,7 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
   if (!file_entries.is_empty()) {
     sort_entries(file_entries, options);
     render_entries(file_entries, options, false, uid_cache, gid_cache, output,
-                   cxt.scratch_allocator());
+                   allocator);
   }
 
   bool has_printed_block = !file_entries.is_empty();
@@ -800,7 +852,7 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
     if (!options.is_tree) {
       render_directory_block(target, options, 0, should_print_headers,
                              uid_cache, gid_cache, has_printed_block, output,
-                             ec, cxt, status, cxt.scratch_allocator());
+                             ec, cxt, status, allocator);
       continue;
     }
 
@@ -809,9 +861,8 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
     output += target;
     output += '\n';
 
-    let prefix = String{cxt.scratch_allocator()};
-    render_tree_level(target, options, 0, prefix, output,
-                      cxt.scratch_allocator());
+    let prefix = String{allocator};
+    render_tree_level(target, options, 0, prefix, output, allocator);
   }
 
   ec.print_to_stdout(output);

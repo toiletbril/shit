@@ -7,7 +7,7 @@
  * matching descriptions.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -955,4 +955,4 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} // namespace koshka::koshkit
+}

@@ -6,8 +6,8 @@
  * reports and can select either section for copyable diagnostics.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -27,7 +27,7 @@ FLAG(EVILLOGS_CORES, Bool, '\0', "cores", "Print only the core dump report.");
 FLAG(EVILLOGS_LOGS, Bool, '\0', "logs", "Print only the log report.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Evillogs);
+REGISTER_KOSHKIT_UTIL_FLAGS(EvilLogs);
 
 namespace koshka::koshkit {
 
@@ -480,14 +480,14 @@ fn append_log_report(String &output, Allocator allocator,
 
 }
 
-Evillogs::Evillogs() = default;
+EvilLogs::EvilLogs() = default;
 
-pure fn Evillogs::kind() const wontthrow -> Utility::Kind
+pure fn EvilLogs::kind() const wontthrow -> Utility::Kind
 {
-  return Kind::Evillogs;
+  return Kind::EvilLogs;
 }
 
-fn Evillogs::execute(
+fn EvilLogs::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {

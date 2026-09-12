@@ -6,7 +6,7 @@
  * login-session identity and reports a failure when no login name is available.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

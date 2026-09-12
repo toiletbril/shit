@@ -10,7 +10,7 @@
  */
 
 #include "Arena.hpp"
-#include "Cli.hpp"
+#include "CLI.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"

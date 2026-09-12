@@ -12,7 +12,7 @@
 
 #include "Arena.hpp"
 #include "Builtin.hpp"
-#include "CliColors.hpp"
+#include "CLIColors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
 #include "CompletionPolicy.hpp"

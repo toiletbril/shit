@@ -7,7 +7,7 @@
  */
 
 #include "../Builtin.hpp"
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"

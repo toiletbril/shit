@@ -4,7 +4,7 @@
  *
  * This file declares terminal color constants, highlight role names, and
  * descriptor-sensitive color policy queries used by diagnostics and
- * interactive output. CliColors.cpp owns environment and terminal probing
+ * interactive output. CLIColors.cpp owns environment and terminal probing
  * together with the decision caches.
  */
 

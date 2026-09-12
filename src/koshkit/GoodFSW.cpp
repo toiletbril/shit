@@ -6,8 +6,8 @@
  * intervals and reports creation, removal, content, and attribute changes.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -34,7 +34,7 @@ FLAG(GOODFSW_EXCLUDE, String, 'e', "exclude",
      "Skip every path that contains this text.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Goodfsw);
+REGISTER_KOSHKIT_UTIL_FLAGS(GoodFSW);
 
 namespace koshka::koshkit {
 
@@ -194,14 +194,14 @@ fn sort_entries(ArrayList<watched_entry> &entries) throws -> void
 
 }
 
-Goodfsw::Goodfsw() = default;
+GoodFSW::GoodFSW() = default;
 
-pure fn Goodfsw::kind() const wontthrow -> Utility::Kind
+pure fn GoodFSW::kind() const wontthrow -> Utility::Kind
 {
-  return Kind::Goodfsw;
+  return Kind::GoodFSW;
 }
 
-fn Goodfsw::execute(const ExecContext &ec, EvalContext &cxt,
+fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<String> &args,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
@@ -225,19 +225,34 @@ fn Goodfsw::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const is_recursive = FLAG_GOODFSW_RECURSIVE.is_enabled();
 
+  let operand_paths = ArrayList<Path>{allocator};
+  let operand_statuses = ArrayList<os::file_status>{allocator};
+  let operand_batch = os::Batch{allocator};
+  operand_paths.reserve(operands.count());
+  operand_statuses.reserve(operands.count());
+  operand_batch.reserve(operands.count());
   for (let const &operand : operands) {
-    os::file_status probe{};
-    if (!os::stat_path(operand.view(), probe)) {
+    operand_paths.push(Path{operand.view()});
+    operand_statuses.push({});
+  }
+  for (usize index = 0; index < operands.count(); index++)
+    operand_batch.add(os::BatchOperation::lstat(operand_paths[index],
+                                                operand_statuses[index]));
+  let const operand_results = operand_batch.execute();
+  for (usize index = 0; index < operands.count(); index++) {
+    if (operand_results[index].error_number != 0) {
+      os::set_last_system_error(operand_results[index].error_number);
       report_soft_koshkit_error(ec, cxt,
-                                "goodfsw: cannot watch '" + operand +
+                                "goodfsw: cannot watch '" + operands[index] +
                                     "': " + os::last_system_error_message());
       return 1;
     }
   }
 
   ArrayList<watched_entry> previous{allocator};
-  for (let const &operand : operands)
-    scan_path(operand.view(), previous, is_recursive, 0, allocator);
+  for (usize index = 0; index < operands.count(); index++)
+    scan_path(operands[index].view(), previous, is_recursive, 0, allocator,
+              &operand_statuses[index]);
   sort_entries(previous);
 
   let const should_color = colors::stdout_wants_color();

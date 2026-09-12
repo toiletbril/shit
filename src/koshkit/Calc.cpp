@@ -9,7 +9,7 @@
  * binds a variable for a later expression to read.
  */
 
-#include "../Cli.hpp"
+#include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../EvalOperations.hpp"

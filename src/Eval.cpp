@@ -12,8 +12,8 @@
 #include "Eval.hpp"
 
 #include "Arena.hpp"
-#include "Cli.hpp"
-#include "CliColors.hpp"
+#include "CLI.hpp"
+#include "CLIColors.hpp"
 #include "Common.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"

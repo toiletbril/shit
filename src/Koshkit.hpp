@@ -13,7 +13,7 @@
 #pragma once
 
 #include "Builtin.hpp"
-#include "Cli.hpp"
+#include "CLI.hpp"
 #include "Common.hpp"
 #include "Maybe.hpp"
 #include "PackedStringKey.hpp"
@@ -34,7 +34,7 @@ class Utility
 public:
   enum class Kind : uint8_t
   {
-    Ls,
+    LS,
     Ln,
     Rm,
     Mkdir,
@@ -123,20 +123,20 @@ public:
     Stat,
     Sync,
     Watch,
-    Goodfsw,
-    Evilfiles,
-    Evilps,
+    GoodFSW,
+    EvilFiles,
+    EvilPS,
     Evil,
     Retry,
-    Evilfs,
-    Evilnet,
-    Goodstat,
-    Goodnode,
-    Evildisk,
-    Evilio,
-    Evillogs,
-    Evilss,
-    Goodcore,
+    EvilFS,
+    EvilNet,
+    GoodStat,
+    GoodNode,
+    EvilDisk,
+    EvilIO,
+    EvilLogs,
+    EvilSS,
+    GoodCore,
   };
 
   pure virtual Kind kind() const wontthrow = 0;
@@ -152,7 +152,7 @@ protected:
 };
 
 inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
-    {SSK("ls"),        Utility::Kind::Ls       },
+    {SSK("ls"),        Utility::Kind::LS       },
     {SSK("ln"),        Utility::Kind::Ln       },
     {SSK("rm"),        Utility::Kind::Rm       },
     {SSK("mkdir"),     Utility::Kind::Mkdir    },
@@ -241,26 +241,26 @@ inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
     {SSK("stat"),      Utility::Kind::Stat     },
     {SSK("sync"),      Utility::Kind::Sync     },
     {SSK("watch"),     Utility::Kind::Watch    },
-    {SSK("goodfsw"),   Utility::Kind::Goodfsw  },
-    {SSK("evilfiles"), Utility::Kind::Evilfiles},
-    {SSK("evilps"),    Utility::Kind::Evilps   },
+    {SSK("goodfsw"),   Utility::Kind::GoodFSW  },
+    {SSK("evilfiles"), Utility::Kind::EvilFiles},
+    {SSK("evilps"),    Utility::Kind::EvilPS   },
     {SSK("evil"),      Utility::Kind::Evil     },
     {SSK("retry"),     Utility::Kind::Retry    },
-    {SSK("evilfs"),    Utility::Kind::Evilfs   },
-    {SSK("evilnet"),   Utility::Kind::Evilnet  },
-    {SSK("goodnode"),  Utility::Kind::Goodnode },
-    {SSK("goodstat"),  Utility::Kind::Goodstat },
-    {SSK("evildisk"),  Utility::Kind::Evildisk },
-    {SSK("evilio"),    Utility::Kind::Evilio   },
-    {SSK("evillogs"),  Utility::Kind::Evillogs },
-    {SSK("evilss"),    Utility::Kind::Evilss   },
-    {SSK("goodcore"),  Utility::Kind::Goodcore },
+    {SSK("evilfs"),    Utility::Kind::EvilFS   },
+    {SSK("evilnet"),   Utility::Kind::EvilNet  },
+    {SSK("goodnode"),  Utility::Kind::GoodNode },
+    {SSK("goodstat"),  Utility::Kind::GoodStat },
+    {SSK("evildisk"),  Utility::Kind::EvilDisk },
+    {SSK("evilio"),    Utility::Kind::EvilIO   },
+    {SSK("evillogs"),  Utility::Kind::EvilLogs },
+    {SSK("evilss"),    Utility::Kind::EvilSS   },
+    {SSK("goodcore"),  Utility::Kind::GoodCore },
 };
 
 inline constexpr StaticStringMap KOSHKIT_UTILS{KOSHKIT_ENTRIES};
 
 inline constexpr usize KOSHKIT_UTIL_COUNT =
-    static_cast<usize>(Utility::Kind::Goodcore) + 1;
+    static_cast<usize>(Utility::Kind::GoodCore) + 1;
 
 /* A utility with no registration reads back null. */
 fn register_koshkit_util_flags(Utility::Kind chosen,
@@ -323,14 +323,6 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
                            usize name_index, SourceLocation &error_location,
                            String &error_message) throws -> Maybe<i32>;
 
-fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
-                       const ArrayList<SourceLocation> *arg_locations = nullptr,
-                       ArrayList<SourceLocation> *operand_locations = nullptr,
-                       bool should_accept_negative_number_operand = false,
-                       bool should_allow_options_after_operands = false,
-                       bool should_accept_unknown_flag_operand = false) throws
-    -> ArrayList<String>;
-
 fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
                    StringView description, const FlagList &flags) throws
     -> void;
@@ -354,7 +346,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   }
 
 #define UTILITY_SWITCH_CASES()                                                 \
-  U_CASE(Ls);                                                                  \
+  U_CASE(LS);                                                                  \
   U_CASE(Ln);                                                                  \
   U_CASE(Rm);                                                                  \
   U_CASE(Mkdir);                                                               \
@@ -443,20 +435,20 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Stat);                                                                \
   U_CASE(Sync);                                                                \
   U_CASE(Watch);                                                               \
-  U_CASE(Goodfsw);                                                             \
-  U_CASE(Evilfiles);                                                           \
-  U_CASE(Evilps);                                                              \
+  U_CASE(GoodFSW);                                                             \
+  U_CASE(EvilFiles);                                                           \
+  U_CASE(EvilPS);                                                              \
   U_CASE(Evil);                                                                \
   U_CASE(Retry);                                                               \
-  U_CASE(Evilfs);                                                              \
-  U_CASE(Evilnet);                                                             \
-  U_CASE(Goodnode);                                                            \
-  U_CASE(Goodstat);                                                            \
-  U_CASE(Evildisk);                                                            \
-  U_CASE(Evilio);                                                              \
-  U_CASE(Evillogs);                                                            \
-  U_CASE(Evilss);                                                              \
-  U_CASE(Goodcore)
+  U_CASE(EvilFS);                                                              \
+  U_CASE(EvilNet);                                                             \
+  U_CASE(GoodNode);                                                            \
+  U_CASE(GoodStat);                                                            \
+  U_CASE(EvilDisk);                                                            \
+  U_CASE(EvilIO);                                                              \
+  U_CASE(EvilLogs);                                                            \
+  U_CASE(EvilSS);                                                              \
+  U_CASE(GoodCore)
 
 #define UTILITY_STRUCT(u)                                                      \
   class u : public Utility                                                     \
@@ -471,7 +463,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
         const ArrayList<SourceLocation> &arg_locations) const throws override; \
   };
 
-UTILITY_STRUCT(Ls);
+UTILITY_STRUCT(LS);
 UTILITY_STRUCT(Ln);
 UTILITY_STRUCT(Rm);
 UTILITY_STRUCT(Mkdir);
@@ -560,20 +552,20 @@ UTILITY_STRUCT(Tput);
 UTILITY_STRUCT(Stat);
 UTILITY_STRUCT(Sync);
 UTILITY_STRUCT(Watch);
-UTILITY_STRUCT(Goodfsw);
-UTILITY_STRUCT(Evilfiles);
-UTILITY_STRUCT(Evilps);
+UTILITY_STRUCT(GoodFSW);
+UTILITY_STRUCT(EvilFiles);
+UTILITY_STRUCT(EvilPS);
 UTILITY_STRUCT(Evil);
 UTILITY_STRUCT(Retry);
-UTILITY_STRUCT(Evilfs);
-UTILITY_STRUCT(Evilnet);
-UTILITY_STRUCT(Goodnode);
-UTILITY_STRUCT(Goodstat);
-UTILITY_STRUCT(Evildisk);
-UTILITY_STRUCT(Evilio);
-UTILITY_STRUCT(Evillogs);
-UTILITY_STRUCT(Evilss);
-UTILITY_STRUCT(Goodcore);
+UTILITY_STRUCT(EvilFS);
+UTILITY_STRUCT(EvilNet);
+UTILITY_STRUCT(GoodNode);
+UTILITY_STRUCT(GoodStat);
+UTILITY_STRUCT(EvilDisk);
+UTILITY_STRUCT(EvilIO);
+UTILITY_STRUCT(EvilLogs);
+UTILITY_STRUCT(EvilSS);
+UTILITY_STRUCT(GoodCore);
 
 fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>;
 fn confirm_koshkit_action(const ExecContext &ec, StringView prompt) throws

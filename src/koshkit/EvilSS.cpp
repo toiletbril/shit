@@ -7,8 +7,8 @@
  * process owners.
  */
 
-#include "../Cli.hpp"
-#include "../CliColors.hpp"
+#include "../CLI.hpp"
+#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -31,7 +31,7 @@ FLAG(EVILSS_IPV6, Bool, '6', "ipv6", "Show IPv6 sockets.");
 FLAG(EVILSS_NO_HEADER, Bool, 'H', "no-header", "Omit the header row.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_KOSHKIT_UTIL_FLAGS(Evilss);
+REGISTER_KOSHKIT_UTIL_FLAGS(EvilSS);
 
 namespace koshka::koshkit {
 
@@ -256,11 +256,11 @@ fn append_network_socket_report(String &output,
 
 }
 
-Evilss::Evilss() = default;
+EvilSS::EvilSS() = default;
 
-pure fn Evilss::kind() const wontthrow -> Utility::Kind { return Kind::Evilss; }
+pure fn EvilSS::kind() const wontthrow -> Utility::Kind { return Kind::EvilSS; }
 
-fn Evilss::execute(const ExecContext &ec, EvalContext &cxt,
+fn EvilSS::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<String> &args,
                    const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32

@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include "../Allocator.hpp"
-#include "../ArrayList.hpp"
-#include "../Maybe.hpp"
-#include "../StringView.hpp"
+#include "Allocator.hpp"
+#include "ArrayList.hpp"
+#include "Maybe.hpp"
+#include "StringView.hpp"
 
 namespace koshka::koshkit {
 
@@ -39,4 +39,4 @@ fn parse_tab_stop_list(StringView text, Allocator allocator) throws
 pure fn next_tab_column(usize column,
                         const ArrayList<usize> &tab_stops) wontthrow -> usize;
 
-} // namespace koshka::koshkit
+}
