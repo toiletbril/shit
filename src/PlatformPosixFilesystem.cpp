@@ -340,7 +340,6 @@ cold static fn list_directory_status_fallback(StringView dir,
   if (handle == nullptr) return None;
 
   let entries = ArrayList<directory_status_entry>{allocator};
-  let const directory_descriptor = ::dirfd(handle);
   loop
   {
     errno = 0;
@@ -368,18 +367,25 @@ cold static fn list_directory_status_fallback(StringView dir,
     directory_status_entry entry{
         Path::directory_child{String{allocator, name}, kind}
     };
-    struct stat info{};
-    if (directory_descriptor >= 0 &&
-        ::fstatat(directory_descriptor, native_entry->d_name, &info,
-                  AT_SYMLINK_NOFOLLOW) == 0)
-    {
-      fill_file_status(info, entry.status);
-      entry.has_status = true;
-    }
     entries.push(steal(entry));
   }
 
   ::closedir(handle);
+
+  let paths = ArrayList<Path>{allocator};
+  let batch = Batch{allocator};
+  paths.reserve(entries.count());
+  batch.reserve(entries.count());
+  for (let const &entry : entries) {
+    paths.push(PathBuilder{dir}.append(entry.child.name.view()).build());
+  }
+  for (usize index = 0; index < entries.count(); index++)
+    batch.add(BatchOperation::lstat(paths[index], entries[index].status));
+
+  let const results = batch.execute();
+  for (usize index = 0; index < entries.count(); index++)
+    entries[index].has_status = results[index].error_number == 0;
+
   return entries;
 }
 

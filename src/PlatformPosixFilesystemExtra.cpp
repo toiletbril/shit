@@ -1035,22 +1035,58 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
     }
 
     usize completed_count = 0;
+    let const do_interrupt_batch = [&]() wontthrow -> void {
+      for (usize chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
+        if (!is_queued[chunk_index] || is_completed[chunk_index]) continue;
+        unused(::aio_cancel(controls[chunk_index].aio_fildes,
+                            &controls[chunk_index]));
+      }
+      for (usize chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
+        if (!is_queued[chunk_index] || is_completed[chunk_index]) continue;
+
+        let &result = results[operation_start + chunk_index];
+        const aiocb *pending[] = {&controls[chunk_index]};
+        while (!finish_suspended_aio(controls[chunk_index], result))
+          unused(::aio_suspend(pending, 1, nullptr));
+        result = {operations[operation_start + chunk_index].request_id, 0,
+                  EINTR};
+        is_completed[chunk_index] = true;
+        completed_count++;
+      }
+      for (usize index = operation_start + chunk_count; index < operation_count;
+           index++)
+      {
+        results[index] = {operations[index].request_id, 0, EINTR};
+      }
+    };
     while (completed_count < queued_count) {
+      if (INTERRUPT_REQUESTED) {
+        do_interrupt_batch();
+        return true;
+      }
+
       struct kevent64_s events[AIO_LISTIO_MAX]{};
       let const event_count =
           ::kevent64(queue_descriptor, nullptr, 0, events,
                      static_cast<i32>(queued_count - completed_count), 0,
                      nullptr);
       if (event_count < 0) {
-        if (errno == EINTR) continue;
+        if (errno == EINTR) {
+          if (!INTERRUPT_REQUESTED) continue;
+          do_interrupt_batch();
+          return true;
+        }
 
         for (usize chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
           if (!is_queued[chunk_index] || is_completed[chunk_index]) continue;
           const aiocb *pending[] = {&controls[chunk_index]};
-          while (!finish_suspended_aio(
-              controls[chunk_index],
-              results[operation_start + chunk_index]))
+          while (!finish_suspended_aio(controls[chunk_index],
+                                       results[operation_start + chunk_index]))
           {
+            if (INTERRUPT_REQUESTED) {
+              do_interrupt_batch();
+              return true;
+            }
             unused(::aio_suspend(pending, 1, nullptr));
           }
           is_completed[chunk_index] = true;
@@ -1151,6 +1187,7 @@ struct io_uring_batch
   usize submission_mapping_size{0};
   usize completion_mapping_size{0};
   usize entry_mapping_size{0};
+  i64 owner_process_id{-1};
   i32 descriptor{-1};
   bool has_shared_mapping{false};
   bool has_read{false};
@@ -1195,6 +1232,7 @@ static fn close_io_uring_batch(io_uring_batch &ring) wontthrow -> void
   ring.submission_mapping_size = 0;
   ring.completion_mapping_size = 0;
   ring.entry_mapping_size = 0;
+  ring.owner_process_id = -1;
   ring.has_shared_mapping = false;
   ring.has_read = false;
   ring.has_write = false;
@@ -1223,6 +1261,7 @@ static fn open_io_uring_batch(io_uring_batch &ring) wontthrow -> bool
   ring.descriptor = static_cast<i32>(
       ::syscall(SYS_io_uring_setup, IO_URING_ENTRY_COUNT, &ring.parameters));
   if (ring.descriptor < 0) return false;
+  ring.owner_process_id = get_current_process_id();
 
   alignas(io_uring_probe)
       u8 probe_storage[sizeof(io_uring_probe) +
@@ -1350,6 +1389,9 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
   }
 
   static thread_local io_uring_batch ring{};
+  let const process_id = get_current_process_id();
+  if (ring.descriptor >= 0 && ring.owner_process_id != process_id)
+    close_io_uring_batch(ring);
   if (ring.descriptor < 0 && !open_io_uring_batch(ring)) return false;
   if (!io_uring_batch_supports_operations(ring, operations, operation_count))
     return false;
